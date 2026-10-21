@@ -18,7 +18,9 @@ found while building it, what is unfinished, and what needs attention.
   buildings, surveyed retaining walls and the city tree register.
 - **Not play-tested by a human beyond the user's own sessions.** Verification so far = headless
   autopilot runs + screenshots in the desktop app's browser pane.
-- **The project is not a git repository.** Recommend `git init` with `raw/` (420 MB cache) ignored.
+- Git repository on branch `main` (initial commit `998c94d`). `raw/` (420 MB download cache) is
+  ignored; the generated `data/` files (~26 MB) are committed so the game runs without rebuilding.
+  No remote is configured.
 
 ## 2. Run, build, test
 
