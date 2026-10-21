@@ -173,7 +173,7 @@ function makeT3Car(line, mats) {
   // roof: resistor box, ventilation hatches and the orange diamond pantograph
   box(1.3, 0.26, 2.6, lambert(0x48494a), 0, 3.19, -2.4);
   for (const z of [4.4, -0.2, -5.3]) box(0.7, 0.07, 0.85, grey, 0, 3.1, z);
-  box(1.1, 0.12, 1.4, dark, 0, 3.12, 1.6); // pantograph base frame
+  box(1.1, 0.12, 1.4, dark, 0, 3.12, 3.1); // pantograph base frame
   const pan = new THREE.Group();
   const bar = (x0, y0, z0, x1, y1, z1, mat = orange) => {
     const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1);
@@ -193,7 +193,11 @@ function makeT3Car(line, mats) {
   head.position.set(0, 4.88, 0);
   pan.add(head);
   bar(-0.62, 4.88, 0, -0.85, 4.74, 0, dark); bar(0.62, 4.88, 0, 0.85, 4.74, 0, dark);
-  pan.position.z = 1.6;
+  // same place as on the detailed model (3.1 m ahead of the car centre), raised to the wire:
+  // the frame is stretched up from its base at 3.2 m so the head (4.88 m) meets the wire
+  const k = (CONTACT_WIRE - RAIL_TOP - 0.01 - 3.2) / (4.88 - 3.2);
+  pan.scale.y = k;
+  pan.position.set(0, 3.2 - 3.2 * k, 3.1);
   g.add(pan);
   return g;
 }
@@ -205,6 +209,8 @@ export function makeT3({ line = '22', cars = 1, detailed = true } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
   if (detailed && detailedProto) return makeDetailedSet(root, line, cars);
+  root.userData.bogie = 3.8;     // bogie pivots of the built-in model
+  root.userData.bodyFront = 7.0;
   const mats = {
     red: lambert(0xb81a1f), cream: lambert(0xefe4c4), glass: lambert(0x1c262d), dark: lambert(0x2a2a2a),
     roof: lambert(0x5d6164), chrome: lambert(0xb9bcbf), orange: lambert(0xd8541c), grey: lambert(0x6a6d70),
@@ -225,30 +231,50 @@ export function makeT3({ line = '22', cars = 1, detailed = true } = {}) {
 // found by principal component analysis of the body: length e1 (front = wipers), width e2
 // (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
 let detailedProto = null;
+export const CONTACT_WIRE = 5.6;   // contact wire height above the track bed level used by the world
+export const RAIL_TOP = 0.26;      // rail head above the track bed level (track ribbons in world.js)
+
 export async function loadDetailedT3(url = 'assets/t3/t3.gltf') {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const gl = await new GLTFLoader().loadAsync(url);
   const src = gl.scene;
   src.updateMatrixWorld(true);
-  const e1 = new THREE.Vector3(0.678, -0.157, 0.718).normalize();
-  // body height and width are almost equal, so "up" is not taken from the principal axes but
-  // from the wheels (centred under the body) towards the body centre, square to the length axis
-  const centroid = (prefix) => {
-    const c = new THREE.Vector3(), v = new THREE.Vector3();
-    let n = 0;
-    src.traverse((o) => {
-      if (!o.isMesh || !o.name.startsWith(prefix)) return;
-      const p = o.geometry.attributes.position;
-      for (let i = 0; i < p.count; i++) { c.add(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld)); n++; }
-    });
-    return c.divideScalar(n || 1);
-  };
-  const up = centroid('body').sub(centroid('wheels'));
-  up.addScaledVector(e1, -up.dot(e1)).normalize();
-  const e3 = up.clone().negate();                                     // down
-  const e2 = new THREE.Vector3().crossVectors(e3, e1).normalize();    // right (e2 x e3 = e1)
-  // local car axes: x = left (-e2), y = up (-e3), z = forward (e1)
-  const rot = new THREE.Matrix4().set(-e2.x, -e2.y, -e2.z, 0, -e3.x, -e3.y, -e3.z, 0, e1.x, e1.y, e1.z, 0, 0, 0, 0, 1);
+  // The car's axes come from its 8 wheels (the body is too box-like for a reliable principal
+  // axis analysis): forward from the rear to the front axle midpoints, left from the right to the
+  // left wheels, up square to both. A rough length axis only sorts the wheels into groups.
+  const rough = new THREE.Vector3(0.678, -0.157, 0.718).normalize();
+  const wheelPts = [];
+  const v = new THREE.Vector3();
+  src.traverse((o) => {
+    if (!o.isMesh || !o.name.startsWith('wheels')) return;
+    const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) wheelPts.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
+  });
+  const mid = wheelPts.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(wheelPts.length);
+  const bodyMid = new THREE.Vector3(); let nb = 0;
+  src.traverse((o) => {
+    if (!o.isMesh || !o.name.startsWith('body')) return;
+    const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) { bodyMid.add(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld)); nb++; }
+  });
+  bodyMid.divideScalar(nb);
+  const roughUp = bodyMid.clone().sub(mid);
+  roughUp.addScaledVector(rough, -roughUp.dot(rough)).normalize();
+  const roughLeft = new THREE.Vector3().crossVectors(roughUp, rough); // up x forward = left
+  const groups = new Map(); // "front/rear" + "left/right" -> mean point
+  for (const p of wheelPts) {
+    const d = p.clone().sub(mid);
+    const k = (d.dot(rough) > 0 ? 'F' : 'B') + (d.dot(roughLeft) > 0 ? 'L' : 'R');
+    if (!groups.has(k)) groups.set(k, { c: new THREE.Vector3(), n: 0 });
+    const g = groups.get(k); g.c.add(p); g.n++;
+  }
+  const G = (k) => groups.get(k).c.clone().divideScalar(groups.get(k).n);
+  const fwd = G('FL').add(G('FR')).sub(G('BL')).sub(G('BR')).normalize();
+  const left = G('FL').add(G('BL')).sub(G('FR')).sub(G('BR'));
+  left.addScaledVector(fwd, -left.dot(fwd)).normalize();
+  const up = new THREE.Vector3().crossVectors(fwd, left); // forward x left = up
+  // local car axes: x = left, y = up, z = forward
+  const rot = new THREE.Matrix4().set(left.x, left.y, left.z, 0, up.x, up.y, up.z, 0, fwd.x, fwd.y, fwd.z, 0, 0, 0, 0, 1);
   const proto = new THREE.Group();
   src.traverse((o) => {
     if (!o.isMesh) return;
@@ -257,19 +283,91 @@ export async function loadDetailedT3(url = 'assets/t3/t3.gltf') {
     m.name = o.name;
     proto.add(m);
   });
-  // rail level = bottom of the wheels; body centred lengthwise
-  const box = new THREE.Box3(), wb = new THREE.Box3();
-  for (const m of proto.children) {
-    m.geometry.computeBoundingBox();
-    if (m.name.startsWith('body')) box.union(m.geometry.boundingBox);
-    if (m.name.startsWith('wheels')) wb.union(m.geometry.boundingBox);
+  // origin: on the rails (bottom of the wheels), centred between the wheels across and along
+  const wb = new THREE.Box3();
+  for (const m of proto.children) if (m.name.startsWith('wheels')) { m.geometry.computeBoundingBox(); wb.union(m.geometry.boundingBox); }
+  const shift = new THREE.Matrix4().makeTranslation(-(wb.min.x + wb.max.x) / 2, -wb.min.y, -(wb.min.z + wb.max.z) / 2);
+  for (const m of proto.children) m.geometry.applyMatrix4(shift);
+  // bogie pivots (between each bogie's two axles) and the pantograph
+  const wheelZ = [];
+  for (const m of proto.children) if (m.name.startsWith('wheels')) {
+    const p = m.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) wheelZ.push(p.getZ(i));
   }
-  const shift = new THREE.Matrix4().makeTranslation(-(box.min.x + box.max.x) / 2, -wb.min.y, -(box.min.z + box.max.z) / 2);
-  for (const m of proto.children) { m.geometry.applyMatrix4(shift); m.geometry.computeBoundingSphere(); }
+  const front = wheelZ.filter((z) => z > 0), rear = wheelZ.filter((z) => z < 0);
+  const bogie = ((front.reduce((a, b) => a + b, 0) / front.length) - (rear.reduce((a, b) => a + b, 0) / rear.length)) / 2;
+  // raise the pantograph head to the contact wire: stretch the frame up from its base
+  const pan = proto.children.filter((m) => m.name.startsWith('power'));
+  const pb = new THREE.Box3();
+  for (const m of pan) { m.geometry.computeBoundingBox(); pb.union(m.geometry.boundingBox); }
+  const base = pb.min.y, k = (CONTACT_WIRE - RAIL_TOP - 0.01 - base) / (pb.max.y - base);
+  for (const m of pan) {
+    const p = m.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setY(i, base + (p.getY(i) - base) * k);
+    p.needsUpdate = true;
+  }
+  for (const m of proto.children) { m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere(); }
+  const body = new THREE.Box3();
+  for (const m of proto.children) if (m.name.startsWith('body')) body.union(m.geometry.boundingBox);
+  proto.userData = { bogie, panto: (pb.min.z + pb.max.z) / 2, bodyFront: body.max.z, boxes: paintedBoxes(proto) };
   const mat = proto.children[0].material;
   mat.metalness = 0; mat.roughness = 0.75;
   detailedProto = proto;
   return proto;
+}
+
+// The route number boxes painted in the model's texture (pixel rectangles in t3_color.jpg, found
+// by colour): map each rectangle's corners onto the model through the triangle whose texture
+// coordinates contain its centre (glTF texture v runs downwards), then make an upright quad over
+// it, a little proud of the surface and a little larger. The rear box mirrors the front one.
+const PAINTED = [[513, 46, 550, 92], [1873, 1078, 1909, 1124]]; // front dome, front right corner
+function paintedBoxes(proto, W = 2048, H = 2048) {
+  const boxes = [];
+  for (const [x0, y0, x1, y1] of PAINTED) {
+    const uc = (x0 + x1) / 2 / W, vc = (y0 + y1) / 2 / H;
+    let tri = null;
+    for (const m of proto.children) {
+      const g = m.geometry, P = g.attributes.position, U = g.attributes.uv;
+      if (!U || tri) continue;
+      const cnt = g.index ? g.index.count : P.count;
+      for (let t = 0; t < cnt && !tri; t += 3) {
+        const ii = [0, 1, 2].map((q) => (g.index ? g.index.getX(t + q) : t + q));
+        const a = ii.map((i) => [U.getX(i), U.getY(i)]);
+        const w = bary(a, uc, vc);
+        if (w && w.every((x) => x > -1e-4)) tri = { a, p: ii.map((i) => new THREE.Vector3().fromBufferAttribute(P, i)) };
+      }
+    }
+    if (!tri) continue;
+    const at = (u, v) => { const w = bary(tri.a, u, v); return tri.p[0].clone().multiplyScalar(w[0]).addScaledVector(tri.p[1], w[1]).addScaledVector(tri.p[2], w[2]); };
+    const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => at(x / W, y / H));
+    const n = new THREE.Vector3().crossVectors(tri.p[1].clone().sub(tri.p[0]), tri.p[2].clone().sub(tri.p[0])).normalize();
+    const c = corners.reduce((s, v) => s.add(v), new THREE.Vector3()).divideScalar(4);
+    if (n.dot(c.clone().setY(0)) < 0) n.negate(); // outwards
+    const up = new THREE.Vector3(0, 1, 0).addScaledVector(n, -n.y).normalize();
+    const right = new THREE.Vector3().crossVectors(up, n).normalize();
+    let r0 = Infinity, r1 = -Infinity, u0 = Infinity, u1 = -Infinity;
+    for (const v of corners) { const d = v.clone().sub(c); r0 = Math.min(r0, d.dot(right)); r1 = Math.max(r1, d.dot(right)); u0 = Math.min(u0, d.dot(up)); u1 = Math.max(u1, d.dot(up)); }
+    boxes.push({ c: c.addScaledVector(n, 0.012), n, up, right, w: (r1 - r0) * 1.12, h: (u1 - u0) * 1.12 });
+  }
+  if (boxes[0]) { // rear: mirror of the front box
+    const f = boxes[0];
+    boxes.push({ ...f, c: new THREE.Vector3(-f.c.x, f.c.y, -f.c.z), n: new THREE.Vector3(-f.n.x, f.n.y, -f.n.z),
+      up: new THREE.Vector3(-f.up.x, f.up.y, -f.up.z), right: new THREE.Vector3(-f.right.x, f.right.y, -f.right.z) });
+  }
+  return boxes;
+}
+function bary(a, u, v) {
+  const d = (a[1][1] - a[2][1]) * (a[0][0] - a[2][0]) + (a[2][0] - a[1][0]) * (a[0][1] - a[2][1]);
+  if (Math.abs(d) < 1e-12) return null;
+  const w1 = ((a[1][1] - a[2][1]) * (u - a[2][0]) + (a[2][0] - a[1][0]) * (v - a[2][1])) / d;
+  const w2 = ((a[2][1] - a[0][1]) * (u - a[2][0]) + (a[0][0] - a[2][0]) * (v - a[2][1])) / d;
+  return [w1, w2, 1 - w1 - w2];
+}
+function boxQuad(b) {
+  // upright quad: x along `right`, y along `up`, facing `n`
+  const g = new THREE.PlaneGeometry(b.w, b.h);
+  g.applyMatrix4(new THREE.Matrix4().makeBasis(b.right, b.up, b.n).setPosition(b.c));
+  return g;
 }
 
 function makeDetailedSet(root, line, cars) {
@@ -277,23 +375,15 @@ function makeDetailedSet(root, line, cars) {
   const mat = detailedProto.children[0].material.clone();
   const rbMat = new THREE.MeshBasicMaterial({ map: routeBoxTexture(line), polygonOffset: true, polygonOffsetFactor: -2 });
   root.userData.mats = { rbMat, body: mat };
+  root.userData.bogie = detailedProto.userData.bogie;
+  root.userData.bodyFront = detailedProto.userData.bodyFront;
   root.userData.cars = [];
   for (let k = 0; k < cars; k++) {
     const car = new THREE.Group();
     car.rotation.order = 'YXZ';
     for (const m of detailedProto.children) car.add(new THREE.Mesh(m.geometry, mat));
-    // our own route number boxes over the ones painted in the texture
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32), rbMat);
-    front.position.set(0, 2.9, 6.99);
-    front.rotation.x = -0.22; // the dome leans back
-    const rear = front.clone();
-    rear.position.set(0, 2.9, -6.99);
-    rear.rotation.set(-0.22, Math.PI, 0, 'YXZ');
-    // small box on the right front pillar, beside the front door
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), rbMat);
-    side.position.set(-1.0, 2.3, 6.62);
-    side.rotation.y = -0.75;
-    car.add(front, rear, side);
+    // our own route number boxes exactly over the ones painted in the texture (+ the rear one)
+    for (const b of detailedProto.userData.boxes) car.add(new THREE.Mesh(boxQuad(b), rbMat));
     root.add(car);
     root.userData.cars.push(car);
   }
@@ -310,16 +400,17 @@ export function setConsistLine(model, line) {
   model.userData.line = line;
 }
 
-// Put each car of a set on the track: cars are 15.2 m over couplers, the body (14 m) starts
-// 0.6 m behind the coupler face and rests on its bogies (3.2 and 10.8 m behind the body front),
-// so it yaws and pitches with them. `at(s)` returns [x, y, height] of the track centre.
+// Put each car of a set on the track: cars are 15.2 m over couplers, the body starts 0.6 m
+// behind the coupler face; the car rests on its two bogie pivots (the model's own spacing), so
+// it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y, track bed height].
 export function placeConsist(model, sFront, at) {
+  const { bogie, bodyFront } = model.userData;
   model.userData.cars.forEach((car, k) => {
-    const f = sFront - k * 15.2 - 0.6;
-    const [ax, ay, za] = at(f - 3.2), [bx, by, zb] = at(f - 10.8);
-    car.position.set((ax + bx) / 2, (za + zb) / 2 + 0.3, -(ay + by) / 2);
+    const c = sFront - k * 15.2 - 0.6 - bodyFront; // car origin (midway between the bogies)
+    const [ax, ay, za] = at(c + bogie), [bx, by, zb] = at(c - bogie);
+    car.position.set((ax + bx) / 2, (za + zb) / 2 + RAIL_TOP, -(ay + by) / 2);
     car.rotation.y = Math.atan2(ax - bx, -(ay - by));
-    car.rotation.x = -Math.atan2(za - zb, 7.6);
+    car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
   });
 }
 

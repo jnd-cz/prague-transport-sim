@@ -30,7 +30,8 @@ export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15 };
 // Prague ran the T3 mostly as two-car multiple-unit sets (both cars motored, one driver).
 // Everything that scales with the cars lives here.
 export const COUPLING_GAP = 0;     // cars are 15.2 m over couplers, coupled buffer to buffer
-export const PANTO_FROM_FRONT = 5.4; // the (first car's) pantograph, which works the overhead contacts
+export const PANTO_FROM_FRONT = 4.5; // the (first car's) pantograph, which works the overhead contacts
+                                     // (coupler 0.6 m + half body 7.0 m - 3.1 m ahead of the centre)
 
 export class Tram {
   constructor(cars = 1) {
