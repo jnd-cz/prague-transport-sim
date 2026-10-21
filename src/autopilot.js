@@ -1,9 +1,8 @@
 // Autopilot driver: plans a target speed from limits, stops, signals, obstacles and the tram
 // ahead, then picks the controller notch from the forces needed (incl. gradient). It also works
 // the doors, departs on time, rings the bell, sands on slippery rail, sets IRC switches and
-// passes overhead contacts with or without current. Used for "watch the ride" and for the
+// passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
-import { T3 } from './tram.js';
 
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
 
@@ -22,7 +21,7 @@ export class Autopilot {
 
     // doors: open at the platform, close once everyone is aboard and it is departure time
     if (st) {
-      const atStop = tr.v < 0.05 && tr.s > st.target - 4 && tr.s < st.target + 12;
+      const atStop = tr.v < 0.05 && g._atStop(st);
       if (atStop && !st.served && g.doorState === 'closed') g.toggleDoors();
       if (atStop && st.served && st.waiting === 0 && st.alight === 0 && g.doorState === 'open' && g.clock >= st.sched) g.toggleDoors();
     }
@@ -61,22 +60,39 @@ export class Autopilot {
         if (w.auto && !w.passed && !w.ircSet && w.s - tr.s > 2 && w.s - tr.s < 70) { g.irc(w.required === 'straight' ? 'straight' : w.divSide); break; }
       }
     }
-    // overhead contact: pass under it drawing current for the turn, coasting for straight
+    // overhead contact: the pantograph passes under it drawing current for the turn, coasting
+    // for straight. Decide only for the last second or so, allowing for the controller's
+    // ramp, so the tram can still start from a stop shortly before a contact.
     let wantPower = null;
     const ct = g.nextContact();
-    if (ct && ct.contact - tr.s < 25) wantPower = ct.required === 'diverging';
+    if (ct) {
+      const d = ct.contact - tr.panto, v = Math.max(0, tr.v);
+      // a short pulse of J1 is enough for the turn (also while braking into a stop); for
+      // straight the current must have died away (the controller ramps down in ~1 s)
+      if (ct.required === 'diverging' && d < v * 0.5 + 1 && (v > 0.3 || vt > 0.5)) wantPower = true;
+      if (ct.required === 'straight' && d < v * 1.3 + 1.5 && v > 0.4) wantPower = false;
+    }
+
+    // heating like a careful driver: seat heaters and cab heater by temperature, the waste-heat
+    // flap open in the cold; and the heating cut-out held while coasting under a contact
+    const c = g.climate;
+    const cold = c.tout < 14;
+    c.saloon = !cold ? 0 : c.tin < 15 ? 2 : c.tin < 18.5 ? 1 : c.tin > 20 ? 0 : c.saloon;
+    c.cab = !cold ? (c.tcab > 24 ? 1 : 0) : c.tcab < 18 ? 3 : c.tcab < 21 ? 2 : 1;
+    c.flap = c.tout < 10 && c.tin < 21;
+    this.input.cutout = wantPower === false && g.heatingDraws();
 
     // force-based notch choice: wanted acceleration plus gravity on the gradient
     const grade = g.profile.grade(tr.s - 7);
     const aWant = Math.max(-1.1, Math.min(1.0, (vt - tr.v) * 0.9));
-    const need = tr.mass * (aWant + 9.81 * grade) + 650 + 4.2 * tr.v * tr.v;
-    const pick = (forces, f) => { for (let k = 1; k <= 4; k++) if (forces[k] >= f) return k; return 4; };
+    const need = tr.mass * (aWant + 9.81 * grade) + 650 * tr.cars + 4.2 * tr.v * tr.v;
+    const pick = (force, f) => { for (let k = 1; k <= 4; k++) if (force(k) >= f) return k; return 4; };
     let notch;
     if (g.doorState !== 'closed') notch = -2;
     else if (vt <= 0.05) notch = tr.v > 1.5 || Math.abs(grade) > 0.03 ? -4 : -2;
     else if (Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) notch = 0;
-    else if (need > 0) notch = pick(T3.driveForce, need);
-    else notch = -pick(T3.brakeForce, -need);
+    else if (need > 0) notch = pick((k) => tr.driveForce(k), need);
+    else notch = -pick((k) => tr.brakeForce(k), -need);
     if (wantPower === true) notch = Math.max(1, notch);
     if (wantPower === false) notch = Math.min(0, notch);
     // slippery rail: ease off one notch and sand

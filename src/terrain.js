@@ -21,20 +21,69 @@ export class Terrain {
     return this.h[iy * this.nx + ix];
   }
 
-  // bilinear height at local metres (x east, y north)
+  // height at local metres (x east, y north), interpolated on the same two triangles per cell
+  // as the rendered terrain mesh (split along b-c), so anything draped on it sits exactly on
+  // the visible surface (bilinear interpolation differs by up to a few dm on curved ground)
   height(x, y) {
     const fx = (x - this.x0) / this.dx, fy = (y - this.y0) / this.dy;
     const ix = Math.floor(fx), iy = Math.floor(fy);
     const tx = fx - ix, ty = fy - iy;
     const a = this.cell(ix, iy), b = this.cell(ix + 1, iy), c = this.cell(ix, iy + 1), d = this.cell(ix + 1, iy + 1);
-    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+    if (tx + ty <= 1) return a + (b - a) * tx + (c - a) * ty;
+    return d + (c - d) * (1 - tx) + (b - d) * (1 - ty);
   }
 }
 
 // Route elevation z(s): terrain sampled along the track, smoothed like real vertical
 // alignment, with bridge decks bridged linearly between their abutments.
+// Surfaces of the IPR "Mosty 3D" bridges right above/below the track centre, every 2 m along
+// the route: Map 2 m bin -> list of z where a bridge triangle is crossed by the vertical line.
+export function bridgeDecks(geo, route, terrain) {
+  const out = new Map();
+  if (!geo?.buildings?.arr) return out;
+  const { arr, q, chunks } = geo.buildings;
+  const cell = 20, grid = new Map();
+  for (const ch of chunks) {
+    if (!ch.k) continue;
+    const [ox, oy, oz] = ch.o;
+    let v = ch.v;
+    for (const [bi, count] of ch.b.entries()) {
+      if (ch.k[bi] !== 1) { v += count; continue; }
+      for (let t = 0; t < count; t += 3, v += 3) {
+        const P = [0, 1, 2].map((k) => [ox + arr[(v + k) * 3] * q, oy + arr[(v + k) * 3 + 1] * q, oz + arr[(v + k) * 3 + 2] * q]);
+        const x0 = Math.min(P[0][0], P[1][0], P[2][0]), x1 = Math.max(P[0][0], P[1][0], P[2][0]);
+        const y0 = Math.min(P[0][1], P[1][1], P[2][1]), y1 = Math.max(P[0][1], P[1][1], P[2][1]);
+        for (let i = Math.floor(x0 / cell); i <= Math.floor(x1 / cell); i++) for (let j = Math.floor(y0 / cell); j <= Math.floor(y1 / cell); j++) {
+          const key = `${i},${j}`;
+          if (!grid.has(key)) grid.set(key, []);
+          grid.get(key).push(P);
+        }
+      }
+    }
+  }
+  if (!grid.size) return out;
+  const p = {};
+  for (let s = 0; s <= route.length; s += 2) {
+    route.at(s, p);
+    const tris = grid.get(`${Math.floor(p.x / cell)},${Math.floor(p.y / cell)}`);
+    if (!tris) continue;
+    const hits = [];
+    for (const [a, b, c] of tris) {
+      const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+      if (Math.abs(d) < 1e-9) continue;
+      const w1 = ((b[1] - c[1]) * (p.x - c[0]) + (c[0] - b[0]) * (p.y - c[1])) / d;
+      const w2 = ((c[1] - a[1]) * (p.x - c[0]) + (a[0] - c[0]) * (p.y - c[1])) / d;
+      const w3 = 1 - w1 - w2;
+      if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+      hits.push(w1 * a[2] + w2 * b[2] + w3 * c[2]);
+    }
+    if (hits.length) out.set(Math.round(s / 2), hits);
+  }
+  return out;
+}
+
 export class Profile {
-  constructor(route, terrain, bridges = [], tunnels = []) {
+  constructor(route, terrain, bridges = [], tunnels = [], decks = new Map()) {
     const step = (this.step = 2);
     const n = (this.n = Math.ceil(route.length / step) + 1);
     let z = new Float32Array(n);
@@ -71,6 +120,39 @@ export class Profile {
         z[i] = z0 + (z1 - z0) * t + 1.2 * Math.sin(Math.PI * t);
       }
     }
+    // real bridges (Mosty 3D): on an OSM-tagged bridge of our route the rails lie on the deck
+    // of the 3D model. In OSM-tagged underpasses / covered stretches any structure at or above
+    // the lidar height is a roof or bridge over the tram (the "bare-earth" model even samples
+    // station canopies there); elsewhere only structures clearly above the track count. The
+    // track keeps CLEAR m below their underside, with ramps of at most 6 %.
+    const CLEAR = 5.3;
+    this.realDecks = [];
+    const soffit = new Float32Array(n).fill(Infinity);
+    if (decks.size) {
+      const tagged = (i) => bridges.some(([a, b]) => i * step > a && i * step < b);
+      const covered = (i) => tunnels.some(([a, b]) => i * step > a - 20 && i * step < b + 20);
+      for (const [k, hits] of decks) {
+        if (k >= n) continue;
+        if (tagged(k)) {
+          const top = Math.max(...hits.filter((h) => Math.abs(h - z[k]) < 3));
+          if (Number.isFinite(top)) z[k] = top;
+        } else {
+          const above = hits.filter((h) => h > z[k] + (covered(k) ? -1.5 : 2.5));
+          if (above.length) soffit[k] = Math.min(...above);
+        }
+      }
+      for (const [s0, s1] of bridges) {
+        let cnt = 0;
+        for (let k = Math.ceil(s0 / step); k <= s1 / step; k++) if (decks.has(k)) cnt++;
+        if (cnt * step > (s1 - s0) * 0.3) this.realDecks.push([s0, s1]);
+      }
+    }
+    // highest allowed track level: under each structure, spreading out as 6 % ramps
+    const limit = soffit.map((v) => v - CLEAR);
+    for (let i = 1; i < n; i++) limit[i] = Math.min(limit[i], limit[i - 1] + 0.06 * step);
+    for (let i = n - 2; i >= 0; i--) limit[i] = Math.min(limit[i], limit[i + 1] + 0.06 * step);
+    const clear = () => { for (let i = 0; i < n; i++) if (z[i] > limit[i]) z[i] = limit[i]; };
+    clear();
     // underpasses: the bare-earth model includes the embankment above, so span them straight
     for (const [s0, s1] of tunnels) {
       const i0 = Math.max(0, Math.floor(s0 / step) - 5), i1 = Math.min(n - 1, Math.ceil(s1 / step) + 5);
@@ -93,6 +175,9 @@ export class Profile {
       if (!changed) break;
     }
     for (let k = 0; k < 3; k++) z = smooth(z, 9); // ~±25 m Gaussian-ish: removes DEM spikes at ramps/abutments
+    // smoothing may lift the track back into an overpass: enforce the clearance, ease it in
+    for (let k = 0; k < 3; k++) { clear(); z = smooth(z, 4); }
+    clear();
     this.z = z;
     this.grades = new Float32Array(n);
     for (let i = 0; i < n; i++) {

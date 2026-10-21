@@ -1,6 +1,6 @@
 // Gameplay: timetable, stops & passengers, doors, signals, switches, obstacles, scoring.
 import * as THREE from 'three';
-import { T3, ADHESION } from './tram.js';
+import { ADHESION, PANTO_FROM_FRONT } from './tram.js';
 import { Route } from './route.js';
 import { t } from './i18n.js';
 import {
@@ -79,6 +79,13 @@ export class Game {
     this.doorsMovingFlag = false;
     this.overspeedAcc = 0;
     this.comfortAcc = 0;
+    // climate (T3SUCS, DPP training manual): saloon seat heaters 0/1/2, cab fan heater (kalorifer)
+    // 0 off / 1 fan / 2 half / 3 full, flap for the accelerator resistors' waste heat; the outdoor
+    // temperature comes from the menu (real Prague weather, or a fixed season)
+    const tout = opts.toutAt ? opts.toutAt(this.clock) : 12;
+    const preheated = tout < 12;
+    this.climate = { saloon: preheated ? 2 : 0, cab: preheated ? 3 : 0, flap: preheated, tout,
+      tin: preheated ? 15 : tout + 1, tcab: preheated ? 17 : tout + 1, warned: 0 };
     this.deadmanHeld = false;
     this.deadmanTimer = 0;
     this.action = null; // { label, t, done }
@@ -91,6 +98,10 @@ export class Game {
     this.flatFlag = false;
     this.rollFlag = false;
 
+    // a vehicle run may change its line number at a terminus (e.g. 9 continuing as 10)
+    this.segments = data.segments || [{ line: String(data.line), from: 0 }];
+    this.line = this.segments.filter((g) => g.from <= opts.startStop).pop().line; // starting at the change stop = new line
+    this.onLineChange = null;
     this.backRoute = data.pathBack?.length > 1 ? new Route(data.pathBack) : null;
     this.backRoute && (this.backRoute.ground = route.ground);
     this._initStops();
@@ -111,7 +122,11 @@ export class Game {
 
     const st = this.stops[opts.startStop];
     tram.s = st.target;
-    tram.passengers = Math.min(T3.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
+    // switches whose contact is already behind the pantograph were set for us on arrival
+    for (const w of this.switches) {
+      if (w.contact < tram.panto && w.s > tram.s - 1) { w.passedContact = true; w.pos = w.required; this._showSwitch(w); }
+    }
+    tram.passengers = Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
     this.nextStop = opts.startStop;
     st.arrived = true;
     st.arriveClock = this.clock;
@@ -130,14 +145,19 @@ export class Game {
       const stop = {
         i, name: s.name, request,
         target: Math.min(s.s + STOP_AHEAD, this.route.length - 2),
+        p0: s.p0, p1: s.p1,
         sched: this.trip[i],
         waiting, alightFrac: 0.08 + r() * 0.25 + central * 0.05,
         alight: 0, runners: r() < 0.35 ? 1 + Math.floor(r() * 3) : 0, runnerDelay: 4 + r() * 9,
         arrived: false, served: false, done: false, departClock: null,
       };
       if (request && r() < 0.5) stop.alightFrac = 0;
+      this._stopZone(stop);
       stop.ambient = request ? Math.floor(r() * 2) : 2 + Math.floor(r() * (5 + central * 6)); // waiting for other lines
       if (i === n - 1) { stop.waiting = 0; stop.alightFrac = 1; stop.runners = 0; }
+      // end of one line of the run: everybody leaves, the tram continues as the next line
+      const change = this.segments.find((g) => g.from === i && g.from > 0);
+      if (change) { stop.alightFrac = 1; stop.lineChange = change.line; }
       this._buildStop(stop);
       return stop;
     });
@@ -186,7 +206,7 @@ export class Game {
         if (d.s > st.target - 25 && d.s < st.target + 2 && st.target + 2 < d.cross - 2) d.s = st.target + 2;
       }
       const mesh = makeTramSignal();
-      place(mesh, this.route, d.s, -2.4, 0, true);
+      this._mount(mesh, d.s, ['pole', 'kerb', 'span']);
       this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction
       const h0 = this.route.heading(d.cross - 5, 5), h1 = this.route.heading(d.cross + 30, 8);
@@ -247,14 +267,81 @@ export class Game {
       this.gauntlets.push(G);
     }
     this.signals.sort((a, b) => a.s - b.s);
+    for (const sig of this.signals) sig.xroad = sig.gauntlet ? null : this._crossRoad(sig.cross);
+  }
+
+  // The street crossing the route at a signalled junction (for cross traffic), as a polyline
+  // through the crossing point, or null where the signal only protects a pedestrian crossing.
+  _crossRoad(sCross) {
+    const P = this.route.at(sCross), h = this.route.heading(sCross, 6);
+    const side = (p) => h.hx * (p[1] - P.y) - h.hy * (p[0] - P.x);
+    let best = null;
+    for (const r of this.data.roads) {
+      if (!r.c || r.w < 5 || r.b || r.f) continue;
+      for (let i = 1; i < r.p.length; i++) {
+        const a = r.p[i - 1], b = r.p[i];
+        if (Math.min(Math.hypot(a[0] - P.x, a[1] - P.y), Math.hypot(b[0] - P.x, b[1] - P.y)) > 80) continue;
+        const fa = side(a), fb = side(b);
+        if (fa * fb >= 0) continue;
+        const t = fa / (fa - fb), x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t;
+        const along = Math.abs((x - P.x) * h.hx + (y - P.y) * h.hy);
+        const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const cos = Math.abs(((b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy) / l);
+        if (along > 15 || cos > 0.8) continue;
+        if (!best || along < best.along) best = { r, i, x, y, along };
+      }
+    }
+    if (!best) return null;
+    // polyline 45 m either side of the crossing point; OSM often splits the street right at
+    // the junction, so it continues into the connecting way that carries straight on
+    const { r, i } = best, X0 = [best.x, best.y];
+    const walk = (pts) => {
+      const out = [];
+      let acc = 0, prev = X0, used = new Set([r]);
+      while (acc < 45) {
+        for (const q of pts) { acc += Math.hypot(q[0] - prev[0], q[1] - prev[1]); out.push(q); prev = q; if (acc >= 45) break; }
+        if (acc >= 45 || out.length < 1) break;
+        const end = out[out.length - 1], before = out.length > 1 ? out[out.length - 2] : X0;
+        const dx = end[0] - before[0], dy = end[1] - before[1], dl = Math.hypot(dx, dy) || 1;
+        let next = null;
+        for (const o of this.data.roads) {
+          if (used.has(o) || o.f || o.p.length < 2) continue;
+          for (const [first, rest] of [[o.p[0], o.p.slice(1)], [o.p[o.p.length - 1], o.p.slice(0, -1).reverse()]]) {
+            if (Math.hypot(first[0] - end[0], first[1] - end[1]) > 1 || !rest.length) continue;
+            const ex = rest[0][0] - end[0], ey = rest[0][1] - end[1], el = Math.hypot(ex, ey) || 1;
+            if ((dx * ex + dy * ey) / (dl * el) > 0.7) { next = { o, rest }; break; }
+          }
+          if (next) break;
+        }
+        if (!next) break;
+        used.add(next.o);
+        pts = next.rest;
+      }
+      return out;
+    };
+    const back = walk(r.p.slice(0, i).reverse()), fwd = walk(r.p.slice(i));
+    if (back.length < 1 || fwd.length < 1) return null;
+    const line = [...back.reverse(), X0, ...fwd];
+    const cum = [0];
+    for (let k = 1; k < line.length; k++) cum.push(cum[k - 1] + Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]));
+    const at = (s) => {
+      s = Math.max(0, Math.min(cum[cum.length - 1], s));
+      let k = 1;
+      while (k < cum.length - 1 && cum[k] < s) k++;
+      const a = line[k - 1], b = line[k], seg = cum[k] - cum[k - 1] || 1e-9, u = (s - cum[k - 1]) / seg;
+      return { x: a[0] + (b[0] - a[0]) * u, y: a[1] + (b[1] - a[1]) * u, hx: (b[0] - a[0]) / seg, hy: (b[1] - a[1]) / seg };
+    };
+    const sX = cum[back.length], length = cum[cum.length - 1];
+    if (sX < 15 || length - sX < 15) return null; // too short to show traffic queueing
+    return { at, length, sX, w: r.w, oneway: r.o || 0 };
   }
 
   _updateGauntlets(dt) {
     const tram = this.tram;
     for (const G of this.gauntlets) {
-      const overlaps = (front) => front > G.s0 && front - T3.length < G.s1;
+      const overlaps = (front, len = tram.length) => front > G.s0 && front - len < G.s1;
       const approaching = (front) => front <= G.s0 && G.s0 - front < 150;
-      const occOurs = overlaps(tram.s) || this.aiTrams.some((t) => overlaps(t.s));
+      const occOurs = overlaps(tram.s) || this.aiTrams.some((t) => overlaps(t.s, t.length));
       const reqOurs = approaching(tram.s) || this.aiTrams.some((t) => approaching(t.s));
       const { requested: reqTheirs, occupied: occTheirs } = G.theirs;
       G.reqOurs = reqOurs;
@@ -303,7 +390,7 @@ export class Game {
       if (minR > 110 || ds < 30 || ds - lastS < 60) continue;
       if (this.signals.some((o) => o !== sig && o.s > ds - 20 && o.s < sig.s)) continue;
       const mesh = makeTramSignal({ distant: true });
-      place(mesh, this.route, ds, -2.4, 0, true);
+      this._mount(mesh, ds, ['pole', 'kerb', 'span']);
       this.objects.add(mesh);
       this.distants.push({ s: ds, main: sig, mesh });
       lastS = sig.s;
@@ -311,27 +398,32 @@ export class Game {
   }
 
   _initSwitches() {
-    this.switches = this.data.switches.map((d) => {
+    // contacts of closely following switches keep their order and at least 4 m between them
+    const contacts = [];
+    this.data.switches.forEach((d, k) => {
+      let c = this._contactPos(d.s);
+      const prev = contacts[k - 1];
+      if (k > 0 && c < prev + 4 && d.s - this.data.switches[k - 1].s < 40) c = Math.min(prev + 4, d.s - PANTO_FROM_FRONT - 1);
+      contacts.push(c);
+    });
+    this.switches = this.data.switches.map((d, k) => {
       const required = d.routeDiverging ? 'diverging' : 'straight';
       const divSide = d.routeDiverging ? d.routeSide : (d.routeSide === 'left' ? 'right' : 'left');
       const sw = {
         ...d, required, divSide,
         pos: this.rand() < 0.5 ? 'straight' : 'diverging',
-        contact: d.s - 22, passedContact: false, passed: false,
+        contact: contacts[k], passedContact: false, passed: false,
         indicator: makeSwitchIndicator(), marker: makeContactMarker(),
       };
-      // a contact inside a stop zone can't be driven sensibly: such switches are set
-      // automatically by the tram's route transmitter (IRC), like most Prague switches today
-      // A contact just after a stop cannot be driven sensibly: these switches are radio (IRC)
-      // controlled, as most Prague switches are today. The driver selects the direction with
-      // the IRC buttons (Q left, R straight, E right), or it is automatic if the option is on.
-      // (the same applies after a signal, where trams also stand and must start up again)
-      sw.auto = this.stops.some((st) => st.target > sw.contact - 60 && st.target < d.s + 2)
-        || this.signals.some((g) => g.s > sw.contact - 60 && g.s < d.s + 2);
+      // Every facing switch is worked by an overhead contact: the driver passes under it with
+      // current (turn) or coasting (straight), also right after a stop, at a signal or on a
+      // gradient. Radio (IRC) control is only used where the data marks a switch as such.
+      // Trailing switches are not in the data at all: the tram simply trails through them.
+      sw.auto = !!d.irc;
       sw.marker.visible = !sw.auto;
       if (sw.auto && this.opts.autoIrc) sw.pos = required;
       const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
-      place(sign, this.route, sw.auto ? d.s - 40 : sw.contact, -2.6, 0, true);
+      this._mount(sign, sw.auto ? d.s - 40 : sw.contact, ['span', 'pole', 'kerb']);
       this.objects.add(sign);
       place(sw.indicator, this.route, d.s - 8, -0.4, 0, true); // hangs from the span wire over the track
       const c = this.route.at(sw.contact);
@@ -342,6 +434,24 @@ export class Game {
       this._showSwitch(sw);
       return sw;
     });
+  }
+
+  // Overhead contact position: ~22 m before the switch, but never where a tram stands with
+  // its pantograph at a stop or a signal (it could not pass under it coasting from rest);
+  // there it is moved back before the standing area, as on the real network.
+  _contactPos(sSwitch) {
+    const P = PANTO_FROM_FRONT, zones = [];
+    for (const st of this.stops) zones.push([st.target - 20 - P - 3, st.target + 12 - P + 2]);
+    for (const g of this.signals) zones.push([g.s - 3 - 18 - P, g.s - P + 1]);
+    let c = sSwitch - 22;
+    for (let k = 0; k < 3; k++) {
+      const z = zones.find(([a, b]) => c > a && c < b);
+      if (!z) break;
+      if (sSwitch - (z[1] + 4) >= 10) c = z[1] + 4;          // room after the standing area
+      else if (sSwitch - (z[0] - 2) <= 75) c = z[0] - 2;     // otherwise just before it
+      else break;
+    }
+    return c;
   }
 
   // IRC direction buttons: set the next radio-controlled switch within 80 m
@@ -383,7 +493,7 @@ export class Game {
       if (s - last < 35 || s < 20) continue;
       last = s;
       const sign = makeSpeedSign(v);
-      place(sign, this.route, s, -2.7, 0, true);
+      this._mount(sign, s, ['span', 'pole', 'kerb'], { movable: true });
       this.objects.add(sign);
     }
     let inSteep = false;
@@ -392,10 +502,54 @@ export class Game {
       if (!inSteep && g < -0.055) {
         inSteep = true;
         const sign = makeGradientSign(Math.round(-this.profile.grade(s + 60) * 100) || 6);
-        place(sign, this.route, s, -2.9, 0, true);
+        this._mount(sign, s, ['span', 'pole', 'kerb'], { movable: true });
         this.objects.add(sign);
       } else if (inSteep && g > -0.03) inSteep = false;
     }
+  }
+
+  // Put a signal or sign beside the track at route position s without blocking the street:
+  // on a catenary pole next to the track ('pole'), hung from a span wire to the right of the
+  // contact wire ('span'), or at the kerb / on a facade found by the world builder ('kerb').
+  // Platforms are kept clear: a sign is moved before the platform, a signal hangs instead.
+  _mount(obj, s, order, { movable = false } = {}) {
+    const route = this.route, C = route.catenary || [], ud = obj.userData;
+    const onPlatform = (x) => this.stops.some((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
+    if (onPlatform(s)) {
+      const st = this.stops.find((q) => s > (q.p0 ?? q.target - 30) - 4 && s < (q.p1 ?? q.target + 2) + 2);
+      if (movable) s = (st.p0 ?? st.target - 30) - 6;
+      else order = ['span', ...order.filter((o) => o !== 'span')];
+    }
+    const near = C.filter((c) => Math.abs(c.s - s) <= 10).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
+    const hidePole = () => { if (ud.pole) ud.pole.visible = false; };
+    for (const how of order) {
+      if (how === 'pole') {
+        const c = near.find((q) => q.R && !q.R.wall && q.R.lat <= 6.5 && !onPlatform(q.s));
+        if (!c) continue;
+        place(obj, route, c.s, -(c.R.lat - 0.25), 0, true);
+        hidePole();
+        return;
+      }
+      if (how === 'span') {
+        const c = near.find((q) => q.L && q.R);
+        if (!c || ud.boardTop === undefined) continue;
+        place(obj, route, c.s, -1.15, 0, true);
+        obj.position.y = this.profile.height(c.s) + 5.3 - ud.boardTop;
+        hidePole();
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+        rod.position.y = ud.boardTop + 0.62;
+        obj.add(rod);
+        return;
+      }
+      if (how === 'kerb' && route.kerbAt) {
+        const k = route.kerbAt(s, -1);
+        if (!k || k.lat > 14 || onPlatform(s) && k.lat < 6) continue;
+        place(obj, route, s, -(k.wall ? k.lat - 0.3 : k.lat), 0, true);
+        if (k.wall) hidePole();
+        return;
+      }
+    }
+    place(obj, route, s, -2.6, 0, true);
   }
 
   _showSwitch(sw) {
@@ -482,7 +636,7 @@ export class Game {
   get currentLimit() {
     // the whole tram length must respect a restriction
     let v = 99;
-    for (let s = this.tram.s - T3.length; s <= this.tram.s + 0.1; s += 5) v = Math.min(v, this.limits.at(s));
+    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 5) v = Math.min(v, this.limits.at(s));
     return v;
   }
 
@@ -511,7 +665,7 @@ export class Game {
       const st = this.stops[this.nextStop];
       if (st && !this._atStop(st)) {
         const d = st.target - this.tram.s;
-        if (d > 0 && d < 200) this.msg(t('msg.notAtPlatform', { go: Math.round(d - STOP_TOL_BEHIND), d: Math.round(d) }), 'warn', 5);
+        if (d > 0 && d < 200) this.msg(t('msg.notAtPlatform', { go: Math.round(st.zone[0] - this.tram.s), d: Math.round(d) }), 'warn', 5);
         else if (d >= 200) this.msg(t('msg.noPlatform'), 'warn');
       }
       this.doorState = 'opening';
@@ -585,7 +739,7 @@ export class Game {
       tram.forcedStop = true;
     } else tram.forcedStop = false;
 
-    const mid = tram.s - T3.length / 2;
+    const mid = tram.s - tram.length / 2;
     tram.update(dt, {
       deadmanTrip,
       grade: this.profile.grade(mid),
@@ -597,6 +751,8 @@ export class Game {
 
     this._updateDoors(dt);
     this._updateStops(dt);
+    this.input = input;
+    this._updateClimate(dt);
     this._updateSwitches(prevS);
     this._updateSignals(dt, prevS);
     this._updateObstacles(dt);
@@ -607,7 +763,21 @@ export class Game {
   }
 
   _atStop(st) {
-    return this.tram.s >= st.target - STOP_TOL_BEHIND && this.tram.s <= st.target + STOP_TOL_AHEAD;
+    return this.tram.s >= st.zone[0] && this.tram.s <= st.zone[1];
+  }
+
+  // Where the tram front may stand to serve a stop. With the OSM platform known, the whole set
+  // must stand alongside it (rear at most 3 m short of its start, front at most 4 m past its end),
+  // so on a long platform a second tram can stop behind the first one; a platform shorter than
+  // the set only needs the first doors at it. Otherwise 20 m behind to 12 m past the stop sign.
+  _stopZone(st) {
+    const L = this.tram.length;
+    if (st.p0 !== undefined && st.p1 - st.p0 >= 15) {
+      const hi = st.p1 + 4;
+      const lo = Math.min(hi - 8, st.p1 - st.p0 + 3 >= L ? st.p0 + L - 3 : st.p1 - 8); // at least 8 m to aim at
+      st.zone = [lo, hi];
+      st.target = Math.max(lo + 2.5, Math.min(st.target, hi - 3));
+    } else st.zone = [st.target - STOP_TOL_BEHIND, st.target + STOP_TOL_AHEAD];
   }
 
   _updateDoors(dt) {
@@ -640,16 +810,16 @@ export class Game {
     // passenger exchange through open doors
     if (at && this.doorState === 'open') {
       st.served = true;
-      // three doors; a packed car boards slowly
-      const crowd = tram.passengers > T3.capacity ? 0.45 : tram.passengers > T3.capacity * 0.75 ? 0.75 : 1;
-      st.flow = (st.flow || 0) + 3 * 1.1 * crowd * dt;
+      // three doors per car; a packed car boards slowly
+      const crowd = tram.passengers > tram.capacity ? 0.45 : tram.passengers > tram.capacity * 0.75 ? 0.75 : 1;
+      st.flow = (st.flow || 0) + 3 * tram.cars * 1.1 * crowd * dt;
       while (st.flow >= 1) {
         st.flow -= 1;
         if (st.alight > 0) { st.alight--; tram.passengers--; this.score += 1; }
-        else if (st.waiting > 0 && tram.passengers < T3.crushCapacity) { st.waiting--; tram.passengers++; this.score += 1; }
+        else if (st.waiting > 0 && tram.passengers < tram.crushCapacity) { st.waiting--; tram.passengers++; this.score += 1; }
         else break;
       }
-      if (st.alight === 0 && st.waiting > 0 && tram.passengers >= T3.crushCapacity) {
+      if (st.alight === 0 && st.waiting > 0 && tram.passengers >= tram.crushCapacity) {
         this.msg(t('msg.full', { n: st.waiting }), 'warn', 5);
         st.leftFull = st.waiting;
         st.waiting = 0;
@@ -661,10 +831,12 @@ export class Game {
         st.runners = 0;
       }
     }
+    // last passengers of the old line are out: the route boxes and the HUD show the new line
+    if (st.lineChange && st.arrived && st.alightSet && st.alight === 0 && this.line !== st.lineChange) this._changeLine(st.lineChange);
     // departure detection
     if (st.served && st.departClock === null && tram.v > 0.3) st.departClock = this.clock;
 
-    const passed = tram.s > st.target + STOP_TOL_AHEAD + 1;
+    const passed = tram.s > st.zone[1] + 1;
     const last = this.nextStop === this.stops.length - 1;
     if (last && st.served && st.alight === 0 && this.doorState === 'open') {
       this._finishStop(st);
@@ -708,14 +880,14 @@ export class Game {
     for (const sw of this.switches) {
       // the indicator blinks while the switch is locked under/for the approaching tram
       if (Math.abs(sw.s - tram.s) < 250) {
-        sw.locked = tram.s > (sw.auto ? sw.s - 8 : sw.contact) && tram.s - T3.length < sw.s + 2;
+        sw.locked = (sw.auto ? tram.s > sw.s - 8 : tram.panto > sw.contact) && tram.s - tram.length < sw.s + 2;
         sw.indicator.userData.set(sw.pos === 'straight' ? 'straight' : sw.divSide, sw.locked && blinkOff);
       }
       if (sw.passed) continue;
-      if (!sw.passedContact && prevS < sw.contact && tram.s >= sw.contact) {
+      if (!sw.passedContact && prevS - PANTO_FROM_FRONT < sw.contact && tram.panto >= sw.contact) {
         sw.passedContact = true;
         if (!sw.auto) {
-          sw.pos = tram.force > 500 ? 'diverging' : 'straight';
+          sw.pos = this.contactCurrent() ? 'diverging' : 'straight';
           this._showSwitch(sw);
           this.audio.click(0.25, 2000);
         }
@@ -737,9 +909,59 @@ export class Game {
     }
   }
 
+  // Does current flow through the pantograph as it passes an overhead contact? Traction power
+  // (the classic way), the "Výhybka" button, or the heating (seat heaters / cab heater) unless
+  // the driver holds the heating cut-out button, as the T3 manual tells drivers in winter.
+  heatingDraws() { const c = this.climate; return c.saloon > 0 || c.cab >= 2; }
+  contactCurrent() {
+    const inp = this.input || {};
+    return this.tram.force > 500 || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
+  }
+
+  setHeating(which) {
+    const c = this.climate;
+    if (which === 'saloon') c.saloon = (c.saloon + 1) % 3;
+    if (which === 'cab') c.cab = (c.cab + 1) % 4;
+    if (which === 'flap') c.flap = !c.flap;
+    this.audio.click(0.15, 900);
+    const key = { saloon: `msg.heatSaloon${c.saloon}`, cab: `msg.heatCab${c.cab}`, flap: c.flap ? 'msg.flapOpen' : 'msg.flapClosed' }[which];
+    this.msg(t(key), 'info', 2.5);
+  }
+
+  // Indoor temperature of the saloon (per car; the set is heated alike from the first car) and
+  // of the cab: heaters, waste heat of the resistors through the flap, passengers' body heat,
+  // losses through the body and much larger ones while the doors are open.
+  _updateClimate(dt) {
+    const c = this.climate, tram = this.tram, cars = tram.cars;
+    if (this.opts.toutAt) c.tout = this.opts.toutAt(this.clock);
+    const seat = [0, 3000, 10000][c.saloon] * cars;
+    const el = tram.electric || 0, v = Math.abs(tram.v);
+    const waste = c.flap ? 0.35 * Math.max(0, -el) + 0.5 * Math.max(0, el) * Math.max(0, 1 - v / 9) : 0;
+    const people = tram.passengers * 90;
+    const open = this.doorState !== 'closed' ? 2500 * cars : 0;
+    const windows = c.tin > 21 ? 1200 * cars : 0; // passengers open the sliding windows
+    const loss = (450 * cars + windows + open) * (c.tin - c.tout);
+    c.tin += ((seat + waste + people - loss) / (2.0e6 * cars)) * dt;
+    const kal = [0, 0, 2000, 4000][c.cab];
+    const mix = c.cab >= 1 ? 120 : 30; // the fan also stirs in saloon air
+    c.tcab += ((kal - 60 * (c.tcab - c.tout) - mix * (c.tcab - c.tin)) / 1.5e5) * dt;
+    // passengers mind the cold below ~12 °C, and heat the driver caused (heating or the flap
+    // on a warm day): above 27 °C and more than 4 K over the outside temperature
+    if (tram.passengers > 0) {
+      const bad = Math.max(0, 12 - c.tin) + Math.max(0, c.tin - Math.max(27, c.tout + 4));
+      if (bad > 0) {
+        const pts = bad * 0.04 * dt * (0.5 + tram.passengers / 60);
+        this.score -= pts;
+        this.penalties.climate = (this.penalties.climate || 0) + pts;
+        c.warned -= dt;
+        if (c.warned <= 0) { c.warned = 90; this.msg(t(c.tin < 12 ? 'msg.cold' : 'msg.hot', { t: Math.round(c.tin) }), 'warn', 5); }
+      }
+    }
+  }
+
   // the next overhead contact ahead (a contact can lie before the previous switch)
   nextContact() {
-    return this.switches.find((w) => !w.auto && !w.passedContact && w.contact > this.tram.s - 1);
+    return this.switches.find((w) => !w.auto && !w.passedContact && w.contact > this.tram.panto - 1);
   }
 
   nextSwitch() {
@@ -766,7 +988,7 @@ export class Game {
         sig.preferred = true;
         sig.timer = Math.min(sig.timer, 5 + this.rand() * 12);
       }
-      if (dist < -T3.length) sig.preferred = false;
+      if (dist < -tram.length) sig.preferred = false;
       // the detector also holds GO for a tram that is committed to the junction
       if (sig.state === 'go' && dist > 0 && dist < 15 + (tram.v * tram.v) / 1.6) sig.timer = Math.max(sig.timer, 1.5); // dilemma zone
       if (sig.timer <= 0) {
@@ -790,33 +1012,54 @@ export class Game {
 
   _crossTraffic(sig, dt) {
     const tram = this.tram;
+    const X = sig.xroad;
+    if (!X) return; // pedestrian signal: no crossing street
     const near = Math.abs(sig.cross - tram.s) < 400;
-    const tramOnCrossing = sig.cross > tram.s - T3.length - 1 && sig.cross < tram.s + 4;
+    const tramOnCrossing = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 4;
+    // drivers also see a tram about to enter (e.g. one that stopped past its signal)
+    const tramComing = tramOnCrossing || (sig.cross > tram.s && sig.cross < tram.s + 6 + tram.v * 2.5 && tram.v > 0.1);
     if (near && sig.state === 'stop' && sig.timer > 5) {
       sig.spawn -= dt;
       if (sig.spawn <= 0 && sig.cars.length < 4) {
         sig.spawn = 3 + this.rand() * 4;
-        const dir = this.rand() < 0.5 ? 1 : -1;
-        const mesh = makeCar(sig.seed++);
-        this.objects.add(mesh);
-        sig.cars.push({ lat: -dir * 45, dir, mesh, v: 9 });
+        const dir = X.oneway || (this.rand() < 0.5 ? 1 : -1);
+        const start = dir > 0 ? 0 : X.length;
+        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) {
+          const mesh = makeCar(sig.seed++);
+          mesh.rotation.order = 'YXZ';
+          this.objects.add(mesh);
+          sig.cars.push({ s: start, dir, mesh, v: 0 });
+        }
       }
     }
+    const ground = this.route.ground;
     for (const car of sig.cars) {
-      const ahead = car.lat * car.dir < -3.5 && car.lat * car.dir > -8;
-      car.v = tramOnCrossing && ahead ? 0 : Math.min(9, car.v + dt * 3);
-      car.lat += car.dir * car.v * dt;
-      const o = this.route.offset(sig.cross, car.lat);
-      car.mesh.position.set(o.x, this.route.ground.atRoute(sig.cross, car.lat) + 0.1, -o.y);
-      // drive perpendicular to the track
-      car.mesh.rotation.y = Math.atan2(-o.hy * car.dir, -o.hx * car.dir);
-      if (Math.abs(car.lat) < 2.3 && tramOnCrossing && tram.v > 0.2 && !car.hit) {
+      // distance to the crossing point along the car's way (+ = still before it)
+      const toX = (X.sX - car.s) * car.dir;
+      // the cross street has red while the tram has GO (and 3 s of clearance before it);
+      // cars wait at their stop line, and always give way to a tram on the crossing
+      const red = sig.state !== 'stop' || sig.timer < 3;
+      const waiting = toX > 3.5 && toX < 12 && (red || tramComing);
+      // queue behind the car in front
+      let gap = Infinity;
+      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - 4.4);
+      const vt = waiting ? 0 : Math.min(9, Math.max(0, (gap - 3) * 0.9));
+      car.v = vt > car.v ? Math.min(vt, car.v + dt * 2.5) : Math.max(vt, car.v - dt * 6);
+      car.s += car.dir * car.v * dt;
+      const p = X.at(car.s), hx = p.hx * car.dir, hy = p.hy * car.dir;
+      const lane = X.oneway ? 0 : Math.max(1.5, X.w / 4); // right-hand traffic
+      const x = p.x + hy * lane, y = p.y - hx * lane;
+      const zf = ground.at(x + hx * 1.6, y + hy * 1.6), zb = ground.at(x - hx * 1.6, y - hy * 1.6);
+      car.mesh.position.set(x, (zf + zb) / 2 + 0.1, -y);
+      car.mesh.rotation.y = Math.atan2(hx, -hy);
+      car.mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
+      if (Math.abs(toX) < 2.3 && tramOnCrossing && tram.v > 0.2 && !car.hit) {
         car.hit = true;
         this._collision(t('obj.crossingCar'));
       }
     }
     sig.cars = sig.cars.filter((c) => {
-      if (Math.abs(c.lat) > 46) { this.objects.remove(c.mesh); return false; }
+      if (c.s < -1 || c.s > X.length + 1) { this.objects.remove(c.mesh); return false; }
       return true;
     });
   }
@@ -854,7 +1097,7 @@ export class Game {
         }
       }
       // collision with tram body
-      if (ob.state !== 'gone' && Math.abs(ob.lat) < 1.55 && ob.s <= tram.s + 0.2 && ob.s >= tram.s - T3.length) {
+      if (ob.state !== 'gone' && Math.abs(ob.lat) < 1.55 && ob.s <= tram.s + 0.2 && ob.s >= tram.s - tram.length) {
         if (tram.v > 0.15 || ob.type === 'pedestrian') {
           ob.state = 'gone';
           ob.mesh.visible = false;
@@ -864,7 +1107,7 @@ export class Game {
     }
     // running into the rear of the tram ahead
     for (const ai of this.aiTrams) {
-      const rear = ai.s - T3.length;
+      const rear = ai.s - ai.length;
       if (!ai.hit && tram.s > rear - 0.3 && tram.s < ai.s) {
         ai.hit = true;
         tram.s = rear - 0.4;
@@ -874,11 +1117,18 @@ export class Game {
     }
   }
 
+  _changeLine(line) {
+    const old = this.line;
+    this.line = line;
+    this.msg(t('msg.lineChange', { a: old, b: line }), 'info', 8);
+    this.onLineChange?.(line, old);
+  }
+
   // gap from our front to the rear of the next tram ahead (m), or null
   tramAheadGap() {
     let gap = null;
     for (const ai of this.aiTrams) {
-      const d = ai.s - T3.length - this.tram.s;
+      const d = ai.s - ai.length - this.tram.s;
       if (d > -1 && (gap === null || d < gap)) gap = d;
     }
     return gap;

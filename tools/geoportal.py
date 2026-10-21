@@ -30,6 +30,7 @@ CACHE = os.path.join(ROOT, "raw", "geoportal", f"line{LINE}")
 os.makedirs(os.path.join(CACHE, "i3s"), exist_ok=True)
 
 BLD = "https://services5.arcgis.com/SBTXIEUGWbqzUecw/arcgis/rest/services/Budovy_3D_WSL1/SceneServer/layers/0"
+BRIDGES = "https://services5.arcgis.com/SBTXIEUGWbqzUecw/arcgis/rest/services/Mosty_3D_WSL1/SceneServer/layers/0"
 WALLS = "https://mp.iprpraha.cz/arcgis/rest/services/Hosted/HM_CUR_HM_HLUKOCHR_OPERNEZDI_L/FeatureServer/0"
 TREES = "https://mp.iprpraha.cz/arcgis/rest/services/Hosted/OPK_CUR_OPK_SMZ_VP_B/FeatureServer/0"
 TREE_ROWS = "https://mp.iprpraha.cz/arcgis/rest/services/Hosted/URK_CUR_URK_SS_STROMORADI_L/FeatureServer/0"
@@ -117,13 +118,15 @@ def route_dist(x, y, reach=CORRIDOR + 60):
 
 
 # ------------------------------------------------------------------ buildings (I3S)
-def i3s_buildings():
+def i3s_buildings(service=BLD, cache="i3s", label="buildings"):
+    """Meshes of an IPR I3S SceneServer (Budovy 3D, Mosty 3D share the geometry layout)."""
     pages = {}
+    os.makedirs(os.path.join(CACHE, cache), exist_ok=True)
 
     def node(i):
         p = i // 64
         if p not in pages:
-            pages[p] = fetch(f"{BLD}/nodepages/{p}?f=json", f"i3s/np{p}.json")["nodes"]
+            pages[p] = fetch(f"{service}/nodepages/{p}?f=json", f"{cache}/np{p}.json")["nodes"]
         return pages[p][i % 64]
 
     # descend into every node whose bounding sphere comes near the route corridor
@@ -141,12 +144,12 @@ def i3s_buildings():
             stack.extend(n["children"])
         elif n.get("mesh"):
             leaves.append(n)
-    print(f"buildings: {len(leaves)} leaf nodes along the route")
+    print(f"{label}: {len(leaves)} leaf nodes along the route")
 
     seen, out = set(), []
     for k, n in enumerate(leaves):
         res = n["mesh"]["geometry"]["resource"]
-        raw = fetch(f"{BLD}/nodes/{res}/geometries/0", f"i3s/g{res}.bin", binary=True)
+        raw = fetch(f"{service}/nodes/{res}/geometries/0", f"{cache}/g{res}.bin", binary=True)
         vc, fc = struct.unpack_from("<II", raw, 0)
         off = 8
         pos = struct.unpack_from(f"<{vc * 3}f", raw, off); off += vc * 12
@@ -174,12 +177,15 @@ def i3s_buildings():
             seen.add(fids[f])
             out.append(verts)
         if (k + 1) % 20 == 0:
-            print(f"  {k + 1}/{len(leaves)} nodes, {len(out)} buildings")
+            print(f"  {k + 1}/{len(leaves)} nodes, {len(out)} {label}")
     return out
 
 
-def write_buildings(buildings):
-    """Quantised binary: per chunk an origin, then Int16 x,y,z triangles (non-indexed)."""
+def write_buildings(buildings, kinds=None):
+    """Quantised binary: per chunk an origin, then Int16 x,y,z triangles (non-indexed).
+    `kinds` (parallel to buildings): 0 building, 1 bridge; stored per chunk as "k"."""
+    kinds = kinds or [0] * len(buildings)
+    kind_of = {id(b): k for b, k in zip(buildings, kinds)}
     chunks = defaultdict(list)
     for b in buildings:
         mx = sum(v[0] for v in b) / len(b)
@@ -196,7 +202,10 @@ def write_buildings(buildings):
             for x, y, z in b:
                 blob += struct.pack("<hhh", *(max(-32768, min(32767, round(c / Q))) for c in (x - ox, y - oy, z - oz)))
             counts.append(len(b))
-        table.append({"o": [ox, oy, oz], "v": voff, "n": len(allv), "b": counts})
+        entry = {"o": [ox, oy, oz], "v": voff, "n": len(allv), "b": counts}
+        if any(kind_of[id(b)] for b in bs):
+            entry["k"] = [kind_of[id(b)] for b in bs]
+        table.append(entry)
         voff += len(allv)
     dst = os.path.join(ROOT, "data", f"line{LINE}.bld.bin")
     with open(dst, "wb") as f:
@@ -280,7 +289,10 @@ def main():
     geo = {"attribution": "3D buildings, retaining walls, trees: data base © IPR Praha (CC BY 4.0)"}
     geo["walls"] = walls()
     geo["trees"] = trees()
-    geo["buildings"] = write_buildings(i3s_buildings())
+    blds = i3s_buildings()
+    bridges = i3s_buildings(BRIDGES, "i3s_bridges", "bridges")
+    geo["buildings"] = write_buildings(blds + bridges, [0] * len(blds) + [1] * len(bridges))
+    geo["attribution"] = "3D buildings and bridges, retaining walls, trees: data base © IPR Praha (CC BY 4.0)"
     dst = os.path.join(ROOT, "data", f"line{LINE}.geo.json")
     with open(dst, "w", encoding="utf-8") as f:
         json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))

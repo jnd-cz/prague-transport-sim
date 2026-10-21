@@ -10,8 +10,8 @@ found while building it, what is unfinished, and what needs attention.
   under the autopilot in dry weather with no stop/signal/switch/collision errors (rain also passes; the
   only penalties are comfort/speed/lateness from the conservative driver).
 - Features: T3 pedal-style controller and force-based physics, gradients from lidar terrain, weather
-  adhesion + sanding, GTFS timetable + stops + passengers with rush-hour demand, doors, contact and IRC
-  switches, Prague 4-lamp tram signals with call (výzva) indicator and distant (P) signals, the Letenská
+  adhesion + sanding, GTFS timetable + stops + passengers with rush-hour demand, doors, overhead
+  contact switches (worked by the pantograph), one- or two-car T3 sets, Prague 4-lamp tram signals with call (výzva) indicator and distant (P) signals, the Letenská
   single-track (gauntlet) block, traffic (trams ahead/oncoming, cars, pedestrians), obstacles,
   Czech/English UI, scoring, results screen, **watch-the-ride autopilot** (menu or `O`).
 - World: OSM tracks/roads/greenery/water, ČÚZK DMR 5G terrain, and (where imported) IPR Praha LOD2 3D
@@ -39,8 +39,12 @@ autopilot(0, 99, { obstacles: 'normal', weather: 'rain', maxT: 5400 });   // ret
 ```
 
 One full-line run takes ~15–20 s; a browser script call times out at 45 s, so run one line per call.
-Last baseline (dry, obstacles normal): line 22 ≈ 3550–3760 s sim time, 23 ≈ 1870 s, 17 ≈ 3390 s,
-9 ≈ 2630 s; all `finished: true`, no `bad:` messages except speeding/lateness.
+Last baseline (dry, obstacles normal; two-car sets except 23): line 22 ≈ 3550–3580 s sim time (also at −6 °C),
+23 ≈ 1880 s (rain, summer), 17 ≈ 3240 s, 9→10 run ≈ 2580 s (stops 0–29) + 3250 s (28–59); all finish, no `bad:`
+messages except comfort/lateness.
+
+Debug hooks on the running page: `window.game`, `window.traffic`, `window.camera`; set
+`window.freeCam = true` to position the camera from the console (the frame loop stops moving it).
 
 ## 3. Code map
 
@@ -50,11 +54,11 @@ Last baseline (dry, obstacles normal): line 22 ≈ 3550–3760 s sim time, 23 �
 | `src/route.js` | `Route` (arc-length polyline, **smoothed** with original s preserved), `smoothPolyline`, nearest/radius/speed limits |
 | `src/terrain.js` | `Terrain` (DMR 5G grid), `Profile` (track z(s): bridges, tunnels, 9 % grade limiter, smoothing), `carveCorridor` (bench + synthetic retaining walls), `makeGround` |
 | `src/world.js` | static scenery: terrain chunks, roads, tracks (+smoothed heights), Most Legií deck/piers, walls, buildings (LOD2 or OSM fallback), trees, catenary |
-| `src/tram.js` | T3 constants and longitudinal dynamics (forces, adhesion, slip/slide, sand, rollback, electrics) |
+| `src/tram.js` | T3 constants and longitudinal dynamics (forces, adhesion, slip/slide, sand, rollback, electrics); `Tram(cars)` scales mass, forces, length, capacity; `panto` = pantograph position |
 | `src/game.js` | rules: stops/passengers/demand, doors, signals, gauntlets, distant signals, switches/IRC/contacts, obstacles, cross traffic, scoring |
 | `src/traffic.js` | ambient cars (street lanes + road network), pedestrians, AI trams ahead/oncoming |
 | `src/autopilot.js` | shared driver (watch mode + headless tests) |
-| `src/models.js` | T3, cars, people, signal head + call box, LED switch indicator, signs, red stop post |
+| `src/models.js` | T3 set (`makeT3({line, cars})` + `placeConsist`), cars, people, signal head + call box, LED switch indicator, signs, red stop post |
 | `src/hud.js` | dashboard gauges/lamps, top bar (incl. passenger counter), hint chips, minimap |
 | `src/i18n.js` | all UI strings, cs/en, `t()`, live language switch |
 | `src/audio.js` | Web Audio synthesis (motors, rolling, joints, squeal, bell, doors) |
@@ -74,6 +78,14 @@ buildings (fallback), roads (with `oneway` → `o`, vehicle class → `c`), gree
   (line 22) or `raw/lineN/`. Use `--refresh` to re-download.
 - Water must be fetched with `out geom` (not `out tags geom`) or relation members are dropped.
 - Track ways are merged into chains (split only at junctions/bridge ends) so smoothing has no kinks.
+- **Switch detection** (facing only): a node on the route with an extra track neighbour whose branch
+  heads forward. Trailing switches are skipped (the branch heads backwards). A neighbour that is part
+  of a track passing straight *through* the node is a **diamond crossing**, not a switch. On line 22
+  this removed 16 of 33 "switches" (side-street curves crossing our track to join the opposite
+  track). The remaining facing switches were checked on plots: all real turnouts.
+- Roads: `c` (vehicle class) now also excludes `vehicle`/`motor_vehicle`/`motorcar` = no / private /
+  destination / delivery; `z` = painted crossing (`footway=crossing` + zebra / marked / uncontrolled /
+  signal-controlled, or `crossing:markings`).
 - Tunnels/underpasses on the route come from `tunnel`, `covered=yes`, negative `layer` tags.
 
 **PID GTFS** (`raw/PID_GTFS.zip`, data.pid.cz) — trips, stops, stop_times, route_stops (line numbers
@@ -121,9 +133,31 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
 - **Distant signals** where the curve radius within 140 m before a signal is < 110 m.
 - **Gauntlets** = stretches where the opposite-direction route is < 1.8 m away for ≥ 25 m (only
   Letenská found on these lines). 6 s clearance.
-- **Contacts** at switch s − 22 m (real positions unknown). A switch becomes **IRC** if a stop or a
-  signal lies within 60 m before its contact (otherwise you'd have to coast/power from standstill).
-  ~16–22 of ~33 switches per line end up IRC.
+- **Contacts** at switch s − 22 m (real positions unknown), all switches manual: the user wants the
+  skill of powering/coasting near stops, signals and hills, so the IRC conversion was removed. The
+  contact is triggered by the **pantograph** (5.4 m behind the front). If it would lie where a tram
+  stands with its pantograph (stop zone, 25 m queue before a signal) it is moved after that area (if
+  at least 10 m remain before the switch) or else just before it. Consecutive switches keep their
+  contacts ordered and at least 4 m apart (Anděl three-way). Switches whose contact is behind the
+  tram at the start are pre-set.
+- **Two-car sets**: lines other than 23 default to two cars (menu "Set" overrides). Forces, mass,
+  resistance, capacity and door flow x2; length 28.4 m. Real 2026 operation differs (T3s are mostly
+  retired); the default follows the user's request.
+- **Tram streets**: a road whose centre line runs within 2.6 m of a track for at least 60 % of its
+  length is widened by 3.2 m per track (OSM `lanes` counts only car lanes). Street car lanes then sit
+  at ±(w/2 − 1.7) m, beside the track zone.
+- **Catenary poles**: per station (12/18/25/32 m by curve radius) march outwards on each side past the
+  tracks (2.3 m clearance) and the carriageway; the first free spot is the kerb and gets a pole, unless
+  an OSM building footprint is within 5.5 m behind it, which gets a wall rosette. If one side has no
+  anchor, a bracket arm (anchor at most 9 m out). Only along our route; other tracks get wire only.
+- **Cross traffic** at signals drives along the real crossing street (extended through connecting
+  ways), only where one exists (pedestrian signals get none), with a red phase while the tram has GO
+  plus 3 s, and yields to a tram entering.
+- **Trees**: real trees at least 3.2 m from any track, crown limited to stay 1.9 m from the track
+  centre; duplicates (register + sampled tree rows) merged per 1.5 m cell.
+- **Terrain under tracks**: `Terrain.height` interpolates on the mesh's own triangles; after track
+  heights are computed, the three vertices of the triangle under every bed sample (centre, ±1.4 m)
+  are lowered by any excess. Verified: 0 bed samples under the terrain on line 9.
 - **Speed limits** from curvature (R<25 → 10 km/h … ≥250 → 50), 15/30 km/h over switches, 25/35 on
   steep descents; HUD/autopilot report the most restrictive limit ahead by braking need.
 - **Stop zone**: front within −20…+12 m of the sign; precision bonus ±3 m.
@@ -145,11 +179,16 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
 4. **Retaining walls** are drawn freestanding from the lower ground up to `vyska`; which side is
    retained is not in the data.
 5. **Line 9** route extends ~3 km past the last stop (see §4).
-6. **Street cars** never use lanes that overlap a track, so streets where cars share the tram lanes
-   (common in Prague) have no parallel traffic. Cars ignore each other at junctions.
-7. **AI trams** ahead appear at a stop 450–900 m ahead and fade out 1 km ahead; they never turn off.
-8. **Asset sizes**: per line ~3.5 MB JSON + 2.6–4.6 MB building binary; `serve.py` doesn't gzip;
-   JS heap ~190 MB on line 23. Fine locally; compress for hosting.
+6. **Street cars** now use lanes beside the track zone, but never drive *on* the tracks (shared
+   lanes) and ignore each other at junctions (they do follow each other within a road/lane).
+7. **AI trams** carry a line that serves the stop where they appear and fade out after the last stop
+   they share with us. They do not actually drive off along their own branch, and they have no
+   timetable (random spawn every 40–120 s). See §10 for the proper fix.
+8. **Asset sizes**: 26 MB raw / 8.6 MB gzip for four lines (see §10); `serve.py` doesn't gzip.
+13. **Pole placement** depends on OSM road widths (class guesses or lanes x 3.2 + tracks) and OSM
+    building footprints (not LOD2); wide junctions and squares fall back to bracket arms or no poles.
+14. **Signals** without a real crossing street get no cross traffic (28 of 45 on line 22 have one);
+    at a complex junction the nearest of several streets is picked.
 9. **Draco**: importer reads the uncompressed geometry buffer; if IPR switches to Draco-only it breaks.
 10. **Audio** was never listened to by me; mixing levels are guesses.
 11. Only tested in the desktop app's Chromium browser pane; keyboard only (no gamepad/touch).
@@ -159,12 +198,16 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
 
 - **Cab dashboard**: more detailed 3D/realistic T3 control panel — deferred by the user (no good
   reference photo yet).
+- **Day/night cycle**: headlights and interior lights (passenger comfort) — see §11 item 4.
+- **RÚIAN building attributes** for real panel/church/industrial classes (see §9a).
 - **Orthophoto** ground texture (10 cm IPR ImageServer) — explicitly skipped "for now".
 - **Mosty 3D** bridge models (Most Legií etc.) instead of the synthetic deck.
 - Two-car T3 set (double length/mass, stop position), night/dusk with lights, snow/ice, gamepad
   (triggers = pedals), real speed-sign positions, more lines (any Prague line works via the two tools).
 - Better pedestrians (walking animation, boarding into doors), cars on shared tram lanes as obstacles.
-- Hosting: static site; gzip/brotli data; maybe stream building chunks.
+- Hosting: static site; gzip/brotli data; stream tiles (§10).
+- **Whole network** (§10): every OSM tram track, tiles loaded on demand, AI trams on their real
+  lines and timetables.
 
 ## 8. Environment gotchas (Windows dev machine)
 
@@ -180,9 +223,124 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
   check the console after changes.
 - Old console entries `t.forEach is not a function` (hud.js:228) are stale from before a fix.
 
+## 9a. Session 2026-10-21 (evening): what changed
+
+- **Runs with a line change** (`build_line.py --then`): GTFS shapes map-matched on the city-wide
+  OSM track graph (`raw/run9-10/network_tracks.json`, 24 k nodes): piecewise Dijkstra in 250 m
+  windows, cost ∝ distance from the shape, extra for the left track and for running against the
+  shape, no turns > 75°. Goal = first node at/after the window end along the shape (OSM nodes can
+  be 100 m apart on straights). Corridor queries use `way(id:…)` of the matched ways. Output gets
+  `segments: [{line, from}]`; the game switches `game.line` after the last passenger of the old
+  line has left at the change stop (`onLineChange` → HUD, route boxes via `setConsistLine`).
+  GTFS: 9 and 10 share stop pole U469Z4P; 212 arrivals / 212 departures, layover 4–11 min.
+  Old line-9 data (relation-based, ran 3 km past the terminus) is replaced.
+- **Platforms** (OSM `public_transport=platform` / `railway=platform` ways projected with a
+  ±150 m s-window, right side preferred) → `p0/p1` per stop; 58/60, 37/39, 16/18 stops have one
+  (20–108 m). Stop zone: rear ≥ p0 − 3 m, front ≤ p1 + 4 m, at least 8 m long; target clamped in.
+- **Car length** 15.2 m over couplers (manual), set pitch 15.2 m, body 14 m starting 0.6 m behind.
+- **Signals/signs**: `route.catenary` (span stations with anchors) and `route.kerbAt(s, side)`
+  from the world builder; `game._mount(obj, s, order)` tries 'pole' / 'span' / 'kerb'. Signals:
+  pole → kerb → span; signs: span → pole → kerb; speed/gradient signs on a platform move before it.
+- **Poles**: retaining walls (surveyed + synthetic cutting walls) stop the anchor search → pole at
+  the wall foot; on bridges poles on the parapet (8.4 m); far side > 9 m with near side < 5 m →
+  bracket arm. Bílá Hora / Zahradní Město had poles, but 9–14 m away beyond the carriageways.
+- **Mosty 3D** (`Mosty_3D_WSL1` SceneServer, same I3S layout as buildings) imported into the same
+  `.bld.bin`, chunk field `k` (1 = bridge). `bridgeDecks()` samples bridge triangles under the
+  track every 2 m. On OSM-tagged bridges the track follows the deck top (±3 m); in OSM
+  covered/tunnel spans any surface at/above the lidar height is a roof (the bare-earth DMR sampled
+  the canopy at Nádraží Zahradní Město, as the user suspected); elsewhere only structures > 2.5 m
+  above count. The track keeps 5.3 m under them with ≤ 6 % ramps. The synthetic deck is skipped
+  where a real model covers > 30 % of a tagged bridge.
+- **Building types**: LOD2 has no type (fields: OBJECTID, ID_BUD, AKTUALIZAC, ML, ZMENA,
+  KATUZE_KOD). Class from the OSM footprint tag under the centroid + roof flatness + height + area
+  (`buildingClass` in world.js). Better source, not yet used: **ČÚZK RÚIAN** `StavebniObjekt`
+  (ags.cuzk.gov.cz/arcgis/rest/services/RUIAN/MapServer/3): `zpusobvyuzitikod` (use),
+  `druhkonstrukcekod` (load-bearing construction — prefab panels), `pocetpodlazi`, `dokonceni`,
+  `pocetbytu`; join by `isknbudovaid` / location. Code lists still to be looked up.
+- **Detailed T3** (Sketchfab, CC BY-NC 4.0; author still to be filled in `assets/t3/LICENSE.txt`):
+  textures reduced to one 2048 px JPEG with AO baked in (44 MB → 2 MB). Axes: length by PCA of the
+  body, **up from wheels→body centroid** (PCA alone rolled it 12° because height ≈ width),
+  our route boxes overlaid on the painted "11". Menu "Tram model" switches to the simple one.
+- **Climate** (`game.climate`, `_updateClimate`): per car C = 2 MJ/K, UA 450 W/K, +1200 W/K open
+  windows above 21 °C, +2500 W/K doors open; seats 3 / 10 kW, cab heater 2 / 4 kW, flap = 35 % of
+  ED-brake power + 50 % of drive power below 9 m/s; 90 W per passenger. All guesses — tune.
+  `contactCurrent()` = traction > 500 N or Výhybka button or (heating drawing and no cut-out).
+- **Mirror / look**: render-to-texture camera outside the right front, mirrored quad drawn in the
+  `#mirror` frame; Q/E (←/→) turn the head ±1.3 rad with a little lean.
+- DPP training manual kept at `raw/reference/DPP_ucebnice_T3.pdf` (+ `.txt`), source
+  https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf (DPP, January 2009; not
+  committed — it is DPP's material).
+
+## 11. From the DPP T3 manual: realistic but arcade-friendly ideas
+
+Ordered by value for effort; each keeps one key / one rule, with assist hints.
+1. **Section insulators (úsekové děliče)**: marked on the wire; pass coasting (sparks + small
+   penalty under power), never stop under one (the manual has a procedure to roll off by gravity).
+2. **Economy driving**: the manual stresses coasting and avoiding needless power steps and quick
+   power→brake changes (ED brake drop-out, early drum brake). Score energy (we have `tram.electric`)
+   and show a coasting bonus at the end.
+3. **ED brake fade below 5–3 km/h**: the drum brake takes over; a "park the brake pedal" step at
+   stops (released brake on a hill = rolling, already modelled) — one key, P-state lamp.
+4. **Day/night lights** (needed with the day/night cycle): switch "day" (dipped) / "night" (marker
+   + tail lights + front destination sign), headlights on a separate lever, saloon fluorescent
+   lights switched on **each car separately** (T3SUCS) — passengers dislike a dark saloon; at
+   termini turn the tubes over (fun detail, optional). Cab light only in "night".
+5. **Two-car set procedures**: control switch off on the second car, heating and lights of the set
+   from the first car only (T3R.P) — could be a start-of-shift checklist (3–4 keys, skippable).
+6. **Start-of-shift / depot run-out**: control switch to 2, direction key, close doors, release the
+   brake pedal — a short checklist mode before the first stop.
+7. **Emergency button vs pedal**: track brake in two stages (rear bogie, then both), red emergency
+   button = drum + track brake + bell; we have one emergency notch — could split.
+8. **Reversing from the rear control box** (zpětný pohyb) for turning at a wye or after a missed
+   switch instead of the crowbar penalty.
+9. **Sanders**: mechanical lever, heated sand boxes; sand runs out (modelled) — refill at termini.
+10. **T3R.P variant** (later Prague cars): 7 power/brake steps, anti-slip, regenerative braking that
+    must be cut with "Výhybka 0" over contacts — a second tram type for variety.
+
 ## 9. User context
 
 Prague-based, knows DPP/Prague trams in detail (signals, IRC, stop posts, Letenská gauntlet) and
 supplies reference photos and sources. Prefers realism grounded in real data, Czech-specific detail,
 and a fully localized cs/en UI. Asked to keep the game playable while it grows (autopilot "watch the
 ride" mode).
+
+## 10. Whole network, on-demand loading, compression (investigation 2026-10-21)
+
+**Prague network in OSM** (Overpass, bbox 49.94–50.18 N, 14.22–14.71 E): 2 625 `railway=tram` ways,
+**310 km of main track** (about 155 km of double-track route) + 41 km depot/yard + 2 km sidings;
+77 `route=tram` relations (lines 1–26, 31, 41, 42, 91–99). The network touches **651 tiles of 250 m**
+(41 km²; 99 km² with a one-tile margin), within an 18 x 15 km box.
+
+**Current per-line data** (raw / gzip -9): line 22 = 3.6 MB / 1.4 MB JSON + 4.5 MB / 1.2 MB buildings;
+all four lines 26.2 MB / 8.6 MB. Inside the JSON the terrain grid is the biggest part (line 22: 2.0 MB
+of 3.6 MB) because it covers the route's whole bounding box (1449 x 520 cells at 10 m) as base64.
+
+**Compression tests (line 22)**:
+- Terrain: base64 + gzip 998 KB; raw Int16 + gzip 837 KB; **2D predictor (a + b − c) + gzip 548 KB**
+  (xz 453 KB). Cropping to the ~1 km band that is actually rendered roughly halves it again.
+- LOD2 buildings: 256 k triangles stored as an unindexed soup (769 k vertices, only 141 k unique).
+  Soup + gzip 1212 KB; indexed + delta + gzip 1044 KB (xz 822 KB). A real mesh codec (meshoptimizer
+  vertex/index codec, roughly 4–6 B per triangle, small JS decoder) should reach about 0.4–0.6 MB.
+- Rest of the JSON (roads, OSM buildings, green, tracks, timetable): 1.6 MB, 433 KB gzip. Integer
+  delta-coded arrays would roughly halve that; gzip/brotli on the server alone gives about 3x.
+
+**Whole-network estimate**: at line 22 density (about 0.3 MB gzip per km² of buildings, 0.1 MB per km²
+of vector data, terrain negligible) the 41 km² track corridor is **about 17 MB gzip (65 MB raw) as
+encoded today, 8–10 MB with the encodings above**, and only a small part is needed at any moment.
+
+**Feasible design** (not implemented):
+1. `tools/build_network.py`: one Overpass / Geoportál / ČÚZK pass for the whole city (cached in `raw/`),
+   output **250 m (or 500 m) tiles** `tiles/x_y.{json,bin}` with roads, footprints, green, tracks, LOD2
+   (meshopt), trees, walls and a terrain patch; plus a small **network graph** (track chains, switches,
+   signals, crossings) and per-line files (route as a chain of graph edges, stops, GTFS timetable,
+   precomputed vertical profile) of about 100–200 KB each.
+2. Client: keep the tiles within ~1 km of the camera (fog is at 950 m), about 30–50 tiles or 1–1.5 MB;
+   at 50 km/h a 250 m tile boundary is crossed every ~18 s, so streaming is light on bandwidth.
+   `ChunkedGeometry` already builds per-cell meshes; world building becomes per tile + dispose.
+3. Any line (and diversions) can then be driven, and **AI trams can run real trips** (GTFS
+   `stop_times` + shapes mapped onto the graph) and take their own branches at switches.
+
+**Do AI trams follow the correct lines?** Before 2026-10-21: no. Each got a random number from all
+lines serving any stop on the route and drove only along our route. Now the number comes from the stop
+where it appears, and it fades out after the last stop it shares with us, but it still never leaves our
+track physically and does not follow a timetable (needs item 3 above).

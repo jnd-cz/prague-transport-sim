@@ -10,7 +10,7 @@
 const G = 9.81;
 
 export const T3 = {
-  length: 14.0,
+  length: 15.2,              // over couplers (body 14.0 m), DPP training manual
   emptyMass: 16000,          // kg
   paxMass: 72,               // kg / passenger
   capacity: 110,             // 24 seated + 86 standing (crush load 160)
@@ -27,8 +27,14 @@ export const T3 = {
 // wheel/rail adhesion coefficient by weather (sand adds ~0.1)
 export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15 };
 
+// Prague ran the T3 mostly as two-car multiple-unit sets (both cars motored, one driver).
+// Everything that scales with the cars lives here.
+export const COUPLING_GAP = 0;     // cars are 15.2 m over couplers, coupled buffer to buffer
+export const PANTO_FROM_FRONT = 5.4; // the (first car's) pantograph, which works the overhead contacts
+
 export class Tram {
-  constructor() {
+  constructor(cars = 1) {
+    this.cars = cars;
     this.s = 0;            // front position along route (m)
     this.v = 0;            // m/s, negative when rolling back
     this.a = 0;            // m/s2
@@ -50,7 +56,13 @@ export class Tram {
     this.mu = ADHESION.dry;
   }
 
-  get mass() { return T3.emptyMass + this.passengers * T3.paxMass; }
+  get mass() { return T3.emptyMass * this.cars + this.passengers * T3.paxMass; }
+  get length() { return T3.length * this.cars + COUPLING_GAP * (this.cars - 1); }
+  get capacity() { return T3.capacity * this.cars; }
+  get crushCapacity() { return T3.crushCapacity * this.cars; }
+  get panto() { return this.s - PANTO_FROM_FRONT; }
+  driveForce(notch) { return T3.driveForce[notch] * this.cars; }
+  brakeForce(notch) { return T3.brakeForce[notch] * this.cars; }
   get kmh() { return this.v * 3.6; }
   // net applied force for gauges, sounds and the overhead contact (+ drawing current)
   get force() { return this.drive - this.brake; }
@@ -66,24 +78,25 @@ export class Tram {
     this.sanding = (sandKey || (emergency && Math.abs(this.v) > 0.3)) && this.sand > 0;
     if (this.sanding) this.sand = Math.max(0, this.sand - dt / 90);
     this.mu = Math.min(0.33, mu + (this.sanding ? 0.1 : 0));
-    const adhesion = this.mu * m * G; // all 4 axles are motored and braked
+    const adhesion = this.mu * m * G; // all axles are motored and braked
+    const k = this.cars;
 
     // targets
     let targetDrive = 0, targetBrake = 0;
     if (notch > 0) {
-      const pNotch = T3.maxPower * (0.4 + 0.15 * notch);
-      let f = Math.min(T3.driveForce[notch], pNotch / Math.max(Math.abs(this.v), 0.5));
+      const pNotch = T3.maxPower * k * (0.4 + 0.15 * notch);
+      let f = Math.min(this.driveForce(notch), pNotch / Math.max(Math.abs(this.v), 0.5));
       if (this.v > 16.5) f *= Math.max(0, 1 - (this.v - 16.5) / (T3.vMax - 16.5 + 0.3));
       targetDrive = f;
     } else if (notch < 0) {
-      targetBrake = T3.brakeForce[Math.min(4, -notch)];
+      targetBrake = this.brakeForce(Math.min(4, -notch));
     }
     // doors open: the T3's door interlock holds the car on the brakes
-    if (autoHold) targetBrake = Math.max(targetBrake, T3.brakeForce[2]);
+    if (autoHold) targetBrake = Math.max(targetBrake, this.brakeForce(2));
 
     // jerk-limited response (contactors, brake cylinders)
-    this.drive += Math.max(-30000 * dt, Math.min(24000 * dt, targetDrive - this.drive));
-    this.brake += Math.max(-30000 * dt, Math.min((emergency ? 90000 : 28000) * dt, targetBrake - this.brake));
+    this.drive += Math.max(-30000 * k * dt, Math.min(24000 * k * dt, targetDrive - this.drive));
+    this.brake += Math.max(-30000 * k * dt, Math.min((emergency ? 90000 : 28000) * k * dt, targetBrake - this.brake));
 
     // adhesion limit: exceeding it spins (traction) or locks (braking) the wheels
     let fDrive = this.drive, fBrake = this.brake;
@@ -93,12 +106,12 @@ export class Tram {
     if (this.slide) fBrake = 0.75 * adhesion;
     this.slideTime = this.slide ? this.slideTime + dt : 0;
     this.trackBrake = emergency && Math.abs(this.v) > 0.3;
-    const fTrack = this.trackBrake ? T3.trackBrakeForce : 0;
+    const fTrack = this.trackBrake ? T3.trackBrakeForce * k : 0;
 
     if (this.forcedStop) {
       // held (collision, crowbar...): brakes stay applied so it can't roll away when released
       this.v = 0; this.a = 0; this.drive = 0;
-      this.brake = Math.max(this.brake, T3.brakeForce[3]);
+      this.brake = Math.max(this.brake, this.brakeForce(3));
       this._electrics(dt, 0);
       return;
     }
@@ -107,7 +120,7 @@ export class Tram {
     const fGrav = (-m * G * grade) / Math.sqrt(1 + grade * grade);
     const curve = Math.min(0.015, 0.3 / Math.max(radius, 10)); // N/N, ~1.5 % equivalent at R = 20 m
     const speed = Math.abs(this.v);
-    const fResist = 650 + 28 * speed + 4.2 * speed * speed + m * G * curve;
+    const fResist = 650 * k + 28 * k * speed + 4.2 * (0.7 + 0.3 * k) * speed * speed + m * G * curve;
     const fStopping = fBrake + fTrack + fResist; // always opposes motion
     const fPush = fDrive + fGrav;
 
@@ -139,6 +152,7 @@ export class Tram {
     else if (notch === -5 && Math.abs(this.v) > 0.3) electric = -60000; // track brake coils
     const drop = electric > 0 ? (electric / 600) * 0.045 : 0;
     this.voltage = T3.lineVoltage + 18 * Math.sin(performance.now() / 2300) - drop;
+    this.electric = electric;
     const targetI = electric / Math.max(this.voltage, 300);
     // wheelspin: motor current collapses and flickers
     const slipI = this.slip ? 0.55 + 0.2 * Math.sin(performance.now() / 40) : 1;

@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { Route } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor } from './terrain.js';
-import { buildWorld } from './world.js';
-import { Tram, T3 } from './tram.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks } from './terrain.js';
+import { buildWorld, widenTramStreets } from './world.js';
+import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3 } from './models.js';
+import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
@@ -33,9 +33,11 @@ try {
     data.attribution += ' ' + data.geo.attribution;
   }
 } catch (e) { console.warn('no Geoportál data', e); }
+widenTramStreets(data); // street widths include the tram tracks running down the middle
 const route = new Route(data.path);
 const terrain = new Terrain(data.terrain);
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || []);
+// real bridge decks under the track (Geoportál Mosty 3D) set the track height there
+const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain));
 const ground = makeGround(route, terrain, profile);
 ground.walls = carveCorridor(terrain, route, profile); // flatten the track bench, retaining walls
 route.ground = ground;
@@ -120,8 +122,14 @@ function updateRain(dt) {
 }
 
 applyWeather('dry');
-const tramModel = makeT3({ line: data.line });
-tramModel.rotation.order = 'YXZ';
+// detailed T3 model (Sketchfab, CC BY-NC 4.0); the built-in low-poly one is the fallback
+let detailedOk = false;
+try { await loadDetailedT3(); detailedOk = true; data.attribution += ' Tatra T3 3D model: Sketchfab, CC BY-NC 4.0 (simplified).'; }
+catch (e) { console.warn('detailed T3 model not loaded', e); }
+const useDetailed = () => detailedOk && $('optModel').value === 'detailed';
+// the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
+const lineCars = data.line === '23' ? 1 : 2;
+let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -146,7 +154,9 @@ $('line').textContent = data.line;
 $('menuLine').textContent = data.line;
 const selLine = $('selLine');
 for (const l of lines.length ? lines : [{ line: data.line, from: data.stops[0].name, to: data.stops[data.stops.length - 1].name }]) {
-  selLine.add(new Option(`${l.line}: ${l.from} → ${l.to}`, l.line));
+  // a run that changes its number on the way: "9 → 10: Sídliště Řepy → Sídliště Řepy (via …)"
+  const label = l.then ? `${l.line} → ${l.then}: ${l.from} → ${l.to} (${l.via})` : `${l.line}: ${l.from} → ${l.to}`;
+  selLine.add(new Option(label, l.line));
 }
 selLine.value = data.line;
 selLine.addEventListener('change', () => {
@@ -181,7 +191,13 @@ $('btnStart').addEventListener('click', start);
 
 function start() {
   audio.start();
-  tram = new Tram();
+  const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
+  tram = new Tram(cars);
+  if (tramModel.userData.cars.length !== cars || !!tramModel.userData.mats.body !== useDetailed()) {
+    scene.remove(tramModel);
+    tramModel = makeT3({ line: data.line, cars, detailed: useDetailed() });
+    scene.add(tramModel);
+  }
   if (game) scene.remove(game.objects);
   const weather = $('optWeather').value;
   if (weather !== worldWeather) {
@@ -191,28 +207,36 @@ function start() {
   $('loading').classList.add('hidden');
   game = new Game(scene, data, route, tram, audio, {
     weather,
-    autoIrc: $('optAutoIrc').checked,
     tripIndex: +selTrip.value,
     startStop: +selStop.value,
     assist: $('optAssist').checked,
     deadman: $('optDeadman').checked,
     obstacles: $('optObst').value,
+    toutAt: outdoorTemperature($('optTemp').value),
+    detailed: useDetailed(),
     seed: Math.floor(Math.random() * 1e9),
   });
+  // the line number shown on the tram, the top bar and in messages follows the run
+  const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l); };
+  showLine(game.line);
+  game.onLineChange = showLine;
   if (traffic) traffic.dispose();
   traffic = new Traffic(scene, data, route, ground, game, Math.random);
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   window.game = game; // handy for debugging from the console
+  window.camera = camera;
   window.traffic = traffic;
   $('menu').classList.add('hidden');
   $('results').classList.add('hidden');
   hud.show(true);
+  $('mirror').classList.remove('hidden');
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
 }
 
 function showResults() {
   hud.show(false);
+  $('mirror').classList.add('hidden');
   const served = game.log.filter((l) => l.dev !== undefined);
   const avg = served.length ? served.reduce((a, l) => a + Math.abs(l.dev), 0) / served.length : 0;
   const pen = Object.entries(game.penalties).filter(([, v]) => v >= 0.5)
@@ -230,8 +254,30 @@ function showResults() {
   $('again').onclick = () => { $('results').classList.add('hidden'); $('menu').classList.remove('hidden'); };
 }
 
+// ------------------------------------------------------------------ outdoor temperature
+// Real hourly temperature in Prague for today (Open-Meteo, no key, sampled once per hour and
+// interpolated by the timetable clock), or a fixed season. Fetched once in the background.
+let pragueHourly = null;
+fetch('https://api.open-meteo.com/v1/forecast?latitude=50.08&longitude=14.42&hourly=temperature_2m&forecast_days=2&timezone=Europe%2FPrague')
+  .then((r) => r.json()).then((j) => { pragueHourly = j.hourly?.temperature_2m || null; }).catch(() => { /* offline: seasonal fallback */ });
+function outdoorTemperature(mode) {
+  const fixed = { winter: -6, autumn: 8, summer: 29 }[mode];
+  if (fixed !== undefined) return (clock) => fixed + 2 * Math.sin(((clock / 3600 - 9) / 24) * 2 * Math.PI);
+  return (clock) => {
+    const h = clock / 3600;
+    if (pragueHourly) {
+      const i = Math.max(0, Math.min(pragueHourly.length - 2, Math.floor(h)));
+      return pragueHourly[i] + (pragueHourly[i + 1] - pragueHourly[i]) * Math.min(1, Math.max(0, h - i));
+    }
+    // no network: a plausible day for the season, coolest at 5 h, warmest at 15 h
+    const month = new Date().getMonth(), mean = [0, 1, 5, 10, 15, 18, 20, 20, 15, 10, 5, 1][month];
+    return mean + 4 * Math.sin(((h - 9) / 24) * 2 * Math.PI);
+  };
+}
+
 // ------------------------------------------------------------------ input
-const input = { deadman: false, sand: false };
+const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
+let look = 0, lookTarget = 0, mirrorOn = true; // head turned left (+) / right (-), right mirror shown
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished) return;
   const k = e.key.toLowerCase();
@@ -249,6 +295,8 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Shift') input.deadman = true;
   if (k === 'a') input.sand = true;
+  if (k === 'c') input.cutout = true;     // heating cut-out button (pass a contact coasting in winter)
+  if (k === 'y') input.switchBtn = true;  // "Výhybka" button: current through the contact
   if (['arrowup', 'arrowdown', ' '].includes(k)) e.preventDefault();
   if (k === 'p' || k === 'escape') { game.paused = !game.paused; return; }
   if (game.paused) return;
@@ -262,9 +310,12 @@ window.addEventListener('keydown', (e) => {
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
-    case 'q': game.irc('left'); break;
-    case 'r': game.irc('straight'); break;
-    case 'e': game.irc('right'); break;
+    case 'q': case 'arrowleft': lookTarget = 1.3; break;   // look out of the left window
+    case 'e': case 'arrowright': lookTarget = -1.3; break; // look right, at the doors
+    case 'z': mirrorOn = !mirrorOn; document.body.classList.toggle('nomirror', !mirrorOn); break;
+    case 'h': game.setHeating('saloon'); break;
+    case 'k': game.setHeating('cab'); break;
+    case 'f': game.setHeating('flap'); break;
     case 'v': chase = !chase; document.body.classList.toggle('chase', chase); break;
     case 'm': audio.setMuted(!audio.muted); break;
   }
@@ -276,7 +327,11 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') input.deadman = false;
-  if (e.key.toLowerCase() === 'a') input.sand = false;
+  const ku = e.key.toLowerCase();
+  if (ku === 'a') input.sand = false;
+  if (ku === 'c') input.cutout = false;
+  if (ku === 'y') input.switchBtn = false;
+  if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (e.key === ' ' && tram.notch === -5) tram.notch = -4;
 });
 window.addEventListener('blur', () => { if (game && !game.finished && !pilot) game.paused = true; }); // keep riding on autopilot
@@ -295,22 +350,20 @@ function previewAt(s) {
 }
 
 function placeTram(s) {
-  // body rests on its two bogies, so it pitches with the gradient
-  const a = route.at(s - 3.2), b = route.at(s - 10.8);
-  const za = profile.height(s - 3.2), zb = profile.height(s - 10.8);
-  tramModel.position.set((a.x + b.x) / 2, (za + zb) / 2 + 0.3, -(a.y + b.y) / 2);
-  tramModel.rotation.y = Math.atan2(a.x - b.x, -(a.y - b.y));
-  tramModel.rotation.x = -Math.atan2(za - zb, 7.6);
+  // each car rests on its two bogies, so it follows curves and pitches with the gradient
+  placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q)]; });
 }
 
 function updateCamera(dt, t) {
   const s = tram.s;
   placeTram(s);
+  if (window.freeCam) { tramModel.visible = true; return; } // debugging: camera set from the console
   tramModel.visible = chase;
   if (chase) {
     // behind and above the tram body (works also at the very start of the route)
-    const fx = Math.sin(tramModel.rotation.y), fz = Math.cos(tramModel.rotation.y);
-    camPos.set(tramModel.position.x - fx * 20 - fz * 3, tramModel.position.y + 8.5, tramModel.position.z - fz * 20 + fx * 3);
+    const lead = tramModel.userData.cars[0], back = 20 + (tramModel.userData.cars.length - 1) * 8;
+    const fx = Math.sin(lead.rotation.y), fz = Math.cos(lead.rotation.y);
+    camPos.set(lead.position.x - fx * back - fz * 3, lead.position.y + 8.5, lead.position.z - fz * back + fx * 3);
     const q = route.at(s + 10);
     camLook.set(q.x, profile.height(s + 10) + 1.5, -q.y);
     camera.position.lerp(camPos, Math.min(1, dt * 4));
@@ -326,13 +379,16 @@ function updateCamera(dt, t) {
   while (d < -Math.PI) d += 2 * Math.PI;
   yaw += d * Math.min(1, dt * 5);
   const bob = Math.sin(t * 9) * 0.012 * Math.min(1, Math.abs(tram.v) / 8);
+  look += (lookTarget - look) * Math.min(1, dt * 6);
   // the cab pitches with the track (bogie-to-bogie slope) plus a little load transfer
   const slope = Math.atan2(profile.height(s - 3.2) - profile.height(s - 10.8), 7.6);
   const pitch = -0.035 - tram.a * 0.006 + slope;
-  camera.position.set(eye.x, profile.height(s - 1.4) + 2.65 + bob, -eye.y);
+  // turning the head also leans towards that side window
+  const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
+  camera.position.set(eye.x + lx, profile.height(s - 1.4) + 2.65 + bob, -(eye.y + ly));
   camera.rotation.set(0, 0, 0);
   camera.rotation.order = 'YXZ';
-  camera.rotation.y = -yaw;
+  camera.rotation.y = -yaw + look;
   camera.rotation.x = pitch;
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8);
 }
@@ -359,6 +415,40 @@ function frame(now) {
     }
   }
   renderer.render(scene, camera);
+  if (game && !chase && mirrorOn) renderMirror();
+}
+
+// Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
+// along the side of the set, rendered to a texture and shown mirrored in the frame at the right.
+const mirrorCam = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 700);
+const mirrorRT = new THREE.WebGLRenderTarget(240, 304);
+const mirrorScene = new THREE.Scene(), mirrorView = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+{
+  const g = new THREE.PlaneGeometry(2, 2), uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); // a mirror shows it the other way round
+  mirrorScene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: mirrorRT.texture })));
+}
+function renderMirror() {
+  const s = tram.s, p = route.offset(s - 0.6, -1.95), h = route.heading(s - 6, 6), z = profile.height(s);
+  mirrorCam.position.set(p.x, z + 2.35, -p.y);
+  // looking back, turned a little outwards so the side of the tram fills the inner edge
+  mirrorCam.rotation.order = 'YXZ';
+  mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.22, 0);
+  const vis = tramModel.visible;
+  tramModel.visible = true;
+  renderer.setRenderTarget(mirrorRT);
+  renderer.render(scene, mirrorCam);
+  renderer.setRenderTarget(null);
+  tramModel.visible = vis;
+  const r = $('mirror').getBoundingClientRect(), H = window.innerHeight;
+  renderer.setViewport(r.left + 6, H - r.bottom + 6, r.width - 12, r.height - 12);
+  renderer.setScissor(r.left + 6, H - r.bottom + 6, r.width - 12, r.height - 12);
+  renderer.setScissorTest(true);
+  renderer.autoClear = false;
+  renderer.render(mirrorScene, mirrorView);
+  renderer.autoClear = true;
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
 }
 
 $('loading').classList.add('hidden');

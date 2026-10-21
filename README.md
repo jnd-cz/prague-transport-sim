@@ -18,7 +18,15 @@ Open http://localhost:8740. There's no build step: plain ES modules, with Three.
 python -I tools/build_line.py --line 22 --headsign "Zahradní Město"
 python -I tools/build_line.py --line 23            # any Prague tram line
 python -I tools/build_line.py --line 17 --refresh  # re-download from Overpass
+python -I tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
 ```
+
+With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
+diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
+network; arrivals of the first line and departures of the second at the shared terminus are paired
+in time order (PID GTFS has no `block_id`). The current line 9 is such a run: Sídliště Řepy →
+Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10 (track repairs, autumn 2026).
+Stop platforms come from OSM (`public_transport=platform`) for all lines.
 
 The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
 with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
@@ -32,7 +40,8 @@ python -I tools/geoportal.py --line 22
 ```
 
 This fetches, for the corridor 110 m either side of the route, the IPR Praha LOD2 3D buildings
-(I3S scene service: real roof shapes, absolute heights matching the terrain), retaining walls with
+and the Mosty 3D bridges (I3S scene services: real roof shapes, absolute heights matching the
+terrain), retaining walls with
 their heights and the city tree register (individual trees and tree rows). It writes
 `data/lineN.geo.json` and the quantised building geometry `data/lineN.bld.bin` (2.6–4.6 MB per
 line). Without it the game falls back to extruded OSM footprints. Underpasses and tunnels on the
@@ -53,44 +62,77 @@ The service date is a constant at the top of the script.
   magnetic track brakes don't depend on adhesion.
 - Line selection in the menu (each line loads its own world). Stop posts list the day lines serving
   each stop (GTFS `route_stops`); trams of those lines run ahead of you.
-- Passengers: an on-board counter (normal capacity 110, crush 160). Demand follows the time of day
+- Line changes: a run can change its number at a terminus (line 9 continues as 10 at Nákladové
+  nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
+- Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered,
+  six doors); line 23
+  runs a single heritage car. "Set" in the menu overrides it. Each car follows the track on its own
+  bogies.
+- Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day
   — morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a packed car
   boards slowly and a full one leaves people for the next tram.
-- Stops from GTFS with real departure times. Stop at the sign, open the doors, wait for boarding and
-  depart on time; early departures cost the most. Request stops (✋) can be passed when nobody waits.
-- Switches: pass under the overhead contact (yellow plate, white sign with a black triangle) drawing
-  current to set the turn, or coasting to go straight. Switches whose contact would fall within 60 m
-  after a stop are radio (IRC) switches (white sign with a radio symbol): select the direction with
-  Q / R / E (left / straight / right) within 80 m — each press sets the next radio switch not yet set —
-  or tick "Automatic IRC switches". The red LED arrow before each switch shows the blade position and
-  blinks while the switch is locked. If you got it wrong, stop and use the crowbar (X).
+- Stops from GTFS with real departure times. Where OSM maps the platform, the whole set must stand
+  alongside it (so a second tram can stop behind one already at a long platform); otherwise stop at
+  the sign. Open the doors, wait for boarding and depart on time; early departures cost the most.
+  Request stops (✋) can be passed when nobody waits.
+- Switches: every facing switch has an overhead contact (yellow plate, white sign with a black
+  triangle), worked by the pantograph: pass under it drawing current to set the turn, or coasting to go
+  straight — also right after a stop, at a signal or on a hill (judging that is part of the driver's
+  skill). Current also flows with the **Výhybka** button (Y, as on T3SUCS) and — in winter — through
+  the heating, unless you hold the heating cut-out (C) while coasting under the contact. Contacts are ~22 m before the switch but never where a tram stands with its pantograph at a
+  stop or signal. Trailing switches (where tracks join) need nothing; diamond crossings are not
+  switches. The red LED arrow before each switch shows the blade position and blinks while the switch
+  is locked. If you got it wrong, stop and use the crowbar (X). (Radio/IRC switching remains in the
+  code for switches the data marks as such; none are marked now.)
 - Stops: the tram counts as at the platform when its front is between 20 m before and 12 m past the
   stop sign; within 3 m of the sign earns a precision bonus.
 - Prague tram signals (four lamps: three on top, one below): the two outer top lamps = stop; top middle +
   bottom = go straight; top left/right + bottom = go left/right; a blinking GO aspect means it is ending.
   The call signal below shows three LED bars (\ | /): the bar of the coming direction lights orange
   once the tram is detected and blinks just before GO. Distant signals with a
-  yellow "P" plate stand before signals hidden behind curves. Tram priority and cross traffic.
+  yellow "P" plate stand before signals hidden behind curves. Tram priority; cross traffic drives
+  along the real crossing street and stops at its line while the tram has GO.
 - Interlaced track in Letenská (under the building near Malostranské náměstí): both directions share
   ~65 m of track, detected automatically from the two OSM route relations. Signals at both ends grant
   the section to one direction at a time, return to STOP behind the entering tram, and hold the other
   side until the section is clear plus 6 s clearance. Oncoming trams obey it.
-- Signs: classic red Prague stop signs, speed limit boards (rychlostník), contact and radio-switch
-  signs, dangerous gradient boards.
+- Signs: classic red Prague stop signs, speed limit boards (rychlostník), contact signs, dangerous
+  gradient boards. Zebra crossings painted where OSM marks them (not across the tracks).
 - Traffic: other trams ahead on the same track (they stop at stops and red signals: keep your distance)
-  and oncoming on the opposite track, cars in the street lanes beside the tram (following the real road
-  geometry and one-way streets) and on the surrounding road network (continuing across junctions),
-  pedestrians on footways and sidewalks who keep off the tracks. Everything fades in and out. Obstacles: parked cars fouling the track (ring the bell) and
+  and oncoming on the opposite track — each carries a line that really serves that stop (GTFS) and
+  turns off (fades out) after the last stop it shares with your line. Cars in the lanes beside the
+  tracks (following the real road geometry and one-way streets) and on the surrounding road network
+  (continuing across junctions); they keep their distance, queue, and pitch/roll with the road
+  surface. Pedestrians on footways and sidewalks who keep off the tracks. Everything fades in and out. Obstacles: parked cars fouling the track (ring the bell) and
   pedestrians crossing.
 - Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut
-  into a hillside (Chotkova), Most Legií on a deck with piers. OSM track geometry is smoothed into curves.
+  into a hillside (Chotkova), Most Legií on a deck with piers. OSM track geometry is smoothed into curves,
+  and the terrain is lowered under every track bed so it never pokes through.
+- Heating (DPP T3SUCS manual): saloon seat heaters 0/1/2 (H: three seats each side / all seats),
+  cab heater (kalorifer) 0–3 (K: off / fan / half / full) and the flap that lets the accelerator
+  resistors' waste heat into the saloon (F). The info panel shows the outside, saloon and cab
+  temperatures. Outside temperature: Prague now (Open-Meteo, hourly) or a fixed winter / autumn /
+  summer day (menu). Cold passengers (< 12 °C) and heat you caused cost points; open doors let the
+  heat out; in summer passengers open the windows.
+- Looking around: hold Q / E (or ← / →) to look out of the left / right window; the right
+  rear-view mirror (Z toggles) shows the side of the set and the doors.
+- Signals and signs stand off the road: on catenary poles, hung from span wires beside the contact
+  wire, or at the kerb — not on platforms.
+- Buildings are textured by type (old tenement, panel block, church, industrial hall, glass office)
+  from the OSM tag under each LOD2 building, its roof shape and size. Real 3D bridges (Mosty 3D) set
+  the deck height on tagged bridges and the clearance under structures (station canopies included).
+- Tram model: detailed (Sketchfab "Tatra T3", CC BY-NC 4.0, simplified — see `assets/t3/LICENSE.txt`)
+  or the built-in simple one (menu).
+- Overhead line: span wires anchored on poles at the kerb (between carriageway and sidewalk), on wall
+  rosettes where a building stands close, or a bracket arm where one side has no room; closer spacing
+  on curves. Street trees are kept (pruned) clear of all tracks.
 
 ## Autopilot
 
 Tick "Autopilot — just watch the ride" in the menu, or press **O** during a shift. It drives like the
 headless test bot: plans speed from limits, stops, signals, obstacles and the tram ahead, picks the
 notch from the forces needed on the gradient, works the doors, departs on time, rings the bell, sands
-on slippery rail, sets IRC switches and coasts or powers under contacts. Press **V** for the outside
+on slippery rail, and gives a short pulse of power (turn) or coasts (straight) under contacts. Press **V** for the outside
 view. Any controller or door key (W/S/Space/N/D) takes over; O hands back to the autopilot. The
 same driver lives in `src/autopilot.js` and is used by `tools/autopilot.js`.
 
