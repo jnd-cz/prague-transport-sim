@@ -2,9 +2,11 @@
  {
   "line": "9",
   "from": "Sídliště Řepy",
-  "to": "Nákladové nádraží Žižkov",
-  "km": 17.3,
-  "stops": 30
+  "to": "Sídliště Řepy",
+  "km": 28.5,
+  "stops": 60,
+  "then": "10",
+  "via": "Nákladové nádraží Žižkov"
  },
  {
   "line": "17",

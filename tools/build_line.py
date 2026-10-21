@@ -6,8 +6,13 @@ Sources:
   - PID GTFS (stops + timetable)  -- ROPID / data.pid.cz, CC BY 4.0
   - ČÚZK DMR 5G bare-earth terrain (lidar) via the ags.cuzk.gov.cz ImageServer  -- CC BY 4.0
 
-Usage:  python -I tools/build_line.py [--refresh]
-Raw downloads are cached in raw/, output goes to data/line22.json.
+Usage:  python -I tools/build_line.py --line N [--headsign "..."] [--refresh]
+        python -I tools/build_line.py --line 9 --then 10      (one vehicle run: 9, continuing as 10)
+Raw downloads are cached in raw/, output goes to data/lineN.json.
+
+With --then, the path is not taken from the OSM route relations (they describe the regular
+route, not diversions) but from the PID GTFS shapes of the two trips, matched onto the OSM tram
+track network; the corridor queries then use the matched OSM ways.
 """
 import base64
 import csv
@@ -37,12 +42,16 @@ def _arg(name, default):
 
 
 LINE = _arg("--line", "22")
+THEN = _arg("--then", None)  # the vehicle continues as this line at the terminus (GTFS run)
 GTFS_ROUTE = f"L{LINE}"
 GTFS_DIRECTION = "0"
 SERVICE_DATE = dt.date(2026, 10, 21)
 GTFS_ZIP = os.path.join(RAW, "PID_GTFS.zip")
 # per-line download cache (line 22 keeps the original location)
-if LINE != "22":
+if THEN:
+    RAW = os.path.join(RAW, f"run{LINE}-{THEN}")
+    os.makedirs(RAW, exist_ok=True)
+elif LINE != "22":
     RAW = os.path.join(RAW, f"line{LINE}")
     os.makedirs(RAW, exist_ok=True)
 
@@ -127,24 +136,39 @@ def gtfs_headsign():
     return c.most_common(1)[0][0]
 
 
-GTFS_HEADSIGN = gtfs_headsign()
-OSM_RELATION, OSM_RELATION_BACK = pick_relations(GTFS_HEADSIGN)
-R = f"relation({OSM_RELATION})->.r;way(r.r)->.w;"
-Q_ROUTE = route_query(OSM_RELATION)
-Q_ROUTE_BACK = route_query(OSM_RELATION_BACK) if OSM_RELATION_BACK else None
-Q_TRACKS = f"[out:json][timeout:120];{R}way(around.w:60)[railway~\"^(tram|light_rail)$\"]->.t;.t out body;.t >;out body qt;"
-Q_POINTS = (f"[out:json][timeout:120];{R}"
-            "(node(around.w:35)[highway=traffic_signals];"
-            "node(around.w:6)[railway~\"^(tram_level_crossing|level_crossing|tram_crossing|crossing)$\"];"
-            "node(around.w:15)[highway=crossing];);out body qt;")
-Q_BUILDINGS = f"[out:json][timeout:180];{R}way(around.w:110)[building];out tags geom qt;"
-Q_ROADS = (f"[out:json][timeout:180];{R}way(around.w:90)[highway~\"^(motorway|trunk|primary|secondary|tertiary|"
-           "residential|unclassified|living_street|service|pedestrian|footway|primary_link|secondary_link|"
-           "tertiary_link|trunk_link)$\"];out tags geom qt;")
-Q_GREEN = (f"[out:json][timeout:180];{R}(way(around.w:120)[landuse~\"^(grass|forest|meadow|recreation_ground|"
-           "village_green|cemetery|allotments)$\"];way(around.w:120)[leisure~\"^(park|garden|pitch)$\"];"
-           "way(around.w:120)[natural~\"^(wood|scrub|grassland)$\"];);out tags geom qt;")
-Q_WATER = f"[out:json][timeout:180];{R}(relation(around.w:250)[natural=water];way(around.w:250)[natural=water];);out geom qt;"
+if THEN:
+    GTFS_HEADSIGN = OSM_RELATION = OSM_RELATION_BACK = Q_ROUTE = Q_ROUTE_BACK = None
+    R = None  # set from the matched path in main()
+else:
+    GTFS_HEADSIGN = gtfs_headsign()
+    OSM_RELATION, OSM_RELATION_BACK = pick_relations(GTFS_HEADSIGN)
+    R = f"relation({OSM_RELATION})->.r;way(r.r)->.w;"
+    Q_ROUTE = route_query(OSM_RELATION)
+    Q_ROUTE_BACK = route_query(OSM_RELATION_BACK) if OSM_RELATION_BACK else None
+
+
+def corridor_queries(R):
+    """Overpass queries for everything around the route ways in set .w (defined by R)."""
+    global Q_TRACKS, Q_POINTS, Q_BUILDINGS, Q_ROADS, Q_GREEN, Q_WATER, Q_PLATFORMS
+    Q_TRACKS = f"[out:json][timeout:120];{R}way(around.w:60)[railway~\"^(tram|light_rail)$\"]->.t;.t out body;.t >;out body qt;"
+    Q_POINTS = (f"[out:json][timeout:120];{R}"
+                "(node(around.w:35)[highway=traffic_signals];"
+                "node(around.w:6)[railway~\"^(tram_level_crossing|level_crossing|tram_crossing|crossing)$\"];"
+                "node(around.w:15)[highway=crossing];);out body qt;")
+    Q_PLATFORMS = (f"[out:json][timeout:120];{R}(way(around.w:20)[public_transport=platform];"
+                   "way(around.w:20)[railway=platform];);out tags geom qt;")
+    Q_BUILDINGS = f"[out:json][timeout:180];{R}way(around.w:110)[building];out tags geom qt;"
+    Q_ROADS = (f"[out:json][timeout:180];{R}way(around.w:90)[highway~\"^(motorway|trunk|primary|secondary|tertiary|"
+               "residential|unclassified|living_street|service|pedestrian|footway|primary_link|secondary_link|"
+               "tertiary_link|trunk_link)$\"];out tags geom qt;")
+    Q_GREEN = (f"[out:json][timeout:180];{R}(way(around.w:120)[landuse~\"^(grass|forest|meadow|recreation_ground|"
+               "village_green|cemetery|allotments)$\"];way(around.w:120)[leisure~\"^(park|garden|pitch)$\"];"
+               "way(around.w:120)[natural~\"^(wood|scrub|grassland)$\"];);out tags geom qt;")
+    Q_WATER = f"[out:json][timeout:180];{R}(relation(around.w:250)[natural=water];way(around.w:250)[natural=water];);out geom qt;"
+
+
+if R:
+    corridor_queries(R)
 
 
 # ---------------------------------------------------------------- geometry
@@ -379,14 +403,247 @@ def fetch_terrain(P, lat_min, lat_max, lon_min, lon_max):
             "nx": w, "ny": h, "base": base, "scale": 0.1, "data": base64.b64encode(packed).decode()}
 
 
+# ---------------------------------------------------------------- GTFS run (line, continuing as another)
+def gtfs_open():
+    z = zipfile.ZipFile(GTFS_ZIP)
+    rd = lambda n: csv.DictReader(io.TextIOWrapper(z.open(n), encoding="utf-8-sig"))
+    ymd, wd = SERVICE_DATE.strftime("%Y%m%d"), SERVICE_DATE.strftime("%A").lower()
+    active = {c["service_id"] for c in rd("calendar.txt") if c["start_date"] <= ymd <= c["end_date"] and c[wd] == "1"}
+    for c in rd("calendar_dates.txt"):
+        if c["date"] == ymd:
+            (active.add if c["exception_type"] == "1" else active.discard)(c["service_id"])
+    return rd, active
+
+
+def secs(hms):
+    h, m, s_ = (int(x) for x in hms.split(":"))
+    return h * 3600 + m * 60 + s_
+
+
+def plan_run(first, then):
+    """A vehicle run: trips of `first` ending at a terminus, each continuing as the next trip of
+    `then` leaving that stop (PID GTFS has no block_id, so arrivals and departures are paired in
+    time order, 2-25 min layover). Also the shapes of the opposite direction (for oncoming trams)."""
+    rd, active = gtfs_open()
+    trips = {t["trip_id"]: t for t in rd("trips.txt")
+             if t["route_id"] in (f"L{first}", f"L{then}") and t["service_id"] in active}
+    st = defaultdict(list)
+    for r in rd("stop_times.txt"):
+        if r["trip_id"] in trips:
+            st[r["trip_id"]].append(r)
+    for v in st.values():
+        v.sort(key=lambda r: int(r["stop_sequence"]))
+    pat = lambda tid: tuple(r["stop_id"] for r in st[tid])
+    by = defaultdict(list)
+    for tid in st:
+        by[(trips[tid]["route_id"][1:], pat(tid))].append(tid)
+    # the first line's pattern whose last stop is where a pattern of the second line starts
+    starts_then = {p[0] for (l, p) in by if l == then}
+    cand = [(len(v), p) for (l, p), v in by.items() if l == first and p[-1] in starts_then]
+    if not cand:
+        raise SystemExit(f"no trip of {first} ends where a trip of {then} starts")
+    pa = max(cand)[1]
+    term = pa[-1]
+    pb = max((len(v), p) for (l, p), v in by.items() if l == then and p[0] == term)[1]
+    ta = sorted(by[(first, pa)], key=lambda t: secs(st[t][-1]["arrival_time"]))
+    tb = sorted(by[(then, pb)], key=lambda t: secs(st[t][0]["departure_time"]))
+    timetable, j = [], 0
+    for a in ta:
+        arr = secs(st[a][-1]["arrival_time"])
+        while j < len(tb) and secs(st[tb[j]][0]["departure_time"]) < arr + 120:
+            j += 1
+        if j >= len(tb):
+            break
+        dep = secs(st[tb[j]][0]["departure_time"])
+        if dep - arr <= 1500:
+            timetable.append([secs(r["departure_time"]) for r in st[a][:-1]] + [secs(r["departure_time"]) for r in st[tb[j]]])
+            j += 1
+    shape_of = lambda tids: Counter(trips[t]["shape_id"] for t in tids).most_common(1)[0][0]
+    # opposite direction: `then` arriving at the terminus, then `first` leaving it
+    # (arrival and departure platforms of a terminus have different stop ids: compare names)
+    names = {r["stop_id"]: r["stop_name"] for r in rd("stops.txt")}
+    tname = names[term]
+    back_b = [v for (l, p), v in by.items() if l == then and names[p[-1]] == tname]
+    back_a = [v for (l, p), v in by.items() if l == first and names[p[0]] == tname]
+    back = []
+    if back_b and back_a:
+        back = [shape_of(max(back_b, key=len)), shape_of(max(back_a, key=len))]
+    flags = {}
+    for r in st[ta[0]] + st[tb[0]]:
+        flags[r["stop_id"]] = flags.get(r["stop_id"], False) or r["pickup_type"] == "3" or r["drop_off_type"] == "3"
+    stop_ids = list(pa) + list(pb[1:])
+    print(f"run {first}->{then}: {len(pa)} + {len(pb) - 1} stops, change at stop {len(pa) - 1}, "
+          f"{len(timetable)} paired trips, shapes {shape_of(ta)} + {shape_of(tb)}, back {back}")
+    return {"stops": stop_ids, "change": len(pa) - 1, "timetable": timetable, "flags": flags,
+            "shapes": [shape_of(ta), shape_of(tb)], "back": back}
+
+
+def gtfs_shapes(ids):
+    rd, _ = gtfs_open()
+    pts = defaultdict(list)
+    for r in rd("shapes.txt"):
+        if r["shape_id"] in ids:
+            pts[r["shape_id"]].append((int(r["shape_pt_sequence"]), float(r["shape_pt_lat"]), float(r["shape_pt_lon"])))
+    return {k: [(la, lo) for _, la, lo in sorted(v)] for k, v in pts.items()}
+
+
+def match_shape(shape, net, P):
+    """Map-match a GTFS shape (lat/lon) onto the OSM track graph: piecewise Dijkstra in 250 m
+    windows along the shape. Edge cost grows with the distance from the shape, more on the left of
+    it (Prague runs on the right-hand track), and a lot when running against the shape; turns
+    sharper than 75° are not allowed (no reversing at junctions or diamond crossings)."""
+    import heapq
+    nodes, adj, pos = net["nodes"], net["adj"], net["pos"]
+    pts = []
+    for la, lo in shape:
+        q = P(la, lo)
+        if not pts or dist(pts[-1], q) > 1:
+            pts.append(q)
+    sh = Polyline(pts)
+    grid = net["grid"]
+
+    def near(p, r):
+        out = []
+        for cx in range(int((p[0] - r) // 50), int((p[0] + r) // 50) + 1):
+            for cy in range(int((p[1] - r) // 50), int((p[1] + r) // 50) + 1):
+                for n in grid.get((cx, cy), ()):
+                    if dist(pos[n], p) <= r:
+                        out.append(n)
+        return out
+
+    def edge_cost(a, b, lo, hi):
+        pa, pb = pos[a], pos[b]
+        m = ((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2)
+        s_, d, side = sh.project(m, lo, hi, radius=1)
+        if s_ is None or d > 30:
+            return None
+        t0, t1 = sh.at(s_ - 2), sh.at(s_ + 2)
+        along = (pb[0] - pa[0]) * (t1[0] - t0[0]) + (pb[1] - pa[1]) * (t1[1] - t0[1])
+        k = 1 + (d / 2.5) ** 2 + (0.8 if side > 0 and d > 0.7 else 0) + (6 if along < 0 else 0)
+        return dist(pa, pb) * k
+
+    def turn_ok(p, a, b):
+        if p is None:
+            return True
+        return angle_between((pos[a][0] - pos[p][0], pos[a][1] - pos[p][1]), (pos[b][0] - pos[a][0], pos[b][1] - pos[a][1])) <= 75
+
+    start = min(near(pts[0], 40) or near(pts[0], 120), key=lambda n: dist(pos[n], pts[0]))
+    path, state = [start], (None, start)
+    s_cur, STEP = 0.0, 250.0
+    while s_cur < sh.length - 1:
+        s_next = min(sh.length, s_cur + STEP)
+        lo, hi = s_cur - 60, s_next + 60
+        reached = {}
+
+        def is_goal(n):
+            # the node lies on the shape at or beyond the end of this window (nodes can be far apart)
+            if n not in reached:
+                s_, d, _ = sh.project(pos[n], lo, hi + 200, radius=2)
+                reached[n] = s_ is not None and d < 25 and s_ >= s_next - (0.5 if s_next >= sh.length else 0)
+            return reached[n]
+        best = {state: 0.0}
+        prev = {}
+        heap = [(0.0, 0, state)]
+        found, cnt = None, 0
+        while heap:
+            c, _, st_ = heapq.heappop(heap)
+            if c > best.get(st_, 1e18):
+                continue
+            p, a = st_
+            if st_ != state and is_goal(a):
+                found = st_
+                break
+            for b in adj[a]:
+                if b == p or not turn_ok(p, a, b):
+                    continue
+                ec = edge_cost(a, b, lo, hi + 200)
+                if ec is None:
+                    continue
+                ns, nc = (a, b), c + ec
+                if nc < best.get(ns, 1e18):
+                    best[ns] = nc
+                    prev[ns] = st_
+                    cnt += 1
+                    heapq.heappush(heap, (nc, cnt, ns))
+        if found is None:
+            print(f"  ! shape matching stuck at {s_cur:.0f} m of {sh.length:.0f} m")
+            break
+        seq, x = [], found
+        while x != state:
+            seq.append(x[1])
+            x = prev[x]
+        path.extend(reversed(seq))
+        state = found
+        # continue from where the reached node actually lies (it may be well past the target)
+        s_found = sh.project(pos[found[1]], lo, hi + 200, radius=2)[0]
+        s_cur = max(s_next, s_found or s_next)
+    print(f"  matched shape: {sh.length / 1000:.2f} km -> {len(path)} track nodes")
+    return path
+
+
+def load_network(P):
+    """Every tram track in Prague (Overpass, cached), as a node graph in local metres."""
+    q = ('[out:json][timeout:180][bbox:49.94,14.22,50.18,14.71];way[railway~"^(tram|light_rail)$"];'
+         'out body;>;out skel qt;')
+    js = overpass("network_tracks", q)
+    nodes = {e["id"]: (e["lat"], e["lon"]) for e in js["elements"] if e["type"] == "node"}
+    ways = [e for e in js["elements"] if e["type"] == "way"]
+    adj, edge_way = defaultdict(set), {}
+    for w in ways:
+        for a, b in zip(w["nodes"], w["nodes"][1:]):
+            if a in nodes and b in nodes and a != b:
+                adj[a].add(b)
+                adj[b].add(a)
+                edge_way[(a, b)] = edge_way[(b, a)] = w
+    pos = {n: P(*ll) for n, ll in nodes.items()}
+    grid = defaultdict(list)
+    for n, p in pos.items():
+        grid[(int(p[0] // 50), int(p[1] // 50))].append(n)
+    return {"nodes": nodes, "adj": adj, "edge_way": edge_way, "pos": pos, "grid": grid}
+
+
+def run_path():
+    """Path, opposite path, bridge/tunnel edges and corridor ways of a GTFS run."""
+    run = plan_run(LINE, THEN)
+    shapes = gtfs_shapes(set(run["shapes"]) | set(run["back"]))
+    main_shape = shapes[run["shapes"][0]] + shapes[run["shapes"][1]][1:]
+    lat0 = sum(p[0] for p in main_shape) / len(main_shape)
+    lon0 = sum(p[1] for p in main_shape) / len(main_shape)
+    P0 = Proj(lat0, lon0)
+    net = load_network(P0)
+    ids = match_shape(main_shape, net, P0)
+    back_ids = []
+    if run["back"]:
+        back_ids = match_shape(shapes[run["back"][0]] + shapes[run["back"][1]][1:], net, P0)
+    bridge_pairs, tunnel_pairs, way_ids = set(), set(), set()
+    for a, b in zip(ids, ids[1:]):
+        w = net["edge_way"].get((a, b))
+        if not w:
+            continue
+        way_ids.add(w["id"])
+        t = w.get("tags", {})
+        if t.get("bridge") not in (None, "no"):
+            bridge_pairs.update({(a, b), (b, a)})
+        elif t.get("tunnel") not in (None, "no") or t.get("covered") == "yes" or t.get("layer", "0").lstrip("-").isdigit() and int(t.get("layer", "0")) < 0:
+            tunnel_pairs.update({(a, b), (b, a)})
+    return run, net["nodes"], ids, back_ids, bridge_pairs, tunnel_pairs, sorted(way_ids)
+
+
 # ---------------------------------------------------------------- main
 def main():
     os.makedirs(OUT, exist_ok=True)
-    route = overpass(f"route_{OSM_RELATION}", Q_ROUTE)
-    rel = next(e for e in route["elements"] if e["type"] == "relation")
-    nodes = {e["id"]: (e["lat"], e["lon"]) for e in route["elements"] if e["type"] == "node"}
-    ways = {e["id"]: e["nodes"] for e in route["elements"] if e["type"] == "way"}
-    bridge_pairs, tunnel_pairs = set(), set()
+    run = None
+    if THEN:
+        run, nodes, path_ids, back_ids, bridge_pairs, tunnel_pairs, way_ids = run_path()
+        corridor_queries(f"way(id:{','.join(map(str, way_ids))})->.w;")
+        rel = {"tags": {"name": f"Tram {LINE} → {THEN}"}}
+        route = {"elements": []}
+    else:
+        route = overpass(f"route_{OSM_RELATION}", Q_ROUTE)
+        rel = next(e for e in route["elements"] if e["type"] == "relation")
+        nodes = {e["id"]: (e["lat"], e["lon"]) for e in route["elements"] if e["type"] == "node"}
+        ways = {e["id"]: e["nodes"] for e in route["elements"] if e["type"] == "way"}
+        bridge_pairs, tunnel_pairs = set(), set()
     for e in route["elements"]:
         if e["type"] != "way":
             continue
@@ -401,7 +658,8 @@ def main():
             for a, b in zip(e["nodes"], e["nodes"][1:]):
                 pairs.update({(a, b), (b, a)})
 
-    path_ids = chain_route(rel, ways)
+    if not THEN:
+        path_ids = chain_route(rel, ways)
     # drop consecutive duplicates
     path_ids = [n for i, n in enumerate(path_ids) if i == 0 or n != path_ids[i - 1]]
     lat0 = sum(nodes[n][0] for n in path_ids) / len(path_ids)
@@ -464,11 +722,23 @@ def main():
         d_in = norm((here[0] - tpos[path_ids[i - 1]][0], here[1] - tpos[path_ids[i - 1]][1]))
         route_tgt = walk(nid, path_ids[i + 1])
         v_route = (route_tgt[0] - here[0], route_tgt[1] - here[1])
+        def through(o):
+            # another track passing straight through this node (a diamond crossing, e.g. a turning
+            # curve from a side street crossing our track to reach the opposite track)
+            vo = norm((tpos[o][0] - here[0], tpos[o][1] - here[1]))
+            for o2 in others:
+                if o2 != o:
+                    vi = norm((here[0] - tpos[o2][0], here[1] - tpos[o2][1]))
+                    if angle_between(vi, vo) < 40:
+                        return True
+            return False
         for o in others:
             alt_tgt = walk(nid, o)
             v_alt = (alt_tgt[0] - here[0], alt_tgt[1] - here[1])
             if angle_between(v_alt, v_route) > 50 or angle_between(v_alt, d_in) > 60:
-                continue  # diamond crossing or trailing switch
+                continue  # trailing switch (sprung, the tram trails through it) or crossing
+            if through(o):
+                continue  # diamond crossing, not a switch
             dev_route = angle_between(d_in, v_route)
             dev_alt = angle_between(d_in, v_alt)
             cross_r = d_in[0] * v_route[1] - d_in[1] * v_route[0]
@@ -528,7 +798,9 @@ def main():
 
     # opposite direction of the line, for oncoming trams
     path_back = []
-    if Q_ROUTE_BACK:
+    if THEN and back_ids:
+        path_back = [[round(x, 2), round(y, 2)] for x, y in (P(*nodes[n]) for n in back_ids)]
+    elif Q_ROUTE_BACK:
         back = overpass(f"route_{OSM_RELATION_BACK}", Q_ROUTE_BACK)
         brel = next(e for e in back["elements"] if e["type"] == "relation")
         bnodes = {e["id"]: (e["lat"], e["lon"]) for e in back["elements"] if e["type"] == "node"}
@@ -591,25 +863,23 @@ def main():
         if c["date"] == ymd:
             (active.add if c["exception_type"] == "1" else active.discard)(c["service_id"])
 
-    trips = [t for t in rd("trips.txt")
-             if t["route_id"] == GTFS_ROUTE and t["direction_id"] == GTFS_DIRECTION
-             and t["trip_headsign"] == GTFS_HEADSIGN and t["service_id"] in active]
-    shape = Counter(t["shape_id"] for t in trips).most_common(1)[0][0]
-    trips = [t for t in trips if t["shape_id"] == shape]
-    trip_ids = {t["trip_id"] for t in trips}
-    print(f"gtfs: {len(trips)} trips on {ymd}, shape {shape}")
-
-    st = defaultdict(list)
-    for r in rd("stop_times.txt"):
-        if r["trip_id"] in trip_ids:
-            st[r["trip_id"]].append(r)
-
-    def secs(hms):
-        h, m, s = (int(x) for x in hms.split(":"))
-        return h * 3600 + m * 60 + s
-
-    patterns = Counter(tuple(r["stop_id"] for r in sorted(v, key=lambda r: int(r["stop_sequence"]))) for v in st.values())
-    pattern = patterns.most_common(1)[0][0]
+    if THEN:
+        st = {}
+        pattern = tuple(run["stops"])
+    else:
+        trips = [t for t in rd("trips.txt")
+                 if t["route_id"] == GTFS_ROUTE and t["direction_id"] == GTFS_DIRECTION
+                 and t["trip_headsign"] == GTFS_HEADSIGN and t["service_id"] in active]
+        shape = Counter(t["shape_id"] for t in trips).most_common(1)[0][0]
+        trips = [t for t in trips if t["shape_id"] == shape]
+        trip_ids = {t["trip_id"] for t in trips}
+        print(f"gtfs: {len(trips)} trips on {ymd}, shape {shape}")
+        st = defaultdict(list)
+        for r in rd("stop_times.txt"):
+            if r["trip_id"] in trip_ids:
+                st[r["trip_id"]].append(r)
+        patterns = Counter(tuple(r["stop_id"] for r in sorted(v, key=lambda r: int(r["stop_sequence"]))) for v in st.values())
+        pattern = patterns.most_common(1)[0][0]
     stop_rows = {}
     for r in rd("stops.txt"):
         if r["stop_id"] in pattern:
@@ -625,6 +895,8 @@ def main():
         if not flags:
             flags = {r["stop_id"]: (r["pickup_type"] == "3" or r["drop_off_type"] == "3") for r in rows}
         timetable.append([secs(r["departure_time"]) for r in rows])
+    if THEN:
+        flags, timetable = run["flags"], run["timetable"]
     timetable.sort(key=lambda t: t[0])
 
     # tram lines serving each platform (for the stop sign's line plate)
@@ -637,22 +909,51 @@ def main():
 
     stops = []
     s_last = 0.0
-    for sid in pattern:
+    for k, sid in enumerate(pattern):
         r = stop_rows[sid]
         p = P(float(r["stop_lat"]), float(r["stop_lon"]))
         s, d, side = path.project(p, s_min=s_last - 5, radius=2)
         if s is None or d > 60:
             s, d, side = path.project(p, s_min=s_last - 5, radius=40)
-        lines = sorted(stop_lines[sid] | {LINE}, key=lambda x: (len(x), x))
+        mine = THEN if run and k > run["change"] else LINE
+        lines = sorted(stop_lines[sid] | {mine} | ({THEN} if run and k == run["change"] else set()), key=lambda x: (len(x), x))
         stops.append({"name": r["stop_name"], "s": round(s, 1), "off": round(d, 1),
                       "side": "left" if side > 0 else "right", "request": flags.get(sid, False), "lines": lines})
         s_last = s
+    # platforms (OSM): where along the route each stop's platform begins and ends, so the game
+    # can require the whole set to stand alongside it (and let two sets stop one behind another)
+    pjs = overpass("platforms", Q_PLATFORMS, optional=True)
+    plats = [e for e in pjs["elements"] if "geometry" in e and e.get("tags", {}).get("bus") != "yes"
+             or "geometry" in e and e.get("tags", {}).get("tram") == "yes"]
+    for st_ in stops:
+        best = None
+        for e in plats:
+            pp = [P(g["lat"], g["lon"]) for g in e["geometry"]]
+            if min(dist(q, path.at(st_["s"])) for q in pp) > 60:
+                continue
+            pr = [path.project(q, st_["s"] - 150, st_["s"] + 150, radius=3) for q in pp]
+            pr = [x for x in pr if x[0] is not None and x[1] < 9]
+            if len(pr) < 2:
+                continue
+            s0, s1 = min(x[0] for x in pr), max(x[0] for x in pr)
+            right = sum(1 for x in pr if x[2] < 0) > len(pr) / 2
+            if s1 - s0 < 10 or s1 - s0 > 160 or st_["s"] < s0 - 25 or st_["s"] > s1 + 25:
+                continue
+            score = (0 if right else 1, abs((s0 + s1) / 2 - st_["s"]))
+            if best is None or score < best[0]:
+                best = (score, s0, s1)
+        if best:
+            st_["p0"], st_["p1"] = round(best[1], 1), round(best[2], 1)
+    with_p = [st_ for st_ in stops if "p0" in st_]
+    if with_p:
+        lens = sorted(st_["p1"] - st_["p0"] for st_ in with_p)
+        print(f"platforms: {len(with_p)}/{len(stops)} stops, length {lens[0]:.0f}-{lens[-1]:.0f} m (median {lens[len(lens)//2]:.0f})")
     print(f"stops: {len(stops)}  first {stops[0]['name']} @ {stops[0]['s']}  last {stops[-1]['name']} @ {stops[-1]['s']}")
     far = [st_ for st_ in stops if st_["off"] > 25]
     for st_ in far:
         print(f"  ! stop {st_['name']} is {st_['off']} m from the track")
     if len(far) > len(stops) * 0.15:
-        raise SystemExit(f"GTFS stops do not match OSM relation {OSM_RELATION} (headsign {GTFS_HEADSIGN}); try --headsign")
+        raise SystemExit(f"GTFS stops do not match the route (relation {OSM_RELATION}, headsign {GTFS_HEADSIGN}); try --headsign")
 
     # ---------------- scenery
     def ring(geom):
@@ -718,7 +1019,13 @@ def main():
                 "f": 1 if hw in ("footway", "pedestrian", "living_street") else 0,
                 "c": 1 if hw in ("motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
                                  "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link")
-                and t.get("service") is None and t.get("access") not in ("no", "private", "destination") else 0}
+                and t.get("service") is None
+                and not any(t.get(k) in ("no", "private", "destination", "delivery")
+                            for k in ("access", "vehicle", "motor_vehicle", "motorcar")) else 0}
+        if hw == "footway" and t.get("footway") == "crossing" and (
+                t.get("crossing") in ("zebra", "marked", "uncontrolled", "traffic_signals", "pedestrian_signals")
+                or t.get("crossing:markings") not in (None, "no") or t.get("crossing_ref") == "zebra"):
+            road["z"] = 1  # painted pedestrian crossing (zebra)
         if t.get("bridge") not in (None, "no"):
             road["b"] = 1
         ow = t.get("oneway")
@@ -801,6 +1108,10 @@ def main():
         "green": green,
         "water": water,
     }
+    if run:
+        # the line number changes at this stop (index into stops): passengers of the first line
+        # all leave there, the tram waits and departs as the second line
+        out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
     dst = os.path.join(OUT, f"line{LINE}.json")
     with open(dst, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
@@ -813,6 +1124,8 @@ def main():
             idx = {l["line"]: l for l in json.load(f)}
     idx[LINE] = {"line": LINE, "from": stops[0]["name"], "to": stops[-1]["name"],
                  "km": round(path.length / 1000, 1), "stops": len(stops)}
+    if run:
+        idx[LINE].update({"then": THEN, "via": stops[run["change"]]["name"]})
     with open(idx_path, "w", encoding="utf-8") as f:
         json.dump(sorted(idx.values(), key=lambda l: int(l["line"])), f, ensure_ascii=False, indent=1)
 

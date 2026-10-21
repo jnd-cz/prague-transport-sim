@@ -1,6 +1,5 @@
 // Cab instruments and overlays (DOM/SVG), plus the minimap.
 import { fmtTime, fmtDev, demandAt } from './game.js';
-import { T3 } from './tram.js';
 import { t, onLangChange } from './i18n.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -157,21 +156,23 @@ export class Hud {
     $('score').querySelector('.sub').textContent = t('hud.points');
     // passengers on board: bar to crush load, tick at the normal capacity
     const pax = tram.passengers, paxEl = $('pax');
-    paxEl.querySelector('.n').textContent = `${pax} / ${T3.capacity}`;
+    paxEl.querySelector('.n').textContent = `${pax} / ${tram.capacity}`;
     const bar = paxEl.querySelector('.bar i');
-    bar.style.width = `${Math.min(100, (pax / T3.crushCapacity) * 100)}%`;
-    bar.style.background = pax > T3.capacity ? 'var(--red)' : pax > T3.capacity * 0.75 ? 'var(--amber)' : 'var(--green)';
-    paxEl.className = pax > T3.capacity ? 'full' : pax > T3.capacity * 0.75 ? 'busy' : '';
+    bar.style.width = `${Math.min(100, (pax / tram.crushCapacity) * 100)}%`;
+    bar.style.background = pax > tram.capacity ? 'var(--red)' : pax > tram.capacity * 0.75 ? 'var(--amber)' : 'var(--green)';
+    paxEl.className = pax > tram.capacity ? 'full' : pax > tram.capacity * 0.75 ? 'busy' : '';
     const peak = demandAt(game.clock) >= 1.7;
-    paxEl.querySelector('.sub').textContent = pax > T3.capacity ? t('hud.crowded') : t('hud.pax') + (peak ? ` · ${t('hud.peak')}` : '');
+    paxEl.querySelector('.sub').textContent = pax > tram.capacity ? t('hud.crowded') : t('hud.pax') + (peak ? ` · ${t('hud.peak')}` : '');
 
     // info screen
     const lim = game.currentLimit;
     const nl = game.nextLimitChange();
     const K = (k) => `<span class="k">${t(k)}</span>`;
     $('info').innerHTML = [
-      `${K('info.line')} <span class="big">${game.data.line}</span> <span class="k">→</span> ${game.stops[game.stops.length - 1].name}`,
-      `${K('info.pax')} <span class="big">${tram.passengers}</span>/110`,
+      `${K('info.line')} <span class="big">${game.line}</span> <span class="k">→</span> ${game.stops[game.stops.length - 1].name}`,
+      `${K('info.pax')} <span class="big">${tram.passengers}</span>/${tram.capacity}`,
+      `${K('info.climate')} ${t('info.temps', { o: Math.round(game.climate.tout), i: Math.round(game.climate.tin), c: Math.round(game.climate.tcab) })}`,
+      `${K('info.heating')} ${t('info.heatState', { s: game.climate.saloon, c: game.climate.cab, f: t(game.climate.flap ? 'flap.open' : 'flap.closed') })}`,
       `${K('info.doors')} ${t(`doors.${game.doorState}`)}`,
       `${K('info.speed')} max ${lim} km/h${nl ? ` · ${t('info.limitAhead', { v: nl.v, d: nl.d })}` : ''}`,
       `${K('info.accel')} ${tram.a.toFixed(2)} · ${t('info.lateral')} ${(game.latAcc || 0).toFixed(1)} m/s²`,
@@ -193,10 +194,10 @@ export class Hud {
         chips.push(`<div class="chip ${ok ? 'ok' : 'bad'}">${t('chip.switch', { d: Math.round(sw.s - tram.s), need: t(`dir.${need}`), cur: t(`dir.${cur}`) })}${auto}${ok ? '' : fix}</div>`);
       }
       const ct = game.nextContact();
-      if (ct && ct.contact - tram.s < 120) {
-        const how = t(ct.required === 'straight' ? 'chip.coast' : 'chip.power');
-        const ok = (tram.force > 500) === (ct.required !== 'straight');
-        chips.push(`<div class="chip ${ok ? 'ok' : 'bad'}">${t('chip.contactNext', { d: Math.max(0, Math.round(ct.contact - tram.s)), how })}</div>`);
+      if (ct && ct.contact - tram.panto < 120) {
+        const how = t(ct.required !== 'straight' ? 'chip.power' : game.heatingDraws() ? 'chip.coastCut' : 'chip.coast');
+        const ok = game.contactCurrent() === (ct.required !== 'straight');
+        chips.push(`<div class="chip ${ok ? 'ok' : 'bad'}">${t('chip.contactNext', { d: Math.max(0, Math.round(ct.contact - tram.panto)), how })}</div>`);
       }
       const sig = game.signals.find((g) => g.s > tram.s - 1);
       if (sig && sig.s - tram.s < 220) {

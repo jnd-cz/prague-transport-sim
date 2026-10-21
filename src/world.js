@@ -44,6 +44,85 @@ function densify(line, maxLen = 4) {
   return out;
 }
 
+// Grid of line segments for fast "distance to the nearest X" queries (tracks, roads).
+class SegmentIndex {
+  constructor(cell = 10) { this.cell = cell; this.map = new Map(); }
+  add(a, b, w = 0) {
+    const c = this.cell, seg = [a[0], a[1], b[0], b[1], w / 2];
+    const i0 = Math.floor((Math.min(a[0], b[0]) - seg[4]) / c), i1 = Math.floor((Math.max(a[0], b[0]) + seg[4]) / c);
+    const j0 = Math.floor((Math.min(a[1], b[1]) - seg[4]) / c), j1 = Math.floor((Math.max(a[1], b[1]) + seg[4]) / c);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const k = `${i},${j}`;
+      if (!this.map.has(k)) this.map.set(k, []);
+      this.map.get(k).push(seg);
+    }
+  }
+  addLine(line, w = 0) { for (let i = 1; i < line.length; i++) this.add(line[i - 1], line[i], w); }
+  // distance from (x, y) to the nearest segment's edge (centre line minus half width), up to ~cell
+  dist(x, y) {
+    const c = this.cell, ci = Math.floor(x / c), cj = Math.floor(y / c);
+    let best = Infinity;
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const arr = this.map.get(`${i},${j}`);
+      if (!arr) continue;
+      for (const [ax, ay, bx, by, hw] of arr) {
+        const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+        best = Math.min(best, Math.hypot(ax + dx * t - x, ay + dy * t - y) - hw);
+      }
+    }
+    return best;
+  }
+}
+
+// Building footprints on a grid, for point-in-building tests.
+class FootprintIndex {
+  constructor(rings, cell = 25) {
+    this.cell = cell; this.map = new Map(); this.entries = [];
+    rings.forEach((ring) => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of ring) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
+      const e = { ring, minX, minY, maxX, maxY };
+      this.entries.push(e);
+      for (let i = Math.floor(minX / cell); i <= Math.floor(maxX / cell); i++) for (let j = Math.floor(minY / cell); j <= Math.floor(maxY / cell); j++) {
+        const k = `${i},${j}`;
+        if (!this.map.has(k)) this.map.set(k, []);
+        this.map.get(k).push(e);
+      }
+    });
+  }
+  inside(x, y) {
+    const arr = this.map.get(`${Math.floor(x / this.cell)},${Math.floor(y / this.cell)}`);
+    if (!arr) return false;
+    for (const e of arr) if (x >= e.minX && x <= e.maxX && y >= e.minY && y <= e.maxY && pointInRing(x, y, e.ring)) return true;
+    return false;
+  }
+}
+
+// OSM `lanes` (and so our width estimate) counts only the car lanes, but in Prague the tram
+// tracks usually run down the middle of the same street. Widen such roads by the track zone
+// (3.2 m per track) and flag them, so asphalt, kerbs (poles) and car lanes sit beside the tracks.
+export function widenTramStreets(data) {
+  const idx = new SegmentIndex(10);
+  for (const t of data.tracks) idx.addLine(t.p);
+  for (const r of data.roads) {
+    if (r.f || r.w < 5 || r.p.length < 2) continue;
+    let n = 0, near = 0, both = 0;
+    const pts = densify(r.p, 5);
+    pts.forEach(([x, y], i) => {
+      n++;
+      if (idx.dist(x, y) < 2.6) near++;
+      // tracks on both sides of the centre line = double track
+      const a = pts[Math.max(0, i - 1)], c = pts[Math.min(pts.length - 1, i + 1)];
+      const hx = c[0] - a[0], hy = c[1] - a[1], hl = Math.hypot(hx, hy) || 1, ox = (-hy / hl) * 1.6, oy = (hx / hl) * 1.6;
+      if (idx.dist(x + ox, y + oy) < 0.8 && idx.dist(x - ox, y - oy) < 0.8) both++;
+    });
+    if (near / n < 0.6) continue;
+    r.tram = both / n > 0.3 ? 2 : 1;
+    r.w += 3.2 * r.tram;
+  }
+}
+
 // Accumulates triangles per chunk, then emits one mesh per chunk.
 class ChunkedGeometry {
   constructor(material, { uv = false, color = false } = {}) {
@@ -189,6 +268,70 @@ function facadeTexture() {
   return t;
 }
 
+// Facade textures by building type: prefab panel blocks (paneláky), churches, industrial halls
+// and glass office fronts. Each tile is white-ish and tinted per building by vertex colour.
+function panelTexture() {
+  // tile 3.6 m x 2.8 m: concrete panel with joints, a window, every other column a loggia
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 200;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f2f0ea'; g.fillRect(0, 0, 256, 200);
+  g.fillStyle = '#d8d4cb'; g.fillRect(0, 0, 256, 3); g.fillRect(0, 0, 3, 200);
+  g.fillStyle = '#e4e1da'; g.fillRect(16, 150, 224, 18); // parapet band
+  g.fillStyle = '#9aa3a8'; g.fillRect(40, 40, 96, 100);   // window
+  g.fillStyle = '#2d3a44'; g.fillRect(46, 46, 84, 88);
+  g.fillStyle = '#9aa3a8'; g.fillRect(86, 46, 4, 88);
+  g.fillStyle = '#4a4f52'; g.fillRect(160, 30, 80, 120);  // loggia recess
+  g.fillStyle = '#d6d2c8'; g.fillRect(156, 108, 88, 42);  // loggia parapet
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+function churchTexture() {
+  // tile 5 m x 9 m: ashlar stone and one tall arched window
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 230;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 128, 230);
+  g.strokeStyle = 'rgba(0,0,0,.10)'; g.lineWidth = 1;
+  for (let y = 0; y < 230; y += 12) { g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke();
+    for (let x = (y / 12) % 2 ? 0 : 16; x < 128; x += 32) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 12); g.stroke(); } }
+  g.fillStyle = '#2b2f36';
+  g.beginPath(); g.moveTo(44, 190); g.lineTo(44, 70); g.arc(64, 70, 20, Math.PI, 0); g.lineTo(84, 190); g.closePath(); g.fill();
+  g.strokeStyle = '#8a8f96'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(64, 52); g.lineTo(64, 190); g.moveTo(44, 120); g.lineTo(84, 120); g.stroke();
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+function industrialTexture() {
+  // tile 6 m x 4 m: vertical cladding ribs and a ribbon window
+  const cv = document.createElement('canvas');
+  cv.width = 192; cv.height = 128;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 192, 128);
+  g.fillStyle = 'rgba(0,0,0,.07)';
+  for (let x = 0; x < 192; x += 8) g.fillRect(x, 0, 3, 128);
+  g.fillStyle = '#3a4650'; g.fillRect(0, 34, 192, 22);
+  g.fillStyle = '#9aa0a4'; for (let x = 0; x < 192; x += 48) g.fillRect(x, 34, 3, 22);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+function glassTexture() {
+  // tile 1.5 m x 3.6 m: curtain wall with mullions and a spandrel band
+  const cv = document.createElement('canvas');
+  cv.width = 64; cv.height = 154;
+  const g = cv.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 64, 154);
+  gr.addColorStop(0, '#9fb6c6'); gr.addColorStop(1, '#55697a');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 154);
+  g.fillStyle = '#d9dcdf'; g.fillRect(0, 0, 3, 154); g.fillRect(0, 124, 64, 30);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+
 const FACADE_COLORS = ['#e8d9b5', '#d9c7a0', '#efe3c8', '#c9b79a', '#e3c9b0', '#d6d0c2', '#e6d2a8', '#cfc3ad',
   '#e0b9a0', '#b9c4c9', '#d8cfb8', '#f0e6d2'].map((c) => new THREE.Color(c));
 const ROOF_COLORS = ['#8c4a32', '#7a3f2c', '#5f5a55', '#6d6862', '#9a5638', '#4f4b47'].map((c) => new THREE.Color(c));
@@ -204,6 +347,14 @@ export function buildWorld(scene, data, route, ground, weather) {
   far.position.y = ground.terrain.min - 3;
   scene.add(far);
 
+  // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
+  // then the terrain is lowered under every track so it can't poke through the bed
+  for (const t of data.tracks) {
+    // OSM draws curves as straight segments: render tracks as smoothed curves
+    if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 ? 6 : 0.1).pts;
+    if (!t.z) t.z = trackHeights(t.smooth, wayHeight(t.p, t.b, ground));
+  }
+  lowerTerrainUnderTracks(data, ground.terrain);
   buildTerrain(group, data, route, ground.terrain, weather);
 
   const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -213,6 +364,7 @@ export function buildWorld(scene, data, route, ground, weather) {
   const roadsCg = new ChunkedGeometry(flatMat, { color: true });
   const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), paving = new THREE.Color(wet ? '#86817a' : '#a39d90').toArray();
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
+    if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
     addRibbon(roadsCg, r.p, r.w, wayHeight(r.p, r.b, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
   }
   roadsCg.build(group);
@@ -223,15 +375,18 @@ export function buildWorld(scene, data, route, ground, weather) {
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.6, roughness: wet ? 0.2 : 0.4 });
   const railCg = new ChunkedGeometry(railMat);
   for (const t of data.tracks) {
-    // OSM draws curves as straight segments: render tracks as smoothed curves
-    if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 ? 6 : 0.1).pts;
-    t.z = trackHeights(t.smooth, wayHeight(t.p, t.b, ground));
     addRibbon(bedCg, t.smooth, 2.7, t.z, 0.2, bed);
     addRibbon(railCg, t.smooth, 0.1, t.z, 0.26, null, 0.72);
     addRibbon(railCg, t.smooth, 0.1, t.z, 0.26, null, -0.72);
   }
   bedCg.build(group);
   railCg.build(group);
+  // every track centre line, for keeping trees, zebra paint and poles off the tracks
+  const tracks = new SegmentIndex(10);
+  for (const t of data.tracks) tracks.addLine(t.smooth);
+  const trackDist = (x, y) => tracks.dist(x, y);
+
+  buildZebras(group, data, ground, trackDist, wet);
 
   buildWalls(group, data, route, ground);
 
@@ -240,8 +395,8 @@ export function buildWorld(scene, data, route, ground, weather) {
   if (data.geo?.buildings?.arr) buildLod2(group, data, route, ground);
   else buildOsmBuildings(group, data, route, ground);
 
-  buildTrees(group, data, route, ground, weather);
-  buildCatenary(group, data, route, ground);
+  buildTrees(group, data, ground, weather, trackDist);
+  buildCatenary(group, data, route, ground, trackDist);
   return group;
 }
 
@@ -297,16 +452,57 @@ function buildOsmBuildings(group, data, route, ground) {
 // IPR Praha LOD2 buildings (real roof shapes, absolute heights). Walls get the facade texture
 // (u along the wall, v up from the building's base), roofs a colour by slope. Buildings the
 // track passes under are lifted clear of the tram; foundations are sunk to hide terrain gaps.
+// building type from the OSM footprint under it, the roof shape and the size
+const CHURCH = new Set(['church', 'cathedral', 'chapel', 'religious', 'synagogue', 'mosque', 'temple', 'monastery']);
+const INDUSTRIAL = new Set(['industrial', 'warehouse', 'garage', 'garages', 'service', 'hangar', 'factory', 'manufacture',
+  'storage_tank', 'transportation', 'train_station', 'shed', 'depot', 'parking']);
+const OFFICE = new Set(['office', 'commercial', 'retail', 'hotel', 'supermarket', 'hospital', 'university', 'public']);
+const RESID = new Set(['apartments', 'residential', 'yes', 'dormitory', 'flats']);
+function buildingClass(kind, flatShare, height, area) {
+  if (CHURCH.has(kind)) return 'church';
+  if (INDUSTRIAL.has(kind)) return 'industrial';
+  if (OFFICE.has(kind) && flatShare > 0.8 && height > 12) return 'glass';
+  if (RESID.has(kind) && flatShare > 0.85 && height >= 15 && area >= 250) return 'panel';
+  if (flatShare > 0.9 && height < 9 && area > 600) return 'industrial';
+  return 'old';
+}
+const CLASS_COLORS = {
+  panel: ['#e9e6dc', '#d9dde0', '#efe2c4', '#dfe8d6', '#f0d9c8', '#d7dbe6'],
+  church: ['#d8cfb8', '#cbc0a6', '#e2dccb', '#bfb59d'],
+  industrial: ['#c9cbcc', '#b8bcbf', '#d6d2c4', '#a9b1b6'],
+  glass: ['#ffffff', '#e6eef4', '#dfe6e0'],
+};
+
 function buildLod2(group, data, route, ground) {
   const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
-  const facadeMat = new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true, side: THREE.DoubleSide });
+  const side = THREE.DoubleSide;
+  const CLASSES = {
+    old: { mat: new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true, side }), w: 3.5, h: 3.2 },
+    panel: { mat: new THREE.MeshLambertMaterial({ map: panelTexture(), vertexColors: true, side }), w: 3.6, h: 2.8 },
+    church: { mat: new THREE.MeshLambertMaterial({ map: churchTexture(), vertexColors: true, side }), w: 5, h: 9 },
+    industrial: { mat: new THREE.MeshLambertMaterial({ map: industrialTexture(), vertexColors: true, side }), w: 6, h: 4 },
+    glass: { mat: new THREE.MeshLambertMaterial({ map: glassTexture(), vertexColors: true, side }), w: 1.5, h: 3.6 },
+  };
+  // OSM footprints say what a building is (church, apartments, warehouse ...)
+  const osm = new FootprintIndex(data.buildings.map((b) => b.p));
+  const kindAt = (x, y) => {
+    const arr2 = osm.map.get(`${Math.floor(x / osm.cell)},${Math.floor(y / osm.cell)}`);
+    if (!arr2) return 'yes';
+    for (const e of arr2) if (x >= e.minX && x <= e.maxX && y >= e.minY && y <= e.maxY && pointInRing(x, y, e.ring)) return e.kind || 'yes';
+    return 'yes';
+  };
+  data.buildings.forEach((b, i) => { osm.entries[i].kind = b.k; });
+  const counts = {};
   const roofMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   let bIndex = 0, lifted = 0, total = 0;
   for (const ch of geo.chunks) {
     const [ox, oy, oz] = ch.o;
-    const wPos = [], wNor = [], wUv = [], wCol = [], rPos = [], rNor = [], rCol = [];
+    const walls = {};
+    for (const k in CLASSES) walls[k] = { pos: [], nor: [], uv: [], col: [] };
+    const rPos = [], rNor = [], rCol = [];
     let v = ch.v;
-    for (const count of ch.b) {
+    for (const [bi, count] of ch.b.entries()) {
+      const isBridge = ch.k?.[bi] === 1; // Mosty 3D: concrete, never lifted or sunk
       // decode this building
       const xs = new Float32Array(count), ys = new Float32Array(count), zs = new Float32Array(count);
       let zmin = Infinity;
@@ -321,15 +517,30 @@ function buildLod2(group, data, route, ground) {
       for (let i = 0; i < count; i += 3) {
         if (route.distance(xs[i], ys[i]) < 2.5) clear = Math.max(clear, ground.at(xs[i], ys[i]) + 6.3);
       }
+      if (isBridge) clear = -Infinity;
       if (clear > zmin + 0.5) {
         lifted++;
         for (let i = 0; i < count; i++) zs[i] = Math.max(zs[i], clear);
         zmin = clear;
-      } else {
+      } else if (!isBridge) {
         for (let i = 0; i < count; i++) if (zs[i] < zmin + 0.3) zs[i] -= 2.5; // sink the foundation
       }
       const r = rng(bIndex * 7919 + 13);
-      const facade = FACADE_COLORS[Math.floor(r() * FACADE_COLORS.length)];
+      // classify: roof flatness, height, footprint size, OSM tag under the centroid
+      let flat = 0, roof = 0, zmax = -Infinity, minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, cxs = 0, cys = 0;
+      for (let t = 0; t < count; t += 3) {
+        const ux = xs[t + 1] - xs[t], uy = ys[t + 1] - ys[t], uz = zs[t + 1] - zs[t], vx = xs[t + 2] - xs[t], vy = ys[t + 2] - ys[t], vz = zs[t + 2] - zs[t];
+        const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz);
+        if (l > 1e-6 && Math.abs(nz) / l > 0.3) { roof += l; if (Math.abs(nz) / l > 0.97) flat += l; }
+      }
+      for (let i = 0; i < count; i++) {
+        zmax = Math.max(zmax, zs[i]); cxs += xs[i]; cys += ys[i];
+        minX = Math.min(minX, xs[i]); maxX = Math.max(maxX, xs[i]); minY = Math.min(minY, ys[i]); maxY = Math.max(maxY, ys[i]);
+      }
+      const cls = buildingClass(kindAt(cxs / count, cys / count), roof ? flat / roof : 0, zmax - zmin, (maxX - minX) * (maxY - minY) * 0.6);
+      counts[isBridge ? 'bridge' : cls] = (counts[isBridge ? 'bridge' : cls] || 0) + 1;
+      const C = CLASSES[cls], W = walls[cls], pal = CLASS_COLORS[cls];
+      const facade = pal ? new THREE.Color(pal[Math.floor(r() * pal.length)]) : FACADE_COLORS[Math.floor(r() * FACADE_COLORS.length)];
       const roofTile = ROOF_COLORS[Math.floor(r() * 3)], roofFlat = new THREE.Color('#77736d');
       for (let t = 0; t < count; t += 3) {
         const ax = xs[t], ay = ys[t], az = zs[t], bx = xs[t + 1], by = ys[t + 1], bz = zs[t + 1], cx = xs[t + 2], cy = ys[t + 2], cz = zs[t + 2];
@@ -340,14 +551,17 @@ function buildLod2(group, data, route, ground) {
         if (l < 1e-6) continue;
         nx /= l; ny /= l; nz /= l;
         const tri = [[ax, ay, az], [bx, by, bz], [cx, cy, cz]];
-        if (Math.abs(nz) > 0.3) {
+        if (isBridge) {
+          const k = 0.75 + 0.25 * Math.abs(nz);
+          for (const [x, y, z] of tri) { rPos.push(x, z, -y); rNor.push(nx, nz, -ny); rCol.push(0.62 * k, 0.61 * k, 0.58 * k); }
+        } else if (Math.abs(nz) > 0.3) {
           const col = Math.abs(nz) > 0.97 ? roofFlat : roofTile;
           for (const [x, y, z] of tri) { rPos.push(x, z, -y); rNor.push(nx, nz, -ny); rCol.push(col.r, col.g, col.b); }
         } else {
           const hl = Math.hypot(nx, ny) || 1, tx = -ny / hl, ty = nx / hl;
           for (const [x, y, z] of tri) {
-            wPos.push(x, z, -y); wNor.push(nx, nz, -ny); wCol.push(facade.r, facade.g, facade.b);
-            wUv.push((x * tx + y * ty) / 3.5, (z - zmin - 0.4) / 3.2);
+            W.pos.push(x, z, -y); W.nor.push(nx, nz, -ny); W.col.push(facade.r, facade.g, facade.b);
+            W.uv.push((x * tx + y * ty) / C.w, (z - zmin - 0.4) / C.h);
           }
         }
       }
@@ -366,10 +580,36 @@ function buildLod2(group, data, route, ground) {
       m.matrixAutoUpdate = false;
       group.add(m);
     };
-    mk(wPos, wNor, wCol, wUv, facadeMat);
+    for (const k in walls) mk(walls[k].pos, walls[k].nor, walls[k].col, walls[k].uv, CLASSES[k].mat);
     mk(rPos, rNor, rCol, null, roofMat);
   }
-  console.log(`LOD2 buildings: ${total} (${lifted} spanning the track)`);
+  console.log(`LOD2 buildings: ${total} (${lifted} spanning the track)`, counts);
+}
+
+// Keep the terrain at or below every track's bed: for samples along each track (centre and
+// both bed edges) find the mesh triangle underneath (same split as Terrain.height) and lower
+// its three vertices by the excess. Bridges are skipped.
+function lowerTerrainUnderTracks(data, T) {
+  const { nx, ny } = T;
+  for (let pass = 0; pass < 2; pass++) for (const t of data.tracks) {
+    if (t.b) continue;
+    const L = t.smooth, Z = t.z;
+    for (let i = 0; i < L.length; i++) {
+      const a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
+      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+      for (const off of [0, 1.4, -1.4]) {
+        const x = L[i][0] - (dy / l) * off, y = L[i][1] + (dx / l) * off;
+        const fx = (x - T.x0) / T.dx, fy = (y - T.y0) / T.dy;
+        const ix = Math.floor(fx), iy = Math.floor(fy);
+        if (ix < 0 || iy < 0 || ix >= nx - 1 || iy >= ny - 1) continue;
+        const tx = fx - ix, ty = fy - iy;
+        const A = iy * nx + ix, B = A + 1, C = A + nx, D = C + 1;
+        const tri = tx + ty <= 1 ? [A, B, C] : [D, C, B];
+        const excess = T.height(x, y) - (Z[i] + 0.1);
+        if (excess > 0) for (const k of tri) T.h[k] -= excess;
+      }
+    }
+  }
 }
 
 // Terrain mesh in chunks near the route, coloured by land cover (parks, woods, water).
@@ -443,6 +683,9 @@ function buildBridges(group, data, route, ground) {
   const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true }), { color: true });
   const deckCol = new THREE.Color('#8f897e').toArray(), sideCol = new THREE.Color('#7a7366').toArray();
   for (const [s0, s1] of data.bridges) {
+    // a real 3D model of this bridge (Mosty 3D) replaces the synthetic deck
+    const real = (ground.profile.realDecks || []).reduce((acc, [a, b]) => acc + Math.max(0, Math.min(b, s1) - Math.max(a, s0)), 0);
+    if (real > (s1 - s0) * 0.5) continue;
     const halfW = 9;
     const pts = [];
     for (let s = s0 - 2; s <= s1 + 2; s += 3) {
@@ -478,14 +721,47 @@ function buildBridges(group, data, route, ground) {
   cg.build(group);
 }
 
-function buildTrees(group, data, route, ground, weather) {
+// Pedestrian crossings with zebra paint: 0.5 m bars every metre along the crossing, each
+// 3 m long across the walking direction. No paint on the tram tracks (as in Prague).
+function buildZebras(group, data, ground, trackDist, wet) {
+  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true }), { color: true });
+  const white = new THREE.Color(wet ? '#c9cbcc' : '#e9e9e4').toArray();
+  for (const r of data.roads) {
+    if (!r.z) continue;
+    const path = densify(r.p, 0.5);
+    let acc = 0;
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1], b = path[i];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+      acc += l;
+      if (acc % 1.0 > 0.5 || acc < 0.4) continue; // stripe on the first half of each metre
+      const hx = (b[0] - a[0]) / l, hy = (b[1] - a[1]) / l, nx = -hy * 1.5, ny = hx * 1.5;
+      const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
+      if (trackDist(cx, cy) < 1.75 || trackDist(cx + nx, cy + ny) < 1.6 || trackDist(cx - nx, cy - ny) < 1.6) continue;
+      const q = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]]
+        .map(([x, y]) => W(x, y, ground.at(x, y) + 0.135));
+      cg.quad(cg._chunk(cx, cy), q[3], q[2], q[1], q[0], white);
+    }
+  }
+  cg.build(group);
+}
+
+function buildTrees(group, data, ground, weather, trackDist) {
   const r = rng(99);
   const spots = [];
   const real = data.geo?.trees;
   if (real) {
+    const seen = new Set(); // the register and the sampled tree rows overlap: one tree per ~1.5 m cell
     for (const [x, y] of real) {
-      if (route.distance(x, y) < 3.5) continue;
-      spots.push([x, y, 0.75 + r() * 0.6, ground.at(x, y)]);
+      const cell = `${Math.round(x / 1.5)},${Math.round(y / 1.5)}`;
+      if (seen.has(cell)) continue;
+      seen.add(cell);
+      // street trees next to the tracks are pruned clear of the tram and the wires
+      const d = trackDist(x, y);
+      if (d < 3.2) continue;
+      const k = Math.min(0.75 + r() * 0.6, (d - 1.9) / 2.86);
+      if (k < 0.45) continue;
+      spots.push([x, y, k, ground.at(x, y)]);
     }
   }
   for (const g of data.green) {
@@ -498,7 +774,7 @@ function buildTrees(group, data, route, ground, weather) {
     for (let i = 0; i < n * 2 && spots.length < 9000; i++) {
       const x = minX + r() * (maxX - minX), y = minY + r() * (maxY - minY);
       if (!pointInRing(x, y, ring)) continue;
-      if (route.distance(x, y) < 6) continue;
+      if (trackDist(x, y) < 6) continue;
       spots.push([x, y, 0.7 + r() * 0.7, ground.terrain.height(x, y)]);
     }
   }
@@ -523,9 +799,12 @@ function buildTrees(group, data, route, ground, weather) {
   group.add(crown, trunk);
 }
 
-function buildCatenary(group, data, route, ground) {
-  // contact wire 5.6 m above every track; Prague-style cross-span wires between poles on
-  // both sides of the street every ~32 m
+// Overhead line: contact wire 5.6 m above every track, hung from Prague-style cross-span wires.
+// Each span is anchored on both sides of the street: on a pole at the kerb (between the
+// carriageway and the sidewalk), or on a wall rosette where a building stands close to the
+// track. Where one side has no place for an anchor (a square, a junction) a single pole with
+// a bracket arm carries the wires. Poles are closer together on curves.
+function buildCatenary(group, data, route, ground, trackDist) {
   const wire = [];
   for (const t of data.tracks) {
     const line = t.smooth, z = t.z;
@@ -534,27 +813,112 @@ function buildCatenary(group, data, route, ground) {
       wire.push(new THREE.Vector3(line[i][0], z[i] + 5.6, -line[i][1]), new THREE.Vector3(line[j][0], z[j] + 5.6, -line[j][1]));
     }
   }
-  const poles = [];
-  for (let s = 10; s <= route.length; s += 32) poles.push(s);
-  const poleMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.17, 7.4, 6), new THREE.MeshLambertMaterial({ color: 0x4b5a4f }), poles.length * 2);
+  // vehicle carriageways (poles stand outside them) and building footprints (rosettes)
+  const roads = new SegmentIndex(12);
+  for (const r of data.roads) if (!r.f && !r.b) roads.addLine(r.p, r.w - 0.6);
+  const houses = new FootprintIndex(data.buildings.map((b) => b.p));
+  // retaining walls: surveyed ones and the synthetic walls of the track cutting
+  const walls = new SegmentIndex(10);
+  for (const w of data.geo?.walls || []) walls.addLine(w.p, 0.8);
+  const cut = { 1: [], '-1': [] };
+  for (const run of ground.walls?.runs || []) if (run.pts.length > 1) cut[run.side].push([run.pts[0].s, run.pts[run.pts.length - 1].s]);
+  const cutAt = (s, side) => cut[side].some(([a, b]) => s >= a - 3 && s <= b + 3);
+  const B = ground.walls?.bench ?? 7;
+
+  // find the anchor on one side (+1 left, -1 right) of route position s
+  const pole = (s, side, lat) => { const p = route.offset(s, side * lat); return { wall: false, lat, sl: side * lat, x: p.x, y: p.y }; };
+  const anchor = (s, side) => {
+    if (ground.profile.onBridge(s)) return pole(s, side, 8.4); // on the bridge parapet
+    for (let lat = 2.4; lat <= 22; lat += 0.4) {
+      const o = route.offset(s, side * lat);
+      if (houses.inside(o.x, o.y)) return lat <= 16 ? { wall: true, lat: lat - 0.1, sl: side * (lat - 0.1), x: o.x, y: o.y } : null;
+      // a retaining wall: the pole stands at its foot, inside the cutting
+      if (walls.dist(o.x, o.y) < 0 || (lat >= B - 0.4 && cutAt(s, side))) return trackDist(o.x, o.y) > 2.2 ? pole(s, side, lat - 0.5) : null;
+      if (trackDist(o.x, o.y) < 2.3 || roads.dist(o.x, o.y) < 0) continue;
+      // first free spot beyond the tracks and the carriageway: the kerb
+      // a facade just behind the sidewalk carries the span wire on a rosette instead
+      for (let k = lat + 0.8; k <= Math.min(lat + 5.5, 16); k += 0.4) {
+        const w = route.offset(s, side * k);
+        if (houses.inside(w.x, w.y)) return { wall: true, lat: k - 0.1, sl: side * (k - 0.1), x: w.x, y: w.y };
+      }
+      const p = route.offset(s, side * (lat + 0.45));
+      return { wall: false, lat: lat + 0.45, sl: side * (lat + 0.45), x: p.x, y: p.y };
+    }
+    return null;
+  };
+  const stations = [];
+  for (let s = 8; s <= route.length; ) {
+    const R = route.radiusAt(s);
+    stations.push(s);
+    s += R < 50 ? 12 : R < 100 ? 18 : R < 200 ? 25 : 32;
+  }
+  const poles = [], rosettes = [];
   const m = new THREE.Matrix4();
-  let n = 0;
-  poles.forEach((s) => {
+  // for the game: span positions (signals and signs hang from them or sit on their poles) and a
+  // kerb finder for anything else that must stand off the carriageway
+  route.catenary = [];
+  route.kerbAt = (s, side) => anchor(s, side);
+  for (const s of stations) {
     const z = ground.profile.height(s);
-    const r = route.offset(s, -3.7), l = route.offset(s, 7.0);
-    for (const o of [r, l]) {
-      m.makeTranslation(o.x, z + 3.7, -o.y);
-      poleMesh.setMatrixAt(n++, m);
+    // tracks this span crosses: ours and any parallel one within 6 m (the opposite direction)
+    const tracksLat = [0];
+    for (let lat = -6; lat <= 6; lat += 0.25) {
+      if (Math.abs(lat) < 2) continue;
+      const o = route.offset(s, lat);
+      if (trackDist(o.x, o.y) < 0.15 && !tracksLat.some((l) => Math.abs(l - lat) < 1.5)) tracksLat.push(lat);
     }
-    // span wire across both tracks, droppers down to each contact wire
-    wire.push(new THREE.Vector3(r.x, z + 6.6, -r.y), new THREE.Vector3(l.x, z + 6.6, -l.y));
-    for (const lat of [0, 3.2]) {
-      const c = route.offset(s, lat);
-      wire.push(new THREE.Vector3(c.x, z + 6.6, -c.y), new THREE.Vector3(c.x, z + 5.6, -c.y));
+    let L = anchor(s, 1), Rt = anchor(s, -1);
+    if (!L && !Rt) continue;
+    // a far anchor across a wide street or square, with a close one on the other side: Prague
+    // uses a bracket arm from the close pole instead of a long span
+    const outer = (side) => (side > 0 ? Math.max(...tracksLat) : -Math.min(...tracksLat));
+    if (L && Rt) {
+      const fl = L.lat - outer(1), fr = Rt.lat - outer(-1);
+      if (fl > 9 && fr < 5 && !Rt.wall) L = null;
+      else if (fr > 9 && fl < 5 && !L.wall) Rt = null;
     }
-  });
+    const top = (a) => (a.wall ? z + 7.0 : ground.at(a.x, a.y) + 7.0);
+    const span = [];
+    if (L && Rt) span.push([L, Rt]);
+    else {
+      // bracket arm from the one anchor to just past the farthest track
+      const a = L || Rt, side = L ? 1 : -1;
+      if (a.lat > 9) continue; // too far for an arm
+      const far = side > 0 ? Math.min(...tracksLat) - 0.8 : Math.max(...tracksLat) + 0.8;
+      const e = route.offset(s, far);
+      span.push([a, { wall: true, sl: far, x: e.x, y: e.y, end: true }]);
+    }
+    route.catenary.push({ s, z, L, R: Rt, span: !!(L && Rt) || tracksLat.length > 0, tracksLat });
+    for (const a of [L, Rt]) {
+      if (!a) continue;
+      if (a.wall) rosettes.push([a.x, z + 7.0, a.y]);
+      else {
+        const zg = ground.at(a.x, a.y);
+        m.makeTranslation(a.x, zg + 3.7, -a.y);
+        poles.push(m.clone());
+      }
+    }
+    for (const [a, b] of span) {
+      const za = top(a), zb = b.end ? za - 0.25 : top(b);
+      wire.push(new THREE.Vector3(a.x, za - 0.4, -a.y), new THREE.Vector3(b.x, zb - 0.4, -b.y));
+      // droppers down to each contact wire under the span
+      for (const lat of tracksLat) {
+        const c = route.offset(s, lat);
+        const t = (lat - a.sl) / (b.sl - a.sl || 1);
+        const zs = za - 0.4 + (zb - za) * Math.max(0, Math.min(1, t));
+        wire.push(new THREE.Vector3(c.x, zs, -c.y), new THREE.Vector3(c.x, z + 5.6, -c.y));
+      }
+    }
+  }
+  const poleMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.17, 7.4, 6), new THREE.MeshLambertMaterial({ color: 0x4b5a4f }), Math.max(1, poles.length));
+  poles.forEach((pm, i) => poleMesh.setMatrixAt(i, pm));
+  poleMesh.count = poles.length;
+  const roseMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 8).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a3a3a }), Math.max(1, rosettes.length));
+  rosettes.forEach(([x, h, y], i) => { m.makeTranslation(x, h - 0.4, -y); roseMesh.setMatrixAt(i, m); });
+  roseMesh.count = rosettes.length;
   const wg = new THREE.BufferGeometry().setFromPoints(wire);
-  group.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0x222222 })), poleMesh);
+  group.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0x222222 })), poleMesh, roseMesh);
+  console.log(`catenary: ${poles.length} poles, ${rosettes.length} wall rosettes`);
 }
 
 // Retaining walls where the track is cut into a hillside (e.g. Chotkova), with a flat cap

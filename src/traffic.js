@@ -3,8 +3,8 @@
 // and oncoming on the opposite track). Everything fades in and out instead of popping.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
-import { makeCar, makeCrowd, makeT3 } from './models.js';
-import { T3 } from './tram.js';
+import { makeCar, makeCrowd, makeT3, placeConsist } from './models.js';
+import { T3, COUPLING_GAP } from './tram.js';
 
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
 const MAX_CARS = 30, MAX_WALKERS = 90, FADE = 1.2;
@@ -40,6 +40,12 @@ function setOpacity(obj, a) {
 }
 
 const key = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
+
+// speed a car may drive at behind a leader `gap` m ahead (bumper to bumper) going `vLead`
+function following(gap, vLead) {
+  if (gap === null) return Infinity;
+  return Math.max(0, Math.min(vLead + (gap - 8) * 0.4, (gap - 3.5) * 0.9));
+}
 
 export class Traffic {
   constructor(scene, data, route, ground, game, rand) {
@@ -122,7 +128,8 @@ export class Traffic {
     }).filter((s) => s !== null).sort((a, b) => a - b) : [];
     // other lines that really serve this route's stops (from GTFS)
     const other = new Set();
-    for (const st of data.stops) for (const l of st.lines || []) if (l !== String(data.line)) other.add(l);
+    const mine = new Set((game.segments || []).map((g) => g.line));
+    for (const st of data.stops) for (const l of st.lines || []) if (!mine.has(l)) other.add(l);
     this.otherLines = other.size ? [...other] : OTHER_LINES;
     this.ahead = [];
     this.oncoming = [];
@@ -140,12 +147,14 @@ export class Traffic {
       const lat = q.hx * (p.y - q.y) - q.hy * (p.x - q.x); // + = left of our direction
       const rel = p.hx * q.hx + p.hy * q.hy > 0 ? 1 : -1;   // road drawn along / against us
       const lanes = [];
+      // streets with the tracks down the middle: one car lane on each side of the track zone
+      const side = r.tram ? r.w / 2 - 1.7 : r.w / 4;
       if (r.o) {
         const dir = r.o * rel;
-        const offs = r.w >= 7 ? [-r.w / 4, r.w / 4] : [0];
+        const offs = r.w >= 7 ? [-side, side] : [0];
         for (const o of offs) lanes.push({ lat: lat + o, dir });
       } else {
-        lanes.push({ lat: lat - r.w / 4, dir: 1 }, { lat: lat + r.w / 4, dir: -1 });
+        lanes.push({ lat: lat - side, dir: 1 }, { lat: lat + side, dir: -1 });
       }
       const ok = lanes.filter((l) => Math.abs(l.lat) > TRACK_CLEAR && Math.abs(l.lat - 3.2) > TRACK_CLEAR);
       if (!ok.length) continue;
@@ -201,24 +210,39 @@ export class Traffic {
       const lane = this.laneAt(s, dir);
       if (lane && !street.some((c) => Math.abs(c.s - s) < 15 && c.dir === dir)) {
         const c = this._carSlot();
-        if (c) Object.assign(c, { active: true, kind: 'street', s, dir, lat: lane.lat, v: 8 + this.rand() * 5 });
+        if (c) Object.assign(c, { active: true, kind: 'street', s, dir, lat: lane.lat, v: 8 + this.rand() * 5, vNow: null });
       }
     }
     for (const c of street) {
-      const front = street.filter((o) => o !== c && o.dir === c.dir && Math.abs(o.lat - c.lat) < 1.5 && (o.s - c.s) * c.dir > 0)
+      const front = street.filter((o) => o !== c && o.active && o.dir === c.dir && Math.abs(o.lat - c.lat) < 1.5 && (o.s - c.s) * c.dir > 0)
         .sort((a, b) => Math.abs(a.s - c.s) - Math.abs(b.s - c.s))[0];
-      let vt = c.v;
-      if (front && Math.abs(front.s - c.s) < 12) vt = Math.min(vt, front.vNow ?? 0);
-      c.vNow = vt;
-      c.s += c.dir * vt * dt;
+      const vt = Math.min(c.v, front ? following(Math.abs(front.s - c.s) - 4.4, front.vNow ?? 0) : Infinity);
+      c.vNow = this._approach(c.vNow ?? vt, vt, dt);
+      c.s += c.dir * c.vNow * dt;
       const lane = this.laneAt(c.s, c.dir, c.lat);
       if (lane) c.lat += (lane.lat - c.lat) * Math.min(1, dt * 2);
       if (!lane || Math.abs(c.s - tram.s) > 480) c.active = false; // street ends: fade out
       this._fade(c, dt);
       const o = this.route.offset(c.s, c.lat);
-      c.mesh.position.set(o.x, this.ground.at(o.x, o.y) + 0.12, -o.y);
-      c.mesh.rotation.y = Math.atan2(o.hx * c.dir, -o.hy * c.dir);
+      this._poseCar(c.mesh, o.x, o.y, o.hx * c.dir, o.hy * c.dir);
     }
+  }
+
+  // speed change with car-like acceleration (2 m/s2) and braking (up to 5 m/s2)
+  _approach(v, vt, dt) {
+    return vt > v ? Math.min(vt, v + 2 * dt) : Math.max(vt, v - 5 * dt);
+  }
+
+  // stand a car on the road surface: pitch with the slope, roll with the camber
+  _poseCar(mesh, x, y, hx, hy) {
+    const g = this.ground;
+    const zf = g.at(x + hx * 1.6, y + hy * 1.6), zb = g.at(x - hx * 1.6, y - hy * 1.6);
+    const zl = g.at(x - hy * 0.8, y + hx * 0.8), zr = g.at(x + hy * 0.8, y - hx * 0.8);
+    mesh.rotation.order = 'YXZ';
+    mesh.position.set(x, (zf + zb) / 2 + 0.12, -y);
+    mesh.rotation.y = Math.atan2(hx, -hy);
+    mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
+    mesh.rotation.z = Math.atan2(zl - zr, 1.6);
   }
 
   // Cars on the surrounding road network: they continue across junctions.
@@ -230,20 +254,28 @@ export class Traffic {
         const [, k, s0] = near;
         const r = this.roads[k];
         const dir = r.o ? r.o : this.rand() < 0.5 ? 1 : -1;
-        const c = this._carSlot();
-        if (c) Object.assign(c, { active: true, kind: 'road', road: r, s: s0, dir, v: 7 + this.rand() * 6, laneSel: this.rand() < 0.5 ? -1 : 1 });
+        const c = road.some((o) => o.active && o.road === r && Math.abs(o.s - s0) < 12) ? null : this._carSlot();
+        if (c) Object.assign(c, { active: true, kind: 'road', road: r, s: s0, dir, v: 7 + this.rand() * 6, vNow: null, laneSel: this.rand() < 0.5 ? -1 : 1 });
       }
     }
     const tram = this.game.tram;
     const tp = this.route.at(tram.s - 7);
     for (const c of road) {
       if (c.active) {
-        const ns = c.s + c.dir * c.v * dt;
         // give way to the tram where the road crosses its track
         const p0 = c.road.path.at(c.s);
         const ax = p0.x + p0.hx * c.dir * 6, ay = p0.y + p0.hy * c.dir * 6;
         const waiting = Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3;
-        if (!waiting) c.s = ns;
+        // keep a distance to the car ahead in the same lane
+        let gap = null, vLead = 0;
+        for (const o of road) {
+          if (o === c || !o.active || o.road !== c.road || o.dir !== c.dir || (c.road.o && o.laneSel !== c.laneSel)) continue;
+          const d = (o.s - c.s) * c.dir - 4.4;
+          if (d > -2 && (gap === null || d < gap)) { gap = d; vLead = o.vNow ?? 0; }
+        }
+        const vt = waiting ? 0 : Math.min(c.v, following(gap, vLead));
+        c.vNow = this._approach(c.vNow ?? vt, vt, dt);
+        c.s += c.dir * c.vNow * dt;
         if (c.s < 0 || c.s > c.road.path.length) this._nextRoad(c);
       }
       this._fade(c, dt);
@@ -252,11 +284,10 @@ export class Traffic {
       const p = r.path.at(c.s);
       const hx = p.hx * c.dir, hy = p.hy * c.dir;
       // right-hand traffic; one-way roads use their full width
-      const lane = r.o ? (r.w >= 7 ? c.laneSel * r.w / 4 : 0) : Math.max(1.5, r.w / 4);
+      const lane = r.tram ? r.w / 2 - 1.7 : r.o ? (r.w >= 7 ? c.laneSel * r.w / 4 : 0) : Math.max(1.5, r.w / 4);
       const x = p.x + hy * lane, y = p.y - hx * lane;
       if (Math.hypot(x - cx, y - cy) > 420) c.active = false;
-      c.mesh.position.set(x, this.ground.at(x, y) + 0.12, -y);
-      c.mesh.rotation.y = Math.atan2(hx, -hy);
+      this._poseCar(c.mesh, x, y, hx, hy);
     }
   }
 
@@ -333,19 +364,30 @@ export class Traffic {
 
   // --------------------------------------------------------------------- other trams
   _placeTram(t, route, s, profileZ) {
-    const a = route.at(s - 3.2), b = route.at(s - 10.8);
-    const za = profileZ(s - 3.2, a), zb = profileZ(s - 10.8, b);
-    t.mesh.position.set((a.x + b.x) / 2, (za + zb) / 2 + 0.3, -(a.y + b.y) / 2);
-    t.mesh.rotation.y = Math.atan2(a.x - b.x, -(a.y - b.y));
-    t.mesh.rotation.x = -Math.atan2(za - zb, 7.6);
+    placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p)]; });
   }
 
-  _newTram() {
-    const mesh = makeT3({ line: this.otherLines[Math.floor(this.rand() * this.otherLines.length)] });
-    mesh.rotation.order = 'YXZ';
+  // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it
+  // runs with us while the consecutive stops are served by it, then turns off (it fades out
+  // there; it does not take its own branch). dir +1 = our direction, -1 = oncoming.
+  _otherLine(i, dir) {
+    const stops = this.game.data.stops, me = this.game.line;
+    const cand = (stops[i]?.lines || []).filter((l) => l !== me);
+    if (!cand.length) return null;
+    const line = cand[Math.floor(this.rand() * cand.length)];
+    let k = i;
+    while (stops[k + dir] && (stops[k + dir].lines || []).includes(line)) k += dir;
+    const end = this.game.stops[k].target;
+    return { line, endS: k === (dir > 0 ? stops.length - 1 : 0) ? null : end + dir * 40 };
+  }
+
+  // a tram of one of the other lines serving these stops: two-car set, except heritage line 23
+  _newTram(line = this.otherLines[Math.floor(this.rand() * this.otherLines.length)]) {
+    const cars = line === '23' ? 1 : 2;
+    const mesh = makeT3({ line, cars, detailed: this.game.opts.detailed });
     setOpacity(mesh, 0);
     this.group.add(mesh);
-    return mesh;
+    return { mesh, length: T3.length * cars + COUPLING_GAP * (cars - 1) };
   }
 
   _tramFade(t, dt, leaving) {
@@ -360,20 +402,21 @@ export class Traffic {
     if (this.spawnTimer <= 0 && this.ahead.length < 2) {
       this.spawnTimer = 40 + this.rand() * 80;
       const st = g.stops.find((x) => x.target > tram.s + 450 && x.target < tram.s + 900 && x.i > g.nextStop);
-      if (st && !this.ahead.some((t) => Math.abs(t.s - st.target) < 60)) {
-        this.ahead.push({ mesh: this._newTram(), s: st.target, v: 0, dwell: 10 + this.rand() * 15, lastStop: st.i });
+      const other = st && this._otherLine(st.i, 1);
+      if (other && !this.ahead.some((t) => Math.abs(t.s - st.target) < 60)) {
+        this.ahead.push({ ...this._newTram(other.line), endS: other.endS, s: st.target, v: 0, dwell: 10 + this.rand() * 15, lastStop: st.i });
       }
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = Math.min(g.limits.at(t.s), g.limits.at(t.s - T3.length)) / 3.6 * 0.85;
+      let vt = Math.min(g.limits.at(t.s), g.limits.at(t.s - t.length)) / 3.6 * 0.85;
       let stopAt = null;
       const st = g.stops.find((x) => x.target > t.s + 0.5);
       if (st) stopAt = st.target;
       const sig = g.signals.find((x) => x.s > t.s + 0.5);
       if (sig && sig.state !== 'go' && sig.s - 3 < (stopAt ?? Infinity)) stopAt = sig.s - 3;
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
-      if (other && other.s - T3.length - 6 < (stopAt ?? Infinity)) stopAt = other.s - T3.length - 6;
+      if (other && other.s - other.length - 6 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 6;
       if (t.dwell > 0) { t.dwell -= dt; vt = 0; }
       else if (stopAt !== null) {
         const d = stopAt - t.s;
@@ -386,7 +429,7 @@ export class Traffic {
       const a = Math.max(-1.3, Math.min(1.0, (vt - t.v) * 0.8));
       t.v = Math.max(0, t.v + a * dt);
       t.s += t.v * dt;
-      t.leaving = t.s - tram.s > 1000 || t.s > this.route.length - 20;
+      t.leaving = t.s - tram.s > 1000 || t.s > this.route.length - 20 || (t.endS !== null && t.s > t.endS);
       this._tramFade(t, dt, t.leaving);
       this._placeTram(t, this.route, t.s, (s) => profile.height(s));
     }
@@ -402,10 +445,14 @@ export class Traffic {
     const br = this.back;
     if (!br) return;
     if (this.oncoming.length < 2 && this.rand() < dt / 25) {
-      const o = this.route.at(Math.min(this.route.length - 5, tram.s + 550 + this.rand() * 400));
+      const s0 = Math.min(this.route.length - 5, tram.s + 550 + this.rand() * 400);
+      const o = this.route.at(s0);
       const n = br.nearest(o.x, o.y);
-      if (n && n.d < 25 && !this.oncoming.some((t) => Math.abs(t.s - n.s) < 120)) {
-        this.oncoming.push({ mesh: this._newTram(), s: n.s, v: 7, dwell: 0, served: new Set() });
+      // a line that serves the stop just beyond, coming towards us
+      const st = this.game.stops.find((x) => x.target > s0);
+      const other = st && this._otherLine(st.i, -1);
+      if (other && n && n.d < 25 && !this.oncoming.some((t) => Math.abs(t.s - n.s) < 120)) {
+        this.oncoming.push({ ...this._newTram(other.line), endS: other.endS, s: n.s, v: 7, dwell: 0, served: new Set() });
       }
     }
     if (!this.backLimits) this.backLimits = br.speedLimits();
@@ -413,11 +460,11 @@ export class Traffic {
     const gauntlets = this.game.gauntlets || [];
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };
     for (const t of this.oncoming) {
-      let vt = Math.min(this.backLimits.at(t.s), this.backLimits.at(t.s - T3.length)) / 3.6 * 0.85;
+      let vt = Math.min(this.backLimits.at(t.s), this.backLimits.at(t.s - t.length)) / 3.6 * 0.85;
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null;
       for (const G of gauntlets) {
-        if (t.s > G.b0 && t.s - T3.length < G.b1) G.theirs.occupied = true;
+        if (t.s > G.b0 && t.s - t.length < G.b1) G.theirs.occupied = true;
         if (t.s <= G.b0 && G.b0 - t.s < 150) {
           G.theirs.requested = true;
           const allowed = G.state === 'theirs' && !G.entered;
@@ -434,7 +481,9 @@ export class Traffic {
       t.v = Math.max(0, t.v + a * dt);
       t.s += t.v * dt;
       const p = br.at(t.s), me = this.route.at(tram.s);
-      t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20;
+      // past the last stop it shares with our line it turns off
+      const ourS = t.endS !== null ? this.route.nearest(p.x, p.y)?.s : null;
+      t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
       this._placeTram(t, br, t.s, (s, q) => ground.at(q.x, q.y));
     }

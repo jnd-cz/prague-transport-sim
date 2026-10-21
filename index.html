@@ -87,6 +87,9 @@
   @keyframes pop { from { transform: scale(.9); opacity: 0; } }
   #action { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,14,12,.9); padding: 14px 22px; border-radius: 8px; font-size: 16px; display: none; }
 
+  #mirror { position: fixed; right: 18px; bottom: 196px; width: 150px; height: 190px; border: 6px solid #1b1f1d;
+    border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.5); pointer-events: none; }
+  body.chase #mirror, body.nomirror #mirror, #mirror.hidden { display: none; }
   #minimap { position: fixed; top: 10px; right: 10px; width: 220px; height: 220px; border-radius: 8px; border: 1px solid #000; background: rgba(15,20,17,.82); pointer-events: none; }
   body:not(.chase) #minimap { top: 8vh; right: 6.5vw; }
 
@@ -143,6 +146,7 @@
 <div id="assist"></div>
 <div id="msgs"></div>
 <div id="action"></div>
+<div id="mirror" class="hidden"></div>
 <canvas id="minimap" width="440" height="440" class="hidden"></canvas>
 <div id="help" class="hidden"></div>
 
@@ -166,9 +170,11 @@
     <div class="checks">
       <label><input type="checkbox" id="optAssist" checked> <span data-i18n="menu.assist"></span></label>
       <label><input type="checkbox" id="optAuto"> <span data-i18n="menu.autopilot"></span></label>
-      <label><input type="checkbox" id="optAutoIrc"> <span data-i18n="menu.autoIrc"></span></label>
       <label><input type="checkbox" id="optDeadman"> <span data-i18n="menu.deadman"></span></label>
       <label><span data-i18n="menu.weather"></span> <select id="optWeather"><option value="dry" selected data-i18n="weather.dry"></option><option value="rain" data-i18n="weather.rain"></option><option value="leaves" data-i18n="weather.leaves"></option></select></label>
+      <label><span data-i18n="menu.model"></span> <select id="optModel"><option value="detailed" selected data-i18n="model.detailed"></option><option value="simple" data-i18n="model.simple"></option></select></label>
+      <label><span data-i18n="menu.consist"></span> <select id="optCars"><option value="auto" selected data-i18n="consist.auto"></option><option value="1" data-i18n="consist.1"></option><option value="2" data-i18n="consist.2"></option></select></label>
+      <label><span data-i18n="menu.temp"></span> <select id="optTemp"><option value="live" selected data-i18n="temp.live"></option><option value="winter" data-i18n="temp.winter"></option><option value="autumn" data-i18n="temp.autumn"></option><option value="summer" data-i18n="temp.summer"></option></select></label>
       <label><span data-i18n="menu.obstacles"></span> <select id="optObst"><option value="off" data-i18n="obst.off"></option><option value="normal" selected data-i18n="obst.normal"></option><option value="many" data-i18n="obst.many"></option></select></label>
     </div>
     <div class="keys">
@@ -177,7 +183,11 @@
       <kbd data-i18n="kbd.space">Space</kbd><span data-i18n="k.emerg"></span>
       <kbd>N</kbd><span data-i18n="k.neutral"></span>
       <kbd>A</kbd><span data-i18n="k.sand"></span>
-      <kbd>Q / R / E</kbd><span data-i18n="k.irc"></span>
+      <kbd>Q / E</kbd><span data-i18n="k.look"></span>
+      <kbd>Z</kbd><span data-i18n="k.mirror"></span>
+      <kbd>H / K / F</kbd><span data-i18n="k.heat"></span>
+      <kbd>C</kbd><span data-i18n="k.cutout"></span>
+      <kbd>Y</kbd><span data-i18n="k.switchBtn"></span>
       <kbd>D</kbd><span data-i18n="k.doors"></span>
       <kbd>B</kbd><span data-i18n="k.bell"></span>
       <kbd>X</kbd><span data-i18n="k.crowbar"></span>
@@ -200,7 +210,7 @@
 <div id="loading" data-i18n="loading">Loading Prague…</div>
 
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
 </script>
 <script type="module" src="src/main.js"></script>
 </body>
