@@ -275,11 +275,24 @@ function outdoorTemperature(mode) {
   };
 }
 
+// ------------------------------------------------------------------ pause panel
+// The pause screen offers to continue or to leave the shift for the menu (pick another line,
+// trip, weather...). The abandoned shift stays paused behind the menu until a new one starts.
+$('btnResume').addEventListener('click', () => { if (game) game.paused = false; });
+$('btnToMenu').addEventListener('click', () => {
+  if (!game) return;
+  game.paused = true;
+  pilot = null;
+  hud.show(false);
+  $('mirror').classList.add('hidden');
+  $('menu').classList.remove('hidden');
+});
+
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let look = 0, lookTarget = 0, mirrorOn = true; // head turned left (+) / right (-), right mirror shown
 window.addEventListener('keydown', (e) => {
-  if (!game || game.finished) return;
+  if (!game || game.finished || !$('menu').classList.contains('hidden')) return;
   const k = e.key.toLowerCase();
   if (k === 'o' && !e.repeat) {
     pilot = pilot ? null : new Autopilot();
@@ -407,7 +420,10 @@ function frame(now) {
     if (!game.paused && !game.finished) traffic.update(dt, camera);
     audio.update(tram, game.currentLimit, dt);
     hudTimer -= dt;
-    if (hudTimer <= 0) { hudTimer = 1 / 30; hud.update(game, game.opts); }
+    const inMenu = !$('menu').classList.contains('hidden');
+    if (hudTimer <= 0 && !inMenu) { hudTimer = 1 / 30; hud.update(game, game.opts); }
+    $('action').style.visibility = inMenu ? 'hidden' : '';
+    $('pausePanel').classList.toggle('show', game.paused && !game.finished && !inMenu);
     if (game.finished && !game.resultsShown) {
       game.resultsShown = true;
       const ended = game;
