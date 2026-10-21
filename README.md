@@ -51,6 +51,14 @@ Expects `raw/PID_GTFS.zip` (download from https://data.pid.cz/PID_GTFS.zip). Ter
 ČÚZK DMR 5G ImageServer (`exportImage`, cached as `raw/terrain.tif`). Writes `data/line22.json`.
 The service date is a constant at the top of the script.
 
+## Deploy
+
+The game is static files: `index.html`, `src/`, `assets/`, `data/`. Three.js comes from jsDelivr and
+the outdoor temperature from Open-Meteo, both fetched by the browser. `python tools/make_dist.py`
+packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directory. Enable gzip or
+brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
+CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
+
 ## Gameplay
 
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.

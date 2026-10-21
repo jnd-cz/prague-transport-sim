@@ -258,9 +258,16 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
   `druhkonstrukcekod` (load-bearing construction — prefab panels), `pocetpodlazi`, `dokonceni`,
   `pocetbytu`; join by `isknbudovaid` / location. Code lists still to be looked up.
 - **Detailed T3** (Sketchfab, CC BY-NC 4.0; author still to be filled in `assets/t3/LICENSE.txt`):
-  textures reduced to one 2048 px JPEG with AO baked in (44 MB → 2 MB). Axes: length by PCA of the
-  body, **up from wheels→body centroid** (PCA alone rolled it 12° because height ≈ width),
-  our route boxes overlaid on the painted "11". Menu "Tram model" switches to the simple one.
+  textures reduced to one 2048 px JPEG with AO baked in (44 MB → 2 MB). Axes are fitted to the
+  **8 wheels** (forward = rear→front axle midpoints, left = right→left wheels, origin on the wheel
+  bottoms, centred between the wheels); the body PCA was off by 3° roll / 0.7° pitch and yaw.
+  Measured after the fix: all wheels at y = 0, ±0.811 m; body level within 7 mm; bogie pivots
+  ±3.18 m (the model's own spacing is used by `placeConsist`, the simple model keeps ±3.8 m);
+  pantograph stretched up from its base so the head meets the wire (`CONTACT_WIRE` 5.6 m above
+  the bed, `RAIL_TOP` 0.26 m); placed on line 22: wheels on the rail heads within 2 mm, head 1 cm
+  under the wire, 1.3 cm off the track centre. Pantograph 3.1 m ahead of the car centre →
+  `PANTO_FROM_FRONT` 4.5 m for the overhead contacts (simple model moved to match).
+  Our route boxes are overlaid on the painted "11". Menu "Tram model" switches to the simple one.
 - **Climate** (`game.climate`, `_updateClimate`): per car C = 2 MJ/K, UA 450 W/K, +1200 W/K open
   windows above 21 °C, +2500 W/K doors open; seats 3 / 10 kW, cab heater 2 / 4 kW, flap = 35 % of
   ED-brake power + 50 % of drive power below 9 m/s; 90 W per passenger. All guesses — tune.
@@ -344,3 +351,37 @@ encoded today, 8–10 MB with the encodings above**, and only a small part is ne
 lines serving any stop on the route and drove only along our route. Now the number comes from the stop
 where it appears, and it fades out after the last stop it shares with us, but it still never leaves our
 track physically and does not follow a timetable (needs item 3 above).
+
+## 12. Open items from the user (2026-10-21, end of session) — not done yet
+
+1. **Two-car set "broken"** — the user saw it on a screenshot that did not reach me. In my views
+   both cars were coupled correctly (centres 15.2 m apart, ~1.5 m between bodies, same track).
+   Ask for the screenshot / place; check AI two-car trams and the simple model too.
+2. **Nádraží Zahradní Město** looks wrong. Facts (cs Wikipedia "Praha-Zahradní Město (nádraží)",
+   PID 24 Sep 2021): the railway station is mostly a **bridge over Průběžná** (3 platforms × 350 m,
+   5 tracks); the **tram and bus stops are in the widened and lowered underpass directly under the
+   train platforms**; stairs, escalators and lifts lead up; pedestrian underpasses on both sides.
+   OSM marks our track covered at 18066–18109 and 18165–18196; Mosty 3D has the bridge slabs.
+   To do: carve the underpass to the real road width (not the ±7 m bench with synthetic walls),
+   render the railway on top (OSM `railway=rail` on the bridge, platforms `railway=platform`,
+   canopies `building=roof` — currently filtered out of buildings), maybe a passing train.
+   Photos: Commons files `Praha-Zahradní_Město_train_station_II,_Praha.jpg`,
+   `Praha-Zahradní_Město_train_station,_Praha.jpg`, `Praha_Strasnice_ZST_Zahradni_Mesto_mural_18.jpg`.
+3. **Both directions and line variants**: a line should be drivable in both directions and in
+   its variants (22: Bílá Hora / Vypich → Zahradní Město / Nádraží Hostivař and back), chosen in
+   the menu. Proposed: one data file per line with the union corridor (scenery) and a list of
+   routes (GTFS patterns map-matched like `--then`, each with path, stops, platforms, timetable,
+   signals, switches); the menu picks a route and reloads with `?line=22&route=k` (the world
+   carve/profile depend on the route). Also show **stops on both sides** (posts, platforms,
+   waiting people for the opposite direction, from the reverse route's stops) and let oncoming
+   NPC trams stop at the real opposite stops.
+4. **Final stop Zahradní Město and the turning loop**: the user had an accident there once.
+   Autopilot runs finish cleanly at the last stop; the route ends at the stop (the loop after it
+   is not part of the GTFS shape). Check manual driving past the final stop (route end clamps,
+   AI tram fading at the terminus) and consider adding the loop to the path.
+5. **Route boxes** now sit exactly on the painted ones (found via texture coordinates, see
+   `paintedBoxes` in models.js; glTF v runs downwards, u can be offset by 1). Rear box mirrored.
+6. **Signals/signs** (this session): at the kerb when within 6.5 m of our track, else hung from
+   the nearest span (±16 m), never on facades or platforms (`Game._mount`).
+7. Model licence: `assets/t3/LICENSE.txt` still needs the Sketchfab author and URL.
+8. Deploy: `dist/tatra-t3-prague.zip` (static files only; see README "Deploy").

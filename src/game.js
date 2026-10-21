@@ -206,7 +206,7 @@ export class Game {
         if (d.s > st.target - 25 && d.s < st.target + 2 && st.target + 2 < d.cross - 2) d.s = st.target + 2;
       }
       const mesh = makeTramSignal();
-      this._mount(mesh, d.s, ['pole', 'kerb', 'span']);
+      this._mount(mesh, d.s);
       this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction
       const h0 = this.route.heading(d.cross - 5, 5), h1 = this.route.heading(d.cross + 30, 8);
@@ -390,7 +390,7 @@ export class Game {
       if (minR > 110 || ds < 30 || ds - lastS < 60) continue;
       if (this.signals.some((o) => o !== sig && o.s > ds - 20 && o.s < sig.s)) continue;
       const mesh = makeTramSignal({ distant: true });
-      this._mount(mesh, ds, ['pole', 'kerb', 'span']);
+      this._mount(mesh, ds);
       this.objects.add(mesh);
       this.distants.push({ s: ds, main: sig, mesh });
       lastS = sig.s;
@@ -423,7 +423,7 @@ export class Game {
       sw.marker.visible = !sw.auto;
       if (sw.auto && this.opts.autoIrc) sw.pos = required;
       const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
-      this._mount(sign, sw.auto ? d.s - 40 : sw.contact, ['span', 'pole', 'kerb']);
+      this._mount(sign, sw.auto ? d.s - 40 : sw.contact);
       this.objects.add(sign);
       place(sw.indicator, this.route, d.s - 8, -0.4, 0, true); // hangs from the span wire over the track
       const c = this.route.at(sw.contact);
@@ -493,7 +493,7 @@ export class Game {
       if (s - last < 35 || s < 20) continue;
       last = s;
       const sign = makeSpeedSign(v);
-      this._mount(sign, s, ['span', 'pole', 'kerb'], { movable: true });
+      this._mount(sign, s, { movable: true });
       this.objects.add(sign);
     }
     let inSteep = false;
@@ -502,53 +502,38 @@ export class Game {
       if (!inSteep && g < -0.055) {
         inSteep = true;
         const sign = makeGradientSign(Math.round(-this.profile.grade(s + 60) * 100) || 6);
-        this._mount(sign, s, ['span', 'pole', 'kerb'], { movable: true });
+        this._mount(sign, s, { movable: true });
         this.objects.add(sign);
       } else if (inSteep && g > -0.03) inSteep = false;
     }
   }
 
-  // Put a signal or sign beside the track at route position s without blocking the street:
-  // on a catenary pole next to the track ('pole'), hung from a span wire to the right of the
-  // contact wire ('span'), or at the kerb / on a facade found by the world builder ('kerb').
-  // Platforms are kept clear: a sign is moved before the platform, a signal hangs instead.
-  _mount(obj, s, order, { movable = false } = {}) {
+  // Put a signal or sign beside the track at route position s: at the kerb on the right when it
+  // is close to the track (within 6.5 m), otherwise hung from the nearest span wire over the
+  // track, where the driver sees it best. Never on a platform or against a facade; speed and
+  // gradient signs that would stand on a platform move to just before it.
+  _mount(obj, s, { movable = false } = {}) {
     const route = this.route, C = route.catenary || [], ud = obj.userData;
-    const onPlatform = (x) => this.stops.some((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
-    if (onPlatform(s)) {
-      const st = this.stops.find((q) => s > (q.p0 ?? q.target - 30) - 4 && s < (q.p1 ?? q.target + 2) + 2);
-      if (movable) s = (st.p0 ?? st.target - 30) - 6;
-      else order = ['span', ...order.filter((o) => o !== 'span')];
-    }
-    const near = C.filter((c) => Math.abs(c.s - s) <= 10).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
+    const platformAt = (x) => this.stops.find((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
+    let onPlatform = platformAt(s);
+    if (onPlatform && movable) { s = (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
     const hidePole = () => { if (ud.pole) ud.pole.visible = false; };
-    for (const how of order) {
-      if (how === 'pole') {
-        const c = near.find((q) => q.R && !q.R.wall && q.R.lat <= 6.5 && !onPlatform(q.s));
-        if (!c) continue;
-        place(obj, route, c.s, -(c.R.lat - 0.25), 0, true);
-        hidePole();
-        return;
-      }
-      if (how === 'span') {
-        const c = near.find((q) => q.L && q.R);
-        if (!c || ud.boardTop === undefined) continue;
-        place(obj, route, c.s, -1.15, 0, true);
-        obj.position.y = this.profile.height(c.s) + 5.3 - ud.boardTop;
-        hidePole();
-        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
-        rod.position.y = ud.boardTop + 0.62;
-        obj.add(rod);
-        return;
-      }
-      if (how === 'kerb' && route.kerbAt) {
-        const k = route.kerbAt(s, -1);
-        if (!k || k.lat > 14 || onPlatform(s) && k.lat < 6) continue;
-        place(obj, route, s, -(k.wall ? k.lat - 0.3 : k.lat), 0, true);
-        if (k.wall) hidePole();
-        return;
-      }
+    const kerb = route.kerbAt ? route.kerbAt(s, -1) : null;
+    if (kerb && !kerb.wall && kerb.lat <= 6.5 && !onPlatform) {
+      place(obj, route, s, -kerb.lat, 0, true);
+      return;
     }
+    const span = C.filter((c) => c.L && c.R && Math.abs(c.s - s) <= 16).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0];
+    if (span && ud.boardTop !== undefined) {
+      place(obj, route, span.s, -1.15, 0, true);
+      obj.position.y = this.profile.height(span.s) + 5.3 - ud.boardTop;
+      hidePole();
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+      rod.position.y = ud.boardTop + 0.62;
+      obj.add(rod);
+      return;
+    }
+    if (kerb && !kerb.wall && kerb.lat <= 12) { place(obj, route, s, -kerb.lat, 0, true); return; }
     place(obj, route, s, -2.6, 0, true);
   }
 
