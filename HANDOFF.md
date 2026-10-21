@@ -257,7 +257,7 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
   (ags.cuzk.gov.cz/arcgis/rest/services/RUIAN/MapServer/3): `zpusobvyuzitikod` (use),
   `druhkonstrukcekod` (load-bearing construction — prefab panels), `pocetpodlazi`, `dokonceni`,
   `pocetbytu`; join by `isknbudovaid` / location. Code lists still to be looked up.
-- **Detailed T3** (Sketchfab, CC BY-NC 4.0; author still to be filled in `assets/t3/LICENSE.txt`):
+- **Detailed T3** ("Tatra T3" by Jakub Vaja (conflig), Sketchfab, CC BY-NC 4.0; `assets/t3/LICENSE.txt`):
   textures reduced to one 2048 px JPEG with AO baked in (44 MB → 2 MB). Axes are fitted to the
   **8 wheels** (forward = rear→front axle midpoints, left = right→left wheels, origin on the wheel
   bottoms, centred between the wheels); the body PCA was off by 3° roll / 0.7° pitch and yaw.
@@ -383,5 +383,5 @@ track physically and does not follow a timetable (needs item 3 above).
    `paintedBoxes` in models.js; glTF v runs downwards, u can be offset by 1). Rear box mirrored.
 6. **Signals/signs** (this session): at the kerb when within 6.5 m of our track, else hung from
    the nearest span (±16 m), never on facades or platforms (`Game._mount`).
-7. Model licence: `assets/t3/LICENSE.txt` still needs the Sketchfab author and URL.
+7. Model licence: done — "Tatra T3" by Jakub Vaja (conflig), Sketchfab, CC BY-NC 4.0.
 8. Deploy: `dist/tatra-t3-prague.zip` (static files only; see README "Deploy").

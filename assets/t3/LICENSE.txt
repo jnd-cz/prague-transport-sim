@@ -1,9 +1,10 @@
 Tatra T3 3D model (assets/t3/t3.gltf, t3.bin, t3_color.jpg)
 
-Source: Sketchfab, "Tatra T3" low-poly model, downloaded by the project owner on 2026-10-21.
+Source: "Tatra T3" by Jakub Vaja (conflig) on Sketchfab
+        https://sketchfab.com/3d-models/tatra-t3-76aa08d7c06340fc89229551c45e3c3a
+        downloaded by the project owner on 2026-10-21.
 Licence: Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0)
          https://creativecommons.org/licenses/by-nc/4.0/
-Author:  TODO - fill in the author's name and the Sketchfab page URL (not included in the download).
 
 Changes: the four 4096 px PBR maps were reduced to one 2048 px colour map with the ambient
 occlusion baked in (normal and metallic maps dropped); the glTF was trimmed accordingly.

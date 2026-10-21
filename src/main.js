@@ -124,7 +124,7 @@ function updateRain(dt) {
 applyWeather('dry');
 // detailed T3 model (Sketchfab, CC BY-NC 4.0); the built-in low-poly one is the fallback
 let detailedOk = false;
-try { await loadDetailedT3(); detailedOk = true; data.attribution += ' Tatra T3 3D model: Sketchfab, CC BY-NC 4.0 (simplified).'; }
+try { await loadDetailedT3(); detailedOk = true; data.attribution += ' Tatra T3 3D model: "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).'; }
 catch (e) { console.warn('detailed T3 model not loaded', e); }
 const useDetailed = () => detailedOk && $('optModel').value === 'detailed';
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
