@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tatra T3 – Line 22</title>
+<style>
+  :root {
+    --panel: #2f3a33;
+    --panel-edge: #1d2520;
+    --ink: #e9e4d4;
+    --dim: #9ea899;
+    --amber: #ffb43a;
+    --red: #ff4b3e;
+    --green: #6fe07a;
+    --blue: #5fb4ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: var(--ink);
+    font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #view { position: fixed; inset: 0; }
+  canvas#gl { display: block; width: 100%; height: 100%; }
+
+  /* cab frame (windshield pillars and roof) */
+  #cab { position: fixed; inset: 0; pointer-events: none; }
+  #cab .roof { position: absolute; left: 0; right: 0; top: 0; height: 7vh;
+    background: linear-gradient(#1b211d, #39443c); border-bottom: 3px solid #121612; }
+  #cab .pillar { position: absolute; top: 0; bottom: 0; width: 5.5vw; background: linear-gradient(90deg, #1b211d, #3a463d 60%, #222a24); }
+  #cab .pillar.l { left: 0; } #cab .pillar.r { right: 0; transform: scaleX(-1); }
+  #cab .mid { position: absolute; top: 7vh; bottom: 180px; left: 50%; width: 10px; margin-left: -5px; background: #222a24; opacity: .0; }
+  body.chase #cab { display: none; }
+
+  /* dashboard */
+  #dash { position: fixed; left: 0; right: 0; bottom: 0; height: 180px; display: flex; gap: 14px; align-items: center;
+    justify-content: center; padding: 10px 16px; pointer-events: none;
+    background: linear-gradient(#3c4a40, var(--panel) 30%, var(--panel-edge)); border-top: 4px solid #151b17;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.45); }
+  body.chase #dash { background: rgba(30,38,33,.82); }
+  .gauge { position: relative; }
+  .gauge svg { display: block; }
+  .group { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .notch { width: 64px; height: 156px; background: #151a17; border: 2px solid #0b0e0c; border-radius: 6px; display: flex; flex-direction: column; padding: 4px; gap: 2px; }
+  .notch div { flex: 1; font: 600 11px/1 ui-monospace, monospace; display: flex; align-items: center; justify-content: center; color: #59645b; border-radius: 3px; background: #1e2420; }
+  .notch div.on.drive { background: #2c6b37; color: #d9ffd9; }
+  .notch div.on.neutral { background: #6a6a52; color: #fff; }
+  .notch div.on.brake { background: #8a5a1c; color: #fff1d9; }
+  .notch div.on.emerg { background: #a02018; color: #fff; }
+  .lamps { display: grid; grid-template-columns: repeat(3, 92px); gap: 6px; }
+  .lamp { height: 34px; border-radius: 5px; background: #151a17; border: 2px solid #0b0e0c; display: flex; align-items: center; justify-content: center;
+    font: 700 10px/1.05 system-ui, sans-serif; text-align: center; color: #4b554d; letter-spacing: .04em; padding: 2px; }
+  .lamp.on { color: #111; }
+  .lamp.on.red { background: var(--red); box-shadow: 0 0 12px var(--red); }
+  .lamp.on.amber { background: var(--amber); box-shadow: 0 0 12px var(--amber); }
+  .lamp.on.green { background: var(--green); box-shadow: 0 0 12px var(--green); }
+  .lamp.on.blue { background: var(--blue); box-shadow: 0 0 12px var(--blue); }
+  .info { width: 280px; background: #101511; border: 2px solid #0b0e0c; border-radius: 6px; padding: 8px 10px; font: 12px/1.38 ui-monospace, "Cascadia Mono", monospace; color: #c9f0c0; height: 156px; overflow: hidden; }
+  .info .big { font-size: 15px; color: #fff; }
+  .info .k { color: #7f9a7a; }
+
+  /* top bar */
+  #top { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: stretch; pointer-events: none; }
+  #top > div { background: rgba(15,20,17,.82); border: 1px solid #000; border-radius: 6px; padding: 6px 12px; }
+  #line { background: #7a0603 !important; color: #fff; font: 800 24px/1.1 system-ui; display: flex; align-items: center; }
+  #nextstop .name { font-weight: 700; font-size: 16px; }
+  #nextstop .sub { color: var(--dim); font-size: 12px; }
+  #clock { font: 700 20px/1.2 ui-monospace, monospace; text-align: center; }
+  #clock .dev { font-size: 13px; }
+  #score { font: 700 18px/1.2 ui-monospace, monospace; text-align: right; }
+  #pax { min-width: 108px; font: 700 16px/1.2 ui-monospace, monospace; }
+  #pax .bar { position: relative; height: 7px; margin: 3px 0 2px; background: #2a322d; border-radius: 4px; overflow: hidden; }
+  #pax .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); border-radius: 4px; }
+  #pax .bar b { position: absolute; top: 0; bottom: 0; left: 68.75%; width: 2px; background: #cfd6c9; }
+  #pax .sub { font: 400 11px/1.2 system-ui; color: var(--dim); }
+  #pax.full .n { color: var(--red); } #pax.busy .n { color: var(--amber); }
+  #score .sub { font-size: 11px; color: var(--dim); font-weight: 400; }
+  .late { color: var(--amber); } .early { color: var(--red); } .ontime { color: var(--green); }
+
+  #assist { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; flex-wrap: wrap; justify-content: center; max-width: 80vw; }
+  #assist .chip { background: rgba(15,20,17,.8); border-radius: 14px; padding: 4px 12px; font-size: 13px; border: 1px solid rgba(255,255,255,.08); }
+  #assist .chip.bad { border-color: var(--red); color: #ffd0cc; }
+  #assist .chip.ok { border-color: #2f7d3a; }
+  #msgs { position: fixed; top: 124px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+  #msgs div { background: rgba(10,14,12,.86); padding: 6px 14px; border-radius: 6px; font-weight: 600; animation: pop .2s ease-out; }
+  #msgs .bad { color: #ffb0a8; border-left: 4px solid var(--red); }
+  #msgs .good { color: #c4ffc8; border-left: 4px solid var(--green); }
+  #msgs .warn { color: #ffe0a0; border-left: 4px solid var(--amber); }
+  @keyframes pop { from { transform: scale(.9); opacity: 0; } }
+  #action { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,14,12,.9); padding: 14px 22px; border-radius: 8px; font-size: 16px; display: none; }
+
+  #minimap { position: fixed; top: 10px; right: 10px; width: 220px; height: 220px; border-radius: 8px; border: 1px solid #000; background: rgba(15,20,17,.82); pointer-events: none; }
+  body:not(.chase) #minimap { top: 8vh; right: 6.5vw; }
+
+  /* menu & results */
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8,10,9,.78); z-index: 10; padding: 16px; }
+  .card { background: #1d2420; border: 1px solid #000; border-radius: 10px; padding: 22px 26px; max-width: 760px; width: 100%; max-height: 100%; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .card h1 { margin: 0 0 4px; font-size: 26px; }
+  .card h1 span:first-child { background: #7a0603; padding: 0 10px; border-radius: 4px; margin-right: 8px; }
+  .card .sub { color: var(--dim); margin-bottom: 16px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  .row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim); flex: 1; min-width: 200px; }
+  select, button { font: inherit; background: #2c3631; color: var(--ink); border: 1px solid #4a5a50; border-radius: 6px; padding: 7px 10px; }
+  button.primary { background: #b5161c; border-color: #d43; font-weight: 700; padding: 10px 26px; cursor: pointer; font-size: 16px; }
+  button.primary:hover { background: #cf2026; }
+  .checks { display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 16px; font-size: 13px; }
+  .keys { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 12px; font-size: 13px; margin: 14px 0; color: #cfd6c9; }
+  kbd { background: #313b35; border: 1px solid #556; border-bottom-width: 2px; border-radius: 4px; padding: 0 6px; font: 600 12px ui-monospace, monospace; white-space: nowrap; }
+  .attrib { font-size: 11px; color: #7d887f; margin-top: 12px; }
+  table.res { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  table.res td { padding: 3px 6px; border-bottom: 1px solid #2c3631; }
+  table.res td:last-child { text-align: right; font-family: ui-monospace, monospace; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #111; z-index: 20; }
+  .hidden { display: none !important; }
+  fieldset.settings { border: 1px solid #3b4741; border-radius: 8px; padding: 8px 12px 10px; margin: 0 0 16px; font-size: 13px; }
+  fieldset.settings legend { color: var(--dim); padding: 0 6px; }
+  #help { position: fixed; left: 7vw; bottom: 192px; font-size: 11px; color: #cfd6c9; background: rgba(15,20,17,.7); padding: 6px 10px; border-radius: 6px; pointer-events: none; line-height: 1.6; }
+  body.chase #help { left: 10px; }
+
+  @media (max-width: 1100px) {
+    .info { display: none; }
+    .lamps { grid-template-columns: repeat(3, 74px); }
+    .lamp { font-size: 9px; }
+  }
+  @media (max-width: 640px) {
+    #dash { gap: 6px; padding: 8px; }
+    .lamps { grid-template-columns: repeat(3, 58px); }
+    .lamp { font-size: 8px; }
+    #minimap { width: 140px; height: 140px; }
+    #help { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="gl"></canvas></div>
+<div id="cab"><div class="roof"></div><div class="pillar l"></div><div class="pillar r"></div></div>
+
+<div id="top" class="hidden">
+  <div id="line">22</div>
+  <div id="nextstop"><div class="name">–</div><div class="sub">–</div></div>
+  <div id="pax"><div class="n">0</div><div class="bar"><i></i><b></b></div><div class="sub">&nbsp;</div></div>
+  <div id="clock">--:--:--<div class="dev">&nbsp;</div></div>
+  <div id="score">0<div class="sub">points</div></div>
+</div>
+<div id="assist"></div>
+<div id="msgs"></div>
+<div id="action"></div>
+<canvas id="minimap" width="440" height="440" class="hidden"></canvas>
+<div id="help" class="hidden"></div>
+
+<div id="dash" class="hidden">
+  <div class="group"><div id="g-amp" class="gauge"></div><div id="g-volt" class="gauge"></div></div>
+  <div id="g-speed" class="gauge"></div>
+  <div class="notch" id="notch"></div>
+  <div class="lamps" id="lamps"></div>
+  <div class="info" id="info"></div>
+</div>
+
+<div id="menu" class="overlay hidden">
+  <div class="card">
+    <h1><span id="menuLine">22</span><span class="t" data-i18n="menu.title"></span></h1>
+    <div class="sub" id="routeName"></div>
+    <div class="row">
+      <label style="flex:0 0 auto;min-width:150px"><span data-i18n="menu.line"></span><select id="selLine"></select></label>
+      <label><span data-i18n="menu.startStop"></span><select id="selStop"></select></label>
+      <label><span data-i18n="menu.trip"></span><select id="selTrip"></select></label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="optAssist" checked> <span data-i18n="menu.assist"></span></label>
+      <label><input type="checkbox" id="optAuto"> <span data-i18n="menu.autopilot"></span></label>
+      <label><input type="checkbox" id="optAutoIrc"> <span data-i18n="menu.autoIrc"></span></label>
+      <label><input type="checkbox" id="optDeadman"> <span data-i18n="menu.deadman"></span></label>
+      <label><span data-i18n="menu.weather"></span> <select id="optWeather"><option value="dry" selected data-i18n="weather.dry"></option><option value="rain" data-i18n="weather.rain"></option><option value="leaves" data-i18n="weather.leaves"></option></select></label>
+      <label><span data-i18n="menu.obstacles"></span> <select id="optObst"><option value="off" data-i18n="obst.off"></option><option value="normal" selected data-i18n="obst.normal"></option><option value="many" data-i18n="obst.many"></option></select></label>
+    </div>
+    <div class="keys">
+      <kbd>W / ↑</kbd><span data-i18n="k.drive"></span>
+      <kbd>S / ↓</kbd><span data-i18n="k.brake"></span>
+      <kbd data-i18n="kbd.space">Space</kbd><span data-i18n="k.emerg"></span>
+      <kbd>N</kbd><span data-i18n="k.neutral"></span>
+      <kbd>A</kbd><span data-i18n="k.sand"></span>
+      <kbd>Q / R / E</kbd><span data-i18n="k.irc"></span>
+      <kbd>D</kbd><span data-i18n="k.doors"></span>
+      <kbd>B</kbd><span data-i18n="k.bell"></span>
+      <kbd>X</kbd><span data-i18n="k.crowbar"></span>
+      <kbd>V</kbd><span data-i18n="k.view"></span>
+      <kbd>O</kbd><span data-i18n="k.autopilot"></span>
+      <kbd>M</kbd><span data-i18n="k.mute"></span>
+      <kbd>P / Esc</kbd><span data-i18n="k.pause"></span>
+    </div>
+    <div style="font-size:13px;color:#cfd6c9;margin-bottom:14px" data-i18n="menu.howto"></div>
+    <fieldset class="settings">
+      <legend data-i18n="menu.settings"></legend>
+      <label><span data-i18n="menu.language"></span> <select id="optLang"><option value="cs">Čeština</option><option value="en">English</option></select></label>
+    </fieldset>
+    <button class="primary" id="btnStart" data-i18n="menu.start"></button>
+    <div class="attrib" id="attrib"></div>
+  </div>
+</div>
+
+<div id="results" class="overlay hidden"><div class="card" id="resultsCard"></div></div>
+<div id="loading" data-i18n="loading">Loading Prague…</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

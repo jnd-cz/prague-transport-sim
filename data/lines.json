@@ -1,0 +1,30 @@
+[
+ {
+  "line": "9",
+  "from": "Sídliště Řepy",
+  "to": "Nákladové nádraží Žižkov",
+  "km": 17.3,
+  "stops": 30
+ },
+ {
+  "line": "17",
+  "from": "Levského",
+  "to": "Vozovna Kobylisy",
+  "km": 21.7,
+  "stops": 37
+ },
+ {
+  "line": "22",
+  "from": "Bílá Hora",
+  "to": "Zahradní Město",
+  "km": 18.4,
+  "stops": 39
+ },
+ {
+  "line": "23",
+  "from": "Královka",
+  "to": "Bílá labuť",
+  "km": 8.2,
+  "stops": 18
+ }
+]

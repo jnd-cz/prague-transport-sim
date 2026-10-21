@@ -1,0 +1,2 @@
+# quantised building geometry must never get line-ending conversion
+*.bin binary

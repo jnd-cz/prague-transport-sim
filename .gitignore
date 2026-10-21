@@ -1,0 +1,10 @@
+# download caches (OSM, GTFS, terrain, Geoportál) — ~420 MB, rebuilt by the tools
+raw/
+
+# Python / OS / editor noise
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
