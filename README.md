@@ -7,10 +7,10 @@ line 22 (Bílá Hora 382 m → Malostranská 189 m → Náměstí Míru 246 m �
 ## Run
 
 ```bash
-python tools/serve.py 8740
+python tools/serve.py 8742
 ```
 
-Open http://localhost:8740. There's no build step: plain ES modules, with Three.js loaded from a CDN.
+Open http://localhost:8742. There's no build step: plain ES modules, with Three.js loaded from a CDN.
 
 ## Rebuild the line data
 

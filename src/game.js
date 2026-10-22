@@ -219,8 +219,19 @@ export class Game {
       const h0 = this.route.heading(d.cross - 5, 5), h1 = this.route.heading(d.cross + 30, 8);
       const turn = Math.atan2(h0.hx * h1.hy - h0.hy * h1.hx, h0.hx * h1.hx + h0.hy * h1.hy);
       const goDir = turn > 0.45 ? 'left' : turn < -0.45 ? 'right' : 'straight';
-      const sig = { ...d, goDir, state: 'stop', timer: 5 + this.rand() * 30, preferred: false, mesh, cars: [], spawn: 0, seed: i * 31 };
-      if (this.rand() < 0.4) { sig.state = 'go'; sig.timer = 5 + this.rand() * 15; }
+      const sig = { ...d, goDir, state: 'stop', timer: 0, preferred: false, mesh, cars: [], spawn: 0, seed: i * 31 };
+      // the junction's controller: one fixed cycle (60-90 s): trams going straight in both
+      // directions together, then a short turning phase if our route turns here, then the cross
+      // street; our GO is the straight phase or the turning phase
+      const C = 60 + this.rand() * 30, gS = 20 + this.rand() * 10, gT = goDir === 'straight' ? 0 : 10;
+      sig.cycle = { C, gS, gT, ours: goDir === 'straight' ? [0, gS] : [gS, gS + gT], cross: gS + gT };
+      sig.t = this.rand() * C;
+      sig.ext = 0;
+      // where the opposite track passes the junction: oncoming trams stop there on red
+      if (this.backRoute) {
+        const x = this.route.at(d.cross), n = this.backRoute.nearest(x.x, x.y);
+        if (n && n.d < 15) sig.backCross = n.s;
+      }
       mesh.userData.set(sig.state, { goDir });
       return sig;
     }).sort((a, b) => a.s - b.s);
@@ -982,21 +993,7 @@ export class Game {
         }
         continue;
       }
-      sig.timer -= dt;
-      const dist = sig.s - tram.s;
-      // tram priority: detectors shorten the red phase when a tram approaches
-      if (sig.state === 'stop' && dist > 0 && dist < 140 && !sig.preferred) {
-        sig.preferred = true;
-        sig.timer = Math.min(sig.timer, 5 + this.rand() * 12);
-      }
-      if (dist < -tram.length) sig.preferred = false;
-      // the detector also holds GO for a tram that is committed to the junction
-      if (sig.state === 'go' && dist > 0 && dist < 15 + (tram.v * tram.v) / 1.6) sig.timer = Math.max(sig.timer, 1.5); // dilemma zone
-      if (sig.timer <= 0) {
-        if (sig.state === 'stop') { sig.state = 'go'; sig.timer = 14 + this.rand() * 14; }
-        else if (sig.state === 'go') { sig.state = 'warn'; sig.timer = 3; }
-        else { sig.state = 'stop'; sig.timer = 20 + this.rand() * 30; sig.stopSince = this.clock; }
-      }
+      this._runController(sig, dt);
       const blink = sig.state === 'warn' && Math.floor(this.clock * 2) % 2 === 0;
       // call lamp: lit once the tram request is registered, blinking in the last 3 s before GO
       let call = 'off';
@@ -1009,6 +1006,37 @@ export class Game {
       this._crossTraffic(sig, dt);
     }
     for (const d of this.distants) d.mesh.userData.set(d.main.state === 'go' ? 'go' : 'stop', { goDir: 'straight' });
+  }
+
+  // Junction controller (fixed cycle, see _initSignals) with tram priority: a tram detected 140 m
+  // before the signal cuts the cross street's green short (after at least 8 s of it) and jumps to
+  // our tram phase; a tram committed to the junction (dilemma zone) holds our GO up to 10 s more.
+  // Sets sig.state (our head: go / warn = last 3 s / stop), sig.timer (s to the next change of our
+  // head) and sig.backState (go while trams straight through have GO: the opposite direction).
+  _runController(sig, dt) {
+    const tram = this.tram, Y = sig.cycle, dist = sig.s - tram.s;
+    const [a, b] = Y.ours;
+    const inOurs = () => sig.t >= a && sig.t < b;
+    if (dist > 0 && dist < 140 && !inOurs()) {
+      if (!sig.preferred) sig.preferred = true;
+      // cut the cross street's green short once it had its minimum: on to the tram phases (the
+      // straight one first, so the opposite direction is never starved when our route turns:
+      // that deadlocked the Letenská single track)
+      if (sig.t >= Y.cross + 8) sig.t = 0;
+    }
+    if (dist < -tram.length) sig.preferred = false;
+    // dilemma zone: hold GO for a tram committed to the junction
+    const committed = dist > 0 && dist < 15 + (tram.v * tram.v) / 1.6;
+    if (inOurs() && b - sig.t < 3.2 && committed && sig.ext < 10) sig.ext += dt;
+    else sig.t += dt;
+    if (sig.t >= Y.C) { sig.t -= Y.C; sig.ext = 0; }
+    const prev = sig.state;
+    sig.state = inOurs() ? (b - sig.t > 3 ? 'go' : 'warn') : 'stop';
+    if (sig.state === 'stop' && prev !== 'stop') sig.stopSince = this.clock;
+    sig.timer = sig.state === 'go' ? b - 3 - sig.t : sig.state === 'warn' ? b - sig.t : (a - sig.t + Y.C) % Y.C;
+    const back = sig.t < Y.gS - 3 ? 'go' : 'stop';
+    if (back === 'stop' && sig.backState !== 'stop') sig.backStopSince = this.clock;
+    sig.backState = back;
   }
 
   _crossTraffic(sig, dt) {
@@ -1039,7 +1067,8 @@ export class Game {
       const toX = (X.sX - car.s) * car.dir;
       // the cross street has red while the tram has GO (and 3 s of clearance before it);
       // cars wait at their stop line, and always give way to a tram on the crossing
-      const red = sig.state !== 'stop' || sig.timer < 3;
+      // (the cross street has green only in its own phase of the cycle)
+      const red = sig.t < sig.cycle.cross || sig.t > sig.cycle.C - 3;
       const waiting = toX > 3.5 && toX < 12 && (red || tramComing);
       // queue behind the car in front
       let gap = Infinity;

@@ -156,8 +156,20 @@ ideas (tier D). Every item names its measurement.
      while standing in a car lane (a walker turning back and forth there blocked a car for minutes);
      walker hits are counted per episode now, like overlaps;
    - line 22: overlaps 492 -> 133, car jumps 73 -> 0; line 23: overlaps 133 -> 46.
-   Still open in B9: trams (ours on autopilot and the AI ones) do not stop for a car on the track
-   ahead (most remaining overlaps: car + tram on shared lanes); lanes of different roads that touch
+   Done later the same day: trams (AI both ways and the autopilot) stop behind a car going their way
+   on their track (`game.carsOnTrack`); the "give way to the tram" wait applies only to cars that
+   cross the track (a car driving along it waited for the tram behind it — deadlock); cars never
+   enter a junction whose exit lane is full ("don't block the box") and ignore a car in the
+   junction that waits for them; the lane-mouth rule ignores cars approaching the same junction
+   (two of them waited for each other); unique car ids; walkers always turn at the end of their
+   path and are clamped into it (one spawned past the end and stood in a lane for good, with eight
+   cars and our tram queued behind); oncoming trams keep their distance to each other.
+   Each was found by a traffic run that did not finish, followed back along the chain of who waits
+   for whom. Also: an obstacle behind a car never stops it (a car beside the front of our tram
+   waited for it); a car whose own path is blocked does not hold its junction priority; tram
+   priority jumps to the start of the tram phases, not straight to ours (our turning phase starved
+   the opposite direction, which then blocked the Letenská single track for good).
+   Still open in B9: lanes of different roads that touch
    (line 22: 45); Vienna-type stops (cars wait beside a tram with open doors) need the stop
    classifier first (C13). Original items:
    - Cars merge onto the tracks past islands and wait behind a tram at Vienna-type stops.
@@ -176,7 +188,15 @@ ideas (tier D). Every item names its measurement.
     15 % + 5 of the baseline. Original text: The traffic counts move ±10–20 % when trajectories change
     (line 9 walkers inside vehicles 921 -> 1 708 after tier A, which did not touch walkers): compare
     rates with a noise band, or average a few seeds, so the comparer only flags real regressions.
-10. **Junction controllers with real cycles.**
+10. ~~**Junction controllers with real cycles.**~~ **done 2026-10-22** (`Game._runController`): one
+    fixed cycle per signal (60-90 s): trams straight in both directions (20-30 s), a 10 s turning
+    phase when our route turns there, then the cross street; tram priority cuts the cross street's
+    green after its minimum 8 s, the dilemma zone holds our GO up to 10 s. Oncoming AI trams stop at
+    the junction's line on the opposite track unless the straight phase runs (they commit with
+    braking distance + 2 s reaction, stop 3 m before the line, never spawn in front of a red line).
+    Traffic run check `redRuns`: an oncoming tram past the line on red although it was far enough to
+    stop while it was red (one that could no longer stop when it changed passes on amber).
+    Original text:
     - Compatible movements share a phase, so trams going straight from both directions get GO together.
     - Lint: conflicting GOs = 0.
 

@@ -1,15 +1,15 @@
 {
  "line": "9",
  "traffic": {
-  "simSeconds": 5583,
-  "samples": 26747,
+  "simSeconds": 5582,
+  "samples": 26742,
   "finished": true,
   "nextStop": 59,
-  "carsVisible": 27.5,
+  "carsVisible": 27.7,
   "walkersVisible": 87.5
  },
- "date": "2026-10-22T11:34:18.395Z",
- "secs": 69.2,
+ "date": "2026-10-22T15:39:00.210Z",
+ "secs": 231.5,
  "checks": {
   "consist": {
    "rule": "consist-coupled",
@@ -61,359 +61,363 @@
   },
   "slide": {
    "rule": "traffic-no-sideways-motion",
-   "count": 731,
-   "of": 26747,
+   "count": 811,
+   "of": 26742,
    "kinds": {
-    "walker": 532,
-    "car junction": 100,
-    "car lane→junction": 72,
-    "car junction→lane": 26,
-    "car next road": 1
+    "walker": 567,
+    "car junction": 134,
+    "car lane→junction": 74,
+    "car junction→lane": 36
    },
    "places": [
     {
      "kind": "car lane→junction",
-     "x": 566.9578374037144,
-     "y": -189.484875580394,
-     "mag": 4.804173031749414,
-     "s": 7638,
-     "info": "4.8 m/s sideways at 6.1 m/s"
-    },
-    {
-     "kind": "car lane→junction",
-     "x": -3446.795044090921,
-     "y": -632.2668211738624,
-     "mag": 4.639592291036847,
-     "s": 24946,
-     "info": "4.6 m/s sideways at 6.6 m/s"
-    },
-    {
-     "kind": "car lane→junction",
-     "x": 566.738755439641,
-     "y": -189.52336550978347,
-     "mag": 2.7906944679308556,
-     "s": 20801,
-     "info": "2.8 m/s sideways at 7.0 m/s"
+     "x": 658.7838323497117,
+     "y": -207.1580198029328,
+     "mag": 6.248876966307244,
+     "s": 7542,
+     "info": "6.2 m/s sideways at 7.7 m/s"
     },
     {
      "kind": "car junction",
-     "x": 567.3937593657598,
-     "y": -190.45462787786363,
-     "mag": 2.7303782690049285,
-     "s": 20802,
-     "info": "2.7 m/s sideways at 5.7 m/s"
-    },
-    {
-     "kind": "car junction",
-     "x": 5711.265436651803,
-     "y": 533.3700106944415,
-     "mag": 2.386048164397137,
-     "s": 15175,
-     "info": "2.4 m/s sideways at 8.1 m/s"
-    },
-    {
-     "kind": "car junction→lane",
-     "x": 5734.510686253833,
-     "y": 1190.9163693828586,
-     "mag": 2.2882394907801205,
-     "s": 14317,
-     "info": "2.3 m/s sideways at 2.6 m/s"
+     "x": 660.0394455099623,
+     "y": -208.41634425287677,
+     "mag": 5.563479355910409,
+     "s": 20948,
+     "info": "5.6 m/s sideways at 9.1 m/s"
     },
     {
      "kind": "car lane→junction",
-     "x": 5711.187826856906,
-     "y": 1179.8049023988845,
-     "mag": 2.2639517071631663,
-     "s": 14317,
-     "info": "2.3 m/s sideways at 10.9 m/s"
-    },
-    {
-     "kind": "car junction→lane",
-     "x": 3150.1038147009963,
-     "y": 1392.1468110876153,
-     "mag": 2.2551654103014918,
-     "s": 12010,
-     "info": "2.3 m/s sideways at 2.5 m/s"
-    },
-    {
-     "kind": "car junction→lane",
-     "x": 2079.0057200741567,
-     "y": 619.0783353183373,
-     "mag": 2.2225448863342265,
-     "s": 10334,
-     "info": "2.2 m/s sideways at 3.0 m/s"
+     "x": 567.0279294928783,
+     "y": -189.64080249029846,
+     "mag": 4.895174891995492,
+     "s": 21372,
+     "info": "4.9 m/s sideways at 6.6 m/s"
     },
     {
      "kind": "car lane→junction",
-     "x": 4298.231005496719,
-     "y": 1196.5004418478354,
-     "mag": 2.006124495191451,
-     "s": 12903,
-     "info": "2.0 m/s sideways at 4.4 m/s"
-    },
-    {
-     "kind": "car junction→lane",
-     "x": 5734.642167793276,
-     "y": 1190.4177318464813,
-     "mag": 1.9408091394868638,
-     "s": 14317,
-     "info": "1.9 m/s sideways at 2.3 m/s"
+     "x": 658.9992145956131,
+     "y": -207.3756338152441,
+     "mag": 4.500561261878747,
+     "s": 7660,
+     "info": "4.5 m/s sideways at 6.6 m/s"
     },
     {
      "kind": "car lane→junction",
-     "x": 566.6400376507216,
-     "y": -189.54680797203153,
-     "mag": 1.9210662245535883,
-     "s": 20675,
-     "info": "1.9 m/s sideways at 4.5 m/s"
+     "x": 658.7187948251798,
+     "y": -207.16792202967727,
+     "mag": 3.2834082498104555,
+     "s": 20947,
+     "info": "3.3 m/s sideways at 9.5 m/s"
+    },
+    {
+     "kind": "car junction→lane",
+     "x": 3190.3471962284284,
+     "y": 200.88326095910503,
+     "mag": 3.072628738610244,
+     "s": 18366,
+     "info": "3.1 m/s sideways at 7.7 m/s"
+    },
+    {
+     "kind": "car lane→junction",
+     "x": 566.6549274519652,
+     "y": -189.5432720986357,
+     "mag": 2.858353553687781,
+     "s": 7567,
+     "info": "2.9 m/s sideways at 6.5 m/s"
+    },
+    {
+     "kind": "car lane→junction",
+     "x": 567.2787215684913,
+     "y": -190.19871471470574,
+     "mag": 2.7476617040929683,
+     "s": 7057,
+     "info": "2.7 m/s sideways at 4.6 m/s"
+    },
+    {
+     "kind": "car lane→junction",
+     "x": 658.4523938034145,
+     "y": -207.3412376709448,
+     "mag": 2.730325042624423,
+     "s": 7222,
+     "info": "2.7 m/s sideways at 5.9 m/s"
+    },
+    {
+     "kind": "car lane→junction",
+     "x": 5711.2831244997005,
+     "y": 1183.7659162086916,
+     "mag": 2.5307648599311707,
+     "s": 14503,
+     "info": "2.5 m/s sideways at 10.1 m/s"
+    },
+    {
+     "kind": "car junction→lane",
+     "x": 3190.2009412309453,
+     "y": 201.19392938345896,
+     "mag": 2.4614664774257022,
+     "s": 18469,
+     "info": "2.5 m/s sideways at 5.7 m/s"
+    },
+    {
+     "kind": "car lane→junction",
+     "x": 2044.0002671721631,
+     "y": 250.17415215633736,
+     "mag": 2.2392907429478583,
+     "s": 19487,
+     "info": "2.2 m/s sideways at 8.5 m/s"
     }
    ]
   },
   "jump": {
    "rule": "traffic-no-teleport",
    "count": 0,
-   "of": 26747,
+   "of": 26742,
    "kinds": {},
    "places": []
   },
   "overlap": {
    "rule": "traffic-no-overlap",
-   "count": 123,
+   "count": 180,
    "of": 93,
    "kinds": {
-    "tram ahead / tram oncoming": 12,
-    "car / car": 64,
-    "car / our tram": 36,
-    "car / tram oncoming": 8,
-    "car / tram ahead": 3
+    "tram ahead / tram oncoming": 30,
+    "tram ahead / tram ahead": 2,
+    "car / car": 88,
+    "car / our tram": 40,
+    "car / tram oncoming": 11,
+    "car / tram ahead": 3,
+    "our tram / tram oncoming": 6
    },
    "states": {
-    "tram ahead + tram oncoming": 12,
-    "junction + junction": 21,
-    "junction + lane": 19,
-    "coast + junction": 1,
-    "lane + lane": 22,
-    "lane + our tram": 26,
-    "junction + our tram": 10,
-    "lane + tram oncoming": 8,
+    "tram ahead + tram oncoming": 30,
+    "tram ahead + tram ahead": 2,
+    "junction + junction": 18,
+    "junction + lane": 37,
+    "lane + lane": 30,
+    "lane + our tram": 24,
+    "coast + our tram": 1,
+    "junction + our tram": 15,
+    "lane + tram oncoming": 6,
+    "junction + tram oncoming": 5,
+    "junction + tram ahead": 3,
     "coast + coast": 1,
-    "junction + tram ahead": 1,
-    "lane + tram ahead": 2
+    "coast + lane": 2,
+    "our tram + tram oncoming": 6
    },
    "places": [
     {
-     "kind": "tram ahead / tram oncoming",
-     "states": "tram ahead + tram oncoming",
-     "x": -5853.628323655748,
-     "y": -997.0195815582999,
-     "mag": 2.5000000000002274,
-     "s": 27070,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.6 m deep"
+     "kind": "tram ahead / tram ahead",
+     "states": "tram ahead + tram ahead",
+     "x": -5318.283347844537,
+     "y": -1069.1099867968974,
+     "mag": 2.5000000000009095,
+     "s": 841,
+     "info": "tram ahead / tram ahead (tram ahead + tram ahead), 0.6 m deep"
+    },
+    {
+     "kind": "tram ahead / tram ahead",
+     "states": "tram ahead + tram ahead",
+     "x": 5323.008437987177,
+     "y": 1094.0205520906998,
+     "mag": 2.500000000000682,
+     "s": 13161,
+     "info": "tram ahead / tram ahead (tram ahead + tram ahead), 0.4 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -5852.182802580875,
-     "y": -997.0625141742948,
-     "mag": 2.5000000000002274,
-     "s": 27071,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.3 m deep"
+     "x": -916.4868002231617,
+     "y": -349.1747419956781,
+     "mag": 2.5000000000001137,
+     "s": 5145,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 0.1 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -5818.177204611028,
-     "y": -1001.1647917685939,
-     "mag": 2.5,
-     "s": 6,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.0 m deep"
+     "x": -927.30314028062,
+     "y": -348.18799145060035,
+     "mag": 2.5000000000001137,
+     "s": 5147,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.2 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -5802.287317211265,
-     "y": -1001.6781870659956,
-     "mag": 2.5,
-     "s": 6,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.6 m deep"
+     "x": -917.5867621988587,
+     "y": -349.0987714301733,
+     "mag": 2.5000000000001137,
+     "s": 5175,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 0.4 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -5818.3987052154835,
-     "y": -1001.1576679409851,
-     "mag": 2.5,
-     "s": 6,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.6 m deep"
-    },
-    {
-     "kind": "tram ahead / tram oncoming",
-     "states": "tram ahead + tram oncoming",
-     "x": -5802.888389568073,
-     "y": -1001.658855579922,
-     "mag": 2.5,
-     "s": 6,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.9 m deep"
-    },
-    {
-     "kind": "tram ahead / tram oncoming",
-     "states": "tram ahead + tram oncoming",
-     "x": -4610.578060267641,
-     "y": -827.8852972063555,
-     "mag": 2.5,
-     "s": 25531,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 2.5 m deep"
-    },
-    {
-     "kind": "tram ahead / tram oncoming",
-     "states": "tram ahead + tram oncoming",
-     "x": -5835.834230710661,
-     "y": -997.5552223122162,
-     "mag": 2.5,
-     "s": 27068,
+     "x": -931.8346921371608,
+     "y": -347.6693396948987,
+     "mag": 2.500000000000057,
+     "s": 5129,
      "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.1 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -5836.262855307974,
-     "y": -997.5425418189661,
-     "mag": 2.5,
-     "s": 27070,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.6 m deep"
+     "x": -822.3365738860152,
+     "y": -335.4011523795372,
+     "mag": 2.500000000000057,
+     "s": 5256,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 0.5 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -4622.581474372442,
-     "y": -837.2104253260032,
-     "mag": 2.4999999999995453,
-     "s": 25531,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 2.5 m deep"
+     "x": -776.5480359285664,
+     "y": -326.5370786987966,
+     "mag": 2.500000000000057,
+     "s": 5269,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.5 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -4616.579900402864,
-     "y": -832.5476909039353,
-     "mag": 2.4999999999995453,
-     "s": 25531,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 2.5 m deep"
+     "x": -820.9578411273894,
+     "y": -335.1342474006128,
+     "mag": 2.500000000000057,
+     "s": 5269,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.5 m deep"
     },
     {
      "kind": "tram ahead / tram oncoming",
      "states": "tram ahead + tram oncoming",
-     "x": -4621.857198383128,
-     "y": -836.6477879128411,
-     "mag": 2.4999999999995453,
-     "s": 25531,
-     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.3 m deep"
+     "x": -792.2234283451826,
+     "y": -329.57163362353634,
+     "mag": 2.500000000000057,
+     "s": 5286,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 0.6 m deep"
+    },
+    {
+     "kind": "tram ahead / tram oncoming",
+     "states": "tram ahead + tram oncoming",
+     "x": -725.1234626280403,
+     "y": -316.0864079286569,
+     "mag": 2.500000000000057,
+     "s": 5359,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 0.5 m deep"
+    },
+    {
+     "kind": "tram ahead / tram oncoming",
+     "states": "tram ahead + tram oncoming",
+     "x": -96.32216856644442,
+     "y": -191.96666832323103,
+     "mag": 2.500000000000057,
+     "s": 5821,
+     "info": "tram ahead / tram oncoming (tram ahead + tram oncoming), 1.5 m deep"
     }
    ]
   },
   "walkerHit": {
    "rule": "traffic-walkers-clear-of-vehicles",
-   "count": 230,
+   "count": 222,
    "of": 93,
    "kinds": {
-    "car": 210,
-    "our tram": 20
+    "car": 211,
+    "our tram": 11
    },
    "places": [
     {
      "kind": "car",
-     "x": -6635.15966796875,
-     "y": -963.6779174804688,
+     "x": -5580.1201171875,
+     "y": -1213.92724609375,
      "mag": 1,
-     "s": 112,
+     "s": 1146,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -5349.8623046875,
-     "y": -1072.7528076171875,
+     "x": -5572.29638671875,
+     "y": -1211.1707763671875,
      "mag": 1,
-     "s": 1376,
+     "s": 1177,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -5351.50439453125,
-     "y": -1074.8958740234375,
+     "x": -5316.3173828125,
+     "y": -1046.244384765625,
+     "mag": 1,
+     "s": 1309,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -5509.494140625,
+     "y": -1185.687255859375,
+     "mag": 1,
+     "s": 1311,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -5316.14599609375,
+     "y": -1046.36279296875,
+     "mag": 1,
+     "s": 1334,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -5347.86572265625,
+     "y": -1072.20751953125,
      "mag": 1,
      "s": 1398,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -5016.27685546875,
-     "y": -940.69091796875,
+     "x": -4679.75244140625,
+     "y": -862.9130249023438,
      "mag": 1,
-     "s": 1956,
+     "s": 2330,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -4547.59326171875,
-     "y": -767.79150390625,
+     "x": -4519.27294921875,
+     "y": -753.2574462890625,
      "mag": 1,
-     "s": 2173,
+     "s": 2395,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -4547.81005859375,
-     "y": -767.113525390625,
+     "x": -4518.59814453125,
+     "y": -752.6902465820312,
      "mag": 1,
-     "s": 2208,
+     "s": 2474,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -4547.423828125,
-     "y": -767.9326171875,
+     "x": -4352.94921875,
+     "y": -703.3130493164062,
      "mag": 1,
-     "s": 2215,
+     "s": 2640,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -4547.49267578125,
-     "y": -767.9512329101562,
+     "x": -4352.939453125,
+     "y": -703.401123046875,
      "mag": 1,
-     "s": 2257,
+     "s": 2677,
      "info": "walker inside car"
     },
     {
      "kind": "car",
-     "x": -4547.96044921875,
-     "y": -767.2549438476562,
+     "x": -3733.42333984375,
+     "y": -650.6119995117188,
      "mag": 1,
-     "s": 2342,
-     "info": "walker inside car"
-    },
-    {
-     "kind": "car",
-     "x": -4547.484375,
-     "y": -767.8573608398438,
-     "mag": 1,
-     "s": 2354,
-     "info": "walker inside car"
-    },
-    {
-     "kind": "car",
-     "x": -4547.658203125,
-     "y": -767.668212890625,
-     "mag": 1,
-     "s": 2376,
-     "info": "walker inside car"
-    },
-    {
-     "kind": "car",
-     "x": -4544.35009765625,
-     "y": -765.219482421875,
-     "mag": 1,
-     "s": 2399,
+     "s": 3284,
      "info": "walker inside car"
     }
    ]
@@ -428,99 +432,205 @@
    "places": [
     {
      "kind": "heating",
-     "x": -5295.006113143121,
-     "y": -1050.5187542915287,
+     "x": -5317.157662441549,
+     "y": -1068.2125124166714,
      "mag": 1,
-     "s": 1402,
+     "s": 1374,
      "info": "2/3/true → 2/2/true at 277 s"
     },
     {
      "kind": "heating",
-     "x": -5100.347994638944,
-     "y": -946.3583509102863,
+     "x": -5272.5601245679745,
+     "y": -1032.754698013943,
      "mag": 1,
-     "s": 1625,
+     "s": 1431,
      "info": "2/2/true → 2/1/true at 297 s"
     },
     {
      "kind": "heating",
-     "x": -3180.7667710286246,
-     "y": -609.8895877080461,
+     "x": -3386.9219162838117,
+     "y": -620.6440196400509,
      "mag": 1,
-     "s": 3610,
-     "info": "2/1/true → 2/2/true at 553 s"
+     "s": 3404,
+     "info": "2/1/true → 2/2/true at 549 s"
     },
     {
      "kind": "heating",
-     "x": -2674.8442174472116,
-     "y": -574.498856363222,
+     "x": -2598.373192548553,
+     "y": -553.0856618949109,
      "mag": 1,
-     "s": 4118,
-     "info": "2/2/true → 1/2/true at 592 s"
+     "s": 4198,
+     "info": "2/2/true → 1/2/true at 613 s"
     },
     {
      "kind": "heating",
-     "x": -638.2155605421767,
-     "y": -297.68169842509013,
+     "x": -895.4943053832563,
+     "y": -348.2191216583456,
      "mag": 1,
-     "s": 6189,
-     "info": "1/2/true → 1/1/true at 856 s"
+     "s": 5927,
+     "info": "1/2/true → 1/1/true at 858 s"
     },
     {
      "kind": "heating",
-     "x": 90.39831843915532,
-     "y": -156.3555427987485,
+     "x": 117.97882459797212,
+     "y": -152.34063717897823,
      "mag": 1,
-     "s": 6932,
-     "info": "1/1/true → 0/1/true at 935 s"
+     "s": 6960,
+     "info": "1/1/true → 0/1/true at 981 s"
     },
     {
      "kind": "heating",
-     "x": 974.1894267873247,
-     "y": 530.3219633387349,
+     "x": 964.6089276244222,
+     "y": 251.64946427452455,
      "mag": 1,
-     "s": 8517,
+     "s": 8237,
      "info": "0/1/true → 0/2/true at 1196 s"
     },
     {
      "kind": "heating",
-     "x": 2078.4217708671745,
-     "y": 842.5077877172426,
+     "x": 1957.674737891734,
+     "y": 937.5319151439221,
      "mag": 1,
-     "s": 10016,
+     "s": 9800,
      "info": "0/2/true → 0/1/true at 1471 s"
     },
     {
      "kind": "heating",
-     "x": 2877.070230762974,
-     "y": 1305.8396714740063,
+     "x": 2966.7973388767664,
+     "y": 1341.8237081167103,
      "mag": 1,
-     "s": 11342,
-     "info": "0/1/true → 0/2/true at 1785 s"
+     "s": 11440,
+     "info": "0/1/true → 0/2/true at 1805 s"
     },
     {
      "kind": "heating",
-     "x": 4473.338108848528,
-     "y": 1159.573946009566,
+     "x": 4473.339287873007,
+     "y": 1159.57374991263,
      "mag": 1,
      "s": 13030,
-     "info": "0/2/true → 1/2/true at 2131 s"
+     "info": "0/2/true → 0/1/true at 2116 s"
     },
     {
      "kind": "heating",
-     "x": 4495.721569461336,
-     "y": 1152.7470350080516,
+     "x": 4791.2638068118995,
+     "y": 984.9152305262021,
      "mag": 1,
-     "s": 13053,
-     "info": "1/2/true → 1/1/true at 2151 s"
+     "s": 13423,
+     "info": "0/1/true → 1/1/true at 2281 s"
     },
     {
      "kind": "heating",
-     "x": 5333.812760422204,
-     "y": 1096.661286841352,
+     "x": 4989.169964584707,
+     "y": 1021.6162196031873,
      "mag": 1,
-     "s": 13977,
-     "info": "1/1/true → 1/2/true at 2393 s"
+     "s": 13624,
+     "info": "1/1/true → 1/2/true at 2368 s"
+    }
+   ]
+  },
+  "redRuns": {
+   "rule": "trams-obey-junction-signals",
+   "count": 36,
+   "of": 93,
+   "kinds": {
+    "oncoming tram": 36
+   },
+   "places": [
+    {
+     "kind": "oncoming tram",
+     "x": -56.987625099885676,
+     "y": -180.59778137079834,
+     "mag": 0.2607753422731782,
+     "s": 21625,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": 1664.59295225122,
+     "y": -57.86545273072177,
+     "mag": 0.26020652486690915,
+     "s": 19868,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -5462.681681345463,
+     "y": -1163.7888067148672,
+     "mag": 0.2600684252641231,
+     "s": 27207,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": 3597.542807300932,
+     "y": 1290.038346700841,
+     "mag": 0.25965095717485737,
+     "s": 12136,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -1812.6054245609039,
+     "y": -424.81190810839524,
+     "mag": 0.25878921571089186,
+     "s": 23410,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": 4018.326805248789,
+     "y": 1248.613687151573,
+     "mag": 0.25850457491336476,
+     "s": 12559,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": 1664.594809539617,
+     "y": -57.86429284816844,
+     "mag": 0.25830706802309855,
+     "s": 19868,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -76.38957274196643,
+     "y": -187.82407135963194,
+     "mag": 0.2582016582460251,
+     "s": 6768,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -5529.906672696609,
+     "y": -1161.7129484717607,
+     "mag": 0.257657661443307,
+     "s": 1133,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -2655.609623405272,
+     "y": -569.3953186951514,
+     "mag": 0.25675318285661003,
+     "s": 4144,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -2655.6095481676934,
+     "y": -569.3952977774105,
+     "mag": 0.25668900680361834,
+     "s": 4144,
+     "info": "oncoming tram through red at 1 km/h"
+    },
+    {
+     "kind": "oncoming tram",
+     "x": -1812.6082245352693,
+     "y": -424.8122313781629,
+     "mag": 0.2565216382722015,
+     "s": 23410,
+     "info": "oncoming tram through red at 1 km/h"
     }
    ]
   }

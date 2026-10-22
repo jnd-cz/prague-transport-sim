@@ -100,7 +100,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   g.audio.setMuted(true);
   window.headless = true; // the page's frame loop must not step the game between our chunks
   const ap = new Autopilot();
-  const slides = [], jumps = [], overlaps = [], hits = [], knobs = [];
+  const slides = [], jumps = [], overlaps = [], hits = [], knobs = [], redRuns = [];
+  const lastS = new Map(); // oncoming tram -> its position at the previous step
   let heat = null; // last heating setting: saloon / cab / flap, to count the autopilot's knob changes
   const prev = new Map(), open = new Map(); // id -> last sample; pair -> open overlap episode
   let T = 0, nextSample = 0, samples = 0, seenVeh = 0, seenWalk = 0;
@@ -111,6 +112,21 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
     for (let k = 0; k < 600 && T < maxT && !g.finished; k++) {
       ap.step(g, dt);
       g.update(dt, ap.input);
+      // oncoming trams crossing a junction's stop line on red (B10: they share the straight phase)
+      for (const t of tr.oncoming) {
+        const s0 = lastS.get(t);
+        if (s0 !== undefined) for (const sig of g.signals) {
+          if (sig.backCross === undefined) continue;
+          const line = sig.backCross - 6, d = line - t.s;
+          // a tram counts only if, while the light was red, it was still far enough to stop (0.9 m/s2
+          // and 2 s reaction): one that could no longer stop when it changed passes on amber
+          t.couldStop = t.couldStop || new Set();
+          if (sig.backState === 'go') t.couldStop.delete(sig);
+          else if (d > (t.v * t.v) / 1.8 + t.v * 2 + 1) t.couldStop.add(sig);
+          if (s0 < line && t.s >= line && sig.backState !== 'go' && t.couldStop.has(sig)) { const p = tr.back.at(t.s); redRuns.push({ kind: 'oncoming tram', x: p.x, y: p.y, mag: t.v, s: Math.round(sig.cross), info: `oncoming tram through red at ${(t.v * 3.6).toFixed(0)} km/h` }); }
+        }
+        lastS.set(t, t.s);
+      }
       const c = g.climate, h = c && `${c.saloon}/${c.cab}/${c.flap}`;
       if (heat !== null && h !== heat) { const p = g.route.at(g.tram.s); knobs.push({ kind: 'heating', x: p.x, y: p.y, mag: 1, s: Math.round(g.tram.s), info: `${heat} → ${h} at ${Math.round(T)} s` }); }
       heat = h;
@@ -190,6 +206,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       overlap: pick('traffic-no-overlap', overlaps, Math.round(minutes)),
       walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, Math.round(minutes)),
       heatingKnobs: pick('autopilot-calm-heating', knobs, Math.round(minutes)),
+      redRuns: pick('trams-obey-junction-signals', redRuns, Math.round(minutes)),
     },
   };
 }

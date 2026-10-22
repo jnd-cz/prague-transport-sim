@@ -26,7 +26,7 @@ This file records what was found while building it, what is unfinished, and what
 ## 2. Run, build, test
 
 ```bash
-python tools/serve.py 8740                                     # dev server, no-cache headers
+python tools/serve.py 8742                                     # dev server, no-cache headers (any free port)
 python -I tools/build_line.py --line 22 --headsign "Zahradní Město"   # OSM + GTFS + terrain -> data/line22.json
 python -I tools/build_line.py --line 23                        # other lines: headsign auto-picked
 python -I tools/geoportal.py --line 22                         # LOD2 buildings, walls, trees -> line22.geo.json + .bld.bin

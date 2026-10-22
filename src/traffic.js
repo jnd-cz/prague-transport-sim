@@ -444,7 +444,7 @@ export class Traffic {
         if (lane) {
           const s = Math.max(0, Math.min(lane.path.length, (lane.dir > 0 ? s0 : r.path.length - s0) - lane.trim));
           const c = cars.some((o) => o.active && o.path === lane.path && Math.abs(o.s - s) < 12) ? null : this._carSlot();
-          if (c) Object.assign(c, { active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null });
+          if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null });
         }
       }
     }
@@ -452,8 +452,8 @@ export class Traffic {
     const tp = this.route.at(tram.s - 7);
     const live = cars.filter((c) => c.active);
     const obstacles = this._pathObstacles();
-    live.forEach((c, i) => {
-      c.id = c.id ?? i;
+    live.forEach((c) => {
+      c.id = c.id ?? (this.nextCarId = (this.nextCarId || 0) + 1); // unique: the priority tie-breaks use it
       c.toEnd = c.conn ? 0 : c.path.length - c.s;
       // the next lane is chosen ahead of time, so the following distance can look across the junction
       if (!c.conn && c.next === undefined && c.toEnd < 40) c.next = this._chooseNext(c.lane);
@@ -502,11 +502,15 @@ export class Traffic {
         const look = Math.max(9, ((c.vNow ?? 0) ** 2) / 8 + 3);
         if (c.plan && c.toEnd < look) {
           const J = c.plan.at;
-          const blocked = live.some((o) => o !== c && (
-            (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan))
+          // (a car in the junction that is itself waiting for this one does not block it; and a car
+          // only enters when its exit lane has room: it never stops inside the junction)
+          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7);
+          const blocked = exitFull || live.some((o) => o !== c && (
+            (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan) && o.seen?.car !== c)
             || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, c.plan)
+              && !(o.seen && o.seen.gap < 4) // (a car whose own path is blocked does not hold its turn)
               && (o.toEnd < c.toEnd - 0.05 || (Math.abs(o.toEnd - c.toEnd) <= 0.05 && o.id < c.id)))
-            || (!o.conn && o.lane !== c.lane && o.lane.to === J && o.toEnd < 5 && this._nearLaneEnd(c.plan, o.lane, true))
+            || (!o.conn && o.lane !== c.lane && o.lane.to === J && o.toEnd < 5 && !(o.plan && o.plan.at === J) && this._nearLaneEnd(c.plan, o.lane, true))
             || (!o.conn && o.lane !== c.next && o.lane.from === J && o.s < 5 && this._nearLaneEnd(c.plan, o.lane, false))));
           if (blocked && c.toEnd > 1.5) jStop = c.toEnd - 2;
         }
@@ -596,7 +600,9 @@ export class Traffic {
   // along the car's heading
   _obstacleAhead(c, seq, obstacles) {
     const p0 = c.path.at(c.s);
-    const near = obstacles.filter((o) => Math.abs(o.x - p0.x) < 50 && Math.abs(o.y - p0.y) < 50);
+    // (something whose centre is behind the car can never be in its way: a car beside the front of
+    // a tram waited for it while the tram waited for the car)
+    const near = obstacles.filter((o) => Math.abs(o.x - p0.x) < 50 && Math.abs(o.y - p0.y) < 50 && (o.x - p0.x) * p0.hx + (o.y - p0.y) * p0.hy > -1);
     if (!near.length) return null;
     for (let d = 2; d <= 40; d += 2) {
       let q = null;
@@ -676,8 +682,11 @@ export class Traffic {
       const ahead = pos(w.s + w.dir * 1.5);
       // turn back before the tracks or at the end of the path, but never while standing in a car
       // lane (finish crossing first: a walker turning back and forth there blocked the cars)
-      const here = pos(w.s);
-      if ((this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR || w.s + w.dir < 0 || w.s + w.dir > w.walk.path.length) && !this.inLane(here.x, here.y)) w.dir = -w.dir;
+      // (at the end of its path a walker always turns back into it; it may have spawned past the end)
+      if (w.s > w.walk.path.length) { w.s = w.walk.path.length; w.dir = -1; }
+      if (w.s < 0) { w.s = 0; w.dir = 1; }
+      const here = pos(w.s), end = w.s + w.dir < 0 || w.s + w.dir > w.walk.path.length;
+      if (end || (this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR && !this.inLane(here.x, here.y))) w.dir = -w.dir;
       else w.s += w.dir * w.v * dt;
       const { x, y, p } = pos(w.s);
       w.x = x; w.y = y;
@@ -788,7 +797,9 @@ export class Traffic {
       // a line that serves the stop just beyond, coming towards us
       const st = this.game.stops.find((x) => x.target > s0);
       const other = st && this._otherLine(st.i, -1);
-      if (other && n && n.d < 25 && !this.oncoming.some((t) => Math.abs(t.s - n.s) < 120)) {
+      // (not within braking distance of a red stop line: it appears already moving)
+      const redAhead = this.game.signals.some((sig) => sig.backCross !== undefined && sig.backState !== 'go' && sig.backCross - 6 - n?.s > -2 && sig.backCross - 6 - n?.s < 80);
+      if (other && n && n.d < 25 && !redAhead && !this.oncoming.some((t) => Math.abs(t.s - n.s) < 120)) {
         this.oncoming.push({ ...this._newTram(other.line), endS: other.endS, s: n.s, v: 7, dwell: 0, served: new Set() });
       }
     }
@@ -801,6 +812,18 @@ export class Traffic {
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null;
       for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
+      // keep a distance to the oncoming tram in front
+      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 6 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 6;
+      // junction signals: the opposite direction has GO together with our straight phase; a tram
+      // that can still stop comfortably waits at its stop line on red
+      if (t.redStop && t.redStop.backState === 'go') t.redStop = null;
+      for (const sig of this.game.signals) {
+        if (sig.backCross === undefined || sig.backState === 'go') continue;
+        const line = sig.backCross - 6, d = line - t.s;
+        // (they brake at 0.9 m/s2 and react with a lag: about 2 s of travel more)
+        if (d > 0 && d < 150 && d > (t.v * t.v) / 1.8 + t.v * 2 + 1 && line < (stopAt ?? Infinity)) t.redStop = sig;
+        if (t.redStop === sig && line - 3 < (stopAt ?? Infinity) && d > -1) stopAt = line - 3; // a little before the line
+      }
       for (const G of gauntlets) {
         if (t.s > G.b0 && t.s - t.length < G.b1) G.theirs.occupied = true;
         if (t.s <= G.b0 && G.b0 - t.s < 150) {

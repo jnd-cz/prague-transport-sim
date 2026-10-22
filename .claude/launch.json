@@ -4,8 +4,8 @@
     {
       "name": "tram",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["tools/serve.py", "8740"],
-      "port": 8740
+      "runtimeArgs": ["tools/serve.py", "8742"],
+      "port": 8742
     }
   ]
 }
