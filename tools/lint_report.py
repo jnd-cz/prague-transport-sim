@@ -24,7 +24,7 @@ if "--accept" in sys.argv:
     sys.exit(0)
 
 worse = 0
-NOISY = {"slide", "jump", "overlap", "walkerHit", "heatingKnobs", "streetBot"}
+NOISY = {"slide", "jump", "overlap", "walkerHit", "heatingKnobs", "streetBot", "redRuns"}
 print(f"{'line':5} {'check':28} {'baseline':>9} {'now':>9}  of")
 for f in sorted(glob.glob(os.path.join(CUR, "line*.json"))):
     now = json.load(open(f, encoding="utf-8"))

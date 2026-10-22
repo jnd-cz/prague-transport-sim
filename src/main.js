@@ -474,7 +474,7 @@ function frame(now) {
   }
   renderer.render(scene, camera);
   if (perfOn) updatePerf(now);
-  if (game && !chase && mirrorOn && !window.freeCam) renderMirror();
+  if (game && !chase && mirrorOn && !window.freeCam && !window.headless) renderMirror(); // (not while a test steps the game)
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
