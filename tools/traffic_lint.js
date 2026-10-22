@@ -100,7 +100,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   g.audio.setMuted(true);
   window.headless = true; // the page's frame loop must not step the game between our chunks
   const ap = new Autopilot();
-  const slides = [], jumps = [], overlaps = [], hits = [];
+  const slides = [], jumps = [], overlaps = [], hits = [], knobs = [];
+  let heat = null; // last heating setting: saloon / cab / flap, to count the autopilot's knob changes
   const prev = new Map(), open = new Map(); // id -> last sample; pair -> open overlap episode
   let T = 0, nextSample = 0, samples = 0, seenVeh = 0, seenWalk = 0;
   const camera = { position: { x: 0, z: 0 } };
@@ -110,6 +111,9 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
     for (let k = 0; k < 600 && T < maxT && !g.finished; k++) {
       ap.step(g, dt);
       g.update(dt, ap.input);
+      const c = g.climate, h = c && `${c.saloon}/${c.cab}/${c.flap}`;
+      if (heat !== null && h !== heat) { const p = g.route.at(g.tram.s); knobs.push({ kind: 'heating', x: p.x, y: p.y, mag: 1, s: Math.round(g.tram.s), info: `${heat} → ${h} at ${Math.round(T)} s` }); }
+      heat = h;
       const p = g.route.at(g.tram.s);
       camera.position.x = p.x; camera.position.z = -p.y;
       tr.update(dt, camera);
@@ -176,6 +180,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       jump: pick('traffic-no-teleport', jumps, samples),
       overlap: pick('traffic-no-overlap', overlaps, Math.round(minutes)),
       walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, samples),
+      heatingKnobs: pick('autopilot-calm-heating', knobs, Math.round(minutes)),
     },
   };
 }

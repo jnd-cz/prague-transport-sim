@@ -1074,9 +1074,15 @@ export class Game {
           if (ob.timer <= 0) ob.state = 'leaving';
         }
         if (ob.state === 'leaving') {
-          ob.lat -= dt * 1.6;
-          if (ob.lat < -5) ob.state = 'gone';
+          // drives off forwards and steers out of the track to the right (no sideways sliding)
+          ob.v = Math.min(8, (ob.v || 0) + 2 * dt);
+          const ds = ob.v * dt, dl = Math.min(ds * 0.2, ob.lat + 4.5);
+          ob.s += ds;
+          ob.lat -= dl;
+          ob.driven = (ob.driven || 0) + ds;
           place(ob.mesh, this.route, ob.s, ob.lat, 0, false);
+          ob.mesh.rotation.y -= ds > 0 ? Math.atan2(dl, ds) : 0;
+          if (ob.driven > 45) { ob.state = 'gone'; ob.mesh.visible = false; }
         }
       } else {
         if (ob.state === 'idle' && d > 0 && d < 55 + tram.v * 2) {

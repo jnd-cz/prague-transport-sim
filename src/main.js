@@ -321,7 +321,7 @@ $('btnToMenu').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
-let look = 0, lookTarget = 0, mirrorOn = true; // head turned left (+) / right (-), right mirror shown
+let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished || !$('menu').classList.contains('hidden')) return;
   const k = e.key.toLowerCase();
@@ -426,7 +426,10 @@ function updateCamera(dt, t) {
   look += (lookTarget - look) * Math.min(1, dt * 6);
   // the cab pitches with the track (bogie-to-bogie slope) plus a little load transfer
   const slope = Math.atan2(profile.height(s - 3.2) - profile.height(s - 10.8), 7.6);
-  const pitch = -0.035 - tram.a * 0.006 + slope;
+  // load transfer follows the acceleration smoothly (it drops to 0 in one frame when the tram
+  // comes to a dead stop, which made the view jump)
+  camAcc += (tram.a - camAcc) * Math.min(1, dt * 3);
+  const pitch = -0.035 - camAcc * 0.006 + slope;
   // turning the head also leans towards that side window
   const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
   camera.position.set(eye.x + lx, profile.height(s - 1.4) + 2.65 + bob, -(eye.y + ly));
