@@ -74,12 +74,20 @@ export class Autopilot {
     }
 
     // heating like a careful driver: seat heaters and cab heater by temperature, the waste-heat
-    // flap open in the cold; and the heating cut-out held while coasting under a contact
+    // flap open in the cold; and the heating cut-out held while coasting under a contact.
+    // A driver turns one knob at a time and then lets the temperature settle: hysteresis bands
+    // and at least 20 s between changes (it used to flick the cab heater every frame at 21 °C)
     const c = g.climate;
-    const cold = c.tout < 14;
-    c.saloon = !cold ? 0 : c.tin < 15 ? 2 : c.tin < 18.5 ? 1 : c.tin > 20 ? 0 : c.saloon;
-    c.cab = !cold ? (c.tcab > 24 ? 1 : 0) : c.tcab < 18 ? 3 : c.tcab < 21 ? 2 : 1;
-    c.flap = c.tout < 10 && c.tin < 21;
+    this.heatHold = (this.heatHold ?? 0) - dt;
+    if (this.heatHold <= 0) {
+      const cold = c.tout < 14;
+      const saloon = !cold ? 0 : c.tin < 15 ? 2 : c.tin < 18 ? Math.max(1, c.saloon) : c.tin > 21 ? 0 : c.tin > 19.5 ? Math.min(1, c.saloon) : c.saloon;
+      const cab = !cold ? (c.tcab > 24 ? 1 : c.tcab < 22 ? 0 : c.cab) : c.tcab < 17 ? 3 : c.tcab < 20 ? Math.max(2, c.cab) : c.tcab > 22 ? Math.max(1, c.cab - 1) : c.cab;
+      const flap = c.flap ? !(c.tin > 22 || c.tout > 12) : c.tout < 10 && c.tin < 20;
+      if (saloon !== c.saloon) { c.saloon = saloon; this.heatHold = 20; }
+      else if (cab !== c.cab) { c.cab = cab; this.heatHold = 20; }
+      else if (flap !== c.flap) { c.flap = flap; this.heatHold = 20; }
+    }
     this.input.cutout = wantPower === false && g.heatingDraws();
 
     // force-based notch choice: wanted acceleration plus gravity on the gradient
