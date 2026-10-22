@@ -4,10 +4,12 @@
 //   const { lint } = await import('/tools/lint.js?v=' + Date.now());
 //   await lint();                 // quick checks (a few seconds)
 //   await lint({ bot: true });    // + the street bot (DTM lines, about a minute)
+//   await lint({ traffic: true }); // + the whole line driven headless, traffic watched (a minute or two)
 // The report is saved to reports/lineN.json by tools/serve.py; compare with the committed baseline:
 //   python tools/lint_report.py            (--accept makes the current reports the baseline)
 import { makeT3, placeConsist } from '../src/models.js';
 import { runStreetBot } from '../src/streetbot.js';
+import { trafficRun } from './traffic_lint.js';
 
 const TOP = 12; // places listed per check
 
@@ -126,7 +128,7 @@ function bridgesWithoutDeck(g) {
   return check('bridge-has-deck', g.data.bridges.length, bad);
 }
 
-export async function lint({ bot = false, save = true } = {}) {
+export async function lint({ bot = false, traffic = false, save = true } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
   const t0 = performance.now();
@@ -142,7 +144,14 @@ export async function lint({ bot = false, save = true } = {}) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });
     checks.streetBot = { rule: 'street-bot', count: r.findings.length, of: Math.round((r.stats.carKm + r.stats.walkKm) * 1000), samples: r.stats.samples, places: r.findings.slice(0, TOP).map((P) => ({ kind: P.kind, x: P.x, y: P.y, mag: P.mag, n: P.n, info: P.info })) };
   }
-  const report = { line: g.data.line, date: new Date().toISOString(), secs: Math.round((performance.now() - t0) / 100) / 10, checks };
+  let trafficStats;
+  if (traffic) {
+    // last: it starts a new shift from the first stop
+    const r = await trafficRun({});
+    Object.assign(checks, r.checks);
+    trafficStats = r.stats;
+  }
+  const report = { line: g.data.line, traffic: trafficStats, date: new Date().toISOString(), secs: Math.round((performance.now() - t0) / 100) / 10, checks };
   if (save) {
     try {
       const r = await fetch(`/report/line${g.data.line}.json`, { method: 'POST', body: JSON.stringify(report, null, 1) });

@@ -441,7 +441,8 @@ function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (game) {
+  // window.headless: a dev tool steps the game itself (tools/traffic_lint.js); only draw
+  if (game && !window.headless) {
     if (pilot && !game.paused && !game.finished) pilot.step(game, dt);
     game.update(dt, pilot ? pilot.input : input);
     game.updateVisuals();

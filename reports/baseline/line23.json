@@ -1,7 +1,15 @@
 {
  "line": "23",
- "date": "2026-10-22T10:04:57.470Z",
- "secs": 0,
+ "traffic": {
+  "simSeconds": 1873,
+  "samples": 8319,
+  "finished": true,
+  "nextStop": 17,
+  "carsVisible": 23.9,
+  "walkersVisible": 87.7
+ },
+ "date": "2026-10-22T10:30:00.505Z",
+ "secs": 13.9,
  "checks": {
   "consist": {
    "rule": "consist-coupled",
@@ -178,6 +186,439 @@
    "count": 0,
    "of": 1,
    "places": []
+  },
+  "slide": {
+   "rule": "traffic-no-sideways-motion",
+   "count": 3756,
+   "of": 8319,
+   "kinds": {
+    "car lane beside the tram": 2163,
+    "car next road": 1339,
+    "car same road": 227,
+    "walker": 27
+   },
+   "places": [
+    {
+     "kind": "car next road",
+     "x": -262.9400449180929,
+     "y": -26.041514152501772,
+     "mag": 24.645214118333584,
+     "s": 4445,
+     "info": "24.6 m/s sideways at 24.7 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -263.3,
+     "y": -26,
+     "mag": 24.51772603666725,
+     "s": 4370,
+     "info": "24.5 m/s sideways at 24.7 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -263.3,
+     "y": -26,
+     "mag": 24.502268393079344,
+     "s": 4551,
+     "info": "24.5 m/s sideways at 24.7 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": 1535.9092736212917,
+     "y": -374.36145120142055,
+     "mag": 24.44761206403215,
+     "s": 7467,
+     "info": "24.4 m/s sideways at 24.6 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -220.95951148666376,
+     "y": 54.30085447239924,
+     "mag": 24.387732836734244,
+     "s": 4445,
+     "info": "24.4 m/s sideways at 25.0 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -220.9412960664751,
+     "y": 54.230594994528786,
+     "mag": 24.379153168334597,
+     "s": 4363,
+     "info": "24.4 m/s sideways at 24.8 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": 2062.5837178638294,
+     "y": 275.49111552131745,
+     "mag": 24.260402570934108,
+     "s": 7818,
+     "info": "24.3 m/s sideways at 24.7 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -1551.9498262311984,
+     "y": 108.80572730963914,
+     "mag": 24.226085191960713,
+     "s": 538,
+     "info": "24.2 m/s sideways at 24.2 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": 1665.8964485124634,
+     "y": -280.45751584430934,
+     "mag": 24.14672499316506,
+     "s": 7670,
+     "info": "24.1 m/s sideways at 24.3 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -197.19394595787224,
+     "y": 69.77009223329455,
+     "mag": 24.145768654035713,
+     "s": 3805,
+     "info": "24.1 m/s sideways at 24.2 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": 1843.0864188622215,
+     "y": 209.45219427836105,
+     "mag": 24.1206196368396,
+     "s": 7818,
+     "info": "24.1 m/s sideways at 24.9 m/s"
+    },
+    {
+     "kind": "car next road",
+     "x": -218.54991723973745,
+     "y": -746.2302356392121,
+     "mag": 23.958084438727365,
+     "s": 5335,
+     "info": "24.0 m/s sideways at 24.5 m/s"
+    }
+   ]
+  },
+  "jump": {
+   "rule": "traffic-no-teleport",
+   "count": 250,
+   "of": 8319,
+   "kinds": {
+    "car next road": 212,
+    "car lane beside the tram": 10,
+    "walker": 28
+   },
+   "places": [
+    {
+     "kind": "car next road",
+     "x": -221.98513888661378,
+     "y": -603.370163375221,
+     "mag": 9.731089162583928,
+     "s": 4980,
+     "info": "9.7 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -218.4537655215821,
+     "y": -747.912903309594,
+     "mag": 9.669910729972166,
+     "s": 5000,
+     "info": "9.7 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -279.69295979717947,
+     "y": -109.63950832668897,
+     "mag": 9.657125429268392,
+     "s": 4147,
+     "info": "9.7 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -279.6945244473751,
+     "y": -109.63357185977027,
+     "mag": 9.619505895274601,
+     "s": 3969,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -279.958180133598,
+     "y": -108.6332311679247,
+     "mag": 9.617526117655492,
+     "s": 4445,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -218.4537655215821,
+     "y": -747.912903309594,
+     "mag": 9.615474157709857,
+     "s": 4992,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -221.97073203878952,
+     "y": -604.2273708207634,
+     "mag": 9.613908801090517,
+     "s": 4975,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -218.4397734055849,
+     "y": -748.2603741901912,
+     "mag": 9.611708060124363,
+     "s": 4986,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -218.368217965848,
+     "y": -750.0373342769913,
+     "mag": 9.591979781942877,
+     "s": 4980,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -280.1032874369935,
+     "y": -108.08267698739442,
+     "mag": 9.58375426189291,
+     "s": 4152,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": -273.09168625010875,
+     "y": -61.53717650440626,
+     "mag": 9.572918150569356,
+     "s": 4153,
+     "info": "9.6 m in 0.2 s (next road)"
+    },
+    {
+     "kind": "car next road",
+     "x": 848.8751737785578,
+     "y": -969.3729843769177,
+     "mag": 9.569693822268682,
+     "s": 5981,
+     "info": "9.6 m in 0.2 s (next road)"
+    }
+   ]
+  },
+  "overlap": {
+   "rule": "traffic-no-overlap",
+   "count": 331,
+   "of": 31,
+   "kinds": {
+    "car / car": 291,
+    "car / our tram": 22,
+    "car / tram oncoming": 17,
+    "car / tram ahead": 1
+   },
+   "places": [
+    {
+     "kind": "car / tram oncoming",
+     "x": 1042.3736906316403,
+     "y": -954.1203412280734,
+     "mag": 1.8000000000004093,
+     "s": 6119,
+     "info": "car / tram oncoming, 0.5 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": -1139.0434202512706,
+     "y": 545.8340877669599,
+     "mag": 1.8000000000002956,
+     "s": 1227,
+     "info": "car / car, 1.8 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": 1155.9962776933749,
+     "y": -910.273005716482,
+     "mag": 1.8000000000002956,
+     "s": 6882,
+     "info": "car / car, 0.5 m deep"
+    },
+    {
+     "kind": "car / our tram",
+     "x": 862.5497285950618,
+     "y": -967.7151450350675,
+     "mag": 1.8000000000002387,
+     "s": 6352,
+     "info": "car / our tram, 0.6 m deep"
+    },
+    {
+     "kind": "car / our tram",
+     "x": -1513.4972701307704,
+     "y": 98.42524833954324,
+     "mag": 1.800000000000182,
+     "s": 698,
+     "info": "car / our tram, 0.3 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": -1293.5767626576392,
+     "y": 625.3193483050063,
+     "mag": 1.800000000000182,
+     "s": 1359,
+     "info": "car / car, 1.8 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": -225.32740076938381,
+     "y": -533.6519885050798,
+     "mag": 1.800000000000182,
+     "s": 4808,
+     "info": "car / car, 0.1 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": 625.2533638843134,
+     "y": -596.2377017288384,
+     "mag": 1.800000000000182,
+     "s": 5696,
+     "info": "car / car, 0.1 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": 1128.523502760408,
+     "y": -858.7485965149426,
+     "mag": 1.800000000000182,
+     "s": 6438,
+     "info": "car / car, 1.7 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": 1139.0773320794883,
+     "y": -860.3783815627742,
+     "mag": 1.800000000000182,
+     "s": 6483,
+     "info": "car / car, 0.5 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": 1135.6507596466877,
+     "y": -864.77588463197,
+     "mag": 1.800000000000182,
+     "s": 6715,
+     "info": "car / car, 1.2 m deep"
+    },
+    {
+     "kind": "car / car",
+     "x": 1135.560852114956,
+     "y": -864.8586136970941,
+     "mag": 1.800000000000182,
+     "s": 6918,
+     "info": "car / car, 0.8 m deep"
+    }
+   ]
+  },
+  "walkerHit": {
+   "rule": "traffic-walkers-clear-of-vehicles",
+   "count": 333,
+   "of": 8319,
+   "kinds": {
+    "car": 322,
+    "tram oncoming": 11
+   },
+   "places": [
+    {
+     "kind": "car",
+     "x": -2033.2117919921875,
+     "y": -318.9017028808594,
+     "mag": 1,
+     "s": 21,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2037.422119140625,
+     "y": -309.937744140625,
+     "mag": 1,
+     "s": 21,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2037.6011962890625,
+     "y": -309.70111083984375,
+     "mag": 1,
+     "s": 21,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2038.5064697265625,
+     "y": -308.5100402832031,
+     "mag": 1,
+     "s": 21,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2039.776611328125,
+     "y": -310.7566833496094,
+     "mag": 1,
+     "s": 49,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2039.4375,
+     "y": -310.693603515625,
+     "mag": 1,
+     "s": 50,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2033.2117919921875,
+     "y": -318.9017028808594,
+     "mag": 1,
+     "s": 56,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2037.08935546875,
+     "y": -310.377197265625,
+     "mag": 1,
+     "s": 175,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2037.2685546875,
+     "y": -310.14056396484375,
+     "mag": 1,
+     "s": 175,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -2038.5321044921875,
+     "y": -308.4762878417969,
+     "mag": 1,
+     "s": 181,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -1648.8701171875,
+     "y": -141.58970642089844,
+     "mag": 1,
+     "s": 274,
+     "info": "walker inside car"
+    },
+    {
+     "kind": "car",
+     "x": -1648.8538818359375,
+     "y": -141.27354431152344,
+     "mag": 1,
+     "s": 275,
+     "info": "walker inside car"
+    }
+   ]
   }
  }
 }
