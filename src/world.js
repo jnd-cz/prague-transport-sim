@@ -911,22 +911,94 @@ function buildZebras(group, data, ground, trackDist, wet) {
   cg.build(group);
 }
 
+// Roofs of the drawn buildings (meshes tagged `building`) in a 4 m grid: `roof(x, y)` is the height
+// of the highest roof over the point, or null; a point under a roof is inside a building.
+export function roofIndex(group) {
+  const grid = new Map(), cell = 4;
+  group.traverse((m) => {
+    if (!m.isMesh || !m.userData.building) return;
+    const a = m.geometry.attributes.position;
+    for (let i = 0; i + 2 < a.count; i += 3) {
+      const t = [];
+      for (let k = 0; k < 3; k++) t.push(a.getX(i + k), -a.getZ(i + k), a.getY(i + k));
+      const area = (t[3] - t[0]) * (t[7] - t[1]) - (t[4] - t[1]) * (t[6] - t[0]);
+      if (Math.abs(area) < 0.5) continue; // walls (vertical) and slivers
+      const x0 = Math.floor(Math.min(t[0], t[3], t[6]) / cell), x1 = Math.floor(Math.max(t[0], t[3], t[6]) / cell);
+      const y0 = Math.floor(Math.min(t[1], t[4], t[7]) / cell), y1 = Math.floor(Math.max(t[1], t[4], t[7]) / cell);
+      for (let ix = x0; ix <= x1; ix++) for (let iy = y0; iy <= y1; iy++) {
+        const k = ix * 100003 + iy;
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push(t);
+      }
+    }
+  });
+  return (x, y) => {
+    let best = null;
+    for (const t of grid.get(Math.floor(x / cell) * 100003 + Math.floor(y / cell)) || []) {
+      const d = (t[4] - t[7]) * (t[0] - t[6]) + (t[6] - t[3]) * (t[1] - t[7]);
+      const w1 = ((t[4] - t[7]) * (x - t[6]) + (t[6] - t[3]) * (y - t[7])) / d;
+      const w2 = ((t[7] - t[1]) * (x - t[6]) + (t[0] - t[6]) * (y - t[7])) / d;
+      if (w1 < 0 || w2 < 0 || w1 + w2 > 1) continue;
+      const z = w1 * t[2] + w2 * t[5] + (1 - w1 - w2) * t[8];
+      if (best === null || z > best) best = z;
+    }
+    return best;
+  };
+}
+
+// Vegetation from the city register (data.geo.trees: [x, y, kind], tools/geoportal.py): 0 deciduous
+// tree, 1 conifer, 2 bush or hedge, 3 plants in a container, 4 a sample along a registered tree row
+// (a position on the row's line, not a surveyed tree). Trees inside a building are dropped and
+// crowns shrink until they clear the facades; row samples on a carriageway are dropped too.
+// Without the register, parks and woods are filled at random.
+const CROWN = 2.6; // icosahedron radius of a tree crown at scale 1 (x 1.1 wide, x 1.4 tall)
 function buildTrees(group, data, ground, weather, trackDist) {
   const r = rng(99);
-  const spots = [];
+  const trees = [], bushes = [], pots = [];
+  const roof = roofIndex(group); // buildings are already in the group
+  const under = (x, y, z) => { const h = roof(x, y); return h !== null && h > z; };
+  // carriageway: the surveyed streets where they exist, else near an OSM road's centre line
+  const roads = new SegmentIndex(10);
+  for (const rd of data.roads) if (!rd.f && rd.c) roads.addLine(rd.p);
+  const onRoad = (x, y) => {
+    const t = ground.dtm?.surfaceAt(x, y);
+    if (t) return t.c === 'road' || t.c === 'tram' || t.c === 'parking';
+    return roads.dist(x, y) < 2.5;
+  };
+  // crown scale that clears the facades: shrinks until neither its rim nor its half-rim is under
+  // a roof; 0 when even a small crown does not fit
+  const fit = (x, y, z, k) => {
+    for (; k >= 0.45; k *= 0.85) {
+      const bottom = z + 5.4 * k - CROWN * 1.4 * k;
+      let clear = true;
+      for (const f of [1, 0.5]) for (let a = 0; a < 8 && clear; a++) {
+        const rad = CROWN * 1.1 * k * f;
+        clear = !under(x + Math.cos(a * Math.PI / 4) * rad, y + Math.sin(a * Math.PI / 4) * rad, bottom);
+      }
+      if (clear) return k;
+    }
+    return 0;
+  };
   const real = data.geo?.trees;
   if (real) {
-    const seen = new Set(); // the register and the sampled tree rows overlap: one tree per ~1.5 m cell
-    for (const [x, y] of real) {
+    const seen = new Set(); // the register and the sampled tree rows overlap: one plant per ~1.5 m cell
+    for (const [x, y, kind = 0] of real) {
       const cell = `${Math.round(x / 1.5)},${Math.round(y / 1.5)}`;
       if (seen.has(cell)) continue;
       seen.add(cell);
+      const z = ground.at(x, y);
+      if (under(x, y, z + 1)) continue; // inside a building (courtyard trees are not under a roof)
+      if (kind === 2 || kind === 3) {
+        if (trackDist(x, y) < 2.2) continue;
+        (kind === 2 ? bushes : pots).push([x, y, 0.8 + r() * 0.6, z]);
+        continue;
+      }
+      if (kind === 4 && onRoad(x, y)) continue;
       // street trees next to the tracks are pruned clear of the tram and the wires
       const d = trackDist(x, y);
       if (d < 3.2) continue;
-      const k = Math.min(0.75 + r() * 0.6, (d - 1.9) / 2.86);
-      if (k < 0.45) continue;
-      spots.push([x, y, k, ground.at(x, y)]);
+      const k = fit(x, y, z, Math.min(0.75 + r() * 0.6, (d - 1.9) / 2.86));
+      if (k) trees.push([x, y, k, z]);
     }
   }
   for (const g of data.green) {
@@ -936,32 +1008,64 @@ function buildTrees(group, data, ground, weather, trackDist) {
     for (const p of ring) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
     const area = Math.abs(signedArea(ring));
     const n = Math.min(400, Math.floor(area / (g.t === 'wood' ? 90 : 500)));
-    for (let i = 0; i < n * 2 && spots.length < 9000; i++) {
+    for (let i = 0; i < n * 2 && trees.length < 9000; i++) {
       const x = minX + r() * (maxX - minX), y = minY + r() * (maxY - minY);
       if (!pointInRing(x, y, ring)) continue;
       if (trackDist(x, y) < 6) continue;
-      spots.push([x, y, 0.7 + r() * 0.7, ground.terrain.height(x, y)]);
+      const z = ground.terrain.height(x, y);
+      if (under(x, y, z + 1)) continue;
+      const k = fit(x, y, z, 0.7 + r() * 0.7);
+      if (k) trees.push([x, y, k, z]);
     }
   }
-  if (!spots.length) return;
-  const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.6, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), spots.length);
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 5), new THREE.MeshLambertMaterial({ color: 0x5b4632 }), spots.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   const col = new THREE.Color();
-  spots.forEach(([x, y, k, z], i) => {
-    s.set(k * 1.1, k * 1.4, k * 1.1);
-    p.set(x, z + 5.4 * k, -y);
-    m.compose(p, q, s);
-    crown.setMatrixAt(i, m);
-    if (weather === 'leaves') col.setHSL(0.05 + r() * 0.08, 0.55 + r() * 0.2, 0.32 + r() * 0.12);
-    else col.setHSL(0.24 + r() * 0.06, 0.35 + r() * 0.15, 0.25 + r() * 0.1);
-    crown.setColorAt(i, col);
-    s.set(1, k, 1);
-    p.set(x, z + 1.5 * k, -y);
-    m.compose(p, q, s);
-    trunk.setMatrixAt(i, m);
-  });
-  group.add(crown, trunk);
+  const leaf = () => (weather === 'leaves' ? col.setHSL(0.05 + r() * 0.08, 0.55 + r() * 0.2, 0.32 + r() * 0.12) : col.setHSL(0.24 + r() * 0.06, 0.35 + r() * 0.15, 0.25 + r() * 0.1));
+  const leafMat = () => new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  if (trees.length) {
+    const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(CROWN, 0), leafMat(), trees.length);
+    const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 5), new THREE.MeshLambertMaterial({ color: 0x5b4632 }), trees.length);
+    crown.userData.trees = true; // read by the lints
+    trees.forEach(([x, y, k, z], i) => {
+      s.set(k * 1.1, k * 1.4, k * 1.1);
+      p.set(x, z + 5.4 * k, -y);
+      m.compose(p, q, s);
+      crown.setMatrixAt(i, m);
+      crown.setColorAt(i, leaf());
+      s.set(1, k, 1);
+      p.set(x, z + 1.5 * k, -y);
+      m.compose(p, q, s);
+      trunk.setMatrixAt(i, m);
+    });
+    group.add(crown, trunk);
+  }
+  // bushes and hedges: a low shrub on the ground
+  if (bushes.length) {
+    const bush = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), leafMat(), bushes.length);
+    bushes.forEach(([x, y, k, z], i) => {
+      s.set(k, k * 0.8, k);
+      p.set(x, z + 0.55 * k, -y);
+      m.compose(p, q, s);
+      bush.setMatrixAt(i, m);
+      bush.setColorAt(i, leaf());
+    });
+    group.add(bush);
+  }
+  // plants in containers: a concrete planter with a small shrub
+  if (pots.length) {
+    const pot = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.6, 1), new THREE.MeshLambertMaterial({ color: 0x9a968c }), pots.length);
+    const shrub = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.55, 0), leafMat(), pots.length);
+    pots.forEach(([x, y, , z], i) => {
+      p.set(x, z + 0.3, -y); s.set(1, 1, 1);
+      m.compose(p, q, s);
+      pot.setMatrixAt(i, m);
+      p.set(x, z + 0.95, -y);
+      m.compose(p, q, s);
+      shrub.setMatrixAt(i, m);
+      shrub.setColorAt(i, leaf());
+    });
+    group.add(pot, shrub);
+  }
 }
 
 // Overhead line: contact wire 5.6 m above every track, hung from Prague-style cross-span wires.
