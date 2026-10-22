@@ -43,6 +43,9 @@ try {
 // the track beyond both termini, so a two-car set standing at the first stop is on rails
 const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
+// banked curves on dedicated track; level at platforms (stop zone from the stop sign back 30 m
+// where the data has no platform)
+route.prepareCant(data.stops.map((st) => ({ p0: st.p0 ?? st.s - 30, p1: st.p1 ?? st.s })));
 const terrain = new Terrain(data.terrain);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there

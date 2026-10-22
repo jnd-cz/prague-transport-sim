@@ -214,35 +214,69 @@ export class Route {
     return { osm: I.osm[k], dedicated: !!I.dedicated[k] };
   }
 
-  // Cant (superelevation, m between the rails) at s: only on dedicated track, which has no road
-  // surface to keep level. The share of the balanced cant v^2 / (g R) * 1.5 m a careful design
-  // uses (60 %), at most 100 mm.
-  cantAt(s) {
-    if (!this._speedInfo(s).dedicated) return 0;
-    const r = this.radiusAt(s);
-    if (r > 1500) return 0;
-    const v = this.curveSpeed(s) / 3.6;
-    return Math.min(CANT_MAX, 0.6 * 1.5 * v * v / (9.81 * r));
+  // Cant (superelevation) profile along the route, every 2 m, signed (+ = the left rail lower, the
+  // tram leans left). Only on dedicated track, which has no road surface to keep level, and not at
+  // stops (a platform edge stays level with the doors) nor near the ends of the route (terminus
+  // loops, depots). The cant a curve gets is 60 % of the balanced cant v² / (g R) · 1.5 m at the
+  // speed the curve allows with full cant, at most 100 mm; it runs in and out linearly at most
+  // 100 mm per 30 m (a transition curve), then is smoothed, so the tram and the view roll gently.
+  // `stops`: [{p0, p1}] platform stretches along the route.
+  prepareCant(stops = []) {
+    const step = 2, n = Math.ceil(this.length / step) + 1;
+    const c = new Float32Array(n);
+    const level = (s) => s < 150 || s > this.length - 150 || stops.some((st) => s > st.p0 - 25 && s < st.p1 + 25);
+    for (let i = 0; i < n; i++) {
+      const s = i * step;
+      if (!this._speedInfo(s).dedicated || level(s)) continue;
+      const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
+      const turn = Math.atan2(a.hx * b.hy - a.hy * b.hx, a.hx * b.hx + a.hy * b.hy); // over 16 m
+      const r = Math.abs(turn) > 1e-4 ? 16 / Math.abs(turn) : 1e6;
+      if (r > 1500) continue;
+      const v = this._designSpeed(s, r, true) / 3.6;
+      c[i] = Math.sign(turn) * Math.min(CANT_MAX, 0.6 * 1.5 * v * v / (9.81 * r));
+    }
+    // run-in / run-out ramps: at most CANT_MAX per 30 m, both ways, towards zero first
+    const d = (CANT_MAX / 30) * step;
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 1; i < n; i++) c[i] = Math.sign(c[i]) * Math.min(Math.abs(c[i]), Math.abs(c[i - 1]) + d) * (Math.sign(c[i]) === Math.sign(c[i - 1]) || !c[i - 1] ? 1 : 0);
+      for (let i = n - 2; i >= 0; i--) c[i] = Math.sign(c[i]) * Math.min(Math.abs(c[i]), Math.abs(c[i + 1]) + d) * (Math.sign(c[i]) === Math.sign(c[i + 1]) || !c[i + 1] ? 1 : 0);
+    }
+    // smooth over ±6 m (the ramp corners)
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      let sum = 0, w = 0;
+      for (let k = -3; k <= 3; k++) { const j = i + k; if (j < 0 || j >= n) continue; const ww = 4 - Math.abs(k); sum += c[j] * ww; w += ww; }
+      out[i] = sum / w;
+    }
+    this.cant = { step, c: out };
   }
 
-  // Signed lean of a tram into the curve at s (rad, + = towards the left), from the cant.
-  rollAt(s) {
-    const h = this.cantAt(s);
-    if (!h) return 0;
-    const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
-    return Math.sign(a.hx * b.hy - a.hy * b.hx) * Math.atan2(h, 1.5);
+  _cantSigned(s) {
+    const C = this.cant;
+    if (!C) return 0;
+    const f = Math.max(0, Math.min(C.c.length - 1.001, s / C.step)), i = Math.floor(f), u = f - i;
+    return C.c[i] * (1 - u) + C.c[i + 1] * u;
   }
 
-  // Speed a curve allows (km/h): unbalanced lateral acceleration A_LAT (+ what the cant takes on
-  // dedicated track), never above the posted OSM speed or the cap (50 in streets, 60 on dedicated
-  // track; the 65-70 km/h pilot stretches are capped for now).
-  curveSpeed(s) {
+  // cant (m) at s
+  cantAt(s) { return Math.abs(this._cantSigned(s)); }
+
+  // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
+  rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
+
+  // speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral
+  // acceleration A_LAT plus what the cant takes, never above the posted OSM speed or the cap
+  // (50 in streets, 60 on dedicated track; the 65-70 km/h pilot stretches are capped for now)
+  _designSpeed(s, r, fullCant, cant = 0) {
     const { osm, dedicated } = this._speedInfo(s);
-    const a = A_LAT + (dedicated ? CANT_MAX * 9.81 / 1.5 : 0);
-    const v = Math.floor((Math.sqrt(a * this.radiusAt(s)) * 3.6) / 5) * 5;
+    const a = A_LAT + (fullCant ? (dedicated ? CANT_MAX : 0) : cant) * 9.81 / 1.5;
+    const v = Math.floor((Math.sqrt(a * r) * 3.6) / 5) * 5;
     const cap = Math.min(60, osm || (dedicated ? 60 : 50));
     return Math.max(10, Math.min(cap, v));
   }
+
+  // speed the curve at s allows (km/h), with the cant actually built there
+  curveSpeed(s) { return this._designSpeed(s, this.radiusAt(s), false, this.cantAt(s)); }
 
   // Speed limits (km/h) sampled every 5 m: curves (curveSpeed) plus extra restrictions.
   speedLimits(extra = []) {
