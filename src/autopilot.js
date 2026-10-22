@@ -47,6 +47,8 @@ export class Autopilot {
     }
     const gap = g.tramAheadGap();
     if (gap !== null) consider(tr.s + gap - 8);
+    // a car on our track ahead (shared lane, queuing on the tracks): stop behind it
+    for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5);
     if (stopAt !== null) {
       const d = stopAt - tr.s;
       vt = Math.min(vt, Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - 1.5))));
