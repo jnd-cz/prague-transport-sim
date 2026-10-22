@@ -390,6 +390,7 @@ export class Traffic {
   update(dt, camera) {
     const tram = this.game.tram;
     const cx = camera.position.x, cy = -camera.position.z;
+    this._carsOnTracks();
     this._updateRoadCars(dt, cx, cy);
     this._updateWalkers(dt, cx, cy);
     this._updateAhead(dt, tram);
@@ -476,8 +477,10 @@ export class Traffic {
         // give way to the tram where the road crosses its track
         const p0 = c.path.at(c.s);
         const ax = p0.x + p0.hx * 6, ay = p0.y + p0.hy * 6;
-        // (not where our track passes over the road on a bridge)
-        const waiting = Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3 && !this.ground.profile.overBridge(tram.s - 7);
+        // (only a car whose road crosses the track: one driving along it follows the tram instead;
+        // not where our track passes over the road on a bridge)
+        const across = Math.abs(p0.hx * tp.hx + p0.hy * tp.hy) < 0.7;
+        const waiting = across && Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3 && !this.ground.profile.overBridge(tram.s - 7);
         // the car ahead: on this path, else across the junction on the connector and the next lane
         const seq = this._seq(c);
         let gap = null, vLead = 0;
@@ -534,6 +537,26 @@ export class Traffic {
       if (Math.hypot(p.x - cx, p.y - cy) > 420) c.active = false;
       this._poseCar(c.mesh, p.x, p.y, p.hx, p.hy);
     }
+  }
+
+  // Cars on our track and on the opposite one (within 1.6 m of a track centre: the car body then
+  // overlaps a tram), as route positions: trams stop behind them (shared lanes, a car queuing on
+  // the tracks). this.game.carsOnTrack: [{s, v}] along our route, carsOnBack along the opposite one.
+  _carsOnTracks() {
+    const ours = [], back = [];
+    for (const c of this.cars) {
+      if (!c.active || c.alpha < 0.5 || !c.path) continue;
+      const p = c.path.at(c.s);
+      // only cars going the tram's way hold it up (one facing it waits for the tram instead)
+      const n = this.route.nearest(p.x, p.y);
+      if (n && n.d < 1.6) { const h = this.route.at(n.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) ours.push({ s: n.s, v: c.vNow ?? 0 }); }
+      if (this.back) {
+        const b = this.back.nearest(p.x, p.y);
+        if (b && b.d < 1.6) { const h = this.back.at(b.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) back.push({ s: b.s, v: c.vNow ?? 0 }); }
+      }
+    }
+    this.game.carsOnTrack = ours;
+    this.carsOnBack = back;
   }
 
   // the paths a car drives next, each with the distance from the car to its start
@@ -729,6 +752,8 @@ export class Traffic {
       if (sig && sig.state !== 'go' && sig.s - 3 < (stopAt ?? Infinity)) stopAt = sig.s - 3;
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
       if (other && other.s - other.length - 6 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 6;
+      // a car on the track ahead
+      for (const c of g.carsOnTrack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       if (t.dwell > 0) { t.dwell -= dt; vt = 0; }
       else if (stopAt !== null) {
         const d = stopAt - t.s;
@@ -775,6 +800,7 @@ export class Traffic {
       let vt = Math.min(this.backLimits.at(t.s), this.backLimits.at(t.s - t.length)) / 3.6 * 0.85;
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null;
+      for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       for (const G of gauntlets) {
         if (t.s > G.b0 && t.s - t.length < G.b1) G.theirs.occupied = true;
         if (t.s <= G.b0 && G.b0 - t.s < 150) {
