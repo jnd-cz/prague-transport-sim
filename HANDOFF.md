@@ -352,6 +352,60 @@ lines serving any stop on the route and drove only along our route. Now the numb
 where it appears, and it fades out after the last stop it shares with us, but it still never leaves our
 track physically and does not follow a timetable (needs item 3 above).
 
+## 13. Prague DTM pilot (2026-10-22): line 22 in Praha 2 and Praha 10
+
+**Where the data is.** geoportalpraha.cz → Data a služby → "DTM kraje - ZPS Sada 2" (areas,
+`*_ZPS_OPL.gpkg`) and "ZPS Sada 3" (lines and points with Z, `*_ZPS_KR.gpkg`), per city district,
+monthly, **CC BY 4.0** ("data base © IPR Praha"). Download links are on the "ke stažení" page of each
+data set (`isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/<uuid>/VS_CZ010_MOMC_<code>_<date>_ZPS_OPL.gpkg.zip`;
+the uuids change monthly). District codes: Praha 1 500054, 2 500089, 3 500097, 4 500119, 5 500143,
+6 500178, 7 500186, 8 500208, 9 500216, 10 500224, 11 547034, 12 547107 (Modřany), 13 539694.
+Sizes: Praha 2 OPL 2.4 MB / KR 5.3 MB zipped; Praha 10 7.3 / 16.6 MB.
+**Not open:** "DI Sada 7" (transport infrastructure, incl. tram track axes) is marked *Neotevřená
+data* — the handoff's plan to snap tracks to DTM axes does not work with open data; tracks stay OSM.
+
+**What is in ZPS.** Areas (2D polygons): carriageway (*Provozní plocha pozemní komunikace*),
+sidewalk, cycle path, parking, traffic island, **tram track area** (only where the track has its own
+bed, not where it is embedded in the street), platforms, bridge deck (*Plocha mostní konstrukce*),
+tunnel/underpass surfaces, railway area, greenery, steps, walls, canopies (*Zastřešení*), buildings.
+Lines with **Z on every vertex** (boundaries of traffic areas = kerb lines, inner divisions of traffic
+areas, terrain edges, walls, buildings …). Attribute `UrovenUmisteniObjektuZPS` = level: 0 ground,
+1 on a structure (bridge decks, railway and roads on bridges), −2 metro. Accuracy classes for
+position and height. Polygon vertices coincide with the 3D line vertices (97 % exact matches).
+
+**Pipeline (`tools/dtm.py`, `tools/gpkg.py`).** Own GeoPackage/WKB reader (no GDAL); pyproj for
+S-JTSK (EPSG:5514) → WGS84 → our local metres. Keeps areas with a vertex within the route corridor
+(40 m grid ±80 m), heights per vertex from the 3D lines; drops areas with > 30 % unknown heights
+(they became flat sheets at a wrong level, e.g. 250.6 m over a 235 m street). Exports a **height
+cloud**: ground-level traffic/surface lines densified to 3 m (53 k points on line 22), because a wide
+carriageway polygon has heights only on its outline and its triangles span tens of metres across
+hills. Line 22: 4 k areas, 5.4 MB JSON.
+
+**In the game (`DtmSurface` in terrain.js).** Ground height = IDW of the cloud within 5 m where a
+DTM area covers the point; overlapping areas → nearest to lidar. The **track profile** uses it
+(7.6 km of line 22), a level-1 deck over the route wins unless OSM marks the track covered/tunnel
+(then the tram runs under it — Nádraží Zahradní Město: track at 234.3 m, railway bridge slabs at
+240–243 m, lidar had sampled the station's roof at 240 m). Rendering: areas triangulated, street
+surfaces split by longest-edge bisection to ≤ 5 m with cloud heights (quadtree splitting crashed the
+page), kerb faces on sidewalks/islands/platforms, level-1 areas as 1 m slabs (canopies 0.3 m),
+carriageway/tram areas flush with the track bed within 3 m of a track (blend to 6 m), OSM road
+ribbons dropped where DTM covers, terrain pushed 0.25 m below DTM surfaces.
+Cost: 1.9 M triangles and ~600 MB JS heap for line 22 with two districts — fine on a desktop, too
+much for the whole network: next step is chunking/LOD (only street surfaces near the track at full
+resolution, merge greenery) or baking meshes offline.
+
+**Findings / caveats.** OSM route vs DTM: consistent (embedded track lies in carriageway areas).
+Profile vs DTM within 0.4 m for 92 % of samples; the rest are bridges the two districts' data does
+not contain (Francouzská over the railway cutting, 12800–12850: no level-1 deck in Praha 2/10, kept
+the grade-limited profile). Retaining walls and building faces in DTM are not used yet (walls come
+from Geoportál). Modřany (Praha 12, code 547107) not imported yet.
+
+**Cars (same session).** OSM roads are now split at every shared node, so the network has real
+junctions; the street the tram runs in stays in the network (it used to be lanes only, so cars from
+side streets vanished at the junction); at the data edge cars roll on while fading; junction
+give-way (nearest car first, ties by id). Line 22 stops 20–30: vanishing at junctions 40 % → 14 % of
+road ends, of which 24/403 within 40 m of the track.
+
 ## 12. Open items from the user (2026-10-21, end of session) — not done yet
 
 1. **Two-car set "broken"** — the user saw it on a screenshot that did not reach me. In my views

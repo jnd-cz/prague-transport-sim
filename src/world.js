@@ -355,7 +355,9 @@ export function buildWorld(scene, data, route, ground, weather) {
     if (!t.z) t.z = trackHeights(t.smooth, wayHeight(t.p, t.b, ground));
   }
   lowerTerrainUnderTracks(data, ground.terrain);
+  if (ground.dtm) lowerTerrainUnderDtm(ground.dtm, ground.terrain);
   buildTerrain(group, data, route, ground.terrain, weather);
+  if (ground.dtm) buildDtm(group, ground.dtm, weather !== 'dry', route, ground.profile, data);
 
   const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const wet = weather !== 'dry';
@@ -365,7 +367,9 @@ export function buildWorld(scene, data, route, ground, weather) {
   const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), paving = new THREE.Color(wet ? '#86817a' : '#a39d90').toArray();
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
     if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
-    addRibbon(roadsCg, r.p, r.w, wayHeight(r.p, r.b, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
+    // where the surveyed DTM streets exist, they replace the OSM ribbons
+    const runs = ground.dtm && !r.b ? uncoveredRuns(r.p, ground.dtm) : [r.p];
+    for (const run of runs) addRibbon(roadsCg, run, r.w, wayHeight(run, r.b, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
   }
   roadsCg.build(group);
 
@@ -584,6 +588,91 @@ function buildLod2(group, data, route, ground) {
     mk(rPos, rNor, rCol, null, roofMat);
   }
   console.log(`LOD2 buildings: ${total} (${lifted} spanning the track)`, counts);
+}
+
+// Pieces of a polyline outside the DTM-surveyed streets (densified at 3 m).
+function uncoveredRuns(line, dtm) {
+  const pts = densify(line, 3), runs = [];
+  let cur = [];
+  for (const p of pts) {
+    if (dtm.heightAt(p[0], p[1]) === null) cur.push(p);
+    else { if (cur.length > 1) runs.push(cur); cur = []; }
+  }
+  if (cur.length > 1) runs.push(cur);
+  return runs;
+}
+
+// Terrain grid vertices under a surveyed street surface go 0.25 m below it, so the lidar
+// ground (10 m grid) never shows through the DTM surfaces.
+function lowerTerrainUnderDtm(dtm, T) {
+  for (let j = 0; j < T.ny; j++) for (let i = 0; i < T.nx; i++) {
+    const x = T.x0 + i * T.dx, y = T.y0 + j * T.dy;
+    if (!dtm.covered(x, y)) continue;
+    // the grid triangles span 10 m: test the vertex and the four half-cell points around it
+    let zmin = Infinity;
+    for (const [ox, oy] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) {
+      const z = dtm.heightAt(x + ox, y + oy);
+      if (z !== null) zmin = Math.min(zmin, z);
+    }
+    const k = j * T.nx + i;
+    if (zmin < Infinity && T.h[k] > zmin - 0.25) T.h[k] = zmin - 0.25;
+  }
+}
+
+// The DTM areas as meshes: ground-level surfaces draped on their surveyed heights (sidewalks,
+// islands and platforms with a kerb face down to the road), level 1 (bridge decks, railway on
+// the bridge, canopies) as slabs with sides and an underside.
+const DTM_COLORS = {
+  road: '#55565a', parking: '#5e5f63', cycle: '#7d5a52', tram: '#6c675d', sidewalk: '#a39d90', island: '#9b968a',
+  platform: '#b3ad9f', paved: '#9b968b', stairs: '#aaa59a', green: '#6f8a4e', water: '#5d7f95', deck: '#8f897e',
+  rail: '#6a6258', roof: '#5f6266', wall: '#8a8172',
+};
+const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, water: 0.01 };
+const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
+function buildDtm(group, dtm, wet, route, profile, data) {
+  // the smoothed track profile wins next to the tracks: carriageway and tram areas are flush with
+  // the track bed within 3 m of a track centre and blend back to their surveyed height by 6 m
+  const tracks = new SegmentIndex(10);
+  for (const t of data.tracks) tracks.addLine(t.smooth);
+  const flush = (x, y, z) => {
+    const d = tracks.dist(x, y);
+    if (d > 6) return z;
+    const n = route.nearest(x, y);
+    if (!n || n.d > 12) return z;
+    const zt = profile.height(n.s) + 0.14;
+    const k = Math.max(0, Math.min(1, (d - 3) / 3));
+    return zt + (z - zt) * k * k * (3 - 2 * k);
+  };
+  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const color = {};
+  for (const [k, v] of Object.entries(DTM_COLORS)) {
+    const c = new THREE.Color(v);
+    if (wet && k !== 'green' && k !== 'water') c.multiplyScalar(0.8);
+    color[k] = c.toArray();
+  }
+  for (const a of dtm.areas) {
+    if (a.c === 'wall') continue; // retaining walls come from the Geoportál layer
+    const col = color[a.c] || color.paved;
+    const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
+    const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
+    const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
+    const fz = a.l === 0 && FLUSH.has(a.c) ? (v) => flush(v[0], v[1], v[2]) : (v) => v[2];
+    for (const [p, q, r] of a.mesh) {
+      cg.tri(c, W(p[0], p[1], fz(p) + lift), W(q[0], q[1], fz(q) + lift), W(r[0], r[1], fz(r) + lift), null, col);
+      if (slab) cg.tri(c, W(p[0], p[1], p[2] - slab), W(r[0], r[1], r[2] - slab), W(q[0], q[1], q[2] - slab), null, col);
+    }
+    // kerbs (ground level) or slab sides (level 1) along every ring
+    const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'platform' ? 0.18 : 0);
+    if (!drop) continue;
+    const side = a.l > 0 ? col : new THREE.Color('#8e8a82').toArray();
+    for (const ring of [a.ring, ...a.holes]) {
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i], q = ring[(i + 1) % ring.length];
+        cg.quad(c, W(p[0], p[1], p[2] + lift - drop), W(q[0], q[1], q[2] + lift - drop), W(q[0], q[1], q[2] + lift), W(p[0], p[1], p[2] + lift), side);
+      }
+    }
+  }
+  cg.build(group);
 }
 
 // Keep the terrain at or below every track's bed: for samples along each track (centre and
