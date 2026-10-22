@@ -345,6 +345,18 @@ export class DtmSurface {
       };
       const outer = fill(a.r), holes = (a.h || []).map(fill);
       if (outer.length < 3) continue;
+      // street model (tools/streets.py): smooth heights and a ready mesh
+      if (a.v && a.t) {
+        const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs: a.k || null, model: true };
+        const rank = SURFACE_RANK[a.c] || 1;
+        for (let i = 0; i < a.t.length; i += 3) {
+          const tri = [a.v[a.t[i]], a.v[a.t[i + 1]], a.v[a.t[i + 2]]];
+          area.mesh.push(tri);
+          this._index(this.grid, [...tri, rank, a.c]);
+        }
+        this.areas.push(area);
+        continue;
+      }
       const v2 = (r) => r.map((p) => new THREE.Vector2(p[0], p[1]));
       let tri;
       try { tri = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2)); } catch { continue; }
@@ -477,6 +489,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
   return {
     terrain,
     profile,
+    route,
     dtm,
     // ground height at an arbitrary point; `deck` marks things that are part of a bridge
     at(x, y, deck = false) {

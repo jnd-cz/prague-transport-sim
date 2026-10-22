@@ -352,12 +352,8 @@ export function buildWorld(scene, data, route, ground, weather) {
 
   // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
   // then the terrain is lowered under every track so it can't poke through the bed
-  for (const t of data.tracks) {
-    // OSM draws curves as straight segments: render tracks as smoothed curves
-    if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 ? 6 : 0.1).pts;
-    if (!t.z) t.z = trackHeights(t.smooth, wayHeight(t.p, t.b, ground));
-  }
-  lowerTerrainUnderTracks(data, ground.terrain);
+  // OSM draws curves as straight segments: render tracks as smoothed curves
+  for (const t of data.tracks) if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 ? 6 : 0.1).pts;
   // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
   // street surfaces laid flush with the track bed
   const tracks = new SegmentIndex(10);
@@ -365,6 +361,17 @@ export function buildWorld(scene, data, route, ground, weather) {
   const trackDist = (x, y) => tracks.dist(x, y);
   ground.trackDist = trackDist;
   if (ground.dtm) flushDtm(ground);
+  // track heights after the streets are laid to the track profile, so other lines' tracks sit in them
+  // (a track embedded in a surveyed carriageway sits 0.14 lower than the street surface function,
+  // so its bed is flush with the road as on our own route, not a raised strip)
+  const embedded = (hf) => (x, y) => {
+    const z = hf(x, y), t = ground.dtm?.surfaceAt(x, y);
+    if (!t || !FLUSH.has(t.c)) return z;
+    const n = route.nearest(x, y);
+    return n && n.d < 4 ? z : z - 0.14;
+  };
+  for (const t of data.tracks) if (!t.z) t.z = trackHeights(t.smooth, t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground)));
+  lowerTerrainUnderTracks(data, ground.terrain);
   if (ground.dtm) lowerTerrainUnderDtm(ground.dtm, ground.terrain);
   buildTerrain(group, data, route, ground.terrain, weather);
   if (ground.dtm) buildDtm(group, ground, weather !== 'dry');
@@ -646,8 +653,57 @@ function flushDtm(ground) {
   if (dtm.flushed) return; // kept across weather rebuilds
   dtm.flushed = true;
   const done = new Set();
+  // Street model areas (tools/streets.py) are laid to the track profile: the carriageway's offset
+  // from the track bed height (profile + 0.14), measured on the unshifted model along the route
+  // (every 2 m) and across it (every 1 m, gaps filled from the nearest carriageway), is applied
+  // fully within 5 m of the route (our track and the opposite one) and fades out by 15 m; other
+  // lines' tracks crossing it take their heights from the street afterwards. Road and sidewalk at the same spot get the
+  // same correction, so kerbs keep their height; a street sloping across gets level at the tracks.
+  const { route, profile } = ground;
+  const rows = new Map();
+  const row = (i) => {
+    if (rows.has(i)) return rows.get(i);
+    const s = i * 2, zt = profile.height(s) + 0.14, e = [];
+    for (let l = -15; l <= 15; l++) {
+      const o = route.offset(s, l), t = dtm.surfaceAt(o.x, o.y);
+      e.push(t && FLUSH.has(t.c) ? zt - t.z : null);
+    }
+    for (let k = 0; k < e.length; k++) if (e[k] === null) {
+      for (let j = 1; j < e.length; j++) {
+        const v = e[k - j] ?? e[k + j];
+        if (v != null) { e[k] = v; break; }
+      }
+    }
+    rows.set(i, e);
+    return e;
+  };
+  const corr = (s, lat) => {
+    const i = Math.round(s / 2), e = row(i);
+    if (e[0] === null) return null;
+    const f = Math.max(0, Math.min(30, lat + 15)), k = Math.min(29, Math.floor(f)), u = f - k;
+    return e[k] * (1 - u) + e[k + 1] * u;
+  };
+  const shift = (p) => {
+    if (done.has(p)) return;
+    done.add(p);
+    const n = route.nearest(p[0], p[1]);
+    if (!n || n.d >= 15) return;
+    const q = route.at(n.s), lat = q.hx * (p[1] - q.y) - q.hy * (p[0] - q.x);
+    const dz = corr(n.s, lat);
+    if (dz === null) return;
+    const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
+    p[2] += dz * (1 - k * k * (3 - 2 * k));
+  };
+  // measure everything first, then move
+  const pts = [];
+  for (const a of dtm.areas) if (a.model) {
+    for (const tri of a.mesh) for (const p of tri) pts.push(p);
+    for (const r of [a.ring, ...a.holes]) for (const p of r) pts.push(p);
+  }
+  for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) row(Math.round(n.s / 2)); }
+  for (const p of pts) shift(p);
   for (const a of dtm.areas) {
-    if (a.l !== 0 || !FLUSH.has(a.c)) continue;
+    if (a.model || a.l !== 0 || !FLUSH.has(a.c)) continue;
     for (const tri of a.mesh) for (const p of tri) {
       if (done.has(p)) continue;
       done.add(p);
@@ -680,12 +736,13 @@ function buildDtm(group, ground, wet) {
     const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'platform' ? 0.18 : 0);
     if (!drop) continue;
     const side = a.l > 0 ? col : new THREE.Color('#8e8a82').toArray();
-    for (const ring of [a.ring, ...a.holes]) {
+    [a.ring, ...a.holes].forEach((ring, ri) => {
       for (let i = 0; i < ring.length; i++) {
+        if (a.kerbs && !a.kerbs[ri]?.[i]) continue; // street model: kerbs only where the carriageway is
         const p = ring[i], q = ring[(i + 1) % ring.length];
         cg.quad(c, W(p[0], p[1], p[2] + lift - drop), W(q[0], q[1], q[2] + lift - drop), W(q[0], q[1], q[2] + lift), W(p[0], p[1], p[2] + lift), side);
       }
-    }
+    });
   }
   cg.build(group, 'dtm');
 }

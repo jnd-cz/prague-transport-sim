@@ -55,6 +55,15 @@ python -m pip install --user pyproj shapely
 python tools/dtm.py --line 22 raw/dtm/<..._500089_..._ZPS_OPL.gpkg> raw/dtm/<..._500224_..._ZPS_OPL.gpkg>
 ```
 
+Then, optionally, the **street model** (pilot, smooth streets with fixed level steps, meshed
+offline) for a stretch of the line, by route position in metres:
+
+```bash
+python tools/streets.py --line 22 --from 10850 --to 12900
+```
+
+It rewrites `data/lineN.dtm.json` (rerunning starts from the survey again; rerun it after `dtm.py`).
+
 Download the district GeoPackages from geoportalpraha.cz → Data a služby → "DTM kraje - ZPS Sada 2"
 (areas, `*_ZPS_OPL.gpkg.zip`) and "ZPS Sada 3" (3D lines, `*_ZPS_KR.gpkg.zip`), unzip both into
 `raw/dtm/` (the tool pairs each OPL folder with its KR folder). It writes `data/lineN.dtm.json`.

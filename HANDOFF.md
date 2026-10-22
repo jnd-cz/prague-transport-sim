@@ -1,7 +1,8 @@
 # Handoff notes — Tatra T3 Prague tram game
 
-State as of 2026-10-21. Read with README.md (how to run/build/play). This file records what was
-found while building it, what is unfinished, and what needs attention.
+State as of 2026-10-21 (sections 13–15: 2026-10-22). Read with README.md (how to run/build/play).
+This file records what was found while building it, what is unfinished, and what needs attention.
+**Priorities and next steps: PLAN.md.**
 
 ## 1. Current state
 
@@ -427,7 +428,51 @@ OSM; footway kerb crossings (walk-kerb: no lowered kerbs at crossings); gaps bet
 not imported). Tilt counts every roll > 7°, half of them < 10° (camber, kerb-side wheels).
 Heap +220 MB for the triangle index (1.65 → 1.87 GB measured the same way during a run).
 
-## 12. Open items from the user (2026-10-21, end of session) — not done yet
+## 15. Street model pilot (2026-10-22): line 22, Karlovo náměstí – Jana Masaryka (s 10850–12900)
+
+Idea from BeamNG.Earth (`grading.py`, `sidewalks.py`): streets built from a few smooth rules instead of
+draping every survey polygon on its own noisy corners. `tools/streets.py` (offline, numpy + shapely
+2.1+ `constrained_delaunay_triangles`, no scipy):
+- **Z0 carriageway surface**: normalized Gaussian convolution (σ 3 m, wider where sparse) of the road /
+  parking / tram-bed corners and the cloud points inside the carriageways (0.2 m in from kerbs), 2 m
+  grid, 3 passes rejecting > 0.25 m outliers (rms 5.5 cm).
+- **R raised surface**: the same fit over sidewalk / island / cycle / paving corners (keeps the real
+  crossfall towards facades), at least 6 cm above Z0; areas off it by > 0.25 m (terraces, steps) keep
+  their survey and leave the fit. Paving/cycle at road level count as carriageway. Platforms: Z0 + one
+  constant step.
+- **Mesh**: 8 m grid cells (4 m within 7 m of a track), clipped to the (5 cm-simplified) polygon,
+  edges split at 4 m so neighbours share vertices, constrained Delaunay per piece. Kerb faces flagged
+  only on edges within 0.4 m of the carriageway (`k`). Areas carry `v`, `t`, `k`, `s` (+ `r0`/`h0`
+  survey copy so reruns start fresh).
+- **In the game** (`DtmSurface`: areas with `v`/`t` use the ready mesh; `world.js flushDtm`): model
+  areas are laid to the track profile by a correction measured along (2 m) and across (1 m) the route
+  on the unshifted model, full within 5 m of the route, fading out by 15 m, same for road and
+  sidewalk (kerbs keep their height). Profile vs Z0 differed up to 0.85 m (grade-limited profile).
+  Track heights are now computed after this, and other lines' tracks embedded in a surveyed
+  carriageway sit 0.14 lower so their bed is flush with the road (it was a 17 cm raised strip).
+
+**Result** (pilot stretch, same code and bot, survey-draped → model): triangles 187 519 → 93 830 (the
+400 snapped areas take 46 k; the rest is greenery, steps and the 106 areas kept on survey);
+car kerb steps 296 → 125, tilts 722 → 269, floating 72 → 23, sunk 131 → 82, jumps 79 → 67;
+walkers: steps 253 → 245, bumpy 200 → 186 (walk paths cross gaps between areas and kept areas);
+kerb crossings 39 → 97 (kerbs are now consistent — crossings need dropped kerbs). Cars on sidewalks
+260 unchanged (lane paths at junction corners, not surfaces). Autopilot 18 → end clean.
+Bot fixes in the same step: steps measured against the local slope (steep streets are not steps),
+walker kerb crossings listed apart (`crossing`).
+
+**Vienna-type stops** (user, 2026-10-22: no island, boarding from the sidewalk across the car lane,
+cars must wait behind the stopped tram; only a few in the city). `streets.py` checks what lies 2.2–3.4 m
+right of the track along each platform: Štěpánská and Jana Masaryka come out "mixed" (a third
+carriageway) → stored as `dtm.vienna`. **Wrong**: the user confirms both have normal islands; the
+real Vienna-type stops are Čechův most towards Kobylisy, Krymská both directions and Újezd from
+Národní třída. A better classifier (lateral survey profile) is planned in PLAN.md §3.8; `dtm.vienna`
+is not used by the game.
+
+**Next**: dropped kerbs at crossings (OSM crossing nodes / zebras), draw DTM retaining walls where
+level-0 areas meet with a step (Zahradní Město ramp), greenery as terrain colour away from streets,
+then the rest of line 22 (Praha 10) and a 1 m height/class raster per tile instead of the triangle index.
+
+## 12. Open items from the user (2026-10-21, end of session) — not done yet (merged into PLAN.md)
 
 1. **Two-car set "broken"** — the user saw it on a screenshot that did not reach me. In my views
    both cars were coupled correctly (centres 15.2 m apart, ~1.5 m between bodies, same track).
