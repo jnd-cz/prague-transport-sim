@@ -13,13 +13,15 @@ import { carPose } from './traffic.js';
 //   walk  - bumpy: the drawn path surface is rough (second difference over 1 m)
 //           kerb, float / sunk: as for cars
 //           road: walking along the carriageway for more than 6 m
+//           crossing: stepping over a normal kerb between carriageway and sidewalk (not a defect,
+//           but a pedestrian crossing should have a dropped kerb)
 // Findings of a kind within 15 m are merged into one place, ranked by size and count.
 
 const CAR_BAD = new Set(['sidewalk', 'island', 'platform', 'green', 'stairs', 'water']);
 const WALK_BAD = new Set(['road', 'tram', 'parking']);
 export const BOT_COLORS = {
   kerb: '#ff3b30', sidewalk: '#ff9500', jump: '#af52de', tilt: '#ffcc00', float: '#34c759', sunk: '#007aff',
-  gap: '#8e8e93', bumpy: '#ff2d55', road: '#5ac8fa', 'walk-kerb': '#ff6b5e', 'walk-float': '#7be08f', 'walk-sunk': '#5fa8ff',
+  gap: '#8e8e93', bumpy: '#ff2d55', crossing: '#c7c7cc', road: '#5ac8fa', 'walk-kerb': '#ff6b5e', 'walk-float': '#7be08f', 'walk-sunk': '#5fa8ff',
 };
 
 // Every triangle of the meshes cars and walkers stand on (tagged `userData.surface`), indexed
@@ -141,7 +143,7 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
   let carM = 0, walkM = 0;
   for (let pi = 0; pi < paths.length; pi++) {
     const { kind, pts } = paths[pi];
-    let prev = null, prevD = null, prev2D = null, roadRun = 0;
+    let prev = null, prevD = null, prev2D = null, roadRun = 0, prevC = null, prev2C = null;
     for (const p of pts) {
       const { x, y, hx, hy } = p;
       if (kind === 'car') {
@@ -165,8 +167,10 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
           if (gap < -0.1) flag('sunk', p, z, -gap, `${(-gap).toFixed(2)} m below`);
         }
         if (prev !== null && Math.abs(z - prev) > 0.15) flag('jump', p, z, Math.abs(z - prev), `${(z - prev).toFixed(2)} m in 1 m`);
-        if (zd !== null && prevD !== null && Math.abs(zd - prevD) > 0.12) flag('kerb', p, z, Math.abs(zd - prevD), `${(zd - prevD).toFixed(2)} m drawn step`);
-        prev = z; prevD = zd;
+        // a step is a sudden change against the slope so far (steep streets are not steps)
+        const slope = prevD !== null && prev2D !== null ? prevD - prev2D : 0;
+        if (zd !== null && prevD !== null && Math.abs(zd - prevD - slope) > 0.12) flag('kerb', p, z, Math.abs(zd - prevD - slope), `${(zd - prevD).toFixed(2)} m drawn step`);
+        prev = z; prev2D = prevD; prevD = zd;
       } else {
         walkM++;
         const z = ground.surface(x, y);
@@ -178,13 +182,19 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
           const gap = z - zd;
           if (gap > 0.15) flag('walk-float', p, z, gap, `${gap.toFixed(2)} m above`);
           if (gap < -0.1) flag('walk-sunk', p, z, -gap, `${(-gap).toFixed(2)} m below`);
-          if (prevD !== null && Math.abs(zd - prevD) > 0.12) flag('walk-kerb', p, z, Math.abs(zd - prevD), `${(zd - prevD).toFixed(2)} m drawn step`);
-          else if (prevD !== null && prev2D !== null) {
+          const step = prevD === null ? 0 : zd - prevD;
+          const jolt = step - (prevD !== null && prev2D !== null ? prevD - prev2D : 0); // against the slope so far
+          // stepping between the carriageway and a raised surface over a normal kerb: real, but a
+          // crossing should have a dropped kerb (listed apart, not counted as a defect)
+          const kerbCross = prevC !== cls && (WALK_BAD.has(prevC) !== WALK_BAD.has(cls)) && Math.abs(step) > 0.06 && Math.abs(step) <= 0.22;
+          if (kerbCross) flag('crossing', p, z, Math.abs(step), `${step.toFixed(2)} m kerb, ${prevC} → ${cls}`);
+          else if (Math.abs(jolt) > 0.12) flag('walk-kerb', p, z, Math.abs(jolt), `${step.toFixed(2)} m drawn step`);
+          else if (prevD !== null && prev2D !== null && prevC === cls && prev2C === cls) {
             const dd = Math.abs(zd - 2 * prevD + prev2D);
             if (dd > 0.06) flag('bumpy', p, z, dd, `${dd.toFixed(2)} m bend in 1 m`);
           }
         }
-        prev2D = prevD; prevD = zd;
+        prev2D = prevD; prevD = zd; prev2C = prevC; prevC = cls;
       }
     }
     if (pi % 50 === 0) { progress(`driving ${pi}/${paths.length}`); await tick(); }
