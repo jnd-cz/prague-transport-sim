@@ -530,7 +530,8 @@ export class Game {
     }
     // a signal that must hang (its place is on a platform) takes a span up to 30 m away
     const reach = hang ? 30 : 16;
-    const span = C.filter((c) => c.L && c.R && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0];
+    // (a cross-span; one that must hang may also use a pole's bracket arm over the track)
+    const span = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0];
     if (span && ud.boardTop !== undefined) {
       // right of the tram: its half width, the overhang of the car ends in a curve, a margin and
       // the board's own half width (it used to hang 1.15 m out, over the tram's roof edge)
