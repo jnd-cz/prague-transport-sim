@@ -4,7 +4,8 @@ import { carPose } from './traffic.js';
 // Street bot (debug, ?bot in the URL): drives every car lane and walks every footway of the
 // traffic network where the surveyed DTM streets exist, the way the traffic places cars and
 // walkers, and reports the places that look wrong:
-//   car   - kerb: the drawn surface steps under the car (it drives over a kerb)
+//   car   - (every lane and junction connector of the lane graph, Traffic._buildLanes)
+//           kerb: the drawn surface steps under the car (it drives over a kerb)
 //           sidewalk: two or more wheels on a sidewalk, island, platform, greenery or steps
 //           jump: the car's own height steps by more than 0.15 m within 1 m
 //           tilt: rolled more than 7° (one side up a kerb)
@@ -95,29 +96,14 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
     }
     if (cur.length > 3) paths.push({ kind, pts: cur });
   };
-  for (const [k, r] of traffic.roads.entries()) {
-    const dirs = r.o ? [r.o] : [1, -1];
-    const sels = r.o && r.w >= 7 ? [-1, 1] : [1];
-    for (const dir of dirs) for (const sel of sels) {
-      runsOf('car', `road ${k}`, (s0) => {
-        const s = dir > 0 ? s0 : r.path.length - s0;
-        const p = r.path.at(s);
-        const hx = p.hx * dir, hy = p.hy * dir, lane = traffic.laneOffset(r, s, dir, sel);
-        return { x: p.x + hy * lane, y: p.y - hx * lane, hx, hy };
-      }, r.path.length);
+  // the lane graph the cars drive: every lane, and every connector a car may take at a junction
+  const along = (path) => (s) => { const p = path.at(s); return { x: p.x, y: p.y, hx: p.hx, hy: p.hy }; };
+  for (const lane of traffic.laneList) {
+    runsOf('car', `lane ${lane.id}`, along(lane.path), lane.path.length);
+    for (const b of traffic.nextLanes(lane)) {
+      const c = traffic.connector(lane, b);
+      if (c) runsOf('car', `junction ${c.id}`, along(c.path), c.path.length);
     }
-  }
-  // cars in the lanes beside the tram (Traffic._updateStreetCars, lateral offset eased in)
-  for (const dir of [1, -1]) {
-    let lat = null;
-    runsOf('car', 'lane', (s0) => {
-      const s = dir > 0 ? s0 : route.length - s0;
-      const lane = traffic.laneAt(s, dir, lat);
-      if (!lane) { lat = null; return null; }
-      lat = lat === null ? lane.lat : lat + (lane.lat - lat) * 0.2;
-      const o = route.offset(s, lat);
-      return { x: o.x, y: o.y, hx: o.hx * dir, hy: o.hy * dir };
-    }, route.length);
   }
   for (const [k, w] of traffic.walks.entries()) {
     runsOf('walk', `walk ${k}`, (s) => {
