@@ -573,6 +573,15 @@ function buildLod2(group, data, route, ground) {
       const roofTile = ROOF_COLORS[Math.floor(r() * 3)], roofFlat = new THREE.Color('#77736d');
       for (let t = 0; t < count; t += 3) {
         const ax = xs[t], ay = ys[t], az = zs[t], bx = xs[t + 1], by = ys[t + 1], bz = zs[t + 1], cx = xs[t + 2], cy = ys[t + 2], cz = zs[t + 2];
+        // nothing of a bridge model inside the space our tram sweeps (±3 m, 0.4-5.8 m above the
+        // rails): at the north end of Čechův most a slab 3.7 m above the deck cut through the tram
+        if (isBridge) {
+          const mx = (ax + bx + cx) / 3, my = (ay + by + cy) / 3, n = route.nearest(mx, my);
+          if (n && n.d < 3) {
+            const zr = ground.profile.height(n.s) + 0.26, mz = (az + bz + cz) / 3;
+            if (mz > zr + 0.4 && mz < zr + 5.8) continue;
+          }
+        }
         let nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
         let ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
         let nz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
@@ -1156,7 +1165,8 @@ function buildCatenary(group, data, route, ground, trackDist) {
       if (fl > 9 && fr < 5 && !Rt.wall) L = null;
       else if (fr > 9 && fl < 5 && !L.wall) Rt = null;
     }
-    const top = (a) => (a.wall ? z + 7.0 : ground.at(a.x, a.y) + 7.0);
+    // (deck = true: on a bridge the pole stands on the deck, not on the river bed below)
+    const top = (a) => (a.wall ? z + 7.0 : ground.at(a.x, a.y, true) + 7.0);
     const span = [];
     if (L && Rt) span.push([L, Rt]);
     else {
@@ -1172,7 +1182,7 @@ function buildCatenary(group, data, route, ground, trackDist) {
       if (!a) continue;
       if (a.wall) rosettes.push([a.x, z + 7.0, a.y]);
       else {
-        const zg = ground.at(a.x, a.y);
+        const zg = ground.at(a.x, a.y, true);
         m.makeTranslation(a.x, zg + 3.7, -a.y);
         poles.push(m.clone());
       }
