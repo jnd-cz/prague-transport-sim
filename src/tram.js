@@ -152,11 +152,14 @@ export class Tram {
     else if (this.brake > 0 && this.v > T3.edBrakeMinV && notch !== -5) electric = -this.brake * this.v * 0.9;
     else if (notch === -5 && Math.abs(this.v) > 0.3) electric = -60000; // track brake coils
     const drop = electric > 0 ? (electric / 600) * 0.045 : 0;
-    this.voltage = T3.lineVoltage + 18 * Math.sin(performance.now() / 2300) - drop;
+    // simulation time, not the wall clock: the current decides the contacts (switches), so the
+    // same drive must give the same result (headless tests)
+    this.time = (this.time || 0) + dt;
+    this.voltage = T3.lineVoltage + 18 * Math.sin(this.time * 1000 / 2300) - drop;
     this.electric = electric;
     const targetI = electric / Math.max(this.voltage, 300);
     // wheelspin: motor current collapses and flickers
-    const slipI = this.slip ? 0.55 + 0.2 * Math.sin(performance.now() / 40) : 1;
+    const slipI = this.slip ? 0.55 + 0.2 * Math.sin(this.time * 1000 / 40) : 1;
     this.current += (targetI * slipI - this.current) * Math.min(1, dt * 6);
   }
 }

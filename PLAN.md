@@ -168,7 +168,33 @@ The last sessions fixed many spots one at a time. To scale to the whole network:
    | tree crown into a building | 219 | 176 | 292 | 41 |
    | bridge span without a deck | 0/2 | 0/8 | 0/1 | 0/1 |
    | street bot places (DTM only) | – | – | 3510 | – |
-2. Headless real-traffic run + slide/overlap lints.
+2. ~~Headless real-traffic run + slide/overlap lints~~ — **done 2026-10-22**: `tools/traffic_lint.js`
+   (`lint({ traffic: true })`) drives the whole line with the real game and traffic, fixed step,
+   seeded, first trip, autumn, dry (deterministic per page load; the page's frame loop only draws
+   while `window.headless`). Tram electrics now run on simulation time (they used the wall clock,
+   which made contacts and therefore runs differ). Fixed on the way, measured by the run:
+   - cars handing over to "coast" at the data edge hopped sideways (lane rule) — 626 → 0 on line 23;
+   - fitted DTM lanes changed sideways too fast — lane drift limited to 5 % (line 22 same-road
+     slides 16 245 → 1 330). Trade-off: street-bot sidewalk samples 2 338 → 4 645 (7.5 %: 7 720 /
+     3 736). Lanes must become smooth curves inside the carriageway (step 5) to win both.
+
+   Baseline (whole line, one sample every 0.2 s; overlaps are episodes, `of` = minutes):
+
+   | check | 9 | 17 | 22 | 23 |
+   |---|---|---|---|---|
+   | slide (samples) | 6 619 | 4 554 | 8 611 | 3 756 |
+   | jump | 642 | 316 | 863 | 250 |
+   | overlap (episodes / minutes) | 652 / 93 | 296 / 52 | 580 / 58 | 331 / 31 |
+   | walker inside a vehicle | 921 | 808 | 718 | 333 |
+
+   Causes (line 22): slides — lane beside the tram 3 714 (its offset steps between 10 m cells and
+   eases sideways), next road 3 510 (a junction snaps the car from one lane end to the next lane
+   start: no turning curves), same road 1 330; jumps — almost all "next road". Overlaps — car/car
+   at junctions (give-way is per road end, turning paths cross), car/our tram, a few tram/tram
+   (line 9 near the far terminus, s ≈ 27 090: AI trams of both directions). Walkers inside vehicles —
+   mostly cars: walkers cross roads without yielding and walk paths use OSM widths while cars use
+   the fitted lanes. All of these point at step 5 (lane graph with junction curves, one following
+   model for every vehicle, walkers yielding at crossings).
 3. Signal mounting rule (small, closes a P1 item, proves the lint loop).
 4. Trees vs LOD2 footprints (small).
 5. Lane graph from the carriageway (largest P1 item); then stops/queues; then junction controllers.

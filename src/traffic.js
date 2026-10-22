@@ -220,8 +220,17 @@ export class Traffic {
       return best;
     });
     const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -2; d <= 2; d++) if (arr[i + d] !== undefined) { s += arr[i + d]; m++; } return s / m; });
-    road.fitLo = smooth(fill(lo, -road.w / 2));
-    road.fitHi = smooth(fill(hi, road.w / 2));
+    // a lane drifts sideways at most 5 % of the distance driven (0.2 m per 4 m sample), both ways,
+    // so cars change position gently instead of sliding. A trade-off until lanes are proper curves
+    // (PLAN step 5); line 22, same-road slides / street-bot sidewalk samples: no limit 16245 / 2338,
+    // 7.5 % 7720 / 3736, 5 % 1350 / 4645
+    const limit = (arr) => {
+      for (let i = 1; i < arr.length; i++) arr[i] = Math.max(arr[i - 1] - 0.2, Math.min(arr[i - 1] + 0.2, arr[i]));
+      for (let i = arr.length - 2; i >= 0; i--) arr[i] = Math.max(arr[i + 1] - 0.2, Math.min(arr[i + 1] + 0.2, arr[i]));
+      return arr;
+    };
+    road.fitLo = limit(smooth(fill(lo, -road.w / 2)));
+    road.fitHi = limit(smooth(fill(hi, road.w / 2)));
   }
   // lateral position (+ = right of the driving direction) of a car on a road at s. Right-hand
   // traffic: 1.8 m in from the right kerb, but never closer than 1.2 m to the middle of a two-way
@@ -421,8 +430,7 @@ export class Traffic {
       if (!c.active && c.coast) {
         const k = c.coast;
         k.d += (c.vNow || 6) * dt;
-        const lane = Math.max(1.5, c.road.w / 4);
-        this._poseCar(c.mesh, k.x + k.hx * k.d + k.hy * lane, k.y + k.hy * k.d - k.hx * lane, k.hx, k.hy);
+        this._poseCar(c.mesh, k.x + k.hx * k.d + k.hy * k.lane, k.y + k.hy * k.d - k.hx * k.lane, k.hx, k.hy);
         continue;
       }
       const r = c.road;
@@ -453,7 +461,8 @@ export class Traffic {
       // the data ends here (corridor edge): keep rolling straight on while fading out
       c.active = false;
       c.s = Math.max(0, Math.min(r.path.length, c.s));
-      c.coast = { x: here.x, y: here.y, hx, hy, d: 0 };
+      // keep the lane it was driving in (the same offset as on the road, no sideways hop)
+      c.coast = { x: here.x, y: here.y, hx, hy, d: 0, lane: this.laneOffset(r, c.s, c.dir, c.laneSel) };
       return;
     }
     c.coast = null;
