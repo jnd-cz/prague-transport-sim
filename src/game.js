@@ -424,7 +424,7 @@ export class Game {
       // current (turn) or coasting (straight), also right after a stop, at a signal or on a
       // gradient. Radio (IRC) control is only used where the data marks a switch as such.
       // Trailing switches are not in the data at all: the tram simply trails through them.
-      sw.auto = !!d.irc;
+      sw.auto = !!d.irc || !!this.opts.autoSwitch;
       sw.marker.visible = !sw.auto;
       if (sw.auto && this.opts.autoIrc) sw.pos = required;
       const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
