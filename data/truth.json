@@ -1,18 +1,74 @@
 {
-  "note": "Ground truth from the user, used to score detectors and lints (PLAN.md §2.4). Add facts here, not special cases in code.",
-  "stops": [
-    { "name": "Čechův most", "towards": "Kobylisy", "type": "vienna", "source": "user 2026-10-22" },
-    { "name": "Krymská", "towards": "*", "type": "vienna", "source": "user 2026-10-22" },
-    { "name": "Újezd", "from": "Národní třída", "type": "vienna", "source": "user 2026-10-22" },
-    { "name": "Štěpánská", "towards": "*", "type": "island", "source": "user 2026-10-22" },
-    { "name": "Jana Masaryka", "towards": "*", "type": "island", "source": "user 2026-10-22" }
-  ],
-  "rules": [
-    { "id": "signal-not-in-platform", "text": "Tram signal heads stand at the platform head or hang from the wire, never along the platform", "source": "user 2026-10-22" },
-    { "id": "straight-both-directions", "text": "Trams going straight through a junction from both directions get GO together", "source": "user 2026-10-22" },
-    { "id": "consist-coupled", "text": "A two-car set starts coupled: 15.2 m between car centres on the same track, at every start stop (Sídliště Řepy fails)", "source": "user 2026-10-22" }
-  ],
-  "places": [
-    { "name": "Nádraží Zahradní Město", "text": "Tram and bus stop in a lowered underpass under the railway platforms; block retaining walls along the Průběžná ramp", "source": "user photos 2026-10-22" }
-  ]
+ "note": "Ground truth from the user, used to score detectors and lints (PLAN.md §2.4). Add facts here, not special cases in code.",
+ "stops": [
+  {
+   "name": "Čechův most",
+   "towards": "Kobylisy",
+   "type": "vienna",
+   "source": "user 2026-10-22"
+  },
+  {
+   "name": "Krymská",
+   "towards": "*",
+   "type": "vienna",
+   "source": "user 2026-10-22"
+  },
+  {
+   "name": "Újezd",
+   "from": "Národní třída",
+   "type": "vienna",
+   "source": "user 2026-10-22"
+  },
+  {
+   "name": "Štěpánská",
+   "towards": "*",
+   "type": "island",
+   "source": "user 2026-10-22"
+  },
+  {
+   "name": "Jana Masaryka",
+   "towards": "*",
+   "type": "island",
+   "source": "user 2026-10-22"
+  }
+ ],
+ "rules": [
+  {
+   "id": "signal-not-in-platform",
+   "text": "Tram signal heads stand at the platform head or hang from the wire, never along the platform",
+   "source": "user 2026-10-22"
+  },
+  {
+   "id": "straight-both-directions",
+   "text": "Trams going straight through a junction from both directions get GO together",
+   "source": "user 2026-10-22"
+  },
+  {
+   "id": "consist-coupled",
+   "text": "A two-car set starts coupled: 15.2 m between car centres on the same track, at every start stop (Sídliště Řepy fails)",
+   "source": "user 2026-10-22"
+  }
+ ],
+ "places": [
+  {
+   "name": "Nádraží Zahradní Město",
+   "text": "Tram and bus stop in a lowered underpass under the railway platforms; block retaining walls along the Průběžná ramp",
+   "source": "user photos 2026-10-22"
+  },
+  {
+   "name": "Kotlářka – Sídliště Řepy",
+   "text": "Dedicated tram corridor, not shared with cars (candidate for cant / banked curves)",
+   "source": "user 2026-10-22"
+  },
+  {
+   "name": "Dvorce – Sídliště Modřany",
+   "text": "Dedicated tram corridor, not shared with cars (candidate for cant / banked curves)",
+   "source": "user 2026-10-22"
+  },
+  {
+   "name": "Ohrada – Palmovka (line 37)",
+   "text": "Tracks completely separate from any street, with their own bridge over the park and the railway",
+   "source": "user 2026-10-22"
+  }
+ ]
 }

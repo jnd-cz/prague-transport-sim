@@ -79,86 +79,115 @@ The last sessions fixed many spots one at a time. To scale to the whole network:
    
    Lists exist only as test truth.
 
-## 3. Priorities
+## 3. Priorities (reordered 2026-10-22, evening)
 
-**P1 — foundation and what the driver sees every minute**
+**Done:** lint runner + baselines, headless traffic run, two-car set at the terminus (routes
+continue 60 m past both ends), coasting cars keep their lane, fitted lanes drift at most 5 %.
+Details and baseline tables in §4.
 
-1. **Lint harness + baselines** (§2.1–2.3), including the headless real-traffic run with the slide
-   and overlap checks. Everything below is measured with it.
-2. **Lanes from the surveyed carriageway (lane graph).**
-   - Build directed lanes per tile from DTM carriageway polygons (offsets from the kerb lines, lane
-     count from width) joined with OSM topology (direction, oneway, turn connections).
-   - Mark lanes that share the tram tracks.
-   - This replaces OSM centre line + fitted offsets + `lanes beside tram`, and fixes cars on sidewalks
-     at junction corners and sliding from lateral jumps.
-3. **Cars at tram stops and in queues.**
-   - **Island stops:** where the lane is blocked or narrowed by a stop island, cars merge onto the
-     tracks (shared lane), as in Prague.
-   - **Vienna-type stops:** cars stop behind a tram with open doors.
-   - **One following model:** every vehicle (cars, AI trams, our tram) keeps its gap to whatever is
-     ahead in its lane, including on shared track, and nobody overlaps.
-   - Lint: overlaps per minute = 0.
-4. **Junction controllers with real cycles.**
-   - One controller per junction (OSM signal cluster + lane graph). Phases in a fixed cycle (60–90 s)
-     with tram priority (call at the výzva contact).
-   - Compatible movements share a phase, so trams straight in both directions get GO together.
-   - Cars, AI trams and our tram all obey the same controller.
-   - Lint: conflicting GOs = 0.
-5. **Signal and sign mounting rule.**
-   - The head stands at the platform head: past its end, on the island nose, or hung from a span.
-     Never along the platform.
-   - Lint "signal in platform" = 0 on all lines (today 5 on line 9).
+Order: first the small fixes that are visibly wrong and each measurable by a lint or a run
+(tier A), then the traffic core (tier B), then the network and new content (tier C), then later
+ideas (tier D). Every item names its measurement.
 
-**P2 — scenery correctness**
+**Tier A — small, visible, measurable (next, in this order)**
 
-6. **Trees vs buildings.**
-   - Drop register trees whose trunk is inside an LOD2 footprint.
-   - Scale each crown to clear the nearest facade (as is done for the tracks).
-   - Lint "crown in building" ≈ 0.
-7. **Poles at curve centres.**
-   - Where the track turns more than 120° (turning loops, terminus loops) and the centre is free
-     (no building, track or carriageway), place a centre pole with radial pull-offs, as on real
-     loops. Otherwise fall back to the outside poles.
-   - Lint "wire without a support within 40 m" on loops.
-8. **Stop types from the survey, validated against truth.**
-   - Classify each platform side from the lateral class profile: island strip / raised lane to the
-     facade (Vienna, raised) / carriageway to the sidewalk (Vienna, at grade).
-   - Score it against truth: Vienna = Čechův most towards Kobylisy, Krymská both directions, Újezd
-     from Národní třída; island = Štěpánská, Jana Masaryka.
-   - Needs DTM for Praha 1, 5, 7 (Újezd, Čechův most) — import those districts.
-9. **Street model rollout.**
-   - The rest of line 22 (Praha 10), then lines 9/17/23 once their districts are imported.
-   - Dropped kerbs at crossings (OSM crossing nodes).
-   - DTM retaining walls where level-0 areas meet with a step (the Zahradní Město ramp).
-   - Greenery as terrain colour away from streets.
+1. **No invented walls on surveyed streets.** The corridor carve adds synthetic retaining walls
+   where the 10 m lidar grid rises beside the track; on line 22, 1 272 m of its 2 700 m stand on DTM
+   sidewalks or road (§5). Where the DTM covers, the survey decides: no synthetic walls (surveyed
+   Geoportál walls and DTM level steps only). Lint: synthetic wall on a surveyed street = 0.
+2. **Vegetation by category.** The register is not only trees (§5):
+   - bushes (keř 51, skupina keřů 41, živý plot 131) become low shrubs;
+   - plants in containers (21) become planters;
+   - climbers (101) are dropped;
+   - tree-row samples inside buildings or carriageway are dropped;
+   - then trunks and crowns are kept clear of LOD2 buildings.
 
-**P3 — bigger features and scale**
+   Lints exist: trunk under a roof (612/215/390/73), crown into a building.
+3. **Signals and signs clear of the tram.**
+   - No signal head along a platform (lint: 5/7/1/0 now).
+   - Hung signals and signs move to the right, outside the space the tram sweeps (including overhang in
+     curves).
+   - New lint: any mounted object (pole, sign, signal, rosette, tree crown) inside the tram's
+     kinematic envelope.
+4. **Curve speeds from lateral acceleration** (§5 table).
+   - A continuous limit v = √(a·R) replaces the step table, with a ≈ 0.8 m/s² unbalanced in streets.
+   - On dedicated corridors (track not inside any carriageway: Kotlářka – Sídliště Řepy, Dvorce –
+     Sídliště Modřany), a standard cant (superelevation) adds up to +0.65 m/s², drawn as a tilted bed
+     and tram.
+   - Checked by autopilot run times and comfort.
+5. **Driving feel fixes.**
+   - Autopilot: a minimum time between actions and hysteresis on heating (no flicking).
+   - Camera jump when coming to a dead stop.
+   - A parked car on the tracks drives off forwards; the traffic run with obstacles on counts slides.
+   - Lint/run: autopilot actions per minute.
+6. **Cab view and diagnostics.**
+   - Rear window visible and not covered by the cab frame.
+   - Look-back pose near the right edge, clear of the red stop posts.
+   - Optional FPS / frame-time / memory overlay (menu option; `performance.memory` where the browser has
+     it).
+7. **Menu option: automatic switch setting** (onboard computer / radio control) for manual driving.
+   The default stays manual contacts (the driver skill the user wants kept).
 
-10. **Bridges as models.**
-    - Keep Mosty 3D for the deck height and outline.
-    - Build the look from a parametric kit chosen by OSM `bridge:structure`/material plus pier
-      positions (Mosty supports, else OSM `bridge:support`):
-      - stone arches with cornices for Most Legií and Palackého most;
-      - steel arch for Čechův most;
-      - concrete viaduct with pier rows for the Modřany estakáda.
-    - First check whether the Mosty I3S nodes carry piers/arches at finer LODs (we read only one level).
-11. **Both directions, line variants, stops on both sides** (HANDOFF §12.3) and the terminus loop
-    at Zahradní Město (§12.4).
-12. **Performance and scale:** height/class raster per tile instead of the triangle index; offline
-    meshes; tiles on demand; then the whole network with AI trams on real lines (HANDOFF §10).
-13. Still waiting on the user: the two-car set screenshot (HANDOFF §12.1).
-14. ~~**Two-car set at the start**~~ — **done 2026-10-22**: the route ended at the terminus stop,
-    so the second car's position was clamped onto the first (Sídliště Řepy s = 0, Bílá Hora 3.4 m;
-    very likely also the "dual-car set broken" report, HANDOFF §12.1). Every route now continues
-    60 m past both ends along the OSM tracks (`extendAlongTracks` in route.js, negative s before the
-    start). Lint `consist` places a two-car set at every stop: 0 failures on all lines.
+**Tier B — traffic core (largest; most traffic findings point here)**
 
-## 4. Next steps (in order)
+8. **Lane graph from the surveyed carriageway** with turning curves at junctions. It replaces the OSM
+   centre line + fitted offsets + lanes beside the tram, and ends the slide-vs-sidewalk trade-off.
+9. **Cars at stops and in queues.**
+   - Cars merge onto the tracks past islands and wait behind a tram at Vienna-type stops.
+   - One following model for every vehicle; walkers yield at crossings.
+   - Lints: overlaps per minute, walkers inside vehicles.
+10. **Junction controllers with real cycles.**
+    - Compatible movements share a phase, so trams going straight from both directions get GO together.
+    - Lint: conflicting GOs = 0.
 
-1. ~~`data/truth.json`, lint runner, baselines~~ — **done 2026-10-22**: `tools/lint.js` (consist at
-   every stop, signals in platforms, tree trunks/crowns in drawn buildings, bridges without a deck,
-   street bot on DTM lines), reports saved by `tools/serve.py`, `tools/lint_report.py` compares with
-   `reports/baseline/`. Baseline (2026-10-22):
+**Tier C — network and content**
+
+11. **Line ends and depots as part of the network.** Today a route ends 60 m past its last stop
+    (§5). Next:
+    - the terminus loop is part of the path (drive on past the final stop and start the return run);
+    - AI trams lay over at the terminus and run their next service;
+    - depots (OSM vozovna tracks near our lines, e.g. Vozovna Žižkov on line 37; others to be
+      checked) where runs can start and end.
+
+    This joins the old item "both directions, line variants, stops on both sides".
+12. **Line 37** (temporary; GTFS: Spojovací – Vozovna Žižkov – Ohrada – Krejcárek – Palmovka – …
+    – Lehovec, 366 trips).
+    - The Ohrada – Krejcárek – Palmovka section is a dedicated corridor with its own bridge over the
+      park and railway.
+    - It's the test case for cant (A4), bridges (C16) and a depot.
+    - Check whether Mosty 3D and the DTM already contain the new bridge.
+13. **Stops.**
+    - The platform kerb follows a curved track (offset curve of the track, no clipping into the rails).
+    - Stop types from the survey, validated against truth.
+    - DTM for Praha 1, 5, 7, 12; street model rollout, dropped kerbs, DTM walls (Zahradní Město ramp),
+      greenery as terrain colour.
+14. **People.**
+    - Late runners shown running to the doors (today only a counter and a message).
+    - The driver walking out to throw a switch with the crowbar (today key X, a timed action, no
+      figure).
+15. **Sounds from the user's samples** (waiting for the samples).
+    - Traction motor whine of the old commutator type, following current and speed (now it sounds
+      like a car).
+    - Curve squeal as metallic scraping by radius and speed (now a mosquito-like whine).
+16. Poles at curve centres (loops); bridges as models by type (stone arches, steel arch, viaduct).
+
+**Tier D — later**
+
+17. Road markings and signs on the ground; bike lanes and cyclists as a traffic mode.
+18. Performance and scale: height/class raster per tile, offline meshes, tiles on demand, the whole
+    network with AI trams on real lines.
+
+## 4. Done (2026-10-22)
+
+1. **Lint runner and baselines**: `tools/lint.js` checks:
+   - consist at every stop;
+   - signals in platforms;
+   - tree trunks/crowns in drawn buildings;
+   - bridges without a deck;
+   - street bot on DTM lines.
+
+   Reports are saved by `tools/serve.py`, and `tools/lint_report.py` compares them with
+   `reports/baseline/`.
 
    | check | 9 | 17 | 22 | 23 |
    |---|---|---|---|---|
@@ -167,18 +196,18 @@ The last sessions fixed many spots one at a time. To scale to the whole network:
    | tree trunk under a roof | 612 | 215 | 390 | 73 |
    | tree crown into a building | 219 | 176 | 292 | 41 |
    | bridge span without a deck | 0/2 | 0/8 | 0/1 | 0/1 |
-   | street bot places (DTM only) | – | – | 3510 | – |
-2. ~~Headless real-traffic run + slide/overlap lints~~ — **done 2026-10-22**: `tools/traffic_lint.js`
-   (`lint({ traffic: true })`) drives the whole line with the real game and traffic, fixed step,
-   seeded, first trip, autumn, dry (deterministic per page load; the page's frame loop only draws
-   while `window.headless`). Tram electrics now run on simulation time (they used the wall clock,
-   which made contacts and therefore runs differ). Fixed on the way, measured by the run:
-   - cars handing over to "coast" at the data edge hopped sideways (lane rule) — 626 → 0 on line 23;
-   - fitted DTM lanes changed sideways too fast — lane drift limited to 5 % (line 22 same-road
-     slides 16 245 → 1 330). Trade-off: street-bot sidewalk samples 2 338 → 4 645 (7.5 %: 7 720 /
-     3 736). Lanes must become smooth curves inside the carriageway (step 5) to win both.
+   | street bot places (DTM only) | – | – | 3685 | – |
+2. **Headless traffic run**: `tools/traffic_lint.js` (`lint({ traffic: true })`) drives the whole
+   line with the real game and traffic.
+   - It runs at a fixed step, seeded, on the first trip, autumn, dry. It's deterministic per page
+     load; the frame loop only draws while `window.headless`.
+   - Tram electrics now run on simulation time; the wall clock made contacts, and so runs, differ.
 
-   Baseline (whole line, one sample every 0.2 s; overlaps are episodes, `of` = minutes):
+   Fixed on the way:
+   - cars handing over to "coast" at the data edge hopped sideways — 626 → 0 on line 23;
+   - fitted DTM lanes changed sideways too fast — lane drift limited to 5 % (line 22 same-road
+     slides 16 245 → 1 330). Trade-off: street-bot sidewalk samples 2 338 → 4 645 (at 7.5 %:
+     7 720 / 3 736). Lanes must become smooth curves inside the carriageway (B8) to win both.
 
    | check | 9 | 17 | 22 | 23 |
    |---|---|---|---|---|
@@ -187,21 +216,74 @@ The last sessions fixed many spots one at a time. To scale to the whole network:
    | overlap (episodes / minutes) | 652 / 93 | 296 / 52 | 580 / 58 | 331 / 31 |
    | walker inside a vehicle | 921 | 808 | 718 | 333 |
 
-   Causes (line 22): slides — lane beside the tram 3 714 (its offset steps between 10 m cells and
-   eases sideways), next road 3 510 (a junction snaps the car from one lane end to the next lane
-   start: no turning curves), same road 1 330; jumps — almost all "next road". Overlaps — car/car
-   at junctions (give-way is per road end, turning paths cross), car/our tram, a few tram/tram
-   (line 9 near the far terminus, s ≈ 27 090: AI trams of both directions). Walkers inside vehicles —
-   mostly cars: walkers cross roads without yielding and walk paths use OSM widths while cars use
-   the fitted lanes. All of these point at step 5 (lane graph with junction curves, one following
-   model for every vehicle, walkers yielding at crossings).
-3. Signal mounting rule (small, closes a P1 item, proves the lint loop).
-4. Trees vs LOD2 footprints (small).
-5. Lane graph from the carriageway (largest P1 item); then stops/queues; then junction controllers.
-6. Import DTM for Praha 1, 5, 7 and 12; validate the stop classifier; extend the street model.
-7. Curve-centre poles; bridge kit.
+   Causes (line 22):
+   - slides: lane beside the tram 3 714, next road 3 510 (no turning curves), same road 1 330;
+   - jumps: almost all "next road";
+   - overlaps: car/car at junctions, car/our tram, a few tram/tram (line 9 near the far terminus,
+     s ≈ 27 090);
+   - walkers inside vehicles: mostly cars (walkers do not yield; walk paths use OSM widths, cars the
+     fitted lanes).
+3. **Two-car set at the terminus**: routes continue 60 m past both ends along the OSM tracks
+   (`extendAlongTracks`). The second car was clamped into the first at Sídliště Řepy (s = 0) and
+   Bílá Hora (3.4 m), very likely the earlier "dual-car set broken" report too.
 
-## 5. Ground truth from the user (to go into data/truth.json)
+## 5. Findings for the 2026-10-22 evening questions
+
+**Curve speeds.** Not measured on real trams. They come from commonly used design values for
+unbalanced lateral acceleration (0.65 m/s² comfortable, ~1.0 m/s² upper bound) and cant (100 mm on
+1 435 mm gauge ≈ +0.65 m/s²), with v = √(a·R):
+
+| R (m) | now (km/h) | a = 0.65 | a = 1.0 | 100 mm cant + 0.65 |
+|---|---|---|---|---|
+| 20 | 10 | 13 | 16 | 18 |
+| 30 | 15 | 16 | 20 | 23 |
+| 45 | 20 | 19 | 24 | 28 |
+| 60 | 20 | 22 | 28 | 32 |
+| 80 | 30 | 26 | 32 | 37 |
+| 100 | 30 | 29 | 36 | 41 |
+| 140 | 40 | 34 | 43 | 49 |
+| 200 | 40 | 41 | 51 | 58 |
+| 250 | 50 | 46 | 57 | 65 |
+| 400 | 50 | 58 | 72 | 82 |
+
+The step table sits around 0.65 m/s² on average but jumps at its band edges (30 km/h at R 80 =
+0.87 m/s²; 10 km/h at R 20 is below even the comfortable value).
+
+Proposal:
+- continuous √(a·R) with a ≈ 0.8 in streets;
+- cant on dedicated corridors;
+- capped by the line maximum (50 km/h in streets, 60 on dedicated track — to confirm with the user).
+
+Ground truth would be phone accelerometer recordings on real rides (data/truth.json).
+
+**Walls inside sidewalks and road** come from the synthetic retaining walls of the corridor carve
+(built where the lidar terrain rises > 1.5 m beside the track bench), not from the surveyed walls.
+Line 22 has 900 synthetic segments, 2 700 m, of which 1 272 m stand on a DTM street surface. Of the
+53 surveyed Geoportál wall segments, none stands with street at the same level on both sides.
+Fix A1.
+
+**Trees.** Geoportál "vegetační prvky" (body) has no size (no height or crown width), only
+categories (`kod_vp`, from the layer's coded values):
+- Strom 71 (25 548 points on our lines);
+- Keř 51 (3 206);
+- Zeleň v nádobách 21 (124);
+- Popínavá dřevina 101 (33).
+
+`kod_drevin`: 1 conifer, 2 deciduous, 3 fruit, 4 mixed; `kod_tvar`: 1 shaped, 2 free.
+
+All are drawn as full trees today; the bushes, planters and climbers explain part of the trees in
+streets and on facades. Tree rows (Stromořadí, lines) are resampled every 9 m, which can put points
+in a road or a building. Fix A2.
+
+**Line ends.** The GTFS path ends at the terminus stop; since today the route runs 60 m further
+along the OSM tracks at both ends (enough for a two-car set). The loop itself is not driven; AI
+trams fade out before the end and have no timetable. Fix C11.
+
+**Already there, without visuals:**
+- late runners: each stop may get 1–3; they add to the waiting count after a delay, with a message;
+- the crowbar: key X, a 9 s action that throws the switch.
+
+## 6. Ground truth from the user (data/truth.json)
 
 | Fact | Source |
 |---|---|
