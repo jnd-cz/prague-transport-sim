@@ -9,6 +9,7 @@ import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
+import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -238,6 +239,26 @@ function start() {
   hud.show(true);
   $('mirror').classList.remove('hidden');
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
+  if (params.has('bot')) streetBot();
+}
+
+// debugging (?bot): drive and walk every street in the surveyed DTM areas, list what looks wrong
+async function streetBot() {
+  game.paused = true;
+  window.freeCam = true;
+  hud.show(false);
+  const css = document.createElement('style');
+  css.textContent = '#pausePanel, #mirror, #action, #cab { display: none !important }';
+  document.head.appendChild(css);
+  const result = await runStreetBot({ world, traffic, ground, route, progress: (m) => game.msg(`street bot: ${m}`, 'info', 3) });
+  window.streetBot = result;
+  console.log('street bot', result.stats);
+  const label = (P) => {
+    const n = route.nearest(P.x, P.y);
+    const st = n ? data.stops.reduce((a, b) => (Math.abs(b.s - n.s) < Math.abs(a.s - n.s) ? b : a)) : null;
+    return `${st ? st.name : '?'} · ${n ? Math.round(n.d) : '?'} m from track · (${P.x.toFixed(0)}, ${P.y.toFixed(0)})`;
+  };
+  window.botPanel = showBotPanel(result, { scene, camera, label });
 }
 
 function showResults() {
@@ -437,7 +458,7 @@ function frame(now) {
     }
   }
   renderer.render(scene, camera);
-  if (game && !chase && mirrorOn) renderMirror();
+  if (game && !chase && mirrorOn && !window.freeCam) renderMirror();
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back

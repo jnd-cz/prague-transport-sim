@@ -406,6 +406,27 @@ side streets vanished at the junction); at the data edge cars roll on while fadi
 give-way (nearest car first, ties by id). Line 22 stops 20–30: vanishing at junctions 40 % → 14 % of
 road ends, of which 24/403 within 40 m of the track.
 
+## 14. Street bot and DTM street fixes (2026-10-22, later)
+
+User report: height discontinuities, cars on sidewalks, rough footways in the DTM areas.
+`src/streetbot.js` (`?bot`) drives/walks the whole traffic network inside the DTM coverage and
+reports places (see README → Dev). Line 22, 69 km of car lanes + 117 km of footways. Samples before → after:
+
+| finding | before | after | cause / fix |
+|---|---|---|---|
+| wheels on sidewalk | 12 012 | 2 338 | cars on the OSM centre line + guessed width → lanes fitted to the DTM kerb lines (`Traffic._fitRoad`, `laneOffset`; a track bed in the middle joins both halves); lanes beside the tram shifted into the carriageway (`_fitLat`). Road objects never carried `tram`, so tram streets used the wrong lane rule |
+| walker above/below drawn | 2 001 / 3 194 | 19 / 2 129 | one height for what is drawn: `ground.surface(x, y)` (DTM area + class lift, else ribbon + 0.12) used by cars (`carPose`) and walkers; height lookup indexes the drawn split triangles; the track flush is baked into the DTM vertices once (`flushDtm`) |
+| car sunk / floating | 4 628 / 1 575 | 1 822 / 299 | same; terrain lowered exactly under every drawn DTM vertex (was only at its 10 m grid points), max 4 m |
+| height jumps / tilt | 918 / 4 826 | 659 / 4 314 | importer: ground-level areas only take heights from ground-level lines, corners > 5 m under the lidar ground are dropped (an underground floor under Náměstí Míru was tagged level 0), lines of all districts are indexed before matching (areas across the Praha 2/10 border had no heights on the far side and were filled with a constant 8 m too low), missing heights interpolated along the ring; height cloud filtered by level, only for road/tram/parking (sidewalks are planar between their exact corners) |
+
+**Still listed** (top of the bot list): the cutting of Průběžná down to Nádraží Zahradní Město (block
+retaining walls along the ramp, user photos 2026-10-22: road and tracks drop between walls, island stop
+with railings under the railway bridge, platform canopies above) — the DTM wall areas are not drawn, so
+car paths cross from the street above to the ramp; junction squares where the fitted lane falls back to
+OSM; footway kerb crossings (walk-kerb: no lowered kerbs at crossings); gaps between DTM areas (classes
+not imported). Tilt counts every roll > 7°, half of them < 10° (camber, kerb-side wheels).
+Heap +220 MB for the triangle index (1.65 → 1.87 GB measured the same way during a run).
+
 ## 12. Open items from the user (2026-10-21, end of session) — not done yet
 
 1. **Two-car set "broken"** — the user saw it on a screenshot that did not reach me. In my views
