@@ -47,6 +47,18 @@ their heights and the city tree register (individual trees and tree rows). It wr
 line). Without it the game falls back to extruded OSM footprints. Underpasses and tunnels on the
 route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track profile.
 
+Optionally, the surveyed streets from the Prague Digital Technical Map (DTM, open part "ZPS", per
+city district, CC BY 4.0) — so far imported for line 22 in Praha 2 and Praha 10 (pilot):
+
+```bash
+python -m pip install --user pyproj shapely
+python tools/dtm.py --line 22 raw/dtm/<..._500089_..._ZPS_OPL.gpkg> raw/dtm/<..._500224_..._ZPS_OPL.gpkg>
+```
+
+Download the district GeoPackages from geoportalpraha.cz → Data a služby → "DTM kraje - ZPS Sada 2"
+(areas, `*_ZPS_OPL.gpkg.zip`) and "ZPS Sada 3" (3D lines, `*_ZPS_KR.gpkg.zip`), unzip both into
+`raw/dtm/` (the tool pairs each OPL folder with its KR folder). It writes `data/lineN.dtm.json`.
+
 Expects `raw/PID_GTFS.zip` (download from https://data.pid.cz/PID_GTFS.zip). Terrain comes from the
 ČÚZK DMR 5G ImageServer (`exportImage`, cached as `raw/terrain.tif`). Writes `data/line22.json`.
 The service date is a constant at the top of the script.

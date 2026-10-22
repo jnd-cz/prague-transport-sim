@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Route } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks } from './terrain.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, DtmSurface } from './terrain.js';
 import { buildWorld, widenTramStreets } from './world.js';
 import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -34,11 +34,17 @@ try {
   }
 } catch (e) { console.warn('no Geoportál data', e); }
 widenTramStreets(data); // street widths include the tram tracks running down the middle
+// optional surveyed streets (Prague DTM, tools/dtm.py) for the districts imported so far
+try {
+  const r = await fetch(`data/line${lineId}.dtm.json`);
+  if (r.ok) { data.dtm = await r.json(); data.attribution += ' ' + data.dtm.attribution; }
+} catch { /* not imported for this line */ }
 const route = new Route(data.path);
 const terrain = new Terrain(data.terrain);
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain));
-const ground = makeGround(route, terrain, profile);
+const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm);
+const ground = makeGround(route, terrain, profile, dtm);
 ground.walls = carveCorridor(terrain, route, profile); // flatten the track bench, retaining walls
 route.ground = ground;
 

@@ -87,10 +87,31 @@ export class Traffic {
         this.index.get(kk).push([kind, k, s]);
       }
     };
+    // OSM roads meet at shared nodes, usually in the middle of a way, not only at its ends:
+    // split every vehicle road at each point it shares with another road, so the network has
+    // real junctions (cars used to vanish where a way simply continued past a junction)
+    const vkey = (p) => `${p[0]},${p[1]}`;
+    const uses = new Map();
+    for (const r of data.roads) {
+      if (r.f || r.p.length < 2) continue;
+      for (const p of new Set(r.p.map(vkey))) uses.set(p, (uses.get(p) || 0) + 1);
+    }
+    const pieces = [];
     for (const r of data.roads) {
       if (r.p.length < 2) continue;
+      if (r.f) { pieces.push(r); continue; }
+      let cur = [r.p[0]];
+      for (let i = 1; i < r.p.length; i++) {
+        cur.push(r.p[i]);
+        if (i < r.p.length - 1 && (uses.get(vkey(r.p[i])) || 0) > 1) { pieces.push({ ...r, p: cur }); cur = [r.p[i]]; }
+      }
+      pieces.push({ ...r, p: cur });
+    }
+    this.jpos = new Map(); // junction key -> [x, y]
+    for (const r of pieces) {
+      if (r.p.length < 2) continue;
       const path = new Path(r.p.length > 2 ? smoothPolyline(r.p, 3, 6).pts : r.p);
-      if (path.length < 15) continue;
+      if (path.length < (r.f ? 15 : 2)) continue;
       if (r.f) {
         // footways running along the tracks are platforms/verges: nobody strolls there
         if (path.length > 30 && nearTrackShare(path) < 0.2) { this.walks.push({ path, off: 0 }); addIndex('w', this.walks.length - 1, path); }
@@ -100,10 +121,15 @@ export class Traffic {
       if (!r.c || r.w < 5 || r.b) continue;
       let near = 0, n = 0;
       for (let s = 0; s < path.length; s += 10) { const p = path.at(s); n++; if (route.distance(p.x, p.y) < 7) near++; }
-      if (near / n > 0.4) { this._addLanes(path, r); continue; }
+      // the street the tram runs in: its lanes get the cars driving alongside us; it stays in the
+      // network so cars from side streets can turn into it instead of vanishing at the junction
+      const along = near / n > 0.4;
+      if (along) this._addLanes(path, r);
       const road = { path, w: r.w, o: r.o || 0, ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
+      this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
       this.roads.push(road);
-      addIndex('r', this.roads.length - 1, path);
+      if (along) continue;
+      if (path.length >= 15) addIndex('r', this.roads.length - 1, path); // spawn only on real streets
       if (r.w >= 6) for (const side of [1, -1]) {
         const off = side * (r.w / 2 + 1.3);
         if (nearTrackShare(path, off) < 0.2) { this.walks.push({ path, off }); addIndex('w', this.walks.length - 1, path); }
@@ -255,11 +281,23 @@ export class Traffic {
         const r = this.roads[k];
         const dir = r.o ? r.o : this.rand() < 0.5 ? 1 : -1;
         const c = road.some((o) => o.active && o.road === r && Math.abs(o.s - s0) < 12) ? null : this._carSlot();
-        if (c) Object.assign(c, { active: true, kind: 'road', road: r, s: s0, dir, v: 7 + this.rand() * 6, vNow: null, laneSel: this.rand() < 0.5 ? -1 : 1 });
+        if (c) Object.assign(c, { active: true, kind: 'road', road: r, s: s0, dir, v: 7 + this.rand() * 6, vNow: null, coast: null, laneSel: this.rand() < 0.5 ? -1 : 1 });
       }
     }
     const tram = this.game.tram;
     const tp = this.route.at(tram.s - 7);
+    // junction occupancy: cars about to enter (within 9 m of the end they drive to) and cars just
+    // through (within 6 m of the start of their new road)
+    const jun = new Map();
+    const at = (k) => { if (!jun.has(k)) jun.set(k, []); return jun.get(k); };
+    road.forEach((c, i) => {
+      if (!c.active) return;
+      const L = c.road.path.length, toEnd = c.dir > 0 ? L - c.s : c.s, fromStart = L - toEnd;
+      c.id = c.id ?? i;
+      c.toEnd = toEnd;
+      if (toEnd < 9) at(c.road.ends[c.dir > 0 ? 1 : 0]).push({ c, approach: true, d: toEnd });
+      if (fromStart < 6) at(c.road.ends[c.dir > 0 ? 0 : 1]).push({ c, approach: false, d: fromStart });
+    });
     for (const c of road) {
       if (c.active) {
         // give way to the tram where the road crosses its track
@@ -273,13 +311,27 @@ export class Traffic {
           const d = (o.s - c.s) * c.dir - 4.4;
           if (d > -2 && (gap === null || d < gap)) { gap = d; vLead = o.vNow ?? 0; }
         }
-        const vt = waiting ? 0 : Math.min(c.v, following(gap, vLead));
+        // give way at junctions: one car crosses at a time, the nearest first (ties by id)
+        let jStop = null;
+        if (c.toEnd < 9) {
+          const here = jun.get(c.road.ends[c.dir > 0 ? 1 : 0]) || [];
+          const blocked = here.some((o) => o.c !== c && o.c.road !== c.road && (o.approach ? (o.d < c.toEnd - 0.05 || (Math.abs(o.d - c.toEnd) <= 0.05 && o.c.id < c.id)) : true));
+          if (blocked && c.toEnd > 2.5) jStop = c.toEnd - 3;
+        }
+        const vt = waiting ? 0 : Math.min(c.v, following(gap, vLead), jStop === null ? Infinity : following(jStop, 0));
         c.vNow = this._approach(c.vNow ?? vt, vt, dt);
         c.s += c.dir * c.vNow * dt;
         if (c.s < 0 || c.s > c.road.path.length) this._nextRoad(c);
       }
       this._fade(c, dt);
       if (c.alpha <= 0) continue;
+      if (!c.active && c.coast) {
+        const k = c.coast;
+        k.d += (c.vNow || 6) * dt;
+        const lane = Math.max(1.5, c.road.w / 4);
+        this._poseCar(c.mesh, k.x + k.hx * k.d + k.hy * lane, k.y + k.hy * k.d - k.hx * lane, k.hx, k.hy);
+        continue;
+      }
       const r = c.road;
       const p = r.path.at(c.s);
       const hx = p.hx * c.dir, hy = p.hy * c.dir;
@@ -304,7 +356,14 @@ export class Traffic {
       const turn = q.hx * dir * hx + q.hy * dir * hy; // 1 = straight on
       return { nr, dir, start: j.end === 0 ? 0 : nr.path.length, score: turn + this.rand() * 0.8 };
     }).filter(Boolean).sort((a, b) => b.score - a.score);
-    if (!opts.length) { c.active = false; c.s = Math.max(0, Math.min(r.path.length, c.s)); return; }
+    if (!opts.length) {
+      // the data ends here (corridor edge): keep rolling straight on while fading out
+      c.active = false;
+      c.s = Math.max(0, Math.min(r.path.length, c.s));
+      c.coast = { x: here.x, y: here.y, hx, hy, d: 0 };
+      return;
+    }
+    c.coast = null;
     const o = opts[0];
     c.road = o.nr; c.dir = o.dir; c.s = o.start;
   }
