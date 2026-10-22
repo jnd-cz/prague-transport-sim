@@ -147,9 +147,6 @@ The last sessions fixed many spots one at a time. To scale to the whole network:
 12. **Performance and scale:** height/class raster per tile instead of the triangle index; offline
     meshes; tiles on demand; then the whole network with AI trams on real lines (HANDOFF §10).
 13. Still waiting on the user: the two-car set screenshot (HANDOFF §12.1).
-14. **Two-car set at the start**: starting a shift at Sídliště Řepy (line 9) puts the second car
-    inside the first (user 2026-10-22). Lint: place the set at every start stop of every line and
-    check both cars' positions along the route and their distance (coupled = 15.2 m, same track).
 
 ## 4. Next steps (in order)
 
