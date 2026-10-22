@@ -399,8 +399,18 @@ export function buildWorld(scene, data, route, ground, weather) {
   const railCg = new ChunkedGeometry(railMat);
   for (const t of data.tracks) {
     addRibbon(bedCg, t.smooth, 2.7, t.z, 0.2, bed);
-    addRibbon(railCg, t.smooth, 0.1, t.z, 0.26, null, 0.72);
-    addRibbon(railCg, t.smooth, 0.1, t.z, 0.26, null, -0.72);
+    // on a canted curve of our route the outer rail is higher, the inner one lower
+    const tilt = t.smooth.map(([x, y], i) => {
+      const n = route.nearest(x, y);
+      if (!n || n.d > 5) return 0;
+      const roll = route.rollAt(n.s);
+      if (!roll) return 0;
+      const L = t.smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
+      const h = route.at(n.s), same = (b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy >= 0 ? 1 : -1;
+      return -0.72 * Math.tan(roll) * same; // left rail (+0.72 along the track) goes up by this (down when leaning left)
+    });
+    addRibbon(railCg, t.smooth, 0.1, t.z.map((z, i) => z + tilt[i]), 0.26, null, 0.72);
+    addRibbon(railCg, t.smooth, 0.1, t.z.map((z, i) => z - tilt[i]), 0.26, null, -0.72);
   }
   bedCg.build(group, 'bed');
   railCg.build(group);

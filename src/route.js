@@ -86,6 +86,9 @@ export function extendAlongTracks(tracks, pts, len = 60) {
   return { before: walk(pts[0], h0[0] / l0, h0[1] / l0).reverse(), after: walk(pts[n - 1], h1[0] / l1, h1[1] / l1) };
 }
 
+// curve speeds: comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m)
+const A_LAT = 0.8, CANT_MAX = 0.1;
+
 export class Route {
   // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
   constructor(pts, ext = null) {
@@ -202,19 +205,51 @@ export class Route {
     return this.radii[Math.max(0, Math.min(this.radii.length - 1, Math.round(s / 5)))];
   }
 
-  // Curvature-based speed limits (km/h) sampled every 5 m, plus extra restrictions.
+  // Posted speed and dedicated track at s from `speedInfo` (data.speed, tools/osm_speeds.py: the
+  // OSM maxspeed of the tram way, as OpenRailwayMap shows it, and "no vehicle road along it").
+  _speedInfo(s) {
+    const I = this.speedInfo;
+    if (!I) return { osm: 0, dedicated: false };
+    const k = Math.max(0, Math.min(I.osm.length - 1, Math.round(s / I.step)));
+    return { osm: I.osm[k], dedicated: !!I.dedicated[k] };
+  }
+
+  // Cant (superelevation, m between the rails) at s: only on dedicated track, which has no road
+  // surface to keep level. The share of the balanced cant v^2 / (g R) * 1.5 m a careful design
+  // uses (60 %), at most 100 mm.
+  cantAt(s) {
+    if (!this._speedInfo(s).dedicated) return 0;
+    const r = this.radiusAt(s);
+    if (r > 1500) return 0;
+    const v = this.curveSpeed(s) / 3.6;
+    return Math.min(CANT_MAX, 0.6 * 1.5 * v * v / (9.81 * r));
+  }
+
+  // Signed lean of a tram into the curve at s (rad, + = towards the left), from the cant.
+  rollAt(s) {
+    const h = this.cantAt(s);
+    if (!h) return 0;
+    const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
+    return Math.sign(a.hx * b.hy - a.hy * b.hx) * Math.atan2(h, 1.5);
+  }
+
+  // Speed a curve allows (km/h): unbalanced lateral acceleration A_LAT (+ what the cant takes on
+  // dedicated track), never above the posted OSM speed or the cap (50 in streets, 60 on dedicated
+  // track; the 65-70 km/h pilot stretches are capped for now).
+  curveSpeed(s) {
+    const { osm, dedicated } = this._speedInfo(s);
+    const a = A_LAT + (dedicated ? CANT_MAX * 9.81 / 1.5 : 0);
+    const v = Math.floor((Math.sqrt(a * this.radiusAt(s)) * 3.6) / 5) * 5;
+    const cap = Math.min(60, osm || (dedicated ? 60 : 50));
+    return Math.max(10, Math.min(cap, v));
+  }
+
+  // Speed limits (km/h) sampled every 5 m: curves (curveSpeed) plus extra restrictions.
   speedLimits(extra = []) {
     const step = 5;
     const n = Math.ceil(this.length / step) + 1;
     const lim = new Float32Array(n).fill(50);
-    for (let i = 0; i < n; i++) {
-      const s = i * step;
-      const r = this.radiusAt(s);
-      let v = 50;
-      if (r < 25) v = 10; else if (r < 45) v = 15; else if (r < 80) v = 20;
-      else if (r < 140) v = 30; else if (r < 250) v = 40;
-      lim[i] = v;
-    }
+    for (let i = 0; i < n; i++) lim[i] = this.curveSpeed(i * step);
     // a curve limit applies to the whole curve: take min over a short window
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) {

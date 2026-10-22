@@ -42,6 +42,7 @@ try {
 } catch { /* not imported for this line */ }
 // the track beyond both termini, so a two-car set standing at the first stop is on rails
 const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
+route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
 const terrain = new Terrain(data.terrain);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
@@ -394,7 +395,7 @@ function previewAt(s) {
 
 function placeTram(s) {
   // each car rests on its two bogies, so it follows curves and pitches with the gradient
-  placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q)]; });
+  placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q), route.rollAt(q)]; });
 }
 
 function updateCamera(dt, t) {
@@ -433,7 +434,8 @@ function updateCamera(dt, t) {
   camera.rotation.order = 'YXZ';
   camera.rotation.y = -yaw + look;
   camera.rotation.x = pitch;
-  camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8);
+  // sway, and the lean into a canted curve
+  camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
 let last = performance.now(), hudTimer = 0;
