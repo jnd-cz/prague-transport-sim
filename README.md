@@ -55,6 +55,15 @@ python -m pip install --user pyproj shapely
 python tools/dtm.py --line 22 raw/dtm/<..._500089_..._ZPS_OPL.gpkg> raw/dtm/<..._500224_..._ZPS_OPL.gpkg>
 ```
 
+Posted speeds and dedicated track (after `build_line.py`; needed for the speed limits and banked
+curves):
+
+```bash
+python -I tools/osm_speeds.py --line 22
+```
+
+Only the vegetation from Geoportál again (tree categories): `python -I tools/geoportal.py --line 22 --trees-only`.
+
 Then, optionally, the **street model** (pilot, smooth streets with fixed level steps, meshed
 offline) for a stretch of the line, by route position in metres:
 
@@ -93,6 +102,16 @@ CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown 
   each stop (GTFS `route_stops`); trams of those lines run ahead of you.
 - Line changes: a run can change its number at a terminus (line 9 continues as 10 at Nákladové
   nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
+- Speeds: each curve allows √(a·R) with 0.8 m/s² unbalanced lateral acceleration, never above the
+  posted speed of the OSM tram way (`tools/osm_speeds.py`, the data OpenRailwayMap shows) and 50 km/h
+  in streets / 60 on dedicated track. Curves on dedicated track are banked (up to 100 mm cant, level
+  at stops and near the termini); the tram and the view lean into them.
+- Junctions: each signal belongs to a junction controller with a fixed cycle (trams straight in both
+  directions, a turning phase, the cross street) and tram priority; oncoming trams obey it.
+- Traffic: cars drive a lane graph (smooth lanes, turning curves through junctions), give way at
+  junctions, queue behind trams on shared track, stop for walkers; trams stop behind cars on their track.
+- Menu options: automatic switches (onboard computer sets every switch by radio instead of the
+  overhead contacts), performance overlay (FPS, frame time, draw calls, triangles, JS heap).
 - Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered,
   six doors); line 23
   runs a single heritage car. "Set" in the menu overrides it. Each car follows the track on its own

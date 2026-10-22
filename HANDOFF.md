@@ -1,6 +1,7 @@
 # Handoff notes — Tatra T3 Prague tram game
 
-State as of 2026-10-21 (sections 13–15: 2026-10-22). Read with README.md (how to run/build/play).
+State as of 2026-10-22, evening (sections 13–16 are from 2026-10-22). Read with README.md (how to
+run/build/play).
 This file records what was found while building it, what is unfinished, and what needs attention.
 **Priorities and next steps: PLAN.md.**
 
@@ -15,6 +16,12 @@ This file records what was found while building it, what is unfinished, and what
   contact switches (worked by the pantograph), one- or two-car T3 sets, Prague 4-lamp tram signals with call (výzva) indicator and distant (P) signals, the Letenská
   single-track (gauntlet) block, traffic (trams ahead/oncoming, cars, pedestrians), obstacles,
   Czech/English UI, scoring, results screen, **watch-the-ride autopilot** (menu or `O`).
+- Since 2026-10-22: curve speeds from lateral acceleration + OSM posted speeds, banked (canted)
+  curves on dedicated track, junction controllers with fixed cycles and tram priority (oncoming AI
+  trams obey them), cars on a lane graph (smooth lanes, junction turns, give-way, following trams on
+  shared track), menu options for automatic switches and a performance overlay (see §16).
+- Testing since 2026-10-22: lints per line with a committed baseline, including a deterministic
+  headless traffic run of the whole line (`tools/lint.js`, `tools/traffic_lint.js`; §2, §16).
 - World: OSM tracks/roads/greenery/water, ČÚZK DMR 5G terrain, and (where imported) IPR Praha LOD2 3D
   buildings, surveyed retaining walls and the city tree register.
 - **Not play-tested by a human beyond the user's own sessions.** Verification so far = headless
@@ -45,7 +52,13 @@ Last baseline (dry, obstacles normal; two-car sets except 23): line 22 ≈ 3550�
 messages except comfort/lateness.
 
 Lints (counts per line vs a committed baseline): `tools/lint.js` + `python tools/lint_report.py`, see
-README → Dev and PLAN.md §2.
+README → Dev and PLAN.md §2. `lint({ traffic: true })` drives the whole line headless with the real
+traffic (asynchronous, poll for the result: line 23 ~1 min, 17 ~2.5 min, 22 with `bot: true` ~4 min,
+9 ~4 min). Run each line on a **freshly loaded page** (deterministic per page load). A traffic run
+that does not finish (`traffic.finished: false`) means a jam: follow `car.seen.car` from the car in
+front of our tram to the car that waits for something else (§16 has the cases found so far).
+After an intended change: `python tools/lint_report.py` (traffic counts have a 15 % + 5 noise band),
+then `--accept` and commit `reports/baseline/`.
 
 Debug hooks on the running page: `window.game`, `window.traffic`, `window.camera`, `window.world`,
 `window.tramModel`; set
@@ -70,7 +83,15 @@ Debug hooks on the running page: `window.game`, `window.traffic`, `window.camera
 | `tools/build_line.py` | Overpass + GTFS + ČÚZK terrain → `data/lineN.json`, `data/lines.json` index |
 | `tools/geoportal.py` | IPR Praha I3S buildings + walls + trees → `data/lineN.geo.json`, `data/lineN.bld.bin` |
 | `tools/autopilot.js` | headless test harness around `src/autopilot.js` |
-| `tools/serve.py` | static server with `Cache-Control: no-store` |
+| `tools/serve.py` | static server with `Cache-Control: no-store`; `POST /report/<name>.json` saves lint reports to `reports/` |
+| `src/streetbot.js` | street bot (`?bot`): samples every lane, junction turn and footway against the drawn surfaces |
+| `tools/lint.js` | per-line lints (consist, signals in platforms, trees in buildings, bridges, invented walls, tram envelope, grade separation, street bot, traffic run) |
+| `tools/traffic_lint.js` | headless traffic run: slide, jump, overlap, walker hit, heating knobs, red runs |
+| `tools/lint_report.py` | compares `reports/lineN.json` with `reports/baseline/`, `--accept` |
+| `tools/osm_speeds.py` | OSM `maxspeed` of the tram ways + dedicated-track flag every 5 m → `speed` in `data/lineN.json` |
+| `tools/dtm.py`, `tools/gpkg.py` | Prague DTM (ZPS) importer → `data/lineN.dtm.json` |
+| `tools/streets.py` | street model (smooth surfaces, offline mesh) for a stretch of a DTM line |
+| `data/truth.json` | ground truth from the user (stop types, rules, places) that lints are scored against |
 
 ## 4. Data sources and findings
 
@@ -180,12 +201,13 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
 1. **LOD2 alignment not measured** — looks right visually, but the Mercator→local conversion has not
    been checked numerically against OSM footprints/tracks. Do a quick offset check.
 2. **Building lift heuristic** may also lift buildings that merely overhang near the track.
-3. **Tree species flag** (`kod_drevin == 1` assumed conifer) is unverified and unused in rendering.
+3. ~~Tree species flag~~ — resolved: the layer's coded values say 1 = conifer; the vegetation kind
+   (tree / bush / planter / climber) is used since 2026-10-22 (§16).
 4. **Retaining walls** are drawn freestanding from the lower ground up to `vyska`; which side is
    retained is not in the data.
 5. **Line 9** route extends ~3 km past the last stop (see §4).
-6. **Street cars** now use lanes beside the track zone, but never drive *on* the tracks (shared
-   lanes) and ignore each other at junctions (they do follow each other within a road/lane).
+6. ~~Street cars~~ — replaced by the lane graph (§16): cars drive on shared track and follow the
+   tram there; junctions have give-way. Remaining traffic issues: see §16 "Open".
 7. **AI trams** carry a line that serves the stop where they appear and fade out after the last stop
    they share with us. They do not actually drive off along their own branch, and they have no
    timetable (random spawn every 40–120 s). See §10 for the proper fix.
@@ -206,10 +228,11 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
 - **Day/night cycle**: headlights and interior lights (passenger comfort) — see §11 item 4.
 - **RÚIAN building attributes** for real panel/church/industrial classes (see §9a).
 - **Orthophoto** ground texture (10 cm IPR ImageServer) — explicitly skipped "for now".
-- **Mosty 3D** bridge models (Most Legií etc.) instead of the synthetic deck.
+- **Mosty 3D** bridge models: used for deck heights and drawn as a plain slab (since 2026-10-21);
+  bridges as models by type (arches, steel arch, viaduct) are PLAN.md C16.
 - Two-car T3 set (double length/mass, stop position), night/dusk with lights, snow/ice, gamepad
   (triggers = pedals), real speed-sign positions, more lines (any Prague line works via the two tools).
-- Better pedestrians (walking animation, boarding into doors), cars on shared tram lanes as obstacles.
+- Better pedestrians (walking animation, boarding into doors). (Cars on shared tram lanes: done.)
 - Hosting: static site; gzip/brotli data; stream tiles (§10).
 - **Whole network** (§10): every OSM tram track, tiles loaded on demand, AI trams on their real
   lines and timetables.
@@ -220,8 +243,12 @@ blinking while locked. Modern red stop post with blue tram pictogram (user photo
   `sys.stdout.reconfigure(encoding="utf-8")`. PIL is only available without `-I`.
 - Bash heredocs with apostrophes or backticks in the body break the tool's shell parsing — write
   patch scripts to a file (scratchpad) and run them instead.
-- The browser caches ES modules aggressively; the dev server moved from port 8737 to **8740** with
-  `no-store` headers. Use `import('/tools/autopilot.js?v=' + Date.now())` in the console.
+- The browser caches ES modules aggressively; the dev server sends `no-store` headers. It runs on
+  **port 8742** now (`.claude/launch.json`): the user runs another session's server on 8740 — do not
+  use or stop that one. Use `import('/tools/autopilot.js?v=' + Date.now())` in the console.
+- A browser script call times out at 45 s: start long runs without awaiting them (store the result in
+  `window.__…`) and poll in further calls. While `window.headless` is set the page's frame loop only
+  draws (the test steps the game itself); the mirror pauses too.
 - When the browser pane is hidden, `requestAnimationFrame` is throttled: screenshots can show stale
   frames and real-time waits barely advance the game. Prefer stepping the sim in JS.
 - The frame loop schedules the next frame first, so one exception doesn't freeze the game; still
@@ -509,3 +536,64 @@ then the rest of line 22 (Praha 10) and a 1 m height/class raster per tile inste
    the nearest span (±16 m), never on facades or platforms (`Game._mount`).
 7. Model licence: done — "Tatra T3" by Jakub Vaja (conflig), Sketchfab, CC BY-NC 4.0.
 8. Deploy: `dist/tatra-t3-prague.zip` (static files only; see README "Deploy").
+
+## 16. Lint-driven work (2026-10-22, afternoon and evening)
+
+All measured with the lints; numbers are line 9 / 17 / 22 / 23 unless noted; details in PLAN.md §3/§4.
+
+**Fixed**
+- **Two-car set at a terminus** (Sídliště Řepy): the route started at the stop, so the second car was
+  clamped into the first. Routes now run 60 m past both ends along the OSM tracks
+  (`extendAlongTracks`, negative s before the start). Probably also the old "dual-car set broken".
+- **Invented walls**: the corridor carve built retaining walls where the 10 m lidar grid rises beside
+  the track — 1 272 m of them on line 22's surveyed sidewalks. No synthetic wall where the DTM covers.
+- **Vegetation**: the tree register has categories (`kod_vp`: 71 tree, 51 bush, 21 plants in
+  containers, 101 climbers; no sizes). Bushes are drawn as shrubs, planters as pots, climbers dropped,
+  tree-row samples off carriageways and buildings, crowns shrink to clear facades: trunks/crowns in
+  buildings 612/215/390/73 → 0. `geoportal.py --trees-only` re-imports just the vegetation.
+- **Signals and signs**: never along a platform (moved to the platform head or hung from a span or
+  bracket arm); hung ones sit outside the tram's swept envelope (`tramClearance`: body + 19.5/R curve
+  overhang + margin): line 9 115/239 inside → 0.
+- **Speeds**: the step table became √(a·R) with a = 0.8 m/s², capped by the OSM `maxspeed` of the
+  tram way (what OpenRailwayMap shows; on 29–97 % of each route) and 50 km/h in streets / 60 on
+  dedicated track (65–70 km/h OSM pilots capped for now; user GPS recordings to come).
+- **Banked curves**: on dedicated track (no road along it) up to 100 mm cant, ramping linearly
+  (100 mm per 30 m) and smoothed; level at platforms (±25 m) and within 150 m of the route ends. The
+  outer rail is raised, trams and the cab lean in (max 0.13°/m).
+- **Autopilot**: heating with hysteresis and ≥ 20 s between changes (34 088 → 9 knob changes in 31 min
+  on line 23); smoothed cab pitch (no jump at a dead stop); parked cars drive off forwards.
+- **Cab**: mirror inside the window frame, its camera on a realistic arm (0.3 m outside the body);
+  menu options: automatic switches (onboard computer), performance overlay.
+- **Bridges** (Čechův most): poles stood on the river bed (they sampled the ground without the deck
+  flag); the deck pick took a second slab 3.7 m above the deck at the north end, the track dipped
+  through the drawn deck — now the track ramps at most 6 % from a span's ends, and no part of a bridge
+  model is drawn inside the tram's swept space.
+- **Grade separation**: a junction well inside a bridge span (> 8 m from its ends) belongs to the road
+  below: no signal, jaywalkers or "wait for the tram" there (line 17: three junctions under the
+  Modřany estakáda).
+- **Lane graph** (`Traffic._buildLanes`): one smooth lane per road and direction at the kerb-fitted
+  position, Hermite connectors through junctions, cars follow their path's tangent, slow for curves,
+  scan 40 m ahead for trams, walkers and cars, give way at junctions. Slides 6 839/5 243/8 671/3 513 →
+  ~300–800 (mostly walkers now), car jumps → 0, street-bot sidewalk samples on line 22 4 645 → 2 008.
+- **Junction controllers** (`Game._runController`): fixed cycle per signal (straight trams both
+  ways, turning phase, cross street), tram priority, dilemma-zone hold; oncoming AI trams stop at the
+  junction on red.
+- **Deadlocks found by traffic runs that did not finish** (each a generic rule now): a car driving
+  along the track waited for the tram behind it (the crossing wait is only for cars crossing the
+  track); cars entered full junctions (don't block the box); a car in the junction waited for one
+  that waited for it; two cars in each other's lane mouth; a car whose own path is blocked kept its
+  junction priority; a car beside the front of our tram waited for it (obstacles behind a car are
+  ignored); walkers turned back and forth in a lane, or spawned past the end of their path and stood
+  in a lane for good; oncoming trams drove into each other at a red light; tram priority jumped to our
+  turning phase and starved the opposite direction, which then blocked the Letenská single track.
+- **Determinism**: tram electrics used the wall clock (the current decides the contacts); now
+  simulation time. The traffic run is seeded, first trip, autumn, dry.
+
+**Open**
+- Traffic counts rose with the junction cycles (queues): overlaps 180/91/166/39, walkers inside
+  vehicles (episodes) 222/157/112/61, slides 811/449/678/319 (baseline 2026-10-22, `c0acbb8`). Part is
+  real, part is that earlier runs jammed early. Next: average several seeds, then look at the causes.
+- Oncoming trams through red, counted fairly (could still stop while red): 36/7/14/4.
+- Lanes of different roads that touch (line 22: ~45 overlaps); Vienna-type stops need the stop
+  classifier (PLAN C13); a car standing on the track blocks a tram until it moves (no overtaking).
+- The street model pilot covers only Karlovo nám. – Jana Masaryka on line 22.
