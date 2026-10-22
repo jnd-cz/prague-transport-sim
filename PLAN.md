@@ -89,44 +89,37 @@ Order: first the small fixes that are visibly wrong and each measurable by a lin
 (tier A), then the traffic core (tier B), then the network and new content (tier C), then later
 ideas (tier D). Every item names its measurement.
 
-**Tier A — small, visible, measurable (next, in this order)**
+**Tier A — done 2026-10-22** (each measured; numbers are line 9 / 17 / 22 / 23 where not noted)
 
-1. **No invented walls on surveyed streets.** The corridor carve adds synthetic retaining walls
-   where the 10 m lidar grid rises beside the track; on line 22, 1 272 m of its 2 700 m stand on DTM
-   sidewalks or road (§5). Where the DTM covers, the survey decides: no synthetic walls (surveyed
-   Geoportál walls and DTM level steps only). Lint: synthetic wall on a surveyed street = 0.
-2. **Vegetation by category.** The register is not only trees (§5):
-   - bushes (keř 51, skupina keřů 41, živý plot 131) become low shrubs;
-   - plants in containers (21) become planters;
-   - climbers (101) are dropped;
-   - tree-row samples inside buildings or carriageway are dropped;
-   - then trunks and crowns are kept clear of LOD2 buildings.
-
-   Lints exist: trunk under a roof (612/215/390/73), crown into a building.
-3. **Signals and signs clear of the tram.**
-   - No signal head along a platform (lint: 5/7/1/0 now).
-   - Hung signals and signs move to the right, outside the space the tram sweeps (including overhang in
-     curves).
-   - New lint: any mounted object (pole, sign, signal, rosette, tree crown) inside the tram's
-     kinematic envelope.
-4. **Curve speeds from lateral acceleration** (§5 table).
-   - A continuous limit v = √(a·R) replaces the step table, with a ≈ 0.8 m/s² unbalanced in streets.
-   - On dedicated corridors (track not inside any carriageway: Kotlářka – Sídliště Řepy, Dvorce –
-     Sídliště Modřany), a standard cant (superelevation) adds up to +0.65 m/s², drawn as a tilted bed
-     and tram.
-   - Checked by autopilot run times and comfort.
-5. **Driving feel fixes.**
-   - Autopilot: a minimum time between actions and hysteresis on heating (no flicking).
-   - Camera jump when coming to a dead stop.
-   - A parked car on the tracks drives off forwards; the traffic run with obstacles on counts slides.
-   - Lint/run: autopilot actions per minute.
-6. **Cab view and diagnostics.**
-   - Rear window visible and not covered by the cab frame.
-   - Look-back pose near the right edge, clear of the red stop posts.
-   - Optional FPS / frame-time / memory overlay (menu option; `performance.memory` where the browser has
-     it).
-7. **Menu option: automatic switch setting** (onboard computer / radio control) for manual driving.
-   The default stays manual contacts (the driver skill the user wants kept).
+1. ~~No invented walls on surveyed streets~~ — the corridor carve gets the DTM and adds no wall
+   where the survey describes the ground at the wall's foot (line 22: 1 272 m of walls on streets
+   -> 0; synthetic walls 2 700 m -> 1 419 m, all outside the survey). Lint `inventedWalls`.
+2. ~~Vegetation by category~~ — `geoportal.py --trees-only` writes the register kind (tree, conifer,
+   bush/hedge, planter, tree-row sample; climbers dropped). Bushes are low shrubs, planters pots;
+   trees inside a building are dropped, crowns shrink until they clear the facades (also woodland
+   fill), row samples on a carriageway are dropped. Trunks under a roof 612/215/390/73 -> 0, crowns
+   into a building 219/176/292/41 -> 0. `roofIndex` shared by the game and the lint.
+3. ~~Signals and signs clear of the tram~~ — a signal along a platform moves to the platform head
+   (past the tram's stop point) or hangs from a span or bracket arm when the crossing follows too
+   closely; hung signals and signs sit right of the tram's envelope (`tramClearance`: body + curve
+   overhang 19.5/R + margin). Signals along platforms 5/7/1/0 -> 0; new lint `tramEnvelope`
+   (signals and signs inside the swept space): line 9 115/239 -> 0.
+4. ~~Curve speeds, OpenRailwayMap speeds, cant~~ — `tools/osm_speeds.py` maps the OSM tram ways'
+   `maxspeed` (what OpenRailwayMap shows; on 29–97 % of the route) and a dedicated-track flag onto
+   each route every 5 m. Limit = min(√(a·R) with a = 0.8 m/s² (+0.65 with cant), posted speed,
+   cap 50 street / 60 dedicated; 65–70 km/h OSM pilots capped for now). Cant up to 100 mm on
+   dedicated curves: outer rail raised, trams and the cab lean into the curve (line 17: 5.6 km
+   canted, 6.3 km at 60 km/h). User GPS recordings (curves, crossings) to come — then calibrate.
+5. ~~Driving feel~~ — autopilot heating with hysteresis and ≥ 20 s between knob changes (traffic
+   run check `heatingKnobs`: line 23 34 088 -> 9 changes in 31 min); cab pitch follows a smoothed
+   acceleration (no jump at a dead stop); a parked car drives off forwards and steers out (all 6
+   on line 23 with obstacles "many", no collision).
+6. ~~Cab view and diagnostics~~ — the mirror sits inside the window frame (the right pillar hid
+   42 of 150 px) and its camera on an arm 0.3 m outside the body (it was 0.7 m out, by the red
+   stop posts), showing the tram's side; menu option performance overlay (FPS, average/worst frame
+   time, draw calls, triangles, JS heap).
+7. ~~Automatic switches option~~ — every facing switch becomes an onboard-computer (radio) switch
+   set to the route; the default stays manual contacts.
 
 **Tier B — traffic core (largest; most traffic findings point here)**
 
@@ -136,6 +129,14 @@ ideas (tier D). Every item names its measurement.
    - Cars merge onto the tracks past islands and wait behind a tram at Vienna-type stops.
    - One following model for every vehicle; walkers yield at crossings.
    - Lints: overlaps per minute, walkers inside vehicles.
+9b. **Grade separation: no crossings where the track is on a bridge.** Where our track runs on a deck
+    (Mosty 3D / OSM bridge, e.g. the Modřany estakáda), roads crossing beneath must not create
+    at-grade crossings, signals, cross traffic or give-way; they pass under at their own height
+    (and the same where a road is in a tunnel under the track). Generic rule from the deck spans
+    (`profile.realDecks`) and OSM `bridge`/`layer`/`tunnel` tags. Lint: crossings on a deck = 0.
+9c. **Lint noise for traffic checks.** The traffic counts move ±10–20 % when trajectories change
+    (line 9 walkers inside vehicles 921 -> 1 708 after tier A, which did not touch walkers): compare
+    rates with a noise band, or average a few seeds, so the comparer only flags real regressions.
 10. **Junction controllers with real cycles.**
     - Compatible movements share a phase, so trams going straight from both directions get GO together.
     - Lint: conflicting GOs = 0.
@@ -170,6 +171,14 @@ ideas (tier D). Every item names its measurement.
       like a car).
     - Curve squeal as metallic scraping by radius and speed (now a mosquito-like whine).
 16. Poles at curve centres (loops); bridges as models by type (stone arches, steel arch, viaduct).
+16b. **Buildings.** Today five classes guessed from shape (old town house, panel block, church,
+    industrial, glass) with a texture each. Next: real building types from RÚIAN (use, floors),
+    facades with whole window bays per floor, street-facing facades in more detail than courtyard
+    sides (facade within ~3 m of a DTM sidewalk), roof shapes and colours.
+16c. **Street-level imagery** (investigate): Mapillary (CC BY-SA, open API) and Panoramax are free
+    to use; Mapy.cz panoramas and Google Street View are not. Mapillary also publishes detected
+    objects with positions (traffic signs, poles, traffic lights): test truth for our signal, sign
+    and pole placement, possibly facade colours.
 
 **Tier D — later**
 
