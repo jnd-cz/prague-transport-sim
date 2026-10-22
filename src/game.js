@@ -1,6 +1,6 @@
 // Gameplay: timetable, stops & passengers, doors, signals, switches, obstacles, scoring.
 import * as THREE from 'three';
-import { ADHESION, PANTO_FROM_FRONT } from './tram.js';
+import { ADHESION, PANTO_FROM_FRONT, tramClearance } from './tram.js';
 import { Route } from './route.js';
 import { t } from './i18n.js';
 import {
@@ -201,12 +201,17 @@ export class Game {
   _initSignals() {
     this.signals = this.data.signals.map((d, i) => {
       d = { ...d };
-      // a signal just before a stop sign would block the platform: move it past the tram front
+      // a signal never stands along a platform: it moves to the platform head, just past where the
+      // tram front stops; if the crossing follows too closely for that, it hangs from the wire
       for (const st of this.stops) {
-        if (d.s > st.target - 25 && d.s < st.target + 2 && st.target + 2 < d.cross - 2) d.s = st.target + 2;
+        const a = (st.p0 ?? st.target - 30) - 1, b = st.target + 2;
+        if (d.s > a && d.s < b) {
+          if (b < d.cross - 2) d.s = b;
+          else d.hang = true;
+        }
       }
       const mesh = makeTramSignal();
-      this._mount(mesh, d.s);
+      this._mount(mesh, d.s, { hang: d.hang });
       this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction
       const h0 = this.route.heading(d.cross - 5, 5), h1 = this.route.heading(d.cross + 30, 8);
@@ -512,22 +517,29 @@ export class Game {
   // is close to the track (within 6.5 m), otherwise hung from the nearest span wire over the
   // track, where the driver sees it best. Never on a platform or against a facade; speed and
   // gradient signs that would stand on a platform move to just before it.
-  _mount(obj, s, { movable = false } = {}) {
+  _mount(obj, s, { movable = false, hang = false } = {}) {
     const route = this.route, C = route.catenary || [], ud = obj.userData;
     const platformAt = (x) => this.stops.find((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
     let onPlatform = platformAt(s);
     if (onPlatform && movable) { s = (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
     const hidePole = () => { if (ud.pole) ud.pole.visible = false; };
     const kerb = route.kerbAt ? route.kerbAt(s, -1) : null;
-    if (kerb && !kerb.wall && kerb.lat <= 6.5 && !onPlatform) {
+    if (kerb && !kerb.wall && kerb.lat <= 6.5 && !onPlatform && !hang) {
       place(obj, route, s, -kerb.lat, 0, true);
       return;
     }
-    const span = C.filter((c) => c.L && c.R && Math.abs(c.s - s) <= 16).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0];
+    // a signal that must hang (its place is on a platform) takes a span up to 30 m away
+    const reach = hang ? 30 : 16;
+    const span = C.filter((c) => c.L && c.R && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0];
     if (span && ud.boardTop !== undefined) {
-      place(obj, route, span.s, -1.15, 0, true);
-      obj.position.y = this.profile.height(span.s) + 5.3 - ud.boardTop;
+      // right of the tram: its half width, the overhang of the car ends in a curve, a margin and
+      // the board's own half width (it used to hang 1.15 m out, over the tram's roof edge)
       hidePole();
+      const box = new THREE.Box3().setFromObject(obj);
+      const half = Math.max(0.2, (box.max.x - box.min.x) / 2);
+      place(obj, route, span.s, -(tramClearance(route, span.s) + half), 0, true);
+      ud.hung = true;
+      obj.position.y = this.profile.height(span.s) + 5.3 - ud.boardTop;
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
       rod.position.y = ud.boardTop + 0.62;
       obj.add(rod);

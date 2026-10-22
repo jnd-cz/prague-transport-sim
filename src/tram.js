@@ -163,3 +163,9 @@ export class Tram {
     this.current += (targetI * slipI - this.current) * Math.min(1, dt * 6);
   }
 }
+
+// Half width of the space a T3 sweeps at s, measured from the track centre: 1.25 m body, the ends
+// of a 14 m car with bogies 6.36 m apart swing out by (7² − 3.18²) / 2R in a curve, 0.25 m margin.
+export function tramClearance(route, s) {
+  return 1.25 + 19.5 / Math.max(15, route.radiusAt(s)) + 0.25;
+}

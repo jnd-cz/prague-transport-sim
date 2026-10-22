@@ -9,6 +9,8 @@
 //   python tools/lint_report.py            (--accept makes the current reports the baseline)
 import { makeT3, placeConsist } from '../src/models.js';
 import { roofIndex } from '../src/world.js';
+import { tramClearance } from '../src/tram.js';
+import * as THREE from 'three';
 import { runStreetBot } from '../src/streetbot.js';
 import { trafficRun } from './traffic_lint.js';
 
@@ -53,7 +55,7 @@ function signalsInPlatforms(g) {
     const p = sg.mesh.position, n = g.route.nearest(p.x, -p.z);
     if (!n) continue;
     for (const st of g.stops) {
-      if (st.p0 == null || n.s <= st.p0 || n.s >= st.p1) continue;
+      if (st.p0 == null || n.s <= st.p0 || n.s >= st.p1 || sg.mesh.userData.hung) continue; // hung over the track is fine
       bad.push({ stop: st.name, s: Math.round(n.s), x: p.x, y: -p.z, mag: Math.min(n.s - st.p0, st.p1 - n.s), info: `${(st.p1 - n.s).toFixed(1)} m before the platform end` });
     }
   }
@@ -94,6 +96,32 @@ function bridgesWithoutDeck(g) {
   return check('bridge-has-deck', g.data.bridges.length, bad);
 }
 
+// Signals and signs inside the space the tram sweeps: up to the roof (3.6 m above the rails) the
+// body width plus the overhang in curves (tramClearance), above it the pantograph (±1 m, to 5.8 m).
+function mountedInEnvelope(g) {
+  const objs = [...g.signals.map((x) => x.mesh)];
+  g.objects.traverse((o) => { if (o.userData.boardTop !== undefined && !objs.includes(o)) objs.push(o); });
+  const bad = [], box = new THREE.Box3(), c = new THREE.Vector3();
+  for (const o of objs) {
+    box.setFromObject(o);
+    if (box.isEmpty()) continue;
+    box.getCenter(c);
+    const n = g.route.nearest(c.x, -c.z);
+    if (!n || n.d > 8) continue;
+    const z0 = g.route.ground.profile.height(n.s) + 0.26; // rail top
+    let worst = 0;
+    // the box corners in plan, as lateral offsets from the track centre
+    for (const [x, y] of [[box.min.x, box.min.z], [box.max.x, box.min.z], [box.min.x, box.max.z], [box.max.x, box.max.z], [c.x, c.z]]) {
+      const q = g.route.at(n.s), lat = Math.abs(q.hx * (-y - q.y) - q.hy * (x - q.x));
+      const body = tramClearance(g.route, n.s) - 0.25;
+      if (box.min.y - z0 < 3.6) worst = Math.max(worst, body - lat);
+      else if (box.min.y - z0 < 5.8) worst = Math.max(worst, 1.0 - lat);
+    }
+    if (worst > 0.05) bad.push({ s: Math.round(n.s), x: c.x, y: -c.z, mag: worst, info: `${o.userData.hung ? 'hung ' : ''}${o.userData.boardTop !== undefined && !g.signals.some((x) => x.mesh === o) ? 'sign' : 'signal'} ${worst.toFixed(2)} m inside the tram's envelope` });
+  }
+  return check('mounted-clear-of-tram', objs.length, bad);
+}
+
 // Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
 function syntheticWallsOnStreets(g) {
   const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
@@ -121,6 +149,7 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     treeCrowns: trees.crown,
     bridges: bridgesWithoutDeck(g),
     inventedWalls: syntheticWallsOnStreets(g),
+    tramEnvelope: mountedInEnvelope(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });
