@@ -221,6 +221,9 @@ function start() {
     startStop: +selStop.value,
     assist: $('optAssist').checked,
     deadman: $('optDeadman').checked,
+    // onboard computer sets every switch by radio (no overhead contacts to work)
+    autoSwitch: $('optAutoSwitch').checked,
+    autoIrc: $('optAutoSwitch').checked,
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
     detailed: useDetailed(),
@@ -467,6 +470,7 @@ function frame(now) {
     }
   }
   renderer.render(scene, camera);
+  if (perfOn) updatePerf(now);
   if (game && !chase && mirrorOn && !window.freeCam) renderMirror();
 }
 
@@ -481,11 +485,11 @@ const mirrorScene = new THREE.Scene(), mirrorView = new THREE.OrthographicCamera
   mirrorScene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: mirrorRT.texture })));
 }
 function renderMirror() {
-  const s = tram.s, p = route.offset(s - 0.6, -1.95), h = route.heading(s - 6, 6), z = profile.height(s);
+  const s = tram.s, p = route.offset(s - 0.6, -1.55), h = route.heading(s - 6, 6), z = profile.height(s);
   mirrorCam.position.set(p.x, z + 2.35, -p.y);
   // looking back, turned a little outwards so the side of the tram fills the inner edge
   mirrorCam.rotation.order = 'YXZ';
-  mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.22, 0);
+  mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.1, 0);
   const vis = tramModel.visible;
   tramModel.visible = true;
   renderer.setRenderTarget(mirrorRT);
@@ -506,3 +510,20 @@ function renderMirror() {
 $('loading').classList.add('hidden');
 $('menu').classList.remove('hidden');
 requestAnimationFrame(frame);
+
+// ------------------------------------------------------------------ performance overlay
+// Menu option: frames per second, frame time (average and worst over the last second), what the
+// renderer drew and the JS heap where the browser reports it (Chromium: performance.memory).
+let perfOn = false, perfFrames = 0, perfSince = performance.now(), perfLast = performance.now(), perfWorst = 0;
+$('optPerf').addEventListener('change', () => { perfOn = $('optPerf').checked; $('perf').classList.toggle('hidden', !perfOn); });
+function updatePerf(now) {
+  perfFrames++;
+  perfWorst = Math.max(perfWorst, now - perfLast);
+  perfLast = now;
+  if (now - perfSince < 1000) return;
+  const fps = (perfFrames * 1000) / (now - perfSince), info = renderer.info.render, mem = performance.memory;
+  $('perf').textContent = `${fps.toFixed(0)} FPS   ${(1000 / fps).toFixed(1)} ms avg   ${perfWorst.toFixed(0)} ms worst\n`
+    + `${info.calls} draw calls   ${(info.triangles / 1e6).toFixed(2)} M triangles`
+    + (mem ? `\nJS heap ${(mem.usedJSHeapSize / 1e6).toFixed(0)} / ${(mem.jsHeapSizeLimit / 1e6).toFixed(0)} MB` : '');
+  perfFrames = 0; perfSince = now; perfWorst = 0;
+}
