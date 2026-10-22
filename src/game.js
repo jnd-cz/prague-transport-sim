@@ -199,7 +199,9 @@ export class Game {
   }
 
   _initSignals() {
-    this.signals = this.data.signals.map((d, i) => {
+    // grade separation: where our track is on a bridge, the junctions and their traffic lights
+    // belong to the road underneath (e.g. the Modřany estakáda), not to the tram
+    this.signals = this.data.signals.filter((d) => !this.profile.overBridge(d.cross)).map((d, i) => {
       d = { ...d };
       // a signal never stands along a platform: it moves to the platform head, just past where the
       // tram front stops; if the crossing follows too closely for that, it hangs from the wire
@@ -574,6 +576,7 @@ export class Game {
     // jaywalkers at some unsignalised pedestrian crossings
     for (const s of this.data.crossings) {
       if (s < this.stops[this.opts.startStop].target + 50 || this.rand() > p * 0.15) continue;
+      if (this.profile.overBridge(s)) continue; // the crossing is on the road under the bridge
       const mesh = makePerson(Math.floor(this.rand() * 8));
       mesh.visible = false;
       this.objects.add(mesh);

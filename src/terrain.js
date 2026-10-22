@@ -206,6 +206,11 @@ export class Profile {
   onBridge(s) {
     return this.bridges.some(([a, b]) => s > a - 4 && s < b + 4);
   }
+  // well inside a bridge span (more than 8 m from its ends): what lies here in 2D is on the road
+  // underneath (a junction at a bridge end is a real one for the tram)
+  overBridge(s) {
+    return this.bridges.some(([a, b]) => s > a + 8 && s < b - 8);
+  }
 }
 
 // Carve the track corridor into the terrain grid. Within BENCH m of the track the ground is
