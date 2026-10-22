@@ -179,6 +179,24 @@ const { autopilot } = await import('/tools/autopilot.js');
 autopilot(0, 99, { obstacles: 'normal', weather: 'rain' });
 ```
 
+**Lints** (PLAN.md §2): each check counts one kind of problem over the whole line. With the dev server
+(`tools/serve.py`, which saves the reports) and a shift started on the line:
+
+```js
+const { lint } = await import('/tools/lint.js?v=' + Date.now());
+await lint();               // consist at every stop, signals in platforms, trees in buildings, bridges
+await lint({ bot: true });  // + the street bot where DTM streets exist (about a minute)
+```
+
+Reports go to `reports/lineN.json`. Compare with the committed baseline (exit code 1 if a count rose):
+
+```bash
+python tools/lint_report.py
+```
+
+After an intended improvement, run it with `--accept` to make the current reports the new baseline.
+Facts from the user that checks are scored against live in `data/truth.json`.
+
 **Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
 bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and
 walker heights with the triangles actually drawn and the DTM area class under the wheels, and lists

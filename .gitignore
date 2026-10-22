@@ -11,3 +11,6 @@ Thumbs.db
 
 # deploy package (tools/make_dist.py)
 dist/
+
+# lint reports (tools/lint.js); the baseline in reports/baseline/ is committed
+reports/*.json

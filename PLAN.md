@@ -147,11 +147,27 @@ The last sessions fixed many spots one at a time. To scale to the whole network:
 12. **Performance and scale:** height/class raster per tile instead of the triangle index; offline
     meshes; tiles on demand; then the whole network with AI trams on real lines (HANDOFF §10).
 13. Still waiting on the user: the two-car set screenshot (HANDOFF §12.1).
+14. ~~**Two-car set at the start**~~ — **done 2026-10-22**: the route ended at the terminus stop,
+    so the second car's position was clamped onto the first (Sídliště Řepy s = 0, Bílá Hora 3.4 m;
+    very likely also the "dual-car set broken" report, HANDOFF §12.1). Every route now continues
+    60 m past both ends along the OSM tracks (`extendAlongTracks` in route.js, negative s before the
+    start). Lint `consist` places a two-car set at every stop: 0 failures on all lines.
 
 ## 4. Next steps (in order)
 
-1. `data/truth.json` with the stop types above; lint runner with the checks that already exist
-   (street bot, signals in platforms, trees in buildings) and a baseline for all four lines.
+1. ~~`data/truth.json`, lint runner, baselines~~ — **done 2026-10-22**: `tools/lint.js` (consist at
+   every stop, signals in platforms, tree trunks/crowns in drawn buildings, bridges without a deck,
+   street bot on DTM lines), reports saved by `tools/serve.py`, `tools/lint_report.py` compares with
+   `reports/baseline/`. Baseline (2026-10-22):
+
+   | check | 9 | 17 | 22 | 23 |
+   |---|---|---|---|---|
+   | consist broken at a stop | 0/60 | 0/37 | 0/39 | 0/18 |
+   | signal head along a platform | 5/55 | 7/44 | 1/45 | 0/12 |
+   | tree trunk under a roof | 612 | 215 | 390 | 73 |
+   | tree crown into a building | 219 | 176 | 292 | 41 |
+   | bridge span without a deck | 0/2 | 0/8 | 0/1 | 0/1 |
+   | street bot places (DTM only) | – | – | 3510 | – |
 2. Headless real-traffic run + slide/overlap lints.
 3. Signal mounting rule (small, closes a P1 item, proves the lint loop).
 4. Trees vs LOD2 footprints (small).

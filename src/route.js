@@ -34,22 +34,81 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
   return { pts: out, s: ss };
 }
 
+// The track beyond the ends of a route: the GTFS path starts and ends at the terminus stops, but a
+// two-car set standing there reaches 30 m further back. Walk the OSM track chains from each end
+// (continuing across chain joints in the most aligned direction) for `len` metres; where no track
+// continues, go straight on. Returns {before, after} point lists (before runs towards the start).
+export function extendAlongTracks(tracks, pts, len = 60) {
+  const walk = (p, dx, dy) => {
+    const out = [];
+    let cur = [p[0], p[1]], hx = dx, hy = dy, left = len, guard = 0;
+    while (left > 0 && guard++ < 20) {
+      // the chain segment through cur that heads our way
+      let best = null;
+      for (const t of tracks) {
+        const q = t.p;
+        for (let i = 0; i < q.length - 1; i++) {
+          const ax = q[i][0], ay = q[i][1], bx = q[i + 1][0], by = q[i + 1][1];
+          const sx = bx - ax, sy = by - ay, l2 = sx * sx + sy * sy;
+          if (!l2) continue;
+          const u = Math.max(0, Math.min(1, ((cur[0] - ax) * sx + (cur[1] - ay) * sy) / l2));
+          const d = Math.hypot(ax + sx * u - cur[0], ay + sy * u - cur[1]);
+          if (d > 1.5) continue;
+          const l = Math.sqrt(l2), dot = (sx * hx + sy * hy) / l;
+          if (Math.abs(dot) < 0.6) continue;
+          // forward along the chain = increasing index if the segment points our way
+          const score = d - Math.abs(dot);
+          if (!best || score < best.score) best = { score, q, i, u, fwd: dot > 0 };
+        }
+      }
+      if (!best) break;
+      const { q, fwd } = best;
+      let i = best.i;
+      const seq = [];
+      if (fwd) for (let k = i + 1; k < q.length; k++) seq.push(q[k]);
+      else for (let k = i; k >= 0; k--) seq.push(q[k]);
+      let moved = false;
+      for (const n of seq) {
+        const l = Math.hypot(n[0] - cur[0], n[1] - cur[1]);
+        if (l < 0.05) continue;
+        if (l >= left) { cur = [cur[0] + (n[0] - cur[0]) * left / l, cur[1] + (n[1] - cur[1]) * left / l]; out.push(cur); left = 0; moved = true; break; }
+        hx = (n[0] - cur[0]) / l; hy = (n[1] - cur[1]) / l;
+        cur = [n[0], n[1]]; out.push(cur); left -= l; moved = true;
+      }
+      if (!moved) break;
+    }
+    if (left > 0) out.push([cur[0] + hx * left, cur[1] + hy * left]); // no track: straight on
+    return out;
+  };
+  const n = pts.length;
+  const h0 = [pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]], l0 = Math.hypot(...h0) || 1;
+  const h1 = [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1]], l1 = Math.hypot(...h1) || 1;
+  return { before: walk(pts[0], h0[0] / l0, h0[1] / l0).reverse(), after: walk(pts[n - 1], h1[0] / l1, h1[1] / l1) };
+}
+
 export class Route {
-  constructor(pts) {
+  // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
+  constructor(pts, ext = null) {
     // smooth curves but keep the original arc-length parameter (stops, switches and
     // signals were measured along the unsmoothed OSM path)
-    const sm = smoothPolyline(pts, 1, 6);
+    const before = ext?.before || [], after = ext?.after || [];
+    const all = [...before, ...pts, ...after];
+    let s0 = 0; // arc length of the run-in = where the original path starts
+    for (let i = 1; i <= before.length; i++) s0 += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
+    let L = 0;
+    for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    const sm = smoothPolyline(all, 1, 6);
     this.pts = sm.pts;
-    this.s = sm.s;
-    this.length = this.s[this.s.length - 1];
+    this.s = Array.from(sm.s, (v) => v - s0);
+    this.length = L; // the route itself ends here; the run-out continues past it
     this.coarse = this.pts.filter((_, i) => i % 8 === 0); // for the minimap
     this._buildSamples();
   }
 
   _index(s) {
     let lo = 0, hi = this.s.length - 1;
-    if (s <= 0) return 0;
-    if (s >= this.length) return hi - 1;
+    if (s <= this.s[0]) return 0;
+    if (s >= this.s[hi]) return hi - 1;
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1;
       if (this.s[mid] <= s) lo = mid; else hi = mid;

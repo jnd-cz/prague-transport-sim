@@ -1,0 +1,224 @@
+{
+ "line": "9",
+ "date": "2026-10-22T10:04:13.990Z",
+ "secs": 0.1,
+ "checks": {
+  "consist": {
+   "rule": "consist-coupled",
+   "count": 0,
+   "of": 60,
+   "places": []
+  },
+  "signalsInPlatforms": {
+   "rule": "signal-not-in-platform",
+   "count": 5,
+   "of": 55,
+   "places": [
+    {
+     "stop": "U Zvonu",
+     "s": 21768,
+     "x": -204.41509228738292,
+     "y": -208.57497948678756,
+     "mag": 22.599999999998545,
+     "info": "22.6 m before the platform end"
+    },
+    {
+     "stop": "Kavalírka",
+     "s": 5388,
+     "x": -1424.1976036720307,
+     "y": -388.80134118952515,
+     "mag": 11.100000000000364,
+     "info": "11.1 m before the platform end"
+    },
+    {
+     "stop": "Švandovo divadlo",
+     "s": 8536,
+     "x": 974.1848733097747,
+     "y": 549.5953805973847,
+     "mag": 5.600000000000364,
+     "info": "5.6 m before the platform end"
+    },
+    {
+     "stop": "Kavalírka",
+     "s": 22992,
+     "x": -1404.156635619624,
+     "y": -379.94630830852236,
+     "mag": 5.200000000000728,
+     "info": "5.2 m before the platform end"
+    },
+    {
+     "stop": "Poštovka",
+     "s": 24244,
+     "x": -2638.3200470993584,
+     "y": -560.0940159645882,
+     "mag": 4.599999999998545,
+     "info": "4.6 m before the platform end"
+    }
+   ]
+  },
+  "treeTrunks": {
+   "rule": "tree-trunk-outside-buildings",
+   "count": 612,
+   "of": 6829,
+   "places": [
+    {
+     "x": 4696.5,
+     "y": 225.10000610351562,
+     "mag": 3.848420333862305,
+     "info": "trunk under a roof at 296.4 m"
+    },
+    {
+     "x": 4703.39990234375,
+     "y": 313.6000061035156,
+     "mag": 3.8467844486236573,
+     "info": "trunk under a roof at 295.4 m"
+    },
+    {
+     "x": 4915.60009765625,
+     "y": 246.39999389648438,
+     "mag": 3.845877242088318,
+     "info": "trunk under a roof at 298.1 m"
+    },
+    {
+     "x": 3688.300048828125,
+     "y": 164.39999389648438,
+     "mag": 3.8454885721206664,
+     "info": "trunk under a roof at 280.1 m"
+    },
+    {
+     "x": 1703,
+     "y": -17.700000762939453,
+     "mag": 3.843659281730652,
+     "info": "trunk under a roof at 219.7 m"
+    },
+    {
+     "x": 2600.699951171875,
+     "y": 237.10000610351562,
+     "mag": 3.839602732658386,
+     "info": "trunk under a roof at 246.7 m"
+    },
+    {
+     "x": 930.7999877929688,
+     "y": -153.10000610351562,
+     "mag": 3.836844539642334,
+     "info": "trunk under a roof at 217.9 m"
+    },
+    {
+     "x": 5900.39990234375,
+     "y": 602,
+     "mag": 3.8347734928131105,
+     "info": "trunk under a roof at 270.5 m"
+    },
+    {
+     "x": 3740.800048828125,
+     "y": 212.8000030517578,
+     "mag": 3.8318039178848267,
+     "info": "trunk under a roof at 281.7 m"
+    },
+    {
+     "x": 4880.60009765625,
+     "y": 232,
+     "mag": 3.8312922000885012,
+     "info": "trunk under a roof at 279.8 m"
+    },
+    {
+     "x": 960.9000244140625,
+     "y": -57.29999923706055,
+     "mag": 3.825642538070679,
+     "info": "trunk under a roof at 214.1 m"
+    },
+    {
+     "x": 2488.10009765625,
+     "y": 240,
+     "mag": 3.8190611839294433,
+     "info": "trunk under a roof at 242.2 m"
+    }
+   ]
+  },
+  "treeCrowns": {
+   "rule": "tree-crown-clear-of-buildings",
+   "count": 219,
+   "of": 6829,
+   "places": [
+    {
+     "x": 4555.7001953125,
+     "y": 223,
+     "mag": 3.8583060026168825,
+     "info": "crown 3.9 m into a building (radius 3.9 m)"
+    },
+    {
+     "x": 3380.800048828125,
+     "y": 14.5,
+     "mag": 3.8560350418090823,
+     "info": "crown 3.9 m into a building (radius 3.9 m)"
+    },
+    {
+     "x": 5528.60009765625,
+     "y": 499.8999938964844,
+     "mag": 3.8553494453430175,
+     "info": "crown 3.9 m into a building (radius 3.9 m)"
+    },
+    {
+     "x": 4482.2998046875,
+     "y": 197.6999969482422,
+     "mag": 3.8437981367111207,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 4563.39990234375,
+     "y": 132.39999389648438,
+     "mag": 3.843436431884766,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 5537.7998046875,
+     "y": 500.6000061035156,
+     "mag": 3.8363653659820556,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 5547,
+     "y": 501.29998779296875,
+     "mag": 3.8312897205352785,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 5508.7001953125,
+     "y": 1171.199951171875,
+     "mag": 3.8299628496170044,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 3807.39990234375,
+     "y": 110.19999694824219,
+     "mag": 3.8275421857833862,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 3101.10009765625,
+     "y": 114,
+     "mag": 3.8264741182327273,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 5661.60009765625,
+     "y": 475.1000061035156,
+     "mag": 3.82594690322876,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 3648.89990234375,
+     "y": 100.69999694824219,
+     "mag": 3.821568322181702,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    }
+   ]
+  },
+  "bridges": {
+   "rule": "bridge-has-deck",
+   "count": 0,
+   "of": 2,
+   "places": []
+  }
+ }
+}

@@ -1,0 +1,240 @@
+{
+ "line": "17",
+ "date": "2026-10-22T10:04:47.922Z",
+ "secs": 0,
+ "checks": {
+  "consist": {
+   "rule": "consist-coupled",
+   "count": 0,
+   "of": 37,
+   "places": []
+  },
+  "signalsInPlatforms": {
+   "rule": "signal-not-in-platform",
+   "count": 7,
+   "of": 44,
+   "places": [
+    {
+     "stop": "Kublov",
+     "s": 10236,
+     "x": -666.9618682324824,
+     "y": -1248.6595393571959,
+     "mag": 27.100000000000364,
+     "info": "27.1 m before the platform end"
+    },
+    {
+     "stop": "Nádraží Modřany",
+     "s": 4396,
+     "x": -1714.7405358847977,
+     "y": -6760.728874838232,
+     "mag": 24.600000000000364,
+     "info": "24.6 m before the platform end"
+    },
+    {
+     "stop": "Palackého náměstí",
+     "s": 12344,
+     "x": -945.5035015230982,
+     "y": 751.6792300553074,
+     "mag": 21.100000000000364,
+     "info": "21.1 m before the platform end"
+    },
+    {
+     "stop": "Kobylisy",
+     "s": 20732,
+     "x": 2093.3131143692726,
+     "y": 6551.756768433794,
+     "mag": 12.200000000000728,
+     "info": "12.2 m before the platform end"
+    },
+    {
+     "stop": "Čechův most",
+     "s": 14900,
+     "x": -711.953253271889,
+     "y": 3150.8387865204595,
+     "mag": 11.700000000000728,
+     "info": "11.7 m before the platform end"
+    },
+    {
+     "stop": "Trojská",
+     "s": 18572,
+     "x": 415.975285387166,
+     "y": 5692.565470597622,
+     "mag": 11.700000000000728,
+     "info": "11.7 m before the platform end"
+    },
+    {
+     "stop": "Přístaviště",
+     "s": 8524,
+     "x": -1283.7109165331492,
+     "y": -2844.168880612078,
+     "mag": 11.100000000000364,
+     "info": "62.8 m before the platform end"
+    }
+   ]
+  },
+  "treeTrunks": {
+   "rule": "tree-trunk-outside-buildings",
+   "count": 215,
+   "of": 8528,
+   "places": [
+    {
+     "x": -930.5,
+     "y": 867.5,
+     "mag": 3.8550971508026124,
+     "info": "trunk under a roof at 219.6 m"
+    },
+    {
+     "x": 2018.9000244140625,
+     "y": 7147.5,
+     "mag": 3.8363653659820556,
+     "info": "trunk under a roof at 307.6 m"
+    },
+    {
+     "x": 2026.0999755859375,
+     "y": 7145.2998046875,
+     "mag": 3.8312897205352785,
+     "info": "trunk under a roof at 307.5 m"
+    },
+    {
+     "x": 2110.800048828125,
+     "y": 6933.10009765625,
+     "mag": 3.8141206741333007,
+     "info": "trunk under a roof at 296.2 m"
+    },
+    {
+     "x": 1707.0999755859375,
+     "y": -6492.89990234375,
+     "mag": 3.8130051851272584,
+     "info": "trunk under a roof at 339.1 m"
+    },
+    {
+     "x": 2037.199951171875,
+     "y": 6904.60009765625,
+     "mag": 3.784340000152588,
+     "info": "trunk under a roof at 301.4 m"
+    },
+    {
+     "x": -1103.9000244140625,
+     "y": -6904.10009765625,
+     "mag": 3.7832245111465457,
+     "info": "trunk under a roof at 217.8 m"
+    },
+    {
+     "x": -358,
+     "y": -6605.2001953125,
+     "mag": 3.7725475549697878,
+     "info": "trunk under a roof at 234.9 m"
+    },
+    {
+     "x": 1976.300048828125,
+     "y": 6940.2998046875,
+     "mag": 3.7704070806503296,
+     "info": "trunk under a roof at 298.1 m"
+    },
+    {
+     "x": 2021.699951171875,
+     "y": 7146.39990234375,
+     "mag": 3.769985866546631,
+     "info": "trunk under a roof at 307.5 m"
+    },
+    {
+     "x": 455.6000061035156,
+     "y": 3703.199951171875,
+     "mag": 3.7622521400451663,
+     "info": "trunk under a roof at 224.8 m"
+    },
+    {
+     "x": 2080.199951171875,
+     "y": 7068,
+     "mag": 3.7614450454711914,
+     "info": "trunk under a roof at 302.8 m"
+    }
+   ]
+  },
+  "treeCrowns": {
+   "rule": "tree-crown-clear-of-buildings",
+   "count": 176,
+   "of": 8528,
+   "places": [
+    {
+     "x": -1355.4296875,
+     "y": -3299.529296875,
+     "mag": 3.96982638835907,
+     "info": "crown 4.0 m into a building (radius 4.0 m)"
+    },
+    {
+     "x": -1639.9918212890625,
+     "y": -4390.404296875,
+     "mag": 3.8937911987304688,
+     "info": "crown 3.9 m into a building (radius 3.9 m)"
+    },
+    {
+     "x": -860,
+     "y": -6951.39990234375,
+     "mag": 3.8435080289840697,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -976.5999755859375,
+     "y": -7048.10009765625,
+     "mag": 3.825435495376587,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -550,
+     "y": -470.5,
+     "mag": 3.8005866527557375,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 1822.5,
+     "y": 7295.39990234375,
+     "mag": 3.790156412124634,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -1240.4000244140625,
+     "y": -2899.5,
+     "mag": 3.789489412307739,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -1086.699951171875,
+     "y": -6908.10009765625,
+     "mag": 3.788341999053955,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": 1995,
+     "y": 6866.2998046875,
+     "mag": 3.786987543106079,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -1308.0999755859375,
+     "y": -6969,
+     "mag": 3.780363726615906,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -861.4000244140625,
+     "y": -6947.7001953125,
+     "mag": 3.7671105146408084,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -1796.300048828125,
+     "y": -5542.39990234375,
+     "mag": 3.7638917446136477,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    }
+   ]
+  },
+  "bridges": {
+   "rule": "bridge-has-deck",
+   "count": 0,
+   "of": 8,
+   "places": []
+  }
+ }
+}
