@@ -153,6 +153,16 @@ export class Profile {
         let cnt = 0;
         for (let k = Math.ceil(s0 / step); k <= s1 / step; k++) if (decks.has(k)) cnt++;
         if (cnt * step > (s1 - s0) * 0.3) this.realDecks.push([s0, s1]);
+        // from each end of the span the track climbs or falls at most 6 % on the deck: the street
+        // levels beside the bridge win over a model surface that would need a step (the north end
+        // of Čechův most: 196.8 m on the model, 193.8 m on the street 20 m further)
+        const i0 = Math.max(0, Math.floor(s0 / step) - 5), i1 = Math.min(n - 1, Math.ceil(s1 / step) + 5);
+        const za = z[i0], zb = z[i1];
+        for (let i = i0; i <= i1; i++) {
+          const da = (i - i0) * step, db = (i1 - i) * step;
+          const hi = Math.min(za + 0.06 * da, zb + 0.06 * db), lo = Math.max(za - 0.06 * da, zb - 0.06 * db);
+          z[i] = Math.max(lo, Math.min(hi, z[i]));
+        }
       }
     }
     // highest allowed track level: under each structure, spreading out as 6 % ramps
