@@ -123,8 +123,29 @@ ideas (tier D). Every item names its measurement.
 
 **Tier B — traffic core (largest; most traffic findings point here)**
 
-8. **Lane graph from the surveyed carriageway** with turning curves at junctions. It replaces the OSM
-   centre line + fitted offsets + lanes beside the tram, and ends the slide-vs-sidewalk trade-off.
+8. ~~**Lane graph from the surveyed carriageway**~~ — **done 2026-10-22** (`Traffic._buildLanes`):
+   one smooth lane per road and direction (two on one-way roads from 7 m) at the kerb-fitted lane
+   position, trimmed back from both junctions; connector curves (cubic Hermite with the lanes'
+   tangents) through junctions; cars follow their path's own tangent (no sideways motion by
+   construction), slow for curves and turns (2.5 m/s² sideways, braking 3 m/s² ahead, across the
+   junction), keep their distance across the junction, and wait at a junction while a car is on, or
+   nearer to, a connector crossing theirs (connectors closer than 2.4 m or merging = conflict). The
+   separate "cars beside the tram" are gone: the tram street is an ordinary part of the network with
+   spawns near the tram. The 5 % drift limit is gone. The street bot drives every lane and every
+   junction connector.
+
+   | (line 9 / 17 / 22 / 23) | before | lane graph |
+   |---|---|---|
+   | slide | 6 839 / 5 243 / 8 671 / 3 513 | 368 / 156 / 311 / 200 |
+   | jump | 641 / 294 / 788 / 270 | 88 / 90 / 73 / 11 |
+   | overlap episodes | 734 / 329 / 539 / 271 | 551 / 293 / 492 / 133 |
+   | walker inside a vehicle | 1 708 / 723 / 657 / 239 | 2 180 / 1 151 / 737 / 417 |
+   | street bot: wheels on sidewalk (22) | 4 645 | 2 008 (incl. junction turns) |
+
+   Left for B9: cars on lanes that lie on the tracks (narrow tram streets — shared lanes in reality)
+   overlap trams (line 22: car/our tram 110, car/oncoming 102): they must follow the tram ahead and
+   not enter the track zone in front of one; walkers inside vehicles rose with more cars near the
+   footways (walkers must yield at crossings, cars stop for walkers on a crossing).
 9. **Cars at stops and in queues.**
    - Cars merge onto the tracks past islands and wait behind a tram at Vienna-type stops.
    - One following model for every vehicle; walkers yield at crossings.

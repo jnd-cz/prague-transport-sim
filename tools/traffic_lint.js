@@ -43,8 +43,8 @@ function snapshot(g, tr) {
   for (const [i, c] of tr.cars.entries()) {
     if (c.alpha < 0.5) continue;
     const p = c.mesh.position, [hx, hy] = head(c.mesh.rotation.y);
-    out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, hx, hy, l: CAR[0] / 2, w: CAR[1] / 2, src: c.kind === 'street' ? 'lane' : 'road', alpha: c.alpha,
-      state: c.kind === 'street' ? 'lane' : c.coast && !c.active ? 'coast' : 'road', road: c.road, dir: c.dir });
+    out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, hx, hy, l: CAR[0] / 2, w: CAR[1] / 2, src: c.kind, alpha: c.alpha,
+      state: c.coast && !c.active ? 'coast' : c.conn ? 'junction' : 'lane', road: c.road, dir: c.dir });
   }
   for (const [list, kind] of [[tr.ahead, 'tram ahead'], [tr.oncoming, 'tram oncoming']]) {
     for (const t of list) {
@@ -132,7 +132,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
         const dx = o.x - q.x, dy = o.y - q.y, d = Math.hypot(dx, dy);
         const isCar = !o.walk, vmax = isCar ? 20 : 3;
         // what changed between the samples (for cars: the state and the road) tells the cause
-        const why = isCar ? (q.state !== o.state ? `${q.state}→${o.state}` : o.state === 'lane' ? 'lane beside the tram' : q.road !== o.road ? 'next road' : q.dir !== o.dir ? 'turned' : 'same road') : 'walk';
+        const why = isCar ? (q.state !== o.state ? `${q.state}→${o.state}` : q.road !== o.road ? 'next road' : o.state === 'junction' ? 'junction' : 'same lane') : 'walk';
         if (d > vmax * step + 1) { jumps.push({ kind: isCar ? `car ${why}` : 'walker', x: o.x, y: o.y, mag: d, s: Math.round(g.tram.s), info: `${d.toFixed(1)} m in ${step} s (${why})` }); continue; }
         const hx = (o.hx + q.hx) / 2, hy = (o.hy + q.hy) / 2, hl = Math.hypot(hx, hy) || 1;
         const side = Math.abs((-dx * hy + dy * hx) / hl) / step; // m/s across the heading

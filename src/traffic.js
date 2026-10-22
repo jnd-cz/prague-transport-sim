@@ -1,6 +1,7 @@
-// Ambient life: cars in the street lanes alongside the tram, cars on the surrounding road
-// network, pedestrians on footways and sidewalks, and other trams (ahead of us on our track,
-// and oncoming on the opposite track). Everything fades in and out instead of popping.
+// Ambient life: cars on the road network (a lane graph: one smooth lane per road and direction,
+// connector curves through the junctions), pedestrians on footways and sidewalks, and other trams
+// (ahead of us on our track, and oncoming on the opposite track). Everything fades in and out
+// instead of popping.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
 import { makeCar, makeCrowd, makeT3, placeConsist } from './models.js';
@@ -25,6 +26,22 @@ class Path {
     const a = this.p[lo], b = this.p[hi], seg = this.s[hi] - this.s[lo] || 1e-9, t = (s - this.s[lo]) / seg;
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
     return { x: a[0] + dx * t, y: a[1] + dy * t, hx: dx / l, hy: dy / l };
+  }
+  // speed (m/s) a car can take at each point: 2.5 m/s2 sideways on the curve through its
+  // neighbours, at least 2.5 m/s (computed once)
+  curveSpeeds() {
+    if (this.vmax) return this.vmax;
+    const P = this.p, n = P.length;
+    this.vmax = new Float32Array(n).fill(30);
+    for (let i = 1; i < n - 1; i++) {
+      const a = P[i - 1], b = P[i], c = P[i + 1];
+      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+      const cross = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+      if (cross < 1e-6) continue;
+      const R = (ab * bc * ca) / (2 * cross); // circumradius
+      this.vmax[i] = Math.max(2.5, Math.sqrt(2.5 * R));
+    }
+    return this.vmax;
   }
 }
 
@@ -85,7 +102,6 @@ export class Traffic {
 
     this.roads = [];
     this.walks = [];
-    this.lanes = new Map(); // street lanes beside the tram: 10 m cell -> [{lat, w, dirs}]
     this.cell = 60;
     this.index = new Map();
     const addIndex = (kind, k, path) => {
@@ -130,27 +146,21 @@ export class Traffic {
       if (!r.c || r.w < 5 || r.b) continue;
       let near = 0, n = 0;
       for (let s = 0; s < path.length; s += 10) { const p = path.at(s); n++; if (route.distance(p.x, p.y) < 7) near++; }
-      // the street the tram runs in: its lanes get the cars driving alongside us; it stays in the
-      // network so cars from side streets can turn into it instead of vanishing at the junction
+      // the street the tram runs in: an ordinary part of the network (its cars drive alongside us),
+      // its sidewalks get no extra walkers (the tram street's own footways cover them)
       const along = near / n > 0.4;
-      if (along) this._addLanes(path, r);
       const road = { path, w: r.w, o: r.o || 0, tram: r.tram, ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
       this._fitRoad(road);
       this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
       this.roads.push(road);
-      if (along) continue;
       if (path.length >= 15) addIndex('r', this.roads.length - 1, path); // spawn only on real streets
+      if (along) continue;
       if (r.w >= 6) for (const side of [1, -1]) {
         const off = side * (r.w / 2 + 1.3);
         if (nearTrackShare(path, off) < 0.2) { this.walks.push({ path, off }); addIndex('w', this.walks.length - 1, path); }
       }
     }
-    // road network: which roads meet at each end point
-    this.junctions = new Map();
-    this.roads.forEach((r, k) => r.ends.forEach((e, end) => {
-      if (!this.junctions.has(e)) this.junctions.set(e, []);
-      this.junctions.get(e).push({ k, end });
-    }));
+    this._buildLanes();
 
     this.cars = [];
     this.walkers = [];
@@ -220,17 +230,8 @@ export class Traffic {
       return best;
     });
     const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -2; d <= 2; d++) if (arr[i + d] !== undefined) { s += arr[i + d]; m++; } return s / m; });
-    // a lane drifts sideways at most 5 % of the distance driven (0.2 m per 4 m sample), both ways,
-    // so cars change position gently instead of sliding. A trade-off until lanes are proper curves
-    // (PLAN step 5); line 22, same-road slides / street-bot sidewalk samples: no limit 16245 / 2338,
-    // 7.5 % 7720 / 3736, 5 % 1350 / 4645
-    const limit = (arr) => {
-      for (let i = 1; i < arr.length; i++) arr[i] = Math.max(arr[i - 1] - 0.2, Math.min(arr[i - 1] + 0.2, arr[i]));
-      for (let i = arr.length - 2; i >= 0; i--) arr[i] = Math.max(arr[i + 1] - 0.2, Math.min(arr[i + 1] + 0.2, arr[i]));
-      return arr;
-    };
-    road.fitLo = limit(smooth(fill(lo, -road.w / 2)));
-    road.fitHi = limit(smooth(fill(hi, road.w / 2)));
+    road.fitLo = smooth(fill(lo, -road.w / 2));
+    road.fitHi = smooth(fill(hi, road.w / 2));
   }
   // lateral position (+ = right of the driving direction) of a car on a road at s. Right-hand
   // traffic: 1.8 m in from the right kerb, but never closer than 1.2 m to the middle of a two-way
@@ -248,58 +249,97 @@ export class Traffic {
     return Math.max(hi - 1.8, mid + 1.2);
   }
 
-  // A lane beside the tram inside the surveyed carriageway: the car body (±0.9 m) must lie on
-  // road or parking; else the nearest such position within 3 m that keeps clear of the tracks.
-  // null where the DTM shows no carriageway nearby (sidewalk, island, platform).
-  _fitLat(s, lat, clear) {
-    const dtm = this.ground.dtm;
-    if (!dtm) return lat;
-    const o0 = this.route.offset(s, lat);
-    if (!dtm.covered(o0.x, o0.y)) return lat;
-    const fits = (lt) => [-0.9, 0, 0.9].every((e) => {
-      const o = this.route.offset(s, lt + e);
-      return CARRIAGEWAY.has(dtm.classAt(o.x, o.y));
+  // ------------------------------------------------------------------ lane graph
+  // Every road gets one lane per driving direction (two on one-way roads from 7 m wide): a smooth
+  // curve of its own at the lane position (laneOffset: fitted to the surveyed kerbs where they
+  // exist), trimmed back from both junctions. A car follows its lane's own tangent, so it never
+  // moves sideways; through a junction a connector curve leads from the end of one lane to the
+  // start of the next.
+  _buildLanes() {
+    this.laneList = [];
+    this.lanesFrom = new Map(); // junction key -> lanes starting there
+    this.lanesTo = new Map();   // junction key -> lanes ending there
+    this.connectors = new Map();
+    this.conflicts = new Map();
+    const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
+    this.roads.forEach((r, k) => {
+      r.lanes = [];
+      const L = r.path.length, trim = Math.min(5, L * 0.2);
+      const dirs = r.o ? [r.o] : [1, -1];
+      const sels = r.o && r.w >= 7 ? [-1, 1] : [1];
+      for (const dir of dirs) for (const sel of sels) {
+        const pts = [], n = Math.max(2, Math.ceil((L - 2 * trim) / 2));
+        for (let i = 0; i <= n; i++) {
+          const u = trim + ((L - 2 * trim) * i) / n, sr = dir > 0 ? u : L - u;
+          const p = r.path.at(sr), hx = p.hx * dir, hy = p.hy * dir, off = this.laneOffset(r, sr, dir, sel);
+          pts.push([p.x + hy * off, p.y - hx * off]);
+        }
+        const path = new Path(pts.length > 3 ? smoothPolyline(pts, 1, 6).pts : pts);
+        const lane = { id: this.laneList.length, road: r, k, dir, sel, trim, path, from: r.ends[dir > 0 ? 0 : 1], to: r.ends[dir > 0 ? 1 : 0] };
+        this.laneList.push(lane);
+        r.lanes.push(lane);
+        push(this.lanesFrom, lane.from, lane);
+        push(this.lanesTo, lane.to, lane);
+      }
     });
-    for (let d = 0; d <= 3; d += 0.5) {
-      for (const lt of d ? [lat - d, lat + d] : [lat]) if (clear(lt) && fits(lt)) return lt;
-    }
-    return null;
   }
 
-  // Lanes of a street that runs along the tram: lateral position relative to our track and
-  // which directions may use them (right-hand traffic, one-way streets respected).
-  _addLanes(path, r) {
-    for (let s = 0; s < path.length; s += 5) {
-      const p = path.at(s);
-      const n = this.route.nearest(p.x, p.y);
-      if (!n || n.d > 12) continue;
-      const q = this.route.at(n.s);
-      const lat = q.hx * (p.y - q.y) - q.hy * (p.x - q.x); // + = left of our direction
-      const rel = p.hx * q.hx + p.hy * q.hy > 0 ? 1 : -1;   // road drawn along / against us
-      const lanes = [];
-      // streets with the tracks down the middle: one car lane on each side of the track zone
-      const side = r.tram ? r.w / 2 - 1.7 : r.w / 4;
-      if (r.o) {
-        const dir = r.o * rel;
-        const offs = r.w >= 7 ? [-side, side] : [0];
-        for (const o of offs) lanes.push({ lat: lat + o, dir });
-      } else {
-        lanes.push({ lat: lat - side, dir: 1 }, { lat: lat + side, dir: -1 });
-      }
-      const clear = (lt) => Math.abs(lt) > TRACK_CLEAR && Math.abs(lt - 3.2) > TRACK_CLEAR;
-      const ok = lanes.map((l) => ({ ...l, lat: this._fitLat(n.s, l.lat, clear) })).filter((l) => l.lat !== null && clear(l.lat));
-      if (!ok.length) continue;
-      const c = Math.floor(n.s / 10);
-      if (!this.lanes.has(c)) this.lanes.set(c, []);
-      this.lanes.get(c).push(...ok);
-    }
+  // lanes a car on lane `a` may take at the junction it drives to: another road, no U-turn, not
+  // against a one-way street (those have no lane in that direction)
+  nextLanes(a) {
+    const here = a.path.at(a.path.length);
+    return (this.lanesFrom.get(a.to) || []).filter((b) => {
+      if (b.road === a.road) return false;
+      const q = b.path.at(0);
+      return q.hx * here.hx + q.hy * here.hy > -0.6;
+    });
   }
-  laneAt(s, dir, lat = null) {
-    const arr = this.lanes.get(Math.floor(s / 10));
-    if (!arr) return null;
-    let best = null;
-    for (const l of arr) if (l.dir === dir && (best === null || (lat !== null && Math.abs(l.lat - lat) < Math.abs(best.lat - lat)))) best = l;
+
+  _chooseNext(a) {
+    const here = a.path.at(a.path.length);
+    let best = null, bestScore = -Infinity;
+    for (const b of this.nextLanes(a)) {
+      const q = b.path.at(0);
+      const score = q.hx * here.hx + q.hy * here.hy + this.rand() * 0.8 + (b.sel === a.sel ? 0.1 : 0); // 1 = straight on
+      if (score > bestScore) { best = b; bestScore = score; }
+    }
     return best;
+  }
+
+  // the connector from the end of lane a to the start of lane b (cubic Hermite with the lanes'
+  // tangents), or null where they already touch
+  connector(a, b) {
+    const key = `${a.id}>${b.id}`;
+    if (this.connectors.has(key)) return this.connectors.get(key);
+    const p0 = a.path.at(a.path.length), p1 = b.path.at(0);
+    const d = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+    let c = null;
+    if (d >= 1) {
+      const pts = [], n = Math.max(3, Math.ceil(d / 1.2));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n, t2 = t * t, t3 = t2 * t;
+        const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+        pts.push([h00 * p0.x + h10 * d * p0.hx + h01 * p1.x + h11 * d * p1.hx, h00 * p0.y + h10 * d * p0.hy + h01 * p1.y + h11 * d * p1.hy]);
+      }
+      c = { id: key, from: a, to: b, at: a.to, path: new Path(pts) };
+    }
+    this.connectors.set(key, c);
+    return c;
+  }
+
+  // two connectors through one junction that cross or come closer than a car is wide (cars from
+  // the same lane follow each other instead)
+  _conflict(c1, c2) {
+    if (!c1 || !c2 || c1 === c2 || c1.from === c2.from) return false;
+    const key = c1.id < c2.id ? `${c1.id}|${c2.id}` : `${c2.id}|${c1.id}`;
+    if (this.conflicts.has(key)) return this.conflicts.get(key);
+    let hit = c1.to === c2.to; // merging into the same lane
+    for (const a of c1.path.p) {
+      if (hit) break;
+      for (const b of c2.path.p) if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 2.4) { hit = true; break; }
+    }
+    this.conflicts.set(key, hit);
+    return hit;
   }
 
   dispose() { this.scene.remove(this.group); }
@@ -307,7 +347,6 @@ export class Traffic {
   update(dt, camera) {
     const tram = this.game.tram;
     const cx = camera.position.x, cy = -camera.position.z;
-    this._updateStreetCars(dt, tram);
     this._updateRoadCars(dt, cx, cy);
     this._updateWalkers(dt, cx, cy);
     this._updateAhead(dt, tram);
@@ -332,33 +371,6 @@ export class Traffic {
     setOpacity(c.mesh, c.alpha);
   }
 
-  // Cars in the lanes beside the tram.
-  _updateStreetCars(dt, tram) {
-    const street = this.cars.filter((c) => c.kind === 'street' && (c.active || c.alpha > 0));
-    if (street.filter((c) => c.active).length < 8 && this.rand() < dt * 1.2) {
-      const dir = this.rand() < 0.5 ? 1 : -1;
-      const s = tram.s + (dir > 0 ? -60 + this.rand() * 320 : 150 + this.rand() * 280);
-      const lane = this.laneAt(s, dir);
-      if (lane && !street.some((c) => Math.abs(c.s - s) < 15 && c.dir === dir)) {
-        const c = this._carSlot();
-        if (c) Object.assign(c, { active: true, kind: 'street', s, dir, lat: lane.lat, v: 8 + this.rand() * 5, vNow: null });
-      }
-    }
-    for (const c of street) {
-      const front = street.filter((o) => o !== c && o.active && o.dir === c.dir && Math.abs(o.lat - c.lat) < 1.5 && (o.s - c.s) * c.dir > 0)
-        .sort((a, b) => Math.abs(a.s - c.s) - Math.abs(b.s - c.s))[0];
-      const vt = Math.min(c.v, front ? following(Math.abs(front.s - c.s) - 4.4, front.vNow ?? 0) : Infinity);
-      c.vNow = this._approach(c.vNow ?? vt, vt, dt);
-      c.s += c.dir * c.vNow * dt;
-      const lane = this.laneAt(c.s, c.dir, c.lat);
-      if (lane) c.lat += (lane.lat - c.lat) * Math.min(1, dt * 2);
-      if (!lane || Math.abs(c.s - tram.s) > 480) c.active = false; // street ends: fade out
-      this._fade(c, dt);
-      const o = this.route.offset(c.s, c.lat);
-      this._poseCar(c.mesh, o.x, o.y, o.hx * c.dir, o.hy * c.dir);
-    }
-  }
-
   // speed change with car-like acceleration (2 m/s2) and braking (up to 5 m/s2)
   _approach(v, vt, dt) {
     return vt > v ? Math.min(vt, v + 2 * dt) : Math.max(vt, v - 5 * dt);
@@ -373,101 +385,118 @@ export class Traffic {
     mesh.rotation.z = p.roll;
   }
 
-  // Cars on the surrounding road network: they continue across junctions.
+  // Cars on the lane graph: along a lane, through a junction on a connector, on along the next
+  // lane. They keep their distance to the car ahead (also across the junction), give way at
+  // junctions to cars on crossing connectors (the nearest first) and to the tram where the road
+  // crosses its track, and roll on while fading out where the data ends.
   _updateRoadCars(dt, cx, cy) {
-    const road = this.cars.filter((c) => c.kind === 'road' && (c.active || c.alpha > 0));
-    if (road.filter((c) => c.active).length < 16 && this.rand() < dt * 3) {
-      const near = this._ringIndex(cx, cy, 'r', 120, 360);
+    const cars = this.cars.filter((c) => c.kind === 'road' && (c.active || c.alpha > 0));
+    if (cars.filter((c) => c.active).length < 22 && this.rand() < dt * 4) {
+      const near = this._ringIndex(cx, cy, 'r', 60, 360);
       if (near) {
         const [, k, s0] = near;
         const r = this.roads[k];
-        const dir = r.o ? r.o : this.rand() < 0.5 ? 1 : -1;
-        const c = road.some((o) => o.active && o.road === r && Math.abs(o.s - s0) < 12) ? null : this._carSlot();
-        if (c) Object.assign(c, { active: true, kind: 'road', road: r, s: s0, dir, v: 7 + this.rand() * 6, vNow: null, coast: null, laneSel: this.rand() < 0.5 ? -1 : 1 });
+        const lane = r.lanes[Math.floor(this.rand() * r.lanes.length)];
+        if (lane) {
+          const s = Math.max(0, Math.min(lane.path.length, (lane.dir > 0 ? s0 : r.path.length - s0) - lane.trim));
+          const c = cars.some((o) => o.active && o.path === lane.path && Math.abs(o.s - s) < 12) ? null : this._carSlot();
+          if (c) Object.assign(c, { active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null });
+        }
       }
     }
     const tram = this.game.tram;
     const tp = this.route.at(tram.s - 7);
-    // junction occupancy: cars about to enter (within 9 m of the end they drive to) and cars just
-    // through (within 6 m of the start of their new road)
-    const jun = new Map();
-    const at = (k) => { if (!jun.has(k)) jun.set(k, []); return jun.get(k); };
-    road.forEach((c, i) => {
-      if (!c.active) return;
-      const L = c.road.path.length, toEnd = c.dir > 0 ? L - c.s : c.s, fromStart = L - toEnd;
+    const live = cars.filter((c) => c.active);
+    live.forEach((c, i) => {
       c.id = c.id ?? i;
-      c.toEnd = toEnd;
-      if (toEnd < 9) at(c.road.ends[c.dir > 0 ? 1 : 0]).push({ c, approach: true, d: toEnd });
-      if (fromStart < 6) at(c.road.ends[c.dir > 0 ? 0 : 1]).push({ c, approach: false, d: fromStart });
+      c.toEnd = c.conn ? 0 : c.path.length - c.s;
+      // the next lane is chosen ahead of time, so the following distance can look across the junction
+      if (!c.conn && c.next === undefined && c.toEnd < 40) c.next = this._chooseNext(c.lane);
+      c.plan = !c.conn && c.next ? this.connector(c.lane, c.next) : null;
     });
-    for (const c of road) {
+    for (const c of cars) {
       if (c.active) {
         // give way to the tram where the road crosses its track
-        const p0 = c.road.path.at(c.s);
-        const ax = p0.x + p0.hx * c.dir * 6, ay = p0.y + p0.hy * c.dir * 6;
+        const p0 = c.path.at(c.s);
+        const ax = p0.x + p0.hx * 6, ay = p0.y + p0.hy * 6;
         const waiting = Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3;
-        // keep a distance to the car ahead in the same lane
+        // the car ahead: on this path, else across the junction on the connector and the next lane
+        const seq = [[c.path, -c.s]];
+        if (c.conn) seq.push([c.conn.to.path, c.conn.path.length - c.s]);
+        else if (c.next) {
+          const off = c.path.length - c.s;
+          if (c.plan) seq.push([c.plan.path, off], [c.next.path, off + c.plan.path.length]);
+          else seq.push([c.next.path, off]);
+        }
         let gap = null, vLead = 0;
-        for (const o of road) {
-          if (o === c || !o.active || o.road !== c.road || o.dir !== c.dir || (c.road.o && o.laneSel !== c.laneSel)) continue;
-          const d = (o.s - c.s) * c.dir - 4.4;
-          if (d > -2 && (gap === null || d < gap)) { gap = d; vLead = o.vNow ?? 0; }
+        for (const o of live) {
+          if (o === c) continue;
+          for (const [path, off] of seq) {
+            if (o.path !== path) continue;
+            const d = off + o.s - 4.4;
+            if (d > -2 && (path !== c.path || o.s > c.s) && (gap === null || d < gap)) { gap = d; vLead = o.vNow ?? 0; }
+          }
         }
-        // give way at junctions: one car crosses at a time, the nearest first (ties by id)
+        // junctions: wait while a car is on a crossing connector, or nearer to its own one
         let jStop = null;
-        if (c.toEnd < 9) {
-          const here = jun.get(c.road.ends[c.dir > 0 ? 1 : 0]) || [];
-          const blocked = here.some((o) => o.c !== c && o.c.road !== c.road && (o.approach ? (o.d < c.toEnd - 0.05 || (Math.abs(o.d - c.toEnd) <= 0.05 && o.c.id < c.id)) : true));
-          if (blocked && c.toEnd > 2.5) jStop = c.toEnd - 3;
+        if (c.plan && c.toEnd < 9) {
+          const blocked = live.some((o) => o !== c && (
+            (o.conn && o.conn.at === c.plan.at && this._conflict(o.conn, c.plan))
+            || (!o.conn && o.plan && o.plan.at === c.plan.at && o.toEnd < 9 && this._conflict(o.plan, c.plan)
+              && (o.toEnd < c.toEnd - 0.05 || (Math.abs(o.toEnd - c.toEnd) <= 0.05 && o.id < c.id)))));
+          if (blocked && c.toEnd > 1.5) jStop = c.toEnd - 2;
         }
-        const vt = waiting ? 0 : Math.min(c.v, following(gap, vLead), jStop === null ? Infinity : following(jStop, 0));
+        // slow down for curves and turns ahead (braking at 3 m/s2), across the junction too
+        let vCurve = Infinity;
+        for (const [path, off] of seq) {
+          const vm = path.curveSpeeds();
+          for (let i = 0; i < path.p.length; i++) {
+            const d = off + path.s[i];
+            if (d < -1 || d > 30) continue;
+            vCurve = Math.min(vCurve, Math.sqrt(vm[i] * vm[i] + 6 * Math.max(0, d)));
+          }
+        }
+        const vt = waiting ? 0 : Math.min(c.v, vCurve, following(gap, vLead), jStop === null ? Infinity : following(jStop, 0));
         c.vNow = this._approach(c.vNow ?? vt, vt, dt);
-        c.s += c.dir * c.vNow * dt;
-        if (c.s < 0 || c.s > c.road.path.length) this._nextRoad(c);
+        c.s += c.vNow * dt;
+        while (c.active && c.s > c.path.length) this._advance(c);
       }
       this._fade(c, dt);
       if (c.alpha <= 0) continue;
       if (!c.active && c.coast) {
         const k = c.coast;
         k.d += (c.vNow || 6) * dt;
-        this._poseCar(c.mesh, k.x + k.hx * k.d + k.hy * k.lane, k.y + k.hy * k.d - k.hx * k.lane, k.hx, k.hy);
+        this._poseCar(c.mesh, k.x + k.hx * k.d, k.y + k.hy * k.d, k.hx, k.hy);
         continue;
       }
-      const r = c.road;
-      const p = r.path.at(c.s);
-      const hx = p.hx * c.dir, hy = p.hy * c.dir;
-      // right-hand traffic; one-way roads use their full width
-      const lane = this.laneOffset(r, c.s, c.dir, c.laneSel);
-      const x = p.x + hy * lane, y = p.y - hx * lane;
-      if (Math.hypot(x - cx, y - cy) > 420) c.active = false;
-      this._poseCar(c.mesh, x, y, hx, hy);
+      const p = c.path.at(c.s);
+      if (Math.hypot(p.x - cx, p.y - cy) > 420) c.active = false;
+      this._poseCar(c.mesh, p.x, p.y, p.hx, p.hy);
     }
   }
 
-  _nextRoad(c) {
-    const r = c.road;
-    const endKey = c.dir > 0 ? r.ends[1] : r.ends[0];
-    const here = r.path.at(c.dir > 0 ? r.path.length : 0);
-    const hx = here.hx * c.dir, hy = here.hy * c.dir;
-    const opts = (this.junctions.get(endKey) || []).filter((j) => this.roads[j.k] !== r).map((j) => {
-      const nr = this.roads[j.k];
-      const dir = j.end === 0 ? 1 : -1;
-      if (nr.o && nr.o !== dir) return null; // no entry against a one-way street
-      const q = nr.path.at(j.end === 0 ? 0 : nr.path.length);
-      const turn = q.hx * dir * hx + q.hy * dir * hy; // 1 = straight on
-      return { nr, dir, start: j.end === 0 ? 0 : nr.path.length, score: turn + this.rand() * 0.8 };
-    }).filter(Boolean).sort((a, b) => b.score - a.score);
-    if (!opts.length) {
-      // the data ends here (corridor edge): keep rolling straight on while fading out
-      c.active = false;
-      c.s = Math.max(0, Math.min(r.path.length, c.s));
-      // keep the lane it was driving in (the same offset as on the road, no sideways hop)
-      c.coast = { x: here.x, y: here.y, hx, hy, d: 0, lane: this.laneOffset(r, c.s, c.dir, c.laneSel) };
-      return;
+  // past the end of the current path: lane -> connector -> next lane; at the edge of the data the
+  // car rolls on straight while fading out
+  _advance(c) {
+    const over = c.s - c.path.length;
+    if (c.conn) {
+      c.lane = c.conn.to; c.conn = null; c.next = undefined;
+    } else {
+      if (c.next === undefined) c.next = this._chooseNext(c.lane);
+      if (!c.next) {
+        const end = c.path.at(c.path.length);
+        c.active = false;
+        c.s = c.path.length;
+        c.coast = { x: end.x, y: end.y, hx: end.hx, hy: end.hy, d: over };
+        return;
+      }
+      const conn = this.connector(c.lane, c.next);
+      if (conn) c.conn = conn;
+      else { c.lane = c.next; c.next = undefined; }
     }
-    c.coast = null;
-    const o = opts[0];
-    c.road = o.nr; c.dir = o.dir; c.s = o.start;
+    c.path = c.conn ? c.conn.path : c.lane.path;
+    c.road = c.lane.road; c.dir = c.lane.dir;
+    c.s = over;
   }
 
   // random index entry at a distance between rMin and rMax from (cx, cy)
