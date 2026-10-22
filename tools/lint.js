@@ -8,6 +8,7 @@
 // The report is saved to reports/lineN.json by tools/serve.py; compare with the committed baseline:
 //   python tools/lint_report.py            (--accept makes the current reports the baseline)
 import { makeT3, placeConsist } from '../src/models.js';
+import { roofIndex } from '../src/world.js';
 import { runStreetBot } from '../src/streetbot.js';
 import { trafficRun } from './traffic_lint.js';
 
@@ -59,47 +60,12 @@ function signalsInPlatforms(g) {
   return check('signal-not-in-platform', g.signals.length, bad);
 }
 
-// Roofs of the drawn buildings in a 4 m grid: a point under a roof is inside a building.
-function roofIndex(world) {
-  const grid = new Map(), cell = 4;
-  world.traverse((m) => {
-    if (!m.isMesh || !m.userData.building) return;
-    const a = m.geometry.attributes.position;
-    for (let i = 0; i + 2 < a.count; i += 3) {
-      const t = [];
-      for (let k = 0; k < 3; k++) t.push(a.getX(i + k), -a.getZ(i + k), a.getY(i + k));
-      const area = (t[3] - t[0]) * (t[7] - t[1]) - (t[4] - t[1]) * (t[6] - t[0]);
-      if (Math.abs(area) < 0.5) continue; // walls (vertical) and slivers
-      const x0 = Math.floor(Math.min(t[0], t[3], t[6]) / cell), x1 = Math.floor(Math.max(t[0], t[3], t[6]) / cell);
-      const y0 = Math.floor(Math.min(t[1], t[4], t[7]) / cell), y1 = Math.floor(Math.max(t[1], t[4], t[7]) / cell);
-      for (let ix = x0; ix <= x1; ix++) for (let iy = y0; iy <= y1; iy++) {
-        const k = ix * 100003 + iy;
-        if (!grid.has(k)) grid.set(k, []);
-        grid.get(k).push(t);
-      }
-    }
-  });
-  // height of the roof over (x, y), or null
-  return (x, y) => {
-    let best = null;
-    for (const t of grid.get(Math.floor(x / cell) * 100003 + Math.floor(y / cell)) || []) {
-      const d = (t[4] - t[7]) * (t[0] - t[6]) + (t[6] - t[3]) * (t[1] - t[7]);
-      const w1 = ((t[4] - t[7]) * (x - t[6]) + (t[6] - t[3]) * (y - t[7])) / d;
-      const w2 = ((t[7] - t[1]) * (x - t[6]) + (t[0] - t[6]) * (y - t[7])) / d;
-      if (w1 < 0 || w2 < 0 || w1 + w2 > 1) continue;
-      const z = w1 * t[2] + w2 * t[5] + (1 - w1 - w2) * t[8];
-      if (best === null || z > best) best = z;
-    }
-    return best;
-  };
-}
-
 // Trees whose trunk stands inside a building, or whose crown reaches into one (the crown circle,
 // sampled at 8 points, passes under a roof that is higher than the crown's bottom).
 function treesInBuildings(world) {
   const roof = roofIndex(world);
   const crown = [];
-  world.traverse((m) => { if (m.isInstancedMesh && m.geometry.type === 'IcosahedronGeometry') crown.push(m); });
+  world.traverse((m) => { if (m.isInstancedMesh && m.userData.trees) crown.push(m); });
   const trunkIn = [], crownIn = [];
   const M = new crown[0].matrix.constructor();
   let n = 0;

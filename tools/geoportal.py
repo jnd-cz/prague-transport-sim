@@ -261,16 +261,28 @@ def walls():
     return out
 
 
+# vegetation element (kod_vp, the layer's coded values) -> kind in the game:
+# 0 deciduous tree, 1 conifer, 2 bush / hedge, 3 plants in a container, 4 tree-row sample;
+# climbers (101, on facades and walls) and beds / lawns are not drawn
+VP_KIND = {71: "tree", 61: "tree", 81: "tree", 51: 2, 41: 2, 131: 2, 21: 3}
+
+
 def trees():
-    out = []
+    out, kinds = [], {}
     for ft in query(TREES, "trees", "*"):
         g = ft.get("geometry") or {}
         pts = g.get("points") or ([[g["x"], g["y"]]] if "x" in g else [])  # multipoint or point
         a = ft["attributes"]
+        kind = VP_KIND.get(a.get("kod_vp"))
+        if kind is None:
+            continue
+        if kind == "tree":
+            kind = 1 if a.get("kod_drevin") == 1 else 0
         for lon, lat in pts:
             x, y = to_local(lat, lon)
             if route_dist(x, y) <= CORRIDOR:
-                out.append([round(x, 1), round(y, 1), 1 if a.get("kod_drevin") == 1 else 0])
+                out.append([round(x, 1), round(y, 1), kind])
+                kinds[kind] = kinds.get(kind, 0) + 1
     rows = 0
     for ft in query(TREE_ROWS, "treerows", "*"):
         for part in (ft.get("geometry") or {}).get("paths", []):
@@ -280,12 +292,21 @@ def trees():
                 for k in range(n):
                     x, y = x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n
                     if route_dist(x, y) <= CORRIDOR:
-                        out.append([round(x, 1), round(y, 1), 0]); rows += 1
-    print(f"trees: {len(out)} ({rows} from tree rows)")
+                        out.append([round(x, 1), round(y, 1), 4]); rows += 1
+    print(f"trees: {len(out)} ({rows} from tree rows), register kinds {dict(sorted(kinds.items()))}")
     return out
 
 
 def main():
+    dst = os.path.join(ROOT, "data", f"line{LINE}.geo.json")
+    if "--trees-only" in sys.argv:
+        # refresh only the vegetation of an existing file (from the download cache)
+        geo = json.load(open(dst, encoding="utf-8"))
+        geo["trees"] = trees()
+        with open(dst, "w", encoding="utf-8") as f:
+            json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))
+        print(f"wrote {dst}")
+        return
     geo = {"attribution": "3D buildings, retaining walls, trees: data base © IPR Praha (CC BY 4.0)"}
     geo["walls"] = walls()
     geo["trees"] = trees()
