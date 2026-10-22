@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Route } from './route.js';
+import { Route, extendAlongTracks } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, DtmSurface } from './terrain.js';
 import { buildWorld, widenTramStreets } from './world.js';
 import { Tram } from './tram.js';
@@ -40,7 +40,8 @@ try {
   const r = await fetch(`data/line${lineId}.dtm.json`);
   if (r.ok) { data.dtm = await r.json(); data.attribution += ' ' + data.dtm.attribution; }
 } catch { /* not imported for this line */ }
-const route = new Route(data.path);
+// the track beyond both termini, so a two-car set standing at the first stop is on rails
+const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
 const terrain = new Terrain(data.terrain);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
@@ -97,6 +98,7 @@ function applyWeather(w) {
       world.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
     }
     world = buildWorld(scene, data, route, ground, w);
+    window.world = world; // read by the lints (tools/lint.js)
     worldWeather = w;
   }
 }
@@ -234,6 +236,7 @@ function start() {
   window.game = game; // handy for debugging from the console
   window.camera = camera;
   window.traffic = traffic;
+  window.tramModel = tramModel;
   $('menu').classList.add('hidden');
   $('results').classList.add('hidden');
   hud.show(true);

@@ -44,7 +44,11 @@ Last baseline (dry, obstacles normal; two-car sets except 23): line 22 ≈ 3550�
 23 ≈ 1880 s (rain, summer), 17 ≈ 3240 s, 9→10 run ≈ 2580 s (stops 0–29) + 3250 s (28–59); all finish, no `bad:`
 messages except comfort/lateness.
 
-Debug hooks on the running page: `window.game`, `window.traffic`, `window.camera`; set
+Lints (counts per line vs a committed baseline): `tools/lint.js` + `python tools/lint_report.py`, see
+README → Dev and PLAN.md §2.
+
+Debug hooks on the running page: `window.game`, `window.traffic`, `window.camera`, `window.world`,
+`window.tramModel`; set
 `window.freeCam = true` to position the camera from the console (the frame loop stops moving it).
 
 ## 3. Code map

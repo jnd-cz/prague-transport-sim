@@ -150,7 +150,8 @@ class ChunkedGeometry {
     if (this.useColor) c.col.push(...col, ...col, ...col);
   }
   quad(c, a, b, d, e, col) { this.tri(c, a, b, d, null, col); this.tri(c, a, d, e, null, col); }
-  // `surface` tags meshes cars and walkers stand on (read by the street bot)
+  // `surface` tags meshes cars and walkers stand on (read by the street bot); 'building' marks
+  // building meshes instead (read by the lints)
   build(group, surface = null) {
     for (const c of this.chunks.values()) {
       if (!c.pos.length) continue;
@@ -162,7 +163,8 @@ class ChunkedGeometry {
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, this.material);
       m.matrixAutoUpdate = false;
-      if (surface) m.userData.surface = surface;
+      if (surface === 'building') m.userData.building = true;
+      else if (surface) m.userData.surface = surface;
       group.add(m);
     }
   }
@@ -461,8 +463,8 @@ function buildOsmBuildings(group, data, route, ground) {
     }
     addFlatPolygon(roofs, ring, top, ROOF_COLORS[Math.floor(r() * ROOF_COLORS.length)].toArray());
   });
-  walls.build(group);
-  roofs.build(group);
+  walls.build(group, 'building');
+  roofs.build(group, 'building');
   console.log(`buildings: ${data.buildings.length} (${skipped} spanning the track)`);
 }
 
@@ -595,6 +597,7 @@ function buildLod2(group, data, route, ground) {
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, mat);
       m.matrixAutoUpdate = false;
+      m.userData.building = true; // read by the lints (trees in buildings)
       group.add(m);
     };
     for (const k in walls) mk(walls[k].pos, walls[k].nor, walls[k].col, walls[k].uv, CLASSES[k].mat);

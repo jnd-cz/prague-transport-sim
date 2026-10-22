@@ -1,0 +1,183 @@
+{
+ "line": "23",
+ "date": "2026-10-22T10:04:57.470Z",
+ "secs": 0,
+ "checks": {
+  "consist": {
+   "rule": "consist-coupled",
+   "count": 0,
+   "of": 18,
+   "places": []
+  },
+  "signalsInPlatforms": {
+   "rule": "signal-not-in-platform",
+   "count": 0,
+   "of": 12,
+   "places": []
+  },
+  "treeTrunks": {
+   "rule": "tree-trunk-outside-buildings",
+   "count": 73,
+   "of": 1837,
+   "places": [
+    {
+     "x": 1677.699951171875,
+     "y": -294.20001220703125,
+     "mag": 3.855730676651001,
+     "info": "trunk under a roof at 221.1 m"
+    },
+    {
+     "x": -1609.9000244140625,
+     "y": -24.299999237060547,
+     "mag": 3.8439689159393313,
+     "info": "trunk under a roof at 300.5 m"
+    },
+    {
+     "x": -1489.5,
+     "y": -1.100000023841858,
+     "mag": 3.8118686199188234,
+     "info": "trunk under a roof at 299.0 m"
+    },
+    {
+     "x": -307.20001220703125,
+     "y": -560.2999877929688,
+     "mag": 3.784150004386902,
+     "info": "trunk under a roof at 206.3 m"
+    },
+    {
+     "x": 1292.300048828125,
+     "y": -543.5,
+     "mag": 3.7260283470153808,
+     "info": "trunk under a roof at 221.8 m"
+    },
+    {
+     "x": -1729.4000244140625,
+     "y": -210.8000030517578,
+     "mag": 3.6011121749877932,
+     "info": "trunk under a roof at 313.1 m"
+    },
+    {
+     "x": -1492.699951171875,
+     "y": 25.100000381469727,
+     "mag": 3.5536879301071167,
+     "info": "trunk under a roof at 289.0 m"
+    },
+    {
+     "x": 858.2999877929688,
+     "y": -586.7000122070312,
+     "mag": 3.549288272857666,
+     "info": "trunk under a roof at 221.1 m"
+    },
+    {
+     "x": -1488,
+     "y": 13.899999618530273,
+     "mag": 3.5260759353637696,
+     "info": "trunk under a roof at 289.0 m"
+    },
+    {
+     "x": 872.4000244140625,
+     "y": -581.9000244140625,
+     "mag": 3.506091666221619,
+     "info": "trunk under a roof at 223.0 m"
+    },
+    {
+     "x": -1710.199951171875,
+     "y": -203.10000610351562,
+     "mag": 3.481366801261902,
+     "info": "trunk under a roof at 313.8 m"
+    },
+    {
+     "x": -1498,
+     "y": -128.10000610351562,
+     "mag": 3.472322940826416,
+     "info": "trunk under a roof at 302.5 m"
+    }
+   ]
+  },
+  "treeCrowns": {
+   "rule": "tree-crown-clear-of-buildings",
+   "count": 41,
+   "of": 1837,
+   "places": [
+    {
+     "x": -1580.5,
+     "y": -221.3000030517578,
+     "mag": 3.758744812011719,
+     "info": "crown 3.8 m into a building (radius 3.8 m)"
+    },
+    {
+     "x": -659.5999755859375,
+     "y": 523.9000244140625,
+     "mag": 3.7318360805511475,
+     "info": "crown 3.7 m into a building (radius 3.7 m)"
+    },
+    {
+     "x": 1411.5999755859375,
+     "y": -670.2000122070312,
+     "mag": 3.6836450338363647,
+     "info": "crown 3.7 m into a building (radius 3.7 m)"
+    },
+    {
+     "x": -271.79998779296875,
+     "y": -381,
+     "mag": 3.619933843612671,
+     "info": "crown 3.6 m into a building (radius 3.6 m)"
+    },
+    {
+     "x": -1850.761474609375,
+     "y": -318.37249755859375,
+     "mag": 3.6186578035354615,
+     "info": "crown 3.6 m into a building (radius 3.6 m)"
+    },
+    {
+     "x": 399.29998779296875,
+     "y": -645.7000122070312,
+     "mag": 3.582874131202698,
+     "info": "crown 3.6 m into a building (radius 3.6 m)"
+    },
+    {
+     "x": -340.1000061035156,
+     "y": -384.3999938964844,
+     "mag": 3.534985899925232,
+     "info": "crown 3.5 m into a building (radius 3.5 m)"
+    },
+    {
+     "x": -301.29998779296875,
+     "y": -382.3999938964844,
+     "mag": 3.533684754371643,
+     "info": "crown 3.5 m into a building (radius 3.5 m)"
+    },
+    {
+     "x": -313.5,
+     "y": -676.5999755859375,
+     "mag": 3.4937695264816284,
+     "info": "crown 3.5 m into a building (radius 3.5 m)"
+    },
+    {
+     "x": -1558.9000244140625,
+     "y": -150.1999969482422,
+     "mag": 3.4594466209411623,
+     "info": "crown 3.5 m into a building (radius 3.5 m)"
+    },
+    {
+     "x": -318.6000061035156,
+     "y": -639.5,
+     "mag": 3.458339810371399,
+     "info": "crown 3.5 m into a building (radius 3.5 m)"
+    },
+    {
+     "x": -305,
+     "y": -675.5999755859375,
+     "mag": 3.452650785446167,
+     "info": "crown 3.5 m into a building (radius 3.5 m)"
+    }
+   ]
+  },
+  "bridges": {
+   "rule": "bridge-has-deck",
+   "count": 0,
+   "of": 1,
+   "places": []
+  }
+ }
+}
