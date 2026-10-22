@@ -525,7 +525,7 @@ export class Traffic {
 
   // --------------------------------------------------------------------- other trams
   _placeTram(t, route, s, profileZ) {
-    placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p)]; });
+    placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p), route.rollAt(q)]; });
   }
 
   // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it

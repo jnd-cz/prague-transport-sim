@@ -407,10 +407,12 @@ export function placeConsist(model, sFront, at) {
   const { bogie, bodyFront } = model.userData;
   model.userData.cars.forEach((car, k) => {
     const c = sFront - k * 15.2 - 0.6 - bodyFront; // car origin (midway between the bogies)
-    const [ax, ay, za] = at(c + bogie), [bx, by, zb] = at(c - bogie);
+    const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
     car.position.set((ax + bx) / 2, (za + zb) / 2 + RAIL_TOP, -(ay + by) / 2);
+    car.rotation.order = 'YXZ'; // heading, then pitch, then the lean into a canted curve
     car.rotation.y = Math.atan2(ax - bx, -(ay - by));
     car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
+    car.rotation.z = -(ra + rb) / 2;
   });
 }
 
