@@ -170,5 +170,13 @@ const { autopilot } = await import('/tools/autopilot.js');
 autopilot(0, 99, { obstacles: 'normal', weather: 'rain' });
 ```
 
+**Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
+bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and
+walker heights with the triangles actually drawn and the DTM area class under the wheels, and lists
+the places that look wrong, worst first: kerb steps, wheels on a sidewalk, height jumps, tilted cars,
+floating or sunken cars and walkers, gaps in the surveyed streets, bumpy footways. Click a row (or
+`n` / `b`) to fly there; arrows orbit, `+` / `−` zoom; coloured posts mark every place.
+`window.streetBot` holds the result (`stats`, `findings`, `raw` samples). One run takes about a minute.
+
 Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
 terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).

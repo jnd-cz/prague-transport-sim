@@ -307,7 +307,13 @@ export function carveCorridor(T, route, profile) {
 // vertex. Triangulated once; `heightAt(x, y)` returns the ground-level (level 0) surface height
 // where an area covers the point (roads and tram areas win over the rest), else null.
 // `covered(x, y)` tells whether the DTM describes the street there at all.
+// drawn DTM surfaces stand this much above their surveyed height (no z-fighting between classes)
+export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, water: 0.01 };
+export const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
 const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'platform', 'cycle']);
+// wide surfaces whose interior heights come from the surveyed point cloud; narrow ones (sidewalks,
+// islands) are planar between their own exact vertices, which keeps them smooth
+const CLOUD = new Set(['road', 'tram', 'parking']);
 const SURFACE_RANK = { tram: 9, road: 8, island: 7, platform: 7, sidewalk: 6, parking: 5, cycle: 5, paved: 4, stairs: 3, green: 2, water: 1 };
 export class DtmSurface {
   constructor(dtm, terrain, THREE) {
@@ -321,7 +327,6 @@ export class DtmSurface {
       if (!this.zgrid.has(key)) this.zgrid.set(key, []);
       this.zgrid.get(key).push(zf[i], zf[i + 1], zf[i + 2]);
     }
-    this.tris = []; // [ax, ay, az, bx, by, bz, cx, cy, cz, rank, level, class]
     this.cell = 10;
     this.grid = new Map();
     this.deckGrid = new Map(); // level 1: bridge decks and the streets on them
@@ -344,48 +349,55 @@ export class DtmSurface {
       let tri;
       try { tri = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2)); } catch { continue; }
       const all = [...outer, ...holes.flat()];
-      const area = { c: a.c, l: a.l, ring: outer, holes, tris: [], mesh: [] };
+      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [] };
+      const rank = SURFACE_RANK[a.c] || 1;
+      const ground = a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && a.c !== 'rail';
       for (const [i, j, k] of tri) {
         const p = all[i], q = all[j], r = all[k];
-        const t = [p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2], SURFACE_RANK[a.c] || 1, a.l, a.c];
-        area.tris.push(t);
-        if (a.l >= 1 && (a.c === 'deck' || a.c === 'road' || a.c === 'tram' || a.c === 'paved' || a.c === 'sidewalk')) this._index(this.deckGrid, t);
-        // render mesh: split to <= 6 m edges, interior heights from the surveyed points
-        if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, true, area.mesh);
-        else area.mesh.push([p, q, r]);
-        if (a.l !== 0 || a.c === 'wall' || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
-        this.tris.push(t);
-        const x0 = Math.min(p[0], q[0], r[0]), x1 = Math.max(p[0], q[0], r[0]), y0 = Math.min(p[1], q[1], r[1]), y1 = Math.max(p[1], q[1], r[1]);
-        for (let ix = Math.floor(x0 / this.cell); ix <= Math.floor(x1 / this.cell); ix++) for (let iy = Math.floor(y0 / this.cell); iy <= Math.floor(y1 / this.cell); iy++) {
-          const key = ix * 100003 + iy;
-          if (!this.grid.has(key)) this.grid.set(key, []);
-          this.grid.get(key).push(t);
+        if (a.l >= 1 && (a.c === 'deck' || a.c === 'road' || a.c === 'tram' || a.c === 'paved' || a.c === 'sidewalk')) {
+          this._index(this.deckGrid, [p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]]);
         }
+        // render mesh: split to <= 5 m edges, interior heights from the surveyed points
+        const n0 = area.mesh.length;
+        if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, CLOUD.has(a.c), area.mesh);
+        else area.mesh.push([p, q, r]);
+        // the height lookup uses exactly the drawn triangles, so cars stand on what is drawn
+        if (ground) for (let m = n0; m < area.mesh.length; m++) this._index(this.grid, [...area.mesh[m], rank, a.c]);
       }
       this.areas.push(area);
     }
   }
   _hit(x, y) {
+    const t = this._hitTri(x, y);
+    return t ? t.z : null;
+  }
+  // DTM area class at (x, y) ('road', 'sidewalk', ...), or null
+  classAt(x, y) {
+    const t = this._hitTri(x, y);
+    return t ? t.c : null;
+  }
+  _hitTri(x, y) {
     const arr = this.grid.get(Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell));
     if (!arr) return null;
     // overlapping ground-level areas: the one closest to the lidar ground, then by rank
     const g = this.terrain.height(x, y);
     let best = null, bestScore = Infinity;
-    for (const t of arr) {
-      const d = (t[4] - t[7]) * (t[0] - t[6]) + (t[6] - t[3]) * (t[1] - t[7]);
+    for (const [p, q, r, rank, c] of arr) {
+      const d = (q[1] - r[1]) * (p[0] - r[0]) + (r[0] - q[0]) * (p[1] - r[1]);
       if (Math.abs(d) < 1e-9) continue;
-      const w1 = ((t[4] - t[7]) * (x - t[6]) + (t[6] - t[3]) * (y - t[7])) / d;
-      const w2 = ((t[7] - t[1]) * (x - t[6]) + (t[0] - t[6]) * (y - t[7])) / d;
+      const w1 = ((q[1] - r[1]) * (x - r[0]) + (r[0] - q[0]) * (y - r[1])) / d;
+      const w2 = ((r[1] - p[1]) * (x - r[0]) + (p[0] - r[0]) * (y - r[1])) / d;
       const w3 = 1 - w1 - w2;
       if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
-      const z = w1 * t[2] + w2 * t[5] + w3 * t[8];
-      const score = Math.abs(z - g) - t[9] * 0.05;
-      if (score < bestScore) { best = z; bestScore = score; }
+      const z = w1 * p[2] + w2 * q[2] + w3 * r[2];
+      const score = Math.abs(z - g) - rank * 0.05;
+      if (score < bestScore) { best = { z, c }; bestScore = score; }
     }
     return best;
   }
-  // inverse distance weighted surveyed height within r m, or null
-  cloudZ(x, y, r = 5) {
+  // inverse distance weighted surveyed height within r m, or null; with `ref`, only points within
+  // `tol` of it count (a street above or below, or a kerb top, must not pull the surface)
+  cloudZ(x, y, r = 5, ref = null, tol = 0.6) {
     const c = this.zc, ci = Math.floor(x / c), cj = Math.floor(y / c), n = Math.ceil(r / c);
     let sw = 0, sz = 0;
     for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
@@ -393,7 +405,7 @@ export class DtmSurface {
       if (!arr) continue;
       for (let k = 0; k < arr.length; k += 3) {
         const d2 = (arr[k] - x) ** 2 + (arr[k + 1] - y) ** 2;
-        if (d2 > r * r) continue;
+        if (d2 > r * r || (ref !== null && Math.abs(arr[k + 2] - ref) > tol)) continue;
         const w = 1 / (d2 + 0.25);
         sw += w; sz += w * arr[k + 2];
       }
@@ -409,14 +421,17 @@ export class DtmSurface {
     else if (l2 === e) [p, q, r] = [r, p, q];
     // now p-q is the longest edge
     const x = (p[0] + q[0]) / 2, y = (p[1] + q[1]) / 2;
-    const m = [x, y, (ground ? this.cloudZ(x, y) : null) ?? (p[2] + q[2]) / 2];
+    const zl = (p[2] + q[2]) / 2;
+    const m = [x, y, (ground ? this.cloudZ(x, y, 5, zl, 0.6 + 0.02 * e) : null) ?? zl];
     this._split(p, m, r, ground, out, depth + 1);
     this._split(m, q, r, ground, out, depth + 1);
   }
   // ground-level surface height where a DTM area covers (x, y): the surveyed points around,
   // else the area's own triangles
+  // (t: flat [ax, ay, az, bx, ...] or [p, q, r, rank, class] with p = [x, y, z])
   _index(grid, t) {
-    const x0 = Math.min(t[0], t[3], t[6]), x1 = Math.max(t[0], t[3], t[6]), y0 = Math.min(t[1], t[4], t[7]), y1 = Math.max(t[1], t[4], t[7]);
+    const [ax, ay, bx, by, cx, cy] = Array.isArray(t[0]) ? [t[0][0], t[0][1], t[1][0], t[1][1], t[2][0], t[2][1]] : [t[0], t[1], t[3], t[4], t[6], t[7]];
+    const x0 = Math.min(ax, bx, cx), x1 = Math.max(ax, bx, cx), y0 = Math.min(ay, by, cy), y1 = Math.max(ay, by, cy);
     for (let ix = Math.floor(x0 / this.cell); ix <= Math.floor(x1 / this.cell); ix++) for (let iy = Math.floor(y0 / this.cell); iy <= Math.floor(y1 / this.cell); iy++) {
       const key = ix * 100003 + iy;
       if (!grid.has(key)) grid.set(key, []);
@@ -441,10 +456,10 @@ export class DtmSurface {
     return best;
   }
   heightAt(x, y) {
-    const z = this._hit(x, y);
-    if (z === null) return null;
-    return this.cloudZ(x, y) ?? z;
+    const t = this._hitTri(x, y);
+    return t ? t.z : null;
   }
+  surfaceAt(x, y) { return this._hitTri(x, y); }
   covered(x, y) { return this.grid.has(Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell)); }
 }
 
@@ -481,6 +496,28 @@ export function makeGround(route, terrain, profile, dtm = null) {
         return zt * (1 - k) + terrain.height(x, y) * k;
       }
       return terrain.height(x, y);
+    },
+    // The smoothed track profile wins next to the tracks: carriageway and tram areas are flush with
+    // the track bed within 3 m of a track centre and blend back to their surveyed height by 6 m.
+    // (`trackDist` is set by buildWorld once the tracks are smoothed.)
+    flush(x, y, z) {
+      const d = this.trackDist ? this.trackDist(x, y) : Infinity;
+      if (d > 6) return z;
+      const n = route.nearest(x, y);
+      if (!n || n.d > 12) return z;
+      const zt = profile.height(n.s) + 0.14;
+      const k = Math.max(0, Math.min(1, (d - 3) / 3));
+      return zt + (z - zt) * k * k * (3 - 2 * k);
+    },
+    // top of the street surface as drawn, where cars and walkers stand: the DTM area (flush with
+    // the tracks, lifted per class), else an OSM road ribbon (0.12 above the ground)
+    surface(x, y) {
+      if (dtm) {
+        const n = near(x, y);
+        const t = n && profile.onBridge(n.s) && n.d < 22 ? null : dtm.surfaceAt(x, y);
+        if (t) return t.z + (DTM_LIFT[t.c] ?? 0.03); // flush with the tracks already (world.js flushDtm)
+      }
+      return this.at(x, y) + 0.12;
     },
     // deck height if (x, y) is on one of the route's bridges, else null
     deckAt(x, y) {

@@ -1,6 +1,7 @@
 // Static 3D scenery built from the preprocessed OSM data, draped on the DMR 5G terrain.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
+import { DTM_LIFT, FLUSH } from './terrain.js';
 
 const CELL = 350; // spatial chunk size (m) for merged meshes, so frustum culling can skip far chunks
 const TERRAIN_CHUNK = 20; // terrain cells per chunk side
@@ -149,7 +150,8 @@ class ChunkedGeometry {
     if (this.useColor) c.col.push(...col, ...col, ...col);
   }
   quad(c, a, b, d, e, col) { this.tri(c, a, b, d, null, col); this.tri(c, a, d, e, null, col); }
-  build(group) {
+  // `surface` tags meshes cars and walkers stand on (read by the street bot)
+  build(group, surface = null) {
     for (const c of this.chunks.values()) {
       if (!c.pos.length) continue;
       const g = new THREE.BufferGeometry();
@@ -160,6 +162,7 @@ class ChunkedGeometry {
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, this.material);
       m.matrixAutoUpdate = false;
+      if (surface) m.userData.surface = surface;
       group.add(m);
     }
   }
@@ -355,9 +358,16 @@ export function buildWorld(scene, data, route, ground, weather) {
     if (!t.z) t.z = trackHeights(t.smooth, wayHeight(t.p, t.b, ground));
   }
   lowerTerrainUnderTracks(data, ground.terrain);
+  // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
+  // street surfaces laid flush with the track bed
+  const tracks = new SegmentIndex(10);
+  for (const t of data.tracks) tracks.addLine(t.smooth);
+  const trackDist = (x, y) => tracks.dist(x, y);
+  ground.trackDist = trackDist;
+  if (ground.dtm) flushDtm(ground);
   if (ground.dtm) lowerTerrainUnderDtm(ground.dtm, ground.terrain);
   buildTerrain(group, data, route, ground.terrain, weather);
-  if (ground.dtm) buildDtm(group, ground.dtm, weather !== 'dry', route, ground.profile, data);
+  if (ground.dtm) buildDtm(group, ground, weather !== 'dry');
 
   const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const wet = weather !== 'dry';
@@ -371,7 +381,7 @@ export function buildWorld(scene, data, route, ground, weather) {
     const runs = ground.dtm && !r.b ? uncoveredRuns(r.p, ground.dtm) : [r.p];
     for (const run of runs) addRibbon(roadsCg, run, r.w, wayHeight(run, r.b, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
   }
-  roadsCg.build(group);
+  roadsCg.build(group, 'road');
 
   // track bed + rails for every tram track around the route
   const bedCg = new ChunkedGeometry(flatMat, { color: true });
@@ -383,12 +393,8 @@ export function buildWorld(scene, data, route, ground, weather) {
     addRibbon(railCg, t.smooth, 0.1, t.z, 0.26, null, 0.72);
     addRibbon(railCg, t.smooth, 0.1, t.z, 0.26, null, -0.72);
   }
-  bedCg.build(group);
+  bedCg.build(group, 'bed');
   railCg.build(group);
-  // every track centre line, for keeping trees, zebra paint and poles off the tracks
-  const tracks = new SegmentIndex(10);
-  for (const t of data.tracks) tracks.addLine(t.smooth);
-  const trackDist = (x, y) => tracks.dist(x, y);
 
   buildZebras(group, data, ground, trackDist, wet);
 
@@ -602,21 +608,27 @@ function uncoveredRuns(line, dtm) {
   return runs;
 }
 
-// Terrain grid vertices under a surveyed street surface go 0.25 m below it, so the lidar
-// ground (10 m grid) never shows through the DTM surfaces.
+// Terrain under the surveyed streets goes 0.25 m below them, so the lidar ground (10 m grid)
+// never shows through: at every drawn DTM vertex and edge midpoint the terrain triangle under it
+// (same split as Terrain.height) is lowered by the excess.
 function lowerTerrainUnderDtm(dtm, T) {
-  for (let j = 0; j < T.ny; j++) for (let i = 0; i < T.nx; i++) {
-    const x = T.x0 + i * T.dx, y = T.y0 + j * T.dy;
-    if (!dtm.covered(x, y)) continue;
-    // the grid triangles span 10 m: test the vertex and the four half-cell points around it
-    let zmin = Infinity;
-    for (const [ox, oy] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) {
-      const z = dtm.heightAt(x + ox, y + oy);
-      if (z !== null) zmin = Math.min(zmin, z);
+  for (const a of dtm.areas) {
+    if (a.l !== 0 || a.c === 'wall' || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
+    for (const [p, q, r] of a.mesh) {
+      for (const [x, y, z] of [p, q, r, mid(p, q), mid(q, r), mid(r, p)]) lowerTerrainAt(T, x, y, z - 0.25);
     }
-    const k = j * T.nx + i;
-    if (zmin < Infinity && T.h[k] > zmin - 0.25) T.h[k] = zmin - 0.25;
   }
+}
+const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
+function lowerTerrainAt(T, x, y, zmax) {
+  const fx = (x - T.x0) / T.dx, fy = (y - T.y0) / T.dy;
+  const ix = Math.floor(fx), iy = Math.floor(fy);
+  if (ix < 0 || iy < 0 || ix >= T.nx - 1 || iy >= T.ny - 1) return;
+  const excess = T.height(x, y) - zmax;
+  if (excess <= 0 || excess > 4) return; // > 4 m: a surface below the street (or bad data), not ours to dig
+  const tx = fx - ix, ty = fy - iy;
+  const A = iy * T.nx + ix, B = A + 1, C = A + T.nx, D = C + 1;
+  for (const k of tx + ty <= 1 ? [A, B, C] : [D, C, B]) T.h[k] -= excess;
 }
 
 // The DTM areas as meshes: ground-level surfaces draped on their surveyed heights (sidewalks,
@@ -627,22 +639,25 @@ const DTM_COLORS = {
   platform: '#b3ad9f', paved: '#9b968b', stairs: '#aaa59a', green: '#6f8a4e', water: '#5d7f95', deck: '#8f897e',
   rail: '#6a6258', roof: '#5f6266', wall: '#8a8172',
 };
-const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, water: 0.01 };
-const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
-function buildDtm(group, dtm, wet, route, profile, data) {
-  // the smoothed track profile wins next to the tracks: carriageway and tram areas are flush with
-  // the track bed within 3 m of a track centre and blend back to their surveyed height by 6 m
-  const tracks = new SegmentIndex(10);
-  for (const t of data.tracks) tracks.addLine(t.smooth);
-  const flush = (x, y, z) => {
-    const d = tracks.dist(x, y);
-    if (d > 6) return z;
-    const n = route.nearest(x, y);
-    if (!n || n.d > 12) return z;
-    const zt = profile.height(n.s) + 0.14;
-    const k = Math.max(0, Math.min(1, (d - 3) / 3));
-    return zt + (z - zt) * k * k * (3 - 2 * k);
-  };
+// Carriageway and tram areas next to the tracks are laid flush with the track bed (ground.flush):
+// applied once to the vertices themselves, so the height lookup and the drawing agree.
+function flushDtm(ground) {
+  const dtm = ground.dtm;
+  if (dtm.flushed) return; // kept across weather rebuilds
+  dtm.flushed = true;
+  const done = new Set();
+  for (const a of dtm.areas) {
+    if (a.l !== 0 || !FLUSH.has(a.c)) continue;
+    for (const tri of a.mesh) for (const p of tri) {
+      if (done.has(p)) continue;
+      done.add(p);
+      p[2] = ground.flush(p[0], p[1], p[2]);
+    }
+  }
+}
+
+function buildDtm(group, ground, wet) {
+  const dtm = ground.dtm;
   const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
   const color = {};
   for (const [k, v] of Object.entries(DTM_COLORS)) {
@@ -656,7 +671,7 @@ function buildDtm(group, dtm, wet, route, profile, data) {
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
     const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
-    const fz = a.l === 0 && FLUSH.has(a.c) ? (v) => flush(v[0], v[1], v[2]) : (v) => v[2];
+    const fz = (v) => v[2];
     for (const [p, q, r] of a.mesh) {
       cg.tri(c, W(p[0], p[1], fz(p) + lift), W(q[0], q[1], fz(q) + lift), W(r[0], r[1], fz(r) + lift), null, col);
       if (slab) cg.tri(c, W(p[0], p[1], p[2] - slab), W(r[0], r[1], r[2] - slab), W(q[0], q[1], q[2] - slab), null, col);
@@ -672,7 +687,7 @@ function buildDtm(group, dtm, wet, route, profile, data) {
       }
     }
   }
-  cg.build(group);
+  cg.build(group, 'dtm');
 }
 
 // Keep the terrain at or below every track's bed: for samples along each track (centre and
@@ -761,6 +776,7 @@ function buildTerrain(group, data, route, T, weather) {
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, mat);
       m.matrixAutoUpdate = false;
+      m.userData.surface = 'terrain';
       group.add(m);
     }
   }

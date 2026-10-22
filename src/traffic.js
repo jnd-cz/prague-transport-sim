@@ -47,6 +47,15 @@ function following(gap, vLead) {
   return Math.max(0, Math.min(vLead + (gap - 8) * 0.4, (gap - 3.5) * 0.9));
 }
 
+const CARRIAGEWAY = new Set(['road', 'parking']);
+
+// stand a car on the drawn street surface: pitch with the slope, roll with the camber
+export function carPose(g, x, y, hx, hy) {
+  const zf = g.surface(x + hx * 1.6, y + hy * 1.6), zb = g.surface(x - hx * 1.6, y - hy * 1.6);
+  const zl = g.surface(x - hy * 0.8, y + hx * 0.8), zr = g.surface(x + hy * 0.8, y - hx * 0.8);
+  return { z: (zf + zb) / 2, pitch: Math.atan2(zf - zb, 3.2), roll: Math.atan2(zl - zr, 1.6) };
+}
+
 export class Traffic {
   constructor(scene, data, route, ground, game, rand) {
     this.scene = scene;
@@ -125,7 +134,8 @@ export class Traffic {
       // network so cars from side streets can turn into it instead of vanishing at the junction
       const along = near / n > 0.4;
       if (along) this._addLanes(path, r);
-      const road = { path, w: r.w, o: r.o || 0, ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
+      const road = { path, w: r.w, o: r.o || 0, tram: r.tram, ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
+      this._fitRoad(road);
       this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
       this.roads.push(road);
       if (along) continue;
@@ -162,6 +172,91 @@ export class Traffic {
     this.spawnTimer = 3;
   }
 
+  // Where the surveyed DTM carriageway is known, fit the road to it: every 4 m, scan across the
+  // OSM centre line for the carriageway it lies in (a track bed in the middle of a divided street
+  // counts, so both halves belong to it; else the nearest carriageway within 8 m) and keep its two
+  // kerb lines, smoothed along the road. Junction squares and plazas (much wider than the street)
+  // and places without DTM keep the OSM centre line and width.
+  _fitRoad(road) {
+    const dtm = this.ground.dtm;
+    if (!dtm) return;
+    const L = road.path.length, n = Math.floor(L / 4) + 1;
+    const lo = new Array(n).fill(null), hi = new Array(n).fill(null);
+    let any = false;
+    for (let i = 0; i < n; i++) {
+      const p = road.path.at(Math.min(L, i * 4));
+      if (!dtm.covered(p.x, p.y)) continue;
+      const on = [];
+      for (let l = -16; l <= 16; l += 0.5) {
+        const c = dtm.classAt(p.x + p.hy * l, p.y - p.hx * l);
+        on.push(CARRIAGEWAY.has(c) ? 1 : c === 'tram' ? 2 : 0);
+      }
+      // the run around the centre (index 32), else the nearest within 8 m
+      let k = 32;
+      for (let d = 0; d <= 16 && !on[k]; d++) k = on[32 + d] ? 32 + d : on[32 - d] ? 32 - d : 32;
+      if (!on[k]) continue;
+      let a = k, b = k;
+      // single 0.5 m holes (paint, a manhole cover area) don't end the carriageway
+      while (a > 0 && (on[a - 1] || (a > 1 && on[a - 2]))) a--;
+      while (b < on.length - 1 && (on[b + 1] || (b < on.length - 2 && on[b + 2]))) b++;
+      while (a < b && on[a] !== 1) a++; // a track bed at the side is not for cars
+      while (b > a && on[b] !== 1) b--;
+      if (on[a] !== 1) continue;
+      const width = (b - a) * 0.5 + 0.5;
+      if (width > Math.max(road.w * 2.2, road.w + 9) || a === 0 || b === on.length - 1) continue; // junction, plaza
+      lo[i] = a * 0.5 - 16.25;
+      hi[i] = b * 0.5 - 15.75;
+      any = true;
+    }
+    if (!any) return;
+    // fill the gaps (blend back to the OSM line over 12 m), then smooth over ±8 m
+    const fill = (arr, def) => arr.map((v, i) => {
+      if (v !== null) return v;
+      let best = def, bd = 4;
+      for (let d = 1; d < 4; d++) {
+        if (arr[i - d] != null && d < bd) { best = def + (arr[i - d] - def) * (1 - d / 4); bd = d; }
+        if (arr[i + d] != null && d < bd) { best = def + (arr[i + d] - def) * (1 - d / 4); bd = d; }
+      }
+      return best;
+    });
+    const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -2; d <= 2; d++) if (arr[i + d] !== undefined) { s += arr[i + d]; m++; } return s / m; });
+    road.fitLo = smooth(fill(lo, -road.w / 2));
+    road.fitHi = smooth(fill(hi, road.w / 2));
+  }
+  // lateral position (+ = right of the driving direction) of a car on a road at s. Right-hand
+  // traffic: 1.8 m in from the right kerb, but never closer than 1.2 m to the middle of a two-way
+  // road; one-way roads from 7 m wide have two lanes.
+  laneOffset(r, s, dir, sel = 1) {
+    let lo = -r.w / 2, hi = r.w / 2;
+    if (r.fitLo) {
+      const f = Math.max(0, Math.min(r.fitLo.length - 1, s / 4)), i = Math.floor(f), j = Math.min(r.fitLo.length - 1, i + 1), u = f - i;
+      lo = r.fitLo[i] * (1 - u) + r.fitLo[j] * u;
+      hi = r.fitHi[i] * (1 - u) + r.fitHi[j] * u;
+    }
+    if (dir < 0) [lo, hi] = [-hi, -lo]; // the car's own right/left
+    const w = hi - lo, mid = (lo + hi) / 2;
+    if (r.o) return w < 7 ? mid : sel > 0 ? hi - 1.8 : lo + 1.8;
+    return Math.max(hi - 1.8, mid + 1.2);
+  }
+
+  // A lane beside the tram inside the surveyed carriageway: the car body (±0.9 m) must lie on
+  // road or parking; else the nearest such position within 3 m that keeps clear of the tracks.
+  // null where the DTM shows no carriageway nearby (sidewalk, island, platform).
+  _fitLat(s, lat, clear) {
+    const dtm = this.ground.dtm;
+    if (!dtm) return lat;
+    const o0 = this.route.offset(s, lat);
+    if (!dtm.covered(o0.x, o0.y)) return lat;
+    const fits = (lt) => [-0.9, 0, 0.9].every((e) => {
+      const o = this.route.offset(s, lt + e);
+      return CARRIAGEWAY.has(dtm.classAt(o.x, o.y));
+    });
+    for (let d = 0; d <= 3; d += 0.5) {
+      for (const lt of d ? [lat - d, lat + d] : [lat]) if (clear(lt) && fits(lt)) return lt;
+    }
+    return null;
+  }
+
   // Lanes of a street that runs along the tram: lateral position relative to our track and
   // which directions may use them (right-hand traffic, one-way streets respected).
   _addLanes(path, r) {
@@ -182,7 +277,8 @@ export class Traffic {
       } else {
         lanes.push({ lat: lat - side, dir: 1 }, { lat: lat + side, dir: -1 });
       }
-      const ok = lanes.filter((l) => Math.abs(l.lat) > TRACK_CLEAR && Math.abs(l.lat - 3.2) > TRACK_CLEAR);
+      const clear = (lt) => Math.abs(lt) > TRACK_CLEAR && Math.abs(lt - 3.2) > TRACK_CLEAR;
+      const ok = lanes.map((l) => ({ ...l, lat: this._fitLat(n.s, l.lat, clear) })).filter((l) => l.lat !== null && clear(l.lat));
       if (!ok.length) continue;
       const c = Math.floor(n.s / 10);
       if (!this.lanes.has(c)) this.lanes.set(c, []);
@@ -259,16 +355,13 @@ export class Traffic {
     return vt > v ? Math.min(vt, v + 2 * dt) : Math.max(vt, v - 5 * dt);
   }
 
-  // stand a car on the road surface: pitch with the slope, roll with the camber
   _poseCar(mesh, x, y, hx, hy) {
-    const g = this.ground;
-    const zf = g.at(x + hx * 1.6, y + hy * 1.6), zb = g.at(x - hx * 1.6, y - hy * 1.6);
-    const zl = g.at(x - hy * 0.8, y + hx * 0.8), zr = g.at(x + hy * 0.8, y - hx * 0.8);
+    const p = carPose(this.ground, x, y, hx, hy);
     mesh.rotation.order = 'YXZ';
-    mesh.position.set(x, (zf + zb) / 2 + 0.12, -y);
+    mesh.position.set(x, p.z, -y);
     mesh.rotation.y = Math.atan2(hx, -hy);
-    mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
-    mesh.rotation.z = Math.atan2(zl - zr, 1.6);
+    mesh.rotation.x = -p.pitch;
+    mesh.rotation.z = p.roll;
   }
 
   // Cars on the surrounding road network: they continue across junctions.
@@ -336,7 +429,7 @@ export class Traffic {
       const p = r.path.at(c.s);
       const hx = p.hx * c.dir, hy = p.hy * c.dir;
       // right-hand traffic; one-way roads use their full width
-      const lane = r.tram ? r.w / 2 - 1.7 : r.o ? (r.w >= 7 ? c.laneSel * r.w / 4 : 0) : Math.max(1.5, r.w / 4);
+      const lane = this.laneOffset(r, c.s, c.dir, c.laneSel);
       const x = p.x + hy * lane, y = p.y - hx * lane;
       if (Math.hypot(x - cx, y - cy) > 420) c.active = false;
       this._poseCar(c.mesh, x, y, hx, hy);
@@ -410,7 +503,7 @@ export class Traffic {
       if (far && w.alpha <= 0) { this.slots[i] = null; m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); continue; }
       // fade by growing out of / sinking into the ground (instances share one material)
       const k = w.alpha;
-      p3.set(x, this.ground.at(x, y) + 0.14 - (1 - k) * 1.8, -y);
+      p3.set(x, this.ground.surface(x, y) - (1 - k) * 1.8, -y);
       e.set(0, Math.atan2(p.hx * w.dir, -p.hy * w.dir), 0);
       q.setFromEuler(e);
       sc.set(1, 1, 1);
