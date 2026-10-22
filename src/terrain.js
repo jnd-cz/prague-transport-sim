@@ -214,7 +214,9 @@ export class Profile {
 // lowered so no coarse terrain triangle can cut through the track. Elsewhere the ground
 // blends back to the natural terrain (embankment / cutting slopes). Returns wall runs.
 const BENCH = 7, BLEND = 8, WALL_MIN = 1.5, WALL_REACH = 22;
-export function carveCorridor(T, route, profile) {
+// `dtm`: where the surveyed streets describe the ground beside the track, the survey decides and no
+// retaining wall is invented (the 10 m lidar grid rising beside a street is not a wall)
+export function carveCorridor(T, route, profile, dtm = null) {
   const { nx, ny } = T;
   const orig = T.h.slice();
   const N = nx * ny;
@@ -257,6 +259,8 @@ export function carveCorridor(T, route, profile) {
         const o = route.offset(s, side * lat);
         top = Math.max(top, origAt(o.x, o.y));
       }
+      const foot = route.offset(s, side * (BENCH + 0.5));
+      if (dtm && dtm.surfaceAt(foot.x, foot.y)) continue;
       if (top - zp > WALL_MIN) wallTop[side][i] = top;
     }
   }

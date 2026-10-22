@@ -47,7 +47,7 @@ const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
 const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm);
 const ground = makeGround(route, terrain, profile, dtm);
-ground.walls = carveCorridor(terrain, route, profile); // flatten the track bench, retaining walls
+ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls
 route.ground = ground;
 
 // ------------------------------------------------------------------ renderer & scene
