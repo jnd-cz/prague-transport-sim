@@ -128,6 +128,21 @@ function bridgesWithoutDeck(g) {
   return check('bridge-has-deck', g.data.bridges.length, bad);
 }
 
+// Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
+function syntheticWallsOnStreets(g) {
+  const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
+  if (!walls) return check('no-invented-walls-on-streets', 0, []);
+  const bad = [];
+  let n = 0;
+  for (const run of walls.runs) for (let i = 0; i < run.pts.length - 1; i++) {
+    n++;
+    const s = (run.pts[i].s + run.pts[i + 1].s) / 2, f = g.route.offset(s, run.side * walls.bench);
+    const t = dtm?.surfaceAt(f.x, f.y);
+    if (t) bad.push({ s: Math.round(s), x: f.x, y: f.y, mag: run.pts[i].top - ground.profile.height(s), info: `wall on ${t.c}` });
+  }
+  return check('no-invented-walls-on-streets', n, bad);
+}
+
 export async function lint({ bot = false, traffic = false, save = true } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
@@ -139,6 +154,7 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     treeTrunks: trees.trunk,
     treeCrowns: trees.crown,
     bridges: bridgesWithoutDeck(g),
+    inventedWalls: syntheticWallsOnStreets(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });
