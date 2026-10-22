@@ -152,16 +152,23 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
         const kinds = [a.kind, b.kind].sort().join(' / ');
         const ep = open.get(key);
         if (ep) { if (depth > ep.mag) Object.assign(ep, { mag: depth, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }); continue; }
-        const rec = { kind: kinds, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, mag: depth, s: Math.round(g.tram.s), info: `${kinds}, ${depth.toFixed(1)} m deep` };
+        const states = [a.state || a.kind, b.state || b.kind].sort().join(' + ');
+        const rec = { kind: kinds, states, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, mag: depth, s: Math.round(g.tram.s), info: `${kinds} (${states}), ${depth.toFixed(1)} m deep` };
         open.set(key, rec);
         overlaps.push(rec);
       }
-      for (const k of [...open.keys()]) if (!live.has(k)) open.delete(k);
-      // walkers inside a vehicle
+      // walkers inside a vehicle, once per episode (a walker and a vehicle that stay together count once)
       for (const w of snap.walk) for (const v of V) if (inBox(v, w.x, w.y)) {
-        hits.push({ kind: v.kind, x: w.x, y: w.y, mag: 1, s: Math.round(g.tram.s), info: `walker inside ${v.kind}` });
+        const key = `${w.id}|${v.id}`;
+        live.add(key);
+        if (!open.has(key)) {
+          const rec = { kind: v.kind, x: w.x, y: w.y, mag: 1, s: Math.round(g.tram.s), info: `walker inside ${v.kind}` };
+          open.set(key, rec);
+          hits.push(rec);
+        }
         break;
       }
+      for (const k of [...open.keys()]) if (!live.has(k)) open.delete(k);
     }
     progress(`traffic run: ${Math.round(T)} s, stop ${g.nextStop}`);
     await new Promise((r) => setTimeout(r, 0));
@@ -170,7 +177,9 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   const pick = (rule, items, of) => {
     const byKind = {};
     for (const it of items) byKind[it.kind] = (byKind[it.kind] || 0) + 1;
-    return { rule, count: items.length, of, kinds: byKind, places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP) };
+    const byState = {};
+    for (const it of items) if (it.states) byState[it.states] = (byState[it.states] || 0) + 1;
+    return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP) };
   };
   const minutes = T / 60;
   return {
@@ -179,7 +188,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       slide: pick('traffic-no-sideways-motion', slides, samples),
       jump: pick('traffic-no-teleport', jumps, samples),
       overlap: pick('traffic-no-overlap', overlaps, Math.round(minutes)),
-      walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, samples),
+      walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, Math.round(minutes)),
       heatingKnobs: pick('autopilot-calm-heating', knobs, Math.round(minutes)),
     },
   };

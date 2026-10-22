@@ -146,16 +146,34 @@ ideas (tier D). Every item names its measurement.
    overlap trams (line 22: car/our tram 110, car/oncoming 102): they must follow the tram ahead and
    not enter the track zone in front of one; walkers inside vehicles rose with more cars near the
    footways (walkers must yield at crossings, cars stop for walkers on a crossing).
-9. **Cars at stops and in queues.**
+9. **Cars at stops and in queues** — **partly done 2026-10-22:**
+   - every car scans its own path 40 m ahead (across the junction too) for trams (ours and AI, as
+     boxes with their velocity), walkers and other cars; it follows or stops behind the first one.
+     Two cars that see each other on crossing paths: the lower id goes first. At a junction a car
+     also waits from braking distance on, and for cars standing in the mouth of a lane its turn
+     passes close to;
+   - sidewalks run 1.5 m beyond the (surveyed) kerb as their own paths; walkers never turn back
+     while standing in a car lane (a walker turning back and forth there blocked a car for minutes);
+     walker hits are counted per episode now, like overlaps;
+   - line 22: overlaps 492 -> 133, car jumps 73 -> 0; line 23: overlaps 133 -> 46.
+   Still open in B9: trams (ours on autopilot and the AI ones) do not stop for a car on the track
+   ahead (most remaining overlaps: car + tram on shared lanes); lanes of different roads that touch
+   (line 22: 45); Vienna-type stops (cars wait beside a tram with open doors) need the stop
+   classifier first (C13). Original items:
    - Cars merge onto the tracks past islands and wait behind a tram at Vienna-type stops.
    - One following model for every vehicle; walkers yield at crossings.
    - Lints: overlaps per minute, walkers inside vehicles.
-9b. **Grade separation: no crossings where the track is on a bridge.** Where our track runs on a deck
+9b. ~~**Grade separation: no crossings where the track is on a bridge.**~~ **done 2026-10-22:**
+    signals whose junction lies well inside a bridge span of the route (more than 8 m from its ends:
+    a junction at a bridge end is real) are dropped, no jaywalkers there, and cars under the bridge do
+    not wait for a tram passing above (`profile.overBridge`). Line 17: the three junctions under the
+    Modřany estakáda (s 4 082, 5 818, 6 523) and four crossings; lint `gradeSeparated`. Original text: Where our track runs on a deck
     (Mosty 3D / OSM bridge, e.g. the Modřany estakáda), roads crossing beneath must not create
     at-grade crossings, signals, cross traffic or give-way; they pass under at their own height
     (and the same where a road is in a tunnel under the track). Generic rule from the deck spans
     (`profile.realDecks`) and OSM `bridge`/`layer`/`tunnel` tags. Lint: crossings on a deck = 0.
-9c. **Lint noise for traffic checks.** The traffic counts move ±10–20 % when trajectories change
+9c. ~~**Lint noise for traffic checks.**~~ **done:** `lint_report.py` flags a traffic count only beyond
+    15 % + 5 of the baseline. Original text: The traffic counts move ±10–20 % when trajectories change
     (line 9 walkers inside vehicles 921 -> 1 708 after tier A, which did not touch walkers): compare
     rates with a noise band, or average a few seeds, so the comparer only flags real regressions.
 10. **Junction controllers with real cycles.**

@@ -1,6 +1,7 @@
 """Compare lint reports (reports/lineN.json, written by tools/lint.js) with the committed baseline
 (reports/baseline/lineN.json): one row per line and check, baseline -> now. A check whose count rose
-is a regression (exit code 1).
+is a regression (exit code 1). The traffic run's counts move by 10-20 % whenever trajectories change,
+so for those a rise counts only beyond a noise band (15 % + 5).
 
 Usage:  python tools/lint_report.py            compare
         python tools/lint_report.py --accept   make the current reports the new baseline
@@ -23,6 +24,7 @@ if "--accept" in sys.argv:
     sys.exit(0)
 
 worse = 0
+NOISY = {"slide", "jump", "overlap", "walkerHit", "heatingKnobs", "streetBot"}
 print(f"{'line':5} {'check':28} {'baseline':>9} {'now':>9}  of")
 for f in sorted(glob.glob(os.path.join(CUR, "line*.json"))):
     now = json.load(open(f, encoding="utf-8"))
@@ -30,7 +32,8 @@ for f in sorted(glob.glob(os.path.join(CUR, "line*.json"))):
     base = json.load(open(bf, encoding="utf-8")) if os.path.exists(bf) else {"checks": {}}
     for name, c in now["checks"].items():
         b = base["checks"].get(name, {}).get("count")
-        mark = "" if b is None or c["count"] == b else ("  worse" if c["count"] > b else "  better")
+        band = b * 0.15 + 5 if name in NOISY and b is not None else 0
+        mark = "" if b is None or abs(c["count"] - b) <= band else ("  worse" if c["count"] > b else "  better")
         worse += mark == "  worse"
         print(f"{now['line']:5} {name:28} {'-' if b is None else b:>9} {c['count']:>9}  {c['of']}{mark}")
         for k, v in sorted((c.get("samples") or {}).items()):

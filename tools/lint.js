@@ -122,6 +122,15 @@ function mountedInEnvelope(g) {
   return check('mounted-clear-of-tram', objs.length, bad);
 }
 
+// Grade separation: no signal, signalled crossing or pedestrian crossing of ours on a bridge span of
+// the route (they belong to the road underneath; PLAN 9b).
+function crossingsOnBridges(g) {
+  const pr = g.route.ground.profile, bad = [];
+  for (const sg of g.signals) if (pr.overBridge(sg.cross)) bad.push({ s: Math.round(sg.s), mag: 1, info: 'signal on a bridge span' });
+  for (const s of g.data.crossings) if (pr.overBridge(s)) bad.push({ s: Math.round(s), mag: 0.5, info: 'pedestrian crossing in the data on a bridge span (no jaywalkers there)' });
+  return check('grade-separated', g.signals.length, bad.filter((b) => b.info.startsWith('signal')));
+}
+
 // Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
 function syntheticWallsOnStreets(g) {
   const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
@@ -150,6 +159,7 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     bridges: bridgesWithoutDeck(g),
     inventedWalls: syntheticWallsOnStreets(g),
     tramEnvelope: mountedInEnvelope(g),
+    gradeSeparated: crossingsOnBridges(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });
