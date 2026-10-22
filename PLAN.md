@@ -1,9 +1,22 @@
-# Plan — Tatra T3 Prague (2026-10-22)
+# Plan — Tatra T3 Prague (updated 2026-10-22, evening)
 
 Priorities and next steps after the DTM, street-bot and street-model work. HANDOFF.md keeps the
 history and findings; this file says what to do next and how. Update it when a step lands.
 
 ## 1. Where we are
+
+**Status 2026-10-22, evening:** tier A done, tier B done except the rest of B9 (below); all four
+lines drive to the end in the headless traffic run; all static lints are 0 on all lines; deploy zip
+rebuilt (`dist/tatra-t3-prague.zip`, 12 MB). Details: HANDOFF.md §16, §4 below.
+
+**Next, in order:**
+1. Traffic counts after the junction cycles: average 3 seeds per line (lint option), then work on
+   the largest causes (car/car overlaps at junctions, walkers inside vehicles, touching lanes).
+2. Oncoming trams through red (line 9: 36): find why they do not commit to stopping.
+3. Tier C: C11 line ends and depots (loops in the path, layovers, depots), C12 line 37 (dedicated
+   Ohrada – Palmovka corridor and bridge), C13 stops (curved platform kerbs, stop-type classifier
+   validated against truth, then Vienna-type stops for B9).
+4. C15 sounds as soon as the user's samples are there.
 
 **Done and verified (autopilot clean on lines 9, 17, 22, 23):**
 - Game: T3 physics and controller, stops/passengers/timetable (PID GTFS), Prague tram signals with
@@ -121,7 +134,7 @@ ideas (tier D). Every item names its measurement.
 7. ~~Automatic switches option~~ — every facing switch becomes an onboard-computer (radio) switch
    set to the route; the default stays manual contacts.
 
-**Tier B — traffic core (largest; most traffic findings point here)**
+**Tier B — traffic core — done 2026-10-22 except the rest of B9** (counts: HANDOFF.md §16)
 
 8. ~~**Lane graph from the surveyed carriageway**~~ — **done 2026-10-22** (`Traffic._buildLanes`):
    one smooth lane per road and direction (two on one-way roads from 7 m) at the kerb-fitted lane
