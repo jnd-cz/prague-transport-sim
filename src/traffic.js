@@ -110,6 +110,7 @@ export class Traffic {
     // what a road's cars and walkers stand on: the street surface, or on a bridge (OSM bridge tag)
     // the deck it lies on, exactly as the road is drawn (ground.way)
     this.surfaceFn = (r) => {
+      if (r.t) { const w = ground.way(r.way || r.p, false, true); return (x, y) => w(x, y) + 0.12; } // a road tunnel
       if (!r.b) return (x, y) => ground.surface(x, y);
       const w = ground.way(r.way || r.p, true); // (the span of the whole way, as drawn)
       return (x, y) => w(x, y) + 0.12;
@@ -164,18 +165,20 @@ export class Traffic {
       const path = new Path(r.p.length > 2 ? smoothPolyline(r.p, 3, 6).pts : r.p);
       if (path.length < (r.f ? 15 : 2)) continue;
       if (r.f) {
+        if (r.t) continue; // (pedestrian underpasses: nobody walks under the ground here)
         // footways running along the tracks are platforms/verges: nobody strolls there
         if (path.length > 30 && nearTrackShare(path) < 0.2) { this.walks.push({ path, off: 0, hf: this.surfaceFn(r), deck: !!r.b }); addIndex('w', this.walks.length - 1, path); }
         continue;
       }
       // cars only on public vehicle roads: no driveways, service yards or courtyards
       if (!r.c || r.w < 5) continue;
+      if (r.t) r.way = r.way || r.p; // (a tunnel spans between its own portals)
       let near = 0, n = 0;
       for (let s = 0; s < path.length; s += 10) { const p = path.at(s); n++; if (route.distance(p.x, p.y) < 7) near++; }
       // the street the tram runs in: an ordinary part of the network (its cars drive alongside us),
       // its sidewalks get no extra walkers (the tram street's own footways cover them)
       const along = near / n > 0.4;
-      const road = { src: r, path, w: r.w, o: r.o || 0, tram: r.tram, b: r.b || 0, hf: this.surfaceFn(r), ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
+      const road = { src: r, path, w: r.w, o: r.o || 0, tram: r.tram, b: r.b || 0, t: r.t || 0, hf: this.surfaceFn(r), ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
       this._fitRoad(road);
       this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
       this.roads.push(road);
@@ -183,8 +186,9 @@ export class Traffic {
       if (along) continue;
       // sidewalks: 1.5 m beyond each kerb (the surveyed one where it exists, so walkers are not in
       // the lanes the cars drive)
-      // (not along a bridge: only the carriageway is drawn there, its footways are OSM ways of their own)
-      if (r.w >= 6 && !r.b) for (const side of [1, -1]) {
+      // (not along a bridge: only the carriageway is drawn there, its footways are OSM ways of their own;
+      // not along a road tunnel: nobody walks under the hill beside the cars)
+      if (r.w >= 6 && !r.b && !r.t) for (const side of [1, -1]) {
         const pts = [];
         for (let s = 0; s <= path.length; s += 3) {
           const p = path.at(Math.min(s, path.length)), k = this.kerbs(road, s);
@@ -225,7 +229,7 @@ export class Traffic {
   // and places without DTM keep the OSM centre line and width.
   _fitRoad(road) {
     const dtm = this.ground.dtm;
-    if (!dtm || road.b) return; // (the survey's classes are those of the ground level)
+    if (!dtm || road.b || road.t) return; // (the survey's classes are those of the ground level)
     const L = road.path.length, n = Math.floor(L / 4) + 1;
     const lo = new Array(n).fill(null), hi = new Array(n).fill(null);
     let any = false;
@@ -281,7 +285,7 @@ export class Traffic {
     const out = [], cx = Math.floor(p.x / 20), cy = Math.floor(p.y / 20), seen = new Set();
     for (let i = cx - 1; i <= cx + 1; i++) for (let j = cy - 1; j <= cy + 1; j++) {
       for (const sg of this.wayIdx.get(i * 100003 + j) || []) {
-        if (sg.src === road.src || !!sg.src.b !== !!road.b || seen.has(sg)) continue;
+        if (sg.src === road.src || !!sg.src.b !== !!road.b || !!sg.src.t !== !!road.t || seen.has(sg)) continue;
         seen.add(sg);
         const dx = sg.b[0] - sg.a[0], dy = sg.b[1] - sg.a[1], l = Math.hypot(dx, dy) || 1;
         if (Math.abs((dx * p.hx + dy * p.hy) / l) < 0.82) continue;

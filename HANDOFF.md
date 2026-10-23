@@ -758,3 +758,39 @@ Kubánské náměstí, probably a lane laid onto the track by the carriageway sp
 camera): `src/inspect.js`, `?inspect` or the I key. The autopilot drives; time 1/4×-32× (game steps of
 at most 1/30 s, several per frame), pause; orbit and fly cameras; camera jumps to the next/previous
 stop; a panel with the camera's route position. main.js runs `inspect.steps(dt)` game steps per frame.
+
+## 19. Plane-fitted streets, track spacing, tunnels (2026-10-23, afternoon)
+
+User findings on line 17: footpaths fine now, nearby terrain jagged; roads still wavy (downhill from
+Levského: arching between points); lanes: two lanes, driving on tracks, sharp turns on straight roads;
+the Vyšehrad tunnel cut open; OSM sometimes draws the two tracks too close; Letenský tunel for cars.
+
+- **Streets** (`tools/streets.py`): the carriageway / raised fits are now first-order normalized
+  convolutions: at every grid cell the plane z = a + b dx + c dy fitted to the points around (Gaussian
+  weights, slope prior), not their weighted mean (which bends between unevenly spread points on a slope:
+  the arching). Convolutions by FFT (whole line 17: 2 min 44 s). Line 17 street bumps 5627 → 5006,
+  street bot 7875 → 7596; line 22 1395 → 1152, 3362 → 3124.
+- **Track spacing** (`src/trackfix.js`, lint `trackSpacing`): where the opposite track runs alongside
+  ours the other way (≥ 40 m from switches), its axis is pushed out to 3.0 m (blended over ±20 m; the
+  back route and the drawn tracks densified to 4 m and moved together; our route stays). Interlaced
+  track (< 1.8 m, Letenská 0.7 m) and 40 m around it are left alone. OSM had 1.92 m on line 17, 2.45 m
+  on line 9, 2.55 m on line 22; the lint is 0 on all lines. Dev switch `?nospread`.
+- **Road tunnels** (Letenský, Bubenečský, nábřeží E. Beneše, Vyšehradský …): `build_line.py` keeps OSM
+  `tunnel=yes` roads flagged `t` (older data patched by `tools/tunnel_roads.py`); cars run on a straight
+  span between the portals (`ground.way(…, isTunnel)`), no ribbon underground, no generated sidewalks,
+  a portal frame with a dark opening at each tunnel end. Dev switch `?notunnels`.
+- **Vyšehrad tunnel** (our route through rock: OSM tunnel and the lidar ground > 8 m over the track):
+  no corridor carve there, the terrain keeps the hill, a hole in the terrain mesh along the tunnel,
+  a vault (walls 4.8 m, arch to 7.2 m, ±8.5 m), the rock top at the lidar height and portal faces;
+  the road through it is drawn inside.
+- **Data checked** (Geoportál catalogue): no open road markings or lanes (ZPS has no markings; "DI"
+  is not open), no 3D tunnel model (Mosty 3D only). Useful and unused: "Model terénu 3D" (IPR lidar
+  bare earth, ~40 points/m², elevation image service in LERC tiles, cm pixels) for the fine terrain;
+  ZPS lines "Terénní hrana" (terrain edges), "Hranice zdi" (walls with heights), "Zábradlí" (railings),
+  "Svodidlo", "Provozní plocha tunelu".
+- **Traffic counts**: they swing ±20-30 % whenever trajectories change (line 22 overlaps 149 / 158 /
+  180 for spread on / both off / tunnels on); the tunnel roads add ~30 overlaps on line 22 (cars at the
+  portals). Baselines accepted; averaging seeds is next (PLAN §1).
+- **Open**: line 23 has a 0.7 m close spot near Malostranská shorter than a gauntlet (no block
+  control: two trams met there once); lanes (two lanes where one, cars on the tracks, sharp kinks) need
+  OSM lanes/turn:lanes and the fitted kerb smoothing (no open lane data).

@@ -10,6 +10,7 @@ import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.j
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
+import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 
@@ -41,6 +42,10 @@ try {
   const r = await fetch(`data/line${lineId}.dtm.json`);
   if (r.ok) { data.dtm = await r.json(); data.attribution += ' ' + data.dtm.attribution; }
 } catch { /* not imported for this line */ }
+// the two tracks of a double-track line at least 3 m apart (OSM sometimes draws them closer)
+// (dev switches for comparing lint runs: ?nospread, ?notunnels)
+if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
+if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 // the track beyond both termini, so a two-car set standing at the first stop is on rails
 const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)

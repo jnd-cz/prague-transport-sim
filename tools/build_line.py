@@ -1005,7 +1005,8 @@ def main():
     roads = []
     for e in rjs["elements"]:
         t = e.get("tags", {})
-        if "geometry" not in e or t.get("tunnel") in ("yes", "building_passage") or t.get("area") == "yes":
+        # (road tunnels are kept, flagged "t": the game runs their cars below ground and draws portals)
+        if "geometry" not in e or t.get("tunnel") == "building_passage" or t.get("area") == "yes":
             continue
         line = [P(g["lat"], g["lon"]) for g in e["geometry"]]
         w = widths.get(t.get("highway"), 5)
@@ -1028,6 +1029,8 @@ def main():
             road["z"] = 1  # painted pedestrian crossing (zebra)
         if t.get("bridge") not in (None, "no"):
             road["b"] = 1
+        if t.get("tunnel") == "yes":
+            road["t"] = 1
         ow = t.get("oneway")
         if ow in ("yes", "true", "1") or t.get("junction") == "roundabout":
             road["o"] = 1

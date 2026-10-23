@@ -371,9 +371,18 @@ export function buildWorld(scene, data, route, ground, weather) {
     return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
   };
   for (const t of data.tracks) if (!t.z) t.z = trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))));
-  lowerTerrainUnderTracks(data, ground.terrain);
+  // our tunnels through rock (terrain.js carveCorridor): the hill stays whole above the track; its
+  // terrain is not drawn in the tunnel's corridor, the vault, the rock over it and the portals are
+  const rock = ground.walls?.rock || [];
+  const TUN_W = 8.5; // half width of the vault: both tracks and the road beside them (Vyšehrad tunnel)
+  const inTunnel = (x, y, pad = 0) => {
+    if (!rock.length) return false;
+    const n = route.nearest(x, y);
+    return !!n && n.d < TUN_W + pad && rock.some(([a, b]) => n.s > a - 0.5 && n.s < b + 0.5);
+  };
+  lowerTerrainUnderTracks(data, ground.terrain, inTunnel);
   if (ground.dtm) lowerTerrainUnderDtm(ground.dtm, ground.terrain);
-  buildTerrain(group, data, route, ground.terrain, weather);
+  buildTerrain(group, data, route, ground.terrain, weather, (x, y) => inTunnel(x, y, 3));
   if (ground.dtm) buildDtm(group, ground, weather !== 'dry');
 
   const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -381,9 +390,18 @@ export function buildWorld(scene, data, route, ground, weather) {
 
   // roads (wider first so footways draw on top)
   const roadsCg = new ChunkedGeometry(flatMat, { color: true });
+  const tunnelPortals = [];
   const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), paving = new THREE.Color(wet ? '#86817a' : '#a39d90').toArray();
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
     if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
+    // a road tunnel runs below ground: drawn only where it shares our tunnel (Vyšehrad), else portals
+    if (r.t) {
+      const tf = ground.way(r.p, false, true);
+      const inside = densify(r.p, 3).filter((p) => inTunnel(p[0], p[1], 2));
+      if (inside.length > 1) addRibbon(roadsCg, inside, r.w, tf, 0.12, asphalt);
+      else if (r.c) tunnelPortals.push({ r, tf });
+      continue;
+    }
     // where the surveyed DTM streets exist, they replace the OSM ribbons (on a bridge: its deck)
     const runs = ground.dtm ? uncoveredRuns(r.p, ground.dtm, r.b ? wayHeight(r.p, true, ground) : null) : [r.p];
     // (a bridge spans between the ends of the whole way, not of the piece drawn)
@@ -421,6 +439,8 @@ export function buildWorld(scene, data, route, ground, weather) {
   buildWalls(group, data, route, ground);
 
   buildBridges(group, data, route, ground);
+  buildRockTunnels(group, route, ground, rock, TUN_W, wet);
+  buildRoadPortals(group, tunnelPortals, wet);
 
   if (data.geo?.buildings?.arr) buildLod2(group, data, route, ground);
   else buildOsmBuildings(group, data, route, ground);
@@ -834,6 +854,83 @@ function buildDtm(group, ground, wet) {
   cg.build(group, 'dtm');
 }
 
+// Our tunnels through rock: a vault over both tracks and the road (walls to 4.8 m, an arch to 7.2 m
+// over the rails), the rock above it at the lidar ground (wider than the hole cut in the terrain, a
+// little above it, so the coarse terrain edge never shows a gap) and the two portal faces between the
+// vault and the rock top. Every 2 m along the span.
+function buildRockTunnels(group, route, ground, rock, HW, wet) {
+  if (!rock.length) return;
+  const T = ground.terrain, pr = ground.profile;
+  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const stone = new THREE.Color(wet ? '#6b6559' : '#8b8475').toArray(), vault = new THREE.Color(wet ? '#4b4943' : '#5d5a52').toArray();
+  const top = new THREE.Color(wet ? '#5a6248' : '#6f7a55').toArray();
+  // the vault's cross-section: lateral offset and height over the rails
+  const prof = [[-HW, -0.3], [-HW, 4.8]];
+  for (let k = 1; k < 10; k++) { const a = Math.PI - (k / 10) * Math.PI; prof.push([HW * Math.cos(a), 4.8 + 2.4 * Math.sin(a)]); }
+  prof.push([HW, 4.8], [HW, -0.3]);
+  const R = HW + 10; // the rock top reaches past the hole in the terrain
+  const P = (s, lat, z) => { const o = route.offset(s, lat); return W(o.x, o.y, z); };
+  const rockTop = (s, l) => { const o = route.offset(s, l); return Math.max(T.height(o.x, o.y) + 0.05, pr.height(s) + 8.5); };
+  for (const [a, b] of rock) {
+    const n = Math.max(2, Math.ceil((b - a) / 2));
+    for (let k = 0; k < n; k++) {
+      const s0 = a + ((b - a) * k) / n, s1 = a + ((b - a) * (k + 1)) / n, z0 = pr.height(s0), z1 = pr.height(s1);
+      const c = cg._chunk(route.at(s0).x, route.at(s0).y);
+      for (let i = 0; i < prof.length - 1; i++) {
+        const [l0, h0] = prof[i], [l1, h1] = prof[i + 1];
+        cg.quad(c, P(s0, l0, z0 + h0), P(s1, l0, z1 + h0), P(s1, l1, z1 + h1), P(s0, l1, z0 + h1), vault);
+      }
+      for (let lat = -R; lat < R; lat += 2) {
+        cg.quad(c, P(s0, lat, rockTop(s0, lat)), P(s0, lat + 2, rockTop(s0, lat + 2)), P(s1, lat + 2, rockTop(s1, lat + 2)), P(s1, lat, rockTop(s1, lat)), top);
+      }
+    }
+    // portals: from each vault point up to the rock top above it, and the rock face beside them
+    for (const s of [a, b]) {
+      const z = pr.height(s), c = cg._chunk(route.at(s).x, route.at(s).y);
+      for (let i = 0; i < prof.length - 1; i++) {
+        const [l0, h0] = prof[i], [l1, h1] = prof[i + 1];
+        cg.quad(c, P(s, l0, z + h0), P(s, l1, z + h1), P(s, l1, rockTop(s, l1)), P(s, l0, rockTop(s, l0)), stone);
+      }
+      for (const side of [-1, 1]) {
+        for (let l = HW; l < R; l += 2) {
+          const l0 = side * l, l1 = side * (l + 2);
+          cg.quad(c, P(s, l0, z - 0.3), P(s, l1, z - 0.3), P(s, l1, rockTop(s, l1)), P(s, l0, rockTop(s, l0)), stone);
+        }
+      }
+    }
+  }
+  cg.build(group, 'support');
+  console.log(`rock tunnels: ${rock.map(([a, b]) => `${Math.round(a)}-${Math.round(b)}`).join(', ')}`);
+}
+
+// Road tunnels away from our track (Letenský tunel): the cars run below ground; at each end that is not
+// another tunnel way, a portal frame with a dark opening facing out of the hill.
+function buildRoadPortals(group, list, wet) {
+  if (!list.length) return;
+  const key = (p) => `${p[0]},${p[1]}`, ends = new Map();
+  for (const { r } of list) for (const p of [r.p[0], r.p[r.p.length - 1]]) ends.set(key(p), (ends.get(key(p)) || 0) + 1);
+  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const frame = new THREE.Color(wet ? '#77736b' : '#9a958a').toArray(), dark = [0.06, 0.06, 0.07];
+  let n = 0;
+  for (const { r, tf } of list) {
+    for (const end of [0, 1]) {
+      const i = end ? r.p.length - 1 : 0, j = end ? r.p.length - 2 : 1;
+      const p = r.p[i];
+      if (ends.get(key(p)) > 1) continue; // the tunnel goes on as the next way
+      const dx = r.p[j][0] - p[0], dy = r.p[j][1] - p[1], l = Math.hypot(dx, dy) || 1;
+      const hx = dx / l, hy = dy / l, nx = -hy, ny = hx, w = r.w / 2 + 0.8, z = tf(p[0], p[1]);
+      const at = (lat, d, h) => W(p[0] + nx * lat + hx * d, p[1] + ny * lat + hy * d, z + h);
+      const c = cg._chunk(p[0], p[1]);
+      cg.quad(c, at(-w, 0.4, 0), at(w, 0.4, 0), at(w, 0.4, 5.2), at(-w, 0.4, 5.2), dark); // the opening
+      cg.quad(c, at(-w - 1, 0, 5.2), at(w + 1, 0, 5.2), at(w + 1, 0, 6.6), at(-w - 1, 0, 6.6), frame); // lintel
+      for (const sd of [-1, 1]) cg.quad(c, at(sd * w, 0, -0.2), at(sd * (w + 1), 0, -0.2), at(sd * (w + 1), 0, 6.6), at(sd * w, 0, 6.6), frame);
+      n++;
+    }
+  }
+  cg.build(group, 'support');
+  console.log(`road tunnel portals: ${n}`);
+}
+
 // What carries our tracks where they stand above the ground drawn beside them (approach ramps of
 // the bridges whose survey or model stops short, an embankment over a lower street): off the bridges,
 // walls from the bed down to the ground at the outer bed edges and a top between the two tracks; on
@@ -915,7 +1012,7 @@ function buildDtmSteps(cg, ground, col) {
 // Keep the terrain at or below every track's bed: for samples along each track (centre and
 // both bed edges) find the mesh triangle underneath (same split as Terrain.height) and lower
 // its three vertices by the excess. Bridges are skipped.
-function lowerTerrainUnderTracks(data, T) {
+function lowerTerrainUnderTracks(data, T, inTunnel = () => false) {
   const { nx, ny } = T;
   for (let pass = 0; pass < 2; pass++) for (const t of data.tracks) {
     if (t.b) continue;
@@ -923,6 +1020,7 @@ function lowerTerrainUnderTracks(data, T) {
     for (let i = 0; i < L.length; i++) {
       const a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
       const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+      if (inTunnel(L[i][0], L[i][1])) continue; // (in a rock tunnel the hill stays above)
       for (const off of [0, 1.4, -1.4]) {
         const x = L[i][0] - (dy / l) * off, y = L[i][1] + (dx / l) * off;
         const fx = (x - T.x0) / T.dx, fy = (y - T.y0) / T.dy;
@@ -939,7 +1037,7 @@ function lowerTerrainUnderTracks(data, T) {
 }
 
 // Terrain mesh in chunks near the route, coloured by land cover (parks, woods, water).
-function buildTerrain(group, data, route, T, weather) {
+function buildTerrain(group, data, route, T, weather, hole = () => false) {
   const { nx, ny } = T;
   const cls = new Uint8Array(nx * ny); // 0 ground, 1 grass, 2 wood, 3 water
   const mark = (ring, v) => {
@@ -987,6 +1085,7 @@ function buildTerrain(group, data, route, T, weather) {
       const idx = [];
       for (let j = 0; j < h - 1; j++) for (let i = 0; i < w - 1; i++) {
         const a = j * w + i, b = a + 1, c = a + w, d = c + 1;
+        if (hole(T.x0 + (ci + i + 0.5) * T.dx, T.y0 + (cj + j + 0.5) * T.dy)) continue; // (a tunnel's corridor)
         // grid rows go south (dy < 0), so this winding faces up
         idx.push(a, c, b, b, c, d);
       }

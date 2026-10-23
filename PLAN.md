@@ -20,10 +20,13 @@ Details and numbers: HANDOFF.md §17.
 directions from PID GTFS + OSM (C13 platforms part done); line 22 re-imported and modelled whole.
 Details: HANDOFF.md §18.
 
-**Next for the street/terrain look (from §18, measured by the new lints):**
-1. Terrain on a fine grid near the route (2 m from lidar + survey edges, clipped at survey area
-   boundaries) instead of lowering the coarse 10 x 15 m lidar triangles: the jagged look beside walls
-   and streets (`terrainOverSurvey` 55 on line 17, all small now).
+**Next for the street/terrain look (from §18-19, measured by the new lints):**
+1. Terrain on a fine grid near the route from IPR "Model terénu 3D" (lidar bare earth, ~40 pts/m²,
+   LERC elevation tiles) plus the ZPS terrain edges, clipped at survey area boundaries, instead of the
+   coarse 10 x 15 m lidar grid: the jagged look beside walls and streets.
+1b. Car lanes: OSM lanes / turn:lanes / placement, smoother kerb fits (kinks on straight roads), a
+   lint for lane kinks and cars on our track where the street has a separate track bed (no open lane
+   or marking data in Prague; orthophoto marking detection is the fallback).
 2. Wall tops and step faces smoothed along their length (they follow every survey vertex).
 3. Remaining rail-support gaps: the estakáda's first span (s 3926-4134, the Mosty deck lies 4-6 m
    under the profile there: check the profile against the model), the Výtoň underpass floor (level -1).
