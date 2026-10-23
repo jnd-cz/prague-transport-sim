@@ -233,6 +233,13 @@ python tools/lint_report.py
 After an intended improvement, run it with `--accept` to make the current reports the new baseline.
 Facts from the user that checks are scored against live in `data/truth.json`.
 
+**Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
+**I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
+overlay is hidden and the mouse moves the camera: **orbit** around the tram (drag to turn, wheel to zoom)
+or **fly** (C; drag to look, W/A/S/D, R/F up/down, Shift faster, wheel = flying speed). PgDn / PgUp
+(or . / ,) put the camera at the next / previous stop, T back to the tram, I leaves (the autopilot keeps
+driving: O hands back the controls). The camera's route position is on the panel, handy with the lints.
+
 **Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
 bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and
 walker heights with the triangles actually drawn and the DTM area class under the wheels, and lists

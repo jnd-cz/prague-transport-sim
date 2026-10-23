@@ -9,6 +9,7 @@ import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
+import { Inspect } from './inspect.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 
@@ -250,6 +251,7 @@ function start() {
   $('mirror').classList.remove('hidden');
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
   if (params.has('bot')) streetBot();
+  if (params.has('inspect')) inspect.toggle(true);
 }
 
 // debugging (?bot): drive and walk every street in the surveyed DTM areas, list what looks wrong
@@ -331,6 +333,8 @@ let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished || !$('menu').classList.contains('hidden')) return;
   const k = e.key.toLowerCase();
+  // dev inspect mode (src/inspect.js): its keys first
+  if (inspect.active ? inspect.key(e) : k === 'i' && !e.repeat && (inspect.toggle(true), true)) return;
   if (k === 'o' && !e.repeat) {
     pilot = pilot ? null : new Autopilot();
     game.autopilot = !!pilot;
@@ -447,6 +451,16 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
+// dev inspect mode: the autopilot drives, time faster or slower, a mouse camera (src/inspect.js)
+const inspect = new Inspect({
+  camera, canvas, getGame: () => game, getTramModel: () => tramModel,
+  onToggle: (on) => {
+    if (on && !pilot) { pilot = new Autopilot(); game.autopilot = true; }
+    if (on) game.paused = false;
+    hud.show(!on);
+  },
+});
+
 let last = performance.now(), hudTimer = 0;
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
@@ -454,12 +468,17 @@ function frame(now) {
   last = now;
   // window.headless: a dev tool steps the game itself (tools/traffic_lint.js); only draw
   if (game && !window.headless) {
-    if (pilot && !game.paused && !game.finished) pilot.step(game, dt);
-    game.update(dt, pilot ? pilot.input : input);
+    // (inspecting: several game steps per frame, or none while paused)
+    for (const h of inspect.active ? inspect.steps(dt) : [dt]) {
+      if (pilot && !game.paused && !game.finished) pilot.step(game, h);
+      game.update(h, pilot ? pilot.input : input);
+      if (inspect.active && !game.paused && !game.finished) traffic.update(h, camera);
+    }
     game.updateVisuals();
     updateCamera(dt, now / 1000);
+    if (inspect.active) inspect.update(dt);
     updateRain(dt);
-    if (!game.paused && !game.finished) traffic.update(dt, camera);
+    if (!inspect.active && !game.paused && !game.finished) traffic.update(dt, camera);
     audio.update(tram, game.currentLimit, dt);
     hudTimer -= dt;
     const inMenu = !$('menu').classList.contains('hidden');

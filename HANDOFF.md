@@ -753,3 +753,8 @@ vertical curves 0, catenary 0. Traffic within the noise band except line 9 walke
 the run before last; nothing in traffic changed) and line 17 overlaps 76 → 100. Line 22 jammed once in
 three runs (stop 31, 4000 s lost; the rerun finished clean): a car stood on our track facing our tram at
 Kubánské náměstí, probably a lane laid onto the track by the carriageway split. Open, intermittent.
+
+**Inspect mode** (same day, user request: faster visual checks than an autopilot ride, with a mouse
+camera): `src/inspect.js`, `?inspect` or the I key. The autopilot drives; time 1/4×-32× (game steps of
+at most 1/30 s, several per frame), pause; orbit and fly cameras; camera jumps to the next/previous
+stop; a panel with the camera's route position. main.js runs `inspect.steps(dt)` game steps per frame.
