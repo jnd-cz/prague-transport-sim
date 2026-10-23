@@ -157,13 +157,14 @@ def corridor_queries(R):
                 "node(around.w:15)[highway=crossing];);out body qt;")
     Q_PLATFORMS = (f"[out:json][timeout:120];{R}(way(around.w:20)[public_transport=platform];"
                    "way(around.w:20)[railway=platform];);out tags geom qt;")
-    Q_BUILDINGS = f"[out:json][timeout:180];{R}way(around.w:110)[building];out tags geom qt;"
-    Q_ROADS = (f"[out:json][timeout:180];{R}way(around.w:90)[highway~\"^(motorway|trunk|primary|secondary|tertiary|"
+    # (the world reaches ~220 m either side: roads, buildings and green; 2026-10-23, was 90-120 m)
+    Q_BUILDINGS = f"[out:json][timeout:180];{R}way(around.w:220)[building];out tags geom qt;"
+    Q_ROADS = (f"[out:json][timeout:180];{R}way(around.w:200)[highway~\"^(motorway|trunk|primary|secondary|tertiary|"
                "residential|unclassified|living_street|service|pedestrian|footway|primary_link|secondary_link|"
                "tertiary_link|trunk_link)$\"];out tags geom qt;")
-    Q_GREEN = (f"[out:json][timeout:180];{R}(way(around.w:120)[landuse~\"^(grass|forest|meadow|recreation_ground|"
-               "village_green|cemetery|allotments)$\"];way(around.w:120)[leisure~\"^(park|garden|pitch)$\"];"
-               "way(around.w:120)[natural~\"^(wood|scrub|grassland)$\"];);out tags geom qt;")
+    Q_GREEN = (f"[out:json][timeout:180];{R}(way(around.w:240)[landuse~\"^(grass|forest|meadow|recreation_ground|"
+               "village_green|cemetery|allotments)$\"];way(around.w:240)[leisure~\"^(park|garden|pitch)$\"];"
+               "way(around.w:240)[natural~\"^(wood|scrub|grassland)$\"];);out tags geom qt;")
     Q_WATER = f"[out:json][timeout:180];{R}(relation(around.w:250)[natural=water];way(around.w:250)[natural=water];);out geom qt;"
 
 
@@ -1031,6 +1032,14 @@ def main():
             road["b"] = 1
         if t.get("tunnel") == "yes":
             road["t"] = 1
+        # lanes as tagged (the game drives one lane per direction unless these say more)
+        for tag, k in (("lanes", "ln"), ("lanes:forward", "lf"), ("lanes:backward", "lb")):
+            try:
+                n = int(str(t.get(tag, "")).split(";")[0])
+                if 0 < n < 9:
+                    road[k] = n
+            except ValueError:
+                pass
         ow = t.get("oneway")
         if ow in ("yes", "true", "1") or t.get("junction") == "roundabout":
             road["o"] = 1

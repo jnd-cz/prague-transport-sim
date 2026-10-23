@@ -64,7 +64,14 @@ function following(gap, vLead) {
   return Math.max(0, Math.min(vLead + (gap - 8) * 0.4, (gap - 3.5) * 0.9));
 }
 
-const CARRIAGEWAY = new Set(['road', 'parking']);
+// lanes per direction: as OSM tags them (lanes:forward / lanes:backward, or lanes on a one-way road,
+// or half of lanes from 4 on a two-way one), else one; turn lanes at junctions are not modelled
+function lanesOf(src, dir) {
+  if (src.o) return src.ln || 1;
+  const own = dir > 0 ? src.lf : src.lb;
+  if (own) return own;
+  return src.ln >= 4 ? Math.floor(src.ln / 2) : 1;
+}
 
 // stand a car on the drawn street surface hf(x, y) (ground level, or the deck of the bridge its road
 // is on): pitch with the slope, roll with the camber
@@ -166,8 +173,25 @@ export class Traffic {
       if (path.length < (r.f ? 15 : 2)) continue;
       if (r.f) {
         if (r.t) continue; // (pedestrian underpasses: nobody walks under the ground here)
-        // footways running along the tracks are platforms/verges: nobody strolls there
-        if (path.length > 30 && nearTrackShare(path) < 0.2) { this.walks.push({ path, off: 0, hf: this.surfaceFn(r), deck: !!r.b }); addIndex('w', this.walks.length - 1, path); }
+        // footways running along the tracks are platforms/verges: nobody strolls there; a footway lying
+        // on the surveyed carriageway for more than 6 m is cut there (crossing a street is fine)
+        const dtm = r.b ? null : this.ground.dtm, keepRuns = [];
+        if (dtm) {
+          const smp = [];
+          for (let s = 0; s <= path.length; s += 2) { const q = path.at(s), c = dtm.classAt(q.x, q.y); smp.push({ q, on: c === 'road' || c === 'parking' || c === 'tram' }); }
+          let cur = [];
+          for (let i = 0; i < smp.length; i++) {
+            let j = i;
+            while (j < smp.length && smp[j].on) j++;
+            if (j - i > 3) { if (cur.length > 1) keepRuns.push(cur); cur = []; i = j - 1; continue; }
+            for (let k = i; k < Math.max(j, i + 1) && k < smp.length; k++) cur.push([smp[k].q.x, smp[k].q.y]);
+            i = Math.max(j, i + 1) - 1;
+          }
+          if (cur.length > 1) keepRuns.push(cur);
+        }
+        for (const wp of dtm ? keepRuns.map((pts) => new Path(pts)) : [path]) {
+          if (wp.length > 30 && nearTrackShare(wp) < 0.2) { this.walks.push({ path: wp, off: 0, hf: this.surfaceFn(r), deck: !!r.b }); addIndex('w', this.walks.length - 1, wp); }
+        }
         continue;
       }
       // cars only on public vehicle roads: no driveways, service yards or courtyards
@@ -178,8 +202,9 @@ export class Traffic {
       // the street the tram runs in: an ordinary part of the network (its cars drive alongside us),
       // its sidewalks get no extra walkers (the tram street's own footways cover them)
       const along = near / n > 0.4;
-      const road = { src: r, path, w: r.w, o: r.o || 0, tram: r.tram, b: r.b || 0, t: r.t || 0, hf: this.surfaceFn(r), ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
+      const road = { src: r, path, w: r.w, o: r.o || 0, tram: r.tram, b: r.b || 0, t: r.t || 0, ln: r.ln, lf: r.lf, lb: r.lb, hf: this.surfaceFn(r), ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
       this._fitRoad(road);
+      this._trackLats(road);
       this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
       this.roads.push(road);
       if (path.length >= 15) addIndex('r', this.roads.length - 1, path); // spawn only on real streets
@@ -189,15 +214,30 @@ export class Traffic {
       // (not along a bridge: only the carriageway is drawn there, its footways are OSM ways of their own;
       // not along a road tunnel: nobody walks under the hill beside the cars)
       if (r.w >= 6 && !r.b && !r.t) for (const side of [1, -1]) {
-        const pts = [];
+        // where the survey covers the street, on its sidewalk: the first sidewalk / paving within 8 m out
+        // from the kerb, 1 m into it (else no path there: walkers used to stroll on parking strips and
+        // carriageway where the kerb fit missed); elsewhere 1.5 m beyond the kerb
+        const dtm = this.ground.dtm, runs = [];
+        let cur = [];
         for (let s = 0; s <= path.length; s += 3) {
           const p = path.at(Math.min(s, path.length)), k = this.kerbs(road, s);
-          const off = side > 0 ? k.hi + 1.5 : k.lo - 1.5;
-          pts.push([p.x + p.hy * off, p.y - p.hx * off]);
+          const kerb = side > 0 ? k.hi : k.lo;
+          let off = kerb + side * 1.5;
+          if (dtm && dtm.covered(p.x, p.y)) {
+            off = null;
+            for (let d = 0.5; d <= 8; d += 0.5) {
+              const o = kerb + side * d, c = dtm.classAt(p.x + p.hy * o, p.y - p.hx * o);
+              if (c === 'sidewalk' || c === 'paved' || c === 'cycle') { off = o + side * 1.0; break; }
+            }
+          }
+          if (off === null) { if (cur.length > 2) runs.push(cur); cur = []; continue; }
+          cur.push([p.x + p.hy * off, p.y - p.hx * off]);
         }
-        if (pts.length < 3) continue;
-        const walk = new Path(smoothPolyline(pts, 1, 4).pts);
-        if (nearTrackShare(walk) < 0.2) { this.walks.push({ path: walk, off: 0, hf: road.hf, deck: !!road.b }); addIndex('w', this.walks.length - 1, walk); }
+        if (cur.length > 2) runs.push(cur);
+        for (const pts of runs) {
+          const walk = new Path(smoothPolyline(pts, 1, 4).pts);
+          if (walk.length > 15 && nearTrackShare(walk) < 0.2) { this.walks.push({ path: walk, off: 0, hf: road.hf, deck: !!road.b }); addIndex('w', this.walks.length - 1, walk); }
+        }
       }
     }
     this._buildLanes();
@@ -229,17 +269,21 @@ export class Traffic {
   // and places without DTM keep the OSM centre line and width.
   _fitRoad(road) {
     const dtm = this.ground.dtm;
-    if (!dtm || road.b || road.t) return; // (the survey's classes are those of the ground level)
+    if (!dtm || road.b) return; // (the survey's classes are those of the ground level)
+    // (a road tunnel: the underground survey of its floor, where there is one)
+    const classAt = road.t ? (x, y) => dtm.classUnder(x, y) : (x, y) => dtm.classAt(x, y);
     const L = road.path.length, n = Math.floor(L / 4) + 1;
     const lo = new Array(n).fill(null), hi = new Array(n).fill(null);
     let any = false;
     for (let i = 0; i < n; i++) {
       const p = road.path.at(Math.min(L, i * 4));
-      if (!dtm.covered(p.x, p.y)) continue;
+      if (!road.t && !dtm.covered(p.x, p.y)) continue;
+      // (1 carriageway; 2 tram area, part of the street only between carriageway; 3 parking, part of it
+      // but no lane: trimmed at the edges like a tram bed at the side)
       const on = [];
       for (let l = -16; l <= 16; l += 0.5) {
-        const c = dtm.classAt(p.x + p.hy * l, p.y - p.hx * l);
-        on.push(CARRIAGEWAY.has(c) ? 1 : c === 'tram' ? 2 : 0);
+        const c = classAt(p.x + p.hy * l, p.y - p.hx * l);
+        on.push(c === 'road' ? 1 : c === 'tram' ? 2 : c === 'parking' ? 3 : 0);
       }
       // the run around the centre (index 32), else the nearest within 8 m
       let k = 32;
@@ -249,7 +293,7 @@ export class Traffic {
       // single 0.5 m holes (paint, a manhole cover area) don't end the carriageway
       while (a > 0 && (on[a - 1] || (a > 1 && on[a - 2]))) a--;
       while (b < on.length - 1 && (on[b + 1] || (b < on.length - 2 && on[b + 2]))) b++;
-      while (a < b && on[a] !== 1) a++; // a track bed at the side is not for cars
+      while (a < b && on[a] !== 1) a++; // a track bed or parking at the side is not for cars
       while (b > a && on[b] !== 1) b--;
       if (on[a] !== 1) continue;
       const width = (b - a) * 0.5 + 0.5;
@@ -275,9 +319,16 @@ export class Traffic {
       }
       return best;
     });
-    const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -2; d <= 2; d++) if (arr[i + d] !== undefined) { s += arr[i + d]; m++; } return s / m; });
-    road.fitLo = smooth(fill(lo, -road.w / 2));
-    road.fitHi = smooth(fill(hi, road.w / 2));
+    // smoothed over ±20 m, and moving sideways at most 0.4 m per 4 m (a fitted kerb jumping at a bus
+    // bay or a driveway made the lane kink on a straight road)
+    const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -5; d <= 5; d++) if (arr[i + d] !== undefined) { const w = 6 - Math.abs(d); s += arr[i + d] * w; m += w; } return s / m; });
+    const limit = (arr) => {
+      for (let i = 1; i < arr.length; i++) arr[i] = Math.max(arr[i - 1] - 0.4, Math.min(arr[i - 1] + 0.4, arr[i]));
+      for (let i = arr.length - 2; i >= 0; i--) arr[i] = Math.max(arr[i + 1] - 0.4, Math.min(arr[i + 1] + 0.4, arr[i]));
+      return arr;
+    };
+    road.fitLo = limit(smooth(fill(lo, -road.w / 2)));
+    road.fitHi = limit(smooth(fill(hi, road.w / 2)));
   }
   // lateral offsets (+ = right) of other vehicle ways running alongside `road` at point p (within 12 m,
   // heading within ~35°), from the centre-line index built in the constructor
@@ -300,6 +351,32 @@ export class Traffic {
     }
     return out;
   }
+  // Tram tracks running along a road (ours and the opposite one), every 4 m: their lateral offsets from
+  // the road's centre line (+ = right). Where both lie in the carriageway, the line between them divides
+  // the two directions; in a narrow street a car's lane then lies on the track of its own direction.
+  _trackLats(road) {
+    const L = road.path.length, n = Math.floor(L / 4) + 1, out = new Array(n);
+    let any = false;
+    for (let i = 0; i < n; i++) {
+      const p = road.path.at(Math.min(L, i * 4)), lats = [];
+      for (const rt of [this.route, this.back]) {
+        if (!rt) continue;
+        const q = rt.nearest(p.x, p.y);
+        if (!q || q.d > road.w / 2 + 6) continue;
+        const h = rt.at(q.s);
+        if (Math.abs(h.hx * p.hx + h.hy * p.hy) < 0.85) continue; // crossing, not along
+        lats.push((h.x - p.x) * p.hy - (h.y - p.y) * p.hx);
+      }
+      out[i] = lats;
+      if (lats.length) any = true;
+    }
+    road.trk = any ? out : null;
+  }
+  tracksAt(r, s) {
+    if (!r.trk) return [];
+    return r.trk[Math.max(0, Math.min(r.trk.length - 1, Math.round(s / 4)))] || [];
+  }
+
   // the two kerb lines of a road at s (m from its centre line, + = right of the road's direction):
   // fitted to the surveyed carriageway where it exists, else the OSM width
   kerbs(r, s) {
@@ -311,12 +388,25 @@ export class Traffic {
   // lateral position (+ = right of the driving direction) of a car on a road at s. Right-hand
   // traffic: 1.8 m in from the right kerb, but never closer than 1.2 m to the middle of a two-way
   // road; one-way roads from 7 m wide have two lanes.
-  laneOffset(r, s, dir, sel = 1) {
+  // Lane k (0 = the right one) of n: 1.7 m in from the right kerb, the others 3 m further each (less
+  // where the band is narrower), never past the divider: the middle of a two-way road, or the line
+  // between the two tracks where both lie in the carriageway (then in a narrow street the lane lies
+  // on the track of its own direction: the Vyšehrad tunnel), or the left kerb of a one-way road.
+  laneOffset(r, s, dir, k = 0) {
     let { lo, hi } = this.kerbs(r, s);
-    if (dir < 0) [lo, hi] = [-hi, -lo]; // the car's own right/left
-    const w = hi - lo, mid = (lo + hi) / 2;
-    if (r.o) return w < 7 ? mid : sel > 0 ? hi - 1.8 : lo + 1.8;
-    return Math.max(hi - 1.8, mid + 1.2);
+    let tk = this.tracksAt(r, s).filter((t) => t > lo - 0.5 && t < hi + 0.5);
+    if (dir < 0) { [lo, hi] = [-hi, -lo]; tk = tk.map((t) => -t); } // the car's own right/left
+    const n = lanesOf(r, dir);
+    let div;
+    if (r.o) div = lo;
+    else if (tk.length >= 2) div = (Math.min(...tk) + Math.max(...tk)) / 2;
+    else div = (lo + hi) / 2;
+    const band = Math.max(0.1, hi - div), step = n > 1 ? Math.max(2.6, Math.min(3.25, (band - 1.7) / (n - 0.5))) : 0;
+    // too narrow for a lane beside the track: on the track of its own direction (right of the divider)
+    const own = tk.filter((t) => t > div);
+    if (band < 3.2 && own.length) return Math.min(...own);
+    const right = hi - Math.min(1.7, band / 2);
+    return Math.max(right - k * step, div + Math.min(1.1, band / 2));
   }
 
   // ------------------------------------------------------------------ lane graph
@@ -337,8 +427,7 @@ export class Traffic {
       r.lanes = [];
       const L = r.path.length, trim = Math.min(5, L * 0.2);
       const dirs = r.o ? [r.o] : [1, -1];
-      const sels = r.o && r.w >= 7 ? [-1, 1] : [1];
-      for (const dir of dirs) for (const sel of sels) {
+      for (const dir of dirs) for (let sel = 0; sel < lanesOf(r, dir); sel++) {
         const pts = [], n = Math.max(2, Math.ceil((L - 2 * trim) / 2));
         for (let i = 0; i <= n; i++) {
           const u = trim + ((L - 2 * trim) * i) / n, sr = dir > 0 ? u : L - u;

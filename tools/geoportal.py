@@ -35,7 +35,7 @@ WALLS = "https://mp.iprpraha.cz/arcgis/rest/services/Hosted/HM_CUR_HM_HLUKOCHR_O
 TREES = "https://mp.iprpraha.cz/arcgis/rest/services/Hosted/OPK_CUR_OPK_SMZ_VP_B/FeatureServer/0"
 TREE_ROWS = "https://mp.iprpraha.cz/arcgis/rest/services/Hosted/URK_CUR_URK_SS_STROMORADI_L/FeatureServer/0"
 
-CORRIDOR = 110.0     # m either side of the route, like the OSM buildings
+CORRIDOR = 220.0     # m either side of the route, like the OSM buildings
 CHUNK = 400.0        # m, building mesh chunks (frustum culling)
 Q = 0.05             # m, vertex quantisation
 R_EARTH = 6378137.0
