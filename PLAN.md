@@ -1,92 +1,126 @@
-# Plan — Tatra T3 Prague (updated 2026-10-22, night)
+# Plan — Tatra T3 Prague (updated 2026-10-23, evening)
 
 Priorities and next steps after the DTM, street-bot and street-model work. HANDOFF.md keeps the
 history and findings; this file says what to do next and how. Update it when a step lands.
 
-## 1. Where we are
+## 1. Where we are (consolidated 2026-10-23, evening)
 
-**Status 2026-10-22, evening:** tier A done, tier B done except the rest of B9 (below); all four
-lines drive to the end in the headless traffic run; all static lints are 0 on all lines; deploy zip
-rebuilt (`dist/tatra-t3-prague.zip`, 12 MB). Details: HANDOFF.md §16, §4 below.
+### 1.1 State
 
-**Status 2026-10-22, night:** line 17 rebuilt on the surveyed streets (DTM) end to end, with two
-levels at bridges and underpasses (traffic and drawing), the surveyed decks in the track profile,
-step walls along the embankment; new lints `bridgeLevels` and `trackLevels` (0 on all lines).
-Details and numbers: HANDOFF.md §17.
+- **Lines**: 9 (→ 10), 17, 22, 23 drive end to end on autopilot and in the headless traffic run; all
+  static lints 0 except the measured look lints below; deploy zip `dist/tatra-t3-prague.zip` 20.9 MB.
+- **Line 17 is the showcase**: surveyed streets (DTM, all seven districts) with the smooth street model
+  (plane fit), two levels at bridges and tunnels, surveyed bridge decks in the profile, embankment step
+  walls, world to ~220 m (roads, buildings, trees), lanes from OSM tags + the survey, platforms of both
+  directions from GTFS, the Vyšehrad tunnel. Line 22 has the survey in Praha 2/10; 9 and 23 none.
+- **Tools**: lints (`tools/lint.js`: static, street bot, traffic run, look and lane checks), inspect mode
+  (`?inspect` / I), street bot (`?bot`), dev switches `?nospread`, `?notunnels`.
 
-**Status 2026-10-23:** line 17 fixes from the user's report (oncoming trams jumping, a survey typo
-"obelisk", wavy streets, spans holding the wire from below, gaps under the tracks), new lints
-`streetWaviness`, `terrainOverSurvey`, `railSupport`, `verticalCurves`, `catenary`; platforms of both
-directions from PID GTFS + OSM (C13 platforms part done); line 22 re-imported and modelled whole.
-Details: HANDOFF.md §18.
+### 1.2 Done 2026-10-23 (details: HANDOFF.md §18-20)
 
-**Next for the street/terrain look (from §18-19, measured by the new lints):**
-1. Terrain on a fine grid near the route from IPR "Model terénu 3D" (lidar bare earth, ~40 pts/m²,
-   LERC elevation tiles) plus the ZPS terrain edges, clipped at survey area boundaries, instead of the
-   coarse 10 x 15 m lidar grid: the jagged look beside walls and streets.
-1b. Car lanes: OSM lanes / turn:lanes / placement, smoother kerb fits (kinks on straight roads), a
-   lint for lane kinks and cars on our track where the street has a separate track bed (no open lane
-   or marking data in Prague; orthophoto marking detection is the fallback).
-2. Wall tops and step faces smoothed along their length (they follow every survey vertex).
-3. Remaining rail-support gaps: the estakáda's first span (s 3926-4134, the Mosty deck lies 4-6 m
-   under the profile there: check the profile against the model), the Výtoň underpass floor (level -1).
-4. The 242-304 m sag under the Holešovice railway bridge (clearance vs vertical curve).
+- Oncoming trams on the track profile (`ground.trackAt`); survey typos above ground rejected ("obelisk");
+  street model as local planes (no arching on slopes), smoothed flush; track corridor laid to the bed.
+- Look lints: street waviness, terrain over survey, rail support, vertical curves, catenary from above,
+  track spacing, lanes. Fixes: spans 7 m over the rails (164 → 0 held the wire from below), vertical
+  curves ≥ 500 m (27 → 1), structure under raised tracks, lawns on the lidar ground.
+- Platforms of both directions from PID GTFS (positions, names, codes, lines) + OSM shapes; stop signs
+  at the GTFS positions; curved strips where the survey has no platform.
+- Track spacing ≥ 3.0 m outside switches and interlaced track (opposite track moved only, for now).
+- Road tunnels kept (cars below ground, portals); the Vyšehrad tunnel built from the underground survey.
+- Inspect mode: autopilot at 1/4×-32×, pause, orbit/fly cameras, jump to stops.
+- Line 17: world widened to ~220 m; lanes: one per direction unless OSM tags more, placed in the
+  surveyed carriageway (no parking strips, no tram beds at the side), divider between the tracks, on
+  the own track where narrow; kerbs smoothed; walkers on sidewalks only (lane problems 3.5 % → 1.5 %,
+  walker hits 135 → 50).
 
-**Car lanes on line 17: measured 2026-10-23, strategy** (lint `lanes`, `tools/lint.js laneQuality`):
-line 17, 89 848 lane samples at 2 m: walkers on the carriageway 965 (footway > 6 m on it), lanes off the
-carriageway 881, doubled (another road's lane alongside the same way) 450, kinks on straight roads
-360, through tram platforms 264 (Trojská 82: no survey there, the OSM road is mapped 4.5 m from the
-track, right beside the platform), on a separate tram bed 189 (Strossmayerovo - Veletržní 113:
-check against the photo, the survey marks a tram area where cars share the street). A third of the
-off/walk findings lie more than ~100 m from the route.
-Data: no open lane or marking data (ZPS has none, "DI" is closed); the IPR orthophoto (leaf-off
-7-8 Apr 2026, 7 cm/px, CC BY, ImageServer `ort/mimovegetacni_letecke_snimkovani`) shows every marking
-(Podolské nábřeží: two lanes + a parking strip each side of the tram bed). Pilot `tools/ortho_lanes.py`:
-1-D cross-section stripes find kerbs, parked cars and rail heads more than paint; needs the tram bed
-and parking areas masked and dashes followed along the road (2-D), a session of work.
-Strategy, in order:
-1. One lane per direction everywhere, placed in the surveyed carriageway minus parking strips (DTM
-   "parking") and separate tram beds; two lanes only where OSM `lanes` (per direction) says so; turn
-   lanes later. Removes doubled lanes and most lane switching.
-2. Kerb fits smoothed harder along the road and limited in how fast they may move sideways (kinks).
-3. Walkers: generated sidewalks only where the survey has sidewalk at the offset (else none); OSM
-   footways cut where they run on the carriageway except at crossings.
-4. Pilot areas to tune on, each with the lint and an orthophoto overlay: Podolské nábřeží (s 10 400-
-   10 800, two lanes + parking, separate tram bed), Strossmayerovo - Veletržní (s 16 300-16 800, shared
-   tracks, island stop), Trojská (s 18 400-18 700, no survey, stops), Palackého nám. (s 12 300-12 800,
-   doubled ways).
-5. Orthophoto markings (2-D dash tracking) as a validation lint first, then as lane positions where
-   OSM has no `lanes`.
+### 1.3 Waiting for the user's answer (proposals not yet decided)
 
-**Both directions drivable (user, 2026-10-23):** the minimum track spacing must then push both tracks
-apart symmetrically (half each), and every placement tied to a track (stops, signals, signs, poles)
-must follow the moved positions. Today only the opposite track moves (`src/trackfix.js`).
+1. **Fine terrain** from IPR "Model terénu 3D" (lidar, ~40 pts/m², LERC tiles) + ZPS terrain edges near
+   the route, replacing the 10 × 15 m grid (the jagged terrain). Go?
+2. **Shared city world in chunks** (U4, §7): first route-independent geometry (a profile per track),
+   then tiles. When?
+3. **Traffic counts by seed average** (3 seeds per line) before judging ±20-30 % changes. Go?
+4. **Line 23 close spot at Malostranská** (OSM tracks 0.7 m apart over less than the 25 m a gauntlet
+   needs: no block control, two trams met once): treat any stretch under 1.8 m as a gauntlet, or check
+   the OSM geometry there?
+5. **Line 9 platforms**: its OSM platform cache is empty (the Overpass query came back empty), 80 of 93
+   platforms are GTFS-only strips. Retry the fetch per stretch?
+6. **Rail support left on line 17**: the estakáda's first span (s 3926-4134), the Mosty deck model lies
+   4-6 m under the profile: trust the model there (profile follows it) or the ramp?
 
-**New from the user (2026-10-22, night), to schedule:**
+### 1.4 New observations (user inspection 2026-10-23), grouped
+
+**A. Bridges, tunnels, underpasses**
+- A1 Regression: tunnel portals show an opaque dark rectangle at the far end (the road-portal "opening"
+  quad blocks the view through; cut the terrain for the portal instead).
+- A2 Bridge models clip the track / road surface: the overpass near Nádraží Modřany, both ends of
+  Čechův most, Trojský most, Štefánikův most. Proposal: a lint "model surface above the deck we drive
+  on" along every bridge we or the cars use; fit each Mosty 3D span to the surveyed deck / profile (a
+  vertical shift per span end, blended), and cut model parts above the deck within the road width,
+  as for the tram envelope today.
+- A3 Footways on bridges hang near the water: footway bridge ways without a surveyed deck fall back to
+  a span between their ends (on the banks). Use the Mosty model top / the route deck for them.
+- A4 Missing: the new railway overpass at Výstaviště (check Mosty 3D and OSM; we draw railways only
+  where the survey has rail areas).
+- A5 Letenský tunel: its cars come down the hill instead of out of the tube (the portal height is the
+  lidar hill; use the surveyed approach ramp and the underground level).
+- A6 Pedestrian underpass at Pobřežní cesta (footway tunnels are skipped today: draw them and let
+  walkers use them).
+- A7 Karlovy lázně: the narrow street by the building, and the passage under the building in both
+  directions (only one is drawn; building passages are dropped by the importer).
+
+**B. Streets and terrain shape**
+- B1 Roads arch near the water around Podolská vodárna and Výtoň (embankment roads beside the lower
+  quay: the street fit still mixes the two levels there).
+- B2 Use the detailed survey layers where feasible, first on the pilot areas: walls as lines with top
+  and foot heights ("Hranice zdi"), terrain edges ("Terénní hrana"), railings ("Zábradlí"), guardrails
+  ("Svodidlo"), tunnel floors.
+- B3 Fine terrain (1.3 item 1).
+
+**C. Stops**
+- C1 Ke Stírce towards Trojská (from Kobylisy) is a Vienna-type stop: the platform is the kerb, not on
+  the road (truth.json).
+- C2 Sídliště Řepy (line 9): several platforms on separate tracks, different lines use different tracks;
+  our two stops are merged. Build stops per GTFS platform (stop_id / code) on the track that line uses.
+- C3 Both directions drivable later: track spacing pushed half each way, every placement follows.
+
+**D. Traffic and signals**
+- D1 Cars with GO at a junction and the tram standing (at a stop): cars go on; they wait only for a
+  moving / approaching tram (today they stop far ahead and block the street).
+- D2 Real traffic lights for cars and pedestrians where OSM marks a controlled junction or crossing
+  (`highway=traffic_signals`, `crossing=traffic_signals`), coordinated with our tram signal cycles;
+  tram signal heads on the overhead signal gantry in the Czech design.
+- D3 Lanes: visual pass on the four pilot areas (Podolské nábřeží, Strossmayerovo - Veletržní, Trojská,
+  Palackého nám.); lines 9, 22, 23 re-run with the new lane rules; turn lanes and the orthophoto check
+  later.
+
+### 1.5 Priorities (next steps, in order)
+
+1. **Regressions and quick wrong places** (each small): A1 portals, A3 bridge footways, A5 Letenský tunel
+   cars, D1 cars and a standing tram, C1 Ke Stírce, D3 re-run lines 9/22/23.
+2. **Structures fitted to the data** (one lint, then fixes): A2 bridge models vs decks (four places),
+   A7 Karlovy lázně passage, A6 Pobřežní cesta underpass, A4 Výstaviště railway bridge, B1 arching by
+   the water.
+3. **Pilot areas on the detailed survey** (B2 + the lane pilots): walls with heights, terrain edges,
+   railings, guardrails on Podolské nábřeží, Strossmayerovo - Veletržní, Trojská, Palackého nám. and
+   Podolská vodárna - Výtoň; then the fine terrain (B3) if the user says go.
+4. **Traffic realism**: D2 car and pedestrian signals with the tram cycles and Czech gantries; U3 cars
+   turning left in front of the tram; seed averaging; turn lanes; orthophoto lane check.
+5. **Stops and network**: C2 Sídliště Řepy per platform; both directions drivable (C3); C11 line ends
+   and depots; C12 line 37.
+6. **Larger**: U1 survey on every line; U4 shared city in chunks; U2 number plates; C15 sounds (samples);
+   16 bridges by type, 16b buildings, 16c street imagery.
+
+### 1.6 Earlier user items still open (2026-10-22)
 - **U1 Rebuild every line on the detailed DTM** like line 17 (9 and 23 have no survey yet, 22 only
-  Praha 2/10): download the districts (links on the Geoportál "ke stažení" pages, uuids change
-  monthly), `dtm.py`, `streets.py` for the whole line, lints. Watch the JS heap (line 17: 1.1 GB).
-- **U2 Line number plates on the trams**: front blue plates without the white border; the top one
-  the size of the model's built-in plate; the one hanging on the mirror assembly smaller and
-  rectangular; the rear one inverted (blue on white) on the bottom edge of the rear glass (mounted
-  inside); in front a similar blue-on-white card behind the glass with the terminus. User can send
-  photos.
-- **U3 Cars turning left in front of the tram** (a major accident cause, at signals and at unsignalled
-  crossings): car indicators; the driver and the autopilot watch for a car about to turn left across
-  the track, ring the bell, which makes the car yield and stop before the track in time; cars
-  standing well ahead are safe. Needs blinkers on the car models and a "turning across" state in the
-  lane graph (the connector already knows it), plus a lint (left-turners crossing in front of us).
-- **U4 Shared city world loaded in chunks** around the tram with a buffer ahead, instead of one
-  prebuilt line that shows other mapped lines as unknown land. See §7 (Codex's proposal and my take).
-
-**Next, in order:**
-1. Traffic counts: average 3 seeds per line (lint option; the runs differ with timing after the
-   street bot), then the largest causes (walker slides, walkers inside vehicles, junction slides).
-2. Oncoming trams through red (line 9: 36): find why they do not commit to stopping.
-3. Tier C: C11 line ends and depots (loops in the path, layovers, depots), C12 line 37 (dedicated
-   Ohrada – Palmovka corridor and bridge), C13 stops (curved platform kerbs, stop-type classifier
-   validated against truth, then Vienna-type stops for B9).
-4. C15 sounds as soon as the user's samples are there.
+  Praha 2/10). Watch the JS heap (line 17: 1.4 GB with the wider world).
+- **U2 Line number plates on the trams**: front blue plates without the white border; the top one the
+  size of the model's built-in plate; the one on the mirror assembly smaller and rectangular; the rear
+  one inverted (blue on white) on the bottom edge of the rear glass; a blue-on-white terminus card
+  behind the front glass. User can send photos.
+- **U3 Cars turning left in front of the tram**: car indicators; the driver and the autopilot watch for
+  them, ring the bell, the car yields before the track; a lint.
+- **U4 Shared city world in chunks** (§7).
 
 **Done and verified (autopilot clean on lines 9, 17, 22, 23):**
 - Game: T3 physics and controller, stops/passengers/timetable (PID GTFS), Prague tram signals with
