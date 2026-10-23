@@ -4,14 +4,9 @@
   {
    "name": "Čechův most",
    "towards": "Kobylisy",
-   "type": "vienna",
-   "source": "user 2026-10-22"
-  },
-  {
-   "name": "Krymská",
-   "towards": "*",
-   "type": "vienna",
-   "source": "user 2026-10-22"
+   "type": "vienna-cycle",
+   "source": "user 2026-10-22; user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)",
+   "text": "towards Kobylisy (from the centre): vienna-cycle; towards the centre: classic vienna (both rebuilt 2023)"
   },
   {
    "name": "Újezd",
@@ -35,13 +30,144 @@
    "name": "Ke Stírce",
    "from": "Kobylisy",
    "type": "vienna",
-   "source": "user 2026-10-23"
+   "source": "user 2026-10-23",
+   "text": "user: Vienna-type, physical stop at the kerb; research list: street-level boarding mentioned (forum 2023, weak)"
   },
   {
    "name": "Sídliště Řepy",
    "towards": "*",
    "type": "multi-platform",
    "text": "several platforms on separate tracks; different lines use different tracks",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Čechův most",
+   "towards": "centrum",
+   "type": "vienna",
+   "year": 2023,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Letenské náměstí",
+   "from": "Sparta",
+   "type": "vienna",
+   "year": 1999,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Nádraží Vysočany",
+   "from": "Poliklinika Vysočany",
+   "type": "vienna",
+   "year": 2002,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Albertov",
+   "from": "Botanická zahrada",
+   "type": "vienna",
+   "year": 2007,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Dělnická",
+   "towards": "*",
+   "type": "vienna",
+   "year": 2014,
+   "text": "both: from Ortenovo náměstí and from Pražská tržnice",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "U Průhonu",
+   "towards": "?",
+   "type": "vienna",
+   "year": 2015,
+   "text": "direction not given in the source",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Ortenovo náměstí",
+   "towards": "Dělnická",
+   "type": "vienna",
+   "year": 2015,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Tusarova",
+   "towards": "?",
+   "type": "vienna",
+   "year": 2015,
+   "text": "direction not given in the source",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Plynárna Michle",
+   "towards": "Chodovská",
+   "type": "vienna",
+   "year": 2017,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Maniny",
+   "towards": "*",
+   "type": "vienna",
+   "year": 2018,
+   "text": "both: from Libeňský most and from Dělnická",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Holešovická tržnice",
+   "towards": "Vltavská",
+   "type": "vienna",
+   "year": 2022,
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Orionka",
+   "towards": "Perunova",
+   "type": "street",
+   "text": "older description; current state to check",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Vinohradská vodárna",
+   "towards": "Šumavská",
+   "type": "street",
+   "text": "older description; current state to check",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Nuselská radnice",
+   "towards": "Palouček",
+   "type": "street",
+   "text": "a stop kerb was planned (TSK 2021): check",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Březiněveská",
+   "towards": "?",
+   "type": "street",
+   "text": "weak: forum 2023; our survey: opposite direction (from Kobylisy) has carriageway at the doors",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Zborovská",
+   "towards": "?",
+   "type": "street",
+   "text": "forum 2023, \"no refuge\"; check",
+   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+  },
+  {
+   "name": "Krymská",
+   "towards": "Jana Masaryka",
+   "type": "vienna-cycle",
+   "text": "Francouzská street, uphill towards the centre (cycle stop, 2014)",
+   "source": "user 2026-10-23 (correction of 2026-10-22: one direction only)"
+  },
+  {
+   "name": "Krymská",
+   "towards": "Ruská",
+   "type": "kerb",
+   "text": "regular high stop kerb next to the tram track",
    "source": "user 2026-10-23"
   }
  ],
@@ -128,5 +254,14 @@
    "text": "Car tunnel: cars come out of the tube, not down the hill",
    "source": "user 2026-10-23"
   }
+ ],
+ "stopTypes": {
+  "vienna": "the lane between the kerb and the track raised to platform height; cars drive over it and stop behind the open doors",
+  "vienna-cycle": "as vienna, but only the cycle strip is raised; for cars a classic stop kerb (Krymská, Čechův most from the centre)",
+  "street": "boarding from the ordinary carriageway, no raised surface between the kerb and the tram",
+  "kerb": "a raised stop kerb (zastávkový mys) or island right at the track: boarding level with the platform, no traffic between"
+ },
+ "notes": [
+  "Vodičkova (towards Lazarská) was a vienna stop 1996-2014, now a stop kerb: not vienna."
  ]
 }

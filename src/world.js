@@ -44,6 +44,7 @@ function densify(line, maxLen = 4) {
   }
   return out;
 }
+const polyLength = (line) => line.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - line[i - 1][0], p[1] - line[i - 1][1]) : 0), 0);
 
 // Grid of line segments for fast "distance to the nearest X" queries (tracks, roads).
 class SegmentIndex {
@@ -380,9 +381,26 @@ export function buildWorld(scene, data, route, ground, weather) {
     const n = route.nearest(x, y);
     return !!n && n.d < TUN_W + pad && rock.some(([a, b]) => n.s > a - 0.5 && n.s < b + 0.5);
   };
+  // road tunnels: drawn inside where they share our tunnel without an underground survey (else the
+  // survey's floor is drawn there); a short one (a building passage, an underpass: under SHORT_TUNNEL m
+  // in all) as an open road at its graded height, the building or bridge over it is its roof; a long
+  // one below ground, with a mouth at each open end
+  const SHORT_TUNNEL = 60, tunnelRoads = [], tunnelPortals = [];
+  for (const r of data.roads) {
+    if (!r.t || r.z) continue;
+    const tf = ground.way(r.way || r.p, false, true), L = polyLength(r.way || r.p);
+    const inside = densify(r.p, 3).filter((p) => inTunnel(p[0], p[1], 2));
+    if (inside.length > 1) { if (!ground.dtm?.under?.length) tunnelRoads.push({ r, inside, tf }); }
+    else if (L < SHORT_TUNNEL) tunnelRoads.push({ r, inside: densify(r.p, 3), tf });
+    else if (r.c) tunnelPortals.push({ r, tf, L });
+  }
+  const mouths = roadPortalMouths(tunnelPortals);
   lowerTerrainUnderTracks(data, ground.terrain, inTunnel);
   if (ground.dtm) lowerTerrainUnderDtm(ground.dtm, ground.terrain);
-  buildTerrain(group, data, route, ground.terrain, weather, (x, y) => inTunnel(x, y, 3));
+  const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
+  const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
+  buildTerrain(group, data, route, ground.terrain, weather, (x, y) => inTunnel(x, y, 3) || inMouth(x, y));
+  if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
   if (ground.dtm) buildDtm(group, ground, weather !== 'dry');
 
   const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -390,24 +408,17 @@ export function buildWorld(scene, data, route, ground, weather) {
 
   // roads (wider first so footways draw on top)
   const roadsCg = new ChunkedGeometry(flatMat, { color: true });
-  const tunnelPortals = [];
   const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), paving = new THREE.Color(wet ? '#86817a' : '#a39d90').toArray();
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
     if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
-    // a road tunnel runs below ground: drawn only where it shares our tunnel (Vyšehrad), else portals
-    if (r.t) {
-      const tf = ground.way(r.p, false, true);
-      const inside = densify(r.p, 3).filter((p) => inTunnel(p[0], p[1], 2));
-      if (inside.length > 1 && !ground.dtm?.under?.length) addRibbon(roadsCg, inside, r.w, tf, 0.12, asphalt);
-      else if (r.c) tunnelPortals.push({ r, tf });
-      continue;
-    }
+    if (r.t) continue; // (road tunnels: above)
     // where the surveyed DTM streets exist, they replace the OSM ribbons (on a bridge: its deck)
-    const runs = ground.dtm ? uncoveredRuns(r.p, ground.dtm, r.b ? wayHeight(r.p, true, ground) : null) : [r.p];
+    const runs = ground.dtm ? uncoveredRuns(r.p, ground.dtm, r.b ? wayHeight(r.way || r.p, true, ground) : null) : [r.p];
     // (a bridge spans between the ends of the whole way, not of the piece drawn)
-    const hf = r.b ? wayHeight(r.p, true, ground) : null;
+    const hf = r.b ? wayHeight(r.way || r.p, true, ground) : null;
     for (const run of runs) addRibbon(roadsCg, run, r.w, hf || wayHeight(run, false, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
   }
+  for (const { r, inside, tf } of tunnelRoads) addRibbon(roadsCg, inside, r.w, tf, 0.12, asphalt);
   roadsCg.build(group, 'road');
 
   // track bed + rails for every tram track around the route
@@ -440,7 +451,7 @@ export function buildWorld(scene, data, route, ground, weather) {
 
   buildBridges(group, data, route, ground);
   buildRockTunnels(group, route, ground, rock, TUN_W, wet);
-  buildRoadPortals(group, tunnelPortals, wet);
+  buildRoadPortals(group, mouths, ground.terrain, wet);
 
   if (data.geo?.buildings?.arr) buildLod2(group, data, route, ground);
   else buildOsmBuildings(group, data, route, ground);
@@ -545,6 +556,32 @@ function buildLod2(group, data, route, ground) {
   const counts = {};
   const roofMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   let bIndex = 0, lifted = 0, total = 0;
+  // the car roads on bridges: a bridge model is cut out over them too (half their width, 0.4-4.5 m over
+  // their surface; parapet blocks 1.2-1.7 m over the deck stood in the lanes, the lint deckClip)
+  const bridgeRoads = new Map(), RC = 20;
+  for (const r of data.roads) {
+    if (!r.b || !r.c) continue;
+    const hf = ground.way(r.way || r.p, true);
+    for (let i = 1; i < r.p.length; i++) {
+      const a = r.p[i - 1], b = r.p[i], seg = { a, b, hw: r.w / 2, hf };
+      for (let gx = Math.floor((Math.min(a[0], b[0]) - 25) / RC); gx <= Math.floor((Math.max(a[0], b[0]) + 25) / RC); gx++) {
+        for (let gy = Math.floor((Math.min(a[1], b[1]) - 25) / RC); gy <= Math.floor((Math.max(a[1], b[1]) + 25) / RC); gy++) {
+          const k = gx * 100003 + gy;
+          if (!bridgeRoads.has(k)) bridgeRoads.set(k, []);
+          bridgeRoads.get(k).push(seg);
+        }
+      }
+    }
+  }
+  // the bridge road under (x, y) within its half width (+ how far), or null
+  const roadUnder = (x, y, pad = 0) => {
+    for (const sg of bridgeRoads.get(Math.floor(x / RC) * 100003 + Math.floor(y / RC)) || []) {
+      const { a, b } = sg, ex = b[0] - a[0], ey = b[1] - a[1], l2 = ex * ex + ey * ey || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / l2));
+      if (Math.hypot(a[0] + ex * t - x, a[1] + ey * t - y) < sg.hw + pad) return sg;
+    }
+    return null;
+  };
   for (const ch of geo.chunks) {
     const [ox, oy, oz] = ch.o;
     const walls = {};
@@ -554,7 +591,7 @@ function buildLod2(group, data, route, ground) {
     for (const [bi, count] of ch.b.entries()) {
       const isBridge = ch.k?.[bi] === 1; // Mosty 3D: concrete, never lifted or sunk
       // decode this building
-      const xs = new Float32Array(count), ys = new Float32Array(count), zs = new Float32Array(count);
+      let xs = new Float32Array(count), ys = new Float32Array(count), zs = new Float32Array(count);
       let zmin = Infinity;
       for (let i = 0; i < count; i++, v++) {
         xs[i] = ox + arr[v * 3] * q;
@@ -562,37 +599,63 @@ function buildLod2(group, data, route, ground) {
         zs[i] = oz + arr[v * 3 + 2] * q;
         zmin = Math.min(zmin, zs[i]);
       }
+      // a bridge model near our track: triangles split to <= 1.5 m, so the tram's envelope (below) cuts
+      // just that space out of it (a coarse block's top, 1.6-1.9 m over the surveyed bed, spanned the
+      // track with triangles whose centres lay outside the envelope: Modřany s 5070, 5824)
+      let n3 = count;
+      if (isBridge) {
+        const near = (t) => [0, 1, 2].some((k) => route.distance(xs[t + k], ys[t + k]) < 25 || roadUnder(xs[t + k], ys[t + k], 25));
+        const out = [];
+        const split = (a, b, c, depth) => {
+          const l = (p, q2) => Math.hypot(p[0] - q2[0], p[1] - q2[1], p[2] - q2[2]);
+          const lab = l(a, b), lbc = l(b, c), lca = l(c, a), m = Math.max(lab, lbc, lca);
+          if (m <= 1.5 || depth > 10) { out.push(a, b, c); return; }
+          const mid = (p, q2) => [(p[0] + q2[0]) / 2, (p[1] + q2[1]) / 2, (p[2] + q2[2]) / 2];
+          if (m === lab) { const d = mid(a, b); split(a, d, c, depth + 1); split(d, b, c, depth + 1); }
+          else if (m === lbc) { const d = mid(b, c); split(a, b, d, depth + 1); split(a, d, c, depth + 1); }
+          else { const d = mid(c, a); split(a, b, d, depth + 1); split(d, b, c, depth + 1); }
+        };
+        for (let t = 0; t < count; t += 3) {
+          const P = [0, 1, 2].map((k) => [xs[t + k], ys[t + k], zs[t + k]]);
+          if (near(t)) split(P[0], P[1], P[2], 0);
+          else out.push(...P);
+        }
+        if (out.length !== count) {
+          n3 = out.length;
+          xs = Float32Array.from(out, (p) => p[0]); ys = Float32Array.from(out, (p) => p[1]); zs = Float32Array.from(out, (p) => p[2]);
+        }
+      }
       // the tram passes under it (a passage): lift everything below the wire clear of the track
       let clear = -Infinity;
-      for (let i = 0; i < count; i += 3) {
+      for (let i = 0; i < n3; i += 3) {
         if (route.distance(xs[i], ys[i]) < 2.5) clear = Math.max(clear, ground.at(xs[i], ys[i], true) + 6.3);
       }
       if (isBridge) clear = -Infinity;
       if (clear > zmin + 0.5) {
         lifted++;
-        for (let i = 0; i < count; i++) zs[i] = Math.max(zs[i], clear);
+        for (let i = 0; i < n3; i++) zs[i] = Math.max(zs[i], clear);
         zmin = clear;
       } else if (!isBridge) {
-        for (let i = 0; i < count; i++) if (zs[i] < zmin + 0.3) zs[i] -= 2.5; // sink the foundation
+        for (let i = 0; i < n3; i++) if (zs[i] < zmin + 0.3) zs[i] -= 2.5; // sink the foundation
       }
       const r = rng(bIndex * 7919 + 13);
       // classify: roof flatness, height, footprint size, OSM tag under the centroid
       let flat = 0, roof = 0, zmax = -Infinity, minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, cxs = 0, cys = 0;
-      for (let t = 0; t < count; t += 3) {
+      for (let t = 0; t < n3; t += 3) {
         const ux = xs[t + 1] - xs[t], uy = ys[t + 1] - ys[t], uz = zs[t + 1] - zs[t], vx = xs[t + 2] - xs[t], vy = ys[t + 2] - ys[t], vz = zs[t + 2] - zs[t];
         const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz);
         if (l > 1e-6 && Math.abs(nz) / l > 0.3) { roof += l; if (Math.abs(nz) / l > 0.97) flat += l; }
       }
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < n3; i++) {
         zmax = Math.max(zmax, zs[i]); cxs += xs[i]; cys += ys[i];
         minX = Math.min(minX, xs[i]); maxX = Math.max(maxX, xs[i]); minY = Math.min(minY, ys[i]); maxY = Math.max(maxY, ys[i]);
       }
-      const cls = buildingClass(kindAt(cxs / count, cys / count), roof ? flat / roof : 0, zmax - zmin, (maxX - minX) * (maxY - minY) * 0.6);
+      const cls = buildingClass(kindAt(cxs / n3, cys / n3), roof ? flat / roof : 0, zmax - zmin, (maxX - minX) * (maxY - minY) * 0.6);
       counts[isBridge ? 'bridge' : cls] = (counts[isBridge ? 'bridge' : cls] || 0) + 1;
       const C = CLASSES[cls], W = walls[cls], pal = CLASS_COLORS[cls];
       const facade = pal ? new THREE.Color(pal[Math.floor(r() * pal.length)]) : FACADE_COLORS[Math.floor(r() * FACADE_COLORS.length)];
       const roofTile = ROOF_COLORS[Math.floor(r() * 3)], roofFlat = new THREE.Color('#77736d');
-      for (let t = 0; t < count; t += 3) {
+      for (let t = 0; t < n3; t += 3) {
         const ax = xs[t], ay = ys[t], az = zs[t], bx = xs[t + 1], by = ys[t + 1], bz = zs[t + 1], cx = xs[t + 2], cy = ys[t + 2], cz = zs[t + 2];
         // nothing of a bridge model inside the space our tram sweeps (±3 m, 0.4-5.8 m above the
         // rails): at the north end of Čechův most a slab 3.7 m above the deck cut through the tram
@@ -601,6 +664,11 @@ function buildLod2(group, data, route, ground) {
           if (n && n.d < 3) {
             const zr = ground.profile.height(n.s) + 0.26, mz = (az + bz + cz) / 3;
             if (mz > zr + 0.4 && mz < zr + 5.8) continue;
+          }
+          const rd = roadUnder(mx, my);
+          if (rd) {
+            const zr = rd.hf(mx, my), mz = (az + bz + cz) / 3;
+            if (mz > zr + 0.4 && mz < zr + 4.5) continue;
           }
         }
         let nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
@@ -930,32 +998,123 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
   console.log(`rock tunnels: ${rock.map(([a, b]) => `${Math.round(a)}-${Math.round(b)}`).join(', ')}`);
 }
 
-// Road tunnels away from our track (Letenský tunel): the cars run below ground; at each end that is not
-// another tunnel way, a portal frame with a dark opening facing out of the hill.
-function buildRoadPortals(group, list, wet) {
-  if (!list.length) return;
-  const key = (p) => `${p[0]},${p[1]}`, ends = new Map();
+// Road tunnels away from our track (Letenský tunel): the cars run below ground. At each end that is
+// not another tunnel way, a mouth: a portal frame and a THROAT_D m deep dark tube into the hill
+// (floor, walls, flat roof, darker inward, a black end far in), so cars drive out of darkness (a flat
+// dark quad at the mouth read as an opaque wall). The terrain cells over a mouth are cut out
+// (buildTerrain's hole) and covered again at 2-3 m: over the throat at least 0.6 m above its roof,
+// in front of it down to the road; a headwall above the lintel reaches up to the hill.
+const THROAT_D = 24, THROAT_H = 5.2;
+function roadPortalMouths(list) {
+  const key = (p) => `${p[0]},${p[1]}`, ends = new Map(), out = [];
   for (const { r } of list) for (const p of [r.p[0], r.p[r.p.length - 1]]) ends.set(key(p), (ends.get(key(p)) || 0) + 1);
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
-  const frame = new THREE.Color(wet ? '#77736b' : '#9a958a').toArray(), dark = [0.06, 0.06, 0.07];
-  let n = 0;
-  for (const { r, tf } of list) {
+  for (const { r, tf, L } of list) {
+    const D = Math.min(THROAT_D, L / 2);
     for (const end of [0, 1]) {
-      const i = end ? r.p.length - 1 : 0, j = end ? r.p.length - 2 : 1;
-      const p = r.p[i];
+      const i = end ? r.p.length - 1 : 0, j = end ? r.p.length - 2 : 1, p = r.p[i];
       if (ends.get(key(p)) > 1) continue; // the tunnel goes on as the next way
+      const w0 = r.way || r.p, at0 = key(w0[0]) === key(p) ? 0 : key(w0[w0.length - 1]) === key(p) ? 1 : -1;
+      if (at0 < 0 || (w0.open && !w0.open[at0])) continue; // (past the edge of the imported roads: no portal)
       const dx = r.p[j][0] - p[0], dy = r.p[j][1] - p[1], l = Math.hypot(dx, dy) || 1;
-      const hx = dx / l, hy = dy / l, nx = -hy, ny = hx, w = r.w / 2 + 0.8, z = tf(p[0], p[1]);
-      const at = (lat, d, h) => W(p[0] + nx * lat + hx * d, p[1] + ny * lat + hy * d, z + h);
-      const c = cg._chunk(p[0], p[1]);
-      cg.quad(c, at(-w, 0.4, 0), at(w, 0.4, 0), at(w, 0.4, 5.2), at(-w, 0.4, 5.2), dark); // the opening
-      cg.quad(c, at(-w - 1, 0, 5.2), at(w + 1, 0, 5.2), at(w + 1, 0, 6.6), at(-w - 1, 0, 6.6), frame); // lintel
-      for (const sd of [-1, 1]) cg.quad(c, at(sd * w, 0, -0.2), at(sd * (w + 1), 0, -0.2), at(sd * (w + 1), 0, 6.6), at(sd * w, 0, 6.6), frame);
-      n++;
+      const hx = dx / l, hy = dy / l, nx = -hy, ny = hx, w = r.w / 2 + 0.8;
+      // local frame: d inward along the tunnel, lat across
+      const loc = (x, y) => [(x - p[0]) * hx + (y - p[1]) * hy, (x - p[0]) * nx + (y - p[1]) * ny];
+      const zAt = (d) => tf(p[0] + hx * Math.max(0, d), p[1] + hy * Math.max(0, d));
+      out.push({
+        p, hx, hy, nx, ny, w, zAt, loc, D,
+        // within the mouth's cut (pad: m around it)
+        has(x, y, pad = 0) { const [d, lat] = loc(x, y); return d > -4 - pad && d < D + 2 + pad && Math.abs(lat) < w + 2 + pad; },
+      });
     }
   }
+  return out;
+}
+// The survey's street areas around a mouth often take the portal's crown into their outline (a road
+// area at the Letenský tunel ran 191-206 m: a grey ramp across the opening). Inside a mouth's
+// footprint, street vertices above the tunnel road come down onto it (in place: the height lookup
+// holds the same points). Lawns and the hill over the throat are left alone.
+const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'tram']);
+function fitDtmToMouths(dtm, mouths) {
+  if (!mouths.length || dtm.mouthsFitted) return;
+  dtm.mouthsFitted = true;
+  const seen = new Set();
+  let n = 0;
+  for (const a of dtm.areas) {
+    if (a.l !== 0 || !MOUTH_FIT.has(a.c)) continue;
+    for (const p of [...a.ring, ...a.holes.flat(), ...a.mesh.flat()]) {
+      if (seen.has(p)) continue;
+      seen.add(p);
+      for (const m of mouths) {
+        const [d, lat] = m.loc(p[0], p[1]);
+        if (d < -3 || d > m.D || Math.abs(lat) > m.w + 1.5) continue;
+        const z = m.zAt(d) + 0.05;
+        if (p[2] > z + 0.3) { p[2] = z; n++; }
+      }
+    }
+  }
+  if (n) console.log(`survey points brought down into tunnel mouths: ${n}`);
+}
+function buildRoadPortals(group, mouths, T, wet) {
+  if (!mouths.length) return;
+  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const floorCg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true }), { color: true });
+  const frame = new THREE.Color(wet ? '#77736b' : '#9a958a').toArray(), lining = new THREE.Color('#6d6a64');
+  const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a'), black = new THREE.Color('#050506');
+  const earth = new THREE.Color(wet ? '#5e7346' : '#6f8a4e').toArray();
+  const fade = (c, d, D) => c.clone().lerp(black, Math.min(1, Math.pow(d / D, 0.6))).toArray();
+  for (const m of mouths) {
+    const { p, hx, hy, nx, ny, w, D } = m;
+    const at = (lat, d, h) => W(p[0] + nx * lat + hx * d, p[1] + ny * lat + hy * d, m.zAt(d) + h);
+    const c = cg._chunk(p[0], p[1]), fc = floorCg._chunk(p[0], p[1]);
+    // the throat, 2 m rings
+    for (let d = 0; d < D; d += 2) {
+      const e = Math.min(D, d + 2), col = fade(lining, d + 1, D);
+      floorCg.quad(fc, at(-w, d, 0.12), at(-w, e, 0.12), at(w, e, 0.12), at(w, d, 0.12), fade(asphalt, d + 1, D));
+      cg.quad(c, at(-w, d, 0), at(-w, e, 0), at(-w, e, THROAT_H), at(-w, d, THROAT_H), col);
+      cg.quad(c, at(w, d, 0), at(w, e, 0), at(w, e, THROAT_H), at(w, d, THROAT_H), col);
+      cg.quad(c, at(-w, d, THROAT_H), at(w, d, THROAT_H), at(w, e, THROAT_H), at(-w, e, THROAT_H), col);
+    }
+    cg.quad(c, at(-w, D, 0), at(w, D, 0), at(w, D, THROAT_H), at(-w, D, THROAT_H), black.toArray());
+    // the frame: lintel and jambs, the headwall above the lintel up to the hill over the mouth
+    const W2 = w + 1.5;
+    let top = 6.6;
+    for (const lat of [-W2, 0, W2]) {
+      const x = p[0] + nx * lat + hx, y = p[1] + ny * lat + hy;
+      top = Math.max(top, Math.max(T.height(x, y), m.zAt(1) + THROAT_H + 0.6) - m.zAt(0) + 0.3);
+    }
+    cg.quad(c, at(-W2, 0, THROAT_H), at(W2, 0, THROAT_H), at(W2, 0, top), at(-W2, 0, top), frame);
+    for (const sd of [-1, 1]) cg.quad(c, at(sd * w, 0, -0.2), at(sd * W2, 0, -0.2), at(sd * W2, 0, top), at(sd * w, 0, top), frame);
+  }
   cg.build(group, 'support');
-  console.log(`road tunnel portals: ${n}`);
+  floorCg.build(group, 'road');
+  // the cover over the terrain cells buildTerrain left out
+  const cov = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const pad = Math.hypot(T.dx, T.dy) / 2, seen = new Set();
+  const coverZ = (x, y) => {
+    let z = T.height(x, y);
+    for (const m of mouths) {
+      const [d, lat] = m.loc(x, y);
+      if (Math.abs(lat) > m.w + 2) continue;
+      if (d >= 0 && d < m.D + 2) z = Math.max(z, m.zAt(d) + THROAT_H + 0.6);
+      else if (d < 0 && d > -4) z = Math.min(z, m.zAt(0) - 0.3);
+    }
+    return z;
+  };
+  for (const m of mouths) {
+    for (let d = -4 - pad; d < m.D + 2 + pad; d += 2) for (let lat = -m.w - 2 - pad; lat < m.w + 2 + pad; lat += 2) {
+      const x = m.p[0] + m.hx * d + m.nx * lat, y = m.p[1] + m.hy * d + m.ny * lat;
+      const i = Math.floor((x - T.x0) / T.dx), j = Math.floor((y - T.y0) / T.dy);
+      if (i < 0 || j < 0 || i >= T.nx - 1 || j >= T.ny - 1 || seen.has(j * T.nx + i)) continue;
+      const cx = T.x0 + (i + 0.5) * T.dx, cy = T.y0 + (j + 0.5) * T.dy;
+      if (!mouths.some((q) => q.has(cx, cy, pad))) continue; // (exactly the cells buildTerrain left out)
+      seen.add(j * T.nx + i);
+      const n = 5, x0 = T.x0 + i * T.dx, y0 = T.y0 + j * T.dy, sx = T.dx / n, sy = T.dy / n, ch = cov._chunk(cx, cy);
+      const P = (u, v) => { const X = x0 + u * sx, Y = y0 + v * sy; return W(X, Y, coverZ(X, Y)); };
+      for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) cov.quad(ch, P(a, b), P(a, b + 1), P(a + 1, b + 1), P(a + 1, b), earth);
+    }
+  }
+  cov.build(group);
+  console.log(`road tunnel mouths: ${mouths.length}, terrain cells re-covered: ${seen.size}`);
 }
 
 // What carries our tracks where they stand above the ground drawn beside them (approach ramps of

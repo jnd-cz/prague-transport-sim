@@ -861,3 +861,62 @@ first; OSM fetched slowly in small pieces, in the background and ahead of planne
   bridges (Bpv on both; an ellipsoid mix-up would be ~45 m). Local outliers to fit in A2: s 4200 +4.7 m
   (the estakáda), 4950 +5.8, 5700 +6.7, 11700 +7.9, 12600 +1.2, 13350 +1.4 (other structure parts or
   levels over the surveyed areas). Script: scratch `mosty_check.py` (to become a lint with A2).
+
+## 23. Priority 1 and A2: tunnels, bridge ways, Vienna stops, cars and a standing tram, decks (2026-10-23, night)
+
+Rules, not spots (each measured on line 17; the lints in brackets):
+- **Tunnels and bridges as whole chains** (`chainTunnels` in terrain.js, applied in main.js): OSM splits a
+  tunnel or bridge into many ways; each way spanned between its own ends, so inner ends took the hill
+  top (Letenský tunel cars came down the hill, A5) or the river (footways on bridge pieces hung at the
+  water, A3). Every tunnel / bridge way now carries `way`, the whole chain; heights run along its length.
+  A chain end with no ordinary road within 4.5 m runs past the edge of the imported roads (`way.open`):
+  a tunnel end there is held 8 m under the terrain, a bridge end takes the other end's height. Portal
+  heights come from the approach road (the lowest ground 0-12 m out of the mouth), not the hill face.
+- **Bridge ways on the Mosty 3D deck** (`bridgeModel(geo)`: `ground.model.surfaces / topAt / deckAt`):
+  a bridge way's height is the surveyed deck near the model's deck, else the model's deck (the lowest
+  up-facing surface from 3 m under the span to 15 m over it, above ground + 1.5 m: piers' tops near
+  the water and parapets above are skipped), else the span (never under the ground). Bridge points under
+  1.5 m over the ground: 79 lifted; over water under 3 m: 71 → 24 (the rest abutments in the river
+  polygon).
+- **Road tunnel mouths** (A1): short tunnels (< 60 m in all: building passages, underpasses) are open
+  roads at their graded height; long ones get a mouth only at real portals: a frame and a 24 m dark
+  throat (floor, walls, roof, darker inward), the terrain cells over it cut out and covered again (over
+  the throat at least 0.6 m above its roof, in front of it down to the road), and the survey's street
+  points inside the mouth brought down to the road (a road area at the Letenský tunel ran 191-206 m: the
+  grey "barrier" across the opening was that ramp, 144 points). Visual polish waits for the fine
+  terrain (user: check after the detailed terrain build).
+- **Cars and a standing tram** (D1, traffic.js): a car waits at the track only while the tram's body is
+  on its crossing, or while the tram moves and its front is within 16 m / 4 s of it; a tram standing
+  clear of it does not hold the cars.
+- **Vienna-type stops at runtime, both directions** (C1, game.js `_vienna`): carriageway on the doors'
+  side (2.2-3.4 m right of the track) along the stop: no platform strip or box on the road, sign and
+  shelter at the kerb on the sidewalk. Line 17: Čechův most (ours), Ke Stírce from Kobylisy, and by the
+  survey also Hodkovičky, Březiněveská, Čechův most towards the centre (opposite direction; to confirm).
+  `dtm.vienna` from streets.py was never used before. The user's research list (vienna, vienna-cycle,
+  street-level boarding, per direction; non-exhaustive, accurate to its sources' dates) is in
+  `data/truth.json` (`stopTypes`); Krymská: vienna-cycle towards Jana Masaryka only, a high kerb towards
+  Ruská. Not drawn yet: the raised lane of a true Vienna stop (vs street-level boarding).
+- **Track on the model deck** (A2, decision 6): on a tagged span with Mosty 3D samples the model's deck
+  top is fixed like a surveyed tram bed (interpolated between samples, a floor with 500 m vertical
+  curves into 6 % ramps beyond). The overpass near Nádraží Modřany (s 4060-4120): 203.2-203.5 under the
+  slab → 204.65-204.77 on its top (204.9), approaches at ~3 %. Where the survey has our tram bed on the
+  structure, the survey wins and the model is cut instead (a coarse block up to the parapet top, 1.6-1.9 m
+  over the measured bed at s 5070 and 5824).
+- **Envelope cuts of bridge models** (world.js buildLod2): bridge model triangles near our track or a
+  car road on a bridge are split to <= 1.5 m first, then cut where they lie in the tram's envelope (3 m,
+  0.4-5.8 m over the rails) or over a bridge road (half its width, 0.4-4.5 m over its surface).
+- **Underpass clearances from OSM maxheight** (user idea; `tools/clearances.py` → `data/lineN.json`
+  `clearances`): roads crossing under the route with `maxheight` (posted metres; `default` = 4.2 m on car
+  roads, 2.5 m on footways, assumed also under our tagged bridges); the profile keeps the track at least
+  clearance + 0.8 m over the road where it is 2 m and more above it already (at grade: nábřeží Edvarda
+  Beneše at the end of Čechův most lifted the track 4 m before that rule).
+- **Lints**: `deckClip` (a ray down from 2.5 m over the track / bridge roads against the drawn
+  buildings and bridges): 68 → 19 (rest kerb edges 0.36-0.41 m, one road 1.1 m at (-1222, 792));
+  `underpassClearance`: 0 short of 19 checked. railSupport 94 → 28.
+- **Overpass**: four servers (FOSSGIS, private.coffee, VK Maps, openstreetmap.fr last: fast but data
+  ~3 months old, logged per answer); public servers were saturated all evening (502/504); line 9 asks
+  the opposite direction only where it runs > 50 m from our path (35 pieces instead of 70).
+- Open: red runs on line 17 4 → 8 (seeds 5 / 8 / 10): oncoming trams at the same signals as the baseline
+  (s 20829, 11785, 10263; already 41 km/h at 11785 there): an old fault, its count moves with the seeds;
+  the line 9 fetch still running.
+

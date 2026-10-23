@@ -424,6 +424,50 @@ function syntheticWallsOnStreets(g) {
 // seeds and the counts averaged (each run's counts kept in "runs")
 const SEEDS = [22, 7, 1234];
 
+// Bridge models (Mosty 3D) cutting through what drives on them: an up-facing model surface 0.15-2.5 m
+// over the track (every 2 m of our route) or over a road on a bridge (every vertex of the bridge
+// ways cars use): the slab or parapet clips the tram or the car (A2: Nádraží Modřany overpass, both
+// ends of Čechův most, Trojský most, Štefánikův most). Places per 20 m.
+function deckClip(g, world) {
+  const r = g.route, G = r.ground, prof = G?.profile;
+  if (!G?.model?.size || !prof) return check('bridge-model-clear-of-deck', 0, []);
+  // (what is drawn: a ray down from 2.5 m over the surface to 0.15 m over it, against the building
+  // meshes, Mosty 3D bridges among them, after the tram's envelope is cut out of them)
+  const meshes = [];
+  world.traverse((o) => { if (o.isMesh && o.userData.building) meshes.push(o); });
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), from = new THREE.Vector3();
+  const bad = new Map();
+  let n = 0;
+  const test = (x, y, z, s, what) => {
+    n++;
+    ray.set(from.set(x, z + 2.5, -y), down);
+    ray.far = 2.35;
+    const hit = ray.intersectObjects(meshes, false)[0];
+    if (!hit) return;
+    const mag = hit.point.y - z, k = `${what}${Math.round(x / 20)},${Math.round(y / 20)}`;
+    if (!(bad.get(k)?.mag >= mag)) bad.set(k, { s: Math.round(s), x, y, mag, info: `${what}: model ${mag.toFixed(2)} m over it` });
+  };
+  for (let s = 0; s < r.length; s += 2) { const p = r.at(s); test(p.x, p.y, prof.height(s), s, 'track'); }
+  for (const rd of g.data.roads) {
+    if (!rd.b || !rd.c) continue;
+    const hf = G.way(rd.way || rd.p, true);
+    for (const [x, y] of rd.p) { const q = r.nearest(x, y); test(x, y, hf(x, y), q ? q.s : -1, 'road'); }
+  }
+  return check('bridge-model-clear-of-deck', n, [...bad.values()]);
+}
+
+// Roads passing under our route (OSM maxheight, tools/clearances.py; the profile keeps them as floors):
+// the track at least the clearance + 0.8 m over the road surface. Short by more than 0.1 m is listed.
+function underpassClearance(g) {
+  const prof = g.route.ground?.profile, cs = prof?.clearances || [];
+  const bad = [];
+  for (const c of cs) {
+    const z = prof.height(c.s), short = c.need - z;
+    if (short > 0.1) bad.push({ s: Math.round(c.s), x: c.x, y: c.y, mag: short, info: `${c.name || c.kind} ${c.mh} m (${c.src}): track ${(z - c.zr).toFixed(1)} m over the road, ${short.toFixed(1)} m short` });
+  }
+  return check('underpass-clearance', cs.length, bad);
+}
+
 export async function lint({ bot = false, traffic = false, save = true, seeds = SEEDS } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
@@ -447,6 +491,8 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
     lanes: laneQuality(g),
+    deckClip: deckClip(g, world),
+    underpassClearance: underpassClearance(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });

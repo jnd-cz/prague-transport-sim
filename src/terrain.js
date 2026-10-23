@@ -82,8 +82,108 @@ export function bridgeDecks(geo, route, terrain) {
   return out;
 }
 
+// The Mosty 3D bridge models as a surface lookup anywhere (not only along the route): topAt(x, y, ref,
+// tol) is the highest up-facing model surface at (x, y) within ref ± tol, or null.
+export function bridgeModel(geo) {
+  const grid = new Map(), cell = 10;
+  if (geo?.buildings?.arr) {
+    const { arr, q, chunks } = geo.buildings;
+    for (const ch of chunks) {
+      if (!ch.k) continue;
+      const [ox, oy, oz] = ch.o;
+      let v = ch.v;
+      for (const [bi, count] of ch.b.entries()) {
+        if (ch.k[bi] !== 1) { v += count; continue; }
+        for (let t = 0; t < count; t += 3, v += 3) {
+          const P = [0, 1, 2].map((k) => [ox + arr[(v + k) * 3] * q, oy + arr[(v + k) * 3 + 1] * q, oz + arr[(v + k) * 3 + 2] * q]);
+          // (up-facing only: a deck's top, not its soffit or sides)
+          const ux = P[1][0] - P[0][0], uy = P[1][1] - P[0][1], uz = P[1][2] - P[0][2], wx = P[2][0] - P[0][0], wy = P[2][1] - P[0][1], wz = P[2][2] - P[0][2];
+          const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+          if (Math.abs(nz) < 0.8 * Math.hypot(nx, ny, nz)) continue;
+          const x0 = Math.min(P[0][0], P[1][0], P[2][0]), x1 = Math.max(P[0][0], P[1][0], P[2][0]);
+          const y0 = Math.min(P[0][1], P[1][1], P[2][1]), y1 = Math.max(P[0][1], P[1][1], P[2][1]);
+          for (let i = Math.floor(x0 / cell); i <= Math.floor(x1 / cell); i++) for (let j = Math.floor(y0 / cell); j <= Math.floor(y1 / cell); j++) {
+            const k = i * 100003 + j;
+            if (!grid.has(k)) grid.set(k, []);
+            grid.get(k).push(P);
+          }
+        }
+      }
+    }
+  }
+  return {
+    size: grid.size,
+    topAt(x, y, ref, tol = 4) {
+      const zs = this.surfaces(x, y).filter((z) => Math.abs(z - ref) <= tol);
+      return zs.length ? Math.max(...zs) : null;
+    },
+    // the deck over a way spanning at `span`: the lowest model surface from 3 m under it to 15 m over
+    // it and above `floor` (a high bridge's deck stood 14 m over the span between the ground at its
+    // OSM ends; railings and arches over the deck are higher, piers' tops near the water lower)
+    deckAt(x, y, span, floor = -Infinity) {
+      const zs = this.surfaces(x, y).filter((z) => z > Math.max(span - 3, floor) && z < span + 15);
+      return zs.length ? Math.min(...zs) : null;
+    },
+    surfaces(x, y) {
+      const tris = grid.get(Math.floor(x / cell) * 100003 + Math.floor(y / cell));
+      if (!tris) return [];
+      const out = [];
+      for (const [a, b, c] of tris) {
+        const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+        if (Math.abs(d) < 1e-9) continue;
+        const w1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+        const w2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+        const w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        out.push(w1 * a[2] + w2 * b[2] + w3 * c[2]);
+      }
+      return out;
+    },
+  };
+}
+
+// Road tunnels and bridges drawn in OSM as several ways (a tube split at its lane changes, a bridge
+// at every change of tags): each such way gets `way`, the whole chain it belongs to (joined end to end
+// through ways of the same kind and level only, oriented), so its height runs between the real portals
+// or abutments (makeGround().way). Per way, the inner ends took the ground there: the hill top over
+// the Letenský tunel, the river under a footway on a bridge.
+export function chainTunnels(roads) {
+  return chainWays(roads, 't') + chainWays(roads, 'b');
+}
+function chainWays(roads, flag) {
+  const tun = roads.filter((r) => r[flag] && r.p?.length > 1), key = (p) => `${p[0]},${p[1]}`, at = new Map();
+  for (const r of tun) for (const p of [r.p[0], r.p[r.p.length - 1]]) { const k = key(p); if (!at.has(k)) at.set(k, []); at.get(k).push(r); }
+  const done = new Set();
+  let n = 0;
+  for (const r0 of tun) {
+    if (done.has(r0)) continue;
+    let line = r0.p.slice();
+    const members = [r0];
+    done.add(r0);
+    // grow at both ends while exactly one other unused tunnel way continues there
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const front of [false, true]) {
+        const p = front ? line[0] : line[line.length - 1], next = (at.get(key(p)) || []).filter((r) => !done.has(r));
+        if (next.length !== 1) continue;
+        const r = next[0], pts = key(r.p[0]) === key(p) ? r.p : r.p.slice().reverse();
+        line = front ? [...pts.slice().reverse(), ...line.slice(1)] : [...line, ...pts.slice(1)];
+        members.push(r); done.add(r); grew = true;
+      }
+    }
+    // an end is a portal where an ordinary road goes on from it; else the tunnel runs on past the
+    // edge of the imported roads (the Letenský tunel's Letná end) and that end is no portal
+    // (an ordinary road within 4.5 m: the importer does not always keep the shared node)
+    const roadEnd = (p) => roads.some((r) => !r[flag] && r.p?.length > 1 && r.p.some((q) => Math.abs(q[0] - p[0]) < 4.5 && Math.abs(q[1] - p[1]) < 4.5 && Math.hypot(q[0] - p[0], q[1] - p[1]) < 4.5));
+    line.open = [roadEnd(line[0]), roadEnd(line[line.length - 1])];
+    for (const r of members) r.way = line;
+    n++;
+  }
+  return n;
+}
+
 export class Profile {
-  constructor(route, terrain, bridges = [], tunnels = [], decks = new Map(), dtm = null) {
+  constructor(route, terrain, bridges = [], tunnels = [], decks = new Map(), dtm = null, clearances = []) {
     const step = (this.step = 2);
     const n = (this.n = Math.ceil(route.length / step) + 1);
     Object.assign(this, { route, terrain, dtm, tunnels });
@@ -144,6 +244,7 @@ export class Profile {
     // there), its raw height is the road under the bridge; interpolate between the bed samples instead
     // (Černý kůň: 198.9 m on the deck, 192.2 m on the road below, flattened to 195.5 by the grade limit)
     const bedEnds = new Map(), rawBed = new Float32Array(n);
+    const fixAt = new Uint8Array(n); // deck samples the track is laid on: surveyed bed or the model's deck
     for (const sp of merged) {
       if (bedShare(sp) <= 0.5) continue;
       const i0 = Math.ceil(sp[0] / step), i1 = Math.min(n - 1, Math.floor(sp[1] / step));
@@ -189,12 +290,18 @@ export class Profile {
     if (decks.size) {
       const tagged = (i) => bridges.some(([a, b]) => i * step > a && i * step < b);
       const covered = (i) => tunnels.some(([a, b]) => i * step > a - 20 && i * step < b + 20);
+      // (on a tagged span: the model's deck top, its highest surface from 3 m under the estimate to 4 m
+      // over it; the track lies on it as on a surveyed bed: user decision 2026-10-23, the model wins
+      // and the approaches follow; the old 6 % limit from the streets beside the bridge kept the track
+      // under the slab of the overpass near Nádraží Modřany, 1.4 m)
+      const modelAt = new Float32Array(n).fill(NaN);
+      for (let i = 0; i < n; i++) fixAt[i] = bedAt[i];
       for (const [k, hits] of decks) {
         if (k >= n) continue;
         if (bedAt[k]) continue; // the surveyed tram bed is the deck here
         if (tagged(k)) {
-          const top = Math.max(...hits.filter((h) => Math.abs(h - z[k]) < 3));
-          if (Number.isFinite(top)) z[k] = top;
+          const top = Math.max(...hits.filter((h) => h > z[k] - 3 && h < z[k] + 4));
+          if (Number.isFinite(top)) modelAt[k] = top;
         } else {
           // (the model of one of our own spans reaching past its OSM ends is not overhead: at Černý
           // kůň it pushed the track 3.4 m under its own deck)
@@ -203,11 +310,31 @@ export class Profile {
           if (above.length) soffit[k] = Math.min(...above);
         }
       }
-      for (const [s0, s1] of merged) {
+      for (const sp of merged) {
+        const [s0, s1] = sp;
         let cnt = 0;
         for (let k = Math.ceil(s0 / step); k <= s1 / step; k++) if (decks.has(k)) cnt++;
         if (cnt * step > (s1 - s0) * 0.3 || bedShare([s0, s1]) > 0.5) this.realDecks.push([s0, s1]); // (model or survey)
         if (bedShare([s0, s1]) > 0.5) continue; // surveyed deck: see below
+        // the model's deck: fixed like a surveyed bed (interpolated between its samples, ramps beyond)
+        const k0 = Math.ceil(s0 / step), k1 = Math.min(n - 1, Math.floor(s1 / step));
+        let first = -1, last = -1;
+        for (let k = k0; k <= k1; k++) if (!Number.isNaN(modelAt[k])) { if (first < 0) first = k; last = k; }
+        if (first >= 0) {
+          let prev = first;
+          z[first] = modelAt[first];
+          fixAt[first] = 1;
+          for (let k = first + 1; k <= last; k++) {
+            if (Number.isNaN(modelAt[k])) continue;
+            z[k] = modelAt[k];
+            fixAt[k] = 1;
+            for (let j = prev + 1; j < k; j++) z[j] = z[prev] + ((z[k] - z[prev]) * (j - prev)) / (k - prev);
+            prev = k;
+          }
+          for (let k = first; k <= last; k++) rawBed[k] = z[k];
+          bedEnds.set(sp, [first, last]);
+          continue;
+        }
         // from each end of the span the track climbs or falls at most 6 % on the deck: the street
         // levels beside the bridge win over a model surface that would need a step (the north end
         // of Čechův most: 196.8 m on the model, 193.8 m on the street 20 m further)
@@ -272,11 +399,29 @@ export class Profile {
     const R_V = 500, LT = 0.06 * R_V; // tram track: 500 m minimum vertical radius in streets
     const drop = (d) => (d <= LT ? (d * d) / (2 * R_V) : (LT * LT) / (2 * R_V) + 0.06 * (d - LT));
     const floor = new Float32Array(n).fill(-Infinity);
+    for (let i = 0; i < n; i++) if (bedAt[i]) fixAt[i] = 1;
     for (const [first, last] of bedEnds.values()) for (let j = first; j <= last; j++) {
-      if (!bedAt[j]) continue;
+      if (!fixAt[j]) continue;
       for (let i = Math.max(0, j - 100); i <= Math.min(n - 1, j + 100); i++) floor[i] = Math.max(floor[i], rawBed[j] - drop(Math.abs(i - j) * step));
     }
-    if (bedEnds.size) {
+    // a road passing under the route (OSM maxheight, tools/clearances.py): the track over it stands at
+    // least its clearance plus STRUCTURE m over the road, where the track is clearly above the road
+    // already (a sign at grade belongs to another structure)
+    const STRUCTURE = 0.8;
+    this.clearances = [];
+    for (const c of clearances) {
+      if (c.mh === null || c.mh === undefined) continue;
+      const j = Math.round(c.s / step);
+      if (j < 0 || j >= n) continue;
+      const zr = dtm?.heightAt(c.x, c.y) ?? terrain.height(c.x, c.y);
+      // (at grade: a road meeting the track at the end of our bridge, nábřeží Edvarda Beneše at Čechův
+      // most lifted the track 4 m; every real underpass already has the track 2 m and more above it)
+      if (z[j] - zr < 2) continue;
+      const need = zr + c.mh + STRUCTURE;
+      this.clearances.push({ ...c, zr, need });
+      for (let i = Math.max(0, j - 100); i <= Math.min(n - 1, j + 100); i++) floor[i] = Math.max(floor[i], need - drop(Math.max(0, Math.abs(i - j) * step - 4)));
+    }
+    if (bedEnds.size || this.clearances.length) {
       for (let k = 0; k < 2; k++) { for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i]); z = smooth(z, 3); }
       for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i] - 0.05);
       clear();
@@ -715,19 +860,61 @@ export function makeGround(route, terrain, profile, dtm = null) {
     // the deck it lies on, else a straight span between the ground at its two ends
     way(line, isBridge, isTunnel = false) {
       if (isTunnel) {
-        // a road tunnel: straight between the ground at its two portals (below the hill in between)
-        const a = line[0], b = line[line.length - 1], ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);
-        const lx = b[0] - a[0], ly = b[1] - a[1], l2 = lx * lx + ly * ly || 1;
-        return (x, y) => ha + (hb - ha) * Math.max(0, Math.min(1, ((x - a[0]) * lx + (y - a[1]) * ly) / l2));
+        // a road tunnel (line: the whole chain of its ways, chainTunnels): graded along its length
+        // between its two portals (below the hill in between). A portal's height is the approach
+        // road's: the lowest ground within 12 m out of the mouth (the lidar at the mouth itself is
+        // often the hill face above it; per way, the inner ends took the hill top: Letenský tunel)
+        const acc = [0];
+        for (let i = 1; i < line.length; i++) acc.push(acc[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+        const L = acc[acc.length - 1] || 1;
+        const portal = (p, q) => {
+          const dx = p[0] - q[0], dy = p[1] - q[1], l = Math.hypot(dx, dy) || 1;
+          let z = Infinity;
+          for (let d = 0; d <= 12; d += 3) z = Math.min(z, this.at(p[0] + (dx / l) * d, p[1] + (dy / l) * d));
+          return z;
+        };
+        // (an end cut off by the edge of the imported roads (line.open false) is deep under the hill)
+        const deep = (p) => this.at(p[0], p[1]) - 8;
+        const [oa, ob] = line.open || [true, true];
+        const ha = oa ? portal(line[0], line[1]) : deep(line[0]), hb = ob ? portal(line[line.length - 1], line[line.length - 2]) : deep(line[line.length - 1]);
+        return (x, y) => {
+          let best = Infinity, s = 0;
+          for (let i = 1; i < line.length; i++) {
+            const a = line[i - 1], b = line[i], ex = b[0] - a[0], ey = b[1] - a[1], l2 = ex * ex + ey * ey || 1e-9;
+            const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / l2));
+            const d = (a[0] + ex * t - x) ** 2 + (a[1] + ey * t - y) ** 2;
+            if (d < best) { best = d; s = acc[i - 1] + (acc[i] - acc[i - 1]) * t; }
+          }
+          return ha + ((hb - ha) * s) / L;
+        };
       }
       if (!isBridge) return (x, y) => this.at(x, y);
-      const a = line[0], b = line[line.length - 1];
-      const ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);
-      const lx = b[0] - a[0], ly = b[1] - a[1], l2 = lx * lx + ly * ly || 1;
+      // a bridge (line: the whole chain of its ways): a span along its length between the ground at
+      // its abutments, and on it the surveyed deck near that height, else the Mosty 3D model's top
+      // (footways on bridge pieces sagged towards the river: the span of the piece ended mid-river)
+      const acc = [0];
+      for (let i = 1; i < line.length; i++) acc.push(acc[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+      const L = acc[acc.length - 1] || 1, a = line[0], b = line[line.length - 1];
+      // (an end cut off by the edge of the imported roads (line.open false, mid-river) takes the other's)
+      const [oa, ob] = line.open || [true, true];
+      let ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);
+      if (!oa && ob) ha = hb;
+      else if (oa && !ob) hb = ha;
+      else if (!oa && !ob) ha = hb = Math.max(ha, hb); // (both: one of them is likely mid-river)
+      const model = this.model;
       return (x, y) => {
-        const t = Math.max(0, Math.min(1, ((x - a[0]) * lx + (y - a[1]) * ly) / l2));
-        const span = ha + (hb - ha) * t, d = this.deckSurface(x, y, span + 0.12);
-        return d !== null ? d - 0.12 : span;
+        let best = Infinity, s = 0;
+        for (let i = 1; i < line.length; i++) {
+          const p = line[i - 1], q = line[i], ex = q[0] - p[0], ey = q[1] - p[1], l2 = ex * ex + ey * ey || 1e-9;
+          const t = Math.max(0, Math.min(1, ((x - p[0]) * ex + (y - p[1]) * ey) / l2));
+          const d = (p[0] + ex * t - x) ** 2 + (p[1] + ey * t - y) ** 2;
+          if (d < best) { best = d; s = acc[i - 1] + (acc[i] - acc[i - 1]) * t; }
+        }
+        const span = ha + ((hb - ha) * s) / L, zg = this.at(x, y);
+        const m = model?.deckAt(x, y, span, zg + 1.5) ?? null;
+        const d = this.deckSurface(x, y, (m ?? span) + 0.12);
+        if (d !== null) return d - 0.12;
+        return m !== null ? m : Math.max(span, zg); // (never under the ground)
       };
     },
     // height of a track (its rails' foot) at (x, y): within 6 m of our route, ours and the opposite

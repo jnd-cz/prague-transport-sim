@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Route, extendAlongTracks } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, DtmSurface } from './terrain.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, widenTramStreets } from './world.js';
 import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -46,6 +46,7 @@ try {
 // (dev switches for comparing lint runs: ?nospread, ?notunnels)
 if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
+chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
 // the track beyond both termini, so a two-car set standing at the first stop is on rails
 const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
@@ -55,8 +56,9 @@ route.prepareCant(data.stops.map((st) => ({ p0: st.p0 ?? st.s - 30, p1: st.p1 ??
 const terrain = new Terrain(data.terrain);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm);
+const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm, data.clearances || []);
 const ground = makeGround(route, terrain, profile, dtm);
+ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
 ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls
 route.ground = ground;
 
