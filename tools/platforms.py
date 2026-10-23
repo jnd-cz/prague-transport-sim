@@ -29,25 +29,37 @@ if "--fetch" in sys.argv:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
     from overpass import pieces, query
     els = {}
-    # (the opposite direction only where it runs off our path: elsewhere our boxes, padded 40 m, hold it)
-    ours = [(p[0], p[1]) for p in line["path"]]
-    off = lambda q: min((q[0] - a) ** 2 + (q[1] - b) ** 2 for a, b in ours[::2]) > 50 ** 2  # noqa: E731
-    runs, cur = [line["path"]], []
-    for q in line.get("pathBack", []):
-        if off(q):
-            cur.append(q)
-        elif cur:
+    try:
+        import osm_local  # the local extract (raw/osm/praha.osm.pbf), when there is one: no servers
+    except ImportError:  # (pyosmium not installed)
+        osm_local = None
+    if osm_local and osm_local.available():
+        lat = [LAT0 + p[1] / KY for p in line["path"] + line.get("pathBack", [])]
+        lon = [LON0 + p[0] / KX for p in line["path"] + line.get("pathBack", [])]
+        box = (min(lat) - 0.001, min(lon) - 0.0015, max(lat) + 0.001, max(lon) + 0.0015)
+        for e in osm_local.ways(lambda t: t.get("public_transport") == "platform" or t.get("railway") == "platform", bbox=box):
+            els[(e["type"], e["id"])] = e
+        print(f"  local extract: {len(els)} platform ways in the line's box")
+    else:  # Overpass, in small polite pieces
+        # (the opposite direction only where it runs off our path: elsewhere our boxes, padded 40 m, hold it)
+        ours = [(p[0], p[1]) for p in line["path"]]
+        off = lambda q: min((q[0] - a) ** 2 + (q[1] - b) ** 2 for a, b in ours[::2]) > 50 ** 2  # noqa: E731
+        runs, cur = [line["path"]], []
+        for q in line.get("pathBack", []):
+            if off(q):
+                cur.append(q)
+            elif cur:
+                runs.append(cur)
+                cur = []
+        if cur:
             runs.append(cur)
-            cur = []
-    if cur:
-        runs.append(cur)
-    for path in runs:
-        boxes = pieces([(LAT0 + y / KY, LON0 + x / KX) for x, y, *_ in path])
-        for i, bb in enumerate(boxes):
-            js = query(f"[out:json][timeout:90];(way({bb})[public_transport=platform];way({bb})[railway=platform];);out tags geom qt;")
-            for e in js["elements"]:
-                els[(e["type"], e["id"])] = e
-            print(f"  piece {i + 1}/{len(boxes)}: {len(js['elements'])} ways", flush=True)
+        for path in runs:
+            boxes = pieces([(LAT0 + y / KY, LON0 + x / KX) for x, y, *_ in path])
+            for i, bb in enumerate(boxes):
+                js = query(f"[out:json][timeout:90];(way({bb})[public_transport=platform];way({bb})[railway=platform];);out tags geom qt;")
+                for e in js["elements"]:
+                    els[(e["type"], e["id"])] = e
+                print(f"  piece {i + 1}/{len(boxes)}: {len(js['elements'])} ways", flush=True)
     os.makedirs(os.path.dirname(src), exist_ok=True)
     json.dump({"elements": list(els.values())}, open(src, "w", encoding="utf-8"))
     print(f"fetched {len(els)} platform ways")
