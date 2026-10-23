@@ -69,7 +69,7 @@ python -I tools/osm_speeds.py --line 22
 Only the vegetation from Geoportál again (tree categories): `python -I tools/geoportal.py --line 22 --trees-only`.
 
 Tram platforms of both directions (PID GTFS positions, names and lines; OSM shapes where mapped):
-`python -I tools/platforms.py --line 22` (`--fetch` refreshes the OSM platforms from Overpass).
+`python -I tools/platforms.py --line 22` (`--fetch` refreshes the OSM platforms from Overpass in ~800 m pieces, slowly, via `tools/overpass.py`: cached in raw/overpass/, retried over three servers).
 
 Then the **street model** (smooth streets with fixed level steps, meshed offline): the whole line
 in 1.5 km chunks (line 17: 45 s), or a stretch by route position in metres:

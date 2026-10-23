@@ -33,20 +33,20 @@ history and findings; this file says what to do next and how. Update it when a s
   the own track where narrow; kerbs smoothed; walkers on sidewalks only (lane problems 3.5 % → 1.5 %,
   walker hits 135 → 50).
 
-### 1.3 Waiting for the user's answer (proposals not yet decided)
+### 1.3 Proposals decided by the user (2026-10-23, evening)
 
-1. **Fine terrain** from IPR "Model terénu 3D" (lidar, ~40 pts/m², LERC tiles) + ZPS terrain edges near
-   the route, replacing the 10 × 15 m grid (the jagged terrain). Go?
-2. **Shared city world in chunks** (U4, §7): first route-independent geometry (a profile per track),
-   then tiles. When?
-3. **Traffic counts by seed average** (3 seeds per line) before judging ±20-30 % changes. Go?
-4. **Line 23 close spot at Malostranská** (OSM tracks 0.7 m apart over less than the 25 m a gauntlet
-   needs: no block control, two trams met once): treat any stretch under 1.8 m as a gauntlet, or check
-   the OSM geometry there?
-5. **Line 9 platforms**: its OSM platform cache is empty (the Overpass query came back empty), 80 of 93
-   platforms are GTFS-only strips. Retry the fetch per stretch?
-6. **Rail support left on line 17**: the estakáda's first span (s 3926-4134), the Mosty deck model lies
-   4-6 m under the profile: trust the model there (profile follows it) or the ramp?
+1. **Fine terrain** from IPR "Model terénu 3D" (lidar, ~40 pts/m², LERC tiles) + ZPS terrain edges:
+   **yes, if the performance cost stays acceptable**; simplify from the precise data (not from the coarse
+   grid) to whatever budget the renderer takes.
+2. **Shared city world in chunks** (U4): **after** the current issues, the car traffic tuning and the
+   signals; then switch to one world shared by all lines instead of rebuilding line by line.
+3. **Traffic counts by seed average** (3 seeds): **yes**.
+4. **Line 23 close spot at Malostranská**: **top priority**: check against OSM first, report back.
+5. **Line 9 platforms**: **retry in smaller pieces**; generally fetch OSM slower, in the background and in
+   advance for the planned coverage (a cache per tile, fetched ahead).
+6. **Estakáda first span**: **the track fits the deck model** (and so should roads on decks), approaches
+   and ramps adjusted to follow it; double-check the coordinate compatibility (S-JTSK → local, heights
+   Bpv) first. Likely fixes other bridge issues (A2) too.
 
 ### 1.4 New observations (user inspection 2026-10-23), grouped
 
@@ -98,14 +98,16 @@ history and findings; this file says what to do next and how. Update it when a s
 
 1. **Regressions and quick wrong places** (each small): A1 portals, A3 bridge footways, A5 Letenský tunel
    cars, D1 cars and a standing tram, C1 Ke Stírce, D3 re-run lines 9/22/23.
-2. **Structures fitted to the data** (one lint, then fixes): A2 bridge models vs decks (four places),
+2. **Structures fitted to the data** (one lint, then fixes): A2 bridge models vs decks (four places;
+   decision 6: the track and the roads follow the Mosty deck, ramps adjusted; registration checked OK,
+   HANDOFF §22),
    A7 Karlovy lázně passage, A6 Pobřežní cesta underpass, A4 Výstaviště railway bridge, B1 arching by
    the water.
 3. **Pilot areas on the detailed survey** (B2 + the lane pilots): walls with heights, terrain edges,
    railings, guardrails on Podolské nábřeží, Strossmayerovo - Veletržní, Trojská, Palackého nám. and
    Podolská vodárna - Výtoň; then the fine terrain (B3) if the user says go.
 4. **Traffic realism**: D2 car and pedestrian signals with the tram cycles and Czech gantries; U3 cars
-   turning left in front of the tram; seed averaging; turn lanes; orthophoto lane check.
+   turning left in front of the tram; turn lanes; orthophoto lane check. (Seed averaging: done.)
 5. **Stops and network**: C2 Sídliště Řepy per platform; both directions drivable (C3); C11 line ends
    and depots; C12 line 37.
 6. **Larger**: U1 survey on every line; U4 shared city in chunks; U2 number plates; C15 sounds (samples);

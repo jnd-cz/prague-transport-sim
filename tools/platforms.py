@@ -24,25 +24,21 @@ LAT0, LON0 = line["origin"]
 KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
 src = os.path.join(ROOT, "raw", f"line{LINE}", "platforms.json")
 if "--fetch" in sys.argv:
-    # tram platforms within 20 m of both directions' paths (Overpass, polyline "around", 40 m steps)
-    import urllib.parse
-    import urllib.request
-    pts = []
+    # platform ways in ~800 m boxes along both directions' paths (small cached queries, slow, retried:
+    # one query for the whole line came back empty); the 12 m filter below picks the ones on our tracks
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+    from overpass import pieces, query
+    els = {}
     for path in (line["path"], line.get("pathBack", [])):
-        acc = 1e9
-        for (x0, y0), (x1, y1) in zip(path, path[1:]):
-            acc += math.hypot(x1 - x0, y1 - y0)
-            if acc >= 40:
-                pts.append(f"{LAT0 + y1 / KY:.6f},{LON0 + x1 / KX:.6f}")
-                acc = 0
-    q = (f"[out:json][timeout:180];(way(around:20,{','.join(pts)})[public_transport=platform];"
-         f"way(around:20,{','.join(pts)})[railway=platform];);out tags geom qt;")
-    req = urllib.request.Request("https://overpass-api.de/api/interpreter", data=urllib.parse.urlencode({"data": q}).encode(),
-                                 headers={"User-Agent": "tram-game-prototype/0.1"})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        data = r.read()
+        boxes = pieces([(LAT0 + y / KY, LON0 + x / KX) for x, y, *_ in path])
+        for i, bb in enumerate(boxes):
+            js = query(f"[out:json][timeout:90];(way({bb})[public_transport=platform];way({bb})[railway=platform];);out tags geom qt;")
+            for e in js["elements"]:
+                els[(e["type"], e["id"])] = e
+            print(f"  piece {i + 1}/{len(boxes)}: {len(js['elements'])} ways", flush=True)
     os.makedirs(os.path.dirname(src), exist_ok=True)
-    open(src, "wb").write(data)
+    json.dump({"elements": list(els.values())}, open(src, "w", encoding="utf-8"))
+    print(f"fetched {len(els)} platform ways")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "platforms.json")
 osm = json.load(open(src, encoding="utf-8"))
