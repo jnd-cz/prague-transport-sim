@@ -267,14 +267,33 @@ export class Profile {
     for (let k = 0; k < 3; k++) { clear(); z = smooth(z, 4); }
     clear();
     // the surveyed deck is a floor: the smoothing above (made for lidar spikes) must not pull a short
-    // span below it; away from it the floor falls at 6 %, then everything is eased once more
+    // span below it; away from it the floor falls along a vertical curve of R_V into a 6 % ramp (a
+    // straight 6 % ramp from the deck edge made 173 m crests), then everything is eased once more
+    const R_V = 500, LT = 0.06 * R_V; // tram track: 500 m minimum vertical radius in streets
+    const drop = (d) => (d <= LT ? (d * d) / (2 * R_V) : (LT * LT) / (2 * R_V) + 0.06 * (d - LT));
     const floor = new Float32Array(n).fill(-Infinity);
-    for (const [first, last] of bedEnds.values()) for (let i = first; i <= last; i++) if (bedAt[i]) floor[i] = Math.max(floor[i], rawBed[i]);
-    for (let i = 1; i < n; i++) floor[i] = Math.max(floor[i], floor[i - 1] - 0.06 * step);
-    for (let i = n - 2; i >= 0; i--) floor[i] = Math.max(floor[i], floor[i + 1] - 0.06 * step);
+    for (const [first, last] of bedEnds.values()) for (let j = first; j <= last; j++) {
+      if (!bedAt[j]) continue;
+      for (let i = Math.max(0, j - 100); i <= Math.min(n - 1, j + 100); i++) floor[i] = Math.max(floor[i], rawBed[j] - drop(Math.abs(i - j) * step));
+    }
     if (bedEnds.size) {
       for (let k = 0; k < 2; k++) { for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i]); z = smooth(z, 3); }
       for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i] - 0.05);
+      clear();
+    }
+    // Vertical curves: wherever a crest or sag is sharper than R_V (grade change over 20 m, as the
+    // vertical-curves lint measures it), ease it locally until none is left (deck floors and the
+    // clearance under structures still hold)
+    const gr = (i) => (z[Math.min(n - 1, i + 3)] - z[Math.max(0, i - 3)]) / (6 * step);
+    for (let pass = 0; pass < 300; pass++) {
+      const mark = new Uint8Array(n);
+      let any = false;
+      for (let i = 8; i < n - 8; i++) if (Math.abs(gr(i + 5) - gr(i - 5)) > 20 / R_V) { any = true; for (let k = i - 6; k <= i + 6; k++) mark[k] = 1; }
+      if (!any) break;
+      const z2 = z.slice();
+      for (let i = 1; i < n - 1; i++) if (mark[i]) z2[i] = 0.5 * z[i] + 0.25 * (z[i - 1] + z[i + 1]);
+      z = z2;
+      for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i] - 0.15);
       clear();
     }
     this.z = z;
@@ -488,6 +507,9 @@ export class DtmSurface {
         const n0 = area.mesh.length;
         if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, CLOUD.has(a.c), area.mesh);
         else if (a.l >= 1 && a.c !== 'roof') this._split(p, q, r, ringZ, area.mesh);
+        // a lawn or park has surveyed heights only on its outline: inside, the lidar ground (a flat
+        // sheet between the edges ran up to 8.7 m under the Letná slope, the terrain showing through)
+        else if (a.l === 0 && a.c === 'green') this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, 10);
         else area.mesh.push([p, q, r]);
         // the height lookup uses exactly the drawn triangles, so cars stand on what is drawn
         if (ground) for (let m = n0; m < area.mesh.length; m++) this._index(this.grid, [...area.mesh[m], rank, a.c]);
@@ -543,10 +565,10 @@ export class DtmSurface {
     return sw ? sz / sw : null;
   }
   // longest-edge bisection down to 5 m edges (thin carriageway slivers stay cheap)
-  _split(p, q, r, ground, out, depth = 0) {
+  _split(p, q, r, ground, out, depth = 0, maxEdge = 5) {
     const l0 = Math.hypot(p[0] - q[0], p[1] - q[1]), l1 = Math.hypot(q[0] - r[0], q[1] - r[1]), l2 = Math.hypot(r[0] - p[0], r[1] - p[1]);
     const e = Math.max(l0, l1, l2);
-    if (e <= 5 || depth >= 16) { out.push([p, q, r]); return; }
+    if (e <= maxEdge || depth >= 16) { out.push([p, q, r]); return; }
     if (l1 === e) [p, q, r] = [q, r, p];
     else if (l2 === e) [p, q, r] = [r, p, q];
     // now p-q is the longest edge
@@ -554,8 +576,8 @@ export class DtmSurface {
     const zl = (p[2] + q[2]) / 2;
     // (ground: true = surveyed cloud heights, a function = its height, false = linear)
     const m = [x, y, (typeof ground === 'function' ? ground(x, y) : ground ? this.cloudZ(x, y, 5, zl, 0.6 + 0.02 * e) : null) ?? zl];
-    this._split(p, m, r, ground, out, depth + 1);
-    this._split(m, q, r, ground, out, depth + 1);
+    this._split(p, m, r, ground, out, depth + 1, maxEdge);
+    this._split(m, q, r, ground, out, depth + 1, maxEdge);
   }
   // ground-level surface height where a DTM area covers (x, y): the surveyed points around,
   // else the area's own triangles
@@ -643,7 +665,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const n = route.nearest(x, y);
       if (!n || n.d > 12 || profile.onBridge(n.s)) return z; // (under our bridge: the road below)
       const zt = profile.height(n.s) + 0.14;
-      if (Math.abs(z - zt) > 2.5) return z; // a street above or below the tracks' level
+      if (d >= 3 ? Math.abs(z - zt) > 2.5 : z - zt > 4.5) return z; // a street above or below the tracks' level (in the track corridor: only a structure well above)
       const k = Math.max(0, Math.min(1, (d - 3) / 3));
       return zt + (z - zt) * k * k * (3 - 2 * k);
     },

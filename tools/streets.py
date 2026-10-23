@@ -76,6 +76,21 @@ def poly(a):
 
 ground = [a for a in dtm["areas"] if a["l"] == 0]
 geoms = {id(a): poly(a) for a in ground}
+BOUND = arg("--bound", 0.6)  # (tighter brings the survey noise back: road bumps 2832 unbound, 3429 at 0.4 m on line 17)
+
+
+def bound(z, xs, ys, P, off):
+    """Clamp model heights z at (xs, ys) to within BOUND of the survey points P (x, y, z), inverse-
+    distance weighted (power 2); P None: no bound (platforms: one constant step)."""
+    if P is None or not len(P):
+        return z
+    xs, ys = np.asarray(xs, float), np.asarray(ys, float)
+    d2 = (xs[:, None] - P[None, :, 0]) ** 2 + (ys[:, None] - P[None, :, 1]) ** 2
+    w = 1.0 / (d2 + 0.05)
+    own = (w * P[None, :, 2]).sum(1) / w.sum(1) + off
+    return np.clip(z, own - BOUND, own + BOUND)
+
+
 def surv(a):
     """The surveyed ring (a model area from an earlier chunk keeps its survey in r0)."""
     return a.get("r0", a["r"])
@@ -153,7 +168,7 @@ def run(S0, S1):
     snapped, kept = defaultdict(int), defaultdict(int)
 
 
-    def mesh(g, field, off):
+    def mesh(g, height):
         """Triangles of polygon g on the 8 m / 4 m grid, z = field + off. Returns (verts, tris)."""
         vid, verts, tris = {}, [], []
         gx0, gy0, gx1, gy1 = g.bounds
@@ -180,7 +195,7 @@ def run(S0, S1):
                         tris += ids
         if verts:
             v = np.array(verts)
-            v[:, 2] = zat(field, v[:, 0], v[:, 1]) + off
+            v[:, 2] = height(v[:, 0], v[:, 1])
             verts = [[round(a, 2), round(b, 2), round(c, 3)] for a, b, c in v]
         return verts, tris
 
@@ -252,14 +267,22 @@ def run(S0, S1):
                 kept[c] += 1
                 continue
             field, off = Z, min(0.35, max(0.10, med))
-        verts, tris = mesh(g, field, off)
+        # never more than BOUND off the area's own survey (its corners and the surveyed points inside
+        # it, inverse-distance weighted): the smooth field may remove noise, but a neighbouring street
+        # at another height must not drag the area (the road dropping to the Letná tunnel, line 17)
+        own = np.array([p for p in surv(a) if p[2] is not None], float)
+        if lv == "road" and len(cz):
+            inside = cz[shapely.contains_xy(g, cz[:, 0], cz[:, 1])]
+            own = np.concatenate([own, inside]) if len(inside) else own
+        height = (lambda f, o, P: lambda xs, ys: bound(zat(f, xs, ys) + o, xs, ys, P, o))(field, off, own if lv != "platform" else None)
+        verts, tris = mesh(g, height)
         if not tris:
             kept[c] += 1
             continue
         ntri_new += len(tris) // 3
         ring = [list(p) for p in g.exterior.coords][:-1]
         holes = [[list(p) for p in h.coords][:-1] for h in g.interiors]
-        rz = lambda r: [[round(x, 2), round(y, 2), round(float(z) + off, 3)] for (x, y), z in zip(r, zat(field, [p[0] for p in r], [p[1] for p in r]))]  # noqa: E731
+        rz = lambda r: [[round(x, 2), round(y, 2), round(float(z), 3)] for (x, y), z in zip(r, height(np.array([p[0] for p in r]), np.array([p[1] for p in r])))]  # noqa: E731
         a["r0"], a["h0"] = a["r"], a.get("h", [])
         a["r"], a["h"] = rz(ring), [rz(h) for h in holes]
         if lv != "road":

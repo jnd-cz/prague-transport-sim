@@ -49,6 +49,17 @@ export const fmtDev = (d) => {
 
 // Place an object at route position s with lateral offset, facing direction of travel
 // (or facing the tram when `faceBack`).
+// a glass stop shelter (back panel on its local -x side)
+function makeShelter() {
+  const shelter = new THREE.Group();
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 5), new THREE.MeshLambertMaterial({ color: 0x3d4a52 }));
+  roof.position.y = 2.5;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.1, 5), new THREE.MeshLambertMaterial({ color: 0x9fb8c4, transparent: true, opacity: 0.45 }));
+  back.position.set(-0.75, 1.3, 0);
+  shelter.add(roof, back);
+  return shelter;
+}
+
 function place(obj, route, s, lateral, h = 0, faceBack = false) {
   const o = route.offset(s, lateral);
   obj.position.set(o.x, h + route.ground.atRoute(s, lateral), -o.y);
@@ -136,6 +147,7 @@ export class Game {
   _initStops() {
     const r = this.rand;
     const n = this.data.stops.length;
+    this._buildPlatforms();
     this.stops = this.data.stops.map((s, i) => {
       const central = i > n * 0.25 && i < n * 0.7 ? 1 : 0;
       const request = !!s.request;
@@ -165,12 +177,94 @@ export class Game {
     this.objects.add(this.crowd);
   }
 
+  // Tram platforms of both directions from OSM (tools/platforms.py): each belongs to the nearer of our
+  // track and the opposite one and is built as a strip curved along it, from 1.5 m off the track centre
+  // out to its width, 0.44 m above the rail foot, kerb faces on both sides. Where the surveyed streets
+  // (DTM) have a platform, island or sidewalk there, the survey draws it. The opposite direction's
+  // platforms get a stop sign at their head and a shelter where OSM has one.
+  _buildPlatforms() {
+    const routes = [this.route, this.backRoute].filter(Boolean), ground = this.route.ground, dtm = ground.dtm;
+    const pos = [], col = [];
+    const cTop = new THREE.Color(0xa7a197), cKerb = new THREE.Color(0x8e8a82);
+    const V = (o, z) => [o.x, z, -o.y];
+    const tri = (a, b, c, k) => { pos.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) col.push(k.r, k.g, k.b); };
+    const quad = (a, b, c, d, k) => { tri(a, b, c, k); tri(a, c, d, k); };
+    this.platforms = [];
+    for (const pl of this.data.platforms || []) {
+      let best = null;
+      for (const rt of routes) {
+        const proj = pl.p.map(([x, y]) => rt.nearest(x, y));
+        if (proj.some((q) => !q)) continue;
+        const d = proj.reduce((a, q) => a + q.d, 0) / proj.length;
+        if (!best || d < best.d) best = { rt, proj, d };
+      }
+      if (!best || best.d > 12) continue;
+      const { rt, proj } = best;
+      // (a platform known only from GTFS: its stop position is where the tram front stops; the
+      // platform runs 31 m back from there, room for a two-car set)
+      let s0 = Math.min(...proj.map((q) => q.s)), s1 = Math.max(...proj.map((q) => q.s));
+      if (pl.gtfs) { s1 = proj[0].s + 1; s0 = s1 - 32; }
+      if (s1 - s0 < 8 || s1 - s0 > 120) continue;
+      const lats = pl.p.map(([x, y], i) => { const q = rt.at(proj[i].s); return q.hx * (y - q.y) - q.hy * (x - q.x); }); // + = left
+      const side = Math.sign(lats.reduce((a, b) => a + b, 0)) || -1, far = Math.max(...lats.map((l) => l * side));
+      // (an OSM platform line usually runs along its middle, an area gives its outer edge)
+      const inner = 1.5, outer = Math.min(inner + 6, Math.max(inner + (pl.w || 2.4), pl.gtfs ? far + 1 : pl.area ? far : 2 * far - inner));
+      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter };
+      this.platforms.push(plat);
+      const mid = rt.offset((s0 + s1) / 2, side * (inner + outer) / 2), cls = dtm?.classAt(mid.x, mid.y);
+      plat.surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
+      if (plat.surveyed) continue;
+      let prev = null;
+      const n = Math.max(2, Math.ceil((s1 - s0) / 2));
+      for (let k = 0; k <= n; k++) {
+        const s = s0 + ((s1 - s0) * k) / n, c = rt.at(s);
+        const I = rt.offset(s, side * inner), O = rt.offset(s, side * outer);
+        const zt = ground.trackAt(c.x, c.y), top = zt + 0.44, zg = Math.min(top - 0.05, ground.surface(O.x, O.y) - 0.05);
+        const cur = { I, O, zt, top, zg };
+        if (prev) {
+          quad(V(prev.I, prev.top), V(I, top), V(O, top), V(prev.O, prev.top), cTop);
+          quad(V(prev.I, prev.zt + 0.2), V(I, zt + 0.2), V(I, top), V(prev.I, prev.top), cKerb);
+          quad(V(prev.O, prev.zg), V(O, zg), V(O, top), V(prev.O, prev.top), cKerb);
+        } else quad(V(I, zt + 0.2), V(O, zg), V(O, top), V(I, top), cKerb);
+        prev = cur;
+      }
+      quad(V(prev.I, prev.zt + 0.2), V(prev.O, prev.zg), V(prev.O, prev.top), V(prev.I, prev.top), cKerb);
+    }
+    if (pos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.computeVertexNormals();
+      this.objects.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    }
+    // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
+    // their driving direction is along the back route), shelter where OSM has one
+    for (const p of this.platforms) {
+      if (!p.back) continue;
+      const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
+      const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at), zt = ground.trackAt(o.x, o.y);
+      const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
+      sign.position.set(o.x, zt + 0.44, -o.y);
+      sign.rotation.y = Math.atan2(-h.hx, h.hy);
+      this.objects.add(sign);
+      if (p.shelter) {
+        const sh = makeShelter(), m = p.rt.offset((p.s0 + p.s1) / 2, p.side * (p.outer - 0.6));
+        sh.position.set(m.x, ground.trackAt(m.x, m.y) + 0.44, -m.y);
+        sh.rotation.y = Math.atan2(m.hx, -m.hy) + (p.side > 0 ? Math.PI : 0);
+        this.objects.add(sh);
+      }
+    }
+  }
+
   _buildStop(stop) {
     const route = this.route;
     const g = new THREE.Group();
-    // platform on the right (T3 doors are on the right side only)
+    // our platform: the OSM one (built with both directions' platforms) where it covers the stop zone,
+    // else a 30 m box on the right (T3 doors are on the right side only)
+    const osm = (this.platforms || []).find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20);
     const len = 30, mid = stop.target - len / 2 - 1;
     const plat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), new THREE.MeshLambertMaterial({ color: 0xa7a197 }));
+    plat.visible = !osm;
     place(plat, route, mid, -3.0, 0.11);
     // curved platforms: approximate with a straight box oriented along the chord
     const a = route.offset(stop.target - len - 1, -3.0), b = route.offset(stop.target - 1, -3.0);
@@ -186,14 +280,9 @@ export class Game {
     const sign = makeStopSign(stop.name, stop.request, this.data.stops[stop.i].lines || [String(this.data.line)]);
     place(sign, route, stop.target + 0.5, -2.3, 0.44, true);
     g.add(sign);
-    // shelter
-    const shelter = new THREE.Group();
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 5), new THREE.MeshLambertMaterial({ color: 0x3d4a52 }));
-    roof.position.y = 2.5;
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.1, 5), new THREE.MeshLambertMaterial({ color: 0x9fb8c4, transparent: true, opacity: 0.45 }));
-    back.position.set(-0.75, 1.3, 0);
-    shelter.add(roof, back);
-    place(shelter, route, stop.target - 12, -3.4, 0.44);
+    // shelter (at the back of the OSM platform where there is one)
+    const shelter = makeShelter();
+    place(shelter, route, stop.target - 12, osm ? -(osm.outer - 0.6) : -3.4, 0.44);
     g.add(shelter);
     this.objects.add(g);
   }

@@ -14,6 +14,21 @@ levels at bridges and underpasses (traffic and drawing), the surveyed decks in t
 step walls along the embankment; new lints `bridgeLevels` and `trackLevels` (0 on all lines).
 Details and numbers: HANDOFF.md §17.
 
+**Status 2026-10-23:** line 17 fixes from the user's report (oncoming trams jumping, a survey typo
+"obelisk", wavy streets, spans holding the wire from below, gaps under the tracks), new lints
+`streetWaviness`, `terrainOverSurvey`, `railSupport`, `verticalCurves`, `catenary`; platforms of both
+directions from PID GTFS + OSM (C13 platforms part done); line 22 re-imported and modelled whole.
+Details: HANDOFF.md §18.
+
+**Next for the street/terrain look (from §18, measured by the new lints):**
+1. Terrain on a fine grid near the route (2 m from lidar + survey edges, clipped at survey area
+   boundaries) instead of lowering the coarse 10 x 15 m lidar triangles: the jagged look beside walls
+   and streets (`terrainOverSurvey` 55 on line 17, all small now).
+2. Wall tops and step faces smoothed along their length (they follow every survey vertex).
+3. Remaining rail-support gaps: the estakáda's first span (s 3926-4134, the Mosty deck lies 4-6 m
+   under the profile there: check the profile against the model), the Výtoň underpass floor (level -1).
+4. The 242-304 m sag under the Holešovice railway bridge (clearance vs vertical curve).
+
 **New from the user (2026-10-22, night), to schedule:**
 - **U1 Rebuild every line on the detailed DTM** like line 17 (9 and 23 have no survey yet, 22 only
   Praha 2/10): download the districts (links on the Geoportál "ke stažení" pages, uuids change
