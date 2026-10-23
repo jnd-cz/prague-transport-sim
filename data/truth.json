@@ -43,9 +43,10 @@
   {
    "name": "Čechův most",
    "towards": "centrum",
-   "type": "vienna",
+   "type": "street",
    "year": 2023,
-   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
+   "source": "user 2026-10-23; research list 2026-10-23",
+   "text": "road-level stop towards the centre, the red stop post on the sidewalk (user); the research list called it a classic vienna stop"
   },
   {
    "name": "Letenské náměstí",
@@ -143,13 +144,6 @@
    "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
   },
   {
-   "name": "Březiněveská",
-   "towards": "?",
-   "type": "street",
-   "text": "weak: forum 2023; our survey: opposite direction (from Kobylisy) has carriageway at the doors",
-   "source": "user research list 2026-10-23 (non-exhaustive; accurate to its sources' dates)"
-  },
-  {
    "name": "Zborovská",
    "towards": "?",
    "type": "street",
@@ -168,6 +162,20 @@
    "towards": "Ruská",
    "type": "kerb",
    "text": "regular high stop kerb next to the tram track",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Hodkovičky",
+   "towards": "*",
+   "type": "kerb",
+   "text": "brand new stop on a separate tram corridor, a regular stop like Belárie",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Březiněveská",
+   "from": "Kobylisy",
+   "type": "street",
+   "text": "road-level stop: boarding from the carriageway, the red stop post on the sidewalk (placed in OSM)",
    "source": "user 2026-10-23"
   }
  ],

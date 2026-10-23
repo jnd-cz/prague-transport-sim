@@ -190,7 +190,8 @@ export class Game {
   _vienna(rt, s0, s1) {
     const dtm = this.route.ground.dtm;
     if (!dtm) return null;
-    const LANE = new Set(['road', 'parking', 'tram']), RAISED = new Set(['island', 'platform', 'sidewalk', 'paved']);
+    // (car lanes only, not the tram bed: Hodkovičky on its own corridor read as a Vienna-type stop)
+    const LANE = new Set(['road', 'parking']), RAISED = new Set(['island', 'platform', 'sidewalk', 'paved']);
     let lane = 0, raised = 0, kerb = 0, nk = 0;
     for (let s = s0 + 3; s < s1 - 2; s += 4) {
       for (const off of [2.2, 2.8, 3.4]) {

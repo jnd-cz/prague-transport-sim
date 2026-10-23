@@ -102,15 +102,18 @@ history and findings; this file says what to do next and how. Update it when a s
 2. **Structures fitted to the data** (one lint, then fixes): A2 bridge models vs decks (four places;
    decision 6: the track and the roads follow the Mosty deck, ramps adjusted; registration checked OK,
    HANDOFF §22; done for tagged spans with model samples, envelope cuts, OSM maxheight clearances,
-   lints deckClip / underpassClearance, HANDOFF §23; left: the 19 deckClip places, a per-bridge look at
-   Štefánikův and Trojský most, the raised lane of true Vienna stops),
+   lints deckClip / underpassClearance, HANDOFF §23; models trimmed to the surveyed decks, §24
+   (Štefánikův most clean, deckClip 7); left: the raised lane of true Vienna stops; Trojský most and the
+   stretch after it (sloped roads, the tunnel mouth): a detailed rebuild after B3),
    A7 Karlovy lázně passage, A6 Pobřežní cesta underpass, A4 Výstaviště railway bridge, B1 arching by
    the water.
 3. **Pilot areas on the detailed survey** (B2 + the lane pilots): walls with heights, terrain edges,
    railings, guardrails on Podolské nábřeží, Strossmayerovo - Veletržní, Trojská, Palackého nám. and
    Podolská vodárna - Výtoň; then the fine terrain (B3) if the user says go.
-4. **Traffic realism**: D2 car and pedestrian signals with the tram cycles and Czech gantries; U3 cars
-   turning left in front of the tram; turn lanes; orthophoto lane check. (Seed averaging: done.)
+4. **Traffic realism**: D2 car and pedestrian signals with the tram cycles and Czech gantries, a
+   detailed cycle model of the whole junction; then the oncoming trams' red runs (line 17 s 20829, 11785,
+   10263); U3 cars turning left in front of the tram; turn lanes; orthophoto lane check. (Seed
+   averaging: done.)
 5. **Stops and network**: C2 Sídliště Řepy per platform; both directions drivable (C3); C11 line ends
    and depots; C12 line 37.
 6. **Larger**: U1 survey on every line; U4 shared city in chunks; U2 number plates; C15 sounds (samples);

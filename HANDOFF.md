@@ -920,3 +920,29 @@ Rules, not spots (each measured on line 17; the lints in brackets):
   (s 20829, 11785, 10263; already 41 km/h at 11785 there): an old fault, its count moves with the seeds;
   the line 9 fetch still running.
 
+## 24. Local OSM extract, bridge models trimmed to the survey, stop facts (2026-10-23, night)
+
+- **What the Mosty 3D models are** (geoportalpraha.cz "Model of buildings and bridges"; the ArcGIS item
+  has no description, attributes only OBJECTID / ID_BUD): one model of buildings and bridges from
+  stereophotogrammetry of aerial images, built 2001-2008 from the centre outwards, cleaned (topology,
+  inner walls) in 2020; accuracy "at least 0.5 m"; walls "semi-automatically derived from the roof",
+  i.e. blocks from the highest surface seen from the air (parapets, railings) down. So the model top
+  is 0-0.5 m over the surveyed deck (as measured, §22), coarse at small bridges (a block to the parapet
+  top over the whole width), and can predate a rebuild (anything after 2008). Rule: the survey (ZPS 2026)
+  wins wherever it has the deck; the model gives the shape, the sides, piers and spans without survey.
+- **Bridge models trimmed to the surveyed deck** (world.js buildLod2): model triangles over a surveyed
+  deck are split to <= 1.5 m and cut 0.2-4.7 m over it (Štefánikův most: the tracks and roads clean).
+  deckClip on line 17: 19 → 7 (all 0.22-0.33 m).
+- **Vienna detection**: the tram bed is not a car lane (Hodkovičky, on its own corridor, came out
+  Vienna-type). Line 17 now: Čechův most (both), Ke Stírce and Březiněveská from Kobylisy. User facts in
+  truth.json: Hodkovičky a regular kerb stop (new, separate corridor, like Belárie); Březiněveská from
+  Kobylisy and Čechův most towards the centre road-level stops with the red post on the sidewalk.
+- **Local OSM** (`tools/osm_local.py`, pyosmium 4.3 in the user site, run with `python -P -E`): Geofabrik's
+  Czech Republic extract (raw/osm/czech-republic-261022.osm.pbf, 950 MB, md5 checked, data of
+  2026-10-22) cut to raw/osm/praha.osm.pbf (Prague + ~3 km, complete ways and relations); `ways(match,
+  bbox)` answers like Overpass. `platforms.py --fetch` uses it when present (Overpass only as fallback).
+  To refresh: download the newest czech-republic-latest.osm.pbf (redirects to the dated file), `cut`.
+- Parked by the user: red runs of oncoming trams after the line rebuild with road traffic signals and a
+  detailed whole-junction cycle model (D2); Trojský most and the stretch after it (garbled sloped roads,
+  also over the tunnel mouth) after the fine terrain (B3), with a detailed rebuild before the next check.
+

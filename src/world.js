@@ -604,7 +604,7 @@ function buildLod2(group, data, route, ground) {
       // track with triangles whose centres lay outside the envelope: Modřany s 5070, 5824)
       let n3 = count;
       if (isBridge) {
-        const near = (t) => [0, 1, 2].some((k) => route.distance(xs[t + k], ys[t + k]) < 25 || roadUnder(xs[t + k], ys[t + k], 25));
+        const near = (t) => [0, 1, 2].some((k) => route.distance(xs[t + k], ys[t + k]) < 25 || roadUnder(xs[t + k], ys[t + k], 25) || ground.dtm?.deckAt(xs[t + k], ys[t + k]) != null);
         const out = [];
         const split = (a, b, c, depth) => {
           const l = (p, q2) => Math.hypot(p[0] - q2[0], p[1] - q2[1], p[2] - q2[2]);
@@ -670,6 +670,10 @@ function buildLod2(group, data, route, ground) {
             const zr = rd.hf(mx, my), mz = (az + bz + cz) / 3;
             if (mz > zr + 0.4 && mz < zr + 4.5) continue;
           }
+          // trimmed to the surveyed deck where there is one (the survey is exact, the model coarse: at
+          // Štefánikův most its top stood in the track and the roads): nothing 0.2-4.7 m over it
+          const mz = (az + bz + cz) / 3, zd = ground.dtm?.deckAt(mx, my, mz - 2.35, 2.35);
+          if (zd !== null && zd !== undefined && mz > zd + 0.2) continue;
         }
         let nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
         let ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
