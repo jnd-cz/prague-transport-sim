@@ -794,3 +794,32 @@ the Vyšehrad tunnel cut open; OSM sometimes draws the two tracks too close; Let
 - **Open**: line 23 has a 0.7 m close spot near Malostranská shorter than a gauntlet (no block
   control: two trams met there once); lanes (two lanes where one, cars on the tracks, sharp kinks) need
   OSM lanes/turn:lanes and the fitted kerb smoothing (no open lane data).
+
+## 20. Wider world, lanes from basic data, Vyšehrad tunnel to the survey (2026-10-23, afternoon)
+
+User decisions: one lane per direction unless OSM tags more; turn lanes and the orthophoto check
+later; smoother kerb fits; walkers only on sidewalks; four pilot areas (Podolské nábřeží, Strossmayerovo
+- Veletržní, Trojská, Palackého nám.); the newer source wins (the survey of Sept 2026 over OSM).
+
+- **World width** (line 17 rebuilt from the cached route): OSM roads 90 → 200 m, buildings (OSM and
+  Geoportál LOD2, trees) 110 → 220 m, green 120 → 240 m; the street survey stays at 80 m (memory),
+  traffic everywhere. Roads 3948 → 6327, LOD2 buildings 2903 → 6064 (6.3 MB), JS heap 1.39 GB.
+  (Overpass timed out on the 220 m OSM buildings query: the old cache is kept, LOD2 is drawn anyway.)
+- **Lanes** (`traffic.js lanesOf`, `laneOffset`, `_trackLats`): lanes per direction from OSM `lanes:forward`
+  / `lanes:backward`, `lanes` on one-way roads, half of `lanes` from 4, else one (891 of 1454 car ways
+  are tagged; `build_line.py` exports `ln`, `lf`, `lb`). The carriageway is the survey's road areas
+  (parking strips at the edges and tram areas at the side excluded); the divider between directions is
+  the line between both tracks where they lie in the carriageway, else the middle; a lane sits 1.7 m in
+  from its right kerb, never past the divider, and where the band is narrower than 3.2 m on the track of
+  its own direction (the Vyšehrad tunnel). Kerb fits smoothed over ±20 m and moving at most 0.4 m per
+  4 m. Road tunnels are fitted to the underground survey (`DtmSurface.classUnder`).
+- **Walkers**: generated sidewalks only on the surveyed sidewalk / paving found within 8 m out from the
+  kerb (1 m into it); OSM footways cut where they lie on the carriageway for more than 6 m.
+- **Vyšehrad tunnel**: walls where the surveyed tunnel floor ends (1.5 m right of our track to 8 m left),
+  a semicircle springing at 2.5 m (user photo), the floor drawn from the underground survey.
+- **Lint `lanes`** (line 17, per sample): 3.5 % → 1.5 % (kinks 360 → 10, walkers on roads 965 → 46,
+  tram bed 189 → 57, platforms 290 → 169, doubled 450 → 302; off carriageway ~1 % unchanged, 40 % of it
+  on the new outer roads). Traffic: overlaps 71 → 51, walker hits 135 → 50.
+- **Troja bridgehead** (s ~18 150, orthophoto): the cross road passes under the tram corridor, mapped in
+  OSM as a tunnel: its cars now run below ground between portals (no survey there).
+- Platform strips from OSM lines capped at 3.5 m (one reached over the car lane at Trojská).

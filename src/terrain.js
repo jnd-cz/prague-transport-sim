@@ -464,6 +464,9 @@ export class DtmSurface {
     this.grid = new Map();
     this.deckGrid = new Map(); // level 1: bridge decks and the streets on them
     this.areas = [];
+    // underground areas (a road tunnel's floor: the Vyšehrad tunnel) are not drawn, but their outlines
+    // tell the tunnel's width and where its road and footway are
+    this.under = dtm.areas.filter((a) => a.l < 0 && a.r?.length > 2).map((a) => ({ c: a.c, ring: a.r }));
     for (const a of dtm.areas) {
       if (a.l < 0) continue; // metro and other underground levels
       const fill = (ring) => {
@@ -626,6 +629,18 @@ export class DtmSurface {
   }
   // (ref: the surface nearest this height, where streets of two heights overlap in plan)
   surfaceAt(x, y, ref = null) { return this._hitTri(x, y, ref); }
+  // class of the underground (level < 0) area at (x, y), or null
+  classUnder(x, y) {
+    for (const a of this.under) {
+      let inside = false;
+      const r = a.ring;
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        if ((r[i][1] > y) !== (r[j][1] > y) && x < ((r[j][0] - r[i][0]) * (y - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
+      }
+      if (inside) return a.c;
+    }
+    return null;
+  }
   covered(x, y) { return this.grid.has(Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell)); }
 }
 

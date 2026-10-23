@@ -398,7 +398,7 @@ export function buildWorld(scene, data, route, ground, weather) {
     if (r.t) {
       const tf = ground.way(r.p, false, true);
       const inside = densify(r.p, 3).filter((p) => inTunnel(p[0], p[1], 2));
-      if (inside.length > 1) addRibbon(roadsCg, inside, r.w, tf, 0.12, asphalt);
+      if (inside.length > 1 && !ground.dtm?.under?.length) addRibbon(roadsCg, inside, r.w, tf, 0.12, asphalt);
       else if (r.c) tunnelPortals.push({ r, tf });
       continue;
     }
@@ -864,14 +864,26 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
   const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
   const stone = new THREE.Color(wet ? '#6b6559' : '#8b8475').toArray(), vault = new THREE.Color(wet ? '#4b4943' : '#5d5a52').toArray();
   const top = new THREE.Color(wet ? '#5a6248' : '#6f7a55').toArray();
-  // the vault's cross-section: lateral offset and height over the rails
-  const prof = [[-HW, -0.3], [-HW, 4.8]];
-  for (let k = 1; k < 10; k++) { const a = Math.PI - (k / 10) * Math.PI; prof.push([HW * Math.cos(a), 4.8 + 2.4 * Math.sin(a)]); }
-  prof.push([HW, 4.8], [HW, -0.3]);
-  const R = HW + 10; // the rock top reaches past the hole in the terrain
   const P = (s, lat, z) => { const o = route.offset(s, lat); return W(o.x, o.y, z); };
-  const rockTop = (s, l) => { const o = route.offset(s, l); return Math.max(T.height(o.x, o.y) + 0.05, pr.height(s) + 8.5); };
+  const rockTop = (s, l) => { const o = route.offset(s, l); return Math.max(T.height(o.x, o.y) + 0.05, pr.height(s) + 9); };
   for (const [a, b] of rock) {
+    // the walls where the surveyed tunnel floor ends (underground DTM areas: the Vyšehrad tunnel is
+    // 1.5 m right of our track to 8 m left of it), else ±HW
+    let lo = Infinity, hi = -Infinity;
+    for (const u of ground.dtm?.under || []) for (const [x, y] of u.ring) {
+      const n = route.nearest(x, y);
+      if (!n || n.s < a - 5 || n.s > b + 5 || n.d > 20) continue;
+      const q = route.at(n.s), lat = q.hx * (y - q.y) - q.hy * (x - q.x);
+      lo = Math.min(lo, lat); hi = Math.max(hi, lat);
+    }
+    if (!(hi - lo > 4)) { lo = -HW; hi = HW; } else { lo -= 0.3; hi += 0.3; }
+    // (the Vyšehrad tunnel: a stone semicircle springing low over the whole width, user photo)
+    const c0 = (lo + hi) / 2, half = (hi - lo) / 2, rise = Math.min(half, 5), spring = 2.5;
+    // the vault's cross-section: lateral offset and height over the rails
+    const prof = [[lo, -0.3], [lo, spring]];
+    for (let k = 1; k < 12; k++) { const t = Math.PI - (k / 12) * Math.PI; prof.push([c0 + half * Math.cos(t), spring + rise * Math.sin(t)]); }
+    prof.push([hi, spring], [hi, -0.3]);
+    const R0 = lo - 10, R1 = hi + 10; // the rock top reaches past the hole in the terrain
     const n = Math.max(2, Math.ceil((b - a) / 2));
     for (let k = 0; k < n; k++) {
       const s0 = a + ((b - a) * k) / n, s1 = a + ((b - a) * (k + 1)) / n, z0 = pr.height(s0), z1 = pr.height(s1);
@@ -880,7 +892,7 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
         const [l0, h0] = prof[i], [l1, h1] = prof[i + 1];
         cg.quad(c, P(s0, l0, z0 + h0), P(s1, l0, z1 + h0), P(s1, l1, z1 + h1), P(s0, l1, z0 + h1), vault);
       }
-      for (let lat = -R; lat < R; lat += 2) {
+      for (let lat = R0; lat < R1; lat += 2) {
         cg.quad(c, P(s0, lat, rockTop(s0, lat)), P(s0, lat + 2, rockTop(s0, lat + 2)), P(s1, lat + 2, rockTop(s1, lat + 2)), P(s1, lat, rockTop(s1, lat)), top);
       }
     }
@@ -891,12 +903,27 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
         const [l0, h0] = prof[i], [l1, h1] = prof[i + 1];
         cg.quad(c, P(s, l0, z + h0), P(s, l1, z + h1), P(s, l1, rockTop(s, l1)), P(s, l0, rockTop(s, l0)), stone);
       }
-      for (const side of [-1, 1]) {
-        for (let l = HW; l < R; l += 2) {
-          const l0 = side * l, l1 = side * (l + 2);
-          cg.quad(c, P(s, l0, z - 0.3), P(s, l1, z - 0.3), P(s, l1, rockTop(s, l1)), P(s, l0, rockTop(s, l0)), stone);
+      for (const [from, to] of [[R0, lo], [hi, R1]]) {
+        for (let l = from; l < to; l += 2) {
+          const l1 = Math.min(to, l + 2);
+          cg.quad(c, P(s, l, z - 0.3), P(s, l1, z - 0.3), P(s, l1, rockTop(s, l1)), P(s, l, rockTop(s, l)), stone);
         }
       }
+    }
+  }
+  // the tunnel's floor as surveyed (underground road and footway areas), at the track's height
+  const floorCol = { road: new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), sidewalk: new THREE.Color(wet ? '#86817a' : '#a39d90').toArray() };
+  for (const u of ground.dtm?.under || []) {
+    const n0 = route.nearest(u.ring[0][0], u.ring[0][1]);
+    if (!n0 || n0.d > 20 || !rock.some(([a, b]) => n0.s > a - 10 && n0.s < b + 10)) continue;
+    const ring = u.ring.map((p) => new THREE.Vector2(p[0], p[1]));
+    let tris;
+    try { tris = THREE.ShapeUtils.triangulateShape(ring, []); } catch { continue; }
+    const lift = u.c === 'sidewalk' || u.c === 'island' ? 0.3 : 0.12, col = floorCol[u.c === 'road' ? 'road' : 'sidewalk'];
+    const z = (p) => { const n = route.nearest(p.x, p.y); return (n ? pr.height(n.s) : pr.height(n0.s)) + lift; };
+    for (const [i, j, k] of tris) {
+      const A = ring[i], B = ring[j], C = ring[k];
+      cg.tri(cg._chunk(A.x, A.y), W(A.x, A.y, z(A)), W(B.x, B.y, z(B)), W(C.x, C.y, z(C)), null, col);
     }
   }
   cg.build(group, 'support');
