@@ -597,3 +597,95 @@ All measured with the lints; numbers are line 9 / 17 / 22 / 23 unless noted; det
 - Lanes of different roads that touch (line 22: ~45 overlaps); Vienna-type stops need the stop
   classifier (PLAN C13); a car standing on the track blocks a tram until it moves (no overtaking).
 - The street model pilot covers only Karlovo nám. – Jana Masaryka on line 22.
+
+## 17. Line 17 on the surveyed streets, two levels at bridges and underpasses (2026-10-22, night)
+
+User request: rebuild line 17 with the detailed DTM, underpass traffic handled and drawn on both
+levels, the same for bridges; check walls, embankment, Čechův most junctions and the Modřany corridor.
+
+**Data.** DTM for Praha 1, 4, 7, 8, 12 (Modřany) and Troja downloaded (September 2026 packages;
+links from the Geoportál "ke stažení" pages, OPL `225F0FAF-…`, KR `28A24EB4-…`), with Praha 2 already
+there: `data/line17.dtm.json`, 9.1 k areas. Coverage: all but 1.3 km of the 21.7 km route (Trojská
+18200–18800: the district's road areas there have no surveyed heights, dropped). The importer now
+uses only lines of an area's **own level** for every level (it did so only for ground level): the
+estakáda's track bed outline had taken the heights of the road below and drew a slab sloping into
+the underpass. `streets.py` runs the whole line in 1.5 km chunks (each area modelled once, in the
+chunk of its nearest route position; fits reach 40 m beyond): 364 k model triangles, 24.7 MB, 45 s.
+JS heap with line 17 loaded: 1.1 GB (raw survey without the model: 1.5 GB).
+
+**Two levels (terrain.js, traffic.js, world.js).**
+- Every OSM road and footway has a level (`bridge` → on a deck). `ground.way(line, isBridge)` is the
+  one height function of a way: ground level, or on a bridge the surveyed deck nearest the way's
+  straight span (`deckSurface`), else our route's deck, else the span between the ends of the whole
+  way (pieces used their own ends, mid-bridge: 4 m floating at Zahradní Město). Ribbons are drawn
+  with it; cars and walkers stand on it (`road.hf`, connectors blend the two lanes' surfaces).
+- Cars now drive on bridge roads (they were excluded); no generated sidewalk paths along bridges
+  (nothing drawn there; bridge footways are OSM ways of their own).
+- `ground.at()` without the deck flag gives the ground under our bridge (it gave the deck within
+  4 m of the track: cars under the Modřany estakáda drove at deck height); `surface()` is ground level only.
+- Obstacles, cars on our track, "wait for the tram" and the traffic lint's overlap/walker checks
+  ignore anything more than 2.5 m above or below (`LEVEL_APART`).
+- `overBridge` (no junction, signal, jaywalkers) needs the deck at least 3 m above the ground under
+  it: the 28 m culvert "bridge" at s 5816 with a road 1.2 m below the rails is a normal crossing.
+- Lint `bridgeLevels`: lanes under our spans ≥ 2.5 m below the rails, lanes on them at rail level.
+  Line 17: Modřany underpasses 4.0–6.7 m, Čechův most lanes at the rails (0/12).
+
+**Bridges in the track profile.**
+- The deck under the route counts only on an OSM-tagged bridge, or where the survey has a **level-1
+  tram bed** (our track on a structure, also untagged: Nádraží Braník 7312–7470, the Trojský most
+  approach); any other structure over the route (road bridge, railway, station) is above the tram.
+- Inside a surveyed span the samples without bed are interpolated between bed samples (they had the
+  road below: Černý kůň 198.9 m deck / 192.2 m road → 195.5 m after the grade limit, the tram ran
+  through its own bridge with 3.2 m above the road); the surveyed deck is a floor after smoothing,
+  falling at 6 % away from it; beyond a surveyed deck the track meets the ground at ≤ 6 % (north of
+  Trojský most the survey stops on the viaduct 9 m above the lidar ground under it).
+- The model of one of our own spans reaching past its OSM ends is not an overhead structure (it
+  pushed the track 5.3 m under it).
+- Every track within 6 m of the route (ours and the opposite one, 4.5 m apart on the Modřany
+  corridor) lies on the profile: the opposite track took the raw survey and stood up to 6 m off ours
+  at the span ends (rails and wire jumping). Lint `trackLevels` (0/29 825 on line 17).
+- Profile vs surveyed decks now within 0.1–0.4 m (Trojský most 193.9 m mid-span, Braník 200.5 m,
+  Černý kůň 198.8 m). Steepest grade on line 17: 7.2 % near Trojská (the ramp off the viaduct into
+  the survey gap; check with the user's GPS recordings).
+
+**Drawing.**
+- Surveyed slabs on structures: triangles split to ≤ 5 m with heights from their own outline nearby
+  (long deck outlines made long triangles); the decks of our bridges are laid to the profile like the
+  streets; a structure over the track keeps its underside 5 m above the rails (thinner slab; only
+  what is lower inside the tram's space is cut, as for the bridge models).
+- Surveyed walls are drawn (a quay wall's area runs from its foot line to its top: a battered face);
+  water areas are level (the river outline had the heights of both embankments' tops); **step faces**
+  wherever the surface just outside a ground-level area's edge is more than 0.5 m lower (outside
+  surface extrapolated to the edge, so a slope is not a step): the embankment shows street, quay wall,
+  náplavka, river. Terrain may now be lowered up to 6 m under a surveyed surface (4).
+- Street flush to the track profile (`flushDtm`, `ground.flush`) measures only the street at the
+  rails' level (Codex found the north end of Čechův most lifting street vertices 5.6 m because the
+  embankment road below was measured) and skips the road under our bridges.
+
+**Traffic fixes found by the runs.**
+- Two OSM ways in one surveyed carriageway (divided street, slip lane) each took the whole width:
+  lanes on top of each other. A parallel way inside the carriageway now splits it halfway
+  (`_parallelWays`): line 17 car/car overlaps 210 → 76.
+- Gridlocks: any cycle of cars waiting for each other (three in a junction on line 9) lets the lowest
+  id go; a car stopped behind a stopped obstacle does not hold its turn at a junction (line 9 s 8679).
+- A walker at the end of a footway that ends by the tracks flipped between "end of path" and "tracks
+  ahead" every frame, standing in a lane on the track (line 17 s 13756): after turning at an end it
+  commits to walking back for 4 s.
+
+**Numbers** (vs the committed baseline; traffic counts per run): see the commit message and
+`reports/`. Line 17 all static 0, finished, overlaps 91 → 76, walker hits 157 → 112, slides 449 →
+715 (walkers; more walkers on the surveyed paths), street bot 8 181 findings over 389 km of probes
+(first run with DTM, no baseline). The runs are not fully deterministic after the street bot (the same
+page and code jammed once and finished once on line 22): average seeds before trusting ±20 %.
+
+**Codex second look** (user, same evening, `CODEX_HANDOFF.md`, separate working copy): its findings
+used here: the level-referenced street flush, tagged-only deck in the profile (done independently
+the same way), explicit surface levels. Not taken yet: analytic cubic lane paths, interior survey
+overshoot check in `streets.py`, embankment source-height glitches (a sidewalk vertex at 185.5 m
+between 191.5 m neighbours near (-264.8, 3234.1)), terrain refinement at survey edges, rendered-
+surface lints. Its city/chunk architecture: PLAN.md §7.
+
+**Open:** walker slides (most of the slide count); Trojská survey gap; OSM road tunnels and `layer`
+still dropped by `build_line.py`; DTM level −1 floors (Výtoň) not drawn as their own surface; line
+23 walker hits 61 → 94 (Královka, no bridges involved: probably the changed random sequence, check
+with seeds).

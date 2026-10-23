@@ -48,12 +48,16 @@ line). Without it the game falls back to extruded OSM footprints. Underpasses an
 route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track profile.
 
 Optionally, the surveyed streets from the Prague Digital Technical Map (DTM, open part "ZPS", per
-city district, CC BY 4.0) — so far imported for line 22 in Praha 2 and Praha 10 (pilot):
+city district, CC BY 4.0) — imported for line 22 (Praha 2 and 10) and all of line 17 (Praha 1, 2, 4,
+7, 8, 12 and Troja):
 
 ```bash
 python -m pip install --user pyproj shapely
 python tools/dtm.py --line 22 raw/dtm/<..._500089_..._ZPS_OPL.gpkg> raw/dtm/<..._500224_..._ZPS_OPL.gpkg>
+python -P -E tools/dtm.py --line 17 raw/dtm/*_{500054,500089,500119,500186,500208,547107,547174}_*_ZPS_OPL.gpkg
 ```
+
+(`-P -E` instead of `-I`: pyproj and shapely live in the user site-packages.)
 
 Posted speeds and dedicated track (after `build_line.py`; needed for the speed limits and banked
 curves):
@@ -64,10 +68,11 @@ python -I tools/osm_speeds.py --line 22
 
 Only the vegetation from Geoportál again (tree categories): `python -I tools/geoportal.py --line 22 --trees-only`.
 
-Then, optionally, the **street model** (pilot, smooth streets with fixed level steps, meshed
-offline) for a stretch of the line, by route position in metres:
+Then the **street model** (smooth streets with fixed level steps, meshed offline): the whole line
+in 1.5 km chunks (line 17: 45 s), or a stretch by route position in metres:
 
 ```bash
+python -P -E tools/streets.py --line 17
 python tools/streets.py --line 22 --from 10850 --to 12900
 ```
 

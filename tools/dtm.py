@@ -134,8 +134,10 @@ def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
     the boundary points within 2.5 m (the nearest and any within 0.5 m more). Lines of the area's
     own level win: a ground-level street must not take the height of a metro vestibule or a deck
-    outline that shares the position in 2D (for ground-level areas they are the only ones used)."""
-    strict = level == 0
+    outline that shares the position in 2D, and a bridge deck must not take the heights of the road
+    under it (on the Modřany estakáda that made a slab sloping from the deck down into the
+    underpass): only lines of the area's own level are used."""
+    strict = True
     global n_z, n_near, n_none
     zs = zkey.get((round(x, 2), round(y, 2)))
     if zs:
