@@ -279,7 +279,7 @@ export class Game {
       // the opposite direction's signal, facing oncoming trams
       G.theirMesh = makeTramSignal();
       const o = back.offset(G.b0 - 4, -2.4);
-      G.theirMesh.position.set(o.x, this.route.ground.at(o.x, o.y), -o.y);
+      G.theirMesh.position.set(o.x, this.route.ground.trackAt(o.x, o.y), -o.y);
       G.theirMesh.rotation.y = Math.atan2(-o.hx, o.hy);
       this.objects.add(G.theirMesh);
       this.gauntlets.push(G);

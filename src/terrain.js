@@ -678,6 +678,14 @@ export function makeGround(route, terrain, profile, dtm = null) {
         return d !== null ? d - 0.12 : span;
       };
     },
+    // height of a track (its rails' foot) at (x, y): within 6 m of our route, ours and the opposite
+    // one (4.5 m apart on the Modřany corridor), the track profile; elsewhere the ground or deck. The
+    // drawn tracks and the trams on them both use it (the oncoming trams read the raw survey 4.2-4.8 m
+    // off our track and jumped up to 3.4 m between Nádraží Braník and Čechova čtvrť)
+    trackAt(x, y) {
+      const n = near(x, y);
+      return n && n.d < 6 ? profile.height(n.s) : this.at(x, y, true);
+    },
     // deck height if (x, y) is on one of the route's bridges, else null
     deckAt(x, y) {
       const n = near(x, y);
