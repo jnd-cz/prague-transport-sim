@@ -131,6 +131,48 @@ function crossingsOnBridges(g) {
   return check('grade-separated', g.signals.length, bad.filter((b) => b.info.startsWith('signal')));
 }
 
+// Two levels where our track is on a bridge: a car lane passing under the span stands on the road
+// below (at least 2.5 m under the rails), a lane on the bridge itself on the deck (at the rails'
+// level, ±0.5 m). Every car lane within 3 m of the route on a span, one sample per lane and span.
+function levelsAtBridges(g) {
+  const tr = window.traffic, r = g.route, pr = r.ground.profile, bad = [];
+  let n = 0;
+  for (const lane of tr?.laneList || []) {
+    const seen = new Set();
+    for (let s = 0; s <= lane.path.length; s += 2) {
+      const p = lane.path.at(s), q = r.nearest(p.x, p.y);
+      if (!q || q.d > 3 || !pr.onBridge(q.s)) continue;
+      const span = pr.bridges.findIndex(([a, b]) => q.s > a - 4 && q.s < b + 4);
+      if (seen.has(span)) continue;
+      const dz = pr.height(q.s) - lane.road.hf(p.x, p.y), under = pr.overBridge(q.s) && !lane.road.b;
+      if (!lane.road.b && !pr.overBridge(q.s)) continue; // at a bridge end or a low culvert: at grade
+      seen.add(span);
+      n++;
+      if (under ? dz < 2.5 : Math.abs(dz + 0.12) > 0.5) bad.push({ s: Math.round(q.s), x: p.x, y: p.y, mag: Math.abs(dz), info: `${under ? 'road under the bridge' : 'road on the bridge'}: ${dz.toFixed(1)} m below the rails` });
+    }
+  }
+  return check('two-levels-at-bridges', n, bad);
+}
+
+// Our track and the opposite one as drawn: within 6 m of the route every track lies on the track
+// profile (a step between the two tracks, or a drawn track off the profile, is a vertical jump in the
+// rails and the wire above them; the Modřany corridor had up to 6 m). Every 1.5 m of track, counted per 10 m.
+function trackLevels(g) {
+  const r = g.route, pr = r.ground.profile, bad = new Map();
+  let n = 0;
+  for (const t of g.data.tracks) {
+    if (!t.z) continue;
+    for (let i = 0; i < t.smooth.length; i++) {
+      const [x, y] = t.smooth[i], q = r.nearest(x, y);
+      if (!q || q.d > 5) continue;
+      n++;
+      const dev = t.z[i] - pr.height(q.s), k = Math.round(q.s / 10);
+      if (Math.abs(dev) > 0.3 && !(bad.get(k)?.mag >= Math.abs(dev))) bad.set(k, { s: Math.round(q.s), x, y, mag: Math.abs(dev), info: `track ${dev.toFixed(2)} m off the profile, ${q.d.toFixed(1)} m from the route` });
+    }
+  }
+  return check('tracks-on-profile', n, [...bad.values()]);
+}
+
 // Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
 function syntheticWallsOnStreets(g) {
   const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
@@ -160,6 +202,8 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     inventedWalls: syntheticWallsOnStreets(g),
     tramEnvelope: mountedInEnvelope(g),
     gradeSeparated: crossingsOnBridges(g),
+    bridgeLevels: levelsAtBridges(g),
+    trackLevels: trackLevels(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });

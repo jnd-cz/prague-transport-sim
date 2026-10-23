@@ -43,7 +43,7 @@ function snapshot(g, tr) {
   for (const [i, c] of tr.cars.entries()) {
     if (c.alpha < 0.5) continue;
     const p = c.mesh.position, [hx, hy] = head(c.mesh.rotation.y);
-    out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, hx, hy, l: CAR[0] / 2, w: CAR[1] / 2, src: c.kind, alpha: c.alpha,
+    out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, z: p.y, hx, hy, l: CAR[0] / 2, w: CAR[1] / 2, src: c.kind, alpha: c.alpha,
       state: c.coast && !c.active ? 'coast' : c.conn ? 'junction' : 'lane', road: c.road, dir: c.dir });
   }
   for (const [list, kind] of [[tr.ahead, 'tram ahead'], [tr.oncoming, 'tram oncoming']]) {
@@ -51,7 +51,7 @@ function snapshot(g, tr) {
       if ((t.alpha ?? 0) < 0.5) continue;
       t.mesh.userData.cars.forEach((m, k) => {
         const [hx, hy] = head(m.rotation.y);
-        out.veh.push({ id: `${t.mesh.uuid}/${k}`, group: t.mesh.uuid, kind, x: m.position.x, y: -m.position.z, hx, hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
+        out.veh.push({ id: `${t.mesh.uuid}/${k}`, group: t.mesh.uuid, kind, x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
       });
     }
   }
@@ -59,14 +59,14 @@ function snapshot(g, tr) {
   const cars = g.tram.cars || 1;
   for (let k = 0; k < cars; k++) {
     const s = g.tram.s - 0.6 - 7.6 - k * 15.2, p = g.route.at(s), h = g.route.heading(s, 3);
-    out.veh.push({ id: `us/${k}`, group: 'us', kind: 'our tram', x: p.x, y: p.y, hx: h.hx, hy: h.hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
+    out.veh.push({ id: `us/${k}`, group: 'us', kind: 'our tram', x: p.x, y: p.y, z: g.route.ground.profile.height(s), hx: h.hx, hy: h.hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
   }
   const M = new tr.crowd.matrix.constructor();
   for (const [i, w] of (tr.slots || []).entries()) {
     if (!w || w.alpha < 0.5) continue;
     tr.crowd.getMatrixAt(i, M);
     const e = M.elements;
-    out.walk.push({ id: `w${i}`, x: e[12], y: -e[14], hx: e[8], hy: -e[10], walk: w }); // w: the slot's walker (new object on respawn)
+    out.walk.push({ id: `w${i}`, x: e[12], y: -e[14], z: e[13], hx: e[8], hy: -e[10], walk: w }); // w: the slot's walker (new object on respawn)
   }
   return out;
 }
@@ -161,6 +161,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
         const a = V[i], b = V[j];
         if (a.group && a.group === b.group) continue; // cars of one set
+        if (Math.abs(a.z - b.z) > 2.5) continue; // different levels: a bridge and the road under it
         const depth = overlap(a, b);
         if (depth <= 0.05) continue;
         const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
@@ -174,7 +175,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
         overlaps.push(rec);
       }
       // walkers inside a vehicle, once per episode (a walker and a vehicle that stay together count once)
-      for (const w of snap.walk) for (const v of V) if (inBox(v, w.x, w.y)) {
+      for (const w of snap.walk) for (const v of V) if (Math.abs(v.z - w.z) < 2.5 && inBox(v, w.x, w.y)) {
         const key = `${w.id}|${v.id}`;
         live.add(key);
         if (!open.has(key)) {

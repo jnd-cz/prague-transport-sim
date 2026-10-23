@@ -66,12 +66,17 @@ function following(gap, vLead) {
 
 const CARRIAGEWAY = new Set(['road', 'parking']);
 
-// stand a car on the drawn street surface: pitch with the slope, roll with the camber
-export function carPose(g, x, y, hx, hy) {
-  const zf = g.surface(x + hx * 1.6, y + hy * 1.6), zb = g.surface(x - hx * 1.6, y - hy * 1.6);
-  const zl = g.surface(x - hy * 0.8, y + hx * 0.8), zr = g.surface(x + hy * 0.8, y - hx * 0.8);
+// stand a car on the drawn street surface hf(x, y) (ground level, or the deck of the bridge its road
+// is on): pitch with the slope, roll with the camber
+export function carPose(hf, x, y, hx, hy) {
+  const zf = hf(x + hx * 1.6, y + hy * 1.6), zb = hf(x - hx * 1.6, y - hy * 1.6);
+  const zl = hf(x - hy * 0.8, y + hx * 0.8), zr = hf(x + hy * 0.8, y - hx * 0.8);
   return { z: (zf + zb) / 2, pitch: Math.atan2(zf - zb, 3.2), roll: Math.atan2(zl - zr, 1.6) };
 }
+
+// things more than this apart in height are on different levels (a bridge and the road under it):
+// they never meet
+const LEVEL_APART = 2.5;
 
 export class Traffic {
   constructor(scene, data, route, ground, game, rand) {
@@ -102,6 +107,13 @@ export class Traffic {
 
     this.roads = [];
     this.walks = [];
+    // what a road's cars and walkers stand on: the street surface, or on a bridge (OSM bridge tag)
+    // the deck it lies on, exactly as the road is drawn (ground.way)
+    this.surfaceFn = (r) => {
+      if (!r.b) return (x, y) => ground.surface(x, y);
+      const w = ground.way(r.way || r.p, true); // (the span of the whole way, as drawn)
+      return (x, y) => w(x, y) + 0.12;
+    };
     this.cell = 60;
     this.index = new Map();
     const addIndex = (kind, k, path) => {
@@ -128,9 +140,23 @@ export class Traffic {
       let cur = [r.p[0]];
       for (let i = 1; i < r.p.length; i++) {
         cur.push(r.p[i]);
-        if (i < r.p.length - 1 && (uses.get(vkey(r.p[i])) || 0) > 1) { pieces.push({ ...r, p: cur }); cur = [r.p[i]]; }
+        if (i < r.p.length - 1 && (uses.get(vkey(r.p[i])) || 0) > 1) { pieces.push({ ...r, p: cur, way: r.p }); cur = [r.p[i]]; }
       }
-      pieces.push({ ...r, p: cur });
+      pieces.push({ ...r, p: cur, way: r.p });
+    }
+    // centre lines of all vehicle ways (20 m cells), for splitting a carriageway two ways share
+    this.wayIdx = new Map();
+    for (const r of pieces) {
+      if (r.f || !r.c || r.p.length < 2) continue;
+      for (let i = 1; i < r.p.length; i++) {
+        const sg = { a: r.p[i - 1], b: r.p[i], src: r };
+        const x0 = Math.min(sg.a[0], sg.b[0]), x1 = Math.max(sg.a[0], sg.b[0]), y0 = Math.min(sg.a[1], sg.b[1]), y1 = Math.max(sg.a[1], sg.b[1]);
+        for (let ix = Math.floor(x0 / 20); ix <= Math.floor(x1 / 20); ix++) for (let iy = Math.floor(y0 / 20); iy <= Math.floor(y1 / 20); iy++) {
+          const k = ix * 100003 + iy;
+          if (!this.wayIdx.has(k)) this.wayIdx.set(k, []);
+          this.wayIdx.get(k).push(sg);
+        }
+      }
     }
     this.jpos = new Map(); // junction key -> [x, y]
     for (const r of pieces) {
@@ -139,17 +165,17 @@ export class Traffic {
       if (path.length < (r.f ? 15 : 2)) continue;
       if (r.f) {
         // footways running along the tracks are platforms/verges: nobody strolls there
-        if (path.length > 30 && nearTrackShare(path) < 0.2) { this.walks.push({ path, off: 0 }); addIndex('w', this.walks.length - 1, path); }
+        if (path.length > 30 && nearTrackShare(path) < 0.2) { this.walks.push({ path, off: 0, hf: this.surfaceFn(r), deck: !!r.b }); addIndex('w', this.walks.length - 1, path); }
         continue;
       }
       // cars only on public vehicle roads: no driveways, service yards or courtyards
-      if (!r.c || r.w < 5 || r.b) continue;
+      if (!r.c || r.w < 5) continue;
       let near = 0, n = 0;
       for (let s = 0; s < path.length; s += 10) { const p = path.at(s); n++; if (route.distance(p.x, p.y) < 7) near++; }
       // the street the tram runs in: an ordinary part of the network (its cars drive alongside us),
       // its sidewalks get no extra walkers (the tram street's own footways cover them)
       const along = near / n > 0.4;
-      const road = { path, w: r.w, o: r.o || 0, tram: r.tram, ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
+      const road = { src: r, path, w: r.w, o: r.o || 0, tram: r.tram, b: r.b || 0, hf: this.surfaceFn(r), ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
       this._fitRoad(road);
       this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
       this.roads.push(road);
@@ -157,7 +183,8 @@ export class Traffic {
       if (along) continue;
       // sidewalks: 1.5 m beyond each kerb (the surveyed one where it exists, so walkers are not in
       // the lanes the cars drive)
-      if (r.w >= 6) for (const side of [1, -1]) {
+      // (not along a bridge: only the carriageway is drawn there, its footways are OSM ways of their own)
+      if (r.w >= 6 && !r.b) for (const side of [1, -1]) {
         const pts = [];
         for (let s = 0; s <= path.length; s += 3) {
           const p = path.at(Math.min(s, path.length)), k = this.kerbs(road, s);
@@ -166,7 +193,7 @@ export class Traffic {
         }
         if (pts.length < 3) continue;
         const walk = new Path(smoothPolyline(pts, 1, 4).pts);
-        if (nearTrackShare(walk) < 0.2) { this.walks.push({ path: walk, off: 0 }); addIndex('w', this.walks.length - 1, walk); }
+        if (nearTrackShare(walk) < 0.2) { this.walks.push({ path: walk, off: 0, hf: road.hf, deck: !!road.b }); addIndex('w', this.walks.length - 1, walk); }
       }
     }
     this._buildLanes();
@@ -198,7 +225,7 @@ export class Traffic {
   // and places without DTM keep the OSM centre line and width.
   _fitRoad(road) {
     const dtm = this.ground.dtm;
-    if (!dtm) return;
+    if (!dtm || road.b) return; // (the survey's classes are those of the ground level)
     const L = road.path.length, n = Math.floor(L / 4) + 1;
     const lo = new Array(n).fill(null), hi = new Array(n).fill(null);
     let any = false;
@@ -225,6 +252,12 @@ export class Traffic {
       if (width > Math.max(road.w * 2.2, road.w + 9) || a === 0 || b === on.length - 1) continue; // junction, plaza
       lo[i] = a * 0.5 - 16.25;
       hi[i] = b * 0.5 - 15.75;
+      // another way running alongside inside the same surveyed carriageway (a divided street mapped
+      // as two ways, a slip lane): each takes its own side, split halfway between the centre lines
+      for (const o of this._parallelWays(road, p)) {
+        if (o > 1 && o < hi[i]) hi[i] = Math.max(o / 2, lo[i] + 2.5);
+        if (o < -1 && o > lo[i]) lo[i] = Math.min(o / 2, hi[i] - 2.5);
+      }
       any = true;
     }
     if (!any) return;
@@ -241,6 +274,27 @@ export class Traffic {
     const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -2; d <= 2; d++) if (arr[i + d] !== undefined) { s += arr[i + d]; m++; } return s / m; });
     road.fitLo = smooth(fill(lo, -road.w / 2));
     road.fitHi = smooth(fill(hi, road.w / 2));
+  }
+  // lateral offsets (+ = right) of other vehicle ways running alongside `road` at point p (within 12 m,
+  // heading within ~35°), from the centre-line index built in the constructor
+  _parallelWays(road, p) {
+    const out = [], cx = Math.floor(p.x / 20), cy = Math.floor(p.y / 20), seen = new Set();
+    for (let i = cx - 1; i <= cx + 1; i++) for (let j = cy - 1; j <= cy + 1; j++) {
+      for (const sg of this.wayIdx.get(i * 100003 + j) || []) {
+        if (sg.src === road.src || !!sg.src.b !== !!road.b || seen.has(sg)) continue;
+        seen.add(sg);
+        const dx = sg.b[0] - sg.a[0], dy = sg.b[1] - sg.a[1], l = Math.hypot(dx, dy) || 1;
+        if (Math.abs((dx * p.hx + dy * p.hy) / l) < 0.82) continue;
+        // where the line through p across the road meets this segment
+        const nx = p.hy, ny = -p.hx, den = dx * ny - dy * nx;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((p.x - sg.a[0]) * ny - (p.y - sg.a[1]) * nx) / den;
+        if (t < 0 || t > 1) continue;
+        const qx = sg.a[0] + dx * t, qy = sg.a[1] + dy * t, off = (qx - p.x) * nx + (qy - p.y) * ny;
+        if (Math.abs(off) < 12) out.push(off);
+      }
+    }
+    return out;
   }
   // the two kerb lines of a road at s (m from its centre line, + = right of the road's direction):
   // fitted to the surveyed carriageway where it exists, else the OSM width
@@ -365,6 +419,12 @@ export class Traffic {
         pts.push([h00 * p0.x + h10 * d * p0.hx + h01 * p1.x + h11 * d * p1.hx, h00 * p0.y + h10 * d * p0.hy + h01 * p1.y + h11 * d * p1.hy]);
       }
       c = { id: key, from: a, to: b, at: a.to, path: new Path(pts) };
+      // its surface: the two lanes' surfaces, blended along it (they meet at a bridge end)
+      const ha = a.road.hf, hb = b.road.hf;
+      c.hf = ha === hb || !(a.road.b || b.road.b) ? ha : (x, y) => {
+        const t = Math.max(0, Math.min(1, ((x - p0.x) * (p1.x - p0.x) + (y - p0.y) * (p1.y - p0.y)) / (d * d)));
+        return ha(x, y) * (1 - t) + hb(x, y) * t;
+      };
     }
     this.connectors.set(key, c);
     return c;
@@ -420,8 +480,8 @@ export class Traffic {
     return vt > v ? Math.min(vt, v + 2 * dt) : Math.max(vt, v - 5 * dt);
   }
 
-  _poseCar(mesh, x, y, hx, hy) {
-    const p = carPose(this.ground, x, y, hx, hy);
+  _poseCar(mesh, x, y, hx, hy, hf = (u, v) => this.ground.surface(u, v)) {
+    const p = carPose(hf, x, y, hx, hy);
     mesh.rotation.order = 'YXZ';
     mesh.position.set(x, p.z, -y);
     mesh.rotation.y = Math.atan2(hx, -hy);
@@ -463,14 +523,24 @@ export class Traffic {
     // the mouth of a junction, lanes that touch)
     for (const o of live) {
       const p = o.path.at(o.s);
-      obstacles.push({ car: o, x: p.x, y: p.y, hx: p.hx, hy: p.hy, l: 2.2, w: 0.9, vx: p.hx * (o.vNow ?? 0), vy: p.hy * (o.vNow ?? 0) });
+      obstacles.push({ car: o, x: p.x, y: p.y, z: o.z, hx: p.hx, hy: p.hy, l: 2.2, w: 0.9, vx: p.hx * (o.vNow ?? 0), vy: p.hy * (o.vNow ?? 0) });
     }
     // first pass: what each car sees ahead; when two cars see each other (crossing paths), the
     // one with the lower id goes first instead of both waiting
     for (const c of live) c.seen = this._obstacleAhead(c, this._seq(c), obstacles);
+    // (and so for any cycle of cars waiting for each other: three cars in a junction each waited for
+    // the next, line 9 s 13284; the lowest id of the cycle goes)
     for (const c of live) {
-      const o = c.seen?.car;
-      if (o && o.seen?.car === c && c.id < o.id) c.seen = null;
+      const ring = [c];
+      for (let o = c.seen?.car; o && ring.length < 8; o = o.seen?.car) {
+        if (o === c) {
+          const first = ring.reduce((u, v) => (v.id < u.id ? v : u));
+          first.seen = null;
+          break;
+        }
+        if (ring.includes(o)) break;
+        ring.push(o);
+      }
     }
     for (const c of cars) {
       if (c.active) {
@@ -480,7 +550,8 @@ export class Traffic {
         // (only a car whose road crosses the track: one driving along it follows the tram instead;
         // not where our track passes over the road on a bridge)
         const across = Math.abs(p0.hx * tp.hx + p0.hy * tp.hy) < 0.7;
-        const waiting = across && Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3 && !this.ground.profile.overBridge(tram.s - 7);
+        const waiting = across && Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3 && !this.ground.profile.overBridge(tram.s - 7)
+          && !(c.z !== undefined && Math.abs(c.z - this.ground.profile.height(tram.s - 7)) > LEVEL_APART);
         // the car ahead: on this path, else across the junction on the connector and the next lane
         const seq = this._seq(c);
         let gap = null, vLead = 0;
@@ -508,7 +579,9 @@ export class Traffic {
           const blocked = exitFull || live.some((o) => o !== c && (
             (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan) && o.seen?.car !== c)
             || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, c.plan)
-              && !(o.seen && o.seen.gap < 4) // (a car whose own path is blocked does not hold its turn)
+              // (a car whose own path is blocked does not hold its turn: one close behind an obstacle, or
+              // stopped behind a stopped one; line 9 s 8679, three cars waited for each other that way)
+              && !(o.seen && (o.seen.gap < 4 || ((o.vNow ?? 0) < 0.3 && o.seen.v < 0.3)))
               && (o.toEnd < c.toEnd - 0.05 || (Math.abs(o.toEnd - c.toEnd) <= 0.05 && o.id < c.id)))
             || (!o.conn && o.lane !== c.lane && o.lane.to === J && o.toEnd < 5 && !(o.plan && o.plan.at === J) && this._nearLaneEnd(c.plan, o.lane, true))
             || (!o.conn && o.lane !== c.next && o.lane.from === J && o.s < 5 && this._nearLaneEnd(c.plan, o.lane, false))));
@@ -534,12 +607,13 @@ export class Traffic {
       if (!c.active && c.coast) {
         const k = c.coast;
         k.d += (c.vNow || 6) * dt;
-        this._poseCar(c.mesh, k.x + k.hx * k.d, k.y + k.hy * k.d, k.hx, k.hy);
+        this._poseCar(c.mesh, k.x + k.hx * k.d, k.y + k.hy * k.d, k.hx, k.hy, c.lane.road.hf);
         continue;
       }
       const p = c.path.at(c.s);
       if (Math.hypot(p.x - cx, p.y - cy) > 420) c.active = false;
-      this._poseCar(c.mesh, p.x, p.y, p.hx, p.hy);
+      this._poseCar(c.mesh, p.x, p.y, p.hx, p.hy, c.conn ? c.conn.hf : c.lane.road.hf);
+      c.z = c.mesh.position.y;
     }
   }
 
@@ -553,6 +627,8 @@ export class Traffic {
       const p = c.path.at(c.s);
       // only cars going the tram's way hold it up (one facing it waits for the tram instead)
       const n = this.route.nearest(p.x, p.y);
+      // (a car on the road under our bridge, or on a bridge over the track, is not on it)
+      if (n && c.z !== undefined && Math.abs(c.z - this.ground.profile.height(n.s)) > LEVEL_APART) continue;
       if (n && n.d < 1.6) { const h = this.route.at(n.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) ours.push({ s: n.s, v: c.vNow ?? 0 }); }
       if (this.back) {
         const b = this.back.nearest(p.x, p.y);
@@ -581,17 +657,17 @@ export class Traffic {
     const out = [], g = this.game, tram = g.tram;
     for (let k = 0; k < (tram.cars || 1); k++) {
       const s = tram.s - 0.6 - 7.6 - k * 15.2, p = this.route.at(s), h = this.route.heading(s, 3);
-      out.push({ x: p.x, y: p.y, hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v });
+      out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v });
     }
     for (const t of [...this.ahead, ...this.oncoming]) {
       if ((t.alpha ?? 0) < 0.3) continue;
       for (const m of t.mesh.userData.cars) {
         const hx = Math.sin(m.rotation.y), hy = -Math.cos(m.rotation.y);
-        out.push({ x: m.position.x, y: -m.position.z, hx, hy, l: 7.2, w: 1.3, vx: hx * t.v, vy: hy * t.v });
+        out.push({ x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: 7.2, w: 1.3, vx: hx * t.v, vy: hy * t.v });
       }
     }
     for (const w of this.slots || []) {
-      if (w && w.alpha > 0.5 && w.x !== undefined) out.push({ x: w.x, y: w.y, hx: 1, hy: 0, l: 0.4, w: 0.4, vx: 0, vy: 0 });
+      if (w && w.alpha > 0.5 && w.x !== undefined) out.push({ x: w.x, y: w.y, z: w.z, hx: 1, hy: 0, l: 0.4, w: 0.4, vx: 0, vy: 0 });
     }
     return out;
   }
@@ -602,7 +678,9 @@ export class Traffic {
     const p0 = c.path.at(c.s);
     // (something whose centre is behind the car can never be in its way: a car beside the front of
     // a tram waited for it while the tram waited for the car)
-    const near = obstacles.filter((o) => Math.abs(o.x - p0.x) < 50 && Math.abs(o.y - p0.y) < 50 && (o.x - p0.x) * p0.hx + (o.y - p0.y) * p0.hy > -1);
+    // (nor something on another level: the bridge above, the road below)
+    const near = obstacles.filter((o) => Math.abs(o.x - p0.x) < 50 && Math.abs(o.y - p0.y) < 50 && (o.x - p0.x) * p0.hx + (o.y - p0.y) * p0.hy > -1
+      && !(o.z !== undefined && c.z !== undefined && Math.abs(o.z - c.z) > LEVEL_APART));
     if (!near.length) return null;
     for (let d = 2; d <= 40; d += 2) {
       let q = null;
@@ -685,8 +763,13 @@ export class Traffic {
       // (at the end of its path a walker always turns back into it; it may have spawned past the end)
       if (w.s > w.walk.path.length) { w.s = w.walk.path.length; w.dir = -1; }
       if (w.s < 0) { w.s = 0; w.dir = 1; }
+      // (after turning at the end of its path a walker commits to walking back into it for a few
+      // seconds: a path ending by the tracks had it flip every frame between "end" and "tracks ahead",
+      // standing in a lane on the track with a queue of cars and our tram behind, line 17 s 13756)
       const here = pos(w.s), end = w.s + w.dir < 0 || w.s + w.dir > w.walk.path.length;
-      if (end || (this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR && !this.inLane(here.x, here.y))) w.dir = -w.dir;
+      w.commit = Math.max(0, (w.commit || 0) - dt);
+      if (end) { w.dir = -w.dir; w.commit = 4; }
+      else if (!w.commit && this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR && !this.inLane(here.x, here.y)) w.dir = -w.dir;
       else w.s += w.dir * w.v * dt;
       const { x, y, p } = pos(w.s);
       w.x = x; w.y = y;
@@ -695,7 +778,8 @@ export class Traffic {
       if (far && w.alpha <= 0) { this.slots[i] = null; m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); continue; }
       // fade by growing out of / sinking into the ground (instances share one material)
       const k = w.alpha;
-      p3.set(x, this.ground.surface(x, y) - (1 - k) * 1.8, -y);
+      w.z = w.walk.hf ? w.walk.hf(x, y) : this.ground.surface(x, y);
+      p3.set(x, w.z - (1 - k) * 1.8, -y);
       e.set(0, Math.atan2(p.hx * w.dir, -p.hy * w.dir), 0);
       q.setFromEuler(e);
       sc.set(1, 1, 1);
@@ -846,7 +930,7 @@ export class Traffic {
       const ourS = t.endS !== null ? this.route.nearest(p.x, p.y)?.s : null;
       t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, br, t.s, (s, q) => ground.at(q.x, q.y));
+      this._placeTram(t, br, t.s, (s, q) => ground.at(q.x, q.y, true));
     }
     this.oncoming = this.oncoming.filter((t) => {
       if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); return false; }

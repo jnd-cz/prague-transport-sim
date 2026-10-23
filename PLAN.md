@@ -1,4 +1,4 @@
-# Plan — Tatra T3 Prague (updated 2026-10-22, evening)
+# Plan — Tatra T3 Prague (updated 2026-10-22, night)
 
 Priorities and next steps after the DTM, street-bot and street-model work. HANDOFF.md keeps the
 history and findings; this file says what to do next and how. Update it when a step lands.
@@ -9,9 +9,31 @@ history and findings; this file says what to do next and how. Update it when a s
 lines drive to the end in the headless traffic run; all static lints are 0 on all lines; deploy zip
 rebuilt (`dist/tatra-t3-prague.zip`, 12 MB). Details: HANDOFF.md §16, §4 below.
 
+**Status 2026-10-22, night:** line 17 rebuilt on the surveyed streets (DTM) end to end, with two
+levels at bridges and underpasses (traffic and drawing), the surveyed decks in the track profile,
+step walls along the embankment; new lints `bridgeLevels` and `trackLevels` (0 on all lines).
+Details and numbers: HANDOFF.md §17.
+
+**New from the user (2026-10-22, night), to schedule:**
+- **U1 Rebuild every line on the detailed DTM** like line 17 (9 and 23 have no survey yet, 22 only
+  Praha 2/10): download the districts (links on the Geoportál "ke stažení" pages, uuids change
+  monthly), `dtm.py`, `streets.py` for the whole line, lints. Watch the JS heap (line 17: 1.1 GB).
+- **U2 Line number plates on the trams**: front blue plates without the white border; the top one
+  the size of the model's built-in plate; the one hanging on the mirror assembly smaller and
+  rectangular; the rear one inverted (blue on white) on the bottom edge of the rear glass (mounted
+  inside); in front a similar blue-on-white card behind the glass with the terminus. User can send
+  photos.
+- **U3 Cars turning left in front of the tram** (a major accident cause, at signals and at unsignalled
+  crossings): car indicators; the driver and the autopilot watch for a car about to turn left across
+  the track, ring the bell, which makes the car yield and stop before the track in time; cars
+  standing well ahead are safe. Needs blinkers on the car models and a "turning across" state in the
+  lane graph (the connector already knows it), plus a lint (left-turners crossing in front of us).
+- **U4 Shared city world loaded in chunks** around the tram with a buffer ahead, instead of one
+  prebuilt line that shows other mapped lines as unknown land. See §7 (Codex's proposal and my take).
+
 **Next, in order:**
-1. Traffic counts after the junction cycles: average 3 seeds per line (lint option), then work on
-   the largest causes (car/car overlaps at junctions, walkers inside vehicles, touching lanes).
+1. Traffic counts: average 3 seeds per line (lint option; the runs differ with timing after the
+   street bot), then the largest causes (walker slides, walkers inside vehicles, junction slides).
 2. Oncoming trams through red (line 9: 36): find why they do not commit to stopping.
 3. Tier C: C11 line ends and depots (loops in the path, layovers, depots), C12 line 37 (dedicated
    Ohrada – Palmovka corridor and bridge), C13 stops (curved platform kerbs, stop-type classifier
@@ -45,6 +67,35 @@ rebuilt (`dist/tatra-t3-prague.zip`, 12 MB). Details: HANDOFF.md §16, §4 below
   carriageway behind it; Krymská (truly Vienna-type) = raised surface continuous from the track to
   the facade (the lane is raised to platform level); Štěpánská shows carriageway right beside the
   track (island on the other side or missing in the survey).
+
+## 7. Shared city world (U4): Codex's proposal (2026-10-22) and my take
+
+Codex (a second opinion the user asked for, `CODEX_HANDOFF.md`, not in the repo) proposes: one
+city-wide track graph with stable ids, route-independent world geometry in a common city frame,
+streamed ~500 m tiles (surfaces, terrain, scenery with LOD) with prefetch along the expected route,
+services (line variants, timetables) as references into the graph, explicit surface ids and levels
+for roads, decks and underpass floors, persistent simulation identity across tiles; migration in
+steps (common coordinates and graph → one shared test district → two services see identical
+geometry → tiles all loaded → streaming → coverage).
+
+**Agree**, with these notes from where the code is now:
+- The step that matters first is **route-independent geometry**. Today the world is shaped around
+  our route (`flushDtm` lays streets to *our* profile, `carveCorridor` cuts a bench along *our* track,
+  the profile itself comes from our route). A shared world needs a profile per **track** (every track
+  edge of the graph gets its height once, from the survey + structures), and the street flush
+  against all tracks. That is also what fixes "other lines' tracks" heights for good.
+- **Explicit levels** are half done (this session): every road and footway carries its level (OSM
+  bridge → deck), one height function per level used by drawing and traffic, obstacle checks ignore
+  other levels. Next: OSM `layer` and road tunnels (today dropped in `build_line.py`), and DTM level
+  −1 areas (underpass floors, Výtoň) as a surface of their own.
+- **Coordinates**: one city origin (S-JTSK or a fixed local origin), tiles store vertices relative to
+  the tile origin. Line files today each have their own origin; the converter is mechanical.
+- **Tiles**: the street model is already chunked along the route (1.5 km, fits reach 40 m beyond);
+  move that to square tiles with overlapping input margins. The triangle index, lane graph and
+  walker paths must be incremental (register/unregister per tile).
+- Start with the **Čechův most – Národní – Výtoň district** (several lines share it, plus the embankment),
+  which has bridges, an underpass and the embankment levels: the hardest cases first.
+- Cost: a few sessions of refactor before anything looks different; worth it before more lines.
 
 ## 2. How we build and test — approach changes
 

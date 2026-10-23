@@ -87,29 +87,31 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
   // 1. probe paths, 1 m steps, only inside the surveyed streets
   const paths = []; // {kind: 'car'|'walk', pts: [{x, y, hx, hy}]}
   // src: what the probe follows ('road 12', 'lane', 'walk 3'), s: position along it
-  const runsOf = (kind, src, sample, length) => {
+  // (hf: the surface the probe stands on, as traffic uses it; deck: on a bridge, where the survey's
+  // ground-level classes say nothing)
+  const runsOf = (kind, src, sample, length, hf = (x, y) => ground.surface(x, y), deck = false) => {
     let cur = [];
     for (let s = 0; s <= length; s += 1) {
       const p = sample(s);
       if (p && covered(p.x, p.y)) { p.src = src; p.s = s; p.L = length; cur.push(p); }
-      else { if (cur.length > 3) paths.push({ kind, pts: cur }); cur = []; }
+      else { if (cur.length > 3) paths.push({ kind, pts: cur, hf, deck }); cur = []; }
     }
-    if (cur.length > 3) paths.push({ kind, pts: cur });
+    if (cur.length > 3) paths.push({ kind, pts: cur, hf, deck });
   };
   // the lane graph the cars drive: every lane, and every connector a car may take at a junction
   const along = (path) => (s) => { const p = path.at(s); return { x: p.x, y: p.y, hx: p.hx, hy: p.hy }; };
   for (const lane of traffic.laneList) {
-    runsOf('car', `lane ${lane.id}`, along(lane.path), lane.path.length);
+    runsOf('car', `lane ${lane.id}`, along(lane.path), lane.path.length, lane.road.hf, !!lane.road.b);
     for (const b of traffic.nextLanes(lane)) {
       const c = traffic.connector(lane, b);
-      if (c) runsOf('car', `junction ${c.id}`, along(c.path), c.path.length);
+      if (c) runsOf('car', `junction ${c.id}`, along(c.path), c.path.length, c.hf, !!(lane.road.b && b.road.b));
     }
   }
   for (const [k, w] of traffic.walks.entries()) {
     runsOf('walk', `walk ${k}`, (s) => {
       const p = w.path.at(s);
       return { x: p.x + p.hy * w.off, y: p.y - p.hx * w.off, hx: p.hx, hy: p.hy };
-    }, w.path.length);
+    }, w.path.length, w.hf, !!w.deck);
   }
   progress(`${paths.length} paths`);
   await tick();
@@ -128,19 +130,19 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
   const flag = (kind, p, z, mag, info) => raw.push({ kind, x: p.x, y: p.y, z, mag, info, src: p.src, s: p.s, L: p.L });
   let carM = 0, walkM = 0;
   for (let pi = 0; pi < paths.length; pi++) {
-    const { kind, pts } = paths[pi];
+    const { kind, pts, hf, deck } = paths[pi];
     let prev = null, prevD = null, prev2D = null, roadRun = 0, prevC = null, prev2C = null;
     for (const p of pts) {
       const { x, y, hx, hy } = p;
       if (kind === 'car') {
         carM++;
-        const { z, roll } = carPose(ground, x, y, hx, hy);
+        const { z, roll } = carPose(hf, x, y, hx, hy);
         const zd = drawn.at(x, y, z);
-        const cls = dtm.classAt(x, y);
+        const cls = deck ? 'road' : dtm.classAt(x, y);
         let bad = 0;
         const on = [];
         for (const [f, l] of [[1.3, 0.8], [1.3, -0.8], [-1.3, 0.8], [-1.3, -0.8]]) {
-          const c = dtm.classAt(x + hx * f - hy * l, y + hy * f + hx * l);
+          const c = deck ? null : dtm.classAt(x + hx * f - hy * l, y + hy * f + hx * l);
           if (CAR_BAD.has(c)) { bad++; on.push(c); }
         }
         if (bad >= 2) flag('sidewalk', p, z, bad / 4, on.join(','));
@@ -159,9 +161,9 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
         prev = z; prev2D = prevD; prevD = zd;
       } else {
         walkM++;
-        const z = ground.surface(x, y);
+        const z = hf(x, y);
         const zd = drawn.at(x, y, z);
-        const cls = dtm.classAt(x, y);
+        const cls = deck ? 'sidewalk' : dtm.classAt(x, y);
         roadRun = WALK_BAD.has(cls) ? roadRun + 1 : 0;
         if (roadRun === 6) flag('road', p, z, 1, `on ${cls}`);
         if (zd !== null) {
