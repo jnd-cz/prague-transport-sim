@@ -151,12 +151,15 @@ export class Route {
   _buildSamples() {
     this.cell = 40;
     this.grid = new Map();
+    this.samples = [];
     const p = {};
     for (let s = 0; s <= this.length; s += 4) {
       this.at(s, p);
+      const q = [p.x, p.y, s, this.samples.length];
+      this.samples.push(q);
       const k = this.key(p.x, p.y);
       if (!this.grid.has(k)) this.grid.set(k, []);
-      this.grid.get(k).push([p.x, p.y, s]);
+      this.grid.get(k).push(q);
     }
   }
 
@@ -164,31 +167,38 @@ export class Route {
     return Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell);
   }
 
-  // Approximate nearest distance from (x, y) to the route (only accurate below ~40 m).
+  // Nearest distance from (x, y) to the route (only accurate below ~40 m).
   distance(x, y) {
-    const cx = Math.floor(x / this.cell), cy = Math.floor(y / this.cell);
-    let best = Infinity;
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-      const arr = this.grid.get((cx + dx) * 100003 + (cy + dy));
-      if (!arr) continue;
-      for (const q of arr) best = Math.min(best, Math.hypot(q[0] - x, q[1] - y));
-    }
-    return best;
+    const n = this.nearest(x, y);
+    return n ? n.d : Infinity;
   }
 
-  // Nearest route sample to (x, y) within ~40 m: { d, s } or null.
+  // Nearest point of the route to (x, y) within ~40 m: { d, s } or null. The nearest 4 m sample,
+  // refined onto the chords to its neighbours (the sample alone was up to 2 m off: two tracks 0.4 m
+  // apart read 0.4-1.9 m, and the Letenská interlaced track fell apart into 3 m pieces).
   nearest(x, y) {
     const cx = Math.floor(x / this.cell), cy = Math.floor(y / this.cell);
-    let best = null;
+    let best = null, bd = Infinity;
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
       const arr = this.grid.get((cx + dx) * 100003 + (cy + dy));
       if (!arr) continue;
       for (const q of arr) {
-        const d = Math.hypot(q[0] - x, q[1] - y);
-        if (!best || d < best.d) best = { d, s: q[2] };
+        const d = (q[0] - x) ** 2 + (q[1] - y) ** 2;
+        if (d < bd) { bd = d; best = q; }
       }
     }
-    return best;
+    if (!best) return null;
+    let out = { d: Math.sqrt(bd), s: best[2] };
+    for (const o of [-1, 1]) {
+      const r = this.samples[best[3] + o];
+      if (!r) continue;
+      const ex = r[0] - best[0], ey = r[1] - best[1], l2 = ex * ex + ey * ey;
+      if (l2 < 1e-9) continue;
+      const t = Math.max(0, Math.min(1, ((x - best[0]) * ex + (y - best[1]) * ey) / l2));
+      const d = Math.hypot(best[0] + ex * t - x, best[1] + ey * t - y);
+      if (d < out.d) out = { d, s: best[2] + (r[2] - best[2]) * t };
+    }
+    return out;
   }
 
   // Curve radius (m) at s, from heading change over 16 m.

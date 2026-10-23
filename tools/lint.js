@@ -420,7 +420,11 @@ function syntheticWallsOnStreets(g) {
   return check('no-invented-walls-on-streets', n, bad);
 }
 
-export async function lint({ bot = false, traffic = false, save = true } = {}) {
+// traffic counts swing 20-30 % whenever trajectories change: the traffic run is repeated with these
+// seeds and the counts averaged (each run's counts kept in "runs")
+const SEEDS = [22, 7, 1234];
+
+export async function lint({ bot = false, traffic = false, save = true, seeds = SEEDS } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
   const t0 = performance.now();
@@ -451,9 +455,13 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
   let trafficStats;
   if (traffic) {
     // last: it starts a new shift from the first stop
-    const r = await trafficRun({});
-    Object.assign(checks, r.checks);
-    trafficStats = r.stats;
+    const runs = [];
+    for (const seed of seeds) runs.push(await trafficRun({ seed }));
+    for (const [k, c] of Object.entries(runs[0].checks)) {
+      const counts = runs.map((r) => r.checks[k]?.count ?? 0);
+      checks[k] = { ...c, count: Math.round(counts.reduce((x, y) => x + y, 0) / counts.length), runs: counts };
+    }
+    trafficStats = { ...runs[0].stats, seeds, finished: runs.every((r) => r.stats.finished) };
   }
   const report = { line: g.data.line, traffic: trafficStats, date: new Date().toISOString(), secs: Math.round((performance.now() - t0) / 100) / 10, checks };
   if (save) {

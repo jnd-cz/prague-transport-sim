@@ -832,3 +832,32 @@ and one priority list. New facts are in `data/truth.json` (Ke Stírce Vienna-typ
 multi-platform, Vyšehrad tunnel shared tracks, Veletržní cars on the tracks, Troja underpass, Pobřežní
 cesta and Výstaviště structures, Karlovy lázně passage, Letenský tunel, two rules). Lines 9, 22, 23 have
 not been re-run since the lane rules changed.
+
+## 22. User answers to the open proposals; Letenská gauntlet; Mosty registration (2026-10-23, night)
+
+Decisions (PLAN §1.3): fine terrain yes if cheap enough (simplify from the precise data); the shared
+city world after the current issues, traffic tuning and signals; seed averaging yes; line 23 close spot
+first; OSM fetched slowly in small pieces, in the background and ahead of planned coverage; the track
+(and roads) fit the bridge deck models, approaches and ramps adjusted, coordinates double-checked.
+
+- **Line 23 "close spot" = the Letenská interlaced track, not built as a gauntlet.** OSM tags it right
+  (`railway:interlaced=yes`, note "kolejová splítka", part under a `building_passage`, ~73 m between
+  lon 14.40521 and 14.40623). `Route.nearest()` returned the nearest 4 m sample, up to 2 m off the true
+  distance, so two tracks 0.3-0.45 m apart read 0.4-1.9 m and the stretch fell apart into 3 m pieces,
+  each under the 25 m minimum: no gauntlet, no block control (the two trams that met there). Fixed at
+  the rule: `nearest()` refines the sample onto the chords to its neighbours and `distance()` uses it
+  (37 callers get exact distances). Line 23 now has the gauntlet s 3978-4056. The two short close
+  spots at s 311-318 and 811-820 are where the two directions' tracks cross (skipped, < 25 m).
+- **Traffic lint averages 3 seeds** (22, 7, 1234; `lint({ seeds })`, each run's count in `runs`). The
+  same seed gives the same run, except the first run after a shift was played. Line 23 (first run since
+  the lane rules, D3): slide 357 → 237, overlap 55 → 28, red runs 2 → 1, walker hits 62 → 90 (78 / 82 /
+  109): cars now in walkers' crossings at Malovanka - Pohořelec (follow-up in D3).
+- **Overpass**: `tools/overpass.py`: queries cached by text in raw/overpass/, 5 s between requests,
+  retries with backoff over three servers. `platforms.py --fetch` asks in ~800 m boxes along both
+  directions (the one-query fetch came back empty for line 9).
+- **Mosty 3D vs the survey** (line 17, every 150 m of route where both have a deck): Web Mercator →
+  local and the heights agree: no systematic horizontal shift (the best of ±4 m shifts scatters in
+  direction and gains a few edge points), and the model top is 0.0-0.5 m over the surveyed deck on most
+  bridges (Bpv on both; an ellipsoid mix-up would be ~45 m). Local outliers to fit in A2: s 4200 +4.7 m
+  (the estakáda), 4950 +5.8, 5700 +6.7, 11700 +7.9, 12600 +1.2, 13350 +1.4 (other structure parts or
+  levels over the surveyed areas). Script: scratch `mosty_check.py` (to become a lint with A2).
