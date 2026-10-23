@@ -208,7 +208,8 @@ export class Game {
       const lats = pl.p.map(([x, y], i) => { const q = rt.at(proj[i].s); return q.hx * (y - q.y) - q.hy * (x - q.x); }); // + = left
       const side = Math.sign(lats.reduce((a, b) => a + b, 0)) || -1, far = Math.max(...lats.map((l) => l * side));
       // (an OSM platform line usually runs along its middle, an area gives its outer edge)
-      const inner = 1.5, outer = Math.min(inner + 6, Math.max(inner + (pl.w || 2.4), pl.gtfs ? far + 1 : pl.area ? far : 2 * far - inner));
+      // (an OSM line: 2-3.5 m wide unless tagged; it reached over the car lane at Trojská, 5.1 m)
+      const inner = 1.5, outer = pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner)));
       const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter };
       this.platforms.push(plat);
       const mid = rt.offset((s0 + s1) / 2, side * (inner + outer) / 2), cls = dtm?.classAt(mid.x, mid.y);
