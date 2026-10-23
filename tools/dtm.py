@@ -127,8 +127,9 @@ for src in SOURCES:
                         for k in range(n + (1 if (x1, y1) == pts[-1][:2] else 0)):
                             u = k / n
                             q = local(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)
-                            if in_corridor(q):
-                                cloud[(round(q[0] * 2), round(q[1] * 2))] = round(z0 + (z1 - z0) * u, 2)
+                            zq = z0 + (z1 - z0) * u
+                            if in_corridor(q) and lidar(*q) - 5 < zq < lidar(*q) + 8:
+                                cloud[(round(q[0] * 2), round(q[1] * 2))] = round(zq, 2)
 
 def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
@@ -214,7 +215,9 @@ def ring(r, level):
     loc = [local(x, y) for x, y, *_ in r]
     cands = [candidates(x, y, level) for x, y, *_ in r]
     if level == 0:
-        cands = [[z for z in c if z > lidar(*q) - 5] for c, q in zip(cands, loc)]
+        # (and nothing at ground level stands 8 m above the bare earth: source typos, a corner at
+        # 298.9 m for 198.9 m beside the Modřany estakáda, a group of streets ~75 m too high)
+        cands = [[z for z in c if lidar(*q) - 5 < z < lidar(*q) + 8] for c, q in zip(cands, loc)]
     zs = ring_heights(cands)
     missing = sum(1 for z in zs if z is None)
     zs = fill_along(r, zs)

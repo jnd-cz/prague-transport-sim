@@ -930,7 +930,7 @@ export class Traffic {
       const ourS = t.endS !== null ? this.route.nearest(p.x, p.y)?.s : null;
       t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, br, t.s, (s, q) => ground.at(q.x, q.y, true));
+      this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y));
     }
     this.oncoming = this.oncoming.filter((t) => {
       if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); return false; }

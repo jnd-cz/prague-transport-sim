@@ -368,7 +368,7 @@ export function buildWorld(scene, data, route, ground, weather) {
   // bridge tagged in OSM or not: the opposite track 4.2 m off took the raw survey, 3 m off ours)
   const onDeck = (hf) => (x, y) => {
     const n = route.nearest(x, y);
-    return n && n.d < 6 ? ground.profile.height(n.s) : hf(x, y);
+    return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
   };
   for (const t of data.tracks) if (!t.z) t.z = trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))));
   lowerTerrainUnderTracks(data, ground.terrain);
@@ -704,9 +704,32 @@ function flushDtm(ground) {
     rows.set(i, e);
     return e;
   };
+  // The correction is a smooth field: each row measures the survey's own noise too (±10-30 cm from
+  // metre to metre), and applied row by row it stamped that noise back as waves across the streets
+  // (line 17 s 15700-15800). Averaged over ±10 m along the route and ±2 m across.
+  const smoothRows = new Map();
+  const srow = (i) => {
+    if (smoothRows.has(i)) return smoothRows.get(i);
+    if (row(i)[0] === null) { smoothRows.set(i, null); return null; }
+    const out = new Array(31).fill(0), w = new Array(31).fill(0);
+    for (let j = i - 5; j <= i + 5; j++) {
+      const e = row(j);
+      if (e[0] === null) continue;
+      const wj = 1 - Math.abs(j - i) / 6;
+      for (let k = 0; k < 31; k++) for (let d = -2; d <= 2; d++) {
+        const kk = k + d;
+        if (kk < 0 || kk > 30) continue;
+        const wk = wj * (1 - Math.abs(d) / 3);
+        out[k] += e[kk] * wk; w[k] += wk;
+      }
+    }
+    const res = out.map((v, k) => v / w[k]);
+    smoothRows.set(i, res);
+    return res;
+  };
   const corr = (s, lat) => {
-    const i = Math.round(s / 2), e = row(i);
-    if (e[0] === null) return null;
+    const e = srow(Math.round(s / 2));
+    if (e === null) return null;
     const f = Math.max(0, Math.min(30, lat + 15)), k = Math.min(29, Math.floor(f)), u = f - k;
     return e[k] * (1 - u) + e[k + 1] * u;
   };
@@ -727,7 +750,7 @@ function flushDtm(ground) {
     for (const tri of a.mesh) for (const p of tri) pts.push(p);
     for (const r of [a.ring, ...a.holes]) for (const p of r) pts.push(p);
   }
-  for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) row(Math.round(n.s / 2)); }
+  for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) srow(Math.round(n.s / 2)); } // (rows and their neighbours, before anything moves)
   for (const p of pts) shift(p);
   for (const a of dtm.areas) {
     if (a.model || a.l !== 0 || !FLUSH.has(a.c)) continue;

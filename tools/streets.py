@@ -39,6 +39,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 arg = lambda k, d: type(d)(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d  # noqa: E731
 LINE, S0, S1, CHUNK = arg("--line", "22"), arg("--from", 0.0), arg("--to", 1e9), arg("--chunk", 1500.0)
 KERB = 0.13
+# carriageway fit: Gaussian scale (m) and outlier rejection (m); σ 3 m followed the survey's noise
+# (tram-bed corners, inner division lines): ±0.1-0.2 m waves within a few metres on line 17
+SIGMA, REJECT = arg("--sigma", 6.0), arg("--reject", 0.15)
 CARRIAGEWAY = {"road", "parking", "tram"}
 SNAP = {"road", "parking", "tram", "sidewalk", "island", "cycle", "paved", "platform"}
 GRID = 2.0
@@ -119,7 +122,7 @@ def run(S0, S1):
         iy = np.clip(((py[keep] - Y0) / GRID).round().astype(int), 0, NY - 1)
         np.add.at(W, (iy, ix), 1.0); np.add.at(WZ, (iy, ix), pz[keep])
         Z, C = None, None
-        for sigma in (3.0, 8.0, 20.0, 60.0):
+        for sigma in (SIGMA, 8.0 if SIGMA < 8 else 2 * SIGMA, 20.0, 60.0):
             w, wz = gauss(W, sigma), gauss(WZ, sigma)
             z = wz / np.maximum(w, 1e-12)
             conf = np.clip(w / 0.05, 0, 1)  # enough points around at this scale
@@ -141,7 +144,7 @@ def run(S0, S1):
     for it in range(3):
         Z = solve(keep, px, py, pz)
         res = pz - zat(Z, px, py)
-        keep = np.abs(res) < 0.25
+        keep = np.abs(res) < REJECT
         print(f"pass {it}: rms {np.sqrt(np.mean(res[keep] ** 2)):.3f} m, {np.sum(~keep)} outliers")
 
     # ------------------------------------------------------------------ snap the areas to the rule
