@@ -122,24 +122,57 @@ def run(S0, S1):
     print(f"carriageway points: {len(px)} ({len(cz)} inside the carriageways)")
 
 
+    def conv1(a, k, axis):
+        """'same' convolution of every row (axis 1) or column (axis 0) with kernel k, by FFT."""
+        n = a.shape[axis] + len(k) - 1
+        fa = np.fft.rfft(a, n, axis=axis)
+        fk = np.fft.rfft(k, n)
+        out = np.fft.irfft(fa * (fk[:, None] if axis == 0 else fk[None, :]), n, axis=axis)
+        r = (len(k) - 1) // 2
+        return out[r:r + a.shape[0]] if axis == 0 else out[:, r:r + a.shape[1]]
+
     def gauss(a, sigma):
         r = int(3 * sigma / GRID) + 1
         k = np.exp(-0.5 * (np.arange(-r, r + 1) * GRID / sigma) ** 2)
         k /= k.sum()
-        a = np.apply_along_axis(lambda v: np.convolve(v, k, mode="same"), 0, a)
-        return np.apply_along_axis(lambda v: np.convolve(v, k, mode="same"), 1, a)
+        return conv1(conv1(a, k, 0), k, 1)
 
+    gx = (np.arange(NX) * GRID)[None, :]
+    gy = (np.arange(NY) * GRID)[:, None]
 
     def solve(keep, px, py, pz):
-        """Normalized convolution: smooth where there are points (sigma 3 m), wider where sparse."""
-        W = np.zeros((NY, NX)); WZ = np.zeros((NY, NX))
+        """First-order normalized convolution: at every grid cell, the plane z = a + b dx + c dy fitted
+        to the points around it (Gaussian weights, sigma SIGMA, wider where sparse), and its height there.
+        (A weighted mean, the zero-order version, bends between unevenly spread points on a slope: the
+        street arched and dipped downhill from Levského.) A small slope prior keeps the plane defined
+        where the points lie on one line."""
         ix = np.clip(((px[keep] - X0) / GRID).round().astype(int), 0, NX - 1)
         iy = np.clip(((py[keep] - Y0) / GRID).round().astype(int), 0, NY - 1)
-        np.add.at(W, (iy, ix), 1.0); np.add.at(WZ, (iy, ix), pz[keep])
+        X, Y, Zp = ix * GRID, iy * GRID, pz[keep]
+        z0 = float(np.median(Zp)) if len(Zp) else 0.0
+        Zp = Zp - z0
+        acc = {}
+        for name, val in (("w", 1.0), ("x", X), ("y", Y), ("z", Zp), ("xx", X * X), ("xy", X * Y), ("yy", Y * Y), ("xz", X * Zp), ("yz", Y * Zp)):
+            A = np.zeros((NY, NX))
+            np.add.at(A, (iy, ix), val)
+            acc[name] = A
         Z, C = None, None
         for sigma in (SIGMA, 8.0 if SIGMA < 8 else 2 * SIGMA, 20.0, 60.0):
-            w, wz = gauss(W, sigma), gauss(WZ, sigma)
-            z = wz / np.maximum(w, 1e-12)
+            g = {k: gauss(v, sigma) for k, v in acc.items()}
+            w = g["w"]
+            W = np.maximum(w, 1e-12)
+            sx, sy = g["x"] - gx * w, g["y"] - gy * w
+            sxx = g["xx"] - 2 * gx * g["x"] + gx * gx * w
+            syy = g["yy"] - 2 * gy * g["y"] + gy * gy * w
+            sxy = g["xy"] - gx * g["y"] - gy * g["x"] + gx * gy * w
+            sxz, syz, sz = g["xz"] - gx * g["z"], g["yz"] - gy * g["z"], g["z"]
+            lam = 0.05 * sigma * sigma * W  # slope prior
+            M = np.stack([np.stack([W, sx, sy], -1), np.stack([sx, sxx + lam, sxy], -1), np.stack([sy, sxy, syy + lam], -1)], -2)
+            rhs = np.stack([sz, sxz, syz], -1)[..., None]
+            try:
+                z = np.linalg.solve(M, rhs)[..., 0, 0] + z0
+            except np.linalg.LinAlgError:
+                z = sz / W + z0
             conf = np.clip(w / 0.05, 0, 1)  # enough points around at this scale
             if Z is None:
                 Z, C = z, conf

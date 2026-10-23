@@ -86,7 +86,7 @@ export class Profile {
   constructor(route, terrain, bridges = [], tunnels = [], decks = new Map(), dtm = null) {
     const step = (this.step = 2);
     const n = (this.n = Math.ceil(route.length / step) + 1);
-    Object.assign(this, { route, terrain, dtm });
+    Object.assign(this, { route, terrain, dtm, tunnels });
     let z = new Float32Array(n);
     const p = {};
     const bedAt = new Uint8Array(n);
@@ -364,12 +364,21 @@ export function carveCorridor(T, route, profile, dtm = null) {
     const a = orig[j * nx + i], b = orig[j * nx + i + 1], c = orig[(j + 1) * nx + i], d = orig[(j + 1) * nx + i + 1];
     return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
   };
+  // Tunnels of our route through rock (OSM tunnel, the lidar ground more than 8 m over the track on
+  // average: the Vyšehrad tunnel; not a covered stretch under a station or a bridge): nothing is
+  // carved there, the hill stays whole over the track and world.js draws the vault and the portals
+  const rock = (profile.tunnels || []).filter(([a, b]) => {
+    let acc = 0, n = 0;
+    for (let s = a; s <= b; s += 4) { const q = route.at(s); acc += origAt(q.x, q.y) - profile.height(s); n++; }
+    return n && acc / n > 8;
+  });
+  const inRock = (s) => rock.some(([a, b]) => s > a - 1 && s < b + 1);
   // where along each side the hillside needs a retaining wall, and how tall
   const WSTEP = 3, nw = Math.ceil(route.length / WSTEP) + 1;
   const wallTop = { 1: new Float32Array(nw).fill(NaN), '-1': new Float32Array(nw).fill(NaN) };
   for (let i = 0; i < nw; i++) {
     const s = i * WSTEP;
-    if (profile.onBridge(s)) continue;
+    if (profile.onBridge(s) || inRock(s)) continue;
     const zp = profile.height(s);
     for (const side of [1, -1]) {
       let top = -Infinity;
@@ -396,7 +405,7 @@ export function carveCorridor(T, route, profile, dtm = null) {
     const d = bestD[k];
     if (d > R) continue;
     const s = bestS[k];
-    if (profile.onBridge(s)) continue;
+    if (profile.onBridge(s) || inRock(s)) continue;
     const zp = profile.height(s);
     const wall = !isNaN(wallTop[bestSide[k]][Math.round(s / WSTEP)]);
     if (d <= BENCH || (wall && d <= WALL_REACH)) T.h[k] = zp - 0.05;
@@ -420,7 +429,7 @@ export function carveCorridor(T, route, profile, dtm = null) {
     r.pts.forEach((q, i) => { q.top = (t[Math.max(0, i - 1)] + t[i] + t[Math.min(t.length - 1, i + 1)]) / 3; });
   }
   T.orig = orig;
-  return { runs, bench: BENCH, reach: WALL_REACH };
+  return { runs, bench: BENCH, reach: WALL_REACH, rock };
 }
 
 // Combined ground function used by all scenery: near the route (and on its bridges)
@@ -689,7 +698,13 @@ export function makeGround(route, terrain, profile, dtm = null) {
     },
     // height function of an OSM way (its ribbon is drawn 0.12 above): ground level, or on a bridge
     // the deck it lies on, else a straight span between the ground at its two ends
-    way(line, isBridge) {
+    way(line, isBridge, isTunnel = false) {
+      if (isTunnel) {
+        // a road tunnel: straight between the ground at its two portals (below the hill in between)
+        const a = line[0], b = line[line.length - 1], ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);
+        const lx = b[0] - a[0], ly = b[1] - a[1], l2 = lx * lx + ly * ly || 1;
+        return (x, y) => ha + (hb - ha) * Math.max(0, Math.min(1, ((x - a[0]) * lx + (y - a[1]) * ly) / l2));
+      }
       if (!isBridge) return (x, y) => this.at(x, y);
       const a = line[0], b = line[line.length - 1];
       const ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);

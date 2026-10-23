@@ -284,6 +284,27 @@ function catenarySpans(g) {
   return check('catenary-from-above', n, bad);
 }
 
+// Track axes of a double-track line at least 2.9 m apart (OSM sometimes draws them 2.1 m apart): every
+// 2 m where the opposite track runs alongside ours the other way, 40 m or more from a switch.
+function trackSpacing(g) {
+  const r = g.route, b = g.backRoute, sw = (g.data.switches || []).map((w) => w.s ?? w), bad = new Map();
+  let n = 0;
+  if (!b) return check('tracks-apart', 0, []);
+  // (interlaced track, under 1.8 m apart, and 40 m around it: as src/trackfix.js)
+  const gaunt = [];
+  for (let s = 0; s < r.length; s += 2) { const p = r.at(s), q = b.nearest(p.x, p.y); if (q && q.d < 1.8) gaunt.push([s - 40, s + 40]); }
+  for (let s = 0; s < r.length; s += 2) {
+    const p = r.at(s), q = b.nearest(p.x, p.y);
+    if (!q || q.d > 6 || q.d < 1.8 || gaunt.some(([a, c]) => s > a && s < c)) continue;
+    const h = b.at(q.s);
+    if (p.hx * h.hx + p.hy * h.hy > -0.97 || sw.some((w) => Math.abs(w - s) < 40)) continue;
+    n++;
+    const k = Math.round(s / 20);
+    if (q.d < 2.9 && !(bad.get(k)?.mag >= 2.9 - q.d)) bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag: 2.9 - q.d, info: `tracks ${q.d.toFixed(2)} m apart` });
+  }
+  return check('tracks-apart', n, [...bad.values()]);
+}
+
 // Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
 function syntheticWallsOnStreets(g) {
   const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
@@ -320,6 +341,7 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     railSupport: railSupport(g, world),
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
+    trackSpacing: trackSpacing(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });
