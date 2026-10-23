@@ -107,7 +107,9 @@ history and findings; this file says what to do next and how. Update it when a s
    stretch after it (sloped roads, the tunnel mouth): a detailed rebuild after B3),
    A7 Karlovy lázně passage, A6 Pobřežní cesta underpass, A4 Výstaviště railway bridge, B1 arching by
    the water.
-3. **Pilot areas on the detailed survey** (B2 + the lane pilots): walls with heights, terrain edges,
+3. **Fine terrain (B3): done for all lines** (2 m DMR 5G near the tracks, HANDOFF §25); next the look of
+   the tunnel mouths, Trojský most and the stretch after it, Pobřežní cesta, Výstaviště on it.
+   **Pilot areas on the detailed survey** (B2 + the lane pilots): walls with heights, terrain edges,
    railings, guardrails on Podolské nábřeží, Strossmayerovo - Veletržní, Trojská, Palackého nám. and
    Podolská vodárna - Výtoň; then the fine terrain (B3) if the user says go.
 4. **Traffic realism**: D2 car and pedestrian signals with the tram cycles and Czech gantries, a
@@ -115,7 +117,8 @@ history and findings; this file says what to do next and how. Update it when a s
    10263); U3 cars turning left in front of the tram; turn lanes; orthophoto lane check. (Seed
    averaging: done.)
 5. **Stops and network**: C2 Sídliště Řepy per platform; both directions drivable (C3); C11 line ends
-   and depots; C12 line 37.
+   and depots; line 37 built (GTFS-only line, §25; the Spojovací end's track to settle). OSM now from
+   the local extract for every tool (refresh: newer Geofabrik file, `osm_local.py cut`).
 6. **Larger**: U1 survey on every line; U4 shared city in chunks; U2 number plates; C15 sounds (samples);
    16 bridges by type, 16b buildings, 16c street imagery.
 

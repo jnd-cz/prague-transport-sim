@@ -1,17 +1,10 @@
 // Terrain heights (ČÚZK DMR 5G grid) and the smoothed vertical profile of the route.
 
-export class Terrain {
-  constructor(t) {
-    const bin = atob(t.data);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const raw = new Int16Array(bytes.buffer);
-    this.h = new Float32Array(raw.length);
-    for (let i = 0; i < raw.length; i++) this.h[i] = t.base + raw[i] * t.scale;
-    Object.assign(this, { x0: t.x0, y0: t.y0, dx: t.dx, dy: t.dy, nx: t.nx, ny: t.ny });
-    let min = Infinity;
-    for (const v of this.h) min = Math.min(min, v);
-    this.min = min;
+// A regular height grid (rows go south: dy < 0): the coarse terrain of a line, or one block of the
+// fine terrain (tools/fine_terrain.py).
+export class Grid {
+  constructor(x0, y0, dx, dy, nx, ny, h) {
+    Object.assign(this, { x0, y0, dx, dy, nx, ny, h });
   }
 
   // grid value with clamping at the edges
@@ -19,6 +12,11 @@ export class Terrain {
     ix = Math.max(0, Math.min(this.nx - 1, ix));
     iy = Math.max(0, Math.min(this.ny - 1, iy));
     return this.h[iy * this.nx + ix];
+  }
+
+  contains(x, y) {
+    const fx = (x - this.x0) / this.dx, fy = (y - this.y0) / this.dy;
+    return fx >= 0 && fy >= 0 && fx <= this.nx - 1 && fy <= this.ny - 1;
   }
 
   // height at local metres (x east, y north), interpolated on the same two triangles per cell
@@ -31,6 +29,76 @@ export class Terrain {
     const a = this.cell(ix, iy), b = this.cell(ix + 1, iy), c = this.cell(ix, iy + 1), d = this.cell(ix + 1, iy + 1);
     if (tx + ty <= 1) return a + (b - a) * tx + (c - a) * ty;
     return d + (c - d) * (1 - tx) + (b - d) * (1 - ty);
+  }
+
+  // lower the mesh triangle under (x, y) so its surface there is at most zmax (by at most `cap` m)
+  lowerAt(x, y, zmax, cap = Infinity) {
+    const fx = (x - this.x0) / this.dx, fy = (y - this.y0) / this.dy;
+    const ix = Math.floor(fx), iy = Math.floor(fy);
+    if (ix < 0 || iy < 0 || ix >= this.nx - 1 || iy >= this.ny - 1) return;
+    const excess = this.height(x, y) - zmax;
+    if (excess <= 0 || excess > cap) return;
+    const tx = fx - ix, ty = fy - iy;
+    const A = iy * this.nx + ix, B = A + 1, C = A + this.nx, D = C + 1;
+    for (const k of tx + ty <= 1 ? [A, B, C] : [D, C, B]) this.h[k] -= excess;
+  }
+}
+
+// The terrain of a line: the coarse grid over everything (10 x 15 m, build_line.py), and where
+// tools/fine_terrain.py made it, a 2 m grid near the tracks in blocks (addFine). `height` asks the fine
+// block first; the edits (carving, lowering under tracks and streets) go to every grid (`grids()`).
+// The coarse grid's fields stay on the Terrain itself (x0, y0, dx, dy, nx, ny, h, cell).
+export class Terrain extends Grid {
+  constructor(t) {
+    const bin = atob(t.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const raw = new Int16Array(bytes.buffer);
+    const h = new Float32Array(raw.length);
+    for (let i = 0; i < raw.length; i++) h[i] = t.base + raw[i] * t.scale;
+    super(t.x0, t.y0, t.dx, t.dy, t.nx, t.ny, h);
+    let min = Infinity;
+    for (const v of this.h) min = Math.min(min, v);
+    this.min = min;
+    this.fine = new Map(); // "bi,bj" -> Grid
+    this.fineMeta = null;
+  }
+
+  // the fine blocks (meta: lineN.fine.json, q: its Int16 samples)
+  addFine(meta, q) {
+    const B = meta.B, n = B + 1, bs = B * meta.step;
+    meta.blocks.forEach(([bi, bj], k) => {
+      const h = new Float32Array(n * n);
+      for (let i = 0; i < n * n; i++) h[i] = meta.base + q[k * n * n + i] * meta.scale;
+      this.fine.set(`${bi},${bj}`, Object.assign(new Grid(meta.x0 + bi * bs, meta.y0 - bj * bs, meta.step, -meta.step, n, n, h), { bi, bj }));
+    });
+    this.fineMeta = { ...meta, bs };
+  }
+
+  fineAt(x, y) {
+    const m = this.fineMeta;
+    if (!m) return null;
+    return this.fine.get(`${Math.floor((x - m.x0) / m.bs)},${Math.floor((m.y0 - y) / m.bs)}`) || null;
+  }
+
+  height(x, y) {
+    const f = this.fineAt(x, y);
+    return f ? f.height(x, y) : super.height(x, y);
+  }
+
+  coarseHeight(x, y) { return super.height(x, y); }
+
+  // every grid the edits apply to: the coarse one (as a plain Grid view) and the fine blocks
+  grids() {
+    if (!this._coarse) this._coarse = new Grid(this.x0, this.y0, this.dx, this.dy, this.nx, this.ny, this.h);
+    return [this._coarse, ...this.fine.values()];
+  }
+
+  // lower the surface at (x, y) to at most zmax in every grid (cap: deeper is not ours to dig; on a
+  // fine block at least 15 m: a 2 m cell lowered stays local, where a coarse 10 x 15 m triangle
+  // dragged its surroundings down; quay walls stood 8-9 m over the surveyed river)
+  lowerAt(x, y, zmax, cap = Infinity) {
+    for (const g of this.grids()) if (g.contains(x, y)) g.lowerAt(x, y, zmax, g.h === this.h ? cap : Math.max(cap, 15));
   }
 }
 
@@ -480,34 +548,13 @@ const BENCH = 7, BLEND = 8, WALL_MIN = 1.5, WALL_REACH = 22;
 // `dtm`: where the surveyed streets describe the ground beside the track, the survey decides and no
 // retaining wall is invented (the 10 m lidar grid rising beside a street is not a wall)
 export function carveCorridor(T, route, profile, dtm = null) {
-  const { nx, ny } = T;
-  const orig = T.h.slice();
-  const N = nx * ny;
-  const bestD = new Float32Array(N).fill(Infinity), bestS = new Float32Array(N), bestSide = new Int8Array(N);
-  const R = WALL_REACH + 3;
-  const p = {};
-  for (let s = 0; s <= route.length; s += 2) {
-    route.at(s, p);
-    const h = route.heading(s, 3);
-    const i0 = Math.max(0, Math.floor((p.x - R - T.x0) / T.dx)), i1 = Math.min(nx - 1, Math.ceil((p.x + R - T.x0) / T.dx));
-    const j0 = Math.max(0, Math.floor((p.y + R - T.y0) / T.dy)), j1 = Math.min(ny - 1, Math.ceil((p.y - R - T.y0) / T.dy));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const x = T.x0 + i * T.dx, y = T.y0 + j * T.dy;
-      const d = Math.hypot(x - p.x, y - p.y);
-      const k = j * nx + i;
-      if (d < bestD[k]) {
-        bestD[k] = d;
-        bestS[k] = s;
-        bestSide[k] = h.hx * (y - p.y) - h.hy * (x - p.x) > 0 ? 1 : -1; // +1 = left
-      }
-    }
-  }
+  // the ground before carving, every grid (the fine blocks where there are some: walls and rock
+  // tunnels are judged on the 2 m lidar there)
+  const grids = T.grids ? T.grids() : [T];
+  const origs = grids.map((g) => new Grid(g.x0, g.y0, g.dx, g.dy, g.nx, g.ny, g.h.slice()));
   const origAt = (x, y) => {
-    const fx = (x - T.x0) / T.dx, fy = (y - T.y0) / T.dy;
-    const i = Math.max(0, Math.min(nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(ny - 2, Math.floor(fy)));
-    const tx = Math.min(1, Math.max(0, fx - i)), ty = Math.min(1, Math.max(0, fy - j));
-    const a = orig[j * nx + i], b = orig[j * nx + i + 1], c = orig[(j + 1) * nx + i], d = orig[(j + 1) * nx + i + 1];
-    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+    for (let k = 1; k < origs.length; k++) if (origs[k].contains(x, y)) return origs[k].height(x, y);
+    return origs[0].height(x, y);
   };
   // Tunnels of our route through rock (OSM tunnel, the lidar ground more than 8 m over the track on
   // average: the Vyšehrad tunnel; not a covered stretch under a station or a bridge): nothing is
@@ -546,16 +593,42 @@ export function carveCorridor(T, route, profile, dtm = null) {
       if (run < 3) w[i] = NaN;
     }
   }
-  for (let k = 0; k < N; k++) {
-    const d = bestD[k];
-    if (d > R) continue;
-    const s = bestS[k];
-    if (profile.onBridge(s) || inRock(s)) continue;
-    const zp = profile.height(s);
-    const wall = !isNaN(wallTop[bestSide[k]][Math.round(s / WSTEP)]);
-    if (d <= BENCH || (wall && d <= WALL_REACH)) T.h[k] = zp - 0.05;
-    else if (d <= BENCH + BLEND) T.h[k] = zp + (orig[k] - zp) * ((d - BENCH) / BLEND);
-  }
+  // carve each grid: every vertex within reach takes its nearest route sample's bench / wall / blend
+  const R = WALL_REACH + 3;
+  const samples = [];
+  for (let s = 0; s <= route.length; s += 2) { const q = route.at(s), h = route.heading(s, 3); samples.push({ s, x: q.x, y: q.y, hx: h.hx, hy: h.hy }); }
+  grids.forEach((g, gk) => {
+    const { nx, ny } = g, N = nx * ny, orig = origs[gk].h;
+    const bestD = new Float32Array(N).fill(Infinity), bestS = new Float32Array(N), bestSide = new Int8Array(N);
+    const gx0 = Math.min(g.x0, g.x0 + (nx - 1) * g.dx), gx1 = Math.max(g.x0, g.x0 + (nx - 1) * g.dx);
+    const gy0 = Math.min(g.y0, g.y0 + (ny - 1) * g.dy), gy1 = Math.max(g.y0, g.y0 + (ny - 1) * g.dy);
+    for (const p of samples) {
+      if (p.x < gx0 - R || p.x > gx1 + R || p.y < gy0 - R || p.y > gy1 + R) continue;
+      const s = p.s, h = p;
+      const i0 = Math.max(0, Math.floor((p.x - R - g.x0) / g.dx)), i1 = Math.min(nx - 1, Math.ceil((p.x + R - g.x0) / g.dx));
+      const j0 = Math.max(0, Math.floor((p.y + R - g.y0) / g.dy)), j1 = Math.min(ny - 1, Math.ceil((p.y - R - g.y0) / g.dy));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = g.x0 + i * g.dx, y = g.y0 + j * g.dy;
+        const d = Math.hypot(x - p.x, y - p.y);
+        const k = j * nx + i;
+        if (d < bestD[k]) {
+          bestD[k] = d;
+          bestS[k] = s;
+          bestSide[k] = h.hx * (y - p.y) - h.hy * (x - p.x) > 0 ? 1 : -1; // +1 = left
+        }
+      }
+    }
+    for (let k = 0; k < N; k++) {
+      const d = bestD[k];
+      if (d > R) continue;
+      const s = bestS[k];
+      if (profile.onBridge(s) || inRock(s)) continue;
+      const zp = profile.height(s);
+      const wall = !isNaN(wallTop[bestSide[k]][Math.round(s / WSTEP)]);
+      if (d <= BENCH || (wall && d <= WALL_REACH)) g.h[k] = zp - 0.05;
+      else if (d <= BENCH + BLEND) g.h[k] = zp + (orig[k] - zp) * ((d - BENCH) / BLEND);
+    }
+  });
   // collect wall runs per side
   const runs = [];
   for (const side of [1, -1]) {
@@ -573,7 +646,6 @@ export function carveCorridor(T, route, profile, dtm = null) {
     const t = r.pts.map((q) => q.top);
     r.pts.forEach((q, i) => { q.top = (t[Math.max(0, i - 1)] + t[i] + t[Math.min(t.length - 1, i + 1)]) / 3; });
   }
-  T.orig = orig;
   return { runs, bench: BENCH, reach: WALL_REACH, rock };
 }
 

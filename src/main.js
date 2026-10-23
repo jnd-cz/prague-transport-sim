@@ -54,6 +54,16 @@ route.speedInfo = data.speed || null; // posted speeds and dedicated track (tool
 // where the data has no platform)
 route.prepareCant(data.stops.map((st) => ({ p0: st.p0 ?? st.s - 30, p1: st.p1 ?? st.s })));
 const terrain = new Terrain(data.terrain);
+// the fine terrain near the tracks (2 m, tools/fine_terrain.py), where it was made for this line
+// (dev switch ?nofine: the coarse grid only, for comparing lint runs)
+if (!params.has('nofine')) try {
+  const [mr, br] = await Promise.all([fetch(`data/line${lineId}.fine.json`), fetch(`data/line${lineId}.fine.bin`)]);
+  if (mr.ok && br.ok) {
+    const meta = await mr.json();
+    terrain.addFine(meta, new Int16Array(await br.arrayBuffer()));
+    data.attribution += ' ' + meta.attribution;
+  }
+} catch { /* not made for this line */ }
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
 const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm, data.clearances || []);

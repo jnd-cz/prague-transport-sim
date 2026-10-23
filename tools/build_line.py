@@ -43,6 +43,9 @@ def _arg(name, default):
 
 LINE = _arg("--line", "22")
 THEN = _arg("--then", None)  # the vehicle continues as this line at the terminus (GTFS run)
+# a line without an OSM route relation (substitute lines like 37): its GTFS shapes are matched onto
+# the OSM track graph, as for a vehicle run (also chosen by itself when OSM has no relation)
+GTFS_ONLY = "--gtfs" in sys.argv
 GTFS_ROUTE = f"L{LINE}"
 GTFS_DIRECTION = "0"
 SERVICE_DATE = dt.date(2026, 10, 21)
@@ -69,6 +72,20 @@ def overpass(name, query, optional=False):
     if os.path.exists(path) and not REFRESH:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
+    # the local extract (tools/osm_local.py, raw/osm/praha.osm.pbf) when there is one: no servers
+    # (needs pyosmium: run with python -P -E)
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import osm_local
+    except ImportError:
+        osm_local = None
+    if osm_local and osm_local.available():
+        js = osm_local.emulate(name, query)
+        if not js["elements"] and not optional and name != "relations":
+            raise SystemExit("local OSM: nothing for " + name)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(js, f)
+        return js
     print("overpass:", name)
     body = urllib.parse.urlencode({"data": query}).encode()
     for attempt in range(10):
@@ -106,7 +123,8 @@ def pick_relations(headsign):
     rels = overpass("relations", "[out:json][timeout:60];relation[type=route][route=tram]"
                     f"[ref=\"{LINE}\"](49.9,14.2,50.2,14.7);out tags;")["elements"]
     if not rels:
-        raise SystemExit(f"no OSM relation for tram {LINE}")
+        print(f"no OSM route relation for tram {LINE}: built from its GTFS shapes")
+        return None, None
     hs = norm_name(headsign)
     main = (next((r for r in rels if norm_name(r["tags"].get("to")) == hs), None)
             or next((r for r in rels if hs and hs in norm_name(r["tags"].get("to"))), None) or rels[0])
@@ -136,15 +154,20 @@ def gtfs_headsign():
     return c.most_common(1)[0][0]
 
 
-if THEN:
+if THEN or GTFS_ONLY:
     GTFS_HEADSIGN = OSM_RELATION = OSM_RELATION_BACK = Q_ROUTE = Q_ROUTE_BACK = None
-    R = None  # set from the matched path in main()
 else:
     GTFS_HEADSIGN = gtfs_headsign()
     OSM_RELATION, OSM_RELATION_BACK = pick_relations(GTFS_HEADSIGN)
+    GTFS_ONLY = OSM_RELATION is None
+if THEN or GTFS_ONLY:
+    GTFS_HEADSIGN = OSM_RELATION = OSM_RELATION_BACK = Q_ROUTE = Q_ROUTE_BACK = None
+    R = None  # set from the matched path in main()
+else:
     R = f"relation({OSM_RELATION})->.r;way(r.r)->.w;"
     Q_ROUTE = route_query(OSM_RELATION)
     Q_ROUTE_BACK = route_query(OSM_RELATION_BACK) if OSM_RELATION_BACK else None
+RUN = bool(THEN or GTFS_ONLY)  # path, stops and timetable from GTFS (plan_run / plan_line)
 
 
 def corridor_queries(R):
@@ -479,6 +502,34 @@ def plan_run(first, then):
             "shapes": [shape_of(ta), shape_of(tb)], "back": back}
 
 
+def plan_line(line):
+    """A line from GTFS alone (no OSM route relation): its most common direction-0 stop pattern on the
+    service date, the timetable of the trips with it, and the opposite direction's shape; shaped like
+    plan_run's result (no change of line: change -1)."""
+    rd, active = gtfs_open()
+    trips = {t["trip_id"]: t for t in rd("trips.txt") if t["route_id"] == f"L{line}" and t["service_id"] in active}
+    st = defaultdict(list)
+    for r in rd("stop_times.txt"):
+        if r["trip_id"] in trips:
+            st[r["trip_id"]].append(r)
+    for v in st.values():
+        v.sort(key=lambda r: int(r["stop_sequence"]))
+    by = defaultdict(list)
+    for tid in st:
+        by[(trips[tid]["direction_id"], tuple(r["stop_id"] for r in st[tid]))].append(tid)
+    if not any(d == "0" for d, _ in by):
+        raise SystemExit(f"no GTFS trips of {line} on the service date")
+    pa = max(((len(v), p) for (d, p), v in by.items() if d == "0"))[1]
+    ta = sorted(by[("0", pa)], key=lambda t: secs(st[t][0]["departure_time"]))
+    timetable = [[secs(r["departure_time"]) for r in st[t]] for t in ta]
+    shape_of = lambda tids: Counter(trips[t]["shape_id"] for t in tids).most_common(1)[0][0]  # noqa: E731
+    back = [v for (d, p), v in by.items() if d == "1"]
+    flags = {r["stop_id"]: (r["pickup_type"] == "3" or r["drop_off_type"] == "3") for r in st[ta[0]]}
+    print(f"line {line} from GTFS: {len(pa)} stops, {len(timetable)} trips, shape {shape_of(ta)}, back {back and shape_of(max(back, key=len))}")
+    return {"stops": list(pa), "change": -1, "timetable": timetable, "flags": flags,
+            "shapes": [shape_of(ta)], "back": [shape_of(max(back, key=len))] if back else []}
+
+
 def gtfs_shapes(ids):
     rd, _ = gtfs_open()
     pts = defaultdict(list)
@@ -605,9 +656,9 @@ def load_network(P):
 
 def run_path():
     """Path, opposite path, bridge/tunnel edges and corridor ways of a GTFS run."""
-    run = plan_run(LINE, THEN)
+    run = plan_run(LINE, THEN) if THEN else plan_line(LINE)
     shapes = gtfs_shapes(set(run["shapes"]) | set(run["back"]))
-    main_shape = shapes[run["shapes"][0]] + shapes[run["shapes"][1]][1:]
+    main_shape = shapes[run["shapes"][0]] + [q for sid in run["shapes"][1:] for q in shapes[sid][1:]]
     lat0 = sum(p[0] for p in main_shape) / len(main_shape)
     lon0 = sum(p[1] for p in main_shape) / len(main_shape)
     P0 = Proj(lat0, lon0)
@@ -615,7 +666,7 @@ def run_path():
     ids = match_shape(main_shape, net, P0)
     back_ids = []
     if run["back"]:
-        back_ids = match_shape(shapes[run["back"][0]] + shapes[run["back"][1]][1:], net, P0)
+        back_ids = match_shape(shapes[run["back"][0]] + [q for sid in run["back"][1:] for q in shapes[sid][1:]], net, P0)
     bridge_pairs, tunnel_pairs, way_ids = set(), set(), set()
     for a, b in zip(ids, ids[1:]):
         w = net["edge_way"].get((a, b))
@@ -634,10 +685,10 @@ def run_path():
 def main():
     os.makedirs(OUT, exist_ok=True)
     run = None
-    if THEN:
+    if RUN:
         run, nodes, path_ids, back_ids, bridge_pairs, tunnel_pairs, way_ids = run_path()
         corridor_queries(f"way(id:{','.join(map(str, way_ids))})->.w;")
-        rel = {"tags": {"name": f"Tram {LINE} → {THEN}"}}
+        rel = {"tags": {"name": f"Tram {LINE} → {THEN}" if THEN else f"Tram {LINE}"}}
         route = {"elements": []}
     else:
         route = overpass(f"route_{OSM_RELATION}", Q_ROUTE)
@@ -659,7 +710,7 @@ def main():
             for a, b in zip(e["nodes"], e["nodes"][1:]):
                 pairs.update({(a, b), (b, a)})
 
-    if not THEN:
+    if not RUN:
         path_ids = chain_route(rel, ways)
     # drop consecutive duplicates
     path_ids = [n for i, n in enumerate(path_ids) if i == 0 or n != path_ids[i - 1]]
@@ -799,7 +850,7 @@ def main():
 
     # opposite direction of the line, for oncoming trams
     path_back = []
-    if THEN and back_ids:
+    if RUN and back_ids:
         path_back = [[round(x, 2), round(y, 2)] for x, y in (P(*nodes[n]) for n in back_ids)]
     elif Q_ROUTE_BACK:
         back = overpass(f"route_{OSM_RELATION_BACK}", Q_ROUTE_BACK)
@@ -864,7 +915,7 @@ def main():
         if c["date"] == ymd:
             (active.add if c["exception_type"] == "1" else active.discard)(c["service_id"])
 
-    if THEN:
+    if RUN:
         st = {}
         pattern = tuple(run["stops"])
     else:
@@ -896,7 +947,7 @@ def main():
         if not flags:
             flags = {r["stop_id"]: (r["pickup_type"] == "3" or r["drop_off_type"] == "3") for r in rows}
         timetable.append([secs(r["departure_time"]) for r in rows])
-    if THEN:
+    if RUN:
         flags, timetable = run["flags"], run["timetable"]
     timetable.sort(key=lambda t: t[0])
 
@@ -916,7 +967,7 @@ def main():
         s, d, side = path.project(p, s_min=s_last - 5, radius=2)
         if s is None or d > 60:
             s, d, side = path.project(p, s_min=s_last - 5, radius=40)
-        mine = THEN if run and k > run["change"] else LINE
+        mine = THEN if THEN and k > run["change"] else LINE
         lines = sorted(stop_lines[sid] | {mine} | ({THEN} if run and k == run["change"] else set()), key=lambda x: (len(x), x))
         stops.append({"name": r["stop_name"], "s": round(s, 1), "off": round(d, 1),
                       "side": "left" if side > 0 else "right", "request": flags.get(sid, False), "lines": lines})
@@ -1120,7 +1171,7 @@ def main():
         "green": green,
         "water": water,
     }
-    if run:
+    if THEN:
         # the line number changes at this stop (index into stops): passengers of the first line
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
@@ -1136,7 +1187,7 @@ def main():
             idx = {l["line"]: l for l in json.load(f)}
     idx[LINE] = {"line": LINE, "from": stops[0]["name"], "to": stops[-1]["name"],
                  "km": round(path.length / 1000, 1), "stops": len(stops)}
-    if run:
+    if THEN:
         idx[LINE].update({"then": THEN, "via": stops[run["change"]]["name"]})
     with open(idx_path, "w", encoding="utf-8") as f:
         json.dump(sorted(idx.values(), key=lambda l: int(l["line"])), f, ensure_ascii=False, indent=1)
