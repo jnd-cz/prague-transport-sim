@@ -32,6 +32,36 @@ Details: HANDOFF.md §18.
    under the profile there: check the profile against the model), the Výtoň underpass floor (level -1).
 4. The 242-304 m sag under the Holešovice railway bridge (clearance vs vertical curve).
 
+**Car lanes on line 17: measured 2026-10-23, strategy** (lint `lanes`, `tools/lint.js laneQuality`):
+line 17, 89 848 lane samples at 2 m: walkers on the carriageway 965 (footway > 6 m on it), lanes off the
+carriageway 881, doubled (another road's lane alongside the same way) 450, kinks on straight roads
+360, through tram platforms 264 (Trojská 82: no survey there, the OSM road is mapped 4.5 m from the
+track, right beside the platform), on a separate tram bed 189 (Strossmayerovo - Veletržní 113:
+check against the photo, the survey marks a tram area where cars share the street). A third of the
+off/walk findings lie more than ~100 m from the route.
+Data: no open lane or marking data (ZPS has none, "DI" is closed); the IPR orthophoto (leaf-off
+7-8 Apr 2026, 7 cm/px, CC BY, ImageServer `ort/mimovegetacni_letecke_snimkovani`) shows every marking
+(Podolské nábřeží: two lanes + a parking strip each side of the tram bed). Pilot `tools/ortho_lanes.py`:
+1-D cross-section stripes find kerbs, parked cars and rail heads more than paint; needs the tram bed
+and parking areas masked and dashes followed along the road (2-D), a session of work.
+Strategy, in order:
+1. One lane per direction everywhere, placed in the surveyed carriageway minus parking strips (DTM
+   "parking") and separate tram beds; two lanes only where OSM `lanes` (per direction) says so; turn
+   lanes later. Removes doubled lanes and most lane switching.
+2. Kerb fits smoothed harder along the road and limited in how fast they may move sideways (kinks).
+3. Walkers: generated sidewalks only where the survey has sidewalk at the offset (else none); OSM
+   footways cut where they run on the carriageway except at crossings.
+4. Pilot areas to tune on, each with the lint and an orthophoto overlay: Podolské nábřeží (s 10 400-
+   10 800, two lanes + parking, separate tram bed), Strossmayerovo - Veletržní (s 16 300-16 800, shared
+   tracks, island stop), Trojská (s 18 400-18 700, no survey, stops), Palackého nám. (s 12 300-12 800,
+   doubled ways).
+5. Orthophoto markings (2-D dash tracking) as a validation lint first, then as lane positions where
+   OSM has no `lanes`.
+
+**Both directions drivable (user, 2026-10-23):** the minimum track spacing must then push both tracks
+apart symmetrically (half each), and every placement tied to a track (stops, signals, signs, poles)
+must follow the moved positions. Today only the opposite track moves (`src/trackfix.js`).
+
 **New from the user (2026-10-22, night), to schedule:**
 - **U1 Rebuild every line on the detailed DTM** like line 17 (9 and 23 have no survey yet, 22 only
   Praha 2/10): download the districts (links on the Geoportál "ke stažení" pages, uuids change

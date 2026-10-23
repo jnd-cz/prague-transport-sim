@@ -305,6 +305,106 @@ function trackSpacing(g) {
   return check('tracks-apart', n, [...bad.values()]);
 }
 
+// Car lanes and footways against the survey (DTM lines), the tracks and the platforms. Every lane
+// and every junction connector a car may take, every 2 m (ground level only):
+//   off       the lane centre on a sidewalk, island, platform, lawn, steps (not carriageway, parking,
+//             tram bed or paving at road level)
+//   trambed   on a separate tram bed (survey class "tram" within 1.6 m of a track): cars drive on the
+//             tracks only where the track lies in the carriageway
+//   stop      through a tram platform (ours or the opposite one, game.platforms, or a surveyed one)
+//   kink      the lane turns more than 12° within 4 m where its road runs straight (< 4°)
+//   doubled   another road's lane the same way within 2.2 m alongside (two lanes where one is)
+// and every footway (walker path) 2 m step: on the carriageway for more than 6 m in a row (crossing a
+// street is fine), as "walkroad". Places per 30 m; counts per kind in samples.
+function laneQuality(g) {
+  const tr = window.traffic, dtm = g.route.ground?.dtm, r = g.route, bk = g.backRoute;
+  if (!tr) return check('lanes-realistic', 0, []);
+  const CARR = new Set(['road', 'parking', 'tram']), OK_WALK = new Set(['sidewalk', 'island', 'platform', 'paved', 'cycle', 'stairs', 'green']);
+  const trackD = (x, y) => Math.min(r.distance(x, y), bk ? bk.distance(x, y) : Infinity);
+  const plats = (g.platforms || []).map((p) => ({ p, rt: p.rt }));
+  const onPlatform = (x, y) => plats.some(({ p, rt }) => {
+    const n = rt.nearest(x, y);
+    if (!n || n.s < p.s0 || n.s > p.s1) return false;
+    const q = rt.at(n.s), lat = q.hx * (y - q.y) - q.hy * (x - q.x);
+    return lat * p.side > p.inner - 0.2 && lat * p.side < p.outer;
+  });
+  const kinds = {}, bad = new Map();
+  let n = 0;
+  const flag = (kind, x, y, info) => {
+    kinds[kind] = (kinds[kind] || 0) + 1;
+    const q = r.nearest(x, y), k = `${kind}${Math.round(x / 30)},${Math.round(y / 30)}`;
+    if (!bad.has(k)) bad.set(k, { s: q ? Math.round(q.s) : null, x, y, mag: 1, kind, info: `${kind}: ${info}` });
+    else bad.get(k).mag++;
+  };
+  // lane points in a grid for the doubled test
+  const grid = new Map();
+  for (const L of tr.laneList) {
+    if (L.road.b || L.road.t) continue;
+    for (let s = 0; s <= L.path.length; s += 2) {
+      const p = L.path.at(s), k = Math.floor(p.x / 4) * 100003 + Math.floor(p.y / 4);
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push([p.x, p.y, p.hx, p.hy, L]);
+    }
+  }
+  const paths = [];
+  for (const L of tr.laneList) {
+    if (L.road.b || L.road.t) continue;
+    paths.push({ path: L.path, lane: L, road: L.road });
+    for (const b of tr.nextLanes(L)) { const c = tr.connector(L, b); if (c && !b.road.b && !b.road.t) paths.push({ path: c.path, conn: true }); }
+  }
+  for (const { path, lane, road, conn } of paths) {
+    for (let s = 0; s <= path.length; s += 2) {
+      const p = path.at(s);
+      n++;
+      const c = dtm ? dtm.classAt(p.x, p.y) : 'road';
+      if (c && !CARR.has(c) && !(c === 'paved' || c === 'cycle')) flag('off', p.x, p.y, `lane on ${c}`);
+      if (c === 'tram' && trackD(p.x, p.y) < 1.6) flag('trambed', p.x, p.y, 'lane on a separate tram bed');
+      if (onPlatform(p.x, p.y) || c === 'platform') flag('stop', p.x, p.y, 'lane through a tram platform');
+      // kinks along a lane (not connectors) where the road itself runs straight
+      if (!conn && s >= 4 && s <= path.length - 4) {
+        const a = path.at(s - 2), b = path.at(s + 2);
+        const turn = Math.abs(Math.atan2(a.hx * b.hy - a.hy * b.hx, a.hx * b.hx + a.hy * b.hy));
+        if (turn > 0.21) {
+          // the road's own turn at the same place (its centre line, nearest point)
+          let best = 0, bd = Infinity;
+          for (let u = 0; u <= road.path.length; u += 2) { const o = road.path.at(u), d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd) { bd = d; best = u; } }
+          const ra = road.path.at(Math.max(0, best - 2)), rb = road.path.at(Math.min(road.path.length, best + 2));
+          const rt = Math.abs(Math.atan2(ra.hx * rb.hy - ra.hy * rb.hx, ra.hx * rb.hx + ra.hy * rb.hy));
+          if (rt < 0.07) flag('kink', p.x, p.y, `lane turns ${(turn * 57.3).toFixed(0)}° in 4 m on a straight road`);
+        }
+      }
+      if (lane) {
+        const k0x = Math.floor(p.x / 4), k0y = Math.floor(p.y / 4);
+        let dbl = false;
+        for (let i = k0x - 1; i <= k0x + 1 && !dbl; i++) for (let j = k0y - 1; j <= k0y + 1 && !dbl; j++) {
+          for (const [x, y, hx, hy, L2] of grid.get(i * 100003 + j) || []) {
+            if (L2.road === road || hx * p.hx + hy * p.hy < 0.9) continue;
+            if (Math.hypot(x - p.x, y - p.y) < 2.2) { dbl = true; break; }
+          }
+        }
+        if (dbl) flag('doubled', p.x, p.y, 'another road\'s lane alongside, the same way');
+      }
+    }
+  }
+  // walkers on the carriageway
+  if (dtm) for (const w of tr.walks) {
+    if (w.deck) continue;
+    let run = 0;
+    for (let s = 0; s <= w.path.length; s += 2) {
+      const p = w.path.at(s), c = dtm.classAt(p.x + p.hy * w.off, p.y - p.hx * w.off);
+      run = c && CARR.has(c) ? run + 2 : 0;
+      if (run === 8) flag('walkroad', p.x, p.y, `footway on the ${c} for over 6 m`);
+    }
+  }
+  const out = check('lanes-realistic', n, [...bad.values()]);
+  out.count = Object.values(kinds).reduce((a, b) => a + b, 0);
+  out.samples = kinds;
+  // per 500 m of the route and kind (where to look first)
+  out.byArea = {};
+  for (const b of bad.values()) { const k = Math.round((b.s ?? -500) / 500) * 500; (out.byArea[k] ||= {})[b.kind] = ((out.byArea[k] ||= {})[b.kind] || 0) + b.mag; }
+  return out;
+}
+
 // Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
 function syntheticWallsOnStreets(g) {
   const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
@@ -342,6 +442,7 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
+    lanes: laneQuality(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });
