@@ -414,6 +414,7 @@ export function buildWorld(scene, data, route, ground, weather) {
   }
   bedCg.build(group, 'bed');
   railCg.build(group);
+  buildTrackSupport(group, route, ground, trackDist, wet);
 
   buildZebras(group, data, ground, trackDist, wet);
 
@@ -739,16 +740,20 @@ function flushDtm(ground) {
     const n = route.nearest(p[0], p[1]);
     if (!n || n.d >= 15) return;
     const q = route.at(n.s), lat = q.hx * (p[1] - q.y) - q.hy * (p[0] - q.x);
+    // in the track corridor (3 m from our tracks) a carriageway or tram bed is the bed, whatever
+    // the survey says there (a 2 m bump at s 2420 stood 3.6 m over the rails); a structure well above
+    // the track (over 4.5 m) is another level
+    if (bed.has(p) && ground.trackDist(p[0], p[1]) < 3 && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.height(n.s) + 0.14; return; }
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
     p[2] += dz * (1 - k * k * (3 - 2 * k));
   };
   // measure everything first, then move
-  const pts = [];
+  const pts = [], bed = new Set(); // (bed: vertices of carriageway and tram areas, laid flush with the tracks)
   for (const a of dtm.areas) if (a.model) {
-    for (const tri of a.mesh) for (const p of tri) pts.push(p);
-    for (const r of [a.ring, ...a.holes]) for (const p of r) pts.push(p);
+    for (const tri of a.mesh) for (const p of tri) { pts.push(p); if (FLUSH.has(a.c)) bed.add(p); }
+    for (const r of [a.ring, ...a.holes]) for (const p of r) { pts.push(p); if (FLUSH.has(a.c)) bed.add(p); }
   }
   for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) srow(Math.round(n.s / 2)); } // (rows and their neighbours, before anything moves)
   for (const p of pts) shift(p);
@@ -827,6 +832,44 @@ function buildDtm(group, ground, wet) {
   }
   buildDtmSteps(cg, ground, color.wall);
   cg.build(group, 'dtm');
+}
+
+// What carries our tracks where they stand above the ground drawn beside them (approach ramps of
+// the bridges whose survey or model stops short, an embankment over a lower street): off the bridges,
+// walls from the bed down to the ground at the outer bed edges and a top between the two tracks; on
+// our bridges, a 0.8 m deck under the beds where the ground is far below. Every 2 m along the route.
+function buildTrackSupport(group, route, ground, trackDist, wet) {
+  const { profile, dtm, terrain } = ground;
+  const below = (x, y) => { const t = dtm?.surfaceAt(x, y); return t ? t.z : terrain.height(x, y); };
+  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const stone = new THREE.Color(wet ? '#6d675d' : '#8a8376').toArray(), ballast = new THREE.Color(wet ? '#5f5c56' : '#77736a').toArray();
+  const edges = (s) => {
+    let lo = 0, hi = 0;
+    for (let lat = -6; lat <= 6; lat += 0.25) { const o = route.offset(s, lat); if (trackDist(o.x, o.y) < 0.2) { lo = Math.min(lo, lat); hi = Math.max(hi, lat); } }
+    return [lo - 1.4, hi + 1.4];
+  };
+  let prev = null, walls = 0;
+  for (let s = 0; s <= route.length; s += 2) {
+    const zb = profile.height(s) + 0.2, [lo, hi] = edges(s), bridge = profile.onBridge(s);
+    const L = route.offset(s, hi), R = route.offset(s, lo);
+    const gL = below(L.x, L.y), gR = below(R.x, R.y), C = route.at(s), gC = below(C.x, C.y);
+    const cur = { s, zb, L, R, gL, gR, bridge, need: bridge ? zb - Math.min(gL, gR, gC) > 1 : Math.max(zb - gL, zb - gR) > 0.6 };
+    if (prev && prev.need && cur.need) {
+      const c = cg._chunk(L.x, L.y);
+      const P = (o, z) => W(o.x, o.y, z);
+      // top (ballast) between the outer bed edges, just under the beds
+      cg.quad(c, P(prev.R, prev.zb - 0.03), P(R, zb - 0.03), P(L, zb - 0.03), P(prev.L, prev.zb - 0.03), ballast);
+      const footL = bridge ? zb - 0.8 : Math.min(zb, gL) - 0.1, footLp = prev.bridge ? prev.zb - 0.8 : Math.min(prev.zb, prev.gL) - 0.1;
+      const footR = bridge ? zb - 0.8 : Math.min(zb, gR) - 0.1, footRp = prev.bridge ? prev.zb - 0.8 : Math.min(prev.zb, prev.gR) - 0.1;
+      cg.quad(c, P(prev.L, footLp), P(L, footL), P(L, zb), P(prev.L, prev.zb), stone);
+      cg.quad(c, P(prev.R, footRp), P(R, footR), P(R, zb), P(prev.R, prev.zb), stone);
+      if (bridge) cg.quad(c, P(prev.L, footLp), P(prev.R, footRp), P(R, footR), P(L, footL), stone);
+      walls++;
+    }
+    prev = cur;
+  }
+  cg.build(group, 'support');
+  console.log(`track support: ${walls * 2} m`);
 }
 
 // Steps between surveyed surfaces: embankment and quay walls, terraces, retaining walls the survey
@@ -1265,8 +1308,11 @@ function buildCatenary(group, data, route, ground, trackDist) {
       if (fl > 9 && fr < 5 && !Rt.wall) L = null;
       else if (fr > 9 && fl < 5 && !L.wall) Rt = null;
     }
-    // (deck = true: on a bridge the pole stands on the deck, not on the river bed below)
-    const top = (a) => (a.wall ? z + 7.0 : ground.at(a.x, a.y, true) + 7.0);
+    // The span always hangs 7 m over the rails (0.4 under the pole top: 1 m over the contact wire), so
+    // both ends are level and it carries the wire from above; a pole reaches from its foot up to
+    // there however low it stands (164 of 692 spans on line 17 hung from poles on a lower street and
+    // held the wire from below, up to 6 m). (deck = true: on a bridge the pole stands on the deck.)
+    const top = () => z + 7.0;
     const span = [];
     if (L && Rt) span.push([L, Rt]);
     else {
@@ -1277,18 +1323,20 @@ function buildCatenary(group, data, route, ground, trackDist) {
       const e = route.offset(s, far);
       span.push([a, { wall: true, sl: far, x: e.x, y: e.y, end: true }]);
     }
-    route.catenary.push({ s, z, L, R: Rt, span: !!(L && Rt) || tracksLat.length > 0, tracksLat });
+    const cat = { s, z, L, R: Rt, span: !!(L && Rt) || tracksLat.length > 0, tracksLat, attach: [] };
+    route.catenary.push(cat);
     for (const a of [L, Rt]) {
       if (!a) continue;
       if (a.wall) rosettes.push([a.x, z + 7.0, a.y]);
       else {
-        const zg = ground.at(a.x, a.y, true);
-        m.makeTranslation(a.x, zg + 3.7, -a.y);
+        const zg = ground.at(a.x, a.y, true), h = Math.max(3, z + 7.4 - zg); // (the mesh is 7.4 m)
+        m.makeScale(1, h / 7.4, 1).setPosition(a.x, zg + h / 2, -a.y);
         poles.push(m.clone());
       }
     }
     for (const [a, b] of span) {
       const za = top(a), zb = b.end ? za - 0.25 : top(b);
+      cat.attach.push(za - 0.4, zb - 0.4); // (read by the lints: where the span hangs)
       wire.push(new THREE.Vector3(a.x, za - 0.4, -a.y), new THREE.Vector3(b.x, zb - 0.4, -b.y));
       // droppers down to each contact wire under the span
       for (const lat of tracksLat) {

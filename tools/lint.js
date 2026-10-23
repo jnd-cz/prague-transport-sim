@@ -173,6 +173,117 @@ function trackLevels(g) {
   return check('tracks-on-profile', n, [...bad.values()]);
 }
 
+// Streets that wave: the drawn survey surface along lines parallel to the route (6-20 m either side,
+// every 1 m), each sample against its 21 m running mean within the same surface class; a sample more
+// than 8 cm off is a bump. Places: where samples deviate more than 15 cm, per 50 m.
+const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'cycle', 'paved', 'platform']);
+function streetWaviness(g) {
+  const r = g.route, dtm = r.ground.dtm;
+  if (!dtm) return check('streets-smooth', 0, []);
+  let n = 0;
+  const bad = new Map(), byClass = {};
+  for (const lat of [-20, -14, -9, -6, 6, 9, 14, 20]) {
+    const zs = [], cs = [];
+    for (let s = 0; s < r.length; s += 1) { const o = r.offset(s, lat), t = dtm.surfaceAt(o.x, o.y); zs.push(t ? t.z : null); cs.push(t ? t.c : null); }
+    for (let i = 10; i < zs.length - 10; i++) {
+      if (zs[i] === null || !STREETS.has(cs[i])) continue; // (lawns follow the lidar ground; water is level)
+      let sum = 0, ok = true;
+      for (let k = -10; k <= 10 && ok; k++) { if (zs[i + k] === null || cs[i + k] !== cs[i]) ok = false; else sum += zs[i + k]; }
+      if (!ok) continue;
+      n++;
+      const res = Math.abs(zs[i] - sum / 21);
+      if (res <= 0.08) continue;
+      byClass[cs[i]] = (byClass[cs[i]] || 0) + 1;
+      const k = Math.round(i / 50);
+      if (res > 0.15 && !(bad.get(k)?.mag >= res)) { const o = r.offset(i, lat); bad.set(k, { s: i, x: o.x, y: o.y, mag: res, info: `${cs[i]} ${res.toFixed(2)} m off its 21 m mean, ${lat} m from the route` }); }
+    }
+  }
+  const c = check('streets-smooth', n, [...bad.values()]);
+  c.count = Object.values(byClass).reduce((a, b) => a + b, 0);
+  c.samples = byClass;
+  return c;
+}
+
+// The coarse lidar terrain (10 x 15 m) showing through a surveyed surface: within 25 m of the route,
+// every 2 m along and 1.5 m across, terrain more than 5 cm above the drawn survey.
+function terrainOverSurvey(g) {
+  const r = g.route, ground = r.ground, dtm = ground.dtm, T = ground.terrain;
+  if (!dtm) return check('terrain-under-survey', 0, []);
+  let n = 0;
+  const bad = new Map();
+  for (let s = 0; s < r.length; s += 2) for (let lat = -25; lat <= 25; lat += 1.5) {
+    const o = r.offset(s, lat), t = dtm.surfaceAt(o.x, o.y);
+    if (!t) continue;
+    n++;
+    const dz = T.height(o.x, o.y) - t.z;
+    const k = Math.round(s / 20);
+    if (dz > 0.05 && !(bad.get(k)?.mag >= dz)) bad.set(k, { s: Math.round(s), x: o.x, y: o.y, mag: dz, info: `terrain ${dz.toFixed(2)} m above the ${t.c}, ${lat} m from the route` });
+  }
+  return check('terrain-under-survey', n, [...bad.values()]);
+}
+
+// What carries the rails: every 2 m, a ray down from 2.5 m above the track bed onto the drawn
+// ground, street, bridge deck or bridge model (not the bed itself). Something above the bed top
+// covers the rails; nothing within 0.6 m under the bed is a gap (on a bridge: the deck lies below
+// the tracks).
+function railSupport(g, world) {
+  const r = g.route, pr = r.ground.profile;
+  const targets = [];
+  world.traverse((m) => { if (m.isMesh && (m.userData.building || ['terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
+  ray.far = 9;
+  let n = 0;
+  const bad = new Map();
+  for (let s = 0; s < r.length; s += 2) {
+    const p = r.at(s), zb = pr.height(s) + 0.2; // bed top
+    o.set(p.x, zb + 2.5, -p.y);
+    ray.set(o, down);
+    const hit = ray.intersectObjects(targets, false)[0];
+    n++;
+    const top = hit ? hit.point.y : -Infinity, bridge = pr.onBridge(s);
+    let info = null, mag = 0;
+    if (top > zb + 0.05) { info = `${bridge ? 'bridge' : 'ground'} ${(top - zb).toFixed(2)} m above the bed top`; mag = top - zb; }
+    else if (top < zb - 0.8) { info = hit ? `${bridge ? 'deck' : 'ground'} ${(zb - top).toFixed(2)} m below the bed top` : 'nothing under the bed within 6.5 m'; mag = hit ? zb - top : 6.5; }
+    const k = Math.round(s / 20);
+    if (info && !(bad.get(k)?.mag >= mag)) bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag, info });
+  }
+  return check('rails-supported', n, [...bad.values()]);
+}
+
+// Vertical curves of the track profile: the radius of every crest and sag over 20 m (change of
+// grade per metre), flagged under 500 m (tram track: 500 m minimum in streets, 1000 m preferred), and
+// grades over 9 %.
+function verticalCurves(g) {
+  const pr = g.route.ground.profile, L = g.route.length, bad = new Map();
+  let n = 0, minR = Infinity;
+  for (let s = 10; s < L - 10; s += 2) {
+    n++;
+    const dg = pr.grade(s + 10) - pr.grade(s - 10), R = 20 / Math.max(1e-6, Math.abs(dg)), gr = Math.abs(pr.grade(s));
+    minR = Math.min(minR, R);
+    const k = Math.round(s / 50);
+    if (R < 500 && !(bad.get(k)?.mag >= 500 / R)) bad.set(k, { s: Math.round(s), mag: 500 / R, info: `${dg > 0 ? 'sag' : 'crest'} radius ${Math.round(R)} m` });
+    else if (gr > 0.09 && !bad.has(k)) bad.set(k, { s: Math.round(s), mag: gr * 10, info: `grade ${(gr * 100).toFixed(1)} %` }); // (Hercovka - Kobylisy really climbs 8-8.8 %)
+  }
+  const c = check('vertical-curves', n, [...bad.values()]);
+  c.minRadius = Math.round(minR);
+  return c;
+}
+
+// Overhead line: every span (or bracket arm) carries the contact wire from above, at least 0.6 m over
+// it (wire 5.6 m above the rails), and the two ends of a span are level (within 0.5 m).
+function catenarySpans(g) {
+  const bad = [];
+  let n = 0;
+  for (const c of g.route.catenary || []) {
+    if (!c.attach?.length) continue;
+    n++;
+    const wire = c.z + 5.6, low = Math.min(...c.attach), tilt = Math.max(...c.attach) - low;
+    if (low < wire + 0.6) bad.push({ s: Math.round(c.s), mag: wire + 0.6 - low, info: `span ${(low - wire).toFixed(2)} m over the contact wire${low < wire ? ' (holds it from below)' : ''}` });
+    else if (tilt > 0.5) bad.push({ s: Math.round(c.s), mag: tilt, info: `span ends ${tilt.toFixed(2)} m apart in height` });
+  }
+  return check('catenary-from-above', n, bad);
+}
+
 // Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
 function syntheticWallsOnStreets(g) {
   const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
@@ -204,6 +315,11 @@ export async function lint({ bot = false, traffic = false, save = true } = {}) {
     gradeSeparated: crossingsOnBridges(g),
     bridgeLevels: levelsAtBridges(g),
     trackLevels: trackLevels(g),
+    streetWaviness: streetWaviness(g),
+    terrainOverSurvey: terrainOverSurvey(g),
+    railSupport: railSupport(g, world),
+    verticalCurves: verticalCurves(g),
+    catenary: catenarySpans(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });

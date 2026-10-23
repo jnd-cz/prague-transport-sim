@@ -689,3 +689,67 @@ surface lints. Its city/chunk architecture: PLAN.md §7.
 still dropped by `build_line.py`; DTM level −1 floors (Výtoň) not drawn as their own surface; line
 23 walker hits 61 → 94 (Královka, no bridges involved: probably the changed random sequence, check
 with seeds).
+
+## 18. Line 17 look fixes, new lints, platforms of both directions (2026-10-23)
+
+User report: wavy streets and footpaths, jagged walls and terrain beside the tracks, oncoming trams
+jumping between Nádraží Braník and Čechova čtvrť, an "obelisk" near Čechova čtvrť, overhead poles too
+low (the span under the wire). Asked: measure first (lints), then fix; full-size stops of both
+directions from the data, curved; platform names from GTFS.
+
+**Causes and fixes**
+- **Oncoming trams jumping (up to 3.4 m):** their height came from `ground.at()`, which returns the
+  profile only within 4 m of our track; on the Modřany corridor the opposite track is 4.2-4.8 m away.
+  `ground.trackAt(x, y)` (profile within 6 m, else ground/deck) is now used by the drawn tracks, the
+  oncoming trams and the opposite signal: within 0.15 m.
+- **Obelisk:** a survey typo, 298.9 m for 198.9 m, beside the estakáda (and a group of streets ~75 m too
+  high on lines 17 and 22). `dtm.py` drops ground-level corners and cloud points more than 8 m above
+  the lidar ground (it only had the "5 m below" test).
+- **Wavy streets:** the street model's carriageway fit (σ 3 m) followed the survey's noise (tram-bed
+  corners, inner division lines). σ 6 m and outlier rejection 0.15 m (`--sigma`, `--reject`); each
+  model area stays within 0.6 m of its own survey (`--bound`: stops a neighbouring street at another
+  height dragging it; tighter brings the noise back); the flush correction to the track profile is a
+  smoothed field (±10 m along, ±2 m across). Line 17 street bumps > 8 cm: road 5528 → 2832 (6.4 %),
+  sidewalk 3448 → 1618, tram bed 1384 → 487; street bot 8181 → ~7200.
+- **Track corridor:** within 3 m of our tracks a surveyed carriageway or tram bed is laid to the bed,
+  whatever the survey says (a 2 m bump at s 2420 stood 3.6 m over the rails); the "another level"
+  guard applies beyond 3 m and to structures more than 4.5 m above.
+- **Vertical curves:** surveyed deck floors fall along a 500 m vertical curve into the 6 % ramp, and a
+  final pass eases any crest or sag under 500 m (line 17: 27 places, min 173 m → 1, the sag under the
+  Holešovice railway bridge, 242-304 m, held by the clearance rule). Grades of 8-8.8 % between
+  Trojská and Kobylisy are real (lint flags over 9 %).
+- **Catenary:** the span hung 0.4 m under the top of each 7.4 m pole wherever the pole stood; poles on
+  a lower street held the contact wire from below (164 of 692 spans on line 17, up to 6 m). Spans now
+  hang 7.0 m over the rails (1 m over the wire, both ends level), poles reach up from their foot.
+- **Structure under the tracks** (`buildTrackSupport`): where the bed stands > 0.6 m over the drawn
+  ground beside it, walls down to the ground and a top between the tracks; on our bridges a 0.8 m deck
+  where nothing is close below (approach ramps whose survey or model stops short).
+- **Lawns** (survey green: heights only on the outline) follow the lidar ground inside (10 m triangles):
+  terrain through the survey 192 → 55 samples (8.7 m under the Letná slope before).
+
+**New lints** (`tools/lint.js`): `streetWaviness` (street classes only), `terrainOverSurvey`,
+`railSupport` (a ray down from above the bed: covered / gap / deck below), `verticalCurves` (radius
+< 500 m, grade > 9 %), `catenary` (spans over the wire, level). Line 17 after: catenary 0/692,
+vertical curves 1, rail support 88/10 850 (estakáda first span, Výtoň underpass floor, a few short
+spots), terrain over survey 55.
+
+**Platforms of both directions** (`tools/platforms.py`, game `_buildPlatforms`): every PID tram
+platform within 10 m of either path from GTFS (exact position, name, platform code, lines; tram routes
+from `routes.txt` + `route_stops.txt`), matched to the OSM platform it stands on for the shape (OSM
+lines usually along the middle, areas give the outer edge); GTFS platforms without OSM get 32 m back
+from the stop position. Built as strips curved along their track (ours or the opposite one), 1.5 m
+from the track centre to the width, 0.44 m above the rail foot; skipped where the survey draws a
+platform, island or sidewalk there. Opposite direction: stop sign at the GTFS position with its lines,
+shelter where OSM has one; our stops keep the 30 m box only without an OSM platform (35/37 on line 17
+have one). Line 9: 93 platforms, 80 from GTFS only (its OSM cache has none; the Overpass polyline
+query came back empty).
+
+**Line 22** re-imported with the outlier filter and modelled whole (it had only the pilot stretch).
+
+**Numbers after** (baselines accepted 2026-10-23; all four lines finish): new lints — line 17: waviness
+5627/71 327 street samples, terrain over survey 56, rail support 85/10 850, vertical curves 1, catenary
+0/692; line 22: 1395/27 849, 0, 25/9184, 1, 0/607; lines 9 and 23 (no survey): rail support 28 and 11,
+vertical curves 0, catenary 0. Traffic within the noise band except line 9 walker hits 146 → 246 (222
+the run before last; nothing in traffic changed) and line 17 overlaps 76 → 100. Line 22 jammed once in
+three runs (stop 31, 4000 s lost; the rerun finished clean): a car stood on our track facing our tram at
+Kubánské náměstí, probably a lane laid onto the track by the carriageway split. Open, intermittent.
