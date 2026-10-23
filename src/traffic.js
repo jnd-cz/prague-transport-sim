@@ -148,9 +148,9 @@ export class Traffic {
       let cur = [r.p[0]];
       for (let i = 1; i < r.p.length; i++) {
         cur.push(r.p[i]);
-        if (i < r.p.length - 1 && (uses.get(vkey(r.p[i])) || 0) > 1) { pieces.push({ ...r, p: cur, way: r.p }); cur = [r.p[i]]; }
+        if (i < r.p.length - 1 && (uses.get(vkey(r.p[i])) || 0) > 1) { pieces.push({ ...r, p: cur, way: r.way || r.p }); cur = [r.p[i]]; }
       }
-      pieces.push({ ...r, p: cur, way: r.p });
+      pieces.push({ ...r, p: cur, way: r.way || r.p });
     }
     // centre lines of all vehicle ways (20 m cells), for splitting a carriageway two ways share
     this.wayIdx = new Map();
@@ -196,7 +196,7 @@ export class Traffic {
       }
       // cars only on public vehicle roads: no driveways, service yards or courtyards
       if (!r.c || r.w < 5) continue;
-      if (r.t) r.way = r.way || r.p; // (a tunnel spans between its own portals)
+      if (r.t) r.way = r.way || r.p; // (a tunnel: its whole chain of ways, chainTunnels)
       let near = 0, n = 0;
       for (let s = 0; s < path.length; s += 10) { const p = path.at(s); n++; if (route.distance(p.x, p.y) < 7) near++; }
       // the street the tram runs in: an ordinary part of the network (its cars drive alongside us),
@@ -602,7 +602,6 @@ export class Traffic {
       }
     }
     const tram = this.game.tram;
-    const tp = this.route.at(tram.s - 7);
     const live = cars.filter((c) => c.active);
     const obstacles = this._pathObstacles();
     live.forEach((c) => {
@@ -642,9 +641,20 @@ export class Traffic {
         const ax = p0.x + p0.hx * 6, ay = p0.y + p0.hy * 6;
         // (only a car whose road crosses the track: one driving along it follows the tram instead;
         // not where our track passes over the road on a bridge)
-        const across = Math.abs(p0.hx * tp.hx + p0.hy * tp.hy) < 0.7;
-        const waiting = across && Math.hypot(p0.x - tp.x, p0.y - tp.y) < 16 && this.route.distance(ax, ay) < 3 && !this.ground.profile.overBridge(tram.s - 7)
-          && !(c.z !== undefined && Math.abs(c.z - this.ground.profile.height(tram.s - 7)) > LEVEL_APART);
+        // Where the road meets the track (sx): wait while the tram's body stands on it, or while the
+        // tram moves and its front is within 16 m / 4 s of it. A tram standing clear of it (at a stop
+        // before the junction) does not hold the cars: they go with their green (user, 2026-10-23: they
+        // waited far ahead of a standing tram and blocked the street).
+        let waiting = false;
+        const xing = this.route.nearest(ax, ay);
+        if (xing && xing.d < 3) {
+          const h = this.route.at(xing.s), sx = xing.s;
+          const across = Math.abs(p0.hx * h.hx + p0.hy * h.hy) < 0.7;
+          const onBody = sx > tram.s - tram.length - 2 && sx < tram.s + 2;
+          const coming = tram.v > 0.5 && sx >= tram.s && sx - tram.s < Math.max(16, tram.v * 4);
+          waiting = across && (onBody || coming) && !this.ground.profile.overBridge(sx)
+            && !(c.z !== undefined && Math.abs(c.z - this.ground.profile.height(sx)) > LEVEL_APART);
+        }
         // the car ahead: on this path, else across the junction on the connector and the next lane
         const seq = this._seq(c);
         let gap = null, vLead = 0;

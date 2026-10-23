@@ -96,11 +96,14 @@ history and findings; this file says what to do next and how. Update it when a s
 
 ### 1.5 Priorities (next steps, in order)
 
-1. **Regressions and quick wrong places** (each small): A1 portals, A3 bridge footways, A5 Letenský tunel
-   cars, D1 cars and a standing tram, C1 Ke Stírce, D3 re-run lines 9/22/23.
+1. **Regressions and quick wrong places**: done 2026-10-23 night (HANDOFF §23): A1 portals (rules; the
+   look of the mouths after the fine terrain), A3 bridge footways, A5 Letenský tunel cars, D1 cars and a
+   standing tram, C1 Ke Stírce (Vienna stops both directions); D3 lines 22/23 re-run, line 9 pending.
 2. **Structures fitted to the data** (one lint, then fixes): A2 bridge models vs decks (four places;
    decision 6: the track and the roads follow the Mosty deck, ramps adjusted; registration checked OK,
-   HANDOFF §22),
+   HANDOFF §22; done for tagged spans with model samples, envelope cuts, OSM maxheight clearances,
+   lints deckClip / underpassClearance, HANDOFF §23; left: the 19 deckClip places, a per-bridge look at
+   Štefánikův and Trojský most, the raised lane of true Vienna stops),
    A7 Karlovy lázně passage, A6 Pobřežní cesta underpass, A4 Výstaviště railway bridge, B1 arching by
    the water.
 3. **Pilot areas on the detailed survey** (B2 + the lane pilots): walls with heights, terrain edges,

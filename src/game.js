@@ -182,6 +182,31 @@ export class Game {
   // out to its width, 0.44 m above the rail foot, kerb faces on both sides. Where the surveyed streets
   // (DTM) have a platform, island or sidewalk there, the survey draws it. The opposite direction's
   // platforms get a stop sign at their head and a shelter where OSM has one.
+  // A Vienna-type stop (boarding from the sidewalk across the car lane; cars stop behind the open
+  // doors): right of the track along the stop (2.2-3.4 m, doors on the right) the survey has mostly
+  // carriageway, not an island or a raised edge (as tools/streets.py; it was only listed, never used:
+  // Čechův most, Ke Stírce from Kobylisy got a platform on the road). Returns the kerb's offset (m right
+  // of the track: the first sidewalk out to 12 m), or null for an ordinary stop / no survey.
+  _vienna(rt, s0, s1) {
+    const dtm = this.route.ground.dtm;
+    if (!dtm) return null;
+    const LANE = new Set(['road', 'parking', 'tram']), RAISED = new Set(['island', 'platform', 'sidewalk', 'paved']);
+    let lane = 0, raised = 0, kerb = 0, nk = 0;
+    for (let s = s0 + 3; s < s1 - 2; s += 4) {
+      for (const off of [2.2, 2.8, 3.4]) {
+        const o = rt.offset(s, -off), c = dtm.classAt(o.x, o.y);
+        if (LANE.has(c)) lane++;
+        else if (RAISED.has(c)) raised++;
+      }
+      for (let off = 3.4; off <= 12; off += 0.4) {
+        const o = rt.offset(s, -off), c = dtm.classAt(o.x, o.y);
+        if (c === 'sidewalk' || c === 'paved' || c === 'platform' || c === 'island') { kerb += off; nk++; break; }
+      }
+    }
+    if (lane + raised < 3 || lane / (lane + raised) <= 0.5) return null;
+    return nk ? kerb / nk : 6;
+  }
+
   _buildPlatforms() {
     const routes = [this.route, this.backRoute].filter(Boolean), ground = this.route.ground, dtm = ground.dtm;
     const pos = [], col = [];
@@ -212,6 +237,9 @@ export class Game {
       const inner = 1.5, outer = pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner)));
       const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter };
       this.platforms.push(plat);
+      // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
+      plat.kerb = side < 0 ? this._vienna(rt, s0, s1) : null;
+      if (plat.kerb !== null) { plat.inner = plat.kerb; plat.outer = plat.kerb + 2; plat.surveyed = true; continue; }
       const mid = rt.offset((s0 + s1) / 2, side * (inner + outer) / 2), cls = dtm?.classAt(mid.x, mid.y);
       plat.surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
       if (plat.surveyed) continue;
@@ -243,7 +271,8 @@ export class Game {
     for (const p of this.platforms) {
       if (!p.back) continue;
       const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
-      const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at), zt = ground.trackAt(o.x, o.y);
+      const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
+      const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.44 : ground.trackAt(o.x, o.y);
       const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
       sign.position.set(o.x, zt + 0.44, -o.y);
       sign.rotation.y = Math.atan2(-h.hx, h.hy);
@@ -264,8 +293,11 @@ export class Game {
     // else a 30 m box on the right (T3 doors are on the right side only)
     const osm = (this.platforms || []).find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20);
     const len = 30, mid = stop.target - len / 2 - 1;
+    // (a Vienna-type stop: boarding from the sidewalk; sign and shelter stand at the kerb)
+    const kerb = osm ? osm.kerb : this._vienna(route, stop.target - len - 1, stop.target - 1);
+    stop.vienna = kerb !== null;
     const plat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), new THREE.MeshLambertMaterial({ color: 0xa7a197 }));
-    plat.visible = !osm;
+    plat.visible = !osm && !stop.vienna;
     place(plat, route, mid, -3.0, 0.11);
     // curved platforms: approximate with a straight box oriented along the chord
     const a = route.offset(stop.target - len - 1, -3.0), b = route.offset(stop.target - 1, -3.0);
@@ -279,11 +311,15 @@ export class Game {
     g.add(plat);
     // the classic red Prague stop sign (zastávkový označník) where the tram front stops
     const sign = makeStopSign(stop.name, stop.request, this.data.stops[stop.i].lines || [String(this.data.line)]);
-    place(sign, route, stop.target + 0.5, -2.3, 0.44, true);
+    // (on the sidewalk's height, not the track's)
+    const onWalk = (m) => { m.position.y = route.ground.surface(m.position.x, -m.position.z); };
+    place(sign, route, stop.target + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.44, true);
+    if (stop.vienna) onWalk(sign);
     g.add(sign);
     // shelter (at the back of the OSM platform where there is one)
     const shelter = makeShelter();
-    place(shelter, route, stop.target - 12, osm ? -(osm.outer - 0.6) : -3.4, 0.44);
+    place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(osm.outer - 0.6) : -3.4, 0.44);
+    if (stop.vienna) onWalk(shelter);
     g.add(shelter);
     this.objects.add(g);
   }

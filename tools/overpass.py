@@ -18,14 +18,18 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "raw", "overpass")
+# the free, keyless public instances with world data (wiki.openstreetmap.org/wiki/Overpass_API, 2026-10),
+# last the French one: not on the list, answers fast, but its data lagged ~3 months (2026-07-28 in
+# 2026-10); each answer's data date goes to the log
 SERVERS = ["https://overpass-api.de/api/interpreter",
            "https://overpass.private.coffee/api/interpreter",
-           "https://overpass.kumi.systems/api/interpreter"]
+           "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+           "https://overpass.openstreetmap.fr/api/interpreter"]
 PAUSE = 5.0  # s between requests
 _last = [0.0]
 
 
-def query(q, tries=8, log=print):
+def query(q, tries=12, log=print):
     """Overpass JSON for query q (cached). Raises after `tries` failed attempts."""
     os.makedirs(CACHE, exist_ok=True)
     f = os.path.join(CACHE, hashlib.sha1(q.encode()).hexdigest()[:16] + ".json")
@@ -45,11 +49,14 @@ def query(q, tries=8, log=print):
             if "remark" in js and "runtime error" in js["remark"]:
                 raise RuntimeError(js["remark"][:120])
             open(f, "wb").write(data)
+            log(f"  overpass {url.split('/')[2]}: ok, data of {js.get('osm3s', {}).get('timestamp_osm_base', '?')}", flush=True)
             return js
         except Exception as e:  # noqa: BLE001
             _last[0] = time.time()
-            log(f"  overpass {url.split('/')[2]}: {str(e)[:80]}; retry in {wait:.0f} s")
-            time.sleep(wait)
+            # (429 / 406: the main server's policy asks for 30 s at least)
+            code = getattr(e, "code", None)
+            log(f"  overpass {url.split('/')[2]}: {str(e)[:80]}; retry in {max(wait, 30 if code in (429, 406) else 0):.0f} s", flush=True)
+            time.sleep(max(wait, 30 if code in (429, 406) else 0))
             wait = min(wait * 2, 300)
     raise RuntimeError("overpass: no answer after %d tries" % tries)
 

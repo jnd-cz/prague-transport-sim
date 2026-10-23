@@ -29,7 +29,19 @@ if "--fetch" in sys.argv:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
     from overpass import pieces, query
     els = {}
-    for path in (line["path"], line.get("pathBack", [])):
+    # (the opposite direction only where it runs off our path: elsewhere our boxes, padded 40 m, hold it)
+    ours = [(p[0], p[1]) for p in line["path"]]
+    off = lambda q: min((q[0] - a) ** 2 + (q[1] - b) ** 2 for a, b in ours[::2]) > 50 ** 2  # noqa: E731
+    runs, cur = [line["path"]], []
+    for q in line.get("pathBack", []):
+        if off(q):
+            cur.append(q)
+        elif cur:
+            runs.append(cur)
+            cur = []
+    if cur:
+        runs.append(cur)
+    for path in runs:
         boxes = pieces([(LAT0 + y / KY, LON0 + x / KX) for x, y, *_ in path])
         for i, bb in enumerate(boxes):
             js = query(f"[out:json][timeout:90];(way({bb})[public_transport=platform];way({bb})[railway=platform];);out tags geom qt;")
