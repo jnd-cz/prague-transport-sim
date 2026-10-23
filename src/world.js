@@ -396,10 +396,11 @@ export function buildWorld(scene, data, route, ground, weather) {
   }
   const mouths = roadPortalMouths(tunnelPortals);
   lowerTerrainUnderTracks(data, ground.terrain, inTunnel);
-  if (ground.dtm) lowerTerrainUnderDtm(ground.dtm, ground.terrain);
+  if (ground.dtm) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); lowerFineUnderDtm(ground.dtm, ground.terrain); }
   const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
-  buildTerrain(group, data, route, ground.terrain, weather, (x, y) => inTunnel(x, y, 3) || inMouth(x, y));
+  fitFineToMouths(ground.terrain, mouths);
+  buildTerrain(group, data, route, ground.terrain, weather, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
   if (ground.dtm) buildDtm(group, ground, weather !== 'dry');
 
@@ -743,15 +744,22 @@ function lowerTerrainUnderDtm(dtm, T) {
   }
 }
 const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
+// The fine blocks under the surveyed streets, vertex by vertex (the survey's own vertices are too far
+// apart for a 2 m grid: a river area of a few large triangles left the quay's lidar 8 m over the water
+// between them): every fine vertex under a ground-level surveyed area goes 0.25 m below it (up to 15 m).
+function lowerFineUnderDtm(dtm, T) {
+  for (const g of T.fine?.values() || []) {
+    for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
+      const x = g.x0 + i * g.dx, y = g.y0 + j * g.dy, t = dtm.surfaceAt(x, y);
+      if (!t) continue;
+      const k = j * g.nx + i, excess = g.h[k] - (t.z - 0.25);
+      if (excess > 0 && excess <= 15) g.h[k] -= excess;
+    }
+  }
+}
+// (> 6 m: a surface below the street (or bad data), not ours to dig; every grid, fine blocks too)
 function lowerTerrainAt(T, x, y, zmax) {
-  const fx = (x - T.x0) / T.dx, fy = (y - T.y0) / T.dy;
-  const ix = Math.floor(fx), iy = Math.floor(fy);
-  if (ix < 0 || iy < 0 || ix >= T.nx - 1 || iy >= T.ny - 1) return;
-  const excess = T.height(x, y) - zmax;
-  if (excess <= 0 || excess > 6) return; // > 6 m: a surface below the street (or bad data), not ours to dig
-  const tx = fx - ix, ty = fy - iy;
-  const A = iy * T.nx + ix, B = A + 1, C = A + T.nx, D = C + 1;
-  for (const k of tx + ty <= 1 ? [A, B, C] : [D, C, B]) T.h[k] -= excess;
+  T.lowerAt(x, y, zmax, 6);
 }
 
 // The DTM areas as meshes: ground-level surfaces draped on their surveyed heights (sidewalks,
@@ -1110,7 +1118,7 @@ function buildRoadPortals(group, mouths, T, wet) {
       const i = Math.floor((x - T.x0) / T.dx), j = Math.floor((y - T.y0) / T.dy);
       if (i < 0 || j < 0 || i >= T.nx - 1 || j >= T.ny - 1 || seen.has(j * T.nx + i)) continue;
       const cx = T.x0 + (i + 0.5) * T.dx, cy = T.y0 + (j + 0.5) * T.dy;
-      if (!mouths.some((q) => q.has(cx, cy, pad))) continue; // (exactly the cells buildTerrain left out)
+      if (!mouths.some((q) => q.has(cx, cy, pad)) || T.fineAt?.(cx, cy)) continue; // (exactly the cells buildTerrain left out; under a fine block the ground itself is shaped)
       seen.add(j * T.nx + i);
       const n = 5, x0 = T.x0 + i * T.dx, y0 = T.y0 + j * T.dy, sx = T.dx / n, sy = T.dy / n, ch = cov._chunk(cx, cy);
       const P = (u, v) => { const X = x0 + u * sx, Y = y0 + v * sy; return W(X, Y, coverZ(X, Y)); };
@@ -1203,7 +1211,6 @@ function buildDtmSteps(cg, ground, col) {
 // both bed edges) find the mesh triangle underneath (same split as Terrain.height) and lower
 // its three vertices by the excess. Bridges are skipped.
 function lowerTerrainUnderTracks(data, T, inTunnel = () => false) {
-  const { nx, ny } = T;
   for (let pass = 0; pass < 2; pass++) for (const t of data.tracks) {
     if (t.b) continue;
     const L = t.smooth, Z = t.z;
@@ -1213,21 +1220,16 @@ function lowerTerrainUnderTracks(data, T, inTunnel = () => false) {
       if (inTunnel(L[i][0], L[i][1])) continue; // (in a rock tunnel the hill stays above)
       for (const off of [0, 1.4, -1.4]) {
         const x = L[i][0] - (dy / l) * off, y = L[i][1] + (dx / l) * off;
-        const fx = (x - T.x0) / T.dx, fy = (y - T.y0) / T.dy;
-        const ix = Math.floor(fx), iy = Math.floor(fy);
-        if (ix < 0 || iy < 0 || ix >= nx - 1 || iy >= ny - 1) continue;
-        const tx = fx - ix, ty = fy - iy;
-        const A = iy * nx + ix, B = A + 1, C = A + nx, D = C + 1;
-        const tri = tx + ty <= 1 ? [A, B, C] : [D, C, B];
-        const excess = T.height(x, y) - (Z[i] + 0.1);
-        if (excess > 0) for (const k of tri) T.h[k] -= excess;
+        T.lowerAt(x, y, Z[i] + 0.1);
       }
     }
   }
 }
 
 // Terrain mesh in chunks near the route, coloured by land cover (parks, woods, water).
-function buildTerrain(group, data, route, T, weather, hole = () => false) {
+// (hole: coarse cells left out; fineHole: fine cells left out (a tunnel's corridor); the coarse cells
+// under the fine blocks are left out too, the fine mesh is drawn instead)
+function buildTerrain(group, data, route, T, weather, hole = () => false, fineHole = hole) {
   const { nx, ny } = T;
   const cls = new Uint8Array(nx * ny); // 0 ground, 1 grass, 2 wood, 3 water
   const mark = (ring, v) => {
@@ -1275,7 +1277,8 @@ function buildTerrain(group, data, route, T, weather, hole = () => false) {
       const idx = [];
       for (let j = 0; j < h - 1; j++) for (let i = 0; i < w - 1; i++) {
         const a = j * w + i, b = a + 1, c = a + w, d = c + 1;
-        if (hole(T.x0 + (ci + i + 0.5) * T.dx, T.y0 + (cj + j + 0.5) * T.dy)) continue; // (a tunnel's corridor)
+        const mx = T.x0 + (ci + i + 0.5) * T.dx, my = T.y0 + (cj + j + 0.5) * T.dy;
+        if (hole(mx, my) || T.fineAt?.(mx, my)) continue; // (a tunnel's corridor; a fine block's area)
         // grid rows go south (dy < 0), so this winding faces up
         idx.push(a, c, b, b, c, d);
       }
@@ -1289,6 +1292,76 @@ function buildTerrain(group, data, route, T, weather, hole = () => false) {
       m.matrixAutoUpdate = false;
       m.userData.surface = 'terrain';
       group.add(m);
+    }
+  }
+  // the fine blocks (2 m, tools/fine_terrain.py): one mesh each, land cover from the coarse classes,
+  // and a 3 m skirt down along every edge without a neighbouring block (no crack to the coarse grid)
+  const fineMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  for (const g of T.fine?.values() || []) {
+    const n = g.nx, pos = [], nor = [], col = [], idx = [];
+    const clsAt = (x, y) => {
+      const gi = Math.max(0, Math.min(nx - 1, Math.round((x - T.x0) / T.dx))), gj = Math.max(0, Math.min(ny - 1, Math.round((y - T.y0) / T.dy)));
+      return palette[cls[gj * nx + gi]];
+    };
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const x = g.x0 + i * g.dx, y = g.y0 + j * g.dy;
+      pos.push(x, g.cell(i, j), -y);
+      const hx = (g.cell(i + 1, j) - g.cell(i - 1, j)) / ((Math.min(n - 1, i + 1) - Math.max(0, i - 1)) * g.dx);
+      const hy = (g.cell(i, j + 1) - g.cell(i, j - 1)) / ((Math.min(n - 1, j + 1) - Math.max(0, j - 1)) * g.dy);
+      const l = Math.hypot(hx, 1, hy);
+      nor.push(-hx / l, 1 / l, hy / l);
+      const c = clsAt(x, y);
+      col.push(c.r, c.g, c.b);
+    }
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+      if (fineHole(g.x0 + (i + 0.5) * g.dx, g.y0 + (j + 0.5) * g.dy)) continue;
+      const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    // skirts: (edge vertices, then the same 3 m lower)
+    const edges = [
+      [[g.bi, g.bj - 1], (k) => k],
+      [[g.bi, g.bj + 1], (k) => (n - 1) * n + k],
+      [[g.bi - 1, g.bj], (k) => k * n],
+      [[g.bi + 1, g.bj], (k) => k * n + n - 1],
+    ];
+    for (const [[bi, bj], at] of edges) {
+      if (T.fine.has(`${bi},${bj}`)) continue;
+      const base = pos.length / 3;
+      for (let k = 0; k < n; k++) {
+        const v = at(k);
+        pos.push(pos[v * 3], pos[v * 3 + 1] - 3, pos[v * 3 + 2]);
+        nor.push(nor[v * 3], nor[v * 3 + 1], nor[v * 3 + 2]);
+        col.push(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]);
+      }
+      for (let k = 0; k < n - 1; k++) idx.push(at(k), base + k, at(k + 1), at(k + 1), base + k, base + k + 1);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, fineMat);
+    m.matrixAutoUpdate = false;
+    m.userData.surface = 'terrain';
+    group.add(m);
+  }
+}
+
+// The tunnel mouths in the fine blocks: the cover is the ground itself at 2 m (no hole): over the
+// throat at least 0.6 m above its roof, in front of it down to the road (as buildRoadPortals' cover).
+function fitFineToMouths(T, mouths) {
+  if (!T.fine?.size || !mouths.length) return;
+  for (const g of T.fine.values()) {
+    for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
+      const x = g.x0 + i * g.dx, y = g.y0 + j * g.dy, k = j * g.nx + i;
+      for (const m of mouths) {
+        const [d, lat] = m.loc(x, y);
+        if (Math.abs(lat) > m.w + 2) continue;
+        if (d >= 0 && d < m.D + 2) g.h[k] = Math.max(g.h[k], m.zAt(d) + THROAT_H + 0.6);
+        else if (d < 0 && d > -4) g.h[k] = Math.min(g.h[k], m.zAt(0) - 0.3);
+      }
     }
   }
 }

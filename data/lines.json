@@ -28,5 +28,12 @@
   "to": "Bílá labuť",
   "km": 8.2,
   "stops": 18
+ },
+ {
+  "line": "37",
+  "from": "Spojovací",
+  "to": "Lehovec",
+  "km": 9.5,
+  "stops": 20
  }
 ]

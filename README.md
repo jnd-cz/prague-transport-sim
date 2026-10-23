@@ -14,7 +14,17 @@ Open http://localhost:8742. There's no build step: plain ES modules, with Three.
 
 ## Rebuild the line data
 
+OSM comes from a **local extract** when there is one (no Overpass servers): Geofabrik's Czech Republic
+file cut to Prague once, then every OSM query of the tools reads it (pyosmium; `-P -E`):
+
 ```bash
+python -m pip install --user osmium
+curl -L -o raw/osm/czech-republic-latest.osm.pbf https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
+python -P -E tools/osm_local.py cut raw/osm/czech-republic-latest.osm.pbf   # -> raw/osm/praha.osm.pbf (75 MB, ~8 min)
+```
+
+```bash
+python -P -E tools/build_line.py --line 37         # local OSM; no OSM route relation: from its GTFS shapes
 python -I tools/build_line.py --line 22 --headsign "Zahradní Město"
 python -I tools/build_line.py --line 23            # any Prague tram line
 python -I tools/build_line.py --line 17 --refresh  # re-download from Overpass
@@ -31,7 +41,9 @@ Stop platforms come from OSM (`public_transport=platform`) for all lines.
 The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
 with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
 lie on the chosen OSM route, and writes `data/lineN.json` plus the menu index `data/lines.json`.
-Downloads are cached in `raw/` (line 22) and `raw/lineN/` (other lines). Built lines: 9, 17, 22, 23.
+Downloads are cached in `raw/` (line 22) and `raw/lineN/` (other lines). A line without an OSM route
+relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
+it). Built lines: 9, 17, 22, 23, 37.
 
 Then, optionally, import the Geoportál Praha data for the line (recommended):
 
@@ -71,6 +83,11 @@ Only the vegetation from Geoportál again (tree categories): `python -I tools/ge
 Tram platforms of both directions (PID GTFS positions, names and lines; OSM shapes where mapped):
 `python -I tools/platforms.py --line 22` (`--fetch` refreshes the OSM platforms from Overpass in ~800 m pieces, slowly, via `tools/overpass.py`: cached in raw/overpass/, retried over three servers).
 `python -P -E tools/clearances.py --line 17` lists the roads passing under the route with their OSM `maxheight` (the profile keeps the track over them).
+
+The **fine terrain** near the tracks (ČÚZK DMR 5G on a 2 m grid in 128 m blocks within 120 m of either
+track; the 10 x 15 m grid stays elsewhere): `python -P -E tools/fine_terrain.py --line 17` writes
+`data/lineN.fine.bin` + `.fine.json` (2-5 MB; export tiles cached in raw/dem/). `?nofine` loads
+without it.
 
 Then the **street model** (smooth streets with fixed level steps, meshed offline): the whole line
 in 1.5 km chunks (line 17: 45 s), or a stretch by route position in metres:

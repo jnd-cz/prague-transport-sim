@@ -946,3 +946,40 @@ Rules, not spots (each measured on line 17; the lints in brackets):
   detailed whole-junction cycle model (D2); Trojský most and the stretch after it (garbled sloped roads,
   also over the tunnel mouth) after the fine terrain (B3), with a detailed rebuild before the next check.
 
+## 25. Fine terrain (B3), local OSM for every tool, line 37 (2026-10-23, late)
+
+- **Local OSM works end to end**: raw/osm/praha.osm.pbf (75 MB; 6.1 M nodes, 801 k ways, 19.7 k relations,
+  2 625 tram ways, 77 tram routes, 2 379 platforms; one full read 14 s). `osm_local.emulate(name, query)`
+  answers build_line.py's named queries (relations, route_<id>, network_tracks, tracks, points,
+  platforms, buildings, roads, green, water) in the Overpass shapes, "around the route ways" done in
+  shapely; build_line.py uses it whenever the extract exists (python -P -E), the raw caches first as
+  before. Line 9's platforms from it: 15 s, the same 87/93 matched as the slow Overpass fetch.
+- **Fine terrain** (`tools/fine_terrain.py`): ČÚZK DMR 5G (2 m TIN raster, the source of the coarse grid
+  too; IPR's "Model terénu 3D" is cm-resolution LERC tiles in Web Mercator, kept for pilots) sampled
+  on a 2 m lattice in 64 x 64-cell blocks touching a band of 120 m either side of either track, Int16
+  cm. Line 17: 534 blocks, 4.5 MB; 22: 440 / 3.7 MB; 23: 197 / 1.7 MB; 9: 487 / 4.1 MB; 37: 234 / 2.0 MB;
+  43 s per line from cached tiles. In the game (terrain.js): `Grid` (coarse grid and fine blocks alike:
+  cell, height, lowerAt); `Terrain` = the coarse grid + `fine` blocks: `height` asks the fine block
+  first, `grids()` lists all for the edits; carveCorridor judges walls and rock tunnels on the pre-carve
+  heights (fine where present) and carves every grid; lowering under tracks and streets goes to every
+  grid (fine cap 15 m, coarse 6 m) and, for fine blocks, vertex by vertex under every surveyed ground
+  area (`lowerFineUnderDtm`: the survey's own vertices are too far apart for 2 m: a river area of a few
+  big triangles left the quay lidar 8 m over the water); the tunnel mouths are written into the fine
+  heights (no hole); world.js draws coarse cells only outside fine blocks and each fine block as a mesh
+  with 3 m skirts where it has no neighbour. Dev switch `?nofine`. 60 fps in the foreground (a
+  background window throttles frames: not a measurement); memory: the whole line is built and kept at
+  load (no streaming), the fine terrain adds ~0.15-0.2 GB; the heap gauge mostly shows uncollected
+  garbage after the build (3.4 GB read with ?nofine, 1.6 GB with fine).
+  Line 17: railSupport 28 → 26, terrainOverSurvey 54 → 68 (river 12.5 m off the track at Rašínovo
+  nábřeží, in the carve's blend zone), streetWaviness 4935 → 4917. Line 22: railSupport 23 → 4, overlap
+  180 → 44, slide 706 → 546, terrainOverSurvey 0 → 7.
+- **Line 37** (Lehovec - Spojovací, a substitute line in GTFS; no OSM route relation): build_line.py
+  builds a line without a relation from its GTFS shapes like a run (`plan_line`: the most common
+  direction-0 pattern, its trips, the direction-1 shape; `--gtfs` forces it). 9.5 km, 20 stops, 110
+  trips, all 42 PID platforms matched to OSM, 7 roads under the route, Geoportál LOD2 + trees, fine
+  terrain. Drives end to end (3 seeds): static lints 0 except railSupport 8, verticalCurves 1, lanes 185,
+  deckClip 11; overlap 47, walker hits 68, red runs 6. Open: the GTFS shapes run between the two tracks
+  (1.6 m from each) from Spojovací to the crossover at Kněžská luka (s 1675), and the matcher put our
+  direction on the left track there, so both directions share it as a 1.7 km "gauntlet" (asked the user
+  how Spojovací is worked during the closure).
+
