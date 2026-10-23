@@ -823,3 +823,12 @@ later; smoother kerb fits; walkers only on sidewalks; four pilot areas (Podolsk�
 - **Troja bridgehead** (s ~18 150, orthophoto): the cross road passes under the tram corridor, mapped in
   OSM as a tunnel: its cars now run below ground between portals (no survey there).
 - Platform strips from OSM lines capped at 3.5 m (one reached over the car lane at Trojská).
+
+## 21. Consolidated state (2026-10-23, evening)
+
+PLAN.md §1 is now the single current picture: state, today's changes, proposals waiting for the user,
+the user's inspection observations grouped (A bridges/tunnels, B streets/terrain, C stops, D traffic)
+and one priority list. New facts are in `data/truth.json` (Ke Stírce Vienna-type, Sídliště Řepy
+multi-platform, Vyšehrad tunnel shared tracks, Veletržní cars on the tracks, Troja underpass, Pobřežní
+cesta and Výstaviště structures, Karlovy lázně passage, Letenský tunel, two rules). Lines 9, 22, 23 have
+not been re-run since the lane rules changed.

@@ -30,6 +30,19 @@
    "towards": "*",
    "type": "island",
    "source": "user 2026-10-22"
+  },
+  {
+   "name": "Ke Stírce",
+   "from": "Kobylisy",
+   "type": "vienna",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Sídliště Řepy",
+   "towards": "*",
+   "type": "multi-platform",
+   "text": "several platforms on separate tracks; different lines use different tracks",
+   "source": "user 2026-10-23"
   }
  ],
  "rules": [
@@ -47,6 +60,16 @@
    "id": "consist-coupled",
    "text": "A two-car set starts coupled: 15.2 m between car centres on the same track, at every start stop (Sídliště Řepy fails)",
    "source": "user 2026-10-22"
+  },
+  {
+   "id": "cars-go-when-tram-stands",
+   "text": "With GO at a junction, cars do not wait for a tram standing (at a stop); they wait only for a moving / approaching tram",
+   "source": "user 2026-10-23"
+  },
+  {
+   "id": "newer-data-wins",
+   "text": "Where sources disagree (recent reconstruction), the newer one wins: the street survey of Sept 2026 over OSM",
+   "source": "user 2026-10-23"
   }
  ],
  "places": [
@@ -69,6 +92,41 @@
    "name": "Ohrada – Palmovka (line 37)",
    "text": "Tracks completely separate from any street, with their own bridge over the park and the railway",
    "source": "user 2026-10-22"
+  },
+  {
+   "name": "Vyšehradský tunel",
+   "text": "Too narrow for a car lane beside the tracks: cars drive on the track of their own direction (never the opposite one); narrow footway beside the road; stone semicircular portal",
+   "source": "user + OSM + photo 2026-10-23"
+  },
+  {
+   "name": "Veletržní palác (Dukelských hrdinů)",
+   "text": "Cars really drive on the tram tracks (street recently reconstructed: prefer the newer survey over OSM)",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Trojský most, Troja end",
+   "text": "Car underpass under the tram corridor at the bridgehead",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Pobřežní cesta",
+   "text": "Pedestrian underpass",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Výstaviště",
+   "text": "New railway overpass (missing on the map)",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Karlovy lázně",
+   "text": "Narrow street by the building; the tracks pass under the building in both directions",
+   "source": "user 2026-10-23"
+  },
+  {
+   "name": "Letenský tunel",
+   "text": "Car tunnel: cars come out of the tube, not down the hill",
+   "source": "user 2026-10-23"
   }
  ]
 }
