@@ -22,3 +22,6 @@ reports/*.json
 data/*
 !data/truth.json
 !data/MANIFEST.json
+
+# headless check results (tools/headless.py)
+reports/headless/
