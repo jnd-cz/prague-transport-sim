@@ -24,8 +24,9 @@ export const T3 = {
   lineVoltage: 600,
 };
 
-// wheel/rail adhesion coefficient by weather (sand adds ~0.1)
-export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15 };
+// wheel/rail adhesion coefficient by weather (sand adds ~0.1); snow: the rail head under fresh snow
+// (game.js: compacted snow and ice at the pedestrian crossings is worse)
+export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15, snow: 0.12 };
 
 // Prague ran the T3 mostly as two-car multiple-unit sets (both cars motored, one driver).
 // Everything that scales with the cars lives here.

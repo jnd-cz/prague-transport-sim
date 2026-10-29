@@ -117,7 +117,17 @@
   table.res { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
   table.res td { padding: 3px 6px; border-bottom: 1px solid #2c3631; }
   table.res td:last-child { text-align: right; font-family: ui-monospace, monospace; }
-  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #111; z-index: 20; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #111; z-index: 20; padding: 16px; }
+  .loadBox { width: min(460px, 100%); }
+  .loadHead { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0; }
+  .loadHead.dim { font-size: 13px; color: var(--dim); min-height: 1.3em; }
+  .loadTrack { height: 10px; border-radius: 5px; background: #2c3631; overflow: hidden; }
+  #loadBar { height: 100%; width: 0; background: var(--amber); }
+  #loadFiles { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; color: var(--dim); }
+  #loadFiles td { padding: 2px 4px; }
+  #loadFiles td:not(:first-child) { text-align: right; font-family: ui-monospace, monospace; white-space: nowrap; }
+  #loadFiles tr.done { opacity: 0.55; }
+  #loadFiles tr.missing, #loadFiles tr.error { opacity: 0.4; font-style: italic; }
   .hidden { display: none !important; }
   fieldset.settings { border: 1px solid #3b4741; border-radius: 8px; padding: 8px 12px 10px; margin: 0 0 16px; font-size: 13px; }
   fieldset.settings legend { color: var(--dim); padding: 0 6px; }
@@ -184,7 +194,7 @@
       <label><input type="checkbox" id="optDeadman"> <span data-i18n="menu.deadman"></span></label>
       <label><input type="checkbox" id="optAutoSwitch"> <span data-i18n="menu.autoSwitch"></span></label>
       <label><input type="checkbox" id="optPerf"> <span data-i18n="menu.perf"></span></label>
-      <label><span data-i18n="menu.weather"></span> <select id="optWeather"><option value="dry" selected data-i18n="weather.dry"></option><option value="rain" data-i18n="weather.rain"></option><option value="leaves" data-i18n="weather.leaves"></option></select></label>
+      <label><span data-i18n="menu.weather"></span> <select id="optWeather"><option value="dry" selected data-i18n="weather.dry"></option><option value="rain" data-i18n="weather.rain"></option><option value="leaves" data-i18n="weather.leaves"></option><option value="snow" data-i18n="weather.snow"></option></select></label>
       <label><span data-i18n="menu.model"></span> <select id="optModel"><option value="detailed" selected data-i18n="model.detailed"></option><option value="simple" data-i18n="model.simple"></option></select></label>
       <label><span data-i18n="menu.consist"></span> <select id="optCars"><option value="auto" selected data-i18n="consist.auto"></option><option value="1" data-i18n="consist.1"></option><option value="2" data-i18n="consist.2"></option></select></label>
       <label><span data-i18n="menu.temp"></span> <select id="optTemp"><option value="live" selected data-i18n="temp.live"></option><option value="winter" data-i18n="temp.winter"></option><option value="autumn" data-i18n="temp.autumn"></option><option value="summer" data-i18n="temp.summer"></option></select></label>
@@ -220,7 +230,12 @@
 </div>
 
 <div id="results" class="overlay hidden"><div class="card" id="resultsCard"></div></div>
-<div id="loading" data-i18n="loading">Loading Prague…</div>
+<div id="loading"><div class="loadBox">
+  <div class="loadHead"><span data-i18n="loading">Loading Prague…</span><span id="loadPct">0 %</span></div>
+  <div class="loadTrack"><div id="loadBar"></div></div>
+  <div class="loadHead dim"><span id="loadStep">Loading the 3D engine…</span><span id="loadBytes"></span></div>
+  <table id="loadFiles"></table>
+</div></div>
 
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
