@@ -6,8 +6,7 @@
 // light changed.
 // Also counted: passes while the GO blinks (warn: allowed), our own signal penalties, controller holds.
 export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
-  let x = seed >>> 0;
-  Math.random = () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
   const $ = (id) => document.getElementById(id);
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
   $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal';

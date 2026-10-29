@@ -71,20 +71,9 @@ function snapshot(g, tr) {
   return out;
 }
 
-// seeded random numbers (mulberry32): the same run every time, so counts compare with the baseline
-function seeded(seed) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 / 30, maxT = 7200, seed = 22, progress = () => {} } = {}) {
   const $ = (id) => document.getElementById(id);
-  const random = Math.random;
-  Math.random = seeded(seed); // the game and the traffic draw from Math.random; restored below
+  window.runSeed = seed; // the run's seeded stream (src/random.js): the same run every time; cleared below
   $('menu').classList.remove('hidden');
   $('selStop').value = String(from);
   $('selStop').dispatchEvent(new Event('change'));
@@ -190,7 +179,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
     progress(`traffic run: ${Math.round(T)} s, stop ${g.nextStop}`);
     await new Promise((r) => setTimeout(r, 0));
   }
-  } finally { window.headless = false; Math.random = random; }
+  } finally { window.headless = false; delete window.runSeed; }
   const pick = (rule, items, of) => {
     const byKind = {};
     for (const it of items) byKind[it.kind] = (byKind[it.kind] || 0) + 1;

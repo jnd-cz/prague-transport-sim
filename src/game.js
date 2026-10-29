@@ -15,15 +15,7 @@ const STOP_AHEAD = 6;          // tram front stops this far past the projected p
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 
-function rng(seed) {
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { rng } from './random.js';
 
 // Passenger demand by time of day (weekday): morning and afternoon peaks, quiet nights.
 const DEMAND = [[0, 0.3], [5, 0.35], [6, 1.0], [7, 2.2], [8.5, 2.3], [9.5, 1.3], [11, 1.0], [14, 1.3],

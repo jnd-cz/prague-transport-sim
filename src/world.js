@@ -1,6 +1,7 @@
 // Static 3D scenery built from the preprocessed OSM data, draped on the DMR 5G terrain.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
+import { rng } from './random.js';
 import { DTM_LIFT, FLUSH } from './terrain.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
@@ -9,17 +10,6 @@ const TERRAIN_CHUNK = 20; // terrain cells per chunk side
 // how much of the snow stays on a surface (src/weather.js): carriageways are driven and ploughed,
 // footways trodden; ground, roofs, ballast take it all
 const STREET_SNOW = 0.35, FOOT_SNOW = 0.7, GROUND_SNOW = 1;
-
-// deterministic pseudo random
-export function rng(seed) {
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const W = (x, y, h = 0) => [x, h, -y];
 

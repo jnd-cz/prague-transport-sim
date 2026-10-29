@@ -15,6 +15,7 @@ import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
+import { rng, runSeed } from './random.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -341,6 +342,8 @@ function start() {
     scene.add(tramModel);
   }
   if (game) scene.remove(game.objects);
+  // one seeded stream for the whole run (rules and traffic), apart from Math.random
+  const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
   applyWeather(weather);
   game = new Game(scene, data, route, tram, audio, {
@@ -355,14 +358,15 @@ function start() {
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
     detailed: useDetailed(),
-    seed: Math.floor(Math.random() * 1e9),
+    seed: Math.floor(random() * 1e9),
   });
+  game.runSeed = seed; // (replay: ?seed=N)
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
   game.onLineChange = showLine;
   if (traffic) traffic.dispose();
-  traffic = new Traffic(scene, data, route, ground, game, Math.random);
+  traffic = new Traffic(scene, data, route, ground, game, random);
   debugOverlay.reset();
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;

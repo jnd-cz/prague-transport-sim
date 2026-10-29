@@ -9,8 +9,7 @@ const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle
 
 export async function run(seed = 1, opts = {}) {
   const { trip = 40, chunk = 400 } = opts;
-  let x = seed >>> 0;
-  Math.random = () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
   const $ = (id) => document.getElementById(id);
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
   $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal';
