@@ -60,8 +60,10 @@ Stop platforms come from OSM (`public_transport=platform`) for all lines.
 The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
 with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
 lie on the chosen OSM route, and writes `data/lineN.json` plus the menu index `data/lines.json`.
-The OSM answers are cached in `raw/` (line 22) and `raw/lineN/` (other lines), each marked with the
-extract it came from (a new snapshot's extract recomputes them). A line without an OSM route
+The OSM answers are cached in `raw/` (line 22), `raw/runN-M/` (a run such as 9 → 10) and `raw/lineN/`
+(other lines), each marked with a key of the extract, the query and the code that answers it
+(`tools/osm_local.py`, `tools/geo.py`): a new snapshot's extract or an edit to either file recomputes
+them. A line without an OSM route
 relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
 it). Built lines: 9, 17, 22, 23, 37.
 

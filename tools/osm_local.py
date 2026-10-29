@@ -53,6 +53,19 @@ def base_id():
     return h
 
 
+def answer_key(query):
+    """Identity of one emulated answer: the extract, the query text, and the code that answers it (this
+    file and geo.py: the corridor queries measure their radius in the city frame). The extract alone kept
+    answers from the old per-line frames after #7 (lines 9 and 23 published with them, #87). Any edit to
+    either file recomputes the answers, ~1 min a line."""
+    import hashlib
+    hs = hashlib.sha256(query.encode("utf-8"))
+    for f in (__file__, os.path.join(os.path.dirname(os.path.abspath(__file__)), "geo.py")):
+        with open(f, "rb") as fh:
+            hs.update(fh.read().replace(b"\r\n", b"\n"))  # (the same key on a CRLF checkout)
+    return f"{base_id()}-{hs.hexdigest()[:12]}"
+
+
 def cut(src=None):
     src = src or sorted(glob.glob(os.path.join(DIR, "czech-republic-*.osm.pbf")))[-1]
     s, w, n, e = BOX

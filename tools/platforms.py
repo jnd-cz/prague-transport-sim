@@ -5,8 +5,8 @@ platform within 12 m of the route or the opposite one, as drawn in OSM: usually 
 platform (sometimes an area), with its tags. The game builds the platforms from them, curved along
 the track, on both sides (where the surveyed streets (DTM) have the platform, the survey draws it).
 
-Usage:  python tools/platforms.py --line 17      (reads raw/lineN/platforms.json; fetches it from
-        Overpass when missing or with --fetch)
+Usage:  python -P -E tools/platforms.py --line 17   (the line's platform ways from the local OSM extract,
+        cached in raw/lineN/platforms_box.json while extract, box and code are the same; --fetch redoes it)
 Adds "platforms": [{"p": [[x, y], ...], "area": 0|1, "w": width, "shelter": 0|1, "name": ...}] to data/lineN.json.
 """
 import json
@@ -23,26 +23,31 @@ line = json.load(open(dst, encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
-src = os.path.join(ROOT, "raw", f"line{LINE}", "platforms.json")
-if "--fetch" in sys.argv or not os.path.exists(src):
-    # tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the
-    # 12 m filter below picks the ones on our tracks). The Overpass API is no longer used.
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
-    try:
-        import osm_local
-    except ImportError:
-        raise SystemExit("needs pyosmium and python -P -E (or an existing raw/lineN/platforms.json)")
+# tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the 12 m
+# filter below picks the ones on our tracks), cached under a name of its own: until #87 this was
+# raw/lineN/platforms.json, where build_line.py caches its 20 m corridor answer, so lines 17, 23 and 37
+# read that one instead (lines 9 and 22 cache elsewhere and got the box), and it was never checked
+# against the extract.
+src = os.path.join(ROOT, "raw", f"line{LINE}", "platforms_box.json")
+box = tuple(round(float(v), 7) for v in F.bbox(line["path"] + line.get("pathBack", []), 100))
+try:
+    import osm_local
+except ImportError:
+    osm_local = None
+osm = json.load(open(src, encoding="utf-8")) if os.path.exists(src) else None
+if osm_local is None:
+    if osm is None:
+        raise SystemExit("needs pyosmium and python -P -E (or an existing raw/lineN/platforms_box.json)")
+    print("(no pyosmium: the cached platforms, unchecked against the extract)")
+elif "--fetch" in sys.argv or osm is None or osm.get("osm_key") != osm_local.answer_key(f"platforms in box {box}"):
     if not osm_local.available():
         raise SystemExit("no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch")
-    s, w, n, e = (float(v) for v in F.bbox(line["path"] + line.get("pathBack", []), 100))
-    box = (s, w, n, e)
     els = osm_local.ways(lambda t: t.get("public_transport") == "platform" or t.get("railway") == "platform", bbox=box)
+    osm = {"elements": els, "osm_base": osm_local.base_id(), "osm_key": osm_local.answer_key(f"platforms in box {box}")}
     os.makedirs(os.path.dirname(src), exist_ok=True)
-    json.dump({"elements": els, "osm_base": osm_local.base_id()}, open(src, "w", encoding="utf-8"))
+    with open(src, "w", encoding="utf-8") as fh:
+        json.dump(osm, fh)
     print(f"local extract: {len(els)} platform ways in the line's box")
-if not os.path.exists(src):
-    src = os.path.join(ROOT, "raw", "platforms.json")
-osm = json.load(open(src, encoding="utf-8"))
 
 
 def P(g):

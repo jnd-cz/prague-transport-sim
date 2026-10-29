@@ -25,10 +25,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
-# the Overpass cache of this line's tracks (a run like 9 -> 10 has its own folder)
+# the Overpass cache of this line's tracks (a run like 9 -> 10 has its own folder, line 22 the raw/ root;
+# another line's answers there are not this line's, #87)
 cands = glob.glob(os.path.join(ROOT, "raw", f"run{LINE}-*", "tracks.json")) + [
-    os.path.join(ROOT, "raw", f"line{LINE}", "tracks.json"), os.path.join(ROOT, "raw", "tracks.json")]
-src = next(p for p in cands if os.path.exists(p))
+    os.path.join(ROOT, "raw", f"line{LINE}", "tracks.json")] + ([os.path.join(ROOT, "raw", "tracks.json")] if LINE == "22" else [])
+src = next((p for p in cands if os.path.exists(p)), None) or sys.exit(f"no cached tracks for line {LINE}: run build_line.py first")
 els = json.load(open(src, encoding="utf-8"))["elements"]
 nodes = {e["id"]: tuple(float(v) for v in F.xy(e["lat"], e["lon"])) for e in els if e["type"] == "node"}
 

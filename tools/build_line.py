@@ -68,7 +68,8 @@ REFRESH = "--refresh" in sys.argv
 # ---------------------------------------------------------------- OSM (the local extract of the snapshot)
 # The queries keep their Overpass QL text (it says what is asked), but are answered from the snapshot's
 # OSM extract (tools/osm_local.py, raw/osm/praha.osm.pbf; python -P -E for pyosmium). The Overpass API is
-# no longer used. A cached answer in raw/lineN/ is kept only while it came from the same extract.
+# no longer used. A cached answer in raw/lineN/ is kept only while it came from the same extract, query
+# and emulation code (osm_local.answer_key).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from geo import Frame  # noqa: E402
 try:
@@ -80,17 +81,17 @@ except ImportError:
 def overpass(name, query, optional=False):
     if not osm_local.available():
         raise SystemExit("no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch")
-    base = osm_local.base_id()
+    key = osm_local.answer_key(query)
     path = os.path.join(RAW, name + ".json")
     if os.path.exists(path) and not REFRESH:
         with open(path, encoding="utf-8") as f:
             js = json.load(f)
-        if js.get("osm_base") == base:
+        if js.get("osm_key") == key:
             return js
     js = osm_local.emulate(name, query)
     if not js["elements"] and not optional and name != "relations":
         raise SystemExit("local OSM: nothing for " + name)
-    js["osm_base"] = base
+    js["osm_base"], js["osm_key"] = osm_local.base_id(), key
     with open(path, "w", encoding="utf-8") as f:
         json.dump(js, f)
     return js
