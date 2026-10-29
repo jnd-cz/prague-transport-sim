@@ -27,7 +27,8 @@ queries.
    ```
    Send the `.pub` line to the store's admin: it goes into the `tramdata` account's
    `authorized_keys` (one line per computer; delete the line to revoke it).
-2. **SSH config** (`~/.ssh/config`):
+2. **SSH config** (`~/.ssh/config`). The store's address, port and host key are not public: the
+   maintainer shares them privately with each contributor who gets access.
    ```
    Host tramdata
        HostName <store host>
@@ -37,7 +38,7 @@ queries.
        IdentitiesOnly yes
        PasswordAuthentication no
    ```
-   Check the server's key on first connection: ED25519 `SHA256:<host key fingerprint>`.
+   Check the server's key on first connection against the fingerprint you were given.
    Test: `sftp tramdata` then `ls store` lists `sources` and `builds`.
 3. **Git identity** in the clone: `git config user.email "2506000+jnd-cz@users.noreply.github.com"`.
 4. **Python** 3.12+; the OSM tools need pyosmium (`python -m pip install --user osmium`) and run with

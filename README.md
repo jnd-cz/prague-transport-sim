@@ -285,7 +285,7 @@ floating or sunken cars and walkers, gaps in the surveyed streets, bumpy footway
 `n` / `b`) to fly there; arrows orbit, `+` / `−` zoom; coloured posts mark every place.
 `window.streetBot` holds the result (`stats`, `findings`, `raw` samples). One run takes about a minute.
 
-Code: GNU GPL v3 ([LICENSE](LICENSE)). Assets and data have their own licences (being collected in #72).
+Code: GNU GPL v3 ([LICENSE](LICENSE)). Assets: [ASSETS.md](ASSETS.md) (the detailed T3 model is CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](NOTICE.md).
 
 Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
 terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).
