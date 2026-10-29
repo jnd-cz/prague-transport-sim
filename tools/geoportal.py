@@ -70,7 +70,9 @@ def fetch(url, cache_name=None, binary=False):
 with open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8") as f:
     line = json.load(f)
 LAT0, LON0 = line["origin"]
-KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0  # same projection as build_line.py
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from geo import Frame  # noqa: E402
+KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
 
 
 def to_local(lat, lon):

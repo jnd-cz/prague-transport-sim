@@ -19,12 +19,17 @@ KY = 110574.0  # m per degree of latitude
 class Frame:
     def __init__(self, lat0, lon0):
         self.lat0, self.lon0 = lat0, lon0
-        self.kx, self.ky = 111320.0 * math.cos(math.radians(lat0)), KY
+        self.kx, self.ky = math.cos(math.radians(lat0)) * 111320.0, KY
 
     @classmethod
     def of_line(cls, line):
         d = json.load(open(os.path.join(ROOT, "data", f"line{line}.json"), encoding="utf-8"))
         return cls(*d["origin"])
+
+    @property
+    def k(self):
+        """(kx, ky): metres per degree of longitude and latitude."""
+        return self.kx, self.ky
 
     def xy(self, lat, lon):
         return (lon - self.lon0) * self.kx, (lat - self.lat0) * self.ky

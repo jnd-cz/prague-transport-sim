@@ -28,7 +28,9 @@ src = os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "roads.json")
 LAT0, LON0 = line["origin"]
-KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from geo import Frame  # noqa: E402
+KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
 CAR = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street",
        "service", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"}
 WALK = {"footway", "cycleway", "path", "pedestrian", "steps", "track", "bridleway"}

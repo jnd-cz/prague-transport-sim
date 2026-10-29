@@ -21,7 +21,9 @@ LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 dst = os.path.join(ROOT, "data", f"line{LINE}.json")
 line = json.load(open(dst, encoding="utf-8"))
 LAT0, LON0 = line["origin"]
-KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from geo import Frame  # noqa: E402
+KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
 src = os.path.join(ROOT, "raw", f"line{LINE}", "platforms.json")
 if "--fetch" in sys.argv or not os.path.exists(src):
     # tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the
