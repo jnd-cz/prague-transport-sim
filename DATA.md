@@ -77,8 +77,8 @@ the tool changes that produced it.
 4. `data-publish`, then commit `snapshots/` and `data/MANIFEST.json` together.
 
 Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`, unpacked `.gpkg`) are
-not part of a snapshot; they are recomputed from it (each OSM answer is marked with the extract it came
-from and recomputed when that changes).
+not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query
+and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes).
 
 ## Snapshots
 

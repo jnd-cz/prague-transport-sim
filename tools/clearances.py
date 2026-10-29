@@ -10,6 +10,7 @@ the road surface.
 Usage:  python -P -E tools/clearances.py --line 17
 Adds "clearances": [{"s", "x", "y", "mh", "src", "kind", "name"}] to data/lineN.json.
 """
+import glob
 import json
 import math
 import os
@@ -24,9 +25,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "17"
 dst = os.path.join(ROOT, "data", f"line{LINE}.json")
 line = json.load(open(dst, encoding="utf-8"))
-src = os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")
-if not os.path.exists(src):
-    src = os.path.join(ROOT, "raw", "roads.json")
+# build_line's cached roads for this line: a run like 9 -> 10 has its own folder, line 22 the raw/ root
+# (#87: line 9 found no raw/line9/ and took line 22's roads from the root)
+cands = glob.glob(os.path.join(ROOT, "raw", f"run{LINE}-*", "roads.json")) + [
+    os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")] + ([os.path.join(ROOT, "raw", "roads.json")] if LINE == "22" else [])
+src = next((p for p in cands if os.path.exists(p)), None) or sys.exit(f"no cached roads for line {LINE}: run build_line.py first")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
