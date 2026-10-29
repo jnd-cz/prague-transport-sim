@@ -274,11 +274,22 @@ export class Traffic {
     this.crowd = makeCrowd(MAX_WALKERS);
     this.group.add(this.crowd);
 
-    this.backStops = this.back ? game.stops.map((st) => {
+    // where oncoming trams stop: the front at the far end of their own platform (game.platforms of the
+    // back route: OSM shapes, GTFS positions). Mapped from our stop point they stopped 8 m into theirs:
+    // our platform's far end is near the start of theirs (user: "they stop just before the stop instead
+    // of running to its end"). Our stop mapped across stays the fallback where they have no platform.
+    // (on their right: the T3's doors)
+    // (overlapping platforms of one stop, OSM and GTFS, are one stretch: two stop points in one platform
+    // stopped the tram twice, Kobylisy 951 and 1012)
+    const backPl = (game.platforms || []).filter((p) => p.back && p.rt === this.back && p.side < 0).map((p) => [p.s0, p.s1]).sort((a, b) => a[0] - b[0]);
+    const runs = [];
+    for (const [a, b] of backPl) if (runs.length && a < runs[runs.length - 1][1] + 10) runs[runs.length - 1][1] = Math.max(runs[runs.length - 1][1], b); else runs.push([a, b]);
+    const ends = runs.map(([, b]) => b - 1);
+    this.backStops = this.back ? [...ends, ...game.stops.map((st) => {
       const o = route.offset(st.target, 3.2);
       const n = this.back.nearest(o.x, o.y);
-      return n && n.d < 30 ? n.s + 8 : null;
-    }).filter((s) => s !== null).sort((a, b) => a - b) : [];
+      return n && n.d < 30 && !runs.some(([a, b]) => n.s + 8 > a - 30 && n.s + 8 < b + 30) ? n.s + 8 : null;
+    }).filter((s) => s !== null)].sort((a, b) => a - b) : [];
     // other lines that really serve this route's stops (from GTFS)
     const other = new Set();
     const mine = new Set((game.segments || []).map((g) => g.line));
@@ -1396,6 +1407,12 @@ export class Traffic {
             w.prev = w.walk; w.walk = pick.walk; w.s = pick.s; w.travel = H;
             w.dir = pick.s < 0.5 ? 1 : pick.s > len - 0.5 ? -1 : nq.hx * H.x + nq.hy * H.y >= 0 ? 1 : -1;
             w.commit = 2;
+            // (its sideways offset is along the way's drawing direction: onto a way drawn the other way it
+            // flipped sides, a 1.2 m hop at the join; keep the side nearer to where it stands)
+            const pa = pos(w.s);
+            w.side = -w.side;
+            const pb = pos(w.s);
+            if (Math.hypot(pa.x - here.x, pa.y - here.y) < Math.hypot(pb.x - here.x, pb.y - here.y)) w.side = -w.side;
           } else { w.dir = -w.dir; w.commit = 4; w.travel = null; w.prev = null; } // a dead end: back
         } else if (!w.commit && this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR && !this.inLane(here.x, here.y)) w.dir = -w.dir;
         // (B9) at the kerb, about to step into a car lane: wait while a car is coming (it would reach the
@@ -1477,14 +1494,18 @@ export class Traffic {
     setOpacity(t.mesh, t.alpha);
   }
 
-  // Trams of other lines ahead of us: they stop at stops and at signals not showing GO.
+  // Trams of other lines ahead of us: they stop at stops and at signals not showing GO. They keep their
+  // head start as a dispatcher would have them: at the speed limit, and with our tram within 300 m they
+  // only let people on and off (6-8 s) instead of a full dwell (user: catching up with them kept
+  // delaying the tram; line 17: 173 s behind them over the line at 85 % of the limit, 12-24 s dwells,
+  // spawned 450-900 m ahead).
   _updateAhead(dt, tram) {
     const g = this.game;
     for (const sig of g.signals) { sig.aheadCommitted = false; sig.aiRequest = false; } // (set again below, read by the controller)
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && this.ahead.length < 2) {
       this.spawnTimer = 40 + this.rand() * 80;
-      const st = g.stops.find((x) => x.target > tram.s + 450 && x.target < tram.s + 900 && x.i > g.nextStop);
+      const st = g.stops.find((x) => x.target > tram.s + 700 && x.target < tram.s + 1300 && x.i > g.nextStop);
       const other = st && this._otherLine(st.i, 1);
       if (other && !this.ahead.some((t) => Math.abs(t.s - st.target) < 60)) {
         this.ahead.push({ ...this._newTram(other.line), endS: other.endS, s: st.target, v: 0, dwell: 10 + this.rand() * 15, lastStop: st.i });
@@ -1492,7 +1513,8 @@ export class Traffic {
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = Math.min(g.limits.at(t.s), g.limits.at(t.s - t.length)) / 3.6 * 0.85;
+      let vt = Math.min(g.limits.at(t.s), g.limits.at(t.s - t.length)) / 3.6;
+      const close = t.s - t.length - tram.s < 300; // (our tram closing in)
       let stopAt = null;
       const st = g.stops.find((x) => x.target > t.s + 0.5);
       if (st) stopAt = st.target;
@@ -1520,6 +1542,7 @@ export class Traffic {
       for (const c of g.carsCrossing || []) if (c.s > t.s && c.s - 6 < (stopAt ?? Infinity)) stopAt = c.s - 6;
       // (on its braking curve it brakes as hard as it takes to stop at the point, as _updateOncoming)
       let aStop = Infinity;
+      if (close && t.dwell > 8) t.dwell = 6 + (t.dwell % 2); // (only boarding while we close in)
       if (t.dwell > 0) { t.dwell -= dt; vt = 0; }
       else if (stopAt !== null) {
         const d = stopAt - t.s;
@@ -1527,7 +1550,7 @@ export class Traffic {
         if (t.v > vt - 0.05 && t.v > 0.05) aStop = -(t.v * t.v) / (2 * Math.max(0.1, d - 0.5));
         if (d < 0.8 && t.v < 0.3) {
           t.v = 0;
-          if (st && stopAt === st.target && t.lastStop !== st.i) { t.lastStop = st.i; t.dwell = 12 + this.rand() * 12; }
+          if (st && stopAt === st.target && t.lastStop !== st.i) { t.lastStop = st.i; t.dwell = close ? 6 + this.rand() * 2 : 12 + this.rand() * 12; }
         }
       }
       const a = Math.max(-1.3, Math.min(1.0, (vt - t.v) * 0.8, aStop));

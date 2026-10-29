@@ -999,3 +999,53 @@ Rules, not spots (each measured on line 17; the lints in brackets):
   underpassClearance 0, deckClip 7, terrainOverSurvey 55 → 68; overlap 51 → 42, walker hits 50 → 63,
   red runs 4 → 7 (per seed 10 / 6 / 5).
 
+## 26. Shared repository, data store, the remote sessions' work merged (2026-10-29)
+
+- **Repository**: GitHub private `jnd-cz/prague-transport-sim`. History rewritten before sharing to the
+  GitHub private address (`2506000+jnd-cz@users.noreply.github.com`; set `user.email` per clone); old →
+  new commit ids in `COMMIT-MAP-2026-10-29.md` (the remote copy's base `6839a81` = `780153b`).
+- **Data store** (DATA.md): raw sources as pinned snapshots (`snapshots/<id>.json` + `CURRENT`), built
+  game data by `data/MANIFEST.json`, both by SHA-256 in an SFTP-only store (`tramdata`, chrooted).
+  `tools/snapshot.py` fetch / data-fetch / status / publish / data-publish; checked on a fresh clone
+  (data 12 s, sources 5.4 min, every hash; the 16 DTM packages unpack into folders named after them).
+  Snapshots `2026-10-23` (1 297 files, 1.98 GB) and `2026-10-29` (+ the archived DTMP street points).
+  `data/` is out of git except `truth.json` and `MANIFEST.json`. **The Overpass API is gone**: OSM only
+  from the snapshot's extract; build_line.py's cached answers carry the extract's id and are recomputed
+  when it changes.
+- **The remote sessions' work** (zip of 2026-10-24 plus the 10-27 / 10-29 research docs; their log is
+  REMOTE-CHANGES.md, the plans ARCHITECTURE-PROPOSAL.md, BUILD-TOOLS-HANDOFF.md, PERF-ANALYSIS.md,
+  TRACK-DATA-DECISION-2026-10-27.md, TERRAIN-REBUILD-HANDOFF-2026-10-29.md): branch `remote/2026-10-24`
+  on its base, merged without conflicts. Moved into the project: benches `.claude/bench/` →
+  `tools/bench/`; `osm_signals.py`, `osm_validate.py` (ported to the extract: results identical to the
+  remote's Overpass ones, point for point), `dtm_points.py` (its raw answer a snapshot input) → `tools/`;
+  `tools/geo.py`, the one coordinate conversion (new tools use it; the older ones still carry their own,
+  identical, conversion); the no-cache server's rate limit into `tools/serve.py` (`tram-slow`, port 8744).
+  `tools/lint.js` needs the page loaded with `?keepgeo` (the game frees the meshes' CPU copies).
+- **Found and fixed after the merge** (smoke runs: u3 bench, seed 1, every line):
+  - line 23 s 307: two signals (inputs 283 and 328) placed at one stop line, one GO and one red: a red
+    pass on a GO. Placement rules: a signal never moves past the crossing it was made for (not along a
+    platform, where the remote's platform-end rules decide), and two signals at one stop line are one.
+    Kept by the first rule on line 17: 9729, 11050, 19718 (12-18 m short of the next conflict): to look
+    at with the F8 overlay;
+  - the u3 bench crashed on gauntlet signals (no cycle time);
+  - **oncoming trams stopped ~8 m into their platform** (user): their stop point was our stop mapped
+    across +8 m, near the start of theirs. Now the far end of their own platform (back platforms on
+    their right, OSM and GTFS ones merged per stop; the old mapping only where they have none): line 17
+    42 platforms, one stop point each;
+  - **AI trams ahead kept delaying ours** (user): 85 % of the limit, 12-24 s dwells, spawned 450-900 m
+    ahead; line 17: 173 s crawling behind them. Now at the limit, spawned 700-1300 m ahead, only
+    boarding (6-8 s) while ours is within 300 m: 38 s. Red runs 0.
+- **Checks** (reduced on purpose: the lines are to be rebuilt): u3 seed 1 clean on 9, 22, 23, 37 (no
+  deadlock, no car into a junction on red, no collision, no signal penalty); line 17 u3 seeds 1-3 clean,
+  redruns seed 1 clean (0 AI red runs) before and after the traffic changes. Line 17's full lint (3
+  seeds) after the merge, the pre-rebuild reference (reports/line17.json): red runs 4 → 0, overlap 51 → 27,
+  walker hits 50, static checks as before except signalsInPlatforms 0 → 6 (the remote's tram signals on
+  the platform head: the lint predates that design) and lanes 1864 → 2045 (the remote's lane / stop line
+  changes); **slide 750 → 5136 and jump 0 → 892, all walkers** (the remote's footway network).
+- **Walkers, open** (first thing to look at next): at a join onto a way drawn the other way a walker's
+  sideways offset flipped sides (a 1.2 m hop): fixed (it keeps the side nearer to where it stands);
+  seed 22 jumps 892 → 284. Left: "slides" of ~1.5 m per 0.2 s fully sideways, repeating at the same spots
+  (seed 22: 4 671; e.g. s 14845, 20625, 21244, and the spot x 2048 / y 6892 near Kobylisy where two
+  footways end with link walks of 0.9 and 1.6 m between them): walkers hopping back and forth at short
+  link walks or joins. Reproduce with tools/traffic_lint.js trafficRun({ seed: 22 }) and the places list.
+

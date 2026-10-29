@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-10-23",
- "built_at_commit": "bb975a8",
- "published": "2026-10-29 12:22",
- "note": "The lines as built until 2026-10-29 (9, 17, 22, 23, 37; fine terrain, line 37 on its right-hand track). Built partly from the Overpass caches of 2026-10-21..23 that preceded snapshot 2026-10-23.",
+ "snapshot": "2026-10-29",
+ "built_at_commit": "1335be7",
+ "published": "2026-10-29 13:04",
+ "note": "+ line17.signals.json (tools/osm_signals.py, snapshot extract), line17.dtmpoints.json (tools/dtm_points.py), line17.validate.json (tools/osm_validate.py): the remote sessions' data, rebuilt here",
  "files": {
   "line17.bld.bin": {
    "size": 6349176,
@@ -11,6 +11,10 @@
   "line17.dtm.json": {
    "size": 23255601,
    "sha256": "315e3cbe85e0578fbe751d7d3bd405884daaa1692ae2ccf3483f181c34fe9e08"
+  },
+  "line17.dtmpoints.json": {
+   "size": 836400,
+   "sha256": "1bf9bb359f7591f320295993f3e4b730c6a2ed0f3a1311b624f606f77569bcff"
   },
   "line17.fine.bin": {
    "size": 4512300,
@@ -27,6 +31,14 @@
   "line17.json": {
    "size": 3912935,
    "sha256": "c3fa77679b77a86aa9d0c6a589930a5fa03faa311f07af89a3ca9d1edf52a1e4"
+  },
+  "line17.signals.json": {
+   "size": 29231,
+   "sha256": "4bfed76c91250d8465a20471e0d8203b40ec83d31d4e5eebb46683f08e5d5519"
+  },
+  "line17.validate.json": {
+   "size": 4435,
+   "sha256": "a0cebd36bb9c58ff1754b4b99876c3741134032172d28170897c7dc09a36a3f2"
   },
   "line22.bld.bin": {
    "size": 4631616,

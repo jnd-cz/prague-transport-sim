@@ -1,3 +1,8 @@
+> **Merged 2026-10-29** (HANDOFF §26): this log describes the remote copy as it was. Since the merge the
+> benches live in `tools/bench/`, the three data tools in `tools/` (`osm_signals.py` and
+> `osm_validate.py` read the snapshot's OSM extract, run with `python -P -E`), `.claude/serve_nocache.py`
+> is `tools/serve.py <port> [KB/s]`, and the data files are in the data store (DATA.md), not in git.
+
 # Changes made on the deployment copy (remote session, 2026-10-23)
 
 **2026-10-27 track research:** See [TRACK-DATA-DECISION-2026-10-27.md](TRACK-DATA-DECISION-2026-10-27.md) for the agreed DTM/older-map/OSM source strategy, Kobylisy spacing evidence, elevation findings, and implementation handoff. This is a documentation-only update; game code and data were not changed.
