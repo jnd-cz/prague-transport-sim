@@ -1,7 +1,7 @@
 // Dev prototype (not part of the game): what the surveyed traffic signal heads of Prague's technical map
-// (data/lineN.dtmpoints.json, .claude/tools/dtm_points.py) are for, and how they stand relative to what
+// (data/lineN.dtmpoints.json, tools/dtm_points.py) are for, and how they stand relative to what
 // they serve, against where the game puts its heads. In the page, after a shift has started:
-//   const { run } = await import('/.claude/bench/heads.js'); const r = await run(); r.report
+//   const { run } = await import('/tools/bench/heads.js'); const r = await run(); r.report
 // Heads within 1.2 m are one pole. Each pole is labelled by its context (the nearest within reach wins,
 // distances scaled by each reach):
 //   tram  within 6 m of our track and 0-25 m after the stop point of one of our tram signals (s − 3)
@@ -17,7 +17,7 @@ const stats = (a) => ({ n: a.length, p10: q(a, 0.1), median: q(a, 0.5), p90: q(a
 export async function run() {
   const game = window.game, traffic = window.traffic, R = game.route;
   const res = await fetch(`/data/line${game.data.line}.dtmpoints.json`);
-  if (!res.ok) throw new Error('no dtmpoints file: run .claude/tools/dtm_points.py first');
+  if (!res.ok) throw new Error('no dtmpoints file: run tools/dtm_points.py first');
   const pts = (await res.json()).points.filter((p) => p.k === 'signal' || p.k === 'signal_on_building');
   // heads -> poles
   const poles = [];

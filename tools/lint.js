@@ -1,6 +1,6 @@
 // Dev tool: lints for the loaded line (PLAN.md §2). Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
-// In the browser console on a running shift (start one from the menu first):
+// In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
 //   const { lint } = await import('/tools/lint.js?v=' + Date.now());
 //   await lint();                 // quick checks (a few seconds)
 //   await lint({ bot: true });    // + the street bot (DTM lines, about a minute)
@@ -471,6 +471,8 @@ function underpassClearance(g) {
 export async function lint({ bot = false, traffic = false, save = true, seeds = SEEDS } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
+  // (the game frees the meshes' CPU copies after the GPU upload; the mesh checks need them: ?keepgeo)
+  if (!/[?&](keepgeo|bot)\b/.test(location.search)) throw new Error('load the page with ?keepgeo (e.g. /?line=17&keepgeo)');
   const t0 = performance.now();
   const trees = treesInBuildings(world);
   const checks = {

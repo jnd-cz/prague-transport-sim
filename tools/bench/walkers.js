@@ -1,5 +1,5 @@
 // Dev check (not part of the game): pedestrians on the footway network. In the page, after a shift
-// has started: const { run } = await import('/.claude/bench/walkers.js'); run(seconds)
+// has started: const { run } = await import('/tools/bench/walkers.js'); run(seconds)
 // The tram stands; only the traffic is stepped, with the camera over the tram. Counts: doors walked
 // out of / into, faded away far off, link walks taken, dead-end turns, U-turns (more than 120° within
 // 0.8 m of walking, link walks included) and metres walked per U-turn.

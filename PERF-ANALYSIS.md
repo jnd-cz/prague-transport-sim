@@ -260,7 +260,7 @@ the loading bar keeps moving during the 17 s instead of freezing per step; no ti
 ## 9. WebAssembly vs JavaScript
 
 Toolchain on this PC: Rust 1.67; `wasm32-unknown-unknown` added with the user's OK (no MSVC linker,
-so no native build). Kernel: `.claude/bench/tri.rs` (built to `tri.wasm` and `tri_simd.wasm` with
+so no native build). Kernel: `tools/bench/tri.rs` (built to `tri.wasm` and `tri_simd.wasm` with
 `+simd128`), the DTM lookup's inner loop (barycentric test per triangle, two divisions), run over
 3.85 M triangle tests at 200 k points around line 17, best of 7, all four giving the same sum:
 

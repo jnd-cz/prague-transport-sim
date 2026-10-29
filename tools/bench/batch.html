@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bench Batch</title>
 <!-- Dev tool (not part of the game): runs the headless benches unattended, each in a fresh page, and
-     lists the results. Serve the project root (e.g. .claude/serve_nocache.py 8743) and open
-       http://localhost:8743/.claude/bench/batch.html?lines=17&seeds=1-10&benches=u3,redruns
+     lists the results. Serve the project root (e.g. tools/serve.py 8742) and open
+       http://localhost:8742/tools/bench/batch.html?lines=17&seeds=1-10&benches=u3,redruns
      Keep the tab visible (background tabs are throttled). Results stay in this page's localStorage
      until cleared; "Download JSON" saves them. Thresholds: BUILD-TOOLS-HANDOFF.md §4.2. -->
 <style>
@@ -95,7 +95,7 @@ function runOne(line, bench, seed) {
       const s = d.createElement('script');
       s.type = 'module';
       s.textContent = `window._batch = { done: false };
-        try { const { run } = await import('/.claude/bench/${bench}.js'); const r = await run(${seed});
+        try { const { run } = await import('/tools/bench/${bench}.js'); const r = await run(${seed});
           window._batch = { done: true, result: JSON.parse(JSON.stringify({ ...r, watch: undefined })) };
         } catch (e) { window._batch = { done: true, result: { error: String(e) } }; }`;
       d.body.appendChild(s);

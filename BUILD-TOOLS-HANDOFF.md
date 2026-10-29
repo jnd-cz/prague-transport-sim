@@ -45,7 +45,7 @@ re-check).
 
 ### 2.1 Fold the OSM signal import into the build (high)
 
-The prototype is `.claude/tools/osm_signals.py` (run as `python -I .claude/tools/osm_signals.py 17`).
+The prototype is `tools/osm_signals.py` (run as `python -P -E tools/osm_signals.py 17`).
 It writes `data/lineN.signals.json`, which `src/main.js` loads optionally as `data.osmSignals`:
 
 | key | OSM source | used by | line 17 |
@@ -155,7 +155,7 @@ enthusiasts.
   - the stop sign is ~3 m from our post, which matches OSM's stop position and the user's photo;
   - a semafor is ~1 m from the tram signal pole at the island's tip (the user's photo);
   - in a 170 × 200 m box: 19 semafor points, 4 stop signs, 30 poles, 29 lights on poles.
-- **Fetch tool:** `.claude/tools/dtm_points.py N` writes `data/lineN.dtmpoints.json`
+- **Fetch tool:** `tools/dtm_points.py N` writes `data/lineN.dtmpoints.json`
   (`{k, x, y}` in local metres, with the shared conversion). Move it into `tools/`.
 - **Line 17 corridor (60 m around the route):** 3,326 lights on poles, 538 poles, 444 semafor,
   393 sign carriers, 86 stop signs, 70 lights on buildings, 59 warning beacons, 36 low-voltage poles,
@@ -209,7 +209,7 @@ box model.
   source wins.
 
 **Step 1: label what each surveyed head is for.**
-- **Prototype:** `.claude/bench/heads.js`, run in the page during a shift (needs
+- **Prototype:** `tools/bench/heads.js`, run in the page during a shift (needs
   `data/lineN.dtmpoints.json`).
 - Heads within 1.2 m are one pole. Each pole is labelled by context:
   - **tram:** within 6 m of our track and 0–25 m past one of our tram signals' stop points;
@@ -340,9 +340,9 @@ See `PERF-ANALYSIS.md` §6. In short:
 ## 4. Checks in the browser after a rebuild
 
 Test on **line 17**: fine terrain plus the detailed survey. Line 22 is secondary until its world is
-rebuilt at higher detail. Serve without caching (`.claude/serve_nocache.py`, launch entries
-`tram-static` on port 8743 and `tram-slow` on 8744 at 1500 KB/s), because the browser otherwise keeps
-stale modules.
+rebuilt at higher detail. Serve without caching (`tools/serve.py`, launch entry `tram` on port 8742;
+`tram-slow` on 8744 limits each response to 1500 KB/s), because the browser otherwise keeps stale
+modules.
 
 ### 4.1 Console log lines to read
 
@@ -357,9 +357,9 @@ stale modules.
 ### 4.2 Bench scripts (in the page, after loading, menu still open)
 
 ```js
-const { run } = await import('/.claude/bench/u3.js');      await run(1)   // also 2, 3
-const { run } = await import('/.claude/bench/redruns.js'); await run(1)   // result in window._res
-const { run } = await import('/.claude/bench/walkers.js'); await run(1)
+const { run } = await import('/tools/bench/u3.js');      await run(1)   // also 2, 3
+const { run } = await import('/tools/bench/redruns.js'); await run(1)   // result in window._res
+const { run } = await import('/tools/bench/walkers.js'); await run(1)
 ```
 
 Each drives the whole line headless with the autopilot (~3 min); reload the page between runs. The
@@ -397,9 +397,9 @@ lane, speed, crossing seen, yielding.
 
 **Built in now:** press **F8** during a shift (or load with `?debug`). `src/debugOverlay.js` draws the
 same markers as the snippet below and more: route conflicts, platform ends, passenger stop points.
-For data checks without the game, run `python -I .claude/tools/osm_validate.py 17`, which covers §3
+For data checks without the game, run `python -P -E tools/osm_validate.py 17`, which covers §3
 from the data files and a cached OSM download. For many seeds unattended, open
-`.claude/bench/batch.html` (REMOTE-CHANGES §18).
+`tools/bench/batch.html` (REMOTE-CHANGES §18).
 
 The manual snippet, for reference: load line 17, start a shift, then in the console:
 

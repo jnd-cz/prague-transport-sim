@@ -12,7 +12,7 @@ test procedure) and `PERF-ANALYSIS.md` (numbers).
   details (run cards, the Czech light sequence, signal phases) give it a feel hand-made worlds rarely
   have.
 - No build step means fast iteration.
-- The seeded headless benches (`.claude/bench/*.js`) found every real bug in this session. They are
+- The seeded headless benches (`tools/bench/*.js`) found every real bug in this session. They are
   the most valuable tool the project has.
 
 **The recurring problem**
@@ -186,7 +186,7 @@ On every push and PR:
 - a nightly longer run (more seeds, all lines) posting a report.
 
 This needs the headless core (§4) or Playwright with Chromium in CI. Until then, run
-`.claude/bench/batch.html` on any machine.
+`tools/bench/batch.html` on any machine.
 
 ### Instructions for agents (`CLAUDE.md` at the repository root)
 - how to serve (the no-cache server), the test lines (17 first), and how to run the benches with
@@ -339,4 +339,4 @@ This copy has no git:
 3. Diff against the branch. Where the original project has moved on in the same files, merge by
    section using the change log.
 4. Run the benches (handoff §4.2) and the lints (with `?keepgeo`); re-baseline `traffic_lint`.
-5. Merge, then move `.claude/tools/osm_signals.py` into `tools/` (handoff §2.1).
+5. Merge, then move `tools/osm_signals.py` into `tools/` (handoff §2.1).

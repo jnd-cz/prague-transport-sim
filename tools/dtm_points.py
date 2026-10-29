@@ -1,10 +1,11 @@
 # Street furniture points from Prague's technical map (archived DTMP, state as of 30 June 2024, CC BY,
 # "datový podklad © IPR Praha") along a line: traffic signals, public transport stop signs, poles and
-# masts, street lights, traffic sign carriers. Not part of the game; belongs into the build tools.
-#   python -I .claude/tools/dtm_points.py 17      -> data/lineN.dtmpoints.json
+# masts, street lights, traffic sign carriers, ground covers (REMOTE-CHANGES §20, §22).
+#   python -I tools/dtm_points.py 17             -> data/lineN.dtmpoints.json (from the snapshot's raw answer)
+#   python -I tools/dtm_points.py 17 --refresh   (asks the service again: a new raw answer for a new snapshot)
 # Source: https://mp.iprpraha.cz/arcgis/rest/services/Hosted/DTMP_CUR_TMISZNAK_B/FeatureServer/0
-# (open data hub item d4418172a31b46b7b875668eaa354f22). Points have no heights. Raw answers are cached
-# in .claude/tools/cache/lineN.dtmpoints.raw.json.
+# (open data hub item d4418172a31b46b7b875668eaa354f22). Points have no heights. The raw answer is a
+# snapshot input: raw/dtmpoints/lineN.json (tools/snapshot.py).
 # Checked at Palackého náměstí: the stop sign ~3 m from the OSM stop position / the user's photo, a
 # "semafor" ~1 m from the tram signal pole at the island's tip (tram signals are coded "semafor" too).
 import json
@@ -29,11 +30,12 @@ KINDS = {
     736750: 'phone_booth', 606650: 'transformer', 408170: 'fountain',
 }
 line = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else '17'
-data = json.load(open(f'data/line{line}.json', encoding='utf-8'))
-lat0, lon0 = data['origin']
-KY, KX = 110574, 111320 * math.cos(math.radians(lat0))  # the line data's conversion
-to_xy = lambda lat, lon: ((lon - lon0) * KX, (lat - lat0) * KY)
-to_ll = lambda x, y: (lat0 + y / KY, lon0 + x / KX)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I leaves it out)
+from geo import ROOT, Frame  # noqa: E402
+
+data = json.load(open(os.path.join(ROOT, 'data', f'line{line}.json'), encoding='utf-8'))
+frame = Frame(*data['origin'])
+to_xy, to_ll = frame.xy, frame.ll
 
 
 def get(params):
@@ -48,7 +50,7 @@ def get(params):
     raise SystemExit('the map server did not answer')
 
 
-cache = f'.claude/tools/cache/line{line}.dtmpoints.raw.json'
+cache = os.path.join(ROOT, 'raw', 'dtmpoints', f'line{line}.json')
 if '--refresh' in sys.argv or not os.path.exists(cache):
     path, boxes, cur, acc = data['path'], [], [data['path'][0]], 0.0
     for a, b in zip(path, path[1:]):
@@ -90,5 +92,5 @@ for f in raw['features']:
     out['points'].append({'k': k, 'x': round(x, 2), 'y': round(y, 2)})
     counts[k] = counts.get(k, 0) + 1
 out['points'].sort(key=lambda p: (p['k'], p['x'], p['y']))
-json.dump(out, open(f'data/line{line}.dtmpoints.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+json.dump(out, open(os.path.join(ROOT, 'data', f'line{line}.dtmpoints.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print(f'line {line}: ' + ', '.join(f'{v} {k}' for k, v in sorted(counts.items(), key=lambda kv: -kv[1])) + f' -> data/line{line}.dtmpoints.json')

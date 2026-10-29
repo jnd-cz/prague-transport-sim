@@ -1,6 +1,6 @@
 // Dev check (not part of the game): drive a whole line headless with the autopilot and count the
 // oncoming AI trams that pass their stop line on red. In the page (after loading):
-//   const { run } = await import('/.claude/bench/redruns.js'); await run(seed);   then read window._res
+//   const { run } = await import('/tools/bench/redruns.js'); await run(seed);   then read window._res
 // A red run is "avoidable" when, during that same red period, the tram was once far enough away to
 // stop with full service braking (v²/2.6 + v + 0.5 m); else it was in the dilemma zone when the
 // light changed.

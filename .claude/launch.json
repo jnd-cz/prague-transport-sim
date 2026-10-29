@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["tools/serve.py", "8742"],
       "port": 8742
+    },
+    {
+      "name": "tram-slow",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/serve.py", "8744", "1500"],
+      "port": 8744
     }
   ]
 }
