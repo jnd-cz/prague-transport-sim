@@ -211,8 +211,12 @@ def fetch(store, sid):
     store.download("sources", need)
     for z in unzip:  # (the street survey: the tools read the .gpkg)
         with zipfile.ZipFile(z) as zf:
+            # into a folder named after the package (every district's package holds the same generic
+            # ZPS_KR.gpkg / ZPS_OPL.gpkg; tools/dtm.py takes these folders)
+            folder = z[:-4] if z.endswith(".zip") else z + ".d"
+            os.makedirs(folder, exist_ok=True)
             for n in zf.namelist():
-                out = os.path.join(os.path.dirname(z), os.path.basename(n))
+                out = os.path.join(folder, os.path.basename(n))
                 if not os.path.exists(out):
                     print("  unzip", rel(out))
                     with zf.open(n) as src, open(out, "wb") as dst:
