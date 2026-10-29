@@ -1,2 +1,18 @@
+# Text files are LF in the repository and in every working copy, whatever core.autocrlf says (issue #5)
+* text=auto eol=lf
+
+# binary data: never converted
 # quantised building geometry must never get line-ending conversion
 *.bin binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.glb binary
+*.pbf binary
+*.zip binary
+*.tif binary
+*.laz binary
+*.ogg binary
+*.wav binary
+*.mp3 binary

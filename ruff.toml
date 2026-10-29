@@ -1,0 +1,13 @@
+# Python lint / format settings (issue #5): `ruff check tools` and `ruff format --diff tools`.
+# Not enforced yet: the existing tools were written to a 110-120 column style; reformat a file only
+# together with a real change to it.
+line-length = 120
+target-version = "py312"
+
+[format]
+quote-style = "double"
+line-ending = "lf"
+
+[lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E501", "E731", "E741"]
