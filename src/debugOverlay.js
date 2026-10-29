@@ -8,7 +8,7 @@
 //   green bars / ball    platform start and end / where the tram front stops for passengers
 import * as THREE from 'three';
 
-// What the rules decided at run time, as the compiled-world GeoJSON of ARCHITECTURE-PROPOSAL.md §10.4
+// What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
 // (WGS84, the line data's conversion: 110574 m per degree of latitude, 111320·cos(lat0) of longitude).
 // From the console during a shift: window.exportBuiltGeoJSON() saves data-lineN.built.geojson.
 export function builtGeoJSON(game, traffic) {

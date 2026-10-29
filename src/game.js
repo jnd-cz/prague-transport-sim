@@ -502,7 +502,7 @@ export class Game {
     const moved = [];
     for (const d of out) {
       const s0 = d.s;
-      d.s0 = s0; // (its input position: a stable id for the annotations, ARCHITECTURE-PROPOSAL.md §10.4)
+      d.s0 = s0; // (its input position: a stable id for the annotations, docs/architecture.md §10.4)
       // (the first conflict ahead of the signal, within 40 m: the crossing point can lie between two
       // clusters, Palackého náměstí s 12435 is 15 m after one and 12 m before the next, and the nearest
       // one was the far side of the junction)

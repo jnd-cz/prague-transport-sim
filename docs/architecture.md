@@ -1,5 +1,8 @@
 # Architecture proposal: from one line to a city network
 
+> Moved 2026-10-29 from the root (was ARCHITECTURE-PROPOSAL.md); the companions it names are in
+> [history/](history/). The design is current; its tasks are GitHub issues (see [ROADMAP.md](../ROADMAP.md)).
+
 Written in the remote session (2026-10-24) for the original project, after a long stretch of work on
 line 17: performance, signals, traffic, pedestrians, weather and OSM data. The companions are
 `REMOTE-CHANGES.md` (what changed, by section), `BUILD-TOOLS-HANDOFF.md` (build-side to-do list and

@@ -1,5 +1,7 @@
 # Terrain and street rebuild: Výtoň study and handoff
 
+> Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [../history/](../history/).
+
 **Date:** 2026-10-29  
 **Status:** research and source preparation; work in progress, not implemented in the game. Awaiting original development checkout, world-build tools, and further source checks.  
 **Scope:** road and sidewalk waviness, terrain source selection, level separation, and a pilot rebuild. This supplements `TRACK-DATA-DECISION-2026-10-27.md`, `BUILD-TOOLS-HANDOFF.md`, and the historical `PLAN.md`; it does not supersede the agreed track-centreline source preference.

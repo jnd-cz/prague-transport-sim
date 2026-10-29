@@ -152,7 +152,7 @@ function result(items) {
 
 const flash = (t) => { const m = document.getElementById('msg'); m.textContent = t; setTimeout(() => { m.textContent = ''; }, 4000); };
 
-fetch('/ISSUES-DRAFT.md', { cache: 'no-store' }).then((r) => r.text()).then((md) => {
+fetch('/docs/history/ISSUES-DRAFT.md', { cache: 'no-store' }).then((r) => r.text()).then((md) => {
   const items = parse(md);
   document.getElementById('filter').onchange = () => render(items);
   document.getElementById('save').onclick = async () => {

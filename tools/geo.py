@@ -1,4 +1,4 @@
-"""The one coordinate conversion of the line data (BUILD-TOOLS-HANDOFF §1.1). Every tool imports it.
+"""The one coordinate conversion of the line data (docs/history/BUILD-TOOLS-HANDOFF.md §1.1). Every tool imports it.
 
 A line's local metres: x east, y north from `origin = [lat0, lon0]` of data/lineN.json, with 110574 m
 per degree of latitude and 111320·cos(lat0) per degree of longitude. (The remote OSM signal import

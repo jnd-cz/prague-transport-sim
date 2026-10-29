@@ -1,5 +1,5 @@
-# Traffic-signal data along a line from OpenStreetMap, for the game's traffic lights (REMOTE-CHANGES §17).
-# Belongs into build_line.py later (BUILD-TOOLS-HANDOFF §2.1).
+# Traffic-signal data along a line from OpenStreetMap, for the game's traffic lights (docs/history/REMOTE-CHANGES.md §17).
+# Belongs into build_line.py later (docs/history/BUILD-TOOLS-HANDOFF.md §2.1).
 #   python -P -E tools/osm_signals.py 17      -> data/line17.signals.json
 # Reads the snapshot's OSM extract (tools/osm_local.py; pyosmium, hence -P -E). Writes, in the line's
 # local metres (tools/geo.py):

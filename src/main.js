@@ -371,7 +371,7 @@ function start() {
   window.renderer = renderer; // performance checks from the console (renderer.info, the scene)
   window.scene = scene;
   window.traffic = traffic;
-  // the compiled world as GeoJSON (ARCHITECTURE-PROPOSAL.md §10.4), for the annotation editor
+  // the compiled world as GeoJSON (docs/architecture.md §10.4), for the annotation editor
   window.exportBuiltGeoJSON = (save = true) => {
     const fc = builtGeoJSON(game, traffic);
     if (save) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/geo+json' })); a.download = `data-line${game.data.line}.built.geojson`; a.click(); }

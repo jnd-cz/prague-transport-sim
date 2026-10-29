@@ -1,5 +1,7 @@
 # Track geometry and elevation: research decision and handoff
 
+> Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [../history/](../history/).
+
 **Date:** 2026-10-27  
 **Status:** agreed direction; research and comparison only, not implemented in the game.  
 **Scope:** Prague tram-track placement, depot coverage and heights. Metro and railway observations are included where relevant. The measured game is the line 17 code and data in `transport-game-remote-2026-10-24.zip`; this is a deployed copy without the original build tools, raw caches or Git history.
