@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue draft review</title>
+<!-- Review helper for ISSUES-DRAFT.md: mark each item keep / drop / merge / change, add notes, save.
+     Open through the dev server: http://localhost:8742/tools/issue_review.html
+     "Save" writes reports/issue-review.json (tools/serve.py), which the next session reads. -->
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --ink: #222; --mute: #777; --line: #ddd;
+          --keep: #2e7d32; --drop: #b71c1c; --merge: #6a1b9a; --change: #e65100; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1c1e; --card: #26282b; --ink: #e8e6e3; --mute: #9a9894; --line: #3a3c40; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line);
+           padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  header .stats { color: var(--mute); font-size: 13px; }
+  header button, header select { font: inherit; padding: 4px 10px; }
+  main { max-width: 980px; margin: 0 auto; padding: 12px 16px 80px; }
+  h2 { font-size: 15px; margin: 22px 0 6px; color: var(--mute); text-transform: uppercase; letter-spacing: .03em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--line);
+          border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .card.keep { border-left-color: var(--keep); } .card.drop { border-left-color: var(--drop); opacity: .6; }
+  .card.merge { border-left-color: var(--merge); } .card.change { border-left-color: var(--change); }
+  .card .num { font-weight: 700; margin-right: 6px; }
+  .card .title { font-weight: 600; }
+  .card .body { color: var(--mute); margin: 4px 0 8px; white-space: pre-wrap; }
+  .card .labels span { display: inline-block; font-size: 12px; border: 1px solid var(--line); border-radius: 10px;
+                       padding: 0 7px; margin: 0 4px 4px 0; color: var(--mute); }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .acts button { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 4px; border: 1px solid var(--line);
+                 background: transparent; color: var(--ink); cursor: pointer; }
+  .acts button.on.keep { background: var(--keep); color: #fff; } .acts button.on.drop { background: var(--drop); color: #fff; }
+  .acts button.on.merge { background: var(--merge); color: #fff; } .acts button.on.change { background: var(--change); color: #fff; }
+  .acts input { font: inherit; font-size: 13px; padding: 3px 6px; width: 90px; }
+  textarea { width: 100%; font: inherit; font-size: 14px; margin-top: 6px; min-height: 2.4em; resize: vertical;
+             background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 5px; }
+  .struck .title { text-decoration: line-through; }
+  .msg { color: var(--keep); font-size: 13px; }
+  #newItem { margin-top: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Issue draft review</h1>
+  <select id="filter">
+    <option value="all">all items</option><option value="open">not marked yet</option>
+    <option value="keep">keep</option><option value="drop">drop</option><option value="merge">merge</option><option value="change">change</option>
+  </select>
+  <button id="save" title="writes reports/issue-review.json through the dev server">Save</button>
+  <button id="download">Download JSON</button>
+  <span class="stats" id="stats"></span>
+  <span class="msg" id="msg"></span>
+</header>
+<main id="main">Loading ISSUES-DRAFT.md …</main>
+<script>
+const KEY = 'issue-review-v1';
+const state = JSON.parse(localStorage.getItem(KEY) || '{}');   // id -> { mark, into, note }
+const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+
+// items: "N. **title** ..." or "2a. ~~title~~ ..." with indented continuation lines; sections from "## "
+function parse(md) {
+  const out = [], lines = md.split(/\r?\n/);
+  let section = '', sub = '', cur = null;
+  for (const line of lines) {
+    const h = line.match(/^##\s+(.*)/);
+    if (h) { section = h[1]; sub = ''; cur = null; continue; }
+    const m = line.match(/^(\d+[a-z]?)\.\s+(.*)/);
+    if (m && section) {
+      cur = { id: m[1], section, sub, text: m[2] };
+      out.push(cur);
+      continue;
+    }
+    if (cur && /^\s{2,}\S/.test(line)) { cur.text += '\n' + line.trim(); continue; }
+    if (line.trim() && !line.startsWith(' ') && !line.startsWith('-')) { sub = line.trim().replace(/:$/, ''); cur = null; }
+    else if (!line.trim()) cur = null;
+  }
+  for (const it of out) {
+    const t = it.text.match(/^\*\*(.+?)\*\*|^~~(.+?)~~/);
+    it.title = t ? (t[1] || t[2]) : it.text.split('\n')[0];
+    it.struck = /^~~/.test(it.text);
+    it.labels = [...new Set([...it.text.matchAll(/`([a-z0-9-]+)`/g)].map((x) => x[1]))];
+    it.body = it.text.replace(/^\*\*.+?\*\*\s*—?\s*|^~~.+?~~\s*/, '')
+      .replace(/^(\s*`[a-z0-9-]+`\s*,?\s*)+\.?\s*/, ''); // (the labels, shown as chips)
+  }
+  return out;
+}
+
+function render(items) {
+  const main = document.getElementById('main'), f = document.getElementById('filter').value;
+  main.innerHTML = '';
+  let sec = null;
+  for (const it of items) {
+    const s = state[it.id] || {};
+    if (f === 'open' && s.mark) continue;
+    if (f !== 'all' && f !== 'open' && s.mark !== f) continue;
+    if (it.section !== sec) { sec = it.section; const h = document.createElement('h2'); h.textContent = sec; main.append(h); }
+    const c = document.createElement('div');
+    c.className = 'card ' + (s.mark || '') + (it.struck ? ' struck' : '');
+    c.innerHTML = `<div><span class="num">#${it.id}</span><span class="title"></span></div>
+      <div class="body"></div><div class="labels"></div>
+      <div class="acts"></div><textarea placeholder="note: what to change, why, details"></textarea>`;
+    c.querySelector('.title').textContent = it.title;
+    c.querySelector('.body').textContent = it.body;
+    c.querySelector('.labels').innerHTML = it.labels.map((l) => `<span>${l}</span>`).join('');
+    const acts = c.querySelector('.acts');
+    for (const k of ['keep', 'drop', 'merge', 'change']) {
+      const b = document.createElement('button');
+      b.textContent = k; b.className = k + (s.mark === k ? ' on' : '');
+      b.onclick = () => { state[it.id] = { ...state[it.id], mark: s.mark === k ? undefined : k }; persist(); render(items); };
+      acts.append(b);
+    }
+    if (s.mark === 'merge') {
+      const inp = document.createElement('input');
+      inp.placeholder = 'into #'; inp.value = s.into || '';
+      inp.oninput = () => { state[it.id] = { ...state[it.id], into: inp.value }; persist(); };
+      acts.append(inp);
+    }
+    const ta = c.querySelector('textarea');
+    ta.value = s.note || '';
+    ta.oninput = () => { state[it.id] = { ...state[it.id], note: ta.value }; persist(); stats(items); };
+    main.append(c);
+  }
+  // new items the draft does not have yet
+  const nw = document.createElement('div');
+  nw.id = 'newItem';
+  nw.innerHTML = '<h2>New items (one per line or paragraph)</h2><textarea style="min-height:8em"></textarea>';
+  const t = nw.querySelector('textarea');
+  t.value = state._new?.note || '';
+  t.oninput = () => { state._new = { note: t.value }; persist(); };
+  main.append(nw);
+  stats(items);
+}
+
+function stats(items) {
+  const n = { keep: 0, drop: 0, merge: 0, change: 0 };
+  for (const it of items) { const m = state[it.id]?.mark; if (m) n[m]++; }
+  const done = n.keep + n.drop + n.merge + n.change;
+  document.getElementById('stats').textContent =
+    `${done} / ${items.length} marked · keep ${n.keep} · drop ${n.drop} · merge ${n.merge} · change ${n.change}`;
+}
+
+function result(items) {
+  return { draft: 'ISSUES-DRAFT.md', saved: new Date().toISOString(),
+    items: items.map((it) => ({ id: it.id, title: it.title, ...(state[it.id] || {}) })),
+    newItems: state._new?.note || '' };
+}
+
+const flash = (t) => { const m = document.getElementById('msg'); m.textContent = t; setTimeout(() => { m.textContent = ''; }, 4000); };
+
+fetch('/ISSUES-DRAFT.md', { cache: 'no-store' }).then((r) => r.text()).then((md) => {
+  const items = parse(md);
+  document.getElementById('filter').onchange = () => render(items);
+  document.getElementById('save').onclick = async () => {
+    try {
+      const r = await fetch('/report/issue-review.json', { method: 'POST', body: JSON.stringify(result(items), null, 1) });
+      flash(r.ok ? 'saved to reports/issue-review.json' : 'save failed: ' + r.status);
+    } catch (e) { flash('save failed: ' + e.message); }
+  };
+  document.getElementById('download').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(result(items), null, 1)], { type: 'application/json' }));
+    a.download = 'issue-review.json'; a.click();
+  };
+  render(items);
+}).catch((e) => { document.getElementById('main').textContent = 'Could not load ISSUES-DRAFT.md: ' + e.message; });
+</script>
+</body>
+</html>
