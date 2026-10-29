@@ -980,6 +980,10 @@ Rules, not spots (each measured on line 17; the lints in brackets):
   terrain. Drives end to end (3 seeds): static lints 0 except railSupport 8, verticalCurves 1, lanes 185,
   deckClip 11; overlap 47, walker hits 68, red runs 6. Open: the GTFS shapes run between the two tracks
   (1.6 m from each) from Spojovací to the crossover at Kněžská luka (s 1675), and the matcher put our
-  direction on the left track there, so both directions share it as a 1.7 km "gauntlet" (asked the user
-  how Spojovací is worked during the closure).
+  direction on the left track there, so both directions shared it as a 1.7 km "gauntlet". User
+  (2026-10-29): double track the whole way, regular service always on the right-hand track (truth.json
+  rule right-hand-track). Cause: match_shape started at the node nearest the shape's first point,
+  whatever its side, and had no way across before the crossover. Fix: the start node by distance + 20
+  on the shape's left. Line 37 rebuilt (no gauntlet, the opposite track 3.1-3.7 m to the left all the
+  way); line 9's run matched identically (path and pathBack unchanged).
 
