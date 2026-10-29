@@ -1,4 +1,7 @@
-# Issue draft for review (not on GitHub yet)
+# Issue draft (reviewed; on GitHub since 2026-10-29)
+
+**Superseded by the GitHub issues** (jnd-cz/prague-transport-sim #1–#71); draft id → issue number in
+`reports/issue-map.json`. Item 6 (going public, licence) waits for the licence choice. Kept for history.
 
 Collected from PLAN.md (§1, §3), HANDOFF.md (§16–26), REMOTE-CHANGES.md, BUILD-TOOLS-HANDOFF.md,
 ARCHITECTURE-PROPOSAL.md, TRACK-DATA-DECISION-2026-10-27.md, TERRAIN-REBUILD-HANDOFF-2026-10-29.md.
