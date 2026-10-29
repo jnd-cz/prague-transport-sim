@@ -132,7 +132,9 @@ for i, g in enumerate(gtfs):
         out.append({"p": [g["q"]], "gtfs": 1, "area": 0, "w": 0, "shelter": 0, "name": g["name"], "code": g["code"],
                     "stop": g["q"], "lines": g["lines"], "id": g["id"]})
 line["platforms"] = out
-with open(dst, "w", encoding="utf-8") as fh:
+# (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
+with open(dst + ".part", "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
+os.replace(dst + ".part", dst)
 print(f"line {LINE}: {len(out)} tram platforms ({sum(p['area'] for p in out)} OSM areas, {sum(p.get('gtfs', 0) for p in out)} "
       f"from GTFS only); {len(gtfs)} PID tram platforms, {len(used)} matched to OSM")
