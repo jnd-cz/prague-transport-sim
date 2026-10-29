@@ -12,24 +12,28 @@ python tools/serve.py 8742
 
 Open http://localhost:8742. There's no build step: plain ES modules, with Three.js loaded from a CDN.
 
+The game data (`data/`) and the raw sources (`raw/`) are not in git: a fresh clone gets them from the
+data store, see **[DATA.md](DATA.md)** (one-time SSH setup, then):
+
+```bash
+python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~85 MB)
+python -I tools/snapshot.py fetch          # raw/ to build the world (~2 GB, the pinned source snapshot)
+```
+
 ## Rebuild the line data
 
-OSM comes from a **local extract** when there is one (no Overpass servers): Geofabrik's Czech Republic
-file cut to Prague once, then every OSM query of the tools reads it (pyosmium; `-P -E`):
+Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
+(`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
 
 ```bash
-python -m pip install --user osmium
-curl -L -o raw/osm/czech-republic-latest.osm.pbf https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
-python -P -E tools/osm_local.py cut raw/osm/czech-republic-latest.osm.pbf   # -> raw/osm/praha.osm.pbf (75 MB, ~8 min)
+python -P -E tools/build_line.py --line 37         # no OSM route relation: from its GTFS shapes
+python -P -E tools/build_line.py --line 22 --headsign "Zahradní Město"
+python -P -E tools/build_line.py --line 23         # any Prague tram line
+python -P -E tools/build_line.py --line 17 --refresh  # recompute the OSM answers cached in raw/line17/
+python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
 ```
 
-```bash
-python -P -E tools/build_line.py --line 37         # local OSM; no OSM route relation: from its GTFS shapes
-python -I tools/build_line.py --line 22 --headsign "Zahradní Město"
-python -I tools/build_line.py --line 23            # any Prague tram line
-python -I tools/build_line.py --line 17 --refresh  # re-download from Overpass
-python -I tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
-```
+After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
 
 With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
 diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
@@ -41,7 +45,8 @@ Stop platforms come from OSM (`public_transport=platform`) for all lines.
 The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
 with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
 lie on the chosen OSM route, and writes `data/lineN.json` plus the menu index `data/lines.json`.
-Downloads are cached in `raw/` (line 22) and `raw/lineN/` (other lines). A line without an OSM route
+The OSM answers are cached in `raw/` (line 22) and `raw/lineN/` (other lines), each marked with the
+extract it came from (a new snapshot's extract recomputes them). A line without an OSM route
 relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
 it). Built lines: 9, 17, 22, 23, 37.
 
@@ -81,7 +86,7 @@ python -I tools/osm_speeds.py --line 22
 Only the vegetation from Geoportál again (tree categories): `python -I tools/geoportal.py --line 22 --trees-only`.
 
 Tram platforms of both directions (PID GTFS positions, names and lines; OSM shapes where mapped):
-`python -I tools/platforms.py --line 22` (`--fetch` refreshes the OSM platforms from Overpass in ~800 m pieces, slowly, via `tools/overpass.py`: cached in raw/overpass/, retried over three servers).
+`python -P -E tools/platforms.py --line 22` (`--fetch` re-reads the OSM platforms from the snapshot's extract).
 `python -P -E tools/clearances.py --line 17` lists the roads passing under the route with their OSM `maxheight` (the profile keeps the track over them).
 
 The **fine terrain** near the tracks (ČÚZK DMR 5G on a 2 m grid in 128 m blocks within 120 m of either

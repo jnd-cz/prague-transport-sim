@@ -1,0 +1,120 @@
+{
+ "snapshot": "2026-10-23",
+ "built_at_commit": "bb975a8",
+ "published": "2026-10-29 12:22",
+ "note": "The lines as built until 2026-10-29 (9, 17, 22, 23, 37; fine terrain, line 37 on its right-hand track). Built partly from the Overpass caches of 2026-10-21..23 that preceded snapshot 2026-10-23.",
+ "files": {
+  "line17.bld.bin": {
+   "size": 6349176,
+   "sha256": "35c8c8519c4df09cc2c37f2048534dfbe471a7790c4c1488d821efa7070a20a3"
+  },
+  "line17.dtm.json": {
+   "size": 23255601,
+   "sha256": "315e3cbe85e0578fbe751d7d3bd405884daaa1692ae2ccf3483f181c34fe9e08"
+  },
+  "line17.fine.bin": {
+   "size": 4512300,
+   "sha256": "f22a6818b34f40be9146f3ca066dde57eb2658a990cc3df9bad01d6debaeab77"
+  },
+  "line17.fine.json": {
+   "size": 4588,
+   "sha256": "7c60fc8b83e414f7290b57e898f110b65874a58d11ffd62ee8680769d6744e9c"
+  },
+  "line17.geo.json": {
+   "size": 193291,
+   "sha256": "d31670caa0614d4cf01ed15bb72d4754f891230c7c6dc2cee0a405c70aa844ba"
+  },
+  "line17.json": {
+   "size": 3912935,
+   "sha256": "c3fa77679b77a86aa9d0c6a589930a5fa03faa311f07af89a3ca9d1edf52a1e4"
+  },
+  "line22.bld.bin": {
+   "size": 4631616,
+   "sha256": "07c9eda94667666edcca87ecac6af4abd6dbae11f01d1556128772fe04b9dbd5"
+  },
+  "line22.dtm.json": {
+   "size": 11495527,
+   "sha256": "d26b23cbb9e06a660caf267229d1290c9546a5fe26946ac061cb89ef3ca05e1c"
+  },
+  "line22.fine.bin": {
+   "size": 3718000,
+   "sha256": "cc2c9057d750c53f3b619d842724b15c91c8df64b12fe1449ba21bbc36fe9add"
+  },
+  "line22.fine.json": {
+   "size": 3697,
+   "sha256": "e706189fc764093e6cd7d5927df00045c444873c8efcf1fd9463a9a100d6f94e"
+  },
+  "line22.geo.json": {
+   "size": 91389,
+   "sha256": "9efe7642d863c5b7a10eb138f9a8e66d3c0b2090a8df88c6fad683af21c0503c"
+  },
+  "line22.json": {
+   "size": 3704207,
+   "sha256": "df790d3c0e538025299407e294a1bef57269b33a4f1f6515eaa4fb806cedf501"
+  },
+  "line23.bld.bin": {
+   "size": 2648952,
+   "sha256": "06a34e76a998e21f7733b58165b604dbc22895aef42f4052b8209d2170dd972f"
+  },
+  "line23.fine.bin": {
+   "size": 1664650,
+   "sha256": "0db7658d1e727d53b79b40552f3a45be66d6a694adfbbe5ca96291be0a51baff"
+  },
+  "line23.fine.json": {
+   "size": 1697,
+   "sha256": "1d3972444a0d93c5f01beb783fa9bd9c2234d4fe3e3ffa6a072c64866043a1f4"
+  },
+  "line23.geo.json": {
+   "size": 28157,
+   "sha256": "8f86a7feb578444db8dba99652a2a5f75fc6fdef3c68d463d67329630900f304"
+  },
+  "line23.json": {
+   "size": 1179636,
+   "sha256": "f72871c152bc477c2fea221995e76931fc00804ad03d530d9d8da4290f0f3268"
+  },
+  "line37.bld.bin": {
+   "size": 3171942,
+   "sha256": "b5081125b55675082466cd4e87c3c8989ff30c63b5e71ba71c7f0901371c084f"
+  },
+  "line37.fine.bin": {
+   "size": 1985750,
+   "sha256": "b67107497cbdb1fa8a50a5a5e9e125d70880edae02b6ef5fa5ee09b22e1a6169"
+  },
+  "line37.fine.json": {
+   "size": 1980,
+   "sha256": "d9b9ea72eb1691f994e015337b45acc2bb9b924f94cac50a8b5bb93af1590b1a"
+  },
+  "line37.geo.json": {
+   "size": 174014,
+   "sha256": "aa129bc35273f596e4719903a4bae50860dd0657f1ee6297b406c01eda52a318"
+  },
+  "line37.json": {
+   "size": 1536910,
+   "sha256": "9a97b4c06d8d412af0243fcd9a71376525f5204056c4a443acf67bcea7e63a17"
+  },
+  "line9.bld.bin": {
+   "size": 5318550,
+   "sha256": "d1f034e786d36a1fab23107929a543040f52d62dd447b7fc0c0ea8f959a3c439"
+  },
+  "line9.fine.bin": {
+   "size": 4115150,
+   "sha256": "78e83bd3df8b2827a277d428a5e1703ba77e6088ae2e87544d5be72bb1567aa3"
+  },
+  "line9.fine.json": {
+   "size": 4060,
+   "sha256": "abf8707f798cb1b9ac37fcb1bc6d07b17768622c7ea9eab3adf41af4542fa968"
+  },
+  "line9.geo.json": {
+   "size": 118839,
+   "sha256": "19fd13888dd5adffa37a5dcebd9d7af65b46b0650c4daa2c3d508b8f7159519f"
+  },
+  "line9.json": {
+   "size": 3102921,
+   "sha256": "b1984351c6bb9702daef932930fdb6d0a0aaf46855075a76965c8d0580c7d5e6"
+  },
+  "lines.json": {
+   "size": 607,
+   "sha256": "6017704f8d0144aed693effefaf03ec2286568f5376eb006452fcd4eecf44d57"
+  }
+ }
+}

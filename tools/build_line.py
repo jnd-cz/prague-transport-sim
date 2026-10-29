@@ -62,52 +62,37 @@ DEM_SERVICE = "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer/e
 DEM_STEP = 10.0     # terrain grid spacing (m)
 DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
 
-OVERPASS = ["https://maps.mail.ru/osm/tools/overpass/api/interpreter", "https://overpass-api.de/api/interpreter"]
 REFRESH = "--refresh" in sys.argv
 
 
-# ---------------------------------------------------------------- downloads
+# ---------------------------------------------------------------- OSM (the local extract of the snapshot)
+# The queries keep their Overpass QL text (it says what is asked), but are answered from the snapshot's
+# OSM extract (tools/osm_local.py, raw/osm/praha.osm.pbf; python -P -E for pyosmium). The Overpass API is
+# no longer used. A cached answer in raw/lineN/ is kept only while it came from the same extract.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import osm_local
+except ImportError:
+    raise SystemExit("needs pyosmium (python -m pip install --user osmium) and python -P -E")
+
+
 def overpass(name, query, optional=False):
+    if not osm_local.available():
+        raise SystemExit("no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch")
+    base = osm_local.base_id()
     path = os.path.join(RAW, name + ".json")
     if os.path.exists(path) and not REFRESH:
         with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    # the local extract (tools/osm_local.py, raw/osm/praha.osm.pbf) when there is one: no servers
-    # (needs pyosmium: run with python -P -E)
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        import osm_local
-    except ImportError:
-        osm_local = None
-    if osm_local and osm_local.available():
-        js = osm_local.emulate(name, query)
-        if not js["elements"] and not optional and name != "relations":
-            raise SystemExit("local OSM: nothing for " + name)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(js, f)
-        return js
-    print("overpass:", name)
-    body = urllib.parse.urlencode({"data": query}).encode()
-    for attempt in range(10):
-        req = urllib.request.Request(OVERPASS[attempt % len(OVERPASS)], data=body,
-                                     headers={"User-Agent": "tram-game-prototype/0.1"})
-        try:
-            with urllib.request.urlopen(req, timeout=300) as r:
-                data = r.read()
-            if not json.loads(data).get("elements"):
-                raise ValueError("empty result")
-            break
-        except Exception as e:  # rate limit / timeout: back off and retry
-            print("  retry", attempt, e)
-            time.sleep(min(90, 5 * 2 ** (attempt // 2)))  # back off: the public servers are often overloaded
-    else:
-        if optional:
-            print("  ! skipped (optional):", name)
-            return {"elements": []}
-        raise SystemExit("overpass failed: " + name)
-    with open(path, "wb") as f:
-        f.write(data)
-    return json.loads(data)
+            js = json.load(f)
+        if js.get("osm_base") == base:
+            return js
+    js = osm_local.emulate(name, query)
+    if not js["elements"] and not optional and name != "relations":
+        raise SystemExit("local OSM: nothing for " + name)
+    js["osm_base"] = base
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(js, f)
+    return js
 
 
 def route_query(rel_id):
