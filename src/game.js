@@ -537,11 +537,30 @@ export class Game {
         continue;
       }
       d.edge = edge(lo, hi);
+      // (never past the crossing it was made for: there the conflicts missed its own junction and the
+      // next one took it; line 23 s 283 went to 307, 18 m past its junction at 288, onto the stop point
+      // of the next signal, which stayed red: a red pass on a GO). Not for a signal along a platform:
+      // there the data's crossing is often a road-only one inside the platform and the platform end
+      // decides (Palackého náměstí, Přístaviště above).
+      if (!plat && d.cross !== undefined && d.edge > d.cross + 5 && d.cross > d.s) {
+        moved.push(`${Math.round(s0)} kept (the first conflict at ${Math.round(d.edge)} lies past its own crossing ${Math.round(d.cross)})`);
+        d.edge = d.cross; continue;
+      }
       const want = d.edge - 4;
       // (forward by 25 m at most: the OSM signal is usually near its stop line; a conflict missing in our
       // data must not move it far into a junction)
       if (want > d.s + 25) { moved.push(`${Math.round(s0)} kept (its junction edge ${Math.round(want - d.s)} m on)`); d.farEdge = d.edge; d.edge = d.s + 4; continue; }
       if (Math.abs(want - d.s) > 1) { d.s = want; moved.push(`${Math.round(s0)}→${Math.round(d.s)}`); }
+    }
+    // two signals at one stop line are one: a tram cannot obey two heads there (one GO, one red); the
+    // one whose crossing comes first stays
+    const live = out.filter((d) => !d.drop).sort((a, b) => a.s - b.s);
+    for (let i = 1; i < live.length; i++) {
+      const a = live[i - 1], b = live[i];
+      if (b.s - a.s >= 8 || a.drop) continue;
+      const later = (b.cross ?? b.s) >= (a.cross ?? a.s) ? b : a;
+      later.drop = true;
+      moved.push(`${Math.round(later.s0)} dropped (at the stop line of ${Math.round((later === b ? a : b).s0)})`);
     }
     console.log(`signals placed: ${moved.join(', ')}`);
     this.signalMoves = moved;
