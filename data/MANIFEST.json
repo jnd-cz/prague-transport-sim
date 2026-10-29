@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-10-29b",
- "built_at_commit": "3c100ed",
- "published": "2026-10-29 16:48",
- "note": "all five lines rebuilt in the city frame (S-JTSK from the Marian column, #7)",
+ "snapshot": "2026-10-29c",
+ "built_at_commit": "27d1f32",
+ "published": "2026-10-29 17:08",
+ "note": "trees in S-JTSK on all lines (#8)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
@@ -25,8 +25,8 @@
    "sha256": "5459ce3028a690f75502789fb3041b09b4fc75277558a0fc632aaaae2a22434c"
   },
   "line17.geo.json": {
-   "size": 193940,
-   "sha256": "a220e60bba585550aca6b96b6fea9851626180c7581f3e670d1b8543f3feac47"
+   "size": 225878,
+   "sha256": "ec2ca93569b191001197efad852b540c85871eaf5a850ac212da9e4241576e18"
   },
   "line17.json": {
    "size": 4986267,
@@ -57,8 +57,8 @@
    "sha256": "def02f8151f1eeb5f37705ec4c855f08bddd148a3058897c2ae1cbd782c963f8"
   },
   "line22.geo.json": {
-   "size": 170894,
-   "sha256": "19a9e9f86fb308ffeb224db6015dda99f4c082c59bf8ba76df4807c4bfa477e5"
+   "size": 204698,
+   "sha256": "3aaa533dd3b7af58d32b0db6d5ecea54de77cd4b5541b0ca75ba674c0dc85c05"
   },
   "line22.json": {
    "size": 5160549,
@@ -77,8 +77,8 @@
    "sha256": "6de4fe6167992b694c07cd44e345006713c8b5eb7deeb85cf1af0d541ca3e57a"
   },
   "line23.geo.json": {
-   "size": 54892,
-   "sha256": "b8abd5c45586c11003151e68d22e33e193e7c5ad3bbeafc903d830826de48985"
+   "size": 79280,
+   "sha256": "0aa6e7d927e8ae178fc6d12f1cec97df115927c9061848fa4fbd4f651862f2f3"
   },
   "line23.json": {
    "size": 1724020,
@@ -97,8 +97,8 @@
    "sha256": "4d48fa171ca7f0dcbc898e0d7400cfb4e034041d2040a70cf7d9d51b0bc2ba46"
   },
   "line37.geo.json": {
-   "size": 173695,
-   "sha256": "6c2fc860eaf6c0c939ad449d5296eb7aa7f4fbb9229b8335e058b82c50f3452d"
+   "size": 173786,
+   "sha256": "7e3f05ea10667b367bdb21bcfb608d1d32fe6a6e51221ca3379dcc5246305699"
   },
   "line37.json": {
    "size": 1516012,
@@ -117,8 +117,8 @@
    "sha256": "9aecee2d0101a69688bc4a84d5363293ea5437546c7badad734b6d712da4b438"
   },
   "line9.geo.json": {
-   "size": 203296,
-   "sha256": "4591f6792edcefb07cac9cea283c6981f2a91ccb448e0c5eea7870bd4538211f"
+   "size": 263236,
+   "sha256": "adceadccb68ca371a8a3abf93ca948ad28c9fe9bc72f58ada0de1c0623b8861a"
   },
   "line9.json": {
    "size": 3834859,

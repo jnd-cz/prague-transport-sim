@@ -227,16 +227,17 @@ def corridor_boxes(step=600.0):
     return boxes
 
 
-def query(service, name, fields):
+def query(service, name, fields, out_sr=4326):
+    """Features in the corridor; geometry as lat/lon, or as S-JTSK with out_sr=5514 (see trees())."""
     feats = {}
     for k, (lo0, la0, lo1, la1) in enumerate(corridor_boxes()):
         offset = 0
         while True:
             q = urllib.parse.urlencode({
                 "where": "1=1", "geometry": f"{lo0},{la0},{lo1},{la1}", "geometryType": "esriGeometryEnvelope",
-                "inSR": 4326, "outSR": 4326, "spatialRel": "esriSpatialRelIntersects", "outFields": fields,
+                "inSR": 4326, "outSR": out_sr, "spatialRel": "esriSpatialRelIntersects", "outFields": fields,
                 "returnGeometry": "true", "resultOffset": offset, "resultRecordCount": 2000, "f": "json"})
-            d = fetch(f"{service}/query?{q}", f"{name}_{k}_{offset}.json")
+            d = fetch(f"{service}/query?{q}", f"{name}{'' if out_sr == 4326 else out_sr}_{k}_{offset}.json")
             for ft in d.get("features", []):
                 at = ft["attributes"]
                 feats[at.get("objectid", at.get("OBJECTID", id(ft)))] = ft
@@ -266,7 +267,11 @@ VP_KIND = {71: "tree", 61: "tree", 81: "tree", 51: 2, 41: 2, 131: 2, 21: 3}
 
 def trees():
     out, kinds = [], {}
-    for ft in query(TREES, "trees", "*"):
+    # The tree register is stored in Web Mercator by the service, converted from the survey's S-JTSK with
+    # a poor datum shift: its lat/lon lies ~10 m off the survey (the service gives the same shift back
+    # when asked for S-JTSK). Asked for S-JTSK, the trees sit 0.3 m from the surveyed tree pits; the tree
+    # rows and the other layers are right as lat/lon (tools/registration.py, #8).
+    for ft in query(TREES, "trees", "*", out_sr=5514):
         g = ft.get("geometry") or {}
         pts = g.get("points") or ([[g["x"], g["y"]]] if "x" in g else [])  # multipoint or point
         a = ft["attributes"]
@@ -275,8 +280,8 @@ def trees():
             continue
         if kind == "tree":
             kind = 1 if a.get("kod_drevin") == 1 else 0
-        for lon, lat in pts:
-            x, y = to_local(lat, lon)
+        for e, n in pts:
+            x, y = (float(v) for v in F.from_jtsk(e, n))
             if route_dist(x, y) <= CORRIDOR:
                 out.append([round(x, 1), round(y, 1), kind])
                 kinds[kind] = kinds.get(kind, 0) + 1
