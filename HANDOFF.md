@@ -986,4 +986,16 @@ Rules, not spots (each measured on line 17; the lints in brackets):
   whatever its side, and had no way across before the crossover. Fix: the start node by distance + 20
   on the shape's left. Line 37 rebuilt (no gauntlet, the opposite track 3.1-3.7 m to the left all the
   way); line 9's run matched identically (path and pathBack unchanged).
+- **Model decks on our bridges** (after line 37 moved to its right-hand track, the Krejcárek viaduct lost
+  its deck: the Mosty model there has a deck under one track only): `bridgeDecks` samples 3.3 m to
+  either side when nothing lies under our track, on our own tagged bridges only (a structure beside the
+  track is not over it); the model deck window reaches 6 m under the first estimate; and a model deck
+  is a ceiling too (deck + 0.1 m), not only a floor. Not on surveyed tram beds: there the ceiling pinned
+  the track to every dip of the survey (line 17: 13 vertical curves under 500 m, and one traffic run
+  stalled before stop 7 for the whole 2 h limit). Line 37: the viaduct's upper half on the deck (0-0.7 m),
+  the lowest ~120 m still 1-2 m over it (the final easing lifts it toward the ground beyond; open);
+  static lints 0 except railSupport 2, verticalCurves 1, lanes 189, deckClip 4. Line 17 with the fine
+  terrain, all three seeds finished: railSupport 94 → 26, streetWaviness 5006 → 4917, verticalCurves 1,
+  underpassClearance 0, deckClip 7, terrainOverSurvey 55 → 68; overlap 51 → 42, walker hits 50 → 63,
+  red runs 4 → 7 (per seed 10 / 6 / 5).
 
