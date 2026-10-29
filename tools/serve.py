@@ -43,4 +43,10 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
 
-http.server.ThreadingHTTPServer(("127.0.0.1", PORT), NoCache).serve_forever()
+class Server(http.server.ThreadingHTTPServer):
+    # (the default backlog of 5 overflows when headless.py --jobs loads several pages at once, and on
+    # Windows a full backlog refuses the connection: every page then hung on "Loading the 3D engine")
+    request_queue_size = 128
+
+
+Server(("127.0.0.1", PORT), NoCache).serve_forever()

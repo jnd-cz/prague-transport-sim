@@ -40,7 +40,10 @@ target design) and [docs/decisions/](docs/decisions/).
   (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it; shell
   heredocs with quotes break on this machine.
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
-  --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold).
+  --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
+  once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
+  (`--parallel` for several lines). Keep memory in check: long jobs size themselves by free memory
+  (`tools/sysinfo.py`); don't start a second heavy job while one runs.
 - Checks in a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`, `lint({ traffic: true })` averages
   seeds 22, 7, 1234), `python tools/lint_report.py` against `reports/baseline/`; benches in `tools/bench/`
   (u3, redruns, walkers; `batch.html`). Run long browser jobs unawaited and poll (script calls time out

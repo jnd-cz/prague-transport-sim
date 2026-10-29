@@ -90,7 +90,10 @@ for c in out:
         continue
     dedup.append(c)
 line["clearances"] = dedup
-json.dump(line, open(dst, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+# (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
+with open(dst + ".part", "w", encoding="utf-8") as fh:
+    json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
+os.replace(dst + ".part", dst)
 for c in dedup:
     print(f"s {c['s']:7.0f}  {c['kind']:4} {str(c['mh']):5} ({c['src']})  {c['name'] or ''}{'  [tunnel]' if c['tunnel'] else ''}")
 print(f"{len(dedup)} crossings under the route")

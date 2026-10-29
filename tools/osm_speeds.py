@@ -120,8 +120,10 @@ while k < n:
         k += 1
 
 line["speed"] = {"step": STEP, "osm": osm, "dedicated": ded, "source": "OpenStreetMap railway=tram maxspeed (as shown by OpenRailwayMap)"}
-with open(dst, "w", encoding="utf-8") as fh:
+# (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
+with open(dst + ".part", "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
+os.replace(dst + ".part", dst)
 tagged = sum(1 for v in osm if v)
 print(f"line {LINE}: {len(osm)} samples, maxspeed on {100 * tagged / len(osm):.0f} % "
       f"({', '.join(f'{v}: {osm.count(v)}' for v in sorted(set(osm)) if v)}), dedicated {100 * sum(ded) / n:.0f} %")

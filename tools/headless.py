@@ -3,6 +3,7 @@
     python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
     python -P -E tools/headless.py --lines 23 --checks traffic --seeds 22,7,1234
     python -P -E tools/headless.py --lines 17 --checks lint            # static lints (no seed)
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 4   # 4 pages at once
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
 check and awaits it, exactly like tools/bench/batch.html. Results: one JSON per run in reports/headless/
@@ -13,7 +14,10 @@ finish; lint has no thresholds here, compare with `python tools/lint_report.py`)
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
 Starts its own tools/serve.py on --port unless --url points at a running server. WebGL runs on
 SwiftShader (software): slower than a desktop browser, the same results (the checks step the
-simulation themselves).
+simulation themselves). --jobs N runs N pages at once, each in a worker process with its own
+browser (default: half the cores, at most 4, and
+what free memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded in
+its own fresh page, so the counts are the same as one after another.
 """
 import argparse
 import json
@@ -22,8 +26,12 @@ import subprocess
 import sys
 import time
 import urllib.request
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+from sysinfo import workers  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
@@ -94,6 +102,23 @@ def serve(port):
     raise SystemExit(f"tools/serve.py did not come up on port {port}")
 
 
+ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
+        "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
+        "--disable-backgrounding-occluded-windows"]
+
+
+def worker(job, url, headed, timeout):
+    """One job in a worker process, with a browser of its own (sync Playwright is one per process)."""
+    line, check, seed = job
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=not headed, args=ARGS)
+        try:
+            r, secs = run_one(browser, url, line, check, seed, timeout)
+        finally:
+            browser.close()
+    return job, r, secs
+
+
 def run_one(browser, url, line, check, seed, timeout):
     page = browser.new_page(viewport={"width": 960, "height": 540})
     errors = []
@@ -128,6 +153,8 @@ def main():
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
+    ap.add_argument("--jobs", type=int, default=workers(4.0),
+                    help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
     a = ap.parse_args()
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
@@ -139,30 +166,34 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     server = None if a.url else serve(a.port)
     url = a.url or f"http://localhost:{a.port}"
-    failed = 0
+    failed, t0 = 0, time.time()
+
+    def report(i, job, r, secs):
+        nonlocal failed
+        line, check, seed = job
+        ok, text = judge(check, r)
+        failed += not ok
+        name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + ".json"
+        with open(os.path.join(a.out, name), "w", encoding="utf-8") as f:
+            json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "ok": ok,
+                       "time": time.strftime("%Y-%m-%dT%H:%M:%S"), "result": r}, f, ensure_ascii=False, indent=1)
+        print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
+              + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
+
     try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=not a.headed, args=[
-                "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
-                "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
-                "--disable-backgrounding-occluded-windows"])
-            for i, (line, check, seed) in enumerate(jobs, 1):
-                print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}"),
-                      end=" … ", flush=True)
-                r, secs = run_one(browser, url, line, check, seed, a.timeout)
-                ok, text = judge(check, r)
-                failed += not ok
-                name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + ".json"
-                with open(os.path.join(a.out, name), "w", encoding="utf-8") as f:
-                    json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "ok": ok,
-                               "time": time.strftime("%Y-%m-%dT%H:%M:%S"), "result": r}, f, ensure_ascii=False,
-                              indent=1)
-                print(f"{'pass' if ok else 'FAIL'} ({secs} s) {text}")
-            browser.close()
+        if a.jobs > 1 and len(jobs) > 1:
+            with ProcessPoolExecutor(min(a.jobs, len(jobs))) as ex:
+                futs = [ex.submit(worker, job, url, a.headed, a.timeout) for job in jobs]
+                for i, fu in enumerate(as_completed(futs), 1):
+                    report(i, *fu.result())
+        else:
+            for i, job in enumerate(jobs, 1):
+                report(i, *worker(job, url, a.headed, a.timeout))
     finally:
         if server:
             server.terminate()
-    print(f"{len(jobs) - failed}/{len(jobs)} passed; results in {os.path.relpath(a.out, ROOT)}")
+    print(f"{len(jobs) - failed}/{len(jobs)} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
+          f"results in {os.path.relpath(a.out, ROOT)}")
     sys.exit(1 if failed else 0)
 
 

@@ -99,6 +99,10 @@ Review these when realism matters; most move into the build in M2.
 - Python `-I` ignores `PYTHONIOENCODING`: scripts call `sys.stdout.reconfigure(encoding="utf-8")`.
 - Shell heredocs with quotes or backticks break: write scripts to a file.
 - ES modules are cached hard: the dev server sends `no-store`; import tools with `?v=` + `Date.now()`.
+- A full listen backlog refuses connections on Windows (Linux queues them). Python's HTTP server
+  defaults to 5, which several pages loading their ~20 modules at once overflow: every page hung on
+  "Loading the 3D engine" (`ERR_CONNECTION_REFUSED`). `tools/serve.py` sets 128; a `headless.py --jobs N
+  --url` server needs the same.
 - Browser script calls time out at 45 s; a hidden pane throttles `requestAnimationFrame`, so step the
   simulation in JS (`window.headless`) rather than waiting in real time.
 - Memory: the whole line is built at load (no streaming); fine terrain adds ~0.15–0.2 GB.

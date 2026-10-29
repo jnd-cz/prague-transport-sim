@@ -30,7 +30,9 @@ Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from
 (`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
 All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
 
-The whole chain for a line, in order (logs in `reports/rebuild/`):
+The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
+side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
+The OSM extract is read once per build (~1 min), and a line takes ~2-4 min:
 
 ```bash
 python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
@@ -242,7 +244,11 @@ each in a fresh headless page, with pass / fail per run (exit code 1 on a failur
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
 python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 3
 ```
+
+`--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
+up to ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
 
 `tools/autopilot.js` drives the game headlessly to check the rules. In the browser console:
 
