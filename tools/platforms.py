@@ -20,10 +20,9 @@ LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 
 dst = os.path.join(ROOT, "data", f"line{LINE}.json")
 line = json.load(open(dst, encoding="utf-8"))
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 src = os.path.join(ROOT, "raw", f"line{LINE}", "platforms.json")
 if "--fetch" in sys.argv or not os.path.exists(src):
     # tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the
@@ -35,9 +34,8 @@ if "--fetch" in sys.argv or not os.path.exists(src):
         raise SystemExit("needs pyosmium and python -P -E (or an existing raw/lineN/platforms.json)")
     if not osm_local.available():
         raise SystemExit("no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch")
-    lat = [LAT0 + p[1] / KY for p in line["path"] + line.get("pathBack", [])]
-    lon = [LON0 + p[0] / KX for p in line["path"] + line.get("pathBack", [])]
-    box = (min(lat) - 0.001, min(lon) - 0.0015, max(lat) + 0.001, max(lon) + 0.0015)
+    s, w, n, e = (float(v) for v in F.bbox(line["path"] + line.get("pathBack", []), 100))
+    box = (s, w, n, e)
     els = osm_local.ways(lambda t: t.get("public_transport") == "platform" or t.get("railway") == "platform", bbox=box)
     os.makedirs(os.path.dirname(src), exist_ok=True)
     json.dump({"elements": els, "osm_base": osm_local.base_id()}, open(src, "w", encoding="utf-8"))
@@ -48,7 +46,7 @@ osm = json.load(open(src, encoding="utf-8"))
 
 
 def P(g):
-    return [round((g["lon"] - LON0) * KX, 2), round((g["lat"] - LAT0) * KY, 2)]
+    return [round(v, 2) for v in tuple(float(v) for v in F.xy(g["lat"], g["lon"]))]
 
 
 # both directions' paths as segments in 20 m cells
@@ -87,7 +85,7 @@ gtfs = []
 for r in rd("stops.txt"):
     if r["stop_id"] not in lines_of:
         continue
-    q = [round((float(r["stop_lon"]) - LON0) * KX, 2), round((float(r["stop_lat"]) - LAT0) * KY, 2)]
+    q = [round(v, 2) for v in tuple(float(v) for v in F.xy(float(r["stop_lat"]), float(r["stop_lon"])))]
     if dist(q) <= 10:
         gtfs.append({"id": r["stop_id"], "name": r["stop_name"], "code": r["platform_code"], "q": q,
                      "lines": sorted(lines_of[r["stop_id"]], key=lambda x: (len(x), x))})

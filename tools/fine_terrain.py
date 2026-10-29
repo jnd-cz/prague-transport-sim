@@ -23,7 +23,6 @@ import urllib.request
 
 import numpy as np
 from PIL import Image
-from pyproj import Transformer
 from shapely.geometry import LineString, box
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -36,11 +35,9 @@ CACHE = os.path.join(ROOT, "raw", "dem")
 os.makedirs(CACHE, exist_ok=True)
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
-to_jtsk = Transformer.from_crs(4326, 5514, always_xy=True)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 paths = [LineString([p[:2] for p in line["path"]])]
 if line.get("pathBack"):
     paths.append(LineString([p[:2] for p in line["pathBack"]]))
@@ -113,7 +110,7 @@ for k, (bi, bj) in enumerate(blocks):
     xs = X0 + bi * BS + np.arange(B + 1) * STEP
     ys = Y0 - bj * BS - np.arange(B + 1) * STEP
     GX, GY = np.meshgrid(xs, ys)  # rows north to south
-    X, Y = to_jtsk.transform(LON0 + GX / KX, LAT0 + GY / KY)
+    X, Y = F.to_jtsk(GX, GY)  # (the city frame is a shift of S-JTSK)
     z = sample(np.asarray(X), np.asarray(Y))
     if np.isnan(z).any() or (z < 0).any():  # (no data: outside the republic's model) the coarse grid holds
         bad = np.isnan(z) | (z < 0)

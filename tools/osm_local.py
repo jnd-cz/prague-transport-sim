@@ -176,10 +176,8 @@ def emulate(name, query):
     else:
         wids = {int(x) for x in re.search(r"way\(id:([0-9,]+)\)->\.w;", query).group(1).split(",")}
     rw = [w for w in ways(lambda t: True) if w["id"] in wids]
-    lat0 = sum(g["lat"] for w in rw for g in w["geometry"]) / max(1, sum(len(w["geometry"]) for w in rw))
-    lon0 = sum(g["lon"] for w in rw for g in w["geometry"]) / max(1, sum(len(w["geometry"]) for w in rw))
-    kx, ky = Frame(lat0, lon0).k
-    xy = lambda g: ((g["lon"] - lon0) * kx, (g["lat"] - lat0) * ky)  # noqa: E731
+    F = Frame()
+    xy = lambda g: tuple(float(v) for v in F.xy(g["lat"], g["lon"]))  # noqa: E731
     route = shapely.union_all([LineString([xy(g) for g in w["geometry"]]) for w in rw if len(w["geometry"]) > 1])
     zones = {}
 

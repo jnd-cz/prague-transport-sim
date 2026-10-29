@@ -25,3 +25,6 @@ data/*
 
 # headless check results (tools/headless.py)
 reports/headless/
+
+# rebuild logs (tools/rebuild.py)
+reports/rebuild/

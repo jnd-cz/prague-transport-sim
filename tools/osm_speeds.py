@@ -21,17 +21,16 @@ STEP = 5.0
 
 dst = os.path.join(ROOT, "data", f"line{LINE}.json")
 line = json.load(open(dst, encoding="utf-8"))
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 # the Overpass cache of this line's tracks (a run like 9 -> 10 has its own folder)
 cands = glob.glob(os.path.join(ROOT, "raw", f"run{LINE}-*", "tracks.json")) + [
     os.path.join(ROOT, "raw", f"line{LINE}", "tracks.json"), os.path.join(ROOT, "raw", "tracks.json")]
 src = next(p for p in cands if os.path.exists(p))
 els = json.load(open(src, encoding="utf-8"))["elements"]
-nodes = {e["id"]: ((e["lon"] - LON0) * KX, (e["lat"] - LAT0) * KY) for e in els if e["type"] == "node"}
+nodes = {e["id"]: tuple(float(v) for v in F.xy(e["lat"], e["lon"])) for e in els if e["type"] == "node"}
 
 
 def speed(tags):

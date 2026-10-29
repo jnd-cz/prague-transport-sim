@@ -18,10 +18,9 @@ line = json.load(open(dst, encoding="utf-8"))
 src = os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "roads.json")
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 widths = {"motorway": 16, "trunk": 14, "primary": 12, "secondary": 10, "tertiary": 8, "primary_link": 7,
           "secondary_link": 7, "tertiary_link": 6, "trunk_link": 7, "residential": 6.5, "unclassified": 6,
           "living_street": 5, "service": 4, "pedestrian": 6, "footway": 2.5}
@@ -38,7 +37,7 @@ for e in json.load(open(src, encoding="utf-8"))["elements"]:
             w = max(w, int(t["lanes"].split(";")[0]) * 3.2)
         except ValueError:
             pass
-    road = {"p": [[round((g["lon"] - LON0) * KX, 1), round((g["lat"] - LAT0) * KY, 1)] for g in e["geometry"]], "w": w,
+    road = {"p": [[round(float(x), 1), round(float(y), 1)] for x, y in zip(*F.xy([g["lat"] for g in e["geometry"]], [g["lon"] for g in e["geometry"]]))], "w": w,
             "f": 1 if hw in ("footway", "pedestrian", "living_street") else 0,
             "c": 1 if hw in ("motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
                              "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link")

@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I lea
 from geo import ROOT, Frame  # noqa: E402
 
 data = json.load(open(os.path.join(ROOT, 'data', f'line{line}.json'), encoding='utf-8'))
-frame = Frame(*data['origin'])
+frame = Frame()
 to_xy, to_ll = frame.xy, frame.ll
 
 
