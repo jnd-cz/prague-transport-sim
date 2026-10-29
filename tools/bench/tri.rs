@@ -1,4 +1,4 @@
-// Benchmark kernel (not part of the game): the DTM lookup's triangle test, as in PERF-ANALYSIS §9,
+// Benchmark kernel (not part of the game): the DTM lookup's triangle test, as in docs/history/PERF-ANALYSIS.md §9,
 // over the same flat arrays as the JS "flat" variant. Build:
 // rustc --target wasm32-unknown-unknown --crate-type cdylib -O -C panic=abort tri.rs -o tri.wasm
 // (add -C target-feature=+simd128 for the SIMD build)

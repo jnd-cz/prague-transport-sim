@@ -1,5 +1,5 @@
 {
- "note": "Ground truth from the user, used to score detectors and lints (PLAN.md §2.4). Add facts here, not special cases in code.",
+ "note": "Ground truth from the user, used to score detectors and lints (docs/history/PLAN.md §2.4). Add facts here, not special cases in code.",
  "stops": [
   {
    "name": "Čechův most",

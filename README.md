@@ -4,6 +4,10 @@ Arcade tram driving in a 3D Prague built from real data: OpenStreetMap track net
 roads and greenery, ČÚZK DMR 5G lidar terrain (10 m grid), and the PID GTFS timetable for
 line 22 (Bílá Hora 382 m → Malostranská 189 m → Náměstí Míru 246 m → Zahradní Město 237 m).
 
+Project docs: [ROADMAP.md](ROADMAP.md) (milestones; tasks are GitHub issues), [AGENTS.md](AGENTS.md)
+(working rules for agents and contributors), [docs/knowledge.md](docs/knowledge.md),
+[docs/architecture.md](docs/architecture.md), [docs/decisions/](docs/decisions/).
+
 ## Run
 
 ```bash
@@ -229,7 +233,7 @@ const { autopilot } = await import('/tools/autopilot.js');
 autopilot(0, 99, { obstacles: 'normal', weather: 'rain' });
 ```
 
-**Lints** (PLAN.md §2): each check counts one kind of problem over the whole line. With the dev server
+**Lints** ([docs/knowledge.md](docs/knowledge.md)): each check counts one kind of problem over the whole line. With the dev server
 (`tools/serve.py`, which saves the reports), the page loaded with **`?keepgeo`** (the game otherwise frees
 the meshes' CPU copies after loading) and a shift started on the line:
 

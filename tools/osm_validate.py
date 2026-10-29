@@ -1,4 +1,4 @@
-# Checks a line's data against OpenStreetMap (BUILD-TOOLS-HANDOFF.md §3). Not part of the game.
+# Checks a line's data against OpenStreetMap (docs/history/BUILD-TOOLS-HANDOFF.md §3). Not part of the game.
 #   python -P -E tools/osm_validate.py 17
 # Reads the snapshot's OSM extract (tools/osm_local.py). Prints: the coordinate fit (OSM tram ways vs our
 # tracks), stops vs OSM stop positions, the line's crossings without an OSM tram crossing, tram signals

@@ -8,7 +8,7 @@
      lists the results. Serve the project root (e.g. tools/serve.py 8742) and open
        http://localhost:8742/tools/bench/batch.html?lines=17&seeds=1-10&benches=u3,redruns
      Keep the tab visible (background tabs are throttled). Results stay in this page's localStorage
-     until cleared; "Download JSON" saves them. Thresholds: BUILD-TOOLS-HANDOFF.md §4.2. -->
+     until cleared; "Download JSON" saves them. Thresholds: docs/history/BUILD-TOOLS-HANDOFF.md §4.2. -->
 <style>
   :root { --bg: #f6f6f4; --fg: #1d1d1b; --mut: #6b6b66; --ok: #1f7a3a; --bad: #b3261e; --line: #d9d8d3; }
   @media (prefers-color-scheme: dark) { :root { --bg: #18181a; --fg: #e8e8e4; --mut: #9a9a94; --ok: #5fc77e; --bad: #ff7b72; --line: #333336; } }
@@ -50,7 +50,7 @@ const save = (r) => { try { localStorage.setItem(KEY, JSON.stringify(r)); } catc
 let results = load(), stopping = false;
 const range = (s) => s.split(',').flatMap((p) => { const [a, b] = p.split('-').map(Number); return b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]; });
 
-// pass/fail and a one-line summary per bench (thresholds as in BUILD-TOOLS-HANDOFF.md §4.2)
+// pass/fail and a one-line summary per bench (thresholds as in docs/history/BUILD-TOOLS-HANDOFF.md §4.2)
 function judge(bench, r) {
   if (r.error) return { ok: false, text: r.error };
   if (bench === 'u3') {

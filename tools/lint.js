@@ -1,4 +1,4 @@
-// Dev tool: lints for the loaded line (PLAN.md §2). Each check counts one kind of problem over the
+// Dev tool: lints for the loaded line (docs/history/PLAN.md §2). Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
 // In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
 //   const { lint } = await import('/tools/lint.js?v=' + Date.now());
