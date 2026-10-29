@@ -13,6 +13,13 @@ What sessions learned and later work needs. Kept current and short; the full log
 - Until 2026-10-29 each line had its own lat/lon origin and a flat-earth scale (110 574 m per degree of
   latitude, 111 320·cos(lat0) of longitude): 0.59 % short N–S, 0.20 % E–W (line 17 was 100 m short), so
   positions quoted in older notes (route `s`, x/y) are off by up to that much.
+- **Layer registration** (`tools/registration.py --line 17|22`, against the DTM survey; 2026-10-29): IPR LOD2
+  buildings 0.04–0.10 m, OSM buildings 0.06–0.10 m, trees 0.2–0.3 m, tree rows 0.16 m from the trees.
+  IPR's hosted feature layers are stored in Web Mercator, and each was loaded from S-JTSK with its own
+  datum shift: the **tree register's lat/lon is ~10 m off** (ask its service for S-JTSK, `outSR=5514`,
+  which `geoportal.py` does), while the tree rows and the archived DTM street points are right as
+  lat/lon (asking those for S-JTSK puts them 6–10 m off). A new Geoportál layer gets measured both ways
+  before use.
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
 - Geoportál I3S layers are Web Mercator with absolute heights; the orthophoto ImageServer is S-JTSK.
