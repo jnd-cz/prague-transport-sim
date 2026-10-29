@@ -1,7 +1,7 @@
 # One city frame (S-JTSK) and the tile grid
 
 **Date:** 2026-10-29
-**Status:** agreed 2026-10-29 (issue #7), with the Marian column as the origin (user).
+**Status:** agreed and implemented 2026-10-29 (issue #7), with the Marian column as the origin (user); snapshot 2026-10-29b.
 
 ## Measured
 

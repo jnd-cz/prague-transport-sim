@@ -16,7 +16,7 @@ from geo import ROOT, Frame  # noqa: E402
 
 line = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else '17'
 data = json.load(open(os.path.join(ROOT, 'data', f'line{line}.json'), encoding='utf-8'))
-frame = Frame(*data['origin'])
+frame = Frame()
 to_xy = frame.xy
 
 class Polyline:

@@ -5,10 +5,14 @@ What sessions learned and later work needs. Kept current and short; the full log
 
 ## Coordinates and heights
 
-- **Today's line frame** (`tools/geo.py`, every tool): local metres around a per-line origin, 110 574 m
-  per degree of latitude and 111 320·cos(lat0) per degree of longitude. It squeezes the world 0.59 %
-  N–S and 0.20 % E–W (line 17 is 100 m short of 21 799 m), and two lines' worlds do not meet. To be
-  replaced by one city-wide S-JTSK (EPSG:5514) frame (M2).
+- **The city frame** (`tools/geo.py`, every tool; [decision](decisions/2026-10-29-city-frame-and-tiles.md)):
+  game metres = S-JTSK (EPSG:5514) minus the Marian column (−742 806, −1 043 024); every line shares it
+  (`data/lineN.json` `frame`). Lat/lon goes through ČÚZK's grid as a pinned PROJ pipeline (the grid file
+  is in the snapshot, `raw/proj/`); survey data (DTM, DMR 5G, IPR rasters) is a plain shift. S-JTSK is
+  9.6 cm/km short of true length, and grid north is 7.8° off true north.
+- Until 2026-10-29 each line had its own lat/lon origin and a flat-earth scale (110 574 m per degree of
+  latitude, 111 320·cos(lat0) of longitude): 0.59 % short N–S, 0.20 % E–W (line 17 was 100 m short), so
+  positions quoted in older notes (route `s`, x/y) are off by up to that much.
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
 - Geoportál I3S layers are Web Mercator with absolute heights; the orthophoto ImageServer is S-JTSK.

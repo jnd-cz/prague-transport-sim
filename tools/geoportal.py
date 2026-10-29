@@ -69,18 +69,14 @@ def fetch(url, cache_name=None, binary=False):
 # ------------------------------------------------------------------ coordinates
 with open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8") as f:
     line = json.load(f)
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 
 def to_local(lat, lon):
-    return (lon - LON0) * KX, (lat - LAT0) * KY
-
-
-def to_latlon(x, y):
-    return LAT0 + y / KY, LON0 + x / KX
+    x, y = F.xy(lat, lon)
+    return float(x), float(y)
 
 
 def merc_to_latlon(mx, my):
@@ -225,8 +221,7 @@ def corridor_boxes(step=600.0):
         if acc >= step or i == len(path) - 1:
             seg = path[start:i + 1]
             xs, ys = [p[0] for p in seg], [p[1] for p in seg]
-            la0, lo0 = to_latlon(min(xs) - CORRIDOR, min(ys) - CORRIDOR)
-            la1, lo1 = to_latlon(max(xs) + CORRIDOR, max(ys) + CORRIDOR)
+            la0, lo0, la1, lo1 = (float(v) for v in F.bbox(seg, CORRIDOR))
             boxes.append((lo0, la0, lo1, la1))
             acc, start = 0.0, i
     return boxes

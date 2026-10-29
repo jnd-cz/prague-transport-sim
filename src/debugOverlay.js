@@ -9,11 +9,11 @@
 import * as THREE from 'three';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
-// (WGS84, the line data's conversion: 110574 m per degree of latitude, 111320·cos(lat0) of longitude).
+// In S-JTSK (EPSG:5514): game metres plus the city origin (data.frame, docs/decisions/2026-10-29-city-frame-and-tiles.md).
 // From the console during a shift: window.exportBuiltGeoJSON() saves data-lineN.built.geojson.
 export function builtGeoJSON(game, traffic) {
-  const [lat0, lon0] = game.data.origin, kx = 111320 * Math.cos((lat0 * Math.PI) / 180);
-  const ll = (x, y) => [+(lon0 + x / kx).toFixed(7), +(lat0 + y / 110574).toFixed(7)];
+  const [e0, n0] = game.data.frame.origin;
+  const ll = (x, y) => [+(e0 + x).toFixed(2), +(n0 + y).toFixed(2)];
   const R = game.route, line = String(game.data.line), out = [];
   const feat = (geometry, p) => out.push({ type: 'Feature', geometry, properties: { line, ...p } });
   const pt = (x, y) => ({ type: 'Point', coordinates: ll(x, y) });
@@ -39,7 +39,7 @@ export function builtGeoJSON(game, traffic) {
     const heads = traffic.lights?.group.children[0], M = new THREE.Matrix4();
     for (let i = 0; heads && i < heads.count; i++) { heads.getMatrixAt(i, M); v.setFromMatrixPosition(M); feat(pt(v.x, -v.z), { id: `car_signal_head:${line}:${i}`, type: 'car_signal_head' }); }
   }
-  return { type: 'FeatureCollection', properties: { line, build: `runtime ${new Date().toISOString().slice(0, 10)}`, origin: [lat0, lon0] }, features: out };
+  return { type: 'FeatureCollection', crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::5514' } }, properties: { line, build: `runtime ${new Date().toISOString().slice(0, 10)}`, origin: [e0, n0] }, features: out };
 }
 
 export function createDebugOverlay(scene) {

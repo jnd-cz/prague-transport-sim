@@ -20,7 +20,6 @@ from collections import defaultdict
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpkg  # noqa: E402
-from pyproj import Transformer  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
@@ -38,10 +37,8 @@ CLASSES = {
 }
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
-LAT0, LON0 = line["origin"]
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
-to_wgs = Transformer.from_crs(5514, 4326, always_xy=True)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 # lidar ground (DMR 5G grid of the line): a ground-level street corner far below it is a mislabelled
 # underground line (e.g. a floor 20 m under Náměstí Míru tagged as level 0)
@@ -61,8 +58,8 @@ def lidar(x, y):
 
 
 def local(x, y):
-    lon, lat = to_wgs.transform(x, y)
-    return ((lon - LON0) * KX, (lat - LAT0) * KY)
+    # the survey is native S-JTSK: the city frame is a shift of it
+    return (x - F.E0, y - F.N0)
 
 
 # corridor test on a 40 m grid of route points (ours and the opposite direction)

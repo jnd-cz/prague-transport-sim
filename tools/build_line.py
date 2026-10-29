@@ -183,8 +183,10 @@ if R:
 
 # ---------------------------------------------------------------- geometry
 class Proj(Frame):
-    # x = east, y = north (metres): the one conversion (tools/geo.py)
-    __call__ = Frame.xy
+    # x = east, y = north (metres) in the city frame: the one conversion (tools/geo.py)
+    def __call__(self, lat, lon):
+        x, y = self.xy(lat, lon)
+        return float(x), float(y)
 
 
 def dist(a, b):
@@ -352,14 +354,17 @@ def read_tiff_f32(data):
     return out
 
 
-def fetch_terrain(P, lat_min, lat_max, lon_min, lon_max):
-    """Bare-earth elevation grid (~DEM_STEP m) for the bbox, cached in raw/terrain.*"""
-    nx = int((lon_max - lon_min) * P.kx / DEM_STEP) + 1
-    ny = int((lat_max - lat_min) * P.ky / DEM_STEP) + 1
-    path, meta_path = os.path.join(RAW, "terrain.tif"), os.path.join(RAW, "terrain.json")
+def fetch_terrain(P, x_min, x_max, y_min, y_max):
+    """Bare-earth elevation grid (DEM_STEP m) for the box (game metres) on the S-JTSK grid: cell edges
+    at whole multiples of DEM_STEP in S-JTSK, as the survey data. Cached in raw/terrain5514.*"""
+    (e0, n0), (e1, n1) = P.to_jtsk(x_min, y_min), P.to_jtsk(x_max, y_max)
+    e0, n0 = math.floor(e0 / DEM_STEP) * DEM_STEP, math.floor(n0 / DEM_STEP) * DEM_STEP
+    e1, n1 = math.ceil(e1 / DEM_STEP) * DEM_STEP, math.ceil(n1 / DEM_STEP) * DEM_STEP
+    nx, ny = round((e1 - e0) / DEM_STEP), round((n1 - n0) / DEM_STEP)
+    path, meta_path = os.path.join(RAW, "terrain5514.tif"), os.path.join(RAW, "terrain5514.json")
     if not (os.path.exists(path) and os.path.exists(meta_path)) or REFRESH:
         q = urllib.parse.urlencode({
-            "bbox": f"{lon_min},{lat_min},{lon_max},{lat_max}", "bboxSR": 4326, "imageSR": 4326,
+            "bbox": f"{e0},{n0},{e1},{n1}", "bboxSR": 5514, "imageSR": 5514,
             "size": f"{nx},{ny}", "format": "tiff", "pixelType": "F32", "noData": -9999,
             "interpolation": "RSP_BilinearInterpolation", "compression": "None", "f": "json"})
         print(f"terrain: requesting {nx}x{ny} grid")
@@ -379,8 +384,8 @@ def fetch_terrain(P, lat_min, lat_max, lon_min, lon_max):
     with open(meta_path) as f:
         ext = json.load(f)["extent"]
     h, w = len(grid), len(grid[0])
-    dlon = (ext["xmax"] - ext["xmin"]) / w
-    dlat = (ext["ymax"] - ext["ymin"]) / h
+    de = (ext["xmax"] - ext["xmin"]) / w
+    dn = (ext["ymax"] - ext["ymin"]) / h
     # fill nodata cells from their neighbours
     valid = [[v > -1000 for v in row] for row in grid]
     for _ in range(100):
@@ -401,9 +406,9 @@ def fetch_terrain(P, lat_min, lat_max, lon_min, lon_max):
     flat = [v for row in grid for v in row]
     base = math.floor(min(flat))
     packed = struct.pack("<" + "h" * len(flat), *[max(-32768, min(32767, round((v - base) * 10))) for v in flat])
-    x0, y0 = P(ext["ymax"] - dlat / 2, ext["xmin"] + dlon / 2)  # centre of the north-west cell
+    x0, y0 = (float(v) for v in P.from_jtsk(ext["xmin"] + de / 2, ext["ymax"] - dn / 2))  # NW cell centre
     print(f"terrain: {w}x{h} cells, {min(flat):.1f}-{max(flat):.1f} m")
-    return {"x0": round(x0, 2), "y0": round(y0, 2), "dx": round(dlon * P.kx, 4), "dy": round(-dlat * P.ky, 4),
+    return {"x0": round(x0, 2), "y0": round(y0, 2), "dx": round(de, 4), "dy": round(-dn, 4),
             "nx": w, "ny": h, "base": base, "scale": 0.1, "data": base64.b64encode(packed).decode()}
 
 
@@ -568,6 +573,7 @@ def match_shape(shape, net, P):
     start = min(near(pts[0], 40) or near(pts[0], 120), key=start_cost)
     path, state = [start], (None, start)
     s_cur, STEP = 0.0, 250.0
+    reach = 200  # how far past the window a node may lie (a node ends a track edge: edges can be long)
     while s_cur < sh.length - 1:
         s_next = min(sh.length, s_cur + STEP)
         lo, hi = s_cur - 60, s_next + 60
@@ -576,7 +582,7 @@ def match_shape(shape, net, P):
         def is_goal(n):
             # the node lies on the shape at or beyond the end of this window (nodes can be far apart)
             if n not in reached:
-                s_, d, _ = sh.project(pos[n], lo, hi + 200, radius=2)
+                s_, d, _ = sh.project(pos[n], lo, hi + reach, radius=2)
                 reached[n] = s_ is not None and d < 25 and s_ >= s_next - (0.5 if s_next >= sh.length else 0)
             return reached[n]
         best = {state: 0.0}
@@ -594,7 +600,7 @@ def match_shape(shape, net, P):
             for b in adj[a]:
                 if b == p or not turn_ok(p, a, b):
                     continue
-                ec = edge_cost(a, b, lo, hi + 200)
+                ec = edge_cost(a, b, lo, hi + reach)
                 if ec is None:
                     continue
                 ns, nc = (a, b), c + ec
@@ -604,6 +610,11 @@ def match_shape(shape, net, P):
                     cnt += 1
                     heapq.heappush(heap, (nc, cnt, ns))
         if found is None:
+            # a straight track edge longer than the reach ends past it (line 9 at Motol: 265 m, which
+            # fitted only in the old 0.6 % short frame): the same window again, reaching further
+            if reach < 800:
+                reach *= 2
+                continue
             print(f"  ! shape matching stuck at {s_cur:.0f} m of {sh.length:.0f} m")
             break
         seq, x = [], found
@@ -613,7 +624,8 @@ def match_shape(shape, net, P):
         path.extend(reversed(seq))
         state = found
         # continue from where the reached node actually lies (it may be well past the target)
-        s_found = sh.project(pos[found[1]], lo, hi + 200, radius=2)[0]
+        s_found = sh.project(pos[found[1]], lo, hi + reach, radius=2)[0]
+        reach = 200
         s_cur = max(s_next, s_found or s_next)
     print(f"  matched shape: {sh.length / 1000:.2f} km -> {len(path)} track nodes")
     return path
@@ -645,9 +657,7 @@ def run_path():
     run = plan_run(LINE, THEN) if THEN else plan_line(LINE)
     shapes = gtfs_shapes(set(run["shapes"]) | set(run["back"]))
     main_shape = shapes[run["shapes"][0]] + [q for sid in run["shapes"][1:] for q in shapes[sid][1:]]
-    lat0 = sum(p[0] for p in main_shape) / len(main_shape)
-    lon0 = sum(p[1] for p in main_shape) / len(main_shape)
-    P0 = Proj(lat0, lon0)
+    P0 = Proj()
     net = load_network(P0)
     ids = match_shape(main_shape, net, P0)
     back_ids = []
@@ -700,9 +710,7 @@ def main():
         path_ids = chain_route(rel, ways)
     # drop consecutive duplicates
     path_ids = [n for i, n in enumerate(path_ids) if i == 0 or n != path_ids[i - 1]]
-    lat0 = sum(nodes[n][0] for n in path_ids) / len(path_ids)
-    lon0 = sum(nodes[n][1] for n in path_ids) / len(path_ids)
-    P = Proj(lat0, lon0)
+    P = Proj()
     pts = [P(*nodes[n]) for n in path_ids]
     for i in range(1, len(pts)):
         if dist(pts[i - 1], pts[i]) > 400:
@@ -953,6 +961,10 @@ def main():
         s, d, side = path.project(p, s_min=s_last - 5, radius=2)
         if s is None or d > 60:
             s, d, side = path.project(p, s_min=s_last - 5, radius=40)
+        if s is None:
+            s0, d0, _ = path.project(p, radius=40)
+            raise SystemExit(f"stop {k} {r['stop_name']} not on the route after s {s_last:.0f} "
+                             f"(nearest anywhere: s {s0}, {d0} m off)")
         mine = THEN if THEN and k > run["change"] else LINE
         lines = sorted(stop_lines[sid] | {mine} | ({THEN} if run and k == run["change"] else set()), key=lambda x: (len(x), x))
         stops.append({"name": r["stop_name"], "s": round(s, 1), "off": round(d, 1),
@@ -1130,15 +1142,14 @@ def main():
                     water.append(ring([{"lat": a, "lon": b} for a, b in cur]))
     print(f"green: {len(green)}, water: {len(water)}")
 
-    lats = [nodes[n][0] for n in path_ids]
-    lons = [nodes[n][1] for n in path_ids]
-    mlat, mlon = DEM_MARGIN / P.ky, DEM_MARGIN / P.kx
-    terrain = fetch_terrain(P, min(lats) - mlat, max(lats) + mlat, min(lons) - mlon, max(lons) + mlon)
+    terrain = fetch_terrain(P, min(x for x, _ in pts) - DEM_MARGIN, max(x for x, _ in pts) + DEM_MARGIN,
+                            min(y for _, y in pts) - DEM_MARGIN, max(y for _, y in pts) + DEM_MARGIN)
 
     out = {
         "line": LINE,
         "name": rel["tags"].get("name"),
-        "origin": [lat0, lon0],
+        "origin": [round(float(v), 7) for v in P.origin_ll()],  # the city origin (the Marian column)
+        "frame": {"crs": "EPSG:5514", "origin": [P.E0, P.N0]},  # game metres = S-JTSK minus this
         "attribution": "Map data © OpenStreetMap contributors (ODbL). Timetable: PID GTFS, data.pid.cz (CC BY 4.0). "
                        "Terrain: ČÚZK DMR 5G (CC BY 4.0).",
         "path": [[round(x, 2), round(y, 2)] for x, y in pts],

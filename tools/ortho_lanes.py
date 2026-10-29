@@ -22,7 +22,6 @@ import urllib.request
 import numpy as np
 import shapely
 from PIL import Image, ImageDraw
-from pyproj import Transformer
 from shapely.geometry import Polygon
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -35,15 +34,13 @@ TILE = 100.0  # m
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 dtm = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.dtm.json"), encoding="utf-8"))
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
-to_jtsk = Transformer.from_crs(4326, 5514, always_xy=True)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 
 def jtsk(x, y):
-    return to_jtsk.transform(LON0 + np.asarray(x) / KX, LAT0 + np.asarray(y) / KY)
+    return F.to_jtsk(np.asarray(x), np.asarray(y))
 
 
 path = shapely.LineString([p[:2] for p in line["path"]])

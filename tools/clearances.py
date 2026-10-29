@@ -27,10 +27,9 @@ line = json.load(open(dst, encoding="utf-8"))
 src = os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "roads.json")
-LAT0, LON0 = line["origin"]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
-KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
+F = Frame()  # the city frame: the one conversion (tools/geo.py)
 CAR = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street",
        "service", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"}
 WALK = {"footway", "cycleway", "path", "pedestrian", "steps", "track", "bridleway"}
@@ -61,7 +60,7 @@ for e in json.load(open(src, encoding="utf-8"))["elements"]:
     kind = "car" if hw in CAR else "walk" if hw in WALK else None
     if not kind:
         continue
-    g = LineString([((p["lon"] - LON0) * KX, (p["lat"] - LAT0) * KY) for p in e["geometry"]])
+    g = LineString(list(zip(*F.xy([p["lat"] for p in e["geometry"]], [p["lon"] for p in e["geometry"]]))))
     raw_mh = t.get("maxheight:physical") or t.get("maxheight")
     for rt in (path, back):
         if rt is None or not g.intersects(rt):

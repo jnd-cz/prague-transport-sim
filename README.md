@@ -28,6 +28,15 @@ python -I tools/snapshot.py fetch          # raw/ to build the world (~2 GB, the
 
 Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
 (`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
+All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
+
+The whole chain for a line, in order (logs in `reports/rebuild/`):
+
+```bash
+python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
+```
+
+The single steps:
 
 ```bash
 python -P -E tools/build_line.py --line 37         # no OSM route relation: from its GTFS shapes
