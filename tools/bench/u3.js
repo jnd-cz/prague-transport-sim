@@ -29,7 +29,7 @@ export async function run(seed = 1, opts = {}) {
   game.penalty = (kind, pts, msg) => {
     if (kind === 'signal') {
       const sig = game.signals.filter((x) => Math.abs(x.s - game.tram.s) < 5)[0];
-      (R.sig ||= []).push({ s: Math.round(game.tram.s), v: +game.tram.v.toFixed(1), sigS: sig && Math.round(sig.s), t: sig && +sig.t.toFixed(1), ext: sig && +sig.ext.toFixed(1), cycle: sig && sig.cycle, goDir: sig?.goDir,
+      (R.sig ||= []).push({ s: Math.round(game.tram.s), v: +game.tram.v.toFixed(1), sigS: sig && Math.round(sig.s), t: sig?.t !== undefined ? +sig.t.toFixed(1) : null, ext: sig?.ext !== undefined ? +sig.ext.toFixed(1) : null, cycle: sig && sig.cycle, goDir: sig?.goDir,
         sinceStop: sig && +(game.clock - sig.stopSince).toFixed(1), trail: (R.trail || []).slice(-12).join(' | ') });
     }
     pen(kind, pts, msg);
@@ -87,7 +87,7 @@ export async function run(seed = 1, opts = {}) {
         // (a trail of our tram near signals: s, v, the next signal's state, t, ext; every 0.5 s)
         if (R.steps % 15 === 0) {
           const nx = game.signals.find((x) => x.s > tr.s - 1);
-          if (nx && nx.s - tr.s < 120) { (R.trail ||= []).push(`${Math.round(game.clock)} s${Math.round(tr.s)} v${tr.v.toFixed(1)} ${Math.round(nx.s)}:${nx.state} t${nx.t.toFixed(1)} x${nx.ext.toFixed(1)}${nx.backCommitted ? ' B' : ''}${nx.aheadCommitted ? ' A' : ''}`); if (R.trail.length > 40) R.trail.shift(); }
+          if (nx && nx.s - tr.s < 120) { (R.trail ||= []).push(`${Math.round(game.clock)} s${Math.round(tr.s)} v${tr.v.toFixed(1)} ${Math.round(nx.s)}:${nx.state} t${nx.t?.toFixed(1) ?? (nx.gauntlet ? "gauntlet" : "-")} x${nx.ext?.toFixed(1) ?? "-"}${nx.backCommitted ? ' B' : ''}${nx.aheadCommitted ? ' A' : ''}`); if (R.trail.length > 40) R.trail.shift(); }
         }
         for (const c of traffic.cars) if (c.active && c.yielding && c.xing && Math.abs(c.xing.sx - tr.s) < 150) {
           yielded.add(c.id);
