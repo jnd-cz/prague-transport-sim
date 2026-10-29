@@ -15,6 +15,9 @@ target design) and [docs/decisions/](docs/decisions/).
 3. `gh issue view N --comments`; branch `N-short-name` from `main`.
 4. The issue says what is now, where, and when it is done; the known failures below are not yours.
 
+In Claude Code, `/issue N` runs these steps and `/regress` the regression check before a PR
+(`.claude/skills/`).
+
 ## Work
 
 - **Tasks live in GitHub issues** (`jnd-cz/prague-transport-sim`), grouped by milestone. Docs link to
