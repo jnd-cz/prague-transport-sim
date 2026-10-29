@@ -10,9 +10,10 @@ the command line by **Python + Playwright** (Chromium), collecting JSON and comp
 No Node toolchain for now; Node or Deno only once the simulation core is split from Three.js (M5), where
 type checking would come with it.
 
-## Licences (direction; the exact pick is in the going-public issue)
+## Licences
 
-- **Code:** fully open source (GPL-3.0 proposed, MIT the alternative).
+- **Code:** **GPL-3.0** (the user's choice, 2026-10-29; `LICENSE`): fully open source, and versions others
+  distribute stay open. MIT code (e.g. ported from OSM2World) can be included with its notice kept.
 - **Own assets** (models, textures, the user's photos and recordings): their own licence, separate from
   the code (e.g. CC BY-NC-SA 4.0).
 - **Third-party assets:** only with a licence that allows redistribution, each listed in an asset
