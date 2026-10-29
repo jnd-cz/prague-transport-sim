@@ -276,5 +276,60 @@
  },
  "notes": [
   "Vodičkova (towards Lazarská) was a vienna stop 1996-2014, now a stop kerb: not vienna."
+ ],
+ "trackStyleKinds": {
+  "embedded": "rails laid in the street surface (asphalt, setts), cars drive on the track",
+  "panels": "large concrete panels on a track body of its own, flush with the rail heads",
+  "grass": "grassed track: the vegetation below the rail heads (by design 3-5 cm, or down near the rail foot)",
+  "ballast": "open track: rails on sleepers in ballast, the ballast below the sleeper tops"
+ },
+ "trackStyles": [
+  {
+   "line": "22",
+   "from": "Malý Břevnov",
+   "to": "Obora Hvězda",
+   "style": "ballast",
+   "extent": "mostly",
+   "source": "user 2026-10-29"
+  },
+  {
+   "line": "22",
+   "from": "Pohořelec",
+   "to": "Brusnice",
+   "style": "grass",
+   "extent": "mostly",
+   "source": "user 2026-10-29"
+  },
+  {
+   "line": "22",
+   "from": "Brusnice",
+   "to": "Pražský hrad",
+   "style": "grass",
+   "extent": "mostly",
+   "source": "user 2026-10-29"
+  },
+  {
+   "line": "22",
+   "from": "Újezd",
+   "to": "Národní třída",
+   "via": [
+    "Národní divadlo"
+   ],
+   "style": "embedded",
+   "extent": "all",
+   "source": "user 2026-10-29"
+  },
+  {
+   "line": "22",
+   "from": "Karlovo náměstí",
+   "to": "I. P. Pavlova",
+   "via": [
+    "Štěpánská"
+   ],
+   "style": "panels",
+   "extent": "all",
+   "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
+   "source": "user 2026-10-29"
+  }
  ]
 }

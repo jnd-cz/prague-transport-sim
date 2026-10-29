@@ -46,14 +46,28 @@
 
    | Style | Where (data) | TOR over the surrounding surface | Drawn |
    |---|---|---|---|
-   | **embedded** in a street (asphalt, setts, panels) | survey class road / paved / parking at the axis; OSM road `embedded_rails=tram` | **0** | street surface up to the rails, flush; a strip between the rails in the street's material; no separate bed |
-   | **panels** on a separate body (large concrete panels) | survey tram-track area (default for it) | **0** | panel surface flush with the rail heads |
-   | **grass** track | marked per section (orthophoto, the user, OSM `surface=grass`) | **≈ 0.05 ?** | grass a few cm below the rail heads |
-   | **ballast** (open track) | marked per section | **≈ 0.15 ?** | ballast shoulder below the rails, sleepers visible |
+   | **embedded** in a street (asphalt, setts) | survey class road / paved / parking at the axis; OSM road `embedded_rails=tram` | **0** | street surface up to the rails, flush; a strip between the rails in the street's material; no separate bed |
+   | **panels** (large concrete panels), also in a street apart from the car lanes | survey tram-track area (default for it), or road class as at Karlovo náměstí – I. P. Pavlova | **0** (measured there: the lanes 4.5 m off are level with the axis, +0.008 m) | panel surface flush with the rail heads |
+   | **grass** track | marked per section (`truth.json` `trackStyles`, later the orthophoto) | **0.04** (vegetation 3–5 cm under the rail head, the high variant); the low variant (vegetation near the rail foot) **≈ 0.16** | grass below the rail heads |
+   | **ballast** (open track) | marked per section | **≈ 0.17** (ballast at the sleeper tops; the rail and its plate above them) | ballast below the rails, sleepers visible |
 
    Embedded and panel track need nothing new: the survey already gives TOR. Grass and ballast need the
    style per section; until a section is marked, it is drawn as panels. Track bed styles as content
    are #52; this record only fixes where TOR is.
+
+   **Where the offsets come from.** No open dataset measures them yet. The street survey records the
+   grass or ballast surface, not the rails. The current DTM track axes mostly carry no height (Praha 8:
+   278 of 339 all-zero Z), and the archived map server has no track-axis layer. So they are design
+   values: grass from ČVUT's green-track study (two variants:
+   [Zelená trať](https://projects.fd.cvut.cz/k612x1rk/soubory/Zelena_trat.pdf)); ballast from standard
+   track build-up (no Prague source found). They are kept as named constants, so a measurement replaces
+   them: the DTM track axes where they have heights (#61), or the user's photos of the example stretches.
+
+   **Example stretches** (the user, line 22, in `data/truth.json` `trackStyles` by stops, so they survive
+   frame changes): ballast Malý Břevnov – Obora Hvězda; grass Pohořelec – Brusnice – Pražský hrad;
+   embedded Újezd – Národní divadlo – Národní třída; panels Karlovo náměstí – Štěpánská – I. P. Pavlova.
+   Marking whole lines or the network needs the orthophoto and an editor (#28), and styles change as
+   streets are rebuilt, so every mark carries its source and date.
 5. **Streets meet the track flush at TOR.** The +0.14 m street lift and the +0.20 / +0.26 m track lifts go.
    What z-fighting needs stays tiny (≤ 0.01 m, as `DTM_LIFT` does for streets).
 6. **Fallbacks keep the meaning.** Without a survey, TOR = terrain + the style's offset (embedded by default
@@ -70,7 +84,7 @@
 - Check: lints (railSupport, deckClip, terrainOverSurvey), the walkers and cars at crossings, screenshots of
   an embedded street (Karlovo náměstí), a separate body (Modřany), a bridge (Štefánikův most).
 
-## Questions for the user
+## Open
 
-- The TOR offsets for **grass** and **ballast** track in Prague: 5 and 15 cm?
-- Which sections of the five lines are grass or ballast (or is the orthophoto enough to find them)?
+- Which grass variant the Hradčany stretch is (high, 4 cm, or low, ≈ 16 cm): a photo settles it.
+- The ballast offset, from a track-axis height or a photo with a known reference.
