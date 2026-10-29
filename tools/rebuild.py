@@ -76,6 +76,12 @@ def rebuild(line):
 
 
 def main():
+    # (any other flag, --help too, used to fall through to a rebuild of every line)
+    flags = [a for a in sys.argv[1:] if a.startswith("-") and a != "--parallel"]
+    if flags:
+        sys.stdout.reconfigure(encoding="utf-8")  # (the docstring's arrows on a cp1252 console)
+        print(__doc__)
+        sys.exit(0 if flags in (["-h"], ["--help"]) else 2)
     lines = [a for a in sys.argv[1:] if not a.startswith("--")] or ["9", "17", "22", "23", "37"]
     if "--parallel" in sys.argv:
         # (lines side by side, as many as free memory holds: a line's build with its parallel steps
