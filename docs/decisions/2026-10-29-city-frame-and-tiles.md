@@ -1,7 +1,7 @@
 # One city frame (S-JTSK) and the tile grid
 
 **Date:** 2026-10-29
-**Status:** proposed (issue #7); to be agreed before the M2 rebuild.
+**Status:** agreed 2026-10-29 (issue #7), with the Marian column as the origin (user).
 
 ## Measured
 
@@ -32,15 +32,20 @@
    the snapshot. Other operations are not allowed, so every computer builds the same world. OSM's WGS 84 is
    taken as ETRS89: the 2026 difference of ~0.9 m is within OSM's own accuracy, and the operation the
    tools use today treats it the same way (within 9 cm).
-3. **Game coordinates: S-JTSK minus one fixed city origin `(−743 000, −1 043 000)`**, a round kilometre
-   188 m from Staroměstské náměstí, also a tile corner. Every line and tile shares it. The
-   whole city lies within 25 km of it.
+3. **Game coordinates: S-JTSK minus one fixed city origin, the Marian column on Staroměstské náměstí:
+   `(−742 806, −1 043 024)`** (the centre of its footprint, OSM way 815041625, through the ČÚZK grid,
+   rounded to whole metres). The Prague meridian line (Pražský poledník), by which Prague time was once
+   kept from the original column's noon shadow, runs 10 m beside it. Every line and tile shares the
+   origin; the whole city lies within 25 km of it. The origin is a defined constant: how accurately the
+   column itself is mapped does not matter, it only has to be one number for everyone. Tiles stay on the
+   absolute S-JTSK 500 m grid, so the origin is not a tile corner (the corner of its own tile is at (−194, +24) m).
 4. **No scale correction.** The −9.6 cm/km is 0.01 %: 2 m on line 17, below every other error, and the
    game stays registered exactly to the survey numbers. Revisit only if timing ever needs it.
 5. **Grid north ≠ true north (7.8°):** one constant (`TRUE_NORTH = 7.8°`, from PROJ at the origin) for
    what needs real directions: sun and shadows, a compass, wind.
 6. **Tiles: 500 m squares on the S-JTSK grid**, edges at whole multiples of 500 m in absolute S-JTSK,
-   named by absolute index (e.g. `e-1486_n-2086` for the tile whose SW corner is (−743 000, −1 043 000)).
+   named by absolute index (e.g. `e-1486_n-2086` for the tile whose SW corner is (−743 000, −1 043 000),
+   the one with the origin in it).
    Names do not depend on the origin.
    - The source rasters (DMR 5G 2 m, IPR 1 m, 10 m) divide 500 m exactly, so tiles cut between cells
      and never resample.
