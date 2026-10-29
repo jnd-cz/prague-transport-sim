@@ -7,7 +7,7 @@
 //   await lint({ traffic: true }); // + the whole line driven headless, traffic watched (a minute or two)
 // The report is saved to reports/lineN.json by tools/serve.py; compare with the committed baseline:
 //   python tools/lint_report.py            (--accept makes the current reports the baseline)
-import { makeT3, placeConsist } from '../src/models.js';
+import { makeT3, placeConsist, CONTACT_WIRE } from '../src/models.js';
 import { roofIndex } from '../src/world.js';
 import { tramClearance } from '../src/tram.js';
 import * as THREE from 'three';
@@ -108,7 +108,7 @@ function mountedInEnvelope(g) {
     box.getCenter(c);
     const n = g.route.nearest(c.x, -c.z);
     if (!n || n.d > 8) continue;
-    const z0 = g.route.ground.profile.height(n.s) + 0.26; // rail top
+    const z0 = g.route.ground.profile.height(n.s); // rail top (the profile, src/heights.js)
     let worst = 0;
     // the box corners in plan, as lateral offsets from the track centre
     for (const [x, y] of [[box.min.x, box.min.z], [box.max.x, box.min.z], [box.min.x, box.max.z], [box.max.x, box.max.z], [c.x, c.z]]) {
@@ -235,7 +235,7 @@ function railSupport(g, world) {
   let n = 0;
   const bad = new Map();
   for (let s = 0; s < r.length; s += 2) {
-    const p = r.at(s), zb = pr.height(s) + 0.2; // bed top
+    const p = r.at(s), zb = pr.height(s) - pr.lift(s); // bed top (src/heights.js)
     o.set(p.x, zb + 2.5, -p.y);
     ray.set(o, down);
     const hit = ray.intersectObjects(targets, false)[0];
@@ -277,7 +277,7 @@ function catenarySpans(g) {
   for (const c of g.route.catenary || []) {
     if (!c.attach?.length) continue;
     n++;
-    const wire = c.z + 5.6, low = Math.min(...c.attach), tilt = Math.max(...c.attach) - low;
+    const wire = c.z + CONTACT_WIRE, low = Math.min(...c.attach), tilt = Math.max(...c.attach) - low;
     if (low < wire + 0.6) bad.push({ s: Math.round(c.s), mag: wire + 0.6 - low, info: `span ${(low - wire).toFixed(2)} m over the contact wire${low < wire ? ' (holds it from below)' : ''}` });
     else if (tilt > 0.5) bad.push({ s: Math.round(c.s), mag: tilt, info: `span ends ${tilt.toFixed(2)} m apart in height` });
   }
