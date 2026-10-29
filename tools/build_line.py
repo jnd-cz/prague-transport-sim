@@ -579,7 +579,13 @@ def match_shape(shape, net, P):
             return True
         return angle_between((pos[a][0] - pos[p][0], pos[a][1] - pos[p][1]), (pos[b][0] - pos[a][0], pos[b][1] - pos[a][1])) <= 75
 
-    start = min(near(pts[0], 40) or near(pts[0], 120), key=lambda n: dist(pos[n], pts[0]))
+    # the first node: nearest the shape's start, on its right-hand side (a shape drawn between the two
+    # tracks started on the left one at Spojovací, line 37, and stayed there to the next crossover
+    # 1.7 km on: there is no way across before it)
+    def start_cost(n):
+        s_, d, side = sh.project(pos[n], 0, 60, radius=2)
+        return dist(pos[n], pts[0]) + (20 if s_ is not None and side > 0 and d > 0.7 else 0)
+    start = min(near(pts[0], 40) or near(pts[0], 120), key=start_cost)
     path, state = [start], (None, start)
     s_cur, STEP = 0.0, 250.0
     while s_cur < sh.length - 1:

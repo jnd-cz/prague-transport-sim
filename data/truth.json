@@ -204,6 +204,11 @@
    "id": "newer-data-wins",
    "text": "Where sources disagree (recent reconstruction), the newer one wins: the street survey of Sept 2026 over OSM",
    "source": "user 2026-10-23"
+  },
+  {
+   "id": "right-hand-track",
+   "text": "regular service always runs on the right-hand track; a double-track line has two tracks the whole way (line 37 Spojovací - Kněžská luka included)",
+   "source": "user 2026-10-29"
   }
  ],
  "places": [
