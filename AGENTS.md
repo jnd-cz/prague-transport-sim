@@ -75,6 +75,7 @@ target design) and [docs/decisions/](docs/decisions/).
 | check | line | symptom | issue |
 |---|---|---|---|
 | u3 | 9 | "stuck at 14355" (the 9 → 10 layover counts as a deadlock), every seed | #80 |
+| redruns | 17 | seed 1: "1 ahead red runs" (an AI tram at the s 10826 signal brakes too gently on warn) | #92 |
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
 
 ## Code style
