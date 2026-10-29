@@ -7,12 +7,27 @@ step; Python tools build the world from pinned source snapshots. Read before wor
 quirks, conventions, why the main heuristics exist), [docs/architecture.md](docs/architecture.md) (the
 target design) and [docs/decisions/](docs/decisions/).
 
+## Starting a session (one issue per session)
+
+1. `git checkout main && git pull`, then `python -I tools/snapshot.py status`; if `data/` differs from
+   the manifest, `python -I tools/snapshot.py data-fetch` (builds also need `fetch` for `raw/`).
+2. `python --version` is 3.12 or newer (an older one first on PATH breaks `-P`).
+3. `gh issue view N --comments`; branch `N-short-name` from `main`.
+4. The issue says what is now, where, and when it is done; the known failures below are not yours.
+
 ## Work
 
 - **Tasks live in GitHub issues** (`jnd-cz/prague-transport-sim`), grouped by milestone. Docs link to
   issues instead of listing tasks. New findings that are not fixed now become an issue.
 - One branch per issue (`<number>-<short-name>`), PR into `main`, the PR says which checks were run and
   their numbers. Small doc or data-fact changes may go straight to `main`.
+- PR description: `Closes #N.`, what changes and why, a check table (line × check, before → after),
+  and for rebuilt data what changed per line. Merged as a squash, subject `<PR title> (#PR)` (the title
+  ends with `(#issue)`), branch deleted.
+- Rebuilt data: `python -I tools/snapshot.py data-publish --note "…"` from the branch, commit
+  `data/MANIFEST.json` on it, then merge. `main`'s manifest always names data that is in the store.
+- New issues: what is now (with numbers), where in the code, what done means, which checks prove it.
+  A fresh session should need nothing but the issue.
 - Commits: what changed and why, with numbers where something was measured. Author email in this repo:
   `2506000+jnd-cz@users.noreply.github.com` (`git config user.email …` per clone).
 - **Fix rules, not spots.** Measure an issue on every line (lints, benches, `data/truth.json`), change
@@ -37,8 +52,8 @@ target design) and [docs/decisions/](docs/decisions/).
 - Dev server: `python tools/serve.py 8742` (no-cache headers; `POST /report/<name>.json` saves to
   `reports/`). Port 8740 may belong to another session: never use or stop it.
 - Python: `python -I` for stdlib-only tools; `python -P -E` for tools needing the user site packages
-  (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it; shell
-  heredocs with quotes break on this machine.
+  (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it: shell
+  heredocs with quotes can break in the Windows shells.
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
   --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
   once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
@@ -49,6 +64,15 @@ target design) and [docs/decisions/](docs/decisions/).
   (u3, redruns, walkers; `batch.html`). Run long browser jobs unawaited and poll (script calls time out
   at 45 s); a background window throttles frames, so no fps readings then.
 - Dev switches: `?line=N`, `?inspect`, `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`.
+- A regression check compares the same checks on the new data and on the published data (same seeds);
+  a count that moves needs a reason in the PR.
+
+## Known failures (not caused by your change; remove a row when its issue closes)
+
+| check | line | symptom | issue |
+|---|---|---|---|
+| u3 | 9 | "stuck at 14355" (the 9 → 10 layover counts as a deadlock), every seed | #80 |
+| page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
 
 ## Code style
 

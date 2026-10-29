@@ -94,7 +94,7 @@ Review these when realism matters; most move into the build in M2.
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - Line 17's full lint after the merge is the pre-rebuild reference (`reports/line17.json`).
 
-## Environment (Windows dev machine)
+## Environment (Windows dev machines)
 
 - Python `-I` ignores `PYTHONIOENCODING`: scripts call `sys.stdout.reconfigure(encoding="utf-8")`.
 - Shell heredocs with quotes or backticks break: write scripts to a file.
