@@ -66,7 +66,7 @@ if (!params.has('nofine')) try {
 } catch { /* not made for this line */ }
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm, data.clearances || []);
+const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || []);
 const ground = makeGround(route, terrain, profile, dtm);
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
 ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls

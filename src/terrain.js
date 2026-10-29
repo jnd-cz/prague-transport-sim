@@ -106,7 +106,7 @@ export class Terrain extends Grid {
 // alignment, with bridge decks bridged linearly between their abutments.
 // Surfaces of the IPR "Mosty 3D" bridges right above/below the track centre, every 2 m along
 // the route: Map 2 m bin -> list of z where a bridge triangle is crossed by the vertical line.
-export function bridgeDecks(geo, route, terrain) {
+export function bridgeDecks(geo, route, terrain, bridges = []) {
   const out = new Map();
   if (!geo?.buildings?.arr) return out;
   const { arr, q, chunks } = geo.buildings;
@@ -131,19 +131,28 @@ export function bridgeDecks(geo, route, terrain) {
   }
   if (!grid.size) return out;
   const p = {};
-  for (let s = 0; s <= route.length; s += 2) {
-    route.at(s, p);
-    const tris = grid.get(`${Math.floor(p.x / cell)},${Math.floor(p.y / cell)}`);
-    if (!tris) continue;
+  const hitsAt = (x, y) => {
+    const tris = grid.get(`${Math.floor(x / cell)},${Math.floor(y / cell)}`);
     const hits = [];
-    for (const [a, b, c] of tris) {
+    for (const [a, b, c] of tris || []) {
       const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
       if (Math.abs(d) < 1e-9) continue;
-      const w1 = ((b[1] - c[1]) * (p.x - c[0]) + (c[0] - b[0]) * (p.y - c[1])) / d;
-      const w2 = ((c[1] - a[1]) * (p.x - c[0]) + (a[0] - c[0]) * (p.y - c[1])) / d;
+      const w1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+      const w2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
       const w3 = 1 - w1 - w2;
       if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
       hits.push(w1 * a[2] + w2 * b[2] + w3 * c[2]);
+    }
+    return hits;
+  };
+  for (let s = 0; s <= route.length; s += 2) {
+    route.at(s, p);
+    let hits = hitsAt(p.x, p.y);
+    // nothing right under our track on one of our bridges: the other track's half of the same
+    // structure (the Krejcárek viaduct's model has its deck under one track only; ours ran 2.8 m under
+    // it as a plain span). (Not off our bridges: a structure beside the track is not over it.)
+    if (!hits.length && bridges.some(([a, b]) => s > a && s < b)) {
+      for (const side of [1, -1]) if (!hits.length) hits = hitsAt(p.x - p.hy * 3.3 * side, p.y + p.hx * 3.3 * side);
     }
     if (hits.length) out.set(Math.round(s / 2), hits);
   }
@@ -358,7 +367,8 @@ export class Profile {
     if (decks.size) {
       const tagged = (i) => bridges.some(([a, b]) => i * step > a && i * step < b);
       const covered = (i) => tunnels.some(([a, b]) => i * step > a - 20 && i * step < b + 20);
-      // (on a tagged span: the model's deck top, its highest surface from 3 m under the estimate to 4 m
+      // (on a tagged span: the model's deck top, its highest surface from 6 m under the estimate (the
+      // span between the abutments with its hog sat 3-4 m over it down the Krejcárek viaduct) to 4 m
       // over it; the track lies on it as on a surveyed bed: user decision 2026-10-23, the model wins
       // and the approaches follow; the old 6 % limit from the streets beside the bridge kept the track
       // under the slab of the overpass near Nádraží Modřany, 1.4 m)
@@ -368,7 +378,7 @@ export class Profile {
         if (k >= n) continue;
         if (bedAt[k]) continue; // the surveyed tram bed is the deck here
         if (tagged(k)) {
-          const top = Math.max(...hits.filter((h) => h > z[k] - 3 && h < z[k] + 4));
+          const top = Math.max(...hits.filter((h) => h > z[k] - 6 && h < z[k] + 4));
           if (Number.isFinite(top)) modelAt[k] = top;
         } else {
           // (the model of one of our own spans reaching past its OSM ends is not overhead: at Černý
@@ -492,6 +502,11 @@ export class Profile {
     if (bedEnds.size || this.clearances.length) {
       for (let k = 0; k < 2; k++) { for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i]); z = smooth(z, 3); }
       for (let i = 0; i < n; i++) z[i] = Math.max(z[i], floor[i] - 0.05);
+      // and a ceiling on the deck itself (the smoothing toward higher ground beyond lifted the track
+      // 1-2 m off the lower end of the Krejcárek viaduct: a deck holds the track from above too)
+      // (model decks only: on a surveyed bed the ceiling pinned the track to every dip of the survey,
+      // 13 vertical curves under 500 m on line 17)
+      for (let i = 0; i < n; i++) if (fixAt[i] && !bedAt[i]) z[i] = Math.min(z[i], rawBed[i] + 0.1);
       clear();
     }
     // Vertical curves: wherever a crest or sag is sharper than R_V (grade change over 20 m, as the
