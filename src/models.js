@@ -36,18 +36,59 @@ function band(y0, y1, inset, mat) {
   return new THREE.Mesh(geo, mat);
 }
 
-function routeBoxTexture(line) {
-  // DPP route number: white digits on a blue field with a thin white edge
-  return canvasTexture(192, 96, (g, w, h) => {
-    g.fillStyle = '#f2f2f2';
+// The T3's number plates and cards (user photos, 2026-10-23): the route number on the roof box at
+// the front and on the mirror arm (white digits on DPP blue, no border; the mirror one smaller and
+// taller than wide), on the rear at the bottom of the rear window inverted (blue digits on white),
+// and behind the windscreen the destination card (blue capitals on white with a blue frame, two
+// lines, centred) and the run number card (white on black, on the side pane left of the frame support
+// as seen from the front).
+const DPP_BLUE = '#1f57a8';
+// (fill: the font size as a share of the plate height; digits are ~0.72 of it)
+function numberTexture(line, w, h, fg, bg, fill = 0.85) {
+  return canvasTexture(w, h, (g) => {
+    g.fillStyle = bg;
     g.fillRect(0, 0, w, h);
-    g.fillStyle = '#1f4f9e';
-    g.fillRect(6, 6, w - 12, h - 12);
-    g.fillStyle = '#ffffff';
-    g.font = 'bold 72px "Arial Narrow", Arial, sans-serif';
+    g.fillStyle = fg;
+    const text = String(line);
+    let size = h * fill;
+    g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`;
+    while (g.measureText(text).width > w * 0.86 && size > 10) { size -= 2; g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`; }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(String(line), w / 2, h / 2 + 4);
+    g.fillText(text, w / 2, h / 2 + h * 0.04);
+  });
+}
+const routeBoxTexture = (line) => numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9);
+const mirrorPlateTexture = (line) => numberTexture(line, 104, 128, '#ffffff', DPP_BLUE, 0.85);
+const rearPlateTexture = (line) => numberTexture(line, 144, 128, '#1d3f86', '#f4f4f0', 1.0);
+const runCardTexture = (run) => numberTexture(run, 112, 72, '#f4f4f0', '#151515', 0.8);
+// the destination in capitals on two lines when it is more than one word (split nearest the middle)
+function destinationTexture(name) {
+  return canvasTexture(320, 128, (g, w, h) => {
+    g.fillStyle = '#f4f4f0';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = DPP_BLUE;
+    g.lineWidth = 6;
+    g.strokeRect(5, 5, w - 10, h - 10);
+    if (!name) return;
+    const words = name.toUpperCase().split(/\s+/);
+    let lines = [words.join(' ')];
+    if (words.length > 1) {
+      let best = null;
+      for (let k = 1; k < words.length; k++) {
+        const a = words.slice(0, k).join(' '), b = words.slice(k).join(' ');
+        if (!best || Math.abs(a.length - b.length) < Math.abs(best[0].length - best[1].length)) best = [a, b];
+      }
+      lines = best;
+    }
+    g.fillStyle = DPP_BLUE;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    let size = lines.length > 1 ? 46 : 56;
+    const fit = () => lines.every((l) => g.measureText(l).width < w - 28);
+    g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`;
+    while (!fit() && size > 14) { size -= 2; g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`; }
+    lines.forEach((l, i) => g.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * size * 1.05 + 2));
   });
 }
 
@@ -205,10 +246,11 @@ function makeT3Car(line, mats) {
 // A T3 set of one or two cars (Prague ran most T3s as two-car multiple units). The cars are
 // separate children so each can follow the track on its own bogies: see placeConsist().
 // Each set owns its materials (traffic fades them individually).
-export function makeT3({ line = '22', cars = 1, detailed = true } = {}) {
+// dest: the destination card's text (none: no card); run: the run number card
+export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '' } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
-  if (detailed && detailedProto) return makeDetailedSet(root, line, cars);
+  if (detailed && detailedProto) return makeDetailedSet(root, line, cars, dest, run);
   root.userData.bogie = 3.8;     // bogie pivots of the built-in model
   root.userData.bodyFront = 7.0;
   const mats = {
@@ -234,9 +276,12 @@ let detailedProto = null;
 export const CONTACT_WIRE = 5.6;   // contact wire height above the track bed level used by the world
 export const RAIL_TOP = 0.26;      // rail head above the track bed level (track ribbons in world.js)
 
-export async function loadDetailedT3(url = 'assets/t3/t3.gltf') {
+// files: { url: blob URL } of parts already downloaded (the loading screen counts their bytes)
+export async function loadDetailedT3(url = 'assets/t3/t3.gltf', files = {}) {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-  const gl = await new GLTFLoader().loadAsync(url);
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((u) => files[u] || u);
+  const gl = await new GLTFLoader(manager).loadAsync(url);
   const src = gl.scene;
   src.updateMatrixWorld(true);
   // The car's axes come from its 8 wheels (the body is too box-like for a reliable principal
@@ -309,7 +354,7 @@ export async function loadDetailedT3(url = 'assets/t3/t3.gltf') {
   for (const m of proto.children) { m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere(); }
   const body = new THREE.Box3();
   for (const m of proto.children) if (m.name.startsWith('body')) body.union(m.geometry.boundingBox);
-  proto.userData = { bogie, panto: (pb.min.z + pb.max.z) / 2, bodyFront: body.max.z, boxes: paintedBoxes(proto) };
+  proto.userData = { bogie, panto: (pb.min.z + pb.max.z) / 2, bodyFront: body.max.z, boxes: paintedBoxes(proto), cards: glassCards(proto) };
   const mat = proto.children[0].material;
   mat.metalness = 0; mat.roughness = 0.75;
   detailedProto = proto;
@@ -349,12 +394,36 @@ function paintedBoxes(proto, W = 2048, H = 2048) {
     for (const v of corners) { const d = v.clone().sub(c); r0 = Math.min(r0, d.dot(right)); r1 = Math.max(r1, d.dot(right)); u0 = Math.min(u0, d.dot(up)); u1 = Math.max(u1, d.dot(up)); }
     boxes.push({ c: c.addScaledVector(n, 0.012), n, up, right, w: (r1 - r0) * 1.12, h: (u1 - u0) * 1.12 });
   }
-  if (boxes[0]) { // rear: mirror of the front box
-    const f = boxes[0];
-    boxes.push({ ...f, c: new THREE.Vector3(-f.c.x, f.c.y, -f.c.z), n: new THREE.Vector3(-f.n.x, f.n.y, -f.n.z),
-      up: new THREE.Vector3(-f.up.x, f.up.y, -f.up.z), right: new THREE.Vector3(-f.right.x, f.right.y, -f.right.z) });
-  }
   return boxes;
+}
+
+// The cards on the windows: the model's windows are painted in its (opaque) texture, so the cards lie
+// on the glass, 5 mm proud, following its slope: found by casting a ray at the window from outside.
+// [name, x (left +), bottom height, width, height, end (+1 front, -1 rear)] in metres; the windscreen's
+// flat middle pane runs from x −0.62 to +0.58 between the frame supports (measured by raycasting), from
+// 1.71 m up; a wiper arm stands out at x −0.36; the side panes curve back beyond the supports. The
+// destination card in the middle pane's middle, the run number on the right-hand side pane (left as
+// seen from the front), just past the frame support.
+const CARDS = [
+  ['dest', -0.02, 1.75, 0.46, 0.19, 1],
+  ['run', -0.75, 1.75, 0.15, 0.1, 1],
+  ['rear', 0, 1.75, 0.34, 0.3, -1],
+];
+function glassCards(proto) {
+  proto.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster(), out = {};
+  for (const [name, x, y0, w, h, end] of CARDS) {
+    const y = y0 + h / 2;
+    ray.set(new THREE.Vector3(x, y, end * 20), new THREE.Vector3(0, 0, -end));
+    const hit = ray.intersectObjects(proto.children, false)[0];
+    if (!hit) continue;
+    const n = hit.face.normal.clone();
+    if (n.z * end < 0) n.negate(); // outwards
+    const up = new THREE.Vector3(0, 1, 0).addScaledVector(n, -n.y).normalize();
+    const right = new THREE.Vector3().crossVectors(up, n).normalize();
+    out[name] = { c: hit.point.clone().addScaledVector(n, 0.005), n, up, right, w, h };
+  }
+  return out;
 }
 function bary(a, u, v) {
   const d = (a[1][1] - a[2][1]) * (a[0][0] - a[2][0]) + (a[2][0] - a[1][0]) * (a[0][1] - a[2][1]);
@@ -370,34 +439,57 @@ function boxQuad(b) {
   return g;
 }
 
-function makeDetailedSet(root, line, cars) {
+function makeDetailedSet(root, line, cars, dest, run) {
   // own material per set (traffic fades sets individually), shared geometry
   const mat = detailedProto.children[0].material.clone();
-  const rbMat = new THREE.MeshBasicMaterial({ map: routeBoxTexture(line), polygonOffset: true, polygonOffsetFactor: -2 });
-  root.userData.mats = { rbMat, body: mat };
+  const plate = (map) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
+  // (cards on the glass: lit like the body, not glowing)
+  const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
+  const mats = {
+    rbMat: plate(routeBoxTexture(line)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
+    destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)), body: mat,
+  };
+  root.userData.mats = mats;
+  root.userData.dest = dest;
+  root.userData.run = run;
   root.userData.bogie = detailedProto.userData.bogie;
   root.userData.bodyFront = detailedProto.userData.bodyFront;
   root.userData.cars = [];
+  const { boxes, cards } = detailedProto.userData;
   for (let k = 0; k < cars; k++) {
     const car = new THREE.Group();
     car.rotation.order = 'YXZ';
     for (const m of detailedProto.children) car.add(new THREE.Mesh(m.geometry, mat));
-    // our own route number boxes exactly over the ones painted in the texture (+ the rear one)
-    for (const b of detailedProto.userData.boxes) car.add(new THREE.Mesh(boxQuad(b), rbMat));
+    // the leading car: the roof and mirror plates over the boxes painted in the texture, the cards
+    // behind the windscreen (no destination card on a tram whose destination we do not know); the
+    // last car: the inverted plate in the rear window
+    if (k === 0) {
+      if (boxes[0]) car.add(new THREE.Mesh(boxQuad(boxes[0]), mats.rbMat));
+      // (the mirror plate is smaller than the box painted there, and taller than wide)
+      if (boxes[1]) car.add(new THREE.Mesh(boxQuad({ ...boxes[1], w: 0.22, h: 0.28 }), mats.mirMat));
+      if (cards.dest && dest) car.add(new THREE.Mesh(boxQuad(cards.dest), mats.destMat));
+      if (cards.run) car.add(new THREE.Mesh(boxQuad(cards.run), mats.runMat));
+    }
+    if (k === cars - 1 && cards.rear) car.add(new THREE.Mesh(boxQuad(cards.rear), mats.rearMat));
     root.add(car);
     root.userData.cars.push(car);
   }
   return root;
 }
 
-// Change the number in the route boxes (a run continuing as another line).
-export function setConsistLine(model, line) {
-  if (model.userData.line === line) return;
-  const m = model.userData.mats.rbMat, old = m.map;
-  m.map = routeBoxTexture(line);
-  m.needsUpdate = true;
-  old?.dispose();
-  model.userData.line = line;
+// Change the route number on the plates, the destination card and the run number (a new shift, a run
+// continuing as another line). (A set made without a destination has no card to change.)
+export function setConsistLine(model, line, dest = model.userData.dest, run = model.userData.run) {
+  const u = model.userData, { mats } = u;
+  const swap = (m, tex) => { if (!m) return; const old = m.map; m.map = tex; m.needsUpdate = true; old?.dispose(); };
+  if (u.line !== line) {
+    swap(mats.rbMat, routeBoxTexture(line));
+    swap(mats.mirMat, mirrorPlateTexture(line));
+    swap(mats.rearMat, rearPlateTexture(line));
+  }
+  if (u.dest !== dest) swap(mats.destMat, destinationTexture(dest));
+  if (u.run !== run) swap(mats.runMat, runCardTexture(run));
+  Object.assign(u, { line, dest, run });
 }
 
 // Put each car of a set on the track: cars are 15.2 m over couplers, the body starts 0.6 m
@@ -433,6 +525,21 @@ export function makeCar(seed = 0) {
     w.position.set(x, 0.32, z);
     g.add(w);
   }
+  // turn indicators at the four corners (+X is the car's left), lit by userData.blink(side, on)
+  const amber = new THREE.MeshBasicMaterial({ color: 0xffa31a });
+  const lamps = { left: [], right: [] };
+  for (const [side, x] of [['left', 0.78], ['right', -0.78]]) {
+    for (const z of [2.16, -2.16]) {
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.04), amber);
+      l.position.set(x, 0.82, z);
+      l.visible = false;
+      lamps[side].push(l);
+      g.add(l);
+    }
+  }
+  g.userData.blink = (side, on) => {
+    for (const s of ['left', 'right']) for (const l of lamps[s]) l.visible = s === side && on;
+  };
   return g; // facing +Z
 }
 
@@ -447,6 +554,82 @@ export function makePerson(seed = 0) {
   head.position.y = 1.65;
   g.add(legs, torso, head);
   return g;
+}
+
+// Traffic lights for cars (D2), all heads of the line in a few instanced meshes: a grey pole, a black
+// housing with a black backplate, and three lamps (red, amber, green from the top) whose colour is set
+// per instance, bright when lit, dark when not. heads: [{ x, z, h, face }] in world coordinates (h:
+// the ground height; face: the turn about Y that points the lamps, local +Z, towards the drivers).
+// Returns { group, set(i, aspect) } with aspect 'red' | 'redamber' | 'amber' | 'green' | 'dark'.
+export function makeTrafficLights(heads) {
+  const n = Math.max(1, heads.length);
+  const group = new THREE.Group();
+  const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.07, 3.3, 6).translate(0, 1.65, 0), lambert(0x6f7377), n);
+  const box = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.95, 0.24).translate(0, 2.85, -0.02), lambert(0x161616), n);
+  const plate = new THREE.InstancedMesh(new THREE.BoxGeometry(0.56, 1.18, 0.02).translate(0, 2.85, -0.15), lambert(0x101010), n);
+  const lamp = new THREE.InstancedMesh(new THREE.CircleGeometry(0.11, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }), n * 3);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  heads.forEach((h, i) => {
+    q.setFromAxisAngle(up, h.face);
+    p.set(h.x, h.h, h.z);
+    m.compose(p, q, s);
+    pole.setMatrixAt(i, m); box.setMatrixAt(i, m); plate.setMatrixAt(i, m);
+    for (let k = 0; k < 3; k++) {
+      const off = new THREE.Vector3(0, 3.15 - k * 0.3, 0.105).applyQuaternion(q);
+      m.compose(p.clone().add(off), q, s);
+      lamp.setMatrixAt(i * 3 + k, m);
+    }
+  });
+  group.add(pole, box, plate, lamp);
+  const LIT = [new THREE.Color(0xff2a1a), new THREE.Color(0xffb000), new THREE.Color(0x2bff6a)];
+  const OFF = [new THREE.Color(0x2a0806), new THREE.Color(0x2a1f04), new THREE.Color(0x05220e)];
+  const ON = { red: [1, 0, 0], redamber: [1, 1, 0], amber: [0, 1, 0], green: [0, 0, 1], dark: [0, 0, 0] };
+  const state = new Array(n).fill(null);
+  const set = (i, aspect) => {
+    if (state[i] === aspect) return;
+    state[i] = aspect;
+    ON[aspect].forEach((on, k) => lamp.setColorAt(i * 3 + k, on ? LIT[k] : OFF[k]));
+    lamp.instanceColor.needsUpdate = true;
+  };
+  heads.forEach((_, i) => set(i, 'red'));
+  return { group, set, count: heads.length };
+}
+
+// Pedestrian signal heads, instanced like the car heads: a pole, a narrow black housing and two square
+// lamps (red standing figure above, green walking figure below; plain squares here). heads: [{ x, z, h,
+// face }] as for makeTrafficLights (face turns local +Z towards the people waiting across the street).
+// Returns { group, set(i, 'red' | 'green' | 'dark'), count }.
+export function makePedLights(heads) {
+  const n = Math.max(1, heads.length);
+  const group = new THREE.Group();
+  const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.06, 2.6, 6).translate(0, 1.3, 0), lambert(0x6f7377), n);
+  const box = new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.62, 0.2).translate(0, 2.3, 0.02), lambert(0x161616), n);
+  const lamp = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0xffffff }), n * 2);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  heads.forEach((h, i) => {
+    q.setFromAxisAngle(up, h.face);
+    p.set(h.x, h.h, h.z);
+    m.compose(p, q, s);
+    pole.setMatrixAt(i, m); box.setMatrixAt(i, m);
+    for (let k = 0; k < 2; k++) {
+      const off = new THREE.Vector3(0, 2.45 - k * 0.29, 0.125).applyQuaternion(q);
+      m.compose(p.clone().add(off), q, s);
+      lamp.setMatrixAt(i * 2 + k, m);
+    }
+  });
+  group.add(pole, box, lamp);
+  const LIT = [new THREE.Color(0xff2a1a), new THREE.Color(0x2bff6a)];
+  const OFF = [new THREE.Color(0x2a0806), new THREE.Color(0x05220e)];
+  const ON = { red: [1, 0], green: [0, 1], dark: [0, 0] };
+  const state = new Array(n).fill(null);
+  const set = (i, aspect) => {
+    if (state[i] === aspect) return;
+    state[i] = aspect;
+    ON[aspect].forEach((on, k) => lamp.setColorAt(i * 2 + k, on ? LIT[k] : OFF[k]));
+    lamp.instanceColor.needsUpdate = true;
+  };
+  heads.forEach((_, i) => set(i, 'red'));
+  return { group, set, count: heads.length };
 }
 
 // Instanced people (one simple figure per instance, per-instance shirt colour).

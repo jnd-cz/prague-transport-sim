@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bench Batch</title>
+<!-- Dev tool (not part of the game): runs the headless benches unattended, each in a fresh page, and
+     lists the results. Serve the project root (e.g. .claude/serve_nocache.py 8743) and open
+       http://localhost:8743/.claude/bench/batch.html?lines=17&seeds=1-10&benches=u3,redruns
+     Keep the tab visible (background tabs are throttled). Results stay in this page's localStorage
+     until cleared; "Download JSON" saves them. Thresholds: BUILD-TOOLS-HANDOFF.md §4.2. -->
+<style>
+  :root { --bg: #f6f6f4; --fg: #1d1d1b; --mut: #6b6b66; --ok: #1f7a3a; --bad: #b3261e; --line: #d9d8d3; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #18181a; --fg: #e8e8e4; --mut: #9a9a94; --ok: #5fc77e; --bad: #ff7b72; --line: #333336; } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  input { font: inherit; padding: 4px 6px; width: 9em; }
+  button { font: inherit; padding: 4px 10px; cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); font-weight: 600; } .mut { color: var(--mut); }
+  iframe { width: 480px; height: 270px; border: 1px solid var(--line); max-width: 100%; }
+  #status { color: var(--mut); }
+  .wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Bench batch</h1>
+<div class="bar">
+  <label>lines <input id="lines" value="17"></label>
+  <label>seeds <input id="seeds" value="1-3"></label>
+  <label>benches <input id="benches" value="u3,redruns"></label>
+  <button id="go">Run</button>
+  <button id="stop">Stop after this run</button>
+  <button id="dl">Download JSON</button>
+  <button id="clear">Clear results</button>
+</div>
+<div id="status">idle</div>
+<div class="wrap"><table><thead><tr><th>time</th><th>line</th><th>bench</th><th>seed</th><th>verdict</th><th>key numbers</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p class="mut">Current run:</p>
+<iframe id="frame" title="game under test"></iframe>
+<script>
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+for (const k of ['lines', 'seeds', 'benches']) if (q.has(k)) $(k).value = q.get(k);
+const KEY = 'benchBatchResults';
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } };
+const save = (r) => { try { localStorage.setItem(KEY, JSON.stringify(r)); } catch { /* full or blocked */ } };
+let results = load(), stopping = false;
+const range = (s) => s.split(',').flatMap((p) => { const [a, b] = p.split('-').map(Number); return b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]; });
+
+// pass/fail and a one-line summary per bench (thresholds as in BUILD-TOOLS-HANDOFF.md §4.2)
+function judge(bench, r) {
+  if (r.error) return { ok: false, text: r.error };
+  if (bench === 'u3') {
+    const bad = [];
+    if (r.carsIntoJunctions?.red) bad.push(`${r.carsIntoJunctions.red} red entries`);
+    if (r.hits) bad.push(`${r.hits} collisions at ${(r.collisions || []).map((c) => Math.round(c.s)).join(', ')}`);
+    if (r.stuck != null) bad.push(`stuck at ${Math.round(r.stuck)}`);
+    if (r.signalPenalty) bad.push(`signal penalty ${r.signalPenalty} at ${(r.signalEvents || []).map((e) => Math.round(e.s)).join(', ')}`);
+    return { ok: !bad.length, text: (bad.join('; ') || 'clean') + ` · yielded ${r.yielded}, cut-ins ${r.closeCuts}, junctions ${JSON.stringify(r.carsIntoJunctions)}` };
+  }
+  if (bench === 'redruns') {
+    const bad = [];
+    if (r.redRuns) bad.push(`${r.redRuns} oncoming red runs (${r.avoidable} avoidable)`);
+    if (r.aheadRedRuns) bad.push(`${r.aheadRedRuns} ahead red runs`);
+    if (r.ourSignalPenalty) bad.push(`our signal penalty ${r.ourSignalPenalty}`);
+    return { ok: !bad.length, text: (bad.join('; ') || 'clean') + ` · warn passes ${r.warnPasses}, holds ${r.holds}` };
+  }
+  return { ok: true, text: JSON.stringify(r).slice(0, 200) };
+}
+
+function render() {
+  $('rows').innerHTML = results.map((x) => {
+    const j = judge(x.bench, x.result);
+    return `<tr><td class="mut">${x.time.slice(5, 16).replace('T', ' ')}</td><td>${x.line}</td><td>${x.bench}</td><td>${x.seed}</td><td class="${j.ok ? 'ok' : 'bad'}">${j.ok ? 'pass' : 'FAIL'}</td><td>${j.text}</td></tr>`;
+  }).join('');
+}
+
+// one bench run in a fresh copy of the game: wait for the menu, then import the bench in the frame
+function runOne(line, bench, seed) {
+  return new Promise((resolve) => {
+    const f = $('frame'), done = (result) => { clearInterval(poll); clearTimeout(limit); resolve(result); };
+    f.src = `/?line=${line}&t=${Date.now()}`;
+    let started = false;
+    const limit = setTimeout(() => done({ error: 'timeout (20 min)' }), 20 * 60 * 1000);
+    const poll = setInterval(() => {
+      const w = f.contentWindow, d = f.contentDocument;
+      if (!w || !d) return;
+      if (w._batch) { if (w._batch.done) done(w._batch.result); return; }
+      const loading = d.getElementById('loading');
+      if (started || !loading || !loading.classList.contains('hidden') || !d.title.includes(String(line))) return;
+      started = true;
+      const s = d.createElement('script');
+      s.type = 'module';
+      s.textContent = `window._batch = { done: false };
+        try { const { run } = await import('/.claude/bench/${bench}.js'); const r = await run(${seed});
+          window._batch = { done: true, result: JSON.parse(JSON.stringify({ ...r, watch: undefined })) };
+        } catch (e) { window._batch = { done: true, result: { error: String(e) } }; }`;
+      d.body.appendChild(s);
+    }, 1000);
+  });
+}
+
+$('go').onclick = async () => {
+  stopping = false;
+  const lines = $('lines').value.split(',').map((s) => s.trim()).filter(Boolean), seeds = range($('seeds').value), benches = $('benches').value.split(',').map((s) => s.trim());
+  const jobs = lines.flatMap((line) => benches.flatMap((bench) => seeds.map((seed) => ({ line, bench, seed }))));
+  for (let i = 0; i < jobs.length && !stopping; i++) {
+    const { line, bench, seed } = jobs[i], t0 = Date.now();
+    $('status').textContent = `run ${i + 1}/${jobs.length}: line ${line}, ${bench}, seed ${seed}…`;
+    const result = await runOne(line, bench, seed);
+    results.push({ time: new Date().toISOString(), line, bench, seed, seconds: Math.round((Date.now() - t0) / 1000), result });
+    save(results); render();
+  }
+  $('frame').src = 'about:blank';
+  $('status').textContent = stopping ? 'stopped' : `done: ${jobs.length} runs`;
+};
+$('stop').onclick = () => { stopping = true; $('status').textContent += ' (stopping after this run)'; };
+$('clear').onclick = () => { results = []; save(results); render(); };
+$('dl').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(results, null, 1)], { type: 'application/json' }));
+  a.download = `bench-results-${new Date().toISOString().slice(0, 16).replace(':', '')}.json`;
+  a.click();
+};
+render();
+if (q.has('autorun')) $('go').click();
+</script>
+</body>
+</html>

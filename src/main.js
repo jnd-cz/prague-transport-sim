@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Route, extendAlongTracks } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
-import { buildWorld, widenTramStreets } from './world.js';
+import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
 import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
@@ -13,25 +13,36 @@ import { Inspect } from './inspect.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
+import { Loader } from './loading.js';
+import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 
 const $ = (id) => document.getElementById(id);
 
+const load = new Loader();
+applyStatic();
 // line selection: ?line=N, else the last one played
 let lines = [];
-try { lines = await (await fetch('data/lines.json')).json(); } catch { /* single-line build */ }
+try { lines = await (await load.get('data/lines.json')).json(); } catch { /* single-line build */ }
 const params = new URLSearchParams(location.search);
 let lineId = params.get('line');
 try { lineId = lineId || localStorage.getItem('tram.line'); } catch { /* storage unavailable */ }
 if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId = lines[0]?.line || '22';
-const data = await (await fetch(`data/line${lineId}.json`)).json();
+// every file of the line at once (the optional ones may be missing); the T3 model alongside
+const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.jpg'];
+for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json']) load.prefetch(`data/line${lineId}.${f}`);
+if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
+for (const f of T3_FILES) load.prefetch(f);
+// (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
+load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
+const data = await (await load.get(`data/line${lineId}.json`)).json();
 data.line = String(data.line);
 setLine(data.line);
 // optional Geoportál Praha import (tools/geoportal.py): LOD2 buildings, retaining walls, trees
 try {
-  const geoRes = await fetch(`data/line${lineId}.geo.json`);
+  const geoRes = await load.get(`data/line${lineId}.geo.json`);
   if (geoRes.ok) {
     data.geo = await geoRes.json();
-    const bin = await fetch(`data/${data.geo.buildings.file}`);
+    const bin = await load.get(`data/${data.geo.buildings.file}`);
     if (bin.ok) data.geo.buildings.arr = new Int16Array(await bin.arrayBuffer());
     data.attribution += ' ' + data.geo.attribution;
   }
@@ -39,9 +50,23 @@ try {
 widenTramStreets(data); // street widths include the tram tracks running down the middle
 // optional surveyed streets (Prague DTM, tools/dtm.py) for the districts imported so far
 try {
-  const r = await fetch(`data/line${lineId}.dtm.json`);
+  const r = await load.get(`data/line${lineId}.dtm.json`);
   if (r.ok) { data.dtm = await r.json(); data.attribution += ' ' + data.dtm.attribution; }
 } catch { /* not imported for this line */ }
+// optional OSM traffic signals (stop lines, signalled crossings; .claude/tools/osm_signals.py for now)
+try {
+  const r = await load.get(`data/line${lineId}.signals.json`);
+  if (r.ok) data.osmSignals = await r.json();
+} catch { /* none for this line */ }
+// optional street furniture of Prague's technical map (manholes, inlets, hydrants, …; .claude/tools/dtm_points.py)
+try {
+  const r = await load.get(`data/line${lineId}.dtmpoints.json`);
+  if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; data.attribution += ' Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).'; }
+} catch { /* none for this line */ }
+// wait for the rest before the build steps, which block the page
+const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
+const t3Res = await Promise.all(T3_FILES.map((f) => load.get(f)));
+await load.begin('terrain');
 // the two tracks of a double-track line at least 3 m apart (OSM sometimes draws them closer)
 // (dev switches for comparing lint runs: ?nospread, ?notunnels)
 if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
@@ -57,7 +82,7 @@ const terrain = new Terrain(data.terrain);
 // the fine terrain near the tracks (2 m, tools/fine_terrain.py), where it was made for this line
 // (dev switch ?nofine: the coarse grid only, for comparing lint runs)
 if (!params.has('nofine')) try {
-  const [mr, br] = await Promise.all([fetch(`data/line${lineId}.fine.json`), fetch(`data/line${lineId}.fine.bin`)]);
+  const [mr, br] = fineRes;
   if (mr.ok && br.ok) {
     const meta = await mr.json();
     terrain.addFine(meta, new Int16Array(await br.arrayBuffer()));
@@ -65,6 +90,7 @@ if (!params.has('nofine')) try {
   }
 } catch { /* not made for this line */ }
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
+await load.begin('profile');
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
 const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain), dtm, data.clearances || []);
 const ground = makeGround(route, terrain, profile, dtm);
@@ -76,7 +102,19 @@ route.ground = ground;
 const canvas = $('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+// Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
+// longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
+// instead of a frozen black screen.
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  if (game) game.paused = true;
+  const card = $('resultsCard');
+  card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
+  $('results').classList.remove('hidden');
+  $('glReload').onclick = () => location.reload();
+});
 const scene = new THREE.Scene();
+const debugOverlay = createDebugOverlay(scene);
 const sky = new THREE.Color('#b9cfe0');
 scene.background = sky;
 scene.fog = new THREE.Fog(sky, 180, 950);
@@ -101,10 +139,45 @@ const WEATHER = {
   dry: { sky: '#b9cfe0', fog: [180, 950], sun: 1.6, hemi: 1.6 },
   rain: { sky: '#8e99a3', fog: [90, 520], sun: 0.55, hemi: 1.25 },
   leaves: { sky: '#a9b2b5', fog: [120, 700], sun: 0.9, hemi: 1.35 },
+  snow: { sky: '#c3c9cf', fog: [70, 480], sun: 0.6, hemi: 1.45 },
 };
-let world = null, worldWeather = null;
-const rain = makeRain();
-scene.add(rain);
+let world = null;
+const rain = makeRain(), snow = makeSnow();
+scene.add(rain, snow);
+
+// The whole world to the GPU in the loading step 'gpu' (one frame drawing everything, culling off:
+// buffers and shaders), not piecemeal as it comes into view (the first frame after the loading screen
+// took seconds). Its geometry is static: once a buffer is on the GPU the JS copy is dropped (line 17:
+// ~660 MB of the heap). Kept with ?bot (the street bot reads the meshes) and ?keepgeo (dev tools
+// reading window.world's geometry, tools/lint.js: pass it there). The cost: a lost WebGL context
+// cannot be restored without reloading the page.
+const keepGeometry = params.has('bot') || params.has('keepgeo');
+function uploadWorld() {
+  const culled = [];
+  world.traverse((o) => {
+    const g = o.geometry;
+    if (!g) return;
+    if (!keepGeometry && !g.userData.release) {
+      g.userData.release = true;
+      if (!g.boundingSphere) g.computeBoundingSphere(); // (culling reads it; it cannot be computed later)
+      const free = function () { this.array = null; };
+      for (const a of Object.values(g.attributes)) a.onUpload(free);
+      g.index?.onUpload(free);
+    }
+    if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; }
+  });
+  renderer.render(scene, camera);
+  for (const o of culled) o.frustumCulled = true;
+}
+
+// The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the
+// precipitation and the materials' state (src/weather.js): instant, so it could change during a shift.
+async function buildCity() {
+  await load.parts(WORLD_PARTS);
+  world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
+  if (data.dtmPoints) world.add(buildStreetDetail(data, ground));
+  window.world = world; // read by the lints (tools/lint.js)
+}
 
 function applyWeather(w) {
   const cfg = WEATHER[w];
@@ -114,15 +187,32 @@ function applyWeather(w) {
   sun.intensity = cfg.sun;
   hemi.intensity = cfg.hemi;
   rain.visible = w === 'rain';
-  if (worldWeather !== w) {
-    if (world) {
-      scene.remove(world);
-      world.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
-    }
-    world = buildWorld(scene, data, route, ground, w);
-    window.world = world; // read by the lints (tools/lint.js)
-    worldWeather = w;
+  snow.visible = w === 'snow';
+  world.userData.setWeather(w);
+}
+
+// snowflakes: points drifting down (~1 m/s) and sideways around the camera
+function makeSnow() {
+  const n = 4000, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) pos.set([(Math.random() - 0.5) * 60, Math.random() * 25, (Math.random() - 0.5) * 60], i * 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xf4f6f8, size: 0.07, transparent: true, opacity: 0.9 }));
+  m.frustumCulled = false;
+  m.visible = false;
+  return m;
+}
+
+function updateSnow(dt, t) {
+  if (!snow.visible) return;
+  const pos = snow.geometry.attributes.position.array;
+  for (let i = 0; i < pos.length; i += 3) {
+    pos[i + 1] -= (0.8 + (i % 7) * 0.08) * dt;
+    pos[i] += Math.sin(t * 0.7 + i) * 0.3 * dt;
+    if (pos[i + 1] < -3) pos[i + 1] += 25;
   }
+  snow.geometry.attributes.position.needsUpdate = true;
+  snow.position.set(camera.position.x, camera.position.y - 10, camera.position.z);
 }
 
 function makeRain() {
@@ -152,15 +242,36 @@ function updateRain(dt) {
   rain.position.set(camera.position.x, camera.position.y - 12, camera.position.z);
 }
 
+await load.begin('world');
+await buildCity();
 applyWeather('dry');
+await load.begin('gpu');
+uploadWorld();
+await load.begin('tram');
 // detailed T3 model (Sketchfab, CC BY-NC 4.0); the built-in low-poly one is the fallback
 let detailedOk = false;
-try { await loadDetailedT3(); detailedOk = true; data.attribution += ' Tatra T3 3D model: "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).'; }
+const t3Blobs = {};
+const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg: 'image/jpeg' };
+for (const r of t3Res) if (r.ok) t3Blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
+try { await loadDetailedT3(T3_FILES[0], t3Blobs); detailedOk = true; data.attribution += ' Tatra T3 3D model: "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).'; }
 catch (e) { console.warn('detailed T3 model not loaded', e); }
 const useDetailed = () => detailedOk && $('optModel').value === 'detailed';
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
-let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk });
+// The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
+// digits (801 = depot 8, run 01); a tram keeps its run number for its whole time out in service;
+// night and late-evening runs (single cars) are numbered from 51. Prepared for data the line files
+// do not have yet: `data.runs[trip] = { depot, run }` (which run serves each timetable trip, from the
+// PID GTFS or the run lists published by enthusiasts, e.g. pražské tramvaje / forums; a build tool to
+// come). Until then a placeholder: depot 8, a day run (01-49) from the trip's place in the timetable.
+function runNumber(trip) {
+  const r = data.runs?.[trip];
+  if (r) return `${r.depot}${String(r.run).padStart(2, '0')}`;
+  return `8${String((trip % 49) + 1).padStart(2, '0')}`;
+}
+// (the destination card: the last stop until a shift says otherwise)
+const lastStop = data.stops[data.stops.length - 1].name;
+let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk, dest: lastStop, run: runNumber(0) });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -226,16 +337,12 @@ function start() {
   tram = new Tram(cars);
   if (tramModel.userData.cars.length !== cars || !!tramModel.userData.mats.body !== useDetailed()) {
     scene.remove(tramModel);
-    tramModel = makeT3({ line: data.line, cars, detailed: useDetailed() });
+    tramModel = makeT3({ line: data.line, cars, detailed: useDetailed(), dest: lastStop, run: runNumber(0) });
     scene.add(tramModel);
   }
   if (game) scene.remove(game.objects);
   const weather = $('optWeather').value;
-  if (weather !== worldWeather) {
-    $('loading').classList.remove('hidden');
-  }
   applyWeather(weather);
-  $('loading').classList.add('hidden');
   game = new Game(scene, data, route, tram, audio, {
     weather,
     tripIndex: +selTrip.value,
@@ -251,16 +358,25 @@ function start() {
     seed: Math.floor(Math.random() * 1e9),
   });
   // the line number shown on the tram, the top bar and in messages follows the run
-  const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l); };
+  const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
   game.onLineChange = showLine;
   if (traffic) traffic.dispose();
   traffic = new Traffic(scene, data, route, ground, game, Math.random);
+  debugOverlay.reset();
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   window.game = game; // handy for debugging from the console
   window.camera = camera;
+  window.renderer = renderer; // performance checks from the console (renderer.info, the scene)
+  window.scene = scene;
   window.traffic = traffic;
+  // the compiled world as GeoJSON (ARCHITECTURE-PROPOSAL.md §10.4), for the annotation editor
+  window.exportBuiltGeoJSON = (save = true) => {
+    const fc = builtGeoJSON(game, traffic);
+    if (save) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/geo+json' })); a.download = `data-line${game.data.line}.built.geojson`; a.click(); }
+    return fc;
+  };
   window.tramModel = tramModel;
   $('menu').classList.add('hidden');
   $('results').classList.add('hidden');
@@ -269,6 +385,7 @@ function start() {
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
   if (params.has('bot')) streetBot();
   if (params.has('inspect')) inspect.toggle(true);
+  if (params.has('debug')) debugOverlay.toggle(game, traffic);
 }
 
 // debugging (?bot): drive and walk every street in the surveyed DTM areas, list what looks wrong
@@ -350,6 +467,8 @@ let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished || !$('menu').classList.contains('hidden')) return;
   const k = e.key.toLowerCase();
+  // dev overlay of signals, stop lines, conflicts and platforms (src/debugOverlay.js; ?debug shows it at the start)
+  if (k === 'f8' && !e.repeat) { e.preventDefault(); debugOverlay.toggle(game, traffic); return; }
   // dev inspect mode (src/inspect.js): its keys first
   if (inspect.active ? inspect.key(e) : k === 'i' && !e.repeat && (inspect.toggle(true), true)) return;
   if (k === 'o' && !e.repeat) {
@@ -486,15 +605,18 @@ function frame(now) {
   // window.headless: a dev tool steps the game itself (tools/traffic_lint.js); only draw
   if (game && !window.headless) {
     // (inspecting: several game steps per frame, or none while paused)
-    for (const h of inspect.active ? inspect.steps(dt) : [dt]) {
+    const steps = inspect.active ? inspect.steps(dt) : [dt];
+    steps.forEach((h, i) => {
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       game.update(h, pilot ? pilot.input : input);
-      if (inspect.active && !game.paused && !game.finished) traffic.update(h, camera);
-    }
+      // (the traffic is posed for drawing on the frame's last step only)
+      if (inspect.active && !game.paused && !game.finished) traffic.update(h, camera, i === steps.length - 1);
+    });
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
+    updateSnow(dt, now / 1000);
     if (!inspect.active && !game.paused && !game.finished) traffic.update(dt, camera);
     audio.update(tram, game.currentLimit, dt);
     hudTimer -= dt;
@@ -546,7 +668,7 @@ function renderMirror() {
   renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
 }
 
-$('loading').classList.add('hidden');
+load.finish();
 $('menu').classList.remove('hidden');
 requestAnimationFrame(frame);
 

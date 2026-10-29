@@ -23,7 +23,8 @@ export class Autopilot {
     if (st) {
       const atStop = tr.v < 0.05 && g._atStop(st);
       if (atStop && !st.served && g.doorState === 'closed') g.toggleDoors();
-      if (atStop && st.served && st.waiting === 0 && st.alight === 0 && g.doorState === 'open' && g.clock >= st.sched) g.toggleDoors();
+      // (and nobody is still running for it)
+      if (atStop && st.served && st.waiting === 0 && st.alight === 0 && !g.runnersFor?.(st) && g.doorState === 'open' && g.clock >= st.sched) g.toggleDoors();
     }
 
     // target speed: line speed, upcoming restrictions, then everything we must stop for
@@ -36,8 +37,22 @@ export class Autopilot {
       const needStop = !st.request || st.waiting > 0 || st.alightFrac > 0;
       if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target);
     }
+    // a signal: when its GO starts blinking, stop if that is comfortable (~0.9 m/s2), else clear the
+    // junction on it and keep going (the controller holds the phase for a committed tram); braking
+    // for a blinking GO it could not stop for took it over the line on red (line 17 s 3158)
     const sig = g.signals.find((x) => x.s > tr.s + 0.2);
-    if (sig && sig.state !== 'go') consider(sig.s - 3);
+    if (sig && sig.state !== 'go') {
+      const d = sig.s - 3 - tr.s;
+      // (only a moving tram: one standing at the stop point stays; it went on red from there, s 14178)
+      if (sig.state === 'warn' && this.goThrough !== sig && tr.v > 1 && d < (tr.v * tr.v) / 1.8 + tr.v) this.goThrough = sig;
+      // (red after all, the hold having run out while it crawled up behind something: stop if service
+      // braking still can, line 17 s 10251)
+      if (sig.state === 'stop' && this.goThrough === sig && d > (tr.v * tr.v) / 2.2 + 0.5) this.goThrough = null;
+      // (a tram that stopped anyway, for the passengers at a stop whose stop point is the signal's, has
+      // nothing to clear: it drove off on red after the doors closed, Čechův most s 14907, seed 4)
+      if (this.goThrough === sig && tr.v < 0.3) this.goThrough = null;
+      if (this.goThrough !== sig) consider(sig.s - 3);
+    }
     let hazard = false;
     for (const ob of g.obstacles) {
       if (ob.state !== 'gone' && Math.abs(ob.lat) < 2.5 && ob.s > tr.s) {
@@ -49,6 +64,14 @@ export class Autopilot {
     if (gap !== null) consider(tr.s + gap - 8);
     // a car on our track ahead (shared lane, queuing on the tracks): stop behind it
     for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5);
+    // a car crossing our track ahead (turning across, U3), or committed to it (too close to stop): stop
+    // short of it until it is across, and ring the bell within 60 m (a car that went while we stood at a
+    // stop before the junction was hit as we pulled away, line 17 s 16851)
+    for (const c of g.carsCrossing || []) {
+      if (c.s <= tr.s) continue;
+      consider(c.s - 6);
+      if (c.s - tr.s < 60 && tr.v > 1) hazard = true;
+    }
     if (stopAt !== null) {
       const d = stopAt - tr.s;
       vt = Math.min(vt, Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - 1.5))));
