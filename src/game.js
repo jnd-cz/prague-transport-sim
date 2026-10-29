@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ADHESION, PANTO_FROM_FRONT, tramClearance } from './tram.js';
 import { Route } from './route.js';
 import { t } from './i18n.js';
+import { leafTexture } from './weather.js';
 import {
   makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
   makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign,
@@ -100,6 +101,7 @@ export class Game {
     this.deadmanHeld = false;
     this.deadmanTimer = 0;
     this.action = null; // { label, t, done }
+    this.runners = []; // late passengers running for the tram (C14)
     this.holdTimer = 0;
     this.objects = new THREE.Group();
     scene.add(this.objects);
@@ -317,9 +319,22 @@ export class Game {
     place(sign, route, stop.target + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.44, true);
     if (stop.vienna) onWalk(sign);
     g.add(sign);
+    // (kept to move with the stop point: _initSignals may pull it back to a signal's stop point)
+    stop.sign = sign;
+    stop.signPlace = (s) => { place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.44, true); if (stop.vienna) onWalk(sign); };
+    // the shelter's outer edge: the OSM platform's, but no further than the surveyed one where the DTM
+    // draws the platform (OSM's island at Palackého náměstí is 6.2 m out, the survey's 4.5 m: the
+    // shelter stood on the road)
+    let outer = osm ? osm.outer : null;
+    const dtm = route.ground.dtm;
+    if (osm && dtm?.classAt) {
+      let lat = osm.inner + 0.5, last = null;
+      for (; lat <= osm.outer + 0.01; lat += 0.25) { const o = route.offset(stop.target - 12, -lat); if (dtm.classAt(o.x, o.y) === 'platform') last = lat; else if (last !== null) break; }
+      if (last !== null) outer = Math.min(outer, last + 0.25);
+    }
     // shelter (at the back of the OSM platform where there is one)
     const shelter = makeShelter();
-    place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(osm.outer - 0.6) : -3.4, 0.44);
+    place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(outer - 0.6) : -3.4, 0.44);
     if (stop.vienna) onWalk(shelter);
     g.add(shelter);
     this.objects.add(g);
@@ -328,19 +343,34 @@ export class Game {
   _initSignals() {
     // grade separation: where our track is on a bridge, the junctions and their traffic lights
     // belong to the road underneath (e.g. the Modřany estakáda), not to the tram
-    this.signals = this.data.signals.filter((d) => !this.profile.overBridge(d.cross)).map((d, i) => {
+    const placed = this._placeSignals(this.data.signals);
+    this.signals = placed.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d, i) => {
       d = { ...d };
       // a signal never stands along a platform: it moves to the platform head, just past where the
       // tram front stops; if the crossing follows too closely for that, it hangs from the wire
       for (const st of this.stops) {
         const a = (st.p0 ?? st.target - 30) - 1, b = st.target + 2;
         if (d.s > a && d.s < b) {
-          if (b < d.cross - 2) d.s = b;
-          else d.hang = true;
+          // (only while the platform head is still before the junction's near edge)
+          if (b < (d.edge ?? d.cross) - 1) d.s = b;
+          else {
+            // (the crossing right after the platform: its stop point, 3 m before the signal, is where the
+            // front stops for the passengers, or the crossing's edge if that comes first; hung 12-15 m
+            // back over the platform it made trams stop short of the platform end at red, Kublov)
+            d.hang = true; d.head = st;
+            d.s = Math.max(d.s, Math.min(st.target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
+            // (and the front stops for the passengers no further than that: the crossing began 4 m before
+            // the platform's end at Staroměstská, the tram served the stop 3 m past its red stop point)
+            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], st.target + 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
+          }
         }
       }
       const mesh = makeTramSignal();
-      this._mount(mesh, d.s, { hang: d.hang });
+      // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
+      // the track, so the post does not hide it from the driver; the same pole carries the crossing's
+      // pedestrian heads; user's street view, Palackého náměstí. Hung from a span it hung 20 m back)
+      if (d.head && !d.head.vienna) place(mesh, this.route, Math.min(d.s, (d.head.p1 ?? d.s) - 0.5), -3.5, 0.44, true);
+      else this._mount(mesh, d.s, { hang: d.hang });
       this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction
       const h0 = this.route.heading(d.cross - 5, 5), h1 = this.route.heading(d.cross + 30, 8);
@@ -413,6 +443,109 @@ export class Game {
     }
     this.signals.sort((a, b) => a.s - b.s);
     for (const sig of this.signals) sig.xroad = sig.gauntlet ? null : this._crossRoad(sig.cross);
+  }
+
+  // Where streets, footways and pedestrian crossings cross our route: { s, start, car } sorted by s
+  // (the conflict points a signal protects): s where the centre line crosses, start where its near
+  // edge does (half its width, longer at a slant). Not ways on a bridge or in a tunnel (other levels).
+  _routeConflicts() {
+    const R = this.route, out = [];
+    for (const r of this.data.roads) {
+      if (r.t) continue;
+      // (a bridge way counts where it meets the track at its end, at street level: the road off
+      // Palackého most enters the junction there; it was left out and the signal moved into the junction)
+      const chain = r.b ? (r.way || r.p) : null, ends = chain && [chain[0], chain[chain.length - 1]];
+      const P = r.p;
+      for (let i = 1; i < P.length; i++) {
+        const a = P[i - 1], b = P[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+        const m = R.nearest((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+        if (!m || m.d > L / 2 + 3) continue;
+        for (let t = 0; t <= L; t += 1) {
+          const x = a[0] + ((b[0] - a[0]) * t) / L, y = a[1] + ((b[1] - a[1]) * t) / L, n = R.nearest(x, y);
+          if (!n || n.d > 1.2) continue;
+          if (ends && Math.min(...ends.map((e) => Math.hypot(e[0] - x, e[1] - y))) > 25) break;
+          const h = R.at(n.s);
+          // (crossing at more than ~18°: streets meet the track at a slant where it curves through a
+          // junction, Kobylisy; "more than 37°" missed most of that junction)
+          const cos = Math.abs(((b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy) / L);
+          if (cos < 0.95) out.push({ s: n.s, start: n.s - (r.w || 3) / 2 / Math.max(0.3, Math.sqrt(1 - cos * cos)), car: !r.f && !!r.c });
+          break;
+        }
+      }
+    }
+    // (not a crossing that starts inside our platform with no OSM crossing over the tracks there: a zebra
+    // from the island platform across the road beside it, which the line data projected onto the track;
+    // the signal at Palackého náměstí stopped the tram 15 m short of the platform end for one, user's
+    // orthophoto 2026-10-24; also Jiráskovo nám., Strossmayerovo nám., Veletržní palác)
+    const osmTram = (this.data.osmSignals?.tram || []).map((c) => R.nearest(c.x, c.y)).filter((n) => n && n.d < 4).map((n) => n.s);
+    const inPlatform = (s) => this.data.osmSignals && this.stops?.some((st) => st.p0 !== undefined && s > st.p0 + 2 && s < st.p1 - 0.5) && !osmTram.some((t) => Math.abs(t - s) < 5);
+    for (const s of this.data.crossings) if (!inPlatform(s)) out.push({ s, start: s - 2, car: false });
+    // signalled crossings over the tram track from OSM (data/lineN.signals.json, .claude/tools/osm_signals.py)
+    for (const c of this.data.osmSignals?.tram || []) { const n = R.nearest(c.x, c.y); if (n && n.d < 4) out.push({ s: n.s, start: n.s - 2.5, car: false }); }
+    return out.sort((a, b) => a.s - b.s);
+  }
+
+  // Where each signal stands (user, 2026-10-24: one after the junction at Kobylisy, some in the
+  // middle of nowhere, some far before their junction). The conflicts come in clusters (gaps under
+  // 20 m: a wide junction has 18 m between its streets' centre lines): a junction. A signal standing after a street junction (car crossings within 45 m before
+  // it) that has no signal of its own belongs to it; if the junction has one, it is the junction's
+  // far-side pedestrian crossing and is dropped (Kobylisy s 20819 stood after the junction, matched to
+  // the zebra beyond it); else to the cluster around its crossing point. It stands 4 m before the
+  // cluster's first conflict's near edge (the stop line), forward or back (the platform rule in _initSignals may
+  // still move or hang it). No conflict within 30 m (a cycle path or footway we do not have): an
+  // on-demand crossing (d.demand), resting on GO for the tram.
+  _placeSignals(list) {
+    const C = this._routeConflicts(), GAP = 20;
+    const edge = (lo, hi) => Math.min(...C.slice(lo, hi + 1).map((c) => c.start)); // the cluster's near edge
+    const clusterOf = (k) => { let lo = k, hi = k; while (lo > 0 && C[lo].s - C[lo - 1].s < GAP) lo--; while (hi < C.length - 1 && C[hi + 1].s - C[hi].s < GAP) hi++; return [lo, hi]; };
+    const out = list.map((d) => ({ ...d }));
+    const moved = [];
+    for (const d of out) {
+      const s0 = d.s;
+      d.s0 = s0; // (its input position: a stable id for the annotations, ARCHITECTURE-PROPOSAL.md §10.4)
+      // (the first conflict ahead of the signal, within 40 m: the crossing point can lie between two
+      // clusters, Palackého náměstí s 12435 is 15 m after one and 12 m before the next, and the nearest
+      // one was the far side of the junction)
+      // (from the platform end for a signal standing along a platform: Přístaviště's stood 72 m before
+      // the crossing that follows the platform, matched to nothing and ran on demand mid-platform)
+      const plat = this.stops?.find((st) => d.s > (st.p0 ?? st.target - 30) - 1 && d.s < st.target + 2);
+      const from = plat ? Math.max(d.s, plat.target) : d.s;
+      let k = C.findIndex((c) => c.s > from - 3), best = k < 0 ? Infinity : C[k].s - from;
+      if (best > 40) {
+        k = -1; best = Infinity;
+        C.forEach((c, i) => { const e = Math.abs(c.s - d.cross); if (e < best) { best = e; k = i; } });
+        if (best > 30) k = -1;
+      }
+      if (k < 0) { d.demand = true; moved.push(`${Math.round(s0)} on demand`); continue; }
+      const [lo, hi] = clusterOf(k);
+      // matched to a pedestrian crossing (no street in its cluster) right after a street junction (its
+      // last street crossing within 25 m before the signal) that has no signal of its own: the junction's
+      const ownStreet = C.slice(lo, hi + 1).some((c) => c.car);
+      const behind = C.filter((c) => c.car && c.s < d.s && c.s > d.s - 25);
+      if (!ownStreet && behind.length) {
+        const [blo, bhi] = clusterOf(C.indexOf(behind[behind.length - 1]));
+        const first = edge(blo, bhi);
+        if (!list.some((o) => o !== d && o.s > first - 30 && o.s < first)) {
+          d.s = first - 4; d.edge = first; d.cross = C.slice(blo).find((c) => c.car).s;
+          moved.push(`${Math.round(s0)}→${Math.round(d.s)} (it stood after its junction)`);
+          continue;
+        }
+        // the junction has its signal: this one is for the junction's far-side pedestrian crossing, which
+        // belongs to the same controller; no tram signal of its own after the junction (Kobylisy s 20819)
+        d.drop = true;
+        moved.push(`${Math.round(s0)} dropped (a far-side crossing of the junction before it)`);
+        continue;
+      }
+      d.edge = edge(lo, hi);
+      const want = d.edge - 4;
+      // (forward by 25 m at most: the OSM signal is usually near its stop line; a conflict missing in our
+      // data must not move it far into a junction)
+      if (want > d.s + 25) { moved.push(`${Math.round(s0)} kept (its junction edge ${Math.round(want - d.s)} m on)`); d.farEdge = d.edge; d.edge = d.s + 4; continue; }
+      if (Math.abs(want - d.s) > 1) { d.s = want; moved.push(`${Math.round(s0)}→${Math.round(d.s)}`); }
+    }
+    console.log(`signals placed: ${moved.join(', ')}`);
+    this.signalMoves = moved;
+    return out;
   }
 
   // The street crossing the route at a signalled junction (for cross traffic), as a polyline
@@ -670,8 +803,11 @@ export class Game {
     }
     // a signal that must hang (its place is on a platform) takes a span up to 30 m away
     const reach = hang ? 30 : 16;
-    // (a cross-span; one that must hang may also use a pole's bracket arm over the track)
-    const span = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0];
+    // (a cross-span; one that must hang may also use a pole's bracket arm over the track. Not one
+    // after s: the nearest span was often over the junction, the signal hung in its middle (user,
+    // 2026-10-24); one that must hang takes such a span only when there is none before s)
+    const spans = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
+    const span = spans.find((c) => c.s <= s + 2) || (hang ? spans[0] : null);
     if (span && ud.boardTop !== undefined) {
       // right of the tram: its half width, the overhang of the car ends in a curve, a margin and
       // the board's own half width (it used to hang 1.15 m out, over the tram's roof edge)
@@ -723,21 +859,28 @@ export class Game {
   }
 
   // Wheel/rail adhesion along the line. Rain lowers it everywhere; in autumn, crushed wet
-  // leaves form short, very slippery patches (drawn as brown smears on the rails).
+  // leaves form short, very slippery patches (drawn as a dark leaf mash on and between the rails);
+  // in snow, feet (and cars) pack snow and ice into the rails where they cross the track (the
+  // pedestrian crossings, ±4 m: ~5 % of line 17; road junctions would be the next to add).
   _initAdhesion() {
     this.muBase = ADHESION[this.weather] ?? ADHESION.dry;
     this.patches = [];
+    this.icy = this.weather === 'snow' ? this.data.crossings.map((s) => [s - 4, s + 4]) : [];
     if (this.weather !== 'leaves') return;
-    const mat = new THREE.MeshLambertMaterial({ color: 0x6b4a22, transparent: true, opacity: 0.85 });
+    const mat = new THREE.MeshLambertMaterial({ map: leafTexture(true), alphaTest: 0.35, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const geo = new THREE.PlaneGeometry(1, 1);
     for (let s = 150 + this.rand() * 200; s < this.route.length - 50; s += 180 + this.rand() * 420) {
       const len = 15 + this.rand() * 45;
       this.patches.push([s, s + len]);
-      for (let k = s; k < s + len; k += 4) {
-        const smear = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 4.2), mat);
-        smear.rotation.x = -Math.PI / 2;
+      // overlapping irregular smears, thickest in the middle of the patch
+      for (let k = s; k < s + len; k += 1.6 + this.rand() * 1.4) {
+        const smear = new THREE.Mesh(geo, mat);
+        smear.rotation.set(-Math.PI / 2, 0, this.rand() * Math.PI * 2);
+        const size = (1.4 + this.rand() * 1.4) * (0.6 + 0.4 * Math.sin(Math.PI * (k - s) / len));
+        smear.scale.set(size, size, 1);
         const holder = new THREE.Group();
         holder.add(smear);
-        place(holder, this.route, k + 2, (this.rand() - 0.5) * 0.3, 0.28, false);
+        place(holder, this.route, k, (this.rand() - 0.5) * 1.2, 0.27, false);
         this.objects.add(holder);
       }
     }
@@ -747,6 +890,7 @@ export class Game {
     let mu = this.muBase;
     if (this.weather === 'rain') mu += 0.02 * Math.sin(s / 37);
     for (const [a, b] of this.patches) if (s > a && s < b) return 0.06;
+    for (const [a, b] of this.icy) if (s > a && s < b) return 0.08;
     return mu;
   }
 
@@ -830,20 +974,86 @@ export class Game {
     }
   }
 
+  // The driver gets out with the switch iron (stavědlo; C14; the code keeps the name crowbar): walks
+  // from the cab door along the tram's right side to
+  // the switch (1.6 m/s), throws it (2 s crouched over the points) and walks back; at least 9 s.
   crowbar() {
     if (this.action) return;
     const sw = this.switches.find((w) => !w.passed && w.s - this.tram.s > 0 && w.s - this.tram.s < 40);
     if (!sw) { this.msg(t('msg.noSwitch'), 'warn'); return; }
     if (this.tram.v > 0.05) { this.msg(t('msg.stopFirst'), 'warn'); return; }
+    const door = this.tram.s - 1.5, walk = (sw.s - 0.6 - door) / 1.6, total = Math.max(9, 2 * walk + 2);
+    const driver = makePerson(4);
+    driver.children[1].material.color.set(0xff7a1a); // (the torso: a high-visibility vest)
+    this.objects.add(driver);
     this.action = {
-      label: t('msg.crowbar'), t: 9,
+      label: t('msg.crowbar'), t: total, total, walk, door, at: sw.s - 0.6, driver,
       done: () => {
+        this.objects.remove(driver);
         sw.pos = sw.pos === 'straight' ? 'diverging' : 'straight';
         this._showSwitch(sw);
         this.audio.click(0.3, 400);
         this.msg(t('msg.switchManual', { dir: t(`dirShort.${sw.pos === 'straight' ? 'straight' : sw.divSide}`) }), 'info');
       },
     };
+    this._poseDriver();
+  }
+
+  // the driver out with the switch iron: out along the side of the tram, at the points, back
+  _poseDriver() {
+    const a = this.action;
+    if (!a?.driver) return;
+    const el = a.total - a.t, back = a.total - a.walk;
+    let along, lat = -1.7, crouch = 1;
+    if (el < a.walk) along = a.door + (a.at - a.door) * (el / a.walk);
+    else if (el < back) { along = a.at; lat = -0.6; crouch = 0.7 + 0.08 * Math.sin(el * 5); }
+    else along = a.at - (a.at - a.door) * Math.min(1, (el - back) / a.walk);
+    const o = this.route.offset(along, lat);
+    a.driver.position.set(o.x, this.profile.height(along) + 0.05, -o.y);
+    a.driver.scale.y = crouch;
+  }
+
+  // Late passengers (C14): when the tram arrives they come running along the platform side from behind
+  // (3.4-4 m/s, timed to arrive about runnerDelay later) to the rear door. With the doors open they
+  // join the waiting passengers and board; at closed doors they wait (the driver may open again); left
+  // behind when the tram goes: a penalty.
+  _spawnRunners(st) {
+    const tr = this.tram;
+    for (let k = 0; k < st.runners; k++) {
+      const mesh = makePerson(11 + st.i + k);
+      this.objects.add(mesh);
+      const target = tr.s - tr.length + 2.2 + k * 0.6;
+      this.runners.push({ mesh, st, s: target - 6 - k * 2.5 - 3.4 * st.runnerDelay, lat: -3.4 + (k % 2) * 0.5, v: 3.4 + this.rand() * 0.6, target, state: 'run' });
+    }
+    this.msg(t('msg.runners', { n: st.runners }), 'info');
+    st.runners = 0;
+  }
+
+  // is anybody still running for the tram at this stop (the autopilot keeps its doors open)
+  runnersFor(st) { return this.runners.some((r) => r.st === st && r.state !== 'left'); }
+
+  _updateRunners(dt) {
+    const tr = this.tram;
+    for (const r of this.runners) {
+      if (r.state === 'run') {
+        r.s = Math.min(r.target, r.s + r.v * dt);
+        r.lat += (-1.9 - r.lat) * Math.min(1, dt * 0.8); // towards the platform edge by the door
+        if (r.s >= r.target) r.state = 'door';
+      }
+      if (r.state !== 'left') {
+        const open = this.doorState === 'open' || this.doorState === 'opening';
+        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { r.st.waiting++; r.state = 'aboard'; }
+        else if (tr.s > r.st.zone[1] + 2 || (tr.v > 0.5 && this.doorState === 'closed')) { // (the tram leaves)
+          r.state = 'left';
+          this.penalty('leftBehind', 15, t('msg.runnerLeft'));
+        }
+      }
+      const o = this.route.offset(r.s, r.lat), bob = r.state === 'run' ? Math.abs(Math.sin(r.s * 2.2)) * 0.08 : 0;
+      r.mesh.position.set(o.x, this.profile.height(r.s) + 0.44 + bob, -o.y);
+    }
+    // aboard, or left far behind: gone
+    for (const r of this.runners) if (r.state === 'aboard' || (r.state === 'left' && tr.s - r.s > 150)) this.objects.remove(r.mesh);
+    this.runners = this.runners.filter((r) => !(r.state === 'aboard' || (r.state === 'left' && tr.s - r.s > 150)));
   }
 
   // ------------------------------------------------------------------ update
@@ -872,6 +1082,7 @@ export class Game {
     if (this.action) {
       this.action.t -= dt;
       tram.forcedStop = true;
+      this._poseDriver();
       if (this.action.t <= 0) { const a = this.action; this.action = null; a.done(); }
     } else if (this.holdTimer > 0) {
       this.holdTimer -= dt;
@@ -890,6 +1101,7 @@ export class Game {
 
     this._updateDoors(dt);
     this._updateStops(dt);
+    this._updateRunners(dt);
     this.input = input;
     this._updateClimate(dt);
     this._updateSwitches(prevS);
@@ -941,6 +1153,7 @@ export class Game {
       const err = tram.s - st.target;
       if (Math.abs(err) < 3) this.bonus(15, t('msg.precise'));
       else if (err > 4) this.penalty('precision', 20, t('msg.overshot', { d: Math.round(err) }));
+      if (st.runners > 0) this._spawnRunners(st);
     }
     if (st.arrived && !st.alightSet) {
       st.alightSet = true;
@@ -962,12 +1175,6 @@ export class Game {
         this.msg(t('msg.full', { n: st.waiting }), 'warn', 5);
         st.leftFull = st.waiting;
         st.waiting = 0;
-      }
-      // late runners
-      if (st.runners > 0 && this.clock - st.arriveClock > st.runnerDelay) {
-        st.waiting += st.runners;
-        this.msg(t('msg.runners', { n: st.runners }), 'info');
-        st.runners = 0;
       }
     }
     // last passengers of the old line are out: the route boxes and the HUD show the new line
@@ -1137,31 +1344,48 @@ export class Game {
 
   // Junction controller (fixed cycle, see _initSignals) with tram priority: a tram detected 140 m
   // before the signal cuts the cross street's green short (after at least 8 s of it) and jumps to
-  // our tram phase; a tram committed to the junction (dilemma zone) holds our GO up to 10 s more.
-  // Sets sig.state (our head: go / warn = last 3 s / stop), sig.timer (s to the next change of our
-  // head) and sig.backState (go while trams straight through have GO: the opposite direction).
+  // our tram phase; a tram committed to the junction (dilemma zone: too close to stop when the GO
+  // starts blinking) holds the phase up to 10 s more: ours, an AI tram ahead of us (sig.aheadCommitted)
+  // or an oncoming one (sig.backCommitted; both set by traffic.js). Sets sig.state (our head: go / warn = last 3 s / stop), sig.timer (s to the
+  // next change of our head) and sig.backState (the opposite direction, whose GO is the straight
+  // phase but ends 3 s before it for clearance: go / warn = its last 3 s, blinking / stop).
   _runController(sig, dt) {
     const tram = this.tram, Y = sig.cycle, dist = sig.s - tram.s;
     const [a, b] = Y.ours;
     const inOurs = () => sig.t >= a && sig.t < b;
-    if (dist > 0 && dist < 140 && !inOurs()) {
-      if (!sig.preferred) sig.preferred = true;
+    const ourCall = dist > 0 && dist < 140;
+    if ((ourCall || sig.aiRequest) && !inOurs()) {
+      if (ourCall && !sig.preferred) sig.preferred = true; // (the call lamp: our tram's request)
       // cut the cross street's green short once it had its minimum: on to the tram phases (the
       // straight one first, so the opposite direction is never starved when our route turns:
-      // that deadlocked the Letenská single track)
-      if (sig.t >= Y.cross + 8) sig.t = 0;
+      // that deadlocked the Letenská single track) through the cross street's amber and all-red
+      // (D2: its cars see the lights now; the jump straight to 0 turned them from green to red)
+      if (sig.t >= Y.cross + 8 && sig.t < Y.C - 6) sig.t = Y.C - 6;
     }
     if (dist < -tram.length) sig.preferred = false;
     // dilemma zone: hold GO for a tram committed to the junction
-    const committed = dist > 0 && dist < 15 + (tram.v * tram.v) / 1.6;
-    if (inOurs() && b - sig.t < 3.2 && committed && sig.ext < 10) sig.ext += dt;
-    else sig.t += dt;
-    if (sig.t >= Y.C) { sig.t -= Y.C; sig.ext = 0; }
+    // (committed: moving, and too close to stop comfortably before the stop point 3 m before the
+    // signal, the autopilot's own test; "within 15 m + v²/1.6" held the phase 10 s for a slow tram still
+    // 50 m out, and the hold was spent before it arrived, line 17 s 10251; standing: it can wait)
+    const committed = dist > 0 && tram.v > 1 && dist - 3 < (tram.v * tram.v) / 1.8 + tram.v;
+    // (each its own 10 s: our tram, an AI tram ahead of it, an oncoming one; holding for another tram
+    // used a shared budget up, and ours then got a red it could not stop for, line 17 s 3158, 10251)
+    const backWarn = sig.t >= Y.gS - 6 && sig.t < Y.gS - 3, endOurs = inOurs() && b - sig.t < 3.2;
+    const holds = [['ext', endOurs && committed], ['extAhead', endOurs && sig.aheadCommitted], ['extBack', backWarn && sig.backCommitted]];
+    const h = holds.find(([k, want]) => want && (sig[k] ?? 0) < 10);
+    // an on-demand crossing (sig.demand: no street or footway we know there) rests on GO for the trams
+    // (before both directions' blinking) until someone asks to cross, about every two minutes; then
+    // one cycle runs
+    const rest = sig.demand && Y.gT === 0 && !sig.request && inOurs() && sig.t >= a + 1 && b - sig.t > 6.5;
+    if (rest && this.rand() < dt / 120) sig.request = true;
+    if (h) sig[h[0]] = (sig[h[0]] ?? 0) + dt;
+    else if (!rest) sig.t += dt;
+    if (sig.t >= Y.C) { sig.t -= Y.C; sig.ext = 0; sig.extAhead = 0; sig.extBack = 0; sig.request = false; }
     const prev = sig.state;
     sig.state = inOurs() ? (b - sig.t > 3 ? 'go' : 'warn') : 'stop';
     if (sig.state === 'stop' && prev !== 'stop') sig.stopSince = this.clock;
     sig.timer = sig.state === 'go' ? b - 3 - sig.t : sig.state === 'warn' ? b - sig.t : (a - sig.t + Y.C) % Y.C;
-    const back = sig.t < Y.gS - 3 ? 'go' : 'stop';
+    const back = sig.t < Y.gS - 6 ? 'go' : sig.t < Y.gS - 3 ? 'warn' : 'stop';
     if (back === 'stop' && sig.backState !== 'stop') sig.backStopSince = this.clock;
     sig.backState = back;
   }
@@ -1278,6 +1502,13 @@ export class Game {
       }
       if (tram.s < rear - 5) ai.hit = false;
     }
+  }
+
+  // where the current line goes (the destination card): the stop where the run changes its number,
+  // else the last stop
+  get destination() {
+    const i = this.segments.findIndex((g) => g.line === this.line), next = this.segments[i + 1];
+    return this.data.stops[next ? next.from : this.data.stops.length - 1].name;
   }
 
   _changeLine(line) {

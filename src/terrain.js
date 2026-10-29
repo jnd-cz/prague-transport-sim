@@ -90,15 +90,35 @@ export class Terrain extends Grid {
 
   // every grid the edits apply to: the coarse one (as a plain Grid view) and the fine blocks
   grids() {
+    return [this.coarse(), ...this.fine.values()];
+  }
+
+  // the coarse grid as a plain Grid (its height ignores the fine blocks)
+  coarse() {
     if (!this._coarse) this._coarse = new Grid(this.x0, this.y0, this.dx, this.dy, this.nx, this.ny, this.h);
-    return [this._coarse, ...this.fine.values()];
+    return this._coarse;
   }
 
   // lower the surface at (x, y) to at most zmax in every grid (cap: deeper is not ours to dig; on a
   // fine block at least 15 m: a 2 m cell lowered stays local, where a coarse 10 x 15 m triangle
   // dragged its surroundings down; quay walls stood 8-9 m over the surveyed river)
   lowerAt(x, y, zmax, cap = Infinity) {
-    for (const g of this.grids()) if (g.contains(x, y)) g.lowerAt(x, y, zmax, g.h === this.h ? cap : Math.max(cap, 15));
+    const c = this.coarse();
+    if (c.contains(x, y)) c.lowerAt(x, y, zmax, cap);
+    for (const g of this.finesAt(x, y)) g.lowerAt(x, y, zmax, Math.max(cap, 15));
+  }
+
+  // the fine blocks whose area (edges included) holds (x, y): at most the four around a block corner,
+  // looked up by index (scanning every block made the lowering under the streets take a minute)
+  finesAt(x, y) {
+    const m = this.fineMeta, out = [];
+    if (!m) return out;
+    const fx = (x - m.x0) / m.bs, fy = (m.y0 - y) / m.bs, bi = Math.floor(fx), bj = Math.floor(fy);
+    for (let i = bi - 1; i <= bi; i++) for (let j = bj - 1; j <= bj; j++) {
+      const g = this.fine.get(`${i},${j}`);
+      if (g && g.contains(x, y)) out.push(g);
+    }
+    return out;
   }
 }
 
@@ -692,9 +712,8 @@ export class DtmSurface {
       if (!this.zgrid.has(key)) this.zgrid.set(key, []);
       this.zgrid.get(key).push(zf[i], zf[i + 1], zf[i + 2]);
     }
-    this.cell = 10;
-    this.grid = new Map();
-    this.deckGrid = new Map(); // level 1: bridge decks and the streets on them
+    this.grid = new TriIndex();
+    this.deckGrid = new TriIndex(); // level 1: bridge decks and the streets on them
     this.areas = [];
     // underground areas (a road tunnel's floor: the Vyšehrad tunnel) are not drawn, but their outlines
     // tell the tunnel's width and where its road and footway are
@@ -725,7 +744,7 @@ export class DtmSurface {
         for (let i = 0; i < a.t.length; i += 3) {
           const tri = [a.v[a.t[i]], a.v[a.t[i + 1]], a.v[a.t[i + 2]]];
           area.mesh.push(tri);
-          this._index(this.grid, [...tri, rank, a.c]);
+          this.grid.add(tri, rank, a.c);
         }
         this.areas.push(area);
         continue;
@@ -756,12 +775,14 @@ export class DtmSurface {
         else if (a.l === 0 && a.c === 'green') this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, 10);
         else area.mesh.push([p, q, r]);
         // the height lookup uses exactly the drawn triangles, so cars stand on what is drawn
-        if (ground) for (let m = n0; m < area.mesh.length; m++) this._index(this.grid, [...area.mesh[m], rank, a.c]);
+        if (ground) for (let m = n0; m < area.mesh.length; m++) this.grid.add(area.mesh[m], rank, a.c);
         // (decks by reference: world.js lays the decks of our bridges to the track profile afterwards)
-        if (a.l >= 1 && DECK.has(a.c)) for (let m = n0; m < area.mesh.length; m++) this._index(this.deckGrid, [...area.mesh[m], a.l, a.c]);
+        if (a.l >= 1 && DECK.has(a.c)) for (let m = n0; m < area.mesh.length; m++) this.deckGrid.add(area.mesh[m], a.l, a.c);
       }
       this.areas.push(area);
     }
+    this.grid.freeze();
+    this.deckGrid.freeze();
   }
   _hit(x, y) {
     const t = this._hitTri(x, y);
@@ -773,12 +794,13 @@ export class DtmSurface {
     return t ? t.c : null;
   }
   _hitTri(x, y, ref = null) {
-    const arr = this.grid.get(Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell));
-    if (!arr) return null;
+    const ix = this.grid, k = ix.at(x, y);
+    if (k < 0) return null;
     // overlapping ground-level areas: the one closest to the lidar ground (or to `ref`), then by rank
     const g = ref ?? this.terrain.height(x, y);
-    let best = null, bestScore = Infinity;
-    for (const [p, q, r, rank, c] of arr) {
+    let best = -1, bestZ = 0, bestScore = Infinity;
+    for (let n = ix.start[k], end = ix.start[k + 1]; n < end; n++) {
+      const id = ix.ids[n], t = ix.tris[id], p = t[0], q = t[1], r = t[2];
       const d = (q[1] - r[1]) * (p[0] - r[0]) + (r[0] - q[0]) * (p[1] - r[1]);
       if (Math.abs(d) < 1e-9) continue;
       const w1 = ((q[1] - r[1]) * (x - r[0]) + (r[0] - q[0]) * (y - r[1])) / d;
@@ -786,10 +808,10 @@ export class DtmSurface {
       const w3 = 1 - w1 - w2;
       if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
       const z = w1 * p[2] + w2 * q[2] + w3 * r[2];
-      const score = Math.abs(z - g) - rank * 0.05;
-      if (score < bestScore) { best = { z, c }; bestScore = score; }
+      const score = Math.abs(z - g) - ix.val[id] * 0.05;
+      if (score < bestScore) { best = id; bestZ = z; bestScore = score; }
     }
-    return best;
+    return best < 0 ? null : { z: bestZ, c: ix.classOf(best) };
   }
   // inverse distance weighted surveyed height within r m, or null; with `ref`, only points within
   // `tol` of it count (a street above or below, or a kerb top, must not pull the surface)
@@ -823,26 +845,15 @@ export class DtmSurface {
     this._split(p, m, r, ground, out, depth + 1, maxEdge);
     this._split(m, q, r, ground, out, depth + 1, maxEdge);
   }
-  // ground-level surface height where a DTM area covers (x, y): the surveyed points around,
-  // else the area's own triangles
-  // (t: [p, q, r, ...] with p = [x, y, z])
-  _index(grid, t) {
-    const [ax, ay, bx, by, cx, cy] = [t[0][0], t[0][1], t[1][0], t[1][1], t[2][0], t[2][1]];
-    const x0 = Math.min(ax, bx, cx), x1 = Math.max(ax, bx, cx), y0 = Math.min(ay, by, cy), y1 = Math.max(ay, by, cy);
-    for (let ix = Math.floor(x0 / this.cell); ix <= Math.floor(x1 / this.cell); ix++) for (let iy = Math.floor(y0 / this.cell); iy <= Math.floor(y1 / this.cell); iy++) {
-      const key = ix * 100003 + iy;
-      if (!grid.has(key)) grid.set(key, []);
-      grid.get(key).push(t);
-    }
-  }
   // top of a surveyed surface on a structure (bridge deck, level 1+) over (x, y), or null: the one
   // nearest to `ref` (within `tol`) when given, else the highest level-1 surface (then any level)
   deckAt(x, y, ref = null, tol = Infinity, cls = null) {
-    const arr = this.deckGrid.get(Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell));
-    if (!arr) return null;
+    const ix = this.deckGrid, k = ix.at(x, y);
+    if (k < 0) return null;
     let best = null, score = Infinity;
-    for (const [p, q, r, l, c] of arr) {
-      if (cls && c !== cls) continue;
+    for (let n = ix.start[k], end = ix.start[k + 1]; n < end; n++) {
+      const id = ix.ids[n], t = ix.tris[id], p = t[0], q = t[1], r = t[2], l = ix.val[id];
+      if (cls && ix.classOf(id) !== cls) continue;
       const d = (q[1] - r[1]) * (p[0] - r[0]) + (r[0] - q[0]) * (p[1] - r[1]);
       if (Math.abs(d) < 1e-9) continue;
       const w1 = ((q[1] - r[1]) * (x - r[0]) + (r[0] - q[0]) * (y - r[1])) / d;
@@ -873,7 +884,71 @@ export class DtmSurface {
     }
     return null;
   }
-  covered(x, y) { return this.grid.has(Math.floor(x / this.cell) * 100003 + Math.floor(y / this.cell)); }
+  covered(x, y) { return this.grid.covered(x, y); }
+}
+
+// Triangles of the surveyed areas by 3 m cell, for the height and deck lookups. The triangles are
+// the areas' own mesh triangles by reference (world.js moves their heights afterwards: flush with
+// the tracks, bridge decks, tunnel mouths; the lookups see that), numbered in one list, each with a
+// value (rank or level) and a class. The cells' triangle numbers lie in one Int32Array (`ids`), cell
+// k's from start[k] to start[k + 1]. (It was 10 m cells, each entry a new [p, q, r, value, class]
+// array: 4.8 M of them on line 17, ~250 MB, and ~100 triangles tested per lookup; now ~20.)
+// `covered` keeps the 10 m cells: callers ask whether the survey is about at all.
+const TRI_CELL = 3, COVER_CELL = 10;
+class TriIndex {
+  constructor() {
+    this.tris = [];
+    this.vals = [];
+    this.clsIds = [];
+    this.classes = [];
+    this.classId = new Map();
+    this.lists = new Map(); // key -> triangle numbers while building
+    this.cover = new Set(); // 10 m keys with a triangle
+  }
+
+  add(t, val, c) {
+    const id = this.tris.length;
+    this.tris.push(t);
+    this.vals.push(val);
+    if (!this.classId.has(c)) { this.classId.set(c, this.classes.length); this.classes.push(c); }
+    this.clsIds.push(this.classId.get(c));
+    const ax = t[0][0], ay = t[0][1], bx = t[1][0], by = t[1][1], cx = t[2][0], cy = t[2][1];
+    const x0 = Math.min(ax, bx, cx), x1 = Math.max(ax, bx, cx), y0 = Math.min(ay, by, cy), y1 = Math.max(ay, by, cy);
+    for (let ix = Math.floor(x0 / TRI_CELL); ix <= Math.floor(x1 / TRI_CELL); ix++) for (let iy = Math.floor(y0 / TRI_CELL); iy <= Math.floor(y1 / TRI_CELL); iy++) {
+      const key = ix * 100003 + iy;
+      let arr = this.lists.get(key);
+      if (!arr) this.lists.set(key, arr = []);
+      arr.push(id);
+    }
+    for (let ix = Math.floor(x0 / COVER_CELL); ix <= Math.floor(x1 / COVER_CELL); ix++) for (let iy = Math.floor(y0 / COVER_CELL); iy <= Math.floor(y1 / COVER_CELL); iy++) this.cover.add(ix * 100003 + iy);
+  }
+
+  // after the last add: the compact form
+  freeze() {
+    let n = 0;
+    for (const arr of this.lists.values()) n += arr.length;
+    this.ids = new Int32Array(n);
+    this.start = new Int32Array(this.lists.size + 1);
+    this.cells = new Map(); // key -> cell number
+    let k = 0, o = 0;
+    for (const [key, arr] of this.lists) {
+      this.cells.set(key, k);
+      this.start[k++] = o;
+      this.ids.set(arr, o);
+      o += arr.length;
+    }
+    this.start[k] = o;
+    this.val = Float32Array.from(this.vals);
+    this.cls = Uint8Array.from(this.clsIds);
+    this.lists = this.vals = this.clsIds = null;
+  }
+
+  // the cell number at (x, y), or -1
+  at(x, y) { return this.cells.get(Math.floor(x / TRI_CELL) * 100003 + Math.floor(y / TRI_CELL)) ?? -1; }
+
+  covered(x, y) { return this.cover.has(Math.floor(x / COVER_CELL) * 100003 + Math.floor(y / COVER_CELL)); }
+
+  classOf(id) { return this.classes[this.cls[id]]; }
 }
 
 export function makeGround(route, terrain, profile, dtm = null) {

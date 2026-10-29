@@ -2,9 +2,13 @@
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
 import { DTM_LIFT, FLUSH } from './terrain.js';
+import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
 const CELL = 350; // spatial chunk size (m) for merged meshes, so frustum culling can skip far chunks
 const TERRAIN_CHUNK = 20; // terrain cells per chunk side
+// how much of the snow stays on a surface (src/weather.js): carriageways are driven and ploughed,
+// footways trodden; ground, roofs, ballast take it all
+const STREET_SNOW = 0.35, FOOT_SNOW = 0.7, GROUND_SNOW = 1;
 
 // deterministic pseudo random
 export function rng(seed) {
@@ -333,13 +337,33 @@ const FACADE_COLORS = ['#e8d9b5', '#d9c7a0', '#efe3c8', '#c9b79a', '#e3c9b0', '#
   '#e0b9a0', '#b9c4c9', '#d8cfb8', '#f0e6d2'].map((c) => new THREE.Color(c));
 const ROOF_COLORS = ['#8c4a32', '#7a3f2c', '#5f5a55', '#6d6862', '#9a5638', '#4f4b47'].map((c) => new THREE.Color(c));
 
-export function buildWorld(scene, data, route, ground, weather) {
+// The parts of buildWorld in order, with their usual share of its time (line 17, ms) and the loading
+// screen's label for them. (A line without the surveyed streets skips the two DTM parts.)
+export const WORLD_PARTS = [
+  ['tracks + tunnel roads', 1600, 'tracks'], ['terrain under tracks', 100, 'terrain'], ['terrain under DTM', 4700, 'terrain'],
+  ['fine under DTM', 750, 'terrain'], ['fine to tunnel mouths', 100, 'terrain'], ['terrain mesh', 1100, 'terrain'],
+  ['DTM streets', 3800, 'streets'], ['OSM roads', 300, 'roads'], ['track bed + rails', 100, 'roads'], ['track support', 1200, 'roads'],
+  ['zebras', 50, 'roads'], ['walls', 20, 'roads'], ['bridges + tunnels', 20, 'roads'], ['buildings', 3300, 'buildings'],
+  ['trees', 200, 'wires'], ['catenary', 200, 'wires'],
+];
+
+// onPart(name): called (and awaited) after each part, so a loading screen can show the progress.
+// The world is the same in every weather: group.userData.setWeather(w) sets it (src/weather.js).
+export async function buildWorld(scene, data, route, ground, onPart = null) {
   const group = new THREE.Group();
   group.matrixAutoUpdate = false;
   scene.add(group);
+  // time of each part (window.worldTimes, logged at the end: what to optimize)
+  const times = {};
+  let lap = performance.now();
+  const mark = async (k) => {
+    times[k] = Math.round(performance.now() - lap);
+    if (onPart) await onPart(k);
+    lap = performance.now();
+  };
 
   // far fallback ground below the terrain
-  const far = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), new THREE.MeshLambertMaterial({ color: 0x8a897d }));
+  const far = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), weatherize(new THREE.MeshLambertMaterial({ color: 0x8a897d }), { wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW }));
   far.rotation.x = -Math.PI / 2;
   far.position.y = ground.terrain.min - 3;
   scene.add(far);
@@ -395,21 +419,28 @@ export function buildWorld(scene, data, route, ground, weather) {
     else if (r.c) tunnelPortals.push({ r, tf, L });
   }
   const mouths = roadPortalMouths(tunnelPortals);
+  await mark('tracks + tunnel roads');
   lowerTerrainUnderTracks(data, ground.terrain, inTunnel);
-  if (ground.dtm) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); lowerFineUnderDtm(ground.dtm, ground.terrain); }
+  await mark('terrain under tracks');
+  if (ground.dtm) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); await mark('terrain under DTM'); lowerFineUnderDtm(ground.dtm, ground.terrain); await mark('fine under DTM'); }
   const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
   fitFineToMouths(ground.terrain, mouths);
-  buildTerrain(group, data, route, ground.terrain, weather, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
+  await mark('fine to tunnel mouths');
+  buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
+  await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
-  if (ground.dtm) buildDtm(group, ground, weather !== 'dry');
+  if (ground.dtm) buildDtm(group, ground);
+  await mark('DTM streets');
 
-  const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  const wet = weather !== 'dry';
+  // (the weather is the materials' state, src/weather.js: everything is built in its dry colours, each
+  // material with how much darker it gets wet (the old wet colours as factors) and how snow lies on it)
+  const flatMat = (dry, wetHex, snow = STREET_SNOW) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true }), { wet: wetFactor(dry, wetHex), snow, slush: true });
 
   // roads (wider first so footways draw on top)
-  const roadsCg = new ChunkedGeometry(flatMat, { color: true });
-  const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), paving = new THREE.Color(wet ? '#86817a' : '#a39d90').toArray();
+  const roadsCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43'), { color: true });
+  const footCg = new ChunkedGeometry(flatMat('#a39d90', '#86817a', FOOT_SNOW), { color: true });
+  const asphalt = new THREE.Color('#55565a').toArray(), paving = new THREE.Color('#a39d90').toArray();
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
     if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
     if (r.t) continue; // (road tunnels: above)
@@ -417,15 +448,21 @@ export function buildWorld(scene, data, route, ground, weather) {
     const runs = ground.dtm ? uncoveredRuns(r.p, ground.dtm, r.b ? wayHeight(r.way || r.p, true, ground) : null) : [r.p];
     // (a bridge spans between the ends of the whole way, not of the piece drawn)
     const hf = r.b ? wayHeight(r.way || r.p, true, ground) : null;
-    for (const run of runs) addRibbon(roadsCg, run, r.w, hf || wayHeight(run, false, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
+    for (const run of runs) addRibbon(r.f ? footCg : roadsCg, run, r.w, hf || wayHeight(run, false, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt);
   }
-  for (const { r, inside, tf } of tunnelRoads) addRibbon(roadsCg, inside, r.w, tf, 0.12, asphalt);
+  // (road tunnels: no snow inside)
+  const tunnelCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43', 0), { color: true });
+  for (const { r, inside, tf } of tunnelRoads) addRibbon(tunnelCg, inside, r.w, tf, 0.12, asphalt);
   roadsCg.build(group, 'road');
+  footCg.build(group, 'road');
+  tunnelCg.build(group, 'road');
+  await mark('OSM roads');
 
   // track bed + rails for every tram track around the route
-  const bedCg = new ChunkedGeometry(flatMat, { color: true });
-  const bed = new THREE.Color(wet ? '#5f5c56' : '#77736a').toArray();
-  const railMat = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.6, roughness: wet ? 0.2 : 0.4 });
+  const bedCg = new ChunkedGeometry(flatMat('#77736a', '#5f5c56'), { color: true });
+  const bed = new THREE.Color('#77736a').toArray();
+  // (rails: glossy when wet, roughness set by the weather; trams keep them clear of snow)
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.6, roughness: 0.4 });
   const railCg = new ChunkedGeometry(railMat);
   for (const t of data.tracks) {
     addRibbon(bedCg, t.smooth, 2.7, t.z, 0.2, bed);
@@ -444,28 +481,49 @@ export function buildWorld(scene, data, route, ground, weather) {
   }
   bedCg.build(group, 'bed');
   railCg.build(group);
-  buildTrackSupport(group, route, ground, trackDist, wet);
+  await mark('track bed + rails');
+  buildTrackSupport(group, route, ground, trackDist);
+  await mark('track support');
 
-  buildZebras(group, data, ground, trackDist, wet);
+  buildZebras(group, data, ground, trackDist);
+  await mark('zebras');
 
   buildWalls(group, data, route, ground);
+  await mark('walls');
 
   buildBridges(group, data, route, ground);
-  buildRockTunnels(group, route, ground, rock, TUN_W, wet);
-  buildRoadPortals(group, mouths, ground.terrain, wet);
+  buildRockTunnels(group, route, ground, rock, TUN_W);
+  buildRoadPortals(group, mouths, ground.terrain);
+  await mark('bridges + tunnels');
 
   if (data.geo?.buildings?.arr) buildLod2(group, data, route, ground);
   else buildOsmBuildings(group, data, route, ground);
+  await mark('buildings');
 
-  buildTrees(group, data, ground, weather, trackDist);
+  const trees = buildTrees(group, data, ground, trackDist);
+  await mark('trees');
   buildCatenary(group, data, route, ground, trackDist);
+  await mark('catenary');
+  window.worldTimes = times;
+  console.log('world build (ms)', times);
+  // the weather: shader uniforms shared by all patched materials, the rails' gloss, the trees' crowns
+  // and the fallen leaves (instant: nothing is rebuilt)
+  group.userData.setWeather = (w) => {
+    const look = WEATHER_LOOK[w] || WEATHER_LOOK.dry;
+    WEATHER_UNIFORMS.uWet.value = look.wet;
+    WEATHER_UNIFORMS.uSnow.value = look.snow;
+    WEATHER_UNIFORMS.uAutumn.value = look.autumn;
+    railMat.roughness = look.wet ? 0.2 : 0.4;
+    trees.setWeather(w);
+  };
   return group;
 }
 
 // Fallback: OSM footprints extruded to their tagged height, sitting on the terrain.
 function buildOsmBuildings(group, data, route, ground) {
-  const facadeMat = new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true });
-  const roofMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // (snow on the roofs: the faces that point up)
+  const facadeMat = weatherize(new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true }), { snow: GROUND_SNOW });
+  const roofMat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true }), { snow: GROUND_SNOW });
   const walls = new ChunkedGeometry(facadeMat, { uv: true, color: true });
   const roofs = new ChunkedGeometry(roofMat, { color: true });
   let skipped = 0;
@@ -539,11 +597,12 @@ function buildLod2(group, data, route, ground) {
   const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
   const side = THREE.DoubleSide;
   const CLASSES = {
-    old: { mat: new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true, side }), w: 3.5, h: 3.2 },
-    panel: { mat: new THREE.MeshLambertMaterial({ map: panelTexture(), vertexColors: true, side }), w: 3.6, h: 2.8 },
-    church: { mat: new THREE.MeshLambertMaterial({ map: churchTexture(), vertexColors: true, side }), w: 5, h: 9 },
-    industrial: { mat: new THREE.MeshLambertMaterial({ map: industrialTexture(), vertexColors: true, side }), w: 6, h: 4 },
-    glass: { mat: new THREE.MeshLambertMaterial({ map: glassTexture(), vertexColors: true, side }), w: 1.5, h: 3.6 },
+    // (snow on whatever points up: roofs, ledges)
+    old: { mat: weatherize(new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true, side }), { snow: GROUND_SNOW }), w: 3.5, h: 3.2 },
+    panel: { mat: weatherize(new THREE.MeshLambertMaterial({ map: panelTexture(), vertexColors: true, side }), { snow: GROUND_SNOW }), w: 3.6, h: 2.8 },
+    church: { mat: weatherize(new THREE.MeshLambertMaterial({ map: churchTexture(), vertexColors: true, side }), { snow: GROUND_SNOW }), w: 5, h: 9 },
+    industrial: { mat: weatherize(new THREE.MeshLambertMaterial({ map: industrialTexture(), vertexColors: true, side }), { snow: GROUND_SNOW }), w: 6, h: 4 },
+    glass: { mat: weatherize(new THREE.MeshLambertMaterial({ map: glassTexture(), vertexColors: true, side }), { snow: GROUND_SNOW }), w: 1.5, h: 3.6 },
   };
   // OSM footprints say what a building is (church, apartments, warehouse ...)
   const osm = new FootprintIndex(data.buildings.map((b) => b.p));
@@ -555,7 +614,7 @@ function buildLod2(group, data, route, ground) {
   };
   data.buildings.forEach((b, i) => { osm.entries[i].kind = b.k; });
   const counts = {};
-  const roofMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const roofMat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { snow: GROUND_SNOW });
   let bIndex = 0, lifted = 0, total = 0;
   // the car roads on bridges: a bridge model is cut out over them too (half their width, 0.4-4.5 m over
   // their surface; parapet blocks 1.2-1.7 m over the deck stood in the lanes, the lint deckClip)
@@ -885,19 +944,25 @@ function flushDtm(ground) {
   for (const [p, dz] of deckMoves) p[2] += dz;
 }
 
-function buildDtm(group, ground, wet) {
+// (by weather: carriageways get slush, footways and the rest trodden snow, lawns all of it; all but
+// lawns and water 0.8 darker when wet)
+const DTM_KIND = { road: 'street', parking: 'street', tram: 'street', cycle: 'street', green: 'green', water: 'water' };
+function buildDtm(group, ground) {
   const dtm = ground.dtm;
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
+  const cgs = {
+    street: new ChunkedGeometry(mat({ wet: 0.8, snow: STREET_SNOW, slush: true }), { color: true }),
+    other: new ChunkedGeometry(mat({ wet: 0.8, snow: FOOT_SNOW }), { color: true }),
+    green: new ChunkedGeometry(mat({ snow: GROUND_SNOW }), { color: true }),
+    water: new ChunkedGeometry(mat({}), { color: true }),
+  };
   const color = {};
-  for (const [k, v] of Object.entries(DTM_COLORS)) {
-    const c = new THREE.Color(v);
-    if (wet && k !== 'green' && k !== 'water') c.multiplyScalar(0.8);
-    color[k] = c.toArray();
-  }
+  for (const [k, v] of Object.entries(DTM_COLORS)) color[k] = new THREE.Color(v).toArray();
   for (const a of dtm.areas) {
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
     const col = color[a.c] || color.paved;
+    const cg = cgs[DTM_KIND[a.c] || 'other'];
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
     const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
@@ -930,20 +995,22 @@ function buildDtm(group, ground, wet) {
       }
     });
   }
-  buildDtmSteps(cg, ground, color.wall);
-  cg.build(group, 'dtm');
+  buildDtmSteps(cgs.other, ground, color.wall);
+  for (const cg of Object.values(cgs)) cg.build(group, 'dtm');
 }
 
 // Our tunnels through rock: a vault over both tracks and the road (walls to 4.8 m, an arch to 7.2 m
 // over the rails), the rock above it at the lidar ground (wider than the hole cut in the terrain, a
 // little above it, so the coarse terrain edge never shows a gap) and the two portal faces between the
 // vault and the rock top. Every 2 m along the span.
-function buildRockTunnels(group, route, ground, rock, HW, wet) {
+function buildRockTunnels(group, route, ground, rock, HW) {
   if (!rock.length) return;
   const T = ground.terrain, pr = ground.profile;
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
-  const stone = new THREE.Color(wet ? '#6b6559' : '#8b8475').toArray(), vault = new THREE.Color(wet ? '#4b4943' : '#5d5a52').toArray();
-  const top = new THREE.Color(wet ? '#5a6248' : '#6f7a55').toArray();
+  // outside (the portals and the rock top) wet and snowy in the weather; the vault and the floor inside dry
+  const cg = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { wet: wetFactor('#8b8475', '#6b6559'), snow: GROUND_SNOW }), { color: true });
+  const inner = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const stone = new THREE.Color('#8b8475').toArray(), vault = new THREE.Color('#5d5a52').toArray();
+  const top = new THREE.Color('#6f7a55').toArray();
   const P = (s, lat, z) => { const o = route.offset(s, lat); return W(o.x, o.y, z); };
   const rockTop = (s, l) => { const o = route.offset(s, l); return Math.max(T.height(o.x, o.y) + 0.05, pr.height(s) + 9); };
   for (const [a, b] of rock) {
@@ -967,10 +1034,10 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
     const n = Math.max(2, Math.ceil((b - a) / 2));
     for (let k = 0; k < n; k++) {
       const s0 = a + ((b - a) * k) / n, s1 = a + ((b - a) * (k + 1)) / n, z0 = pr.height(s0), z1 = pr.height(s1);
-      const c = cg._chunk(route.at(s0).x, route.at(s0).y);
+      const c = cg._chunk(route.at(s0).x, route.at(s0).y), ci = inner._chunk(route.at(s0).x, route.at(s0).y);
       for (let i = 0; i < prof.length - 1; i++) {
         const [l0, h0] = prof[i], [l1, h1] = prof[i + 1];
-        cg.quad(c, P(s0, l0, z0 + h0), P(s1, l0, z1 + h0), P(s1, l1, z1 + h1), P(s0, l1, z0 + h1), vault);
+        inner.quad(ci, P(s0, l0, z0 + h0), P(s1, l0, z1 + h0), P(s1, l1, z1 + h1), P(s0, l1, z0 + h1), vault);
       }
       for (let lat = R0; lat < R1; lat += 2) {
         cg.quad(c, P(s0, lat, rockTop(s0, lat)), P(s0, lat + 2, rockTop(s0, lat + 2)), P(s1, lat + 2, rockTop(s1, lat + 2)), P(s1, lat, rockTop(s1, lat)), top);
@@ -992,7 +1059,7 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
     }
   }
   // the tunnel's floor as surveyed (underground road and footway areas), at the track's height
-  const floorCol = { road: new THREE.Color(wet ? '#3e3f43' : '#55565a').toArray(), sidewalk: new THREE.Color(wet ? '#86817a' : '#a39d90').toArray() };
+  const floorCol = { road: new THREE.Color('#55565a').toArray(), sidewalk: new THREE.Color('#a39d90').toArray() };
   for (const u of ground.dtm?.under || []) {
     const n0 = route.nearest(u.ring[0][0], u.ring[0][1]);
     if (!n0 || n0.d > 20 || !rock.some(([a, b]) => n0.s > a - 10 && n0.s < b + 10)) continue;
@@ -1003,10 +1070,11 @@ function buildRockTunnels(group, route, ground, rock, HW, wet) {
     const z = (p) => { const n = route.nearest(p.x, p.y); return (n ? pr.height(n.s) : pr.height(n0.s)) + lift; };
     for (const [i, j, k] of tris) {
       const A = ring[i], B = ring[j], C = ring[k];
-      cg.tri(cg._chunk(A.x, A.y), W(A.x, A.y, z(A)), W(B.x, B.y, z(B)), W(C.x, C.y, z(C)), null, col);
+      inner.tri(inner._chunk(A.x, A.y), W(A.x, A.y, z(A)), W(B.x, B.y, z(B)), W(C.x, C.y, z(C)), null, col);
     }
   }
   cg.build(group, 'support');
+  inner.build(group, 'support');
   console.log(`rock tunnels: ${rock.map(([a, b]) => `${Math.round(a)}-${Math.round(b)}`).join(', ')}`);
 }
 
@@ -1066,13 +1134,14 @@ function fitDtmToMouths(dtm, mouths) {
   }
   if (n) console.log(`survey points brought down into tunnel mouths: ${n}`);
 }
-function buildRoadPortals(group, mouths, T, wet) {
+function buildRoadPortals(group, mouths, T) {
   if (!mouths.length) return;
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  // (the frame wet in the weather, no snow in the throat; the floor inside stays dry)
+  const cg = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { wet: wetFactor('#9a958a', '#77736b') }), { color: true });
   const floorCg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true }), { color: true });
-  const frame = new THREE.Color(wet ? '#77736b' : '#9a958a').toArray(), lining = new THREE.Color('#6d6a64');
-  const asphalt = new THREE.Color(wet ? '#3e3f43' : '#55565a'), black = new THREE.Color('#050506');
-  const earth = new THREE.Color(wet ? '#5e7346' : '#6f8a4e').toArray();
+  const frame = new THREE.Color('#9a958a').toArray(), lining = new THREE.Color('#6d6a64');
+  const asphalt = new THREE.Color('#55565a'), black = new THREE.Color('#050506');
+  const earth = new THREE.Color('#6f8a4e').toArray();
   const fade = (c, d, D) => c.clone().lerp(black, Math.min(1, Math.pow(d / D, 0.6))).toArray();
   for (const m of mouths) {
     const { p, hx, hy, nx, ny, w, D } = m;
@@ -1100,7 +1169,7 @@ function buildRoadPortals(group, mouths, T, wet) {
   cg.build(group, 'support');
   floorCg.build(group, 'road');
   // the cover over the terrain cells buildTerrain left out
-  const cov = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
+  const cov = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { wet: wetFactor('#6f8a4e', '#5e7346'), snow: GROUND_SNOW }), { color: true });
   const pad = Math.hypot(T.dx, T.dy) / 2, seen = new Set();
   const coverZ = (x, y) => {
     let z = T.height(x, y);
@@ -1133,11 +1202,11 @@ function buildRoadPortals(group, mouths, T, wet) {
 // the bridges whose survey or model stops short, an embankment over a lower street): off the bridges,
 // walls from the bed down to the ground at the outer bed edges and a top between the two tracks; on
 // our bridges, a 0.8 m deck under the beds where the ground is far below. Every 2 m along the route.
-function buildTrackSupport(group, route, ground, trackDist, wet) {
+function buildTrackSupport(group, route, ground, trackDist) {
   const { profile, dtm, terrain } = ground;
   const below = (x, y) => { const t = dtm?.surfaceAt(x, y); return t ? t.z : terrain.height(x, y); };
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
-  const stone = new THREE.Color(wet ? '#6d675d' : '#8a8376').toArray(), ballast = new THREE.Color(wet ? '#5f5c56' : '#77736a').toArray();
+  const cg = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { wet: wetFactor('#8a8376', '#6d675d'), snow: GROUND_SNOW }), { color: true });
+  const stone = new THREE.Color('#8a8376').toArray(), ballast = new THREE.Color('#77736a').toArray();
   const edges = (s) => {
     let lo = 0, hi = 0;
     for (let lat = -6; lat <= 6; lat += 0.25) { const o = route.offset(s, lat); if (trackDist(o.x, o.y) < 0.2) { lo = Math.min(lo, lat); hi = Math.max(hi, lat); } }
@@ -1229,7 +1298,8 @@ function lowerTerrainUnderTracks(data, T, inTunnel = () => false) {
 // Terrain mesh in chunks near the route, coloured by land cover (parks, woods, water).
 // (hole: coarse cells left out; fineHole: fine cells left out (a tunnel's corridor); the coarse cells
 // under the fine blocks are left out too, the fine mesh is drawn instead)
-function buildTerrain(group, data, route, T, weather, hole = () => false, fineHole = hole) {
+// (dry colours; the weather by the land class on every vertex (landCls), src/weather.js)
+function buildTerrain(group, data, route, T, hole = () => false, fineHole = hole) {
   const { nx, ny } = T;
   const cls = new Uint8Array(nx * ny); // 0 ground, 1 grass, 2 wood, 3 water
   const mark = (ring, v) => {
@@ -1244,24 +1314,19 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
   for (const g of data.green) mark(g.p, g.t === 'wood' ? 2 : 1);
   for (const w of data.water) mark(w, 3);
 
-  const autumn = weather === 'leaves';
-  const palette = [
-    new THREE.Color(weather === 'dry' ? '#8d8c80' : '#77766c'),
-    new THREE.Color(autumn ? '#8a8a4a' : '#6f8a4e'),
-    new THREE.Color(autumn ? '#7a6a3a' : '#566f3c'),
-    new THREE.Color('#5d7f95'),
-  ];
+  const palette = [new THREE.Color('#8d8c80'), new THREE.Color('#6f8a4e'), new THREE.Color('#566f3c'), new THREE.Color('#5d7f95')];
   // which chunks are close enough to the route to matter
   const samples = [];
   for (let s = 0; s <= route.length; s += 60) { const p = route.at(s); samples.push([p.x, p.y]); }
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const veg = { wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW, veg: true };
+  const mat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true }), veg);
   const C = TERRAIN_CHUNK;
   for (let cj = 0; cj < ny - 1; cj += C) {
     for (let ci = 0; ci < nx - 1; ci += C) {
       const cx = T.x0 + (ci + C / 2) * T.dx, cy = T.y0 + (cj + C / 2) * T.dy;
       if (!samples.some((p) => Math.abs(p[0] - cx) < 1000 && Math.abs(p[1] - cy) < 1000 && Math.hypot(p[0] - cx, p[1] - cy) < 1000)) continue;
       const w = Math.min(C, nx - 1 - ci) + 1, h = Math.min(C, ny - 1 - cj) + 1;
-      const pos = new Float32Array(w * h * 3), nor = new Float32Array(w * h * 3), col = new Float32Array(w * h * 3);
+      const pos = new Float32Array(w * h * 3), nor = new Float32Array(w * h * 3), col = new Float32Array(w * h * 3), lc = new Uint8Array(w * h);
       for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
         const gi = ci + i, gj = cj + j, k = (j * w + i) * 3;
         const x = T.x0 + gi * T.dx, y = T.y0 + gj * T.dy;
@@ -1271,7 +1336,8 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
         const hy = (T.cell(gi, gj + 1) - T.cell(gi, gj - 1)) / (2 * T.dy);
         const l = Math.hypot(hx, 1, hy);
         nor[k] = -hx / l; nor[k + 1] = 1 / l; nor[k + 2] = hy / l;
-        const c = palette[cls[gj * nx + gi]];
+        lc[j * w + i] = cls[gj * nx + gi];
+        const c = palette[lc[j * w + i]];
         col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
       }
       const idx = [];
@@ -1286,6 +1352,7 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
       g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      g.setAttribute('landCls', new THREE.BufferAttribute(lc, 1));
       g.setIndex(idx);
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, mat);
@@ -1296,12 +1363,12 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
   }
   // the fine blocks (2 m, tools/fine_terrain.py): one mesh each, land cover from the coarse classes,
   // and a 3 m skirt down along every edge without a neighbouring block (no crack to the coarse grid)
-  const fineMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const fineMat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), veg);
   for (const g of T.fine?.values() || []) {
-    const n = g.nx, pos = [], nor = [], col = [], idx = [];
+    const n = g.nx, pos = [], nor = [], col = [], lc = [], idx = [];
     const clsAt = (x, y) => {
       const gi = Math.max(0, Math.min(nx - 1, Math.round((x - T.x0) / T.dx))), gj = Math.max(0, Math.min(ny - 1, Math.round((y - T.y0) / T.dy)));
-      return palette[cls[gj * nx + gi]];
+      return cls[gj * nx + gi];
     };
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const x = g.x0 + i * g.dx, y = g.y0 + j * g.dy;
@@ -1310,7 +1377,8 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
       const hy = (g.cell(i, j + 1) - g.cell(i, j - 1)) / ((Math.min(n - 1, j + 1) - Math.max(0, j - 1)) * g.dy);
       const l = Math.hypot(hx, 1, hy);
       nor.push(-hx / l, 1 / l, hy / l);
-      const c = clsAt(x, y);
+      const k = clsAt(x, y), c = palette[k];
+      lc.push(k);
       col.push(c.r, c.g, c.b);
     }
     for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
@@ -1333,6 +1401,7 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
         pos.push(pos[v * 3], pos[v * 3 + 1] - 3, pos[v * 3 + 2]);
         nor.push(nor[v * 3], nor[v * 3 + 1], nor[v * 3 + 2]);
         col.push(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]);
+        lc.push(lc[v]);
       }
       for (let k = 0; k < n - 1; k++) idx.push(at(k), base + k, at(k + 1), at(k + 1), base + k, base + k + 1);
     }
@@ -1340,6 +1409,7 @@ function buildTerrain(group, data, route, T, weather, hole = () => false, fineHo
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('landCls', new THREE.BufferAttribute(Uint8Array.from(lc), 1));
     geo.setIndex(idx);
     geo.computeBoundingSphere();
     const m = new THREE.Mesh(geo, fineMat);
@@ -1369,7 +1439,7 @@ function fitFineToMouths(T, mouths) {
 // Deck, parapets and piers for bridges on the route (e.g. Most Legií).
 function buildBridges(group, data, route, ground) {
   const sideMat = new THREE.MeshLambertMaterial({ color: 0x7f786c });
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true }), { color: true });
+  const cg = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true }), { snow: STREET_SNOW, slush: true }), { color: true });
   const deckCol = new THREE.Color('#8f897e').toArray(), sideCol = new THREE.Color('#7a7366').toArray();
   for (const [s0, s1] of data.bridges) {
     // a real 3D model of this bridge (Mosty 3D) replaces the synthetic deck
@@ -1412,11 +1482,31 @@ function buildBridges(group, data, route, ground) {
 
 // Pedestrian crossings with zebra paint: 0.5 m bars every metre along the crossing, each
 // 3 m long across the walking direction. No paint on the tram tracks (as in Prague).
-function buildZebras(group, data, ground, trackDist, wet) {
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true }), { color: true });
-  const white = new THREE.Color(wet ? '#c9cbcc' : '#e9e9e4').toArray();
-  for (const r of data.roads) {
-    if (!r.z) continue;
+function buildZebras(group, data, ground, trackDist) {
+  const cg = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true }), { wet: wetFactor('#e9e9e4', '#c9cbcc'), snow: STREET_SNOW, slush: true }), { color: true });
+  const white = new THREE.Color('#e9e9e4').toArray();
+  // and the OSM signalled crossings (data.osmSignals.peds) without a zebra way of their own: across the
+  // nearest car road, kerb to kerb (Palackého náměstí: the two crossings from the island over the road
+  // had no paint, user's orthophoto 2026-10-24)
+  const ways = data.roads.filter((r) => r.z).map((r) => ({ p: r.p }));
+  const segDist = (P, x, y) => { let m = Infinity; for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)); m = Math.min(m, Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y)); } return m; };
+  for (const o of data.osmSignals?.peds || []) {
+    if (ways.some((w) => segDist(w.p, o.x, o.y) < 4)) continue;
+    let best = null;
+    for (const r of data.roads) {
+      if (!r.c || r.f || r.t || !(r.w >= 5)) continue;
+      const P = r.p;
+      for (let i = 1; i < P.length; i++) {
+        const a = P[i - 1], b = P[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((o.x - a[0]) * dx + (o.y - a[1]) * dy) / l2)), d = Math.hypot(a[0] + dx * t - o.x, a[1] + dy * t - o.y);
+        if (d < 6 && (!best || d < best.d)) { const l = Math.sqrt(l2); best = { d, hx: dx / l, hy: dy / l, half: r.w / 2 }; }
+      }
+    }
+    if (!best) continue;
+    const cx = -best.hy, cy = best.hx;
+    ways.push({ p: [[o.x - cx * best.half, o.y - cy * best.half], [o.x + cx * best.half, o.y + cy * best.half]], osm: true });
+  }
+  for (const r of ways) {
     const path = densify(r.p, 0.5);
     let acc = 0;
     for (let i = 1; i < path.length; i++) {
@@ -1433,6 +1523,65 @@ function buildZebras(group, data, ground, trackDist, wet) {
     }
   }
   cg.build(group);
+}
+
+// Street detail from Prague's technical map (data.dtmPoints, .claude/tools/dtm_points.py; CC BY,
+// datový podklad © IPR Praha): manhole covers and valve caps as flat discs on the drawn ground, gutter
+// inlets as grates turned along the nearest street, above-ground hydrants as small red posts. One
+// instanced mesh per kind for the whole line (a few thousand instances: a few draw calls).
+export function buildStreetDetail(data, ground) {
+  const group = new THREE.Group();
+  const pts = data.dtmPoints || [];
+  // street directions for the grates: road segments in 20 m cells
+  const cell = 20, grid = new Map();
+  for (const r of data.roads) {
+    if (!r.c || r.f) continue;
+    for (let i = 1; i < r.p.length; i++) {
+      const a = r.p[i - 1], b = r.p[i], k = `${Math.floor((a[0] + b[0]) / 2 / cell)},${Math.floor((a[1] + b[1]) / 2 / cell)}`;
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push([a, b]);
+    }
+  }
+  const streetAngle = (x, y) => {
+    let best = null;
+    for (let gx = -1; gx <= 1; gx++) for (let gy = -1; gy <= 1; gy++) for (const [a, b] of grid.get(`${Math.floor(x / cell) + gx},${Math.floor(y / cell) + gy}`) || []) {
+      const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2));
+      const d = Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y);
+      if (!best || d < best.d) best = { d, ang: Math.atan2(dx, -dy) };
+    }
+    return best ? best.ang : 0;
+  };
+  const flat = (geo) => geo.rotateX(-Math.PI / 2);
+  const iron = (c) => weatherize(new THREE.MeshLambertMaterial({ color: c, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), { wet: 0.6 });
+  const kinds = {
+    manhole: { geo: flat(new THREE.CircleGeometry(0.32, 14)), mat: iron(0x3a3a3c), turn: false },
+    // (caps smaller than first drawn, user 2026-10-24; reference photos of all the covers to come)
+    hydrant_cap: { geo: flat(new THREE.CircleGeometry(0.1, 10)), mat: iron(0x4a3a30), turn: false },
+    valve_cap: { geo: flat(new THREE.CircleGeometry(0.06, 8)), mat: iron(0x3d3d3d), turn: false },
+    gutter_inlet: { geo: flat(new THREE.PlaneGeometry(0.62, 0.36)), mat: iron(0x242424), turn: true },
+    hydrant: { geo: new THREE.CylinderGeometry(0.11, 0.14, 0.85, 8).translate(0, 0.42, 0), mat: new THREE.MeshLambertMaterial({ color: 0x9c1d16 }), turn: false },
+  };
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  for (const [k, def] of Object.entries(kinds)) {
+    // (one shaft is often recorded twice, under two networks' codes: one cover per 0.3 m)
+    const list = [];
+    for (const o of pts) if (o.k === k && !list.some((l) => Math.abs(l.x - o.x) < 0.3 && Math.abs(l.y - o.y) < 0.3)) list.push(o);
+    if (!list.length) continue;
+    const mesh = new THREE.InstancedMesh(def.geo, def.mat, list.length);
+    list.forEach((o, i) => {
+      q.setFromAxisAngle(up, def.turn ? streetAngle(o.x, o.y) : (o.x * 7.3 + o.y * 3.1) % (Math.PI * 2));
+      // (between the rails on the paved track bed, which is drawn above the street's height: most covers
+      // at Strossmayerovo náměstí lie in the track and were hidden under it)
+      const onTrack = ground.trackDist && ground.trackDist(o.x, o.y) < 1.8 && ground.trackAt;
+      p.set(o.x, Math.max(ground.surface(o.x, o.y), onTrack ? ground.trackAt(o.x, o.y) + 0.16 : -Infinity) + 0.015, -o.y);
+      m.compose(p, q, s);
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+  }
+  group.userData.counts = Object.fromEntries(Object.keys(kinds).map((k) => [k, pts.filter((o) => o.k === k).length]));
+  return group;
 }
 
 // Roofs of the drawn buildings (meshes tagged `building`) in a 4 m grid: `roof(x, y)` is the height
@@ -1476,7 +1625,7 @@ export function roofIndex(group) {
 // crowns shrink until they clear the facades; row samples on a carriageway are dropped too.
 // Without the register, parks and woods are filled at random.
 const CROWN = 2.6; // icosahedron radius of a tree crown at scale 1 (x 1.1 wide, x 1.4 tall)
-function buildTrees(group, data, ground, weather, trackDist) {
+function buildTrees(group, data, ground, trackDist) {
   const r = rng(99);
   const trees = [], bushes = [], pots = [];
   const roof = roofIndex(group); // buildings are already in the group
@@ -1543,24 +1692,30 @@ function buildTrees(group, data, ground, weather, trackDist) {
     }
   }
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-  const col = new THREE.Color();
-  const leaf = () => (weather === 'leaves' ? col.setHSL(0.05 + r() * 0.08, 0.55 + r() * 0.2, 0.32 + r() * 0.12) : col.setHSL(0.24 + r() * 0.06, 0.35 + r() * 0.15, 0.25 + r() * 0.1));
-  const leafMat = () => new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  // each plant's own summer green (drawn in the same order as always, so the dry look is unchanged);
+  // the weather recolours them (src/weather.js: species, autumn stage, bare in winter)
+  const summer = () => new THREE.Color().setHSL(0.24 + r() * 0.06, 0.35 + r() * 0.15, 0.25 + r() * 0.1);
+  // (a little snow settles on the tops of the crowns: bare twigs hold little)
+  const leafMat = () => weatherize(new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), { snow: 0.15 });
+  const sets = []; // [mesh, plants, summer colours, first colour index, place(i, thinning)]
   if (trees.length) {
     const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(CROWN, 0), leafMat(), trees.length);
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 5), new THREE.MeshLambertMaterial({ color: 0x5b4632 }), trees.length);
     crown.userData.trees = true; // read by the lints
-    trees.forEach(([x, y, k, z], i) => {
-      s.set(k * 1.1, k * 1.4, k * 1.1);
-      p.set(x, z + 5.4 * k, -y);
+    const place = (i, f) => {
+      const [x, y, k, z] = trees[i];
+      s.set(k * 1.1 * f, k * 1.4 * f, k * 1.1 * f);
+      p.set(x, z + 5.4 * k + CROWN * 1.4 * k * (f - 1) * 0.5, -y); // (a thinner crown keeps its top lower, not its bottom)
       m.compose(p, q, s);
       crown.setMatrixAt(i, m);
-      crown.setColorAt(i, leaf());
+    };
+    trees.forEach(([x, y, k, z], i) => {
       s.set(1, k, 1);
       p.set(x, z + 1.5 * k, -y);
       m.compose(p, q, s);
       trunk.setMatrixAt(i, m);
     });
+    sets.push([crown, trees, trees.map(summer), 0, place]);
     group.add(crown, trunk);
   }
   // bushes and hedges: a low shrub on the ground
@@ -1571,13 +1726,13 @@ function buildTrees(group, data, ground, weather, trackDist) {
       p.set(x, z + 0.55 * k, -y);
       m.compose(p, q, s);
       bush.setMatrixAt(i, m);
-      bush.setColorAt(i, leaf());
     });
+    sets.push([bush, bushes, bushes.map(summer), 100000, null]);
     group.add(bush);
   }
   // plants in containers: a concrete planter with a small shrub
   if (pots.length) {
-    const pot = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.6, 1), new THREE.MeshLambertMaterial({ color: 0x9a968c }), pots.length);
+    const pot = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.6, 1), weatherize(new THREE.MeshLambertMaterial({ color: 0x9a968c }), { snow: GROUND_SNOW }), pots.length);
     const shrub = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.55, 0), leafMat(), pots.length);
     pots.forEach(([x, y, , z], i) => {
       p.set(x, z + 0.3, -y); s.set(1, 1, 1);
@@ -1586,12 +1741,66 @@ function buildTrees(group, data, ground, weather, trackDist) {
       p.set(x, z + 0.95, -y);
       m.compose(p, q, s);
       shrub.setMatrixAt(i, m);
-      shrub.setColorAt(i, leaf());
     });
+    sets.push([shrub, pots, pots.map(summer), 200000, null]);
     group.add(pot, shrub);
   }
+  const litter = buildLeafLitter(group, trees, ground, trackDist, onRoad);
+  const col = new THREE.Color();
+  const setWeather = (w) => {
+    for (const [mesh, plants, greens, i0, place] of sets) {
+      for (let i = 0; i < plants.length; i++) {
+        mesh.setColorAt(i, crownColor(i0 + i, w, greens[i], col));
+        if (place) place(i, crownThinning(i0 + i, w));
+      }
+      mesh.instanceColor.needsUpdate = true;
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    for (const l of litter) l.visible = w === 'leaves';
+  };
+  setWeather('dry');
+  return { setWeather };
 }
 
+// Fallen leaves under the trees in autumn: flat patches of a leaf texture (alpha cut out) around each
+// crown, more under bigger trees; few on carriageways (traffic blows them away), none on the tracks.
+// One instanced mesh per CELL square, so far ones are culled. Hidden unless the weather is 'leaves'.
+function buildLeafLitter(group, trees, ground, trackDist, onRoad) {
+  const r = rng(4242);
+  const cells = new Map();
+  for (const [x, y, k] of trees) {
+    const R = CROWN * 1.3 * k, n = Math.round(6 + k * 8);
+    for (let j = 0; j < n; j++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R;
+      const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d;
+      if (trackDist(px, py) < 2) continue;
+      if (onRoad(px, py) && r() < 0.75) continue;
+      const key = `${Math.floor(px / CELL)},${Math.floor(py / CELL)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push([px, py, 2 + r() * 2.2, r() * Math.PI * 2, 0.85 + r() * 0.3]);
+    }
+  }
+  const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshLambertMaterial({ map: leafTexture(), alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+  const out = [];
+  for (const list of cells.values()) {
+    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach(([x, y, size, rot, light], i) => {
+      p.set(x, ground.at(x, y) + 0.03, -y);
+      q.setFromAxisAngle(up, rot);
+      s.set(size, 1, size);
+      m.compose(p, q, s);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, col.setScalar(light));
+    });
+    mesh.computeBoundingSphere();
+    mesh.visible = false;
+    group.add(mesh);
+    out.push(mesh);
+  }
+  return out;
+}
 // Overhead line: contact wire 5.6 m above every track, hung from Prague-style cross-span wires.
 // Each span is anchored on both sides of the street: on a pole at the kerb (between the
 // carriageway and the sidewalk), or on a wall rosette where a building stands close to the
