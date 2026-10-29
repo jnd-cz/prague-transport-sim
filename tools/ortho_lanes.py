@@ -35,6 +35,7 @@ TILE = 100.0  # m
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 dtm = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.dtm.json"), encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
@@ -63,7 +64,8 @@ def tile(ix, iy):
         n = int(TILE / PX)
         url = f"{SERVICE}?bbox={x0},{y0},{x0 + TILE},{y0 + TILE}&bboxSR=5514&imageSR=5514&size={n},{n}&format=png&f=image"
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "tram-game-prototype/0.1"}), timeout=120) as r:
-            open(f, "wb").write(r.read())
+            with replacing(f, "wb") as fh:
+                fh.write(r.read())
     tiles[(ix, iy)] = np.asarray(Image.open(f).convert("L"), dtype=np.float32)
     return tiles[(ix, iy)]
 

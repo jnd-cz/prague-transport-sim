@@ -11,6 +11,7 @@ import sys
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # (Czech names on a Windows console; -I ignores PYTHONIOENCODING)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+from atomic import replacing  # noqa: E402
 import osm_local  # noqa: E402
 from geo import ROOT, Frame  # noqa: E402
 
@@ -113,5 +114,6 @@ out['signalsOnPlatforms'], out['crossingsInPlatforms'] = on, inside
 print(f"4. tram signals standing along a platform: {len(on)}" + (' (' + ', '.join(f"{o['signal']} {o['stop']}" for o in on) + ')' if on else ''))
 print(f"5. crossings inside a platform: {len(inside)}" + (' (' + ', '.join(f"{o['crossing']} {o['stop']} {o['beforeEnd']} m before its end" for o in inside) + ')' if inside else ''))
 
-json.dump(out, open(os.path.join(ROOT, 'data', f'line{line}.validate.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+with replacing(os.path.join(ROOT, 'data', f'line{line}.validate.json'), 'w', encoding='utf-8') as fh:
+    json.dump(out, fh, ensure_ascii=False, indent=1)
 print(f'written data/line{line}.validate.json')

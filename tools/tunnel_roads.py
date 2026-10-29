@@ -19,6 +19,7 @@ src = os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "roads.json")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 widths = {"motorway": 16, "trunk": 14, "primary": 12, "secondary": 10, "tertiary": 8, "primary_link": 7,
@@ -51,6 +52,6 @@ for e in json.load(open(src, encoding="utf-8"))["elements"]:
         road["o"] = -1
     line["roads"].append(road)
     n += 1
-with open(dst, "w", encoding="utf-8") as fh:
+with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
 print(f"line {LINE}: {n} tunnel ways ({sum(1 for r in line['roads'] if r.get('t') and r['c'])} for cars)")

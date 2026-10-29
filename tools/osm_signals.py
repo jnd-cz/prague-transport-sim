@@ -16,6 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+from atomic import replacing  # noqa: E402
 import osm_local  # noqa: E402
 from geo import ROOT, Frame  # noqa: E402
 
@@ -79,5 +80,6 @@ for nid, el in nodes.items():
     if t.get('crossing') == 'traffic_signals' or t.get('highway') == 'traffic_signals':
         out['peds'].append({'x': round(x, 2), 'y': round(y, 2)})
 
-json.dump(out, open(os.path.join(ROOT, 'data', f'line{line}.signals.json'), 'w', encoding='utf-8'), separators=(',', ':'))
+with replacing(os.path.join(ROOT, 'data', f'line{line}.signals.json'), 'w', encoding='utf-8') as fh:
+    json.dump(out, fh, separators=(',', ':'))
 print(f"line {line}: {len(out['stop'])} car stop lines, {len(out['peds'])} signalled pedestrian crossings, {len(out['tram'])} tram crossings ({sum(1 for c in out['tram'] if c['sig'])} signalled)")
