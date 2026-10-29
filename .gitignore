@@ -14,3 +14,11 @@ dist/
 
 # lint reports (tools/lint.js); the baseline in reports/baseline/ is committed
 reports/*.json
+
+# tools/snapshot.py download scratch
+.snap-*/
+
+# game data: in the data store (DATA.md), only the manifest and the hand-made truth in git
+data/*
+!data/truth.json
+!data/MANIFEST.json

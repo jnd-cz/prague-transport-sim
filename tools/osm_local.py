@@ -30,6 +30,26 @@ def available():
     return os.path.exists(PRAHA)
 
 
+def base_id():
+    """Identity of the extract the answers come from (the first 16 hex of its SHA-256): derived caches
+    (build_line.py's raw/lineN/*.json) are reused only while it is the same file."""
+    side = PRAHA + ".sha256"
+    st = os.stat(PRAHA)
+    key = f"{st.st_size}:{int(st.st_mtime)}"
+    if os.path.exists(side):
+        k, _, h = open(side, encoding="utf-8").read().strip().partition(" ")
+        if k == key:
+            return h
+    import hashlib
+    hs = hashlib.sha256()
+    with open(PRAHA, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            hs.update(b)
+    h = hs.hexdigest()[:16]
+    open(side, "w", encoding="utf-8").write(f"{key} {h}\n")
+    return h
+
+
 def cut(src=None):
     src = src or sorted(glob.glob(os.path.join(DIR, "czech-republic-*.osm.pbf")))[-1]
     s, w, n, e = BOX

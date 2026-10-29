@@ -23,46 +23,23 @@ line = json.load(open(dst, encoding="utf-8"))
 LAT0, LON0 = line["origin"]
 KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
 src = os.path.join(ROOT, "raw", f"line{LINE}", "platforms.json")
-if "--fetch" in sys.argv:
-    # platform ways in ~800 m boxes along both directions' paths (small cached queries, slow, retried:
-    # one query for the whole line came back empty); the 12 m filter below picks the ones on our tracks
+if "--fetch" in sys.argv or not os.path.exists(src):
+    # tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the
+    # 12 m filter below picks the ones on our tracks). The Overpass API is no longer used.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
-    from overpass import pieces, query
-    els = {}
     try:
-        import osm_local  # the local extract (raw/osm/praha.osm.pbf), when there is one: no servers
-    except ImportError:  # (pyosmium not installed)
-        osm_local = None
-    if osm_local and osm_local.available():
-        lat = [LAT0 + p[1] / KY for p in line["path"] + line.get("pathBack", [])]
-        lon = [LON0 + p[0] / KX for p in line["path"] + line.get("pathBack", [])]
-        box = (min(lat) - 0.001, min(lon) - 0.0015, max(lat) + 0.001, max(lon) + 0.0015)
-        for e in osm_local.ways(lambda t: t.get("public_transport") == "platform" or t.get("railway") == "platform", bbox=box):
-            els[(e["type"], e["id"])] = e
-        print(f"  local extract: {len(els)} platform ways in the line's box")
-    else:  # Overpass, in small polite pieces
-        # (the opposite direction only where it runs off our path: elsewhere our boxes, padded 40 m, hold it)
-        ours = [(p[0], p[1]) for p in line["path"]]
-        off = lambda q: min((q[0] - a) ** 2 + (q[1] - b) ** 2 for a, b in ours[::2]) > 50 ** 2  # noqa: E731
-        runs, cur = [line["path"]], []
-        for q in line.get("pathBack", []):
-            if off(q):
-                cur.append(q)
-            elif cur:
-                runs.append(cur)
-                cur = []
-        if cur:
-            runs.append(cur)
-        for path in runs:
-            boxes = pieces([(LAT0 + y / KY, LON0 + x / KX) for x, y, *_ in path])
-            for i, bb in enumerate(boxes):
-                js = query(f"[out:json][timeout:90];(way({bb})[public_transport=platform];way({bb})[railway=platform];);out tags geom qt;")
-                for e in js["elements"]:
-                    els[(e["type"], e["id"])] = e
-                print(f"  piece {i + 1}/{len(boxes)}: {len(js['elements'])} ways", flush=True)
+        import osm_local
+    except ImportError:
+        raise SystemExit("needs pyosmium and python -P -E (or an existing raw/lineN/platforms.json)")
+    if not osm_local.available():
+        raise SystemExit("no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch")
+    lat = [LAT0 + p[1] / KY for p in line["path"] + line.get("pathBack", [])]
+    lon = [LON0 + p[0] / KX for p in line["path"] + line.get("pathBack", [])]
+    box = (min(lat) - 0.001, min(lon) - 0.0015, max(lat) + 0.001, max(lon) + 0.0015)
+    els = osm_local.ways(lambda t: t.get("public_transport") == "platform" or t.get("railway") == "platform", bbox=box)
     os.makedirs(os.path.dirname(src), exist_ok=True)
-    json.dump({"elements": list(els.values())}, open(src, "w", encoding="utf-8"))
-    print(f"fetched {len(els)} platform ways")
+    json.dump({"elements": els, "osm_base": osm_local.base_id()}, open(src, "w", encoding="utf-8"))
+    print(f"local extract: {len(els)} platform ways in the line's box")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "platforms.json")
 osm = json.load(open(src, encoding="utf-8"))
