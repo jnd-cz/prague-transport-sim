@@ -19,7 +19,9 @@ src = os.path.join(ROOT, "raw", f"line{LINE}", "roads.json")
 if not os.path.exists(src):
     src = os.path.join(ROOT, "raw", "roads.json")
 LAT0, LON0 = line["origin"]
-KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from geo import Frame  # noqa: E402
+KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
 widths = {"motorway": 16, "trunk": 14, "primary": 12, "secondary": 10, "tertiary": 8, "primary_link": 7,
           "secondary_link": 7, "tertiary_link": 6, "trunk_link": 7, "residential": 6.5, "unclassified": 6,
           "living_street": 5, "service": 4, "pedestrian": 6, "footway": 2.5}

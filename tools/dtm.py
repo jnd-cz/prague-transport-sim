@@ -39,7 +39,8 @@ CLASSES = {
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 LAT0, LON0 = line["origin"]
-KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
+from geo import Frame  # noqa: E402
+KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
 to_wgs = Transformer.from_crs(5514, 4326, always_xy=True)
 
 # lidar ground (DMR 5G grid of the line): a ground-level street corner far below it is a mislabelled

@@ -70,6 +70,7 @@ REFRESH = "--refresh" in sys.argv
 # OSM extract (tools/osm_local.py, raw/osm/praha.osm.pbf; python -P -E for pyosmium). The Overpass API is
 # no longer used. A cached answer in raw/lineN/ is kept only while it came from the same extract.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from geo import Frame  # noqa: E402
 try:
     import osm_local
 except ImportError:
@@ -181,15 +182,9 @@ if R:
 
 
 # ---------------------------------------------------------------- geometry
-class Proj:
-    def __init__(self, lat0, lon0):
-        self.lat0, self.lon0 = lat0, lon0
-        self.kx = math.cos(math.radians(lat0)) * 111320.0
-        self.ky = 110574.0
-
-    def __call__(self, lat, lon):
-        # x = east, y = north (metres)
-        return ((lon - self.lon0) * self.kx, (lat - self.lat0) * self.ky)
+class Proj(Frame):
+    # x = east, y = north (metres): the one conversion (tools/geo.py)
+    __call__ = Frame.xy
 
 
 def dist(a, b):

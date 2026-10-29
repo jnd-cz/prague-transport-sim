@@ -20,6 +20,9 @@ import time
 
 import osmium
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+from geo import Frame  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "raw", "osm")
 PRAHA = os.path.join(DIR, "praha.osm.pbf")
@@ -175,7 +178,7 @@ def emulate(name, query):
     rw = [w for w in ways(lambda t: True) if w["id"] in wids]
     lat0 = sum(g["lat"] for w in rw for g in w["geometry"]) / max(1, sum(len(w["geometry"]) for w in rw))
     lon0 = sum(g["lon"] for w in rw for g in w["geometry"]) / max(1, sum(len(w["geometry"]) for w in rw))
-    kx, ky = math.cos(math.radians(lat0)) * 111320.0, 110574.0
+    kx, ky = Frame(lat0, lon0).k
     xy = lambda g: ((g["lon"] - lon0) * kx, (g["lat"] - lat0) * ky)  # noqa: E731
     route = shapely.union_all([LineString([xy(g) for g in w["geometry"]]) for w in rw if len(w["geometry"]) > 1])
     zones = {}

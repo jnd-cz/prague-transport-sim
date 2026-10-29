@@ -37,7 +37,9 @@ os.makedirs(CACHE, exist_ok=True)
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 LAT0, LON0 = line["origin"]
-KX, KY = math.cos(math.radians(LAT0)) * 111320.0, 110574.0
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from geo import Frame  # noqa: E402
+KX, KY = Frame(LAT0, LON0).k  # the one conversion (tools/geo.py)
 to_jtsk = Transformer.from_crs(4326, 5514, always_xy=True)
 paths = [LineString([p[:2] for p in line["path"]])]
 if line.get("pathBack"):
