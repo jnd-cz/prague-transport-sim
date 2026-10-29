@@ -1,28 +1,23 @@
 # Checks a line's data against OpenStreetMap (BUILD-TOOLS-HANDOFF.md §3). Not part of the game.
-#   python -I .claude/tools/osm_validate.py 17            (fetches OSM once, then uses the cache)
-#   python -I .claude/tools/osm_validate.py 17 --refresh  (fetches again)
-# Prints: the coordinate fit (OSM tram ways vs our tracks), stops vs OSM stop positions, the line's
-# crossings without an OSM tram crossing, tram signals standing along platforms, and crossings inside
-# platforms. Writes the same as JSON to data/lineN.validate.json. The OSM answer is cached in
-# .claude/tools/cache/lineN.osm.json (raw Overpass JSON).
+#   python -P -E tools/osm_validate.py 17
+# Reads the snapshot's OSM extract (tools/osm_local.py). Prints: the coordinate fit (OSM tram ways vs our
+# tracks), stops vs OSM stop positions, the line's crossings without an OSM tram crossing, tram signals
+# standing along platforms, and crossings inside platforms. Writes the same as JSON to
+# data/lineN.validate.json.
 import json
 import math
 import os
 import sys
-import time
-import urllib.parse
-import urllib.request
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # (Czech names on a Windows console; -I ignores PYTHONIOENCODING)
-SERVERS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
-line = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else '17'
-refresh = '--refresh' in sys.argv
-data = json.load(open(f'data/line{line}.json', encoding='utf-8'))
-lat0, lon0 = data['origin']
-KY, KX = 110574, 111320 * math.cos(math.radians(lat0))  # the line data's conversion (handoff §1.1)
-to_xy = lambda lat, lon: ((lon - lon0) * KX, (lat - lat0) * KY)
-to_ll = lambda x, y: (lat0 + y / KY, lon0 + x / KX)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+import osm_local  # noqa: E402
+from geo import ROOT, Frame  # noqa: E402
 
+line = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else '17'
+data = json.load(open(os.path.join(ROOT, 'data', f'line{line}.json'), encoding='utf-8'))
+frame = Frame(*data['origin'])
+to_xy = frame.xy
 
 class Polyline:
     """nearest(x, y) -> (s, d, lateral +right) on a polyline, through a 25 m grid of its segments"""
@@ -55,43 +50,13 @@ route = Polyline(data['path'])
 back = Polyline(data['pathBack']) if data.get('pathBack') else None
 
 
-def query(q):
-    for k, url in enumerate(SERVERS * 2):
-        try:
-            req = urllib.request.Request(url, data=urllib.parse.urlencode({'data': q}).encode(), headers={'User-Agent': 'tatra-t3-prague-game/0.1 (data validation)'})
-            with urllib.request.urlopen(req, timeout=120) as r:
-                return json.loads(r.read().decode('utf-8'))
-        except Exception as e:  # noqa: BLE001 (next server, backing off)
-            print(f'  {url}: {e}; retrying', file=sys.stderr)
-            time.sleep(5 * (k + 1))
-    raise SystemExit('Overpass: no server answered')
-
-
-cache = f'.claude/tools/cache/line{line}.osm.json'
-if refresh or not os.path.exists(cache):
-    path, boxes, cur, acc = data['path'], [], [data['path'][0]], 0.0
-    for a, b in zip(path, path[1:]):
-        acc += math.dist(a, b)
-        cur.append(b)
-        if acc > 1500:
-            boxes.append(cur); cur, acc = [b], 0.0
-    if len(cur) > 1:
-        boxes.append(cur)
-    els = {}
-    for i, pts in enumerate(boxes):
-        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-        s, w = to_ll(min(xs) - 120, min(ys) - 120)
-        n, e = to_ll(max(xs) + 120, max(ys) + 120)
-        bb = f'{s:.6f},{w:.6f},{n:.6f},{e:.6f}'
-        res = query(f'[out:json][timeout:90];(way({bb})[railway=tram];node({bb})[public_transport=stop_position][tram=yes];node({bb})[railway=tram_crossing];'
-                    f'node({bb})[highway=crossing];way({bb})[public_transport=platform][tram=yes];way({bb})[railway=platform];);out geom tags;')
-        for el in res['elements']:
-            els[f"{el['type']}{el['id']}"] = el
-        print(f'box {i + 1}/{len(boxes)}: {len(els)} elements', file=sys.stderr)
-        time.sleep(5)
-    os.makedirs(os.path.dirname(cache), exist_ok=True)
-    json.dump({'fetched': time.strftime('%Y-%m-%d'), 'elements': list(els.values())}, open(cache, 'w', encoding='utf-8'))
-osm = json.load(open(cache, encoding='utf-8'))
+if not osm_local.available():
+    raise SystemExit('no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch')
+bb = frame.bbox(data['path'] + data.get('pathBack', []), 120)
+osm = {'fetched': f'extract {osm_local.base_id()}', 'elements':
+       [{**w, 'type': 'way'} for w in osm_local.ways(lambda t: t.get('railway') in ('tram', 'platform') or (t.get('public_transport') == 'platform' and t.get('tram') == 'yes'), bbox=bb)]
+       + [n for n in osm_local.nodes(lambda t: (t.get('public_transport') == 'stop_position' and t.get('tram') == 'yes') or t.get('railway') == 'tram_crossing' or t.get('highway') == 'crossing')
+          if bb[0] <= n['lat'] <= bb[2] and bb[1] <= n['lon'] <= bb[3]]}
 els = osm['elements']
 tags = lambda el: el.get('tags', {})
 geom = lambda el: [to_xy(g['lat'], g['lon']) for g in el.get('geometry', [])] if el['type'] == 'way' else [to_xy(el['lat'], el['lon'])]
@@ -148,5 +113,5 @@ out['signalsOnPlatforms'], out['crossingsInPlatforms'] = on, inside
 print(f"4. tram signals standing along a platform: {len(on)}" + (' (' + ', '.join(f"{o['signal']} {o['stop']}" for o in on) + ')' if on else ''))
 print(f"5. crossings inside a platform: {len(inside)}" + (' (' + ', '.join(f"{o['crossing']} {o['stop']} {o['beforeEnd']} m before its end" for o in inside) + ')' if inside else ''))
 
-json.dump(out, open(f'data/line{line}.validate.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+json.dump(out, open(os.path.join(ROOT, 'data', f'line{line}.validate.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print(f'written data/line{line}.validate.json')

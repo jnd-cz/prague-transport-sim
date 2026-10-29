@@ -1,32 +1,30 @@
-# Traffic-signal data along a line from OpenStreetMap (Overpass), for the game's traffic lights.
-# Not part of the game; belongs into the project's build tools (build_line.py) later.
-#   python -I .claude/tools/osm_signals.py 17      -> data/line17.signals.json
-# Writes, in the line's local metres (x east, y north from data/lineN.json "origin", the same
-# conversion the game data uses):
+# Traffic-signal data along a line from OpenStreetMap, for the game's traffic lights (REMOTE-CHANGES §17).
+# Belongs into build_line.py later (BUILD-TOOLS-HANDOFF §2.1).
+#   python -P -E tools/osm_signals.py 17      -> data/line17.signals.json
+# Reads the snapshot's OSM extract (tools/osm_local.py; pyosmium, hence -P -E). Writes, in the line's
+# local metres (tools/geo.py):
 #   stop:  highway=traffic_signals nodes on roads (mappers put them at each approach's stop line), with
 #          the travel direction they serve (traffic_signals:direction forward/backward along the way;
 #          none: both ways): [{ x, y, hx, hy, both }]
 #   peds:  signalled pedestrian crossings (crossing=traffic_signals, not on the tram track): [{ x, y }]
 #   tram:  crossings over the tram track (railway=tram_crossing, or a crossing node on a tram way):
 #          [{ x, y, sig }], sig = signalled (crossing=traffic_signals)
-# Queries the corridor in boxes along the route, 5 s apart (be kind to the public servers).
+# The corridor: boxes of ~1.5 km of route, 120 m around it.
 import json
 import math
+import os
 import sys
-import time
-import urllib.parse
-import urllib.request
 
-SERVERS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+import osm_local  # noqa: E402
+from geo import ROOT, Frame  # noqa: E402
+
 line = sys.argv[1] if len(sys.argv) > 1 else '17'
-data = json.load(open(f'data/line{line}.json', encoding='utf-8'))
-lat0, lon0 = data['origin']
-# (the line data's own conversion: 110574 m per degree of latitude, 111320 cos(lat0) of longitude;
-# 111320 for both put the nodes up to 45 m off at the line's ends, fitted against the OSM tram tracks)
-ky = 110574
-kx = 111320 * math.cos(math.radians(lat0))
-to_xy = lambda lat, lon: ((lon - lon0) * kx, (lat - lat0) * ky)
-to_ll = lambda x, y: (lat0 + y / ky, lon0 + x / kx)
+data = json.load(open(os.path.join(ROOT, 'data', f'line{line}.json'), encoding='utf-8'))
+frame = Frame(*data['origin'])
+to_xy = frame.xy
+if not osm_local.available():
+    raise SystemExit('no raw/osm/praha.osm.pbf: run python -I tools/snapshot.py fetch')
 
 # boxes of ~1.5 km of route each, 120 m around it
 path = data['path']
@@ -38,32 +36,14 @@ for a, b in zip(path, path[1:]):
         boxes.append(cur); cur, acc = [b], 0.0
 if len(cur) > 1:
     boxes.append(cur)
+bbs = [frame.bbox(pts, 120) for pts in boxes]
+inbox = lambda lat, lon: any(s <= lat <= n and w <= lon <= e for s, w, n, e in bbs)  # noqa: E731
 
-
-def query(q):
-    for k, url in enumerate(SERVERS * 2):
-        try:
-            req = urllib.request.Request(url, data=urllib.parse.urlencode({'data': q}).encode(), headers={'User-Agent': 'tatra-t3-prague-game/0.1 (signal import)'})
-            with urllib.request.urlopen(req, timeout=90) as r:
-                return json.loads(r.read().decode('utf-8'))
-        except Exception as e:  # noqa: BLE001 (retry on the next server, backing off)
-            print(f'  {url}: {e}; retrying', file=sys.stderr)
-            time.sleep(5 * (k + 1))
-    raise SystemExit('Overpass: no server answered')
-
-
-nodes, ways = {}, {}
-for i, pts in enumerate(boxes):
-    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-    s, w = to_ll(min(xs) - 120, min(ys) - 120)
-    n, e = to_ll(max(xs) + 120, max(ys) + 120)
-    bb = f'{s:.6f},{w:.6f},{n:.6f},{e:.6f}'
-    q = f'[out:json][timeout:60];(node({bb})[highway=traffic_signals];node({bb})[crossing=traffic_signals];node({bb})[railway=tram_crossing];)->.sig;.sig out body;way(bn.sig)[~"^(highway|railway)$"~"."];out geom;'
-    res = query(q)
-    for el in res['elements']:
-        (nodes if el['type'] == 'node' else ways)[el['id']] = el
-    print(f'box {i + 1}/{len(boxes)}: {len(nodes)} nodes, {len(ways)} ways so far', file=sys.stderr)
-    time.sleep(5)
+nodes = {el['id']: el for el in osm_local.nodes(lambda t: t.get('highway') == 'traffic_signals' or t.get('crossing') == 'traffic_signals'
+                                                   or t.get('railway') == 'tram_crossing') if inbox(el['lat'], el['lon'])}
+ways = {w['id']: w for w in osm_local.ways(lambda t: 'highway' in t or 'railway' in t, bbox=(min(b[0] for b in bbs), min(b[1] for b in bbs), max(b[2] for b in bbs), max(b[3] for b in bbs)))
+        if any(n in nodes for n in w['nodes'])}
+print(f'{len(nodes)} signal / crossing nodes, {len(ways)} ways through them', file=sys.stderr)
 
 # the ways each node lies on, with its neighbours there (for the direction)
 on_ways = {}
@@ -72,7 +52,7 @@ for wy in ways.values():
         if nid in nodes:
             on_ways.setdefault(nid, []).append((wy, k))
 
-out = {'source': 'OpenStreetMap contributors (ODbL), via Overpass', 'stop': [], 'peds': [], 'tram': []}
+out = {'source': f'OpenStreetMap contributors (ODbL), extract {osm_local.base_id()}', 'stop': [], 'peds': [], 'tram': []}
 for nid, el in nodes.items():
     t = el.get('tags', {})
     x, y = to_xy(el['lat'], el['lon'])
@@ -99,5 +79,5 @@ for nid, el in nodes.items():
     if t.get('crossing') == 'traffic_signals' or t.get('highway') == 'traffic_signals':
         out['peds'].append({'x': round(x, 2), 'y': round(y, 2)})
 
-json.dump(out, open(f'data/line{line}.signals.json', 'w', encoding='utf-8'), separators=(',', ':'))
+json.dump(out, open(os.path.join(ROOT, 'data', f'line{line}.signals.json'), 'w', encoding='utf-8'), separators=(',', ':'))
 print(f"line {line}: {len(out['stop'])} car stop lines, {len(out['peds'])} signalled pedestrian crossings, {len(out['tram'])} tram crossings ({sum(1 for c in out['tram'] if c['sig'])} signalled)")

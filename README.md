@@ -230,7 +230,8 @@ autopilot(0, 99, { obstacles: 'normal', weather: 'rain' });
 ```
 
 **Lints** (PLAN.md §2): each check counts one kind of problem over the whole line. With the dev server
-(`tools/serve.py`, which saves the reports) and a shift started on the line:
+(`tools/serve.py`, which saves the reports), the page loaded with **`?keepgeo`** (the game otherwise frees
+the meshes' CPU copies after loading) and a shift started on the line:
 
 ```js
 const { lint } = await import('/tools/lint.js?v=' + Date.now());

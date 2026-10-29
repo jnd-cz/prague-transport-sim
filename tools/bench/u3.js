@@ -1,6 +1,6 @@
 // Dev check (not part of the game): cars turning across our track in front of the tram (PLAN U3).
 // Drives a whole line headless with the autopilot; in the page (after loading):
-//   const { run } = await import('/.claude/bench/u3.js'); await run(seed)
+//   const { run } = await import('/tools/bench/u3.js'); await run(seed)
 // Counts (distinct cars): yielded = waited at the track for our tram (within 150 m of it);
 // crossedAhead = crossed in front of the moving tram within 100 m; closeCuts = on the track inside the
 // tram's stopping distance (v²/2 + 10 m at 1 m/s2) while it moved faster than 2 m/s (of them bold);
