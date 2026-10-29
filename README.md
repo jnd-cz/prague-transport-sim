@@ -226,6 +226,15 @@ Strings live in `src/i18n.js`.
 
 ## Dev
 
+**Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
+each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
+`reports/headless/`:
+
+```bash
+python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
+python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
+```
+
 `tools/autopilot.js` drives the game headlessly to check the rules. In the browser console:
 
 ```js
