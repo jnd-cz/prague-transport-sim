@@ -252,6 +252,19 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 3
 `--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
 up to ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
 
+Regression checks compare with main's baseline in `reports/baseline/headless.json`: the key counts of
+each run, with the code and data they were measured on.
+
+```bash
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --baseline
+```
+
+`--compare` prints baseline → now per run (also in `reports/headless/compare.md`, for the PR) and marks
+problem counts that rose (traffic counts beyond a 15 % + 5 noise band). It warns when the baseline was not
+measured on main's code and data. `--baseline` stores the run as the new baseline; it needs the game,
+the in-page checks and `data/MANIFEST.json` committed and `data/` matching the manifest.
+
 `tools/autopilot.js` drives the game headlessly to check the rules. In the browser console:
 
 ```js
@@ -278,7 +291,10 @@ a vehicle (`walkerHit`), each with its cause where known (next road, lane beside
 seeded and uses the first trip, autumn and dry weather, so a run on a **freshly loaded page** gives
 the same counts every time (a second run in the same page differs slightly).
 
-Reports go to `reports/lineN.json`. Compare with the committed baseline (exit code 1 if a count rose):
+Reports go to `reports/lineN.json`. Compare with the in-page baseline (exit code 1 if a count rose).
+That baseline (`reports/baseline/lineN.json`) dates from 2026-10-23, before the city frame (#7) and top of
+rail (#84), and is no longer maintained: for regression checks use `tools/headless.py --compare`, whose
+baseline follows main.
 
 ```bash
 python tools/lint_report.py
