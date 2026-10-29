@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-10-29c",
- "built_at_commit": "27d1f32",
- "published": "2026-10-29 17:08",
- "note": "trees in S-JTSK on all lines (#8)",
+ "built_at_commit": "a4c6c92",
+ "published": "2026-10-29 22:48",
+ "note": "#87: OSM answers keyed by extract, query and code; lines 9 and 23 from fresh answers, line 9 clearances from its own roads, platforms from each line's box (17, 23, 37)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
@@ -29,8 +29,8 @@
    "sha256": "ec2ca93569b191001197efad852b540c85871eaf5a850ac212da9e4241576e18"
   },
   "line17.json": {
-   "size": 4986267,
-   "sha256": "23b8836c55e5287711d751c2eac8e62317412b2509d649478edd26da2faf71c4"
+   "size": 4986347,
+   "sha256": "96a3d04960a382d877199a2a7828048f7a9d545007e2767996dd4c5283d43dde"
   },
   "line17.signals.json": {
    "size": 34904,
@@ -81,8 +81,8 @@
    "sha256": "0aa6e7d927e8ae178fc6d12f1cec97df115927c9061848fa4fbd4f651862f2f3"
   },
   "line23.json": {
-   "size": 1724020,
-   "sha256": "acd7accb9a52e46041f63f73d8d4e9355111ceee12dad953ebf009242e13b9ee"
+   "size": 1719709,
+   "sha256": "6e55d4086dbd04d8277ec473e21893f8b3a708a68b5bb1e41737d7df8f0cfb77"
   },
   "line37.bld.bin": {
    "size": 3160548,
@@ -101,8 +101,8 @@
    "sha256": "7e3f05ea10667b367bdb21bcfb608d1d32fe6a6e51221ca3379dcc5246305699"
   },
   "line37.json": {
-   "size": 1516012,
-   "sha256": "8be6e4b0508fc910115187e93e9d6d1b65a7866736469e8ce8ba50c35450d6ad"
+   "size": 1516074,
+   "sha256": "3432cc4861d1248239ba8f353f2df813169431812e732c69835320112cb06df3"
   },
   "line9.bld.bin": {
    "size": 10024992,
@@ -121,8 +121,8 @@
    "sha256": "adceadccb68ca371a8a3abf93ca948ad28c9fe9bc72f58ada0de1c0623b8861a"
   },
   "line9.json": {
-   "size": 3834859,
-   "sha256": "40218a21e17584bf9888bedad5bebc7a4517626210bcfd385c96b026a050587e"
+   "size": 3837678,
+   "sha256": "985d8f6baabf881ab05c277452013fe741aa7d02a0c9b366b8a9585288e9c6a1"
   },
   "lines.json": {
    "size": 607,
