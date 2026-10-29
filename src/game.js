@@ -173,7 +173,7 @@ export class Game {
 
   // Tram platforms of both directions from OSM (tools/platforms.py): each belongs to the nearer of our
   // track and the opposite one and is built as a strip curved along it, from 1.5 m off the track centre
-  // out to its width, 0.44 m above the rail foot, kerb faces on both sides. Where the surveyed streets
+  // out to its width, 0.18 m over top of rail (src/heights.js), kerb faces on both sides. Where the surveyed streets
   // (DTM) have a platform, island or sidewalk there, the survey draws it. The opposite direction's
   // platforms get a stop sign at their head and a shelter where OSM has one.
   // A Vienna-type stop (boarding from the sidewalk across the car lane; cars stop behind the open
@@ -243,13 +243,13 @@ export class Game {
       for (let k = 0; k <= n; k++) {
         const s = s0 + ((s1 - s0) * k) / n, c = rt.at(s);
         const I = rt.offset(s, side * inner), O = rt.offset(s, side * outer);
-        const zt = ground.trackAt(c.x, c.y), top = zt + 0.44, zg = Math.min(top - 0.05, ground.surface(O.x, O.y) - 0.05);
+        const zt = ground.trackAt(c.x, c.y), top = zt + 0.18, zg = Math.min(top - 0.05, ground.surface(O.x, O.y) - 0.05);
         const cur = { I, O, zt, top, zg };
         if (prev) {
           quad(V(prev.I, prev.top), V(I, top), V(O, top), V(prev.O, prev.top), cTop);
-          quad(V(prev.I, prev.zt + 0.2), V(I, zt + 0.2), V(I, top), V(prev.I, prev.top), cKerb);
+          quad(V(prev.I, prev.zt - 0.06), V(I, zt - 0.06), V(I, top), V(prev.I, prev.top), cKerb);
           quad(V(prev.O, prev.zg), V(O, zg), V(O, top), V(prev.O, prev.top), cKerb);
-        } else quad(V(I, zt + 0.2), V(O, zg), V(O, top), V(I, top), cKerb);
+        } else quad(V(I, zt - 0.06), V(O, zg), V(O, top), V(I, top), cKerb);
         prev = cur;
       }
       quad(V(prev.I, prev.zt + 0.2), V(prev.O, prev.zg), V(prev.O, prev.top), V(prev.I, prev.top), cKerb);
@@ -267,14 +267,14 @@ export class Game {
       if (!p.back) continue;
       const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
       const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
-      const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.44 : ground.trackAt(o.x, o.y);
+      const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.18 : ground.trackAt(o.x, o.y);
       const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
-      sign.position.set(o.x, zt + 0.44, -o.y);
+      sign.position.set(o.x, zt + 0.18, -o.y);
       sign.rotation.y = Math.atan2(-h.hx, h.hy);
       this.objects.add(sign);
       if (p.shelter) {
         const sh = makeShelter(), m = p.rt.offset((p.s0 + p.s1) / 2, p.side * (p.outer - 0.6));
-        sh.position.set(m.x, ground.trackAt(m.x, m.y) + 0.44, -m.y);
+        sh.position.set(m.x, ground.trackAt(m.x, m.y) + 0.18, -m.y);
         sh.rotation.y = Math.atan2(m.hx, -m.hy) + (p.side > 0 ? Math.PI : 0);
         this.objects.add(sh);
       }
@@ -293,7 +293,7 @@ export class Game {
     stop.vienna = kerb !== null;
     const plat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), new THREE.MeshLambertMaterial({ color: 0xa7a197 }));
     plat.visible = !osm && !stop.vienna;
-    place(plat, route, mid, -3.0, 0.11);
+    place(plat, route, mid, -3.0, -0.15); // (0.26 under the old street-level reference: top of rail now)
     // curved platforms: approximate with a straight box oriented along the chord
     const a = route.offset(stop.target - len - 1, -3.0), b = route.offset(stop.target - 1, -3.0);
     const za = this.profile.height(stop.target - len - 1), zb = this.profile.height(stop.target - 1);
@@ -308,12 +308,12 @@ export class Game {
     const sign = makeStopSign(stop.name, stop.request, this.data.stops[stop.i].lines || [String(this.data.line)]);
     // (on the sidewalk's height, not the track's)
     const onWalk = (m) => { m.position.y = route.ground.surface(m.position.x, -m.position.z); };
-    place(sign, route, stop.target + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.44, true);
+    place(sign, route, stop.target + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true);
     if (stop.vienna) onWalk(sign);
     g.add(sign);
     // (kept to move with the stop point: _initSignals may pull it back to a signal's stop point)
     stop.sign = sign;
-    stop.signPlace = (s) => { place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.44, true); if (stop.vienna) onWalk(sign); };
+    stop.signPlace = (s) => { place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true); if (stop.vienna) onWalk(sign); };
     // the shelter's outer edge: the OSM platform's, but no further than the surveyed one where the DTM
     // draws the platform (OSM's island at Palackého náměstí is 6.2 m out, the survey's 4.5 m: the
     // shelter stood on the road)
@@ -326,7 +326,7 @@ export class Game {
     }
     // shelter (at the back of the OSM platform where there is one)
     const shelter = makeShelter();
-    place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(outer - 0.6) : -3.4, 0.44);
+    place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(outer - 0.6) : -3.4, 0.18);
     if (stop.vienna) onWalk(shelter);
     g.add(shelter);
     this.objects.add(g);
@@ -361,7 +361,7 @@ export class Game {
       // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
       // the track, so the post does not hide it from the driver; the same pole carries the crossing's
       // pedestrian heads; user's street view, Palackého náměstí. Hung from a span it hung 20 m back)
-      if (d.head && !d.head.vienna) place(mesh, this.route, Math.min(d.s, (d.head.p1 ?? d.s) - 0.5), -3.5, 0.44, true);
+      if (d.head && !d.head.vienna) place(mesh, this.route, Math.min(d.s, (d.head.p1 ?? d.s) - 0.5), -3.5, 0.18, true);
       else this._mount(mesh, d.s, { hang: d.hang });
       this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction
@@ -714,7 +714,7 @@ export class Game {
       const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
       this._mount(sign, sw.auto ? d.s - 40 : sw.contact);
       this.objects.add(sign);
-      place(sw.indicator, this.route, d.s - 8, -0.4, 0, true); // hangs from the span wire over the track
+      place(sw.indicator, this.route, d.s - 8, -0.4, -0.26, true); // hangs from the span wire over the track
       const c = this.route.at(sw.contact);
       sw.marker.position.x = c.x;
       sw.marker.position.y += this.profile.height(sw.contact);
@@ -827,7 +827,7 @@ export class Game {
       const half = Math.max(0.2, (box.max.x - box.min.x) / 2);
       place(obj, route, span.s, -(tramClearance(route, span.s) + half), 0, true);
       ud.hung = true;
-      obj.position.y = this.profile.height(span.s) + 5.3 - ud.boardTop;
+      obj.position.y = this.profile.height(span.s) + 5.04 - ud.boardTop;
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
       rod.position.y = ud.boardTop + 0.62;
       obj.add(rod);
@@ -1060,7 +1060,7 @@ export class Game {
         }
       }
       const o = this.route.offset(r.s, r.lat), bob = r.state === 'run' ? Math.abs(Math.sin(r.s * 2.2)) * 0.08 : 0;
-      r.mesh.position.set(o.x, this.profile.height(r.s) + 0.44 + bob, -o.y);
+      r.mesh.position.set(o.x, this.profile.height(r.s) + 0.18 + bob, -o.y);
     }
     // aboard, or left far behind: gone
     for (const r of this.runners) if (r.state === 'aboard' || (r.state === 'left' && tr.s - r.s > 150)) this.objects.remove(r.mesh);
@@ -1616,7 +1616,7 @@ export class Game {
       for (let k = 0; k < count && n < 120; k++) {
         const along = stop.target - 2 - r() * 24, lat = -2.4 - r() * 1.6;
         const o = this.route.offset(along, lat);
-        p.set(o.x, this.profile.height(along) + 0.44, -o.y);
+        p.set(o.x, this.profile.height(along) + 0.18, -o.y);
         sc.set(1, 0.85 + r() * 0.3, 1);
         q.setFromEuler(new THREE.Euler(0, r() * 6.28, 0));
         m.compose(p, q, sc);

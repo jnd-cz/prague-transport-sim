@@ -16,6 +16,7 @@ import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.
 import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
+import { trackStyles } from './heights.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -65,6 +66,8 @@ try {
   if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; data.attribution += ' Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).'; }
 } catch { /* none for this line */ }
 // wait for the rest before the build steps, which block the page
+// the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
+const truth = await fetch('data/truth.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
 const t3Res = await Promise.all(T3_FILES.map((f) => load.get(f)));
 await load.begin('terrain');
@@ -93,8 +96,10 @@ if (!params.has('nofine')) try {
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 await load.begin('profile');
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || []);
+const styles = trackStyles(truth, data, dtm ? (s) => { const p = route.at(s); return dtm.classAt(p.x, p.y); } : null, route.length);
+const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || [], styles.lift);
 const ground = makeGround(route, terrain, profile, dtm);
+ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
 ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls
 route.ground = ground;
@@ -582,7 +587,7 @@ function updateCamera(dt, t) {
   const pitch = -0.035 - camAcc * 0.006 + slope;
   // turning the head also leans towards that side window
   const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
-  camera.position.set(eye.x + lx, profile.height(s - 1.4) + 2.65 + bob, -(eye.y + ly));
+  camera.position.set(eye.x + lx, profile.height(s - 1.4) + 2.39 + bob, -(eye.y + ly)); // (2.39 over top of rail)
   camera.rotation.set(0, 0, 0);
   camera.rotation.order = 'YXZ';
   camera.rotation.y = -yaw + look;
@@ -651,7 +656,7 @@ const mirrorScene = new THREE.Scene(), mirrorView = new THREE.OrthographicCamera
 }
 function renderMirror() {
   const s = tram.s, p = route.offset(s - 0.6, -1.55), h = route.heading(s - 6, 6), z = profile.height(s);
-  mirrorCam.position.set(p.x, z + 2.35, -p.y);
+  mirrorCam.position.set(p.x, z + 2.09, -p.y);
   // looking back, turned a little outwards so the side of the tram fills the inner edge
   mirrorCam.rotation.order = 'YXZ';
   mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.1, 0);

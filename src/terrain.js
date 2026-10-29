@@ -280,8 +280,11 @@ function chainWays(roads, flag) {
 }
 
 export class Profile {
-  constructor(route, terrain, bridges = [], tunnels = [], decks = new Map(), dtm = null, clearances = []) {
+  // The profile is the top of rail (src/heights.js): the surveyed surface (or the terrain) at the axis
+  // plus `lift(s)`, how high the track's style stands top of rail over the surface around it.
+  constructor(route, terrain, bridges = [], tunnels = [], decks = new Map(), dtm = null, clearances = [], lift = () => 0) {
     const step = (this.step = 2);
+    this.lift = lift;
     const n = (this.n = Math.ceil(route.length / step) + 1);
     Object.assign(this, { route, terrain, dtm, tunnels });
     let z = new Float32Array(n);
@@ -302,7 +305,7 @@ export class Profile {
       const deck = bed ?? (dtm && tagged && !under ? dtm.deckAt(p.x, p.y) : null);
       const zd = deck ?? (dtm ? dtm.heightAt(p.x, p.y) : null);
       if (zd !== null) this.surveyed++;
-      z[i] = zd ?? terrain.height(p.x, p.y);
+      z[i] = (zd ?? terrain.height(p.x, p.y)) + lift(i * step);
     }
     // box filter via prefix sums (window shrinks at the ends)
     const smooth = (arr, radius) => {
@@ -606,7 +609,7 @@ export function carveCorridor(T, route, profile, dtm = null) {
   for (let i = 0; i < nw; i++) {
     const s = i * WSTEP;
     if (profile.onBridge(s) || inRock(s)) continue;
-    const zp = profile.height(s);
+    const zp = profile.height(s) - profile.lift(s); // (the bed: src/heights.js)
     for (const side of [1, -1]) {
       let top = -Infinity;
       for (const lat of [BENCH + 1, BENCH + 4, BENCH + 8]) {
@@ -658,7 +661,7 @@ export function carveCorridor(T, route, profile, dtm = null) {
       if (d > R) continue;
       const s = bestS[k];
       if (profile.onBridge(s) || inRock(s)) continue;
-      const zp = profile.height(s);
+      const zp = profile.height(s) - profile.lift(s); // (the bed)
       const wall = !isNaN(wallTop[bestSide[k]][Math.round(s / WSTEP)]);
       if (d <= BENCH || (wall && d <= WALL_REACH)) g.h[k] = zp - 0.05;
       else if (d <= BENCH + BLEND) g.h[k] = zp + (orig[k] - zp) * ((d - BENCH) / BLEND);
@@ -691,6 +694,8 @@ export function carveCorridor(T, route, profile, dtm = null) {
 // where an area covers the point (roads and tram areas win over the rest), else null.
 // `covered(x, y)` tells whether the DTM describes the street there at all.
 // drawn DTM surfaces stand this much above their surveyed height (no z-fighting between classes)
+import { STREET_BELOW, ROAD_BELOW } from './heights.js';
+
 export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, water: 0.01 };
 export const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
 const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'platform', 'cycle']);
@@ -969,18 +974,20 @@ export function makeGround(route, terrain, profile, dtm = null) {
     dtm,
     // ground height at an arbitrary point; `deck` marks things that are part of a bridge of our
     // route (on it: the deck; without the flag: the ground under the bridge, where the roads below are)
+    // (next to the track: the ground under the OSM road ribbons, which are drawn 0.12 m over it, so the
+    // road meets the rail heads at the track's surface level: src/heights.js)
     at(x, y, deck = false) {
-      const n = near(x, y);
+      const n = near(x, y), under = (s) => profile.height(s) - profile.lift(s) - ROAD_BELOW;
       if (n && profile.onBridge(n.s)) {
-        if (deck && n.d < 22) return profile.height(n.s);
+        if (deck && n.d < 22) return under(n.s);
         return (dtm ? dtm.heightAt(x, y) : null) ?? terrain.height(x, y);
       }
-      if (n && n.d < 4) return profile.height(n.s);
+      if (n && n.d < 4) return under(n.s);
       // surveyed street surface (DTM) where it exists
       const zd = dtm ? dtm.heightAt(x, y) : null;
       if (zd !== null) return zd;
       if (n && n.d < 9) {
-        const zt = profile.height(n.s);
+        const zt = under(n.s);
         // blend from track level to terrain over 4..9 m
         const k = (n.d - 4) / 5;
         return zt * (1 - k) + terrain.height(x, y) * k;
@@ -995,7 +1002,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       if (d > 6) return z;
       const n = route.nearest(x, y);
       if (!n || n.d > 12 || profile.onBridge(n.s)) return z; // (under our bridge: the road below)
-      const zt = profile.height(n.s) + 0.14;
+      const zt = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW; // the surface the track lies in
       if (d >= 3 ? Math.abs(z - zt) > 2.5 : z - zt > 4.5) return z; // a street above or below the tracks' level (in the track corridor: only a structure well above)
       const k = Math.max(0, Math.min(1, (d - 3) / 3));
       return zt + (z - zt) * k * k * (3 - 2 * k);
@@ -1016,7 +1023,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const z = dtm ? dtm.deckAt(x, y, ref, ref === null ? Infinity : 4) : null;
       if (z !== null) return z + 0.02;
       const n = near(x, y);
-      return n && n.d < 22 && profile.onBridge(n.s) ? profile.height(n.s) + 0.12 : null;
+      return n && n.d < 22 && profile.onBridge(n.s) ? profile.height(n.s) - profile.lift(n.s) - 0.012 : null;
     },
     // height function of an OSM way (its ribbon is drawn 0.12 above): ground level, or on a bridge
     // the deck it lies on, else a straight span between the ground at its two ends

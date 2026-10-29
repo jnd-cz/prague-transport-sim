@@ -273,8 +273,8 @@ export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, ru
 // found by principal component analysis of the body: length e1 (front = wipers), width e2
 // (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
 let detailedProto = null;
-export const CONTACT_WIRE = 5.6;   // contact wire height above the track bed level used by the world
-export const RAIL_TOP = 0.26;      // rail head above the track bed level (track ribbons in world.js)
+export const CONTACT_WIRE = 5.34;  // contact wire over top of rail (the track profile; src/heights.js)
+export const RAIL_TOP = 0;         // the wheels stand on the profile: it is the top of rail (src/heights.js)
 
 // files: { url: blob URL } of parts already downloaded (the loading screen counts their bytes)
 export async function loadDetailedT3(url = 'assets/t3/t3.gltf', files = {}) {
