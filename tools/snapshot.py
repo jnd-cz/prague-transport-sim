@@ -17,6 +17,7 @@ Usage (python -I is enough; the store is reached with the system's `sftp`, ssh c
     python -I tools/snapshot.py status             # what differs locally
     python -I tools/snapshot.py publish 2026-11-05 --note "new OSM and GTFS"   # raw/ -> new snapshot
     python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST
+    python -I tools/snapshot.py verify [--base main]   # after a publish: all in the store, new files intact
     python -I tools/snapshot.py cache-prune [--dry-run]   # drop cached files no checkout links any more
 Options: --store HOST:DIR (default tramdata:store, or $TRAMDATA_STORE); --cache DIR (default
 $TRAMDATA_CACHE; none: files are copied into the checkout only) or --no-cache.
@@ -493,6 +494,43 @@ def data_fetch(store, cache=None):
     store.download("builds", need, cache)
 
 
+def verify(store, sid, base="main"):
+    """Check a publish without a fresh checkout (#107): every file of the snapshot and of data/MANIFEST.json
+    is listed in the store, and only the new ones (in no other snapshot manifest; for builds, not in base's
+    manifest) are downloaded to a temporary folder and hashed. A full restore to check 20 new files fetched
+    1,137 store objects (#61)."""
+    snap = load_snapshot(sid)
+    others = set()
+    for p in glob.glob(os.path.join(SNAPDIR, "*.json")):
+        if os.path.basename(p) != f"{sid}.json":
+            others |= {f["sha256"] for g in json.load(open(p, encoding="utf-8"))["groups"] for f in g["files"]}
+    files = {"sources": {f["sha256"]: f["size"] for g in snap["groups"] for f in g["files"]}}
+    old = {"sources": others, "builds": set()}
+    if os.path.exists(DATA_MANIFEST):
+        files["builds"] = {m["sha256"]: m["size"] for m in json.load(open(DATA_MANIFEST, encoding="utf-8"))["files"].values()}
+        r = subprocess.run(["git", "show", f"{base}:data/MANIFEST.json"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        if r.returncode == 0:
+            old["builds"] = {m["sha256"] for m in json.loads(r.stdout)["files"].values()}
+    bad = 0
+    for kind, want in files.items():
+        missing = set(want) - store.listing(kind)
+        new = sorted(set(want) - old[kind] - missing)
+        print(f"{kind}: {len(want)} files, {len(missing)} missing in the store, "
+              f"{len(new)} new to check ({sum(want[h] for h in new) / 1e6:.0f} MB)")
+        for h in sorted(missing):
+            print(f"  missing {kind}/{h}")
+        bad += len(missing)
+        if new:
+            tmp = tempfile.mkdtemp(prefix=".verify-", dir=ROOT)
+            try:  # (download checks every hash and stops on a file it cannot fetch intact)
+                store.download(kind, [(h, os.path.join(tmp, h)) for h in new])
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+    if bad:
+        raise SystemExit(f"{bad} files missing in the store")
+    print(f"snapshot {sid} and data/MANIFEST.json: in the store, new files intact")
+
+
 def data_status():
     if not os.path.exists(DATA_MANIFEST):
         print("data: no MANIFEST.json")
@@ -527,6 +565,8 @@ if __name__ == "__main__":
         status(opt("--snapshot") or current_id())
     elif cmd == "data-publish":
         data_publish(store, opt("--note", ""), opt("--snapshot"), cache)
+    elif cmd == "verify":
+        verify(store, opt("--snapshot") or current_id(), opt("--base", "main"))
     elif cmd == "data-fetch":
         data_fetch(store, cache)
     elif cmd == "cache-prune":

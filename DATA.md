@@ -85,6 +85,7 @@ never in place: a file there may be a protected link into the machine cache.
 **Built data** (after rebuilding lines):
 ```bash
 python -I tools/snapshot.py data-publish --note "line 17 rebuilt: …"
+python -I tools/snapshot.py verify         # all in the store, the new files fetched back and hashed
 git add data/MANIFEST.json && git commit
 ```
 The manifest records the snapshot the build used and the commit it was built at. Commit it together with
@@ -98,6 +99,12 @@ the tool changes that produced it.
 3. `python -I tools/snapshot.py publish <YYYY-MM-DD> --note "what changed"`: uploads the new files,
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`.
 4. `data-publish`, then commit `snapshots/` and `data/MANIFEST.json` together.
+
+**Checking a publish:** `python -I tools/snapshot.py verify` (#107). It lists the store once and fetches
+back only what this publish added: source files no other snapshot in `snapshots/` has, built files not in
+`main`'s `data/MANIFEST.json` (`--base REF` for another). Files an earlier snapshot had were checked when
+it was published. Don't restore the whole snapshot into a fresh checkout to check a publish: on
+2026-10-29c that is 1,117 store objects (~2 GB) against 147 for `verify` (35 s).
 
 Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`, unpacked `.gpkg`) are
 not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query
