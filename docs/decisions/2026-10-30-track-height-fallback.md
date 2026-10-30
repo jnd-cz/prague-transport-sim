@@ -186,6 +186,8 @@ triangulating their vertex heights only inside their footprint. A covering tram 
 track's ZPS level; otherwise a covering deck can establish it. Conflicting anchor levels are unresolved.
 Covering tram areas take precedence over deck anchors, so a deck above a ground track cannot lend it
 the upper level. Conflicting tram levels stay on hold even when OSM has no structure tag.
+Without anchors, a containing nonzero-level surface also leaves the level unresolved; it cannot be
+assumed to be ground simply because OSM has no structure tag.
 DI placement codes are not used as ZPS levels: Trojský most's DI code is 0. At a structure, a ground-level
 anchor cannot establish an elevated track level. Without a structure hint, absent anchors use level 0
 with `ordinary_surface_default` provenance. Water, walls, roofs and buildings are diagnostics only. Surfaces at

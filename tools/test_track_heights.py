@@ -436,6 +436,14 @@ class DeckFallback(unittest.TestCase):
         self.assertIsNone(result['z'])
         self.assertIn('track_zps_level_unverified', result['review_flags'])
 
+    def test_nonzero_road_level_without_track_anchor_is_not_assumed_to_be_ground(self):
+        road = {**deck_record('upper-road', 194), 'class': 'road', 'level': 1}
+        decks = Decks([road], [offset_fact(0)])
+        candidates = decks.candidates(5, 0, 'di-1')
+        result = HeightGuard().choose({'id': 'di-1', 'z': None}, match(path(1, 180)), 5, 0, decks=candidates)
+        self.assertIsNone(result['z'])
+        self.assertIn('track_zps_level_unverified', result['review_flags'])
+
     def test_tunnel_without_di_stays_on_hold_and_local_review_can_resolve_it(self):
         args = ({'id': 'di-1', 'z': None}, match(path(1, 200)), 5, 0)
         result = HeightGuard().choose(*args, tunnel_hint=True)

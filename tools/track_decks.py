@@ -93,6 +93,13 @@ class Decks:
         anchors = tram_anchors or anchors
         levels = {r['level'] for _, r in anchors}
         level = next(iter(levels)) if len(levels) == 1 else (0 if not levels and not structure_hint else None)
+        if not anchors and any(
+            self.polygons[i].covers(point)
+            and self.records[i]['level'] != 0
+            and self.records[i].get('class') not in ('water', 'wall', 'roof', 'building')
+            for i, _ in nearby
+        ):
+            level = None
         if structure_hint and level == 0:
             level = None
         level_sources = [r['id'] for _, r in anchors]
@@ -132,7 +139,7 @@ class Decks:
                     'surveyed_track_area'
                     if anchors
                     else 'unverified'
-                    if structure_hint
+                    if level is None
                     else 'ordinary_surface_default'
                 ),
                 'inside': inside,
