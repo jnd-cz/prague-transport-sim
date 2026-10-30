@@ -43,7 +43,7 @@ Near the Vozovna loop, junctions and multiple parallel tracks require explicit t
 
 ## District acquisition, 2026-10-30 (#61)
 
-**Prepared locally; source-snapshot publication awaits the user's approval.** The game and its built
+**Published in source snapshot `2026-10-30`, with the user's approval.** The game and its built
 data are unchanged. Importing these tracks is [#20](https://github.com/jnd-cz/prague-transport-sim/issues/20).
 
 ### Access, formats and the HANDOFF contradiction
@@ -140,16 +140,17 @@ python -P -E tools/dtm_di.py                 # offline report -> reports/dtm-di.
 python -P -E tools/dtm_di.py --fetch         # deliberately refresh upstream sources
 ```
 
-The staged source group is `raw/dtm-di/`: **16 ZIPs + catalogue.json + provenance.json + terms.pdf +
+The published source group is `raw/dtm-di/`: **16 ZIPs + catalogue.json + provenance.json + terms.pdf +
 access.html**, **21,933,947 bytes**. Provenance records exact per-package URL, date and SHA-256; the
 catalogue and terms are retained as received. ZIPs are read directly; snapshot fetch need not unpack
 them. The snapshot scanner includes these 20 files. No built-data publication or game regression
 baseline update is needed, because neither the runtime nor generated line files changed.
 
-After approval: `python -I tools/snapshot.py publish 2026-10-30 --note "DI set 7: 16 districts for lines 9,17,22,23,37, state 2026-09-30"`,
-then commit the manifest and `snapshots/CURRENT`. Verify `fetch` and `status` in a fresh checkout and
-rerun the offline report there. Until that is done, the source files are staged locally and #61's
-published-snapshot acceptance check remains outstanding.
+Publication command (2026-10-30, after approval):
+`python -I tools/snapshot.py publish 2026-10-30 --note "DI set 7: 16 districts for lines 9,17,22,23,37, state 2026-09-30"`.
+The SFTP store accepted all 20 new files (21,933,947 bytes). The complete snapshot contains 1549
+files (2112 MB); every previously pinned source is unchanged. Fresh-checkout fetch/status and
+offline-report verification follow publication.
 
 ## Height and terrain findings
 
