@@ -34,6 +34,9 @@ import shapely
 from shapely.geometry import Polygon, Point, box
 from shapely.ops import unary_union
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from atomic import replacing  # noqa: E402
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 arg = lambda k, d: type(d)(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d  # noqa: E731
@@ -379,6 +382,6 @@ for st in line["stops"]:
     print(f"stop {st['name']} (platform {st['off']} m from the track): {kind}  {dict(seen)}")
 dtm["vienna"] = vienna
 
-with open(dst, "w", encoding="utf-8") as fh:
+with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(dtm, fh, ensure_ascii=False, separators=(",", ":"))
 print(f"wrote {dst} ({os.path.getsize(dst) / 1e6:.2f} MB)")

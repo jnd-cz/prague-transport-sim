@@ -45,6 +45,26 @@ queries.
    `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, Pillow;
    the headless checks need Playwright (`python -m pip install --user playwright`, then
    `python -m playwright install chromium`).
+5. **Machine cache** (optional; worth it from the second checkout on, e.g. several agents or worktrees):
+   one folder of store files that every checkout on this computer shares. Set the user environment
+   variable once, then open a new terminal:
+   ```bash
+   setx TRAMDATA_CACHE C:\tramdata\cache
+   ```
+   (Windows: or System Properties → Environment Variables → User variables; elsewhere `export
+   TRAMDATA_CACHE=…` in the shell profile; per command `--cache DIR`, or `--no-cache`.) Put it on the
+   same drive as the checkouts. Then `fetch` and `data-fetch` download into the cache and hard-link the
+   files into `raw/` and `data/`: an extra checkout costs no disk space and fetches without the
+   network. The cached files deny writing their data (Windows: an ACL entry, `icacls … /deny
+   <user>:(WD,AD)`; elsewhere read-only), through every link: a tool writing such a file in place fails
+   with PermissionError instead of changing every checkout's copy. The tools write whole files
+   (`tools/atomic.py`: temp + rename), which replaces only the checkout's own link.
+   - Not set: files are copied into the checkout, as before.
+   - Set but not usable (can't be created or written): a note, then the same as not set.
+   - On another drive than the checkout: hard links can't cross drives, so files are copied out of the
+     cache (still no download).
+   - `python -I tools/snapshot.py cache-prune [--dry-run]` removes cached files that no checkout links
+     any more (after deleting a checkout or moving to a new snapshot).
 
 ## Everyday use
 
@@ -55,7 +75,10 @@ python -I tools/snapshot.py status         # local raw/ and data/ against the ma
 ```
 
 After pulling a commit that changed `data/MANIFEST.json` or `snapshots/CURRENT`, fetch again (only
-changed files are downloaded).
+changed files are downloaded, or linked from the machine cache).
+
+Tools write `data/` and `raw/` files whole, via `tools/atomic.py` (`with replacing(path, "w") as fh:`),
+never in place: a file there may be a protected link into the machine cache.
 
 ## Publishing
 

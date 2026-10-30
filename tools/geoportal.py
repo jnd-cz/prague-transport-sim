@@ -61,7 +61,7 @@ def fetch(url, cache_name=None, binary=False):
         if data[:2] == b"\x1f\x8b":
             data = gzip.decompress(data)
         if path:
-            with open(path, "wb") as f:
+            with replacing(path, "wb") as f:
                 f.write(data)
     return data if binary else json.loads(data)
 
@@ -70,6 +70,7 @@ def fetch(url, cache_name=None, binary=False):
 with open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8") as f:
     line = json.load(f)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
@@ -206,7 +207,7 @@ def write_buildings(buildings, kinds=None):
         table.append(entry)
         voff += len(allv)
     dst = os.path.join(ROOT, "data", f"line{LINE}.bld.bin")
-    with open(dst, "wb") as f:
+    with replacing(dst, "wb") as f:
         f.write(blob)
     print(f"buildings: {len(buildings)} in {len(table)} chunks, {voff} vertices, {len(blob) / 1e6:.1f} MB")
     return {"file": f"line{LINE}.bld.bin", "q": Q, "chunks": table}
@@ -305,7 +306,7 @@ def main():
         # refresh only the vegetation of an existing file (from the download cache)
         geo = json.load(open(dst, encoding="utf-8"))
         geo["trees"] = trees()
-        with open(dst, "w", encoding="utf-8") as f:
+        with replacing(dst, "w", encoding="utf-8") as f:
             json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))
         print(f"wrote {dst}")
         return
@@ -317,7 +318,7 @@ def main():
     geo["buildings"] = write_buildings(blds + bridges, [0] * len(blds) + [1] * len(bridges))
     geo["attribution"] = "3D buildings and bridges, retaining walls, trees: data base © IPR Praha (CC BY 4.0)"
     dst = os.path.join(ROOT, "data", f"line{LINE}.geo.json")
-    with open(dst, "w", encoding="utf-8") as f:
+    with replacing(dst, "w", encoding="utf-8") as f:
         json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {dst}")
 

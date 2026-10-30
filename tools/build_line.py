@@ -71,6 +71,7 @@ REFRESH = "--refresh" in sys.argv
 # no longer used. A cached answer in raw/lineN/ is kept only while it came from the same extract, query
 # and emulation code (osm_local.answer_key).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 try:
     import osm_local
@@ -376,9 +377,9 @@ def fetch_terrain(P, x_min, x_max, y_min, y_max):
             raise SystemExit(f"terrain export failed: {meta}")
         with urllib.request.urlopen(urllib.request.Request(meta["href"], headers=hdr), timeout=300) as r:
             tif = r.read()
-        with open(path, "wb") as f:
+        with replacing(path, "wb") as f:
             f.write(tif)
-        with open(meta_path, "w") as f:
+        with replacing(meta_path, "w") as f:
             json.dump(meta, f)
     with open(path, "rb") as f:
         grid = read_tiff_f32(f.read())
@@ -1174,7 +1175,7 @@ def main():
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
     dst = os.path.join(OUT, f"line{LINE}.json")
-    with open(dst, "w", encoding="utf-8") as f:
+    with replacing(dst, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {dst} ({os.path.getsize(dst)/1e6:.2f} MB)")
     # index of built lines for the menu
@@ -1187,7 +1188,7 @@ def main():
                  "km": round(path.length / 1000, 1), "stops": len(stops)}
     if THEN:
         idx[LINE].update({"then": THEN, "via": stops[run["change"]]["name"]})
-    with open(idx_path, "w", encoding="utf-8") as f:
+    with replacing(idx_path, "w", encoding="utf-8") as f:
         json.dump(sorted(idx.values(), key=lambda l: int(l["line"])), f, ensure_ascii=False, indent=1)
 
 

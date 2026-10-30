@@ -19,6 +19,7 @@ from collections import defaultdict
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from atomic import replacing  # noqa: E402
 import gpkg  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -263,6 +264,6 @@ for (kx, ky), z in cloud.items():
     flat += [kx / 2, ky / 2, z]
 out = {"attribution": "Streets: DTM Praha, data base © IPR Praha (CC BY 4.0)", "areas": areas, "z": flat}
 dst = os.path.join(ROOT, "data", f"line{LINE}.dtm.json")
-with open(dst, "w", encoding="utf-8") as fh:
+with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
 print(f"wrote {dst} ({os.path.getsize(dst) / 1e6:.2f} MB)")

@@ -17,7 +17,12 @@ Usage (python -I is enough; the store is reached with the system's `sftp`, ssh c
     python -I tools/snapshot.py status             # what differs locally
     python -I tools/snapshot.py publish 2026-11-05 --note "new OSM and GTFS"   # raw/ -> new snapshot
     python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST
-Options: --store HOST:DIR (default tramdata:store, or $TRAMDATA_STORE).
+    python -I tools/snapshot.py cache-prune [--dry-run]   # drop cached files no checkout links any more
+Options: --store HOST:DIR (default tramdata:store, or $TRAMDATA_STORE); --cache DIR (default
+$TRAMDATA_CACHE; none: files are copied into the checkout only) or --no-cache.
+
+The machine cache (#77, class Cache): every checkout on a computer shares one folder of store files,
+hard-linked into raw/ and data/ and protected against writing in place; see DATA.md.
 
 A new snapshot is a deliberate step: refresh the inputs (instructions per source group below and in
 DATA.md), check the build, then `publish`. The Overpass API is not a source any more.
@@ -34,6 +39,9 @@ import time
 import zipfile
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I leaves it out)
+from atomic import replacing  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SNAPDIR = os.path.join(ROOT, "snapshots")
 DATA_MANIFEST = os.path.join(ROOT, "data", "MANIFEST.json")
@@ -134,26 +142,199 @@ class Store:
         self.run(cmds)
         print(f"  done in {time.time() - t0:.0f} s ({total / 1e6 / max(1, time.time() - t0):.1f} MB/s)")
 
-    def download(self, kind, items):
-        """items: [(sha, final local path)]: fetched to a temporary file, checked, moved in place."""
+    def download(self, kind, items, cache=None):
+        """items: [(sha, final local path)]: fetched to a temporary file, checked, then put in place
+        (through the machine cache when there is one)."""
+        if cache:  # (what the cache already has is only linked)
+            here = [(h, p) for h, p in items if cache.has(kind, h)]
+            for h, p in here:
+                cache.place(kind, h, p)
+            if here:
+                print(f"{len(here)} files from the cache {cache.root}")
+            items = [(h, p) for h, p in items if not cache.has(kind, h)]
         if not items:
             return
         # (inside the project: sftp gets relative paths, and a temp folder on another drive has none)
         tmpdir = tempfile.mkdtemp(prefix=".snap-", dir=ROOT)
         try:
-            cmds = [f'get "{self.dir}/{kind}/{h}" "{rel(os.path.join(tmpdir, h))}"' for h, _ in {h: p for h, p in items}.items()]
-            print(f"downloading {len(cmds)} files ...", flush=True)
+            want = sorted({h for h, _ in items})
+            print(f"downloading {len(want)} files ...", flush=True)
             t0 = time.time()
-            self.run(cmds)
+            # (in sessions of 200 files, each retried for what is missing or cut off: one session of 1117
+            # files was reset by the server on 2026-10-29)
+            good = set()
+            for i in range(0, len(want), 200):
+                for attempt in range(4):
+                    todo = [h for h in want[i:i + 200] if h not in good]
+                    if not todo:
+                        break
+                    if attempt:
+                        print(f"  retrying {len(todo)} files", flush=True)
+                        time.sleep(5 * attempt)
+                    self.run([f'get "{self.dir}/{kind}/{h}" "{rel(os.path.join(tmpdir, h))}"' for h in todo], check=False)
+                    for h in todo:
+                        p = os.path.join(tmpdir, h)
+                        if os.path.exists(p) and sha256(p) == h:
+                            good.add(h)
+                        elif os.path.exists(p):
+                            os.remove(p)  # (cut off: fetched again)
+            if bad := [h for h in want if h not in good]:
+                raise SystemExit(f"{len(bad)} files not fetched intact from the store (e.g. {kind}/{bad[0]})")
+            for h in want:
+                if cache:
+                    cache.add(kind, h, os.path.join(tmpdir, h))
+            if cache:
+                cache.protect(os.path.join(cache.root, kind))
             for h, dst in items:
-                src = os.path.join(tmpdir, h)
-                if sha256(src) != h:
-                    raise SystemExit(f"hash mismatch for {rel(dst)} (store file {h})")
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
-                shutil.copyfile(src, dst)
+                if cache:
+                    cache.place(kind, h, dst)
+                else:
+                    put(os.path.join(tmpdir, h), dst)
             print(f"  done in {time.time() - t0:.0f} s")
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def put(src, dst):
+    """A copy of src at dst, written whole (dst may be a protected link into a cache: replaced, not written)."""
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    tmp = f"{dst}.{os.getpid()}.part"
+    shutil.copyfile(src, tmp)
+    os.replace(tmp, dst)
+
+
+# ---------------------------------------------------------------- the machine's store cache (#77)
+class Cache:
+    """A folder every checkout on this computer shares, laid out like the store: sources/<sha256>,
+    builds/<sha256>, and unzipped/<zip sha256>/ for the DTM packages. Set it with TRAMDATA_CACHE (or
+    --cache DIR); without one, files are copied into each checkout as before.
+
+    Its files are hard-linked into the checkouts' raw/ and data/, so an extra checkout costs no space
+    and fetches locally. Each cached file denies writing its data (Windows: an ACL entry for this user,
+    `icacls /deny user:(WD,AD)`; elsewhere: read-only mode), and that holds through every link: a tool
+    writing a linked file in place fails loudly instead of changing every checkout's copy, while the
+    tools' temp + rename (tools/atomic.py) replaces only its own link. Linking needs the same volume;
+    on another one the files are copied out of the cache (no download, no saving of space)."""
+
+    def __init__(self, root):
+        self.root = root
+        self.copies = False  # (set once linking failed: another volume)
+
+    @staticmethod
+    def open(spec):
+        if not spec:
+            return None
+        root = os.path.abspath(os.path.expanduser(spec))
+        try:
+            os.makedirs(root, exist_ok=True)
+            probe = os.path.join(root, f".probe-{os.getpid()}")
+            open(probe, "w").close()
+            os.remove(probe)
+        except OSError as e:
+            print(f"note: the cache {root} is not usable ({e.strerror}): files go into the checkout only")
+            return None
+        return Cache(root)
+
+    def path(self, kind, h):
+        return os.path.join(self.root, kind, h)
+
+    def has(self, kind, h):
+        return os.path.isfile(self.path(kind, h))
+
+    def add(self, kind, h, src):
+        """A checked file into the cache (copied: src stays where it is)."""
+        dst = self.path(kind, h)
+        if not os.path.exists(dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            put(src, dst)
+
+    def adopt(self, kind, h, path):
+        """A checkout's own file (just built) into the cache, linked when it can be: the checkout keeps
+        it, now protected like any cached file."""
+        dst = self.path(kind, h)
+        if os.path.exists(dst):
+            self.place(kind, h, path)  # (the same bytes are cached already: link to those)
+            return
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        try:
+            os.link(path, dst)
+        except OSError:
+            put(path, dst)
+
+    def place(self, kind, h, dst, src=None):
+        """The cached file at dst: a hard link (or a copy on another volume), replacing what was there."""
+        src = src or self.path(kind, h)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.exists(dst) and os.path.samefile(src, dst):
+            return
+        tmp = f"{dst}.{os.getpid()}.part"
+        if not self.copies:
+            try:
+                os.link(src, tmp)
+                os.replace(tmp, dst)
+                return
+            except OSError as e:
+                self.copies = True
+                print(f"note: no hard links from {self.root} to {rel(os.path.dirname(dst))} ({e.strerror}): copying")
+        put(src, dst)
+
+    def holds(self, kind, h, p):
+        """Whether checkout file p is this cached file (a link: no need to hash it)."""
+        c = self.path(kind, h)
+        return os.path.exists(p) and os.path.exists(c) and os.path.samefile(p, c)
+
+    def protect(self, folder):
+        """Deny writing the data of every file in folder (idempotent; one call per folder)."""
+        if not os.path.isdir(folder):
+            return
+        if os.name == "nt":
+            user = os.environ.get("USERNAME") or os.getlogin()
+            subprocess.run(["icacls", os.path.join(folder, "*"), "/deny", f"{user}:(WD,AD)", "/Q"],
+                           capture_output=True)
+        else:
+            for f in os.listdir(folder):
+                p = os.path.join(folder, f)
+                if os.path.isfile(p):
+                    os.chmod(p, 0o444)
+
+    def unzipped(self, zh, zpath):
+        """The folder with zip zh's members (unzipped once per cache)."""
+        d = os.path.join(self.root, "unzipped", zh)
+        if not os.path.isdir(d):
+            part = f"{d}.{os.getpid()}.part"
+            shutil.rmtree(part, ignore_errors=True)
+            os.makedirs(part)
+            with zipfile.ZipFile(zpath) as zf:
+                for n in zf.namelist():
+                    if not n.endswith("/"):
+                        with zf.open(n) as src, open(os.path.join(part, os.path.basename(n)), "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+            os.replace(part, d)
+            self.protect(d)
+        return d
+
+    def prune(self, dry):
+        """Remove what no checkout links any more (a file with one link is only the cache's)."""
+        n = size = 0
+        for kind in ("sources", "builds"):
+            d = os.path.join(self.root, kind)
+            for f in os.listdir(d) if os.path.isdir(d) else []:
+                p = os.path.join(d, f)
+                st = os.stat(p)
+                if st.st_nlink == 1:
+                    n, size = n + 1, size + st.st_size
+                    if not dry:
+                        os.remove(p)
+        u = os.path.join(self.root, "unzipped")
+        for z in os.listdir(u) if os.path.isdir(u) else []:
+            d = os.path.join(u, z)
+            files = [os.path.join(d, f) for f in os.listdir(d)]
+            if all(os.stat(p).st_nlink == 1 for p in files):
+                n, size = n + len(files), size + sum(os.path.getsize(p) for p in files)
+                if not dry:
+                    shutil.rmtree(d)
+        print(f"cache {self.root}: {n} files, {size / 1e6:.0f} MB linked by no checkout"
+              + (" (dry run: nothing removed)" if dry else ": removed"))
 
 
 # ---------------------------------------------------------------- sources
@@ -205,29 +386,37 @@ def publish(store, sid, note):
           f"snapshots/{sid}.json and CURRENT written: commit them")
 
 
-def fetch(store, sid):
+def fetch(store, sid, cache=None):
     snap = load_snapshot(sid)
     need, unzip = [], []
     for g in snap["groups"]:
         for f in g["files"]:
             p = os.path.join(ROOT, f["path"])
-            if not (os.path.exists(p) and os.path.getsize(p) == f["size"] and sha256(p) == f["sha256"]):
+            # (with the file cached, only a link to it counts: a matching copy is swapped for the link)
+            ok = cache.holds("sources", f["sha256"], p) if cache and cache.has("sources", f["sha256"]) else (
+                os.path.exists(p) and os.path.getsize(p) == f["size"] and sha256(p) == f["sha256"])
+            if not ok:
                 need.append((f["sha256"], p))
             if g.get("unzip"):
-                unzip.append(p)
+                unzip.append((f["sha256"], p))
     print(f"snapshot {sid}: {sum(len(g['files']) for g in snap['groups'])} files, {len(need)} to fetch")
-    store.download("sources", need)
-    for z in unzip:  # (the street survey: the tools read the .gpkg)
+    store.download("sources", need, cache)
+    for zh, z in unzip:  # (the street survey: the tools read the .gpkg)
+        # into a folder named after the package (every district's package holds the same generic
+        # ZPS_KR.gpkg / ZPS_OPL.gpkg; tools/dtm.py takes these folders)
+        folder = z[:-4] if z.endswith(".zip") else z + ".d"
+        os.makedirs(folder, exist_ok=True)
+        if cache:  # (unzipped once per cache, linked like the rest)
+            d = cache.unzipped(zh, z)
+            for n in os.listdir(d):
+                cache.place(None, None, os.path.join(folder, n), src=os.path.join(d, n))
+            continue
         with zipfile.ZipFile(z) as zf:
-            # into a folder named after the package (every district's package holds the same generic
-            # ZPS_KR.gpkg / ZPS_OPL.gpkg; tools/dtm.py takes these folders)
-            folder = z[:-4] if z.endswith(".zip") else z + ".d"
-            os.makedirs(folder, exist_ok=True)
             for n in zf.namelist():
                 out = os.path.join(folder, os.path.basename(n))
                 if not os.path.exists(out):
                     print("  unzip", rel(out))
-                    with zf.open(n) as src, open(out, "wb") as dst:
+                    with zf.open(n) as src, replacing(out, "wb") as dst:
                         shutil.copyfileobj(src, dst)
 
 
@@ -259,13 +448,17 @@ def data_files():
     return sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)) and f not in DATA_KEEP)
 
 
-def data_publish(store, note, sid=None):
+def data_publish(store, note, sid=None, cache=None):
     files = {}
     for f in data_files():
         p = os.path.join(ROOT, "data", f)
         files[f] = {"size": os.path.getsize(p), "sha256": sha256(p)}
     have = store.listing("builds")
     store.upload("builds", [(os.path.join(ROOT, "data", f), m["sha256"]) for f, m in files.items() if m["sha256"] not in have])
+    if cache:  # (other checkouts then fetch this build locally)
+        for f, m in files.items():
+            cache.adopt("builds", m["sha256"], os.path.join(ROOT, "data", f))
+        cache.protect(os.path.join(cache.root, "builds"))
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     man = {"snapshot": sid or (current_id() if os.path.exists(os.path.join(SNAPDIR, "CURRENT")) else None),
            "built_at_commit": head, "published": time.strftime("%Y-%m-%d %H:%M"), "note": note, "files": files}
@@ -273,17 +466,20 @@ def data_publish(store, note, sid=None):
     print(f"data: {len(files)} files, {sum(m['size'] for m in files.values()) / 1e6:.0f} MB; data/MANIFEST.json written: commit it")
 
 
-def data_fetch(store):
+def data_fetch(store, cache=None):
     if not os.path.exists(DATA_MANIFEST):
         raise SystemExit("no data/MANIFEST.json")
     man = json.load(open(DATA_MANIFEST, encoding="utf-8"))
     need = []
     for f, m in man["files"].items():
         p = os.path.join(ROOT, "data", f)
-        if not (os.path.exists(p) and os.path.getsize(p) == m["size"] and sha256(p) == m["sha256"]):
+        # (with the file cached, only a link to it counts: a matching copy is swapped for the link)
+        ok = cache.holds("builds", m["sha256"], p) if cache and cache.has("builds", m["sha256"]) else (
+            os.path.exists(p) and os.path.getsize(p) == m["size"] and sha256(p) == m["sha256"])
+        if not ok:
             need.append((m["sha256"], p))
     print(f"data (snapshot {man.get('snapshot')}, built at {man.get('built_at_commit')}): {len(man['files'])} files, {len(need)} to fetch")
-    store.download("builds", need)
+    store.download("builds", need, cache)
 
 
 def data_status():
@@ -310,16 +506,21 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     opt = lambda k, d=None: args[args.index(k) + 1] if k in args else d  # noqa: E731
     store = Store(opt("--store", os.environ.get("TRAMDATA_STORE", "tramdata:store")))
+    cache = None if "--no-cache" in args else Cache.open(opt("--cache", os.environ.get("TRAMDATA_CACHE")))
     cmd = args[0] if args else ""
     if cmd == "fetch":
-        fetch(store, opt("--snapshot") or current_id())
+        fetch(store, opt("--snapshot") or current_id(), cache)
     elif cmd == "publish" and len(args) > 1:
         publish(store, args[1], opt("--note", ""))
     elif cmd == "status":
         status(opt("--snapshot") or current_id())
     elif cmd == "data-publish":
-        data_publish(store, opt("--note", ""), opt("--snapshot"))
+        data_publish(store, opt("--note", ""), opt("--snapshot"), cache)
     elif cmd == "data-fetch":
-        data_fetch(store)
+        data_fetch(store, cache)
+    elif cmd == "cache-prune":
+        if not cache:
+            raise SystemExit("no cache: set TRAMDATA_CACHE or pass --cache DIR")
+        cache.prune("--dry-run" in args)
     else:
         print(__doc__)

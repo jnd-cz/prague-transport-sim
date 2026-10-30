@@ -36,6 +36,7 @@ os.makedirs(CACHE, exist_ok=True)
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 paths = [LineString([p[:2] for p in line["path"]])]
@@ -74,7 +75,8 @@ def tile(ix, iy):
                 with urllib.request.urlopen(urllib.request.Request(SERVICE + "?" + q, headers={"User-Agent": "tram-game-prototype/0.1"}), timeout=180) as r:
                     data = r.read()
                 Image.open(io.BytesIO(data))  # (an error page is no image)
-                open(f, "wb").write(data)
+                with replacing(f, "wb") as fh:
+                    fh.write(data)
                 break
             except Exception as e:  # noqa: BLE001
                 print(f"  tile {ix},{iy}: {str(e)[:60]}; retry", flush=True)
@@ -125,8 +127,10 @@ SCALE = 0.01
 if (allz.max() - base) / SCALE > 32767:
     SCALE = 0.02
 q = np.concatenate([np.round((g.ravel() - base) / SCALE).astype(np.int16) for g in grids])
-open(os.path.join(ROOT, "data", f"line{LINE}.fine.bin"), "wb").write(q.tobytes())
+with replacing(os.path.join(ROOT, "data", f"line{LINE}.fine.bin"), "wb") as fh:
+    fh.write(q.tobytes())
 meta = {"attribution": "Terrain: ČÚZK DMR 5G (CC BY 4.0)", "step": STEP, "B": B, "base": base, "scale": SCALE,
         "x0": X0, "y0": Y0, "band": BAND, "blocks": [list(b) for b in blocks]}
-json.dump(meta, open(os.path.join(ROOT, "data", f"line{LINE}.fine.json"), "w"), separators=(",", ":"))
+with replacing(os.path.join(ROOT, "data", f"line{LINE}.fine.json"), "w") as fh:
+    json.dump(meta, fh, separators=(",", ":"))
 print(f"wrote data/line{LINE}.fine.bin ({q.nbytes / 1e6:.1f} MB), {len(blocks)} blocks, heights {base:.0f}-{allz.max():.0f} m, {time.time() - t0:.0f} s")

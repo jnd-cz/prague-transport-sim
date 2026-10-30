@@ -45,12 +45,16 @@ target design) and [docs/decisions/](docs/decisions/).
 - Sources come only from the pinned snapshot in `raw/` (`python -I tools/snapshot.py fetch`); OSM only
   from its local extract (`raw/osm/praha.osm.pbf`). **The public Overpass API is not used.**
 - One coordinate conversion for every tool: `tools/geo.py`.
+- Tools write files in `data/` and `raw/` whole (`tools/atomic.py`), never in place: with a machine cache
+  (`TRAMDATA_CACHE`, DATA.md) they are protected hard links shared by every checkout.
 - New source files go into a snapshot (`tools/snapshot.py publish`), with source URL, licence and date.
 
 ## Running and checking
 
 - Dev server: `python tools/serve.py 8742` (no-cache headers; `POST /report/<name>.json` saves to
-  `reports/`). Port 8740 may belong to another session: never use or stop it.
+  `reports/`). One port per agent on a computer: Claude 8742, Codex 8743, `headless.py` 8745 (its
+  default; a second run at once takes `--port 876x`). Port 8740 may belong to another session: never
+  use or stop it.
 - Python: `python -I` for stdlib-only tools; `python -P -E` for tools needing the user site packages
   (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it: shell
   heredocs with quotes can break in the Windows shells.
