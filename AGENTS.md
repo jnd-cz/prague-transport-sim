@@ -71,7 +71,9 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - One coordinate conversion for every tool: `tools/geo.py`.
 - Tools write files in `data/` and `raw/` whole (`tools/atomic.py`), never in place: with a machine cache
   (`TRAMDATA_CACHE`, DATA.md) they are protected hard links shared by every checkout.
-- New source files go into a snapshot (`tools/snapshot.py publish`), with source URL, licence and date.
+- New source files go into a snapshot (`tools/snapshot.py publish`), with source URL, licence and date,
+  and into `tools/sources.py` (its layer's fallback order, date, credits); built files carry their
+  `provenance` from it.
 - A publish is checked with `python -I tools/snapshot.py verify` (only the new files are fetched back),
   not by a full `fetch` into a fresh checkout.
 

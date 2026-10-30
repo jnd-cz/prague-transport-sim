@@ -205,6 +205,7 @@ exports**. Until those packages exist, no post-1.5 compatibility conclusion has 
 
 | id | note |
 |---|---|
+| `2026-10-30c` | `2026-10-30b` + IPR Praha's 1 m terrain raster (`raw/ipr-dtm/`, lidar 2023, resampled 2025-07-10), the first level of the terrain chain (#10). |
 | `2026-10-30b` | `2026-10-30` + complete archived DTMP tram-axis layer (55010) with Z, IDs, metadata and provenance; assessed as a height fallback in the same 16 DI districts. |
 | `2026-10-30` | `2026-10-29c` + DI set 7 JVF packages for the 16 districts crossed by lines 9, 17, 22, 23 and 37 (state 2026-09-30), exact download provenance and provider access/licence evidence. |
 | `2026-10-29` | `2026-10-23` + the archived technical map's street furniture points for line 17 (`raw/dtmpoints/`, state 2024-06-30, fetched 2026-10-24). |
@@ -219,6 +220,14 @@ ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and
 The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
 altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
 The first acquisition is published in snapshot `2026-10-30` (#61).
+
+### IPR 1 m terrain
+
+`python -P -E tools/ipr_dtm.py --fetch` downloads `DTM.zip` (2.05 GB, one BigTIFF) with its catalogue
+records and writes `raw/ipr-dtm/provenance.json` (URLs, date, sizes, SHA-256); `fetch` unzips it into
+`raw/ipr-dtm/DTM/`. `python -P -E tools/ipr_dtm.py` checks the file's layout and prints a few heights. The
+build reads only the tiles it needs. Its datum and what was measured: [source per
+layer](docs/decisions/2026-10-30-source-per-layer.md).
 
 ### Archived DTMP track heights
 

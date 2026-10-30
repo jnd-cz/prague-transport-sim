@@ -20,6 +20,7 @@ from collections import defaultdict
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
+import sources  # noqa: E402
 import gpkg  # noqa: E402
 from dtm_packages import DTM, select_packages  # noqa: E402
 
@@ -259,7 +260,17 @@ print(f"height cloud: {len(cloud)} points")
 flat = []
 for (kx, ky), z in cloud.items():
     flat += [kx / 2, ky / 2, z]
-out = {"attribution": "Streets: DTM Praha, data base © IPR Praha (CC BY 4.0)", "areas": areas, "z": flat}
+out = {"areas": areas, "z": flat}
+# the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
+# within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
+vertex = {"exact": n_z, "near": n_near, "missing": n_none, "droppedAreas": dropped}
+nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
+out["provenance"] = sources.stamp("dtm.py", {
+    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex}),
+    "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
+    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall")),
+    "z": sources.single("streets", "zps", len(cloud), "ground heights (0.5 m cloud)")})
+out["attribution"] = sources.attribution(out["provenance"])
 dst = os.path.join(ROOT, "data", f"line{LINE}.dtm.json")
 with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
