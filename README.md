@@ -244,6 +244,15 @@ Strings live in `src/i18n.js`.
 each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
 `reports/headless/`:
 
+For a combined GTFS run, independently check every logged pair and the built timetable against the
+pinned GTFS:
+
+```bash
+python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
+```
+
+The audit date defaults to the build's service date (2026-10-21); use `--date` if the build date changes.
+
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
 python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
