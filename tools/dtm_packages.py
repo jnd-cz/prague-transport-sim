@@ -49,10 +49,11 @@ def snapshot_months(root):
 
 
 def select_packages(root, districts=None, sources=None):
-    """Select OPL/KR pairs; explicit sources choose districts, never override snapshot dates.
+    """Select OPL/KR pairs; explicit sources choose districts and prefer available snapshot dates.
 
-    Inspect source siblings so a stale shell glob cannot override CURRENT. Missing pinned files or
-    half a pair are errors, never a mix of months. Supports extracted folders and named .gpkg files.
+    Inspect source siblings so a stale shell glob cannot override an available CURRENT pair. During
+    a refresh, an unavailable pinned pair may be replaced by the newest local month after it, with a warning.
+    Incomplete pairs fail, never mix months. Supports extracted folders and named .gpkg files.
     """
     root = Path(root)
     folders = {root / "raw" / "dtm"}
@@ -102,6 +103,7 @@ def select_packages(root, districts=None, sources=None):
     for district in sorted(requested):
         dates = sorted({date for d, date, _ in local if d == district})
         date = pinned.get(district)
+        refresh_from = None
         if date is None:
             if not dates:
                 raise FileNotFoundError(f"no extracted DTM packages for district {district}")
@@ -109,11 +111,20 @@ def select_packages(root, districts=None, sources=None):
             if len(dates) > 1:
                 LOG.warning("DTM district %s: no snapshot month; choosing newest %s from %s",
                             district, date, ", ".join(dates))
+        elif not all((district, date, kind) in local for kind in ("OPL", "KR")) and dates and dates[-1] > date:
+            # Refreshes rebuild before publish changes CURRENT. Both kinds must come from the new
+            # month; never silently use an older local month when the pinned source is missing.
+            refresh_from, date = date, dates[-1]
         paths = []
         for kind in ("OPL", "KR"):
             path = local.get((district, date, kind))
             if path is None:
                 raise FileNotFoundError(f"DTM district {district}, month {date}: missing ZPS_{kind}; fetch the snapshot")
             paths.append(path)
+        if refresh_from is not None:
+            sid = (root / "snapshots/CURRENT").read_text(encoding="utf-8").strip()
+            LOG.warning("DTM district %s: raw/ is ahead of snapshot %s (%s -> %s); "
+                        "using the newer pair; rebuild/check and publish it",
+                        district, sid, refresh_from, date)
         selected.append(Package(district, date, *paths))
     return selected

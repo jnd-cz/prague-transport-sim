@@ -73,10 +73,36 @@ class Selection(unittest.TestCase):
                 self.assertIn(NEW, log.output[0])
                 self.assertIn(OLD, log.output[0])
 
-    def test_missing_pinned_half_cannot_use_another_month(self):
+    def test_missing_halves_cannot_be_paired_across_months(self):
+        pin(self.root, [(DISTRICT, OLD)])
+        package(self.root, OLD, 'OPL').unlink()
+        package(self.root, NEW, 'KR').unlink()
+        with self.assertRaisesRegex(FileNotFoundError, f'{NEW}.*ZPS_KR'):
+            packages.select_packages(self.root, districts=[DISTRICT])
+
+    def test_refresh_uses_newest_pair_when_snapshot_files_are_removed(self):
+        pin(self.root, [(DISTRICT, OLD)])
+        for kind in ('OPL', 'KR'):
+            package(self.root, OLD, kind).unlink()
+        with self.assertLogs('dtm_packages', level='WARNING') as log:
+            selected = packages.select_packages(self.root, districts=[DISTRICT])
+        self.assertEqual(selected[0].date, NEW)
+        self.assertTrue(all(NEW in str(selected[0].path(k)) for k in ('OPL', 'KR')))
+        for text in ('snapshot test', OLD, NEW, 'publish'):
+            self.assertIn(text, log.output[0])
+
+    def test_refresh_replaces_an_incomplete_pinned_pair_with_a_complete_newer_pair(self):
         pin(self.root, [(DISTRICT, OLD)])
         package(self.root, OLD, 'KR').unlink()
-        with self.assertRaisesRegex(FileNotFoundError, f'{OLD}.*ZPS_KR'):
+        with self.assertLogs('dtm_packages', level='WARNING'):
+            selected = packages.select_packages(self.root, districts=[DISTRICT])
+        self.assertTrue(all(NEW in str(selected[0].path(k)) for k in ('OPL', 'KR')))
+
+    def test_missing_snapshot_files_cannot_roll_back_to_an_older_month(self):
+        pin(self.root, [(DISTRICT, NEW)])
+        for kind in ('OPL', 'KR'):
+            package(self.root, NEW, kind).unlink()
+        with self.assertRaisesRegex(FileNotFoundError, f'{NEW}.*ZPS_OPL'):
             packages.select_packages(self.root, districts=[DISTRICT])
 
     def test_each_district_has_its_own_pinned_date(self):
@@ -176,6 +202,31 @@ class Readers(unittest.TestCase):
             self.assertEqual(set(result['z'][2::3]),{200})
             self.assertIn(OLD,r.stdout)
             self.assertNotIn(NEW,r.stdout)
+            # Refresh rebuild/check comes before publish: CURRENT still names OLD, but its files
+            # have been replaced. Both real readers must now use NEW, with the same warning.
+            for kind in ('OPL', 'KR'):
+                package(root,OLD,kind).unlink()
+            r = subprocess.run([sys.executable,'-P','-E','-c',script], cwd=root,capture_output=True,
+                               text=True,encoding='utf-8')
+            self.assertEqual(r.returncode,0,r.stderr)
+            self.assertIn('features 2 2',r.stdout)
+            for text in ('snapshot test',OLD,NEW,'publish'):
+                self.assertIn(text,r.stderr)
+            r = subprocess.run([sys.executable,'-P','-E','tools/dtm.py','--line','17',*sources],
+                               cwd=root,capture_output=True,text=True,encoding='utf-8')
+            self.assertEqual(r.returncode,0,r.stderr)
+            for text in ('snapshot test',OLD,NEW,'publish'):
+                self.assertIn(text,r.stderr)
+            result = json.loads((root / 'data/line17.dtm.json').read_text(encoding='utf-8'))
+            self.assertEqual(len(result['areas']),2)
+            self.assertEqual({p[2] for a in result['areas'] for p in a['r']},{201})
+            self.assertEqual(set(result['z'][2::3]),{201})
+            with patch.object(rebuild, 'ROOT', str(root)), patch.dict(packages.DTM, {'17':[DISTRICT]}):
+                with self.assertLogs('dtm_packages',level='WARNING'):
+                    _, groups = rebuild.steps('17')
+            args = next(g[0] for g in groups if g[0][0]=='dtm.py')
+            self.assertEqual(len(args),4)
+            self.assertIn(NEW,args[-1])
 
 
 if __name__ == '__main__':
