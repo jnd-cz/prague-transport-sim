@@ -4,7 +4,8 @@ DTM Praha open data, "Základní prostorová situace" per city district (městsk
 CC BY 4.0, data base © IPR Praha / Hlavní město Praha: https://geoportalpraha.cz (DTM kraje - ZPS
 Sada 2 = areas, ZPS Sada 3 = 3D boundary lines). Areas are 2D; every vertex gets its height from the
 3D boundary lines at the same position (they share vertices), else from the nearest boundary point.
-The tram track axes (DI) are not open data, so tracks stay from OSM.
+Track-axis import is separate (#20): public DI JVF acquisition and archived DTMP height assessment
+are documented in docs/decisions/2026-10-27-track-source.md. This tool imports ZPS surfaces only.
 
 Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<district KR dir> ...
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)

@@ -606,7 +606,7 @@ const inspect = new Inspect({
   },
 });
 
-let last = performance.now(), hudTimer = 0;
+let last = performance.now(), hudTimer = 0, lastDraw = 0;
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -639,7 +639,9 @@ function frame(now) {
       setTimeout(() => { if (game === ended) showResults(); }, 1500); // not if a new shift started meanwhile
     }
   }
-  renderer.render(scene, camera);
+  // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
+  // about 9 cores for one page; nothing the checks read depends on drawing, #104)
+  if (!window.headless || now - lastDraw > 1000) { renderer.render(scene, camera); lastDraw = now; }
   if (perfOn) updatePerf(now);
   if (game && !chase && mirrorOn && !window.freeCam && !window.headless) renderMirror(); // (not while a test steps the game)
 }

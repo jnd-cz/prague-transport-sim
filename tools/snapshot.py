@@ -17,6 +17,7 @@ Usage (python -I is enough; the store is reached with the system's `sftp`, ssh c
     python -I tools/snapshot.py status             # what differs locally
     python -I tools/snapshot.py publish 2026-11-05 --note "new OSM and GTFS"   # raw/ -> new snapshot
     python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST
+    python -I tools/snapshot.py verify [--base main]   # after a publish: all in the store, new files intact
     python -I tools/snapshot.py cache-prune [--dry-run]   # drop cached files no checkout links any more
 Options: --store HOST:DIR (default tramdata:store, or $TRAMDATA_STORE); --cache DIR (default
 $TRAMDATA_CACHE; none: files are copied into the checkout only) or --no-cache.
@@ -61,6 +62,11 @@ SOURCES = [
      "source": "Prague digital technical map, ZPS district packages (isdtmk.dtm-praha-sck.cz, OPL + KR)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha / DTM Praha",
      "refresh": "download the districts' *_ZPS_OPL / *_ZPS_KR .gpkg.zip (README: DTM), fetch unzips them"},
+    {"name": "dtm-di", "globs": ["raw/dtm-di/*.jvf.zip", "raw/dtm-di/*.json",
+                                  "raw/dtm-di/terms.pdf", "raw/dtm-di/access.html"],
+     "source": "Prague DTM DI set 7 public JVF district packages; exact URLs, state dates and hashes in raw/dtm-di/provenance.json",
+     "licence": "CC BY 4.0, datový podklad © IPR Praha; download-service terms I.8 (raw/dtm-di/terms.pdf); catalogue openData=false retained",
+     "refresh": "python -P -E tools/dtm_di.py --fetch; review access/licence evidence before publishing; ZIPs read directly"},
     {"name": "geoportal", "globs": ["raw/geoportal/**/*"],
      "source": "Geoportál Praha services: Budovy 3D, Mosty 3D (I3S), opěrné zdi, stromy (tools/geoportal.py caches)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha",
@@ -74,6 +80,10 @@ SOURCES = [
      "source": "Archivní DTM Prahy – povrchové znaky (DTMP_CUR_TMISZNAK_B FeatureServer, state 2024-06-30), tools/dtm_points.py",
      "licence": "CC BY 4.0, datový podklad © IPR Praha",
      "refresh": "python -I tools/dtm_points.py N --refresh"},
+    {"name": "dtmp-tracks", "globs": ["raw/dtmp-tracks/*.json"],
+     "source": "Archived DTMP tram track axes, CTMTP_KOD=55010, https://gs-pub.praha.eu/arcgis/rest/services/dtmp/dtmp/MapServer/10; query batches, dates and hashes in provenance.json",
+     "licence": "CC BY 4.0, datový podklad © IPR Praha; download-service terms I.8, retained in raw/dtm-di/terms.pdf",
+     "refresh": "python -P -E tools/dtmp_tracks.py --fetch --acquire-only; inspect offline with tools/dtmp_tracks.py before snapshot publication"},
     {"name": "ortho", "globs": ["raw/ortho/*"],
      "source": "IPR Praha orthophoto, leaf-off flight 2026 (ImageServer, tools/ortho_lanes.py tiles)",
      "licence": "CC BY 4.0, IPR Praha", "refresh": "rerun tools/ortho_lanes.py"},
@@ -493,6 +503,43 @@ def data_fetch(store, cache=None):
     store.download("builds", need, cache)
 
 
+def verify(store, sid, base="main"):
+    """Check a publish without a fresh checkout (#107): every file of the snapshot and of data/MANIFEST.json
+    is listed in the store, and only the new ones (in no earlier snapshot; for builds, not in base's
+    manifest) are downloaded to a temporary folder and hashed. A full restore to check 20 new files fetched
+    1,137 store objects (#61)."""
+    snap = load_snapshot(sid)
+    others = set()
+    for p in glob.glob(os.path.join(SNAPDIR, "*.json")):
+        if os.path.basename(p)[:-5] < sid:  # (ids sort by date: a later one may share this one's new files)
+            others |= {f["sha256"] for g in json.load(open(p, encoding="utf-8"))["groups"] for f in g["files"]}
+    files = {"sources": {f["sha256"]: f["size"] for g in snap["groups"] for f in g["files"]}}
+    old = {"sources": others, "builds": set()}
+    if os.path.exists(DATA_MANIFEST):
+        files["builds"] = {m["sha256"]: m["size"] for m in json.load(open(DATA_MANIFEST, encoding="utf-8"))["files"].values()}
+        r = subprocess.run(["git", "show", f"{base}:data/MANIFEST.json"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        if r.returncode == 0:
+            old["builds"] = {m["sha256"] for m in json.loads(r.stdout)["files"].values()}
+    bad = 0
+    for kind, want in files.items():
+        missing = set(want) - store.listing(kind)
+        new = sorted(set(want) - old[kind] - missing)
+        print(f"{kind}: {len(want)} files, {len(missing)} missing in the store, "
+              f"{len(new)} new to check ({sum(want[h] for h in new) / 1e6:.0f} MB)")
+        for h in sorted(missing):
+            print(f"  missing {kind}/{h}")
+        bad += len(missing)
+        if new:
+            tmp = tempfile.mkdtemp(prefix=".verify-", dir=ROOT)
+            try:  # (download checks every hash and stops on a file it cannot fetch intact)
+                store.download(kind, [(h, os.path.join(tmp, h)) for h in new])
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+    if bad:
+        raise SystemExit(f"{bad} files missing in the store")
+    print(f"snapshot {sid} and data/MANIFEST.json: in the store, new files intact")
+
+
 def data_status():
     if not os.path.exists(DATA_MANIFEST):
         print("data: no MANIFEST.json")
@@ -527,6 +574,8 @@ if __name__ == "__main__":
         status(opt("--snapshot") or current_id())
     elif cmd == "data-publish":
         data_publish(store, opt("--note", ""), opt("--snapshot"), cache)
+    elif cmd == "verify":
+        verify(store, opt("--snapshot") or current_id(), opt("--base", "main"))
     elif cmd == "data-fetch":
         data_fetch(store, cache)
     elif cmd == "cache-prune":

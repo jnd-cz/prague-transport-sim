@@ -85,6 +85,7 @@ never in place: a file there may be a protected link into the machine cache.
 **Built data** (after rebuilding lines):
 ```bash
 python -I tools/snapshot.py data-publish --note "line 17 rebuilt: …"
+python -I tools/snapshot.py verify         # all in the store, the new files fetched back and hashed
 git add data/MANIFEST.json && git commit
 ```
 The manifest records the snapshot the build used and the commit it was built at. Commit it together with
@@ -99,6 +100,12 @@ the tool changes that produced it.
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`.
 4. `data-publish`, then commit `snapshots/` and `data/MANIFEST.json` together.
 
+**Checking a publish:** `python -I tools/snapshot.py verify` (#107). It lists the store once and fetches
+back only what this publish added: source files no earlier snapshot in `snapshots/` has, built files not in
+`main`'s `data/MANIFEST.json` (`--base REF` for another). Files an earlier snapshot had were checked when
+it was published. Don't restore the whole snapshot into a fresh checkout to check a publish: on
+2026-10-29c that is 1,117 store objects (~2 GB) against 147 for `verify` (35 s).
+
 Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`, unpacked `.gpkg`) are
 not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query
 and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes).
@@ -107,8 +114,29 @@ and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any
 
 | id | note |
 |---|---|
+| `2026-10-30b` | `2026-10-30` + complete archived DTMP tram-axis layer (55010) with Z, IDs, metadata and provenance; assessed as a height fallback in the same 16 DI districts. |
+| `2026-10-30` | `2026-10-29c` + DI set 7 JVF packages for the 16 districts crossed by lines 9, 17, 22, 23 and 37 (state 2026-09-30), exact download provenance and provider access/licence evidence. |
 | `2026-10-29` | `2026-10-23` + the archived technical map's street furniture points for line 17 (`raw/dtmpoints/`, state 2024-06-30, fetched 2026-10-24). |
 | `2026-10-23` | First pinned snapshot: the inputs of the lines built until 2026-10-29 (OSM Geofabrik 2026-10-22, PID GTFS 2026-10-21..11-03, DTM ZPS 2026-09-30, Geoportál and DMR 5G caches of 2026-10-21..23). The data built before it partly came from Overpass caches of 2026-10-21..23; a rebuild from the snapshot may differ slightly there. |
+
+### Transport infrastructure (DI set 7)
+
+Acquisition and offline inspection: `python -P -E tools/dtm_di.py --fetch`, then
+`python -P -E tools/dtm_di.py`. It selects districts from both route directions of the five built
+lines and the snapshot's OSM district boundaries. Sources go to `raw/dtm-di/`, separately from the
+ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and provider terms.
+The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
+altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
+The first acquisition is published in snapshot `2026-10-30` (#61).
+
+### Archived DTMP track heights
+
+`python -P -E tools/dtmp_tracks.py --fetch --acquire-only` acquires the archived tram-axis layer
+(`CTMTP_KOD=55010`, MapServer layer 10), preserving the feature-ID inventory, metadata, complete
+3D query batches and provenance in `raw/dtmp-tracks/`. `python -P -E tools/dtmp_tracks.py` compares
+it offline with DI in the same 16 district export polygons and on both paths of all five lines.
+The city-wide archive is only about 15 MB; the assessment clips it to the DI area. Results and the
+matching/structure checks are documented in [the fallback assessment](docs/decisions/2026-10-30-track-height-fallback.md).
 
 ## The store (admin)
 
