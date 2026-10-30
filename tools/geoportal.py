@@ -72,6 +72,7 @@ with open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8") as f
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
+import sources  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 
@@ -306,17 +307,26 @@ def main():
         # refresh only the vegetation of an existing file (from the download cache)
         geo = json.load(open(dst, encoding="utf-8"))
         geo["trees"] = trees()
+        geo["provenance"] = sources.stamp("geoportal.py", {"trees": sources.single("trees", "trees", len(geo["trees"]))},
+                                          geo.get("provenance"))
+        geo["attribution"] = sources.attribution(geo["provenance"])
         with replacing(dst, "w", encoding="utf-8") as f:
             json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))
         print(f"wrote {dst}")
         return
-    geo = {"attribution": "3D buildings, retaining walls, trees: data base © IPR Praha (CC BY 4.0)"}
+    geo = {}
     geo["walls"] = walls()
     geo["trees"] = trees()
     blds = i3s_buildings()
     bridges = i3s_buildings(BRIDGES, "i3s_bridges", "bridges")
     geo["buildings"] = write_buildings(blds + bridges, [0] * len(blds) + [1] * len(bridges))
-    geo["attribution"] = "3D buildings and bridges, retaining walls, trees: data base © IPR Praha (CC BY 4.0)"
+    # (the binary holds both: kind 0 a building, 1 a bridge)
+    geo["provenance"] = sources.stamp("geoportal.py", {
+        "walls": sources.single("walls", "walls", len(geo["walls"])),
+        "trees": sources.single("trees", "trees", len(geo["trees"])),
+        "buildings": sources.single("buildings", "lod2", len(blds), "models"),
+        "buildings[k=1]": sources.single("structures", "mosty3d", len(bridges), "models")})
+    geo["attribution"] = sources.attribution(geo["provenance"])
     dst = os.path.join(ROOT, "data", f"line{LINE}.geo.json")
     with replacing(dst, "w", encoding="utf-8") as f:
         json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))

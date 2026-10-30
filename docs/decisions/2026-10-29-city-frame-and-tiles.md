@@ -48,7 +48,8 @@
    the one with the origin in it).
    Names do not depend on the origin.
    - The source rasters (DMR 5G 2 m, IPR 1 m, 10 m) divide 500 m exactly, so tiles cut between cells
-     and never resample.
+     and never resample. (Measured 2026-10-30: IPR's published 1 m raster has its cell centres 0.72 m /
+     0.61 m off the metre grid, so it is resampled: [source per layer](2026-10-30-source-per-layer.md).)
    - **Seams:** neighbouring tiles carry the same edge vertices from the same source cells. Terrain LOD
      levels use cells that divide 500 m (2, 4, 10, 20, 50 m), so a coarse level still shares its edge
      vertices with a finer neighbour. Skirts hide the T-junctions between levels.
