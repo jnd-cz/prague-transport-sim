@@ -4,30 +4,36 @@
     python tools/serve.py 8744 1500     # each response sent no faster than 1500 KB/s (the loading screen
                                         # on a slow connection; from the remote session's serve_nocache.py)
 """
+import argparse
+import functools
 import http.server
+import json
 import os
 import re
 import shutil
+import socket
 import sys
 import time
+from pathlib import Path
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8737
-RATE = float(sys.argv[2]) * 1024 if len(sys.argv) > 2 else 0  # bytes per second, 0 = no limit
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class NoCache(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
+        if self.server.identity:
+            self.send_header("X-Tram-Server-Identity", self.server.identity)
         super().end_headers()
 
     def copyfile(self, source, outputfile):
-        if not RATE:
+        rate = self.server.rate
+        if not rate:
             return shutil.copyfileobj(source, outputfile)
-        chunk = max(1024, int(RATE / 10))
+        chunk = max(1024, int(rate / 10))
         while data := source.read(chunk):
             outputfile.write(data)
-            time.sleep(len(data) / RATE)
+            time.sleep(len(data) / rate)
 
     def do_POST(self):
         """Lint reports from the page: POST /report/<name>.json -> reports/<name>.json (local only)."""
@@ -47,6 +53,44 @@ class Server(http.server.ThreadingHTTPServer):
     # (the default backlog of 5 overflows when headless.py --jobs loads several pages at once, and on
     # Windows a full backlog refuses the connection: every page then hung on "Loading the 3D engine")
     request_queue_size = 128
+    # POSIX reuse permits restart after TIME_WAIT, not a second active listener. On Windows use
+    # exclusive ownership instead: SO_REUSEADDR there can allow two listeners on one port.
+    allow_reuse_address = not hasattr(socket, 'SO_EXCLUSIVEADDRUSE')
+
+    def server_bind(self):
+        # Windows SO_REUSEADDR can allow two listeners on one port. Never share a dev server's socket.
+        if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
-Server(("127.0.0.1", PORT), NoCache).serve_forever()
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('port', type=int, nargs='?', default=8737)
+    ap.add_argument('rate', type=float, nargs='?', default=0)
+    ap.add_argument('--identity', help=argparse.SUPPRESS)
+    ap.add_argument('--ready-file', type=Path, help=argparse.SUPPRESS)
+    args = ap.parse_args()
+    ready = {'identity': args.identity, 'pid': os.getpid(), 'root': ROOT}
+
+    def announce(value):
+        if args.ready_file:
+            tmp = args.ready_file.with_suffix('.part')
+            tmp.write_text(json.dumps(value), encoding='utf-8')
+            os.replace(tmp, args.ready_file)
+
+    try:
+        server = Server(('127.0.0.1', args.port), functools.partial(NoCache, directory=ROOT))
+    except OSError as e:
+        announce({**ready, 'error': f'cannot bind 127.0.0.1:{args.port}: {e}'})
+        raise SystemExit(str(e)) from e
+    server.identity, server.rate = args.identity, args.rate * 1024
+    # POST reports are relative to this checkout too, independent of the caller's cwd.
+    os.chdir(ROOT)
+    with server:
+        announce({**ready, 'port': server.server_port})
+        server.serve_forever()
+
+
+if __name__ == '__main__':
+    main()

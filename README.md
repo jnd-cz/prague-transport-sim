@@ -263,6 +263,10 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 3
 `--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
 up to ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
 
+The harness verifies its own server before launching a job. An occupied `--port` fails without using
+or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
+uses an already-running server.
+
 Regression checks compare with main's baseline in `reports/baseline/headless.json`: the key counts of
 each run, with the code and data they were measured on.
 

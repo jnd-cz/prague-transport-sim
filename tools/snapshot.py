@@ -76,6 +76,11 @@ SOURCES = [
      "source": "ČÚZK DMR 5G ImageServer exports (fine terrain tiles: tools/fine_terrain.py; line grids: build_line.py)",
      "licence": "CC BY 4.0, ČÚZK",
      "refresh": "delete the tiles / terrain.* and rerun the tools"},
+    {"name": "ipr-dtm", "globs": ["raw/ipr-dtm/DTM.zip", "raw/ipr-dtm/*.json"], "unzip": True,
+     "source": "IPR Praha, Digitální model terénu - rastr (1 m, lidar 2023), opendata.geoportalpraha.cz item "
+               "97d2c9c11aa9478cb21b469b8a4f820e; URLs, date and hashes in raw/ipr-dtm/provenance.json",
+     "licence": "CC BY 4.0, datový podklad © IPR Praha",
+     "refresh": "python -P -E tools/ipr_dtm.py --fetch (2 GB); fetch unzips it; rebuild checks the datum (fine_terrain.py)"},
     {"name": "dtmpoints", "globs": ["raw/dtmpoints/*.json"],
      "source": "Archivní DTM Prahy – povrchové znaky (DTMP_CUR_TMISZNAK_B FeatureServer, state 2024-06-30), tools/dtm_points.py",
      "licence": "CC BY 4.0, datový podklad © IPR Praha",
@@ -216,7 +221,7 @@ def put(src, dst):
 # ---------------------------------------------------------------- the machine's store cache (#77)
 class Cache:
     """A folder every checkout on this computer shares, laid out like the store: sources/<sha256>,
-    builds/<sha256>, and unzipped/<zip sha256>/ for the DTM packages. Set it with TRAMDATA_CACHE (or
+    builds/<sha256>, and unzipped/<zip sha256>/ for the unzipped archives (DTM packages, terrain). Set it with TRAMDATA_CACHE (or
     --cache DIR); without one, files are copied into each checkout as before.
 
     Its files are hard-linked into the checkouts' raw/ and data/, so an extra checkout costs no space
@@ -416,13 +421,13 @@ def fetch(store, sid, cache=None):
             p = os.path.join(ROOT, f["path"])
             if not is_current(cache, "sources", f["sha256"], f["size"], p):
                 need.append((f["sha256"], p))
-            if g.get("unzip"):
+            if g.get("unzip") and p.endswith(".zip"):  # (a group's records beside its archives stay as they are)
                 unzip.append((f["sha256"], p))
     print(f"snapshot {sid}: {sum(len(g['files']) for g in snap['groups'])} files, {len(need)} to fetch")
     if cache:
         cache.protect(os.path.join(cache.root, "sources"))  # (files taken in from the checkout)
     store.download("sources", need, cache)
-    for zh, z in unzip:  # (the street survey: the tools read the .gpkg)
+    for zh, z in unzip:  # (the street survey: the tools read the .gpkg; the terrain raster's .tif)
         # into a folder named after the package (every district's package holds the same generic
         # ZPS_KR.gpkg / ZPS_OPL.gpkg; tools/dtm.py takes these folders)
         folder = z[:-4] if z.endswith(".zip") else z + ".d"

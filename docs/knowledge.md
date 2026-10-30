@@ -27,6 +27,7 @@ What sessions learned and later work needs. Kept current and short; the full log
 - Geoportál I3S layers are Web Mercator with absolute heights; the orthophoto ImageServer is S-JTSK.
 - The track ribbon is drawn 0.20 m (bed) and 0.26 m (rails) over the profile height: rendering offsets
   to redefine with "what each height means" (M2).
+- Bpv vs EVRF2007 in Prague: 0.13 m (ČÚZK's `vertoffset` in PROJ, EPSG:8357 → 5621).
 
 ## Sources and their quirks
 
@@ -51,8 +52,16 @@ What sessions learned and later work needs. Kept current and short; the full log
   leaves Řepy and returns to it over the same tracks: s 0–8 km and 20–28 km): the closest piece of it can be our own track. Matching
   onto another route takes the heading into account (`Route.nearestOnHeading`); plain `nearest` there
   spawned oncoming trams on our track and made two false 8 km gauntlets on line 9 (28 signals lost).
-- **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; coarse
-  10 m grid + fine 2 m blocks within 120 m of the tracks (`tools/fine_terrain.py`, `?nofine`).
+- **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
+  `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
+- **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
+  LZW). Its cell centres sit 0.72 m / 0.61 m off the S-JTSK metre grid (sampled bilinear, never copied);
+  it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
+  DMR 5G per line; a Bpv / EVRF2007 mix-up is 0.13 m). The fine 2 m blocks within 120 m of the tracks
+  come from it (`tools/fine_terrain.py`, `?nofine`). It has no covers over passages (underpasses,
+  culverts: bare earth shows the passage); near OSM passages DMR 5G, which kept them, takes over.
+- **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
+  10 m grid of a line, and the fine blocks' fallback where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): all of line 17, part of 22. Its vertices are
   far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:

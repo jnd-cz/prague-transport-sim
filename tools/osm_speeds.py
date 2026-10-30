@@ -24,6 +24,7 @@ line = json.load(open(dst, encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
 from atomic import replacing  # noqa: E402
+import sources  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 # the Overpass cache of this line's tracks (a run like 9 -> 10 has its own folder, line 22 the raw/ root;
@@ -122,6 +123,10 @@ while k < n:
         k += 1
 
 line["speed"] = {"step": STEP, "osm": osm, "dedicated": ded, "source": "OpenStreetMap railway=tram maxspeed (as shown by OpenRailwayMap)"}
+# (a sample without a posted speed is 0: the game's curvature and switch limits hold there)
+line["provenance"] = sources.stamp("osm_speeds.py", {"speed": sources.entry(
+    "speeds", [sum(1 for v in osm if v), sum(1 for v in osm if not v)], f"{STEP:g} m samples")}, line.get("provenance"))
+line["attribution"] = sources.attribution(line["provenance"])
 # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
 with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))

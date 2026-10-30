@@ -23,6 +23,7 @@ line = json.load(open(dst, encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
 from atomic import replacing  # noqa: E402
+import sources  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 # tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the 12 m
 # filter below picks the ones on our tracks), cached under a name of its own: until #87 this was
@@ -137,7 +138,12 @@ for i, g in enumerate(gtfs):
     if i not in used:
         out.append({"p": [g["q"]], "gtfs": 1, "area": 0, "w": 0, "shelter": 0, "name": g["name"], "code": g["code"],
                     "stop": g["q"], "lines": g["lines"], "id": g["id"]})
+for pl in out:  # (OSM platforms, and PID's platform points where OSM has none)
+    pl["fb"] = 1 if pl.get("gtfs") else 0
 line["platforms"] = out
+line["provenance"] = sources.stamp("platforms.py", {"platforms": sources.entry(
+    "stops", [sum(1 for p in out if not p["fb"]), sum(1 for p in out if p["fb"])])}, line.get("provenance"))
+line["attribution"] = sources.attribution(line["provenance"])
 # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
 with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))

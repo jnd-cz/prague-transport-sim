@@ -74,6 +74,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from gtfs_runs import pair_continuations  # noqa: E402
+import sources  # noqa: E402
 try:
     import osm_local
 except ImportError:
@@ -1159,8 +1160,6 @@ def main():
         "name": rel["tags"].get("name"),
         "origin": [round(float(v), 7) for v in P.origin_ll()],  # the city origin (the Marian column)
         "frame": {"crs": "EPSG:5514", "origin": [P.E0, P.N0]},  # game metres = S-JTSK minus this
-        "attribution": "Map data © OpenStreetMap contributors (ODbL). Timetable: PID GTFS, data.pid.cz (CC BY 4.0). "
-                       "Terrain: ČÚZK DMR 5G (CC BY 4.0).",
         "path": [[round(x, 2), round(y, 2)] for x, y in pts],
         "bridges": bridges,
         "tunnels": tunnels,
@@ -1181,6 +1180,18 @@ def main():
         # the line number changes at this stop (index into stops): passengers of the first line
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
+    one = sources.single
+    out["provenance"] = sources.stamp("build_line.py", {
+        "path": one("tracks", "osm", 1, "route"), "pathBack": one("tracks", "osm", 1 if path_back else 0, "route"),
+        "tracks": one("tracks", "osm", len(track_lines), "ways"), "switches": one("tracks", "osm", len(switches)),
+        "bridges": one("structures", "osm", len(bridges), "route ranges"),
+        "tunnels": one("structures", "osm", len(tunnels), "route ranges"),
+        "terrain": one("terrain", "coarse", terrain["nx"] * terrain["ny"], "cells"),
+        "stops": one("stops", "gtfs", len(stops)), "timetable": one("timetable", "gtfs", len(timetable), "trips"),
+        "signals": one("signals", "osm", len(signals)), "crossings": one("crossings", "osm", len(crossings)),
+        "buildings": one("buildings", "osm", len(buildings)), "roads": one("streets", "osm", len(roads)),
+        "green": one("areas", "osm", len(green)), "water": one("areas", "osm", len(water))})
+    out["attribution"] = sources.attribution(out["provenance"])
     dst = os.path.join(OUT, f"line{LINE}.json")
     with replacing(dst, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))

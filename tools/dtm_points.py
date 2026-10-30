@@ -33,6 +33,7 @@ line = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I leaves it out)
 from atomic import replacing  # noqa: E402
 from geo import ROOT, Frame  # noqa: E402
+import sources  # noqa: E402
 
 data = json.load(open(os.path.join(ROOT, 'data', f'line{line}.json'), encoding='utf-8'))
 frame = Frame()
@@ -94,6 +95,8 @@ for f in raw['features']:
     out['points'].append({'k': k, 'x': round(x, 2), 'y': round(y, 2)})
     counts[k] = counts.get(k, 0) + 1
 out['points'].sort(key=lambda p: (p['k'], p['x'], p['y']))
+out['provenance'] = sources.stamp('dtm_points.py', {'points': sources.single('furniture', 'dtmpoints', len(out['points']))})
+out['attribution'] = sources.attribution(out['provenance'])
 with replacing(os.path.join(ROOT, 'data', f'line{line}.dtmpoints.json'), 'w', encoding='utf-8') as fh:
     json.dump(out, fh, ensure_ascii=False, separators=(',', ':'))
 print(f'line {line}: ' + ', '.join(f'{v} {k}' for k, v in sorted(counts.items(), key=lambda kv: -kv[1])) + f' -> data/line{line}.dtmpoints.json')

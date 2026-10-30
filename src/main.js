@@ -17,6 +17,7 @@ import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
 import { trackStyles } from './heights.js';
+import { credits, logProvenance, fallbacks } from './provenance.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -38,6 +39,7 @@ for (const f of T3_FILES) load.prefetch(f);
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const data = await (await load.get(`data/line${lineId}.json`)).json();
 data.line = String(data.line);
+const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
 setLine(data.line);
 // optional Geoportál Praha import (tools/geoportal.py): LOD2 buildings, retaining walls, trees
 try {
@@ -46,24 +48,24 @@ try {
     data.geo = await geoRes.json();
     const bin = await load.get(`data/${data.geo.buildings.file}`);
     if (bin.ok) data.geo.buildings.arr = new Int16Array(await bin.arrayBuffer());
-    data.attribution += ' ' + data.geo.attribution;
+    built[`line${lineId}.geo.json`] = data.geo;
   }
 } catch (e) { console.warn('no Geoportál data', e); }
 widenTramStreets(data); // street widths include the tram tracks running down the middle
 // optional surveyed streets (Prague DTM, tools/dtm.py) for the districts imported so far
 try {
   const r = await load.get(`data/line${lineId}.dtm.json`);
-  if (r.ok) { data.dtm = await r.json(); data.attribution += ' ' + data.dtm.attribution; }
+  if (r.ok) { data.dtm = await r.json(); built[`line${lineId}.dtm.json`] = data.dtm; }
 } catch { /* not imported for this line */ }
 // optional OSM traffic signals (stop lines, signalled crossings; .claude/tools/osm_signals.py for now)
 try {
   const r = await load.get(`data/line${lineId}.signals.json`);
-  if (r.ok) data.osmSignals = await r.json();
+  if (r.ok) { data.osmSignals = await r.json(); built[`line${lineId}.signals.json`] = data.osmSignals; }
 } catch { /* none for this line */ }
 // optional street furniture of Prague's technical map (manholes, inlets, hydrants, …; .claude/tools/dtm_points.py)
 try {
   const r = await load.get(`data/line${lineId}.dtmpoints.json`);
-  if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; data.attribution += ' Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).'; }
+  if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; built[`line${lineId}.dtmpoints.json`] = j.provenance ? j : { attribution: 'Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).' }; }
 } catch { /* none for this line */ }
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
@@ -90,9 +92,11 @@ if (!params.has('nofine')) try {
   if (mr.ok && br.ok) {
     const meta = await mr.json();
     terrain.addFine(meta, new Int16Array(await br.arrayBuffer()));
-    data.attribution += ' ' + meta.attribution;
+    built[`line${lineId}.fine.json`] = meta;
   }
 } catch { /* not made for this line */ }
+data.attribution = credits(built);
+logProvenance(built);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 await load.begin('profile');
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
@@ -376,6 +380,7 @@ function start() {
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   window.game = game; // handy for debugging from the console
+  game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   window.camera = camera;
   window.renderer = renderer; // performance checks from the console (renderer.info, the scene)
   window.scene = scene;

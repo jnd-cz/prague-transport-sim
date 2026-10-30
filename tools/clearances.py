@@ -33,6 +33,7 @@ src = next((p for p in cands if os.path.exists(p)), None) or sys.exit(f"no cache
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
 from atomic import replacing  # noqa: E402
+import sources  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 CAR = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street",
        "service", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"}
@@ -93,7 +94,12 @@ for c in out:
             dedup[-1] = c
         continue
     dedup.append(c)
+for c in dedup:  # a number from OSM, or the default (no tag, maxheight=default, or a sign without its number)
+    c["fb"] = 0 if c["src"] not in ("assumed", "default", "none", "below_default") else 1
 line["clearances"] = dedup
+line["provenance"] = sources.stamp("clearances.py", {"clearances": sources.entry(
+    "clearances", [sum(1 for c in dedup if not c["fb"]), sum(1 for c in dedup if c["fb"])])}, line.get("provenance"))
+line["attribution"] = sources.attribution(line["provenance"])
 # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
 with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
