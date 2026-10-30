@@ -27,10 +27,15 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - PR description: `Closes #N.`, what changes and why, a check table (line × check, before → after),
   and for rebuilt data what changed per line. Merged as a squash, subject `<PR title> (#PR)` (the title
   ends with `(#issue)`), branch deleted.
+- An issue done in parts (time-bound, waiting on data): each PR says `Part of #N`, and only the PR
+  that finishes it says `Closes #N`.
 - Rebuilt data: `python -I tools/snapshot.py data-publish --note "…"` from the branch, commit
   `data/MANIFEST.json` on it, then merge. `main`'s manifest always names data that is in the store.
 - New issues: what is now (with numbers), where in the code, what done means, which checks prove it.
   A fresh session should need nothing but the issue.
+- Where docs go: DATA.md is snapshots, the store and how to refresh sources; facts learned about data
+  and code go to `docs/knowledge.md`, decisions to `docs/decisions/`. One place per fact: point to a
+  table in code instead of copying it.
 - Commits: what changed and why, with numbers where something was measured. Author email in this repo:
   `2506000+jnd-cz@users.noreply.github.com` (`git config user.email …` per clone).
 - **Fix rules, not spots.** Measure an issue on every line (lints, benches, `data/truth.json`), change
@@ -107,6 +112,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 
 - Match the surrounding code: plain modules, short names in hot loops, comments that say why (the data
   quirk, the measured case), not what. Units are metres, seconds, m/s unless named otherwise.
+- Docs say what is and what was measured, briefly: no disclaimers or hedges, no restating.
 - No new dependencies or build steps without an issue that decides it. Tests and benches: Python +
   Playwright (headless Chromium); Node / Deno only once the simulation core is split out.
 - Randomness must be reproducible: today the benches override `Math.random` with a seeded one; new

@@ -5,6 +5,9 @@
 // stop with full service braking (v²/2.6 + v + 0.5 m); else it was in the dilemma zone when the
 // light changed.
 // Also counted: passes while the GO blinks (warn: allowed), our own signal penalties, controller holds.
+// It stops when our tram is stuck (tools/bench/stuck.js, as u3).
+import { stuckWatch, stuckScene } from './stuck.js';
+
 export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
   window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
   const $ = (id) => document.getElementById(id);
@@ -15,6 +18,7 @@ export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
   const { Autopilot } = await import('/src/autopilot.js');
   const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
+  const stuck = stuckWatch(game);
   game.autopilot = true; game.paused = false;
   const R = window._res = { seed, steps: 0, red: [], warnPasses: 0, holds: 0, done: false, t0: performance.now() };
   const h = 1 / 30;
@@ -63,11 +67,12 @@ export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
         }
       }
       R.tramS = Math.round(game.tram.s);
+      if ((R.stuck = stuck()) !== null) { R.done = true; R.stuckScene = stuckScene(game, traffic, pilot); }
       if (!R.done) setTimeout(tick, 0);
       else { R.ourSignalPenalty = game.penalties.signal || 0; R.minutes = Math.round(game.clock / 60); R.ms = Math.round(performance.now() - R.t0); resolve(); }
     };
     tick();
   });
-  return { seed, redRuns: R.red.length, avoidable: R.red.filter((r) => r.avoidable).length, warnPasses: R.warnPasses, holds: R.holds,
+  return { seed, stuck: R.stuck ?? null, stuckScene: R.stuckScene || null, redRuns: R.red.length, avoidable: R.red.filter((r) => r.avoidable).length, warnPasses: R.warnPasses, holds: R.holds,
     aheadRedRuns: (R.aheadRed || []).length, aheadWarnPasses: R.aheadWarnPasses || 0, ourSignalPenalty: R.ourSignalPenalty, red: R.red, aheadRed: R.aheadRed || [] };
 }

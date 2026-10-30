@@ -110,6 +110,95 @@ Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`,
 not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query
 and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes).
 
+## Regional DTM monthly downloads and JVF transition (#63)
+
+**Status checked 2026-10-30:** the two live ZPS indexes each list all **57 Prague districts** and only
+state **2026-09-30**. No October (`2026-10-31`) package is listed yet. Existing source and built-data
+manifests remain unchanged. Snapshotting a newer month is a separate decision after inspection.
+
+The [regional distribution page](https://portal.dtm-praha-sck.cz/poskytovani-dat) links to Geoportál's
+monthly public ZPS packages. [Provider guidance](https://portal.dtm-praha-sck.cz/poskytovani-dat/zpusoby-poskytovani-prazskych-dat-dtm)
+lists JVF, DGN, SHP and GPKG; the same four formats are present in both current ZPS indexes.
+The [provider's announcement](https://portal.dtm-praha-sck.cz/archiv-zprav?typ=Praha) says monthly
+packages have the state of the last calendar day of the month. The month in a filename is the
+**data-state date**, not necessarily the export/publication date.
+
+| Set | Content | Catalogue / download page | Website JSON index |
+|---|---|---|---|
+| 2 | ZPS_OPL, derived surface polygons | [ZPS Sada 2](https://geoportalpraha.cz/data-a-sluzby/225F0FAF-C041-439D-A3B5-B2BADA225683), [downloads](https://geoportalpraha.cz/data-a-sluzby/ke-stazeni/225F0FAF-C041-439D-A3B5-B2BADA225683) | `https://geoportalpraha.cz/api/get-dtm-download-metadata?code=02` |
+| 3 | ZPS_KR, drawing lines and points | [ZPS Sada 3](https://geoportalpraha.cz/data-a-sluzby/28A24EB4-5EE8-436E-B0BB-357025258211), [downloads](https://geoportalpraha.cz/data-a-sluzby/ke-stazeni/28A24EB4-5EE8-436E-B0BB-357025258211) | `https://geoportalpraha.cz/api/get-dtm-download-metadata?code=03` |
+
+**Finding each month's UUID:** these are the working JSON endpoints used by the website, rather than
+a promised, versioned public API. Each response is an array of districts (`obec`), each containing
+`formats`. Select records by `obec_kod`, `format` and `platnost`; use the **returned** `kod_stazeni`,
+which contains both UUID and filename. Prepend
+`https://isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/`. Do not guess the UUID or replace
+the month in an older URL. `soubor_nazev` and `velikost` give the expected filename and byte count.
+Current pattern: `VS_CZ010_MOMC_<district>_<yyyymmdd>_ZPS_OPL|KR.gpkg.zip`.
+
+For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
+GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned
+sources:
+
+```powershell
+$dtmStage = 'reports/rebuild/dtm-transition'
+New-Item -ItemType Directory -Force -Path $dtmStage | Out-Null
+foreach ($dtmSet in @('02', '03')) {
+    $dtmRows = Invoke-RestMethod "https://geoportalpraha.cz/api/get-dtm-download-metadata?code=$dtmSet"
+    foreach ($dtmFormat in @('GPKG', 'JVF')) {
+        $dtmPackage = $dtmRows.formats |
+            Where-Object { $_.obec_kod -eq '500089' -and $_.format -eq $dtmFormat } |
+            Sort-Object platnost -Descending | Select-Object -First 1
+        if (-not $dtmPackage) { throw "No Praha 2 $dtmFormat package in set $dtmSet" }
+        $dtmUrl = 'https://isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/' + $dtmPackage.kod_stazeni
+        $dtmFile = Join-Path $dtmStage $dtmPackage.soubor_nazev
+        Invoke-WebRequest $dtmUrl -OutFile $dtmFile
+        if ((Get-Item -LiteralPath $dtmFile).Length -ne [long]$dtmPackage.velikost) { throw 'Download size mismatch' }
+        Get-FileHash -Algorithm SHA256 -LiteralPath $dtmFile
+    }
+}
+```
+
+ZPS catalogue records advertise **WMS** map services (`dtm_zps_plochy_seda` and
+`dtm_zps_linie_body` under `https://isdtmk.dtm-praha-sck.cz/api/wms/v1/…/service.svc/get`).
+The checked provider pages/catalogue records do not identify a public **WFS** download endpoint;
+the verified vector-data route here is the package index above. This is not a claim that no WFS
+exists elsewhere. E-výdej provides registered, area-specific exports (125 ha free limit); it is not
+needed to fetch the public monthly packages. See [access guidance](https://portal.dtm-praha-sck.cz/poskytovani-dat/zpusoby-poskytovani-prazskych-dat-dtm).
+
+**What our tools rely on** in these packages (file and folder names, layer names and type codes,
+`UrovenUmisteniObjektuZPS`, geometry types, EPSG:5514) and the measured pre-transition baseline of
+the 16 pinned packages: `docs/knowledge.md`, "Regional DTM ZPS packages". The comparison below checks
+exactly those.
+
+**Schema inspector and comparison:** stdlib-only, read-only inputs; ZIPs are inspected through
+temporary copies. Full names, type codes, columns/types/defaults, geometry declarations/dimensions
+and CRS definitions go to the JSON report. Human output groups repeated attribute sets as A1, A2,
+etc. XML/JVF input reports its explicit header separately. Exit codes: 0 inspection/identical schema,
+1 schema differences, 2 invalid input. Feature contents, hashes and data-state/write dates are
+reported separately and do not create false schema differences.
+
+```powershell
+python -I tools/dtm_schema.py 'raw/dtm/*500089*.gpkg.zip' --output reports/dtm-praha2-before.json
+python -I tools/dtm_schema.py OLD_OPL.gpkg.zip NEW_OPL.gpkg.zip --compare --output reports/dtm-opl-diff.json
+python -I tools/dtm_schema.py OLD_KR.gpkg.zip NEW_KR.gpkg.zip --compare --output reports/dtm-kr-diff.json
+python -I tools/dtm_schema.py NEW_OPL.jvf.zip NEW_KR.jvf.zip --output reports/dtm-jvf-headers.json
+python -I tools/test_dtm_schema.py
+```
+
+**Post-transition check remains pending:** the [2026-09-29 provider notice](https://portal.dtm-praha-sck.cz/archiv-zprav?typ=Praha)
+stops accepting updates **2026-11-10 22:00** and resumes **2026-11-18 23:59**, accepting only JVF
+**1.5.0.2** afterwards (Prague local time). This is a submission-format notice; it does not establish
+that monthly GPKG schemas change or that downloads stop during the submission freeze.
+
+After the switch, fetch the first genuinely **newly generated** Praha 2 OPL/KR export and its JVF
+companions. A download made on 19 November can still be an old export; check `platnost`, the filename,
+`DatumZapisu` and `VerzeJVFDTM`. With monthly publication the first relevant package may arrive later.
+Compare both GPKGs against the pinned September archives and record the exact differences and new
+header version in #63 and here. If a consumed name, code, attribute, encoding or CRS changes, open a
+tool-change issue with the diff. If there are no differences, record that **only for the tested new
+exports**. Until those packages exist, no post-1.5 compatibility conclusion has been made.
+
 ## Snapshots
 
 | id | note |
