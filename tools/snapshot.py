@@ -386,20 +386,31 @@ def publish(store, sid, note):
           f"snapshots/{sid}.json and CURRENT written: commit them")
 
 
+def is_current(cache, kind, h, size, p):
+    """Whether checkout file p holds store file h. With a cache, only a link to the cached file counts (a
+    matching copy is swapped for the link), and a matching file the cache lacks is taken into it: a
+    checkout fetched before the cache existed fills it without downloading (and its file is protected)."""
+    if cache and cache.has(kind, h):
+        return cache.holds(kind, h, p)
+    ok = os.path.exists(p) and os.path.getsize(p) == size and sha256(p) == h
+    if ok and cache:
+        cache.adopt(kind, h, p)
+    return ok
+
+
 def fetch(store, sid, cache=None):
     snap = load_snapshot(sid)
     need, unzip = [], []
     for g in snap["groups"]:
         for f in g["files"]:
             p = os.path.join(ROOT, f["path"])
-            # (with the file cached, only a link to it counts: a matching copy is swapped for the link)
-            ok = cache.holds("sources", f["sha256"], p) if cache and cache.has("sources", f["sha256"]) else (
-                os.path.exists(p) and os.path.getsize(p) == f["size"] and sha256(p) == f["sha256"])
-            if not ok:
+            if not is_current(cache, "sources", f["sha256"], f["size"], p):
                 need.append((f["sha256"], p))
             if g.get("unzip"):
                 unzip.append((f["sha256"], p))
     print(f"snapshot {sid}: {sum(len(g['files']) for g in snap['groups'])} files, {len(need)} to fetch")
+    if cache:
+        cache.protect(os.path.join(cache.root, "sources"))  # (files taken in from the checkout)
     store.download("sources", need, cache)
     for zh, z in unzip:  # (the street survey: the tools read the .gpkg)
         # into a folder named after the package (every district's package holds the same generic
@@ -473,12 +484,11 @@ def data_fetch(store, cache=None):
     need = []
     for f, m in man["files"].items():
         p = os.path.join(ROOT, "data", f)
-        # (with the file cached, only a link to it counts: a matching copy is swapped for the link)
-        ok = cache.holds("builds", m["sha256"], p) if cache and cache.has("builds", m["sha256"]) else (
-            os.path.exists(p) and os.path.getsize(p) == m["size"] and sha256(p) == m["sha256"])
-        if not ok:
+        if not is_current(cache, "builds", m["sha256"], m["size"], p):
             need.append((m["sha256"], p))
     print(f"data (snapshot {man.get('snapshot')}, built at {man.get('built_at_commit')}): {len(man['files'])} files, {len(need)} to fetch")
+    if cache:
+        cache.protect(os.path.join(cache.root, "builds"))
     store.download("builds", need, cache)
 
 
