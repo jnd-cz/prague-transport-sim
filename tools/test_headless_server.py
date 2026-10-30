@@ -89,6 +89,21 @@ class Ownership(unittest.TestCase):
         finally:
             headless.stop_server(a)
 
+    def test_owned_port_can_restart_after_clean_shutdown(self):
+        root = self.checkout('restart','index')
+        first, url = self.start(root)
+        port = int(url.rsplit(':',1)[1])
+        try:
+            self.assertEqual(read(url)[0],b'index')
+        finally:
+            headless.stop_server(first)
+        second, again = self.start(root,port)
+        try:
+            self.assertEqual(again,url)
+            self.assertEqual(read(again)[0],b'index')
+        finally:
+            headless.stop_server(second)
+
     def test_occupied_port_fails_before_jobs_or_baseline_writes(self):
         root = self.checkout('target','target index')
         baseline = root/'baseline.json'

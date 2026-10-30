@@ -53,7 +53,9 @@ class Server(http.server.ThreadingHTTPServer):
     # (the default backlog of 5 overflows when headless.py --jobs loads several pages at once, and on
     # Windows a full backlog refuses the connection: every page then hung on "Loading the 3D engine")
     request_queue_size = 128
-    allow_reuse_address = False
+    # POSIX reuse permits restart after TIME_WAIT, not a second active listener. On Windows use
+    # exclusive ownership instead: SO_REUSEADDR there can allow two listeners on one port.
+    allow_reuse_address = not hasattr(socket, 'SO_EXCLUSIVEADDRUSE')
 
     def server_bind(self):
         # Windows SO_REUSEADDR can allow two listeners on one port. Never share a dev server's socket.
