@@ -1,0 +1,502 @@
+{
+ "line17-lint": {
+  "counts": {
+   "consist": 0,
+   "signalsInPlatforms": 6,
+   "treeTrunks": 0,
+   "treeCrowns": 0,
+   "bridges": 0,
+   "inventedWalls": 0,
+   "tramEnvelope": 0,
+   "gradeSeparated": 0,
+   "bridgeLevels": 0,
+   "trackLevels": 0,
+   "streetWaviness": 4888,
+   "terrainOverSurvey": 69,
+   "railSupport": 37,
+   "verticalCurves": 2,
+   "catenary": 0,
+   "trackSpacing": 0,
+   "lanes": 2062,
+   "deckClip": 0,
+   "underpassClearance": 0
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line17-redruns-seed1": {
+  "counts": {
+   "redRuns": 0,
+   "avoidable": 0,
+   "aheadRedRuns": 1,
+   "ourSignalPenalty": 0,
+   "warnPasses": 2,
+   "holds": 4
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line17-traffic-seed1": {
+  "counts": {
+   "slide": 5435,
+   "jump": 297,
+   "overlap": 26,
+   "walkerHit": 37,
+   "heatingKnobs": 13,
+   "redRuns": 0,
+   "finished": 1
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line17-u3-seed1": {
+  "counts": {
+   "stuck": null,
+   "hits": 0,
+   "red": 0,
+   "signalPenalty": 0,
+   "yielded": 48,
+   "closeCuts": 1,
+   "green": 203,
+   "amber": 17
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line22-lint": {
+  "counts": {
+   "consist": 0,
+   "signalsInPlatforms": 3,
+   "treeTrunks": 0,
+   "treeCrowns": 0,
+   "bridges": 0,
+   "inventedWalls": 0,
+   "tramEnvelope": 0,
+   "gradeSeparated": 0,
+   "bridgeLevels": 0,
+   "trackLevels": 0,
+   "streetWaviness": 1237,
+   "terrainOverSurvey": 7,
+   "railSupport": 6,
+   "verticalCurves": 1,
+   "catenary": 0,
+   "trackSpacing": 0,
+   "lanes": 1150,
+   "deckClip": 0,
+   "underpassClearance": 0
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line22-redruns-seed1": {
+  "counts": {
+   "redRuns": 0,
+   "avoidable": 0,
+   "aheadRedRuns": 0,
+   "ourSignalPenalty": 0,
+   "warnPasses": 6,
+   "holds": 7
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line22-traffic-seed1": {
+  "counts": {
+   "slide": 5918,
+   "jump": 332,
+   "overlap": 22,
+   "walkerHit": 107,
+   "heatingKnobs": 14,
+   "redRuns": 0,
+   "finished": 1
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line22-u3-seed1": {
+  "counts": {
+   "stuck": null,
+   "hits": 0,
+   "red": 0,
+   "signalPenalty": 0,
+   "yielded": 61,
+   "closeCuts": 3,
+   "green": 265,
+   "amber": 14
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line23-lint": {
+  "counts": {
+   "consist": 0,
+   "signalsInPlatforms": 1,
+   "treeTrunks": 0,
+   "treeCrowns": 0,
+   "bridges": 0,
+   "inventedWalls": 0,
+   "tramEnvelope": 0,
+   "gradeSeparated": 0,
+   "bridgeLevels": 0,
+   "trackLevels": 0,
+   "streetWaviness": 0,
+   "terrainOverSurvey": 0,
+   "railSupport": 1,
+   "verticalCurves": 0,
+   "catenary": 0,
+   "trackSpacing": 0,
+   "lanes": 445,
+   "deckClip": 0,
+   "underpassClearance": 0
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line23-redruns-seed1": {
+  "counts": {
+   "redRuns": 0,
+   "avoidable": 0,
+   "aheadRedRuns": 0,
+   "ourSignalPenalty": 0,
+   "warnPasses": 2,
+   "holds": 3
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line23-traffic-seed1": {
+  "counts": {
+   "slide": 2577,
+   "jump": 221,
+   "overlap": 11,
+   "walkerHit": 50,
+   "heatingKnobs": 9,
+   "redRuns": 0,
+   "finished": 1
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line23-u3-seed1": {
+  "counts": {
+   "stuck": null,
+   "hits": 0,
+   "red": 0,
+   "signalPenalty": 0,
+   "yielded": 24,
+   "closeCuts": 2,
+   "green": 109,
+   "amber": 4
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line37-lint": {
+  "counts": {
+   "consist": 0,
+   "signalsInPlatforms": 10,
+   "treeTrunks": 0,
+   "treeCrowns": 0,
+   "bridges": 0,
+   "inventedWalls": 0,
+   "tramEnvelope": 0,
+   "gradeSeparated": 0,
+   "bridgeLevels": 0,
+   "trackLevels": 0,
+   "streetWaviness": 0,
+   "terrainOverSurvey": 0,
+   "railSupport": 1,
+   "verticalCurves": 1,
+   "catenary": 0,
+   "trackSpacing": 0,
+   "lanes": 183,
+   "deckClip": 0,
+   "underpassClearance": 0
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line37-redruns-seed1": {
+  "counts": {
+   "redRuns": 0,
+   "avoidable": 0,
+   "aheadRedRuns": 0,
+   "ourSignalPenalty": 0,
+   "warnPasses": 5,
+   "holds": 5
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line37-traffic-seed1": {
+  "counts": {
+   "slide": 2211,
+   "jump": 200,
+   "overlap": 16,
+   "walkerHit": 33,
+   "heatingKnobs": 8,
+   "redRuns": 0,
+   "finished": 1
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line37-u3-seed1": {
+  "counts": {
+   "stuck": null,
+   "hits": 0,
+   "red": 0,
+   "signalPenalty": 0,
+   "yielded": 25,
+   "closeCuts": 4,
+   "green": 130,
+   "amber": 4
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line9-lint": {
+  "counts": {
+   "consist": 0,
+   "signalsInPlatforms": 3,
+   "treeTrunks": 0,
+   "treeCrowns": 0,
+   "bridges": 0,
+   "inventedWalls": 0,
+   "tramEnvelope": 1,
+   "gradeSeparated": 0,
+   "bridgeLevels": 0,
+   "trackLevels": 0,
+   "streetWaviness": 0,
+   "terrainOverSurvey": 0,
+   "railSupport": 3,
+   "verticalCurves": 0,
+   "catenary": 0,
+   "trackSpacing": 0,
+   "lanes": 1009,
+   "deckClip": 0,
+   "underpassClearance": 0
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line9-redruns-seed1": {
+  "counts": {
+   "redRuns": 0,
+   "avoidable": 0,
+   "aheadRedRuns": 0,
+   "ourSignalPenalty": 0,
+   "warnPasses": 4,
+   "holds": 5
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line9-traffic-seed1": {
+  "counts": {
+   "slide": 7106,
+   "jump": 582,
+   "overlap": 76,
+   "walkerHit": 134,
+   "heatingKnobs": 23,
+   "redRuns": 0,
+   "finished": 1
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ },
+ "line9-u3-seed1": {
+  "counts": {
+   "stuck": 14355,
+   "hits": 0,
+   "red": 0,
+   "signalPenalty": 0,
+   "yielded": 33,
+   "closeCuts": 2,
+   "green": 180,
+   "amber": 15
+  },
+  "measured_on": {
+   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
+   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
+   "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
+   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+  },
+  "commit": "255a988",
+  "time": "2026-10-29 23:27"
+ }
+}

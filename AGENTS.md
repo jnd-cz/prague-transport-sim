@@ -60,18 +60,22 @@ target design) and [docs/decisions/](docs/decisions/).
   (`--parallel` for several lines). Keep memory in check: long jobs size themselves by free memory
   (`tools/sysinfo.py`); don't start a second heavy job while one runs.
 - Checks in a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`, `lint({ traffic: true })` averages
-  seeds 22, 7, 1234), `python tools/lint_report.py` against `reports/baseline/`; benches in `tools/bench/`
+  seeds 22, 7, 1234), `python tools/lint_report.py` against `reports/baseline/lineN.json` (an in-page
+  baseline of 2026-10-23, before #7 and #84, not maintained: regressions use `headless.py --compare`); benches in `tools/bench/`
   (u3, redruns, walkers; `batch.html`). Run long browser jobs unawaited and poll (script calls time out
   at 45 s); a background window throttles frames, so no fps readings then.
 - Dev switches: `?line=N`, `?inspect`, `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`.
-- A regression check compares the same checks on the new data and on the published data (same seeds);
-  a count that moves needs a reason in the PR.
+- A regression check compares a run with main's stored baseline (`headless.py … --compare`, the table
+  goes into the PR); a count that moves needs a reason in the PR. When a PR moves the numbers, rerun with
+  `--baseline` once its code and data are committed and published, and commit
+  `reports/baseline/headless.json` with it.
 
 ## Known failures (not caused by your change; remove a row when its issue closes)
 
 | check | line | symptom | issue |
 |---|---|---|---|
 | u3 | 9 | "stuck at 14355" (the 9 → 10 layover counts as a deadlock), every seed | #80 |
+| redruns | 17 | seed 1: "1 ahead red runs" (an AI tram at the s 10826 signal brakes too gently on warn) | #92 |
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
 
 ## Code style

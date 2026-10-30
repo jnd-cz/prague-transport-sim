@@ -18,6 +18,15 @@ simulation themselves). --jobs N runs N pages at once, each in a worker process 
 browser (default: half the cores, at most 4, and
 what free memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded in
 its own fresh page, so the counts are the same as one after another.
+
+Baseline (#89): `--baseline` stores each run's key counts in reports/baseline/headless.json (committed),
+with what they were measured on (the git trees of the game, the in-page checks and the data manifest:
+MEASURED; the data files must match the manifest and those paths be committed). `--compare` prints baseline -> now per
+run as a table for the PR (reports/headless/compare.md) and warns when the baseline was not measured on
+the code and data of main (the merge base). A PR that moves the numbers commits its new baseline, so
+main's stays current:
+
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
 """
 import argparse
 import json
@@ -79,6 +88,92 @@ def judge(check, r):
         more = ", ".join(f"{k} {v.get('count')}" for k, v in (r.get("checks") or {}).items()
                          if isinstance(v, dict) and "count" in v)
     return not bad, ("; ".join(bad) or "clean") + " · " + more
+
+
+BASELINE = os.path.join(ROOT, "reports", "baseline", "headless.json")
+# (what the counts depend on: the game, the in-page checks, the data; not the build tools, whose output
+# the manifest covers, nor this harness)
+MEASURED = ("src", "index.html", "tools/bench", "tools/lint.js", "tools/traffic_lint.js", "tools/autopilot.js",
+            "data/MANIFEST.json")
+# counts that are problems when they rise (the rest are context: yields, junction phases, holds)
+BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
+       "redruns": {"redRuns", "aheadRedRuns", "ourSignalPenalty"}}
+# traffic counts move 10-20 % whenever trajectories change (tools/lint_report.py): a band of 15 % + 5
+NOISY = {"slide", "jump", "overlap", "walkerHit", "heatingKnobs", "streetBot", "redRuns"}
+
+
+def counts(check, r):
+    """The key numbers of one run (what the baseline keeps)."""
+    if "error" in r:
+        return {"error": 1}
+    if check == "u3":
+        j = r.get("carsIntoJunctions") or {}
+        return {"stuck": None if r.get("stuck") is None else round(r["stuck"]), "hits": r.get("hits") or 0,
+                "red": j.get("red", 0), "signalPenalty": r.get("signalPenalty") or 0, "yielded": r.get("yielded"),
+                "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber")}
+    if check == "redruns":
+        return {k: r.get(k) for k in ("redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
+    out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
+           if not isinstance(v, dict) or "count" in v}
+    if check == "traffic":
+        out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
+    return out
+
+
+def git(*args):
+    r = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def trees(rev):
+    """The git objects the checks depend on, at a commit."""
+    return {p: git("rev-parse", f"{rev}:{p}") for p in MEASURED}
+
+
+def data_matches(lines):
+    """Whether data/ holds the manifest's files for these lines (a hand-copied file would mix builds)."""
+    import hashlib
+    man = json.load(open(os.path.join(ROOT, "data", "MANIFEST.json"), encoding="utf-8"))["files"]
+    bad = []
+    for name, f in man.items():
+        if not any(name.startswith(f"line{ln}.") for ln in lines):
+            continue
+        p = os.path.join(ROOT, "data", name)
+        h = hashlib.sha256(open(p, "rb").read()).hexdigest() if os.path.exists(p) else None
+        if h != f["sha256"]:
+            bad.append(name)
+    return bad
+
+
+def key_of(line, check, seed):
+    return f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}")
+
+
+def compare_rows(base, results):
+    """Markdown rows: baseline -> now for each run, changed counts only; problems that rose are marked."""
+    rows = []
+    for (line, check, seed), c in sorted(results.items(), key=lambda kv: (int(kv[0][0]), kv[0][1], kv[0][2])):
+        b = (base.get(key_of(line, check, seed)) or {}).get("counts")
+        if b is None:
+            rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | no baseline |")
+            continue
+        moved = []
+        for k in sorted(set(b) | set(c)):
+            bv, cv = b.get(k), c.get(k)
+            if bv == cv:
+                continue
+            band = bv * 0.15 + 5 if k in NOISY and isinstance(bv, (int, float)) else 0
+            if k == "finished":
+                worse = cv == 0
+            elif k == "stuck":  # (a position: newly stuck is worse, stuck elsewhere is context)
+                worse = bv is None
+            elif check in ("lint", "traffic") or k in BAD.get(check, ()) or k == "error":
+                worse = isinstance(cv, (int, float)) and cv > (bv or 0) + band
+            else:
+                worse = False
+            moved.append(f"{k} {bv} → {cv}" + (" **worse**" if worse else ""))
+        rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | {'; '.join(moved) or 'same'} |")
+    return rows
 
 
 def seeds_of(spec):
@@ -156,6 +251,9 @@ def main():
     ap.add_argument("--jobs", type=int, default=workers(4.0),
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
+    ap.add_argument("--baseline", action="store_true",
+                    help="store these runs' counts as the baseline (reports/baseline/headless.json)")
+    ap.add_argument("--compare", action="store_true", help="compare these runs with the baseline")
     a = ap.parse_args()
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
     for c in checks:
@@ -163,7 +261,17 @@ def main():
             raise SystemExit(f"unknown check {c!r}: {', '.join(CALLS)}")
     jobs = [(line.strip(), c, s) for line in a.lines.split(",") for c in checks
             for s in ([0] if c in SEEDLESS else seeds_of(a.seeds))]
+    lines = sorted({j[0] for j in jobs})
+    if a.baseline:
+        # (measured on what is committed and published, or the baseline would name the wrong trees)
+        dirty = git("status", "--porcelain", "--", *MEASURED)
+        if dirty or (bad := data_matches(lines)):
+            raise SystemExit("--baseline needs committed src/, tools/, index.html, data/MANIFEST.json and data/ "
+                             f"matching the manifest: {dirty or 'data differs: ' + ', '.join(bad)}")
+    if a.compare and (bad := data_matches(lines)):
+        print(f"note: data/ differs from data/MANIFEST.json ({', '.join(bad)}): comparing unpublished data")
     os.makedirs(a.out, exist_ok=True)
+    results = {}
     server = None if a.url else serve(a.port)
     url = a.url or f"http://localhost:{a.port}"
     failed, t0 = 0, time.time()
@@ -173,6 +281,7 @@ def main():
         line, check, seed = job
         ok, text = judge(check, r)
         failed += not ok
+        results[job] = counts(check, r)
         name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + ".json"
         with open(os.path.join(a.out, name), "w", encoding="utf-8") as f:
             json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "ok": ok,
@@ -194,6 +303,28 @@ def main():
             server.terminate()
     print(f"{len(jobs) - failed}/{len(jobs)} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
           f"results in {os.path.relpath(a.out, ROOT)}")
+    base = json.load(open(BASELINE, encoding="utf-8")) if os.path.exists(BASELINE) else {}
+    if a.compare:
+        main_rev = git("merge-base", "HEAD", "origin/main") or git("rev-parse", "main")
+        want = trees(main_rev)
+        stale = sorted({key_of(*job) for job in results
+                        if (base.get(key_of(*job)) or {}).get("measured_on") not in (None, want)})
+        if stale:
+            print(f"\nWARNING: the baseline of {', '.join(stale)} was not measured on main ({main_rev[:7]}): "
+                  "run --baseline on main first, or read the differences as main's changes plus yours")
+        rows = ["| line | check | seed | baseline → now |", "|---|---|---|---|", *compare_rows(base, results)]
+        print("\n" + "\n".join(rows))
+        with open(os.path.join(a.out, "compare.md"), "w", encoding="utf-8") as f:
+            f.write("\n".join(rows) + "\n")
+    if a.baseline:
+        rev = git("rev-parse", "HEAD")
+        for job, c in results.items():
+            base[key_of(*job)] = {"counts": c, "measured_on": trees(rev), "commit": rev[:7],
+                                  "time": time.strftime("%Y-%m-%d %H:%M")}
+        os.makedirs(os.path.dirname(BASELINE), exist_ok=True)
+        with open(BASELINE, "w", encoding="utf-8") as f:
+            json.dump(dict(sorted(base.items())), f, ensure_ascii=False, indent=1)
+        print(f"baseline: {len(results)} runs stored in {os.path.relpath(BASELINE, ROOT)} (commit it)")
     sys.exit(1 if failed else 0)
 
 
