@@ -101,7 +101,7 @@ the tool changes that produced it.
 4. `data-publish`, then commit `snapshots/` and `data/MANIFEST.json` together.
 
 **Checking a publish:** `python -I tools/snapshot.py verify` (#107). It lists the store once and fetches
-back only what this publish added: source files no other snapshot in `snapshots/` has, built files not in
+back only what this publish added: source files no earlier snapshot in `snapshots/` has, built files not in
 `main`'s `data/MANIFEST.json` (`--base REF` for another). Files an earlier snapshot had were checked when
 it was published. Don't restore the whole snapshot into a fresh checkout to check a publish: on
 2026-10-29c that is 1,117 store objects (~2 GB) against 147 for `verify` (35 s).

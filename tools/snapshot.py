@@ -505,13 +505,13 @@ def data_fetch(store, cache=None):
 
 def verify(store, sid, base="main"):
     """Check a publish without a fresh checkout (#107): every file of the snapshot and of data/MANIFEST.json
-    is listed in the store, and only the new ones (in no other snapshot manifest; for builds, not in base's
+    is listed in the store, and only the new ones (in no earlier snapshot; for builds, not in base's
     manifest) are downloaded to a temporary folder and hashed. A full restore to check 20 new files fetched
     1,137 store objects (#61)."""
     snap = load_snapshot(sid)
     others = set()
     for p in glob.glob(os.path.join(SNAPDIR, "*.json")):
-        if os.path.basename(p) != f"{sid}.json":
+        if os.path.basename(p)[:-5] < sid:  # (ids sort by date: a later one may share this one's new files)
             others |= {f["sha256"] for g in json.load(open(p, encoding="utf-8"))["groups"] for f in g["files"]}
     files = {"sources": {f["sha256"]: f["size"] for g in snap["groups"] for f in g["files"]}}
     old = {"sources": others, "builds": set()}
