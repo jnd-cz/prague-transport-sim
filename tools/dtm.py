@@ -11,7 +11,6 @@ Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<distri
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)
 Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes]}]}
 """
-import glob
 import json
 import math
 import os
@@ -22,6 +21,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 import gpkg  # noqa: E402
+from dtm_packages import DTM, select_packages  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
@@ -94,15 +94,10 @@ CLOUD_LINES = ("Hranice_dopravní_stavby_nebo_plochy", "Vnitřní_členění_dop
 # take heights from the neighbour's lines too), keyed by its S-JTSK position (1 cm)
 zkey = defaultdict(set)  # several heights where lines of two levels share a 2D position (wall top/foot)
 zgrid = defaultdict(list)
-districts = []
-for src in SOURCES:
-    opl = glob.glob(os.path.join(src, "*.gpkg"))[0] if os.path.isdir(src) else src
-    if "OPL" not in opl:
-        continue
-    kr_dir = src.replace("ZPS_OPL", "ZPS_KR")
-    kr = glob.glob(os.path.join(kr_dir, "*.gpkg"))[0]
-    districts.append((src, opl))
-    print("district:", os.path.basename(src))
+packages = select_packages(ROOT, sources=SOURCES) if SOURCES else select_packages(ROOT, districts=DTM[LINE])
+for package in packages:
+    kr = package.kr
+    print(f"district: {package.district}, month {package.date}")
     for t, info in gpkg.layers(kr).items():
         if info["type"] not in ("LINESTRING", "MULTILINESTRING") or "Hranice" not in t:
             continue
@@ -229,7 +224,8 @@ def ring(r, level):
     return out, missing
 
 
-for src, opl in districts:
+for package in packages:
+    opl = package.opl
     for t in gpkg.layers(opl):
         cls = CLASSES.get(t.split("#")[-1].split("_")[0])
         if not cls:
