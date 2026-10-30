@@ -12,7 +12,8 @@ and a table; the exit code is 1 when a run fails its thresholds (docs/history/BU
 finish; lint has no thresholds here, compare with `python tools/lint_report.py`).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
-Starts its own tools/serve.py on --port unless --url points at a running server. WebGL runs on
+Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
+any job; an occupied port fails. --url explicitly uses an existing server. WebGL runs on
 SwiftShader (software): slower than a desktop browser, the same results (the checks step the
 simulation themselves). --jobs N runs N pages at once, each in a worker process with its own
 browser (default: half the cores, at most 4, and
@@ -31,8 +32,10 @@ main's stays current:
 import argparse
 import json
 import os
+import secrets
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -186,17 +189,57 @@ def seeds_of(spec):
     return out
 
 
-def serve(port):
-    p = subprocess.Popen([sys.executable, "-I", os.path.join(ROOT, "tools", "serve.py"), str(port)], cwd=ROOT,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for _ in range(50):
+def stop_server(p):
+    """Reap only the child we started, including failed or interrupted startup."""
+    if p.poll() is None:
+        p.terminate()
+    try:
+        p.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        p.wait(timeout=5)
+
+
+def serve(port, startup_timeout=10):
+    """(child, URL): a bound socket and a per-launch identity, never an existing listener (#116)."""
+    identity = secrets.token_hex(16)
+    with tempfile.TemporaryDirectory(prefix='tram-server-') as folder:
+        ready = os.path.join(folder, 'ready.json')
+        p = subprocess.Popen([sys.executable, '-I', os.path.join(ROOT, 'tools', 'serve.py'), str(port),
+                              '--identity', identity, '--ready-file', ready], cwd=ROOT,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        deadline = time.monotonic() + startup_timeout
         try:
-            urllib.request.urlopen(f"http://localhost:{port}/index.html", timeout=1).read(1)
-            return p
-        except OSError:
-            time.sleep(0.2)
-    p.kill()
-    raise SystemExit(f"tools/serve.py did not come up on port {port}")
+            while time.monotonic() < deadline:
+                if os.path.exists(ready):
+                    with open(ready, encoding='utf-8') as f:
+                        info = json.load(f)
+                    if info.get('error'):
+                        raise SystemExit(f"tools/serve.py: {info['error']}; choose another --port or --port 0")
+                    if p.poll() is not None:
+                        raise SystemExit(f'tools/serve.py exited {p.returncode} before verified startup on port {port}')
+                    if (info.get('identity') != identity or info.get('pid') != p.pid or not info.get('root') or
+                            os.path.normcase(os.path.realpath(info.get('root', ''))) !=
+                            os.path.normcase(os.path.realpath(ROOT))):
+                        raise SystemExit('tools/serve.py readiness does not identify this child/checkout')
+                    url = f"http://127.0.0.1:{info['port']}"
+                    try:
+                        with urllib.request.urlopen(url + '/index.html', timeout=1) as response:
+                            if response.headers.get('X-Tram-Server-Identity') != identity:
+                                raise SystemExit(f'server identity mismatch at {url}; refusing another listener')
+                        if p.poll() is None:
+                            return p, url
+                    except OSError:
+                        pass  # the child has bound, but may not have entered its request loop yet
+                if p.poll() is not None:
+                    if os.path.exists(ready):
+                        continue  # child may have announced its bind error just before it exited
+                    raise SystemExit(f'tools/serve.py exited {p.returncode} before verified startup on port {port}')
+                time.sleep(.05)
+            raise SystemExit(f'tools/serve.py did not verify its identity on port {port} within {startup_timeout} s')
+        except BaseException:
+            stop_server(p)
+            raise
 
 
 ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
@@ -263,7 +306,7 @@ def main():
     ap.add_argument("--lines", default="17")
     ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint")
     ap.add_argument("--seeds", default="1-3")
-    ap.add_argument("--port", type=int, default=8745)
+    ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
@@ -291,10 +334,8 @@ def main():
                              f"matching the manifest: {dirty or 'data differs: ' + ', '.join(bad)}")
     if a.compare and (bad := data_matches(lines)):
         print(f"note: data/ differs from data/MANIFEST.json ({', '.join(bad)}): comparing unpublished data")
-    os.makedirs(a.out, exist_ok=True)
     results = {}
-    server = None if a.url else serve(a.port)
-    url = a.url or f"http://localhost:{a.port}"
+    server, url = (None, a.url) if a.url else serve(a.port)
     failed, t0 = 0, time.time()
 
     def report(i, job, r, secs):
@@ -311,6 +352,7 @@ def main():
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
     try:
+        os.makedirs(a.out, exist_ok=True)
         if a.jobs > 1 and len(jobs) > 1:
             with ProcessPoolExecutor(min(a.jobs, len(jobs))) as ex:
                 futs = [ex.submit(worker, job, url, a.headed, a.timeout) for job in jobs]
@@ -321,7 +363,7 @@ def main():
                 report(i, *worker(job, url, a.headed, a.timeout))
     finally:
         if server:
-            server.terminate()
+            stop_server(server)
     print(f"{len(jobs) - failed}/{len(jobs)} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
           f"results in {os.path.relpath(a.out, ROOT)}")
     base = json.load(open(BASELINE, encoding="utf-8")) if os.path.exists(BASELINE) else {}
