@@ -88,6 +88,9 @@ What sessions learned and later work needs. Kept current and short; the full log
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 - Tatra T3 figures (ČKD pamphlet, unverified): 16 t empty, 4 × 40 kW, ~39 kN, 1.8 m/s² service accel and
   brake, 5 m/s² emergency, 24 seated + 86 standing.
+- T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
+  overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
+  tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
 - Prague signals: 4 white lamps on a white plate (stop = outer two), call box with three orange LED bars,
   distant signal with a yellow "P"; switch indicator a red LED chevron on the span wire.
 
