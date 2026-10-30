@@ -203,11 +203,11 @@ export class Route {
 
   // A combined run may visit this street in both directions. Select a traversal, not just
   // the closest piece of track (9 -> 10 otherwise picked its own track as "oncoming").
-  nearestOnHeading(x, y, hx, hy, minDot = 0.5) {
+  nearestOnHeading(x, y, hx, hy) {
     const near = this.nearest(x, y);
     if (near) {
       const h = this.heading(near.s, 3);
-      if (h.hx * hx + h.hy * hy > minDot) return near;
+      if (h.hx * hx + h.hy * hy > 0.5) return near;
     }
     const cx = Math.floor(x / this.cell), cy = Math.floor(y / this.cell);
     let out = null;
@@ -216,7 +216,7 @@ export class Route {
         const r = this.samples[q[3] + 1];
         if (!r) continue;
         const ex = r[0] - q[0], ey = r[1] - q[1], l2 = ex * ex + ey * ey;
-        if (l2 < 1e-9 || (ex * hx + ey * hy) / Math.sqrt(l2) <= minDot) continue;
+        if (l2 < 1e-9 || (ex * hx + ey * hy) / Math.sqrt(l2) <= 0.5) continue;
         const t = Math.max(0, Math.min(1, ((x - q[0]) * ex + (y - q[1]) * ey) / l2));
         const d = Math.hypot(q[0] + ex * t - x, q[1] + ey * t - y);
         if (!out || d < out.d) out = { d, s: q[2] + (r[2] - q[2]) * t };

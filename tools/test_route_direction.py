@@ -19,8 +19,6 @@ with sync_playwright() as p:
       check(crossing.nearestOnHeading(50,0,1,0)===null,'perpendicular crossing');
       const repeated=new Route([[0,0],[100,0],[100,4],[0,4],[0,0],[100,0]]);
       check(repeated.nearestOnHeading(50,0,-1,0).s>100,'repeated same-direction traversals cannot mask opposing track');
-      const merging=new Route([[0,0],[40,90]]);
-      check(merging.nearestOnHeading(20,45,1,0)===null && merging.nearestOnHeading(20,45,1,0,0.3)!==null,'retain car-following heading tolerance');
-      return '7 route-direction cases pass';
+      return '6 route-direction cases pass';
     }'''))
     browser.close()

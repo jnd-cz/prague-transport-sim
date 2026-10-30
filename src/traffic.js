@@ -864,12 +864,12 @@ export class Traffic {
       if (!c.active || c.alpha < 0.5 || !c.path) continue;
       const p = c.path.at(c.s);
       // only cars going the tram's way hold it up (one facing it waits for the tram instead)
-      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy, 0.3);
+      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy);
       // (a car on the road under our bridge, or on a bridge over the track, is not on it)
       if (n && c.z !== undefined && Math.abs(c.z - this.ground.profile.height(n.s)) > LEVEL_APART) continue;
       if (n && n.d < 1.6) { const h = this.route.at(n.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) ours.push({ s: n.s, v: c.vNow ?? 0 }); }
       if (this.back) {
-        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy, 0.3);
+        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy);
         if (b && b.d < 1.6) { const h = this.back.at(b.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) back.push({ s: b.s, v: c.vNow ?? 0 }); }
       }
     }
