@@ -424,14 +424,14 @@
   "measured_on": {
    "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/bench": "25c5e83bb5d2da2aab8fe050a8c2d57ff989312b",
    "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "6a10547",
+  "time": "2026-10-30 07:55"
  },
  "line9-redruns-seed1": {
   "counts": {
@@ -439,64 +439,64 @@
    "avoidable": 0,
    "aheadRedRuns": 0,
    "ourSignalPenalty": 0,
-   "warnPasses": 4,
-   "holds": 5
+   "warnPasses": 1,
+   "holds": 1
   },
   "measured_on": {
    "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/bench": "25c5e83bb5d2da2aab8fe050a8c2d57ff989312b",
    "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "6a10547",
+  "time": "2026-10-30 07:55"
  },
  "line9-traffic-seed1": {
   "counts": {
-   "slide": 7106,
-   "jump": 582,
-   "overlap": 76,
-   "walkerHit": 134,
-   "heatingKnobs": 23,
+   "slide": 6584,
+   "jump": 474,
+   "overlap": 123,
+   "walkerHit": 123,
+   "heatingKnobs": 21,
    "redRuns": 0,
    "finished": 1
   },
   "measured_on": {
    "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/bench": "25c5e83bb5d2da2aab8fe050a8c2d57ff989312b",
    "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "6a10547",
+  "time": "2026-10-30 07:55"
  },
  "line9-u3-seed1": {
   "counts": {
-   "stuck": 14355,
+   "stuck": null,
    "hits": 0,
    "red": 0,
    "signalPenalty": 0,
-   "yielded": 33,
+   "yielded": 74,
    "closeCuts": 2,
-   "green": 180,
+   "green": 235,
    "amber": 15
   },
   "measured_on": {
    "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
+   "tools/bench": "25c5e83bb5d2da2aab8fe050a8c2d57ff989312b",
    "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "6a10547",
+  "time": "2026-10-30 07:55"
  }
 }
