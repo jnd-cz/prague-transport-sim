@@ -2,7 +2,7 @@
  "line17-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 6,
+   "signalsInPlatforms": 1,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -22,16 +22,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "29e5dcb7c7496ea47c1739990d2add81b1b688d8",
+   "src": "bf2907b8ae8d8528b4eef1fd3ba977b488d19490",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
    "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "a01bd8c",
-  "time": "2026-10-30 17:39"
+  "commit": "7e0d2bf",
+  "time": "2026-10-30 18:14"
  },
  "line17-redruns-seed1": {
   "counts": {
@@ -237,7 +237,7 @@
  "line22-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 3,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -257,16 +257,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "29e5dcb7c7496ea47c1739990d2add81b1b688d8",
+   "src": "bf2907b8ae8d8528b4eef1fd3ba977b488d19490",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
    "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "a01bd8c",
-  "time": "2026-10-30 17:39"
+  "commit": "7e0d2bf",
+  "time": "2026-10-30 18:14"
  },
  "line22-redruns-seed1": {
   "counts": {
@@ -472,7 +472,7 @@
  "line23-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 1,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -492,16 +492,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "29e5dcb7c7496ea47c1739990d2add81b1b688d8",
+   "src": "bf2907b8ae8d8528b4eef1fd3ba977b488d19490",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
    "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "a01bd8c",
-  "time": "2026-10-30 17:39"
+  "commit": "7e0d2bf",
+  "time": "2026-10-30 18:14"
  },
  "line23-redruns-seed1": {
   "counts": {
@@ -707,7 +707,7 @@
  "line37-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 10,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -727,16 +727,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "29e5dcb7c7496ea47c1739990d2add81b1b688d8",
+   "src": "bf2907b8ae8d8528b4eef1fd3ba977b488d19490",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
    "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "a01bd8c",
-  "time": "2026-10-30 17:39"
+  "commit": "7e0d2bf",
+  "time": "2026-10-30 18:14"
  },
  "line37-redruns-seed1": {
   "counts": {
@@ -942,7 +942,7 @@
  "line9-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 9,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -962,16 +962,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "29e5dcb7c7496ea47c1739990d2add81b1b688d8",
+   "src": "bf2907b8ae8d8528b4eef1fd3ba977b488d19490",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
    "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "a01bd8c",
-  "time": "2026-10-30 17:39"
+  "commit": "7e0d2bf",
+  "time": "2026-10-30 18:14"
  },
  "line9-redruns-seed1": {
   "counts": {
