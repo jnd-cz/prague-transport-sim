@@ -150,7 +150,8 @@ def di_data():
                 if key not in seen:
                     seen[key] = len(paths)
                     paths.append({'id': identity, 'coords': coords, 'attrs': attrs, 'sources': []})
-                paths[seen[key]]['sources'].append({k: entry[k] for k in ('code', 'file', 'sha256', 'state')})
+                paths[seen[key]]['sources'].append(
+                    {k: entry[k] for k in ('code', 'file', 'sha256', 'state')} | {'attributes': attrs})
     return districts, paths
 
 

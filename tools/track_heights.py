@@ -15,6 +15,7 @@ def usable(z):
 class HeightGuard:
     def __init__(self, evidence=(), alignment_reviews=(), conflicts=()):
         self.evidence = list(evidence)
+        self.by_di = {}
         self.conflicts = {str(i) for i in conflicts}
         self.reviews = {}
         for review in alignment_reviews:
@@ -38,6 +39,7 @@ class HeightGuard:
                     not 0 < e.get('radius_m', 0) <= 1):
                 raise ValueError('height evidence needs unique id, track/point scope, reviewed independent source, Bpv rail height and physical level')
             ids.add(e['id'])
+            self.by_di.setdefault(str(e['di_id']), []).append(e)
 
     def choose(self, di, match, x, y, structure_hint=False):
         flags, candidates = [], []
@@ -74,8 +76,7 @@ class HeightGuard:
             out['status'] = 'rejected' if review['status'] == 'obsolete' else 'review'
             out['review_flags'] = sorted(set(out['review_flags'] + ['di_' + review['status'] + '_alignment']))
             return out
-        evidence = [e for e in self.evidence if str(e['di_id']) == identity and
-                    math.dist(e['xy'], (x, y)) <= e['radius_m']]
+        evidence = [e for e in self.by_di.get(identity, []) if math.dist(e['xy'], (x, y)) <= e['radius_m']]
         out['evidence_ids'] = [e['id'] for e in evidence]
         if not evidence:
             out['review_flags'].append('independent_level_evidence_required')
@@ -88,7 +89,7 @@ class HeightGuard:
         if not supported or max(c['z'] for c in supported) - min(c['z'] for c in supported) > TOLERANCE:
             out['review_flags'].append('no_unique_supported_height')
             return out
-        # Geometry preference is used only after independent height/level validation.
+        # Prefer the DI height only after independent height/level validation.
         selected = next((c for c in supported if c['dataset'] == 'di'), supported[0])
         out.update(status='selected', z=selected['z'],
                    height_source={'dataset': selected['dataset'], 'id': selected['id']},

@@ -2,16 +2,20 @@
 from contextlib import redirect_stdout
 from copy import deepcopy
 import io
+import hashlib
+import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 from shapely.geometry import Point, box
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dtmp_tracks import Segments, ROOT, di_data, archive_data, surface_evidence
+import dtmp_tracks as research
 from track_heights import HeightGuard
 import import_track_heights as stage
 
@@ -32,6 +36,30 @@ def evidence(z=200, **updates):
 
 
 class Guard(unittest.TestCase):
+    def test_repeated_di_geometry_keeps_each_packages_attributes_and_dates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            entries = []
+            for code, quality in [('500054', '2'), ('500089', '3')]:
+                name = code + '.zip'
+                xml = f'''<obj:JVFDTM xmlns:obj="objtyp" xmlns:r="track" xmlns:atr="atr"
+                    xmlns:di="dopinf" xmlns:gml="http://www.opengis.net/gml/3.2">
+                    <di:ObvodDatoveSady><gml:Polygon><gml:posList>0 0 10 0 10 10 0 0</gml:posList>
+                    </gml:Polygon></di:ObvodDatoveSady><obj:OsaKolejeTramvajoveDrahy><r:ZaznamObjektu>
+                    <atr:ID>same</atr:ID><atr:TridaPresnostiVyska>{quality}</atr:TridaPresnostiVyska>
+                    <gml:LineString srsName="EPSG:5514" srsDimension="3"><gml:posList>0 0 200 10 0 200</gml:posList>
+                    </gml:LineString></r:ZaznamObjektu></obj:OsaKolejeTramvajoveDrahy></obj:JVFDTM>'''
+                with zipfile.ZipFile(folder / name, 'w') as z:
+                    z.writestr('DI.xml', xml)
+                entries.append({'code':code, 'file':name, 'state':'2026-09-30',
+                                'sha256':hashlib.sha256((folder/name).read_bytes()).hexdigest()})
+            (folder / 'provenance.json').write_text(json.dumps({'packages':entries}), encoding='utf-8')
+            with patch.object(research, 'DI', folder):
+                _, paths = di_data()
+        self.assertEqual(len(paths), 1)
+        self.assertEqual([s['attributes']['TridaPresnostiVyska'] for s in paths[0]['sources']], ['2','3'])
+        self.assertEqual([s['file'] for s in paths[0]['sources']], ['500054.zip','500089.zip'])
+
     def test_close_plan_fit_numeric_z_and_di_level_zero_do_not_validate_a_bridge(self):
         di = {'id': '1000413716080', 'z': 194.398, 'attrs': {'UrovenUmisteniObjektuDI': '0'}}
         m = match(path(5168282, 180.412, .137))
