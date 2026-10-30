@@ -2,7 +2,7 @@
  "line17-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 6,
+   "signalsInPlatforms": 1,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -22,16 +22,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "src": "a315983256722fe5be3aab664d2bd36d93a6b2a5",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "0236b14",
+  "time": "2026-10-30 16:45"
  },
  "line17-redruns-seed1": {
   "counts": {
@@ -102,7 +102,7 @@
  "line22-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 3,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -122,16 +122,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "src": "a315983256722fe5be3aab664d2bd36d93a6b2a5",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "0236b14",
+  "time": "2026-10-30 16:45"
  },
  "line22-redruns-seed1": {
   "counts": {
@@ -202,7 +202,7 @@
  "line23-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 1,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -222,16 +222,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "35a2069b9dc9edb5a96ad2f1b8337b72c4f9f399",
+   "src": "a315983256722fe5be3aab664d2bd36d93a6b2a5",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "cfea57e99bcc7dc105faf5c56f654d933f942d3f",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "7e4cd4f",
-  "time": "2026-10-30 08:55"
+  "commit": "0236b14",
+  "time": "2026-10-30 16:45"
  },
  "line23-redruns-seed1": {
   "counts": {
@@ -346,7 +346,7 @@
  "line37-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 10,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -366,16 +366,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "16838d0f2447b2db160f7db0033be9033e99d5ac",
+   "src": "a315983256722fe5be3aab664d2bd36d93a6b2a5",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "2902867fe9c0f130e63c8998f5a76e8a3bc74374",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
-   "data/MANIFEST.json": "d9f5c68ba9d55946079640d03d3d5c9017b38b26"
+   "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "255a988",
-  "time": "2026-10-29 23:27"
+  "commit": "0236b14",
+  "time": "2026-10-30 16:45"
  },
  "line37-redruns-seed1": {
   "counts": {
@@ -446,7 +446,7 @@
  "line9-lint": {
   "counts": {
    "consist": 0,
-   "signalsInPlatforms": 9,
+   "signalsInPlatforms": 0,
    "treeTrunks": 0,
    "treeCrowns": 0,
    "bridges": 0,
@@ -466,16 +466,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "35a2069b9dc9edb5a96ad2f1b8337b72c4f9f399",
+   "src": "a315983256722fe5be3aab664d2bd36d93a6b2a5",
    "index.html": "1a054002131f4e610da69c749dd134922c2de2b2",
-   "tools/bench": "56e9312421a4271875100a2ae545dd2548569e71",
-   "tools/lint.js": "b2db83731c3c2c5d5517cc105e5e2101ae3a7a13",
+   "tools/bench": "4aab78fffb5ad0b313af33ada8dd5a78b43e9d47",
+   "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
    "tools/traffic_lint.js": "4529b55e8b2dee7810f8cc78d5579a0816a58df1",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "83dddc928bdfc8c509dcbd14518eb11e428a2499"
   },
-  "commit": "669dd30",
-  "time": "2026-10-30 10:11"
+  "commit": "0236b14",
+  "time": "2026-10-30 16:45"
  },
  "line9-redruns-seed1": {
   "counts": {
