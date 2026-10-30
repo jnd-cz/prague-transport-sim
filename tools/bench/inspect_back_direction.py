@@ -12,13 +12,19 @@ with sync_playwright() as p:
         const data = await (await fetch(`/data/line${line}.json`)).json();
         const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
         const back = new Route(data.pathBack);
-        let near = 0, same = 0, opposite = 0, cross = 0, overlapSame = 0;
+        let near = 0, same = 0, opposite = 0, cross = 0, overlapSame = 0, directedNear = 0, directedSame = 0;
         const examples = [];
         for (let s = 50; s < route.length - 50; s += 100) {
           const p = route.at(s), n = back.nearest(p.x, p.y);
           if (!n || n.d >= 25) continue;
           near++;
           const a = route.heading(s, 3), b = back.heading(n.s, 3);
+          const directed = back.nearestOnHeading(p.x, p.y, -a.hx, -a.hy);
+          if (directed && directed.d < 25) {
+            directedNear++;
+            const h = back.heading(directed.s, 3);
+            if (a.hx * h.hx + a.hy * h.hy > -0.5) directedSame++;
+          }
           const dot = a.hx * b.hx + a.hy * b.hy;
           if (dot > 0.5) {
             same++;
@@ -27,7 +33,7 @@ with sync_playwright() as p:
           } else if (dot < -0.5) opposite++;
           else cross++;
         }
-        out.push({ line, near, same, opposite, cross, overlapSame, examples });
+        out.push({ line, near, same, opposite, cross, overlapSame, directedNear, directedSame, examples });
       }
       return out;
     }''')
