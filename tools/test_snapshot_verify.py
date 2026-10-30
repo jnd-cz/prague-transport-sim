@@ -35,7 +35,7 @@ class Verify(unittest.TestCase):
             root = Path(tmp)
             (root / "snapshots").mkdir()
             (root / "data").mkdir()
-            for s in (snap("a", ["s1", "s2"]), snap("b", ["s1", "s2", "s3"])):
+            for s in (snap("a", ["s1", "s2"]), snap("b", ["s1", "s2", "s3"]), snap("c", ["s1", "s2", "s3", "s4"])):
                 (root / "snapshots" / f"{s['id']}.json").write_text(json.dumps(s), encoding="utf-8")
             manifest = root / "data" / "MANIFEST.json"
             manifest.write_text(json.dumps({"files": {"x": {"sha256": "b1", "size": 1}, "y": {"sha256": "b2", "size": 1}}}), encoding="utf-8")
