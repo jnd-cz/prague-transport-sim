@@ -39,10 +39,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   built as a 9 → 10 run. Line 37 (a substitute line) has no OSM relation: built from its GTFS shapes,
   which run between the two tracks in places; the matcher prefers the right-hand track (regular
   service always uses it, `data/truth.json`).
-- **PID GTFS does have `block_id`** (older notes said it had none). A two-line run pairs a trip with
-  the next trip of its vehicle block, never by time (#96): on 2026-10-21, 195 of 200 line 9 arrivals at
-  Nákladové nádraží Žižkov continue as line 10 with a 0 s gap; the old 2–25 min time window had paired
-  198, none in the same block. `tools/audit_run_timetable.py` checks a built run against the GTFS.
+- **PID GTFS `block_id` links through-running trips only** (older notes said it had none): on
+  2026-10-21 each of line 9's 427 blocks is one 9 trip and the 10 trip it becomes, and lines 17, 22,
+  23 and 37 have no `block_id` at all. It is not a vehicle's day (no run numbers, no depot runs).
+  A two-line run pairs trips by it, never by time (#96): 195 of 200 line 9 arrivals at Nákladové
+  nádraží Žižkov continue as line 10 with a 0 s gap; the old 2–25 min time window had paired 198, none
+  in the same block. `tools/audit_run_timetable.py` checks a built run against the GTFS.
 - **A two-line run's `pathBack` holds both directions** of the streets the run covers twice (9 → 10
   leaves Řepy and returns to it over the same tracks: s 0–8 km and 20–28 km): the closest piece of it can be our own track. Matching
   onto another route takes the heading into account (`Route.nearestOnHeading`); plain `nearest` there
