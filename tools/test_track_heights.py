@@ -112,6 +112,8 @@ class Guard(unittest.TestCase):
         result = HeightGuard([evidence()]).choose({'id': 'di-1', 'z': None}, m, 5, 0)
         self.assertIsNone(result['z'])
         self.assertIn('nearest_archive_missing_z', result['review_flags'])
+        self.assertEqual([(c['id'],c['excluded']) for c in result['candidates']],
+                         [(1,'missing_z'), (2,'nearest_archive_missing_z')])
 
     def test_disagreement_record_is_flagged_even_where_current_z_is_missing(self):
         result = HeightGuard(conflicts=[1]).choose({'id': 'di-1', 'z': None}, match(path(1, 200)), 5, 0)

@@ -51,10 +51,13 @@ class HeightGuard:
         if near:
             near = [c for c in near if c['distance'] <= near[0]['distance'] + .25]
         # A farther numeric track must never replace the nearest one with missing Z.
-        if match['status'] in ('numeric', 'ambiguous'):
-            for c in near:
-                if usable(c.get('z')):
-                    candidates.append({'dataset': 'archive', **c})
+        for c in near:
+            candidate = {'dataset': 'archive', **c}
+            if not usable(c.get('z')):
+                candidate['excluded'] = 'missing_z'
+            elif match['status'] == 'missing_z':
+                candidate['excluded'] = 'nearest_archive_missing_z'
+            candidates.append(candidate)
         if structure_hint:
             flags.append('structure_requires_level_evidence')
         if match['status'] == 'ambiguous':
@@ -63,7 +66,8 @@ class HeightGuard:
             flags.append('nearest_archive_missing_z')
         if any(str(c['id']) in self.conflicts for c in near):
             flags.append('known_archive_disagreement')
-        if usable(di.get('z')) and any(abs(c['z'] - di['z']) > TOLERANCE for c in candidates if c['dataset'] == 'archive'):
+        if usable(di.get('z')) and any(abs(c['z'] - di['z']) > TOLERANCE for c in candidates
+                                     if c['dataset'] == 'archive' and usable(c['z'])):
             flags.append('di_archive_height_disagreement')
         for c in candidates:
             r = self.reviews.get((c['dataset'], str(c['id'])), {})
