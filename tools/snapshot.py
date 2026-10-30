@@ -473,7 +473,8 @@ def data_publish(store, note, sid=None, cache=None):
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     man = {"snapshot": sid or (current_id() if os.path.exists(os.path.join(SNAPDIR, "CURRENT")) else None),
            "built_at_commit": head, "published": time.strftime("%Y-%m-%d %H:%M"), "note": note, "files": files}
-    json.dump(man, open(DATA_MANIFEST, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    with replacing(DATA_MANIFEST, "w", encoding="utf-8") as f:
+        json.dump(man, f, ensure_ascii=False, indent=1)
     print(f"data: {len(files)} files, {sum(m['size'] for m in files.values()) / 1e6:.0f} MB; data/MANIFEST.json written: commit it")
 
 
