@@ -56,6 +56,16 @@ function stopDistance(v, state) {
   return state === 'warn' ? (v * v) / 1.8 + v * 2 + 1 : (v * v) / 2.6 + v + 0.5;
 }
 
+// The speed (m/s) an AI tram may run at s: the limit under the whole set, and every lower limit ahead
+// reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
+// stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
+// until it turned red (line 17 s 10826).
+function limitSpeed(lim, s, len) {
+  let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
+  for (let d = 5; d < 300; d += 5) v = Math.min(v, Math.sqrt((lim.at(s + d) / 3.6) ** 2 + 2 * 0.7 * Math.max(0, d - 5)));
+  return v;
+}
+
 function setOpacity(obj, a) {
   obj.visible = a > 0.01;
   obj.traverse((o) => {
@@ -1513,7 +1523,7 @@ export class Traffic {
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = Math.min(g.limits.at(t.s), g.limits.at(t.s - t.length)) / 3.6;
+      let vt = limitSpeed(g.limits, t.s, t.length);
       const close = t.s - t.length - tram.s < 300; // (our tram closing in)
       let stopAt = null;
       const st = g.stops.find((x) => x.target > t.s + 0.5);
@@ -1590,7 +1600,7 @@ export class Traffic {
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };
     for (const sig of this.game.signals) sig.backCommitted = false; // (set again below, read by the controller)
     for (const t of this.oncoming) {
-      let vt = Math.min(this.backLimits.at(t.s), this.backLimits.at(t.s - t.length)) / 3.6 * 0.85;
+      let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null;
       for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
