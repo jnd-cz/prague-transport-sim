@@ -41,6 +41,116 @@ Near the Vozovna loop, junctions and multiple parallel tracks require explicit t
 - Depo Hostivař shows why all sources matter. The current DTM extract contains the 2022 terminal tram loop and plausible track heights there, while the fetched OSM extract included broader metro-depot and railway-yard linework. Track records from one source can be absent or represent a different date, scope or classification in another. Treat zero Z as missing/suspect, not sea level; inspect mixed Z and flags individually.
 - Maintain provenance per geometry and per height: provider, dataset and feature ID, extraction date, available observation/update dates, quality and incomplete flags, height source, coordinate system and confidence/review status. DTM owner identifiers and the operator can help interpret records, but ownership alone is not proof of current physical status.
 
+## District acquisition, 2026-10-30 (#61)
+
+**Prepared locally; source-snapshot publication awaits the user's approval.** The game and its built
+data are unchanged. Importing these tracks is [#20](https://github.com/jnd-cz/prague-transport-sim/issues/20).
+
+### Access, formats and the HANDOFF contradiction
+
+The distinction is between the catalogue's **open-data classification**, **public download access**,
+and the format offered. Checked on 2026-10-30:
+
+- The [set 7 catalogue record](https://geoportalpraha.cz/data-a-sluzby/50DF58EE-2B3B-42B7-A414-3D2809159B8C)
+  still has `openData=false`, `eVydej=true`, `dtmDatasetCode=07`, data date 2026-09-30 and metadata
+  update 2026-10-23. This explains HANDOFF §13's *Neotevřená data* observation; the flag was not invented.
+- The [regional provider's access guidance](https://portal.dtm-praha-sck.cz/poskytovani-dat/zpusoby-poskytovani-prazskych-dat-dtm)
+  describes ZPS and DI as public, with monthly district downloads under its open-data heading. Its
+  [distribution overview](https://portal.dtm-praha-sck.cz/poskytovani-dat) mentions only ZPS for the
+  Geoportál package route, so the provider's own pages are inconsistent too.
+- The Geoportál's [actual set 7 download index](https://geoportalpraha.cz/api/get-dtm-download-metadata?code=07)
+  lists 57 Prague districts, **JVF ZIP only**, all state 2026-09-30. The listed
+  `isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/<uuid>/<filename>` links work without login.
+  The 16 required ZIPs were downloaded, checked against the listed byte sizes and ZIP CRCs, and
+  hashed. They contain XML, JVF **1.4.3**, horizontal **EPSG:5514** and three coordinates per track
+  vertex. The catalogue identifies the vertical reference as Baltic 1977 height. The format menu's
+  absence of GPKG matters: do not invent a `.gpkg.zip` URL from a JVF URL or call these ZPS packages.
+- Licence basis for these publicly served packages: IPR's
+  [data-provision rules](https://geoportalpraha.cz/backend/getdokument/1), approved 2024-01-22,
+  **I.8**, cover map viewing/download services as well as open data under **CC BY 4.0**, with
+  attribution **“datový podklad © IPR Praha”**, licence link and changes indicated. I.7 separately
+  addresses terms for non-open deliveries. We use I.8 for the public download-service route and
+  retain the contradictory catalogue flag and provider guidance with the source evidence; this
+  does not establish that a separately ordered GPKG delivery has the same terms.
+
+Thus HANDOFF's conclusion that tram axes cannot be obtained from public downloads is superseded;
+its statement about the catalogue label remains accurate. Public JVF is available even though the
+catalogue does not label set 7 open. If confirmation of this classification or GPKG delivery is
+needed, use [IPR's request route](https://geoportalpraha.cz/data-a-sluzby/jak-ziskat-data):
+`vydej@ipr.praha.eu` (dataset contact `dtm@ipr.praha.eu`). Ask for **DTM kraje – DI Sada 7**, the
+district codes below, latest state before the 2026-11-10 transition, format, and explicit reuse and
+redistribution terms. No request or order was sent. If a delivery cannot be used, #20 falls back to
+reviewed **archived DTMP layer 10** and **OSM**, as already agreed above.
+
+### Which districts and what is in them
+
+`tools/dtm_di.py` intersects **complete segments of both `path` and `pathBack`** for lines 9, 17, 22,
+23 and 37 with all 57 level-9 district boundaries in the pinned local OSM extract (district code
+`ref:cobe`); conversion uses `tools/geo.py`. The union covers every route segment, with no uncovered
+length above the 0.01 m numerical tolerance. A route touching a district boundary selects both
+districts. This is district acquisition, not a corridor clip or a track importer.
+
+All rows below are whole-district **`OsaKolejeTramvajoveDrahy`** records, state **2026-09-30**,
+JVF **1.4.3**. `OsaTramvajoveDrahy` (alignment rather than individual track) is reported separately
+in the JSON, never added to these counts. “Numeric” means finite, nonzero Z on every vertex; it
+does **not** certify plausible elevation or accuracy. Mixed means some zero and some nonzero Z.
+
+| District | Code | Lines | Track features | Zero Z | Numeric Z | Mixed Z | `NeuplnaData=true` |
+|---|---|---|---:|---:|---:|---:|---:|
+| Praha 1 | 500054 | 9, 17, 22, 23 | 1052 | 786 | 266 | 0 | 1052 |
+| Praha 2 | 500089 | 9, 17, 22, 23 | 887 | 862 | 25 | 0 | 887 |
+| Praha 3 | 500097 | 9, 37 | 662 | 552 | 110 | 0 | 662 |
+| Praha 4 | 500119 | 17 | 1010 | 974 | 36 | 0 | 1005 |
+| Praha 5 | 500143 | 9, 22, 23 | 1295 | 948 | 347 | 0 | 1295 |
+| Praha 6 | 500178 | 22, 23 | 1349 | 1213 | 136 | 0 | 1349 |
+| Praha 7 | 500186 | 17 | 806 | 559 | 247 | 0 | 802 |
+| Praha 8 | 500208 | 17, 37 | 1175 | 791 | 382 | 2 | 1175 |
+| Praha 9 | 500216 | 37 | 719 | 635 | 78 | 6 | 719 |
+| Praha 10 | 500224 | 9, 22 | 1061 | 277 | 784 | 0 | 1061 |
+| Praha 12 | 547107 | 17 | 234 | 185 | 49 | 0 | 234 |
+| Praha 13 | 539694 | 9 | 3 | 0 | 3 | 0 | 3 |
+| Praha 14 | 547361 | 37 | 67 | 66 | 1 | 0 | 67 |
+| Praha 17 | 547174 | 9, 22 | 135 | 23 | 112 | 0 | 135 |
+| Praha-Libuš | 547051 | 17 | 7 | 0 | 7 | 0 | 7 |
+| Praha-Troja | 547328 | 17 | 42 | 0 | 42 | 0 | 42 |
+| **Package totals** | | | **10504** | **7871** | **2625** | **8** | **10495** |
+
+These are feature instances across packages, not deduplicated physical tracks. The earlier Praha 8
+count of 339 used a comparison rectangle; 1175 here covers the whole district. Neither contradicts
+the other. Roughly three quarters of the package records have no height; an accuracy flag does not
+make their zero Z usable.
+
+Quality flags in every district are position class **3**, height class **3**, acquisition method
+**1**, placement level **0**, and incomplete **true**, except:
+
+- Praha 4: five records are incomplete **false** with position/height class **2**; acquisition is
+  **1** on 1007 records and **99** on three. Placement is still 0 on all 1010.
+- Praha 7: four records are incomplete **false**; two have position/height class **2**, the other
+  804 class **3**. Acquisition is **1** on 804 and **99** on two; level is 0 on all 806.
+
+These are raw code values, not an interpretation of survey quality. The report retains distributions
+per district and `DatumVkladu` / `DatumZmeny` ranges. Record changes span 2025-01-30 to 2026-08-31;
+package date, insertion date and change date do not establish the actual observation date.
+
+### Reproduce and publish
+
+```powershell
+python -P -E tools/test_dtm_di.py
+python -P -E tools/dtm_di.py                 # offline report -> reports/dtm-di.json
+python -P -E tools/dtm_di.py --fetch         # deliberately refresh upstream sources
+```
+
+The staged source group is `raw/dtm-di/`: **16 ZIPs + catalogue.json + provenance.json + terms.pdf +
+access.html**, **21,933,947 bytes**. Provenance records exact per-package URL, date and SHA-256; the
+catalogue and terms are retained as received. ZIPs are read directly; snapshot fetch need not unpack
+them. The snapshot scanner includes these 20 files. No built-data publication or game regression
+baseline update is needed, because neither the runtime nor generated line files changed.
+
+After approval: `python -I tools/snapshot.py publish 2026-10-30 --note "DI set 7: 16 districts for lines 9,17,22,23,37, state 2026-09-30"`,
+then commit the manifest and `snapshots/CURRENT`. Verify `fetch` and `status` in a fresh checkout and
+rerun the offline report there. Until that is done, the source files are staged locally and #61's
+published-snapshot acceptance check remains outstanding.
+
 ## Height and terrain findings
 
 Do not confuse “DTM” as **digital technical map** (transport objects and surveyed street surfaces) with **digital terrain model** (a bare-earth elevation raster). They are different datasets.
