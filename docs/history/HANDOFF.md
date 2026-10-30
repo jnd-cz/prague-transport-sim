@@ -393,8 +393,10 @@ data set (`isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/<uuid>/VS_CZ010
 the uuids change monthly). District codes: Praha 1 500054, 2 500089, 3 500097, 4 500119, 5 500143,
 6 500178, 7 500186, 8 500208, 9 500216, 10 500224, 11 547034, 12 547107 (Modřany), 13 539694.
 Sizes: Praha 2 OPL 2.4 MB / KR 5.3 MB zipped; Praha 10 7.3 / 16.6 MB.
-**Not open:** "DI Sada 7" (transport infrastructure, incl. tram track axes) is marked *Neotevřená
-data* — the handoff's plan to snap tracks to DTM axes does not work with open data; tracks stay OSM.
+**Historical observation, superseded 2026-10-30 (#61):** "DI Sada 7" (transport infrastructure,
+incl. tram track axes) is marked *Neotevřená data*. The catalogue still has that flag, but public
+JVF district downloads are available; the earlier conclusion that the axes cannot be acquired was
+too broad. See the [access evidence, licence basis and district report](../decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
 
 **What is in ZPS.** Areas (2D polygons): carriageway (*Provozní plocha pozemní komunikace*),
 sidewalk, cycle path, parking, traffic island, **tram track area** (only where the track has its own

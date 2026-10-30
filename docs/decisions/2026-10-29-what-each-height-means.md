@@ -57,7 +57,9 @@
 
    **Where the offsets come from.** No open dataset measures them yet. The street survey records the
    grass or ballast surface, not the rails. The current DTM track axes mostly carry no height (Praha 8:
-   278 of 339 all-zero Z), and the archived map server has no track-axis layer. So they are design
+   278 of 339 all-zero Z). The archived map server does expose track axes with Z in layer 10;
+   the [2026-10-30 assessment](2026-10-30-track-height-fallback.md) measures their fallback coverage
+   and the cases needing review. Until source heights and track styles are matched, these remain design
    values: grass from ČVUT's green-track study (two variants:
    [Zelená trať](https://projects.fd.cvut.cz/k612x1rk/soubory/Zelena_trat.pdf)); ballast from standard
    track build-up (no Prague source found). They are kept as named constants, so a measurement replaces
