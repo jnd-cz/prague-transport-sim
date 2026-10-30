@@ -149,8 +149,22 @@ baseline update is needed, because neither the runtime nor generated line files 
 Publication command (2026-10-30, after approval):
 `python -I tools/snapshot.py publish 2026-10-30 --note "DI set 7: 16 districts for lines 9,17,22,23,37, state 2026-09-30"`.
 The SFTP store accepted all 20 new files (21,933,947 bytes). The complete snapshot contains 1549
-files (2112 MB); every previously pinned source is unchanged. Fresh-checkout fetch/status and
-offline-report verification follow publication.
+files (2,111,750,063 bytes); every previously pinned source is unchanged.
+
+Verified on 2026-10-30 in a fresh clone, with no local source or built-data cache:
+
+- `python -I tools/snapshot.py fetch --no-cache`: fetched all 1549 source paths (1137 distinct
+  content-addressed objects) from the SFTP server, hash-checked and unpacked the ZPS packages;
+  download completed in 324 s.
+- `python -I tools/snapshot.py data-fetch --no-cache`: fetched the 31 existing built-data files.
+- `python -I tools/snapshot.py status`: **0 missing/changed, 0 new input files**, and **0 built-data
+  differences**.
+- `python -P -E tools/dtm_di.py`: the entire JSON report exactly matches the pre-publication report,
+  including all 16 district rows and 10,504 track-feature records.
+- `tools/test_dtm_di.py` and `tools/test_data_publish.py`: **4 + 1 tests pass** in the fresh clone.
+
+This completes the published-snapshot and reproducibility checks for #61. Existing built data still
+records its original source snapshot; no world rebuild was performed for this acquisition.
 
 ## Height and terrain findings
 
