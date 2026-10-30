@@ -23,6 +23,7 @@ dst = os.path.join(ROOT, "data", f"line{LINE}.json")
 line = json.load(open(dst, encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
+from atomic import replacing  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
 # the Overpass cache of this line's tracks (a run like 9 -> 10 has its own folder, line 22 the raw/ root;
@@ -122,9 +123,8 @@ while k < n:
 
 line["speed"] = {"step": STEP, "osm": osm, "dedicated": ded, "source": "OpenStreetMap railway=tram maxspeed (as shown by OpenRailwayMap)"}
 # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
-with open(dst + ".part", "w", encoding="utf-8") as fh:
+with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
-os.replace(dst + ".part", dst)
 tagged = sum(1 for v in osm if v)
 print(f"line {LINE}: {len(osm)} samples, maxspeed on {100 * tagged / len(osm):.0f} % "
       f"({', '.join(f'{v}: {osm.count(v)}' for v in sorted(set(osm)) if v)}), dedicated {100 * sum(ded) / n:.0f} %")

@@ -378,7 +378,7 @@ export class Game {
       sig.ext = 0;
       // where the opposite track passes the junction: oncoming trams stop there on red
       if (this.backRoute) {
-        const x = this.route.at(d.cross), n = this.backRoute.nearest(x.x, x.y);
+        const x = this.route.at(d.cross), n = this.backRoute.nearestOnHeading(x.x, x.y, -x.hx, -x.hy);
         if (n && n.d < 15) sig.backCross = n.s;
       }
       mesh.userData.set(sig.state, { goDir });
@@ -400,17 +400,25 @@ export class Game {
     let cur = null;
     for (let s = 0; s < this.route.length; s += 3) {
       const p = this.route.at(s);
-      const n = back.nearest(p.x, p.y);
-      if (n && n.d < 1.8) { if (!cur) { cur = [s, s]; segs.push(cur); } else cur[1] = s; } else cur = null;
+      const n = back.nearestOnHeading(p.x, p.y, -p.hx, -p.hy);
+      if (n && n.d < 1.8) {
+        // Consecutive 3 m samples must follow the same reverse traversal; a jump at a
+        // crossing or between legs of a loop must not join two conflict sections.
+        if (!cur || n.s > cur[2] || cur[2] - n.s > 15) { cur = [s, s, n.s]; segs.push(cur); }
+        else { cur[1] = s; cur[2] = n.s; }
+      } else cur = null;
     }
     for (const [a, b] of segs) {
       if (b - a < 25) continue;
       const s0 = a - 6, s1 = b + 6; // conflict zone incl. car body overhang
       const pa = this.route.at(s0), pb = this.route.at(s1);
+      const enter = back.nearestOnHeading(pb.x, pb.y, -pb.hx, -pb.hy);
+      const exit = back.nearestOnHeading(pa.x, pa.y, -pa.hx, -pa.hy);
+      if (!enter || !exit || enter.s >= exit.s) continue;
       const G = {
         s0, s1,
-        b0: back.nearest(pb.x, pb.y).s, // oncoming trams enter at our far end
-        b1: back.nearest(pa.x, pa.y).s,
+        b0: enter.s, // oncoming trams enter at our far end
+        b1: exit.s,
         state: 'idle', timer: 0, entered: false, lastServed: 'theirs', grantedAt: 0,
         theirs: { requested: false, occupied: false },
       };

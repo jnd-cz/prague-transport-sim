@@ -287,7 +287,7 @@ export class Traffic {
     const ends = runs.map(([, b]) => b - 1);
     this.backStops = this.back ? [...ends, ...game.stops.map((st) => {
       const o = route.offset(st.target, 3.2);
-      const n = this.back.nearest(o.x, o.y);
+      const n = this.back.nearestOnHeading(o.x, o.y, -o.hx, -o.hy);
       return n && n.d < 30 && !runs.some(([a, b]) => n.s + 8 > a - 30 && n.s + 8 < b + 30) ? n.s + 8 : null;
     }).filter((s) => s !== null)].sort((a, b) => a - b) : [];
     // other lines that really serve this route's stops (from GTFS)
@@ -864,12 +864,12 @@ export class Traffic {
       if (!c.active || c.alpha < 0.5 || !c.path) continue;
       const p = c.path.at(c.s);
       // only cars going the tram's way hold it up (one facing it waits for the tram instead)
-      const n = this.route.nearest(p.x, p.y);
+      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy);
       // (a car on the road under our bridge, or on a bridge over the track, is not on it)
       if (n && c.z !== undefined && Math.abs(c.z - this.ground.profile.height(n.s)) > LEVEL_APART) continue;
       if (n && n.d < 1.6) { const h = this.route.at(n.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) ours.push({ s: n.s, v: c.vNow ?? 0 }); }
       if (this.back) {
-        const b = this.back.nearest(p.x, p.y);
+        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy);
         if (b && b.d < 1.6) { const h = this.back.at(b.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) back.push({ s: b.s, v: c.vNow ?? 0 }); }
       }
     }
@@ -1574,7 +1574,7 @@ export class Traffic {
     if (this.oncoming.length < 2 && this.rand() < dt / 25) {
       const s0 = Math.min(this.route.length - 5, tram.s + 550 + this.rand() * 400);
       const o = this.route.at(s0);
-      const n = br.nearest(o.x, o.y);
+      const n = br.nearestOnHeading(o.x, o.y, -o.hx, -o.hy);
       // a line that serves the stop just beyond, coming towards us
       const st = this.game.stops.find((x) => x.target > s0);
       const other = st && this._otherLine(st.i, -1);
@@ -1636,7 +1636,7 @@ export class Traffic {
       t.s += t.v * dt;
       const p = br.at(t.s), me = this.route.at(tram.s);
       // past the last stop it shares with our line it turns off
-      const ourS = t.endS !== null ? this.route.nearest(p.x, p.y)?.s : null;
+      const ourS = t.endS !== null ? this.route.nearestOnHeading(p.x, p.y, -p.hx, -p.hy)?.s : null;
       t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
       this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y));

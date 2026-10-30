@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-10-29c",
- "built_at_commit": "a4c6c92",
- "published": "2026-10-29 22:48",
- "note": "#87: OSM answers keyed by extract, query and code; lines 9 and 23 from fresh answers, line 9 clearances from its own roads, platforms from each line's box (17, 23, 37)",
+ "built_at_commit": "06c742c",
+ "published": "2026-10-30 07:46",
+ "note": "Line 9: pair 9 to 10 trips by GTFS vehicle block (#96)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
@@ -121,8 +121,8 @@
    "sha256": "adceadccb68ca371a8a3abf93ca948ad28c9fe9bc72f58ada0de1c0623b8861a"
   },
   "line9.json": {
-   "size": 3837678,
-   "sha256": "985d8f6baabf881ab05c277452013fe741aa7d02a0c9b366b8a9585288e9c6a1"
+   "size": 3836592,
+   "sha256": "527110b3509d88729c379bbc00434fa34e8f78aed9de17395269530181afebda"
   },
   "lines.json": {
    "size": 607,

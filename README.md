@@ -52,9 +52,10 @@ After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and com
 
 With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
 diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
-network; arrivals of the first line and departures of the second at the shared terminus are paired
-in time order (PID GTFS has no `block_id`). The current line 9 is such a run: Sídliště Řepy →
-Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10 (track repairs, autumn 2026).
+network; trips are paired only when the next trip in the GTFS vehicle block starts at the same terminus
+on the selected pattern. Unmatched or ambiguous trips are reported by the build. The current line 9 is
+such a run: Sídliště Řepy → Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10
+(track repairs, autumn 2026).
 Stop platforms come from OSM (`public_transport=platform`) for all lines.
 
 The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
@@ -242,6 +243,16 @@ Strings live in `src/i18n.js`.
 **Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
 each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
 `reports/headless/`:
+
+For a combined GTFS run, independently check every logged pair and the built timetable against the
+pinned GTFS, including eligible pairs omitted from both the log and timetable:
+
+```bash
+python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
+```
+
+The audit takes the service date from the build log (`service date …`, `SERVICE_DATE` in
+`tools/build_line.py`).
 
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
