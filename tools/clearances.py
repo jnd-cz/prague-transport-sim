@@ -32,6 +32,7 @@ cands = glob.glob(os.path.join(ROOT, "raw", f"run{LINE}-*", "roads.json")) + [
 src = next((p for p in cands if os.path.exists(p)), None) or sys.exit(f"no cached roads for line {LINE}: run build_line.py first")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
+from atomic import replacing  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 CAR = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street",
        "service", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"}
@@ -94,9 +95,8 @@ for c in out:
     dedup.append(c)
 line["clearances"] = dedup
 # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
-with open(dst + ".part", "w", encoding="utf-8") as fh:
+with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
-os.replace(dst + ".part", dst)
 for c in dedup:
     print(f"s {c['s']:7.0f}  {c['kind']:4} {str(c['mh']):5} ({c['src']})  {c['name'] or ''}{'  [tunnel]' if c['tunnel'] else ''}")
 print(f"{len(dedup)} crossings under the route")

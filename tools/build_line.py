@@ -73,6 +73,7 @@ REFRESH = "--refresh" in sys.argv
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
+from gtfs_runs import pair_continuations  # noqa: E402
 try:
     import osm_local
 except ImportError:
@@ -93,7 +94,7 @@ def overpass(name, query, optional=False):
     if not js["elements"] and not optional and name != "relations":
         raise SystemExit("local OSM: nothing for " + name)
     js["osm_base"], js["osm_key"] = osm_local.base_id(), key
-    with open(path, "w", encoding="utf-8") as f:
+    with replacing(path, "w", encoding="utf-8") as f:
         json.dump(js, f)
     return js
 
@@ -433,11 +434,13 @@ def secs(hms):
 
 def plan_run(first, then):
     """A vehicle run: trips of `first` ending at a terminus, each continuing as the next trip of
-    `then` leaving that stop (PID GTFS has no block_id, so arrivals and departures are paired in
-    time order, 2-25 min layover). Also the shapes of the opposite direction (for oncoming trams)."""
+    `then` in the same GTFS block. Also the opposite direction's shapes (for oncoming trams)."""
     rd, active = gtfs_open()
-    trips = {t["trip_id"]: t for t in rd("trips.txt")
-             if t["route_id"] in (f"L{first}", f"L{then}") and t["service_id"] in active}
+    active_trips = {t["trip_id"]: t for t in rd("trips.txt") if t["service_id"] in active}
+    blocks = {t.get("block_id") for t in active_trips.values() if t["route_id"] == f"L{first}" and t.get("block_id")}
+    # Other routes in these blocks matter: an intervening trip is not a direct continuation.
+    trips = {tid: t for tid, t in active_trips.items() if t["route_id"] in (f"L{first}", f"L{then}")
+             or t.get("block_id") in blocks}
     st = defaultdict(list)
     for r in rd("stop_times.txt"):
         if r["trip_id"] in trips:
@@ -447,7 +450,8 @@ def plan_run(first, then):
     pat = lambda tid: tuple(r["stop_id"] for r in st[tid])
     by = defaultdict(list)
     for tid in st:
-        by[(trips[tid]["route_id"][1:], pat(tid))].append(tid)
+        if trips[tid]["route_id"] in (f"L{first}", f"L{then}"):
+            by[(trips[tid]["route_id"][1:], pat(tid))].append(tid)
     # the first line's pattern whose last stop is where a pattern of the second line starts
     starts_then = {p[0] for (l, p) in by if l == then}
     cand = [(len(v), p) for (l, p), v in by.items() if l == first and p[-1] in starts_then]
@@ -458,17 +462,19 @@ def plan_run(first, then):
     pb = max((len(v), p) for (l, p), v in by.items() if l == then and p[0] == term)[1]
     ta = sorted(by[(first, pa)], key=lambda t: secs(st[t][-1]["arrival_time"]))
     tb = sorted(by[(then, pb)], key=lambda t: secs(st[t][0]["departure_time"]))
-    timetable, j = [], 0
-    for a in ta:
-        arr = secs(st[a][-1]["arrival_time"])
-        while j < len(tb) and secs(st[tb[j]][0]["departure_time"]) < arr + 120:
-            j += 1
-        if j >= len(tb):
-            break
-        dep = secs(st[tb[j]][0]["departure_time"])
-        if dep - arr <= 1500:
-            timetable.append([secs(r["departure_time"]) for r in st[a][:-1]] + [secs(r["departure_time"]) for r in st[tb[j]]])
-            j += 1
+    pairs, rejected, unused = pair_continuations(trips, st, ta, tb)
+    for a, b, gap in pairs:
+        print(f"paired {a} {st[a][-1]['arrival_time']} -> {b} {st[b][0]['departure_time']} "
+              f"block {trips[a]['block_id']}, gap {gap}s")
+    for tid, why in rejected:
+        print(f"unmatched arrival {tid} {st[tid][-1]['arrival_time']}: {why}")
+    for tid in unused:
+        print(f"unmatched departure {tid} {st[tid][0]['departure_time']}")
+    print(f"continuation gaps (seconds): {dict(sorted(Counter(gap for _, _, gap in pairs).items()))}")
+    if not pairs:
+        raise SystemExit(f"no verified {first}->{then} continuations in GTFS blocks")
+    timetable = [[secs(r["departure_time"]) for r in st[a][:-1]] +
+                 [secs(r["departure_time"]) for r in st[b]] for a, b, _ in pairs]
     shape_of = lambda tids: Counter(trips[t]["shape_id"] for t in tids).most_common(1)[0][0]
     # opposite direction: `then` arriving at the terminus, then `first` leaving it
     # (arrival and departure platforms of a terminus have different stop ids: compare names)

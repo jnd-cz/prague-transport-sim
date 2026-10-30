@@ -22,6 +22,7 @@ dst = os.path.join(ROOT, "data", f"line{LINE}.json")
 line = json.load(open(dst, encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from geo import Frame  # noqa: E402
+from atomic import replacing  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 # tram platform ways in the line's box, from the snapshot's OSM extract (tools/osm_local.py; the 12 m
 # filter below picks the ones on our tracks), cached under a name of its own: until #87 this was
@@ -45,7 +46,7 @@ elif "--fetch" in sys.argv or osm is None or osm.get("osm_key") != osm_local.ans
     els = osm_local.ways(lambda t: t.get("public_transport") == "platform" or t.get("railway") == "platform", bbox=box)
     osm = {"elements": els, "osm_base": osm_local.base_id(), "osm_key": osm_local.answer_key(f"platforms in box {box}")}
     os.makedirs(os.path.dirname(src), exist_ok=True)
-    with open(src, "w", encoding="utf-8") as fh:
+    with replacing(src, "w", encoding="utf-8") as fh:
         json.dump(osm, fh)
     print(f"local extract: {len(els)} platform ways in the line's box")
 
@@ -138,8 +139,7 @@ for i, g in enumerate(gtfs):
                     "stop": g["q"], "lines": g["lines"], "id": g["id"]})
 line["platforms"] = out
 # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
-with open(dst + ".part", "w", encoding="utf-8") as fh:
+with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
-os.replace(dst + ".part", dst)
 print(f"line {LINE}: {len(out)} tram platforms ({sum(p['area'] for p in out)} OSM areas, {sum(p.get('gtfs', 0) for p in out)} "
       f"from GTFS only); {len(gtfs)} PID tram platforms, {len(used)} matched to OSM")

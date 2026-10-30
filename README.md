@@ -52,9 +52,10 @@ After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and com
 
 With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
 diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
-network; arrivals of the first line and departures of the second at the shared terminus are paired
-in time order (PID GTFS has no `block_id`). The current line 9 is such a run: Sídliště Řepy →
-Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10 (track repairs, autumn 2026).
+network; trips are paired only when the next trip in the GTFS vehicle block starts at the same terminus
+on the selected pattern. Unmatched or ambiguous trips are reported by the build. The current line 9 is
+such a run: Sídliště Řepy → Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10
+(track repairs, autumn 2026).
 Stop platforms come from OSM (`public_transport=platform`) for all lines.
 
 The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
