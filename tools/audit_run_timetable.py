@@ -2,8 +2,8 @@
 
     python -I tools/audit_run_timetable.py --line 9 --log reports/issue96-pairs.log
 
-Checks every emitted timetable row and logged pair, including the full vehicle block, the stop
-sequence and the source snapshot's hash. It does not import the builder or its pairing helper.
+Checks emitted rows, logged pairs and omitted eligible pairs, including the full vehicle block,
+the stop sequence and the source snapshot's hash. It does not import the builder or its helper.
 """
 import argparse
 from collections import Counter, defaultdict
@@ -69,20 +69,23 @@ def main():
             if r['date'] == ymd:
                 (active.add if r['exception_type'] == '1' else active.discard)(r['service_id'])
         trips = {r['trip_id']: r for r in rows('trips.txt') if r['service_id'] in active}
-        blocks = {block for _, _, _, _, block, _ in pairs}
-        in_block = {tid for tid, trip in trips.items() if trip.get('block_id') in blocks}
+        first_route, second_route = ('L' + segment['line'] for segment in segments)
+        blocks = {trip.get('block_id') for trip in trips.values()
+                  if trip['route_id'] == first_route and trip.get('block_id')}
+        relevant = {tid for tid, trip in trips.items()
+                    if trip['route_id'] in (first_route, second_route) or trip.get('block_id') in blocks}
         times = defaultdict(list)
         for row in rows('stop_times.txt'):
-            if row['trip_id'] in in_block:
+            if row['trip_id'] in relevant:
                 times[row['trip_id']].append(row)
         names = {r['stop_id']: r['stop_name'] for r in rows('stops.txt')}
     for t in times.values():
         t.sort(key=lambda row: int(row['stop_sequence']))
     block_trips = defaultdict(list)
-    for tid in in_block:
-        if not times[tid]:
-            raise SystemExit(f'block trip {tid} has no stop times')
-        block_trips[trips[tid]['block_id']].append(tid)
+    for tid in relevant:
+        block = trips[tid].get('block_id')
+        if block in blocks:
+            block_trips[block].append(tid)
 
     expected_rows = []
     seen_a, seen_b = set(), set()
@@ -108,12 +111,50 @@ def main():
         for other in block_trips[block]:
             if other in (a, b):
                 continue
+            if not times[other]:
+                raise SystemExit(f'block trip {other} has no stop times')
             start, end = seconds(times[other][0]['departure_time']), seconds(times[other][-1]['arrival_time'])
             if (start < arrival < end) or arrival <= start <= departure:
                 raise SystemExit(f'overlapping or intervening block trip {other}: {a} -> {b}')
         expected_rows.append(tuple(seconds(r['departure_time']) for r in aa[:-1] + bb))
     if Counter(expected_rows) != Counter(map(tuple, data['timetable'])):
         raise SystemExit('built timetable does not contain exactly the logged GTFS pairs')
+    # Derive the two selected stop patterns independently from a logged pair, then scan all
+    # active first-route blocks. This catches a pair omitted from both the log and the output.
+    pattern_a = tuple(r['stop_id'] for r in times[pairs[0][0]])
+    pattern_b = tuple(r['stop_id'] for r in times[pairs[0][2]])
+    first_ids = [tid for tid in relevant if trips[tid]['route_id'] == first_route and
+                 tuple(r['stop_id'] for r in times[tid]) == pattern_a]
+    second_ids = {tid for tid in relevant if trips[tid]['route_id'] == second_route and
+                  tuple(r['stop_id'] for r in times[tid]) == pattern_b}
+    candidates = []
+    for a in first_ids:
+        block = trips[a].get('block_id')
+        group = block_trips.get(block, [])
+        if not block or any(not times[tid] for tid in group):
+            continue
+        try:
+            spans = [(seconds(times[tid][0]['departure_time']), seconds(times[tid][-1]['arrival_time']), tid)
+                     for tid in group]
+            if any(end < start for start, end, _ in spans):
+                continue
+            arrival = seconds(times[a][-1]['arrival_time'])
+        except (ValueError, KeyError, TypeError):
+            continue
+        others = [(start, end, tid) for start, end, tid in spans if tid != a]
+        if any(start < arrival < end for start, end, _ in others):
+            continue
+        starts = sorted((start, tid) for start, _, tid in others if start >= arrival)
+        if not starts or (len(starts) > 1 and starts[0][0] == starts[1][0]):
+            continue
+        b = starts[0][1]
+        if b in second_ids and times[a][-1]['stop_id'] == times[b][0]['stop_id']:
+            candidates.append((a, b))
+    claims = Counter(b for _, b in candidates)
+    eligible = {(a, b) for a, b in candidates if claims[b] == 1}
+    emitted = {(a, b) for a, _, b, _, _, _ in pairs}
+    if eligible != emitted:
+        raise SystemExit(f'eligible GTFS pairs differ: omitted {sorted(eligible - emitted)}, unexpected {sorted(emitted - eligible)}')
     gaps = Counter(int(pair[-1]) for pair in pairs)
     print(f'{len(pairs)} pairs verified against {snapshot_id} GTFS for {date}; gaps in seconds: {dict(sorted(gaps.items()))}')
 

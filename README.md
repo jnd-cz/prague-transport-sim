@@ -245,7 +245,7 @@ each in a fresh headless page, with pass / fail per run (exit code 1 on a failur
 `reports/headless/`:
 
 For a combined GTFS run, independently check every logged pair and the built timetable against the
-pinned GTFS:
+pinned GTFS, including eligible pairs omitted from both the log and timetable:
 
 ```bash
 python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
