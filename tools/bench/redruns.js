@@ -63,11 +63,19 @@ export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
         }
       }
       R.tramS = Math.round(game.tram.s);
+      // Same ten-minute deadlock limit as u3; scheduled waits start the clock at departure.
+      if (R.lastS === undefined || Math.abs(game.tram.s - R.lastS) > 1) {
+        R.lastS = game.tram.s; R.lastMove = game.clock;
+      }
+      const st = game.stops[game.nextStop];
+      if (st?.arrived && game._atStop(st) && Math.abs(game.tram.v) < 0.05)
+        R.lastMove = Math.max(R.lastMove, Math.min(game.clock, st.sched));
+      if (game.clock - R.lastMove > 600) { R.done = true; R.stuck = Math.round(game.tram.s); }
       if (!R.done) setTimeout(tick, 0);
       else { R.ourSignalPenalty = game.penalties.signal || 0; R.minutes = Math.round(game.clock / 60); R.ms = Math.round(performance.now() - R.t0); resolve(); }
     };
     tick();
   });
-  return { seed, redRuns: R.red.length, avoidable: R.red.filter((r) => r.avoidable).length, warnPasses: R.warnPasses, holds: R.holds,
+  return { seed, stuck: R.stuck ?? null, redRuns: R.red.length, avoidable: R.red.filter((r) => r.avoidable).length, warnPasses: R.warnPasses, holds: R.holds,
     aheadRedRuns: (R.aheadRed || []).length, aheadWarnPasses: R.aheadWarnPasses || 0, ourSignalPenalty: R.ourSignalPenalty, red: R.red, aheadRed: R.aheadRed || [] };
 }

@@ -63,6 +63,7 @@ function judge(bench, r) {
   }
   if (bench === 'redruns') {
     const bad = [];
+    if (r.stuck != null) bad.push(`stuck at ${Math.round(r.stuck)}`);
     if (r.redRuns) bad.push(`${r.redRuns} oncoming red runs (${r.avoidable} avoidable)`);
     if (r.aheadRedRuns) bad.push(`${r.aheadRedRuns} ahead red runs`);
     if (r.ourSignalPenalty) bad.push(`our signal penalty ${r.ourSignalPenalty}`);

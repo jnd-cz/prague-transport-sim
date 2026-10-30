@@ -37,7 +37,7 @@ import time
 import urllib.request
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
 from sysinfo import workers  # noqa: E402
@@ -72,6 +72,8 @@ def judge(check, r):
             bad.append(f"signal penalty {r['signalPenalty']}")
         more = f"yielded {r.get('yielded')}, cut-ins {r.get('closeCuts')}, junctions {r.get('carsIntoJunctions')}"
     elif check == "redruns":
+        if r.get("stuck") is not None:
+            bad.append(f"stuck at {round(r['stuck'])}")
         if r.get("redRuns"):
             bad.append(f"{r['redRuns']} oncoming red runs ({r.get('avoidable')} avoidable)")
         if r.get("aheadRedRuns"):
@@ -97,7 +99,7 @@ MEASURED = ("src", "index.html", "tools/bench", "tools/lint.js", "tools/traffic_
             "data/MANIFEST.json")
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-       "redruns": {"redRuns", "aheadRedRuns", "ourSignalPenalty"}}
+       "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # traffic counts move 10-20 % whenever trajectories change (tools/lint_report.py): a band of 15 % + 5
 NOISY = {"slide", "jump", "overlap", "walkerHit", "heatingKnobs", "streetBot", "redRuns"}
 
@@ -112,7 +114,7 @@ def counts(check, r):
                 "red": j.get("red", 0), "signalPenalty": r.get("signalPenalty") or 0, "yielded": r.get("yielded"),
                 "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber")}
     if check == "redruns":
-        return {k: r.get(k) for k in ("redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
+        return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":
@@ -218,25 +220,42 @@ def run_one(browser, url, line, check, seed, timeout):
     page = browser.new_page(viewport={"width": 960, "height": 540})
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    t0 = time.time()
+    t0 = time.monotonic()
+
+    def remaining(cap):
+        ms = (timeout - (time.monotonic() - t0)) * 1000
+        if ms <= 0:
+            raise PlaywrightTimeoutError("run deadline reached")
+        return min(cap, ms)
+
     try:
-        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=120_000)
+        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=remaining(120_000))
         # loaded: the loading screen is hidden and the title names the line (as batch.html waits)
         page.wait_for_function(
             f"() => document.getElementById('loading')?.classList.contains('hidden') && document.title.includes('{line}')",
-            timeout=600_000, polling=1000)
+            timeout=remaining(600_000), polling=1000)
         js = CALLS[check].replace("SEED", str(seed))
-        page.set_default_timeout(timeout * 1000)
-        r = page.evaluate(f"async () => {{ {js} }}")
+        # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
+        page.evaluate(f"""() => {{
+            window._job = {{ done: false }};
+            (async () => {{ {js} }})().then(
+                result => {{ window._job.result = result; window._job.done = true; }},
+                error => {{ window._job.result = {{ error: String(error) }}; window._job.done = true; }});
+        }}""")
+        page.wait_for_function("() => window._job.done", timeout=remaining(timeout * 1000), polling=100)
+        r = page.evaluate("() => window._job.result")
         r = json.loads(json.dumps(r, default=str)) if r is not None else {}
         if isinstance(r, dict):
             r.pop("watch", None)
+    except PlaywrightTimeoutError:
+        r = {"error": "timeout"}
     except Exception as e:  # noqa: BLE001 (a failed run is a result)
         r = {"error": f"{type(e).__name__}: {e}"}
+    finally:
+        page.close()
     if errors:
         r["pageErrors"] = errors[:20]
-    page.close()
-    return r, round(time.time() - t0)
+    return r, round(time.monotonic() - t0)
 
 
 def main():
@@ -255,6 +274,8 @@ def main():
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
     ap.add_argument("--compare", action="store_true", help="compare these runs with the baseline")
     a = ap.parse_args()
+    if a.timeout <= 0:
+        ap.error("--timeout must be positive")
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
     for c in checks:
         if c not in CALLS:
