@@ -41,6 +41,22 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - Heuristics standing in for missing data log what they decided (debug overlay F8, `window.game`) so they
   can be reviewed.
 
+## Unattended runs (overnight, Codex /goal, scheduled sessions)
+
+- The task states what may be done without the user. Default when it does not: push the issue
+  branch, open and update a draft PR, open issues for findings. Not without saying so: data-publish,
+  marking a PR ready, merging, pushing to main, force-pushing, closing or editing other issues.
+- The progress log is the draft PR, opened after the first commit: its description holds the current
+  state (open questions for the user first, then the check table), with a dated comment per step.
+  No log files in the repo; scratch output goes to `reports/` (ignored) or outside the checkout.
+- A defect outside the issue becomes an issue (or a "Findings" section in the PR when issues are not
+  allowed). It is fixed on the same branch only when the issue's checks cannot pass without it, in
+  its own commits, and the PR says so.
+- Investigation scripts are not committed unless they run like the other tools: their own server on
+  a free port (as `headless.py`), no fixed agent port, a usage line at the top.
+- The run ends with the draft PR saying what is done, what was measured and what the user must
+  decide; it does not mark it ready.
+
 ## Data
 
 - **Never edit generated data by hand** (`data/line*.json` and sidecars): change the tool and rebuild.
@@ -57,7 +73,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - Dev server: `python tools/serve.py 8742` (no-cache headers; `POST /report/<name>.json` saves to
   `reports/`). One port per agent on a computer: Claude 8742, Codex 8743, `headless.py` 8745 (its
   default; a second run at once takes `--port 876x`). Port 8740 may belong to another session: never
-  use or stop it.
+  use or stop it. A tool or test that needs a page starts its own server on a free port; the
+  per-agent ports are for interactive dev servers.
 - Python: `python -I` for stdlib-only tools; `python -P -E` for tools needing the user site packages
   (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it: shell
   heredocs with quotes can break in the Windows shells.
