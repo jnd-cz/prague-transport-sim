@@ -156,8 +156,44 @@ height evidence and confidence separately for geometry and height. Do not add an
 because it has Z. Structures, ambiguous matches, known disagreements, changed alignments and transitions
 between sources need explicit review. The measurements support a large fallback opportunity while
 leaving those decisions to #20; no archive heights were applied to the game in this work.
-The measured structure hazard and importer regression case are tracked in
-[#106](https://github.com/jnd-cz/prague-transport-sim/issues/106).
+### Guarded height-import stage (#106)
+
+`tools/import_track_heights.py` stages the height decisions for #20 under `reports/track-heights.json`.
+Track topology and game integration remain #20. The output separates unchanged DI XY geometry and
+raw source Z from the selected height, height source, confidence, evidence IDs and review flags.
+Geometry records retain DI attributes and source package hashes/state dates; archive IDs retain their
+attributes, acquisition dates and batch hashes. Archived-only geometry is never added by this stage.
+
+Without a reviewed independent observation, every height remains unvalidated with `z: null`, even
+where DI and archive agree or the OSM structure mask is absent. The 210.542 km availability screen
+does not become import approval. The OSM buffer adds a review flag; reviewed physical-level evidence
+can resolve either a real structure or a surface track near one. DI placement flags do not establish
+the physical level. Compiled ZPS deck vertices remain diagnostics and are not fed back as approval.
+
+The selection rule is `tools/track_heights.py`. An optional `--evidence` JSON file holds two lists:
+
+- `evidence`: a unique `id`, the `di_id`, city-frame `xy`, `radius_m` (positive, at most 1 m),
+  `reviewed: true`, `vertical_datum: "Bpv"`, `height_meaning: "top_of_rail"`, finite `z`, a reviewed
+  integer `level`, context `kind` (`surface`, `deck` or `tunnel`), and `source` with `dataset`, `record`
+  and `date`. This is a local observation of that track's physical level. A deck-surface height needs
+  an evidenced conversion to rail height before entering this file; no style offset is invented.
+  DI, archive and compiled-ZPS diagnostics are rejected as independent evidence.
+- `alignment_reviews`: `dataset` (`di` or `archive`), feature `id`, `status` (`current`, `uncertain`
+  or `obsolete`) and a `source` reference. Obsolete DI geometry is rejected, uncertain DI geometry is
+  held for review, and obsolete/uncertain archived candidates cannot supply a selected height. The
+  source geometry remains visible in the staging output with its review, rather than silently added.
+
+Evidence is bound to the current track ID and point, never reused for a neighbouring track or the
+rest of a long archived feature. All applicable observations must agree on physical level and within
+0.3 m in rail height. Only a candidate supported within 0.3 m can be selected; a newer or numeric DI
+value does not override contrary evidence. Ambiguous levels stay unresolved without that evidence.
+The nearest archive segment missing Z is not replaced by a farther numeric segment.
+
+Archive records are flagged throughout their candidate coverage when any compared sample differs
+by more than 1 m, including records shorter than the research's 10 m test. The existing >=10 m,
+p90 >0.3 m disagreement screen also applies. Flags and both candidates remain visible even when
+local independent evidence resolves a particular sample. Source transitions and profile assembly
+are left to #20; staged midpoint samples are not a continuous rail profile.
 
 ## Reproduce
 
@@ -166,6 +202,8 @@ python -I tools/snapshot.py fetch
 python -I tools/snapshot.py data-fetch
 python -P -E tools/test_dtmp_tracks.py
 python -P -E tools/dtmp_tracks.py
+python -P -E tools/test_track_heights.py
+python -P -E tools/import_track_heights.py
 ```
 
 The report is `reports/dtmp-tracks.json`. Upstream acquisition is explicit:

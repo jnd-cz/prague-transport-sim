@@ -22,6 +22,8 @@ What sessions learned and later work needs. Kept current and short; the full log
   before use.
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
+- Archived track Z is guarded separately from DI geometry by `tools/track_heights.py`; the staging
+  command and evidence contract are in [the fallback decision](decisions/2026-10-30-track-height-fallback.md).
 - Geoportál I3S layers are Web Mercator with absolute heights; the orthophoto ImageServer is S-JTSK.
 - The track ribbon is drawn 0.20 m (bed) and 0.26 m (rails) over the profile height: rendering offsets
   to redefine with "what each height means" (M2).
