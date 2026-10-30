@@ -56,6 +56,16 @@ function stopDistance(v, state) {
   return state === 'warn' ? (v * v) / 1.8 + v * 2 + 1 : (v * v) / 2.6 + v + 0.5;
 }
 
+// The speed (m/s) an AI tram may run at s: the limit under the whole set, and every lower limit ahead
+// reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
+// stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
+// until it turned red (line 17 s 10826).
+function limitSpeed(lim, s, len) {
+  let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
+  for (let d = 5; d < 300; d += 5) v = Math.min(v, Math.sqrt((lim.at(s + d) / 3.6) ** 2 + 2 * 0.7 * Math.max(0, d - 5)));
+  return v;
+}
+
 function setOpacity(obj, a) {
   obj.visible = a > 0.01;
   obj.traverse((o) => {
@@ -706,7 +716,7 @@ export class Traffic {
         // (every crossing within 45 m, nearest first, not only the first one: where the route loops
         // around, a car path crosses it twice; the car went by the first, the tram far off there, and
         // met the tram at the second already on the track, line 17 s 21530)
-        let xGap = null;
+        let xGap = null, keepClear = false;
         const xs = [];
         for (const [path, off] of seq) {
           for (const x of this._trackCrossings(path)) {
@@ -725,23 +735,6 @@ export class Traffic {
         // track and was hit)
         const wayAt = (d) => { for (let i = seq.length - 1; i >= 0; i--) if (d >= seq[i][1]) return seq[i][0].at(d - seq[i][1]); return null; };
         for (const x of xs) { const q = wayAt(x.dC + 12), n = q && this.route.nearest(q.x, q.y); x.along = !!n && n.d < 2.6; }
-        c.xing = xs[0] || null;
-        for (const x of xs) {
-          if (c.z !== undefined && Math.abs(c.z - this.ground.profile.height(x.sx)) > LEVEL_APART) continue;
-          const { dC, sx } = x, v = c.vNow ?? 0, front = dC - CAR_HALF;
-          const onBody = sx > tram.s - tram.length - 2 && sx < tram.s + 2;
-          const tA = (sx - tram.s - 2) / Math.max(tram.v, 0.1), tC = (Math.max(0, front) + TRACK_ZONE + 2 * CAR_HALF) / Math.max(v, 2.5);
-          const coming = tram.v > 0.5 && sx >= tram.s && (sx - tram.s < 16 || tA < tC + (c.bold ? 0.5 : 2.5) || (x.along && sx - tram.s < (tram.v * tram.v) / 2 + tram.v * 2 + 20));
-          // (braking up to 5 m/s2; a car standing or crawling stays where it is: one held by the queue
-          // 0.9 m from the band, inside YIELD_GAP, counted as committed and pulled out in front of the
-          // tram when the queue moved on, line 17 s 9903)
-          const canStop = v < 1 || front - YIELD_GAP > (v * v) / 10 - 0.5;
-          if ((onBody || coming) && canStop && front > 0) { xGap = front - YIELD_GAP + 8; c.xing = x; break; } // (following() stops 8 m short)
-          // crossing: on the track, or moving onto it (a car standing before it, held by a queue, is not:
-          // the tram waited for two such cars for good, line 17 s 11629)
-          if ((front <= 0 && front > -TRACK_ZONE - 2 * CAR_HALF) || (front > 0 && front < 8 && v > 1)) crossing.push({ s: sx, onTrack: front <= 0, car: c });
-        }
-        c.yielding = xGap !== null;
         // the car ahead: on this path, else across the junction on the connector and the next lane
         let gap = null, vLead = 0, lead = null;
         for (const o of live) {
@@ -770,6 +763,29 @@ export class Traffic {
         // stop, someone crossing): stop or follow behind
         const ob = c.seen;
         if (ob && (gap === null || ob.gap < gap)) { gap = ob.gap; vLead = ob.v; }
+        c.xing = xs[0] || null;
+        for (const x of xs) {
+          if (c.z !== undefined && Math.abs(c.z - this.ground.profile.height(x.sx)) > LEVEL_APART) continue;
+          const { dC, sx } = x, v = c.vNow ?? 0, front = dC - CAR_HALF;
+          const onBody = sx > tram.s - tram.length - 2 && sx < tram.s + 2;
+          const tA = (sx - tram.s - 2) / Math.max(tram.v, 0.1), tC = (Math.max(0, front) + TRACK_ZONE + 2 * CAR_HALF) / Math.max(v, 2.5);
+          const coming = tram.v > 0.5 && sx >= tram.s && (sx - tram.s < 16 || tA < tC + (c.bold ? 0.5 : 2.5) || (x.along && sx - tram.s < (tram.v * tram.v) / 2 + tram.v * 2 + 20));
+          // (braking up to 5 m/s2; a car standing or crawling stays where it is: one held by the queue
+          // 0.9 m from the band, inside YIELD_GAP, counted as committed and pulled out in front of the
+          // tram when the queue moved on, line 17 s 9903)
+          const canStop = v < 1 || front - YIELD_GAP > (v * v) / 10 - 0.5;
+          if ((onBody || coming) && canStop && front > 0) { xGap = front - YIELD_GAP + 8; c.xing = x; break; } // (following() stops 8 m short)
+          // nor onto the track without room to leave it: the car ahead standing or crawling closer than
+          // the way across (the band and a car's length). A car stood on the track behind a queue that
+          // waited, round the junction, for a car giving way to our tram, which waited for the first
+          // (line 9 s 11221, seed 2)
+          if (gap !== null && vLead < 1 && gap < Math.max(0, front) + TRACK_ZONE + 2 * CAR_HALF && canStop && front > 0) { xGap = front - YIELD_GAP + 8; c.xing = x; keepClear = true; break; }
+          // crossing: on the track, or moving onto it (a car standing before it, held by a queue, is not:
+          // the tram waited for two such cars for good, line 17 s 11629)
+          if ((front <= 0 && front > -TRACK_ZONE - 2 * CAR_HALF) || (front > 0 && front < 8 && v > 1)) crossing.push({ s: sx, onTrack: front <= 0, car: c });
+        }
+        c.yielding = xGap !== null && !keepClear; // (to the tram: what u3 counts)
+        c.keepClear = keepClear;
         // junctions, from braking distance on: wait while a car is on a crossing connector, nearer
         // to its own crossing one, or standing at the mouth of a lane the connector passes close to
         let jStop = null;
@@ -1513,7 +1529,7 @@ export class Traffic {
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = Math.min(g.limits.at(t.s), g.limits.at(t.s - t.length)) / 3.6;
+      let vt = limitSpeed(g.limits, t.s, t.length);
       const close = t.s - t.length - tram.s < 300; // (our tram closing in)
       let stopAt = null;
       const st = g.stops.find((x) => x.target > t.s + 0.5);
@@ -1590,7 +1606,7 @@ export class Traffic {
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };
     for (const sig of this.game.signals) sig.backCommitted = false; // (set again below, read by the controller)
     for (const t of this.oncoming) {
-      let vt = Math.min(this.backLimits.at(t.s), this.backLimits.at(t.s - t.length)) / 3.6 * 0.85;
+      let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null;
       for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
