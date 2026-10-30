@@ -175,17 +175,39 @@ The user's revised selection order (2026-10-30) is:
    extrapolate outside the polygon. Multiple candidate levels remain unresolved.
 
 An archive-only height is held for review when there are several candidate levels, a known archive
-record discrepancy over 1 m, a contradictory nearby deck survey, or an obsolete/uncertain alignment.
-The OSM buffer is a review hint, not a level determination or a blanket prohibition. Flags and all
+record discrepancy over 1 m, a contradictory nearby surveyed surface, or an obsolete/uncertain alignment.
+An OSM structure hint requires independent survey support at the track's ZPS level; without it the
+sample is `structure_unverified`. The OSM buffer supplies no level itself. Flags and all
 candidates remain visible even when DI or a later reviewed observation selects a height. The research
 availability screen remains an estimate; staged selections report their actual source and confidence.
 
-`tools/track_decks.py` samples explicit ZPS `deck` polygons, triangulating only inside their footprint.
-Nearby polygons within 2 m can expose archive/deck contradictions but cannot supply an extrapolated
-deck-only fallback. Deck records retain the compiled file hash, area index and available source-state
+`tools/track_decks.py` discovers every `data/line*.dtm.json` and checks all surveyed surface classes,
+triangulating their vertex heights only inside their footprint. A covering tram area establishes the
+track's ZPS level; otherwise a covering deck can establish it. Conflicting anchor levels are unresolved.
+Covering tram areas take precedence over deck anchors, so a deck above a ground track cannot lend it
+the upper level. Conflicting tram levels stay on hold even when OSM has no structure tag.
+DI placement codes are not used as ZPS levels: Trojský most's DI code is 0. At a structure, a ground-level
+anchor cannot establish an elevated track level. Without a structure hint, absent anchors use level 0
+with `ordinary_surface_default` provenance. Water, walls, roofs and buildings are diagnostics only. Surfaces at
+another level remain in the report with `survey_level_mismatch` and cannot validate or supply rail Z.
+Nearby polygons within 1.5 m can expose contradictions at the established level but cannot supply an
+extrapolated fallback. Only class `deck` supplies the third-priority fallback; other classes check the
+archive. Records retain the compiled file hash, area index and available source-state
 date. The four style offsets approved for staging are facts in `data/truth.json`, rather than constants
-in the importer. User `trackStyles` marks are applied to their line sections; unmarked track uses the
+in the importer or the game. The user's reply, “Use the proposed offsets for all four styles”, is recorded
+at `trackHeights.offsetApproval`; approval adopts design values, not a new survey measurement.
+User `trackStyles` marks are applied to their line sections; unmarked track uses the
 documented panel default and carries a `track_style_defaulted_panels` flag.
+
+**Tunnel decision (user, 2026-10-30):** hold archive heights for review until independent evidence is
+available. Pinned OSM tunnel, covered and negative-layer tram ways retain a `tunnel_unverified` flag.
+Numeric DI still wins; local reviewed tunnel evidence can resolve a fallback. Surface survey above a
+tunnel cannot validate its archive height. No portal-profile heuristic is applied in this stage.
+
+Survey compilation currently covers only lines 17 and 22. Beyond those corridors, structure candidates
+remain on hold until the missing districts' ZPS packages and compiled surfaces are available. Discovering
+sidecars automatically makes new coverage available without changing the height-stage code; coverage
+expansion is [#125](https://github.com/jnd-cz/prague-transport-sim/issues/125).
 
 The selection rule is `tools/track_heights.py`. An optional `--evidence` JSON file holds two lists:
 

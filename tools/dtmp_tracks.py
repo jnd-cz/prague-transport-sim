@@ -41,18 +41,24 @@ RADIUS = 1.0
 ANGLE = 15.0
 
 
-def structure_mask():
+def structure_mask(*, separate_tunnels=False):
     """A plan match cannot establish track Z on a structure (archive has ground Z on Trojsky most)."""
     from osm_local import ways
     tagged = ways(lambda t: t.get('railway') == 'tram' and (
         t.get('bridge', 'no') != 'no' or t.get('tunnel', 'no') != 'no'
         or t.get('covered') == 'yes' or t.get('layer', '0') != '0'))
-    geoms = []
+    geoms, tunnels = [], []
     for way in tagged:
         coords = way['geometry']
         x, y = Frame().xy([p['lat'] for p in coords], [p['lon'] for p in coords])
-        geoms.append(LineString(zip(x, y)))
-    return unary_union(geoms).buffer(5), [w['id'] for w in tagged]
+        geom = LineString(zip(x, y))
+        geoms.append(geom)
+        tags = way['tags']
+        if (tags.get('tunnel', 'no') != 'no' or tags.get('covered') == 'yes'
+                or tags.get('layer', '0').startswith('-')):
+            tunnels.append(geom)
+    result = unary_union(geoms).buffer(5), [w['id'] for w in tagged]
+    return (*result, unary_union(tunnels).buffer(5)) if separate_tunnels else result
 
 
 def request(url, params):

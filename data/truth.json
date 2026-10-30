@@ -278,6 +278,12 @@
   "Vodičkova (towards Lazarská) was a vienna stop 1996-2014, now a stop kerb: not vienna."
  ],
  "trackHeights": {
+  "offsetApproval": {
+   "date": "2026-10-30",
+   "source": "user reply while implementing PR #119",
+   "quote": "Use the proposed offsets for all four styles",
+   "scope": "The four documented design offsets for the guarded height stage; approval is not a new survey measurement."
+  },
   "note": "Deck-to-top-of-rail offsets approved for guarded staging on 2026-10-30; explicit trackStyles win, otherwise panels is the documented default. Grass and ballast are design values, not newly measured survey heights.",
   "railAboveDeck": [
    {
