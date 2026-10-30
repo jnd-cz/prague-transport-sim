@@ -173,3 +173,9 @@ The report is `reports/dtmp-tracks.json`. Upstream acquisition is explicit:
 batch are checked for completeness, duplicate IDs, transfer-limit truncation, Z, CRS and hashes.
 Eight focused tests cover interpolation, crossings and neighbouring tracks, overlapping levels,
 missing Z, length weighting, denominator separation, known disagreements and structures.
+
+Verification on 2026-10-30: an isolated checkout with no archived files fetched all **23 new files**
+directly from the SFTP store with `--no-cache`. `snapshot.py status` then reported **0 missing/changed,
+0 extra inputs and 0 built-data differences**. Running the full offline assessment there produced
+an **exact JSON match**, including all 16 district rows, all five route rows, height distributions
+and outlier/deck evidence. The 1549 previously pinned source paths are unchanged in the new snapshot.
