@@ -2,6 +2,7 @@
 from contextlib import redirect_stdout
 from copy import deepcopy
 import io
+import math
 import hashlib
 import json
 from pathlib import Path
@@ -18,6 +19,7 @@ from dtmp_tracks import Segments, ROOT, di_data, archive_data, surface_evidence
 import dtmp_tracks as research
 from track_heights import HeightGuard
 import import_track_heights as stage
+from track_decks import Decks, load_decks
 
 
 def path(identity, z, y=0):
@@ -60,12 +62,12 @@ class Guard(unittest.TestCase):
         self.assertEqual([s['attributes']['TridaPresnostiVyska'] for s in paths[0]['sources']], ['2','3'])
         self.assertEqual([s['file'] for s in paths[0]['sources']], ['500054.zip','500089.zip'])
 
-    def test_close_plan_fit_numeric_z_and_di_level_zero_do_not_validate_a_bridge(self):
+    def test_trojsky_di_wins_and_archive_disagreement_remains_flagged(self):
         di = {'id': '1000413716080', 'z': 194.398, 'attrs': {'UrovenUmisteniObjektuDI': '0'}}
         m = match(path(5168282, 180.412, .137))
         result = HeightGuard().choose(di, m, 5, 0, structure_hint=True)
-        self.assertIsNone(result['z'])
-        self.assertEqual(result['confidence'], 'unvalidated')
+        self.assertEqual(result['z'], 194.398)
+        self.assertEqual(result['height_source']['dataset'], 'di')
         self.assertIn('di_archive_height_disagreement', result['review_flags'])
         self.assertEqual(result['candidates'][1]['id'], 5168282)
 
@@ -81,21 +83,22 @@ class Guard(unittest.TestCase):
     def test_ordinary_agreeing_surface_preserves_geometry_and_separate_height_source(self):
         di, m = {'id': 'di-1', 'z': 200.05}, match(path(1, 200))
         original = deepcopy((di, m))
-        result = HeightGuard([evidence()]).choose(di, m, 5, 0)
+        result = HeightGuard().choose(di, m, 5, 0)
         self.assertEqual(result['z'], 200.05)
         self.assertEqual(result['height_source']['dataset'], 'di')
         self.assertEqual((di, m), original)
 
-    def test_archive_can_supply_a_missing_or_disagreeing_current_height_only_with_evidence(self):
+    def test_archive_fills_missing_di_but_never_overrides_numeric_di(self):
         for z in (None, 0, 224.93):
             result = HeightGuard([evidence()]).choose({'id': 'di-1', 'z': z}, match(path(1, 200)), 5, 0)
-            self.assertEqual(result['z'], 200)
-            self.assertEqual(result['height_source'], {'dataset': 'archive', 'id': 1})
+            self.assertEqual(result['z'], 224.93 if z==224.93 else 200)
+            self.assertEqual(result['height_source']['dataset'], 'di' if z==224.93 else 'archive')
 
-    def test_untagged_surface_and_source_agreement_are_still_unvalidated_without_evidence(self):
-        result = HeightGuard().choose({'id': 'di-1', 'z': 200}, match(path(1, 200)), 5, 0)
-        self.assertEqual(result['status'], 'review')
-        self.assertIsNone(result['z'])
+    def test_ordinary_surface_archive_fills_without_a_reviewed_point(self):
+        result = HeightGuard().choose({'id': 'di-1', 'z': None}, match(path(1, 200)), 5, 0)
+        self.assertEqual(result['status'], 'selected')
+        self.assertEqual(result['z'], 200)
+        self.assertEqual(result['height_source']['dataset'], 'archive')
 
     def test_ambiguous_levels_need_local_level_evidence(self):
         m = match(path(1, 200), path(2, 205, .1))
@@ -130,14 +133,14 @@ class Guard(unittest.TestCase):
 
     def test_evidence_cannot_be_reused_for_another_track_or_location(self):
         for e in (evidence(di_id='other'), evidence(xy=[7, 0])):
-            result = HeightGuard([e]).choose({'id': 'di-1', 'z': None}, match(path(1, 200)), 5, 0)
+            result = HeightGuard([e], conflicts=[1]).choose({'id': 'di-1', 'z': None}, match(path(1, 200)), 5, 0)
             self.assertIsNone(result['z'])
 
     def test_structure_buffer_cannot_overrule_reviewed_surface_level(self):
         result = HeightGuard([evidence()]).choose({'id': 'di-1', 'z': None},
             match(path(1, 200)), 5, 0, structure_hint=True)
         self.assertEqual(result['z'], 200)
-        self.assertEqual(result['confidence'], 'independent_level_match')
+        self.assertEqual(result['confidence'], 'reviewed_level_match')
 
     def test_raw_deck_diagnostic_datum_or_unreviewed_evidence_cannot_approve_z(self):
         for e in (evidence(height_meaning='deck_surface'), evidence(vertical_datum='unknown'),
@@ -160,20 +163,119 @@ class Guard(unittest.TestCase):
             with patch.multiple(stage, ROOT=root, di_data=lambda: ([{'polygon':box(-1,-1,11,1)}],[di]),
                     archive_data=lambda: ({'acquired':'2026-10-30'}, {}, archived),
                     structure_mask=lambda: (box(50,50,60,60), []),
-                    load_line=lambda n: {'path':[[0,0],[10,0]]}, surface_evidence=lambda rows: None), redirect_stdout(io.StringIO()):
+                    load_line=lambda n: {'path':[[0,0],[10,0]]}, load_decks=lambda root: Decks([]),
+                    surface_evidence=lambda rows: None), redirect_stdout(io.StringIO()):
                 result = stage.stage({})
         self.assertEqual(di, original)
         self.assertEqual(len(result['geometry']), 1)
         self.assertEqual(result['geometry'][0]['xy'], [(0,0),(10,0)])
         self.assertEqual(result['geometry'][0]['raw_z'], [0,0])
         self.assertEqual(result['geometry'][0]['sources'], di['sources'])
-        self.assertTrue(all(r['z'] is None and r['confidence']=='unvalidated' for r in result['height_samples']))
+        self.assertTrue(all(r['z']==200 and r['height_source']['dataset']=='archive' for r in result['height_samples']))
+        self.assertTrue(all('record' in r['height_source'] and 'date' in r['height_source'] for r in result['height_samples']))
+        self.assertEqual(result['overall']['selected_by_source_m'], {'di':0,'archive':10,'deck':0})
         self.assertEqual(len(result['lines']), 5)
+
+    def test_route_coverage_matches_archive_to_di_heading_not_route_heading(self):
+        dy = math.tan(math.radians(14))
+        di = {'id':'di-1','coords':[(-1,-dy,0),(1,dy,0)],'attrs':{},'sources':[]}
+        archived = {'id':1,'coords':[(-1,dy,200),(1,-dy,200)],'attrs':{},'sources':[]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'snapshots').mkdir()
+            (root/'snapshots/CURRENT').write_text('test')
+            with patch.multiple(stage, ROOT=root, di_data=lambda: ([{'polygon':box(-2,-2,2,2)}],[di]),
+                    archive_data=lambda: ({'acquired':'2026-10-30'}, {}, [archived]),
+                    structure_mask=lambda: (box(50,50,60,60), []),
+                    load_line=lambda n: {'path':[[-1,0],[1,0]]}, load_decks=lambda root: Decks([]),
+                    surface_evidence=lambda rows: None), redirect_stdout(io.StringIO()):
+                result = stage.stage({})
+        self.assertTrue(all(r['selected_by_source_m']['archive']==0 for r in result['lines']))
+
+
+def deck_record(identity='deck-1', z=200):
+    return {'id':identity, 'ring':[(0,-2,z),(10,-2,z),(10,2,z),(0,2,z)], 'level':1,
+            'source':{'record':identity,'date':'2026-09-30','file':'fixture.gpkg','sha256':'fixture'}}
+
+
+def offset_fact(value=.2, **updates):
+    return {'id':'offset-1','metres':value,'scope':'all','source':'test fixture','date':'2026-10-30',**updates}
+
+
+class DeckFallback(unittest.TestCase):
+    def choose(self, decks, archived=(), di_z=None):
+        return HeightGuard().choose({'id':'di-1','z':di_z}, match(*archived),5,0,
+                                    structure_hint=True,decks=decks.candidates(5,0,'di-1'))
+
+    def test_deck_only_uses_survey_height_plus_fact_and_keeps_provenance(self):
+        result = self.choose(Decks([deck_record()],[offset_fact()]))
+        self.assertAlmostEqual(result['z'],200.2)
+        self.assertEqual(result['height_source']['dataset'],'deck')
+        self.assertEqual(result['height_source']['record'],'deck-1')
+        self.assertEqual(result['height_source']['rail_above_deck_m'],.2)
+        self.assertEqual(result['height_source']['offset_fact_ids'],['offset-1'])
+
+    def test_archive_has_priority_when_it_agrees_with_the_deck(self):
+        result = self.choose(Decks([deck_record()],[offset_fact(0)]),[path(1,200)])
+        self.assertEqual(result['height_source']['dataset'],'archive')
+
+    def test_archive_only_structure_contradicted_by_deck_is_not_selected(self):
+        result = self.choose(Decks([deck_record(z=214)],[offset_fact(0)]),[path(1,200)])
+        self.assertIsNone(result['z'])
+        self.assertIn('archive_deck_height_disagreement',result['review_flags'])
+        self.assertEqual({c['dataset'] for c in result['candidates']},{'archive','deck'})
+
+    def test_numeric_di_wins_even_when_archive_and_deck_disagree(self):
+        result = self.choose(Decks([deck_record(z=214)],[offset_fact(0)]),[path(1,200)],di_z=215)
+        self.assertEqual(result['z'],215)
+        self.assertEqual(result['height_source']['dataset'],'di')
+        self.assertIn('archive_deck_height_disagreement',result['review_flags'])
+
+    def test_several_deck_levels_stay_ambiguous(self):
+        result = self.choose(Decks([deck_record('lower',200),deck_record('upper',210)],[offset_fact(0)]))
+        self.assertIsNone(result['z'])
+        self.assertIn('ambiguous_deck_levels',result['review_flags'])
+
+    def test_missing_or_conflicting_offset_facts_are_not_guessed(self):
+        for facts, flag in [([], 'deck_rail_offset_missing'),
+                            ([offset_fact(0),offset_fact(.2,id='offset-2')], 'ambiguous_rail_offset_facts')]:
+            result = self.choose(Decks([deck_record()],facts))
+            self.assertIsNone(result['z'])
+            self.assertIn(flag,result['review_flags'])
+
+    def test_slope_is_interpolated_from_survey_vertices(self):
+        record = deck_record()
+        record['ring'] = [(0,-2,200),(10,-2,201),(10,2,201),(0,2,200)]
+        result = self.choose(Decks([record],[offset_fact()]))
+        self.assertAlmostEqual(result['z'],200.7)
+
+    def test_nearby_deck_is_not_extrapolated_as_a_deck_only_fallback(self):
+        decks = Decks([deck_record()],[offset_fact()])
+        candidates = decks.candidates(5,3,'di-1')
+        self.assertTrue(candidates)
+        self.assertFalse(candidates[0]['inside'])
+        result = HeightGuard().choose({'id':'di-1','z':None},match(),5,3,decks=candidates)
+        self.assertIsNone(result['z'])
+
+    def test_all_four_user_approved_style_facts_are_read_from_truth(self):
+        facts = json.loads((ROOT/'data/truth.json').read_text(encoding='utf-8'))['trackHeights']['railAboveDeck']
+        for style,value in [('embedded',0),('panels',0),('grass',.04),('ballast',.17)]:
+            regions = [{'style':style,'polygon':box(-1,-3,11,3)}]
+            result = self.choose(Decks([deck_record()],facts,regions))
+            self.assertAlmostEqual(result['z'],200+value)
+            self.assertEqual(result['height_source']['offset_fact_ids'],['rail-above-deck-'+style])
+        default = self.choose(Decks([deck_record()],facts))
+        self.assertEqual(default['z'],200)
+        self.assertIn('track_style_defaulted_panels',default['review_flags'])
+
+    def test_a_small_disagreement_does_not_blacklist_an_entire_archive_record(self):
+        rows = [{'z':200.5,'weight':20,'archive':match(path(1,200))}]
+        self.assertEqual(stage.conflict_records(rows),set())
 
 
 @unittest.skipUnless((ROOT / 'raw/dtmp-tracks/provenance.json').exists(), 'fetch snapshot for real source regression')
 class PinnedBridge(unittest.TestCase):
-    def test_trojsky_ids_and_compiled_deck_diagnostic_do_not_approve_archived_ground_z(self):
+    def test_trojsky_ids_use_di_and_do_not_import_archived_ground_z(self):
         _, di = di_data()
         _, _, archived = archive_data()
         current = Segments([p for p in di if p['id']=='1000413716080'])
@@ -187,8 +289,12 @@ class PinnedBridge(unittest.TestCase):
         self.assertAlmostEqual(hit['z'],194.398,delta=.02)
         self.assertAlmostEqual(m['z'],180.412,delta=.02)
         self.assertAlmostEqual(m['distance'],.137,delta=.02)
-        result = HeightGuard().choose(hit,m,hit['x'],hit['y'],structure_hint=True)
-        self.assertIsNone(result['z'])
+        decks = load_decks(ROOT).candidates(hit['x'],hit['y'],hit['id'])
+        self.assertTrue(decks)
+        self.assertTrue(any(c.get('z') is not None for c in decks))
+        result = HeightGuard().choose(hit,m,hit['x'],hit['y'],structure_hint=True,decks=decks)
+        self.assertEqual(result['z'],hit['z'])
+        self.assertEqual(result['height_source']['dataset'],'di')
         examples = [{'xy':[hit['x'],hit['y']]}]
         surface_evidence(examples)
         self.assertTrue(any(194.4 < z < 194.6 for e in examples[0]['compiled_survey_deck_evidence']

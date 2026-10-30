@@ -219,6 +219,8 @@ class Segments:
             if details:
                 value['candidates'] = [
                     {'id': c[3]['id'], 'z': c[2], 'distance': c[0], 'x': c[4], 'y': c[5],
+                     'ux': (c[3]['b'][0]-c[3]['a'][0])/c[3]['length'],
+                     'uy': (c[3]['b'][1]-c[3]['a'][1])/c[3]['length'],
                      'heading_error_degrees': math.degrees(math.acos(min(1, abs(
                          ((c[3]['b'][0] - c[3]['a'][0]) * ux +
                           (c[3]['b'][1] - c[3]['a'][1]) * uy) / c[3]['length']))))}

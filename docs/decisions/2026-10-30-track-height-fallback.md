@@ -164,35 +164,50 @@ raw source Z from the selected height, height source, confidence, evidence IDs a
 Geometry records retain DI attributes and source package hashes/state dates; archive IDs retain their
 attributes, acquisition dates and batch hashes. Archived-only geometry is never added by this stage.
 
-Without a reviewed independent observation, every height remains unvalidated with `z: null`, even
-where DI and archive agree or the OSM structure mask is absent. The 210.542 km availability screen
-does not become import approval. The OSM buffer adds a review flag; reviewed physical-level evidence
-can resolve either a real structure or a surface track near one. DI placement flags do not establish
-the physical level. Compiled ZPS deck vertices remain diagnostics and are not fed back as approval.
+The user's revised selection order (2026-10-30) is:
+
+1. Use numeric DI Z as supplied. Archived Z and the optional review file cannot override it; a
+   disagreement remains flagged. This selects DI's deck-level height on the Trojský most regression.
+2. Where DI lacks usable Z, use its unambiguous archived track match, within the existing plan and
+   heading limits. Ordinary track no longer needs a hand-reviewed point observation.
+3. Where neither has usable Z, interpolate the containing ZPS deck polygon's surveyed vertex heights
+   and add the applicable `data/truth.json` `trackHeights.railAboveDeck` fact. Deck fallback does not
+   extrapolate outside the polygon. Multiple candidate levels remain unresolved.
+
+An archive-only height is held for review when there are several candidate levels, a known archive
+record discrepancy over 1 m, a contradictory nearby deck survey, or an obsolete/uncertain alignment.
+The OSM buffer is a review hint, not a level determination or a blanket prohibition. Flags and all
+candidates remain visible even when DI or a later reviewed observation selects a height. The research
+availability screen remains an estimate; staged selections report their actual source and confidence.
+
+`tools/track_decks.py` samples explicit ZPS `deck` polygons, triangulating only inside their footprint.
+Nearby polygons within 2 m can expose archive/deck contradictions but cannot supply an extrapolated
+deck-only fallback. Deck records retain the compiled file hash, area index and available source-state
+date. The four style offsets approved for staging are facts in `data/truth.json`, rather than constants
+in the importer. User `trackStyles` marks are applied to their line sections; unmarked track uses the
+documented panel default and carries a `track_style_defaulted_panels` flag.
 
 The selection rule is `tools/track_heights.py`. An optional `--evidence` JSON file holds two lists:
 
 - `evidence`: a unique `id`, the `di_id`, city-frame `xy`, `radius_m` (positive, at most 1 m),
   `reviewed: true`, `vertical_datum: "Bpv"`, `height_meaning: "top_of_rail"`, finite `z`, a reviewed
   integer `level`, context `kind` (`surface`, `deck` or `tunnel`), and `source` with `dataset`, `record`
-  and `date`. This is a local observation of that track's physical level. A deck-surface height needs
-  an evidenced conversion to rail height before entering this file; no style offset is invented.
-  DI, archive and compiled-ZPS diagnostics are rejected as independent evidence.
+  and `date`. This local observation can resolve a flagged fallback. It must already describe rail
+  height; a raw deck-surface point is not a reviewed rail observation. Numeric DI still keeps priority.
 - `alignment_reviews`: `dataset` (`di` or `archive`), feature `id`, `status` (`current`, `uncertain`
   or `obsolete`) and a `source` reference. Obsolete DI geometry is rejected, uncertain DI geometry is
   held for review, and obsolete/uncertain archived candidates cannot supply a selected height. The
   source geometry remains visible in the staging output with its review, rather than silently added.
 
 Evidence is bound to the current track ID and point, never reused for a neighbouring track or the
-rest of a long archived feature. All applicable observations must agree on physical level and within
-0.3 m in rail height. Only a candidate supported within 0.3 m can be selected; a newer or numeric DI
-value does not override contrary evidence. Ambiguous levels stay unresolved without that evidence.
+rest of a long archived feature. For a reviewed fallback, all applicable observations must agree on
+physical level and within 0.3 m in rail height; supported candidates must fit within 0.3 m as well.
 The nearest archive segment missing Z is not replaced by a farther numeric segment.
 
 Archive records are flagged throughout their candidate coverage when any compared sample differs
-by more than 1 m, including records shorter than the research's 10 m test. The existing >=10 m,
-p90 >0.3 m disagreement screen also applies. Flags and both candidates remain visible even when
-local independent evidence resolves a particular sample. Source transitions and profile assembly
+by more than 1 m, including records shorter than the research's 10 m test. The research's p90 screen
+remains part of its availability analysis, not an additional ordinary-track gate. Flags and both
+candidates remain visible even when local evidence resolves a sample. Source transitions and profile assembly
 are left to #20; staged midpoint samples are not a continuous rail profile.
 
 ## Reproduce

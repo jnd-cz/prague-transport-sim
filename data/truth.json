@@ -277,6 +277,47 @@
  "notes": [
   "Vodičkova (towards Lazarská) was a vienna stop 1996-2014, now a stop kerb: not vienna."
  ],
+ "trackHeights": {
+  "note": "Deck-to-top-of-rail offsets approved for guarded staging on 2026-10-30; explicit trackStyles win, otherwise panels is the documented default. Grass and ballast are design values, not newly measured survey heights.",
+  "railAboveDeck": [
+   {
+    "id": "rail-above-deck-embedded",
+    "styles": ["embedded"],
+    "scope": "all",
+    "metres": 0,
+    "basis": "surface and rail heads flush",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   },
+   {
+    "id": "rail-above-deck-panels",
+    "styles": ["panels"],
+    "scope": "all",
+    "metres": 0,
+    "basis": "panel surface and rail heads flush; documented default for unmarked track",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   },
+   {
+    "id": "rail-above-deck-grass",
+    "styles": ["grass"],
+    "scope": "all",
+    "metres": 0.04,
+    "basis": "design value: high grass variant",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   },
+   {
+    "id": "rail-above-deck-ballast",
+    "styles": ["ballast"],
+    "scope": "all",
+    "metres": 0.17,
+    "basis": "design value: rail and plate above sleeper tops",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   }
+  ]
+ },
  "trackStyleKinds": {
   "embedded": "rails laid in the street surface (asphalt, setts), cars drive on the track",
   "panels": "large concrete panels on a track body of its own, flush with the rail heads",

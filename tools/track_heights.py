@@ -1,7 +1,7 @@
-"""Guarded height selection for #20's importer (#106). Geometry is never selected by its Z.
+"""Height priority for #20: numeric DI, matched archive, surveyed deck + truth fact (#106).
 
-No candidate becomes an importable height without local, reviewed, independent physical-level
-evidence. A plan match or an OSM structure buffer supplies a review flag, never that evidence.
+Flags retain disagreements even when DI wins. Local reviewed evidence resolves flagged fallback
+cases; it is not a gate for ordinary track and cannot override a numeric DI height.
 """
 import math
 
@@ -41,7 +41,7 @@ class HeightGuard:
             ids.add(e['id'])
             self.by_di.setdefault(str(e['di_id']), []).append(e)
 
-    def choose(self, di, match, x, y, structure_hint=False):
+    def choose(self, di, match, x, y, structure_hint=False, decks=()):
         flags, candidates = [], []
         identity = str(di['id'])
         review = self.reviews.get(('di', identity), {})
@@ -58,8 +58,15 @@ class HeightGuard:
             elif match['status'] == 'missing_z':
                 candidate['excluded'] = 'nearest_archive_missing_z'
             candidates.append(candidate)
+        for deck in decks:
+            candidate = {'dataset': 'deck', **deck}
+            if not usable(candidate.get('z')):
+                candidate['excluded'] = candidate.get('excluded', 'deck_rail_offset_missing')
+            elif not candidate.get('inside', True):
+                candidate['excluded'] = 'outside_surveyed_deck'
+            candidates.append(candidate)
         if structure_hint:
-            flags.append('structure_requires_level_evidence')
+            flags.append('structure_hint')
         if match['status'] == 'ambiguous':
             flags.append('ambiguous_archive_match')
         if match['status'] == 'missing_z':
@@ -69,6 +76,19 @@ class HeightGuard:
         if usable(di.get('z')) and any(abs(c['z'] - di['z']) > TOLERANCE for c in candidates
                                      if c['dataset'] == 'archive' and usable(c['z'])):
             flags.append('di_archive_height_disagreement')
+        surveyed = [c for c in candidates if c['dataset'] == 'deck' and usable(c.get('z'))]
+        if surveyed and max(c['z'] for c in surveyed) - min(c['z'] for c in surveyed) > TOLERANCE:
+            flags.append('ambiguous_deck_levels')
+        archived = [c for c in candidates if c['dataset'] == 'archive' and usable(c.get('z')) and 'excluded' not in c]
+        if surveyed and archived and all(abs(a['z'] - d['z']) > TOLERANCE for a in archived for d in surveyed):
+            flags.append('archive_deck_height_disagreement')
+        if any(c.get('excluded') == 'deck_rail_offset_missing' for c in candidates):
+            flags.append('deck_rail_offset_missing')
+        for reason in ('ambiguous_rail_offset_facts', 'deck_surface_height_unavailable'):
+            if any(c.get('excluded') == reason for c in candidates):
+                flags.append(reason)
+        if any(c.get('style_defaulted') for c in candidates):
+            flags.append('track_style_defaulted_panels')
         for c in candidates:
             r = self.reviews.get((c['dataset'], str(c['id'])), {})
             if r.get('status') in ('obsolete', 'uncertain'):
@@ -82,20 +102,46 @@ class HeightGuard:
             return out
         evidence = [e for e in self.by_di.get(identity, []) if math.dist(e['xy'], (x, y)) <= e['radius_m']]
         out['evidence_ids'] = [e['id'] for e in evidence]
-        if not evidence:
-            out['review_flags'].append('independent_level_evidence_required')
+        def select(candidate, confidence):
+            out.update(status='selected', z=candidate['z'],
+                       height_source={'dataset': candidate['dataset'], 'id': candidate['id']},
+                       confidence=confidence)
+            if candidate.get('provenance'):
+                out['height_source'].update(candidate['provenance'])
+            if candidate['dataset'] == 'deck':
+                out['height_source'].update(rail_above_deck_m=candidate['rail_above_deck_m'],
+                                          offset_fact_ids=candidate['offset_fact_ids'],
+                                          track_styles=candidate.get('track_styles',[]),
+                                          style_sources=candidate.get('style_sources',[]))
             return out
-        if len({e['level'] for e in evidence}) != 1 or max(e['z'] for e in evidence) - min(e['z'] for e in evidence) > TOLERANCE:
+        # The current DI height is used as supplied. Archive/deck disagreements remain visible,
+        # but neither the archive nor the optional review file substitutes a different DI value.
+        if usable(di.get('z')):
+            if evidence and any(abs(e['z'] - di['z']) > TOLERANCE for e in evidence):
+                out['review_flags'].append('reviewed_evidence_disagrees_with_di')
+            return select(candidates[0], 'di_numeric')
+        if evidence and (len({e['level'] for e in evidence}) != 1 or
+                         max(e['z'] for e in evidence) - min(e['z'] for e in evidence) > TOLERANCE):
             out['review_flags'].append('conflicting_level_evidence')
             return out
-        supported = [c for c in candidates if 'excluded' not in c and
-                     all(abs(c['z'] - e['z']) <= TOLERANCE for e in evidence)]
-        if not supported or max(c['z'] for c in supported) - min(c['z'] for c in supported) > TOLERANCE:
-            out['review_flags'].append('no_unique_supported_height')
+        blocking = {'ambiguous_archive_match', 'known_archive_disagreement', 'ambiguous_deck_levels',
+                    'archive_deck_height_disagreement', 'archive_obsolete_alignment', 'archive_uncertain_alignment',
+                    'ambiguous_rail_offset_facts'}
+        # A surveyed structure without the rail-above-deck fact cannot validate an archive level.
+        if decks and 'deck_rail_offset_missing' in out['review_flags']:
+            blocking.add('deck_rail_offset_missing')
+        if evidence:
+            supported = [c for c in candidates if 'excluded' not in c and
+                         all(abs(c['z'] - e['z']) <= TOLERANCE for e in evidence)]
+            if not supported or max(c['z'] for c in supported) - min(c['z'] for c in supported) > TOLERANCE:
+                out['review_flags'].append('no_unique_supported_height')
+                return out
+            return select(supported[0], 'reviewed_level_match')
+        if blocking.intersection(out['review_flags']):
             return out
-        # Prefer the DI height only after independent height/level validation.
-        selected = next((c for c in supported if c['dataset'] == 'di'), supported[0])
-        out.update(status='selected', z=selected['z'],
-                   height_source={'dataset': selected['dataset'], 'id': selected['id']},
-                   confidence='independent_level_match')
-        return out
+        available = [c for c in candidates if 'excluded' not in c]
+        if not available:
+            out['review_flags'].append('no_usable_height')
+            return out
+        selected = next((c for c in available if c['dataset'] == 'archive'), available[0])
+        return select(selected, 'archive_plan_match' if selected['dataset'] == 'archive' else 'surveyed_deck_plus_fact')

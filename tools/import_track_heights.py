@@ -3,8 +3,9 @@
     python -P -E tools/import_track_heights.py
     python -P -E tools/import_track_heights.py --evidence reviewed-heights.json --output reports/track-heights.json
 
-Optional evidence file: {"evidence": [...], "alignment_reviews": [...]}; see track_heights.py and
-docs/decisions/2026-10-30-track-height-fallback.md. Default output retains candidates for review.
+Optional evidence file resolves flagged cases: {"evidence": [...], "alignment_reviews": [...]}.
+Ordinary heights use DI, then archive, then surveyed deck plus truth fact; candidates/flags are retained.
+See docs/decisions/2026-10-30-track-height-fallback.md for the contracts.
 """
 import argparse
 from collections import Counter
@@ -17,26 +18,31 @@ from shapely.geometry import Point
 from shapely.ops import unary_union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from dtmp_tracks import (ROOT, Segments, archive_data, di_data, good_z, load_line, quantile,
+from dtmp_tracks import (ROOT, Segments, archive_data, di_data, good_z, load_line,
                          samples, structure_mask, surface_evidence, write_json)
 from geo import Frame
 from track_heights import HeightGuard
+from track_decks import load_decks
 
 
 def lengths(rows):
     counts, flags = Counter(), Counter()
+    sources = Counter({'di':0, 'archive':0, 'deck':0})
     for row in rows:
         d = row['decision']
         counts[d['status'] + '_m'] += row['weight']
+        if d['status'] == 'selected':
+            sources[d['height_source']['dataset']] += row['weight']
         for flag in d['review_flags']:
             flags[flag] += row['weight']
     return {'lengths': {k: round(v, 3) for k, v in sorted(counts.items())},
+            'selected_by_source_m':{k:round(v,3) for k,v in sources.items()},
             'flag_lengths': {k: round(v, 3) for k, v in sorted(flags.items())}}
 
 
 def conflict_records(observations):
     """Hold out every known large disagreement, including short records below the research's 10 m test."""
-    pairs, conflicts = {}, set()
+    conflicts = set()
     for obs in observations:
         match = obs['archive']
         if not good_z(obs['z']):
@@ -45,12 +51,6 @@ def conflict_records(observations):
         for c in near:
             if c['distance'] <= near[0]['distance'] + .25 and good_z(c['z']) and abs(c['z'] - obs['z']) > 1:
                 conflicts.add(str(c['id']))
-        if match['status'] == 'numeric':
-            pairs.setdefault(str(match['id']), []).append((abs(match['z'] - obs['z']), obs['weight']))
-    for identity, values in pairs.items():
-        v, w = zip(*values)
-        if sum(w) >= 10 and quantile(v, w, .9) > .3:
-            conflicts.add(identity)
     return conflicts
 
 
@@ -61,11 +61,11 @@ def observations(current, archive, area):
     return rows
 
 
-def decide(rows, guard, structures):
+def decide(rows, guard, structures, decks):
     hints = shapely.intersects(structures, shapely.points([(r['x'], r['y']) for r in rows]))
     for row, hint in zip(rows, hints):
         row['decision'] = guard.choose({'id': row['id'], 'z': row['z']}, row['archive'],
-                                      row['x'], row['y'], bool(hint))
+                                      row['x'], row['y'], bool(hint), decks.candidates(row['x'],row['y'],row['id']))
     return rows
 
 
@@ -74,11 +74,13 @@ def stage(review):
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
     structures, structure_ids = structure_mask()
+    decks = load_decks(ROOT)
     area = unary_union([d['polygon'] for d in districts])
+    print(f'Matching {len(paths)} DI paths for guarded height staging', flush=True)
     rows = observations(current, archive, area)
     conflicts = conflict_records(rows)
     guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts)
-    decide(rows, guard, structures)
+    decide(rows, guard, structures, decks)
     lines = []
     for line in (9, 17, 22, 23, 37):
         data = load_line(line)
@@ -86,11 +88,13 @@ def stage(review):
                           for key in ('path', 'pathBack') if data.get(key)])
         selected = []
         for row in samples(route, None):
-            hit = current.match(row['x'], row['y'], row['ux'], row['uy'], radius=2)
+            hit = current.match(row['x'], row['y'], row['ux'], row['uy'], radius=2, details=True)
             if hit['status'] in ('numeric', 'missing_z'):
-                match = archive.match(hit['x'], hit['y'], row['ux'], row['uy'], details=True)
+                tangent = hit['candidates'][0]
+                match = archive.match(hit['x'], hit['y'], tangent['ux'], tangent['uy'], details=True)
                 row['decision'] = guard.choose({'id': hit['id'], 'z': hit['z']}, match,
-                    hit['x'], hit['y'], structures.intersects(Point(hit['x'], hit['y'])))
+                    hit['x'], hit['y'], structures.intersects(Point(hit['x'], hit['y'])),
+                    decks.candidates(hit['x'],hit['y'],hit['id']))
             else:
                 row['decision'] = {'status': 'review', 'review_flags': ['no_unambiguous_current_geometry']}
             selected.append(row)
@@ -104,8 +108,19 @@ def stage(review):
     archive_sources = {str(p['id']): {'dataset': 'archive', 'attributes': p['attrs'], 'sources': p['sources'],
                                     'alignment_review': guard.reviews.get(('archive', str(p['id'])), {'status': 'unreviewed'})}
                        for p in archived_paths}
-    staged = [{'di_id': r['id'], 'xy': [r['x'], r['y']], 'weight_m': r['weight'],
-               'raw_di_z': r['z'], **r['decision']} for r in rows]
+    di_sources = {str(p['id']): {'record':str(p['id']),
+                 'date':sorted({s['state'] for s in p['sources']}), 'date_kind':'export_state'} for p in paths}
+    archived_sources = {str(p['id']): {'record':str(p['id']),
+                       'date':p['attrs'].get('DAT_ZMENA') or p['attrs'].get('DAT_VZNIK'),
+                       'date_kind':'record_change_or_creation'} for p in archived_paths}
+    staged = []
+    for r in rows:
+        d = r['decision']
+        source = d['height_source']
+        if source and source['dataset'] in ('di','archive'):
+            catalog = di_sources if source['dataset']=='di' else archived_sources
+            source.update(catalog[str(source['id'])])
+        staged.append({'di_id':r['id'], 'xy':[r['x'],r['y']], 'weight_m':r['weight'], 'raw_di_z':r['z'], **d})
     examples = []
     for r in rows:
         m = r['archive']
@@ -117,12 +132,12 @@ def stage(review):
     for e in examples:
         unique.setdefault((e['di_id'], e['archive_objectid']), e)
     examples = list(unique.values())[:20]
-    surface_evidence(examples)  # diagnostic vertices; never fed to HeightGuard as reviewed rail evidence
+    surface_evidence(examples)
     return {'schema': 1, 'snapshot': (ROOT / 'snapshots/CURRENT').read_text().strip(),
             'frame': {'crs': 'EPSG:5514', 'origin': list(Frame().to_jtsk(0, 0)), 'height_datum': 'Bpv'},
             'scope': 'height proposals at DI midpoint samples <=5m; topology and game integration are #20',
             'structure_hint_osm_ways': structure_ids, 'known_conflicting_archive_ids': sorted(conflicts),
-            'evidence': review, 'archive_acquired': provenance['acquired'],
+            'evidence': review, 'rail_above_deck_facts':decks.facts, 'archive_acquired': provenance['acquired'],
             'geometry': geometry, 'archive_sources': archive_sources, 'height_samples': staged,
             'overall': lengths(rows), 'lines': lines, 'large_disagreement_diagnostics': examples}
 
