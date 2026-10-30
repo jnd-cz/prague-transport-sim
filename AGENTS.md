@@ -67,6 +67,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - Tools write files in `data/` and `raw/` whole (`tools/atomic.py`), never in place: with a machine cache
   (`TRAMDATA_CACHE`, DATA.md) they are protected hard links shared by every checkout.
 - New source files go into a snapshot (`tools/snapshot.py publish`), with source URL, licence and date.
+- A publish is checked with `python -I tools/snapshot.py verify` (only the new files are fetched back),
+  not by a full `fetch` into a fresh checkout.
 
 ## Running and checking
 
