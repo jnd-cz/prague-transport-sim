@@ -63,8 +63,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   `tools/registration.py`; audit of the 16 pinned packages of 2026-09-30, #63). What to compare after a
   format change (JVF 1.5.0.2 from 18 Nov 2026; refresh steps in DATA.md):
   - Files: each ZIP holds exactly `ZPS_OPL.gpkg` or `ZPS_KR.gpkg`; `fetch` unzips into the archive's
-    name without `.zip`, `dtm.py` pairs folders by swapping `ZPS_OPL` / `ZPS_KR`. `registration.py`
-    reads every month of a district it finds (#113).
+    name without `.zip`. `tools/dtm_packages.py` selects one OPL/KR month per district for the import,
+    registration and rebuild: CURRENT's `dtm` group wins; unpinned districts use the newest local date
+    with a warning when several are present. If the pinned pair is unavailable, a newer local month
+    may be used with a snapshot/month warning for rebuild-before-publish refreshes; incomplete pairs fail.
   - Layers: classified by the type code, `table.split('#')[-1].split('_')[0]` (the codes in `dtm.py`'s
     table; registration matches a table ending in the code or containing `#<code>_`). Full names matter
     too: height lines need `Hranice` in the name, and the ground-height cloud filters the prefixes

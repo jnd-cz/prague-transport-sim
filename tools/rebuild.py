@@ -18,11 +18,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+from dtm_packages import DTM, select_packages  # noqa: E402
+
 PY = [sys.executable, "-P", "-E"]
-DTM = {  # district packages (Prague DTM ZPS) with the line's surveyed streets
-    "17": ["500054", "500089", "500119", "500186", "500208", "547107", "547174"],
-    "22": ["500089", "500224"],
-}
 BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsign", "Zahradní Město"]}
 
 
@@ -34,9 +33,7 @@ def steps(line):
         writers += [["osm_signals.py", line], ["dtm_points.py", line], ["osm_validate.py", line]]
     groups = [writers, [["geoportal.py", "--line", line]], [["fine_terrain.py", "--line", line]]]
     if line in DTM:
-        dtm = sorted(os.listdir(os.path.join(ROOT, "raw", "dtm")))
-        opl = [os.path.join("raw", "dtm", f) for f in dtm
-               if f.endswith("_ZPS_OPL.gpkg") and any(f"_{d}_" in f for d in DTM[line])]
+        opl = [str(p.opl) for p in select_packages(ROOT, districts=DTM[line])]
         groups.append([["dtm.py", "--line", line, *opl], ["streets.py", "--line", line]])
     return first, groups
 

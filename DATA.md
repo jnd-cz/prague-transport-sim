@@ -95,6 +95,8 @@ the tool changes that produced it.
 1. Refresh the inputs in `raw/` (each group's `refresh` in the manifest; OSM: download Geofabrik's
    `czech-republic-latest.osm.pbf` + `.md5`, `python -P -E tools/osm_local.py cut <file>`, remove the old
    files; GTFS: `https://data.pid.cz/PID_GTFS.zip`, and adjust `SERVICE_DATE` in `tools/build_line.py`).
+   For a DTM refresh, remove the superseded month's ZIPs and extracted package folders for the replaced
+   districts from `raw/dtm/` before rebuilding; an available snapshot pair keeps priority over a newer one.
 2. Rebuild and check the lines (lints, benches).
 3. `python -I tools/snapshot.py publish <YYYY-MM-DD> --note "what changed"`: uploads the new files,
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`.
