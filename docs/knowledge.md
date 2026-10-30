@@ -39,6 +39,14 @@ What sessions learned and later work needs. Kept current and short; the full log
   built as a 9 → 10 run. Line 37 (a substitute line) has no OSM relation: built from its GTFS shapes,
   which run between the two tracks in places; the matcher prefers the right-hand track (regular
   service always uses it, `data/truth.json`).
+- **PID GTFS does have `block_id`** (older notes said it had none). A two-line run pairs a trip with
+  the next trip of its vehicle block, never by time (#96): on 2026-10-21, 195 of 200 line 9 arrivals at
+  Nákladové nádraží Žižkov continue as line 10 with a 0 s gap; the old 2–25 min time window had paired
+  198, none in the same block. `tools/audit_run_timetable.py` checks a built run against the GTFS.
+- **A two-line run's `pathBack` holds both directions** of the streets the run covers twice (9 → 10
+  leaves Řepy and returns to it over the same tracks: s 0–8 km and 20–28 km): the closest piece of it can be our own track. Matching
+  onto another route takes the heading into account (`Route.nearestOnHeading`); plain `nearest` there
+  spawned oncoming trams on our track and made two false 8 km gauntlets on line 9 (28 signals lost).
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; coarse
   10 m grid + fine 2 m blocks within 120 m of the tracks (`tools/fine_terrain.py`, `?nofine`).
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): all of line 17, part of 22. Its vertices are
@@ -62,8 +70,9 @@ Review these when realism matters; most move into the build in M2.
 - **Signals**: from OSM `traffic_signals` clusters near the route; never past the crossing they were
   made for (except along platforms, where the platform-head rules decide); two at one stop line are one.
   GO held for a tram in its dilemma zone (15 + v²/1.6 m). Distant signals where R < 110 m within 140 m.
-- **Gauntlets**: opposite route < 1.8 m away for ≥ 25 m (needs exact `Route.nearest`, which refines
-  onto the chords: 4 m samples read 0.3 m tracks as up to 1.9 m apart).
+- **Gauntlets**: opposite route < 1.8 m away for ≥ 25 m along one continuous opposing traversal
+  (needs exact `Route.nearest`, which refines onto the chords: 4 m samples read 0.3 m tracks as up to
+  1.9 m apart).
 - **Contacts** at switch − 22 m (real positions unknown), worked by the pantograph, moved out of stop
   zones and signal queues; all switches manual on purpose (driver skill).
 - **Catenary poles** march out past tracks and carriageway to the kerb; a building within 5.5 m gets a

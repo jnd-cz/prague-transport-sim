@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--line', required=True)
     parser.add_argument('--log', required=True)
     parser.add_argument('--data', help='built line JSON (defaults to data/lineN.json)')
-    parser.add_argument('--date', default='2026-10-21', help='service date used by the build')
+    parser.add_argument('--date', help='service date (defaults to the one the build log names)')
     args = parser.parse_args()
     data_path = Path(args.data) if args.data else ROOT / 'data' / f'line{args.line}.json'
     data = json.loads(data_path.read_text(encoding='utf-8'))
@@ -49,16 +49,23 @@ def main():
     if actual != expected:
         raise SystemExit('GTFS does not match the pinned source snapshot')
 
-    pairs = []
+    pairs, logged_date = [], None
     for line in Path(args.log).read_text(encoding='utf-8-sig').splitlines():
-        if line.startswith('paired '):
+        if line.startswith('service date '):
+            logged_date = line.split()[-1]
+        elif line.startswith('paired '):
             match = PAIR.fullmatch(line)
             if not match:
                 raise SystemExit(f'unrecognised pair log: {line}')
             pairs.append(match.groups())
     if not pairs:
         raise SystemExit('no pairs in build log')
-    date = dt.date.fromisoformat(args.date)
+    # The build's own date, not a copy of it here: a new GTFS snapshot moves SERVICE_DATE.
+    if not (args.date or logged_date):
+        raise SystemExit('the build log names no service date: pass --date')
+    if args.date and logged_date and args.date != logged_date:
+        raise SystemExit(f'--date {args.date} differs from the build log ({logged_date})')
+    date = dt.date.fromisoformat(args.date or logged_date)
     ymd, weekday = date.strftime('%Y%m%d'), date.strftime('%A').lower()
     with zipfile.ZipFile(source) as z:
         def rows(name):

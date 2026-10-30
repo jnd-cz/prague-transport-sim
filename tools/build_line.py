@@ -463,6 +463,7 @@ def plan_run(first, then):
     ta = sorted(by[(first, pa)], key=lambda t: secs(st[t][-1]["arrival_time"]))
     tb = sorted(by[(then, pb)], key=lambda t: secs(st[t][0]["departure_time"]))
     pairs, rejected, unused = pair_continuations(trips, st, ta, tb)
+    print(f"service date {SERVICE_DATE.isoformat()}")  # (read by tools/audit_run_timetable.py)
     for a, b, gap in pairs:
         print(f"paired {a} {st[a][-1]['arrival_time']} -> {b} {st[b][0]['departure_time']} "
               f"block {trips[a]['block_id']}, gap {gap}s")

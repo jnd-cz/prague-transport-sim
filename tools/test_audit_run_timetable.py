@@ -55,12 +55,13 @@ class AuditRun(unittest.TestCase):
                      'timetable': [[28800, 29400, 30300], [39600, 40200, 41100]]}
         self.log = ['paired a1 08:10:00 -> b1 08:10:00 block one, gap 0s',
                     'paired a4 11:10:00 -> b4 11:10:00 block four, gap 0s']
+        self.date = 'service date 2026-10-21'
         self.write_fixture()
 
     def write_fixture(self):
         with replacing(self.root / 'data' / 'line9.json', 'w', encoding='utf-8') as f:
             json.dump(self.line, f)
-        (self.root / 'log.txt').write_text('\n'.join(self.log), encoding='utf-8')
+        (self.root / 'log.txt').write_text('\n'.join(([self.date] if self.date else []) + self.log), encoding='utf-8')
 
     def run_audit(self):
         with patch.object(audit, 'ROOT', self.root), \
@@ -77,6 +78,12 @@ class AuditRun(unittest.TestCase):
         self.log.pop(0)
         self.write_fixture()
         with self.assertRaisesRegex(SystemExit, "omitted .*a1.*b1"):
+            self.run_audit()
+
+    def test_service_date_comes_from_the_build_log(self):
+        self.date = None
+        self.write_fixture()
+        with self.assertRaisesRegex(SystemExit, 'names no service date'):
             self.run_audit()
 
     def test_wrong_source_hash_is_rejected(self):

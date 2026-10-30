@@ -251,7 +251,8 @@ pinned GTFS, including eligible pairs omitted from both the log and timetable:
 python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
 ```
 
-The audit date defaults to the build's service date (2026-10-21); use `--date` if the build date changes.
+The audit takes the service date from the build log (`service date …`, `SERVICE_DATE` in
+`tools/build_line.py`).
 
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
