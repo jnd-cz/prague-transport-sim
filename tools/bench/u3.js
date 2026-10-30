@@ -108,8 +108,11 @@ export async function run(seed = 1, opts = {}) {
         }
       }
       R.tramS = Math.round(game.tram.s);
-      // (stuck: the tram has not moved for 10 game minutes, a deadlock; give up and report)
+      // A scheduled wait is not a deadlock; start the 10-minute clock at departure.
       if (R.lastS === undefined || Math.abs(game.tram.s - R.lastS) > 1) { R.lastS = game.tram.s; R.lastMove = game.clock; }
+      const st = game.stops[game.nextStop];
+      if (st?.arrived && game._atStop(st) && Math.abs(game.tram.v) < 0.05)
+        R.lastMove = Math.max(R.lastMove, Math.min(game.clock, st.sched));
       if (game.clock - R.lastMove > 600) {
         R.done = true; R.stuck = Math.round(game.tram.s);
         // what holds the tram: the autopilot's plan and what lies ahead of it
