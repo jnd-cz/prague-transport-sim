@@ -105,7 +105,6 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 
 | check | line | symptom | issue |
 |---|---|---|---|
-| redruns | 17 | seed 1: "1 ahead red runs" (an AI tram at the s 10826 signal brakes too gently on warn) | #92 |
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
 
 ## Code style
