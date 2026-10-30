@@ -119,8 +119,8 @@ Review these when realism matters; most move into the build in M2.
 
 ## Checks and what they measure
 
-- `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (counts the remote's
-  platform-head signals: 6 on line 17 is expected), trees in buildings, bridges, invented walls, tram
+- `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
+  poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
   `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
