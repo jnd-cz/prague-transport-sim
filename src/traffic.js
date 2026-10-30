@@ -656,7 +656,10 @@ export class Traffic {
           // (not within 50 m of a stop line that is not green: it came in at speed and ran the red)
           // (from the stop line, which can be up to 40 m before the lane's end: a car spawned 10 m before a
           // red line at 11.5 m/s, line 17 seed 5)
-          const redNear = lane.light && this.lightAspect(lane.light) !== 'green' && lane.path.length - lane.light.back - s < 50;
+          // (nor within 50 m of one on a lane that follows: a short lane in a junction's mouth carries its
+          // light at its start; a car spawned 16 m before such a red line at 11.2 m/s, line 9 s 15074, seed 3)
+          const redAt = (l, d) => l.light && this.lightAspect(l.light) !== 'green' && d + l.path.length - l.light.back < 50;
+          const redNear = redAt(lane, -s) || this.nextLanes(lane).some((b) => redAt(b, lane.path.length - s + (this.connector(lane, b)?.path.length || 0)));
           // (and at least 50 m from the camera itself: the ring's point picks an index cell, and a cell
           // can reach the camera; a car came in at 8 m/s 6 m before the track with the tram 4 m off,
           // line 17 s 19919)
