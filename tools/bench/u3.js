@@ -5,6 +5,8 @@
 // crossedAhead = crossed in front of the moving tram within 100 m; closeCuts = on the track inside the
 // tram's stopping distance (v²/2 + 10 m at 1 m/s2) while it moved faster than 2 m/s (of them bold);
 // bells = the autopilot's bell; hits = collisions with crossing cars.
+import { stuckWatch, stuckScene } from './stuck.js';
+
 const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
 
 export async function run(seed = 1, opts = {}) {
@@ -18,6 +20,7 @@ export async function run(seed = 1, opts = {}) {
   const { Autopilot } = await import('/src/autopilot.js');
   const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
+  const stuck = stuckWatch(game);
   game.autopilot = true; game.paused = false;
   const R = window._u3 = { seed, steps: 0, done: false, bells: 0, hits: [], cuts: [] };
   const yielded = new Set(), crossed = new Set(), cut = new Set();
@@ -108,22 +111,7 @@ export async function run(seed = 1, opts = {}) {
         }
       }
       R.tramS = Math.round(game.tram.s);
-      // A scheduled wait is not a deadlock; start the 10-minute clock at departure.
-      if (R.lastS === undefined || Math.abs(game.tram.s - R.lastS) > 1) { R.lastS = game.tram.s; R.lastMove = game.clock; }
-      const st = game.stops[game.nextStop];
-      if (st?.arrived && game._atStop(st) && Math.abs(game.tram.v) < 0.05)
-        R.lastMove = Math.max(R.lastMove, Math.min(game.clock, st.sched));
-      if (game.clock - R.lastMove > 600) {
-        R.done = true; R.stuck = Math.round(game.tram.s);
-        // what holds the tram: the autopilot's plan and what lies ahead of it
-        const tr = game.tram, plan = pilot.step(game, 0);
-        R.stuckScene = { s: Math.round(tr.s), v: tr.v, plan: { vt: plan.vt, stopAt: plan.stopAt && Math.round(plan.stopAt - tr.s) }, doors: game.doorState, action: !!game.action, hold: game.holdTimer,
-          nextStop: game.stops[game.nextStop] && { name: game.stops[game.nextStop].name, d: Math.round(game.stops[game.nextStop].target - tr.s), served: game.stops[game.nextStop].served, waiting: game.stops[game.nextStop].waiting, runners: game.runners.length },
-          signal: (() => { const x = game.signals.find((q) => q.s > tr.s); return x && { d: Math.round(x.s - tr.s), state: x.state, demand: !!x.demand, t: x.t }; })(),
-          carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => Math.round(c.s - tr.s)),
-          carsCrossing: (game.carsCrossing || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), onTrack: c.onTrack, v: c.car.vNow, light: c.car.lane?.light ? traffic.lightAspect(c.car.lane.light) : null, seen: c.car.seen && { gap: c.car.seen.gap, v: c.car.seen.v } })),
-          tramAhead: game.tramAheadGap(), obstacles: game.obstacles.filter((o) => o.state !== 'gone' && o.s > tr.s && o.s - tr.s < 100).map((o) => ({ d: Math.round(o.s - tr.s), lat: o.lat, type: o.type, state: o.state })) };
-      }
+      if ((R.stuck = stuck()) !== null) { R.done = true; R.stuckScene = stuckScene(game, traffic, pilot); }
       if (!R.done) setTimeout(tick, 0);
       else resolve();
     };

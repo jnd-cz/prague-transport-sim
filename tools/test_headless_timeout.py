@@ -36,8 +36,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split('?')[0]
         if path == '/started':
             self.started.set()
-        if path == '/tools/bench/redruns.js':
-            body = (Path(__file__).parent / 'bench' / 'redruns.js').read_bytes()
+        if path in ('/tools/bench/redruns.js', '/tools/bench/stuck.js'):
+            body = (Path(__file__).parent / 'bench' / path.rsplit('/', 1)[1]).read_bytes()
             mime = 'text/javascript'
         elif path == '/src/autopilot.js':
             body = b'export class Autopilot { constructor() { this.input = {}; } step() {} }'
@@ -109,6 +109,7 @@ class TimeoutTests(unittest.TestCase):
                 self.assertLess(result['clock'], departure + 630)
                 self.assertIn('stuck at 11221', headless.judge('redruns', result)[1])
                 self.assertEqual(headless.counts('redruns', result)['stuck'], 11221)
+                self.assertEqual(result['stuckScene']['s'], 11221)
 
     def test_stuck_at_zero_fails_both_judges(self):
         self.assertFalse(headless.judge('redruns', {'stuck': 0})[0])
