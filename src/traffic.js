@@ -96,6 +96,9 @@ function turnOf(conn) {
 // TRACK_ZONE = how far into the crossing a car is on the tram's way (the 2.6 m band each side of the
 // track centre, ~5.2 m across); a car's front stops YIELD_GAP m before it
 const CAR_HALF = 2.2, TRACK_ZONE = 5.2, YIELD_GAP = 1.5;
+// a car on the track holds up the tram when its heading is within 72° of the track's (cos 0.3): one
+// still turning onto it counts (#100; at 60°, cos 0.5, it did not until it had straightened out)
+const CAR_ALIGN = 0.3;
 
 // lanes per direction: as OSM tags them (lanes:forward / lanes:backward, or lanes on a one-way road,
 // or half of lanes from 4 on a two-way one), else one; turn lanes at junctions are not modelled
@@ -653,7 +656,10 @@ export class Traffic {
           // (not within 50 m of a stop line that is not green: it came in at speed and ran the red)
           // (from the stop line, which can be up to 40 m before the lane's end: a car spawned 10 m before a
           // red line at 11.5 m/s, line 17 seed 5)
-          const redNear = lane.light && this.lightAspect(lane.light) !== 'green' && lane.path.length - lane.light.back - s < 50;
+          // (nor within 50 m of one on a lane that follows: a short lane in a junction's mouth carries its
+          // light at its start; a car spawned 16 m before such a red line at 11.2 m/s, line 9 s 15074, seed 3)
+          const redAt = (l, d) => l.light && this.lightAspect(l.light) !== 'green' && d + l.path.length - l.light.back < 50;
+          const redNear = redAt(lane, -s) || this.nextLanes(lane).some((b) => redAt(b, lane.path.length - s + (this.connector(lane, b)?.path.length || 0)));
           // (and at least 50 m from the camera itself: the ring's point picks an index cell, and a cell
           // can reach the camera; a car came in at 8 m/s 6 m before the track with the tram 4 m off,
           // line 17 s 19919)
@@ -880,13 +886,13 @@ export class Traffic {
       if (!c.active || c.alpha < 0.5 || !c.path) continue;
       const p = c.path.at(c.s);
       // only cars going the tram's way hold it up (one facing it waits for the tram instead)
-      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy);
+      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
       // (a car on the road under our bridge, or on a bridge over the track, is not on it)
       if (n && c.z !== undefined && Math.abs(c.z - this.ground.profile.height(n.s)) > LEVEL_APART) continue;
-      if (n && n.d < 1.6) { const h = this.route.at(n.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) ours.push({ s: n.s, v: c.vNow ?? 0 }); }
+      if (n && n.d < 1.6) ours.push({ s: n.s, v: c.vNow ?? 0 });
       if (this.back) {
-        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy);
-        if (b && b.d < 1.6) { const h = this.back.at(b.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) back.push({ s: b.s, v: c.vNow ?? 0 }); }
+        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
+        if (b && b.d < 1.6) back.push({ s: b.s, v: c.vNow ?? 0 });
       }
     }
     this.game.carsOnTrack = ours;
