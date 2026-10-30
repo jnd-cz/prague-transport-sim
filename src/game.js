@@ -361,7 +361,11 @@ export class Game {
       // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
       // the track, so the post does not hide it from the driver; the same pole carries the crossing's
       // pedestrian heads; user's street view, Palackého náměstí. Hung from a span it hung 20 m back)
-      if (d.head && !d.head.vienna) place(mesh, this.route, Math.min(d.s, (d.head.p1 ?? d.s) - 0.5), -3.5, 0.18, true);
+      if (d.head && !d.head.vienna) {
+        const s = Math.min(d.s, (d.head.p1 ?? d.s) - 0.5);
+        place(mesh, this.route, s, -3.5, 0.18, true);
+        mesh.userData.tip = s === d.head.p1 - 0.5;
+      }
       else this._mount(mesh, d.s, { hang: d.hang });
       this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction

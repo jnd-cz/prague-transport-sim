@@ -65,8 +65,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   `tools/registration.py`; audit of the 16 pinned packages of 2026-09-30, #63). What to compare after a
   format change (JVF 1.5.0.2 from 18 Nov 2026; refresh steps in DATA.md):
   - Files: each ZIP holds exactly `ZPS_OPL.gpkg` or `ZPS_KR.gpkg`; `fetch` unzips into the archive's
-    name without `.zip`, `dtm.py` pairs folders by swapping `ZPS_OPL` / `ZPS_KR`. `registration.py`
-    reads every month of a district it finds (#113).
+    name without `.zip`. `tools/dtm_packages.py` selects one OPL/KR month per district for the import,
+    registration and rebuild: CURRENT's `dtm` group wins; unpinned districts use the newest local date
+    with a warning when several are present. If the pinned pair is unavailable, a newer local month
+    may be used with a snapshot/month warning for rebuild-before-publish refreshes; incomplete pairs fail.
   - Layers: classified by the type code, `table.split('#')[-1].split('_')[0]` (the codes in `dtm.py`'s
     table; registration matches a table ending in the code or containing `#<code>_`). Full names matter
     too: height lines need `Hranice` in the name, and the ground-height cloud filters the prefixes
@@ -88,6 +90,9 @@ What sessions learned and later work needs. Kept current and short; the full log
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 - Tatra T3 figures (ČKD pamphlet, unverified): 16 t empty, 4 × 40 kW, ~39 kN, 1.8 m/s² service accel and
   brake, 5 m/s² emergency, 24 seated + 86 standing.
+- T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
+  overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
+  tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
 - Prague signals: 4 white lamps on a white plate (stop = outer two), call box with three orange LED bars,
   distant signal with a yellow "P"; switch indicator a red LED chevron on the span wire.
 
@@ -121,8 +126,8 @@ Review these when realism matters; most move into the build in M2.
 
 ## Checks and what they measure
 
-- `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (counts the remote's
-  platform-head signals: 6 on line 17 is expected), trees in buildings, bridges, invented walls, tram
+- `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
+  poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
   `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;

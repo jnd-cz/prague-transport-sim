@@ -48,14 +48,14 @@ function consistAtStops(g) {
   return check('consist-coupled', g.stops.length, bad);
 }
 
-// Signal heads standing along a platform (they belong at its head, past the end, or on the wire).
+// Signal heads standing along a platform (an island-tip pole or a head on the wire is fine).
 function signalsInPlatforms(g) {
   const bad = [];
   for (const sg of g.signals) {
     const p = sg.mesh.position, n = g.route.nearest(p.x, -p.z);
     if (!n) continue;
     for (const st of g.stops) {
-      if (st.p0 == null || n.s <= st.p0 || n.s >= st.p1 || sg.mesh.userData.hung) continue; // hung over the track is fine
+      if (st.p0 == null || n.s <= st.p0 || n.s >= st.p1 || sg.mesh.userData.hung || sg.mesh.userData.tip) continue;
       bad.push({ stop: st.name, s: Math.round(n.s), x: p.x, y: -p.z, mag: Math.min(n.s - st.p0, st.p1 - n.s), info: `${(st.p1 - n.s).toFixed(1)} m before the platform end` });
     }
   }

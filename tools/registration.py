@@ -16,6 +16,7 @@ import math
 import os
 import struct
 import sys
+from functools import cache
 
 import numpy as np
 from shapely import STRtree
@@ -24,12 +25,12 @@ from shapely.geometry import LineString, Point
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
 import gpkg  # noqa: E402
 from geo import ROOT, Frame  # noqa: E402
+from dtm_packages import DTM, select_packages  # noqa: E402
 
 sys.stdout.reconfigure(encoding="utf-8")
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "17"
 TILES = "--tiles" in sys.argv
 F = Frame()
-DTM = {"17": ["500054", "500089", "500119", "500186", "500208", "547107", "547174"], "22": ["500089", "500224"]}
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 xs = [p[0] for p in line["path"]]
@@ -39,23 +40,23 @@ inbox = lambda x, y: BOX[0] <= x <= BOX[2] and BOX[1] <= y <= BOX[3]  # noqa: E7
 
 
 # ------------------------------------------------------------------ reference: the survey
+@cache
+def survey_packages():
+    return select_packages(ROOT, districts=DTM[LINE])
+
+
 def survey(kind, code):
     """Survey features of one object type (code) in the line's box, in game metres."""
     out = []
-    for d in DTM[LINE]:
-        for f in sorted(os.listdir(os.path.join(ROOT, "raw", "dtm"))):
-            if f"_{d}_" not in f or not f.endswith(f"_ZPS_{kind}.gpkg"):
-                continue
-            path = os.path.join(ROOT, "raw", "dtm", f)
-            if os.path.isdir(path):
-                path = os.path.join(path, f"ZPS_{kind}.gpkg")
-            table = next((t for t in gpkg.layers(path) if t.endswith(code) or f"#{code}_" in t), None)
-            if not table:
-                continue
-            for feat in gpkg.features(path, table):
-                g = feat["geom"]
-                if g:
-                    out.append(g)
+    for package in survey_packages():
+        path = package.path(kind)
+        table = next((t for t in gpkg.layers(path) if t.endswith(code) or f"#{code}_" in t), None)
+        if not table:
+            continue
+        for feat in gpkg.features(path, table):
+            g = feat["geom"]
+            if g:
+                out.append(g)
     return out
 
 
@@ -213,6 +214,8 @@ def main():
     if LINE not in DTM:
         raise SystemExit(f"line {LINE} has no surveyed streets (lines {', '.join(DTM)})")
     print(f"line {LINE}: reference = DTM ZPS survey (S-JTSK); offsets = layer minus survey, game metres")
+    for package in survey_packages():
+        print(f"  survey district {package.district}: {package.date}")
     walls = ref_lines("OPL", "010000000103")
     rows = {
         "LOD2 buildings (IPR I3S, Web Mercator)": lambda: line_offset(lod2_walls(), walls),
