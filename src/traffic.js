@@ -96,6 +96,9 @@ function turnOf(conn) {
 // TRACK_ZONE = how far into the crossing a car is on the tram's way (the 2.6 m band each side of the
 // track centre, ~5.2 m across); a car's front stops YIELD_GAP m before it
 const CAR_HALF = 2.2, TRACK_ZONE = 5.2, YIELD_GAP = 1.5;
+// a car on the track holds up the tram when its heading is within 72° of the track's (cos 0.3): one
+// still turning onto it counts (#100; at 60°, cos 0.5, it did not until it had straightened out)
+const CAR_ALIGN = 0.3;
 
 // lanes per direction: as OSM tags them (lanes:forward / lanes:backward, or lanes on a one-way road,
 // or half of lanes from 4 on a two-way one), else one; turn lanes at junctions are not modelled
@@ -880,13 +883,13 @@ export class Traffic {
       if (!c.active || c.alpha < 0.5 || !c.path) continue;
       const p = c.path.at(c.s);
       // only cars going the tram's way hold it up (one facing it waits for the tram instead)
-      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy);
+      const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
       // (a car on the road under our bridge, or on a bridge over the track, is not on it)
       if (n && c.z !== undefined && Math.abs(c.z - this.ground.profile.height(n.s)) > LEVEL_APART) continue;
-      if (n && n.d < 1.6) { const h = this.route.at(n.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) ours.push({ s: n.s, v: c.vNow ?? 0 }); }
+      if (n && n.d < 1.6) ours.push({ s: n.s, v: c.vNow ?? 0 });
       if (this.back) {
-        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy);
-        if (b && b.d < 1.6) { const h = this.back.at(b.s); if (h.hx * p.hx + h.hy * p.hy > 0.3) back.push({ s: b.s, v: c.vNow ?? 0 }); }
+        const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
+        if (b && b.d < 1.6) back.push({ s: b.s, v: c.vNow ?? 0 });
       }
     }
     this.game.carsOnTrack = ours;
