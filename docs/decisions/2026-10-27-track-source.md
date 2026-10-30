@@ -168,6 +168,10 @@ records its original source snapshot; no world rebuild was performed for this ac
 
 ## Height and terrain findings
 
+Follow-up for the same 16 districts: [archived DTMP height coverage, comparison and fallback
+assessment, 2026-10-30](2026-10-30-track-height-fallback.md). The archived layer is available with Z;
+close horizontal correspondence alone does not make its Z safe on bridges.
+
 Do not confuse “DTM” as **digital technical map** (transport objects and surveyed street surfaces) with **digital terrain model** (a bare-earth elevation raster). They are different datasets.
 
 - Prague IPR publishes a city terrain raster at **1 m** resolution derived from lidar. The downloaded GeoTIFF is float32 and uses S-JTSK / Krovak East North, EPSG:5514, horizontally. Its processing metadata records cubic resampling to 1 m in 2025; intermediate file names suggest a 25 cm raster, but neither that intermediate’s actual resolution nor its public availability was confirmed. The Hostivař and Kobylisy local capture dates and the TIFF’s explicit vertical datum were not established. Check the vertical reference against Bpv and the track data before treating differences as an engineering-grade comparison.

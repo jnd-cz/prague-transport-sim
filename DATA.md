@@ -107,6 +107,7 @@ and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any
 
 | id | note |
 |---|---|
+| `2026-10-30b` | `2026-10-30` + complete archived DTMP tram-axis layer (55010) with Z, IDs, metadata and provenance; assessed as a height fallback in the same 16 DI districts. |
 | `2026-10-30` | `2026-10-29c` + DI set 7 JVF packages for the 16 districts crossed by lines 9, 17, 22, 23 and 37 (state 2026-09-30), exact download provenance and provider access/licence evidence. |
 | `2026-10-29` | `2026-10-23` + the archived technical map's street furniture points for line 17 (`raw/dtmpoints/`, state 2024-06-30, fetched 2026-10-24). |
 | `2026-10-23` | First pinned snapshot: the inputs of the lines built until 2026-10-29 (OSM Geofabrik 2026-10-22, PID GTFS 2026-10-21..11-03, DTM ZPS 2026-09-30, Geoportál and DMR 5G caches of 2026-10-21..23). The data built before it partly came from Overpass caches of 2026-10-21..23; a rebuild from the snapshot may differ slightly there. |
@@ -120,6 +121,15 @@ ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and
 The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
 altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
 The first acquisition is published in snapshot `2026-10-30` (#61).
+
+### Archived DTMP track heights
+
+`python -P -E tools/dtmp_tracks.py --fetch --acquire-only` acquires the archived tram-axis layer
+(`CTMTP_KOD=55010`, MapServer layer 10), preserving the feature-ID inventory, metadata, complete
+3D query batches and provenance in `raw/dtmp-tracks/`. `python -P -E tools/dtmp_tracks.py` compares
+it offline with DI in the same 16 district export polygons and on both paths of all five lines.
+The city-wide archive is only about 15 MB; the assessment clips it to the DI area. Results and the
+matching/structure checks are documented in [the fallback assessment](docs/decisions/2026-10-30-track-height-fallback.md).
 
 ## The store (admin)
 
