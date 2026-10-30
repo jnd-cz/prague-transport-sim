@@ -2,7 +2,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sys
-from threading import Thread
+from threading import Event, Thread
 import time
 import unittest
 from unittest.mock import patch
@@ -30,8 +30,12 @@ window.camera = {position: {set() {}}};
 
 
 class Handler(BaseHTTPRequestHandler):
+    started = Event()
+
     def do_GET(self):
         path = self.path.split('?')[0]
+        if path == '/started':
+            self.started.set()
         if path == '/tools/bench/redruns.js':
             body = (Path(__file__).parent / 'bench' / 'redruns.js').read_bytes()
             mime = 'text/javascript'
@@ -73,10 +77,12 @@ class TimeoutTests(unittest.TestCase):
         return result
 
     def test_timeout_then_next_job(self):
-        with patch.dict(headless.CALLS, redruns='return await new Promise(() => {});'):
+        Handler.started.clear()
+        with patch.dict(headless.CALLS, redruns="await fetch('/started'); return await new Promise(() => {});"):
             start = time.monotonic()
             self.assertEqual(self.run_bench(timeout=0.5), {'error': 'timeout'})
             self.assertLess(time.monotonic() - start, 3)
+            self.assertTrue(Handler.started.is_set(), 'the hanging bench must start before its timeout')
         result = self.run_bench('finish')
         self.assertIsNone(result['stuck'])
         self.assertTrue(headless.judge('redruns', result)[0])
