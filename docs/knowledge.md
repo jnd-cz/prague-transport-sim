@@ -59,6 +59,29 @@ What sessions learned and later work needs. Kept current and short; the full log
 - **Mosty 3D**: photogrammetry 2001–2008, ±0.5 m, blocks from the highest surface seen from the air
   (parapets) down; can predate rebuilds. **The survey deck wins wherever it exists**; the model gives
   sides, piers and spans elsewhere, and is trimmed over surveyed decks.
+- **Regional DTM ZPS packages: what our tools rely on** (`tools/dtm.py`, `tools/gpkg.py`,
+  `tools/registration.py`; audit of the 16 pinned packages of 2026-09-30, #63). What to compare after a
+  format change (JVF 1.5.0.2 from 18 Nov 2026; refresh steps in DATA.md):
+  - Files: each ZIP holds exactly `ZPS_OPL.gpkg` or `ZPS_KR.gpkg`; `fetch` unzips into the archive's
+    name without `.zip`, `dtm.py` pairs folders by swapping `ZPS_OPL` / `ZPS_KR`. `registration.py`
+    reads every month of a district it finds (#113).
+  - Layers: classified by the type code, `table.split('#')[-1].split('_')[0]` (the codes in `dtm.py`'s
+    table; registration matches a table ending in the code or containing `#<code>_`). Full names matter
+    too: height lines need `Hranice` in the name, and the ground-height cloud filters the prefixes
+    `Hranice_dopravní_stavby_nebo_plochy`, `Vnitřní_členění_dopravní_plochy`, `Hranice_ostatní_plochy`,
+    `Hranice_udržované_zeleně`, `Hranice_přírodního`, `Terénní_hrana`.
+  - Attributes: only `UrovenUmisteniObjektuZPS` (nullable INTEGER on 981 of the 1,062 layers, absent on
+    81; absent or null = level 0). The geometry column is found from `gpkg_geometry_columns` (now
+    `shape`).
+  - Geometry: OPL polygons / multipolygons (XY); KR line strings with Z (boundary heights) and points
+    (registration). `gpkg.py`'s WKB reader takes base types 1–7 with ISO / EWKB Z and M (M dropped) and
+    envelope codes 0–4: curved types would need work.
+  - CRS: everything is EPSG:5514 metres, M = 0, and no tool reprojects or rejects another CRS.
+  - Per district (OPL polygon / KR line / KR point layers): Praha 1 50/28/61, 2 43/26/52, 4 49/28/60,
+    7 45/28/56, 8 53/29/63, 10 49/27/62, 12 50/29/58, 17 43/26/47.
+  - Versions: the GPKG `user_version` 10301 is GeoPackage 1.3.1, not the JVF version. The GPKG ZIPs
+    carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
+    `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 - Tatra T3 figures (ČKD pamphlet, unverified): 16 t empty, 4 × 40 kW, ~39 kN, 1.8 m/s² service accel and

@@ -61,7 +61,7 @@ SOURCES = [
     {"name": "dtm", "globs": ["raw/dtm/*.zip"], "unzip": True,
      "source": "Prague digital technical map, ZPS district packages (isdtmk.dtm-praha-sck.cz, OPL + KR)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha / DTM Praha",
-     "refresh": "Geoportal monthly indexes /api/get-dtm-download-metadata?code=02 (OPL) / 03 (KR); resolve kod_stazeni, compare with tools/dtm_schema.py; DATA.md regional DTM refresh notes; fetch unzips approved packages"},
+     "refresh": "DATA.md, Regional DTM monthly downloads (the monthly index, then tools/dtm_schema.py --compare); fetch unzips them"},
     {"name": "dtm-di", "globs": ["raw/dtm-di/*.jvf.zip", "raw/dtm-di/*.json",
                                   "raw/dtm-di/terms.pdf", "raw/dtm-di/access.html"],
      "source": "Prague DTM DI set 7 public JVF district packages; exact URLs, state dates and hashes in raw/dtm-di/provenance.json",

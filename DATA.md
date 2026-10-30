@@ -136,8 +136,9 @@ which contains both UUID and filename. Prepend
 the month in an older URL. `soubor_nazev` and `velikost` give the expected filename and byte count.
 Current pattern: `VS_CZ010_MOMC_<district>_<yyyymmdd>_ZPS_OPL|KR.gpkg.zip`.
 
-For example, stage the latest advertised Praha 2 GPKG and matching JVF header reference **outside
-raw/** before deciding whether to replace pinned sources:
+For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
+GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned
+sources:
 
 ```powershell
 $dtmStage = 'reports/rebuild/dtm-transition'
@@ -165,67 +166,10 @@ the verified vector-data route here is the package index above. This is not a cl
 exists elsewhere. E-výdej provides registered, area-specific exports (125 ha free limit); it is not
 needed to fetch the public monthly packages. See [access guidance](https://portal.dtm-praha-sck.cz/poskytovani-dat/zpusoby-poskytovani-prazskych-dat-dtm).
 
-**Our GeoPackage contract** (`tools/dtm.py`, `tools/gpkg.py`, `tools/registration.py`):
-
-- Files: ZIP members currently are exactly `ZPS_OPL.gpkg` and `ZPS_KR.gpkg`. Snapshot fetch extracts
-  into the archive's filename without `.zip`. `dtm.py` pairs folders by replacing `ZPS_OPL` with
-  `ZPS_KR`; registration also expects the inner filenames. Use one approved month per district:
-  registration scans matching district folders without selecting a date, so leaving old and new
-  extracted months together mixes sources.
-- SQLite metadata: `gpkg_contents` (`data_type='features'`), `gpkg_geometry_columns` (table/column,
-  geometry type, Z flag), and `PRAGMA table_info`. The geometry column is discovered dynamically
-  (currently `shape`); other columns are read dynamically by name.
-- Names/codes: areas are classified with `table.split('#')[-1].split('_')[0]`. Full names matter too:
-  height lines require the substring `Hranice`; the ground-height cloud filters the exact prefixes
-  `Hranice_dopravní_stavby_nebo_plochy`, `Vnitřní_členění_dopravní_plochy`, `Hranice_ostatní_plochy`,
-  `Hranice_udržované_zeleně`, `Hranice_přírodního`, `Terénní_hrana`. See the class-code table below.
-- Direct attribute dependency: **`UrovenUmisteniObjektuZPS`**, currently nullable INTEGER, with absent
-  or null values treated as level 0. Registration uses geometry/type codes rather than attributes.
-  ID/date/quality columns are visible in the schema report but are not directly used by these tools.
-- Geometry: OPL polygons/multipolygons; KR line strings/multiline strings with Z for boundary heights
-  and points for registration. The minimal WKB reader supports base types 1–7, ISO Z/M/ZM and EWKB
-  dimension flags; it discards M values. GeoPackage envelope codes 0–4 are supported. Curved types
-  and other new encodings would require review.
-- CRS/units: consumers assume native **S-JTSK EPSG:5514 metres**, converted by `tools/geo.py`; they do
-  not reproject or reject another CRS themselves. Source heights follow the project's Bpv convention.
-  GPKG CRS metadata here does not independently establish a vertical datum.
-
-| Area class | Object type codes used by dtm.py |
-|---|---|
-| road | 010000000503, 010000001703 |
-| parking / cycle / sidewalk / island | 010000001103 / 010000000903 / 010000000703 / 010000001303 |
-| tram / platform / bridge deck | 010000002403 / 010000005303 / 010000005803 |
-| tunnel / underpass / railway | 010000006203 / 010000006603 / 010000031203 |
-| green | 010000021503, 010000020903, 010000015203 |
-| paved | 010000018703, 010000018903, 010000005503 |
-| stairs / roof / wall / water | 010000016603 / 010000031503 / 010000016803 / 010000020303 |
-
-Registration references: buildings **010000000103**, tree pits **010000033803**, carriers
-**010000020101**, water connections **010000011601**, sewer connections **010000012401**. It matches
-a table ending in the code or containing `#<code>_`.
-
-**Pre-transition measured baseline (all 16 pinned packages, 2026-09-30):**
-
-| District | Code | OPL polygon layers (XY) | KR line layers (XYZ) | KR point layers (XYZ) |
-|---|---|---:|---:|---:|
-| Praha 1 | 500054 | 50 | 28 | 61 |
-| Praha 2 | 500089 | 43 | 26 | 52 |
-| Praha 4 | 500119 | 49 | 28 | 60 |
-| Praha 7 | 500186 | 45 | 28 | 56 |
-| Praha 8 | 500208 | 53 | 29 | 63 |
-| Praha 10 | 500224 | 49 | 27 | 62 |
-| Praha 12 | 547107 | 50 | 29 | 58 |
-| Praha 17 | 547174 | 43 | 26 | 47 |
-
-There are **1062 feature layers**, all using EPSG:5514 and M=0; all layer-name class keys match their
-12-digit type code. `UrovenUmisteniObjektuZPS` is present as nullable INTEGER on 981 layers and absent
-on 81. GeoPackage `user_version` is **10301** (GPKG 1.3.1), which is **not JVF 1.4.3**.
-
-The GPKG ZIPs have no embedded XML or `gpkg_metadata` JVF header. Separately inspected current
-Praha 2 JVF companions explicitly say **`VerzeJVFDTM=1.4.3`**, `DatumZapisu=2026-10-01T00:00:00`.
-Their SHA-256 values are OPL `ba86e8f68ccaa95fbe75f0e75d5883e074cbb5ce258531962b9a48fdf4da1130`
-and KR `3384bf028a9dc9e43341011ce2446d2542a296b7cb3fbd036952ca94e15767e5`.
-These companion downloads were inspected in scratch storage, not added to the source snapshot.
+**What our tools rely on** in these packages (file and folder names, layer names and type codes,
+`UrovenUmisteniObjektuZPS`, geometry types, EPSG:5514) and the measured pre-transition baseline of
+the 16 pinned packages: `docs/knowledge.md`, "Regional DTM ZPS packages". The comparison below checks
+exactly those.
 
 **Schema inspector and comparison:** stdlib-only, read-only inputs; ZIPs are inspected through
 temporary copies. Full names, type codes, columns/types/defaults, geometry declarations/dimensions
