@@ -11,6 +11,7 @@ import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
+import { Reporter, canvasShot, place } from './report.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
@@ -485,8 +486,9 @@ $('btnToMenu').addEventListener('click', () => {
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 window.addEventListener('keydown', (e) => {
-  if (!game || game.finished || !$('menu').classList.contains('hidden')) return;
+  if (!game || game.finished || !$('menu').classList.contains('hidden') || reporter.isOpen) return;
   const k = e.key.toLowerCase();
+  if (k === 'f9' && !e.repeat) { e.preventDefault(); reporter.open(); return; }
   // dev overlay of signals, stop lines, conflicts and platforms (src/debugOverlay.js; ?debug shows it at the start)
   if (k === 'f8' && !e.repeat) { e.preventDefault(); debugOverlay.toggle(game, traffic); return; }
   // dev inspect mode (src/inspect.js): its keys first
@@ -607,6 +609,30 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
+// ⚑ Report (F9, #138): a note with the moment's state and a screenshot, for the agent to look into
+const reporter = new Reporter({
+  shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
+  pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },
+  state: () => {
+    const g = game, p = route.at(tram.s), d = new THREE.Vector3(), c = camera.position, r = (v, k = 1) => Math.round(v * k) / k;
+    camera.getWorldDirection(d);
+    const yaw = Math.atan2(d.x, -d.z), deg = (v) => Math.round((v * 180) / Math.PI);
+    const cam = { x: r(c.x, 10), y: r(-c.z, 10), z: r(c.y, 10), yaw: deg(yaw), pitch: deg(Math.asin(d.y)) };
+    // (the place in review mode: the camera's target on the ground, seen from above at its heading)
+    const tx = c.x + d.x * 20, ty = -c.z - d.z * 20;
+    return {
+      line: g.line, dataLine: data.line, trip: g.opts.tripIndex, startStop: g.opts.startStop, nextStop: g.stops[g.nextStop]?.name,
+      clock: fmtTime(g.clock), weather: g.opts.weather, seed: g.runSeed, obstacles: g.opts.obstacles,
+      mode: inspect.active ? 'inspect' : pilot ? 'autopilot' : 'driving',
+      tram: { s: r(tram.s, 10), kmh: r(tram.v * 3.6, 10), notch: tram.notch, a: r(tram.a, 100), passengers: tram.passengers,
+              x: r(p.x, 10), y: r(p.y, 10), z: r(profile.height(tram.s), 100) },
+      camera: cam, ...place(cam.x, cam.y, data.frame.origin),
+      review: `?line=${data.line}&review&at=${tx.toFixed(1)},${ty.toFixed(1)},${cam.yaw},45,60`,
+      url: location.href, viewport: `${innerWidth}x${innerHeight}@${devicePixelRatio}`, ua: navigator.userAgent,
+    };
+  },
+});
+
 // dev inspect mode: the autopilot drives, time faster or slower, a mouse camera (src/inspect.js)
 const inspect = new Inspect({
   camera, canvas, getGame: () => game, getTramModel: () => tramModel,
@@ -643,6 +669,7 @@ function frame(now) {
     const inMenu = !$('menu').classList.contains('hidden');
     if (hudTimer <= 0 && !inMenu) { hudTimer = 1 / 30; hud.update(game, game.opts); }
     $('action').style.visibility = inMenu ? 'hidden' : '';
+    document.body.classList.toggle('shift', !inMenu && !game.finished);
     $('pausePanel').classList.toggle('show', game.paused && !game.finished && !inMenu);
     if (game.finished && !game.resultsShown) {
       game.resultsShown = true;

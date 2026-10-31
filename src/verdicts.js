@@ -5,6 +5,18 @@
 // localStorage and go with the next save or retry.
 const KEY = (name) => `tram-review:${name}`;
 
+// one record file to the store (src/report.js): review.php, else tools/serve.py; true when stored
+export async function postRecord(name, body) {
+  const opts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Review': '1' }, body: JSON.stringify(body) };
+  for (const url of [`review.php?f=${name}`, `review/${name}.json`]) {
+    try {
+      const r = await fetch(url, opts);
+      if (r.ok && (r.headers.get('content-type') || '').includes('json')) return true;
+    } catch { /* (offline) */ }
+  }
+  return false;
+}
+
 export class Verdicts {
   constructor(name, meta = {}, onStatus = () => {}) {
     Object.assign(this, { name, meta, onStatus, items: {}, pending: {}, mode: null, state: 'loading' });

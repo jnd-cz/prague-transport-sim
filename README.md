@@ -367,6 +367,15 @@ A findings file can bring its own answers (`"options": [...]`). Lists for review
 `reports/review/` and deployed with the site: `?line=17&review=reports/review/track-z.json` is #106's
 large track-height disagreements (`tools/dtmp_tracks.py --findings`).
 
+**Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
+pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
+screenshot of the 3D view. The state covers the line, trip, clock, weather, seed, tram position, speed
+and notch, the camera, lat/lon, a review-mode link to the place and the deployed version. The record is
+stored as `report-<date>-<time>-<code>`; the id is shown so it can be quoted in chat. It goes into the
+same store as the review answers: on the test host it comes back through `autodeploy.py` as
+`reports/reviews/report-….json` and `.jpg` in the deploy checkout; locally `serve.py` writes it there
+directly. Without a server the record is downloaded as a file instead.
+
 **Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
 bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and
 walker heights with the triangles actually drawn and the DTM area class under the wheels, and lists

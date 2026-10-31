@@ -15,6 +15,7 @@ Review verdicts (#136): tools/review.php goes up as review.php and stores them i
 access); --pull-reviews only fetches reviews/*.json into reports/reviews/, merged with what is there.
 """
 import argparse
+import base64
 import datetime
 import ftplib
 import getpass
@@ -166,13 +167,17 @@ def upload(ftp, rel, value, made):
 
 
 def pull_reviews(ftp, dest=os.path.join(ROOT, "reports", "reviews")):
-    """reviews/*.json from the host merged into dest; prints the files that changed."""
+    """reviews/*.json from the host merged into dest; prints the files that changed. A report (src/report.js,
+    written once) is fetched once, its screenshot saved beside it as report-….jpg."""
     try:
         names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("reviews")]
     except ftplib.error_perm:
         return  # (nothing reviewed yet)
     for n in sorted(names):
         if not n.endswith(".json") or not reviews.NAME.fullmatch(n[:-5]):
+            continue
+        path = os.path.join(dest, n)
+        if n.startswith("report-") and os.path.exists(path):
             continue
         buf = io.BytesIO()
         ftp.retrbinary(f"RETR reviews/{n}", buf.write)
@@ -181,7 +186,18 @@ def pull_reviews(ftp, dest=os.path.join(ROOT, "reports", "reviews")):
         except ValueError:
             print(f"reviews/{n}: not JSON, skipped")
             continue
-        path = os.path.join(dest, n)
+        if n.startswith("report-") and isinstance(new, dict):
+            for rec in (new.get("items") or {}).values():
+                shot = rec.get("shot") if isinstance(rec, dict) else None
+                if isinstance(shot, str) and shot.startswith("data:image/jpeg;base64,"):
+                    os.makedirs(dest, exist_ok=True)
+                    with open(os.path.join(dest, n[:-5] + ".jpg"), "wb") as fh:
+                        fh.write(base64.b64decode(shot.split(",", 1)[1]))
+                    rec["shot"] = n[:-5] + ".jpg"
+            reviews.save(path, new)
+            for rec in (new.get("items") or {}).values():
+                print(f"{os.path.relpath(path, ROOT)}: {rec.get('kind')}, line {rec.get('line')}: {rec.get('note', '')[:80]}")
+            continue
         cur = reviews.load(path)
         out = reviews.merge(cur, new if isinstance(new, dict) else {})
         if out != cur:
