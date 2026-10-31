@@ -32,5 +32,8 @@ reports/rebuild/
 # web host login for tools/deploy.py (host, user, folder; never the password)
 deploy.local.json
 
+# review verdicts (tools/serve.py, tools/deploy.py --pull-reviews)
+reports/reviews/
+
 # tools/autodeploy.py log and state
 reports/autodeploy.*

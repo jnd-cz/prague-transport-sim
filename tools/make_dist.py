@@ -5,7 +5,8 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DST = os.path.join(ROOT, "dist", "tatra-t3-prague.zip")
-INCLUDE = ["index.html", "README.md", "src", "assets", "data"]
+# (reports/review: the findings lists for review mode, ?review=reports/review/track-z.json)
+INCLUDE = ["index.html", "README.md", "src", "assets", "data", "reports/review"]
 
 
 def files(root=ROOT):

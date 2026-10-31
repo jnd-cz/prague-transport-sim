@@ -4,7 +4,8 @@
     python tools/serve.py 8744 1500     # each response sent no faster than 1500 KB/s (the loading screen
                                         # on a slow connection; from the remote session's serve_nocache.py)
     python tools/serve.py 8742 --lan    # also to the home network (a phone: review mode, #129): only what
-                                        # the game loads, read-only; prints the address to open
+                                        # the game loads, read-only apart from review verdicts;
+                                        # prints the address to open
 """
 import argparse
 import functools
@@ -16,11 +17,14 @@ import re
 import shutil
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import reviews  # noqa: E402
 
 
 # what --lan serves: the game and its data, not the sources in raw/, .git or the tools' caches
@@ -52,8 +56,31 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
             time.sleep(len(data) / rate)
 
     def do_POST(self):
-        """Lint reports from the page: POST /report/<name>.json -> reports/<name>.json (local only)."""
+        """Lint reports from the page: POST /report/<name>.json -> reports/<name>.json (local only).
+        Review verdicts (#136): POST /review/<name>.json merges into reports/reviews/<name>.json, also
+        from the home network (with the page's X-Review header, which no cross-site form sends)."""
         name = os.path.basename(self.path)
+        if self.path.startswith("/review/"):
+            n = int(self.headers.get("Content-Length", 0))
+            if not self.headers.get("X-Review") or not reviews.NAME.fullmatch(name.removesuffix(".json")) or n > reviews.MAX:
+                self.send_error(400)
+                return
+            try:
+                new = json.loads(self.rfile.read(n))
+            except ValueError:
+                self.send_error(400)
+                return
+            path = os.path.join(REVIEWS, name)
+            with REVIEW_LOCK:
+                out = reviews.merge(reviews.load(path), new if isinstance(new, dict) else {})
+                reviews.save(path, out)
+            body = json.dumps({"ok": True, "items": len(out["items"])}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.server.lan or not self.path.startswith("/report/") or not re.fullmatch(r"[\w.-]+\.json", name):
             self.send_error(404)
             return
@@ -63,6 +90,10 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
             fh.write(body)
         self.send_response(204)
         self.end_headers()
+
+
+REVIEWS = os.path.join(ROOT, "reports", "reviews")
+REVIEW_LOCK = threading.Lock()
 
 
 class Server(http.server.ThreadingHTTPServer):
@@ -111,7 +142,7 @@ def main():
                 ip = s.getsockname()[0]
             except OSError:
                 ip = '<this computer>'
-        print(f'on the home network: http://{ip}:{server.server_port}/?review (read-only)', flush=True)
+        print(f'on the home network: http://{ip}:{server.server_port}/?review (read-only, review verdicts saved)', flush=True)
     # POST reports are relative to this checkout too, independent of the caller's cwd.
     os.chdir(ROOT)
     with server:
