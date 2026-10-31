@@ -41,18 +41,24 @@ RADIUS = 1.0
 ANGLE = 15.0
 
 
-def structure_mask():
+def structure_mask(*, separate_tunnels=False):
     """A plan match cannot establish track Z on a structure (archive has ground Z on Trojsky most)."""
     from osm_local import ways
     tagged = ways(lambda t: t.get('railway') == 'tram' and (
         t.get('bridge', 'no') != 'no' or t.get('tunnel', 'no') != 'no'
         or t.get('covered') == 'yes' or t.get('layer', '0') != '0'))
-    geoms = []
+    geoms, tunnels = [], []
     for way in tagged:
         coords = way['geometry']
         x, y = Frame().xy([p['lat'] for p in coords], [p['lon'] for p in coords])
-        geoms.append(LineString(zip(x, y)))
-    return unary_union(geoms).buffer(5), [w['id'] for w in tagged]
+        geom = LineString(zip(x, y))
+        geoms.append(geom)
+        tags = way['tags']
+        if (tags.get('tunnel', 'no') != 'no' or tags.get('covered') == 'yes'
+                or tags.get('layer', '0').startswith('-')):
+            tunnels.append(geom)
+    result = unary_union(geoms).buffer(5), [w['id'] for w in tagged]
+    return (*result, unary_union(tunnels).buffer(5)) if separate_tunnels else result
 
 
 def request(url, params):
@@ -120,7 +126,7 @@ def xyz(values):
 
 def di_data():
     provenance = json.loads((DI / 'provenance.json').read_text(encoding='utf-8'))
-    districts, paths, seen = [], [], set()
+    districts, paths, seen = [], [], {}
     for entry in provenance['packages']:
         file = DI / entry['file']
         if sha(file) != entry['sha256']:
@@ -148,8 +154,10 @@ def di_data():
                 coords = xyz([vals[i:i + 3] for i in range(0, len(vals), 3)])
                 key = (identity, tuple(coords))
                 if key not in seen:
-                    paths.append({'id': identity, 'coords': coords, 'attrs': attrs})
-                    seen.add(key)
+                    seen[key] = len(paths)
+                    paths.append({'id': identity, 'coords': coords, 'attrs': attrs, 'sources': []})
+                paths[seen[key]]['sources'].append(
+                    {k: entry[k] for k in ('code', 'file', 'sha256', 'state')} | {'attributes': attrs})
     return districts, paths
 
 
@@ -170,7 +178,9 @@ def archive_data():
                 raise ValueError('duplicate archive feature or wrong track classification')
             features[identity] = feature
             for coords in feature.get('geometry', {}).get('paths', []):
-                paths.append({'id': identity, 'coords': xyz(coords), 'attrs': attrs})
+                paths.append({'id': identity, 'coords': xyz(coords), 'attrs': attrs,
+                              'sources': [{'file': page['file'], 'sha256': page['sha256'],
+                                           'acquired': provenance['acquired']}]})
     if sorted(features) != sorted(ids['objectIds']):
         raise ValueError('archive pages do not match the ID inventory')
     return provenance, features, paths
@@ -195,7 +205,7 @@ class Segments:
         self.geoms = geoms
         self.tree = STRtree(geoms)
 
-    def match(self, x, y, ux, uy, radius=RADIUS):
+    def match(self, x, y, ux, uy, radius=RADIUS, details=False):
         candidates = []
         for index in self.tree.query(Point(x, y).buffer(radius)):
             row = self.rows[index]
@@ -210,17 +220,28 @@ class Segments:
                 continue
             z = a[2] + t * (b[2] - a[2]) if good_z(a[2]) and good_z(b[2]) else None
             candidates.append((distance, str(row['id']), z, row, px, py))
-        if not candidates:
-            return {'status': 'no_match'}
         candidates.sort(key=lambda c: (c[0], c[1]))
+        def result(value):
+            if details:
+                value['candidates'] = [
+                    {'id': c[3]['id'], 'z': c[2], 'distance': c[0], 'x': c[4], 'y': c[5],
+                     'ux': (c[3]['b'][0]-c[3]['a'][0])/c[3]['length'],
+                     'uy': (c[3]['b'][1]-c[3]['a'][1])/c[3]['length'],
+                     'heading_error_degrees': math.degrees(math.acos(min(1, abs(
+                         ((c[3]['b'][0] - c[3]['a'][0]) * ux +
+                          (c[3]['b'][1] - c[3]['a'][1]) * uy) / c[3]['length']))))}
+                    for c in candidates]
+            return value
+        if not candidates:
+            return result({'status': 'no_match'})
         best = candidates[0]
         # Crossing/overlapping levels with almost equal plan fit must not supply an arbitrary Z.
         if best[2] is not None and any(c[2] is not None and c[0] <= best[0] + 0.25
                                      and abs(c[2] - best[2]) > 0.3 for c in candidates[1:]):
-            return {'status': 'ambiguous'}
-        return {'status': 'numeric' if best[2] is not None else 'missing_z',
+            return result({'status': 'ambiguous'})
+        return result({'status': 'numeric' if best[2] is not None else 'missing_z',
                 'z': best[2], 'id': best[3]['id'], 'attrs': best[3]['attrs'],
-                'distance': best[0], 'x': best[4], 'y': best[5]}
+                'distance': best[0], 'x': best[4], 'y': best[5]})
 
 
 def samples(segments, area):
