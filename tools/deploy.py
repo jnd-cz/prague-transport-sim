@@ -118,6 +118,8 @@ def password(cfg):
             return auth[2]
     except (FileNotFoundError, netrc.NetrcParseError):
         pass
+    if not sys.stdin or not sys.stdin.isatty():
+        raise SystemExit(f"no password for {cfg['host']}: TRAM_DEPLOY_PASSWORD or ~/.netrc (nobody to ask)")
     return getpass.getpass(f"FTP password for {cfg['user']}@{cfg['host']}: ")
 
 

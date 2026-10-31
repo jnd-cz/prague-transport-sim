@@ -141,6 +141,13 @@ whose data matches the manifest:
 
 The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
 
+Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
+`deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
+checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
+it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
+`~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
+hour. Log: `reports/autodeploy.log`.
+
 ## Gameplay
 
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
