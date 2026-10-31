@@ -724,12 +724,12 @@ export class Traffic {
         // met the tram at the second already on the track, line 17 s 21530)
         let xGap = null, keepClear = false;
         const xs = [];
-        for (const [path, off] of seq) {
+        seq.forEach(([path, off], k) => {
           for (const x of this._trackCrossings(path)) {
             const dC = off + x.sIn; // the car's middle to where the track's band begins
-            if (dC > -CAR_HALF - TRACK_ZONE - CAR_HALF && dC < 45) xs.push({ dC, sx: x.sx });
+            if (dC > -CAR_HALF - TRACK_ZONE - CAR_HALF && dC < 45) xs.push({ dC, sx: x.sx, k });
           }
-        }
+        });
         xs.sort((a, b) => a.dC - b.dC);
         // (one crossing seen twice, the next path starting inside the track's band, counts once: a car
         // turning into a lane along the track stood with its nose on it, giving way at the second copy
@@ -780,7 +780,19 @@ export class Traffic {
           // 0.9 m from the band, inside YIELD_GAP, counted as committed and pulled out in front of the
           // tram when the queue moved on, line 17 s 9903)
           const canStop = v < 1 || front - YIELD_GAP > (v * v) / 10 - 0.5;
-          if ((onBody || coming) && canStop && front > 0) { xGap = front - YIELD_GAP + 8; c.xing = x; break; } // (following() stops 8 m short)
+          if ((onBody || coming) && canStop && front > 0) {
+            xGap = front - YIELD_GAP + 8; // (following() stops 8 m short)
+            // a crossing past a junction: wait before the junction, not in it, unless the car stands
+            // wholly on the lane beyond. One waiting in the junction's mouth blocked a car leaving the
+            // track the other way; the tram stopped for that one with its body on this car's crossing
+            // (line 37 s 1475, seed 2). Where the tracks run through the junction, cars wait in it.
+            const J = seq[x.k - 1];
+            if (J && J[2] && J[1] > 0 && dC - YIELD_GAP - 2 * CAR_HALF < seq[x.k][1]) {
+              const toJ = J[1] - CAR_HALF - 1; // its front 1 m before the junction
+              if (v < 1 || toJ > (v * v) / 10 - 0.5) xGap = toJ + 8;
+            }
+            c.xing = x; break;
+          }
           // nor onto the track without room to leave it: the car ahead standing or crawling closer than
           // the way across (the band and a car's length). A car stood on the track behind a queue that
           // waited, round the junction, for a car giving way to our tram, which waited for the first
@@ -923,12 +935,12 @@ export class Traffic {
   // crossing two lanes ahead, beyond a 4 m piece in a junction's mouth, was seen only 5 m before the
   // track, too late to give way to the tram (line 17 s 16855).
   _seq(c) {
-    const seq = [[c.path, -c.s]];
+    const seq = [[c.path, -c.s, !!c.conn]]; // [path, offset, a junction's connector]
     let lane = null, off = 0;
     if (c.conn) { lane = c.conn.to; off = c.conn.path.length - c.s; seq.push([lane.path, off]); }
     else if (c.next) {
       off = c.path.length - c.s;
-      if (c.plan) { seq.push([c.plan.path, off]); off += c.plan.path.length; }
+      if (c.plan) { seq.push([c.plan.path, off, true]); off += c.plan.path.length; }
       lane = c.next;
       seq.push([lane.path, off]);
     }
@@ -937,7 +949,7 @@ export class Traffic {
       if (c.next2) {
         const cn = this.connector(lane, c.next2);
         off += lane.path.length;
-        if (cn) { seq.push([cn.path, off]); off += cn.path.length; }
+        if (cn) { seq.push([cn.path, off, true]); off += cn.path.length; }
         seq.push([c.next2.path, off]);
       }
     }
