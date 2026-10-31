@@ -88,10 +88,6 @@ def walk(geom):
 
 
 areas, n_z, n_near, n_none, dropped = [], 0, 0, 0, 0
-cloud = {}  # (x*2, y*2) rounded -> z: one surveyed ground height per 0.5 m
-# lines whose heights describe the ground-level street surface (not walls, stairs, buildings)
-CLOUD_LINES = ("Hranice_dopravní_stavby_nebo_plochy", "Vnitřní_členění_dopravní_plochy", "Hranice_ostatní_plochy",
-               "Hranice_udržované_zeleně", "Hranice_přírodního", "Terénní_hrana")
 # heights: every vertex of the 3D boundary lines of all districts (areas along a district border
 # take heights from the neighbour's lines too), keyed by its S-JTSK position (1 cm)
 zkey = defaultdict(set)  # several heights where lines of two levels share a 2D position (wall top/foot)
@@ -109,24 +105,11 @@ for package in packages:
                 continue
             parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
             lvl = f.get("UrovenUmisteniObjektuZPS") or 0
-            ground_line = lvl == 0 and any(k in t for k in CLOUD_LINES)
             for pts in parts:
                 for x, y, z in pts:
                     if z:
                         zkey[(round(x, 2), round(y, 2))].add((z, lvl))
                         zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
-                # height cloud: ground-level traffic and surface lines, densified to 3 m
-                if ground_line:
-                    for (x0, y0, z0), (x1, y1, z1) in zip(pts, pts[1:]):
-                        if not z0 or not z1:
-                            continue
-                        n = max(1, int(math.hypot(x1 - x0, y1 - y0) // 3))
-                        for k in range(n + (1 if (x1, y1) == pts[-1][:2] else 0)):
-                            u = k / n
-                            q = local(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)
-                            zq = z0 + (z1 - z0) * u
-                            if in_corridor(q) and lidar(*q) - 5 < zq < lidar(*q) + 8:
-                                cloud[(round(q[0] * 2), round(q[1] * 2))] = round(zq, 2)
 
 def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
@@ -265,11 +248,7 @@ for a in areas:
 print("areas:", dict(sorted(counts.items())))
 print(f"dropped {dropped} areas with >30 % unknown heights")
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing")
-print(f"height cloud: {len(cloud)} points")
-flat = []
-for (kx, ky), z in cloud.items():
-    flat += [kx / 2, ky / 2, z]
-out = {"areas": areas, "z": flat}
+out = {"areas": areas}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
 vertex = {"exact": n_z, "near": n_near, "missing": n_none, "droppedAreas": dropped}
@@ -277,8 +256,7 @@ nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex, "kerbs": kerb_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
-    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall")),
-    "z": sources.single("streets", "zps", len(cloud), "ground heights (0.5 m cloud)")})
+    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])
 dst = os.path.join(ROOT, "data", f"line{LINE}.dtm.json")
 with replacing(dst, "w", encoding="utf-8") as fh:

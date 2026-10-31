@@ -94,9 +94,9 @@ What sessions learned and later work needs. Kept current and short; the full log
     may be used with a snapshot/month warning for rebuild-before-publish refreshes; incomplete pairs fail.
   - Layers: classified by the type code, `table.split('#')[-1].split('_')[0]` (the codes in `dtm.py`'s
     table; registration matches a table ending in the code or containing `#<code>_`). Full names matter
-    too: height lines need `Hranice` in the name, and the ground-height cloud filters the prefixes
-    `Hranice_dopravní_stavby_nebo_plochy`, `Vnitřní_členění_dopravní_plochy`, `Hranice_ostatní_plochy`,
-    `Hranice_udržované_zeleně`, `Hranice_přírodního`, `Terénní_hrana`.
+    too: height lines need `Hranice` in the name. (The ground-height cloud built from the
+    `Hranice_dopravní_stavby_nebo_plochy` … `Terénní_hrana` lines was retired in #21: surfaces are
+    linear between their surveyed vertices.)
   - Attributes: only `UrovenUmisteniObjektuZPS` (nullable INTEGER on 981 of the 1,062 layers, absent on
     81; absent or null = level 0). The geometry column is found from `gpkg_geometry_columns` (now
     `shape`).
