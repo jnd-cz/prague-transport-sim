@@ -60,8 +60,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   culverts: bare earth shows the passage); near OSM passages DMR 5G, which kept them, takes over.
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
-- **Prague DTM / ZPS survey** (street areas, kerbs, points): all of line 17, part of 22. Its vertices are
-  far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
+  (`tools/dtm_packages.py` `DTM`, `--check` recomputes it from the OSM district boundaries). The hand-made
+  lists before #125 covered under half of line 22 (no Praha 1 or 6) and missed line 17's Troja and Libuš,
+  with Trojský most. Its vertices are far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
 - **An outline along a retaining wall takes the wall's top and foot by turns** (#147): the area's
   vertices coincide with the wall's 3D lines (`Hranice stavby`, ground level), whose heights alternate.
   Beside the tram embankment at Belárie (line 17) the tram area's edge read 195.8 / 199.7 / 196.8 /

@@ -142,6 +142,11 @@ which contains both UUID and filename. Prepend
 the month in an older URL. `soubor_nazev` and `velikost` give the expected filename and byte count.
 Current pattern: `VS_CZ010_MOMC_<district>_<yyyymmdd>_ZPS_OPL|KR.gpkg.zip`.
 
+`python -I tools/dtm_packages.py --fetch` does this for every district in `DTM` that lacks a pair in
+`raw/dtm/`: the index's newest month, the size checked against `velikost`, the ZIP tested, and the URL
+and state recorded in `raw/dtm/provenance.json` (in the `dtm` group). Packages pinned before #125 have
+no recorded URL.
+
 For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
 GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned
 sources:

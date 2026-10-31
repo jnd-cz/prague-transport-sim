@@ -58,7 +58,7 @@ SOURCES = [
      "source": "PID open data, https://data.pid.cz/PID_GTFS.zip",
      "licence": "CC BY 4.0, ROPID",
      "refresh": "download the zip; tools/build_line.py's SERVICE_DATE must fall inside the feed"},
-    {"name": "dtm", "globs": ["raw/dtm/*.zip"], "unzip": True,
+    {"name": "dtm", "globs": ["raw/dtm/*.zip", "raw/dtm/provenance.json"], "unzip": True,
      "source": "Prague digital technical map, ZPS district packages (isdtmk.dtm-praha-sck.cz, OPL + KR)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha / DTM Praha",
      "refresh": "DATA.md, Regional DTM monthly downloads (the monthly index, then tools/dtm_schema.py --compare); fetch unzips them"},

@@ -174,7 +174,7 @@ class Readers(unittest.TestCase):
             root = Path(tmp)
             tools = root / 'tools'
             tools.mkdir()
-            for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py'):
+            for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             (root / 'data').mkdir()
             line = {'path': [[0,0],[20,0]], 'terrain': {'data': base64.b64encode(array.array('h',[0]*4)).decode(),

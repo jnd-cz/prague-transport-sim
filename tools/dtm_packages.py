@@ -1,15 +1,30 @@
-"""One ZPS month per district: CURRENT's snapshot, otherwise the newest local month (#113)."""
+"""One ZPS month per district: CURRENT's snapshot, otherwise the newest local month (#113).
+
+    python -P -E tools/dtm_packages.py --check     # DTM below against the rule (OSM district boundaries)
+    python -I tools/dtm_packages.py --fetch        # missing OPL/KR pairs from the monthly index into raw/dtm/
+"""
 from dataclasses import dataclass
 import glob
 import json
 import logging
 from pathlib import Path
 import re
+import sys
+import urllib.request
+import zipfile
 
-DTM = {  # lines whose builds include surveyed streets
-    "17": ["500054", "500089", "500119", "500186", "500208", "547107", "547174"],
-    "22": ["500089", "500224"],
+CORRIDOR = 80.0  # m: the survey a line's build takes, around path and pathBack (tools/dtm.py)
+# Districts by rule: every district the line's corridor touches (--check recomputes it). The hand-made
+# lists before missed most of line 22 (Praha 1 and 6) and line 17's Troja and Libuš, with Trojský most (#125).
+DTM = {
+    "9": ["500054", "500089", "500097", "500143", "500208", "500224", "539694", "539899", "547174"],
+    "17": ["500054", "500089", "500119", "500186", "500208", "547051", "547107", "547328"],
+    "22": ["500054", "500089", "500143", "500178", "500186", "500224", "547174"],
+    "23": ["500054", "500089", "500143", "500178", "500186", "500208"],
+    "37": ["500097", "500208", "500216", "547361"],
 }
+INDEX = "https://geoportalpraha.cz/api/get-dtm-download-metadata?code={}"  # sets 02 OPL, 03 KR (DATA.md)
+BASE = "https://isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/"
 NAME = re.compile(r"VS_CZ010_MOMC_(\d{6})_(\d{8})_ZPS_(OPL|KR)\.gpkg(?:\.zip)?$")
 LOG = logging.getLogger(__name__)
 
@@ -128,3 +143,70 @@ def select_packages(root, districts=None, sources=None):
                         district, sid, refresh_from, date)
         selected.append(Package(district, date, *paths))
     return selected
+
+
+def check():
+    """The table against the rule; prints the right one when they differ."""
+    from dtm_di import districts
+    rule = {line: [] for line in DTM}
+    for d in districts(tuple(int(k) for k in DTM), CORRIDOR):
+        for line in d["lines"]:
+            rule[str(line)].append(d["code"])
+    rule = {k: sorted(v) for k, v in rule.items()}
+    if rule != {k: sorted(v) for k, v in DTM.items()}:
+        print("DTM differs from the rule; it should be:\n" + json.dumps(rule, indent=1))
+        return 1
+    print(f"DTM matches the rule: {sum(map(len, DTM.values()))} line districts, {len(set(sum(DTM.values(), [])))} packages")
+    return 0
+
+
+def fetch(root):
+    """Missing OPL/KR pairs of DTM's districts, the index's newest month; each checked against the
+    index's size and as a ZIP, written whole, with its URL and state in raw/dtm/provenance.json."""
+    from atomic import replacing
+    root, have = Path(root), {}
+    folder = root / "raw" / "dtm"
+    for f in folder.glob("*.gpkg.zip"):
+        m = NAME.fullmatch(f.name)
+        have.setdefault(m[1], set()).add(m[3])
+    prov_path = folder / "provenance.json"
+    prov = json.loads(prov_path.read_text(encoding="utf-8")) if prov_path.exists() else {"packages": {}}
+    need = sorted({d for ds in DTM.values() for d in ds if have.get(d) != {"OPL", "KR"}})
+    for code, kind in (("02", "OPL"), ("03", "KR")):
+        with urllib.request.urlopen(INDEX.format(code), timeout=120) as r:
+            rows = json.load(r)
+        for district in need:
+            if kind in have.get(district, ()):
+                continue
+            entries = [f for row in rows for f in row["formats"] if f["obec_kod"] == district and f["format"] == "GPKG"]
+            if not entries:
+                raise ValueError(f"district {district}: no GPKG in index set {code}")
+            e = max(entries, key=lambda e: e["platnost"])
+            name = e["soubor_nazev"]
+            if not (m := NAME.fullmatch(name)) or m[1] != district or m[3] != kind or not name.endswith(".zip"):
+                raise ValueError(f"district {district}: unexpected package name {name}")
+            url = BASE + e["kod_stazeni"]
+            with urllib.request.urlopen(url, timeout=600) as r:
+                content = r.read()
+            if len(content) != int(e["velikost"]):
+                raise ValueError(f"{name}: {len(content)} bytes, the index says {e['velikost']}")
+            with replacing(folder / name, "wb") as f:
+                f.write(content)
+            with zipfile.ZipFile(folder / name) as z:
+                if z.testzip():
+                    raise ValueError(f"{name}: corrupt ZIP")
+            prov["packages"][name] = {"url": url, "index": INDEX.format(code), "state": e["platnost"],
+                                      "size": len(content)}
+            print(f"{name}: {len(content):,} bytes", flush=True)
+    with replacing(prov_path, "w", encoding="utf-8") as f:
+        json.dump(prov, f, ensure_ascii=False, indent=1)
+
+
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    if "--check" in sys.argv:
+        sys.exit(check())
+    if "--fetch" in sys.argv:
+        fetch(Path(__file__).resolve().parent.parent)
+    else:
+        print(__doc__)
