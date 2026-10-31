@@ -320,6 +320,24 @@ or **fly** (C; drag to look, W/A/S/D, R/F up/down, Shift faster, wheel = flying 
 (or . / ,) put the camera at the next / previous stop, T back to the tram, I leaves (the autopilot keeps
 driving: O hands back the controls). The camera's route position is on the panel, handy with the lints.
 
+**Review mode** (the checks' findings on the map, desktop or phone; #129): open
+`index.html?line=17&review`, no shift needed. The panel lists findings worst first:
+- the kerb review list from the survey's provenance (`tools/kerbs.py`);
+- seams and flat or sunk kerbs between neighbouring survey areas, grouped per 30 m;
+- with `&review=reports/x.json`, every `{x, y}` in that file (a lint or headless result, a hand-made list).
+
+Choosing one (a row, a tapped pin, N / B) moves the camera there. The card says:
+- the street (OSM name) and the nearest stop;
+- `s`, `x, y` and lat/lon;
+- links to Mapillary, Panoramax, the Mapy.com aerial and Google Street View at that place (facing the camera's heading).
+
+**Layers** toggles the survey classes as colours, the wireframe of the survey triangles, kerb edges, seam posts, pins, our track, the buildings and the trees.
+- **Mouse:** drag pans, right-drag (or Shift-drag) turns and tilts, the wheel zooms.
+- **Touch:** one finger pans; two fingers pinch, twist and tilt.
+- **Keys:** W/A/S/D, Q/E, R/F.
+
+The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (read-only, only the game's files) prints the address to open; Windows asks once to allow it through the firewall.
+
 **Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
 bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and
 walker heights with the triangles actually drawn and the DTM area class under the wheels, and lists

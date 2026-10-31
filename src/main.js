@@ -10,6 +10,7 @@ import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.j
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
+import { Review, parseAt } from './review.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
@@ -644,6 +645,7 @@ function frame(now) {
       setTimeout(() => { if (game === ended) showResults(); }, 1500); // not if a new shift started meanwhile
     }
   }
+  if (review) review.update(dt);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   if (!window.headless || now - lastDraw > 1000) { renderer.render(scene, camera); lastDraw = now; }
@@ -685,7 +687,12 @@ function renderMirror() {
 }
 
 load.finish();
-$('menu').classList.remove('hidden');
+// review mode (?review, src/review.js): the checks' findings on the map, no shift
+let review = null;
+if (params.has('review')) {
+  review = new Review({ scene, camera, canvas, data, route, ground, world, url: params.get('review'), at: parseAt(params.get('at')) });
+  window.review = review;
+} else $('menu').classList.remove('hidden');
 requestAnimationFrame(frame);
 
 // ------------------------------------------------------------------ performance overlay
