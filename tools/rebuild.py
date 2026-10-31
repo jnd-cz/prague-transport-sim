@@ -8,7 +8,7 @@ group writes data/lineN.json, each writer whole and renamed):
   platforms → osm_speeds → clearances (→ for line 17: OSM signals, survey points, OSM validation)
   geoportal
   fine_terrain
-  dtm (lines with surveyed streets)
+  dtm → zps_source (lines with surveyed streets: the areas, then the source lines for review mode)
 Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log. After it: python -I tools/snapshot.py data-publish.
 """
 import os
@@ -34,7 +34,7 @@ def steps(line):
     groups = [writers, [["geoportal.py", "--line", line]], [["fine_terrain.py", "--line", line]]]
     if line in DTM:
         opl = [str(p.opl) for p in select_packages(ROOT, districts=DTM[line])]
-        groups.append([["dtm.py", "--line", line, *opl]])
+        groups.append([["dtm.py", "--line", line, *opl], ["zps_source.py", "--line", line]])
     return first, groups
 
 

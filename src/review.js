@@ -20,16 +20,20 @@ const CLASS_COLORS = {
   paved: '#e6d84a', cycle: '#34d1a6', stairs: '#c9a27a', green: '#4caf50', water: '#2a8cff', deck: '#ffffff', rail: '#9e9e9e',
 };
 const SRC_COLORS = { kerbs: '#ff3e6c', seams: '#ffd400', file: '#3ee0ff' };
+const HL = '#ffe600'; // the selected finding: its ring and its area's outline
 const SEAM = 0.03, FLAT = 0.05, CELL = 30; // m: a seam over 3 cm; a kerb under 5 cm; findings per 30 m
 // (the class colours are drawn 0.2 m up: the OSM road ribbons lie 0.12 m over the survey)
 const NEAR = 130; // m: the survey layers are drawn this far around the camera's target
 const fmt = (v, d = 0) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d);
-// the answers per kind of finding (a findings file can bring its own: "options": [...])
+// the answers per kind of finding (a findings file can bring its own: "options": [...]). They compare the
+// game with reality (the imagery); whether the source or the build is wrong is for the agent to find
+// (the Source layer shows the survey as it comes)
 const OPTIONS = {
-  kerb: ['kerb missing in game', 'ramp / level: OK', 'source wrong', 'unsure'],
+  kerb: ['wrong in game', 'matches reality', 'other level / wall', 'unsure'],
   seam: ['visible step', 'not visible', 'unsure'],
-  file: ['real problem', 'OK as is', 'source wrong', 'unsure'],
+  file: ['wrong in game', 'matches reality', 'unsure'],
 };
+const LEVEL_COLORS = { '-1': '#3ee0ff', 0: '#ffffff', 1: '#ff9a3e' }; // the source's levels: under, at, over ground
 const options = (f) => f.options || (f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
 // (a finding's place and kind: the same after a rebuild that leaves it where it was)
 const fid = (f) => `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
@@ -123,7 +127,7 @@ export class Review {
     this.cur = -1;
     this.T = { x: 0, y: 0, z: 0 };
     this.yaw = 0; this.pitch = 0.75; this.dist = 90;
-    this.layers = { classes: true, wire: false, kerbs: true, seams: true, findings: true, track: true, buildings: true, trees: true };
+    this.layers = { classes: true, wire: false, source: false, kerbs: true, seams: true, findings: true, track: true, buildings: true, trees: true };
     this.held = new Set();
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -263,12 +267,17 @@ body.review #gl { touch-action: none }
 <div class="rvList" id="rvList"></div>`;
     document.body.appendChild(box);
     const $ = (id) => box.querySelector(`#${id}`);
-    const names = { classes: 'Classes', wire: 'Wireframe', kerbs: 'Kerbs', seams: 'Seams', findings: 'Pins', track: 'Track', buildings: 'Buildings', trees: 'Trees, wires' };
+    const names = { classes: 'Classes', wire: 'Wireframe', source: 'Source', kerbs: 'Kerbs', seams: 'Seams', findings: 'Pins', track: 'Track', buildings: 'Buildings', trees: 'Trees, wires' };
     for (const [k, label] of Object.entries(names)) {
       const b = document.createElement('button');
       b.textContent = label;
       b.classList.toggle('on', this.layers[k]);
-      b.onclick = () => { this.layers[k] = !this.layers[k]; b.classList.toggle('on', this.layers[k]); this._applyLayers(); };
+      b.onclick = () => {
+        this.layers[k] = !this.layers[k];
+        b.classList.toggle('on', this.layers[k]);
+        if (k === 'source' && this.layers.source) this._loadSource();
+        this._applyLayers();
+      };
       $('rvLayers').appendChild(b);
     }
     $('rvLay').onclick = () => { box.classList.toggle('lay'); $('rvLay').classList.toggle('on', box.classList.contains('lay')); this._render(); };
@@ -347,7 +356,48 @@ body.review #gl { touch-action: none }
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
 <div class="rvRow" style="padding:6px 0 0"><button data-go="-1">◀ prev</button><button data-go="1">next ▶</button><button data-copy="1">Copy link</button></div>
+<div id="rvSrc">${this._srcHtml(f)}</div>
 ${this._verdictHtml(f)}`;
+  }
+
+  // ------------------------------------------------------------------ the source (data/lineN.zps.json, tools/zps_source.py)
+  _loadSource() {
+    if (this.src !== undefined) return;
+    this.src = null;
+    fetch(`data/line${this.data.line}.zps.json`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))).then((j) => {
+      // per line: kind, level, height class, flat x,y,z; bounding boxes for the near layer
+      this.src = j.lines.map((l) => { const p = l.slice(3); return { k: j.kinds[l[0]], l: l[1], h: l[2], p, box: bboxFlat(p) }; });
+      this.nearAt = null;
+      this._render();
+      if (this.cur >= 0) { const e = this.$('rvSrc'); if (e) e.innerHTML = this._srcHtml(this.list[this.cur]); }
+    }).catch((e) => { this.src = null; this._note(`no source lines for line ${this.data.line} (${e.message})`); });
+  }
+
+  // the source lines passing within 5 m of a place: kind, level, their height at the closest point and
+  // the accuracy class (a straight kerb has its vertices far apart: the distance is to the segments)
+  _srcHtml(f) {
+    if (!this.layers.source) return '';
+    if (!this.src) return '<div class="dim">source: loading…</div>';
+    const R = 5, by = new Map();
+    for (const s of this.src) {
+      const [x0, y0, x1, y1] = s.box;
+      if (f.x < x0 - R || f.x > x1 + R || f.y < y0 - R || f.y > y1 + R) continue;
+      const p = s.p;
+      for (let i = 0; i + 3 < p.length; i += 3) {
+        const ax = p[i], ay = p[i + 1], dx = p[i + 3] - ax, dy = p[i + 4] - ay, L = dx * dx + dy * dy;
+        const u = L ? Math.max(0, Math.min(1, ((f.x - ax) * dx + (f.y - ay) * dy) / L)) : 0;
+        if (Math.hypot(ax + u * dx - f.x, ay + u * dy - f.y) > R) continue;
+        const za = p[i + 2], zb = p[i + 5], k = `${s.k}|${s.l}|${s.h ?? '?'}`, e = by.get(k) || { s, z: [] };
+        if (za !== null && zb !== null) e.z.push(za + u * (zb - za));
+        by.set(k, e);
+      }
+    }
+    if (!by.size) return '<div class="dim">source: no survey line within 5 m</div>';
+    const rows = [...by.values()].sort((a, b) => a.s.l - b.s.l).map(({ s, z }) => {
+      const zs = z.length ? `${Math.min(...z).toFixed(2)}${z.length > 1 ? `–${Math.max(...z).toFixed(2)}` : ''} m` : 'no height';
+      return `<span style="color:${LEVEL_COLORS[Math.sign(s.l)]}">■</span> ${esc(s.k.replace(/_/g, ' '))} · level ${s.l} · ${zs} · class ${s.h ?? '?'}`;
+    });
+    return `<div class="dim" style="margin-top:4px">source within 5 m (height class: 3 good … 9 unknown):<br>${rows.join('<br>')}</div>`;
   }
 
   _verdictHtml(f) {
@@ -434,17 +484,19 @@ ${this._verdictHtml(f)}`;
   _highlight(f) {
     if (this.hl) { this.group.remove(this.hl); this.hl.traverse((o) => o.geometry?.dispose()); }
     this.hl = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.8, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', depthTest: false, side: THREE.DoubleSide }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.25, 2.75, 40), new THREE.MeshBasicMaterial({ color: HL, depthTest: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(f.x, f.z + 0.3, -f.y);
     ring.renderOrder = 7;
     this.hl.add(ring);
     const a = f.c && this.dtm?.areas.find((a) => a.c === f.c && a.l === 0 && inRing(f.x, f.y, a.ring));
     if (a) {
-      const pts = [...a.ring, a.ring[0]].map((p) => new THREE.Vector3(p[0], p[2] + 0.25, -p[1]));
-      const o = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffffff', depthTest: false }));
-      o.renderOrder = 7;
-      this.hl.add(o);
+      // (WebGL lines are 1 px: the outline is a 0.22 m band, a dark edge under it so it shows on any colour)
+      for (const [w, col, dz, ro] of [[0.45, '#000000', 0.24, 7], [0.22, HL, 0.25, 8]]) {
+        const o = new THREE.Mesh(band([...a.ring, a.ring[0]], w, dz), new THREE.MeshBasicMaterial({ color: col, depthTest: false, side: THREE.DoubleSide, transparent: true, opacity: col === HL ? 1 : 0.55 }));
+        o.renderOrder = ro;
+        this.hl.add(o);
+      }
     }
     this.group.add(this.hl);
   }
@@ -482,6 +534,19 @@ ${this._verdictHtml(f)}`;
       seam.push(q.x, q.z, -q.y, q.x, q.z + h, -q.y);
       scol.push(c.r, c.g, c.b, c.r, c.g, c.b);
     }
+    const src = [], scl = [], dots = [], dcol = [];
+    if (this.src) for (const s of this.src) {
+      const [x0, y0, x1, y1] = s.box;
+      if (x1 < tx - NEAR || x0 > tx + NEAR || y1 < ty - NEAR || y0 > ty + NEAR) continue;
+      c.set(LEVEL_COLORS[Math.sign(s.l)]);
+      const p = s.p, z = (i) => (p[i + 2] ?? this.ground.at(p[i], p[i + 1]));
+      for (let i = 0; i < p.length; i += 3) {
+        dots.push(p[i], z(i) + 0.03, -p[i + 1]);
+        const m = p[i + 2] === null ? [1, 0.2, 0.2] : [c.r, c.g, c.b]; // (red: no height in the source)
+        dcol.push(...m);
+        if (i + 3 < p.length) { src.push(p[i], z(i) + 0.03, -p[i + 1], p[i + 3], z(i + 3) + 0.03, -p[i + 4]); scl.push(c.r, c.g, c.b, c.r, c.g, c.b); }
+      }
+    }
     const geo = (p, col) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); if (col) g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g; };
     this.classMesh = new THREE.Mesh(geo(tri, tcol), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }));
     this.kerbLines = new THREE.LineSegments(geo(kerb), new THREE.LineBasicMaterial({ color: '#ff3e6c', depthTest: false }));
@@ -489,7 +554,11 @@ ${this._verdictHtml(f)}`;
     this.kerbLines.renderOrder = this.seamBars.renderOrder = 4;
     // the survey's triangles as drawn (the outline points and the 5 m splits between them)
     this.wire = new THREE.LineSegments(new THREE.WireframeGeometry(this.classMesh.geometry), new THREE.LineBasicMaterial({ color: '#101418', transparent: true, opacity: 0.55 }));
-    this.near.add(this.classMesh, this.wire, this.kerbLines, this.seamBars);
+    // (the source at its own heights, seen through the surfaces: where it lies against them is the point)
+    this.srcLines = new THREE.LineSegments(geo(src, scl), new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+    this.srcDots = new THREE.Points(geo(dots, dcol), new THREE.PointsMaterial({ vertexColors: true, size: 5, sizeAttenuation: false, depthTest: false }));
+    this.srcLines.renderOrder = this.srcDots.renderOrder = 5;
+    this.near.add(this.classMesh, this.wire, this.kerbLines, this.seamBars, this.srcLines, this.srcDots);
     this.kerbCount = kerb.length / 6;
     this._applyLayers();
   }
@@ -498,6 +567,8 @@ ${this._verdictHtml(f)}`;
     const L = this.layers;
     if (this.classMesh) this.classMesh.visible = L.classes;
     if (this.wire) this.wire.visible = L.wire;
+    if (this.srcLines) this.srcLines.visible = this.srcDots.visible = L.source;
+    if (this.cur >= 0 && this.$('rvSrc')) this.$('rvSrc').innerHTML = this._srcHtml(this.list[this.cur]);
     if (this.kerbLines) this.kerbLines.visible = L.kerbs;
     if (this.seamBars) this.seamBars.visible = L.seams;
     if (this.markers) this.markers.visible = L.findings;
@@ -642,6 +713,27 @@ export function parseAt(v) {
   if (a.length < 2 || a.slice(0, 2).some((n) => !Number.isFinite(n))) return null;
   const r = (n, d) => (Number.isFinite(n) ? (n * Math.PI) / 180 : d);
   return [a[0], a[1], r(a[2], 0), r(a[3], 0.75), Number.isFinite(a[4]) ? a[4] : 90];
+}
+
+// a flat band along a polyline of [x, y, z] (game frame), w wide, dz over it, as three.js geometry
+function band(pts, w, dz) {
+  const pos = [], idx = [];
+  pts.forEach((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = (-dy / L) * w / 2, ny = (dx / L) * w / 2;
+    pos.push(p[0] + nx, p[2] + dz, -(p[1] + ny), p[0] - nx, p[2] + dz, -(p[1] - ny));
+    if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+function bboxFlat(p) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < p.length; i += 3) { if (p[i] < x0) x0 = p[i]; if (p[i] > x1) x1 = p[i]; if (p[i + 1] < y0) y0 = p[i + 1]; if (p[i + 1] > y1) y1 = p[i + 1]; }
+  return [x0, y0, x1, y1];
 }
 
 function bbox(r) {
