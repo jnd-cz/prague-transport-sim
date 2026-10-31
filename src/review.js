@@ -482,7 +482,8 @@ body.review #gl { touch-action: none }
       if (ptr.size >= 2 && two) {
         const q = pair();
         this._zoom(two.d / Math.max(1, q.d));
-        this._turn(q.ang - two.ang, (q.my - two.my) * 0.004);
+        // (the map turns with the fingers: a clockwise twist turns the view, i.e. the heading, anticlockwise)
+        this._turn(two.ang - q.ang, (q.my - two.my) * 0.004);
         two = q;
       } else if (mode === 'turn') this._turn(-dx * 0.006, dy * 0.005);
       else this._pan(dx, dy);
