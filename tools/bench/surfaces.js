@@ -2,7 +2,7 @@
 // areas, kerbs between road and sidewalk. Run from the command line:
 //   python -P -E tools/headless.py --lines 17,22 --checks surfaces
 // or in a page started with ?keepgeo: const { run } = await import('/tools/bench/surfaces.js'); await run()
-// Before #21 (main f4cb8ea, line 17 / 22): waves 6.8 / 4.4 % of the samples, seams over 3 cm 23 / 4.5 %,
+// Before #21 (main f4cb8ea, line 17 / 22): waves 6.8 / 4.4 % of the samples, seams over 3 cm 13 / 3.9 %,
 // kerb step median 0.06 m (the survey's one kerb line gave both sides one height).
 const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'cycle', 'paved', 'platform']);
 const ROAD = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
