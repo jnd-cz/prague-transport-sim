@@ -2,6 +2,7 @@
 
     python -P -E tools/dtm_packages.py --check     # DTM below against the rule (OSM district boundaries)
     python -I tools/dtm_packages.py --fetch        # missing OPL/KR pairs from the monthly index into raw/dtm/
+    python -I tools/dtm_packages.py --fetch --index FILE   # the same from a saved copy of the index
 """
 from dataclasses import dataclass
 import glob
@@ -160,9 +161,11 @@ def check():
     return 0
 
 
-def fetch(root):
+def fetch(root, index=None):
     """Missing OPL/KR pairs of DTM's districts, the index's newest month; each checked against the
-    index's size and as a ZIP, written whole, with its URL and state in raw/dtm/provenance.json."""
+    index's size and as a ZIP, written whole, with its URL and state in raw/dtm/provenance.json.
+    index: a saved copy, {"02": [format entries], "03": [...]}, for when the API turns scripts away
+    (2026-10-31: 502 to scripts for hours while a browser read it)."""
     from atomic import replacing
     root, have = Path(root), {}
     folder = root / "raw" / "dtm"
@@ -173,12 +176,15 @@ def fetch(root):
     prov = json.loads(prov_path.read_text(encoding="utf-8")) if prov_path.exists() else {"packages": {}}
     need = sorted({d for ds in DTM.values() for d in ds if have.get(d) != {"OPL", "KR"}})
     for code, kind in (("02", "OPL"), ("03", "KR")):
-        with urllib.request.urlopen(INDEX.format(code), timeout=120) as r:
-            rows = json.load(r)
+        if index:
+            formats = json.loads(Path(index).read_text(encoding="utf-8"))[code]
+        else:
+            with urllib.request.urlopen(INDEX.format(code), timeout=120) as r:
+                formats = [f for row in json.load(r) for f in row["formats"]]
         for district in need:
             if kind in have.get(district, ()):
                 continue
-            entries = [f for row in rows for f in row["formats"] if f["obec_kod"] == district and f["format"] == "GPKG"]
+            entries = [f for f in formats if f["obec_kod"] == district and f["format"] == "GPKG"]
             if not entries:
                 raise ValueError(f"district {district}: no GPKG in index set {code}")
             e = max(entries, key=lambda e: e["platnost"])
@@ -195,7 +201,7 @@ def fetch(root):
             with zipfile.ZipFile(folder / name) as z:
                 if z.testzip():
                     raise ValueError(f"{name}: corrupt ZIP")
-            prov["packages"][name] = {"url": url, "index": INDEX.format(code), "state": e["platnost"],
+            prov["packages"][name] = {"url": url, "index": INDEX.format(code) + (" (saved copy)" if index else ""), "state": e["platnost"],
                                       "size": len(content)}
             print(f"{name}: {len(content):,} bytes", flush=True)
     with replacing(prov_path, "w", encoding="utf-8") as f:
@@ -207,6 +213,6 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         sys.exit(check())
     if "--fetch" in sys.argv:
-        fetch(Path(__file__).resolve().parent.parent)
+        fetch(Path(__file__).resolve().parent.parent, sys.argv[sys.argv.index("--index") + 1] if "--index" in sys.argv else None)
     else:
         print(__doc__)
