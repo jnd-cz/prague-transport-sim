@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-10-30c",
- "built_at_commit": "bb6ac88",
- "published": "2026-10-31 16:53",
- "note": "#21: kerbs from the survey's kerb line, linear street surfaces, no height cloud (lines 17, 22)",
+ "built_at_commit": "9c1d2cb",
+ "published": "2026-10-31 22:26",
+ "note": "OSM street names on road pieces for review mode (#129)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
@@ -29,8 +29,8 @@
    "sha256": "2491267ae13fe66b2f8b3b8fc42bedf9ddaf91cb9858ed7150e25a8f46463df0"
   },
   "line17.json": {
-   "size": 4989839,
-   "sha256": "48a5274bb2a74e2b84ac61664c9c33ca84637e56d950b2291dcc47aab8b0fa9c"
+   "size": 5024273,
+   "sha256": "c07308211cc62af2367ac6c6ad200a0fc65f150777de470735f206f7735bf673"
   },
   "line17.signals.json": {
    "size": 35510,
@@ -61,8 +61,8 @@
    "sha256": "eb7378012683c1bdaf1374980a6802ce84ab46f231d8f1daf6c6b667ec9ebba7"
   },
   "line22.json": {
-   "size": 5163956,
-   "sha256": "ebb5f0a6d9542d510b7b2471e2472837795ac51e32295d04eb92b18969811657"
+   "size": 5200220,
+   "sha256": "59cd515314740aac0e01f4e939156babdaa7562be3d587e5afb9ee1dfad2fe40"
   },
   "line23.bld.bin": {
    "size": 4805172,
@@ -81,8 +81,8 @@
    "sha256": "fa7d6cea3987ee488cefa925e03cf6ed889e44b41ca90daa93dd34d3667ac17e"
   },
   "line23.json": {
-   "size": 1722833,
-   "sha256": "b6df435ab86e3262ffd28a11b07413cb65cec429c62767c331496c21b91c9071"
+   "size": 1741650,
+   "sha256": "cf1d4c11b1fe685ecc5ba44056267a72ce5f44be137169ed6d526cad62337ea9"
   },
   "line37.bld.bin": {
    "size": 3160548,
@@ -101,8 +101,8 @@
    "sha256": "9763cf5ef863a092106c27c54d86533ff1daeac3acd61f254ea93da888a2ae03"
   },
   "line37.json": {
-   "size": 1519099,
-   "sha256": "ccf638c65835ef5a954cdd991c0e1170fdf32c3a2743eb19657199bb3bf18fdc"
+   "size": 1533310,
+   "sha256": "4b14913e528db74ebeea7ae259b0f5008ea564ac0aa312167d69f7b8da6539c6"
   },
   "line9.bld.bin": {
    "size": 10024992,
@@ -121,8 +121,8 @@
    "sha256": "7b8f964a41239abb9b2c7a2960b4c46042f87adc6f5d31985cdf392cec463f26"
   },
   "line9.json": {
-   "size": 3840092,
-   "sha256": "665720949bb2534ce4eedcbc265205cf10e89478f0d78850a49e2fe128f0b316"
+   "size": 3874257,
+   "sha256": "61ebe1e4353de1a29484f037dd20ce73e3feda19a48fb2399a36ba55c4397c39"
   },
   "lines.json": {
    "size": 607,
