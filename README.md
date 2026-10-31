@@ -346,14 +346,21 @@ Choosing one (a row, a tapped pin, N / B) moves the camera there. The card says:
 - `s`, `x, y` and lat/lon;
 - links to Mapillary, Panoramax, the Mapy.com aerial and Google Street View at that place (facing the camera's heading).
 
-**Layers** toggles the survey classes as colours, the wireframe of the survey triangles, kerb edges, seam posts, pins, our track, the buildings and the trees.
+**Layers** toggles the survey classes as colours, the wireframe of the survey triangles, the survey's own lines (**Source**), kerb edges, seam posts, pins, our track, the buildings and the trees.
+The classes and the wireframe are the game's build of the survey (`tools/dtm.py`: merged areas,
+fitted heights). **Source** draws the survey's 3D lines as they come (`data/lineN.zps.json`,
+`tools/zps_source.py`, lines with surveyed streets) at their own heights: white at ground level, cyan
+below, orange above, red dots where a vertex has no height. The card then lists the source lines
+within 5 m with their kind, level, height there and height accuracy class.
 - **Mouse:** drag pans, right-drag (or Shift-drag) turns and tilts, the wheel zooms.
 - **Touch:** one finger pans; two fingers pinch, twist and tilt.
 - **Keys:** W/A/S/D, Q/E, R/F.
 
 The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (only the game's files; read-only apart from review answers) prints the address to open; Windows asks once to allow it through the firewall.
 
-**Answers** (#136): the card has a button per answer (1–4 on the keyboard) and a note. An answer is saved
+**Answers** (#136): the card has a button per answer (1–4 on the keyboard) and a note. The answers compare
+the game with reality (the imagery): kerbs wrong in game / matches reality / other level or wall / unsure;
+which of the source and the build is wrong is for the agent to find. An answer is saved
 and the card moves to the next finding without one; **to do** hides the answered ones, and their pins turn
 grey. The answers are kept per line in the browser and sent to the server, which merges them per finding
 (the newer wins), so a phone and a computer share one review:

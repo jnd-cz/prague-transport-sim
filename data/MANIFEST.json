@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-10-30c",
- "built_at_commit": "9c1d2cb",
- "published": "2026-10-31 22:26",
- "note": "OSM street names on road pieces for review mode (#129)",
+ "built_at_commit": "d35f440",
+ "published": "2026-10-31 23:42",
+ "note": "Survey source lines for review mode, lines 17 and 22 (#140)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
@@ -40,6 +40,10 @@
    "size": 4439,
    "sha256": "30edab267311680d56ee52715b773c957457575f552776442d6b295c9fb0bffc"
   },
+  "line17.zps.json": {
+   "size": 6101888,
+   "sha256": "60c2688889e1acc5a010fc761281673d5f07045ee3f46232428401536cd07669"
+  },
   "line22.bld.bin": {
    "size": 8575524,
    "sha256": "a9d5d6b57c9d28649402ffa10d0193f6903caf3dac2fd2807d6006373ced0bfe"
@@ -63,6 +67,10 @@
   "line22.json": {
    "size": 5200220,
    "sha256": "59cd515314740aac0e01f4e939156babdaa7562be3d587e5afb9ee1dfad2fe40"
+  },
+  "line22.zps.json": {
+   "size": 3134713,
+   "sha256": "2a3ed81eb44cf343930d3551284714e63c99a2a5252bbe4fe15677a4c15c1687"
   },
   "line23.bld.bin": {
    "size": 4805172,
