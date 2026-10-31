@@ -11,6 +11,8 @@ What goes up: tools/make_dist.py's files, plus version.json (commit, data snapsh
 changed files are uploaded (each to a .part name, then renamed), files no longer in the site are
 deleted, the manifest is written last. A rollback is a deploy from the older commit.
 --reports also uploads reports/headless/*.json (for ?review=reports/headless/line17-lint.json).
+Review verdicts (#136): tools/review.php goes up as review.php and stores them in reviews/ (no direct
+access); --pull-reviews only fetches reviews/*.json into reports/reviews/, merged with what is there.
 """
 import argparse
 import datetime
@@ -27,6 +29,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import reviews  # noqa: E402
 from make_dist import ROOT, files  # noqa: E402
 
 CONFIG = os.path.join(ROOT, "deploy.local.json")
@@ -80,6 +83,8 @@ def site(commit, reports=False):
                "deployed": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
                "by": git("config", "user.name")}
     out["version.json"] = json.dumps(version, ensure_ascii=False, indent=1).encode()
+    out["review.php"] = os.path.join(ROOT, "tools", "review.php")
+    out["reviews/.htaccess"] = b"Require all denied\n"
     out[".htaccess"] = HTACCESS.encode()
     return out
 
@@ -160,6 +165,31 @@ def upload(ftp, rel, value, made):
     ftp.rename(f"{rel}.part", rel)
 
 
+def pull_reviews(ftp, dest=os.path.join(ROOT, "reports", "reviews")):
+    """reviews/*.json from the host merged into dest; prints the files that changed."""
+    try:
+        names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("reviews")]
+    except ftplib.error_perm:
+        return  # (nothing reviewed yet)
+    for n in sorted(names):
+        if not n.endswith(".json") or not reviews.NAME.fullmatch(n[:-5]):
+            continue
+        buf = io.BytesIO()
+        ftp.retrbinary(f"RETR reviews/{n}", buf.write)
+        try:
+            new = json.loads(buf.getvalue() or b"{}")
+        except ValueError:
+            print(f"reviews/{n}: not JSON, skipped")
+            continue
+        path = os.path.join(dest, n)
+        cur = reviews.load(path)
+        out = reviews.merge(cur, new if isinstance(new, dict) else {})
+        if out != cur:
+            reviews.save(path, out)
+            done = sum(1 for v in out["items"].values() if v.get("v"))
+            print(f"{os.path.relpath(path, ROOT)}: {len(out['items'])} findings, {done} with a verdict")
+
+
 def protected(url):
     """The HTTP status of version.json without a login: 401 when the host protects the site."""
     try:
@@ -175,11 +205,19 @@ def main(argv=None, connect=connect):
     ap.add_argument("--dry-run", action="store_true", help="list what would change, write nothing")
     ap.add_argument("--reports", action="store_true", help="also upload reports/headless/*.json")
     ap.add_argument("--dirty", action="store_true", help="deploy with uncommitted changes (a test)")
+    ap.add_argument("--pull-reviews", action="store_true", help="only fetch the review verdicts from the host")
     args = ap.parse_args(argv)
     if not os.path.exists(CONFIG):
         raise SystemExit(f"no {os.path.basename(CONFIG)}: see the usage at the top of tools/deploy.py")
     with open(CONFIG, encoding="utf-8") as fh:
         cfg = json.load(fh)
+    if args.pull_reviews:
+        ftp = connect(cfg, password(cfg))
+        try:
+            pull_reviews(ftp)
+        finally:
+            ftp.quit()
+        return
     commit = checks(args.dirty)
     local = site(commit, args.reports)
     hashes = {r: digest(v) for r, v in local.items()}

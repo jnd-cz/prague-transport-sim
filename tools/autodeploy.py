@@ -2,8 +2,8 @@
 
 Runs in a checkout kept for deploys (a worktree with deploy.local.json and its HEAD detached, as
 ../tg-deploy): fetches origin/main and, when it moved since the last deploy, checks it out, fetches
-the data its manifest names (tools/snapshot.py data-fetch) and runs tools/deploy.py. Without a new
-commit it only fetches. A failed deploy is retried after an hour, not on every run (the host bans
+the data its manifest names (tools/snapshot.py data-fetch) and runs tools/deploy.py. Every run then
+pulls the review verdicts from the host into reports/reviews/ (deploy.py --pull-reviews, #136). A failed deploy is retried after an hour, not on every run (the host bans
 repeated failed logins). The password comes from ~/.netrc (machine <host> login <user> password …)
 or TRAM_DEPLOY_PASSWORD: there is nobody to ask.
 
@@ -74,7 +74,22 @@ def once(log):
         return 2
     if run(log, "git", "fetch", "-q", "origin", "main"):
         return 1
-    new, st = git("rev-parse", "origin/main"), load_state()
+    st = load_state()
+    code = deploy(log, st)
+    if time.time() - st.get("pull_failed_at", 0) >= RETRY:
+        if run(log, python(), "-I", "tools/deploy.py", "--pull-reviews"):
+            st["pull_failed_at"] = time.time()
+            print(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} pulling the reviews failed; next try in {RETRY // 60} min", file=log)
+            code = code or 1
+        else:
+            st.pop("pull_failed_at", None)
+    save_state(st)
+    return code
+
+
+def deploy(log, st):
+    """The new main deployed, if there is one; st updated."""
+    new = git("rev-parse", "origin/main")
     if new == st.get("deployed"):
         return 0
     if new == st.get("failed") and time.time() - st.get("failed_at", 0) < RETRY:
@@ -84,11 +99,12 @@ def once(log):
           and run(log, python(), "-I", "tools/snapshot.py", "data-fetch") == 0
           and run(log, python(), "-I", "tools/deploy.py") == 0)
     if ok:
-        st = {"deployed": new, "at": time.time()}
+        st.update(deployed=new, at=time.time())
+        st.pop("failed", None)
+        st.pop("failed_at", None)
     else:
         st.update(failed=new, failed_at=time.time())
         print(f"deploy of {new[:7]} failed; next try in {RETRY // 60} min", file=log)
-    save_state(st)
     return 0 if ok else 1
 
 

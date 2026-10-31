@@ -351,7 +351,21 @@ Choosing one (a row, a tapped pin, N / B) moves the camera there. The card says:
 - **Touch:** one finger pans; two fingers pinch, twist and tilt.
 - **Keys:** W/A/S/D, Q/E, R/F.
 
-The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (read-only, only the game's files) prints the address to open; Windows asks once to allow it through the firewall.
+The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (only the game's files; read-only apart from review answers) prints the address to open; Windows asks once to allow it through the firewall.
+
+**Answers** (#136): the card has a button per answer (1–4 on the keyboard) and a note. An answer is saved
+and the card moves to the next finding without one; **to do** hides the answered ones, and their pins turn
+grey. The answers are kept per line in the browser and sent to the server, which merges them per finding
+(the newer wins), so a phone and a computer share one review:
+- on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
+  `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
+  on every run, and `python -I tools/deploy.py --pull-reviews` does it at once;
+- with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
+
+Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
+A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
+`reports/review/` and deployed with the site: `?line=17&review=reports/review/track-z.json` is #106's
+large track-height disagreements (`tools/dtmp_tracks.py --findings`).
 
 **Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
 bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and

@@ -10,6 +10,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import deploy  # noqa: E402
+import reviews  # noqa: E402
 
 SOME = ["index.html", "src/main.js", "src/route.js", "data/MANIFEST.json"]
 
@@ -52,6 +53,11 @@ class FakeFtp:
         if os.path.exists(self._p(b)):
             raise ftplib.error_perm("550 exists")  # (as some servers: the target goes first)
         os.rename(self._p(a), self._p(b))
+
+    def nlst(self, d):
+        if not os.path.isdir(self._p(d)):
+            raise ftplib.error_perm("550 no such directory")
+        return [f"{d}/{n}" for n in os.listdir(self._p(d))]
 
     def quit(self):
         pass
@@ -117,6 +123,27 @@ class DeployTest(unittest.TestCase):
         v = json.load(open(os.path.join(self.server, "version.json"), encoding="utf-8"))
         self.assertEqual(len(v["commit"]), 40)
         self.assertIn("snapshot", v["data"])
+
+    def test_review_php_and_pull(self):
+        self.run_deploy()
+        self.assertTrue(os.path.exists(os.path.join(self.server, "review.php")))
+        self.assertEqual(open(os.path.join(self.server, "reviews", ".htaccess")).read().strip(), "Require all denied")
+        # answers on the host (as review.php leaves them) and older and newer ones here
+        host = {"meta": {"line": 17}, "items": {"a": {"v": "x", "t": 5}, "b": {"v": "new", "t": 9}}}
+        json.dump(host, open(os.path.join(self.server, "reviews", "line17.json"), "w"))
+        dest = os.path.join(self.tmp, "pulled")
+        reviews.save(os.path.join(dest, "line17.json"), {"items": {"b": {"v": "old", "t": 3}, "c": {"v": "here", "t": 1}}})
+        deploy.pull_reviews(FakeFtp(self.server), dest)
+        got = reviews.load(os.path.join(dest, "line17.json"))["items"]
+        self.assertEqual({k: v["v"] for k, v in got.items()}, {"a": "x", "b": "new", "c": "here"})
+        # the answers stay on the host through the next deploy
+        self.run_deploy()
+        self.assertTrue(os.path.exists(os.path.join(self.server, "reviews", "line17.json")))
+
+    def test_merge_newer_wins(self):
+        out = reviews.merge({"meta": {"a": 1}, "items": {"k": {"v": 1, "t": 5}}},
+                            {"meta": {"b": 2}, "items": {"k": {"v": 2, "t": 4}, "j": {"v": 3, "t": 1}, 7: "bad"}})
+        self.assertEqual(out, {"meta": {"a": 1, "b": 2}, "items": {"k": {"v": 1, "t": 5}, "j": {"v": 3, "t": 1}}})
 
 
 if __name__ == "__main__":

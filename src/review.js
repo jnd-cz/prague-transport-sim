@@ -6,9 +6,12 @@
 //   &at=x,y,yaw,pitch,dist      the camera (the address follows it, so a place can be bookmarked or sent)
 // Mouse: drag pans, right-drag (or Shift-drag) turns and tilts, wheel zooms, click a marker selects it.
 // Touch: one finger pans, two fingers pinch, twist and tilt (move up / down together), tap a marker.
-// Keys: W/A/S/D pan, Q/E turn, R/F tilt, + / − zoom, N / B next / previous finding.
+// Keys: W/A/S/D pan, Q/E turn, R/F tilt, + / − zoom, N / B next / previous finding, 1–4 an answer.
+// Verdicts (#136): a button per answer and a note on the card, saved per line (src/verdicts.js) on the
+// server; tools/deploy.py --pull-reviews (or reports/reviews/ locally) hands them to the agent.
 import * as THREE from 'three';
 import { toLatLon } from './geo.js';
+import { Verdicts } from './verdicts.js';
 
 const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
 const STREETS = new Set([...CARR, ...RAISED, 'paved', 'cycle']);
@@ -21,6 +24,16 @@ const SEAM = 0.03, FLAT = 0.05, CELL = 30; // m: a seam over 3 cm; a kerb under 
 // (the class colours are drawn 0.2 m up: the OSM road ribbons lie 0.12 m over the survey)
 const NEAR = 130; // m: the survey layers are drawn this far around the camera's target
 const fmt = (v, d = 0) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d);
+// the answers per kind of finding (a findings file can bring its own: "options": [...])
+const OPTIONS = {
+  kerb: ['kerb missing in game', 'ramp / level: OK', 'source wrong', 'unsure'],
+  seam: ['visible step', 'not visible', 'unsure'],
+  file: ['real problem', 'OK as is', 'source wrong', 'unsure'],
+};
+const options = (f) => f.options || (f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
+// (a finding's place and kind: the same after a rebuild that leaves it where it was)
+const fid = (f) => `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // the kerb review list in the survey's provenance: wherever the stamp put it
 function findKerbs(o) {
@@ -87,12 +100,13 @@ function grouped(pts) {
 // every object with numeric x and y in a findings file; its kind from the keys above it
 function fileFindings(json, label) {
   const out = [], skip = new Set(['places', 'checks', 'result', 'review', 'findings', 'bad']);
+  const opts = Array.isArray(json?.options) ? json.options.map(String) : undefined;
   const walk = (o, kind) => {
     if (Array.isArray(o)) { for (const v of o) walk(v, kind); return; }
     if (!o || typeof o !== 'object') return;
     if (typeof o.x === 'number' && typeof o.y === 'number') {
       const k = [kind, o.kind].filter(Boolean).join(': ') || label;
-      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '' });
+      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts });
       return;
     }
     for (const [k, v] of Object.entries(o)) walk(v, skip.has(k) ? kind : k);
@@ -116,8 +130,10 @@ export class Review {
     this.near = new THREE.Group(); // the survey layers around the target, rebuilt as it moves
     this.group.add(this.near);
     this.nearAt = null;
+    this.todo = false;
     this._names();
     this._ui();
+    this.verdicts = new Verdicts(`line${data.line}`, { line: data.line, file: url || null }, () => this._sync());
     this._input();
     this._track();
     // findings: the data's own, then the file's
@@ -136,6 +152,8 @@ export class Review {
       }
       this._filters();
       this._markers();
+      // (the stored answers arrive while the first finding is shown)
+      this.verdicts.load().then(() => this._redraw());
       if (at) {
         [this.T.x, this.T.y, this.yaw, this.pitch, this.dist] = at;
         this.T.z = ground.at(this.T.x, this.T.y);
@@ -218,6 +236,10 @@ body.review #gl { touch-action: none }
 #review .rvItem { padding: 8px 10px; border-top: 1px solid #2a2a2a; cursor: pointer }
 #review .rvItem.sel { background: #3a4250 }
 #review .rvItem .sw, #review .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px }
+#review .rvItem.done { opacity: .6 }
+#review .rvItem .vd { color: #8fd18f }
+#review .rvVerdict { padding-top: 8px }
+#review textarea { width: 100%; font: inherit; color: #eee; background: #1d2026; border: 1px solid #444; border-radius: 6px; padding: 6px 8px; resize: vertical }
 #review .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 10px 6px; font-size: 11px }
 #review:not(.lay) #rvLayers, #review:not(.lay) .legend { display: none }
 #review.min .rvList, #review.min .rvRow.more, #review.min .legend { display: none }
@@ -236,7 +258,7 @@ body.review #gl { touch-action: none }
 <div class="rvHead"><b>Review · line ${this.data.line}</b><span class="dim" id="rvCount"></span><button id="rvLay">Layers</button><button id="rvMin" title="fold the panel">▾</button></div>
 <div class="rvRow more" id="rvLayers"></div>
 <div class="legend" id="rvLegend">${Object.entries(CLASS_COLORS).map(([c, col]) => `<span><span class="sw" style="background:${col}"></span>${c}</span>`).join('')}</div>
-<div class="rvRow more"><select id="rvFilter"></select></div>
+<div class="rvRow more"><select id="rvFilter"></select><button id="rvTodo" title="hide the findings with an answer">to do</button></div>
 <div class="rvCard" id="rvCard"><span class="dim">loading findings…</span></div>
 <div class="rvList" id="rvList"></div>`;
     document.body.appendChild(box);
@@ -252,12 +274,20 @@ body.review #gl { touch-action: none }
     $('rvLay').onclick = () => { box.classList.toggle('lay'); $('rvLay').classList.toggle('on', box.classList.contains('lay')); this._render(); };
     $('rvMin').onclick = () => { box.classList.toggle('min'); $('rvMin').textContent = box.classList.contains('min') ? '▴' : '▾'; this._render(); };
     $('rvFilter').onchange = () => { this._fill(); if (this.list.length) this.select(0); };
+    $('rvTodo').onclick = () => { this.todo = !this.todo; $('rvTodo').classList.toggle('on', this.todo); this._fill(); if (this.list.length) this.select(0); };
     $('rvList').addEventListener('click', (e) => { const r = e.target.closest('.rvItem'); if (r) this.select(+r.dataset.i); });
     $('rvCard').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.go) this.select(Math.max(0, Math.min(this.list.length - 1, this.cur + +b.dataset.go)));
       if (b.dataset.copy) navigator.clipboard?.writeText(location.href).then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Copy failed'; });
+      if (b.dataset.v !== undefined) this.verdict(b.dataset.v === '' ? null : options(this.list[this.cur])[+b.dataset.v]);
+    });
+    // a note typed without a new answer is kept with the answer there is
+    $('rvCard').addEventListener('change', (e) => {
+      if (e.target.id !== 'rvNote' || this.cur < 0) return;
+      const f = this.list[this.cur], old = this.verdicts.get(fid(f));
+      if (old || e.target.value.trim()) this._record(f, old?.v ?? null, e.target.value.trim());
     });
     this.$ = $;
   }
@@ -280,11 +310,13 @@ body.review #gl { touch-action: none }
 
   _fill() {
     const v = this.$('rvFilter').value, [src, kind] = v.split('|');
-    this.list = this.findings.filter((f) => !v || (f.src === src && (!kind || f.kind === kind))).sort((a, b) => b.mag - a.mag);
-    this.$('rvCount').textContent = `${this.list.length} findings`;
+    const all = this.findings.filter((f) => !v || (f.src === src && (!kind || f.kind === kind)));
+    this.list = all.filter((f) => !this.todo || !this.verdicts.get(fid(f))?.v).sort((a, b) => b.mag - a.mag);
+    this.$('rvCount').textContent = `${all.filter((f) => this.verdicts.get(fid(f))?.v).length} / ${all.length} done`;
     this.$('rvList').innerHTML = this.list.slice(0, 400).map((f, i) => {
       const w = this.where(f.x, f.y);
-      return `<div class="rvItem" data-i="${i}"><span class="sw" style="background:${SRC_COLORS[f.src]}"></span><b>${f.kind}</b> · ${f.mag.toFixed(0)}<br>
+      const r = this.verdicts.get(fid(f));
+      return `<div class="rvItem${r?.v ? ' done' : ''}" data-i="${i}"><span class="sw" style="background:${SRC_COLORS[f.src]}"></span><b>${f.kind}</b> · ${f.mag.toFixed(0)}${r?.v ? ` · <span class="vd">✓ ${esc(r.v)}</span>` : ''}<br>
 <span class="dim">${w.street || w.stop || ''}${w.s !== null ? ` · s ${w.s} m` : ''}</span></div>`;
     }).join('') + (this.list.length > 400 ? `<div class="rvItem dim">… ${this.list.length - 400} more (narrow the filter)</div>` : '');
     this.cur = -1;
@@ -314,7 +346,54 @@ body.review #gl { touch-action: none }
 <div>${f.info}</div>
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
-<div class="rvRow" style="padding:6px 0 0"><button data-go="-1">◀ prev</button><button data-go="1">next ▶</button><button data-copy="1">Copy link</button></div>`;
+<div class="rvRow" style="padding:6px 0 0"><button data-go="-1">◀ prev</button><button data-go="1">next ▶</button><button data-copy="1">Copy link</button></div>
+${this._verdictHtml(f)}`;
+  }
+
+  _verdictHtml(f) {
+    const r = this.verdicts.get(fid(f));
+    return `<div class="rvVerdict"><textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
+<div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
+<div class="dim" id="rvSync">${this._syncText()}</div></div>`;
+  }
+
+  _syncText() {
+    const V = this.verdicts, n = Object.keys(V.pending).length;
+    const where = V.mode === 'php' ? 'on the server' : V.mode === 'serve' ? 'in reports/reviews/' : '';
+    return V.state === 'loading' ? 'loading the saved answers…' : V.state === 'offline' ? `${n} not sent yet (kept on this device, sent with the next answer)`
+      : V.state === 'sending' ? 'sending…' : `answers saved ${where}`;
+  }
+
+  _sync() { const e = this.$('rvSync'); if (e) e.textContent = this._syncText(); }
+
+  // an answer (null: none) for the finding on the card, then the next one without an answer
+  verdict(v) {
+    const f = this.list[this.cur];
+    if (!f) return;
+    this._record(f, v, this.$('rvNote')?.value.trim() || '');
+    const n = this.list.length;
+    let next = null;
+    if (v !== null) for (let k = 1; k <= n && !next; k++) { const g = this.list[(this.cur + k) % n]; if (!this.verdicts.get(fid(g))?.v) next = g; }
+    this._redraw();
+    if (next && this.list.includes(next)) this.select(this.list.indexOf(next));
+  }
+
+  _record(f, v, note) {
+    const w = this.where(f.x, f.y);
+    this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
+      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1] });
+  }
+
+  // the list, pins and card again after the answers changed, on the same finding
+  _redraw() {
+    const f = this.list[this.cur];
+    this._fill();
+    const i = f ? this.list.indexOf(f) : -1;
+    if (i >= 0) {
+      this.cur = i;
+      this.box.querySelectorAll('.rvItem').forEach((r) => r.classList.toggle('sel', +r.dataset.i === i));
+      this._card(f);
+    }
   }
 
   // ------------------------------------------------------------------ layers
@@ -342,7 +421,7 @@ body.review #gl { touch-action: none }
     const M = new THREE.Matrix4(), c = new THREE.Color();
     this.list.forEach((f, i) => {
       m.setMatrixAt(i, M.makeTranslation(f.x, f.z, -f.y));
-      m.setColorAt(i, c.set(SRC_COLORS[f.src] || '#fff'));
+      m.setColorAt(i, c.set(this.verdicts.get(fid(f))?.v ? '#777' : SRC_COLORS[f.src] || '#fff'));
     });
     m.count = this.list.length;
     m.renderOrder = 6;
@@ -500,8 +579,10 @@ body.review #gl { touch-action: none }
     cv.addEventListener('pointercancel', up);
     cv.addEventListener('wheel', (e) => { e.preventDefault(); this._zoom(Math.exp(e.deltaY * 0.0012)); this._render(); }, { passive: false });
     window.addEventListener('keydown', (e) => {
-      if (e.target.closest?.('select, input')) return;
+      if (e.target.closest?.('select, input, textarea')) return;
       const k = e.key.toLowerCase();
+      const o = this.cur >= 0 && /^[1-9]$/.test(k) && options(this.list[this.cur])[+k - 1];
+      if (o) { this.verdict(o); return; }
       if (k === 'n') this.select(Math.min(this.list.length - 1, this.cur + 1));
       else if (k === 'b') this.select(Math.max(0, this.cur - 1));
       else if (k === '+' || k === '=') { this._zoom(0.8); this._render(); }
@@ -542,6 +623,8 @@ body.review #gl { touch-action: none }
       if (h.has('f')) this._turn(0, -0.8 * dt);
       this._render();
     }
+    this.retry = (this.retry ?? 30) - dt;
+    if (this.retry <= 0) { this.retry = 30; if (this.verdicts.state === 'offline') this.verdicts.send(); }
     this.urlWait = (this.urlWait || 0) - dt;
     if (this.dirty && this.urlWait <= 0) {
       this.dirty = false;
