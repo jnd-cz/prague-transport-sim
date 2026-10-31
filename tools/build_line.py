@@ -1087,6 +1087,8 @@ def main():
                 t.get("crossing") in ("zebra", "marked", "uncontrolled", "traffic_signals", "pedestrian_signals")
                 or t.get("crossing:markings") not in (None, "no") or t.get("crossing_ref") == "zebra"):
             road["z"] = 1  # painted pedestrian crossing (zebra)
+        if t.get("name"):
+            road["n"] = t["name"]  # street name: where a review finding is (src/review.js, #129)
         if t.get("bridge") not in (None, "no"):
             road["b"] = 1
         if t.get("tunnel") == "yes":

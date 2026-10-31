@@ -368,8 +368,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   scene.add(group);
   // time of each part (window.worldTimes, logged at the end: what to optimize)
   const times = {};
-  let lap = performance.now();
+  let lap = performance.now(), seen = 0;
   const mark = async (k) => {
+    // (each mesh knows its part: review mode hides the buildings and the trees, src/review.js)
+    for (const o of group.children.slice(seen)) o.userData.part ??= k;
+    seen = group.children.length;
     times[k] = Math.round(performance.now() - lap);
     if (onPart) await onPart(k);
     lap = performance.now();
