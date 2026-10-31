@@ -130,6 +130,10 @@ packages have the state of the last calendar day of the month. The month in a fi
 | 2 | ZPS_OPL, derived surface polygons | [ZPS Sada 2](https://geoportalpraha.cz/data-a-sluzby/225F0FAF-C041-439D-A3B5-B2BADA225683), [downloads](https://geoportalpraha.cz/data-a-sluzby/ke-stazeni/225F0FAF-C041-439D-A3B5-B2BADA225683) | `https://geoportalpraha.cz/api/get-dtm-download-metadata?code=02` |
 | 3 | ZPS_KR, drawing lines and points | [ZPS Sada 3](https://geoportalpraha.cz/data-a-sluzby/28A24EB4-5EE8-436E-B0BB-357025258211), [downloads](https://geoportalpraha.cz/data-a-sluzby/ke-stazeni/28A24EB4-5EE8-436E-B0BB-357025258211) | `https://geoportalpraha.cz/api/get-dtm-download-metadata?code=03` |
 
+**When the index or the download server fails** (2026-10-31: both answered 502 for hours, the download
+server for every client): wait, or read the index in a browser and save the entries
+(`tools/dtm_packages.py --fetch --index FILE`, #125). Requests are never disguised as a browser's.
+
 **Finding each month's UUID:** these are the working JSON endpoints used by the website, rather than
 a promised, versioned public API. Each response is an array of districts (`obec`), each containing
 `formats`. Select records by `obec_kod`, `format` and `platnost`; use the **returned** `kod_stazeni`,

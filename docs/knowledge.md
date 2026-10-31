@@ -62,6 +62,22 @@ What sessions learned and later work needs. Kept current and short; the full log
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): all of line 17, part of 22. Its vertices are
   far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
+  outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
+  of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**
+  (road −0.005 / +0.006 m, sidewalk +0.095 / +0.109 m on lines 17 / 22); along line 17's platforms the
+  **top** (+0.17 m over the road). The sidewalks' far edges lie +0.100 m over the foot: sidewalks are
+  nearly flat across (a 2 % crossfall would leave 2–3 cm kerbs).
+- **Street surfaces from the survey**: smoothing fits through the outline vertices (on straight kerbs only
+  the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
+  is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street
+  model, #21).
+- **Track heights against each other** (#106 staging, 2026-10-31, where DI has Z): the archive minus DI
+  median 0.00 m, p90 +0.04 (n 71 727); DI minus the surveyed tram area + style offset +0.02 m (p10–p90
+  −0.09…+0.20, n 6 964) and minus surveyed road +0.04 m: these samples are street track. On open track
+  the tram area's surveyed outline is its edges, not rail level (line 17 Levského – Přístaviště: archive
+  +0.4…+0.9 m over it). DI minus surveyed green surface +0.22 m (n 219): the survey there is probably the
+  track bed, not the grass.
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
   breaks if IPR goes Draco-only), retaining walls with `vyska` (which side is retained is not in the
   data), tree register (multipoint) and tree rows.
