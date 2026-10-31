@@ -1,4 +1,5 @@
 """tools/deploy.py against a fake FTP server in a temp folder: python -I tools/test_deploy.py"""
+import base64
 import ftplib
 import json
 import os
@@ -25,6 +26,7 @@ class FakeFtp:
         return os.path.join(self.root, *rel.split("/"))
 
     def retrbinary(self, cmd, cb):
+        self.log.append(("RETR", cmd.split(" ", 1)[1]))
         p = self._p(cmd.split(" ", 1)[1])
         if not os.path.exists(p):
             raise ftplib.error_perm("550 not found")
@@ -115,7 +117,7 @@ class DeployTest(unittest.TestCase):
 
     def test_dry_run_writes_nothing(self):
         self.run_deploy("--dry-run")
-        self.assertEqual(self.ftp.log, [])
+        self.assertEqual([e for e in self.ftp.log if e[0] != "RETR"], [])
         self.assertEqual(os.listdir(self.server), [])
 
     def test_version(self):
@@ -136,6 +138,17 @@ class DeployTest(unittest.TestCase):
         deploy.pull_reviews(FakeFtp(self.server), dest)
         got = reviews.load(os.path.join(dest, "line17.json"))["items"]
         self.assertEqual({k: v["v"] for k, v in got.items()}, {"a": "x", "b": "new", "c": "here"})
+        # a report: fetched once, the screenshot as a file beside it
+        jpg = "data:image/jpeg;base64," + base64.b64encode(b"JPEG bytes").decode()
+        rep = {"meta": {"report": True}, "items": {"report-1": {"kind": "other", "note": "a bump", "line": 17, "shot": jpg}}}
+        json.dump(rep, open(os.path.join(self.server, "reviews", "report-20261031-120000-ab12.json"), "w"))
+        deploy.pull_reviews(FakeFtp(self.server), dest)
+        self.assertEqual(open(os.path.join(dest, "report-20261031-120000-ab12.jpg"), "rb").read(), b"JPEG bytes")
+        self.assertEqual(reviews.load(os.path.join(dest, "report-20261031-120000-ab12.json"))["items"]["report-1"]["shot"],
+                         "report-20261031-120000-ab12.jpg")
+        ftp = FakeFtp(self.server)
+        deploy.pull_reviews(ftp, dest)
+        self.assertNotIn("report-20261031-120000-ab12.json", str(ftp.log), "a report is fetched once")
         # the answers stay on the host through the next deploy
         self.run_deploy()
         self.assertTrue(os.path.exists(os.path.join(self.server, "reviews", "line17.json")))
