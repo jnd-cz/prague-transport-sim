@@ -133,6 +133,14 @@ packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directo
 brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
 CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
 
+To a web host over FTPS (#131): `python -I tools/deploy.py` uploads the same files from a clean commit
+whose data matches the manifest:
+- only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
+- it adds `version.json`, shown in the menu's credits, and an `.htaccess` with compression;
+- `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
+
+The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
+
 ## Gameplay
 
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
