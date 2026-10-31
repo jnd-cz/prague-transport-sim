@@ -9,7 +9,8 @@ are documented in docs/decisions/2026-10-27-track-source.md. This tool imports Z
 
 Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<district KR dir> ...
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)
-Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes]}]}
+Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes],
+"k": kerb edges (raised areas)}]}; kerbs: tools/kerbs.py
 """
 import json
 import math
@@ -250,6 +251,14 @@ for package in packages:
                     a["h"] = holes
                 areas.append(a)
 
+# one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
+from ipr_dtm import IprDtm  # noqa: E402
+import kerbs  # noqa: E402
+_ipr = IprDtm()
+kerb_report = kerbs.apply(areas, lambda x, y: _ipr.sample(x + F.E0, y + F.N0))
+print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSteps']}",
+      f"{len(kerb_report['review'])} areas where the terrain disagrees")
+
 counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
@@ -266,7 +275,7 @@ out = {"areas": areas, "z": flat}
 vertex = {"exact": n_z, "near": n_near, "missing": n_none, "droppedAreas": dropped}
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
-    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex}),
+    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex, "kerbs": kerb_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall")),
     "z": sources.single("streets", "zps", len(cloud), "ground heights (0.5 m cloud)")})
