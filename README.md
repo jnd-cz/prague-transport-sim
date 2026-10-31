@@ -112,15 +112,10 @@ track; the 10 x 15 m grid stays elsewhere): `python -P -E tools/fine_terrain.py 
 `data/lineN.fine.bin` + `.fine.json` (2-5 MB; export tiles cached in raw/dem/). `?nofine` loads
 without it.
 
-Then the **street model** (smooth streets with fixed level steps, meshed offline): the whole line
-in 1.5 km chunks (line 17: 45 s), or a stretch by route position in metres:
-
-```bash
-python -P -E tools/streets.py --line 17
-python tools/streets.py --line 22 --from 10850 --to 12900
-```
-
-It rewrites `data/lineN.dtm.json` (rerunning starts from the survey again; rerun it after `dtm.py`).
+`dtm.py` also puts the kerbs back: the survey records a kerb as one line with one height, and
+`tools/kerbs.py` decides per sidewalk, island and platform which side that line belongs to and moves
+the other side by the step (0.10 m, platforms measured; #21). Surfaces are drawn straight between the
+surveyed vertices.
 
 Download the district GeoPackages from geoportalpraha.cz → Data a služby → "DTM kraje - ZPS Sada 2"
 (areas, `*_ZPS_OPL.gpkg.zip`) and "ZPS Sada 3" (3D lines, `*_ZPS_KR.gpkg.zip`), unzip both into
