@@ -302,6 +302,11 @@ function menuTexts() {
   $('help').innerHTML = t('help');
 }
 $('attrib').textContent = data.attribution;
+// a deployed copy says which commit and data it is (tools/deploy.py writes version.json; not asked for
+// on a local server, where it would only be a 404 in the console)
+if (!['localhost', '127.0.0.1'].includes(location.hostname)) fetch('version.json').then((r) => (r.ok ? r.json() : null)).then((v) => {
+  if (v) $('attrib').textContent += ` · Version ${v.commit.slice(0, 7)} (${v.deployed.slice(0, 10)}), data ${v.data?.snapshot ?? '?'}.`;
+}).catch(() => { /* not deployed */ });
 $('line').textContent = data.line;
 $('menuLine').textContent = data.line;
 const selLine = $('selLine');
