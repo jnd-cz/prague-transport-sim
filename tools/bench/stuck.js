@@ -22,7 +22,12 @@ export function stuckScene(game, traffic, pilot) {
     const out = [];
     for (let c = car, n = 0; c && n < 8; n++) {
       const o = c.seen;
-      if (!o) break;
+      // (the last car of the chain sees no car: why it stands - the tram, a light, a give-way)
+      if (!o) {
+        if (n) out.push({ id: c.id, v: +(c.vNow ?? 0).toFixed(1), conn: !!c.conn, yielding: !!c.yielding, keepClear: !!c.keepClear,
+          light: c.lane?.light ? traffic.lightAspect(c.lane.light) : null, why: c.why ?? null, junction: c.jBlock ?? null, for: null });
+        break;
+      }
       out.push({ id: c.id, gap: +o.gap.toFixed(1), v: +(c.vNow ?? 0).toFixed(1), conn: !!c.conn, yielding: !!c.yielding, keepClear: !!c.keepClear, for: o.car ? o.car.id : 'tram or walker' });
       if (!o.car || out.some((x) => x.id === o.car.id)) break;
       c = o.car;

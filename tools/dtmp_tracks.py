@@ -2,6 +2,7 @@
 
     python -P -E tools/dtmp_tracks.py --fetch --acquire-only  # explicit upstream acquisition
     python -P -E tools/dtmp_tracks.py                       # offline report from raw snapshot
+    python -P -E tools/dtmp_tracks.py --findings reports/review/track-z.json   # plus the review list (#106)
 
 The small city-wide 55010 layer is acquired completely, then assessment is clipped to the same
 16 DI export polygons. Never imports the archive into generated game data.
@@ -317,7 +318,7 @@ def summary(observations):
                                   'median_xy_m': quantile(horizontal, weights, 0.5)}}
 
 
-def analyse():
+def analyse(found=None):
     districts, current_paths = di_data()
     provenance, features, archive_paths = archive_data()
     area = unary_union([d['polygon'] for d in districts])
@@ -406,6 +407,8 @@ def analyse():
     for e in examples:
         unique.setdefault((e['di_id'], e['archive_objectid']), e)
     review = list(unique.values())[:20]
+    if found is not None:
+        found.extend(unique.values())
     surface_evidence(review)
     return {'method': {'step_m': STEP, 'max_distance_m': RADIUS, 'max_heading_degrees': ANGLE,
                        'usable_z_range_m': [100, 500], 'scope': 'DI export polygons for 16 districts',
@@ -449,17 +452,48 @@ def surface_evidence(examples):
         example['compiled_survey_deck_evidence'] = evidence
 
 
+def findings(examples, cell=20.0):
+    """The large disagreements as a review-mode list (src/review.js ?review=FILE, #106): the worst per DI and
+    archive pair, then per 20 m (a bridge's pairs one after another make one place), with the verdicts."""
+    best = {}
+    for e in examples:
+        k = (e['structure'], math.floor(e['xy'][0] / cell), math.floor(e['xy'][1] / cell))
+        if k not in best or abs(e['delta_m']) > abs(best[k]['delta_m']):
+            best[k] = e
+    places = sorted(best.values(), key=lambda e: -abs(e['delta_m']))
+    surface_evidence(places)
+    out = []
+    for e in places:
+        hi, lo = ('archive', 'DI') if e['delta_m'] > 0 else ('DI', 'archive')
+        deck = [z for ev in e['compiled_survey_deck_evidence'] for z in ev['nearest_vertex_z']]
+        out.append({'x': round(e['xy'][0], 2), 'y': round(e['xy'][1], 2), 'mag': round(abs(e['delta_m']), 2),
+                    'kind': 'on a structure' if e['structure'] else 'surface',
+                    'info': f"track height: DI {e['di_z']:.2f} m, archive {e['archive_z']:.2f} m ({hi} {abs(e['delta_m']):.2f} m higher; "
+                            f"plan {e['distance_m']:.2f} m apart)"
+                            + (f"; survey deck {min(deck):.2f}–{max(deck):.2f} m" if deck else "")
+                            + f". DI {e['di_id']}, archive OBJECTID {e['archive_objectid']}",
+                    'di_id': e['di_id'], 'archive_objectid': e['archive_objectid'],
+                    'di_z': round(e['di_z'], 3), 'archive_z': round(e['archive_z'], 3)})
+    return {'about': 'Archived DTMP track heights more than 1 m from the current DI (#106, tools/dtmp_tracks.py --findings)',
+            'options': ['higher one right', 'lower one right', 'neither', 'unsure'], 'findings': out}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fetch', action='store_true')
     parser.add_argument('--acquire-only', action='store_true')
     parser.add_argument('--output', type=Path, default=ROOT / 'reports' / 'dtmp-tracks.json')
+    parser.add_argument('--findings', type=Path, help='also write the large disagreements for review mode')
     args = parser.parse_args()
     if args.fetch:
         acquire()
     if not args.acquire_only:
-        report = analyse()
+        found = []
+        report = analyse(found)
         write_json(args.output, report)
+        if args.findings:
+            write_json(args.findings, findings(found))
+            print(f'Review list: {args.findings}')
         print(json.dumps({'overall': report['overall'], 'lines': report['lines']}, indent=2))
         print(f'Report: {args.output}')
 

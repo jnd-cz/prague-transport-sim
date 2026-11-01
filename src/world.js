@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
 import { rng } from './random.js';
-import { DTM_LIFT, FLUSH } from './terrain.js';
+import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
 import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
@@ -368,8 +368,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   scene.add(group);
   // time of each part (window.worldTimes, logged at the end: what to optimize)
   const times = {};
-  let lap = performance.now();
+  let lap = performance.now(), seen = 0;
   const mark = async (k) => {
+    // (each mesh knows its part: review mode hides the buildings and the trees, src/review.js)
+    for (const o of group.children.slice(seen)) o.userData.part ??= k;
+    seen = group.children.length;
     times[k] = Math.round(performance.now() - lap);
     if (onPart) await onPart(k);
     lap = performance.now();
@@ -857,8 +860,8 @@ function flushDtm(ground) {
   if (dtm.flushed) return; // kept across weather rebuilds
   dtm.flushed = true;
   const done = new Set();
-  // Street model areas (tools/streets.py) are laid to the track profile: the carriageway's offset
-  // from the track's surface level (top of rail less its style's offset), measured on the unshifted model along the route
+  // The ground-level street areas are laid to the track profile: the carriageway's offset
+  // from the track's surface level (top of rail less its style's offset), measured on the unshifted survey along the route
   // (every 2 m) and across it (every 1 m, gaps filled from the nearest carriageway), is applied
   // fully within 5 m of the route (our track and the opposite one) and fades out by 15 m; other
   // lines' tracks crossing it take their heights from the street afterwards. Road and sidewalk at the same spot get the
@@ -934,14 +937,16 @@ function flushDtm(ground) {
   // track is grass track: src/heights.js)
   const pts = [], bed = new Set(), green = new Set();
   const inBed = (a, p) => { if (FLUSH.has(a.c)) bed.add(p); else if (a.c === 'green') { bed.add(p); green.add(p); } };
-  for (const a of dtm.areas) if (a.model) {
+  // (every ground-level street area, sidewalks too: road and sidewalk move together, so the kerbs
+  // tools/kerbs.py gave them keep their height)
+  for (const a of dtm.areas) if (a.l === 0 && STREET.has(a.c)) {
     for (const tri of a.mesh) for (const p of tri) { pts.push(p); inBed(a, p); }
     for (const r of [a.ring, ...a.holes]) for (const p of r) { pts.push(p); inBed(a, p); }
   }
   for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) srow(Math.round(n.s / 2)); } // (rows and their neighbours, before anything moves)
   for (const p of pts) shift(p);
   for (const a of dtm.areas) {
-    if (a.model || a.l !== 0 || !(FLUSH.has(a.c) || a.c === 'green')) continue;
+    if (a.l !== 0 || !(FLUSH.has(a.c) || a.c === 'green')) continue;
     for (const tri of a.mesh) for (const p of tri) {
       if (done.has(p)) continue;
       if (a.c === 'green') { const n = route.nearest(p[0], p[1]); if (!n || n.d > 8 || ground.styles?.at(n.s) !== 'grass') continue; }
@@ -1014,7 +1019,7 @@ function buildDtm(group, ground) {
     const side = a.l > 0 ? col : new THREE.Color('#8e8a82').toArray();
     [a.ring, ...a.holes].forEach((ring, ri) => {
       for (let i = 0; i < ring.length; i++) {
-        if (a.kerbs && !a.kerbs[ri]?.[i]) continue; // street model: kerbs only where the carriageway is
+        if (a.kerbs && !a.kerbs[ri]?.[i]) continue; // kerbs only where the carriageway is (tools/kerbs.py)
         const p = ring[i], q = ring[(i + 1) % ring.length];
         cg.quad(c, W(p[0], p[1], p[2] + lift - drop), W(q[0], q[1], q[2] + lift - drop), W(q[0], q[1], q[2] + lift), W(p[0], p[1], p[2] + lift), side);
       }

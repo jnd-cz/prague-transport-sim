@@ -22,6 +22,10 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 
 - **Tasks live in GitHub issues** (`jnd-cz/prague-transport-sim`), grouped by milestone. Docs link to
   issues instead of listing tasks. New findings that are not fixed now become an issue.
+- **Who works on what:** an issue in progress carries its agent's label (`agent:claude`, `agent:codex`),
+  set when the work starts and removed when its PR merges; `gh issue list --label agent:codex` shows the
+  other agent's work, its branch and draft PR the rest. Before starting, check the open PRs for files
+  the issue will touch too (`gh pr list`, `gh pr diff N --name-only`).
 - One branch per issue (`<number>-<short-name>`), PR into `main`, the PR says which checks were run and
   their numbers. Small doc or data-fact changes may go straight to `main`.
 - PR description: `Closes #N.`, what changes and why, a check table (line × check, before → after),
@@ -42,7 +46,12 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   the rule that produced it, measure again on all lines. A local special case needs a fact in
   `data/truth.json`, not a coordinate in code.
 - **Realism over convenience.** Keep the driver's real skills (contacts, coasting, signals) instead of
-  automating them. Facts from the user (a Prague tram expert) win over heuristics.
+  automating them. Facts from the user (a Prague tram expert) win over heuristics. A user fact cites
+  where it was said (the quote, and the issue or PR comment or the session date), in `data/truth.json`
+  and in the PR.
+- **Calibrate a check before it holds or overrules data:** measure it against an independent source where
+  one exists (DI heights, survey points), split by the cases it covers. The #119 survey check held 4.6 km
+  of line 17's open track: calibrated on street track only.
 - Heuristics standing in for missing data log what they decided (debug overlay F8, `window.game`) so they
   can be reviewed.
 
@@ -57,6 +66,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - A defect outside the issue becomes an issue (or a "Findings" section in the PR when issues are not
   allowed). It is fixed on the same branch only when the issue's checks cannot pass without it, in
   its own commits, and the PR says so.
+- A measurement worth repeating becomes a check (`tools/bench/`, a `headless.py --checks` entry), not a
+  scratch script the next session rewrites.
 - Investigation scripts are not committed unless they run like the other tools: their own server on
   a free port (as `headless.py`), no fixed agent port, a usage line at the top.
 - The run ends with the draft PR saying what is done, what was measured and what the user must
@@ -66,6 +77,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 
 - **Never edit generated data by hand** (`data/line*.json` and sidecars): change the tool and rebuild.
   Hand-made facts go to `data/truth.json`.
+- A provider that refuses scripted requests is waited out or read from a saved copy; requests are never
+  disguised as a browser's (DATA.md, ZPS downloads).
 - Sources come only from the pinned snapshot in `raw/` (`python -I tools/snapshot.py fetch`); OSM only
   from its local extract (`raw/osm/praha.osm.pbf`). **The public Overpass API is not used.**
 - One coordinate conversion for every tool: `tools/geo.py`.
@@ -97,7 +110,10 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   baseline of 2026-10-23, before #7 and #84, not maintained: regressions use `headless.py --compare`); benches in `tools/bench/`
   (u3, redruns, walkers; `batch.html`). Run long browser jobs unawaited and poll (script calls time out
   at 45 s); a background window throttles frames, so no fps readings then.
-- Dev switches: `?line=N`, `?inspect`, `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`.
+- **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
+  another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
+  `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`.
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, the table
   goes into the PR); a count that moves needs a reason in the PR. When a PR moves the numbers, rerun with
   `--baseline` once its code and data are committed and published, and commit
@@ -108,10 +124,12 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
+| traffic seed 3 | 22 | did not finish (stop 24, 7200 s): a jam | #154 |
 
 ## Code style
 
-- Match the surrounding code: plain modules, short names in hot loops, comments that say why (the data
+- Don't reformat code you are not changing (no formatter over whole files: #119's reflow buried its
+  changes). Match the surrounding code: plain modules, short names in hot loops, comments that say why (the data
   quirk, the measured case), not what. Units are metres, seconds, m/s unless named otherwise.
 - Docs say what is and what was measured, briefly: no disclaimers or hedges, no restating.
 - No new dependencies or build steps without an issue that decides it. Tests and benches: Python +

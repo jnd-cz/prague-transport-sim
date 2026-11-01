@@ -19,9 +19,12 @@ them in order; read AGENTS.md first if it is not in context yet.
 2. **The issue:** `gh issue view $ARGUMENTS --comments`. Note its Now / Where / Done when / Checks (the
    issue template). If it lacks one of them, work it out from the code and say what you assumed.
    Check the linked issues and the known failures table in AGENTS.md, so you know which failures are
-   not yours.
+   not yours. Check who else works nearby: `gh issue list --label agent:codex` and the open PRs
+   (`gh pr list`; `gh pr diff N --name-only` for the files they touch). Say if one overlaps.
+   Long jobs running in this checkout pin it: then work in a worktree (AGENTS.md).
 3. **Branch:** `git checkout -b $ARGUMENTS-<two or three words from the title, kebab-case>`; set
    `git config user.email "2506000+jnd-cz@users.noreply.github.com"` if it is not set in this clone.
+   Label the issue: `gh issue edit $ARGUMENTS --add-label agent:claude`.
 4. **Plan:** say in a few lines what you will change (files, the rule, not a spot fix), and which checks
    prove it: the issue's Checks, plus `/regress` before the PR. If the issue changes built data, the plan
    ends with rebuild, `/regress`, `data-publish` and the manifest commit on the branch (AGENTS.md).

@@ -55,8 +55,10 @@ CALLS = {
     "traffic": "const { trafficRun } = await import('/tools/traffic_lint.js'); return await trafficRun({ seed: SEED });",
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
+    "surfaces": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+                "const { run } = await import('/tools/bench/surfaces.js'); return await run();",
 }
-SEEDLESS = {"lint"}
+SEEDLESS = {"lint", "surfaces"}
 
 
 def judge(check, r):
@@ -304,7 +306,7 @@ def run_one(browser, url, line, check, seed, timeout):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="17")
-    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint")
+    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint, surfaces")
     ap.add_argument("--seeds", default="1-3")
     ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")

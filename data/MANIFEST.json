@@ -1,16 +1,16 @@
 {
- "snapshot": "2026-10-30c",
- "built_at_commit": "9442672",
- "published": "2026-10-30 19:41",
- "note": "Lines 9, 17, 22, 23, 37: fine terrain from IPR 1 m (DMR 5G over passages), provenance in every file (#10)",
+ "snapshot": "2026-11-01",
+ "built_at_commit": "62795ac",
+ "published": "2026-11-01 12:49",
+ "note": "Lines 17 and 22: ZPS districts by rule, snapshot 2026-11-01 (#125)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
    "sha256": "001375e5882b556c2e5c2c3af8e5f31e9c1f357010413d1c3b4c35e0a7dbcc8e"
   },
   "line17.dtm.json": {
-   "size": 23414323,
-   "sha256": "cc9a98780e07865bdbae64022ef2c89483b6979b756891a0faab055b06e7855d"
+   "size": 9663408,
+   "sha256": "5c16967013d2a868aaa5fe0ace649e4b008d969816910e7215ee3f6de8d3adce"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -29,8 +29,8 @@
    "sha256": "2491267ae13fe66b2f8b3b8fc42bedf9ddaf91cb9858ed7150e25a8f46463df0"
   },
   "line17.json": {
-   "size": 4989839,
-   "sha256": "48a5274bb2a74e2b84ac61664c9c33ca84637e56d950b2291dcc47aab8b0fa9c"
+   "size": 5024273,
+   "sha256": "c07308211cc62af2367ac6c6ad200a0fc65f150777de470735f206f7735bf673"
   },
   "line17.signals.json": {
    "size": 35510,
@@ -40,13 +40,17 @@
    "size": 4439,
    "sha256": "30edab267311680d56ee52715b773c957457575f552776442d6b295c9fb0bffc"
   },
+  "line17.zps.json": {
+   "size": 6386309,
+   "sha256": "63f2e82b1511ae04c42f5d247af257867814710452030414cb6ad77de3dc0889"
+  },
   "line22.bld.bin": {
    "size": 8575524,
    "sha256": "a9d5d6b57c9d28649402ffa10d0193f6903caf3dac2fd2807d6006373ced0bfe"
   },
   "line22.dtm.json": {
-   "size": 11687376,
-   "sha256": "f6a6b2d059a1d5f94f0713c8d50ee3a53178ca3c5ac601bc93ee5708f7bf0e22"
+   "size": 9978041,
+   "sha256": "7953178fd6e469afeec3eef58732027f7975560d8bf89beb13370a30f2d1b1a8"
   },
   "line22.fine.bin": {
    "size": 3734900,
@@ -61,8 +65,12 @@
    "sha256": "eb7378012683c1bdaf1374980a6802ce84ab46f231d8f1daf6c6b667ec9ebba7"
   },
   "line22.json": {
-   "size": 5163956,
-   "sha256": "ebb5f0a6d9542d510b7b2471e2472837795ac51e32295d04eb92b18969811657"
+   "size": 5200220,
+   "sha256": "59cd515314740aac0e01f4e939156babdaa7562be3d587e5afb9ee1dfad2fe40"
+  },
+  "line22.zps.json": {
+   "size": 6851852,
+   "sha256": "a6865dbacaaf70591fdfe8a804acaf2cc1b668da800727b4cec622faab569ab9"
   },
   "line23.bld.bin": {
    "size": 4805172,
@@ -81,8 +89,8 @@
    "sha256": "fa7d6cea3987ee488cefa925e03cf6ed889e44b41ca90daa93dd34d3667ac17e"
   },
   "line23.json": {
-   "size": 1722833,
-   "sha256": "b6df435ab86e3262ffd28a11b07413cb65cec429c62767c331496c21b91c9071"
+   "size": 1741650,
+   "sha256": "cf1d4c11b1fe685ecc5ba44056267a72ce5f44be137169ed6d526cad62337ea9"
   },
   "line37.bld.bin": {
    "size": 3160548,
@@ -101,8 +109,8 @@
    "sha256": "9763cf5ef863a092106c27c54d86533ff1daeac3acd61f254ea93da888a2ae03"
   },
   "line37.json": {
-   "size": 1519099,
-   "sha256": "ccf638c65835ef5a954cdd991c0e1170fdf32c3a2743eb19657199bb3bf18fdc"
+   "size": 1533310,
+   "sha256": "4b14913e528db74ebeea7ae259b0f5008ea564ac0aa312167d69f7b8da6539c6"
   },
   "line9.bld.bin": {
    "size": 10024992,
@@ -121,8 +129,8 @@
    "sha256": "7b8f964a41239abb9b2c7a2960b4c46042f87adc6f5d31985cdf392cec463f26"
   },
   "line9.json": {
-   "size": 3840092,
-   "sha256": "665720949bb2534ce4eedcbc265205cf10e89478f0d78850a49e2fe128f0b316"
+   "size": 3874257,
+   "sha256": "61ebe1e4353de1a29484f037dd20ce73e3feda19a48fb2399a36ba55c4397c39"
   },
   "lines.json": {
    "size": 607,

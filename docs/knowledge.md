@@ -62,8 +62,36 @@ What sessions learned and later work needs. Kept current and short; the full log
   culverts: bare earth shows the passage); near OSM passages DMR 5G, which kept them, takes over.
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
-- **Prague DTM / ZPS survey** (street areas, kerbs, points): all of line 17, part of 22. Its vertices are
-  far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
+  (`tools/dtm_packages.py` `DTM`, `--check` recomputes it from the OSM district boundaries). The hand-made
+  lists before #125 covered under half of line 22 (no Praha 1 or 6) and missed line 17's Troja and Libuš,
+  with Trojský most. Its vertices are far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **An outline along a retaining wall takes the wall's top and foot by turns** (#147): the area's
+  vertices coincide with the wall's 3D lines (`Hranice stavby`, ground level), whose heights alternate.
+  Beside the tram embankment at Belárie (line 17) the tram area's edge read 195.8 / 199.7 / 196.8 /
+  200.3 m with the terrain at ~198.5, and two points took a footbridge's 202.7 m, listed on level 0 and 1.
+  `dtm.py` `despike`: on surfaces driven or walked on, a point more than 1 m off its neighbours' median
+  (and steeper than 1:5) takes the height along the outline, but only where the terrain agrees with the
+  median better than with the point: an outline that really runs on two levels (a riverside walk under
+  the street wall) keeps the points the terrain confirms. Without the terrain check the rule lifted
+  Novoměstská náplavka's walk 6 m to the street. Line 17: 1,595 points, line 22: 693
+  (`provenance … vertexHeights.spikes`).
+- **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
+  outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
+  of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**
+  (road −0.005 / +0.006 m, sidewalk +0.095 / +0.109 m on lines 17 / 22); along line 17's platforms the
+  **top** (+0.17 m over the road). The sidewalks' far edges lie +0.100 m over the foot: sidewalks are
+  nearly flat across (a 2 % crossfall would leave 2–3 cm kerbs).
+- **Street surfaces from the survey**: smoothing fits through the outline vertices (on straight kerbs only
+  the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
+  is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street
+  model, #21).
+- **Track heights against each other** (#106 staging, 2026-10-31, where DI has Z): the archive minus DI
+  median 0.00 m, p90 +0.04 (n 71 727); DI minus the surveyed tram area + style offset +0.02 m (p10–p90
+  −0.09…+0.20, n 6 964) and minus surveyed road +0.04 m: these samples are street track. On open track
+  the tram area's surveyed outline is its edges, not rail level (line 17 Levského – Přístaviště: archive
+  +0.4…+0.9 m over it). DI minus surveyed green surface +0.22 m (n 219): the survey there is probably the
+  track bed, not the grass.
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
   breaks if IPR goes Draco-only), retaining walls with `vyska` (which side is retained is not in the
   data), tree register (multipoint) and tree rows.
@@ -80,9 +108,9 @@ What sessions learned and later work needs. Kept current and short; the full log
     may be used with a snapshot/month warning for rebuild-before-publish refreshes; incomplete pairs fail.
   - Layers: classified by the type code, `table.split('#')[-1].split('_')[0]` (the codes in `dtm.py`'s
     table; registration matches a table ending in the code or containing `#<code>_`). Full names matter
-    too: height lines need `Hranice` in the name, and the ground-height cloud filters the prefixes
-    `Hranice_dopravní_stavby_nebo_plochy`, `Vnitřní_členění_dopravní_plochy`, `Hranice_ostatní_plochy`,
-    `Hranice_udržované_zeleně`, `Hranice_přírodního`, `Terénní_hrana`.
+    too: height lines need `Hranice` in the name. (The ground-height cloud built from the
+    `Hranice_dopravní_stavby_nebo_plochy` … `Terénní_hrana` lines was retired in #21: surfaces are
+    linear between their surveyed vertices.)
   - Attributes: only `UrovenUmisteniObjektuZPS` (nullable INTEGER on 981 of the 1,062 layers, absent on
     81; absent or null = level 0). The geometry column is found from `gpkg_geometry_columns` (now
     `shape`).

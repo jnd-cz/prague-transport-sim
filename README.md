@@ -112,15 +112,10 @@ track; the 10 x 15 m grid stays elsewhere): `python -P -E tools/fine_terrain.py 
 `data/lineN.fine.bin` + `.fine.json` (2-5 MB; export tiles cached in raw/dem/). `?nofine` loads
 without it.
 
-Then the **street model** (smooth streets with fixed level steps, meshed offline): the whole line
-in 1.5 km chunks (line 17: 45 s), or a stretch by route position in metres:
-
-```bash
-python -P -E tools/streets.py --line 17
-python tools/streets.py --line 22 --from 10850 --to 12900
-```
-
-It rewrites `data/lineN.dtm.json` (rerunning starts from the survey again; rerun it after `dtm.py`).
+`dtm.py` also puts the kerbs back: the survey records a kerb as one line with one height, and
+`tools/kerbs.py` decides per sidewalk, island and platform which side that line belongs to and moves
+the other side by the step (0.10 m, platforms measured; #21). Surfaces are drawn straight between the
+surveyed vertices.
 
 Download the district GeoPackages from geoportalpraha.cz → Data a služby → "DTM kraje - ZPS Sada 2"
 (areas, `*_ZPS_OPL.gpkg.zip`) and "ZPS Sada 3" (3D lines, `*_ZPS_KR.gpkg.zip`), unzip both into
@@ -138,8 +133,36 @@ packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directo
 brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
 CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
 
+To a web host over FTPS (#131): `python -I tools/deploy.py` uploads the same files from a clean commit
+whose data matches the manifest:
+- only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
+- it adds `version.json`, shown in the menu's credits, and an `.htaccess` with compression;
+- `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
+
+The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
+
+Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
+`deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
+checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
+it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
+`~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
+hour. Log: `reports/autodeploy.log`.
+
 ## Gameplay
 
+- **On a phone or tablet** (#79): on-screen buttons, shown on a touch screen by default and switched by
+  🎮 in the menu (remembered per device). They send the keyboard's keys:
+  - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive, STOP (the emergency brake, held), and
+    the dead-man button when that option is on;
+  - the left column: doors, bell, sand (held), look left / right (held), view, mirror, pause;
+  - ⋯ for the rest: switch contact, switch iron, heating cut-out, heating, autopilot, sound, ⚑ report.
+
+  On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
+- **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
+  zoom; a double click brings it back behind the tram.
+- **The right mirror** grows with the window (a quarter of its height, 110–420 px) and keeps its
+  aspect, so its field of view stays the same; its picture is drawn at the frame's size in device
+  pixels.
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
   Forces follow the ČKD T3 pamphlet (1.8 m/s² acceleration and service braking for an empty 16 t car),
   so a full car is slower; gravity on gradients (Chotkova ~7 %), curve resistance, rolling back
@@ -161,6 +184,8 @@ CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown 
   junctions, queue behind trams on shared track, stop for walkers; trams stop behind cars on their track.
 - Menu options: automatic switches (onboard computer sets every switch by radio instead of the
   overhead contacts), performance overlay (FPS, frame time, draw calls, triangles, JS heap).
+- Idle pages draw 4 frames a second (#149): the menu, a pause, the results, review mode with its
+  camera at rest. Driving and inspect mode draw every frame; a hidden tab draws nothing.
 - Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered,
   six doors); line 23
   runs a single heritage car. "Set" in the menu overrides it. Each car follows the track on its own
@@ -318,12 +343,88 @@ python tools/lint_report.py
 After an intended improvement, run it with `--accept` to make the current reports the new baseline.
 Facts from the user that checks are scored against live in `data/truth.json`.
 
+**Compare a view or rebuilt data** (#158):
+
+```bash
+python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main
+python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
+python -I tools/datadiff.py --line 17 dtm
+python -I tools/datadiff.py --line 17 zps --at=-2489,-8331 --radius 5
+python -I tools/datadiff.py --line 17 dtm --ref '5d6c427^'
+```
+
+`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`.
+Views: `cab` (default), `chase`, `review`. The tram is paused at `s`, traffic and HUD are hidden;
+review uses `&at=` at that route point. Both sides use the current view's exact camera, so a changed
+profile cannot move the comparison camera. It starts its own free-port servers, one view at a time.
+The reference defaults to `origin/main`: a git revision is exported temporarily with its published
+data from `TRAMDATA_CACHE`; a directory uses its working files. Neither checkout is modified.
+
+`datadiff.py` compares working `dtm`, `zps` or `line` JSON with the SHA-256-verified published version
+named by `data/MANIFEST.json`, read from the machine cache. `--ref DIR|REV` selects another published
+manifest. Reports in `reports/diffs/` give counts per area class/source kind, the absolute-height-change
+histogram in metres, and the largest changed vertices with their record IDs and XY. Shapes match by
+class, level and exact XY; reordered rings/records are unchanged, XY edits count as added/removed,
+and closed outline endpoints count once. Missing heights count separately. `line` also lists changed
+fields and array counts. `--at X,Y` lists nearby working survey areas and source segments (including
+their levels and height-accuracy classes); the JSON report retains their vertices.
+Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
+in a separate checkout of that reference; comparisons never restore over the working data.
+
 **Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
 **I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
 overlay is hidden and the mouse moves the camera: **orbit** around the tram (drag to turn, wheel to zoom)
 or **fly** (C; drag to look, W/A/S/D, R/F up/down, Shift faster, wheel = flying speed). PgDn / PgUp
 (or . / ,) put the camera at the next / previous stop, T back to the tram, I leaves (the autopilot keeps
 driving: O hands back the controls). The camera's route position is on the panel, handy with the lints.
+
+**Review mode** (the checks' findings on the map, desktop or phone; #129): open
+`index.html?line=17&review`, no shift needed. The panel lists findings worst first:
+- the kerb review list from the survey's provenance (`tools/kerbs.py`);
+- seams and flat or sunk kerbs between neighbouring survey areas, grouped per 30 m;
+- with `&review=reports/x.json`, every `{x, y}` in that file (a lint or headless result, a hand-made list).
+
+Choosing one (a row, a tapped pin, N / B) moves the camera there. The card says:
+- the street (OSM name) and the nearest stop;
+- `s`, `x, y` and lat/lon;
+- links to Mapillary, Panoramax, the Mapy.com aerial and Google Street View at that place (facing the camera's heading).
+
+**Layers** toggles the survey classes as colours, the wireframe of the survey triangles, the survey's own lines (**Source**), kerb edges, seam posts, pins, our track, the buildings and the trees.
+The classes and the wireframe are the game's build of the survey (`tools/dtm.py`: merged areas,
+fitted heights). **Source** draws the survey's 3D lines as they come (`data/lineN.zps.json`,
+`tools/zps_source.py`, lines with surveyed streets) at their own heights: white at ground level, cyan
+below, orange above, red dots where a vertex has no height. The card then lists the source lines
+within 5 m with their kind, level, height there and height accuracy class.
+- **Mouse:** drag pans, right-drag (or Shift-drag) turns and tilts, the wheel zooms.
+- **Touch:** one finger pans; two fingers pinch, twist and tilt.
+- **Keys:** W/A/S/D, Q/E, R/F.
+
+The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (only the game's files; read-only apart from review answers) prints the address to open; Windows asks once to allow it through the firewall.
+
+**Answers** (#136): the card has a button per answer (1–4 on the keyboard) and a note. The answers compare
+the game with reality (the imagery): kerbs wrong in game / matches reality / other level or wall / unsure;
+which of the source and the build is wrong is for the agent to find. An answer is saved
+and the card moves to the next finding without one; **to do** hides the answered ones, and their pins turn
+grey. The answers are kept per line in the browser and sent to the server, which merges them per finding
+(the newer wins), so a phone and a computer share one review:
+- on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
+  `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
+  on every run, and `python -I tools/deploy.py --pull-reviews` does it at once;
+- with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
+
+Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
+A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
+`reports/review/` and deployed with the site: `?line=17&review=reports/review/track-z.json` is #106's
+large track-height disagreements (`tools/dtmp_tracks.py --findings`).
+
+**Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
+pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
+screenshot of the 3D view. The state covers the line, trip, clock, weather, seed, tram position, speed
+and notch, the camera, lat/lon, a review-mode link to the place and the deployed version. The record is
+stored as `report-<date>-<time>-<code>`; the id is shown so it can be quoted in chat. It goes into the
+same store as the review answers: on the test host it comes back through `autodeploy.py` as
+`reports/reviews/report-….json` and `.jpg` in the deploy checkout; locally `serve.py` writes it there
+directly. Without a server the record is downloaded as a file instead.
 
 **Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
 bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and

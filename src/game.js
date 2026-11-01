@@ -178,9 +178,9 @@ export class Game {
   // platforms get a stop sign at their head and a shelter where OSM has one.
   // A Vienna-type stop (boarding from the sidewalk across the car lane; cars stop behind the open
   // doors): right of the track along the stop (2.2-3.4 m, doors on the right) the survey has mostly
-  // carriageway, not an island or a raised edge (as tools/streets.py; it was only listed, never used:
-  // Čechův most, Ke Stírce from Kobylisy got a platform on the road). Returns the kerb's offset (m right
-  // of the track: the first sidewalk out to 12 m), or null for an ordinary stop / no survey.
+  // carriageway, not an island or a raised edge (Čechův most, Ke Stírce from Kobylisy got a platform
+  // on the road). Returns the kerb's offset (m right of the track: the first sidewalk out to 12 m), or
+  // null for an ordinary stop / no survey.
   _vienna(rt, s0, s1) {
     const dtm = this.route.ground.dtm;
     if (!dtm) return null;

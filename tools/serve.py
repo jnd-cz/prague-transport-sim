@@ -3,23 +3,43 @@
     python tools/serve.py 8742          # the project root on http://localhost:8742
     python tools/serve.py 8744 1500     # each response sent no faster than 1500 KB/s (the loading screen
                                         # on a slow connection; from the remote session's serve_nocache.py)
+    python tools/serve.py 8742 --lan    # also to the home network (a phone: review mode, #129): only what
+                                        # the game loads, read-only apart from review verdicts;
+                                        # prints the address to open
 """
 import argparse
 import functools
 import http.server
 import json
 import os
+import posixpath
 import re
 import shutil
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import reviews  # noqa: E402
+
+
+# what --lan serves: the game and its data, not the sources in raw/, .git or the tools' caches
+LAN_TOP = {"", "index.html", "src", "assets", "data", "tools", "reports", "favicon.ico"}
 
 
 class NoCache(http.server.SimpleHTTPRequestHandler):
+    def send_head(self):
+        # (the first segment after normalising: /src/../raw/x is raw)
+        top = posixpath.normpath(unquote(self.path.split("?", 1)[0].split("#", 1)[0])).lstrip("/").split("/")[0]
+        if self.server.lan and top not in LAN_TOP:
+            self.send_error(404)
+            return None
+        return super().send_head()
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
         if self.server.identity:
@@ -36,9 +56,32 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
             time.sleep(len(data) / rate)
 
     def do_POST(self):
-        """Lint reports from the page: POST /report/<name>.json -> reports/<name>.json (local only)."""
+        """Lint reports from the page: POST /report/<name>.json -> reports/<name>.json (local only).
+        Review verdicts (#136): POST /review/<name>.json merges into reports/reviews/<name>.json, also
+        from the home network (with the page's X-Review header, which no cross-site form sends)."""
         name = os.path.basename(self.path)
-        if not self.path.startswith("/report/") or not re.fullmatch(r"[\w.-]+\.json", name):
+        if self.path.startswith("/review/"):
+            n = int(self.headers.get("Content-Length", 0))
+            if not self.headers.get("X-Review") or not reviews.NAME.fullmatch(name.removesuffix(".json")) or n > reviews.MAX:
+                self.send_error(400)
+                return
+            try:
+                new = json.loads(self.rfile.read(n))
+            except ValueError:
+                self.send_error(400)
+                return
+            path = os.path.join(REVIEWS, name)
+            with REVIEW_LOCK:
+                out = reviews.merge(reviews.load(path), new if isinstance(new, dict) else {})
+                reviews.save(path, out)
+            body = json.dumps({"ok": True, "items": len(out["items"])}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.server.lan or not self.path.startswith("/report/") or not re.fullmatch(r"[\w.-]+\.json", name):
             self.send_error(404)
             return
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
@@ -47,6 +90,10 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
             fh.write(body)
         self.send_response(204)
         self.end_headers()
+
+
+REVIEWS = os.path.join(ROOT, "reports", "reviews")
+REVIEW_LOCK = threading.Lock()
 
 
 class Server(http.server.ThreadingHTTPServer):
@@ -68,6 +115,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('port', type=int, nargs='?', default=8737)
     ap.add_argument('rate', type=float, nargs='?', default=0)
+    ap.add_argument('--lan', action='store_true', help='listen on every interface, read-only, the game files only')
     ap.add_argument('--identity', help=argparse.SUPPRESS)
     ap.add_argument('--ready-file', type=Path, help=argparse.SUPPRESS)
     args = ap.parse_args()
@@ -80,11 +128,21 @@ def main():
             os.replace(tmp, args.ready_file)
 
     try:
-        server = Server(('127.0.0.1', args.port), functools.partial(NoCache, directory=ROOT))
+        host = '0.0.0.0' if args.lan else '127.0.0.1'
+        server = Server((host, args.port), functools.partial(NoCache, directory=ROOT))
     except OSError as e:
-        announce({**ready, 'error': f'cannot bind 127.0.0.1:{args.port}: {e}'})
+        announce({**ready, 'error': f'cannot bind {host}:{args.port}: {e}'})
         raise SystemExit(str(e)) from e
-    server.identity, server.rate = args.identity, args.rate * 1024
+    server.identity, server.rate, server.lan = args.identity, args.rate * 1024, args.lan
+    if args.lan:
+        # (the address other devices reach: the interface that would route outwards; nothing is sent)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            try:
+                s.connect(('10.255.255.255', 1))
+                ip = s.getsockname()[0]
+            except OSError:
+                ip = '<this computer>'
+        print(f'on the home network: http://{ip}:{server.server_port}/?review (read-only, review verdicts saved)', flush=True)
     # POST reports are relative to this checkout too, independent of the caller's cwd.
     os.chdir(ROOT)
     with server:

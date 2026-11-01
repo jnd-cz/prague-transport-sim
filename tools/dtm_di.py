@@ -48,8 +48,9 @@ def sha(path):
         return hashlib.file_digest(f, 'sha256').hexdigest()
 
 
-def districts():
-    """Intersect complete line segments (including pathBack), not sampled points or bounding boxes."""
+def districts(lines=LINES, buffer=0.0):
+    """Intersect complete line segments (including pathBack), not sampled points or bounding boxes;
+    with a buffer, the corridor around them (the ZPS street survey's, dtm_packages.CORRIDOR)."""
     import osmium
     from shapely.geometry import LineString
     from shapely.ops import polygonize, unary_union
@@ -57,12 +58,13 @@ def districts():
 
     frame = Frame()
     paths = {}
-    for line in LINES:
+    for line in lines:
         data = load_line(line)
         if data.get('frame') != {'crs': 'EPSG:5514', 'origin': list(frame.to_jtsk(0, 0))}:
             raise ValueError(f'line {line}: rebuild in the city frame first')
         paths[line] = unary_union([LineString([p[:2] for p in data[key]])
                                    for key in ('path', 'pathBack') if data.get(key)])
+    areas = {line: path.buffer(buffer) if buffer else path for line, path in paths.items()}
     rels = relations(lambda t: t.get('admin_level') == '9' and 'ref:cobe' in t
                      and t.get('name', '').startswith('Praha'))
     if len(rels) != 57:
@@ -85,7 +87,7 @@ def districts():
         if poly.is_empty or not poly.is_valid:
             raise ValueError(f"invalid district boundary: {rel['tags']['name']}")
         polygons.append(poly)
-        hits = [line for line, path in paths.items() if poly.intersects(path)]
+        hits = [line for line, area in areas.items() if poly.intersects(area)]
         if hits:
             found.append({'code': rel['tags']['ref:cobe'], 'name': rel['tags']['name'],
                           'lines': hits, 'osm_relation': rel['id']})

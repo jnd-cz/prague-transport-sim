@@ -26,5 +26,18 @@ data/*
 # headless check results (tools/headless.py)
 reports/headless/
 
+# comparison evidence (tools/shot.py, tools/datadiff.py)
+reports/shots/
+reports/diffs/
+
 # rebuild logs (tools/rebuild.py)
 reports/rebuild/
+
+# web host login for tools/deploy.py (host, user, folder; never the password)
+deploy.local.json
+
+# review verdicts (tools/serve.py, tools/deploy.py --pull-reviews)
+reports/reviews/
+
+# tools/autodeploy.py log and state
+reports/autodeploy.*

@@ -10,6 +10,9 @@ import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.j
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
+import { Review, parseAt } from './review.js';
+import { Reporter, canvasShot, place } from './report.js';
+import { TouchControls } from './touch.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
@@ -112,6 +115,7 @@ route.ground = ground;
 const canvas = $('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+window.renderer = renderer; // (from the start, also in the menu: performance checks, tools/test_idle.py)
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
@@ -302,6 +306,12 @@ function menuTexts() {
   $('help').innerHTML = t('help');
 }
 $('attrib').textContent = data.attribution;
+// a deployed copy says which commit and data it is (tools/deploy.py writes version.json; not asked for
+// on a local server, where it would only be a 404 in the console)
+if (!['localhost', '127.0.0.1'].includes(location.hostname)) fetch('version.json').then((r) => (r.ok ? r.json() : null)).then((v) => {
+  if (v) $('attrib').textContent += ` · Version ${v.commit.slice(0, 7)} (${v.deployed.slice(0, 10)}), data ${v.data?.snapshot ?? '?'}.`;
+  window.deployVersion = v; // (in each report, src/report.js)
+}).catch(() => { /* not deployed */ });
 $('line').textContent = data.line;
 $('menuLine').textContent = data.line;
 const selLine = $('selLine');
@@ -319,7 +329,9 @@ applyStatic();
 menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
-onLangChange(() => { menuTexts(); const v = selTrip.value; fillTrips(); selTrip.value = v; });
+onLangChange(() => { menuTexts(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+// on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
+const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
 function fillTrips() {
@@ -393,6 +405,7 @@ function start() {
   };
   window.tramModel = tramModel;
   $('menu').classList.add('hidden');
+  touch.sync();
   $('results').classList.add('hidden');
   hud.show(true);
   $('mirror').classList.remove('hidden');
@@ -479,8 +492,9 @@ $('btnToMenu').addEventListener('click', () => {
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 window.addEventListener('keydown', (e) => {
-  if (!game || game.finished || !$('menu').classList.contains('hidden')) return;
+  if (!game || game.finished || !$('menu').classList.contains('hidden') || reporter.isOpen) return;
   const k = e.key.toLowerCase();
+  if (k === 'f9' && !e.repeat) { e.preventDefault(); reporter.open(); return; }
   // dev overlay of signals, stop lines, conflicts and platforms (src/debugOverlay.js; ?debug shows it at the start)
   if (k === 'f8' && !e.repeat) { e.preventDefault(); debugOverlay.toggle(game, traffic); return; }
   // dev inspect mode (src/inspect.js): its keys first
@@ -543,6 +557,36 @@ window.addEventListener('blur', () => { if (game && !game.finished && !pilot) ga
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = null;
+// the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
+// click or tap brings it back behind the tram (#79)
+const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
+{
+  const ptr = new Map();
+  let pinch = null;
+  const on = () => chase && game && !inspect.active && !window.freeCam;
+  canvas.addEventListener('pointerdown', (e) => { if (!on()) return; ptr.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = null; });
+  canvas.addEventListener('pointermove', (e) => {
+    const p = ptr.get(e.pointerId);
+    if (!p || !on()) return;
+    if (ptr.size >= 2) {
+      const [a, b] = [...ptr.values()], d0 = Math.hypot(b.x - a.x, b.y - a.y);
+      p.x = e.clientX; p.y = e.clientY;
+      const d1 = Math.hypot(b.x - a.x, b.y - a.y);
+      if (pinch !== null && d1 > 0) orbit.k = Math.max(0.3, Math.min(4, orbit.k * (d0 / d1)));
+      pinch = d1;
+    } else {
+      orbit.yaw -= (e.clientX - p.x) * 0.006;
+      orbit.pitch = Math.max(-0.35, Math.min(1.1, orbit.pitch + (e.clientY - p.y) * 0.004));
+      p.x = e.clientX; p.y = e.clientY;
+    }
+    orbit.drag = 0.3;
+  });
+  const up = (e) => { ptr.delete(e.pointerId); pinch = null; };
+  canvas.addEventListener('pointerup', up);
+  canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('wheel', (e) => { if (!on()) return; e.preventDefault(); orbit.k = Math.max(0.3, Math.min(4, orbit.k * Math.exp(e.deltaY * 0.001))); orbit.drag = 0.3; }, { passive: false });
+  canvas.addEventListener('dblclick', () => { if (on()) Object.assign(orbit, { yaw: 0, pitch: 0, k: 1 }); });
+}
 
 function previewAt(s) {
   const p = route.at(s - 40);
@@ -565,12 +609,15 @@ function updateCamera(dt, t) {
   tramModel.visible = chase;
   if (chase) {
     // behind and above the tram body (works also at the very start of the route)
-    const lead = tramModel.userData.cars[0], back = 20 + (tramModel.userData.cars.length - 1) * 8;
-    const fx = Math.sin(lead.rotation.y), fz = Math.cos(lead.rotation.y);
-    camPos.set(lead.position.x - fx * back - fz * 3, lead.position.y + 8.5, lead.position.z - fz * back + fx * 3);
+    // (around the point 10 m ahead of the front: by default behind and above the set, as before)
+    const lead = tramModel.userData.cars[0], back = 30 + (tramModel.userData.cars.length - 1) * 8;
     const q = route.at(s + 10);
     camLook.set(q.x, profile.height(s + 10) + 1.5, -q.y);
-    camera.position.lerp(camPos, Math.min(1, dt * 4));
+    const a = lead.rotation.y + orbit.yaw, el = Math.atan2(7, back) + orbit.pitch, R = Math.hypot(back, 7) * orbit.k;
+    camPos.set(camLook.x - Math.sin(a) * Math.cos(el) * R, camLook.y + Math.sin(el) * R, camLook.z - Math.cos(a) * Math.cos(el) * R);
+    // (while the reviewer turns it, the camera follows at once; else it trails the tram smoothly)
+    orbit.drag -= dt;
+    camera.position.lerp(camPos, orbit.drag > 0 ? 1 : Math.min(1, dt * 4));
     camera.lookAt(camLook);
     return;
   }
@@ -601,6 +648,30 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
+// ⚑ Report (F9, #138): a note with the moment's state and a screenshot, for the agent to look into
+const reporter = new Reporter({
+  shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
+  pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },
+  state: () => {
+    const g = game, p = route.at(tram.s), d = new THREE.Vector3(), c = camera.position, r = (v, k = 1) => Math.round(v * k) / k;
+    camera.getWorldDirection(d);
+    const yaw = Math.atan2(d.x, -d.z), deg = (v) => Math.round((v * 180) / Math.PI);
+    const cam = { x: r(c.x, 10), y: r(-c.z, 10), z: r(c.y, 10), yaw: deg(yaw), pitch: deg(Math.asin(d.y)) };
+    // (the place in review mode: the camera's target on the ground, seen from above at its heading)
+    const tx = c.x + d.x * 20, ty = -c.z - d.z * 20;
+    return {
+      line: g.line, dataLine: data.line, trip: g.opts.tripIndex, startStop: g.opts.startStop, nextStop: g.stops[g.nextStop]?.name,
+      clock: fmtTime(g.clock), weather: g.opts.weather, seed: g.runSeed, obstacles: g.opts.obstacles,
+      mode: inspect.active ? 'inspect' : pilot ? 'autopilot' : 'driving',
+      tram: { s: r(tram.s, 10), kmh: r(tram.v * 3.6, 10), notch: tram.notch, a: r(tram.a, 100), passengers: tram.passengers,
+              x: r(p.x, 10), y: r(p.y, 10), z: r(profile.height(tram.s), 100) },
+      camera: cam, ...place(cam.x, cam.y, data.frame.origin),
+      review: `?line=${data.line}&review&at=${tx.toFixed(1)},${ty.toFixed(1)},${cam.yaw},45,60`,
+      url: location.href, viewport: `${innerWidth}x${innerHeight}@${devicePixelRatio}`, ua: navigator.userAgent,
+    };
+  },
+});
+
 // dev inspect mode: the autopilot drives, time faster or slower, a mouse camera (src/inspect.js)
 const inspect = new Inspect({
   camera, canvas, getGame: () => game, getTramModel: () => tramModel,
@@ -612,6 +683,17 @@ const inspect = new Inspect({
 });
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
+// An idle page draws 4 frames a second (#149): the menu, a pause, the results, and review mode with its
+// camera at rest. Driving, inspect mode and a moving review camera draw every frame; a hidden tab draws
+// nothing (requestAnimationFrame stops). The GPU was busy on an idle tab at full frame rate.
+const IDLE_MS = 250;
+function idle() {
+  if (review) return review.resting();
+  if (!$('menu').classList.contains('hidden')) return true;
+  return !!game && !inspect.active && (game.paused || game.finished);
+}
+window.drawCount = 0; // (draws so far: tools/test_idle.py)
+
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -637,6 +719,7 @@ function frame(now) {
     const inMenu = !$('menu').classList.contains('hidden');
     if (hudTimer <= 0 && !inMenu) { hudTimer = 1 / 30; hud.update(game, game.opts); }
     $('action').style.visibility = inMenu ? 'hidden' : '';
+    document.body.classList.toggle('shift', !inMenu && !game.finished);
     $('pausePanel').classList.toggle('show', game.paused && !game.finished && !inMenu);
     if (game.finished && !game.resultsShown) {
       game.resultsShown = true;
@@ -644,11 +727,14 @@ function frame(now) {
       setTimeout(() => { if (game === ended) showResults(); }, 1500); // not if a new shift started meanwhile
     }
   }
+  if (review) review.update(dt);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
-  if (!window.headless || now - lastDraw > 1000) { renderer.render(scene, camera); lastDraw = now; }
+  const lazy = idle();
+  if (window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS) { renderer.render(scene, camera); lastDraw = now; window.drawCount++; }
   if (perfOn) updatePerf(now);
-  if (game && !chase && mirrorOn && !window.freeCam && !window.headless) renderMirror(); // (not while a test steps the game)
+  // (not while a test steps the game; idle, the mirror keeps its last picture)
+  if (game && !chase && mirrorOn && !window.freeCam && !window.headless && !lazy) renderMirror();
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
@@ -674,6 +760,9 @@ function renderMirror() {
   renderer.setRenderTarget(null);
   tramModel.visible = vis;
   const r = $('mirror').getBoundingClientRect(), H = window.innerHeight;
+  // (the frame is sized by the viewport, index.html: the picture follows it in device pixels, capped)
+  const th = Math.round(Math.max(120, Math.min(640, (r.height - 12) * renderer.getPixelRatio())));
+  if (th !== mirrorRT.height) mirrorRT.setSize(Math.round((th * 150) / 190), th);
   renderer.setViewport(r.left + 6, H - r.bottom + 6, r.width - 12, r.height - 12);
   renderer.setScissor(r.left + 6, H - r.bottom + 6, r.width - 12, r.height - 12);
   renderer.setScissorTest(true);
@@ -685,7 +774,12 @@ function renderMirror() {
 }
 
 load.finish();
-$('menu').classList.remove('hidden');
+// review mode (?review, src/review.js): the checks' findings on the map, no shift
+let review = null;
+if (params.has('review')) {
+  review = new Review({ scene, camera, canvas, data, route, ground, world, url: params.get('review'), at: parseAt(params.get('at')) });
+  window.review = review;
+} else $('menu').classList.remove('hidden');
 requestAnimationFrame(frame);
 
 // ------------------------------------------------------------------ performance overlay

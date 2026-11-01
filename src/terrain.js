@@ -698,25 +698,13 @@ import { STREET_BELOW, ROAD_BELOW } from './heights.js';
 
 export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, water: 0.01 };
 export const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
-const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'platform', 'cycle']);
-// wide surfaces whose interior heights come from the surveyed point cloud; narrow ones (sidewalks,
-// islands) are planar between their own exact vertices, which keeps them smooth
-const CLOUD = new Set(['road', 'tram', 'parking']);
+export const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'platform', 'cycle']);
 // level 1+ surfaces that carry traffic: what cars and walkers on a bridge stand on
 const DECK = new Set(['deck', 'road', 'tram', 'paved', 'sidewalk', 'cycle', 'island', 'parking']);
 const SURFACE_RANK = { tram: 9, road: 8, island: 7, platform: 7, sidewalk: 6, parking: 5, cycle: 5, paved: 4, stairs: 3, green: 2, water: 1 };
 export class DtmSurface {
   constructor(dtm, terrain, THREE) {
     this.terrain = terrain;
-    // surveyed ground heights (DTM 3D lines, densified): the height inside wide areas
-    this.zc = 4;
-    this.zgrid = new Map();
-    const zf = dtm.z || [];
-    for (let i = 0; i < zf.length; i += 3) {
-      const key = Math.floor(zf[i] / this.zc) * 100003 + Math.floor(zf[i + 1] / this.zc);
-      if (!this.zgrid.has(key)) this.zgrid.set(key, []);
-      this.zgrid.get(key).push(zf[i], zf[i + 1], zf[i + 2]);
-    }
     this.grid = new TriIndex();
     this.deckGrid = new TriIndex(); // level 1: bridge decks and the streets on them
     this.areas = [];
@@ -735,30 +723,33 @@ export class DtmSurface {
         }
         return ring;
       };
-      const outer = fill(a.r), holes = (a.h || []).map(fill);
+      // ground-level outlines cut into equal pieces of at most 4 m: neighbours share an edge's ends, so
+      // they get the same points on it, and the 5 m split below never adds a point on one side only
+      // (one area's midpoint, moved to the track profile by flushDtm, opened a seam to the other:
+      // line 17's street seams over 3 cm 415 with the street model's shared 4 m grid, 675 without, #21)
+      // (each piece keeps its edge's kerb flag, tools/kerbs.py)
+      const cut = (ring, k) => {
+        if (a.l !== 0) return [ring, k];
+        const out = [], ko = [];
+        ring.forEach((p, i) => {
+          const q = ring[(i + 1) % ring.length], n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 4);
+          for (let j = 0; j < Math.max(1, n); j++) { out.push(j ? [p[0] + (q[0] - p[0]) * j / n, p[1] + (q[1] - p[1]) * j / n, p[2] + (q[2] - p[2]) * j / n] : p); ko.push(k?.[i] ?? 0); }
+        });
+        return [out, k ? ko : null];
+      };
+      const [outer, k0] = cut(fill(a.r), a.k?.[0]), hk = (a.h || []).map((h, j) => cut(fill(h), a.k?.[j + 1]));
+      const holes = hk.map((h) => h[0]), kerbs = a.k ? [k0, ...hk.map((h) => h[1])] : null;
       if (outer.length < 3) continue;
       // a river or pond is level: its outline takes the heights of both banks (the embankment's top)
       if (a.c === 'water') {
         const zs = outer.map((p) => p[2]).sort((u, v) => u - v), zw = zs[Math.floor(zs.length * 0.1)];
         for (const p of [...outer, ...holes.flat()]) p[2] = zw;
       }
-      // street model (tools/streets.py): smooth heights and a ready mesh
-      if (a.v && a.t) {
-        const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs: a.k || null, model: true };
-        const rank = SURFACE_RANK[a.c] || 1;
-        for (let i = 0; i < a.t.length; i += 3) {
-          const tri = [a.v[a.t[i]], a.v[a.t[i + 1]], a.v[a.t[i + 2]]];
-          area.mesh.push(tri);
-          this.grid.add(tri, rank, a.c);
-        }
-        this.areas.push(area);
-        continue;
-      }
       const v2 = (r) => r.map((p) => new THREE.Vector2(p[0], p[1]));
       let tri;
       try { tri = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2)); } catch { continue; }
       const all = [...outer, ...holes.flat()];
-      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [] };
+      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs };
       // on a structure: a long deck outline (the Modřany estakáda's track bed runs from the foot of
       // one ramp to the other) must not be spanned by long triangles; inner points take the height
       // of the outline's own corners nearby
@@ -771,9 +762,10 @@ export class DtmSurface {
       const ground = a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && a.c !== 'rail'; // (nobody stands on a wall)
       for (const [i, j, k] of tri) {
         const p = all[i], q = all[j], r = all[k];
-        // render mesh: split to <= 5 m edges, interior heights from the surveyed points
+        // render mesh: split to <= 5 m edges, linear between the surveyed vertices (the survey's own
+        // meaning; averaging the surveyed points inside roads doubled their bumps, #21)
         const n0 = area.mesh.length;
-        if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, CLOUD.has(a.c), area.mesh);
+        if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh);
         else if (a.l >= 1 && a.c !== 'roof') this._split(p, q, r, ringZ, area.mesh);
         // a lawn or park has surveyed heights only on its outline: inside, the lidar ground (a flat
         // sheet between the edges ran up to 8.7 m under the Letná slope, the terrain showing through)
@@ -818,23 +810,6 @@ export class DtmSurface {
     }
     return best < 0 ? null : { z: bestZ, c: ix.classOf(best) };
   }
-  // inverse distance weighted surveyed height within r m, or null; with `ref`, only points within
-  // `tol` of it count (a street above or below, or a kerb top, must not pull the surface)
-  cloudZ(x, y, r = 5, ref = null, tol = 0.6) {
-    const c = this.zc, ci = Math.floor(x / c), cj = Math.floor(y / c), n = Math.ceil(r / c);
-    let sw = 0, sz = 0;
-    for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
-      const arr = this.zgrid.get(i * 100003 + j);
-      if (!arr) continue;
-      for (let k = 0; k < arr.length; k += 3) {
-        const d2 = (arr[k] - x) ** 2 + (arr[k + 1] - y) ** 2;
-        if (d2 > r * r || (ref !== null && Math.abs(arr[k + 2] - ref) > tol)) continue;
-        const w = 1 / (d2 + 0.25);
-        sw += w; sz += w * arr[k + 2];
-      }
-    }
-    return sw ? sz / sw : null;
-  }
   // longest-edge bisection down to 5 m edges (thin carriageway slivers stay cheap)
   _split(p, q, r, ground, out, depth = 0, maxEdge = 5) {
     const l0 = Math.hypot(p[0] - q[0], p[1] - q[1]), l1 = Math.hypot(q[0] - r[0], q[1] - r[1]), l2 = Math.hypot(r[0] - p[0], r[1] - p[1]);
@@ -845,8 +820,8 @@ export class DtmSurface {
     // now p-q is the longest edge
     const x = (p[0] + q[0]) / 2, y = (p[1] + q[1]) / 2;
     const zl = (p[2] + q[2]) / 2;
-    // (ground: true = surveyed cloud heights, a function = its height, false = linear)
-    const m = [x, y, (typeof ground === 'function' ? ground(x, y) : ground ? this.cloudZ(x, y, 5, zl, 0.6 + 0.02 * e) : null) ?? zl];
+    // (ground: a function = its height, false = linear)
+    const m = [x, y, (typeof ground === 'function' ? ground(x, y) : null) ?? zl];
     this._split(p, m, r, ground, out, depth + 1, maxEdge);
     this._split(m, q, r, ground, out, depth + 1, maxEdge);
   }

@@ -8,7 +8,8 @@ group writes data/lineN.json, each writer whole and renamed):
   platforms → osm_speeds → clearances (→ for line 17: OSM signals, survey points, OSM validation)
   geoportal
   fine_terrain
-  dtm → streets (lines with surveyed streets)
+  dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
+    the source lines for review mode)
 Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log. After it: python -I tools/snapshot.py data-publish.
 """
 import os
@@ -19,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from dtm_packages import DTM, select_packages  # noqa: E402
+from dtm_packages import DTM, HOLD, select_packages  # noqa: E402
 
 PY = [sys.executable, "-P", "-E"]
 BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsign", "Zahradní Město"]}
@@ -32,9 +33,11 @@ def steps(line):
     if line == "17":
         writers += [["osm_signals.py", line], ["dtm_points.py", line], ["osm_validate.py", line]]
     groups = [writers, [["geoportal.py", "--line", line]], [["fine_terrain.py", "--line", line]]]
-    if line in DTM:
+    if line in HOLD:
+        print(f"line {line}: survey held, not built ({HOLD[line]}; tools/dtm_packages.py HOLD)", flush=True)
+    elif line in DTM:
         opl = [str(p.opl) for p in select_packages(ROOT, districts=DTM[line])]
-        groups.append([["dtm.py", "--line", line, *opl], ["streets.py", "--line", line]])
+        groups.append([["dtm.py", "--line", line, *opl], ["zps_source.py", "--line", line]])
     return first, groups
 
 

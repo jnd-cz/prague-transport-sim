@@ -9,7 +9,8 @@ are documented in docs/decisions/2026-10-27-track-source.md. This tool imports Z
 
 Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<district KR dir> ...
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)
-Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes]}]}
+Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes],
+"k": kerb edges (raised areas)}]}; kerbs: tools/kerbs.py
 """
 import json
 import math
@@ -22,12 +23,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 import sources  # noqa: E402
 import gpkg  # noqa: E402
-from dtm_packages import DTM, select_packages  # noqa: E402
+from dtm_packages import CORRIDOR, DTM, select_packages  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
-CORRIDOR = 80.0
 
 # area classes by the DTM object type code at the end of the layer name
 CLASSES = {
@@ -87,10 +87,6 @@ def walk(geom):
 
 
 areas, n_z, n_near, n_none, dropped = [], 0, 0, 0, 0
-cloud = {}  # (x*2, y*2) rounded -> z: one surveyed ground height per 0.5 m
-# lines whose heights describe the ground-level street surface (not walls, stairs, buildings)
-CLOUD_LINES = ("Hranice_dopravní_stavby_nebo_plochy", "Vnitřní_členění_dopravní_plochy", "Hranice_ostatní_plochy",
-               "Hranice_udržované_zeleně", "Hranice_přírodního", "Terénní_hrana")
 # heights: every vertex of the 3D boundary lines of all districts (areas along a district border
 # take heights from the neighbour's lines too), keyed by its S-JTSK position (1 cm)
 zkey = defaultdict(set)  # several heights where lines of two levels share a 2D position (wall top/foot)
@@ -108,24 +104,11 @@ for package in packages:
                 continue
             parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
             lvl = f.get("UrovenUmisteniObjektuZPS") or 0
-            ground_line = lvl == 0 and any(k in t for k in CLOUD_LINES)
             for pts in parts:
                 for x, y, z in pts:
                     if z:
                         zkey[(round(x, 2), round(y, 2))].add((z, lvl))
                         zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
-                # height cloud: ground-level traffic and surface lines, densified to 3 m
-                if ground_line:
-                    for (x0, y0, z0), (x1, y1, z1) in zip(pts, pts[1:]):
-                        if not z0 or not z1:
-                            continue
-                        n = max(1, int(math.hypot(x1 - x0, y1 - y0) // 3))
-                        for k in range(n + (1 if (x1, y1) == pts[-1][:2] else 0)):
-                            u = k / n
-                            q = local(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)
-                            zq = z0 + (z1 - z0) * u
-                            if in_corridor(q) and lidar(*q) - 5 < zq < lidar(*q) + 8:
-                                cloud[(round(q[0] * 2), round(q[1] * 2))] = round(zq, 2)
 
 def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
@@ -206,7 +189,55 @@ def fill_along(r, zs):
     return out
 
 
-def ring(r, level):
+# surfaces driven or walked on: they never jump a metre between nearby outline points (a kerb is a
+# few cm, a ramp a slope; stairs and walls are their own classes)
+SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "platform", "paved"}
+n_spikes = defaultdict(int)
+from ipr_dtm import IprDtm  # noqa: E402
+_ipr = IprDtm()  # (the IPR 1 m terrain: the spikes' judge here, the kerbs' reference below)
+
+
+def terrain(x, y):
+    """The bare earth at a survey (S-JTSK) position, or None outside the terrain."""
+    v = float(_ipr.sample(x, y))
+    return v if math.isfinite(v) else None
+
+
+def despike(r, zs, cls):
+    """Outline points of a smooth surface more than 1 m off the median of their neighbours (3 each
+    side), steeper than 1:5 to the nearest neighbour, and further from the terrain than that median
+    take the height along the ring instead. Where an outline follows a retaining wall the source gives
+    its vertices the wall's top and foot by turns (beside the tram embankment at Belárie, line 17:
+    195.8 / 199.7 / 196.8 / 200.3 m, the terrain ~198.5, #147). On a steady slope the median is the
+    point's own height, so hills stay; an outline that really runs on two levels (a riverside walk
+    under the street wall, Novoměstská náplavka) keeps the points the terrain confirms."""
+    n = len(zs)
+    if cls not in SMOOTH or n < 7:
+        return zs
+    xy = [(x, y) for x, y, *_ in r]
+    bad = []
+    for i, z in enumerate(zs):
+        if z is None:
+            continue
+        w = sorted(zs[(i + k) % n] for k in (-3, -2, -1, 1, 2, 3) if zs[(i + k) % n] is not None)
+        if len(w) < 4:
+            continue
+        m = (w[len(w) // 2 - 1] + w[len(w) // 2]) / 2
+        near = min(math.dist(xy[i], xy[(i - 1) % n]), math.dist(xy[i], xy[(i + 1) % n]))
+        if abs(z - m) > max(1.0, 0.2 * near):
+            g = terrain(*xy[i])
+            if g is not None and abs(m - g) < abs(z - g):
+                bad.append(i)
+    if not bad or len(bad) > 0.4 * n:
+        return zs  # (most of the ring disagrees: no trend to trust)
+    n_spikes[cls] += len(bad)
+    out = list(zs)
+    for i in bad:
+        out[i] = None
+    return fill_along(r, out)
+
+
+def ring(r, level, cls=None):
     """Local coordinates and heights of a ring, and how many vertices had no surveyed height."""
     loc = [local(x, y) for x, y, *_ in r]
     cands = [candidates(x, y, level) for x, y, *_ in r]
@@ -217,6 +248,12 @@ def ring(r, level):
     zs = ring_heights(cands)
     missing = sum(1 for z in zs if z is None)
     zs = fill_along(r, zs)
+    closed = len(r) > 1 and r[0][:2] == r[-1][:2]
+    if closed:
+        zs = despike(r[:-1], zs[:-1], cls)
+        zs = zs + [zs[0]]
+    else:
+        zs = despike(r, zs, cls)
     out = []
     for (lx, ly), z in zip(loc, zs):
         out.append([round(lx, 2), round(ly, 2), None if z is None else round(z, 2)])
@@ -240,15 +277,21 @@ for package in packages:
                 if not any(in_corridor(q) for q in loc[:: max(1, len(loc) // 50)]) and not any(in_corridor(q) for q in loc):
                     continue
                 level = f.get("UrovenUmisteniObjektuZPS") or 0
-                r0, miss = ring(outer, level)
+                r0, miss = ring(outer, level, cls)
                 if miss / max(1, len(r0)) > 0.3:
                     dropped += 1
                     continue  # mostly unknown heights: would be a flat sheet at a guessed level
                 a = {"c": cls, "l": level, "r": r0}
-                holes = [ring(h, level)[0] for h in rings[1:] if len(h) > 3]
+                holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
                 if holes:
                     a["h"] = holes
                 areas.append(a)
+
+# one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
+import kerbs  # noqa: E402
+kerb_report = kerbs.apply(areas, lambda x, y: _ipr.sample(x + F.E0, y + F.N0))
+print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSteps']}",
+      f"{len(kerb_report['review'])} areas where the terrain disagrees")
 
 counts = defaultdict(int)
 for a in areas:
@@ -256,20 +299,16 @@ for a in areas:
 print("areas:", dict(sorted(counts.items())))
 print(f"dropped {dropped} areas with >30 % unknown heights")
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing")
-print(f"height cloud: {len(cloud)} points")
-flat = []
-for (kx, ky), z in cloud.items():
-    flat += [kx / 2, ky / 2, z]
-out = {"areas": areas, "z": flat}
+print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
+out = {"areas": areas}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
-vertex = {"exact": n_z, "near": n_near, "missing": n_none, "droppedAreas": dropped}
+vertex = {"exact": n_z, "near": n_near, "missing": n_none, "droppedAreas": dropped, "spikes": dict(sorted(n_spikes.items()))}
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
-    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex}),
+    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex, "kerbs": kerb_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
-    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall")),
-    "z": sources.single("streets", "zps", len(cloud), "ground heights (0.5 m cloud)")})
+    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])
 dst = os.path.join(ROOT, "data", f"line{LINE}.dtm.json")
 with replacing(dst, "w", encoding="utf-8") as fh:
