@@ -5,6 +5,7 @@ export class TramAudio {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.active = false;
     this.lastJoint = 0;
   }
 
@@ -12,7 +13,7 @@ export class TramAudio {
     if (this.ctx) return;
     const ctx = (this.ctx = new (window.AudioContext || window.webkitAudioContext)());
     this.master = ctx.createGain();
-    this.master.gain.value = 0.6;
+    this.master.gain.value = this.active && !this.muted ? 0.6 : 0;
     this.master.connect(ctx.destination);
 
     // noise buffer shared by several voices
@@ -73,11 +74,16 @@ export class TramAudio {
 
   setMuted(m) {
     this.muted = m;
-    if (this.master) this.master.gain.value = m ? 0 : 0.6;
+    if (this.master) this.master.gain.value = this.active && !m ? 0.6 : 0;
+  }
+
+  setActive(on) {
+    this.active = on;
+    if (this.master) this.master.gain.value = on && !this.muted ? 0.6 : 0;
   }
 
   update(tram, curvatureLimit, dt) {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.active) return;
     const t = this.ctx.currentTime;
     const v = Math.abs(tram.v);
     const load = Math.min(1, Math.abs(tram.current) / 450);
@@ -107,7 +113,7 @@ export class TramAudio {
   }
 
   click(gain = 0.1, freq = 900) {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.active) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -124,7 +130,7 @@ export class TramAudio {
 
   // T3 mechanical bell: two quick metallic strikes
   bell() {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.active) return;
     const ctx = this.ctx;
     for (const delay of [0, 0.16]) {
       const t = ctx.currentTime + delay;
@@ -143,7 +149,7 @@ export class TramAudio {
 
   // door closing buzzer + pneumatic hiss
   doors(closing) {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.active) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (closing) {
       const o = ctx.createOscillator();
@@ -175,7 +181,7 @@ export class TramAudio {
   }
 
   warning() {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.active) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const o = ctx.createOscillator();
     o.type = 'square';
@@ -189,7 +195,7 @@ export class TramAudio {
   }
 
   crash() {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.active) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;

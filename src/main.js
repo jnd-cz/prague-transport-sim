@@ -584,7 +584,9 @@ window.addEventListener('keyup', (e) => {
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (e.key === ' ' && tram.notch === -5) tram.notch = -4;
 });
-window.addEventListener('blur', () => { if (game && !game.finished && !pilot) game.paused = true; }); // keep riding on autopilot
+window.addEventListener('blur', () => {
+  if (game && !game.finished && !pilot) { game.paused = true; audio.setActive(false); }
+}); // keep riding on autopilot
 
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
@@ -732,6 +734,9 @@ function frame(now) {
   last = now;
   // window.headless: a dev tool steps the game itself (tools/traffic_lint.js); only draw
   if (game && !window.headless) {
+    const inMenu = !$('menu').classList.contains('hidden');
+    const sounding = !inMenu && !game.paused && !game.finished && !(inspect.active && inspect.paused);
+    audio.setActive(sounding);
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(dt) : [dt];
     steps.forEach((h, i) => {
@@ -746,9 +751,10 @@ function frame(now) {
     updateRain(dt);
     updateSnow(dt, now / 1000);
     if (!inspect.active && !game.paused && !game.finished) traffic.update(dt, camera);
+    // The shift may have finished during game.update().
+    if (game.finished) audio.setActive(false);
     audio.update(tram, game.currentLimit, dt);
     hudTimer -= dt;
-    const inMenu = !$('menu').classList.contains('hidden');
     if (hudTimer <= 0 && !inMenu) { hudTimer = 1 / 30; hud.update(game, game.opts); }
     $('action').style.visibility = inMenu ? 'hidden' : '';
     document.body.classList.toggle('shift', !inMenu && !game.finished);
