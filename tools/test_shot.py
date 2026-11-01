@@ -14,7 +14,7 @@ from shot import capture, combine, site
 import shot
 
 
-HTML = '''<!doctype html><canvas id="gl" width="1280" height="720"></canvas>
+HTML = '''<!doctype html><div id="view"><canvas id="gl" width="1280" height="720"></canvas></div>
 <div id="loading" class="hidden"></div><div id="menu"><button id="btnStart">Start</button></div>
 <select id="optWeather"><option value="dry">Dry</option></select>
 <select id="optObst"><option value="off">Off</option></select>
@@ -82,6 +82,7 @@ class Shots(unittest.TestCase):
             a = capture(self.browser, self.root, 17, 5064, view, output, 10)
             self.assertTrue(a['paused'])
             self.assertFalse(a['hud_visible'])
+            self.assertTrue(a['canvas_visible'])
             self.assertFalse(a['view_offset_enabled'])
             if view != 'review':
                 self.assertEqual(a['tram_s'], 5064)

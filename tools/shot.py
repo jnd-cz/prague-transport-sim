@@ -52,7 +52,7 @@ def site(root):
         thread.join(timeout=5)
 
 
-HIDE = 'body > :not(#gl):not(#cab) { display:none !important }'
+HIDE = 'body > :not(#view):not(#gl):not(#cab) { display:none !important }'
 
 
 def capture(browser, root, line, s, view, output, timeout, pose=None, target=None):
@@ -128,9 +128,12 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
               const g = window.game;
               return {camera: pose || native, native_camera: native, target: R ? R.T : null,
                       tram_s: g ? g.tram.s : null, paused: g ? g.paused : true, view_offset_enabled:!!cam.view?.enabled,
-                      hud_visible: [...document.body.children].some(e => !['gl','cab'].includes(e.id) &&
+                      canvas_visible: document.getElementById('gl').getBoundingClientRect().width > 0,
+                      hud_visible: [...document.body.children].some(e => !['view','gl','cab'].includes(e.id) &&
                         getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0)};
             }''', pose)
+            if not info['canvas_visible']:
+                raise RuntimeError('the scene canvas is hidden; refusing a blank screenshot')
             count = page.evaluate('window.drawCount')
             page.wait_for_function('n => window.drawCount > n', arg=count, timeout=remaining())
             page.screenshot(path=str(output), timeout=remaining())
