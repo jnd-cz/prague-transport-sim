@@ -250,6 +250,39 @@ function railSupport(g, world) {
   return check('rails-supported', n, [...bad.values()]);
 }
 
+// Compare the drawn rail heads with actual bed and street triangles on each canted curve.
+// A separate missing-ray count makes registration gaps visible instead of calling them clear.
+function cantedRailVisibility(g, world) {
+  const r = g.route, prof = r.ground.profile, rails = [], surfaces = [];
+  world.traverse((m) => {
+    if (!m.isMesh) return;
+    if (m.userData.surface === 'rail') rails.push(m);
+    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
+  });
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
+  ray.far = 4;
+  let samples = 0, missing = 0, curve = -1, inCurve = false;
+  const bad = new Map();
+  for (let s = 0; s < r.length; s += 2) {
+    const canted = r.cantAt(s) > 0.005;
+    if (!canted) { inCurve = false; continue; }
+    if (!inCurve) { curve++; inCurve = true; }
+    for (const side of [-1, 1]) {
+      const p = r.offset(s, side * 0.72);
+      o.set(p.x, prof.height(s) + 1, -p.y); ray.set(o, down);
+      const head = ray.intersectObjects(rails, false)[0];
+      if (!head) { missing++; continue; }
+      samples++;
+      const above = ray.intersectObjects(surfaces, false).find((h) => h.point.y <= head.point.y + 0.4);
+      const delta = above ? above.point.y - head.point.y : -Infinity;
+      if (delta > 0.001 && !(bad.get(curve)?.mag >= delta))
+        bad.set(curve, { s: Math.round(s), x: p.x, y: p.y, side, mag: delta,
+                         info: `${above.object.userData.surface} ${(delta * 1000).toFixed(0)} mm above rail head` });
+    }
+  }
+  return { ...check('canted-rail-visible', samples, [...bad.values()]), curves: curve + 1, missing };
+}
+
 // Vertical curves of the track profile: the radius of every crest and sag over 20 m (change of
 // grade per metre), flagged under 500 m (tram track: 500 m minimum in streets, 1000 m preferred), and
 // grades over 9 %.
@@ -489,6 +522,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     streetWaviness: streetWaviness(g),
     terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
+    cantedRailVisibility: cantedRailVisibility(g, world),
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),

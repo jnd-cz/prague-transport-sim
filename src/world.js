@@ -503,7 +503,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     }
   }
   bedCg.build(group, 'bed');
-  railCg.build(group);
+  railCg.build(group, 'rail');
   await mark('track bed + rails');
   buildTrackSupport(group, route, ground, trackDist);
   await mark('track support');
