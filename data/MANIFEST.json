@@ -1,16 +1,16 @@
 {
- "snapshot": "2026-10-30c",
- "built_at_commit": "0387c6d",
- "published": "2026-11-01 11:45",
- "note": "Lines 17, 22: survey outlines along retaining walls without wall-top spikes (#147)",
+ "snapshot": "2026-11-01",
+ "built_at_commit": "62795ac",
+ "published": "2026-11-01 12:49",
+ "note": "Lines 17 and 22: ZPS districts by rule, snapshot 2026-11-01 (#125)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
    "sha256": "001375e5882b556c2e5c2c3af8e5f31e9c1f357010413d1c3b4c35e0a7dbcc8e"
   },
   "line17.dtm.json": {
-   "size": 8912911,
-   "sha256": "ffd91a891ad9fff93c146afa51c16fa164c74100a899483ae9f2e640deb11fdd"
+   "size": 9663408,
+   "sha256": "5c16967013d2a868aaa5fe0ace649e4b008d969816910e7215ee3f6de8d3adce"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -41,16 +41,16 @@
    "sha256": "30edab267311680d56ee52715b773c957457575f552776442d6b295c9fb0bffc"
   },
   "line17.zps.json": {
-   "size": 6101888,
-   "sha256": "60c2688889e1acc5a010fc761281673d5f07045ee3f46232428401536cd07669"
+   "size": 6386309,
+   "sha256": "63f2e82b1511ae04c42f5d247af257867814710452030414cb6ad77de3dc0889"
   },
   "line22.bld.bin": {
    "size": 8575524,
    "sha256": "a9d5d6b57c9d28649402ffa10d0193f6903caf3dac2fd2807d6006373ced0bfe"
   },
   "line22.dtm.json": {
-   "size": 4344620,
-   "sha256": "ce0a5900a41c98798da2708aa018df945f8b2f0f2feb9932663a6b707c406ea1"
+   "size": 9978041,
+   "sha256": "7953178fd6e469afeec3eef58732027f7975560d8bf89beb13370a30f2d1b1a8"
   },
   "line22.fine.bin": {
    "size": 3734900,
@@ -69,8 +69,8 @@
    "sha256": "59cd515314740aac0e01f4e939156babdaa7562be3d587e5afb9ee1dfad2fe40"
   },
   "line22.zps.json": {
-   "size": 3134713,
-   "sha256": "2a3ed81eb44cf343930d3551284714e63c99a2a5252bbe4fe15677a4c15c1687"
+   "size": 6851852,
+   "sha256": "a6865dbacaaf70591fdfe8a804acaf2cc1b668da800727b4cec622faab569ab9"
   },
   "line23.bld.bin": {
    "size": 4805172,

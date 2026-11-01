@@ -124,6 +124,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
+| traffic seed 3 | 22 | did not finish (stop 24, 7200 s): a jam | #154 |
 
 ## Code style
 

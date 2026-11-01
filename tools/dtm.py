@@ -23,12 +23,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 import sources  # noqa: E402
 import gpkg  # noqa: E402
-from dtm_packages import DTM, select_packages  # noqa: E402
+from dtm_packages import CORRIDOR, DTM, select_packages  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
-CORRIDOR = 80.0
 
 # area classes by the DTM object type code at the end of the layer name
 CLASSES = {
