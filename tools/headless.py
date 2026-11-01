@@ -28,7 +28,13 @@ run as a table for the PR (reports/headless/compare.md) and warns when the basel
 the code and data of main (the merge base). A PR that moves the numbers commits its new baseline, so
 main's stays current:
 
-    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
+
+Seed spread (#156): a change to the tram's timing reshuffles traffic like a new seed (#151 moved walkerHit
++54 % on one seed and -33 % on another). So --baseline and --compare run seeds 1-5 by default, and a
+count is judged by the branch's mean over its seeds against the min-max of main's stored seeds; inside
+it, the move is listed as noise. Problems that must stay at zero (stuck, collisions, red entries,
+signal penalties, a traffic run that does not finish) are compared per seed as before.
 """
 import argparse
 import json
@@ -118,8 +124,11 @@ MEASURED = ("src", "index.html", "tools/bench", "tools/lint.js", "tools/traffic_
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
-# traffic counts move 10-20 % whenever trajectories change (tools/lint_report.py): a band of 15 % + 5
-NOISY = {"slide", "jump", "overlap", "walkerHit", "heatingKnobs", "streetBot", "redRuns"}
+# per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
+HARD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
+        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"},
+        "traffic": {"finished"}}
+SPREAD_SEEDS = "1-5"
 
 
 def counts(check, r):
@@ -137,6 +146,7 @@ def counts(check, r):
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":
         out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
+        out["cyclesBroken"] = (r.get("stats") or {}).get("cyclesBroken", 0)  # (#154: a car on the track left a deadlock)
     return out
 
 
@@ -169,30 +179,93 @@ def key_of(line, check, seed):
     return f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}")
 
 
+def problem(check, k):
+    """A count that is a problem when it rises (lint and traffic counts are; u3's yields are context)."""
+    return check in ("lint", "traffic", "surfaces") or k in BAD.get(check, ()) or k == "error"
+
+
+def num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def fmt(v):
+    return f"{v:.0f}" if abs(v) >= 10 else f"{v:.2g}"
+
+
+def spread_cell(k, before, after, check):
+    """'k mean [min-max] → mean [min-max]' and its mark; None when the branch's mean stays inside main's
+    spread (noise). before/after: the values of one count over the stored and the run seeds."""
+    b, a = [v for v in before if num(v)], [v for v in after if num(v)]
+    if not b or not a:
+        return None
+    bm, am = sum(b) / len(b), sum(a) / len(a)
+    lo, hi = min(b), max(b)
+    if lo <= am <= hi:
+        return None
+    rng = lambda v: "" if min(v) == max(v) else f" [{fmt(min(v))}–{fmt(max(v))}]"
+    mark = (" **worse**" if am > hi else " better") if problem(check, k) else ""
+    return f"{k} {fmt(bm)}{rng(b)} → {fmt(am)}{rng(a)}{mark}"
+
+
+def jammed(c):
+    """A run that did not get through (stuck, unfinished, an error): its counts measure the jam, not the
+    traffic (line 17 traffic seed 4 in #151's check: walkerHit 133 against 11-39 on the other seeds);
+    it is reported per seed and left out of the spread."""
+    return bool(c.get("error")) or c.get("stuck") is not None or c.get("finished") == 0
+
+
 def compare_rows(base, results):
-    """Markdown rows: baseline -> now for each run, changed counts only; problems that rose are marked."""
+    """Markdown rows per line and check: counts whose mean left main's seed spread (marked when a problem
+    rose or fell), the counts that moved inside it, and per-seed changes of the hard problems."""
+    groups = {}
+    for (line, check, seed), c in results.items():
+        groups.setdefault((line, check), {})[seed] = c
     rows = []
-    for (line, check, seed), c in sorted(results.items(), key=lambda kv: (int(kv[0][0]), kv[0][1], kv[0][2])):
-        b = (base.get(key_of(line, check, seed)) or {}).get("counts")
-        if b is None:
-            rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | no baseline |")
-            continue
-        moved = []
-        for k in sorted(set(b) | set(c)):
-            bv, cv = b.get(k), c.get(k)
-            if bv == cv:
+    for (line, check), runs in sorted(groups.items(), key=lambda kv: (int(kv[0][0]), kv[0][1])):
+        if check in SEEDLESS:
+            b = (base.get(key_of(line, check, 0)) or {}).get("counts")
+            if b is None:
+                rows.append(f"| {line} | {check} | | no baseline | | |")
                 continue
-            band = bv * 0.15 + 5 if k in NOISY and isinstance(bv, (int, float)) else 0
-            if k == "finished":
-                worse = cv == 0
-            elif k == "stuck":  # (a position: newly stuck is worse, stuck elsewhere is context)
-                worse = bv is None
-            elif check in ("lint", "traffic") or k in BAD.get(check, ()) or k == "error":
-                worse = isinstance(cv, (int, float)) and cv > (bv or 0) + band
-            else:
-                worse = False
-            moved.append(f"{k} {bv} → {cv}" + (" **worse**" if worse else ""))
-        rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | {'; '.join(moved) or 'same'} |")
+            c = runs[0]
+            moved = [f"{k} {b.get(k)} → {c.get(k)}" + (" **worse**" if num(c.get(k)) and c[k] > (b.get(k) or 0) else "")
+                     for k in sorted(set(b) | set(c)) if b.get(k) != c.get(k)]
+            rows.append(f"| {line} | {check} | | {'; '.join(moved) or 'same'} | | |")
+            continue
+        prefix = f"line{line}-{check}-seed"
+        stored = {int(k[len(prefix):]): v["counts"] for k, v in base.items() if k.startswith(prefix)}
+        if not stored:
+            rows.append(f"| {line} | {check} | {','.join(map(str, sorted(runs)))} | no baseline | | |")
+            continue
+        hard, out, inside = [], [], []
+        for seed in sorted(runs):
+            b, c = stored.get(seed), runs[seed]
+            if b is None:
+                hard.append(f"seed {seed}: no baseline")
+                continue
+            for k in sorted(HARD.get(check, set()) | {"error"}):
+                bv, cv = b.get(k), c.get(k)
+                if bv == cv:
+                    continue
+                if k == "finished":
+                    worse = not cv
+                elif k == "stuck":  # (a position: newly stuck is worse, stuck elsewhere is context)
+                    worse = bv is None
+                else:
+                    worse = num(cv) and cv > (bv or 0)
+                hard.append(f"seed {seed}: {k} {bv} → {cv}" + (" **worse**" if worse else ""))
+        keys = sorted({k for v in [*stored.values(), *runs.values()] for k in v} - HARD.get(check, set()) - {"error"})
+        same_seeds = set(runs) <= set(stored)
+        for k in keys:
+            before = [v.get(k) for v in stored.values() if not jammed(v)]
+            after = [runs[s].get(k) for s in sorted(runs) if not jammed(runs[s])]
+            if same_seeds and after == [stored[s].get(k) for s in sorted(runs) if not jammed(runs[s])]:
+                continue
+            cell = spread_cell(k, before, after, check)
+            (out.append(cell) if cell else inside.append(k))
+        seeds = ",".join(map(str, sorted(runs))) + f" (main: {len(stored)})"
+        rows.append(f"| {line} | {check} | {seeds} | {'; '.join(out) or ('same' if not inside else '–')} | "
+                    f"{', '.join(inside)} | {'; '.join(hard)} |")
     return rows
 
 
@@ -320,7 +393,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="17")
     ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint, canted, surfaces")
-    ap.add_argument("--seeds", default="1-3")
+    ap.add_argument("--seeds", help=f"default 1-3; {SPREAD_SEEDS} with --baseline or --compare (the seed spread)")
     ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
@@ -332,6 +405,7 @@ def main():
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
     ap.add_argument("--compare", action="store_true", help="compare these runs with the baseline")
     a = ap.parse_args()
+    a.seeds = a.seeds or (SPREAD_SEEDS if a.baseline or a.compare else "1-3")
     if a.timeout <= 0:
         ap.error("--timeout must be positive")
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
@@ -390,7 +464,8 @@ def main():
         if stale:
             print(f"\nWARNING: the baseline of {', '.join(stale)} was not measured on main ({main_rev[:7]}): "
                   "run --baseline on main first, or read the differences as main's changes plus yours")
-        rows = ["| line | check | seed | baseline → now |", "|---|---|---|---|", *compare_rows(base, results)]
+        rows = ["| line | check | seeds | outside main's seed spread: mean [min–max] → now | moved inside it | per seed |",
+                "|---|---|---|---|---|---|", *compare_rows(base, results)]
         print("\n" + "\n".join(rows))
         with open(os.path.join(a.out, "compare.md"), "w", encoding="utf-8") as f:
             f.write("\n".join(rows) + "\n")

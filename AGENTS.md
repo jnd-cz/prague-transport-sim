@@ -114,8 +114,11 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
 - Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`.
-- A regression check compares a run with main's stored baseline (`headless.py … --compare`, the table
-  goes into the PR); a count that moves needs a reason in the PR. When a PR moves the numbers, rerun with
+- A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
+  default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
+  of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside
+  the spread are listed as noise. Stuck, unfinished and penalty runs are listed per seed and need a reason,
+  as does every move of the seedless checks (lint, surfaces) and every mean outside the spread. When a PR moves the numbers, rerun with
   `--baseline` once its code and data are committed and published, and commit
   `reports/baseline/headless.json` with it.
 
@@ -124,7 +127,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
-| traffic seed 3 | 22 | did not finish (stop 24, 7200 s): a jam | #154 |
+| traffic seed 4 | 37 | did not finish (stop 8, 7200 s): AI trams and cars gridlocked at Balabenka | #168 |
 
 ## Code style
 
