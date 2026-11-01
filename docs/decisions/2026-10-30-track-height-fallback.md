@@ -156,8 +156,147 @@ height evidence and confidence separately for geometry and height. Do not add an
 because it has Z. Structures, ambiguous matches, known disagreements, changed alignments and transitions
 between sources need explicit review. The measurements support a large fallback opportunity while
 leaving those decisions to #20; no archive heights were applied to the game in this work.
-The measured structure hazard and importer regression case are tracked in
-[#106](https://github.com/jnd-cz/prague-transport-sim/issues/106).
+### Guarded height-import stage (#106)
+
+`tools/import_track_heights.py` stages the height decisions for #20 under `reports/track-heights.json`.
+Track topology and game integration remain #20. The output separates unchanged DI XY geometry and
+raw source Z from the selected height, height source, confidence, evidence IDs and review flags.
+Geometry records retain DI attributes and source package hashes/state dates; archive IDs retain their
+attributes, acquisition dates and batch hashes. Archived-only geometry is never added by this stage.
+
+The user's revised selection order (2026-10-30) is:
+
+1. Use numeric DI Z as supplied. Archived Z and the optional review file cannot override it; a
+   disagreement remains flagged. This selects DI's deck-level height on the Trojský most regression.
+2. Where DI lacks usable Z, use its unambiguous archived track match, within the existing plan and
+   heading limits. Ordinary track no longer needs a hand-reviewed point observation.
+3. Where neither has usable Z, a containing survey of **confirmed paved track** may supply its surface
+   height plus the applicable `data/truth.json` `trackHeights.railAboveDeck` fact. Paved means flush
+   embedded rails, panels or setts, including a dedicated strip behind a kerb. Multiple physical levels
+   remain unresolved. There is no extrapolation outside the surveyed polygon.
+
+An archive-only height is held for review when there are several candidate levels, a known archive
+record discrepancy over 1 m, a contradictory containing paved survey, or an obsolete/uncertain alignment.
+An OSM structure hint requires independent survey support at the track's ZPS level; without it the
+sample is `structure_unverified`. The OSM buffer supplies no level itself. Flags and all
+candidates remain visible even when DI or a later reviewed observation selects a height. The research
+availability screen remains an estimate; staged selections report their actual source and confidence.
+
+`tools/track_decks.py` discovers every `data/line*.dtm.json` and checks all surveyed surface classes,
+triangulating their vertex heights only inside their footprint. A covering tram area establishes the
+track's ZPS level; otherwise a covering deck can establish it. Conflicting anchor levels are unresolved.
+Covering tram areas take precedence over deck anchors, so a deck above a ground track cannot lend it
+the upper level. Conflicting tram levels stay on hold even when OSM has no structure tag.
+Without anchors, a containing nonzero-level surface also leaves the level unresolved; it cannot be
+assumed to be ground simply because OSM has no structure tag.
+DI placement codes are not used as ZPS levels: Trojský most's DI code is 0. At a structure, a ground-level
+anchor cannot establish an elevated track level. Without a structure hint, absent anchors use level 0
+with `ordinary_surface_default` provenance. Railway bridges (class `rail`), water, walls, roofs and buildings
+are diagnostics only. A surface more than 3 m from independent numeric DI is `surface_on_other_level` and
+cannot establish a track level. This test never uses the archive to validate itself. Surfaces at
+another level remain in the report with `survey_level_mismatch` and cannot validate or supply rail Z.
+Nearby polygons within 1.5 m remain diagnostic; only a containing surface can supply or veto a height.
+The eligible paved classes are defined in `tools/track_heights.py`. Records retain the compiled file hash,
+area index and available source-state
+date. The four style offsets approved for staging are facts in `data/truth.json`, rather than constants
+in the importer or the game. The user's reply, “Use the proposed offsets for all four styles”, is recorded
+at `trackHeights.offsetApproval`; approval adopts design values, not a new survey measurement.
+User `trackStyles` marks are applied to their line sections; unmarked track uses the
+documented panel **drawing** default and carries a `track_style_defaulted_panels` flag. That default
+does not prove paved construction for a height check.
+
+`tools/track_context.py` classifies construction from explicit truth styles, then matching pinned OSM
+`surface` / `embedded_rails`, then a covering paved survey class at the established track level. A generic ZPS tram area
+does not establish its material. Open grass/ballast outlines may follow ditches or embankment toes:
+they neither supply a rail height nor veto an archive height. Unknown construction also keeps the
+survey diagnostic. Archive disagreement over 1 m with numeric DI still holds the whole archive record.
+
+### Calibration and review response, 2026-11-01
+
+Calibration uses numeric DI, never archive Z, at the DI tangent. Coincident compiled-line copies are
+deduplicated per sample/class/level/height. The small report is
+[`reports/review/track-height-calibration.json`](../../reports/review/track-height-calibration.json);
+it separates raw DI-minus-survey from the approved drawing-offset residual.
+
+| Construction / surveyed class | Samples | DI minus raw survey, p10 / median / p90 (m) |
+|---|---:|---|
+| Confirmed pavement, unmarked road level 0 | 11,111 | −0.057 / +0.044 / +0.202 |
+| Explicit embedded style, road level 0 | 1,040 | −0.107 / +0.099 / +0.152 |
+| Unverified construction, railway bridge level 1 | 104 | −7.428 / −6.060 / −4.953 |
+| Unverified construction, green level 0 | 224 | +0.075 / +0.224 / +0.447 |
+
+Of the green samples, **219** form one site, Koh-i-noor – Slavia – Nádraží Eden; none overlaps the
+explicit Hradčany grass marks. The other **5** are ground beneath Trojský most, more than 8 m below
+the rails. The 219-site length-weighted median is +0.222 m, p10 +0.075 m, p90 +0.428 m. Its survey class establishes
+green ground, not whether its Z is vegetation or track bed. The user's section assessment is recorded
+at `data/truth.json` `trackHeights.surveyCalibrationSites`; exact grass boundaries and individual
+sample construction remain unverified. No +0.22 m
+survey-to-rail fact is adopted. The approved grass drawing offset remains a separate design fact.
+
+The 3 m level-separation test removes the overhead-deck cluster without treating ordinary open-bed
+differences of a few decimetres as another storey. Ordinary road calibration has no >3 m residual.
+This is a level exclusion, not a claim that every remaining surface measures rail height.
+
+`tools/track_structure_review.py` groups held samples into contiguous direction spans and structure
+decisions. The [review queue](../../reports/review/track-height-spans.json) contains OSM IDs/names,
+both nearest stops, lengths per direction, dated archive records, numeric DI near the ends, same-level
+survey candidates, IPR bare-earth comparisons and one proposed rule per span. Untagged elevated survey
+areas retain their survey IDs instead of acquiring an invented OSM identity. A proposal does not approve
+a height. Building underpasses, including the Křížovnické náměstí case identified in the review, need a
+reviewed street-level rule; a covering building surface cannot establish rail height.
+
+Open `?line=17&inspect&heightreview=reports/review/track-height-spans.json`. F8 shows held spans in orange,
+conflicts in red, building passages resolved by numeric DI in blue, and approved spans in green.
+Clicking a span flies the camera to it and displays its
+sources and proposal; `window.game.heightReview` exposes the complete queue. The overlay follows the
+current world profile and never applies a proposed height.
+
+**Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
+style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
+datum. The queue's `ordinary_terrain_fallbacks` gives those proposals. No ambiguous level, known archive
+conflict, bridge, underpass or tunnel receives this fallback. Structures require reviewed evidence;
+earth under a bridge is never substituted for its rail level. Profile assembly and applying these
+proposals to the game remain #20.
+
+**Tunnel decision (user, 2026-10-30):** hold archive heights for review until independent evidence is
+available. Pinned OSM tunnel, covered and negative-layer tram ways retain a `tunnel_unverified` flag.
+Numeric DI still wins; local reviewed tunnel evidence can resolve a fallback. Surface survey above a
+tunnel cannot validate its archive height. No portal-profile heuristic is applied in this stage.
+
+Published survey sidecars currently belong to lines 17 and 22; intersecting routes use that coverage too.
+The pinned raw snapshot now includes the expanded districts from #125. New compiled sidecars are discovered
+without changing the guard. Missing coverage leaves structures held for review.
+
+The selection rule is `tools/track_heights.py`. An optional `--evidence` JSON file holds these lists:
+
+- `evidence`: a unique `id`, the `di_id`, city-frame `xy`, `radius_m` (positive, at most 1 m),
+  `reviewed: true`, `vertical_datum: "Bpv"`, `height_meaning: "top_of_rail"`, finite `z`, a reviewed
+  integer `level`, context `kind` (`surface`, `deck` or `tunnel`), and `source` with `dataset`, `record`
+  and `date`. This local observation can resolve a flagged fallback. It must already describe rail
+  height; a raw deck-surface point is not a reviewed rail observation. Numeric DI still keeps priority.
+- `alignment_reviews`: `dataset` (`di` or `archive`), feature `id`, `status` (`current`, `uncertain`
+  or `obsolete`) and a `source` reference. Obsolete DI geometry is rejected, uncertain DI geometry is
+  held for review, and obsolete/uncertain archived candidates cannot supply a selected height. The
+  source geometry remains visible in the staging output with its review, rather than silently added.
+- `span_reviews`: a unique `id`, `reviewed: true`, `vertical_datum: "Bpv"`,
+  `height_meaning: "top_of_rail"`, integer physical `level`, `kind` and dated `source` (`dataset`, `record`,
+  `date`). Each `profiles` entry scopes the decision to `di_ids`, a simple city-frame `xy` path, and
+  `radius_m` at most 1 m. Its `rule` is `{"type":"archive"}`, `{"type":"constant","z":…}`, or
+  `{"type":"linear","ends":[startZ,endZ]}`. Copy each direction span's `approval_profile` from the
+  queue; a single structure decision may include several such profiles. Archive approval retains the
+  archive source; a new reviewed profile records its review source. Conflicting approvals stay held.
+  Numeric DI still wins. A tunnel portal profile requires this explicit approval and dated basis.
+
+Evidence is bound to the current track ID and point, never reused for a neighbouring track or the
+rest of a long archived feature. For a reviewed fallback, all applicable observations must agree on
+physical level and within 0.3 m in rail height; supported candidates must fit within 0.3 m as well.
+The nearest archive segment missing Z is not replaced by a farther numeric segment.
+
+Archive records are flagged throughout their candidate coverage when any compared sample differs
+by more than 1 m, including records shorter than the research's 10 m test. The research's p90 screen
+remains part of its availability analysis, not an additional ordinary-track gate. Flags and both
+candidates remain visible even when local evidence resolves a sample. Source transitions and profile assembly
+are left to #20; staged midpoint samples are not a continuous rail profile.
 
 ## Reproduce
 
@@ -166,6 +305,10 @@ python -I tools/snapshot.py fetch
 python -I tools/snapshot.py data-fetch
 python -P -E tools/test_dtmp_tracks.py
 python -P -E tools/dtmp_tracks.py
+python -P -E tools/test_track_heights.py
+python -P -E tools/import_track_heights.py
+python -P -E tools/calibrate_track_heights.py --input reports/track-heights.json
+python -P -E tools/track_structure_review.py --input reports/track-heights.json
 ```
 
 The report is `reports/dtmp-tracks.json`. Upstream acquisition is explicit:

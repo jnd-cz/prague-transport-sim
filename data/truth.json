@@ -277,6 +277,73 @@
  "notes": [
   "Vodičkova (towards Lazarská) was a vienna stop 1996-2014, now a stop kerb: not vienna."
  ],
+ "trackHeights": {
+  "offsetApproval": {
+   "date": "2026-10-30",
+   "source": "user reply while implementing PR #119",
+   "quote": "Use the proposed offsets for all four styles",
+   "scope": "The four documented design offsets for the guarded height stage; approval is not a new survey measurement."
+  },
+  "note": "Deck-to-top-of-rail offsets approved for guarded staging on 2026-10-30; explicit trackStyles win, otherwise panels is the documented default. Grass and ballast are design values, not newly measured survey heights.",
+  "surveyCalibrationSites": [
+   {
+    "id": "koh-i-noor-slavia-green",
+    "line": "22",
+    "from": "Koh-i-noor",
+    "to": "Slavia - Nádraží Eden",
+    "constructionAssessment": "mostly_grass",
+    "observedSurveyToRail": {
+     "metres": 0.2222,
+     "samples": 219,
+     "basis": "length-weighted median numeric DI rail height minus containing raw green survey surface, local to this calibration site",
+     "source": "reports/review/track-height-calibration.json green_sites: Koh-i-noor / Slavia - Nádraží Eden; snapshot 2026-11-01",
+     "status": "local_measurement_only_not_an_adopted_height_rule"
+    },
+    "source": "user reply while reviewing PR #119",
+    "quote": "most of the stretch is grass",
+    "date": "2026-11-01",
+    "scope": "Section assessment; exact grass boundaries and the construction of individual DI samples are unverified. This does not approve a survey-to-rail height correction."
+   }
+  ],
+  "railAboveDeck": [
+   {
+    "id": "rail-above-deck-embedded",
+    "styles": ["embedded"],
+    "scope": "all",
+    "metres": 0,
+    "basis": "surface and rail heads flush",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   },
+   {
+    "id": "rail-above-deck-panels",
+    "styles": ["panels"],
+    "scope": "all",
+    "metres": 0,
+    "basis": "panel surface and rail heads flush; documented default for unmarked track",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   },
+   {
+    "id": "rail-above-deck-grass",
+    "styles": ["grass"],
+    "scope": "all",
+    "metres": 0.04,
+    "basis": "design value: high grass variant",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   },
+   {
+    "id": "rail-above-deck-ballast",
+    "styles": ["ballast"],
+    "scope": "all",
+    "metres": 0.17,
+    "basis": "design value: rail and plate above sleeper tops",
+    "source": "user 2026-10-30: use the four proposed offsets in docs/decisions/2026-10-29-what-each-height-means.md section 4",
+    "date": "2026-10-30"
+   }
+  ]
+ },
  "trackStyleKinds": {
   "embedded": "rails laid in the street surface (asphalt, setts), cars drive on the track",
   "panels": "large concrete panels on a track body of its own, flush with the rail heads",

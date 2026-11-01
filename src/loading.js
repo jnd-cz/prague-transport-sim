@@ -87,6 +87,13 @@ export class Loader {
     this.el = $('loading');
   }
 
+  fail(error) {
+    this.failed = true;
+    this.el?.classList.remove('hidden');
+    $('loadPct').textContent = 'Cannot start';
+    $('loadStep').textContent = `${error.message || error}. Reload the page; if it persists, report this message.`;
+  }
+
   // start downloading now; get(url) later waits for it
   prefetch(url, label = url.split('/').pop()) {
     if (!this.files.has(url)) this.files.set(url, new Download(url, label, () => this.render()));
@@ -196,6 +203,7 @@ export class Loader {
 
   // redraw at most once a frame while bytes stream in; now = immediately (before a blocking step)
   render(now = false) {
+    if (this.failed) return;
     if (!now) {
       if (this.pending) return;
       this.pending = true;

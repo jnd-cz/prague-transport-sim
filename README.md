@@ -424,6 +424,11 @@ Each answer keeps the finding's kind, place, street and info with it, so it can 
 A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
 `reports/review/` and deployed with the site: `?line=17&review=reports/review/track-z.json` is #106's
 large track-height disagreements (`tools/dtmp_tracks.py --findings`).
+The grouped structure-height queue uses
+`?line=17&inspect&heightreview=reports/review/track-height-spans.json`: F8 colors the spans, and clicking
+a span shows its sources and proposed rule. Proposals stay separate from approved height evidence;
+the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
+reproduction commands and `--evidence` format.
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a

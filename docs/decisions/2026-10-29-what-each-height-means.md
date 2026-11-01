@@ -1,7 +1,10 @@
 # What each height means
 
 **Date:** 2026-10-29
-**Status:** proposed (issue #9); the per-style values need the user's confirmation.
+**Status:** proposed (issue #9). The four per-style offsets were approved for the guarded height
+staging tool on 2026-10-30; their values and provenance are in `data/truth.json` `trackHeights.railAboveDeck`.
+The user's approval, “Use the proposed offsets for all four styles”, is recorded at
+`trackHeights.offsetApproval`. Both the game and the staging tool read these facts.
 
 ## Measured (line 17, city frame, every 5 m of route off bridges)
 
@@ -46,24 +49,29 @@
 
    | Style | Where (data) | TOR over the surrounding surface | Drawn |
    |---|---|---|---|
-   | **embedded** in a street (asphalt, setts) | survey class road / paved / parking at the axis; OSM road `embedded_rails=tram` | **0** | street surface up to the rails, flush; a strip between the rails in the street's material; no separate bed |
-   | **panels** (large concrete panels), also in a street apart from the car lanes | survey tram-track area (default for it), or road class as at Karlovo náměstí – I. P. Pavlova | **0** (measured there: the lanes 4.5 m off are level with the axis, +0.008 m) | panel surface flush with the rail heads |
-   | **grass** track | marked per section (`truth.json` `trackStyles`, later the orthophoto) | **0.04** (vegetation 3–5 cm under the rail head, the high variant); the low variant (vegetation near the rail foot) **≈ 0.16** | grass below the rail heads |
-   | **ballast** (open track) | marked per section | **≈ 0.17** (ballast at the sleeper tops; the rail and its plate above them) | ballast below the rails, sleepers visible |
+   | **embedded** in a street (asphalt, setts) | survey class road / paved / parking at the axis; OSM road `embedded_rails=tram` | truth fact `rail-above-deck-embedded`: flush | street surface up to the rails, flush; a strip between the rails in the street's material; no separate bed |
+   | **panels** (large concrete panels), also in a street apart from the car lanes | survey tram-track area (default for it), or road class as at Karlovo náměstí – I. P. Pavlova | truth fact `rail-above-deck-panels`: flush (measured there: the lanes 4.5 m off are level with the axis, +0.008 m) | panel surface flush with the rail heads |
+   | **grass** track | marked per section (`truth.json` `trackStyles`, later the orthophoto) | truth fact `rail-above-deck-grass`: high grass variant | grass below the rail heads |
+   | **ballast** (open track) | marked per section | truth fact `rail-above-deck-ballast`: rail and plate above sleeper tops | ballast below the rails, sleepers visible |
 
    Embedded and panel track need nothing new: the survey already gives TOR. Grass and ballast need the
    style per section; until a section is marked, it is drawn as panels. Track bed styles as content
    are #52; this record only fixes where TOR is.
 
-   **Where the offsets come from.** No open dataset measures them yet. The street survey records the
-   grass or ballast surface, not the rails. The current DTM track axes mostly carry no height (Praha 8:
+   **Where the drawing offsets come from.** On open track a survey outline can follow the track-bed
+   edges; its height is not established as vegetation, ballast or rail level. It cannot automatically
+   receive the drawing offset to become a rail survey. The construction-sensitive height guard and
+   calibration are described in the [fallback decision](2026-10-30-track-height-fallback.md).
+   The current DTM track axes mostly carry no height (Praha 8:
    278 of 339 all-zero Z). The archived map server does expose track axes with Z in layer 10;
    the [2026-10-30 assessment](2026-10-30-track-height-fallback.md) measures their fallback coverage
    and the cases needing review. Until source heights and track styles are matched, these remain design
    values: grass from ČVUT's green-track study (two variants:
    [Zelená trať](https://projects.fd.cvut.cz/k612x1rk/soubory/Zelena_trat.pdf)); ballast from standard
-   track build-up (no Prague source found). They are kept as named constants, so a measurement replaces
+   track build-up (no Prague source found). They are recorded as truth facts, so a measurement replaces
    them: the DTM track axes where they have heights (#61), or the user's photos of the example stretches.
+   The staging importer reads the adopted values from the truth facts; grass and ballast remain design
+   values rather than new survey measurements.
 
    **Example stretches** (the user, line 22, in `data/truth.json` `trackStyles` by stops, so they survive
    frame changes): ballast Malý Břevnov – Obora Hvězda; grass Pohořelec – Brusnice – Pražský hrad;
