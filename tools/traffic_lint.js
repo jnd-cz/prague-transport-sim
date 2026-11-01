@@ -7,6 +7,7 @@
 //   walker - a walker inside a vehicle
 // Used by tools/lint.js ({ traffic: true }); returns checks in the same shape.
 import { Autopilot } from '../src/autopilot.js';
+import { stuckScene } from './bench/stuck.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
 const TOP = 12;
@@ -189,7 +190,9 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   };
   const minutes = T / 60;
   return {
-    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1) },
+    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+      // (a run that did not finish: what held the tram at the end, as u3 and redruns report it)
+      ...(g.finished || g.nextStop >= until ? {} : { stuckScene: stuckScene(g, tr, ap) }) },
     checks: {
       slide: pick('traffic-no-sideways-motion', slides, samples),
       jump: pick('traffic-no-teleport', jumps, samples),
