@@ -1,16 +1,16 @@
 {
  "snapshot": "2026-10-30c",
- "built_at_commit": "d35f440",
- "published": "2026-10-31 23:42",
- "note": "Survey source lines for review mode, lines 17 and 22 (#140)",
+ "built_at_commit": "0387c6d",
+ "published": "2026-11-01 11:45",
+ "note": "Lines 17, 22: survey outlines along retaining walls without wall-top spikes (#147)",
  "files": {
   "line17.bld.bin": {
    "size": 6341832,
    "sha256": "001375e5882b556c2e5c2c3af8e5f31e9c1f357010413d1c3b4c35e0a7dbcc8e"
   },
   "line17.dtm.json": {
-   "size": 8912987,
-   "sha256": "709e44db21b77133c70b977a7c93ab70d4d029cc2e26e2caa69d3def5ca8cca3"
+   "size": 8912911,
+   "sha256": "ffd91a891ad9fff93c146afa51c16fa164c74100a899483ae9f2e640deb11fdd"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -49,8 +49,8 @@
    "sha256": "a9d5d6b57c9d28649402ffa10d0193f6903caf3dac2fd2807d6006373ced0bfe"
   },
   "line22.dtm.json": {
-   "size": 4344463,
-   "sha256": "1ac0d8be979545969124786122459a4d6287a263e157649b918aa2b1a086e6fd"
+   "size": 4344620,
+   "sha256": "ce0a5900a41c98798da2708aa018df945f8b2f0f2feb9932663a6b707c406ea1"
   },
   "line22.fine.bin": {
    "size": 3734900,
