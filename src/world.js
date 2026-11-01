@@ -149,7 +149,7 @@ class ChunkedGeometry {
   quad(c, a, b, d, e, col) { this.tri(c, a, b, d, null, col); this.tri(c, a, d, e, null, col); }
   // `surface` tags meshes cars and walkers stand on (read by the street bot); 'building' marks
   // building meshes instead (read by the lints)
-  build(group, surface = null) {
+  build(group, surface = null, surfaceKind = null) {
     for (const c of this.chunks.values()) {
       if (!c.pos.length) continue;
       const g = new THREE.BufferGeometry();
@@ -159,9 +159,11 @@ class ChunkedGeometry {
       if (this.useColor) g.setAttribute('color', new THREE.Float32BufferAttribute(c.col, 3));
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, this.material);
+      if (c.surfaceRanges) m.userData.surfaceRanges = c.surfaceRanges;
       m.matrixAutoUpdate = false;
       if (surface === 'building') m.userData.building = true;
       else if (surface) m.userData.surface = surface;
+      if (surfaceKind) m.userData.surfaceKind = surfaceKind;
       group.add(m);
     }
   }
@@ -470,7 +472,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const tunnelCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43', 0), { color: true });
   for (const { r, inside, tf } of tunnelRoads) addRibbon(tunnelCg, inside, r.w, tf, 0.12, asphalt);
   roadsCg.build(group, 'road');
-  footCg.build(group, 'road');
+  footCg.build(group, 'road', 'footway');
   tunnelCg.build(group, 'road');
   await mark('OSM roads');
 
@@ -503,7 +505,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     }
   }
   bedCg.build(group, 'bed');
-  railCg.build(group);
+  railCg.build(group, 'rail');
   await mark('track bed + rails');
   buildTrackSupport(group, route, ground, trackDist);
   await mark('track support');
@@ -988,12 +990,14 @@ function buildDtm(group, ground) {
   };
   const color = {};
   for (const [k, v] of Object.entries(DTM_COLORS)) color[k] = new THREE.Color(v).toArray();
-  for (const a of dtm.areas) {
+  const keepSurfaceRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  for (const [areaId, a] of dtm.areas.entries()) {
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
     const col = color[a.c] || color.paved;
     const cg = cgs[DTM_KIND[a.c] || 'other'];
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
+    const startFace = c.pos.length / 9;
     const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
     const fz = (v) => v[2];
@@ -1013,6 +1017,7 @@ function buildDtm(group, ground) {
       cg.tri(c, W(p[0], p[1], fz(p) + lift), W(q[0], q[1], fz(q) + lift), W(r[0], r[1], fz(r) + lift), null, col);
       if (slab) cg.tri(c, W(p[0], p[1], p[2] - under), W(r[0], r[1], r[2] - under), W(q[0], q[1], q[2] - under), null, col);
     }
+    if (keepSurfaceRanges) (c.surfaceRanges ||= []).push([startFace, c.pos.length / 9, a.c, a.l, areaId]);
     // kerbs (ground level) or slab sides (level 1) along every ring
     const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'platform' ? 0.18 : 0);
     if (!drop) continue;
@@ -1026,7 +1031,7 @@ function buildDtm(group, ground) {
     });
   }
   buildDtmSteps(cgs.other, ground, color.wall);
-  for (const cg of Object.values(cgs)) cg.build(group, 'dtm');
+  for (const [kind, cg] of Object.entries(cgs)) cg.build(group, 'dtm', kind);
 }
 
 // Our tunnels through rock: a vault over both tracks and the road (walls to 4.8 m, an arch to 7.2 m

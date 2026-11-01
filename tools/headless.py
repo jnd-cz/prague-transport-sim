@@ -55,10 +55,12 @@ CALLS = {
     "traffic": "const { trafficRun } = await import('/tools/traffic_lint.js'); return await trafficRun({ seed: SEED });",
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
+    "crossing": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+                "const { run } = await import('/tools/bench/crossingSlab.js'); return run();",
     "surfaces": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
                 "const { run } = await import('/tools/bench/surfaces.js'); return await run();",
 }
-SEEDLESS = {"lint", "surfaces"}
+SEEDLESS = {"lint", "surfaces", "crossing"}
 
 
 def judge(check, r):
