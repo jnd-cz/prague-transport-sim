@@ -4,6 +4,7 @@
     python -P -E tools/headless.py --lines 23 --checks traffic --seeds 22,7,1234
     python -P -E tools/headless.py --lines 17 --checks lint            # static lints (no seed)
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 4   # 4 pages at once
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks canted             # rail/bed visibility
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
 check and awaits it, exactly like tools/bench/batch.html. Results: one JSON per run in reports/headless/
@@ -95,6 +96,8 @@ def judge(check, r):
             bad.append(f"{c['count']} curves with bed above a rail")
         if c.get("unmeasuredCurves"):
             bad.append(f"{c['unmeasuredCurves']} curves missing a rail-side sample")
+        if c.get("missingBed"):
+            bad.append(f"{c['missingBed']} rail samples without their own bed")
         more = f"curves {c.get('curves')}, samples {c.get('of')}, missing samples {c.get('missing')}"
     elif check == "traffic":
         st = r.get("stats") or {}
@@ -316,7 +319,7 @@ def run_one(browser, url, line, check, seed, timeout):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="17")
-    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint, surfaces")
+    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint, canted, surfaces")
     ap.add_argument("--seeds", default="1-3")
     ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")

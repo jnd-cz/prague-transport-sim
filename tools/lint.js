@@ -270,7 +270,7 @@ export function cantedRailVisibility(g, world) {
     const range = ranges[lo - 1];
     return range && hit.faceIndex < range[1] ? range[2] : null;
   };
-  let samples = 0, missing = 0, curve = -1, inCurve = false;
+  let samples = 0, missing = 0, missingBed = 0, curve = -1, inCurve = false;
   const bad = new Map(), other = new Map(), covered = new Map();
   for (let s = 0; s < r.length; s += 2) {
     const canted = r.cantAt(s) > 0.005;
@@ -291,9 +291,11 @@ export function cantedRailVisibility(g, world) {
       const trackId = owner(head);
       if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
       samples++;
-      covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
       const hits = ray.intersectObjects(surfaces, false).filter((h) => h.point.y <= head.point.y + 0.4);
-      for (const [map, hit] of [[bad, hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId)],
+      const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId);
+      if (!ownBed) missingBed++;
+      else covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
+      for (const [map, hit] of [[bad, ownBed],
                                 [other, hits.find((h) => h.object.userData.surface !== 'bed' || owner(h) !== trackId)]]) {
         const delta = hit ? hit.point.y - head.point.y : -Infinity;
         if (delta > 0.001 && !(map.get(curve)?.mag >= delta))
@@ -302,7 +304,7 @@ export function cantedRailVisibility(g, world) {
       }
     }
   }
-  return { ...check('canted-bed-below-rail', samples, [...bad.values()]), curves: curve + 1, missing,
+  return { ...check('canted-bed-below-rail', samples, [...bad.values()]), curves: curve + 1, missing, missingBed,
            unmeasuredCurves: curve + 1 - [...covered.values()].filter((sides) => sides === 3).length,
            otherSurfaces: check('other-surfaces-above-rail', samples, [...other.values()]) };
 }
