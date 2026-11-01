@@ -343,6 +343,34 @@ python tools/lint_report.py
 After an intended improvement, run it with `--accept` to make the current reports the new baseline.
 Facts from the user that checks are scored against live in `data/truth.json`.
 
+**Compare a view or rebuilt data** (#158):
+
+```bash
+python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main
+python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
+python -I tools/datadiff.py --line 17 dtm
+python -I tools/datadiff.py --line 17 zps --at=-2489,-8331 --radius 5
+python -I tools/datadiff.py --line 17 dtm --ref '5d6c427^'
+```
+
+`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`.
+Views: `cab` (default), `chase`, `review`. The tram is paused at `s`, traffic and HUD are hidden;
+review uses `&at=` at that route point. Both sides use the current view's exact camera, so a changed
+profile cannot move the comparison camera. It starts its own free-port servers, one view at a time.
+The reference defaults to `origin/main`: a git revision is exported temporarily with its published
+data from `TRAMDATA_CACHE`; a directory uses its working files. Neither checkout is modified.
+
+`datadiff.py` compares working `dtm`, `zps` or `line` JSON with the SHA-256-verified published version
+named by `data/MANIFEST.json`, read from the machine cache. `--ref DIR|REV` selects another published
+manifest. Reports in `reports/diffs/` give counts per area class/source kind, the absolute-height-change
+histogram in metres, and the largest changed vertices with their record IDs and XY. Shapes match by
+class, level and exact XY; reordered rings/records are unchanged, XY edits count as added/removed,
+and closed outline endpoints count once. Missing heights count separately. `line` also lists changed
+fields and array counts. `--at X,Y` lists nearby working survey areas and source segments (including
+their levels and height-accuracy classes); the JSON report retains their vertices.
+Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
+in a separate checkout of that reference; comparisons never restore over the working data.
+
 **Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
 **I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
 overlay is hidden and the mouse moves the camera: **orbit** around the tram (drag to turn, wheel to zoom)
