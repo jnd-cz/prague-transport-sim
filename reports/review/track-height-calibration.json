@@ -1,0 +1,697 @@
+{
+  "snapshot": "2026-11-01",
+  "groups": [
+    {
+      "construction": "paved",
+      "styles": "embedded",
+      "class": "deck",
+      "level": 1,
+      "samples": 157,
+      "metres": 681.133,
+      "p10": 0.1509,
+      "median": 0.6592,
+      "p90": 0.9293,
+      "over_03m": 125,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 157,
+        "metres": 681.133,
+        "p10": 0.1509,
+        "median": 0.6592,
+        "p90": 0.9293,
+        "over_03m": 125,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "embedded",
+      "class": "road",
+      "level": 0,
+      "samples": 1040,
+      "metres": 1217.475,
+      "p10": -0.1066,
+      "median": 0.099,
+      "p90": 0.1521,
+      "over_03m": 0,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 1040,
+        "metres": 1217.475,
+        "p10": -0.1066,
+        "median": 0.099,
+        "p90": 0.1521,
+        "over_03m": 0,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "embedded",
+      "class": "road",
+      "level": 1,
+      "samples": 163,
+      "metres": 704.546,
+      "p10": 0.2128,
+      "median": 0.662,
+      "p90": 0.959,
+      "over_03m": 132,
+      "over_1m": 5,
+      "over_3m": 2,
+      "di_minus_raw_surface": {
+        "samples": 163,
+        "metres": 704.546,
+        "p10": 0.2128,
+        "median": 0.662,
+        "p90": 0.959,
+        "over_03m": 132,
+        "over_1m": 5,
+        "over_3m": 2
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "embedded",
+      "class": "sidewalk",
+      "level": 0,
+      "samples": 3,
+      "metres": 13.928,
+      "p10": -0.0093,
+      "median": 7.9942,
+      "p90": 8.1358,
+      "over_03m": 2,
+      "over_1m": 2,
+      "over_3m": 2,
+      "di_minus_raw_surface": {
+        "samples": 3,
+        "metres": 13.928,
+        "p10": -0.0093,
+        "median": 7.9942,
+        "p90": 8.1358,
+        "over_03m": 2,
+        "over_1m": 2,
+        "over_3m": 2
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "embedded",
+      "class": "water",
+      "level": 0,
+      "samples": 8,
+      "metres": 36.931,
+      "p10": 8.5874,
+      "median": 8.9581,
+      "p90": 9.6061,
+      "over_03m": 8,
+      "over_1m": 8,
+      "over_3m": 8,
+      "di_minus_raw_surface": {
+        "samples": 8,
+        "metres": 36.931,
+        "p10": 8.5874,
+        "median": 8.9581,
+        "p90": 9.6061,
+        "over_03m": 8,
+        "over_1m": 8,
+        "over_3m": 8
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "unmarked",
+      "class": "deck",
+      "level": 1,
+      "samples": 60,
+      "metres": 58.462,
+      "p10": -5.0472,
+      "median": -5.0043,
+      "p90": -4.9459,
+      "over_03m": 60,
+      "over_1m": 60,
+      "over_3m": 60,
+      "di_minus_raw_surface": {
+        "samples": 60,
+        "metres": 58.462,
+        "p10": -5.0472,
+        "median": -5.0043,
+        "p90": -4.9459,
+        "over_03m": 60,
+        "over_1m": 60,
+        "over_3m": 60
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "unmarked",
+      "class": "paved",
+      "level": 0,
+      "samples": 9,
+      "metres": 21.578,
+      "p10": 0.0054,
+      "median": 0.0248,
+      "p90": 0.0973,
+      "over_03m": 0,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 9,
+        "metres": 21.578,
+        "p10": 0.0054,
+        "median": 0.0248,
+        "p90": 0.0973,
+        "over_03m": 0,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "unmarked",
+      "class": "rail",
+      "level": 1,
+      "samples": 60,
+      "metres": 58.462,
+      "p10": -4.9735,
+      "median": -4.9601,
+      "p90": -4.9335,
+      "over_03m": 60,
+      "over_1m": 60,
+      "over_3m": 60,
+      "di_minus_raw_surface": {
+        "samples": 60,
+        "metres": 58.462,
+        "p10": -4.9735,
+        "median": -4.9601,
+        "p90": -4.9335,
+        "over_03m": 60,
+        "over_1m": 60,
+        "over_3m": 60
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "unmarked",
+      "class": "road",
+      "level": 0,
+      "samples": 11111,
+      "metres": 14730.285,
+      "p10": -0.0573,
+      "median": 0.0436,
+      "p90": 0.2017,
+      "over_03m": 237,
+      "over_1m": 7,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 11111,
+        "metres": 14730.285,
+        "p10": -0.0573,
+        "median": 0.0436,
+        "p90": 0.2017,
+        "over_03m": 237,
+        "over_1m": 7,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "paved",
+      "styles": "unmarked",
+      "class": "tram",
+      "level": 0,
+      "samples": 43,
+      "metres": 94.27,
+      "p10": 0.114,
+      "median": 0.1949,
+      "p90": 0.2405,
+      "over_03m": 0,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 43,
+        "metres": 94.27,
+        "p10": 0.114,
+        "median": 0.1949,
+        "p90": 0.2405,
+        "over_03m": 0,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "cycle",
+      "level": 0,
+      "samples": 1,
+      "metres": 3.661,
+      "p10": -0.013,
+      "median": -0.013,
+      "p90": -0.013,
+      "over_03m": 0,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 1,
+        "metres": 3.661,
+        "p10": -0.013,
+        "median": -0.013,
+        "p90": -0.013,
+        "over_03m": 0,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "deck",
+      "level": 1,
+      "samples": 194,
+      "metres": 639.254,
+      "p10": -6.0816,
+      "median": -0.0674,
+      "p90": 0.4313,
+      "over_03m": 101,
+      "over_1m": 81,
+      "over_3m": 81,
+      "di_minus_raw_surface": {
+        "samples": 194,
+        "metres": 639.254,
+        "p10": -6.0816,
+        "median": -0.0674,
+        "p90": 0.4313,
+        "over_03m": 101,
+        "over_1m": 81,
+        "over_3m": 81
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "green",
+      "level": 0,
+      "samples": 224,
+      "metres": 825.569,
+      "p10": 0.0745,
+      "median": 0.2243,
+      "p90": 0.4467,
+      "over_03m": 63,
+      "over_1m": 11,
+      "over_3m": 5,
+      "di_minus_raw_surface": {
+        "samples": 224,
+        "metres": 825.569,
+        "p10": 0.0745,
+        "median": 0.2243,
+        "p90": 0.4467,
+        "over_03m": 63,
+        "over_1m": 11,
+        "over_3m": 5
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "paved",
+      "level": 0,
+      "samples": 6,
+      "metres": 26.831,
+      "p10": 4.7564,
+      "median": 6.1228,
+      "p90": 8.7687,
+      "over_03m": 6,
+      "over_1m": 6,
+      "over_3m": 6,
+      "di_minus_raw_surface": {
+        "samples": 6,
+        "metres": 26.831,
+        "p10": 4.7564,
+        "median": 6.1228,
+        "p90": 8.7687,
+        "over_03m": 6,
+        "over_1m": 6,
+        "over_3m": 6
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "paved",
+      "level": 1,
+      "samples": 54,
+      "metres": 26.175,
+      "p10": -12.1504,
+      "median": -10.7783,
+      "p90": -6.9135,
+      "over_03m": 54,
+      "over_1m": 54,
+      "over_3m": 54,
+      "di_minus_raw_surface": {
+        "samples": 54,
+        "metres": 26.175,
+        "p10": -12.1504,
+        "median": -10.7783,
+        "p90": -6.9135,
+        "over_03m": 54,
+        "over_1m": 54,
+        "over_3m": 54
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "rail",
+      "level": 1,
+      "samples": 44,
+      "metres": 167.156,
+      "p10": -7.5955,
+      "median": -6.091,
+      "p90": -6.0305,
+      "over_03m": 44,
+      "over_1m": 44,
+      "over_3m": 44,
+      "di_minus_raw_surface": {
+        "samples": 44,
+        "metres": 167.156,
+        "p10": -7.5955,
+        "median": -6.091,
+        "p90": -6.0305,
+        "over_03m": 44,
+        "over_1m": 44,
+        "over_3m": 44
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "road",
+      "level": 0,
+      "samples": 29,
+      "metres": 26.122,
+      "p10": -0.0566,
+      "median": -0.0112,
+      "p90": 0.0372,
+      "over_03m": 0,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 29,
+        "metres": 26.122,
+        "p10": -0.0566,
+        "median": -0.0112,
+        "p90": 0.0372,
+        "over_03m": 0,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "road",
+      "level": 1,
+      "samples": 238,
+      "metres": 165.716,
+      "p10": -12.3741,
+      "median": -10.4378,
+      "p90": -7.1174,
+      "over_03m": 236,
+      "over_1m": 236,
+      "over_3m": 236,
+      "di_minus_raw_surface": {
+        "samples": 238,
+        "metres": 165.716,
+        "p10": -12.3741,
+        "median": -10.4378,
+        "p90": -7.1174,
+        "over_03m": 236,
+        "over_1m": 236,
+        "over_3m": 236
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "sidewalk",
+      "level": 0,
+      "samples": 12,
+      "metres": 47.411,
+      "p10": -0.0893,
+      "median": -0.0081,
+      "p90": 11.3922,
+      "over_03m": 4,
+      "over_1m": 4,
+      "over_3m": 4,
+      "di_minus_raw_surface": {
+        "samples": 12,
+        "metres": 47.411,
+        "p10": -0.0893,
+        "median": -0.0081,
+        "p90": 11.3922,
+        "over_03m": 4,
+        "over_1m": 4,
+        "over_3m": 4
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "tram",
+      "level": 0,
+      "samples": 7598,
+      "metres": 13490.377,
+      "p10": -0.061,
+      "median": 0.0153,
+      "p90": 0.1563,
+      "over_03m": 88,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 7598,
+        "metres": 13490.377,
+        "p10": -0.061,
+        "median": 0.0153,
+        "p90": 0.1563,
+        "over_03m": 88,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "tram",
+      "level": 1,
+      "samples": 127,
+      "metres": 534.776,
+      "p10": 0.1455,
+      "median": 0.3872,
+      "p90": 0.5864,
+      "over_03m": 87,
+      "over_1m": 0,
+      "over_3m": 0,
+      "di_minus_raw_surface": {
+        "samples": 127,
+        "metres": 534.776,
+        "p10": 0.1455,
+        "median": 0.3872,
+        "p90": 0.5864,
+        "over_03m": 87,
+        "over_1m": 0,
+        "over_3m": 0
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "tunnel",
+      "level": -2,
+      "samples": 60,
+      "metres": 177.522,
+      "p10": 6.0115,
+      "median": 15.5057,
+      "p90": 17.1111,
+      "over_03m": 60,
+      "over_1m": 60,
+      "over_3m": 60,
+      "di_minus_raw_surface": {
+        "samples": 60,
+        "metres": 177.522,
+        "p10": 6.0115,
+        "median": 15.5057,
+        "p90": 17.1111,
+        "over_03m": 60,
+        "over_1m": 60,
+        "over_3m": 60
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "tunnel",
+      "level": -1,
+      "samples": 26,
+      "metres": 51.064,
+      "p10": 7.9499,
+      "median": 8.0227,
+      "p90": 8.1419,
+      "over_03m": 26,
+      "over_1m": 26,
+      "over_3m": 26,
+      "di_minus_raw_surface": {
+        "samples": 26,
+        "metres": 51.064,
+        "p10": 7.9499,
+        "median": 8.0227,
+        "p90": 8.1419,
+        "over_03m": 26,
+        "over_1m": 26,
+        "over_3m": 26
+      }
+    },
+    {
+      "construction": "unknown",
+      "styles": "unmarked",
+      "class": "water",
+      "level": 0,
+      "samples": 81,
+      "metres": 356.16,
+      "p10": 11.5154,
+      "median": 13.3028,
+      "p90": 13.8324,
+      "over_03m": 81,
+      "over_1m": 81,
+      "over_3m": 81,
+      "di_minus_raw_surface": {
+        "samples": 81,
+        "metres": 356.16,
+        "p10": 11.5154,
+        "median": 13.3028,
+        "p90": 13.8324,
+        "over_03m": 81,
+        "over_1m": 81,
+        "over_3m": 81
+      }
+    }
+  ],
+  "green_sites": [
+    {
+      "xy": [
+        2852.29,
+        -2516.267
+      ],
+      "near_stops": [
+        "Koh-i-noor",
+        "Slavia - Nádraží Eden"
+      ],
+      "samples": 219,
+      "di_ids": [
+        "1000416371299",
+        "1000416371332",
+        "1000416371398",
+        "1000416371402",
+        "1000416371464",
+        "1000416371538",
+        "1000416371716",
+        "1000416371874"
+      ],
+      "construction": [
+        "unknown"
+      ],
+      "explicit_styles": [],
+      "di_minus_raw_green": {
+        "samples": 219,
+        "metres": 802.739,
+        "p10": 0.0745,
+        "median": 0.2222,
+        "p90": 0.4283,
+        "over_03m": 58,
+        "over_1m": 6,
+        "over_3m": 0
+      }
+    },
+    {
+      "xy": [
+        1436.419,
+        2510.116
+      ],
+      "near_stops": [
+        "Nádraží Holešovice",
+        "Trojská"
+      ],
+      "samples": 4,
+      "di_ids": [
+        "1000413716080",
+        "1000413716288"
+      ],
+      "construction": [
+        "unknown"
+      ],
+      "explicit_styles": [],
+      "di_minus_raw_green": {
+        "samples": 4,
+        "metres": 18.406,
+        "p10": 8.3368,
+        "median": 8.3723,
+        "p90": 9.0744,
+        "over_03m": 4,
+        "over_1m": 4,
+        "over_3m": 4
+      }
+    },
+    {
+      "xy": [
+        1401.599,
+        2730.927
+      ],
+      "near_stops": [
+        "Nádraží Holešovice",
+        "Trojská"
+      ],
+      "samples": 1,
+      "di_ids": [
+        "1000413716288"
+      ],
+      "construction": [
+        "unknown"
+      ],
+      "explicit_styles": [],
+      "di_minus_raw_green": {
+        "samples": 1,
+        "metres": 4.423,
+        "p10": 9.1463,
+        "median": 9.1463,
+        "p90": 9.1463,
+        "over_03m": 1,
+        "over_1m": 1,
+        "over_3m": 1
+      }
+    }
+  ],
+  "construction_assessments": [
+    {
+      "id": "koh-i-noor-slavia-green",
+      "line": "22",
+      "from": "Koh-i-noor",
+      "to": "Slavia - Nádraží Eden",
+      "constructionAssessment": "mostly_grass",
+      "observedSurveyToRail": {
+        "metres": 0.2222,
+        "samples": 219,
+        "basis": "length-weighted median numeric DI rail height minus containing raw green survey surface, local to this calibration site",
+        "source": "reports/review/track-height-calibration.json green_sites: Koh-i-noor / Slavia - Nádraží Eden; snapshot 2026-11-01",
+        "status": "local_measurement_only_not_an_adopted_height_rule"
+      },
+      "source": "user reply while reviewing PR #119",
+      "quote": "most of the stretch is grass",
+      "date": "2026-11-01",
+      "scope": "Section assessment; exact grass boundaries and the construction of individual DI samples are unverified. This does not approve a survey-to-rail height correction."
+    }
+  ],
+  "survey_grass_offset_adopted": false,
+  "reason": "Green survey class alone does not identify grass track. Keep drawing offset separate."
+}
