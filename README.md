@@ -150,6 +150,19 @@ hour. Log: `reports/autodeploy.log`.
 
 ## Gameplay
 
+- **On a phone or tablet** (#79): on-screen buttons, shown on a touch screen by default and switched by
+  🎮 in the menu (remembered per device). They send the keyboard's keys:
+  - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive, STOP (the emergency brake, held), and
+    the dead-man button when that option is on;
+  - the left column: doors, bell, sand (held), look left / right (held), view, mirror, pause;
+  - ⋯ for the rest: switch contact, switch iron, heating cut-out, heating, autopilot, sound, ⚑ report.
+
+  On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
+- **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
+  zoom; a double click brings it back behind the tram.
+- **The right mirror** grows with the window (a quarter of its height, 110–420 px) and keeps its
+  aspect, so its field of view stays the same; its picture is drawn at the frame's size in device
+  pixels.
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
   Forces follow the ČKD T3 pamphlet (1.8 m/s² acceleration and service braking for an empty 16 t car),
   so a full car is slower; gravity on gradients (Chotkova ~7 %), curve resistance, rolling back
