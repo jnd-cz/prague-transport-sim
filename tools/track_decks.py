@@ -9,6 +9,7 @@ from shapely.ops import nearest_points, substring, triangulate
 from shapely.strtree import STRtree
 
 from dtm_di import sha
+from dtm_packages import NAME
 
 
 class Decks:
@@ -177,9 +178,8 @@ def load_decks(root):
     root = Path(root)
     manifest = json.loads((root / 'data/MANIFEST.json').read_text(encoding='utf-8'))
     snap = json.loads((root / 'snapshots' / (manifest['snapshot'] + '.json')).read_text(encoding='utf-8'))
-    dates = sorted(
-        {Path(f['path']).name.split('_')[4] for g in snap['groups'] if g['name'] == 'dtm' for f in g['files']}
-    )
+    dates = sorted({m[2] for g in snap['groups'] if g['name'] == 'dtm' for f in g['files']
+                    if (m := NAME.fullmatch(Path(f['path']).name))})
     records = []
     for path in sorted((root / 'data').glob('line*.dtm.json')):
         name = path.name

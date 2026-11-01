@@ -466,7 +466,8 @@ class DeckFallback(unittest.TestCase):
             (root / 'data').mkdir()
             (root / 'snapshots').mkdir()
             (root / 'data/MANIFEST.json').write_text(json.dumps({'snapshot': 'test', 'files': {}}))
-            (root / 'snapshots/test.json').write_text(json.dumps({'groups': []}))
+            (root / 'snapshots/test.json').write_text(json.dumps({'groups': [
+                {'name':'dtm','files':[{'path':'raw/dtm/provenance.json'}]}]}))
             (root / 'data/truth.json').write_text('{}')
             for line, cls in [(9, 'road'), (37, 'tram'), (123, 'water')]:
                 record = deck_record()
