@@ -746,7 +746,8 @@ function frame(now) {
 // along the side of the set, rendered to a texture and shown mirrored in the frame at the right.
 const mirrorHidden = [];
 world.traverse(o => {
-  if (o.userData.mirrorDetail || o.userData.part === 'catenary' && o.isLineSegments) mirrorHidden.push(o);
+  // (the overhead wires stay: near the tram they show in a real T3 mirror, and lines are cheap)
+  if (o.userData.mirrorDetail) mirrorHidden.push(o);
 });
 const mirror = new Mirror(renderer, scene, $('mirror'), mirrorHidden);
 window.mirror = mirror; // cadence, target and excluded geometry are inspectable without changing the simulation
