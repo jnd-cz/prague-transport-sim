@@ -2,12 +2,14 @@
 // every main draw, or the main scene wipes it on the frames between updates (#79).
 import * as THREE from 'three';
 
-const PERIOD = 1000 / 30;
+const PERIOD = 1000 / 30, FAR = 300;
 
 export class Mirror {
   constructor(renderer, scene, element, hidden = []) {
     Object.assign(this, { renderer, scene, element, hidden });
-    this.camera = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 300);
+    this.camera = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, FAR);
+    // The scene's fog (180-950 m) is thin at 300 m: buildings would vanish at the far plane behind the tram.
+    this.fog = new THREE.Fog(0xffffff, FAR * 0.4, FAR);
     this.target = new THREE.WebGLRenderTarget(240, 304);
     this.scene = new THREE.Scene();
     this.view = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -16,7 +18,7 @@ export class Mirror {
     this.scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: this.target.texture })));
     this.source = scene;
     this.last = null;
-    this.stats = { updates: 0, presents: 0, far: 300, maxHz: 30, excluded: hidden.length };
+    this.stats = { updates: 0, presents: 0, far: FAR, maxHz: 30, excluded: hidden.length };
   }
 
   draw(now, active, pose, model) {
@@ -29,14 +31,16 @@ export class Mirror {
     if (resized || this.last === null || active && due) {
       pose(this.camera);
       const visibility = this.hidden.map(o => o.visible), vis = model.visible;
-      const target = R.getRenderTarget();
+      const target = R.getRenderTarget(), fog = this.source.fog;
       try {
         for (const o of this.hidden) o.visible = false;
         model.visible = true;
+        if (fog) { this.fog.color.copy(fog.color); this.source.fog = this.fog; }
         R.setRenderTarget(this.target);
         R.render(this.source, this.camera);
       } finally {
         R.setRenderTarget(target);
+        this.source.fog = fog;
         model.visible = vis;
         this.hidden.forEach((o, i) => { o.visible = visibility[i]; });
       }
