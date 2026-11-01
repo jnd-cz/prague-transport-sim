@@ -252,7 +252,7 @@ function railSupport(g, world) {
 
 // Compare the drawn rail heads with actual bed and street triangles on each canted curve.
 // A separate missing-ray count makes registration gaps visible instead of calling them clear.
-function cantedRailVisibility(g, world) {
+export function cantedRailVisibility(g, world) {
   const r = g.route, prof = r.ground.profile, rails = [], surfaces = [];
   world.traverse((m) => {
     if (!m.isMesh) return;
@@ -262,7 +262,7 @@ function cantedRailVisibility(g, world) {
   const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
   ray.far = 4;
   let samples = 0, missing = 0, curve = -1, inCurve = false;
-  const bad = new Map();
+  const bad = new Map(), other = new Map(), covered = new Map();
   for (let s = 0; s < r.length; s += 2) {
     const canted = r.cantAt(s) > 0.005;
     if (!canted) { inCurve = false; continue; }
@@ -273,14 +273,20 @@ function cantedRailVisibility(g, world) {
       const head = ray.intersectObjects(rails, false)[0];
       if (!head) { missing++; continue; }
       samples++;
-      const above = ray.intersectObjects(surfaces, false).find((h) => h.point.y <= head.point.y + 0.4);
-      const delta = above ? above.point.y - head.point.y : -Infinity;
-      if (delta > 0.001 && !(bad.get(curve)?.mag >= delta))
-        bad.set(curve, { s: Math.round(s), x: p.x, y: p.y, side, mag: delta,
-                         info: `${above.object.userData.surface} ${(delta * 1000).toFixed(0)} mm above rail head` });
+      covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
+      const hits = ray.intersectObjects(surfaces, false).filter((h) => h.point.y <= head.point.y + 0.4);
+      for (const [map, hit] of [[bad, hits.find((h) => h.object.userData.surface === 'bed')],
+                                [other, hits.find((h) => h.object.userData.surface !== 'bed')]]) {
+        const delta = hit ? hit.point.y - head.point.y : -Infinity;
+        if (delta > 0.001 && !(map.get(curve)?.mag >= delta))
+          map.set(curve, { s: Math.round(s), x: p.x, y: p.y, side, mag: delta,
+                           info: `${hit.object.userData.surface} ${(delta * 1000).toFixed(0)} mm above rail head` });
+      }
     }
   }
-  return { ...check('canted-rail-visible', samples, [...bad.values()]), curves: curve + 1, missing };
+  return { ...check('canted-bed-below-rail', samples, [...bad.values()]), curves: curve + 1, missing,
+           unmeasuredCurves: curve + 1 - [...covered.values()].filter((sides) => sides === 3).length,
+           otherSurfaces: check('other-surfaces-above-rail', samples, [...other.values()]) };
 }
 
 // Vertical curves of the track profile: the radius of every crest and sag over 20 m (change of

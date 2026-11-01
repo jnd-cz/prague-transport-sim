@@ -55,10 +55,13 @@ CALLS = {
     "traffic": "const { trafficRun } = await import('/tools/traffic_lint.js'); return await trafficRun({ seed: SEED });",
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
+    "canted": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+              "const { cantedRailVisibility } = await import('/tools/lint.js'); "
+              "return { checks: { cantedRailVisibility: cantedRailVisibility(window.game, window.world) } };",
     "surfaces": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
                 "const { run } = await import('/tools/bench/surfaces.js'); return await run();",
 }
-SEEDLESS = {"lint", "surfaces"}
+SEEDLESS = {"lint", "surfaces", "canted"}
 
 
 def judge(check, r):
@@ -86,6 +89,13 @@ def judge(check, r):
         if r.get("ourSignalPenalty"):
             bad.append(f"our signal penalty {r['ourSignalPenalty']}")
         more = f"warn passes {r.get('warnPasses')}, holds {r.get('holds')}"
+    elif check == "canted":
+        c = (r.get("checks") or {}).get("cantedRailVisibility", {})
+        if c.get("count"):
+            bad.append(f"{c['count']} curves with bed above a rail")
+        if c.get("unmeasuredCurves"):
+            bad.append(f"{c['unmeasuredCurves']} curves missing a rail-side sample")
+        more = f"curves {c.get('curves')}, samples {c.get('of')}, missing samples {c.get('missing')}"
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):
