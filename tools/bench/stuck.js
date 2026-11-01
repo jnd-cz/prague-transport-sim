@@ -14,10 +14,12 @@ export function stuckWatch(game) {
 }
 
 // What holds the tram: the autopilot's plan and what lies ahead of it. Each crossing car carries the
-// chain of what it waits for (a car's id, or 'tram or walker' for an obstacle that is not a car): the
+// chain of what it waits for (a car's id, 'our tram', 'tram', or a walker with what it does): the
 // line 9 s 11221 gridlock ran car -> car -> car -> our tram (#92).
 export function stuckScene(game, traffic, pilot) {
   const tr = game.tram, plan = pilot.step(game, 0) || {}, st = game.stops[game.nextStop];
+  // (a walker: where it stands and why: waiting at the kerb for a car, crossing, on the pavement)
+  const walker = (w) => ({ walker: true, state: w.waitKerb ? 'waits at the kerb' : w.door ? 'at a door' : 'walking', v: +(w.v ?? 0).toFixed(1), dir: w.dir });
   const waits = (car) => {
     const out = [];
     for (let c = car, n = 0; c && n < 8; n++) {
@@ -28,7 +30,7 @@ export function stuckScene(game, traffic, pilot) {
           light: c.lane?.light ? traffic.lightAspect(c.lane.light) : null, why: c.why ?? null, junction: c.jBlock ?? null, for: null });
         break;
       }
-      out.push({ id: c.id, gap: +o.gap.toFixed(1), v: +(c.vNow ?? 0).toFixed(1), conn: !!c.conn, yielding: !!c.yielding, keepClear: !!c.keepClear, for: o.car ? o.car.id : 'tram or walker' });
+      out.push({ id: c.id, gap: +o.gap.toFixed(1), v: +(c.vNow ?? 0).toFixed(1), conn: !!c.conn, yielding: !!c.yielding, keepClear: !!c.keepClear, for: o.car ? o.car.id : o.walker ? walker(o.walker) : o.what });
       if (!o.car || out.some((x) => x.id === o.car.id)) break;
       c = o.car;
     }

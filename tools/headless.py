@@ -133,6 +133,7 @@ def counts(check, r):
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":
         out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
+        out["cyclesBroken"] = (r.get("stats") or {}).get("cyclesBroken", 0)  # (#154: a car on the track left a deadlock)
     return out
 
 

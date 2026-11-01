@@ -889,6 +889,26 @@ export class Traffic {
     // the tram's driver sees these (autopilot: the bell, stopping short of one on the track); a car on
     // the crossing where the tram's front is: a collision (once per car)
     this.game.carsCrossing = crossing;
+    // A car standing on our track in front of our standing tram, whose queue ends at a car that waits for
+    // a standing tram (ours, its body across that car's way, or an oncoming one: it gave way while the tram came, the tram then stopped
+    // for the car on the track behind it): none of the three can move, and the car on the track cannot
+    // back off in this model. After 30 s it leaves (fades out, as at the edge of the traffic area).
+    // Rules that kept the tram short of such crossings, or cars off the track, moved the cycle elsewhere
+    // (line 22 s 12619 seed 3; 10 new stuck runs over 5 lines x 5 seeds; #154)
+    for (const x of crossing) {
+      const a = x.car;
+      let ends = false;
+      if (x.onTrack && tram.v < 0.3 && x.s > tram.s && x.s - tram.s < 15 && (a.vNow ?? 0) < 0.3) {
+        for (let o = a, n = 0; o && n < 6; n++) {
+          const sn = o.seen;
+          if (!sn || (o.vNow ?? 0) > 0.3) break;
+          if (!sn.car) { ends = (sn.what === 'our tram' || sn.what === 'tram') && sn.v < 0.3; break; } // (or an oncoming one, stopped for a car on its track)
+          o = sn.car;
+        }
+      }
+      a.cycleT = ends ? (a.cycleT || 0) + dt : 0;
+      if (a.cycleT > 30) { a.active = false; a.cycleT = 0; this.cyclesBroken = (this.cyclesBroken || 0) + 1; }
+    }
     for (const x of crossing) {
       if (!x.onTrack || x.car.hitTram || x.s < tram.s - 1 || x.s > tram.s + 0.5 || tram.v < 0.3) continue;
       x.car.hitTram = true;
@@ -969,17 +989,17 @@ export class Traffic {
     const out = [], g = this.game, tram = g.tram;
     for (let k = 0; k < (tram.cars || 1); k++) {
       const s = tram.s - 0.6 - 7.6 - k * 15.2, p = this.route.at(s), h = this.route.heading(s, 3);
-      out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v });
+      out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v, what: 'our tram' });
     }
     for (const t of [...this.ahead, ...this.oncoming]) {
       if ((t.alpha ?? 0) < 0.3) continue;
       for (const m of t.mesh.userData.cars) {
         const hx = Math.sin(m.rotation.y), hy = -Math.cos(m.rotation.y);
-        out.push({ x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: 7.2, w: 1.3, vx: hx * t.v, vy: hy * t.v });
+        out.push({ x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: 7.2, w: 1.3, vx: hx * t.v, vy: hy * t.v, what: 'tram' });
       }
     }
     for (const w of this.slots || []) {
-      if (w && w.alpha > 0.5 && w.x !== undefined) out.push({ x: w.x, y: w.y, z: w.z, hx: 1, hy: 0, l: 0.4, w: 0.4, vx: 0, vy: 0 });
+      if (w && w.alpha > 0.5 && w.x !== undefined) out.push({ x: w.x, y: w.y, z: w.z, hx: 1, hy: 0, l: 0.4, w: 0.4, vx: 0, vy: 0, walker: w, what: 'walker' });
     }
     return out;
   }
@@ -1005,7 +1025,7 @@ export class Traffic {
         if (o.car === c) continue;
         const dx = q.x - o.x, dy = q.y - o.y;
         if (Math.abs(dx * o.hx + dy * o.hy) < o.l + 2.2 && Math.abs(-dx * o.hy + dy * o.hx) < o.w + 1.0) {
-          return { gap: d - 2.6, v: Math.max(0, o.vx * q.hx + o.vy * q.hy), car: o.car };
+          return { gap: d - 2.6, v: Math.max(0, o.vx * q.hx + o.vy * q.hy), car: o.car, what: o.what, walker: o.walker };
         }
       }
     }

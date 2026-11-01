@@ -22,16 +22,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:12"
  },
  "line17-redruns-seed1": {
   "counts": {
@@ -44,16 +44,16 @@
    "holds": 5
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:03"
  },
  "line17-redruns-seed2": {
   "counts": {
@@ -66,16 +66,16 @@
    "holds": 5
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:03"
  },
  "line17-redruns-seed3": {
   "counts": {
@@ -88,16 +88,16 @@
    "holds": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:03"
  },
  "line17-redruns-seed4": {
   "counts": {
@@ -110,16 +110,16 @@
    "holds": 4
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:06"
  },
  "line17-redruns-seed5": {
   "counts": {
@@ -132,16 +132,16 @@
    "holds": 1
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:06"
  },
  "line17-surfaces": {
   "counts": {
@@ -153,16 +153,16 @@
    "kerbMedianCm": 10
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:10"
  },
  "line17-traffic-seed1": {
   "counts": {
@@ -172,19 +172,20 @@
    "walkerHit": 24,
    "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:06"
  },
  "line17-traffic-seed2": {
   "counts": {
@@ -194,19 +195,20 @@
    "walkerHit": 39,
    "heatingKnobs": 13,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:06"
  },
  "line17-traffic-seed3": {
   "counts": {
@@ -216,19 +218,20 @@
    "walkerHit": 18,
    "heatingKnobs": 13,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:09"
  },
  "line17-traffic-seed4": {
   "counts": {
@@ -238,19 +241,20 @@
    "walkerHit": 23,
    "heatingKnobs": 13,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:09"
  },
  "line17-traffic-seed5": {
   "counts": {
@@ -260,19 +264,20 @@
    "walkerHit": 23,
    "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:09"
  },
  "line17-u3-seed1": {
   "counts": {
@@ -286,16 +291,16 @@
    "amber": 18
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:00"
  },
  "line17-u3-seed2": {
   "counts": {
@@ -309,16 +314,16 @@
    "amber": 11
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:00"
  },
  "line17-u3-seed3": {
   "counts": {
@@ -332,16 +337,16 @@
    "amber": 9
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:00"
  },
  "line17-u3-seed4": {
   "counts": {
@@ -355,16 +360,16 @@
    "amber": 13
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:00"
  },
  "line17-u3-seed5": {
   "counts": {
@@ -378,16 +383,16 @@
    "amber": 13
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:03"
  },
  "line22-lint": {
   "counts": {
@@ -412,16 +417,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:24"
  },
  "line22-redruns-seed1": {
   "counts": {
@@ -434,16 +439,16 @@
    "holds": 6
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:15"
  },
  "line22-redruns-seed2": {
   "counts": {
@@ -456,16 +461,16 @@
    "holds": 4
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:16"
  },
  "line22-redruns-seed3": {
   "counts": {
@@ -478,16 +483,16 @@
    "holds": 2
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:17"
  },
  "line22-redruns-seed4": {
   "counts": {
@@ -500,16 +505,16 @@
    "holds": 5
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:17"
  },
  "line22-redruns-seed5": {
   "counts": {
@@ -522,16 +527,16 @@
    "holds": 1
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:18"
  },
  "line22-surfaces": {
   "counts": {
@@ -543,16 +548,16 @@
    "kerbMedianCm": 10
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:21"
  },
  "line22-traffic-seed1": {
   "counts": {
@@ -562,19 +567,20 @@
    "walkerHit": 30,
    "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:18"
  },
  "line22-traffic-seed2": {
   "counts": {
@@ -584,41 +590,43 @@
    "walkerHit": 26,
    "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:19"
  },
  "line22-traffic-seed3": {
   "counts": {
-   "slide": 112824,
-   "jump": 363,
-   "overlap": 16,
-   "walkerHit": 15,
-   "heatingKnobs": 27,
+   "slide": 6001,
+   "jump": 388,
+   "overlap": 25,
+   "walkerHit": 27,
+   "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 0
+   "finished": 1,
+   "cyclesBroken": 2
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:20"
  },
  "line22-traffic-seed4": {
   "counts": {
@@ -628,19 +636,20 @@
    "walkerHit": 14,
    "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:20"
  },
  "line22-traffic-seed5": {
   "counts": {
@@ -650,19 +659,20 @@
    "walkerHit": 23,
    "heatingKnobs": 14,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:21"
  },
  "line22-u3-seed1": {
   "counts": {
@@ -676,16 +686,16 @@
    "amber": 16
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:11"
  },
  "line22-u3-seed2": {
   "counts": {
@@ -699,16 +709,16 @@
    "amber": 14
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:12"
  },
  "line22-u3-seed3": {
   "counts": {
@@ -722,16 +732,16 @@
    "amber": 21
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:13"
  },
  "line22-u3-seed4": {
   "counts": {
@@ -745,16 +755,16 @@
    "amber": 12
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:14"
  },
  "line22-u3-seed5": {
   "counts": {
@@ -768,16 +778,16 @@
    "amber": 17
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:15"
  },
  "line23-lint": {
   "counts": {
@@ -802,16 +812,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line23-redruns-seed1": {
   "counts": {
@@ -824,16 +834,16 @@
    "holds": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:22"
  },
  "line23-redruns-seed2": {
   "counts": {
@@ -846,16 +856,16 @@
    "holds": 1
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:22"
  },
  "line23-redruns-seed3": {
   "counts": {
@@ -868,16 +878,16 @@
    "holds": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:23"
  },
  "line23-redruns-seed4": {
   "counts": {
@@ -890,16 +900,16 @@
    "holds": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:23"
  },
  "line23-redruns-seed5": {
   "counts": {
@@ -912,52 +922,53 @@
    "holds": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:23"
  },
  "line23-surfaces": {
   "counts": {},
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line23-traffic-seed1": {
   "counts": {
-   "slide": 2736,
-   "jump": 216,
-   "overlap": 15,
-   "walkerHit": 46,
+   "slide": 2999,
+   "jump": 202,
+   "overlap": 19,
+   "walkerHit": 60,
    "heatingKnobs": 9,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 1
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:24"
  },
  "line23-traffic-seed2": {
   "counts": {
@@ -967,19 +978,20 @@
    "walkerHit": 61,
    "heatingKnobs": 9,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:24"
  },
  "line23-traffic-seed3": {
   "counts": {
@@ -989,19 +1001,20 @@
    "walkerHit": 44,
    "heatingKnobs": 9,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:24"
  },
  "line23-traffic-seed4": {
   "counts": {
@@ -1011,19 +1024,20 @@
    "walkerHit": 47,
    "heatingKnobs": 9,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line23-traffic-seed5": {
   "counts": {
@@ -1033,19 +1047,20 @@
    "walkerHit": 62,
    "heatingKnobs": 9,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line23-u3-seed1": {
   "counts": {
@@ -1059,16 +1074,16 @@
    "amber": 3
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:21"
  },
  "line23-u3-seed2": {
   "counts": {
@@ -1082,16 +1097,16 @@
    "amber": 5
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:21"
  },
  "line23-u3-seed3": {
   "counts": {
@@ -1105,16 +1120,16 @@
    "amber": 4
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:22"
  },
  "line23-u3-seed4": {
   "counts": {
@@ -1128,16 +1143,16 @@
    "amber": 9
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:22"
  },
  "line23-u3-seed5": {
   "counts": {
@@ -1151,16 +1166,16 @@
    "amber": 1
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:22"
  },
  "line37-lint": {
   "counts": {
@@ -1185,16 +1200,16 @@
    "underpassClearance": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:28"
  },
  "line37-redruns-seed1": {
   "counts": {
@@ -1207,16 +1222,16 @@
    "holds": 4
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:26"
  },
  "line37-redruns-seed2": {
   "counts": {
@@ -1229,16 +1244,16 @@
    "holds": 3
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:26"
  },
  "line37-redruns-seed3": {
   "counts": {
@@ -1247,20 +1262,20 @@
    "avoidable": 0,
    "aheadRedRuns": 0,
    "ourSignalPenalty": 0,
-   "warnPasses": 2,
-   "holds": 2
+   "warnPasses": 3,
+   "holds": 3
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:26"
  },
  "line37-redruns-seed4": {
   "counts": {
@@ -1273,16 +1288,16 @@
    "holds": 3
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:27"
  },
  "line37-redruns-seed5": {
   "counts": {
@@ -1295,30 +1310,30 @@
    "holds": 1
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:27"
  },
  "line37-surfaces": {
   "counts": {},
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:28"
  },
  "line37-traffic-seed1": {
   "counts": {
@@ -1328,19 +1343,20 @@
    "walkerHit": 54,
    "heatingKnobs": 7,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:27"
  },
  "line37-traffic-seed2": {
   "counts": {
@@ -1350,19 +1366,20 @@
    "walkerHit": 65,
    "heatingKnobs": 8,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:27"
  },
  "line37-traffic-seed3": {
   "counts": {
@@ -1372,19 +1389,20 @@
    "walkerHit": 79,
    "heatingKnobs": 8,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:28"
  },
  "line37-traffic-seed4": {
   "counts": {
@@ -1394,19 +1412,20 @@
    "walkerHit": 37,
    "heatingKnobs": 24,
    "redRuns": 0,
-   "finished": 0
+   "finished": 0,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:29"
  },
  "line37-traffic-seed5": {
   "counts": {
@@ -1416,19 +1435,20 @@
    "walkerHit": 54,
    "heatingKnobs": 7,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:28"
  },
  "line37-u3-seed1": {
   "counts": {
@@ -1442,16 +1462,16 @@
    "amber": 6
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line37-u3-seed2": {
   "counts": {
@@ -1465,16 +1485,16 @@
    "amber": 8
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line37-u3-seed3": {
   "counts": {
@@ -1482,22 +1502,22 @@
    "hits": 0,
    "red": 0,
    "signalPenalty": 0,
-   "yielded": 34,
-   "closeCuts": 4,
-   "green": 131,
-   "amber": 8
+   "yielded": 33,
+   "closeCuts": 3,
+   "green": 127,
+   "amber": 9
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line37-u3-seed4": {
   "counts": {
@@ -1511,16 +1531,16 @@
    "amber": 8
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:25"
  },
  "line37-u3-seed5": {
   "counts": {
@@ -1534,16 +1554,16 @@
    "amber": 6
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 22:26"
  },
  "line9-lint": {
   "counts": {
@@ -1568,16 +1588,16 @@
    "underpassClearance": 2
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:57"
  },
  "line9-redruns-seed1": {
   "counts": {
@@ -1590,16 +1610,16 @@
    "holds": 11
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:51"
  },
  "line9-redruns-seed2": {
   "counts": {
@@ -1612,16 +1632,16 @@
    "holds": 11
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:51"
  },
  "line9-redruns-seed3": {
   "counts": {
@@ -1634,16 +1654,16 @@
    "holds": 8
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:51"
  },
  "line9-redruns-seed4": {
   "counts": {
@@ -1656,16 +1676,16 @@
    "holds": 11
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:55"
  },
  "line9-redruns-seed5": {
   "counts": {
@@ -1678,30 +1698,30 @@
    "holds": 13
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:55"
  },
  "line9-surfaces": {
   "counts": {},
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:57"
  },
  "line9-traffic-seed1": {
   "counts": {
@@ -1711,19 +1731,20 @@
    "walkerHit": 120,
    "heatingKnobs": 21,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:55"
  },
  "line9-traffic-seed2": {
   "counts": {
@@ -1733,19 +1754,20 @@
    "walkerHit": 99,
    "heatingKnobs": 19,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:55"
  },
  "line9-traffic-seed3": {
   "counts": {
@@ -1755,19 +1777,20 @@
    "walkerHit": 123,
    "heatingKnobs": 19,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:57"
  },
  "line9-traffic-seed4": {
   "counts": {
@@ -1777,19 +1800,20 @@
    "walkerHit": 117,
    "heatingKnobs": 20,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:57"
  },
  "line9-traffic-seed5": {
   "counts": {
@@ -1799,19 +1823,20 @@
    "walkerHit": 131,
    "heatingKnobs": 21,
    "redRuns": 0,
-   "finished": 1
+   "finished": 1,
+   "cyclesBroken": 0
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:57"
  },
  "line9-u3-seed1": {
   "counts": {
@@ -1825,16 +1850,16 @@
    "amber": 21
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:45"
  },
  "line9-u3-seed2": {
   "counts": {
@@ -1848,16 +1873,16 @@
    "amber": 22
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:45"
  },
  "line9-u3-seed3": {
   "counts": {
@@ -1871,16 +1896,16 @@
    "amber": 17
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:45"
  },
  "line9-u3-seed4": {
   "counts": {
@@ -1894,16 +1919,16 @@
    "amber": 20
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:45"
  },
  "line9-u3-seed5": {
   "counts": {
@@ -1917,15 +1942,15 @@
    "amber": 14
   },
   "measured_on": {
-   "src": "c731af83666d3bcb1ef0033c16d7a72360b14251",
+   "src": "f88e911d5f4c123dd63b7f707c45a256fd0be42c",
    "index.html": "1d25b89bcad35dbcf598685a63c480256c82368b",
-   "tools/bench": "2774896392a6b223da0f06d585347e72590265de",
+   "tools/bench": "82414934a618f6424fe3b81e0396a28e86332f4a",
    "tools/lint.js": "52b0cea5e74a8c53f084ce49d759b6acaba6d60c",
-   "tools/traffic_lint.js": "742be67b94e064585bc0ab9504d724537d54a624",
+   "tools/traffic_lint.js": "900fac926550f4ff02fc0c4a31527041a21d2d2e",
    "tools/autopilot.js": "8bcd3b27f008e289f82c9fe7eb6e61675d592003",
    "data/MANIFEST.json": "eadcfa6dea86d547ccd484ea920eef9f0ab645dd"
   },
-  "commit": "2eacf4f",
-  "time": "2026-11-01 19:05"
+  "commit": "9d3e3de",
+  "time": "2026-11-01 21:51"
  }
 }
