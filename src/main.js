@@ -115,6 +115,7 @@ route.ground = ground;
 const canvas = $('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+window.renderer = renderer; // (from the start, also in the menu: performance checks, tools/test_idle.py)
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
@@ -682,6 +683,17 @@ const inspect = new Inspect({
 });
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
+// An idle page draws 4 frames a second (#149): the menu, a pause, the results, and review mode with its
+// camera at rest. Driving, inspect mode and a moving review camera draw every frame; a hidden tab draws
+// nothing (requestAnimationFrame stops). The GPU was busy on an idle tab at full frame rate.
+const IDLE_MS = 250;
+function idle() {
+  if (review) return review.resting();
+  if (!$('menu').classList.contains('hidden')) return true;
+  return !!game && !inspect.active && (game.paused || game.finished);
+}
+window.drawCount = 0; // (draws so far: tools/test_idle.py)
+
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -718,9 +730,11 @@ function frame(now) {
   if (review) review.update(dt);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
-  if (!window.headless || now - lastDraw > 1000) { renderer.render(scene, camera); lastDraw = now; }
+  const lazy = idle();
+  if (window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS) { renderer.render(scene, camera); lastDraw = now; window.drawCount++; }
   if (perfOn) updatePerf(now);
-  if (game && !chase && mirrorOn && !window.freeCam && !window.headless) renderMirror(); // (not while a test steps the game)
+  // (not while a test steps the game; idle, the mirror keeps its last picture)
+  if (game && !chase && mirrorOn && !window.freeCam && !window.headless && !lazy) renderMirror();
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back

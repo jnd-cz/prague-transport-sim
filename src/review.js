@@ -567,6 +567,7 @@ ${this._verdictHtml(f)}`;
 
   _applyLayers() {
     const L = this.layers;
+    this.moved = performance.now();
     if (this.classMesh) this.classMesh.visible = L.classes;
     if (this.wire) this.wire.visible = L.wire;
     if (this.srcLines) this.srcLines.visible = this.srcDots.visible = L.source;
@@ -592,6 +593,7 @@ ${this._verdictHtml(f)}`;
     if (ox || oy) cam.setViewOffset(W, Hh, ox, oy, W, Hh); else cam.clearViewOffset();
     cam.position.set(T.x - Math.sin(this.yaw) * h, T.z + Math.sin(this.pitch) * this.dist, -(T.y - Math.cos(this.yaw) * h));
     cam.lookAt(T.x, T.z, -T.y);
+    this.moved = performance.now();
     if (!this.nearAt || Math.hypot(T.x - this.nearAt.x, T.y - this.nearAt.y) > NEAR / 3) this._near();
     this.dirty = true;
   }
@@ -710,6 +712,9 @@ ${this._verdictHtml(f)}`;
     tip.style.left = `${cx + 14}px`;
     tip.style.top = `${cy + 10}px`;
   }
+
+  // main.js draws a resting review 4 times a second (#149): nothing moved for 1 s, no key held
+  resting() { return !this.held.size && performance.now() - (this.moved || 0) > 1000; }
 
   // every frame: held keys, and the address once the camera rests
   update(dt) {
