@@ -9,7 +9,7 @@ import numpy as np
 
 from track_heights import HeightGuard
 from track_structure_review import Structures, grouped, review, record_date, findings
-from track_span_evidence import SpanEvidence
+from track_span_evidence import SpanEvidence, from_reviews
 from track_terrain_fallback import ordinary_fallback
 from test_track_heights import match, path, offset_fact
 
@@ -23,6 +23,25 @@ def approval(**updates):
 
 
 class SpanReviews(unittest.TestCase):
+    def test_review_answers_import_as_scoped_evidence_or_stay_held(self):
+        span = {'id':'s','profile':[{'xy':[0,0],'surfaces':[{'z':200,'rail_height_eligible':True}]},
+                                  {'xy':[10,0],'surfaces':[{'z':202,'rail_height_eligible':True}]}],
+                'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'bridge-1','decision':{'span_ids':['s'],'structure':{'kind':'bridge'}},'spans':[span]}
+        answer = {'decision_id':'bridge-1','span_ids':['s'],'v':'archive profile ok','note':'','t':1761955200000}
+        get = lambda a:from_reviews({'items':{'pin':a}},{'findings':[finding]},'reviews/line17.json')
+        imported = get(answer)['span_reviews'][0]
+        expected = approval(id='review-bridge-1',kind='deck',level=1,
+                            source={'dataset':'expert_review','record':'reviews/line17.json#pin','date':'2025-11-01','who':'user'},
+                            profiles=[{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'archive'}}])
+        self.assertEqual(imported,expected)
+        self.assertEqual(SpanEvidence([imported]).at('di-1',5,0,[{'z':201}]),SpanEvidence([expected]).at('di-1',5,0,[{'z':201}]))
+        survey = get({**answer,'v':'follows survey surface'})['span_reviews'][0]
+        self.assertEqual(SpanEvidence([survey]).at('di-1',5,0,[])[0]['z'],201)
+        for changed in ({'note':'check level'}, {'v':'unsure'}, {'v':'other level (deck / under)'}, {'span_ids':['changed']}):
+            self.assertFalse(get({**answer,**changed})['span_reviews'])
+            self.assertTrue(get({**answer,**changed})['held'])
+
     def test_findings_keep_all_spans_and_pin_the_longest(self):
         spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},
                  {'id':'b','length_m':30,'profile':[{'xy':[4,5]},{'xy':[6,7]}], 'from_stop':'B','to_stop':'C'}]

@@ -202,6 +202,18 @@ def review(report, structures, terrain, lines):
                                 for c in r.get('candidates',[]) if c['dataset'] in ('deck','survey') and c.get('inside')],
                     'ipr_terrain_z':float(z) if math.isfinite(z) and 100<z<500 else None})
         metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
+        route_line = LineString([p[:2] for p in data[direction]])
+        osm_positions = []
+        for item in structures.paths:
+            if item['id'] not in metadata.get('osm_ways',[]):
+                continue
+            for vertex in item['coords']:
+                point = Point(vertex[:2])
+                if route_line.distance(point) <= 8:
+                    pos = route_line.project(point)
+                    if a-30 <= pos <= b+30:
+                        osm_positions.append(pos)
+        extent = [round(min(osm_positions),3),round(max(osm_positions),3)] if len(osm_positions)>1 else None
         proposal = {'rule':'independent_height_required','reason':'No reviewed rail level or two numeric DI ends.'}
         complete_archive = all(any(usable(a['z']) and not a['excluded'] for a in p['archive']) for p in profile)
         if (complete_archive and all(c['record_date'] for c in archive.values()) and metadata['kind']=='bridge'
@@ -237,7 +249,7 @@ def review(report, structures, terrain, lines):
             'archive_candidates':list(archive.values()),'survey_candidates':list(surfaces.values()),
             'terrain':{'dataset':'ipr-dtm','source':'raw/ipr-dtm/DTM/dtm_1m.tif',
                        'height_meaning':'bare_earth','datum':'Bpv_assumed_not_independent_rail_evidence',**stats(ground)},
-            'proposal':proposal,'profile':profile,'approach':approach,
+            'proposal':proposal,'profile':profile,'approach':approach,'structure_extent':extent,
             'approval_profile':{'xy':[start,*xy,end],'di_ids':sorted({str(r['di_id']) for r in rows if r.get('di_id')}),
                                 'radius_m':1,'rule':{'type':'needs_explicit_review'}}})
     decisions = {}
@@ -279,9 +291,10 @@ def findings(result):
             continue
         longest = max(linked,key=lambda s:s['length_m'])
         point = longest['profile'][len(longest['profile'])//2]
+        conflict = any('known_archive_disagreement' in s.get('review_flags',[]) or 'conflicting_level_evidence' in s.get('review_flags',[]) for s in linked)
         out.append({'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
                     'mag':longest['length_m'],'info':f"{longest['from_stop']} → {longest['to_stop']}: {decision['structure']['kind']}",
-                    'status':decision['status'],'decision':decision,'spans':linked})
+                    'status':'conflict' if conflict else decision['status'],'decision':decision,'spans':linked})
     return {'schema':1,'snapshot':result['snapshot'],'findings':out}
 
 

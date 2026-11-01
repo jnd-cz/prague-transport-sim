@@ -1,5 +1,9 @@
 """Explicitly reviewed structure profiles; no proposal is applied automatically (#106)."""
+import argparse
+from datetime import datetime, timezone
+import json
 import math
+from pathlib import Path
 
 from shapely.geometry import LineString, Point
 
@@ -22,12 +26,18 @@ class SpanEvidence:
                 line = LineString(profile['xy'])
                 rule = profile['rule']
                 if (line.is_empty or line.length <= 0 or not line.is_simple or not profile.get('di_ids')
-                        or not 0 < profile.get('radius_m',1) <= 1 or rule.get('type') not in ('archive','linear','constant')):
+                        or not 0 < profile.get('radius_m',1) <= 1 or rule.get('type') not in ('archive','linear','constant','samples')):
                     raise ValueError('span profile needs simple track path, DI IDs, <=1 m scope and explicit height rule')
                 zs = rule.get('ends',[]) if rule['type']=='linear' else [rule.get('z')] if rule['type']=='constant' else []
                 if ((rule['type']=='linear' and len(zs)!=2)
                         or any(not isinstance(z,(int,float)) or not math.isfinite(z) or not 100<z<500 for z in zs)):
                     raise ValueError('reviewed span heights must be finite Bpv rail heights')
+                if rule['type']=='samples':
+                    samples = rule.get('samples',[])
+                    if (len(samples)<2 or any(not isinstance(s,(int,float)) or not math.isfinite(s) or not 0<=s<=line.length
+                            or not isinstance(z,(int,float)) or not math.isfinite(z) or not 100<z<500 for s,z in samples)
+                            or any(b[0]<=a[0] or b[0]-a[0]>10 for a,b in zip(samples,samples[1:]))):
+                        raise ValueError('survey profile needs ordered finite samples no more than 10 m apart')
                 self.profiles.append((review,profile,line,{str(i) for i in profile['di_ids']}))
 
     def at(self, identity, x, y, archived):
@@ -45,9 +55,95 @@ class SpanEvidence:
                 z = zs[0]
             elif rule['type']=='constant':
                 z = rule['z']
+            elif rule['type']=='samples':
+                s = line.project(point)
+                samples = rule['samples']
+                if s < samples[0][0]-3 or s > samples[-1][0]+3:
+                    continue
+                if s <= samples[0][0]: z = samples[0][1]
+                elif s >= samples[-1][0]: z = samples[-1][1]
+                else:
+                    a,b = next((a,b) for a,b in zip(samples,samples[1:]) if a[0]<=s<=b[0])
+                    z = a[1]+(b[1]-a[1])*(s-a[0])/(b[0]-a[0])
             else:
                 a,b = rule['ends']
                 z = a+(b-a)*line.project(point)/line.length
             out.append({'id':review['id'], 'z':z, 'level':review['level'], 'kind':review['kind'],
                         'rule':rule['type'], 'source':review['source']})
         return out
+
+
+def from_reviews(verdicts, findings, source_name):
+    """Convert unambiguous user answers; notes, other levels and uncertain choices stay held."""
+    by_id = {f['id']:f for f in findings['findings'] if f.get('kind')=='trackheight'}
+    reviews, held, latest = [], [], {}
+    for key,answer in verdicts.get('items',{}).items():
+        identity = answer.get('decision_id')
+        if not identity:
+            continue
+        t = answer.get('t') if isinstance(answer.get('t'),(int,float)) else 0
+        if identity not in latest or t > latest[identity][0]:
+            latest[identity] = (t,key,answer)
+    for identity,(_,key,answer) in latest.items():
+        item = by_id.get(identity)
+        reason = None
+        if not item or set(answer.get('span_ids',[])) != set(item['decision']['span_ids']):
+            reason = 'missing or changed decision scope'
+        elif answer.get('note') or answer.get('v') not in ('archive profile ok','follows survey surface'):
+            reason = 'note, unsure or unspecified other level'
+        elif not isinstance(answer.get('t'),(int,float)):
+            reason = 'missing answer date'
+        if reason:
+            held.append({'id':identity,'reason':reason}); continue
+        kind = item['decision']['structure']['kind']
+        if kind not in ('bridge','tunnel'):
+            held.append({'id':identity,'reason':'structure level is not identified'}); continue
+        profiles = []
+        for span in item['spans']:
+            p = dict(span['approval_profile'])
+            if not p.get('di_ids'):
+                reason = 'span has no DI identities'; break
+            if answer['v']=='archive profile ok':
+                p['rule'] = {'type':'archive'}
+            else:
+                line = LineString(p['xy']); samples = []
+                for point in span['profile']:
+                    candidates = [c['z'] for c in point['surfaces'] if c.get('rail_height_eligible')
+                                  and isinstance(c.get('z'),(int,float)) and math.isfinite(c['z']) and 100<c['z']<500]
+                    if not candidates or max(candidates)-min(candidates)>.3:
+                        reason = 'survey rail height missing or ambiguous'; break
+                    samples.append([round(line.project(Point(point['xy'])),3),sum(candidates)/len(candidates)])
+                if reason: break
+                p['rule'] = {'type':'samples','samples':samples}
+            profiles.append(p)
+        if reason:
+            held.append({'id':identity,'reason':reason}); continue
+        entry = {'id':'review-'+identity,'kind':'deck' if kind=='bridge' else 'tunnel',
+                 'level':1 if kind=='bridge' else -1,'reviewed':True,'vertical_datum':'Bpv',
+                 'height_meaning':'top_of_rail','source':{'dataset':'expert_review','record':f'{source_name}#{key}',
+                 'date':datetime.fromtimestamp(answer['t']/1000,timezone.utc).date().isoformat(),'who':'user'},'profiles':profiles}
+        try:
+            SpanEvidence([entry])
+        except (ValueError,TypeError) as e:
+            held.append({'id':identity,'reason':str(e)}); continue
+        reviews.append(entry)
+    return {'span_reviews':reviews,'held':held}
+
+
+def main():
+    ap = argparse.ArgumentParser(description='Convert stored track-height review answers into dated evidence.')
+    ap.add_argument('--from-reviews',type=Path,required=True)
+    ap.add_argument('--findings',type=Path,default=Path('reports/review/track-heights.json'))
+    ap.add_argument('--output',type=Path,required=True)
+    args = ap.parse_args()
+    result = from_reviews(json.loads(args.from_reviews.read_text(encoding='utf-8')),
+                          json.loads(args.findings.read_text(encoding='utf-8')),str(args.from_reviews))
+    from atomic import replacing
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    with replacing(args.output,'w',encoding='utf-8') as f:
+        json.dump(result,f,ensure_ascii=False,indent=2)
+    print(f"{len(result['span_reviews'])} evidence records, {len(result['held'])} held")
+
+
+if __name__=='__main__':
+    main()

@@ -21,6 +21,12 @@ import serve  # noqa: E402
 FILE = {"options": ["right", "wrong"],
         "checks": {"demo": {"places": [{"x": 0.0, "y": 0.0, "kind": "here", "mag": 5, "info": "the city origin"},
                                        {"x": 30.0, "y": 0.0, "kind": "here", "mag": 4, "info": "30 m east"}]}}}
+HEIGHT = {'findings':[{'kind':'trackheight','id':'bridge-test','x':0,'y':0,'mag':10,'status':'review',
+    'info':'test bridge','decision':{'span_ids':['span-test'],'structure':{'kind':'bridge'}},
+    'spans':[{'id':'span-test','line':17,'direction':'path','length_m':10,'start_s':0,
+              'structure':{'kind':'bridge'},'status':'review','proposal':{'rule':'independent_height_required'},
+              'profile':[{'s':0,'xy':[0,0],'archive':[{'z':200}],'surfaces':[],'ipr_terrain_z':199,'di_z':200},
+                         {'s':10,'xy':[10,0],'archive':[{'z':201}],'surfaces':[],'ipr_terrain_z':200,'di_z':201}]}]}]}
 
 
 class Quiet(serve.NoCache):
@@ -109,6 +115,21 @@ def main():
               R._fill();
               return { rec, count: R.$('rvCount').textContent };
             }""")
+            page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT)))
+            page.goto(f'http://127.0.0.1:{server.server_port}/?line={args.line}&review=height-findings.json',timeout=180000)
+            page.wait_for_function('window.review',timeout=180000)
+            r['height'] = page.evaluate('''async () => {
+              const R=window.review; await R.ready;
+              R.$('rvFilter').value='file|'; R._fill();
+              const i=R.list.findIndex(f=>f.kind==='trackheight'); R.select(i);
+              const svg=document.querySelector('#heightProfile');
+              const button=[...document.querySelectorAll('#rvCard button[data-v]')].map(b=>b.textContent);
+              if (svg) svg.dispatchEvent(new PointerEvent('pointermove',{clientX:svg.getBoundingClientRect().left+80}));
+              return {count:R.list.filter(f=>f.kind==='trackheight').length, svg:!!svg, marker:!!R.heightMarker?.visible, button};
+            }''')
+            page.click("#rvCard button[data-v='0']")
+            page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
+            r['heightSaved'] = json.load(open(saved,encoding='utf-8'))
             browser.close()
     finally:
         server.shutdown()
@@ -136,6 +157,11 @@ def main():
         fails.append(f"after the answer the card shows {r['next']!r}, not the next finding without one")
     if (r["back"]["rec"] or {}).get("v") != "wrong" or not r["back"]["count"].startswith("1 / 2"):
         fails.append(f"after a reload without local storage: {r['back']}")
+    if r['height']['count'] != 1 or not r['height']['svg'] or not r['height']['marker']:
+        fails.append(f"track height finding/profile/hover missing: {r['height']}")
+    if not any(v.get('decision_id')=='bridge-test' and v.get('span_ids')==['span-test'] and v.get('v')=='archive profile ok'
+               for v in r['heightSaved'].get('items',{}).values()):
+        fails.append('track-height answer was not saved with its decision scope')
     if fails:
         sys.exit("; ".join(fails))
     print("review mode: findings, camera, links, bottom sheet, a click on a pin; an answer saved, the next finding, read back: pass")
