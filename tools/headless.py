@@ -193,6 +193,13 @@ def spread_cell(k, before, after, check):
     return f"{k} {fmt(bm)}{rng(b)} → {fmt(am)}{rng(a)}{mark}"
 
 
+def jammed(c):
+    """A run that did not get through (stuck, unfinished, an error): its counts measure the jam, not the
+    traffic (line 17 traffic seed 4 in #151's check: walkerHit 133 against 11-39 on the other seeds);
+    it is reported per seed and left out of the spread."""
+    return bool(c.get("error")) or c.get("stuck") is not None or c.get("finished") == 0
+
+
 def compare_rows(base, results):
     """Markdown rows per line and check: counts whose mean left main's seed spread (marked when a problem
     rose or fell), the counts that moved inside it, and per-seed changes of the hard problems."""
@@ -236,9 +243,9 @@ def compare_rows(base, results):
         keys = sorted({k for v in [*stored.values(), *runs.values()] for k in v} - HARD.get(check, set()) - {"error"})
         same_seeds = set(runs) <= set(stored)
         for k in keys:
-            before = [v.get(k) for v in stored.values()]
-            after = [runs[s].get(k) for s in sorted(runs)]
-            if same_seeds and after == [stored[s].get(k) for s in sorted(runs)]:
+            before = [v.get(k) for v in stored.values() if not jammed(v)]
+            after = [runs[s].get(k) for s in sorted(runs) if not jammed(runs[s])]
+            if same_seeds and after == [stored[s].get(k) for s in sorted(runs) if not jammed(runs[s])]:
                 continue
             cell = spread_cell(k, before, after, check)
             (out.append(cell) if cell else inside.append(k))

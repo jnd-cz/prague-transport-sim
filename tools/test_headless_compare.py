@@ -45,6 +45,12 @@ class Spread(unittest.TestCase):
         cells = row(headless.compare_rows(self.base, runs))
         self.assertEqual(cells[5], "seed 3: finished 1 → 0 **worse**")
 
+    def test_a_jammed_run_is_reported_per_seed_and_left_out_of_the_spread(self):
+        runs = {(22, "traffic", s): {"walkerHit": 80, "slide": 6000, "finished": 1} for s in range(1, 6)}
+        runs[(22, "traffic", 4)] = {"walkerHit": 400, "slide": 90000, "finished": 0}
+        cells = row(headless.compare_rows(self.base, runs))
+        self.assertEqual(cells[3:], ["–", "walkerHit", "seed 4: finished 1 → 0 **worse**"])
+
     def test_context_counts_are_not_marked(self):
         b = base(17, "u3", {s: {"yielded": y, "stuck": None, "hits": 0} for s, y in zip(range(1, 4), (40, 44, 50))})
         runs = {(17, "u3", s): {"yielded": 70, "stuck": None, "hits": 0} for s in range(1, 4)}

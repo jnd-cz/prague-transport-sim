@@ -18,15 +18,20 @@ rerunning the published data.
    - a build tool only, data not rebuilt yet: rebuild first (`python -P -E tools/rebuild.py <lines>
      --parallel`), then the changed lines.
    - docs or harness only: no run needed; say so.
-3. **Run** (in the background; about 10 minutes for all lines with 4 pages at once):
-   `python -P -E tools/headless.py --lines <lines> --checks u3,redruns,traffic,lint --seeds 1 --compare`
-   Add the seeds the issue names (traffic varies by seed; a moved traffic count is worth a second seed).
+3. **Run** (in the background; 47 minutes for all lines with 4 pages at once, seeds 1-5 by default):
+   `python -P -E tools/headless.py --lines <lines> --checks u3,redruns,traffic,lint,surfaces --compare`
+   (`--port 0` when another headless run uses 8745). Seeded counts are judged against main's spread over
+   its seeds (#156); fewer seeds (`--seeds 1-2`) still compare against the full spread, only less surely.
 4. **Read the result:**
    - A stale-baseline warning: main moved since its baseline. Say so, and read the differences as main's
      changes plus the branch's.
-   - Known failures in AGENTS.md (line 9 u3 stuck at 14355, #80) are not regressions.
-   - Every count that moved needs a reason tied to the change (e.g. "roads changed at the corridor
-     edge"). A **worse** mark without one is a regression: report it, don't paper over it.
+   - Known failures in AGENTS.md (its table) are not regressions.
+   - The table lists, per line and check: counts whose mean left main's seed spread (**worse** /
+     better), counts that moved inside it (noise: no reason needed), and per-seed hard failures
+     (stuck, unfinished, penalties). Seedless checks (lint, surfaces) list every move.
+   - Every mean outside the spread, every per-seed failure and every seedless move needs a reason tied to
+     the change (e.g. "roads changed at the corridor edge"). A **worse** mark without one is a regression:
+     report it, don't paper over it.
 5. **For the PR:** the table from `reports/headless/compare.md`, the reasons, and for rebuilt data what
    changed per line. When the numbers moved for good reasons, and code and data are committed and
    published, rerun with `--baseline` instead of `--compare` and commit `reports/baseline/headless.json`
