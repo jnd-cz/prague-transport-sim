@@ -89,7 +89,7 @@
   @keyframes pop { from { transform: scale(.9); opacity: 0; } }
   #action { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,14,12,.9); padding: 14px 22px; border-radius: 8px; font-size: 16px; display: none; }
 
-  /* the mirror frame grows with the viewport (src/main.js renderMirror sizes its picture to it); the aspect
+  /* the mirror frame grows with the viewport (src/mirror.js sizes its picture to it); the aspect
      stays the mirror camera's 150:190, so its field of view does not change */
   #mirror { position: fixed; right: calc(5.5vw + 10px); bottom: calc(var(--dashH) + 16px); height: clamp(110px, 24vh, 420px); aspect-ratio: 150 / 190; border: 6px solid #1b1f1d;
     border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.5); pointer-events: none; }

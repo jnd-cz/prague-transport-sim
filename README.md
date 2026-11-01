@@ -162,7 +162,9 @@ hour. Log: `reports/autodeploy.log`.
   zoom; a double click brings it back behind the tram.
 - **The right mirror** grows with the window (a quarter of its height, 110–420 px) and keeps its
   aspect, so its field of view stays the same; its picture is drawn at the frame's size in device
-  pixels.
+  pixels. The texture updates at most 30 times a second, with a 300 m horizon. Flat covers/grates and
+  thin catenary wires are omitted; people, vehicles, poles and the tram remain. Its cached picture is
+  composited after every main redraw, including while paused.
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
   Forces follow the ČKD T3 pamphlet (1.8 m/s² acceleration and service braking for an empty 16 t car),
   so a full car is slower; gravity on gradients (Chotkova ~7 %), curve resistance, rolling back
@@ -342,6 +344,12 @@ python tools/lint_report.py
 
 After an intended improvement, run it with `--accept` to make the current reports the new baseline.
 Facts from the user that checks are scored against live in `data/truth.json`.
+
+Mirror rendering cost (#79): `python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed`.
+Keep its game window in front until it closes: the report records the graphics backend, focus,
+frame times and mirror geometry/update counts, alternating mirror off/on. Unfocused frame rates are
+rejected. `tools/test_mirror.py` checks cadence and renderer state; `tools/test_mirror_game.py` captures
+the real mirror at 1280×720, 3840×2160 and 390×844 in `reports/shots/mirror79/`.
 
 **Compare a view or rebuilt data** (#158):
 
