@@ -177,14 +177,30 @@ def review(report, structures, terrain, lines):
                         surveyed.append({'id':c['id'],'class':c['class'],'z':c.get('z'),
                             'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
                                 and c['class'] in ('deck','tram','road','paved','parking'),
-                            'excluded':c.get('excluded')})
+                            'level':c.get('level'),'excluded':c.get('excluded')})
             profile.append({'s':round(r['s'],3),'xy':[round(v,3) for v in (r.get('di_xy') or r['xy'])],
-                'di_id':r.get('di_id'),'archive':archived,'surfaces':surveyed,'ipr_terrain_z':z})
+                'di_id':r.get('di_id'),'di_z':r.get('raw_di_z'),'archive':archived,'surfaces':surveyed,'ipr_terrain_z':z})
         for entries in (archive,surfaces):
             for entry in entries.values():
                 entry['height'] = stats(entry.pop('zs'))
                 if 'surface_zs' in entry:
                     entry['survey_height'] = stats(entry.pop('surface_zs'))
+        # Context is plotted but never included in the decision's approval scope.
+        neighbours = [r for r in routes[line,direction] if a-30 <= r['s'] <= b+30 and not a <= r['s'] <= b]
+        approach = []
+        if neighbours:
+            ee,nn = Frame().to_jtsk([r['xy'][0] for r in neighbours],[r['xy'][1] for r in neighbours])
+            for r,z in zip(neighbours,terrain.sample(ee,nn)):
+                approach.append({'s':round(r['s'],3),'xy':[round(v,3) for v in (r.get('di_xy') or r['xy'])],
+                    'di_id':r.get('di_id'),'di_z':r.get('raw_di_z'),
+                    'archive':[{'id':c['id'],'z':c.get('z'),'excluded':c.get('excluded')}
+                               for c in r.get('candidates',[]) if c['dataset']=='archive'],
+                    'surfaces':[{'id':c['id'],'class':c['class'],'level':c.get('level'),'z':c.get('z'),
+                                 'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
+                                    and c['class'] in ('deck','tram','road','paved','parking'),
+                                 'excluded':c.get('excluded')}
+                                for c in r.get('candidates',[]) if c['dataset'] in ('deck','survey') and c.get('inside')],
+                    'ipr_terrain_z':float(z) if math.isfinite(z) and 100<z<500 else None})
         metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
         proposal = {'rule':'independent_height_required','reason':'No reviewed rail level or two numeric DI ends.'}
         complete_archive = all(any(usable(a['z']) and not a['excluded'] for a in p['archive']) for p in profile)
@@ -221,7 +237,7 @@ def review(report, structures, terrain, lines):
             'archive_candidates':list(archive.values()),'survey_candidates':list(surfaces.values()),
             'terrain':{'dataset':'ipr-dtm','source':'raw/ipr-dtm/DTM/dtm_1m.tif',
                        'height_meaning':'bare_earth','datum':'Bpv_assumed_not_independent_rail_evidence',**stats(ground)},
-            'proposal':proposal,'profile':profile,
+            'proposal':proposal,'profile':profile,'approach':approach,
             'approval_profile':{'xy':[start,*xy,end],'di_ids':sorted({str(r['di_id']) for r in rows if r.get('di_id')}),
                                 'radius_m':1,'rule':{'type':'needs_explicit_review'}}})
     decisions = {}
@@ -251,6 +267,22 @@ def review(report, structures, terrain, lines):
     return {'schema':1,'snapshot':report['snapshot'],'frame':report['frame'],
             'scope':'Held structure heights; proposed rules require explicit dated review.',
             'decisions':list(decisions.values()),'spans':spans,'ordinary_terrain_fallbacks':fallbacks}
+
+
+def findings(result):
+    """One review pin per decision, with the complete direction spans attached."""
+    spans = {s['id']:s for s in result['spans']}
+    out = []
+    for decision in result['decisions']:
+        linked = [spans[i] for i in decision['span_ids'] if i in spans and spans[i]['profile']]
+        if not linked:
+            continue
+        longest = max(linked,key=lambda s:s['length_m'])
+        point = longest['profile'][len(longest['profile'])//2]
+        out.append({'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
+                    'mag':longest['length_m'],'info':f"{longest['from_stop']} → {longest['to_stop']}: {decision['structure']['kind']}",
+                    'status':decision['status'],'decision':decision,'spans':linked})
+    return {'schema':1,'snapshot':result['snapshot'],'findings':out}
 
 
 def markdown(result):
@@ -289,6 +321,7 @@ def main():
     ap.add_argument('--input',type=Path,required=True)
     ap.add_argument('--output',type=Path,default=ROOT/'reports/review/track-height-spans.json')
     ap.add_argument('--markdown-output',type=Path,default=ROOT/'reports/review/track-height-spans.md')
+    ap.add_argument('--findings-output',type=Path,default=ROOT/'reports/review/track-heights.json')
     a = ap.parse_args()
     report = json.loads(a.input.read_text(encoding='utf-8'))
     decks = load_decks(ROOT)
@@ -299,6 +332,7 @@ def main():
     finally:
         terrain.f.close()
     write_json(a.output,result)
+    write_json(a.findings_output,findings(result))
     from atomic import replacing
     a.markdown_output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(a.markdown_output,'w',encoding='utf-8') as f:

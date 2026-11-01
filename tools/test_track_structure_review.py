@@ -8,7 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import numpy as np
 
 from track_heights import HeightGuard
-from track_structure_review import Structures, grouped, review, record_date
+from track_structure_review import Structures, grouped, review, record_date, findings
 from track_span_evidence import SpanEvidence
 from track_terrain_fallback import ordinary_fallback
 from test_track_heights import match, path, offset_fact
@@ -23,6 +23,17 @@ def approval(**updates):
 
 
 class SpanReviews(unittest.TestCase):
+    def test_findings_keep_all_spans_and_pin_the_longest(self):
+        spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},
+                 {'id':'b','length_m':30,'profile':[{'xy':[4,5]},{'xy':[6,7]}], 'from_stop':'B','to_stop':'C'}]
+        decision = {'id':'bridge-1','status':'review','span_ids':['a','b'], 'structure':{'kind':'bridge'}}
+        result = findings({'snapshot':'test','spans':spans,'decisions':[decision]})
+        self.assertEqual(len(result['findings']),1)
+        item = result['findings'][0]
+        self.assertEqual((item['x'],item['y']),(6,7))
+        self.assertEqual([s['id'] for s in item['spans']],['a','b'])
+        self.assertEqual(item['id'],'bridge-1')
+
     def test_terrain_last_fallback_has_provenance_and_never_fills_a_structure(self):
         row = {'status':'review','review_flags':['no_usable_height'],'di_id':'di-1','xy':[5,0],
                'construction':{'styles':['grass']}}
