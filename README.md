@@ -184,6 +184,8 @@ hour. Log: `reports/autodeploy.log`.
   junctions, queue behind trams on shared track, stop for walkers; trams stop behind cars on their track.
 - Menu options: automatic switches (onboard computer sets every switch by radio instead of the
   overhead contacts), performance overlay (FPS, frame time, draw calls, triangles, JS heap).
+- Idle pages draw 4 frames a second (#149): the menu, a pause, the results, review mode with its
+  camera at rest. Driving and inspect mode draw every frame; a hidden tab draws nothing.
 - Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered,
   six doors); line 23
   runs a single heritage car. "Set" in the menu overrides it. Each car follows the track on its own
