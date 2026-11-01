@@ -293,9 +293,9 @@
     "to": "Slavia - Nádraží Eden",
     "constructionAssessment": "mostly_grass",
     "observedSurveyToRail": {
-     "metres": 0.2243,
+     "metres": 0.2222,
      "samples": 219,
-     "basis": "median numeric DI rail height minus containing raw green survey surface, local to this calibration site",
+     "basis": "length-weighted median numeric DI rail height minus containing raw green survey surface, local to this calibration site",
      "source": "reports/review/track-height-calibration.json green_sites: Koh-i-noor / Slavia - Nádraží Eden; snapshot 2026-11-01",
      "status": "local_measurement_only_not_an_adopted_height_rule"
     },

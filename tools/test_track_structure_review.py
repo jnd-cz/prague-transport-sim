@@ -1,5 +1,9 @@
 """Structure grouping and explicit approvals: python -P -E tools/test_track_structure_review.py."""
 import unittest
+from pathlib import Path
+import sys
+
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 
 import numpy as np
 

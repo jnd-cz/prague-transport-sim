@@ -206,7 +206,7 @@ documented panel **drawing** default and carries a `track_style_defaulted_panels
 does not prove paved construction for a height check.
 
 `tools/track_context.py` classifies construction from explicit truth styles, then matching pinned OSM
-`surface` / `embedded_rails`, then a covering ground-level paved survey class. A generic ZPS tram area
+`surface` / `embedded_rails`, then a covering paved survey class at the established track level. A generic ZPS tram area
 does not establish its material. Open grass/ballast outlines may follow ditches or embankment toes:
 they neither supply a rail height nor veto an archive height. Unknown construction also keeps the
 survey diagnostic. Archive disagreement over 1 m with numeric DI still holds the whole archive record.
@@ -227,7 +227,7 @@ it separates raw DI-minus-survey from the approved drawing-offset residual.
 
 Of the green samples, **219** form one site, Koh-i-noor – Slavia – Nádraží Eden; none overlaps the
 explicit Hradčany grass marks. The other **5** are ground beneath Trojský most, more than 8 m below
-the rails. The 219-site median is +0.224 m, p10 +0.077 m, p90 +0.447 m. Its survey class establishes
+the rails. The 219-site length-weighted median is +0.222 m, p10 +0.075 m, p90 +0.428 m. Its survey class establishes
 green ground, not whether its Z is vegetation or track bed. The user's section assessment is recorded
 at `data/truth.json` `trackHeights.surveyCalibrationSites`; exact grass boundaries and individual
 sample construction remain unverified. No +0.22 m

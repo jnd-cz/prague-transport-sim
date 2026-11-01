@@ -46,7 +46,8 @@ class TrackContext:
             # outline is not: it can follow ditches and embankment toes around an open track bed.
             if not modes:
                 for c in surfaces:
-                    if (c.get('inside') and c.get('class') in ('road','paved','parking') and c.get('level') == 0
+                    if (c.get('inside') and c.get('class') in ('road','paved','parking')
+                            and c.get('level') == c.get('track_level',0)
                             and c.get('excluded') not in ('survey_level_mismatch','track_zps_level_unverified',
                                                          'non_track_surface','surface_on_other_level')):
                         modes.add('paved')

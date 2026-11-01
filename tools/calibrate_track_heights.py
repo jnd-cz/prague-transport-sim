@@ -54,7 +54,7 @@ def calibrate(report, context):
             raw_groups[key].append((r['raw_di_z'] - c['surface_z'],r['weight_m']))
             if c.get('class') == 'green' or abs(delta)>3:
                 examples[str(key)].append({'di_id':r['di_id'],'xy':r['xy'],'di_z':r['raw_di_z'],
-                                          'surface':c,'delta_m':delta,'construction':kind})
+                                          'weight_m':r['weight_m'],'surface':c,'delta_m':delta,'construction':kind})
     return {'groups':[{'construction':k[0],'styles':k[1],'class':k[2],'level':k[3],**summarize(v),
                        'di_minus_raw_surface':summarize(raw_groups[k])} for k,v in sorted(groups.items())],
             'examples':dict(examples)}
@@ -98,7 +98,7 @@ def main():
                           'di_ids':sorted({str(e['di_id']) for e in rows}),
                           'construction':sorted({e['construction']['kind'] for e in rows}),
                           'explicit_styles':sorted({s for e in rows for s in e['construction']['styles']}),
-                          'di_minus_raw_green':summarize([(e['di_z']-e['surface']['surface_z'],1) for e in rows])})
+                          'di_minus_raw_green':summarize([(e['di_z']-e['surface']['surface_z'],e['weight_m']) for e in rows])})
         summary = {'snapshot':report['snapshot'],'groups':result['groups'],'green_sites':sites,
                    'construction_assessments':json.loads((ROOT/'data/truth.json').read_text(encoding='utf-8')).get('trackHeights',{}).get('surveyCalibrationSites',[]),
                    'survey_grass_offset_adopted':False,

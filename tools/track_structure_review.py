@@ -169,8 +169,10 @@ def review(report, structures, terrain, lines):
                     archived.append({'id':c['id'],'z':c.get('z'),'excluded':c.get('excluded')})
                 elif c['dataset'] in ('deck','survey'):
                     entry = surfaces.setdefault(c['id'],{'id':c['id'],'class':c['class'],'level':c['level'],
-                        'source':c['provenance'],'excluded':c.get('excluded'),'zs':[]})
+                        'source':c['provenance'],'excluded':c.get('excluded'),'zs':[],'surface_zs':[],
+                        'rail_offset_m':c.get('rail_above_deck_m'),'offset_fact_ids':c.get('offset_fact_ids',[])})
                     entry['zs'].append(c.get('z'))
+                    entry['surface_zs'].append(c.get('surface_z'))
                     if c.get('inside'):
                         surveyed.append({'id':c['id'],'class':c['class'],'z':c.get('z'),
                             'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
@@ -181,6 +183,8 @@ def review(report, structures, terrain, lines):
         for entries in (archive,surfaces):
             for entry in entries.values():
                 entry['height'] = stats(entry.pop('zs'))
+                if 'surface_zs' in entry:
+                    entry['survey_height'] = stats(entry.pop('surface_zs'))
         metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
         proposal = {'rule':'independent_height_required','reason':'No reviewed rail level or two numeric DI ends.'}
         complete_archive = all(any(usable(a['z']) and not a['excluded'] for a in p['archive']) for p in profile)
@@ -265,9 +269,14 @@ def markdown(result):
                 '|---|---|---:|---|']
         for s in group:
             out.append(f"| {s['line']} / {s['direction']} | {s['from_stop']} → {s['to_stop']} | {s['length_m']:.1f} | {s['proposal']['rule']} |")
-        archive = {str(c['id']):c for s in group for c in s['archive_candidates']}
-        out += ['', 'Archive candidates: '+('; '.join(f"`{i}` ({c['record_date'] or 'date missing'}; median {c['height'].get('median','?')} m, range {c['height'].get('min','?')}–{c['height'].get('max','?')} m)" for i,c in archive.items()) or 'none')+'.',
-                '', 'DI at span ends: '+('; '.join(f"{e['z']:.3f} m / {e['di_id']} / {e['distance_m']:.1f} m away" for s in group for e in s['di_ends'] if e) or 'no numeric DI within 50 m')+'.',
+        archive = {}
+        for s in group:
+            for c in s['archive_candidates']:
+                entry = archive.setdefault(str(c['id']),{'record_date':c['record_date'],'heights':[]})
+                if c['height']['n']:
+                    entry['heights'] += [c['height']['min'],c['height']['max']]
+        out += ['', 'Archive candidates: '+('; '.join(f"`{i}` ({c['record_date'] or 'date missing'}; range {min(c['heights']) if c['heights'] else '?'}–{max(c['heights']) if c['heights'] else '?'} m)" for i,c in archive.items()) or 'none')+'.',
+                '', 'DI at span ends: '+('; '.join(f"{e['z']:.3f} m / {e['di_id']} / {e['distance_m']:.1f} m away / export {','.join(sorted({p['state'] for p in e['sources']}))}" for s in group for e in s['di_ends'] if e) or 'no numeric DI within 50 m')+'.',
                 '', 'Flags: '+', '.join(f'`{f}`' for f in sorted({f for s in group for f in s['review_flags']}))+'.', '']
     out += ['## Ordinary no-data proposals', '',
             f"{sum(r['weight_m'] for r in result['ordinary_terrain_fallbacks']):.3f} direction-metres use the documented IPR-terrain-plus-style proposal for #20.",

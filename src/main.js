@@ -409,6 +409,14 @@ function start() {
     const p = span.profile[Math.floor(span.profile.length / 2)], [x, y] = p.xy;
     const near = game.route.nearest(x, y), z = near ? game.profile.height(near.s) : 0;
     camera.position.set(x, z + 22, -y + 30);
+    if (span.structure.kind === 'tunnel') {
+      // Approach a passage from outside its portal, rather than placing the camera in its roof.
+      const [a, b] = [span.profile[0].xy, span.profile[span.profile.length - 1].xy];
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const portal = game.route.nearest(a[0], a[1]);
+      camera.position.set(a[0] - (b[0] - a[0]) / length * 25,
+        (portal ? game.profile.height(portal.s) : z) + 8, -(a[1] - (b[1] - a[1]) / length * 25));
+    }
     camera.lookAt(x, z + 1, -y);
     inspect._setMode('fly');
     const dir = new THREE.Vector3(); camera.getWorldDirection(dir);

@@ -12,8 +12,16 @@ export function buildHeightReview(game) {
   const heading = document.createElement('b');
   heading.textContent = 'HEIGHT REVIEW · orange: held · red: conflict · blue: numeric DI · green: approved';
   panel.append(heading);
+  const list = document.createElement('div');
+  Object.assign(list.style, { maxHeight: '25vh', overflow: 'auto' });
+  panel.append(list);
+  const description = document.createElement('pre');
+  Object.assign(description.style, { whiteSpace: 'pre-wrap', maxHeight: '25vh', overflow: 'auto' });
+  const details = document.createElement('details'), label = document.createElement('summary');
+  label.textContent = 'All sources and scope'; details.append(label);
   const info = document.createElement('pre');
-  Object.assign(info.style, { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' });
+  Object.assign(info.style, { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '30vh', overflow: 'auto' });
+  details.append(info);
   for (const span of spans) {
     const conflict = span.review_flags.some((f) => /disagreement|ambiguous/.test(f));
     const color = span.status === 'approved' ? 0x44dd88 : span.status === 'di_numeric' ? 0x66ccff : conflict ? 0xff5555 : 0xffbb44;
@@ -34,13 +42,23 @@ export function buildHeightReview(game) {
     Object.assign(button.style, { display: 'block', width: '100%', textAlign: 'left', marginTop: '6px', color: `#${color.toString(16)}`, background: '#30353c', border: '1px solid #657080', padding: '5px' });
     button.onclick = () => {
       game.inspectHeightSpan?.(span);
+      const range = (h) => h?.n ? `${h.min}–${h.max} m` : 'none';
+      description.textContent = [
+        `Proposed: ${span.proposal?.rule}\n${span.proposal?.reason || ''}`,
+        `DI near ends: ${(span.di_ends || []).map((p) => p ? `${p.z.toFixed(3)} m (${p.distance_m} m away)` : 'none').join(' / ')}`,
+        `Archive: ${(span.archive_candidates || []).map((c) => `${c.id}: ${range(c.height)} (${c.record_date || 'date missing'})`).join('; ') || 'none'}`,
+        `Survey: ${(span.survey_candidates || []).map((c) => `${c.class}, level ${c.level}: raw ${range(c.survey_height)}, rail candidate ${range(c.height)} (${c.source?.date || 'date missing'})${c.excluded ? `, ${c.excluded}` : ''}`).join('; ') || 'none'}`,
+        `IPR bare earth: ${range(span.terrain)} (comparison only)`,
+        `Flags: ${span.review_flags.join(', ')}`,
+      ].join('\n\n');
+      description.scrollTop = 0;
       info.textContent = JSON.stringify({ id: span.id, osm_ways: span.structure.osm_ways, flags: span.review_flags,
         proposal: span.proposal, di_ends: span.di_ends, archive: span.archive_candidates,
         survey: span.survey_candidates, terrain: span.terrain }, null, 2);
     };
-    panel.append(button);
+    list.append(button);
   }
-  panel.append(info);
+  panel.append(description, details);
   document.body.append(panel);
   group.userData.dispose = () => { panel.remove(); for (const r of resources) r.dispose(); };
   return group;
