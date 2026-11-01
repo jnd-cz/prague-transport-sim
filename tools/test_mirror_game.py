@@ -63,7 +63,7 @@ def main():
                 assert row['target'][1]<=640
                 if results['views']:
                     assert row['rotation']==results['views'][0]['rotation']
-                assert all(o['flat'] or o['part']=='catenary' and o['type']=='LineSegments' for o in row['excluded'])
+                assert all(o['flat'] for o in row['excluded'])
                 results['views'].append(row)
                 page.screenshot(path=str(a.out/f'line{a.line}-{width}x{height}.png'))
             idle = page.evaluate('''() => ({...mirror.stats})''')

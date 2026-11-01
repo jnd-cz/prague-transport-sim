@@ -162,8 +162,8 @@ hour. Log: `reports/autodeploy.log`.
   zoom; a double click brings it back behind the tram.
 - **The right mirror** grows with the window (a quarter of its height, 110–420 px) and keeps its
   aspect, so its field of view stays the same; its picture is drawn at the frame's size in device
-  pixels. The texture updates at most 30 times a second, with a 300 m horizon. Flat covers/grates and
-  thin catenary wires are omitted; people, vehicles, poles and the tram remain. Its cached picture is
+  pixels. The texture updates at most 30 times a second, with a 300 m horizon. Flat covers/grates are
+  omitted; people, vehicles, poles, overhead wires and the tram remain. Its cached picture is
   composited after every main redraw, including while paused.
 - Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
   Forces follow the ČKD T3 pamphlet (1.8 m/s² acceleration and service braking for an empty 16 t car),
