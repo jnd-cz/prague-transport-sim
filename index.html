@@ -14,6 +14,8 @@
     --red: #ff4b3e;
     --green: #6fe07a;
     --blue: #5fb4ff;
+    --dashH: 180px; /* the dashboard's height; the mirror and the on-screen controls sit above it */
+    --topH: 7vh;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: var(--ink);
@@ -87,7 +89,9 @@
   @keyframes pop { from { transform: scale(.9); opacity: 0; } }
   #action { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,14,12,.9); padding: 14px 22px; border-radius: 8px; font-size: 16px; display: none; }
 
-  #mirror { position: fixed; right: calc(5.5vw + 10px); bottom: 196px; width: 150px; height: 190px; border: 6px solid #1b1f1d;
+  /* the mirror frame grows with the viewport (src/main.js renderMirror sizes its picture to it); the aspect
+     stays the mirror camera's 150:190, so its field of view does not change */
+  #mirror { position: fixed; right: calc(5.5vw + 10px); bottom: calc(var(--dashH) + 16px); height: clamp(110px, 24vh, 420px); aspect-ratio: 150 / 190; border: 6px solid #1b1f1d;
     border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.5); pointer-events: none; }
   body.chase #mirror, body.nomirror #mirror, #mirror.hidden { display: none; }
   #perf { position: fixed; left: calc(5.5vw + 8px); top: calc(7vh + 8px); z-index: 5; pointer-events: none;
@@ -131,13 +135,31 @@
   .hidden { display: none !important; }
   fieldset.settings { border: 1px solid #3b4741; border-radius: 8px; padding: 8px 12px 10px; margin: 0 0 16px; font-size: 13px; }
   fieldset.settings legend { color: var(--dim); padding: 0 6px; }
-  #help { position: fixed; left: 7vw; bottom: 192px; font-size: 11px; color: #cfd6c9; background: rgba(15,20,17,.7); padding: 6px 10px; border-radius: 6px; pointer-events: none; line-height: 1.6; }
+  #help { position: fixed; left: 7vw; bottom: calc(var(--dashH) + 12px); font-size: 11px; color: #cfd6c9; background: rgba(15,20,17,.7); padding: 6px 10px; border-radius: 6px; pointer-events: none; line-height: 1.6; }
   body.chase #help { left: 10px; }
 
   @media (max-width: 1100px) {
     .info { display: none; }
     .lamps { grid-template-columns: repeat(3, 74px); }
     .lamp { font-size: 9px; }
+  }
+  /* on-screen controls (src/touch.js) on a small screen: a compact dashboard and top bar, the controller
+     buttons above the dashboard, the mirror above them */
+  @media (max-width: 760px), (max-height: 520px) {
+    body.touch { --dashH: 112px; --topH: 64px; }
+    body.touch #dash { height: var(--dashH); gap: 4px; padding: 4px; }
+    body.touch #dash > * { zoom: .6; }
+    body.touch #top { zoom: .7; top: 4px; }
+    body.touch #minimap { display: none; }
+    body.touch #help { display: none; }
+    body.touch #mirror { bottom: calc(var(--dashH) + 74px); height: clamp(90px, 20vh, 200px); }
+    body.touch #assist, body.touch #msgs { zoom: .8; }
+  }
+  @media (max-height: 520px) {
+    body.touch { --dashH: 88px; }
+    body.touch #dash > * { zoom: .47; }
+    body.touch #cab .roof { height: 3vh; }
+    body.touch #mirror { height: clamp(90px, 30vh, 200px); }
   }
   @media (max-width: 640px) {
     #dash { gap: 6px; padding: 8px; }

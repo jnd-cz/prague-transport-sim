@@ -14,6 +14,7 @@ export class Reporter {
   constructor({ state, shot, pause }) {
     Object.assign(this, { state, shot, pause });
     this.version = null;
+    // (also from main.js's own request: on a phone this one came back empty in the first reports)
     fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => { this.version = v; }, () => {});
     const css = document.createElement('style');
     css.textContent = `
@@ -81,7 +82,7 @@ body.shift #rpBtn { display: block }
   async send() {
     const $ = this.$, d = new Date(), p = (n) => String(n).padStart(2, '0');
     const id = `report-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}`;
-    const rec = { kind: $('rpKind').value, note: $('rpNote').value.trim(), ...this.facts, version: this.version,
+    const rec = { kind: $('rpKind').value, note: $('rpNote').value.trim(), ...this.facts, version: this.version || window.deployVersion || null,
       shot: $('rpShot').checked ? this.img : null, t: Date.now() };
     $('rpSend').disabled = true;
     $('rpMsg').textContent = 'sending…';
