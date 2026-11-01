@@ -174,8 +174,12 @@ class Readers(unittest.TestCase):
             root = Path(tmp)
             tools = root / 'tools'
             tools.mkdir()
-            for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py'):
+            for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py','kerbs.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
+            # (the IPR terrain is a 2 GB raster: a flat stand-in at the test's 200 m)
+            (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
+                                              '    def sample(self, E, N):\n        return np.full(np.shape(E), 200.0)\n',
+                                              encoding='utf-8')
             (root / 'data').mkdir()
             line = {'path': [[0,0],[20,0]], 'terrain': {'data': base64.b64encode(array.array('h',[0]*4)).decode(),
                     'base':200,'scale':1,'x0':-10,'y0':-10,'dx':40,'dy':40,'nx':2,'ny':2}}
@@ -198,8 +202,8 @@ class Readers(unittest.TestCase):
             self.assertEqual(r.returncode,0,r.stderr)
             result = json.loads((root / 'data/line17.dtm.json').read_text(encoding='utf-8'))
             self.assertEqual(len(result['areas']),1)
+            # (the outline heights from the pinned month only; the height cloud `z` is gone since #128)
             self.assertEqual({p[2] for p in result['areas'][0]['r']},{200})
-            self.assertEqual(set(result['z'][2::3]),{200})
             self.assertIn(OLD,r.stdout)
             self.assertNotIn(NEW,r.stdout)
             # Refresh rebuild/check comes before publish: CURRENT still names OLD, but its files
@@ -220,7 +224,6 @@ class Readers(unittest.TestCase):
             result = json.loads((root / 'data/line17.dtm.json').read_text(encoding='utf-8'))
             self.assertEqual(len(result['areas']),2)
             self.assertEqual({p[2] for a in result['areas'] for p in a['r']},{201})
-            self.assertEqual(set(result['z'][2::3]),{201})
             with patch.object(rebuild, 'ROOT', str(root)), patch.dict(packages.DTM, {'17':[DISTRICT]}):
                 with self.assertLogs('dtm_packages',level='WARNING'):
                     _, groups = rebuild.steps('17')
