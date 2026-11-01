@@ -111,9 +111,15 @@ class Shots(unittest.TestCase):
         pair = self.root / 'pair.png'
         combine(self.root/'a.png', self.root/'b.png', pair, ['A','B'])
         with Image.open(pair) as image:
-            self.assertEqual(image.size, (40,40))
-            self.assertEqual(image.getpixel((0,30)), (255,0,0))
-            self.assertEqual(image.getpixel((20,30)), (0,0,255))
+            self.assertEqual(image.size, (40,10 + shot.BAR))
+            self.assertEqual(image.getpixel((0,shot.BAR)), (255,0,0))
+            self.assertEqual(image.getpixel((20,shot.BAR)), (0,0,255))
+
+    def test_a_missing_game_hook_is_named(self):
+        (self.root / 'index.html').write_text(HTML.replace('dispose() {}, ', ''), encoding='utf-8')
+        with self.assertRaisesRegex(RuntimeError, 'window.traffic.dispose'):
+            capture(self.browser, self.root, 17, 5064, 'cab', self.root / 'x.png', 10)
+        self.assertFalse((self.root / 'x.png').exists())
 
     def test_failed_reference_preserves_previous_images_and_removes_staging(self):
         output = self.root/'shots'

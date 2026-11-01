@@ -183,6 +183,14 @@ class Files(unittest.TestCase):
             exported = other
             self.assertEqual((other / 'data' / self.file.name).read_bytes(), self.old)
         self.assertFalse(exported.exists())
+        # Another line's file, not in the cache: a one-line export skips it, a full one needs it.
+        self.man['files']['line9.json'] = {'size': 1, 'sha256': '0' * 64}
+        (self.root / 'data/MANIFEST.json').write_text(json.dumps(self.man))
+        run('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qam', 'two lines')
+        with reference.checkout(self.root, 'HEAD', str(self.cache), line=17) as other:
+            self.assertEqual(sorted(p.name for p in (other / 'data').iterdir()), ['MANIFEST.json', self.file.name])
+        with self.assertRaises(FileNotFoundError), reference.checkout(self.root, 'HEAD', str(self.cache)):
+            pass
         self.assertEqual(self.file.read_text(), '{}')
 
 

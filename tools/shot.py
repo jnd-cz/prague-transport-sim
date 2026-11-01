@@ -21,7 +21,7 @@ import threading
 import time
 import tempfile
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -53,6 +53,28 @@ def site(root):
 
 
 HIDE = 'body > :not(#view):not(#gl):not(#cab) { display:none !important }'
+# The game internals this tool drives (src/main.js, traffic.js, review.js); a renamed one fails here
+# by name instead of as a timeout or a blank picture.
+HOOKS = {'game': ['window.game.route.at', 'window.game.route.heading', 'window.game.tram',
+                  'window.traffic.dispose', 'window.drawCount'],
+         'review': ['window.review.ready', 'window.review.T', 'window.review._render', 'window.review.camera']}
+BAR = 36  # label strip above the pair
+
+
+def require(page, part):
+    missing = page.evaluate('''names => names.filter(n => {
+      try { return (0, eval)(n) === undefined; } catch { return true; } })''', HOOKS[part])
+    if missing:
+        raise RuntimeError(f"the page lacks {', '.join(missing)}: shot.py drives these, update it with the game")
+
+
+def font(size=20):
+    for name in ('DejaVuSans.ttf', 'arial.ttf', 'Arial.ttf', 'LiberationSans-Regular.ttf'):
+        try:
+            return ImageFont.truetype(name, size)
+        except OSError:
+            pass
+    return ImageFont.load_default(size)
 
 
 def capture(browser, root, line, s, view, output, timeout, pose=None, target=None):
@@ -82,6 +104,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                 page.select_option('#optTemp', 'autumn')
             page.click('#btnStart', timeout=remaining())
             page.wait_for_function('window.game && window.camera', timeout=remaining())
+            require(page, 'game')
             point = page.evaluate('''s => {
               const g = window.game;
               if (s < 0 || s > g.route.length) throw new Error(`s ${s} outside route 0..${g.route.length}`);
@@ -95,6 +118,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                 at = f"{target['x']},{target['y']},{target['yaw']},45,60"
                 page.goto(f'{url}/?line={line}&seed=158&keepgeo&review&at={at}', timeout=remaining())
                 page.wait_for_function('window.review', timeout=remaining())
+                require(page, 'review')
                 page.evaluate('''() => { window._shotReady = false;
                   window.review.ready.then(() => { window._shotReady = true; }); }''')
                 page.wait_for_function('window._shotReady', timeout=remaining())
@@ -150,12 +174,12 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
 
 def combine(current, reference, output, labels):
     with Image.open(current) as a, Image.open(reference) as b:
-        image = Image.new('RGB', (a.width + b.width, max(a.height, b.height) + 30), '#20242b')
-        image.paste(a, (0, 30))
-        image.paste(b, (a.width, 30))
-        draw = ImageDraw.Draw(image)
-        draw.text((10, 8), labels[0], fill='white')
-        draw.text((a.width + 10, 8), labels[1], fill='white')
+        image = Image.new('RGB', (a.width + b.width, max(a.height, b.height) + BAR), '#20242b')
+        image.paste(a, (0, BAR))
+        image.paste(b, (a.width, BAR))
+        draw, f = ImageDraw.Draw(image), font()
+        draw.text((12, BAR // 2), labels[0], fill='white', font=f, anchor='lm')
+        draw.text((a.width + 12, BAR // 2), labels[1], fill='white', font=f, anchor='lm')
         image.save(output)
 
 
@@ -187,7 +211,7 @@ def main(argv=None, root=ROOT):
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
                 if a.ref:
                     reference = work / f'{stem}-reference.png'
-                    with checkout(root, reference_rev or a.ref, a.cache) as other:
+                    with checkout(root, reference_rev or a.ref, a.cache, a.line) as other:
                         report['reference'] = capture(browser, other, a.line, a.s, a.view, reference, a.timeout,
                                                       pose=now['camera'], target=now['target_xy'])
                         if reference_rev is None:

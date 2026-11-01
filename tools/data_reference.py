@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tarfile
@@ -52,8 +53,9 @@ def published(root, name, man, cache=None, other=None):
 
 
 @contextmanager
-def checkout(root, ref, cache=None):
-    """A directory is used as-is; a git revision is exported, with its own verified published data."""
+def checkout(root, ref, cache=None, line=None):
+    """A directory is used as-is; a git revision is exported, with its own verified published data
+    (with `line`, only that line's files and the shared ones: one line's view needs a tenth of it)."""
     if Path(ref).is_dir():
         yield Path(ref).resolve()
         return
@@ -68,6 +70,9 @@ def checkout(root, ref, cache=None):
             tar.extractall(target, filter='data')
         man = manifest(target)
         for name in man['files']:
+            m = re.match(r'line(\d+)\.', name)
+            if line is not None and m and int(m[1]) != line:
+                continue
             src = published(root, name, man, cache)
             dst = target / 'data' / name
             dst.parent.mkdir(parents=True, exist_ok=True)
