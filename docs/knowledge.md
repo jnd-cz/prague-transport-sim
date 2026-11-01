@@ -62,6 +62,16 @@ What sessions learned and later work needs. Kept current and short; the full log
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): all of line 17, part of 22. Its vertices are
   far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **An outline along a retaining wall takes the wall's top and foot by turns** (#147): the area's
+  vertices coincide with the wall's 3D lines (`Hranice stavby`, ground level), whose heights alternate.
+  Beside the tram embankment at Belárie (line 17) the tram area's edge read 195.8 / 199.7 / 196.8 /
+  200.3 m with the terrain at ~198.5, and two points took a footbridge's 202.7 m, listed on level 0 and 1.
+  `dtm.py` `despike`: on surfaces driven or walked on, a point more than 1 m off its neighbours' median
+  (and steeper than 1:5) takes the height along the outline, but only where the terrain agrees with the
+  median better than with the point: an outline that really runs on two levels (a riverside walk under
+  the street wall) keeps the points the terrain confirms. Without the terrain check the rule lifted
+  Novoměstská náplavka's walk 6 m to the street. Line 17: 1,595 points, line 22: 693
+  (`provenance … vertexHeights.spikes`).
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
   of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**
