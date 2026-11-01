@@ -162,6 +162,7 @@ class ChunkedGeometry {
       m.matrixAutoUpdate = false;
       if (surface === 'building') m.userData.building = true;
       else if (surface) m.userData.surface = surface;
+      if (c.trackRanges) m.userData.trackRanges = c.trackRanges;
       group.add(m);
     }
   }
@@ -483,7 +484,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const railCg = new ChunkedGeometry(railMat);
   // (src/heights.js: t.z is the top of rail; the bed lies the track style's offset under it, the
   // rail heads stand just over it, and where the bed is well below, the rails get their sides)
-  for (const t of data.tracks) {
+  const keepTrackRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  for (const [trackId, t] of data.tracks.entries()) {
+    const bc = keepTrackRanges && t.smooth.length > 1 ? bedCg._chunk(...t.smooth[0]) : null;
+    const rc = keepTrackRanges && t.smooth.length > 1 ? railCg._chunk(...t.smooth[0]) : null;
+    const bedStart = bc && bc.pos.length / 9, railStart = rc && rc.pos.length / 9;
     const lift = t.smooth.map(([x, y]) => liftAt(x, y));
     const zBed = t.z.map((z, i) => z - lift[i] - BED_BELOW);
     // on a canted curve of our route the outer rail is higher, the inner one lower
@@ -503,6 +508,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
       if (lift.some((v) => v > 0.03)) for (const face of [-0.05, 0.05]) addSide(railCg, t.smooth, side * 0.72 + face, zr.map((z) => z + RAIL_HEAD), zBed.map((z, i) => z + tilt[i] * (side + face / 0.72)));
     }
+    if (bc) (bc.trackRanges ||= []).push([bedStart, bc.pos.length / 9, trackId]);
+    if (rc) (rc.trackRanges ||= []).push([railStart, rc.pos.length / 9, trackId]);
   }
   bedCg.build(group, 'bed');
   railCg.build(group, 'rail');

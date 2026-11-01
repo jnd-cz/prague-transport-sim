@@ -261,6 +261,15 @@ export function cantedRailVisibility(g, world) {
   });
   const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
   ray.far = 4;
+  // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
+  // ribbon is a separate obstruction, not a cant error on this one.
+  const owner = (hit) => {
+    const ranges = hit.object.userData.trackRanges || [];
+    let lo = 0, hi = ranges.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (ranges[mid][0] <= hit.faceIndex) lo = mid + 1; else hi = mid; }
+    const range = ranges[lo - 1];
+    return range && hit.faceIndex < range[1] ? range[2] : null;
+  };
   let samples = 0, missing = 0, curve = -1, inCurve = false;
   const bad = new Map(), other = new Map(), covered = new Map();
   for (let s = 0; s < r.length; s += 2) {
@@ -270,16 +279,25 @@ export function cantedRailVisibility(g, world) {
     for (const side of [-1, 1]) {
       const p = r.offset(s, side * 0.72);
       o.set(p.x, prof.height(s) + 1, -p.y); ray.set(o, down);
-      const head = ray.intersectObjects(rails, false)[0];
+      let head = ray.intersectObjects(rails, false)[0];
+      // The route and the smoothed track axis can differ slightly at switches.
+      for (const shift of [-0.1, 0.1, -0.2, 0.2, -0.3, 0.3, -0.4, 0.4]) {
+        if (head) break;
+        const q = r.offset(s, side * 0.72 + shift);
+        o.set(q.x, prof.height(s) + 1, -q.y); ray.set(o, down);
+        head = ray.intersectObjects(rails, false)[0];
+      }
       if (!head) { missing++; continue; }
+      const trackId = owner(head);
+      if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
       samples++;
       covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
       const hits = ray.intersectObjects(surfaces, false).filter((h) => h.point.y <= head.point.y + 0.4);
-      for (const [map, hit] of [[bad, hits.find((h) => h.object.userData.surface === 'bed')],
-                                [other, hits.find((h) => h.object.userData.surface !== 'bed')]]) {
+      for (const [map, hit] of [[bad, hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId)],
+                                [other, hits.find((h) => h.object.userData.surface !== 'bed' || owner(h) !== trackId)]]) {
         const delta = hit ? hit.point.y - head.point.y : -Infinity;
         if (delta > 0.001 && !(map.get(curve)?.mag >= delta))
-          map.set(curve, { s: Math.round(s), x: p.x, y: p.y, side, mag: delta,
+          map.set(curve, { s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: delta,
                            info: `${hit.object.userData.surface} ${(delta * 1000).toFixed(0)} mm above rail head` });
       }
     }
