@@ -26,6 +26,10 @@ data/*
 # headless check results (tools/headless.py)
 reports/headless/
 
+# comparison evidence (tools/shot.py, tools/datadiff.py)
+reports/shots/
+reports/diffs/
+
 # rebuild logs (tools/rebuild.py)
 reports/rebuild/
 
