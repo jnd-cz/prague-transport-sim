@@ -58,8 +58,11 @@ The user's approval, “Use the proposed offsets for all four styles”, is reco
    style per section; until a section is marked, it is drawn as panels. Track bed styles as content
    are #52; this record only fixes where TOR is.
 
-   **Where the offsets come from.** No open dataset measures them yet. The street survey records the
-   grass or ballast surface, not the rails. The current DTM track axes mostly carry no height (Praha 8:
+   **Where the drawing offsets come from.** On open track a survey outline can follow the track-bed
+   edges; its height is not established as vegetation, ballast or rail level. It cannot automatically
+   receive the drawing offset to become a rail survey. The construction-sensitive height guard and
+   calibration are described in the [fallback decision](2026-10-30-track-height-fallback.md).
+   The current DTM track axes mostly carry no height (Praha 8:
    278 of 339 all-zero Z). The archived map server does expose track axes with Z in layer 10;
    the [2026-10-30 assessment](2026-10-30-track-height-fallback.md) measures their fallback coverage
    and the cases needing review. Until source heights and track styles are matched, these remain design

@@ -86,12 +86,13 @@ What sessions learned and later work needs. Kept current and short; the full log
   the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
   is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street
   model, #21).
-- **Track heights against each other** (#106 staging, 2026-10-31, where DI has Z): the archive minus DI
-  median 0.00 m, p90 +0.04 (n 71 727); DI minus the surveyed tram area + style offset +0.02 m (p10–p90
-  −0.09…+0.20, n 6 964) and minus surveyed road +0.04 m: these samples are street track. On open track
-  the tram area's surveyed outline is its edges, not rail level (line 17 Levského – Přístaviště: archive
-  +0.4…+0.9 m over it). DI minus surveyed green surface +0.22 m (n 219): the survey there is probably the
-  track bed, not the grass.
+- **Track height checks depend on construction** (#106): paved embedded/panel/setts surfaces can
+  describe rail level, including a dedicated raised paved strip. Open-track outlines can describe
+  ditches or embankment edges; they neither supply rail Z nor veto the archive. A generic ZPS tram
+  area does not identify its material, and the panel drawing default is not evidence of pavement.
+  Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
+  Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
+  are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
   breaks if IPR goes Draco-only), retaining walls with `vyska` (which side is retained is not in the
   data), tree register (multipoint) and tree rows.

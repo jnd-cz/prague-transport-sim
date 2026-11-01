@@ -19,7 +19,7 @@ import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.
 import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
-import { trackStyles } from './heights.js';
+import { trackStyles, loadHeightFacts } from './heights.js';
 import { credits, logProvenance, fallbacks } from './provenance.js';
 
 const $ = (id) => document.getElementById(id);
@@ -30,6 +30,14 @@ applyStatic();
 let lines = [];
 try { lines = await (await load.get('data/lines.json')).json(); } catch { /* single-line build */ }
 const params = new URLSearchParams(location.search);
+let heightReview = null;
+if (params.has('heightreview')) {
+  try {
+    const response = await fetch(params.get('heightreview'));
+    if (!response.ok) throw new Error(`Height review: HTTP ${response.status}`);
+    heightReview = await response.json();
+  } catch (error) { load.fail(error); throw error; }
+}
 let lineId = params.get('line');
 try { lineId = lineId || localStorage.getItem('tram.line'); } catch { /* storage unavailable */ }
 if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId = lines[0]?.line || '22';
@@ -72,7 +80,9 @@ try {
 } catch { /* none for this line */ }
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
-const truth = await fetch('data/truth.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+let truth;
+try { truth = await loadHeightFacts(); }
+catch (error) { load.fail(error); throw error; }
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
 const t3Res = await Promise.all(T3_FILES.map((f) => load.get(f)));
 await load.begin('terrain');
@@ -392,6 +402,18 @@ function start() {
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   window.game = game; // handy for debugging from the console
+  game.heightReview = heightReview;
+  game.inspectHeightSpan = (span) => {
+    inspect.toggle(true);
+    inspect.paused = true;
+    const p = span.profile[Math.floor(span.profile.length / 2)], [x, y] = p.xy;
+    const near = game.route.nearest(x, y), z = near ? game.profile.height(near.s) : 0;
+    camera.position.set(x, z + 22, -y + 30);
+    camera.lookAt(x, z + 1, -y);
+    inspect._setMode('fly');
+    const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+    inspect.flyYaw = Math.atan2(-dir.x, -dir.z); inspect.flyPitch = Math.asin(dir.y);
+  };
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   window.camera = camera;
   window.renderer = renderer; // performance checks from the console (renderer.info, the scene)
@@ -412,7 +434,7 @@ function start() {
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
   if (params.has('bot')) streetBot();
   if (params.has('inspect')) inspect.toggle(true);
-  if (params.has('debug')) debugOverlay.toggle(game, traffic);
+  if (params.has('debug') || heightReview) debugOverlay.toggle(game, traffic);
 }
 
 // debugging (?bot): drive and walk every street in the surveyed DTM areas, list what looks wrong

@@ -11,6 +11,10 @@ from shapely.strtree import STRtree
 from dtm_di import sha
 from dtm_packages import NAME
 
+NON_TRACK = {'water', 'wall', 'roof', 'building', 'rail'}
+# Numeric DI calibration: ordinary road has no >3 m residual; overhead decks/rail do.
+LEVEL_SEPARATION = 3
+
 
 class Decks:
     def __init__(self, records, facts=(), style_regions=()):
@@ -25,27 +29,14 @@ class Decks:
         self.style_regions = list(style_regions)
         ids = set()
         for fact in self.facts:
-            if (
-                not fact.get('id')
-                or fact['id'] in ids
-                or not fact.get('source')
-                or not fact.get('date')
-                or not isinstance(fact.get('metres'), (int, float))
-                or not math.isfinite(fact['metres'])
-                or fact['metres'] < 0
-            ):
-                raise ValueError(
-                    'railAboveDeck facts need unique id, finite nonnegative metres, source and date'
-                )
+            if (not fact.get('id') or fact['id'] in ids or not fact.get('source') or not fact.get('date') or
+                    not isinstance(fact.get('metres'), (int,float)) or not math.isfinite(fact['metres']) or fact['metres'] < 0):
+                raise ValueError('railAboveDeck facts need unique id, finite nonnegative metres, source and date')
             scopes = [fact.get('scope') == 'all', bool(fact.get('di_ids')), bool(fact.get('bounds'))]
             if sum(scopes) != 1:
-                raise ValueError(
-                    'railAboveDeck fact needs exactly one scope: all, di_ids or city-frame bounds'
-                )
-            if fact.get('styles') and (
-                not isinstance(fact['styles'], list)
-                or any(s not in ('embedded', 'panels', 'grass', 'ballast') for s in fact['styles'])
-            ):
+                raise ValueError('railAboveDeck fact needs exactly one scope: all, di_ids or city-frame bounds')
+            if fact.get('styles') and (not isinstance(fact['styles'], list) or
+                                      any(s not in ('embedded','panels','grass','ballast') for s in fact['styles'])):
                 raise ValueError('unknown railAboveDeck track style')
             if fact.get('bounds'):
                 b = fact['bounds']
@@ -70,34 +61,39 @@ class Decks:
         for triangle, v in self.triangles[index]:
             if not triangle.covers(point):
                 continue
-            (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = v
-            det = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+            (x0,y0,z0),(x1,y1,z1),(x2,y2,z2) = v
+            det = (y1-y2)*(x0-x2) + (x2-x1)*(y0-y2)
             if abs(det) < 1e-9:
                 continue
-            a = ((y1 - y2) * (point.x - x2) + (x2 - x1) * (point.y - y2)) / det
-            b = ((y2 - y0) * (point.x - x2) + (x0 - x2) * (point.y - y2)) / det
-            heights.append(a * z0 + b * z1 + (1 - a - b) * z2)
-        return heights[0] if heights and max(heights) - min(heights) <= 0.3 else None
+            a = ((y1-y2)*(point.x-x2) + (x2-x1)*(point.y-y2))/det
+            b = ((y2-y0)*(point.x-x2) + (x0-x2)*(point.y-y2))/det
+            heights.append(a*z0 + b*z1 + (1-a-b)*z2)
+        return heights[0] if heights and max(heights)-min(heights) <= .3 else None
 
-    def candidates(self, x, y, di_id, structure_hint=False):
+    def candidates(self, x, y, di_id, structure_hint=False, di_z=None):
         point, out = Point(x, y), []
         nearby = [(int(i), self.polygons[i].distance(point)) for i in self.tree.query(point.buffer(1.5))]
         nearby = [(i, d) for i, d in nearby if d <= 1.5]
+        heights = {i: self._height(i, point if self.polygons[i].covers(point)
+                                  else nearest_points(self.polygons[i], point)[0]) for i, _ in nearby}
+        other_level = {i for i, z in heights.items() if z is not None and di_z is not None
+                       and 100 < di_z < 500 and abs(z - di_z) > LEVEL_SEPARATION}
         # DI placement codes are not ZPS levels (Trojsky DI says 0 on the bridge).
         # Only a covering surveyed tram area/deck establishes a structure's track level.
         anchors = [
             (i, self.records[i])
             for i, _ in nearby
-            if self.polygons[i].covers(point) and self.records[i].get('class', 'deck') in ('tram', 'deck')
+            if i not in other_level and self.polygons[i].covers(point)
+            and self.records[i].get('class', 'deck') in ('tram', 'deck')
         ]
         tram_anchors = [(i, r) for i, r in anchors if r.get('class') == 'tram']
         anchors = tram_anchors or anchors
         levels = {r['level'] for _, r in anchors}
         level = next(iter(levels)) if len(levels) == 1 else (0 if not levels and not structure_hint else None)
         if not anchors and any(
-            self.polygons[i].covers(point)
+            i not in other_level and self.polygons[i].covers(point)
             and self.records[i]['level'] != 0
-            and self.records[i].get('class') not in ('water', 'wall', 'roof', 'building')
+            and self.records[i].get('class') not in NON_TRACK
             for i, _ in nearby
         ):
             level = None
@@ -125,8 +121,7 @@ class Decks:
         for index, distance in sorted(nearby):
             poly, record = self.polygons[index], self.records[index]
             inside = poly.covers(point)
-            q = point if inside else nearest_points(poly, point)[0]
-            z = self._height(index, q)
+            z = heights[index]
             cls = record.get('class', 'deck')
             candidate = {
                 'id': record['id'],
@@ -164,8 +159,11 @@ class Decks:
             else:
                 candidate['z'] = z + facts[0]['metres']
                 candidate['rail_above_deck_m'] = facts[0]['metres']
-            if cls in ('water', 'wall', 'roof', 'building'):
+            if cls in NON_TRACK:
                 candidate['excluded'] = 'non_track_surface'
+            elif index in other_level:
+                candidate['excluded'] = 'surface_on_other_level'
+                candidate['di_surface_delta_m'] = di_z - z
             elif level is None:
                 candidate['excluded'] = 'track_zps_level_unverified'
             elif record['level'] != level:

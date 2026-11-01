@@ -17,6 +17,16 @@ export function trackStyleOffsets(truth) {
   return offsets;
 }
 
+// These facts are required by both the profile and the drawn track. A failed download must be
+// reported by the loading screen; it cannot silently substitute a second table of offsets.
+export async function loadHeightFacts(fetcher = fetch) {
+  const response = await fetcher('data/truth.json');
+  if (!response?.ok) throw new Error(`Could not load required track facts (data/truth.json, ${response?.status ?? 'network error'})`);
+  const truth = await response.json();
+  trackStyleOffsets(truth);
+  return truth;
+}
+
 // The drawn layers just around top of rail, apart enough not to flicker: the rail heads a little over
 // it, the bed (or the street of an embedded track) a little under, the street beside the bed under that.
 export const RAIL_HEAD = 0.012; // drawn rail head over TOR
