@@ -12,14 +12,14 @@ import { roofIndex } from '../src/world.js';
 import { tramClearance } from '../src/tram.js';
 import * as THREE from 'three';
 import { runStreetBot } from '../src/streetbot.js';
-import { trafficRun } from './traffic_lint.js';
+import { trafficRun, placesAt } from './traffic_lint.js';
 
 const TOP = 12; // places listed per check
 
 // one check's result: how many, out of how many, and the worst places
 function check(rule, of, items, key = (p) => p.mag) {
   const places = [...items].sort((a, b) => key(b) - key(a)).slice(0, TOP);
-  return { rule, count: items.length, of, places };
+  return { rule, count: items.length, of, places, ...placesAt(items) };
 }
 
 // A two-car set standing at every stop: both cars on the track, coupled (centres 15.2 m apart

@@ -11,6 +11,8 @@ import { stuckScene } from './bench/stuck.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
 const TOP = 12;
+const AT_MAX = 2000; // every place as [x, y, s] up to this many (headless.py keeps them in the baseline, #157)
+export const placesAt = (items) => (items.length <= AT_MAX ? { at: items.map((i) => [i.x == null ? null : Math.round(i.x), i.y == null ? null : Math.round(i.y), i.s == null ? null : Math.round(i.s)]) } : {});
 
 // rectangle as centre, unit heading, half length / width -> its 4 corners
 function corners(b) {
@@ -187,7 +189,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
     for (const it of items) byKind[it.kind] = (byKind[it.kind] || 0) + 1;
     const byState = {};
     for (const it of items) if (it.states) byState[it.states] = (byState[it.states] || 0) + 1;
-    return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP) };
+    return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP), ...placesAt(items) };
   };
   const minutes = T / 60;
   return {
