@@ -74,7 +74,8 @@ function snapshot(g, tr) {
   return out;
 }
 
-export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 / 30, maxT = 7200, seed = 22, progress = () => {} } = {}) {
+// stopAt: end the run when our tram reaches this route s (a replay of the moment, ?seed=N&at=S in src/main.js)
+export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 / 30, maxT = 7200, seed = 22, stopAt = Infinity, progress = () => {} } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = seed; // the run's seeded stream (src/random.js): the same run every time; cleared below
   $('menu').classList.remove('hidden');
@@ -100,8 +101,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   const camera = { position: { x: 0, z: 0 } };
   const step = sample;
   try {
-  while (T < maxT && g.nextStop < until && !g.finished) {
-    for (let k = 0; k < 600 && T < maxT && !g.finished; k++) {
+  while (T < maxT && g.nextStop < until && !g.finished && g.tram.s < stopAt) {
+    for (let k = 0; k < 600 && T < maxT && !g.finished && g.tram.s < stopAt; k++) {
       ap.step(g, dt);
       g.update(dt, ap.input);
       // oncoming trams crossing a junction's stop line on red (B10: they share the straight phase)
