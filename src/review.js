@@ -241,6 +241,8 @@ body.review #gl { touch-action: none }
 #review .rvItem.sel { background: #3a4250 }
 #review .rvItem .sw, #review .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px }
 #review .rvItem.done { opacity: .6 }
+.rvTip { position: fixed; z-index: 61; pointer-events: none; display: none; background: rgba(18,20,24,.92); color: #eee;
+  font: 12px/1.3 system-ui, sans-serif; padding: 4px 8px; border-radius: 6px; white-space: nowrap }
 #review .rvItem .vd { color: #8fd18f }
 #review .rvVerdict { padding-top: 8px }
 #review textarea { width: 100%; font: inherit; color: #eee; background: #1d2026; border: 1px solid #444; border-radius: 6px; padding: 6px 8px; resize: vertical }
@@ -625,7 +627,8 @@ ${this._verdictHtml(f)}`;
     });
     cv.addEventListener('pointermove', (e) => {
       const p = ptr.get(e.pointerId);
-      if (!p) return;
+      if (!p) { if (e.pointerType === 'mouse' && !ptr.size) this._hover(e.clientX, e.clientY); return; }
+      if (this.tip) this.tip.style.display = 'none';
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
       if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 8) tap = null;
@@ -643,10 +646,11 @@ ${this._verdictHtml(f)}`;
       ptr.delete(e.pointerId);
       if (ptr.size < 2) two = null;
       if (ptr.size === 1) { tap = null; mode = 'pan'; } // (from two fingers back to one: panning on)
-      if (tap && ptr.size === 0 && performance.now() - tap.t < 500) this._pick(e.clientX, e.clientY);
+      if (tap && ptr.size === 0 && performance.now() - tap.t < 500) this._pick(e.clientX, e.clientY, e.pointerType !== 'mouse');
       if (!ptr.size) tap = null;
     };
     cv.addEventListener('pointerup', up);
+    cv.addEventListener('pointerleave', () => { if (this.tip) this.tip.style.display = 'none'; });
     cv.addEventListener('pointercancel', up);
     cv.addEventListener('wheel', (e) => { e.preventDefault(); this._zoom(Math.exp(e.deltaY * 0.0012)); this._render(); }, { passive: false });
     window.addEventListener('keydown', (e) => {
@@ -666,17 +670,45 @@ ${this._verdictHtml(f)}`;
   }
 
   // a tap or click: the nearest marker on the screen within 28 px
-  _pick(cx, cy) {
-    const r = this.canvas.getBoundingClientRect(), v = new THREE.Vector3();
-    let best = -1, bd = 28;
-    this.list.forEach((f, i) => {
-      if (i >= 4000) return;
-      v.set(f.x, f.z + 3, -f.y).project(this.camera);
-      if (v.z > 1) return;
-      const d = Math.hypot(r.left + ((v.x + 1) / 2) * r.width - cx, r.top + ((1 - v.y) / 2) * r.height - cy);
-      if (d < bd) { bd = d; best = i; }
-    });
-    if (best >= 0) this.select(best);
+  // the pin under a point of the screen: the nearest to the pin as drawn, foot to head (close up a pin is
+  // 100 px tall: its middle alone missed a click on its head), within R px; among pins as near, the front one
+  _hit(cx, cy, R) {
+    const r = this.canvas.getBoundingClientRect(), a = new THREE.Vector3(), b = new THREE.Vector3();
+    this.camera.updateMatrixWorld(); // (moved since the last frame: its matrices follow at the next draw)
+    let best = -1, bd = R, bz = 1;
+    const n = Math.min(this.list.length, 4000);
+    for (let i = 0; i < n; i++) {
+      const f = this.list[i];
+      a.set(f.x, f.z, -f.y).project(this.camera);
+      b.set(f.x, f.z + 7, -f.y).project(this.camera);
+      if (a.z > 1 || b.z > 1) continue;
+      const ax = r.left + ((a.x + 1) / 2) * r.width, ay = r.top + ((1 - a.y) / 2) * r.height;
+      const dx = r.left + ((b.x + 1) / 2) * r.width - ax, dy = r.top + ((1 - b.y) / 2) * r.height - ay, L = dx * dx + dy * dy;
+      const u = L ? Math.max(0, Math.min(1, ((cx - ax) * dx + (cy - ay) * dy) / L)) : 0;
+      const d = Math.hypot(ax + u * dx - cx, ay + u * dy - cy);
+      if (d < bd - 3 || (d < bd + 3 && a.z < bz)) { bd = Math.min(bd, d); bz = a.z; best = i; }
+    }
+    return best;
+  }
+
+  // a tap or click: the pin there (a finger is wider than a mouse)
+  _pick(cx, cy, touch) {
+    const i = this._hit(cx, cy, touch ? 34 : 18);
+    if (i >= 0) this.select(i);
+  }
+
+  // the mouse over a pin: a pointer and its kind, so a neighbouring finding is one click away
+  _hover(cx, cy) {
+    const i = this._hit(cx, cy, 18), f = this.list[i];
+    this.canvas.style.cursor = f ? 'pointer' : '';
+    let tip = this.tip;
+    if (!tip) { tip = this.tip = document.createElement('div'); tip.className = 'rvTip'; document.body.appendChild(tip); }
+    tip.style.display = f ? 'block' : 'none';
+    if (!f) return;
+    const r = this.verdicts.get(fid(f));
+    tip.innerHTML = `<b>${esc(f.kind)}</b> · ${f.mag.toFixed(0)}${r?.v ? ` · ✓ ${esc(r.v)}` : ''}`;
+    tip.style.left = `${cx + 14}px`;
+    tip.style.top = `${cy + 10}px`;
   }
 
   // every frame: held keys, and the address once the camera rests

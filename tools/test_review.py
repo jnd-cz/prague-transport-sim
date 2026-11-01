@@ -79,6 +79,17 @@ def main():
                        heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null };
             }""")
             r["loadS"] = round(time.time() - t0)
+            # a click on the head of a neighbouring pin, close up (a pin is then ~100 px tall), selects it
+            pin = page.evaluate("""() => {
+              const R = window.review, r = R.canvas.getBoundingClientRect(), V = R.camera.position.constructor;
+              R.T.x = 15; R.yaw = Math.PI / 2; R.pitch = 1.1; R.dist = 90; R._render(); R.camera.updateMatrixWorld();
+              const i = R.list.findIndex((f) => f.info === '30 m east'), f = R.list[i];
+              const v = new V(f.x, f.z + 6.8, -f.y).project(R.camera);
+              return { i, x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+            }""")
+            page.mouse.click(pin["x"], pin["y"])
+            r["pinClick"] = page.evaluate("window.review.list[window.review.cur].info")
+            page.evaluate("window.review.select(window.review.list.findIndex((f) => f.info === 'the city origin'))")
             # the answer as a reviewer gives it: a note, then the button
             page.fill("#rvNote", "kerb about 12 cm")
             page.click("#rvCard button[data-v='1']")
@@ -114,6 +125,8 @@ def main():
         fails.append("the imagery links do not carry the finding's lat/lon")
     if not (math.isclose(r["panel"]["width"], 390, abs_tol=1) and r["panel"]["top"] > 844 / 3):
         fails.append(f"the panel is not a bottom sheet on a phone: {r['panel']}")
+    if r["pinClick"] != "30 m east":
+        fails.append(f"a click on a pin's head selected {r['pinClick']!r}")
     if [b.split(" · ", 1)[-1] for b in r["buttons"]] != FILE["options"]:
         fails.append(f"answer buttons {r['buttons']}, not the file's options")
     items = list((r["saved"] or {}).get("items", {}).values())
@@ -125,7 +138,7 @@ def main():
         fails.append(f"after a reload without local storage: {r['back']}")
     if fails:
         sys.exit("; ".join(fails))
-    print("review mode: findings, camera, links, bottom sheet; an answer saved, the next finding, read back: pass")
+    print("review mode: findings, camera, links, bottom sheet, a click on a pin; an answer saved, the next finding, read back: pass")
 
 
 if __name__ == "__main__":
