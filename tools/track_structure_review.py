@@ -17,6 +17,7 @@ import sys
 
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import substring
 from shapely.strtree import STRtree
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -174,7 +175,7 @@ def review(report, structures, terrain, lines):
                     entry['zs'].append(c.get('z'))
                     entry['surface_zs'].append(c.get('surface_z'))
                     if c.get('inside'):
-                        surveyed.append({'id':c['id'],'class':c['class'],'z':c.get('z'),
+                        surveyed.append({'id':c['id'],'class':c['class'],'z':c.get('z'),'surface_z':c.get('surface_z'),
                             'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
                                 and c['class'] in ('deck','tram','road','paved','parking'),
                             'level':c.get('level'),'excluded':c.get('excluded')})
@@ -195,7 +196,7 @@ def review(report, structures, terrain, lines):
                     'di_id':r.get('di_id'),'di_z':r.get('raw_di_z'),
                     'archive':[{'id':c['id'],'z':c.get('z'),'excluded':c.get('excluded')}
                                for c in r.get('candidates',[]) if c['dataset']=='archive'],
-                    'surfaces':[{'id':c['id'],'class':c['class'],'level':c.get('level'),'z':c.get('z'),
+                    'surfaces':[{'id':c['id'],'class':c['class'],'level':c.get('level'),'z':c.get('z'),'surface_z':c.get('surface_z'),
                                  'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
                                     and c['class'] in ('deck','tram','road','paved','parking'),
                                  'excluded':c.get('excluded')}
@@ -204,15 +205,17 @@ def review(report, structures, terrain, lines):
         metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
         route_line = LineString([p[:2] for p in data[direction]])
         osm_positions = []
+        corridor = substring(route_line,max(0,a-30),min(route_line.length,b+30)).buffer(8)
         for item in structures.paths:
             if item['id'] not in metadata.get('osm_ways',[]):
                 continue
-            for vertex in item['coords']:
-                point = Point(vertex[:2])
-                if route_line.distance(point) <= 8:
-                    pos = route_line.project(point)
-                    if a-30 <= pos <= b+30:
-                        osm_positions.append(pos)
+            clipped = LineString([p[:2] for p in item['coords']]).intersection(corridor)
+            pieces = clipped.geoms if hasattr(clipped,'geoms') else [clipped]
+            for piece in pieces:
+                if piece.is_empty or piece.geom_type not in ('LineString','Point'):
+                    continue
+                for vertex in piece.coords:
+                    osm_positions.append(route_line.project(Point(vertex)))
         extent = [round(min(osm_positions),3),round(max(osm_positions),3)] if len(osm_positions)>1 else None
         proposal = {'rule':'independent_height_required','reason':'No reviewed rail level or two numeric DI ends.'}
         complete_archive = all(any(usable(a['z']) and not a['excluded'] for a in p['archive']) for p in profile)

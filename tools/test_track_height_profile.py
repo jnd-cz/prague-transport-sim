@@ -1,5 +1,6 @@
 """Profile rendering: python -P -E tools/test_track_height_profile.py (free-port server)."""
 from pathlib import Path
+import json
 import sys
 import unittest
 from playwright.sync_api import sync_playwright
@@ -9,6 +10,30 @@ from headless import serve,stop_server
 
 
 class HeightProfile(unittest.TestCase):
+    def test_all_pinned_review_decisions_render(self):
+        source=Path(__file__).resolve().parent.parent/'reports/review/track-height-spans.json'
+        if not source.exists():
+            self.skipTest('the pinned review spans have not been generated')
+        sys.path.insert(0,str(Path(__file__).resolve().parent))
+        from track_structure_review import findings
+        items=findings(json.loads(source.read_text(encoding='utf-8')))['findings']
+        server,url=serve(0)
+        try:
+            with sync_playwright() as p:
+                browser=p.chromium.launch(headless=True)
+                page=browser.new_page()
+                page.goto(url+'/tools/bench/batch.html')
+                result=page.evaluate('''async items => {
+                  const {heightProfile}=await import('/src/trackHeightProfile.js');
+                  const route={nearest(x,y){return {s:0,d:100}}}, profile={height(){return 200}};
+                  return items.map(f=>({id:f.id,ok:!!heightProfile(f,route,profile)}));
+                }''',items)
+                self.assertEqual(len(result),27)
+                self.assertEqual([r['id'] for r in result if not r['ok']],[])
+                browser.close()
+        finally:
+            stop_server(server)
+
     def test_sources_directions_and_single_sample(self):
         server,url=serve(0)
         try:

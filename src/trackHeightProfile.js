@@ -19,7 +19,7 @@ export function heightProfile(f, route, profile) {
   if (!main || !main.profile.length) return null;
   const base = [...(main.approach || []),...main.profile].sort((a,b) => a.s-b.s), origin = main.start_s;
   const series = [];
-  for (const span of f.spans) {
+  for (const span of [main,...f.spans.filter((s)=>s !== main)]) {
     const points = [...(span.approach || []),...span.profile].map((p) => {
       const pos = span === main ? {s:p.s,d:0} : project(p.xy,base);
       const n = route.nearest(...p.xy);
@@ -28,7 +28,7 @@ export function heightProfile(f, route, profile) {
     if (points.length) series.push({span,points});
   }
   const pts = series.flatMap((s) => s.points), x0 = Math.min(-30,...pts.map((p)=>p.x)), x1 = Math.max(main.length_m+30,...pts.map((p)=>p.x));
-  const zs = pts.flatMap((p) => [p.ipr_terrain_z,p.di_z,p.game,...p.archive.map((a)=>a.z),...p.surfaces.map((a)=>a.z)]).filter(valid);
+  const zs = pts.flatMap((p) => [p.ipr_terrain_z,p.di_z,p.game,...p.archive.map((a)=>a.z),...p.surfaces.map((a)=>a.surface_z ?? a.z)]).filter(valid);
   if (!zs.length) return null;
   const z0 = Math.floor(Math.min(...zs)-1), z1 = Math.ceil(Math.max(...zs)+1), w = 360, h = 210, left = 42, right = 350, top = 12, bottom = 180;
   const X = (x) => left+(x-x0)/(x1-x0)*(right-left), Y = (z) => bottom-(z-z0)/(z1-z0)*(bottom-top);
@@ -48,24 +48,29 @@ export function heightProfile(f, route, profile) {
   if (terrain.length) svg += `<path d="M${X(terrain[0].x)},${bottom} ${terrain.map((p)=>`L${X(p.x)},${Y(p.ipr_terrain_z)}`).join(' ')} L${X(terrain[terrain.length-1].x)},${bottom}Z" fill="#65583e" opacity=".45"/>`;
   for (const {span,points} of series) {
     const dash = span.direction === 'pathBack' ? '4 2' : '';
-    svg += line(points,(p)=>p.archive.find((a)=>valid(a.z) && !a.excluded)?.z,'#eeeeee',dash);
+    const archiveIds = new Set(points.flatMap((p)=>p.archive.filter((a)=>valid(a.z)).map((a)=>a.id)));
+    for (const id of archiveIds) svg += line(points,(p)=>p.archive.find((a)=>a.id===id)?.z,'#eeeeee',dash);
     if (span === main) svg += line(points,(p)=>p.game,'#48d5ff','3 2');
     if (span.proposal?.rule === 'linear_di_portals') {
       const [a,b] = span.proposal.ends; svg += line(points,(p)=>a+(b-a)*Math.max(0,Math.min(1,(p.s-span.start_s)/span.length_m)),'#ff9e31','2 2');
     } else if (['review_archive_profile','archive_agrees_with_survey'].includes(span.proposal?.rule))
       svg += line(points,(p)=>p.archive.find((a)=>valid(a.z) && !a.excluded)?.z,'#ff9e31','2 3');
     for (const p of points) {
-      for (const s of p.surfaces) if (valid(s.z)) svg += `<circle cx="${X(p.x)}" cy="${Y(s.z)}" r="2.1" fill="${s.rail_height_eligible && !s.excluded ? '#eabf53' : 'none'}" stroke="#eabf53"><title>${esc(s.class)} level ${esc(s.level ?? '?')}: ${s.z.toFixed(2)} m</title></circle>`;
+      for (const s of p.surfaces) {
+        const z = s.surface_z ?? s.z;
+        if (valid(z)) svg += `<circle cx="${X(p.x)}" cy="${Y(z)}" r="2.1" fill="${s.rail_height_eligible && !s.excluded ? '#eabf53' : 'none'}" stroke="#eabf53"><title>${esc(s.class)} level ${esc(s.level ?? '?')}: ${z.toFixed(2)} m</title></circle>`;
+      }
       if (valid(p.di_z)) svg += `<path d="M${X(p.x)},${Y(p.di_z)-3}l3,3 -3,3 -3,-3Z" fill="#e87eff"><title>DI ${p.di_z.toFixed(2)} m</title></path>`;
     }
   }
   const reverse = series.filter((s)=>s.span.line === main.line && s.span.direction !== main.direction);
+  const rail = (p) => valid(p.di_z) ? p.di_z : p.archive.find((v)=>valid(v.z))?.z;
   for (const p of series[0].points) {
-    const a = p.archive.find((v)=>valid(v.z) && !v.excluded)?.z;
+    const a = rail(p);
     if (!valid(a)) continue;
     for (const other of reverse) {
       const q = other.points.reduce((a,b)=>Math.abs(b.x-p.x)<Math.abs(a.x-p.x) ? b : a);
-      const b = q.archive.find((v)=>valid(v.z) && !v.excluded)?.z;
+      const b = rail(q);
       if (Math.abs(q.x-p.x)<=3 && Math.hypot(q.xy[0]-p.xy[0],q.xy[1]-p.xy[1])<=8 && valid(b) && Math.abs(a-b)>1)
         svg += `<circle cx="${X(p.x)}" cy="${Y(a)}" r="4" fill="none" stroke="#ff3333"><title>Directions differ by ${Math.abs(a-b).toFixed(2)} m</title></circle>`;
     }

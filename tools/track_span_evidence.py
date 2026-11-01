@@ -98,6 +98,14 @@ def from_reviews(verdicts, findings, source_name):
         kind = item['decision']['structure']['kind']
         if kind not in ('bridge','tunnel'):
             held.append({'id':identity,'reason':'structure level is not identified'}); continue
+        tags = item['decision']['structure'].get('tags',{})
+        try:
+            levels = {int(t['layer']) for t in tags.values() if t.get('layer') is not None}
+        except (TypeError,ValueError):
+            held.append({'id':identity,'reason':'unrecognized structure layer'}); continue
+        if len(levels)>1 or (levels and ((kind=='bridge' and next(iter(levels))<=0) or (kind=='tunnel' and next(iter(levels))>=0))):
+            held.append({'id':identity,'reason':'ambiguous structure layer'}); continue
+        level = next(iter(levels)) if levels else (1 if kind=='bridge' else -1)
         profiles = []
         for span in item['spans']:
             p = dict(span['approval_profile'])
@@ -119,7 +127,7 @@ def from_reviews(verdicts, findings, source_name):
         if reason:
             held.append({'id':identity,'reason':reason}); continue
         entry = {'id':'review-'+identity,'kind':'deck' if kind=='bridge' else 'tunnel',
-                 'level':1 if kind=='bridge' else -1,'reviewed':True,'vertical_datum':'Bpv',
+                 'level':level,'reviewed':True,'vertical_datum':'Bpv',
                  'height_meaning':'top_of_rail','source':{'dataset':'expert_review','record':f'{source_name}#{key}',
                  'date':datetime.fromtimestamp(answer['t']/1000,timezone.utc).date().isoformat(),'who':'user'},'profiles':profiles}
         try:
@@ -134,7 +142,7 @@ def main():
     ap = argparse.ArgumentParser(description='Convert stored track-height review answers into dated evidence.')
     ap.add_argument('--from-reviews',type=Path,required=True)
     ap.add_argument('--findings',type=Path,default=Path('reports/review/track-heights.json'))
-    ap.add_argument('--output',type=Path,required=True)
+    ap.add_argument('--output',type=Path,default=Path('reports/review/track-height-evidence.json'))
     args = ap.parse_args()
     result = from_reviews(json.loads(args.from_reviews.read_text(encoding='utf-8')),
                           json.loads(args.findings.read_text(encoding='utf-8')),str(args.from_reviews))

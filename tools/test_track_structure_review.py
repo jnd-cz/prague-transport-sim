@@ -1,7 +1,10 @@
 """Structure grouping and explicit approvals: python -P -E tools/test_track_structure_review.py."""
 import unittest
+import json
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 
@@ -38,9 +41,19 @@ class SpanReviews(unittest.TestCase):
         self.assertEqual(SpanEvidence([imported]).at('di-1',5,0,[{'z':201}]),SpanEvidence([expected]).at('di-1',5,0,[{'z':201}]))
         survey = get({**answer,'v':'follows survey surface'})['span_reviews'][0]
         self.assertEqual(SpanEvidence([survey]).at('di-1',5,0,[])[0]['z'],201)
+        self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':None},match(),5,0,structure_hint=True)['z'],201)
+        self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':205},match(),5,0,structure_hint=True)['z'],205)
         for changed in ({'note':'check level'}, {'v':'unsure'}, {'v':'other level (deck / under)'}, {'span_ids':['changed']}):
             self.assertFalse(get({**answer,**changed})['span_reviews'])
             self.assertTrue(get({**answer,**changed})['held'])
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'answers.json').write_text(json.dumps({'items':{'pin':answer}}),encoding='utf-8')
+            (root/'findings.json').write_text(json.dumps({'findings':[finding]}),encoding='utf-8')
+            subprocess.run([sys.executable,str(Path(__file__).with_name('track_span_evidence.py')),
+                '--from-reviews',str(root/'answers.json'),'--findings',str(root/'findings.json'),
+                '--output',str(root/'out.json')],check=True,capture_output=True,text=True)
+            self.assertEqual(json.loads((root/'out.json').read_text(encoding='utf-8'))['span_reviews'][0]['id'],'review-bridge-1')
 
     def test_findings_keep_all_spans_and_pin_the_longest(self):
         spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},
@@ -124,6 +137,9 @@ class SpanReviews(unittest.TestCase):
         rows = [{'line':17,'direction':direction,'s':s,'weight_m':5,'xy':[x,0],
                  'status':'review','review_flags':['tunnel_unverified'],'di_id':'di-1','raw_di_z':None,
                  'candidates':[]} for direction in ('path','pathBack') for s,x in [(2.5,2.5),(7.5,7.5)]]
+        rows[0]['raw_di_z'] = 205
+        rows.append({'line':17,'direction':'path','s':12.5,'weight_m':5,'xy':[12.5,0],
+                     'status':'selected','review_flags':[],'di_id':'di-2','raw_di_z':206,'candidates':[]})
         class Terrain:
             def sample(self,e,n):
                 return np.full(len(e),190)
@@ -136,6 +152,9 @@ class SpanReviews(unittest.TestCase):
         self.assertEqual(result['spans'][1]['to_stop'],'A')
         self.assertEqual(result['spans'][0]['proposal']['rule'],'independent_height_required')
         self.assertEqual(result['spans'][0]['terrain']['height_meaning'],'bare_earth')
+        self.assertEqual(result['spans'][0]['profile'][0]['di_z'],205)
+        self.assertEqual(result['spans'][0]['approach'][0]['di_z'],206)
+        self.assertNotIn('di-2',result['spans'][0]['approval_profile']['di_ids'])
 
 
 if __name__=='__main__':
