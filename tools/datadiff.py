@@ -91,7 +91,7 @@ def compare(before, after, kind, limit=20):
                      added=max(0, len(new) - len(old)))
         # Duplicate geometries can be emitted by several district packages. Pair by their height
         # signatures, so reordering a duplicate list does not invent a height edit.
-        order = lambda f: repr(heights(f))
+        order = lambda f: repr(sorted(heights(f).items()))
         for a, b in zip(sorted(old, key=order), sorted(new, key=order)):
             za, zb = heights(a), heights(b)
             changed = False
@@ -169,6 +169,12 @@ def near_point(root, line, xy, radius):
 
 
 def main(argv=None, root=ROOT):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # argparse otherwise mistakes a negative X,Y pair for an option (unlike a single negative float).
+    for i in range(len(argv) - 1):
+        if argv[i] == '--at' and ',' in argv[i + 1] and not argv[i + 1].startswith('--'):
+            argv[i:i + 2] = ['--at=' + argv[i + 1]]
+            break
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--line', required=True, type=int)
     ap.add_argument('kind', choices=('dtm', 'zps', 'line'), nargs='?', default='dtm')
@@ -179,7 +185,7 @@ def main(argv=None, root=ROOT):
     ap.add_argument('--limit', type=int, default=20)
     ap.add_argument('--output', type=Path)
     a = ap.parse_args(argv)
-    if a.radius < 0 or not math.isfinite(a.radius) or a.limit < 0:
+    if a.line <= 0 or a.radius < 0 or not math.isfinite(a.radius) or a.limit < 0:
         ap.error('radius must be finite and nonnegative; limit must be nonnegative')
     name = f'line{a.line}' + ('' if a.kind == 'line' else '.' + a.kind) + '.json'
     current = root / 'data' / name

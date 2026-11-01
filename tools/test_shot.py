@@ -4,12 +4,14 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 from playwright.sync_api import sync_playwright, TimeoutError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shot import capture, combine, site
+import shot
 
 
 HTML = '''<!doctype html><canvas id="gl" width="1280" height="720"></canvas>
@@ -17,11 +19,13 @@ HTML = '''<!doctype html><canvas id="gl" width="1280" height="720"></canvas>
 <select id="optWeather"><option value="dry">Dry</option></select>
 <select id="optObst"><option value="off">Off</option></select>
 <div id="top">HUD</div><div id="dash">Dashboard</div><div id="pausePanel">Pause</div><div id="msgs">Message</div>
+<button id="touchToggle">Game controller</button>
 <script>
 const params = new URLSearchParams(location.search);
 const vec = (values) => ({values, toArray() {return [...this.values]}, fromArray(a) {this.values = [...a]}});
 window.camera = {position:vec([1,2,3]), quaternion:vec([0,0,0,1]), up:vec([0,1,0]), fov:60, near:.1, far:10000,
-                clearViewOffset() {}, updateProjectionMatrix() {}, updateMatrixWorld() {}};
+                zoom:1, aspect:1280/720, view:{enabled:true},
+                clearViewOffset() {this.view.enabled=false}, updateProjectionMatrix() {}, updateMatrixWorld() {}};
 window.drawCount = 0;
 let chase = false;
 document.addEventListener('keydown', e => {if (e.key === 'v') chase = true});
@@ -78,6 +82,7 @@ class Shots(unittest.TestCase):
             a = capture(self.browser, self.root, 17, 5064, view, output, 10)
             self.assertTrue(a['paused'])
             self.assertFalse(a['hud_visible'])
+            self.assertFalse(a['view_offset_enabled'])
             if view != 'review':
                 self.assertEqual(a['tram_s'], 5064)
             frozen = {**a['camera'], 'position': [11,22,33]}
@@ -108,6 +113,20 @@ class Shots(unittest.TestCase):
             self.assertEqual(image.size, (40,40))
             self.assertEqual(image.getpixel((0,30)), (255,0,0))
             self.assertEqual(image.getpixel((20,30)), (0,0,255))
+
+    def test_failed_reference_preserves_previous_images_and_removes_staging(self):
+        output = self.root/'shots'
+        output.mkdir()
+        prior = output/'line17-s5064-cab-current.png'
+        prior.write_bytes(b'previous successful image')
+        def fake_capture(browser, root, line, s, view, dst, timeout, **kwargs):
+            Image.new('RGB',(10,10),'red').save(dst)
+            return {'camera':{},'target_xy':{}}
+        with patch.object(shot,'git',return_value='reference'), patch.object(shot,'capture',fake_capture), \
+             patch.object(shot,'checkout',side_effect=FileNotFoundError('cache blob absent')), self.assertRaises(SystemExit):
+            shot.main(['--line','17','--s','5064','--out',str(output)], self.root)
+        self.assertEqual(prior.read_bytes(), b'previous successful image')
+        self.assertEqual(list(output.iterdir()), [prior])
 
 
 if __name__ == '__main__':

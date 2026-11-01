@@ -43,6 +43,16 @@ class Diff(unittest.TestCase):
         r = datadiff.compare({'areas': [area(200), area(202)]}, {'areas': [area(202), area(200)]}, 'dtm')
         self.assertEqual(r['classes']['tram']['unchanged'], 2)
 
+    def test_duplicate_pairing_is_stable_when_each_outline_changes_its_start_vertex(self):
+        a, b = area(200), area(202)
+        rotated = deepcopy(a)
+        pts = rotated['r'][:-1]
+        rotated['r'] = pts[2:] + pts[:2] + [pts[2]]
+        reversed_b = deepcopy(b)
+        reversed_b['r'].reverse()
+        r = datadiff.compare({'areas':[a,b]}, {'areas':[reversed_b,rotated]}, 'dtm')
+        self.assertEqual(r['classes']['tram']['unchanged'], 2)
+
     def test_different_class_level_or_xy_is_added_and_removed_not_height_change(self):
         for b in (area(cls='road'), area(level=1), {**area(), 'r': [[0, 0, 201], [11, 0, 201], [0, 10, 201]]}):
             r = datadiff.compare({'areas': [area()]}, {'areas': [b]}, 'dtm')
@@ -142,6 +152,24 @@ class Files(unittest.TestCase):
         self.file.write_text(json.dumps({'frame': {'origin': [10, 20]}, 'areas': [area()]}))
         with redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as e:
             datadiff.main(['--line', '17', '--cache', str(self.cache)], self.root)
+        self.assertEqual(e.exception.code, 1)
+
+    def test_at_accepts_negative_xy_as_a_separate_argument(self):
+        with redirect_stdout(io.StringIO()):
+            r = datadiff.main(['--line','17','--cache',str(self.cache),'--at','-5,-7'], self.root)
+        self.assertEqual(r['at']['xy'], [-5,-7])
+
+    def test_survey_comparison_checks_the_parent_lines_frame(self):
+        path = self.root/'data/line17.json'
+        path.write_text(json.dumps({'frame':{'origin':[1,2]}}))
+        old = path.read_bytes()
+        h = reference.digest(path)
+        (self.cache/'builds'/h).write_bytes(old)
+        self.man['files'][path.name] = {'size':len(old),'sha256':h}
+        (self.root/'data/MANIFEST.json').write_text(json.dumps(self.man))
+        path.write_text(json.dumps({'frame':{'origin':[3,4]}}))
+        with redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as e:
+            datadiff.main(['--line','17','--cache',str(self.cache)], self.root)
         self.assertEqual(e.exception.code, 1)
 
     def test_git_reference_export_uses_its_manifest_and_cleans_up(self):

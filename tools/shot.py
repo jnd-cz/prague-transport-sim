@@ -14,9 +14,9 @@ import functools
 import http.server
 import json
 import math
-import os
 from pathlib import Path
 import sys
+import shutil
 import threading
 import time
 import tempfile
@@ -52,8 +52,7 @@ def site(root):
         thread.join(timeout=5)
 
 
-HIDE = '''#menu,#results,#loading,#top,#dash,#msgs,#action,#help,#assist,#minimap,#mirror,#pausePanel,
-          #rpBtn,#rpBox,#review,#touch,#perf,.touchControls { display:none !important }'''
+HIDE = 'body > :not(#gl):not(#cab) { display:none !important }'
 
 
 def capture(browser, root, line, s, view, output, timeout, pose=None, target=None):
@@ -115,26 +114,32 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                 page.evaluate('window.headless = true')
             info = page.evaluate('''pose => {
               const R = window.review, cam = R ? R.camera : window.camera;
+              cam.clearViewOffset(); cam.updateProjectionMatrix();
               const native = {position: cam.position.toArray(), quaternion: cam.quaternion.toArray(),
-                              up: cam.up.toArray(), fov: cam.fov, near: cam.near, far: cam.far};
+                              up: cam.up.toArray(), fov: cam.fov, near: cam.near, far: cam.far,
+                              zoom: cam.zoom, aspect: cam.aspect};
               if (pose) {
                 cam.position.fromArray(pose.position); cam.quaternion.fromArray(pose.quaternion);
-                cam.up.fromArray(pose.up); Object.assign(cam, {fov:pose.fov, near:pose.near, far:pose.far});
+                cam.up.fromArray(pose.up); Object.assign(cam, {fov:pose.fov, near:pose.near, far:pose.far,
+                                                             zoom:pose.zoom, aspect:pose.aspect});
                 cam.clearViewOffset(); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
               }
               if (R) R._render = () => {}; // the captured camera stays fixed through the next draw
               const g = window.game;
               return {camera: pose || native, native_camera: native, target: R ? R.T : null,
-                      tram_s: g ? g.tram.s : null, paused: g ? g.paused : true,
-                      hud_visible: [...document.querySelectorAll('#top,#dash,#msgs,#review,#pausePanel')].some(e => getComputedStyle(e).display !== 'none')};
+                      tram_s: g ? g.tram.s : null, paused: g ? g.paused : true, view_offset_enabled:!!cam.view?.enabled,
+                      hud_visible: [...document.body.children].some(e => !['gl','cab'].includes(e.id) &&
+                        getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0)};
             }''', pose)
             count = page.evaluate('window.drawCount')
             page.wait_for_function('n => window.drawCount > n', arg=count, timeout=remaining())
             page.screenshot(path=str(output), timeout=remaining())
             if errors:
                 raise RuntimeError('; '.join(errors))
+            inputs = [*sorted((root / 'data').glob(f'line{line}.*')), root/'data/truth.json', root/'data/MANIFEST.json']
             info.update(target_xy=target, page_errors=errors, image_sha256=digest(output),
-                        data_sha256={p.name: digest(p) for p in sorted((root / 'data').glob(f'line{line}.*')) if p.is_file()})
+                        settings={'viewport':[1280,720], 'seed':158, 'trip_index':0, 'weather':'dry'},
+                        data_sha256={p.name: digest(p) for p in inputs if p.is_file()})
             return info
     finally:
         context.close()
@@ -196,7 +201,10 @@ def main(argv=None, root=ROOT):
                     combine(current, reference, pair, ['Current checkout', f'Reference: {a.ref}'])
                     print(f'Pair: {a.out / pair.name}')
                 for image in work.glob('*.png'):
-                    os.replace(image, a.out / image.name)
+                    # Temp directories are private on Windows. Copy to an atomic sibling in the
+                    # report directory so images inherit its access rights and the user can open them.
+                    with image.open('rb') as src, replacing(a.out / image.name, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
                 with replacing(a.out / f'{stem}.json', 'w', encoding='utf-8') as f:
                     json.dump(report, f, ensure_ascii=False, indent=2)
                 print(f'Shot: {a.out / current.name}')
