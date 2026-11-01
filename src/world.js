@@ -1599,6 +1599,7 @@ export function buildStreetDetail(data, ground) {
     for (const o of pts) if (o.k === k && !list.some((l) => Math.abs(l.x - o.x) < 0.3 && Math.abs(l.y - o.y) < 0.3)) list.push(o);
     if (!list.length) continue;
     const mesh = new THREE.InstancedMesh(def.geo, def.mat, list.length);
+    mesh.userData.mirrorDetail = k !== 'hydrant'; // flat covers/grates do not resolve in the small rear view
     list.forEach((o, i) => {
       q.setFromAxisAngle(up, def.turn ? streetAngle(o.x, o.y) : (o.x * 7.3 + o.y * 3.1) % (Math.PI * 2));
       // (between the rails on the paved track bed, which is drawn above the street's height: most covers

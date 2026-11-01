@@ -21,6 +21,7 @@ import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
 import { trackStyles } from './heights.js';
 import { credits, logProvenance, fallbacks } from './provenance.js';
+import { Mirror } from './mirror.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -393,6 +394,7 @@ function start() {
   game.autopilot = !!pilot;
   window.game = game; // handy for debugging from the console
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
+  game.mirror = mirror.stats;
   window.camera = camera;
   window.renderer = renderer; // performance checks from the console (renderer.info, the scene)
   window.scene = scene;
@@ -731,46 +733,29 @@ function frame(now) {
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
-  if (window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS) { renderer.render(scene, camera); lastDraw = now; window.drawCount++; }
+  const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
+  if (draw) { renderer.render(scene, camera); lastDraw = now; window.drawCount++; }
   if (perfOn) updatePerf(now);
-  // (not while a test steps the game; idle, the mirror keeps its last picture)
-  if (game && !chase && mirrorOn && !window.freeCam && !window.headless && !lazy) renderMirror();
+  // Present the cached picture even on idle redraws; only active driving refreshes its texture.
+  if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
+    mirror.draw(now, !lazy, poseMirror, tramModel);
+  }
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
 // along the side of the set, rendered to a texture and shown mirrored in the frame at the right.
-const mirrorCam = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 700);
-const mirrorRT = new THREE.WebGLRenderTarget(240, 304);
-const mirrorScene = new THREE.Scene(), mirrorView = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-{
-  const g = new THREE.PlaneGeometry(2, 2), uv = g.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); // a mirror shows it the other way round
-  mirrorScene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: mirrorRT.texture })));
-}
-function renderMirror() {
+const mirrorHidden = [];
+world.traverse(o => {
+  if (o.userData.mirrorDetail || o.userData.part === 'catenary' && o.isLineSegments) mirrorHidden.push(o);
+});
+const mirror = new Mirror(renderer, scene, $('mirror'), mirrorHidden);
+window.mirror = mirror; // cadence, target and excluded geometry are inspectable without changing the simulation
+function poseMirror(mirrorCam) {
   const s = tram.s, p = route.offset(s - 0.6, -1.55), h = route.heading(s - 6, 6), z = profile.height(s);
   mirrorCam.position.set(p.x, z + 2.09, -p.y);
   // looking back, turned a little outwards so the side of the tram fills the inner edge
   mirrorCam.rotation.order = 'YXZ';
   mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.1, 0);
-  const vis = tramModel.visible;
-  tramModel.visible = true;
-  renderer.setRenderTarget(mirrorRT);
-  renderer.render(scene, mirrorCam);
-  renderer.setRenderTarget(null);
-  tramModel.visible = vis;
-  const r = $('mirror').getBoundingClientRect(), H = window.innerHeight;
-  // (the frame is sized by the viewport, index.html: the picture follows it in device pixels, capped)
-  const th = Math.round(Math.max(120, Math.min(640, (r.height - 12) * renderer.getPixelRatio())));
-  if (th !== mirrorRT.height) mirrorRT.setSize(Math.round((th * 150) / 190), th);
-  renderer.setViewport(r.left + 6, H - r.bottom + 6, r.width - 12, r.height - 12);
-  renderer.setScissor(r.left + 6, H - r.bottom + 6, r.width - 12, r.height - 12);
-  renderer.setScissorTest(true);
-  renderer.autoClear = false;
-  renderer.render(mirrorScene, mirrorView);
-  renderer.autoClear = true;
-  renderer.setScissorTest(false);
-  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
 }
 
 load.finish();
