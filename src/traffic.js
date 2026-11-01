@@ -810,10 +810,13 @@ export class Traffic {
         const look = Math.max(9, ((c.vNow ?? 0) ** 2) / 8 + 3);
         if (c.plan && c.toEnd < look) {
           const J = c.plan.at;
-          // (a car in the junction that is itself waiting for this one does not block it; and a car
-          // only enters when its exit lane has room: it never stops inside the junction)
+          // (a car that is itself waiting for this one does not block it: in the junction, or standing in the
+          // mouth of a lane leaving it - a car just out of the junction onto the track waited for the one
+          // behind its tail, which waited for it, line 9 s 18390, #152; not a car before the junction: let
+          // through, cars drove in behind one waiting for the tram and blocked the track, line 22 s 11969;
+          // and a car only enters when its exit lane has room: it never stops inside the junction)
           const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7);
-          const blocked = exitFull || live.some((o) => o !== c && (
+          const blocker = live.find((o) => o !== c && (
             (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan) && o.seen?.car !== c)
             || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, c.plan)
               // (a car whose own path is blocked does not hold its turn: one close behind an obstacle, or
@@ -821,8 +824,9 @@ export class Traffic {
               && !(o.seen && (o.seen.gap < 4 || ((o.vNow ?? 0) < 0.3 && o.seen.v < 0.3)))
               && (o.toEnd < c.toEnd - 0.05 || (Math.abs(o.toEnd - c.toEnd) <= 0.05 && o.id < c.id)))
             || (!o.conn && o.lane !== c.lane && o.lane.to === J && o.toEnd < 5 && !(o.plan && o.plan.at === J) && this._nearLaneEnd(c.plan, o.lane, true))
-            || (!o.conn && o.lane !== c.next && o.lane.from === J && o.s < 5 && this._nearLaneEnd(c.plan, o.lane, false))));
-          if (blocked && c.toEnd > 1.5) jStop = c.toEnd - 2;
+            || (!o.conn && o.lane !== c.next && o.lane.from === J && o.s < 5 && o.seen?.car !== c && this._nearLaneEnd(c.plan, o.lane, false))));
+          c.jBlock = exitFull ? 'exit full' : blocker ? blocker.id : null; // (for the stuck scene, tools/bench/stuck.js)
+          if ((exitFull || blocker) && c.toEnd > 1.5) jStop = c.toEnd - 2;
         }
         // slow down for curves and turns ahead (braking at 3 m/s2), across the junction too
         let vCurve = Infinity;
@@ -855,7 +859,10 @@ export class Traffic {
           else if (a === 'amber' && c.lightGo !== lane && c.lightHold !== lane && front < (v * v) / 6 + v) c.lightGo = lane;
           if (a !== 'green' && c.lightGo !== lane && (front > -0.5 || c.lightHold === lane)) { lGap = Math.max(0, front) + 8; c.lightHold = lane; } // (following() halts 8 m short)
         }
-        const vt = Math.min(c.v, vCurve, following(gap, vLead), jStop === null ? Infinity : following(jStop, 0), following(xGap, 0), following(lGap, 0));
+        const terms = { lead: following(gap, vLead), junction: jStop === null ? Infinity : following(jStop, 0), tram: following(xGap, 0), light: following(lGap, 0), curve: vCurve };
+        const vt = Math.min(c.v, ...Object.values(terms));
+        // (what holds the car, for the stuck scene)
+        c.why = vt < 0.3 ? Object.keys(terms).find((k) => terms[k] === vt) || 'speed' : null;
         c.vNow = this._approach(c.vNow ?? vt, vt, dt);
         c.s += c.vNow * dt;
         while (c.active && c.s > c.path.length) this._advance(c);
