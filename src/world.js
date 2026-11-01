@@ -5,6 +5,7 @@ import { rng } from './random.js';
 import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
 import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
+import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
 const CELL = 350; // spatial chunk size (m) for merged meshes, so frustum culling can skip far chunks
@@ -408,6 +409,23 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
   };
   for (const t of data.tracks) if (!t.z) t.z = trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))));
+  // Share the exact rail cant with pedestrian crossings; a crossing must meet each rail's height.
+  const tiltCache = new WeakMap();
+  const tiltOf = (t) => {
+    if (tiltCache.has(t)) return tiltCache.get(t);
+    const tilt = t.smooth.map(([x, y], i) => {
+      const n = route.nearest(x, y);
+      if (!n || n.d > 5) return 0;
+      const roll = route.rollAt(n.s);
+      if (!roll) return 0;
+      const L = t.smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
+      const h = route.at(n.s), same = (b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy >= 0 ? 1 : -1;
+      return -0.72 * Math.tan(roll) * same;
+    });
+    tiltCache.set(t, tilt); return tilt;
+  };
+  const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
+    (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);
   // our tunnels through rock (terrain.js carveCorridor): the hill stays whole above the track; its
   // terrain is not drawn in the tunnel's corridor, the vault, the rock over it and the portals are
   const rock = ground.walls?.rock || [];
@@ -465,7 +483,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // (a street with tracks in it, or crossing them: strips across, so the middle follows the track level)
     for (const run of runs) {
       const across = r.tram || (r.w > 3 && run.some(([x, y]) => trackDist(x, y) < 8));
-      addRibbon(r.f ? footCg : roadsCg, run, r.w, hf || wayHeight(run, false, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt, 0, across ? Math.ceil(r.w / 2) : 1);
+      const height = hf || wayHeight(run, false, ground), lift = r.f ? 0.16 : 0.12;
+      const crossing = r.f ? pedestrianCrossings.footway(run, r.w, height, lift, r.n || null) : null;
+      addRibbon(r.f ? footCg : roadsCg, crossing ? densify(run, 0.75) : run, r.w, crossing || height, lift, r.f ? paving : asphalt, 0,
+        crossing ? Math.ceil(r.w / 0.5) : across ? Math.ceil(r.w / 2) : 1);
     }
   }
   // (road tunnels: no snow inside)
@@ -489,15 +510,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     const zBed = t.z.map((z, i) => z - lift[i] - BED_BELOW);
     addRibbon(bedCg, t.smooth, 2.7, zBed, 0, bed);
     // on a canted curve of our route the outer rail is higher, the inner one lower
-    const tilt = t.smooth.map(([x, y], i) => {
-      const n = route.nearest(x, y);
-      if (!n || n.d > 5) return 0;
-      const roll = route.rollAt(n.s);
-      if (!roll) return 0;
-      const L = t.smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
-      const h = route.at(n.s), same = (b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy >= 0 ? 1 : -1;
-      return -0.72 * Math.tan(roll) * same; // left rail (+0.72 along the track) goes up by this (down when leaning left)
-    });
+    const tilt = tiltOf(t);
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);

@@ -148,6 +148,11 @@ Review these when realism matters; most move into the build in M2.
 - **Catenary poles** march out past tracks and carriageway to the kerb; a building within 5.5 m gets a
   wall rosette, else bracket arms.
 - **Tram streets**: a road within 2.6 m of a track over 60 % of its length is widened 3.2 m per track.
+- **Pedestrian crossings** (#146): the reported line 17 ZPS sidewalk spans both tracks, 6.3 m along
+  and 15.2 m across, with an independently mapped OSM zebra. Its drawn surface was 86–98 mm above
+  the rails. Short survey patches crossing track are adjusted only with a nearby transverse mapped
+  pedestrian way; unsupported candidates are logged for review. OSM footways are adjusted only where
+  they cross matching-level track. Decisions are in `window.game.route.ground.pedestrianCrossings`.
 - **Vienna-type stops**: carriageway on the doors' side 2.2–3.4 m from the track along the stop (the
   tram bed is not a car lane); facts per stop and direction in `truth.json` `stopTypes`.
 - **Bridges on the model deck**: on tagged spans with model samples, the model deck is fixed like a

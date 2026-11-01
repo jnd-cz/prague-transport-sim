@@ -285,7 +285,11 @@ The audit takes the service date from the build log (`service date …`, `SERVIC
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
 python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
 python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 3
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing
 ```
+
+`crossing` counts 20 m route sections where a drawn pedestrian surface is above a sampled rail head;
+it also reports missing rail samples and the independently mapped evidence for survey adjustments.
 
 `--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
 up to ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
