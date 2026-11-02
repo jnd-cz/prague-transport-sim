@@ -1,7 +1,6 @@
 """Shared truth-fact offsets in the browser: python -P -E tools/test_height_styles.py."""
 
 import json
-import re
 from pathlib import Path
 import sys
 import unittest
@@ -116,37 +115,6 @@ class HeightStyles(unittest.TestCase):
             self.assertTrue(page.locator('#loading').is_visible())
             self.assertIn('data/truth.json',page.locator('#loadStep').inner_text())
             self.assertIn('404',page.locator('#loadStep').inner_text())
-        finally:
-            page.close()
-
-    def test_height_review_draws_status_and_disposes_its_panel(self):
-        page = self.browser.new_page()
-        try:
-            html = (ROOT/'index.html').read_text(encoding='utf-8')
-            importmap = re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
-            page.route('**/height-review-test',lambda route:route.fulfill(body=importmap))
-            page.goto(self.url+'/height-review-test')
-            result = page.evaluate('''async () => {
-              const {buildHeightReview}=await import('/src/heightReview.js');
-              const span={id:'bridge-1',line:17,status:'review',review_flags:['known_archive_disagreement'],
-                structure:{names:['Bridge'],kind:'bridge',osm_ways:[1]},from_stop:'A',to_stop:'B',
-                direction:'path',length_m:10,profile:[{xy:[0,0]},{xy:[10,0]}]};
-              let focused=null;
-              const game={data:{line:'17'},route:{nearest:()=>({s:0})},profile:{height:()=>5},
-                heightReview:{spans:[span]},inspectHeightSpan:s=>focused=s.id};
-              const group=buildHeightReview(game);
-              document.querySelector('#heightReviewPanel button').click();
-              const result={n:group.children.length,color:group.children[0].material.color.getHex(),focused,
-                y:group.children[0].geometry.attributes.position.getY(0)};
-              group.userData.dispose();
-              result.removed=!document.getElementById('heightReviewPanel');
-              return result;
-            }''')
-            self.assertEqual(result['n'],1)
-            self.assertEqual(result['color'],0xff5555)
-            self.assertEqual(result['focused'],'bridge-1')
-            self.assertAlmostEqual(result['y'],5.8,places=5)
-            self.assertTrue(result['removed'])
         finally:
             page.close()
 

@@ -2,7 +2,7 @@
 
 Snapshot `2026-11-01`. Proposed rules are not approvals.
 
-Open `?line=17&inspect&heightreview=reports/review/track-height-spans.json`; F8 toggles the spans.
+Open `?line=17&review=reports/review/track-heights.json` to inspect and answer the decisions.
 
 Each decision may cover several lines and directions. A dated reviewed rule can include all its
 `approval_profile` entries in one `span_reviews` record. The placeholder rule deliberately fails

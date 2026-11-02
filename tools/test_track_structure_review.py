@@ -1,15 +1,19 @@
 """Structure grouping and explicit approvals: python -P -E tools/test_track_structure_review.py."""
 import unittest
+import json
+import hashlib
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 
 import numpy as np
 
 from track_heights import HeightGuard
-from track_structure_review import Structures, grouped, review, record_date
-from track_span_evidence import SpanEvidence
+from track_structure_review import Structures, grouped, review, record_date, findings, queue_text
+from track_span_evidence import SpanEvidence, from_reviews, hydrate_findings
 from track_terrain_fallback import ordinary_fallback
 from test_track_heights import match, path, offset_fact
 
@@ -23,6 +27,105 @@ def approval(**updates):
 
 
 class SpanReviews(unittest.TestCase):
+    def test_referenced_span_queue_checks_hash_and_scope(self):
+        queue = {'snapshot':'test','spans':[{'id':'s','profile':[]}]}
+        raw = queue_text(queue).encode('utf-8')
+        payload = {'snapshot':'test','span_file':'queue.json','span_sha256':hashlib.sha256(raw).hexdigest(),
+                   'findings':[{'id':'one','decision':{'span_ids':['s']}}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'queue.json'
+            path.write_bytes(raw)
+            self.assertEqual(hydrate_findings(payload,tmp)['findings'][0]['spans'][0]['id'],'s')
+            path.write_bytes(raw+b' ')
+            with self.assertRaisesRegex(ValueError,'differs'):
+                hydrate_findings(payload,tmp)
+            changed = queue_text({'snapshot':'other','spans':queue['spans']}).encode('utf-8')
+            path.write_bytes(changed)
+            with self.assertRaisesRegex(ValueError,'snapshot'):
+                hydrate_findings({**payload,'span_sha256':hashlib.sha256(changed).hexdigest()},tmp)
+            missing = queue_text({'snapshot':'test','spans':[]}).encode('utf-8')
+            path.write_bytes(missing)
+            with self.assertRaisesRegex(ValueError,'missing'):
+                hydrate_findings({**payload,'span_sha256':hashlib.sha256(missing).hexdigest()},tmp)
+
+    def test_real_findings_explain_every_offered_answer(self):
+        path = Path(__file__).resolve().parent.parent/'reports/review/track-heights.json'
+        if not path.exists():
+            self.skipTest('generate the review findings first')
+        source = json.loads(path.read_text(encoding='utf-8'))
+        if source.get('span_file'):
+            hydrated = hydrate_findings(source)
+            self.assertEqual(len(hydrated['findings']),len(source['findings']))
+        else:
+            queue = json.loads(path.with_name('track-height-spans.json').read_text(encoding='utf-8'))
+            hydrated = findings(queue,inline=True)
+        for item in hydrated['findings']:
+            self.assertIn('archive profile ok',item['options'])
+            self.assertIn('unsure',item['options'])
+            for choice in ('archive profile ok','follows survey surface'):
+                answer = {'decision_id':item['id'],'span_ids':item['decision']['span_ids'],
+                          'v':choice,'note':'','t':1793577600000}
+                result = from_reviews({'items':{'pin':answer}},{'findings':[item]},'test')
+                reason = result['held'][0]['reason'] if result['held'] else None
+                self.assertEqual(item['answer_explanations'][choice],reason,(item['id'],choice))
+                if choice == 'follows survey surface':
+                    self.assertEqual(choice in item['options'],reason is None,item['id'])
+                elif reason:
+                    self.assertTrue(reason,item['id'])
+            for choice in ('other level (deck / under)','unsure'):
+                answer = {'decision_id':item['id'],'span_ids':item['decision']['span_ids'],
+                          'v':choice,'note':'','t':1793577600000}
+                self.assertTrue(from_reviews({'items':{'pin':answer}},{'findings':[item]},'test')['held'])
+
+    def test_review_answers_import_as_scoped_evidence_or_stay_held(self):
+        span = {'id':'s','profile':[{'xy':[0,0],'archive':[{'z':200}],'surfaces':[{'z':200,'rail_height_eligible':True}]},
+                                  {'xy':[10,0],'archive':[{'z':202}],'surfaces':[{'z':202,'rail_height_eligible':True}]}],
+                'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'bridge-1','decision':{'span_ids':['s'],'structure':{'kind':'bridge'}},'spans':[span]}
+        answer = {'decision_id':'bridge-1','span_ids':['s'],'v':'archive profile ok','note':'','t':1761955200000}
+        get = lambda a:from_reviews({'items':{'pin':a}},{'findings':[finding]},'reviews/line17.json')
+        imported = get(answer)['span_reviews'][0]
+        expected = approval(id='review-bridge-1',kind='deck',level=1,
+                            source={'dataset':'expert_review','record':'reviews/line17.json#pin','date':'2025-11-01','who':'user'},
+                            profiles=[{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'archive'}}])
+        self.assertEqual(imported,expected)
+        self.assertEqual(SpanEvidence([imported]).at('di-1',5,0,[{'z':201}]),SpanEvidence([expected]).at('di-1',5,0,[{'z':201}]))
+        span['profile'][0]['archive'].append({'z':201})
+        self.assertFalse(get(answer)['span_reviews'])
+        span['profile'][0]['archive'].pop()
+        survey = get({**answer,'v':'follows survey surface'})['span_reviews'][0]
+        self.assertEqual(SpanEvidence([survey]).at('di-1',5,0,[])[0]['z'],201)
+        self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':None},match(),5,0,structure_hint=True)['z'],201)
+        self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':205},match(),5,0,structure_hint=True)['z'],205)
+        span['profile'][0]['surfaces'].append({'id':'different','z':200.02,'rail_height_eligible':True})
+        self.assertFalse(get({**answer,'v':'follows survey surface'})['span_reviews'])
+        span['profile'][0]['surfaces'].pop()
+        for changed in ({'note':'check level'}, {'v':'unsure'}, {'v':'other level (deck / under)'}, {'span_ids':['changed']}):
+            self.assertFalse(get({**answer,**changed})['span_reviews'])
+            self.assertTrue(get({**answer,**changed})['held'])
+        stale = from_reviews({'items':{'pin':{**answer,'span_sha256':'old'}}},
+                             {'span_sha256':'new','findings':[finding]},'reviews/line17.json')
+        self.assertEqual(stale['held'][0]['reason'],'missing or changed decision scope')
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'answers.json').write_text(json.dumps({'items':{'pin':answer}}),encoding='utf-8')
+            (root/'findings.json').write_text(json.dumps({'findings':[finding]}),encoding='utf-8')
+            subprocess.run([sys.executable,'-P','-E',str(Path(__file__).with_name('track_span_evidence.py')),
+                '--from-reviews',str(root/'answers.json'),'--findings',str(root/'findings.json'),
+                '--output',str(root/'out.json')],check=True,capture_output=True,text=True)
+            self.assertEqual(json.loads((root/'out.json').read_text(encoding='utf-8'))['span_reviews'][0]['id'],'review-bridge-1')
+
+    def test_findings_keep_all_spans_and_pin_the_longest(self):
+        spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},
+                 {'id':'b','length_m':30,'profile':[{'xy':[4,5]},{'xy':[6,7]}], 'from_stop':'B','to_stop':'C'}]
+        decision = {'id':'bridge-1','status':'review','span_ids':['a','b'], 'structure':{'kind':'bridge'}}
+        result = findings({'snapshot':'test','spans':spans,'decisions':[decision]},inline=True)
+        self.assertEqual(len(result['findings']),1)
+        item = result['findings'][0]
+        self.assertEqual((item['x'],item['y']),(6,7))
+        self.assertEqual([s['id'] for s in item['spans']],['a','b'])
+        self.assertEqual(item['id'],'bridge-1')
+
     def test_terrain_last_fallback_has_provenance_and_never_fills_a_structure(self):
         row = {'status':'review','review_flags':['no_usable_height'],'di_id':'di-1','xy':[5,0],
                'construction':{'styles':['grass']}}
@@ -94,6 +197,9 @@ class SpanReviews(unittest.TestCase):
         rows = [{'line':17,'direction':direction,'s':s,'weight_m':5,'xy':[x,0],
                  'status':'review','review_flags':['tunnel_unverified'],'di_id':'di-1','raw_di_z':None,
                  'candidates':[]} for direction in ('path','pathBack') for s,x in [(2.5,2.5),(7.5,7.5)]]
+        rows[0]['raw_di_z'] = 205
+        rows.append({'line':17,'direction':'path','s':12.5,'weight_m':5,'xy':[12.5,0],
+                     'status':'selected','review_flags':[],'di_id':'di-2','raw_di_z':206,'candidates':[]})
         class Terrain:
             def sample(self,e,n):
                 return np.full(len(e),190)
@@ -106,6 +212,9 @@ class SpanReviews(unittest.TestCase):
         self.assertEqual(result['spans'][1]['to_stop'],'A')
         self.assertEqual(result['spans'][0]['proposal']['rule'],'independent_height_required')
         self.assertEqual(result['spans'][0]['terrain']['height_meaning'],'bare_earth')
+        self.assertEqual(result['spans'][0]['profile'][0]['di_z'],205)
+        self.assertEqual(result['spans'][0]['approach'][0]['di_z'],206)
+        self.assertNotIn('di-2',result['spans'][0]['approval_profile']['di_ids'])
 
 
 if __name__=='__main__':

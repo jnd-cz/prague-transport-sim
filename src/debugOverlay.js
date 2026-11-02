@@ -7,7 +7,6 @@
 //   white bar            conflict on the route (street, footway or crossing): its near edge
 //   green bars / ball    platform start and end / where the tram front stops for passengers
 import * as THREE from 'three';
-import { buildHeightReview } from './heightReview.js';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
 // In S-JTSK (EPSG:5514): game metres plus the city origin (data.frame, docs/decisions/2026-10-29-city-frame-and-tiles.md).
@@ -75,8 +74,6 @@ export function createDebugOverlay(scene) {
       for (let i = 0; heads && i < heads.count; i++) { heads.getMatrixAt(i, M); v.setFromMatrixPosition(M); add('ball', 0xffee00, v.x, v.y + 3.2, v.z); }
       for (const o of game.data.osmSignals?.stop || []) add('dot', 0xff2020, o.x, surf(o.x, o.y) + 1, -o.y);
     }
-    const heights = buildHeightReview(game);
-    if (heights) g.add(heights);
     return g;
   }
 

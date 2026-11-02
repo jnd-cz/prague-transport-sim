@@ -2,7 +2,7 @@
 
     python -P -E tools/track_structure_review.py --input reports/track-heights.json
 
-The output loads in ?line=17&inspect&heightreview=reports/review/track-height-spans.json (F8).
+The findings load in ?line=17&review=reports/review/track-heights.json.
 Each structure has contiguous spans with stop names, lengths per direction, dated candidates and
 proposed rules. Copy reviewed profiles to --evidence span_reviews; a proposal is never evidence.
 """
@@ -17,6 +17,7 @@ import sys
 
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import substring
 from shapely.strtree import STRtree
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -27,6 +28,7 @@ from track_context import load_context
 from track_decks import load_decks
 from track_heights import usable
 from track_terrain_fallback import ordinary_fallback
+from track_span_evidence import from_reviews
 
 
 def structure_kind(tags):
@@ -174,18 +176,48 @@ def review(report, structures, terrain, lines):
                     entry['zs'].append(c.get('z'))
                     entry['surface_zs'].append(c.get('surface_z'))
                     if c.get('inside'):
-                        surveyed.append({'id':c['id'],'class':c['class'],'z':c.get('z'),
+                        surveyed.append({'id':c['id'],'class':c['class'],'z':c.get('z'),'surface_z':c.get('surface_z'),
                             'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
                                 and c['class'] in ('deck','tram','road','paved','parking'),
-                            'excluded':c.get('excluded')})
+                            'level':c.get('level'),'excluded':c.get('excluded')})
             profile.append({'s':round(r['s'],3),'xy':[round(v,3) for v in (r.get('di_xy') or r['xy'])],
-                'di_id':r.get('di_id'),'archive':archived,'surfaces':surveyed,'ipr_terrain_z':z})
+                'di_id':r.get('di_id'),'di_z':r.get('raw_di_z'),'archive':archived,'surfaces':surveyed,'ipr_terrain_z':z})
         for entries in (archive,surfaces):
             for entry in entries.values():
                 entry['height'] = stats(entry.pop('zs'))
                 if 'surface_zs' in entry:
                     entry['survey_height'] = stats(entry.pop('surface_zs'))
+        # Context is plotted but never included in the decision's approval scope.
+        neighbours = [r for r in routes[line,direction] if a-30 <= r['s'] <= b+30 and not a <= r['s'] <= b]
+        approach = []
+        if neighbours:
+            ee,nn = Frame().to_jtsk([r['xy'][0] for r in neighbours],[r['xy'][1] for r in neighbours])
+            for r,z in zip(neighbours,terrain.sample(ee,nn)):
+                approach.append({'s':round(r['s'],3),'xy':[round(v,3) for v in (r.get('di_xy') or r['xy'])],
+                    'di_id':r.get('di_id'),'di_z':r.get('raw_di_z'),
+                    'archive':[{'id':c['id'],'z':c.get('z'),'excluded':c.get('excluded')}
+                               for c in r.get('candidates',[]) if c['dataset']=='archive'],
+                    'surfaces':[{'id':c['id'],'class':c['class'],'level':c.get('level'),'z':c.get('z'),'surface_z':c.get('surface_z'),
+                                 'rail_height_eligible':r.get('construction',{}).get('kind')=='paved'
+                                    and c['class'] in ('deck','tram','road','paved','parking'),
+                                 'excluded':c.get('excluded')}
+                                for c in r.get('candidates',[]) if c['dataset'] in ('deck','survey') and c.get('inside')],
+                    'ipr_terrain_z':float(z) if math.isfinite(z) and 100<z<500 else None})
         metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
+        route_line = LineString([p[:2] for p in data[direction]])
+        osm_positions = []
+        corridor = substring(route_line,max(0,a-30),min(route_line.length,b+30)).buffer(8)
+        for item in structures.paths:
+            if item['id'] not in metadata.get('osm_ways',[]):
+                continue
+            clipped = LineString([p[:2] for p in item['coords']]).intersection(corridor)
+            pieces = clipped.geoms if hasattr(clipped,'geoms') else [clipped]
+            for piece in pieces:
+                if piece.is_empty or piece.geom_type not in ('LineString','Point'):
+                    continue
+                for vertex in piece.coords:
+                    osm_positions.append(route_line.project(Point(vertex)))
+        extent = [round(min(osm_positions),3),round(max(osm_positions),3)] if len(osm_positions)>1 else None
         proposal = {'rule':'independent_height_required','reason':'No reviewed rail level or two numeric DI ends.'}
         complete_archive = all(any(usable(a['z']) and not a['excluded'] for a in p['archive']) for p in profile)
         if (complete_archive and all(c['record_date'] for c in archive.values()) and metadata['kind']=='bridge'
@@ -221,7 +253,7 @@ def review(report, structures, terrain, lines):
             'archive_candidates':list(archive.values()),'survey_candidates':list(surfaces.values()),
             'terrain':{'dataset':'ipr-dtm','source':'raw/ipr-dtm/DTM/dtm_1m.tif',
                        'height_meaning':'bare_earth','datum':'Bpv_assumed_not_independent_rail_evidence',**stats(ground)},
-            'proposal':proposal,'profile':profile,
+            'proposal':proposal,'profile':profile,'approach':approach,'structure_extent':extent,
             'approval_profile':{'xy':[start,*xy,end],'di_ids':sorted({str(r['di_id']) for r in rows if r.get('di_id')}),
                                 'radius_m':1,'rule':{'type':'needs_explicit_review'}}})
     decisions = {}
@@ -253,10 +285,48 @@ def review(report, structures, terrain, lines):
             'decisions':list(decisions.values()),'spans':spans,'ordinary_terrain_fallbacks':fallbacks}
 
 
+def queue_text(result):
+    return json.dumps(result,ensure_ascii=False,separators=(',',':'))+'\n'
+
+
+def findings(result, inline=False, span_file='reports/review/track-height-spans.json'):
+    """One pin per decision; the shared span queue is loaded only once."""
+    spans = {s['id']:s for s in result['spans']}
+    out = []
+    for decision in result['decisions']:
+        linked = [spans[i] for i in decision['span_ids'] if i in spans and spans[i]['profile']]
+        if not linked:
+            continue
+        longest = max(linked,key=lambda s:s['length_m'])
+        point = longest['profile'][len(longest['profile'])//2]
+        conflict = any('known_archive_disagreement' in s.get('review_flags',[]) or 'conflicting_level_evidence' in s.get('review_flags',[]) for s in linked)
+        item = {'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
+                    'mag':longest['length_m'],'info':f"{longest['from_stop']} → {longest['to_stop']}: {decision['structure']['kind']}",
+                    'status':'conflict' if conflict else decision['status'],'decision':decision,'spans':linked}
+        explanations = {}
+        for choice in ('archive profile ok','follows survey surface'):
+            answer = {'decision_id':decision['id'],'span_ids':decision['span_ids'],'v':choice,'note':'','t':1793577600000}
+            if all('approval_profile' in span for span in linked):
+                check = from_reviews({'items':{'preview':answer}},{'findings':[item]},'preview')
+                explanations[choice] = check['held'][0]['reason'] if check['held'] else None
+            else:
+                explanations[choice] = 'span approval data is incomplete'
+        item['options'] = ['archive profile ok'] + ([] if explanations['follows survey surface'] else ['follows survey surface']) + ['other level (deck / under)','unsure']
+        item['answer_explanations'] = explanations
+        if not inline:
+            del item['spans']
+        out.append(item)
+    payload = {'schema':1,'snapshot':result['snapshot'],'findings':out}
+    if not inline:
+        payload.update(span_file=span_file,
+                       span_sha256=hashlib.sha256(queue_text(result).encode('utf-8')).hexdigest())
+    return payload
+
+
 def markdown(result):
     spans = {s['id']:s for s in result['spans']}
     out = ['# Structure height decisions', '',f"Snapshot `{result['snapshot']}`. Proposed rules are not approvals.", '',
-           'Open `?line=17&inspect&heightreview=reports/review/track-height-spans.json`; F8 toggles the spans.', '',
+           'Open `?line=17&review=reports/review/track-heights.json` to inspect and answer the decisions.', '',
            'Each decision may cover several lines and directions. A dated reviewed rule can include all its',
            '`approval_profile` entries in one `span_reviews` record. The placeholder rule deliberately fails',
            'validation until a height rule is explicitly chosen. Numeric DI always keeps priority.', '']
@@ -289,7 +359,12 @@ def main():
     ap.add_argument('--input',type=Path,required=True)
     ap.add_argument('--output',type=Path,default=ROOT/'reports/review/track-height-spans.json')
     ap.add_argument('--markdown-output',type=Path,default=ROOT/'reports/review/track-height-spans.md')
+    ap.add_argument('--findings-output',type=Path,default=ROOT/'reports/review/track-heights.json')
     a = ap.parse_args()
+    try:
+        span_file = a.output.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        ap.error('--output must be inside the checkout so review mode can load it')
     report = json.loads(a.input.read_text(encoding='utf-8'))
     decks = load_decks(ROOT)
     context = load_context(decks)
@@ -298,8 +373,11 @@ def main():
         result = review(report,Structures(context.paths,decks.records),terrain,{n:load_line(n) for n in (9,17,22,23,37)})
     finally:
         terrain.f.close()
-    write_json(a.output,result)
     from atomic import replacing
+    a.output.parent.mkdir(parents=True,exist_ok=True)
+    with replacing(a.output,'w',encoding='utf-8',newline='\n') as f:
+        f.write(queue_text(result))
+    write_json(a.findings_output,findings(result,span_file=span_file))
     a.markdown_output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(a.markdown_output,'w',encoding='utf-8') as f:
         f.write(markdown(result))

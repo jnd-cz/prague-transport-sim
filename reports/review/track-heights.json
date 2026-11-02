@@ -1,0 +1,2004 @@
+{
+  "schema": 1,
+  "snapshot": "2026-11-01",
+  "findings": [
+    {
+      "kind": "trackheight",
+      "id": "unmapped-486d384facfb",
+      "x": -207.619,
+      "y": -895.544,
+      "mag": 8.383,
+      "info": "Lazarská → Lazarská: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-486d384facfb",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line9:path:1",
+          "unmapped:line9:path:2",
+          "unmapped:line9:pathBack:6",
+          "unmapped:line9:pathBack:7",
+          "unmapped:line23:path:11",
+          "unmapped:line23:path:12",
+          "unmapped:line23:pathBack:1",
+          "unmapped:line23:pathBack:2"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 13.154,
+          "line9:pathBack": 13.04,
+          "line23:path": 13.154,
+          "line23:pathBack": 13.04
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-22756845",
+      "x": 1075.128,
+      "y": -339.573,
+      "mag": 75.198,
+      "info": "Hlavní nádraží → Hlavní nádraží: tunnel",
+      "status": "review",
+      "decision": {
+        "id": "osm-22756845",
+        "structure": {
+          "id": "osm-22756845",
+          "kind": "tunnel",
+          "osm_ways": [
+            22756845,
+            477083010
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "22756845": {
+              "access": "private",
+              "bicycle": "no",
+              "electrified": "contact_line",
+              "embedded_rails": "tram",
+              "foot": "no",
+              "frequency": "0",
+              "gauge": "1435",
+              "highway": "service",
+              "layer": "-1",
+              "maxheight": "default",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "bing;cuzk:km;survey",
+              "tunnel": "yes",
+              "vehicle": "no",
+              "voltage": "600"
+            },
+            "477083010": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "-1",
+              "maxheight": "default",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing,cuzk",
+              "tunnel": "yes",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-22756845:line9:path:1",
+          "osm-22756845:line9:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 75.198,
+          "line9:pathBack": 74.64
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-8102914",
+      "x": 1202.108,
+      "y": -314.781,
+      "mag": 73.735,
+      "info": "Hlavní nádraží → Hlavní nádraží: tunnel",
+      "status": "review",
+      "decision": {
+        "id": "osm-8102914",
+        "structure": {
+          "id": "osm-8102914",
+          "kind": "tunnel",
+          "osm_ways": [
+            477078032,
+            8102914
+          ],
+          "survey_records": [],
+          "names": [
+            "Seifertova"
+          ],
+          "tags": {
+            "8102914": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "-1",
+              "name": "Seifertova",
+              "oneway": "yes",
+              "railway": "tram",
+              "tunnel": "yes",
+              "voltage": "600"
+            },
+            "477078032": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "-1",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing,cuzk",
+              "tunnel": "yes",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-8102914:line9:path:1",
+          "osm-8102914:line9:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 73.735,
+          "line9:pathBack": 73.568
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-38eafe8f107a",
+      "x": 1125.953,
+      "y": -1504.142,
+      "mag": 29.34,
+      "info": "Šumavská → Šumavská: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-38eafe8f107a",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line9:path:3",
+          "unmapped:line9:path:4",
+          "unmapped:line9:pathBack:4",
+          "unmapped:line9:pathBack:5"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 49.059,
+          "line9:pathBack": 55.042
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-bc2b64283758",
+      "x": 1077.095,
+      "y": -1510.891,
+      "mag": 8.535,
+      "info": "Náměstí Míru → Náměstí Míru: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-bc2b64283758",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line9:path:5",
+          "unmapped:line9:pathBack:3"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 6.759,
+          "line9:pathBack": 8.535
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-f98a249b73d5",
+      "x": 440.273,
+      "y": -1392.604,
+      "mag": 9.085,
+      "info": "I. P. Pavlova → I. P. Pavlova: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-f98a249b73d5",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line9:path:6",
+          "unmapped:line9:path:7",
+          "unmapped:line9:pathBack:1",
+          "unmapped:line9:pathBack:2",
+          "unmapped:line22:path:14",
+          "unmapped:line22:path:15",
+          "unmapped:line22:pathBack:1",
+          "unmapped:line22:pathBack:2"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 13.036,
+          "line9:pathBack": 16.919,
+          "line22:path": 16.919,
+          "line22:pathBack": 13.036
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-bc91db9ea9d2",
+      "x": -309.137,
+      "y": -1194.104,
+      "mag": 14.504,
+      "info": "Karlovo náměstí → Karlovo náměstí: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-bc91db9ea9d2",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line9:path:8",
+          "unmapped:line22:path:12",
+          "unmapped:line22:path:13",
+          "unmapped:line22:pathBack:3",
+          "unmapped:line22:pathBack:4"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 13.948,
+          "line22:path": 17.484,
+          "line22:pathBack": 20.842
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-476017592",
+      "x": -905.585,
+      "y": -1512.534,
+      "mag": 212.984,
+      "info": "Zborovská → Palackého náměstí: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-476017592",
+        "structure": {
+          "id": "osm-476017592",
+          "kind": "bridge",
+          "osm_ways": [
+            476017592,
+            476017594,
+            476017595,
+            476073795,
+            938201414,
+            938201415,
+            938201416,
+            938201417,
+            996102484,
+            996102485,
+            996102490
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "476017592": {
+              "access": "no",
+              "bridge": "yes",
+              "bridge:structure": "arch",
+              "bus": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "highway": "busway",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "50",
+              "oneway": "yes",
+              "railway": "tram",
+              "surface": "concrete",
+              "voltage": "600"
+            },
+            "476017594": {
+              "access": "no",
+              "bridge": "yes",
+              "bus": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "highway": "busway",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "476017595": {
+              "access": "no",
+              "bridge": "yes",
+              "bridge:structure": "arch",
+              "bus": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "highway": "busway",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "50",
+              "oneway": "yes",
+              "psv": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "surface": "concrete",
+              "voltage": "600"
+            },
+            "476073795": {
+              "access": "no",
+              "bridge": "yes",
+              "bus": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "highway": "busway",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "psv": "yes",
+              "railway": "tram",
+              "sidewalk:left": "no",
+              "sidewalk:right": "separate",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "938201414": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "938201415": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "938201416": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "938201417": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "996102484": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "996102485": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "996102490": {
+              "access": "no",
+              "bridge": "yes",
+              "bus": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "highway": "service",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "psv": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-476017592:line9:path:1",
+          "osm-476017592:line9:path:2",
+          "osm-476017592:line9:path:3",
+          "osm-476017592:line9:path:4",
+          "osm-476017592:line9:pathBack:1",
+          "osm-476017592:line9:pathBack:2",
+          "osm-476017592:line9:pathBack:3"
+        ],
+        "length_per_direction_m": {
+          "line9:path": 228.41,
+          "line9:pathBack": 235.419
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "archive rail height missing, excluded or conflicting on part of the span",
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-4722514",
+      "x": -2490.002,
+      "y": -9205.055,
+      "mag": 401.882,
+      "info": "Nádraží Modřany → Čechova čtvrť: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-4722514",
+        "structure": {
+          "id": "osm-4722514",
+          "kind": "bridge",
+          "osm_ways": [
+            1176355489,
+            1176355495,
+            338644891,
+            338644915,
+            4722514,
+            4722515,
+            495700333,
+            495700334
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "4722514": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "50",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "4722515": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "338644891": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "338644915": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "495700333": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "50",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "495700334": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "50",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "1176355489": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "1176355495": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "50",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-4722514:line17:path:1",
+          "osm-4722514:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 397.65,
+          "line17:pathBack": 401.882
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-4722520",
+      "x": -2484.541,
+      "y": -8444.106,
+      "mag": 628.245,
+      "info": "Nádraží Modřany → Belárie: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-4722520",
+        "structure": {
+          "id": "osm-4722520",
+          "kind": "bridge",
+          "osm_ways": [
+            338644883,
+            4722520,
+            495705767,
+            495705768,
+            495705769,
+            495705770
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "4722520": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "338644883": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "495705767": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "495705768": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "495705769": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "495705770": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-4722520:line17:path:1",
+          "osm-4722520:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 628.245,
+          "line17:pathBack": 627.253
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-98560954",
+      "x": -2431.828,
+      "y": -7558.058,
+      "mag": 38.172,
+      "info": "Hodkovičky → Hodkovičky: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-98560954",
+        "structure": {
+          "id": "osm-98560954",
+          "kind": "bridge",
+          "osm_ways": [
+            338644894,
+            98560954
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "98560954": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "70",
+              "note": "max. 70 km/h pouze vozy 14T, ostatní max. 65 km/h",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "338644894": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "70",
+              "note": "max. 70 km/h pouze vozy 14T, ostatní max. 65 km/h",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-98560954:line17:path:1",
+          "osm-98560954:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 38.172,
+          "line17:pathBack": 37.642
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-150611269",
+      "x": -2234.162,
+      "y": -6927.859,
+      "mag": 151.998,
+      "info": "Černý kůň → Černý kůň: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-150611269",
+        "structure": {
+          "id": "osm-150611269",
+          "kind": "bridge",
+          "osm_ways": [
+            1176355492,
+            1176355503,
+            150611269,
+            338644907,
+            495705765,
+            495705766
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "150611269": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "70",
+              "note": "max. 70 km/h pouze vozy 14T, ostatní max. 65 km/h",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "338644907": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "495705765": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "495705766": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "1176355492": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "70",
+              "note": "max. 70 km/h pouze vozy 14T, ostatní max. 65 km/h",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "1176355503": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-150611269:line17:path:1",
+          "osm-150611269:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 151.845,
+          "line17:pathBack": 151.998
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-150611136",
+      "x": -2056.741,
+      "y": -6287.641,
+      "mag": 380.389,
+      "info": "Nádraží Braník → Nádraží Braník: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-150611136",
+        "structure": {
+          "id": "osm-150611136",
+          "kind": "bridge",
+          "osm_ways": [
+            150611136,
+            317188281,
+            495705763,
+            495705764
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "150611136": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            },
+            "317188281": {
+              "electrified": "contact_line",
+              "embankment": "yes",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "495705763": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "voltage": "600"
+            },
+            "495705764": {
+              "bridge": "yes",
+              "bridge:structure": "beam",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "60",
+              "oneway": "yes",
+              "railway": "tram",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-150611136:line17:path:1",
+          "osm-150611136:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 379.87,
+          "line17:pathBack": 380.389
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-462183789",
+      "x": -727.889,
+      "y": -2591.405,
+      "mag": 27.444,
+      "info": "Podolská vodárna → Podolská vodárna: tunnel",
+      "status": "review",
+      "decision": {
+        "id": "osm-462183789",
+        "structure": {
+          "id": "osm-462183789",
+          "kind": "tunnel",
+          "osm_ways": [
+            462183789,
+            462183790
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "462183789": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "maxspeed": "30",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "Bing",
+              "tunnel": "yes",
+              "voltage": "600"
+            },
+            "462183790": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "maxspeed": "30",
+              "oneway": "yes",
+              "railway": "tram",
+              "tunnel": "yes",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-462183789:line17:path:1",
+          "osm-462183789:line17:path:2",
+          "osm-462183789:line17:pathBack:1",
+          "osm-462183789:line17:pathBack:2"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 19.391,
+          "line17:pathBack": 39.562
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-4890563",
+      "x": -726.441,
+      "y": -2571.066,
+      "mag": 29.492,
+      "info": "Podolská vodárna → Podolská vodárna: tunnel",
+      "status": "review",
+      "decision": {
+        "id": "osm-4890563",
+        "structure": {
+          "id": "osm-4890563",
+          "kind": "tunnel",
+          "osm_ways": [
+            4890563
+          ],
+          "survey_records": [],
+          "names": [
+            "Vyšehradský tunel"
+          ],
+          "tags": {
+            "4890563": {
+              "cycleway:both": "shared_lane",
+              "cycleway:both:lane": "pictogram",
+              "embedded_rails": "tram",
+              "highway": "tertiary",
+              "lanes": "2",
+              "layer": "-1",
+              "lit": "yes",
+              "maxheight": "3.3",
+              "maxspeed": "30",
+              "name": "Vyšehradský tunel",
+              "name:de": "Wyschehrader Tunnel",
+              "name:etymology:wikidata": "Q616334",
+              "overtaking": "no",
+              "sidewalk": "separate",
+              "smoothness": "excellent",
+              "source:maxspeed": "sign",
+              "surface": "asphalt",
+              "tunnel": "yes",
+              "wikidata": "Q11949409",
+              "wikipedia": "cs:Vyšehradský tunel"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-4890563:line17:path:1",
+          "osm-4890563:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 29.492,
+          "line17:pathBack": 6.946
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "follows survey surface",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": null
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-212a2fa901a0",
+      "x": -732.529,
+      "y": -1478.366,
+      "mag": 7.337,
+      "info": "Palackého náměstí → Palackého náměstí: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-212a2fa901a0",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line17:path:1",
+          "unmapped:line17:path:2",
+          "unmapped:line17:pathBack:3",
+          "unmapped:line17:pathBack:4"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 12.11,
+          "line17:pathBack": 9.66
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-30619203",
+      "x": -512.357,
+      "y": -84.749,
+      "mag": 19.325,
+      "info": "Karlovy lázně → Karlovy lázně: tunnel",
+      "status": "di_numeric",
+      "decision": {
+        "id": "osm-30619203",
+        "structure": {
+          "id": "osm-30619203",
+          "kind": "tunnel",
+          "osm_ways": [
+            30619203,
+            476507490,
+            476507492,
+            476507495
+          ],
+          "survey_records": [],
+          "names": [
+            "Smetanovo nábřeží"
+          ],
+          "tags": {
+            "30619203": {
+              "bicycle": "yes",
+              "class:bicycle:non_experienced": "-1",
+              "cycleway:right": "shared_lane",
+              "embedded_rails": "tram",
+              "highway": "residential",
+              "horse": "no",
+              "lanes": "1",
+              "lit": "yes",
+              "maxheight": "3.3",
+              "maxspeed": "30",
+              "name": "Smetanovo nábřeží",
+              "name:de": "Franzensquai",
+              "name:ru": "набережная Сметаны",
+              "oneway": "yes",
+              "parking:both": "no",
+              "sidewalk:left": "no",
+              "sidewalk:right": "separate",
+              "surface": "asphalt",
+              "tunnel": "building_passage",
+              "wikidata": "Q43397194"
+            },
+            "476507490": {
+              "bicycle": "yes",
+              "class:bicycle:non_experienced": "-1",
+              "cycleway:right": "shared_lane",
+              "embedded_rails": "tram",
+              "highway": "residential",
+              "horse": "no",
+              "lanes": "1",
+              "lit": "yes",
+              "maxheight": "3.3",
+              "maxspeed": "30",
+              "name": "Smetanovo nábřeží",
+              "name:de": "Franzensquai",
+              "name:ru": "набережная Сметаны",
+              "oneway": "yes",
+              "parking:both": "no",
+              "sidewalk:left": "no",
+              "sidewalk:right": "separate",
+              "surface": "asphalt",
+              "tunnel": "building_passage",
+              "wikidata": "Q43397194"
+            },
+            "476507492": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "maxspeed": "30",
+              "oneway": "yes",
+              "railway": "tram",
+              "tunnel": "building_passage",
+              "voltage": "600"
+            },
+            "476507495": {
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "maxspeed": "30",
+              "oneway": "yes",
+              "railway": "tram",
+              "tunnel": "building_passage",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-30619203:line17:path:1",
+          "osm-30619203:line17:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 19.325,
+          "line17:pathBack": 19.25
+        },
+        "status": "di_numeric"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-7652c51cda3a",
+      "x": -389.81,
+      "y": 190.816,
+      "mag": 7.675,
+      "info": "Staroměstská → Staroměstská: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-7652c51cda3a",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line17:path:3",
+          "unmapped:line17:path:4",
+          "unmapped:line17:pathBack:1",
+          "unmapped:line17:pathBack:2"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 12.573,
+          "line17:pathBack": 11.437
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-127867974",
+      "x": -205.561,
+      "y": 629.001,
+      "mag": 44.245,
+      "info": "Právnická fakulta → Čechův most: bridge",
+      "status": "review",
+      "decision": {
+        "id": "osm-127867974",
+        "structure": {
+          "id": "osm-127867974",
+          "kind": "bridge",
+          "osm_ways": [
+            127867974,
+            1328077842,
+            136122214,
+            475364602,
+            475364605,
+            475364616,
+            475364617,
+            476507512,
+            476507514
+          ],
+          "survey_records": [],
+          "names": [
+            "Čechův most"
+          ],
+          "tags": {
+            "127867974": {
+              "bridge": "yes",
+              "bus": "no",
+              "carriage": "no",
+              "cycleway:both": "no",
+              "embedded_rails": "tram",
+              "highway": "tertiary",
+              "lanes": "2",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "50",
+              "maxspeed:type": "CZ:urban",
+              "maxweight": "3.5",
+              "name": "Čechův most",
+              "name:cs": "Čechův most",
+              "name:cy": "Pont Tsiechwf (Čechův)",
+              "name:etymology:wikidata": "Q745363",
+              "name:ru": "Чехов мост",
+              "oneway": "yes",
+              "parking:both": "no",
+              "railway:lanes": "tram|no",
+              "shoulder": "no",
+              "sidewalk:left": "no",
+              "sidewalk:right": "separate",
+              "smoothness": "excellent",
+              "surface": "asphalt",
+              "turn:lanes": "left|right",
+              "vehicle:lanes": "no|yes"
+            },
+            "136122214": {
+              "bridge": "yes",
+              "cycleway:both": "no",
+              "embedded_rails": "tram",
+              "highway": "tertiary",
+              "lanes": "2",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "50",
+              "maxspeed:type": "CZ:urban",
+              "maxweight:signed": "no",
+              "name": "Čechův most",
+              "name:cs": "Čechův most",
+              "name:cy": "Pont Tsiechwf (Čechův)",
+              "name:etymology:wikidata": "Q745363",
+              "name:ru": "Чехов мост",
+              "oneway": "yes",
+              "parking:both": "no",
+              "shoulder": "no",
+              "sidewalk:left": "no",
+              "sidewalk:right": "separate",
+              "smoothness": "excellent",
+              "surface": "asphalt",
+              "turn:lanes": "left|right"
+            },
+            "475364602": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "cz:IPRPraha:ortofoto",
+              "voltage": "600"
+            },
+            "475364605": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "cz:IPRPraha:ortofoto",
+              "voltage": "600"
+            },
+            "475364616": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "cz:IPRPraha:ortofoto",
+              "voltage": "600"
+            },
+            "475364617": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "cz:IPRPraha:ortofoto",
+              "voltage": "600"
+            },
+            "476507512": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "name:cy": "Pont Tsiechwf",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "cz:IPRPraha:ortofoto",
+              "voltage": "600"
+            },
+            "476507514": {
+              "bridge": "yes",
+              "electrified": "contact_line",
+              "frequency": "0",
+              "gauge": "1435",
+              "layer": "1",
+              "maxspeed": "15",
+              "oneway": "yes",
+              "railway": "tram",
+              "source": "cz:IPRPraha:ortofoto",
+              "voltage": "600"
+            },
+            "1328077842": {
+              "bridge": "yes",
+              "carriage": "no",
+              "cycleway:right": "no",
+              "embedded_rails": "tram",
+              "highway": "tertiary",
+              "lanes": "2",
+              "layer": "1",
+              "lit": "yes",
+              "maxspeed": "50",
+              "maxspeed:type": "CZ:urban",
+              "maxweight:signed": "no",
+              "name": "Čechův most",
+              "name:cs": "Čechův most",
+              "name:cy": "Pont Tsiechwf (Čechův)",
+              "name:etymology:wikidata": "Q745363",
+              "name:ru": "Чехов мост",
+              "oneway": "yes",
+              "parking:both": "no",
+              "shoulder": "no",
+              "sidewalk:left": "no",
+              "sidewalk:right": "separate",
+              "smoothness": "excellent",
+              "surface": "asphalt"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-127867974:line17:path:1",
+          "osm-127867974:line17:path:2",
+          "osm-127867974:line17:path:3",
+          "osm-127867974:line17:pathBack:1",
+          "osm-127867974:line17:pathBack:2",
+          "osm-127867974:line17:pathBack:3"
+        ],
+        "length_per_direction_m": {
+          "line17:path": 59.738,
+          "line17:pathBack": 54.47
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-35a361303197",
+      "x": -5335.901,
+      "y": -101.288,
+      "mag": 14.501,
+      "info": "Vypich → Vypich: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-35a361303197",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line22:path:1",
+          "unmapped:line22:pathBack:15"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 14.501,
+          "line22:pathBack": 9.765
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-68c098542e8a",
+      "x": -2869.771,
+      "y": 176.933,
+      "mag": 43.972,
+      "info": "Malovanka → Malovanka: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-68c098542e8a",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line22:path:2",
+          "unmapped:line22:pathBack:14",
+          "unmapped:line23:pathBack:12"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 43.972,
+          "line22:pathBack": 42.185,
+          "line23:pathBack": 42.185
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-220b321f95bf",
+      "x": -1993.98,
+      "y": 913.61,
+      "mag": 135.191,
+      "info": "Brusnice → Brusnice: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-220b321f95bf",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line22:path:3",
+          "unmapped:line22:pathBack:13",
+          "unmapped:line23:path:2",
+          "unmapped:line23:pathBack:11"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 98.369,
+          "line22:pathBack": 135.191,
+          "line23:path": 98.369,
+          "line23:pathBack": 135.191
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-8880185638fb",
+      "x": -847.317,
+      "y": 783.648,
+      "mag": 8.484,
+      "info": "Královský letohrádek → Královský letohrádek: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-8880185638fb",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line22:path:4",
+          "unmapped:line22:path:5",
+          "unmapped:line22:path:6",
+          "unmapped:line22:path:7",
+          "unmapped:line22:pathBack:9",
+          "unmapped:line22:pathBack:10",
+          "unmapped:line22:pathBack:11",
+          "unmapped:line22:pathBack:12",
+          "unmapped:line23:path:3",
+          "unmapped:line23:path:4",
+          "unmapped:line23:path:5",
+          "unmapped:line23:path:6",
+          "unmapped:line23:pathBack:7",
+          "unmapped:line23:pathBack:8",
+          "unmapped:line23:pathBack:9",
+          "unmapped:line23:pathBack:10"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 24.95,
+          "line22:pathBack": 24.473,
+          "line23:path": 24.95,
+          "line23:pathBack": 24.473
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "survey-c064e349e6e3",
+      "x": -728.685,
+      "y": 898.398,
+      "mag": 4.604,
+      "info": "Královský letohrádek → Královský letohrádek: survey_level",
+      "status": "review",
+      "decision": {
+        "id": "survey-c064e349e6e3",
+        "structure": {
+          "id": "survey-c064e349e6e3",
+          "kind": "survey_level",
+          "osm_ways": [],
+          "survey_records": [
+            "line22.dtm.json#areas/697"
+          ],
+          "names": [],
+          "tags": {
+            "line22.dtm.json#areas/697": {
+              "review_kind": "survey_level",
+              "level": 1
+            }
+          }
+        },
+        "span_ids": [
+          "survey-c064e349e6e3:line22:path:1",
+          "survey-c064e349e6e3:line22:pathBack:1",
+          "survey-c064e349e6e3:line23:path:1",
+          "survey-c064e349e6e3:line23:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 2.739,
+          "line22:pathBack": 4.604,
+          "line23:path": 2.739,
+          "line23:pathBack": 4.604
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-ba62bb8b8cb9",
+      "x": -753.973,
+      "y": 485.671,
+      "mag": 33.969,
+      "info": "Malostranská → Malostranská: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-ba62bb8b8cb9",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line22:path:8",
+          "unmapped:line22:path:9",
+          "unmapped:line22:path:10",
+          "unmapped:line22:path:11",
+          "unmapped:line22:pathBack:5",
+          "unmapped:line22:pathBack:6",
+          "unmapped:line22:pathBack:7",
+          "unmapped:line22:pathBack:8",
+          "unmapped:line23:path:7",
+          "unmapped:line23:path:8",
+          "unmapped:line23:path:9",
+          "unmapped:line23:path:10",
+          "unmapped:line23:pathBack:3",
+          "unmapped:line23:pathBack:4",
+          "unmapped:line23:pathBack:5",
+          "unmapped:line23:pathBack:6"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 48.799,
+          "line22:pathBack": 40.136,
+          "line23:path": 48.799,
+          "line23:pathBack": 40.136
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "osm-476172743",
+      "x": -1072.093,
+      "y": 286.927,
+      "mag": 20.276,
+      "info": "Malostranské náměstí → Malostranské náměstí: tunnel",
+      "status": "review",
+      "decision": {
+        "id": "osm-476172743",
+        "structure": {
+          "id": "osm-476172743",
+          "kind": "tunnel",
+          "osm_ways": [
+            476172743,
+            476172746
+          ],
+          "survey_records": [],
+          "names": [],
+          "tags": {
+            "476172743": {
+              "electrified": "contact_line",
+              "foot": "no",
+              "frequency": "0",
+              "gauge": "1435",
+              "maxspeed": "50",
+              "note": "kolejová splítka",
+              "oneway": "yes",
+              "priority": "backward",
+              "railway": "tram",
+              "railway:interlaced": "yes",
+              "tunnel": "building_passage",
+              "voltage": "600"
+            },
+            "476172746": {
+              "access": "no",
+              "electrified": "contact_line",
+              "embedded_rails": "tram",
+              "foot": "no",
+              "frequency": "0",
+              "gauge": "1435",
+              "maxspeed": "50",
+              "note": "kolejová splítka",
+              "oneway": "yes",
+              "priority": "forward",
+              "railway": "tram",
+              "railway:interlaced": "yes",
+              "source": "cz:IPRPraha:ortofoto",
+              "tunnel": "building_passage",
+              "voltage": "600"
+            }
+          }
+        },
+        "span_ids": [
+          "osm-476172743:line22:path:1",
+          "osm-476172743:line22:pathBack:1",
+          "osm-476172743:line23:path:1",
+          "osm-476172743:line23:pathBack:1"
+        ],
+        "length_per_direction_m": {
+          "line22:path": 20.276,
+          "line22:pathBack": 19.967,
+          "line23:path": 20.276,
+          "line23:pathBack": 19.967
+        },
+        "status": "review"
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": null,
+        "follows survey surface": "survey rail height missing or ambiguous"
+      }
+    },
+    {
+      "kind": "trackheight",
+      "id": "unmapped-2acf2f78d20a",
+      "x": -2863.511,
+      "y": 172.702,
+      "mag": 32.134,
+      "info": "Královka → Malovanka: unmapped",
+      "status": "review",
+      "decision": {
+        "id": "unmapped-2acf2f78d20a",
+        "structure": {
+          "id": "unmapped",
+          "kind": "unmapped",
+          "osm_ways": [],
+          "names": []
+        },
+        "span_ids": [
+          "unmapped:line23:path:1"
+        ],
+        "length_per_direction_m": {
+          "line23:path": 32.134
+        },
+        "status": "review",
+        "scope_note": "Grouped by nearest stops for review; not evidence of one structure or level."
+      },
+      "options": [
+        "archive profile ok",
+        "other level (deck / under)",
+        "unsure"
+      ],
+      "answer_explanations": {
+        "archive profile ok": "structure level is not identified",
+        "follows survey surface": "structure level is not identified"
+      }
+    }
+  ],
+  "span_file": "reports/review/track-height-spans.json",
+  "span_sha256": "ca42aef8ae7105cf01f974c4bf7d3d5db902128c68026123e8da073878a33e57"
+}

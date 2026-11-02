@@ -245,11 +245,11 @@ areas retain their survey IDs instead of acquiring an invented OSM identity. A p
 a height. Building underpasses, including the Křížovnické náměstí case identified in the review, need a
 reviewed street-level rule; a covering building surface cannot establish rail height.
 
-Open `?line=17&inspect&heightreview=reports/review/track-height-spans.json`. F8 shows held spans in orange,
-conflicts in red, building passages resolved by numeric DI in blue, and approved spans in green.
-Clicking a span flies the camera to it and displays its
-sources and proposal; `window.game.heightReview` exposes the complete queue. The overlay follows the
-current world profile and never applies a proposed height.
+Open `?line=17&review=reports/review/track-heights.json`. A decision pin links its direction spans:
+held spans are orange, conflicts red, numeric DI blue, and approved spans green. The profile compares the
+archive, drawn rail, survey surfaces, terrain and numeric DI. Saved answers are converted to scoped,
+dated evidence by `tools/track_span_evidence.py --from-reviews`; notes, unsure, unspecified levels and
+stale span scopes stay held. A proposal is never applied as evidence.
 
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
@@ -281,8 +281,10 @@ The selection rule is `tools/track_heights.py`. An optional `--evidence` JSON fi
 - `span_reviews`: a unique `id`, `reviewed: true`, `vertical_datum: "Bpv"`,
   `height_meaning: "top_of_rail"`, integer physical `level`, `kind` and dated `source` (`dataset`, `record`,
   `date`). Each `profiles` entry scopes the decision to `di_ids`, a simple city-frame `xy` path, and
-  `radius_m` at most 1 m. Its `rule` is `{"type":"archive"}`, `{"type":"constant","z":…}`, or
-  `{"type":"linear","ends":[startZ,endZ]}`. Copy each direction span's `approval_profile` from the
+  `radius_m` at most 1 m. Its `rule` is `{"type":"archive"}`, `{"type":"constant","z":…}`,
+  `{"type":"linear","ends":[startZ,endZ]}`, or `{"type":"samples","samples":[[distance,z],…]}`.
+  Sampled reviewed surfaces interpolate only between samples at most 10 m apart and within 3 m of the
+  outer samples. Copy each direction span's `approval_profile` from the
   queue; a single structure decision may include several such profiles. Archive approval retains the
   archive source; a new reviewed profile records its review source. Conflicting approvals stay held.
   Numeric DI still wins. A tunnel portal profile requires this explicit approval and dated basis.

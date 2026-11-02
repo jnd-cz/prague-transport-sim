@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { toLatLon } from './geo.js';
 import { Verdicts } from './verdicts.js';
+import { heightProfile } from './trackHeightProfile.js';
 
 const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
 const STREETS = new Set([...CARR, ...RAISED, 'paved', 'cycle']);
@@ -20,6 +21,7 @@ const CLASS_COLORS = {
   paved: '#e6d84a', cycle: '#34d1a6', stairs: '#c9a27a', green: '#4caf50', water: '#2a8cff', deck: '#ffffff', rail: '#9e9e9e',
 };
 const SRC_COLORS = { kerbs: '#ff3e6c', seams: '#ffd400', file: '#3ee0ff' };
+const HEIGHT_COLORS = { review: '#ff9e31', conflict: '#ff3333', di_numeric: '#3e9dff', approved: '#52d976' };
 const HL = '#ffe600'; // the selected finding: its ring and its area's outline
 const SEAM = 0.03, FLAT = 0.05, CELL = 30; // m: a seam over 3 cm; a kerb under 5 cm; findings per 30 m
 // (the class colours are drawn 0.2 m up: the OSM road ribbons lie 0.12 m over the survey)
@@ -32,11 +34,12 @@ const OPTIONS = {
   kerb: ['wrong in game', 'matches reality', 'other level / wall', 'unsure'],
   seam: ['visible step', 'not visible', 'unsure'],
   file: ['wrong in game', 'matches reality', 'unsure'],
+  trackheight: ['archive profile ok', 'follows survey surface', 'other level (deck / under)', 'unsure'],
 };
 const LEVEL_COLORS = { '-1': '#3ee0ff', 0: '#ffffff', 1: '#ff9a3e' }; // the source's levels: under, at, over ground
-const options = (f) => f.options || (f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
+const options = (f) => f.options || (f.kind === 'trackheight' ? OPTIONS.trackheight : f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
 // (a finding's place and kind: the same after a rebuild that leaves it where it was)
-const fid = (f) => `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
+const fid = (f) => f.kind === 'trackheight' ? `${f.src}|trackheight|${f.id}` : `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // the kerb review list in the survey's provenance: wherever the stamp put it
@@ -109,6 +112,10 @@ function fileFindings(json, label) {
     if (Array.isArray(o)) { for (const v of o) walk(v, kind); return; }
     if (!o || typeof o !== 'object') return;
     if (typeof o.x === 'number' && typeof o.y === 'number') {
+      if (o.kind === 'trackheight' && Array.isArray(o.spans)) {
+        out.push({ ...o, src: 'file', mag: typeof o.mag === 'number' ? o.mag : 1 });
+        return;
+      }
       const k = [kind, o.kind].filter(Boolean).join(': ') || label;
       out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts });
       return;
@@ -117,6 +124,33 @@ function fileFindings(json, label) {
   };
   walk(json, '');
   return out;
+}
+
+// A track-height findings file references the shared queue instead of repeating all profiles.
+export async function loadFindings(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const json = await response.json();
+  if (json.span_file) {
+    const r = await fetch(json.span_file);
+    if (!r.ok) throw new Error(`span queue: HTTP ${r.status}`);
+    const bytes = await r.arrayBuffer();
+    if (globalThis.crypto?.subtle) {
+      const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((n) => n.toString(16).padStart(2, '0')).join('');
+      if (hash !== json.span_sha256) throw new Error('span queue differs from the findings file');
+    }
+    const queue = JSON.parse(new TextDecoder().decode(bytes));
+    if (queue.snapshot !== json.snapshot) throw new Error('span queue snapshot differs from the findings file');
+    const spans = new Map(queue.spans.map((s) => [s.id, s]));
+    for (const f of json.findings) {
+      f.spans = f.decision.span_ids.map((id) => {
+        if (!spans.has(id)) throw new Error(`span queue missing ${id}`);
+        return spans.get(id);
+      });
+      f.span_sha256 = json.span_sha256;
+    }
+  }
+  return fileFindings(json, url.split('/').pop());
 }
 
 export class Review {
@@ -147,7 +181,7 @@ export class Review {
       this.seams = pts;
       this.findings.push(...kerbFindings(data.dtm), ...grouped(pts));
     }
-    this.ready = (url ? fetch(url).then((r) => r.json()).then((j) => this.findings.push(...fileFindings(j, url.split('/').pop())))
+    this.ready = (url ? loadFindings(url).then((items) => this.findings.push(...items))
       .catch((e) => this._note(`could not read ${url}: ${e.message}`)) : Promise.resolve()).then(() => {
       for (const f of this.findings) {
         f.z ??= ground.at(f.x, f.y);
@@ -355,11 +389,37 @@ body.review #gl { touch-action: none }
     this.$('rvCard').innerHTML = `
 <div><span class="kind">${f.kind}</span> <span class="dim">(${f.src}, ${this.cur + 1} / ${this.list.length})</span></div>
 <div>${f.info}</div>
+<div id="rvHeight"></div>
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
 <div class="rvRow" style="padding:6px 0 0"><button data-go="-1">◀ prev</button><button data-go="1">next ▶</button><button data-copy="1">Copy link</button></div>
 <div id="rvSrc">${this._srcHtml(f)}</div>
 ${this._verdictHtml(f)}`;
+    this.heightChart = f.kind === 'trackheight' ? heightProfile(f, this.route, this.ground.profile) : null;
+    if (this.heightChart) {
+      this.$('rvHeight').innerHTML = this.heightChart.html;
+      const svg = this.$('heightProfile');
+      svg.addEventListener('pointermove', (e) => {
+        const r = svg.getBoundingClientRect(), chart = this.heightChart;
+        const px = (e.clientX - r.left) / r.width * chart.width;
+        const s = chart.x0 + (px - chart.left) / (chart.right - chart.left) * (chart.x1 - chart.x0);
+        const p = chart.points.reduce((a, b) => Math.abs(b.x - s) < Math.abs(a.x - s) ? b : a);
+        this._heightCursor(p);
+      });
+    }
+  }
+
+  _heightCursor(p) {
+    const chart = this.heightChart, cursor = this.$('heightCursor');
+    if (!chart || !p || !cursor) return;
+    const x = chart.left + (p.x - chart.x0) / (chart.x1 - chart.x0) * (chart.right - chart.left);
+    cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.setAttribute('visibility', 'visible');
+    if (!this.heightMarker) {
+      this.heightMarker = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff', depthTest: false }));
+      this.heightMarker.renderOrder = 10; this.group.add(this.heightMarker);
+    }
+    this.heightMarker.position.set(p.xy[0], (p.game ?? this.ground.at(...p.xy)) + 1.5, -p.xy[1]);
+    this.heightMarker.visible = true;
   }
 
   // ------------------------------------------------------------------ the source (data/lineN.zps.json, tools/zps_source.py)
@@ -404,7 +464,16 @@ ${this._verdictHtml(f)}`;
 
   _verdictHtml(f) {
     const r = this.verdicts.get(fid(f));
-    return `<div class="rvVerdict"><textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
+    const reasons = f.kind === 'trackheight' && f.answer_explanations ? f.answer_explanations : null;
+    let explanation = '';
+    if (reasons) {
+      const lines = [];
+      if (reasons['archive profile ok']) lines.push(`Archive answer stays held: ${esc(reasons['archive profile ok'])}.`);
+      if (reasons['follows survey surface']) lines.push(`Survey answer unavailable: ${esc(reasons['follows survey surface'])}.`);
+      lines.push('Notes, unsure and unspecified other levels stay held for review.');
+      explanation = `<div class="dim">${lines.join('<br>')}</div>`;
+    }
+    return `<div class="rvVerdict">${explanation}<textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
 <div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
 <div class="dim" id="rvSync">${this._syncText()}</div></div>`;
   }
@@ -433,7 +502,8 @@ ${this._verdictHtml(f)}`;
   _record(f, v, note) {
     const w = this.where(f.x, f.y);
     this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
-      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1] });
+      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1],
+      ...(f.kind === 'trackheight' ? { decision_id: f.id, span_ids: f.decision.span_ids, span_sha256: f.span_sha256 } : {}) });
   }
 
   // the list, pins and card again after the answers changed, on the same finding
@@ -473,7 +543,7 @@ ${this._verdictHtml(f)}`;
     const M = new THREE.Matrix4(), c = new THREE.Color();
     this.list.forEach((f, i) => {
       m.setMatrixAt(i, M.makeTranslation(f.x, f.z, -f.y));
-      m.setColorAt(i, c.set(this.verdicts.get(fid(f))?.v ? '#777' : SRC_COLORS[f.src] || '#fff'));
+      m.setColorAt(i, c.set(this.verdicts.get(fid(f))?.v ? '#777' : HEIGHT_COLORS[f.status] || SRC_COLORS[f.src] || '#fff'));
     });
     m.count = this.list.length;
     m.renderOrder = 6;
@@ -485,12 +555,23 @@ ${this._verdictHtml(f)}`;
   // the selected finding: a ring on the ground and, for an area finding, the area's outline
   _highlight(f) {
     if (this.hl) { this.group.remove(this.hl); this.hl.traverse((o) => o.geometry?.dispose()); }
+    if (this.heightMarker) this.heightMarker.visible = false;
     this.hl = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.25, 2.75, 40), new THREE.MeshBasicMaterial({ color: HL, depthTest: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(f.x, f.z + 0.3, -f.y);
     ring.renderOrder = 7;
     this.hl.add(ring);
+    if (f.kind === 'trackheight') for (const span of f.spans) {
+      const pts = span.profile.map((p) => {
+        const n = this.route.nearest(...p.xy);
+        return [p.xy[0], p.xy[1], n && n.d < 8 ? this.ground.profile.height(n.s) : this.ground.at(...p.xy)];
+      });
+      if (pts.length < 2) continue;
+      const conflict = span.review_flags?.some((x) => x === 'known_archive_disagreement' || x === 'conflicting_level_evidence');
+      const o = new THREE.Mesh(band(pts, 1.2, 0.5), new THREE.MeshBasicMaterial({ color: HEIGHT_COLORS[conflict ? 'conflict' : span.status] || HEIGHT_COLORS.review, depthTest: false, side: THREE.DoubleSide }));
+      o.renderOrder = 8; this.hl.add(o);
+    }
     const a = f.c && this.dtm?.areas.find((a) => a.c === f.c && a.l === 0 && inRing(f.x, f.y, a.ring));
     if (a) {
       // (WebGL lines are 1 px: the outline is a 0.22 m band, a dark edge under it so it shows on any colour)
@@ -701,6 +782,16 @@ ${this._verdictHtml(f)}`;
 
   // the mouse over a pin: a pointer and its kind, so a neighbouring finding is one click away
   _hover(cx, cy) {
+    if (this.heightChart) {
+      const rect = this.canvas.getBoundingClientRect(), v = new THREE.Vector3();
+      let best = null, distance = 22;
+      for (const p of this.heightChart.points) {
+        v.set(p.xy[0], p.game ?? this.ground.at(...p.xy), -p.xy[1]).project(this.camera);
+        const d = Math.hypot(rect.left + (v.x + 1) * rect.width / 2 - cx, rect.top + (1 - v.y) * rect.height / 2 - cy);
+        if (v.z < 1 && d < distance) { distance = d; best = p; }
+      }
+      if (best) this._heightCursor(best);
+    }
     const i = this._hit(cx, cy, 18), f = this.list[i];
     this.canvas.style.cursor = f ? 'pointer' : '';
     let tip = this.tip;
