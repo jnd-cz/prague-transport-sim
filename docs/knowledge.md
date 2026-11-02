@@ -57,7 +57,16 @@ What sessions learned and later work needs. Kept current and short; the full log
   lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
   stays on the river bed (187.3 m) across its whole span, Hlavní nádraží's tunnel climbs 6 m to the
   street above. A track climbs a few per cent: an archive step over 10 % between points ~5 m apart is the
-  archive measuring something else (`tools/track_span_evidence.py` `dips`).
+  archive measuring something else (`tools/track_span_evidence.py` `dips`). It starts down before the steep
+  drop (Černý kůň: 4–5 % for 14 m, Modřany inbound ~8 % for 50 m), so a dip extends over the descent
+  and climb above 4 % around it (#184).
+- **The two directions of a line agree in the archive** (#184): over the 9806 archived axes, parallel axes
+  2.5–6 m apart differ by p50 0.02, p90 0.09, p99 0.45 m; more than 1 m on 0.4 % of 64,712 samples, mostly
+  structures. Where one direction leaves the other there, it measured something else: Hlavní nádraží
+  +6.9 m and +6.6 m (the road over the tram), Modřany inbound −6 m (the street under), Brusnice −1.1 m.
+- **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
+  tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
+  level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).
 - **ZPS track areas on the Modřany embankment lie ~2 m below the archive and the lidar ground** (s 408:
   survey 198.6, archive 200.8, lidar 201.0 m; flagged `track_zps_level_unverified`), which is why the
   drawn rail there is low and wavy. The level-1 tram area over the Modřany underpass carries the

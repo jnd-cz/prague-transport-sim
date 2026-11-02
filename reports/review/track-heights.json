@@ -116,8 +116,8 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "archive steps up 2.2 m at 11817 m without a dip before it",
-        "archive, bridged over a dip": "archive steps up 2.2 m at 11817 m without a dip before it",
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
         "follows survey surface": "survey rail height missing"
       }
     },
@@ -183,7 +183,7 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "archive steps up 2.2 m at 16465 m without a dip before it",
+        "archive profile ok": null,
         "archive, bridged over a dip": "the archive has no dip to bridge",
         "follows survey surface": "survey rail height missing"
       }
@@ -699,9 +699,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "archive steps up 1.5 m at 17478 m without a dip before it",
+        "archive profile ok": null,
         "archive, bridged over a dip": "the archive has no dip to bridge",
-        "follows survey surface": "survey rail height missing"
+        "follows survey surface": "survey track area lies -7.5 m from the smooth archive at 119 m"
       }
     },
     {
@@ -825,23 +825,115 @@
           [
             5071.952,
             201.111,
-            5113.981,
-            201.256
+            5118.548,
+            201.583,
+            [
+              [
+                5071.952,
+                201.111
+              ],
+              [
+                5076.612,
+                201.156
+              ],
+              [
+                5081.271,
+                201.224
+              ],
+              [
+                5085.931,
+                201.305
+              ],
+              [
+                5090.59,
+                201.392
+              ],
+              [
+                5095.25,
+                201.477
+              ],
+              [
+                5099.91,
+                201.551
+              ],
+              [
+                5104.569,
+                201.607
+              ],
+              [
+                5109.229,
+                201.637
+              ],
+              [
+                5113.888,
+                201.631
+              ],
+              [
+                5118.548,
+                201.583
+              ]
+            ]
           ]
         ],
         "osm-4722520:line17:pathBack:1": [
           [
-            16673.502,
-            201.282,
+            16669.267,
+            201.562,
             16717.061,
-            201.206
+            201.206,
+            [
+              [
+                16669.267,
+                201.562
+              ],
+              [
+                16674.046,
+                201.621
+              ],
+              [
+                16678.826,
+                201.646
+              ],
+              [
+                16683.605,
+                201.641
+              ],
+              [
+                16688.385,
+                201.613
+              ],
+              [
+                16693.164,
+                201.565
+              ],
+              [
+                16697.943,
+                201.502
+              ],
+              [
+                16702.723,
+                201.43
+              ],
+              [
+                16707.502,
+                201.354
+              ],
+              [
+                16712.282,
+                201.278
+              ],
+              [
+                16717.061,
+                201.206
+              ]
+            ]
           ]
         ]
       },
       "answer_explanations": {
-        "archive profile ok": "the archive dips 6.4 m between 436 and 478 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
+        "archive profile ok": "the archive dips 6.4 m between 436 and 483 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
         "archive, bridged over a dip": null,
-        "follows survey surface": "survey rail height missing"
+        "follows survey surface": "survey track area lies -0.3 m from the smooth archive at 15 m"
       }
     },
     {
@@ -914,7 +1006,53 @@
             5824.471,
             200.838,
             5867.256,
-            200.713
+            200.713,
+            [
+              [
+                5824.471,
+                200.838
+              ],
+              [
+                5828.749,
+                200.936
+              ],
+              [
+                5833.028,
+                201.006
+              ],
+              [
+                5837.306,
+                201.05
+              ],
+              [
+                5841.585,
+                201.067
+              ],
+              [
+                5845.863,
+                201.061
+              ],
+              [
+                5850.142,
+                201.032
+              ],
+              [
+                5854.421,
+                200.981
+              ],
+              [
+                5858.699,
+                200.91
+              ],
+              [
+                5862.977,
+                200.82
+              ],
+              [
+                5867.256,
+                200.713
+              ]
+            ]
           ]
         ],
         "osm-98560954:line17:pathBack:1": [
@@ -922,14 +1060,60 @@
             15918.032,
             200.674,
             15960.372,
-            200.908
+            200.908,
+            [
+              [
+                15918.032,
+                200.674
+              ],
+              [
+                15922.266,
+                200.79
+              ],
+              [
+                15926.5,
+                200.893
+              ],
+              [
+                15930.734,
+                200.979
+              ],
+              [
+                15934.968,
+                201.047
+              ],
+              [
+                15939.202,
+                201.092
+              ],
+              [
+                15943.436,
+                201.114
+              ],
+              [
+                15947.67,
+                201.109
+              ],
+              [
+                15951.904,
+                201.074
+              ],
+              [
+                15956.138,
+                201.008
+              ],
+              [
+                15960.372,
+                200.908
+              ]
+            ]
           ]
         ]
       },
       "answer_explanations": {
         "archive profile ok": "the archive dips 6.5 m between 2 and 45 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
         "archive, bridged over a dip": null,
-        "follows survey surface": "survey rail height missing"
+        "follows survey surface": "survey track area lies -1.1 m from the smooth archive at -27 m"
       }
     },
     {
@@ -1041,31 +1225,124 @@
       "options": [
         "archive profile ok",
         "archive, bridged over a dip",
+        "follows survey surface",
         "other level (deck / under)",
         "unsure"
       ],
       "bridged": {
         "osm-150611269:line17:path:1": [
           [
-            6518.631,
-            198.283,
+            6513.69,
+            198.56,
             6580.995,
-            197.794
+            197.794,
+            [
+              [
+                6513.69,
+                198.56
+              ],
+              [
+                6520.42,
+                198.609
+              ],
+              [
+                6527.151,
+                198.652
+              ],
+              [
+                6533.881,
+                198.68
+              ],
+              [
+                6540.612,
+                198.686
+              ],
+              [
+                6547.342,
+                198.661
+              ],
+              [
+                6554.073,
+                198.598
+              ],
+              [
+                6560.803,
+                198.488
+              ],
+              [
+                6567.534,
+                198.322
+              ],
+              [
+                6574.265,
+                198.094
+              ],
+              [
+                6580.995,
+                197.794
+              ]
+            ]
           ]
         ],
         "osm-150611269:line17:pathBack:1": [
           [
-            15223.21,
-            196.653,
-            15266.854,
-            198.156
+            15209.375,
+            197.569,
+            15271.546,
+            198.579,
+            [
+              [
+                15209.375,
+                197.569
+              ],
+              [
+                15215.592,
+                197.733
+              ],
+              [
+                15221.809,
+                197.897
+              ],
+              [
+                15228.026,
+                198.056
+              ],
+              [
+                15234.243,
+                198.205
+              ],
+              [
+                15240.461,
+                198.338
+              ],
+              [
+                15246.678,
+                198.45
+              ],
+              [
+                15252.895,
+                198.536
+              ],
+              [
+                15259.112,
+                198.59
+              ],
+              [
+                15265.329,
+                198.606
+              ],
+              [
+                15271.546,
+                198.579
+              ]
+            ]
           ]
         ]
       },
       "answer_explanations": {
-        "archive profile ok": "the archive dips 5.2 m between 92 and 154 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
+        "archive profile ok": "the archive dips 5.4 m between 87 and 154 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
         "archive, bridged over a dip": null,
-        "follows survey surface": "survey rail height missing"
+        "follows survey surface": null
       }
     },
     {
@@ -1158,7 +1435,7 @@
       "answer_explanations": {
         "archive profile ok": null,
         "archive, bridged over a dip": "the archive has no dip to bridge",
-        "follows survey surface": "survey rail height missing"
+        "follows survey surface": "survey track area lies -0.4 m from the smooth archive at 24 m"
       }
     },
     {
@@ -1806,8 +2083,8 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "archive steps up 0.7 m at 5744 m without a dip before it",
-        "archive, bridged over a dip": "archive steps up 0.7 m at 5744 m without a dip before it",
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
         "follows survey surface": "survey rail height missing"
       }
     },
