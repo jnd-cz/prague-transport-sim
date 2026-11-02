@@ -102,6 +102,22 @@ def extend_holds(rows, guard, reach=6):
     return rows
 
 
+def truth_structures(root, structures, ids, width=6):
+    """The user's structures that no source maps (data/truth.json trackHeights.structures, #190), added to the
+    OSM structure mask as a corridor from 'from' to 'to'."""
+    path = root / 'data/truth.json'
+    truth = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    facts = truth.get('trackHeights', {}).get('structures', [])
+    if not facts:
+        return structures, ids
+    frame = Frame()
+    corridors = []
+    for f in facts:
+        x, y = frame.xy([f['from'][0], f['to'][0]], [f['from'][1], f['to'][1]])
+        corridors.append(shapely.LineString(list(zip(x, y))).buffer(width))
+    return unary_union([structures, *corridors]), ids + ['truth:' + f['id'] for f in facts]
+
+
 def decide(rows, guard, structures, decks, tunnels, context, terrain):
     hints = shapely.intersects(structures, shapely.points([(r['x'], r['y']) for r in rows]))
     tunnel_hints = shapely.intersects(tunnels, shapely.points([(r['x'], r['y']) for r in rows]))
@@ -128,6 +144,7 @@ def stage(review):
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
     structures, structure_ids, tunnels = structure_mask(separate_tunnels=True)
+    structures, structure_ids = truth_structures(ROOT, structures, structure_ids)
     decks = load_decks(ROOT)
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])

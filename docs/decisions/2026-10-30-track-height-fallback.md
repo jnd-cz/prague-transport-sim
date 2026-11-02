@@ -298,9 +298,9 @@ confirms the archive (45,577 samples): archive minus terrain p99.9 0.36 m on pav
 construction, 13 samples over 1 m (0.03 %). An archive height more than 1 m off is held
 (`archive_terrain_height_disagreement`, blocking like a survey disagreement), and the hold spreads along the
 track while neighbours stay more than 0.5 m off (`extend_holds`, above every class's p99). It never judges
-numeric DI, a structure or a tunnel: under a deck the terrain is another level. 2026-11-02 it holds 1395 m of
-the network (line 9 108 m, 17 185 m, 22 and 23 30 m, 37 none): a record 83 m above the street at Malovanka, the old archive alignment winding ±4 m around the
-new Trojský most's approach, the archive's dips onto the streets under the Libeň bridge, 45 m on line 9 at
+numeric DI, a structure or a tunnel: under a deck the terrain is another level. 2026-11-02 it holds 1025 m of
+the network (line 9 108 m, 17 185 m, 22 and 23 30 m, 37 none): a record 83 m above the street at Malovanka,
+the old archive alignment winding ±4 m around the new Trojský most's approach, 45 m on line 9 at
 50.0727 N 14.4099 E (5.4 m under the street), two 5–8 m dips at Brusnice on lines 22/23, Modřany's dip on
 line 17 (its reviewed answer still wins). A held stretch is bridged by the vertical profile's curve from
 both sides ([vertical profile](2026-11-02-vertical-profile.md), #20), as the user asked for dips on #184.
@@ -309,7 +309,15 @@ both sides ([vertical profile](2026-11-02-vertical-profile.md), #20), as the use
 structure mask (`tools/dtmp_tracks.py` `structure_mask`) takes `railway=tram` and the tram values of
 `disused:railway`, `construction:railway` and `construction`: Libeňský most is `railway=disused` +
 `disused:railway=tram` on `bridge=yes` during its rebuild while the 2026 DI has the track. Disused heavy rail
-and the metro D construction tunnels stay out (a tram above them is not on them). +670 m of `structure_hint`.
+and the metro D construction tunnels stay out (a tram above them is not on them).
+
+**The user's structures (#190).** A structure no source maps is a fact from the user in `data/truth.json`
+`trackHeights.structures`, keyed by place (from / to along the track), added to the structure mask as a 6 m
+corridor (`truth_structures`). The first: Libeňský most from the end of the river bridge (50.1034 N, 14.4645 E)
+to the street towards Palmovka (14.4693 E). The old viaduct there is demolished (OSM `railway=razed`), the
+2026 DI track has no heights, and the archive and the lidar fall onto the ground 6–8 m under the deck; the new
+deck keeps the original height, level to ~14.4665 E (192.4 m), then ~1.2 % down to the street (190.0 m), a curve
+between the selected heights at both ends. With both rules `structure_hint` grows 15,650 → 17,029 m.
 
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv

@@ -120,6 +120,16 @@ class Guard(unittest.TestCase):
         held = [r['decision']['status'] for r in stage.extend_holds(rows, guard)]
         self.assertEqual(held, ['selected', 'review', 'review', 'review', 'selected'])
 
+    def test_the_users_libensky_most_holds_its_eastern_approach_as_a_structure(self):
+        from geo import Frame
+        mask, ids = stage.truth_structures(ROOT, box(0, 0, 0, 0), [])
+        self.assertIn('truth:libensky-most-east', ids)
+        frame = Frame()
+        deck = frame.xy(50.10347, 14.46767)     # archive 184.0 m on the ground under the demolished section
+        palmovka = frame.xy(50.10352, 14.47100)  # at grade
+        self.assertTrue(mask.intersects(Point(float(deck[0]), float(deck[1]))))
+        self.assertFalse(mask.intersects(Point(float(palmovka[0]), float(palmovka[1]))))
+
     def test_terrain_never_judges_numeric_di_or_a_flagged_structure(self):
         di = HeightGuard().choose({'id': 'di-1', 'z': 192.7}, match(path(1, 192.7)), 5, 0, terrain=180.4)
         self.assertEqual((di['status'], di['z']), ('selected', 192.7))

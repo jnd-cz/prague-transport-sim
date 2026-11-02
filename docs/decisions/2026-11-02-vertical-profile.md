@@ -74,18 +74,19 @@ the ground under a deck no source maps, bridged by #184's curve from both sides)
 has the same shape, no source disagrees: a question), `archive` (off the terrain by less than the 1 m hold).
 It fails on a step over 1 m whose cause is not `di`, `dip` or `structure`.
 
-2026-11-02 (`reports/track-profile-steps.json`): 608 runs, 64,049 bins, 571 bridged. 41 groups, 73 points:
-`archive` 12 (none over 1 m), `di` 6 (2 over 1 m), `dip` 16 (5), `terrain` 7 (2). Over 1 m:
+2026-11-02 (`reports/track-profile-steps.json`): 610 runs, 63,905 bins, 497 bridged. 34 groups, 56 points:
+`archive` 10 (none over 1 m), `di` 6 (2 over 1 m), `dip` 15 (4), `terrain` 3 (none). 0 fail. Over 1 m:
 
 - `di` +1.76 m at Strašnice (50.0691 N 14.4687 E): numeric DI rises 1.9 m above the archive, the survey and the
   terrain, which agree; −1.14 m at 50.0861 N 14.4319 E. DI wins by the import's rule; both are flagged
   `known_archive_disagreement`.
-- `dip` −5.5 m and −4.2 m at 50.0549 N 14.4723 E, −5.3 and −5.1 m on the Libeň bridge's eastern approach, −3.6 m
-  at Modřany.
-- `terrain` +3.9 m in both directions at 50.1035 N 14.4685 E: the Libeň bridge's eastern approach, rebuilt
-  (OSM maps the old tram there `razed`; the 2026 DI track was inserted on 2025-01-30 in 24 m pieces without
-  heights). Archive and terrain both alternate between the approach (~190 m) and the streets beneath (~184 m):
-  only the user or a deck survey can say where the new deck runs.
+- `dip` −5.5 m and −4.2 m at 50.0549 N 14.4723 E, −4.7 m at the end of the Libeň river bridge (14.4642 E, the
+  street under it), −3.6 m at Modřany.
+- Before the user's answer, `terrain` +3.9 m in both directions on the Libeň bridge's rebuilt eastern approach
+  (the archive and the lidar alternate between the deck, ~190 m, and the ground under it, ~184 m). It is now the
+  user's structure ([height fallback](2026-10-30-track-height-fallback.md)).
+
+Under 1 m (0.3–1 m): `archive` 10 groups, `di` 4, `dip` 11, `terrain` 3, most of one or two points.
 
 ## Check
 
