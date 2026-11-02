@@ -62,13 +62,13 @@ class SpanReviews(unittest.TestCase):
         for item in hydrated['findings']:
             self.assertIn('archive profile ok',item['options'])
             self.assertIn('unsure',item['options'])
-            for choice in ('archive profile ok','follows survey surface'):
+            for choice in ('archive profile ok','archive, bridged over a dip','follows survey surface'):
                 answer = {'decision_id':item['id'],'span_ids':item['decision']['span_ids'],
                           'v':choice,'note':'','t':1793577600000}
                 result = from_reviews({'items':{'pin':answer}},{'findings':[item]},'test')
                 reason = result['held'][0]['reason'] if result['held'] else None
                 self.assertEqual(item['answer_explanations'][choice],reason,(item['id'],choice))
-                if choice == 'follows survey surface':
+                if choice != 'archive profile ok':
                     self.assertEqual(choice in item['options'],reason is None,item['id'])
                 elif reason:
                     self.assertTrue(reason,item['id'])
@@ -78,8 +78,9 @@ class SpanReviews(unittest.TestCase):
                 self.assertTrue(from_reviews({'items':{'pin':answer}},{'findings':[item]},'test')['held'])
 
     def test_review_answers_import_as_scoped_evidence_or_stay_held(self):
-        span = {'id':'s','profile':[{'xy':[0,0],'archive':[{'z':200}],'surfaces':[{'z':200,'rail_height_eligible':True}]},
-                                  {'xy':[10,0],'archive':[{'z':202}],'surfaces':[{'z':202,'rail_height_eligible':True}]}],
+        span = {'id':'s','start_s':0,'length_m':10,
+                'profile':[{'s':0,'xy':[0,0],'archive':[{'z':200}],'surfaces':[{'z':200,'rail_height_eligible':True}]},
+                           {'s':10,'xy':[10,0],'archive':[{'z':200.2}],'surfaces':[{'z':200.2,'rail_height_eligible':True}]}],
                 'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
         finding = {'kind':'trackheight','id':'bridge-1','decision':{'span_ids':['s'],'structure':{'kind':'bridge'}},'spans':[span]}
         answer = {'decision_id':'bridge-1','span_ids':['s'],'v':'archive profile ok','note':'','t':1761955200000}
@@ -87,6 +88,7 @@ class SpanReviews(unittest.TestCase):
         imported = get(answer)['span_reviews'][0]
         expected = approval(id='review-bridge-1',kind='deck',level=1,
                             source={'dataset':'expert_review','record':'reviews/line17.json#pin','date':'2025-11-01','who':'user'},
+                            answer='archive profile ok',
                             profiles=[{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'archive'}}])
         self.assertEqual(imported,expected)
         self.assertEqual(SpanEvidence([imported]).at('di-1',5,0,[{'z':201}]),SpanEvidence([expected]).at('di-1',5,0,[{'z':201}]))
@@ -94,10 +96,10 @@ class SpanReviews(unittest.TestCase):
         self.assertFalse(get(answer)['span_reviews'])
         span['profile'][0]['archive'].pop()
         survey = get({**answer,'v':'follows survey surface'})['span_reviews'][0]
-        self.assertEqual(SpanEvidence([survey]).at('di-1',5,0,[])[0]['z'],201)
-        self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':None},match(),5,0,structure_hint=True)['z'],201)
+        self.assertAlmostEqual(SpanEvidence([survey]).at('di-1',5,0,[])[0]['z'],200.1)
+        self.assertAlmostEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':None},match(),5,0,structure_hint=True)['z'],200.1)
         self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':205},match(),5,0,structure_hint=True)['z'],205)
-        span['profile'][0]['surfaces'].append({'id':'different','z':200.02,'rail_height_eligible':True})
+        span['profile'][0]['surfaces'].append({'id':'different','z':200.05,'rail_height_eligible':True})
         self.assertFalse(get({**answer,'v':'follows survey surface'})['span_reviews'])
         span['profile'][0]['surfaces'].pop()
         for changed in ({'note':'check level'}, {'v':'unsure'}, {'v':'other level (deck / under)'}, {'span_ids':['changed']}):
@@ -114,6 +116,74 @@ class SpanReviews(unittest.TestCase):
                 '--from-reviews',str(root/'answers.json'),'--findings',str(root/'findings.json'),
                 '--output',str(root/'out.json')],check=True,capture_output=True,text=True)
             self.assertEqual(json.loads((root/'out.json').read_text(encoding='utf-8'))['span_reviews'][0]['id'],'review-bridge-1')
+
+    def test_a_dip_in_the_archive_is_bridged_only_when_answered_so(self):
+        # (#176: the archive under Modřany's bridge measures the street below, 6 m down for 40 m)
+        zs = [200+.02*s for s in range(0,105,5)]
+        for s in (40,45,50):
+            zs[s//5] = 194
+        span = {'id':'s','start_s':0,'length_m':100,
+                'profile':[{'s':s,'xy':[s,0],'archive':[{'z':z}],'surfaces':[]} for s,z in zip(range(0,105,5),zs)],
+                'approval_profile':{'xy':[[0,0],[100,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'bridge-1','decision':{'span_ids':['s'],'structure':{'kind':'bridge'}},'spans':[span]}
+        get = lambda v:from_reviews({'items':{'pin':{'decision_id':'bridge-1','span_ids':['s'],'v':v,'note':'','t':1761955200000}}},
+                                    {'findings':[finding]},'reviews/line17.json')
+        self.assertIn('dips 6.7 m between 35 and 55 m',get('archive profile ok')['held'][0]['reason'])
+        entry = get('archive, bridged over a dip')['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['bridged'],[[35,200.7,55,201.1]])
+        self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',45,0,[])[0]['z'],200.9)
+        self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',80,0,[])[0]['z'],201.6)
+        # a drop that never comes back is not a dip: the river under Palackého most
+        for p in span['profile'][8:]:
+            p['archive'] = [{'z':187.27}]
+        self.assertIn('does not come back',get('archive, bridged over a dip')['held'][0]['reason'])
+        self.assertTrue(get('archive profile ok')['held'])
+
+    def test_survey_answer_skips_short_gaps_and_takes_one_height_of_deck_and_road(self):
+        # (Palackého most: deck and road at level 1 within 1 cm; an abutment and a point without survey)
+        points = [{'s':s,'xy':[s,0],'archive':[{'z':187.27}],
+                   'surfaces':[] if s==60 else [{'id':'deck','z':197.8-.001*s,'rail_height_eligible':True},
+                                               {'id':'road','z':197.81-.001*s,'rail_height_eligible':True}]}
+                  for s in range(0,105,5)]
+        span = {'id':'s','start_s':0,'length_m':100,'profile':points,
+                'approval_profile':{'xy':[[0,0],[100,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        abutment = {'id':'a','start_s':100,'length_m':6,
+                    'profile':[{'s':100+s,'xy':[100+s,0],'archive':[{'z':197.7}],
+                                'surfaces':[{'z':197.76,'rail_height_eligible':False,'excluded':'track_zps_level_unverified'}]} for s in (2,5)],
+                    'approval_profile':{'xy':[[100,0],[106,0]],'di_ids':['di-2'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'b','decision':{'span_ids':['s','a'],'structure':{'kind':'bridge'}},'spans':[span,abutment]}
+        get = lambda: from_reviews({'items':{'pin':{'decision_id':'b','span_ids':['s','a'],'v':'follows survey surface','note':'','t':1761955200000}}},
+                                   {'findings':[finding]},'reviews/line17.json')
+        entry = get()['span_reviews'][0]
+        self.assertEqual(entry['uncovered_spans'],['a'])
+        self.assertEqual(entry['profiles'][0]['survey_ids'],['deck','road'])
+        self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',60,0,[])[0]['z'],197.75,places=3)  # (55 and 65 m interpolated)
+        for s in (55,65):
+            points[s//5]['surfaces'] = []
+        self.assertIn('a gap of 20 m',get()['held'][0]['reason'])  # (50 to 70 m)
+
+    def test_street_spans_import_at_level_zero_and_a_surveyed_deck_at_its_level(self):
+        span = {'id':'s','start_s':0,'length_m':10,
+                'profile':[{'s':s,'xy':[s,0],'archive':[{'z':250}],'surfaces':[]} for s in (0,5,10)],
+                'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        for structure,kind,level in (({'kind':'unmapped'},'surface',0),
+                                     ({'kind':'survey_level','tags':{'line22.dtm.json#areas/697':{'level':1}}},'deck',1)):
+            finding = {'kind':'trackheight','id':'d','decision':{'span_ids':['s'],'structure':structure},'spans':[span]}
+            entry = from_reviews({'items':{'pin':{'decision_id':'d','span_ids':['s'],'v':'archive profile ok','note':'','t':1761955200000}}},
+                                 {'findings':[finding]},'reviews/line17.json')['span_reviews'][0]
+            self.assertEqual((entry['kind'],entry['level']),(kind,level))
+            self.assertEqual(SpanEvidence([entry]).at('di-1',5,0,[{'z':250}])[0]['z'],250)
+
+    def test_the_reviewed_decisions_offer_what_the_user_asked_for(self):
+        # (the committed queue: Modřany's bridge over the street, Palackého most over the river; 2026-11-02 session)
+        path = Path(__file__).resolve().parent.parent/'reports/review/track-height-spans.json'
+        items = {f['id']:f for f in findings(json.loads(path.read_text(encoding='utf-8')),inline=True)['findings']}
+        self.assertIn('archive, bridged over a dip',items['osm-4722520']['options'])
+        self.assertNotIn('follows survey surface',items['osm-4722520']['options'])
+        self.assertIn('follows survey surface',items['osm-476017592']['options'])
+        self.assertNotIn('archive, bridged over a dip',items['osm-476017592']['options'])
+        for spans in items['osm-4722520']['bridged'].values():
+            self.assertTrue(all(200.5 < z < 201.6 for b in spans for z in b[1::2]), spans)
 
     def test_findings_keep_all_spans_and_pin_the_longest(self):
         spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},
