@@ -8,6 +8,12 @@ import math
 from track_span_evidence import SpanEvidence
 
 TOLERANCE = 0.3
+# Archive minus the 2023 lidar terrain where a ZPS survey confirms the archive: p99.9 0.36 m on paved track,
+# 13 of 45,577 samples over 1 m (#190). Where the archive is the only height, further than this is not track.
+TERRAIN = 1.0
+# A terrain hold extends to the next samples while they stay this far off (p99 0.19-0.37 m where a survey confirms
+# the archive): the remnant of a wrong record just inside 1 m (Troja, 0.94 m between held stretches; #190).
+TERRAIN_EXTEND = 0.5
 
 
 def usable(z):
@@ -44,7 +50,8 @@ class HeightGuard:
             ids.add(e['id'])
             self.by_di.setdefault(str(e['di_id']), []).append(e)
 
-    def choose(self, di, match, x, y, structure_hint=False, decks=(), tunnel_hint=False, construction=None):
+    def choose(self, di, match, x, y, structure_hint=False, decks=(), tunnel_hint=False, construction=None, terrain=None,
+               terrain_limit=TERRAIN):
         flags, candidates = [], []
         construction = construction or {'kind': 'unknown', 'reason': 'construction_not_classified'}
         paved = construction['kind'] == 'paved'
@@ -125,6 +132,12 @@ class HeightGuard:
                 flags.append('structure_unverified')
         if tunnel_hint:
             flags.append('tunnel_unverified')
+        # Only the terrain can check an archive height that neither DI nor a survey confirms (#190: a record
+        # 83 m above the street at Malovanka, a 3 m dip at Modřany that the survey does not share).
+        confirmed = any(abs(a['z'] - s['z']) <= TOLERANCE for a in archived for s in surveyed)
+        if (usable(terrain) and archived and not usable(di.get('z')) and not confirmed and not structure_hint
+                and not tunnel_hint and all(abs(a['z'] - terrain) > terrain_limit for a in archived)):
+            flags.append('archive_terrain_height_disagreement')
         if any(c.get('excluded') == 'deck_rail_offset_missing' for c in candidates):
             flags.append('deck_rail_offset_missing')
         for reason in (
@@ -151,6 +164,7 @@ class HeightGuard:
             'candidates': candidates,
             'evidence_ids': [],
             'construction': construction,
+            'terrain_z': round(terrain, 3) if usable(terrain) else None,
         }
         if review.get('status') in ('obsolete', 'uncertain'):
             out['status'] = 'rejected' if review['status'] == 'obsolete' else 'review'
@@ -207,6 +221,7 @@ class HeightGuard:
             'archive_uncertain_alignment',
             'structure_unverified',
             'tunnel_unverified',
+            'archive_terrain_height_disagreement',
         }
         if paved:
             blocking.update({'paved_surface_height_disagreement', 'ambiguous_rail_offset_facts'})

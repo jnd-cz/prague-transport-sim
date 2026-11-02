@@ -45,7 +45,11 @@ ANGLE = 15.0
 def structure_mask(*, separate_tunnels=False):
     """A plan match cannot establish track Z on a structure (archive has ground Z on Trojsky most)."""
     from osm_local import ways
-    tagged = ways(lambda t: t.get('railway') == 'tram' and (
+    # A tram's structure is one while OSM maps the track disused or under construction (Libeňský most,
+    # disused:railway=tram on bridge=yes during its rebuild, still a track in the 2026 DI; #190).
+    tram = lambda t: 'tram' in (t.get('railway'), t.get('disused:railway'), t.get('construction:railway'),
+                                t.get('construction'))
+    tagged = ways(lambda t: tram(t) and (
         t.get('bridge', 'no') != 'no' or t.get('tunnel', 'no') != 'no'
         or t.get('covered') == 'yes' or t.get('layer', '0') != '0'))
     geoms, tunnels = [], []
