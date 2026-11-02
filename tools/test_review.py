@@ -155,6 +155,14 @@ def main():
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
             r['heightNext'] = page.evaluate('window.review.list[window.review.cur].id')
             r['heightSaved'] = json.load(open(saved,encoding='utf-8'))
+            # a 1080p desktop window: the tall track-height card scrolls, the list keeps its rows (#178)
+            page.set_viewport_size({'width': 1920, 'height': 800})
+            r['desk'] = page.evaluate('''() => {
+              const R=window.review, card=R.$('rvCard'), list=R.$('rvList');
+              R.select(R.list.findIndex(f=>f.kind==='trackheight'));
+              return {list:list.clientHeight, card:card.clientHeight, cardFull:card.scrollHeight,
+                cardScrolls:getComputedStyle(card).overflowY==='auto', bottom:R.box.getBoundingClientRect().bottom, vh:innerHeight};
+            }''')
             browser.close()
     finally:
         server.shutdown()
@@ -163,6 +171,9 @@ def main():
     print(json.dumps(r, ensure_ascii=False)[:1500])
     if not r["by"].get("file"):
         fails.append("no findings from the file")
+    d = r["desk"]
+    if d["list"] < 150 or d["bottom"] > d["vh"] + 1 or (d["cardFull"] > d["card"] and not d["cardScrolls"]):
+        fails.append(f"desktop panel: the list or the card is cut off: {d}")
     if not r["by"].get("seams"):
         fails.append("no seam findings from the survey")
     if r["look"] > 30:
