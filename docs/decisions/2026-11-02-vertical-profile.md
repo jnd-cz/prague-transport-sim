@@ -31,6 +31,10 @@ On synthetic profiles: a sharp break of grade from +2 % to −2 % becomes a 500 
 a 0.27 m one-point bump stays 2 cm above the grade while its neighbours move under 5 mm, and a real 600 m
 crest and a straight −5.8 % grade (Klárov) are kept (`tools/test_track_profile.py`).
 
+The design radius, not a fit to the data, is the basis: no source is independent of the archive and precise
+enough at 5 m to set a limit (below). The user confirmed it on 2026-11-02: "I confirm the rule should enforce
+500m ČSN radius."
+
 ## Calibration (2026-11-02)
 
 `python -P -E tools/track_profile.py --calibrate` on `reports/track-heights.json` (snapshot 2026-11-01):
