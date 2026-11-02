@@ -32,7 +32,8 @@ from dtmp_tracks import (
     write_json,
 )
 from geo import Frame
-from track_heights import HeightGuard
+from ipr_dtm import IprDtm
+from track_heights import HeightGuard, TERRAIN_EXTEND
 from track_decks import load_decks
 from track_context import load_context
 
@@ -73,12 +74,57 @@ def observations(current, archive, area):
     return rows
 
 
-def decide(rows, guard, structures, decks, tunnels, context):
+class Terrain:
+    """The 2023 lidar terrain at our frame's points: the check for archive heights nothing else confirms."""
+    def __init__(self):
+        self.dtm, self.frame = IprDtm(), Frame()
+
+    def __call__(self, xs, ys):
+        return self.dtm.sample([x + self.frame.E0 for x in xs], [y + self.frame.N0 for y in ys]).tolist()
+
+
+def extend_holds(rows, guard, reach=6):
+    """A terrain hold spreads along the track to neighbours (within reach metres, rows in track order) whose
+    archive is still more than TERRAIN_EXTEND off the terrain, until none is left (#190)."""
+    flag = 'archive_terrain_height_disagreement'
+    changed = True
+    while changed:
+        changed = False
+        for i, row in enumerate(rows):
+            if 'choice' not in row or flag in row['decision'].get('review_flags', []):
+                continue
+            if not any(0 <= j < len(rows) and flag in rows[j]['decision'].get('review_flags', [])
+                       and abs(rows[j]['x'] - row['x']) + abs(rows[j]['y'] - row['y']) <= reach for j in (i - 1, i + 1)):
+                continue
+            decision = guard.choose(*row['choice'], terrain_limit=TERRAIN_EXTEND)
+            if flag in decision['review_flags']:
+                row['decision'], changed = decision, True
+    return rows
+
+
+def truth_structures(root, structures, ids, width=6):
+    """The user's structures that no source maps (data/truth.json trackHeights.structures, #190), added to the
+    OSM structure mask as a corridor from 'from' to 'to'."""
+    path = root / 'data/truth.json'
+    truth = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    facts = truth.get('trackHeights', {}).get('structures', [])
+    if not facts:
+        return structures, ids
+    frame = Frame()
+    corridors = []
+    for f in facts:
+        x, y = frame.xy([f['from'][0], f['to'][0]], [f['from'][1], f['to'][1]])
+        corridors.append(shapely.LineString(list(zip(x, y))).buffer(width))
+    return unary_union([structures, *corridors]), ids + ['truth:' + f['id'] for f in facts]
+
+
+def decide(rows, guard, structures, decks, tunnels, context, terrain):
     hints = shapely.intersects(structures, shapely.points([(r['x'], r['y']) for r in rows]))
     tunnel_hints = shapely.intersects(tunnels, shapely.points([(r['x'], r['y']) for r in rows]))
-    for row, hint, tunnel in zip(rows, hints, tunnel_hints):
+    ground = terrain([r['x'] for r in rows], [r['y'] for r in rows])
+    for row, hint, tunnel, z in zip(rows, hints, tunnel_hints, ground):
         surfaces = decks.candidates(row['x'], row['y'], row['id'], bool(hint), row['z'])
-        row['decision'] = guard.choose(
+        row['choice'] = (
             {'id': row['id'], 'z': row['z']},
             row['archive'],
             row['x'],
@@ -87,8 +133,10 @@ def decide(rows, guard, structures, decks, tunnels, context):
             surfaces,
             bool(tunnel),
             context.classify(row['x'], row['y'], row['ux'], row['uy'], surfaces),
+            z,
         )
-    return rows
+        row['decision'] = guard.choose(*row['choice'])
+    return extend_holds(rows, guard)
 
 
 def stage(review):
@@ -96,6 +144,7 @@ def stage(review):
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
     structures, structure_ids, tunnels = structure_mask(separate_tunnels=True)
+    structures, structure_ids = truth_structures(ROOT, structures, structure_ids)
     decks = load_decks(ROOT)
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])
@@ -104,7 +153,8 @@ def stage(review):
     conflicts = conflict_records(rows)
     guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
                         review.get('span_reviews', []))
-    decide(rows, guard, structures, decks, tunnels, context)
+    terrain = Terrain()
+    decide(rows, guard, structures, decks, tunnels, context, terrain)
     lines, route_samples = [], []
     for line in (9, 17, 22, 23, 37):
         data = load_line(line)
@@ -126,7 +176,7 @@ def stage(review):
                 match = archive.match(hit['x'], hit['y'], tangent['ux'], tangent['uy'], details=True)
                 hint = structures.intersects(Point(hit['x'], hit['y']))
                 surfaces = decks.candidates(hit['x'], hit['y'], hit['id'], hint, hit['z'])
-                row['decision'] = guard.choose(
+                row['choice'] = (
                     {'id': hit['id'], 'z': hit['z']},
                     match,
                     hit['x'],
@@ -135,11 +185,14 @@ def stage(review):
                     surfaces,
                     tunnels.intersects(Point(hit['x'], hit['y'])),
                     context.classify(hit['x'], hit['y'], tangent['ux'], tangent['uy'], surfaces),
+                    terrain([hit['x']], [hit['y']])[0],
                 )
+                row['decision'] = guard.choose(*row['choice'])
                 row['di_id'], row['raw_di_z'], row['di_xy'] = hit['id'], hit['z'], [hit['x'],hit['y']]
             else:
                 row['decision'] = {'status': 'review', 'review_flags': ['no_unambiguous_current_geometry']}
             selected.append(row)
+        for row in extend_holds(selected, guard):
             route_samples.append({'line':line, 'direction':row['id'], 's':row['s'],
                                   'xy':[row['x'],row['y']], 'tangent':[row['ux'],row['uy']],
                                   'weight_m':row['weight'], 'di_id':row.get('di_id'),

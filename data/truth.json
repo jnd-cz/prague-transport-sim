@@ -343,6 +343,10 @@
     "date": "2026-10-30"
    }
   ],
+  "structuresNote": "Track on a structure that neither OSM nor a survey maps, from the user, keyed by place (from/to as lat, lon along the track). tools/import_track_heights.py adds each to the structure mask, so its heights are held; #20 applies the rule. (#190)",
+  "structures": [
+   {"id": "libensky-most-east", "place": "Libeňský most, from the end of the river bridge to street level towards Palmovka", "kind": "bridge", "from": [50.1034213, 14.4645296], "to": [50.1035, 14.46933], "level": "the original bridge deck: level to ~14.4665 E (archive and lidar 192.3-192.4 m), then a slope down towards Palmovka over the demolished section to the street (190.0 m at the 'to' end)", "rule": "a curve between the selected heights at both ends; the archive and the lidar between them measure the ground under the deck (184-186 m)", "quote": "New tram deck will follow the original bridge height afaik. It meets the street at roughly 50.1034213, 14.4645296. There was bit of a slope towards palmovka in the demolished section.", "source": "Claude Code session 2026-11-02 (#190, PR #191)", "date": "2026-11-02"}
+  ],
   "reviewAnswersNote": "The user's answers to the track-height review queue (reports/review/track-heights.json), one per decision, keyed by the decision id (OSM way, survey ids or the stops) and scoped by its lines; tools/track_span_evidence.py turns them into span evidence. Agreed in the walkthrough of 2026-11-02 (#184).",
   "reviewAnswers": [
    {"decision": "unmapped-486d384facfb", "place": "Lazarská", "lines": [9, 23], "answer": "archive profile ok", "quote": "if the archive looks smooth there then it should be chosen, Braník included", "source": "Claude Code session 2026-11-02 (#184)", "date": "2026-11-02"},

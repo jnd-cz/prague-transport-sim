@@ -53,10 +53,40 @@ structures, tunnels and known archive disagreements left out. The archive alone 
   inside the lidar's precision.
 - At record joints (1449 bins) and inside records (9759) the moves are alike (p90 6.1 and 5.4 cm); joints are not
   the main source of the wiggles.
-- **33 runs have steps** (376 points the curve cannot follow within 0.3 m), largest −76.6 m near Malovanka
-  (50.0900 N, 14.3860 E: an archive height from a much lower level), −7.2 m at 50.1033 N, 14.4592 E, +4.5 m at
-  50.0549 N, 14.4723 E and at 50.0969 N, 14.4027 E. They are listed in the report's `steps_at`: data for #20's
-  source checks, not for smoothing.
+- **Steps** (points the curve cannot follow within 0.3 m) on the archive alone: 35 runs, 205 points after
+  #190's robust start (33 runs and 376 points before it, when one bad record pulled its neighbours along).
+  The report's `steps_at` lists them; what they are is `--steps`, below.
+
+## Robust start (#190)
+
+A plain first round bent the curve towards one bad record: at Malovanka an archive record 83 m above the street
+over 25 m moved 32 good points by more than 0.3 m, and Tukey then dropped those too. The reweighting now starts
+from each point's distance to the median of its 11 neighbours: further than 2c (0.47 m) starts without a pull.
+Malovanka's run: 37 step points before, 5 after (the record itself). The calibration above is unchanged by it.
+
+## Steps by cause (#190)
+
+`python -P -E tools/track_profile.py --steps` takes the import's selected heights along every chain of DI paths;
+held heights (a hold of the import, a structure) are bridged by the curve at weight 0 up to 60 m, a longer hold
+cuts the run. Each group of steps gets a cause (`cause`): `structure` (next to a bridged structure, its deck is
+the structure review's), `di` (numeric DI, used as supplied), `dip` (every point below the curve: the archive on
+the ground under a deck no source maps, bridged by #184's curve from both sides), `survey`, `terrain` (the terrain
+has the same shape, no source disagrees: a question), `archive` (off the terrain by less than the 1 m hold).
+It fails on a step over 1 m whose cause is not `di`, `dip` or `structure`.
+
+2026-11-02 (`reports/track-profile-steps.json`): 610 runs, 63,905 bins, 497 bridged. 34 groups, 56 points:
+`archive` 10 (none over 1 m), `di` 6 (2 over 1 m), `dip` 15 (4), `terrain` 3 (none). 0 fail. Over 1 m:
+
+- `di` +1.76 m at Strašnice (50.0691 N 14.4687 E): numeric DI rises 1.9 m above the archive, the survey and the
+  terrain, which agree; −1.14 m at 50.0861 N 14.4319 E. DI wins by the import's rule; both are flagged
+  `known_archive_disagreement`.
+- `dip` −5.5 m and −4.2 m at 50.0549 N 14.4723 E, −4.7 m at the end of the Libeň river bridge (14.4642 E, the
+  street under it), −3.6 m at Modřany.
+- Before the user's answer, `terrain` +3.9 m in both directions on the Libeň bridge's rebuilt eastern approach
+  (the archive and the lidar alternate between the deck, ~190 m, and the ground under it, ~184 m). It is now the
+  user's structure ([height fallback](2026-10-30-track-height-fallback.md)).
+
+Under 1 m (0.3–1 m): `archive` 10 groups, `di` 4, `dip` 11, `terrain` 3, most of one or two points.
 
 ## Check
 

@@ -371,7 +371,7 @@ Archive candidates: `2424348` (2008-03-10; range 268.329–268.799 m); `2214139`
 
 DI at span ends: no numeric DI within 50 m.
 
-Flags: `track_zps_level_unverified`.
+Flags: `archive_terrain_height_disagreement`, `track_zps_level_unverified`.
 
 ## unmapped-8880185638fb · unmapped
 
