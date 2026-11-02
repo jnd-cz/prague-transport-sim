@@ -31,14 +31,6 @@ applyStatic();
 let lines = [];
 try { lines = await (await load.get('data/lines.json')).json(); } catch { /* single-line build */ }
 const params = new URLSearchParams(location.search);
-let heightReview = null;
-if (params.has('heightreview')) {
-  try {
-    const response = await fetch(params.get('heightreview'));
-    if (!response.ok) throw new Error(`Height review: HTTP ${response.status}`);
-    heightReview = await response.json();
-  } catch (error) { load.fail(error); throw error; }
-}
 let lineId = params.get('line');
 try { lineId = lineId || localStorage.getItem('tram.line'); } catch { /* storage unavailable */ }
 if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId = lines[0]?.line || '22';
@@ -403,26 +395,6 @@ function start() {
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   window.game = game; // handy for debugging from the console
-  game.heightReview = heightReview;
-  game.inspectHeightSpan = (span) => {
-    inspect.toggle(true);
-    inspect.paused = true;
-    const p = span.profile[Math.floor(span.profile.length / 2)], [x, y] = p.xy;
-    const near = game.route.nearest(x, y), z = near ? game.profile.height(near.s) : 0;
-    camera.position.set(x, z + 22, -y + 30);
-    if (span.structure.kind === 'tunnel') {
-      // Approach a passage from outside its portal, rather than placing the camera in its roof.
-      const [a, b] = [span.profile[0].xy, span.profile[span.profile.length - 1].xy];
-      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-      const portal = game.route.nearest(a[0], a[1]);
-      camera.position.set(a[0] - (b[0] - a[0]) / length * 25,
-        (portal ? game.profile.height(portal.s) : z) + 8, -(a[1] - (b[1] - a[1]) / length * 25));
-    }
-    camera.lookAt(x, z + 1, -y);
-    inspect._setMode('fly');
-    const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-    inspect.flyYaw = Math.atan2(-dir.x, -dir.z); inspect.flyPitch = Math.asin(dir.y);
-  };
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   game.mirror = mirror.stats;
   window.camera = camera;
@@ -444,7 +416,7 @@ function start() {
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
   if (params.has('bot')) streetBot();
   if (params.has('inspect')) inspect.toggle(true);
-  if (params.has('debug') || heightReview) debugOverlay.toggle(game, traffic);
+  if (params.has('debug')) debugOverlay.toggle(game, traffic);
 }
 
 // debugging (?bot): drive and walk every street in the surveyed DTM areas, list what looks wrong
