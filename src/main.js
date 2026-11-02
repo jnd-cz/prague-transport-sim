@@ -807,8 +807,9 @@ async function replayTo(seed, at) {
   const t0 = performance.now();
   await trafficRun({ seed, stopAt: at, progress: (msg) => { document.title = msg; } });
   document.title = `Replay: seed ${seed}, s ${Math.round(window.game.tram.s)}`;
+  inspect.toggle(true); // (it starts the game running: paused after it)
+  inspect.paused = true;
   window.game.paused = true;
-  inspect.toggle(true);
   window.game.msg(`Replay of the traffic check, seed ${seed}: s ${Math.round(window.game.tram.s)} after ${((performance.now() - t0) / 1000).toFixed(0)} s`, 'info', 10);
 }
 

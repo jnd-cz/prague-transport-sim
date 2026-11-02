@@ -128,7 +128,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       tr.update(dt, camera);
       T += dt;
       window.trafficWatch?.(g, tr, T); // (a dev probe of one moment: the cars around a stuck scene)
-      if (T < nextSample) continue;
+      if (T < nextSample || stopAt !== Infinity) continue; // (a replay: the samples only read, they are skipped)
       nextSample = T + step;
       samples++;
       const snap = snapshot(g, tr);
