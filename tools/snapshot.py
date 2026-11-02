@@ -70,7 +70,8 @@ SOURCES = [
     {"name": "geoportal", "globs": ["raw/geoportal/**/*"],
      "source": "Geoportál Praha services: Budovy 3D, Mosty 3D (I3S), opěrné zdi, stromy (tools/geoportal.py caches)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha",
-     "refresh": "delete raw/geoportal/lineN and run python -I tools/geoportal.py --line N"},
+     "refresh": "delete raw/geoportal/lineN and run python -I tools/geoportal.py --line N; "
+                "the whole Mosty 3D layer: python -I tools/mosty3d.py fetch"},
     {"name": "dem", "globs": ["raw/dem/*.tif", "raw/terrain*.tif", "raw/terrain*.json", "raw/line*/terrain*.tif",
                               "raw/line*/terrain*.json", "raw/run*/terrain*.tif", "raw/run*/terrain*.json"],
      "source": "ČÚZK DMR 5G ImageServer exports (fine terrain tiles: tools/fine_terrain.py; line grids: build_line.py)",

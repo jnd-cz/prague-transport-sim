@@ -34,6 +34,7 @@ from dtmp_tracks import (
 from geo import Frame
 from ipr_dtm import IprDtm
 from track_heights import HeightGuard, TERRAIN_EXTEND
+import track_bridges
 from track_decks import load_decks
 from track_context import load_context
 
@@ -118,6 +119,13 @@ def truth_structures(root, structures, ids, width=6):
     return unary_union([structures, *corridors]), ids + ['truth:' + f['id'] for f in facts]
 
 
+def bridge_structures(structures, ids, paths, current, archive, terrain):
+    """Track on a Mosty 3D bridge, decided from the heights where it enters and leaves (tools/track_bridges.py, #192),
+    added to the OSM structure mask."""
+    geom, found, pieces = track_bridges.mask(track_bridges.decide(paths, current, archive, terrain))
+    return (unary_union([structures, geom]) if found else structures), ids + found, pieces
+
+
 def decide(rows, guard, structures, decks, tunnels, context, terrain):
     hints = shapely.intersects(structures, shapely.points([(r['x'], r['y']) for r in rows]))
     tunnel_hints = shapely.intersects(tunnels, shapely.points([(r['x'], r['y']) for r in rows]))
@@ -145,6 +153,9 @@ def stage(review):
     current, archive = Segments(paths), Segments(archived_paths)
     structures, structure_ids, tunnels = structure_mask(separate_tunnels=True)
     structures, structure_ids = truth_structures(ROOT, structures, structure_ids)
+    terrain = Terrain()
+    structures, structure_ids, bridge_pieces = bridge_structures(structures, structure_ids, paths, current, archive,
+                                                                 terrain)
     decks = load_decks(ROOT)
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])
@@ -153,7 +164,6 @@ def stage(review):
     conflicts = conflict_records(rows)
     guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
                         review.get('span_reviews', []))
-    terrain = Terrain()
     decide(rows, guard, structures, decks, tunnels, context, terrain)
     lines, route_samples = [], []
     for line in (9, 17, 22, 23, 37):
@@ -275,6 +285,7 @@ def stage(review):
         'frame': {'crs': 'EPSG:5514', 'origin': list(Frame().to_jtsk(0, 0)), 'height_datum': 'Bpv'},
         'scope': 'height proposals at DI midpoint samples <=5m; topology and game integration are #20',
         'structure_hint_osm_ways': structure_ids,
+        'mosty3d_structures': bridge_pieces,
         'known_conflicting_archive_ids': sorted(conflicts),
         'evidence': review,
         'rail_above_deck_facts': decks.facts,

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "snapshot": "2026-11-01",
+  "snapshot": "2026-11-02",
   "findings": [
     {
       "kind": "trackheight",
@@ -534,7 +534,10 @@
               "source": "Bing",
               "voltage": "600"
             }
-          }
+          },
+          "mosty3d_features": [
+            398
+          ]
         },
         "span_ids": [
           "osm-476017592:line9:path:1",
@@ -681,7 +684,11 @@
               "railway": "tram",
               "voltage": "600"
             }
-          }
+          },
+          "mosty3d_features": [
+            64,
+            69
+          ]
         },
         "span_ids": [
           "osm-4722514:line17:path:1",
@@ -802,7 +809,11 @@
               "source": "Bing",
               "voltage": "600"
             }
-          }
+          },
+          "mosty3d_features": [
+            74,
+            86
+          ]
         },
         "span_ids": [
           "osm-4722520:line17:path:1",
@@ -982,7 +993,10 @@
               "railway": "tram",
               "voltage": "600"
             }
-          }
+          },
+          "mosty3d_features": [
+            99
+          ]
         },
         "span_ids": [
           "osm-98560954:line17:path:1",
@@ -1210,7 +1224,10 @@
               "railway": "tram",
               "voltage": "600"
             }
-          }
+          },
+          "mosty3d_features": [
+            112
+          ]
         },
         "span_ids": [
           "osm-150611269:line17:path:1",
@@ -1415,7 +1432,10 @@
               "railway": "tram",
               "voltage": "600"
             }
-          }
+          },
+          "mosty3d_features": [
+            129
+          ]
         },
         "span_ids": [
           "osm-150611136:line17:path:1",
@@ -1941,7 +1961,10 @@
               "smoothness": "excellent",
               "surface": "asphalt"
             }
-          }
+          },
+          "mosty3d_features": [
+            506
+          ]
         },
         "span_ids": [
           "osm-127867974:line17:path:1",
@@ -2364,5 +2387,5 @@
     }
   ],
   "span_file": "reports/review/track-height-spans.json",
-  "span_sha256": "8a2996ed68bc01b0661dfa265697bd4f9d2002deeedf3c471952fe8dd1b8b798"
+  "span_sha256": "d11d4fa79d99e085fdc2c0ab4e932b197931a5201988ba7fc0ca2b819f7fdc75"
 }
