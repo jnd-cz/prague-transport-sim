@@ -264,6 +264,33 @@ Brusnice, Čechova čtvrť: a gradual drop and one steep climb) and on 3 for a d
 Hodkovičky, Černý kůň), and the survey answer is offered on 4, Palackého most among them, where the
 archive measured the river bed.
 
+**Fallback order of the 2026-11-02 review (#184).** The user's answers, one per decision, are facts in
+`data/truth.json` (`trackHeights.reviewAnswers`, keyed by decision id, scoped by its lines, each with the
+quote it rests on); `python -P -E tools/track_span_evidence.py` imports them (27 of 27). The order agreed
+in the walkthrough: DI, then the archive where it is smooth, then:
+
+1. **The other direction's archive.** Where a span's archive steps or dips and the other direction of
+   the same line, 2.5–6 m away, is smooth, every stretch where the two differ by more than 0.3 m and
+   agree again at both ends takes the other direction's heights, the offset at the two ends interpolated
+   (`from_parallel` in the profile). Calibration: parallel archive axes city-wide differ by p50 0.02,
+   p90 0.09, p99 0.45 m; 0.3 m is p98.4. 0.3 m only triggers the repair: it reaches out over points under
+   the trigger to where the difference is back within 0.1 m (p90) of its median over the 15 m beyond, and
+   not into the previous repair. The departures start below 0.3 m: Modřany's street record 0.12 m off the
+   usual offset at its first point, Brusnice's sinking record 0.15 m, each leaving a kink (6.1 % at
+   Brusnice, now 0.5 %). Mends Hlavní nádraží (2), Modřany inbound and Brusnice.
+2. **The survey's track and deck areas on a structure** (`follows survey surface`, where no surface is
+   rail-height eligible): only on a span where they meet the archive within 0.3 m at every smooth archive
+   point, on both sides of every dip (`survey_rule: track_area_agrees_with_archive`). On the queue's
+   bridges those areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive, so the test is
+   per span. Černý kůň imports; Hodkovičky's (2 m below) is held.
+3. **A curve across a dip** (`archive, bridged over a dip`): a cubic between the dip's ends that continues
+   the archive's least-squares grade over 15 m on each side (the chord where one side has fewer than
+   two points), instead of a straight deck. Hodkovičky: a crest 0.3 m above the chord, Modřany 0.2 m. A dip extends
+   over the descent and climb above 4 % around its steep part (Černý kůň's archive falls 4–5 % for 14 m
+   before the drop, while the deck rises).
+
+The game does not take these profiles yet: profile assembly is #20.
+
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
 datum. The queue's `ordinary_terrain_fallbacks` gives those proposals. No ambiguous level, known archive

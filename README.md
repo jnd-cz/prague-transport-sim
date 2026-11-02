@@ -434,8 +434,9 @@ decision to inspect its linked spans, height profile and sources. Answers with n
 and unspecified levels remain held. The card explains any held archive answer (a dip under a bridge, a
 steep step) and offers `archive, bridged over a dip` and `follows survey surface` only where they import;
 `python -P -E tools/track_structure_review.py` rewrites those offers from the committed queue after the
-import rules change. Convert unambiguous answers with
-`python -P -E tools/track_span_evidence.py --from-reviews reports/reviews/line17.json`.
+import rules change. Answers talked over with the user are recorded in `data/truth.json`
+(`trackHeights.reviewAnswers`, one per decision with its quote): `python -P -E tools/track_span_evidence.py`
+converts those; `--from-reviews reports/reviews/line17.json` converts a page's unambiguous answers instead.
 Proposals stay separate from approved height evidence;
 the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
 reproduction commands and `--evidence` format.

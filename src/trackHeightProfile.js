@@ -60,10 +60,15 @@ export function heightProfile(f, route, profile) {
       const [a, b] = span.proposal.ends; svg += line(points, (p) => a + (b - a) * Math.max(0, Math.min(1, (p.s - span.start_s) / span.length_m)), '#ff9e31', '2 2');
     } else if (['review_archive_profile', 'archive_agrees_with_survey'].includes(span.proposal?.rule))
       svg += line(points, (p) => p.archive.find((a) => valid(a.z) && !a.excluded)?.z, '#ff9e31', '2 3');
-    // the answer "archive, bridged over a dip": the deck straight across what the archive measured below (#176)
-    for (const [a, za, b, zb] of f.bridged?.[span.id] || []) {
-      const at = (s) => points.reduce((p, q) => Math.abs(q.s - s) < Math.abs(p.s - s) ? q : p).x;
-      svg += `<path d="M${X(at(a)).toFixed(1)},${Y(za).toFixed(1)}L${X(at(b)).toFixed(1)},${Y(zb).toFixed(1)}" stroke="#ff9e31" stroke-width="2.5" fill="none"${dash ? ` stroke-dasharray="${dash}"` : ''}><title>bridged: ${za.toFixed(2)} → ${zb.toFixed(2)} m</title></path>`;
+    // the answer "archive, bridged over a dip": the deck across what the archive measured below (#176), on a
+    // curve continuing the grade on both sides (#184; older findings give only the two ends)
+    for (const [a, za, b, zb, curve] of f.bridged?.[span.id] || []) {
+      // (x between the two points around s: a pathBack span is drawn reversed along the main one)
+      const byS = [...points].sort((p, q) => p.s - q.s), x = (s) => {
+        const i = byS.findIndex((q) => q.s >= s), p = byS[Math.max(0, i - 1)], q = byS[i < 0 ? byS.length - 1 : i];
+        return q.s > p.s ? p.x + (q.x - p.x) * (s - p.s) / (q.s - p.s) : q.x; };
+      const d = (curve || [[a, za], [b, zb]]).map(([s, z], i) => `${i ? 'L' : 'M'}${X(x(s)).toFixed(1)},${Y(z).toFixed(1)}`).join('');
+      svg += `<path d="${d}" stroke="#ff9e31" stroke-width="2.5" fill="none"${dash ? ` stroke-dasharray="${dash}"` : ''}><title>bridged: ${za.toFixed(2)} → ${zb.toFixed(2)} m</title></path>`;
     }
     for (const p of points) {
       for (const s of p.surfaces) {

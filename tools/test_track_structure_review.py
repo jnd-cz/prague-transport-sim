@@ -13,7 +13,7 @@ import numpy as np
 
 from track_heights import HeightGuard
 from track_structure_review import Structures, grouped, review, record_date, findings, queue_text
-from track_span_evidence import SpanEvidence, from_reviews, hydrate_findings
+from track_span_evidence import SpanEvidence, from_reviews, hydrate_findings, truth_answers, dips
 from track_terrain_fallback import ordinary_fallback
 from test_track_heights import match, path, offset_fact
 
@@ -130,7 +130,7 @@ class SpanReviews(unittest.TestCase):
                                     {'findings':[finding]},'reviews/line17.json')
         self.assertIn('dips 6.7 m between 35 and 55 m',get('archive profile ok')['held'][0]['reason'])
         entry = get('archive, bridged over a dip')['span_reviews'][0]
-        self.assertEqual(entry['profiles'][0]['bridged'],[[35,200.7,55,201.1]])
+        self.assertEqual([b[:4] for b in entry['profiles'][0]['bridged']],[[35,200.7,55,201.1]])
         self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',45,0,[])[0]['z'],200.9)
         self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',80,0,[])[0]['z'],201.6)
         # a drop that never comes back is not a dip: the river under Palackého most
@@ -138,6 +138,91 @@ class SpanReviews(unittest.TestCase):
             p['archive'] = [{'z':187.27}]
         self.assertIn('does not come back',get('archive, bridged over a dip')['held'][0]['reason'])
         self.assertTrue(get('archive profile ok')['held'])
+
+    def test_a_dip_is_crossed_on_a_curve_continuing_the_grade_on_both_sides(self):
+        # (#184, Hodkovičky: the archive climbs 3 % to the bridge and falls 3 % after it, the street 6 m below)
+        zs = [200+.03*s if s <= 50 else 201.5-.03*(s-50) for s in range(0,105,5)]
+        for s in (40,45,50,55,60):
+            zs[s//5] = 194.5
+        span = {'id':'s','start_s':0,'length_m':100,
+                'profile':[{'s':s,'xy':[s,0],'archive':[{'z':z}],'surfaces':[]} for s,z in zip(range(0,105,5),zs)],
+                'approval_profile':{'xy':[[0,0],[100,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'h','decision':{'span_ids':['s'],'structure':{'kind':'bridge'}},'spans':[span]}
+        entry = from_reviews({'items':{'pin':{'decision_id':'h','span_ids':['s'],'v':'archive, bridged over a dip','note':'','t':1761955200000}}},
+                             {'findings':[finding]},'reviews/line17.json')['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['bridged'][0][:4],[35,201.05,65,201.05])
+        top = SpanEvidence([entry]).at('di-1',50,0,[])[0]['z']
+        self.assertAlmostEqual(top,201.05+.03*30/4,places=2)  # (a crest, where the chord is flat)
+
+    def test_a_direction_leaving_the_smooth_other_one_takes_its_heights(self):
+        # (#184, Hlavní nádraží: one direction's archive climbs 6.9 m over the tunnel, the other 3.5 m away stays smooth)
+        def span(name, direction, y, hump):
+            zs = [200+.01*s+(6 if hump and 30 <= s <= 50 else 0) for s in range(0,85,5)]
+            return {'id':name,'line':9,'direction':direction,'start_s':0,'length_m':80,
+                    'profile':[{'s':s,'xy':[s,y],'archive':[{'z':z}],'surfaces':[]} for s,z in zip(range(0,85,5),zs)],
+                    'approval_profile':{'xy':[[0,y],[80,y]],'di_ids':['di-'+name],'rule':{'type':'needs_explicit_review'}}}
+        out, back = span('a','path',0,True), span('b','pathBack',3.5,False)
+        finding = {'kind':'trackheight','id':'t','decision':{'span_ids':['a','b'],'structure':{'kind':'tunnel'}},'spans':[out,back]}
+        get = lambda: from_reviews({'items':{'pin':{'decision_id':'t','span_ids':['a','b'],'v':'archive profile ok','note':'','t':1761955200000}}},
+                                   {'findings':[finding]},'reviews/line9.json')
+        entry = get()['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['from_parallel'],[[25,55]])
+        self.assertAlmostEqual(SpanEvidence([entry]).at('di-a',40,0,[])[0]['z'],200.4)
+        self.assertEqual(entry['profiles'][1]['rule'],{'type':'archive'})  # (the smooth one keeps its archive)
+        # (Brusnice: the departure starts 0.15 m off at 25 m, under the 0.3 m trigger; the repair reaches
+        # back to where the two are at their usual offset, so no 6 % step is left there)
+        out['profile'][5]['archive'] = [{'z':out['profile'][5]['archive'][0]['z']-.15}]
+        entry = get()['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['from_parallel'],[[20,55]])
+        samples = entry['profiles'][0]['rule']['samples']
+        grades = [(b[1]-a[1])/(b[0]-a[0]) for a,b in zip(samples,samples[1:])]
+        self.assertLess(max(abs(g-.01) for g in grades),1e-6)
+        for p in back['profile']:  # (the other direction 9 m away is another track: nothing to compare)
+            p['xy'] = [p['xy'][0],9]
+        self.assertIn('steps up',get()['held'][0]['reason'])
+
+    def test_survey_track_areas_count_on_a_bridge_only_where_they_meet_the_archive(self):
+        # (#184, Černý kůň: the tram areas and the deck carry on across the dip, within 0.2 m of the archive)
+        zs = [197+.01*s for s in range(0,105,5)]
+        for s in (40,45,50,55):
+            zs[s//5] = 192.5
+        points = [{'s':s,'xy':[s,0],'archive':[{'z':z}],
+                   'surfaces':[{'id':f'tram{s}','class':'tram' if s < 40 or s > 55 else 'deck','level':0 if s < 40 or s > 55 else 1,
+                                'z':197.1+.01*s,'rail_height_eligible':False,'excluded':'track_zps_level_unverified' if s < 40 or s > 55 else None}]}
+                  for s,z in zip(range(0,105,5),zs)]
+        span = {'id':'s','start_s':0,'length_m':100,'profile':points,
+                'approval_profile':{'xy':[[0,0],[100,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'c','decision':{'span_ids':['s'],'structure':{'kind':'bridge'}},'spans':[span]}
+        get = lambda: from_reviews({'items':{'pin':{'decision_id':'c','span_ids':['s'],'v':'follows survey surface','note':'','t':1761955200000}}},
+                                   {'findings':[finding]},'reviews/line17.json')
+        entry = get()['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['survey_rule'],'track_area_agrees_with_archive')
+        self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',50,0,[])[0]['z'],197.6)
+        for p in points[12:]:  # (Hodkovičky: the tram area lies 2 m below the archive)
+            p['surfaces'][0]['z'] -= 2
+        self.assertIn('from the smooth archive',get()['held'][0]['reason'])
+
+    def test_a_dip_starts_where_the_archive_starts_down_the_abutment(self):
+        # (#184, Černý kůň inbound: 4-5 % down for 14 m before the steep drop, then 5 m below the deck)
+        zs = [200,200,200,199.75,199.5,199.25,195,195,195,200,200,200]
+        found,_ = dips([(5*i,z) for i,z in enumerate(zs)])
+        self.assertEqual(found,[(2,9)])
+
+    def test_answers_recorded_in_truth_are_scoped_by_lines_not_span_ids(self):
+        span = {'id':'s:line22:path:3','line':22,'direction':'path','start_s':0,'length_m':10,
+                'profile':[{'s':s,'xy':[s,0],'archive':[{'z':250}],'surfaces':[]} for s in (0,5,10)],
+                'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        finding = {'kind':'trackheight','id':'unmapped-1','decision':{'span_ids':[span['id']],'structure':{'kind':'unmapped'}},'spans':[span]}
+        truth = lambda lines: {'trackHeights':{'reviewAnswers':[{'decision':'unmapped-1','answer':'archive profile ok','lines':lines,
+                                                                 'quote':'q','source':'s','date':'2026-11-02'}]}}
+        entry = from_reviews(truth_answers(truth([22])),{'findings':[finding]},'data/truth.json')['span_reviews'][0]
+        self.assertEqual((entry['source']['date'],entry['source']['record']),('2026-11-02','data/truth.json#trackHeights.reviewAnswers/unmapped-1'))
+        self.assertIn('changed decision scope',from_reviews(truth_answers(truth([22,23])),{'findings':[finding]},'t')['held'][0]['reason'])
+        # (and the committed answers import on the committed queue)
+        root = Path(__file__).resolve().parent.parent
+        result = from_reviews(truth_answers(json.loads((root/'data/truth.json').read_text(encoding='utf-8'))),
+                              json.loads((root/'reports/review/track-heights.json').read_text(encoding='utf-8')),'data/truth.json')
+        self.assertEqual((len(result['span_reviews']),result['held']),(27,[]))
 
     def test_survey_answer_skips_short_gaps_and_takes_one_height_of_deck_and_road(self):
         # (Palackého most: deck and road at level 1 within 1 cm; an abutment and a point without survey)
