@@ -250,6 +250,65 @@ function railSupport(g, world) {
   return check('rails-supported', n, [...bad.values()]);
 }
 
+// Compare the drawn rail heads with actual bed and street triangles on each canted curve.
+// A separate missing-ray count makes registration gaps visible instead of calling them clear.
+export function cantedRailVisibility(g, world) {
+  const r = g.route, prof = r.ground.profile, rails = [], surfaces = [];
+  world.traverse((m) => {
+    if (!m.isMesh) return;
+    if (m.userData.surface === 'rail') rails.push(m);
+    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
+  });
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
+  ray.far = 4;
+  // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
+  // ribbon is a separate obstruction, not a cant error on this one.
+  const owner = (hit) => {
+    const ranges = hit.object.userData.trackRanges || [];
+    let lo = 0, hi = ranges.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (ranges[mid][0] <= hit.faceIndex) lo = mid + 1; else hi = mid; }
+    const range = ranges[lo - 1];
+    return range && hit.faceIndex < range[1] ? range[2] : null;
+  };
+  let samples = 0, missing = 0, missingBed = 0, curve = -1, inCurve = false;
+  const bad = new Map(), other = new Map(), covered = new Map();
+  for (let s = 0; s < r.length; s += 2) {
+    const canted = r.cantAt(s) > 0.005;
+    if (!canted) { inCurve = false; continue; }
+    if (!inCurve) { curve++; inCurve = true; }
+    for (const side of [-1, 1]) {
+      const p = r.offset(s, side * 0.72);
+      o.set(p.x, prof.height(s) + 1, -p.y); ray.set(o, down);
+      let head = ray.intersectObjects(rails, false)[0];
+      // The route and the smoothed track axis can differ slightly at switches.
+      for (const shift of [-0.1, 0.1, -0.2, 0.2, -0.3, 0.3, -0.4, 0.4]) {
+        if (head) break;
+        const q = r.offset(s, side * 0.72 + shift);
+        o.set(q.x, prof.height(s) + 1, -q.y); ray.set(o, down);
+        head = ray.intersectObjects(rails, false)[0];
+      }
+      if (!head) { missing++; continue; }
+      const trackId = owner(head);
+      if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
+      samples++;
+      const hits = ray.intersectObjects(surfaces, false).filter((h) => h.point.y <= head.point.y + 0.4);
+      const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId);
+      if (!ownBed) missingBed++;
+      else covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
+      for (const [map, hit] of [[bad, ownBed],
+                                [other, hits.find((h) => h.object.userData.surface !== 'bed' || owner(h) !== trackId)]]) {
+        const delta = hit ? hit.point.y - head.point.y : -Infinity;
+        if (delta > 0.001 && !(map.get(curve)?.mag >= delta))
+          map.set(curve, { s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: delta,
+                           info: `${hit.object.userData.surface} ${(delta * 1000).toFixed(0)} mm above rail head` });
+      }
+    }
+  }
+  return { ...check('canted-bed-below-rail', samples, [...bad.values()]), curves: curve + 1, missing, missingBed,
+           unmeasuredCurves: curve + 1 - [...covered.values()].filter((sides) => sides === 3).length,
+           otherSurfaces: check('other-surfaces-above-rail', samples, [...other.values()]) };
+}
+
 // Vertical curves of the track profile: the radius of every crest and sag over 20 m (change of
 // grade per metre), flagged under 500 m (tram track: 500 m minimum in streets, 1000 m preferred), and
 // grades over 9 %.
@@ -489,6 +548,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     streetWaviness: streetWaviness(g),
     terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
+    cantedRailVisibility: cantedRailVisibility(g, world),
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),

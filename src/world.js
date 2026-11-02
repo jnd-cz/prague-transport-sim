@@ -162,6 +162,7 @@ class ChunkedGeometry {
       m.matrixAutoUpdate = false;
       if (surface === 'building') m.userData.building = true;
       else if (surface) m.userData.surface = surface;
+      if (c.trackRanges) m.userData.trackRanges = c.trackRanges;
       group.add(m);
     }
   }
@@ -185,7 +186,7 @@ function addFlatPolygon(cg, ring, h, col) {
 // hfn(x, y) + lift) or an array of centre-line heights (level across, e.g. track).
 // (`strips` > 1: that many strips across, each edge at its own height: a street with tracks in it
 // follows the track level in its middle instead of a straight line from kerb to kerb)
-function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1) {
+function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1, crossfall = null) {
   if (line.length < 2) return;
   const fixed = Array.isArray(hfn);
   if (!fixed) line = densify(line);
@@ -209,8 +210,9 @@ function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1) {
     const nx = -dy, ny = dx;
     const lx = p[0] + nx * (offset + half * scale), ly = p[1] + ny * (offset + half * scale);
     const rx = p[0] + nx * (offset - half * scale), ry = p[1] + ny * (offset - half * scale);
-    L.push(W(lx, ly, (fixed ? hfn[i] : hfn(lx, ly)) + lift));
-    R.push(W(rx, ry, (fixed ? hfn[i] : hfn(rx, ry)) + lift));
+    const dz = crossfall ? crossfall[i] * half * scale : 0;
+    L.push(W(lx, ly, (fixed ? hfn[i] : hfn(lx, ly)) + lift + dz));
+    R.push(W(rx, ry, (fixed ? hfn[i] : hfn(rx, ry)) + lift - dz));
   }
   const c = cg._chunk(line[0][0], line[0][1]);
   for (let i = 0; i < line.length - 1; i++) cg.quad(c, R[i], R[i + 1], L[i + 1], L[i], col);
@@ -482,10 +484,13 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const railCg = new ChunkedGeometry(railMat);
   // (src/heights.js: t.z is the top of rail; the bed lies the track style's offset under it, the
   // rail heads stand just over it, and where the bed is well below, the rails get their sides)
-  for (const t of data.tracks) {
+  const keepTrackRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  for (const [trackId, t] of data.tracks.entries()) {
+    const bc = keepTrackRanges && t.smooth.length > 1 ? bedCg._chunk(...t.smooth[0]) : null;
+    const rc = keepTrackRanges && t.smooth.length > 1 ? railCg._chunk(...t.smooth[0]) : null;
+    const bedStart = bc && bc.pos.length / 9, railStart = rc && rc.pos.length / 9;
     const lift = t.smooth.map(([x, y]) => liftAt(x, y));
     const zBed = t.z.map((z, i) => z - lift[i] - BED_BELOW);
-    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, bed);
     // on a canted curve of our route the outer rail is higher, the inner one lower
     const tilt = t.smooth.map(([x, y], i) => {
       const n = route.nearest(x, y);
@@ -496,14 +501,18 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
       const h = route.at(n.s), same = (b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy >= 0 ? 1 : -1;
       return -0.72 * Math.tan(roll) * same; // left rail (+0.72 along the track) goes up by this (down when leaning left)
     });
+    // The bed is the same canted plane as the rails, including its transition ramps.
+    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, bed, 0, 1, tilt.map((z) => z / 0.72));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
-      if (lift.some((v) => v > 0.03)) for (const face of [-0.05, 0.05]) addSide(railCg, t.smooth, side * 0.72 + face, zr.map((z) => z + RAIL_HEAD), zBed);
+      if (lift.some((v) => v > 0.03)) for (const face of [-0.05, 0.05]) addSide(railCg, t.smooth, side * 0.72 + face, zr.map((z) => z + RAIL_HEAD), zBed.map((z, i) => z + tilt[i] * (side + face / 0.72)));
     }
+    if (bc) (bc.trackRanges ||= []).push([bedStart, bc.pos.length / 9, trackId]);
+    if (rc) (rc.trackRanges ||= []).push([railStart, rc.pos.length / 9, trackId]);
   }
   bedCg.build(group, 'bed');
-  railCg.build(group);
+  railCg.build(group, 'rail');
   await mark('track bed + rails');
   buildTrackSupport(group, route, ground, trackDist);
   await mark('track support');

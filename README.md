@@ -285,6 +285,7 @@ The audit takes the service date from the build log (`service date …`, `SERVIC
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
 python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
 python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 3
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks canted
 ```
 
 `--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
