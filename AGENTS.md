@@ -28,11 +28,16 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   the issue will touch too (`gh pr list`, `gh pr diff N --name-only`).
 - One branch per issue (`<number>-<short-name>`), PR into `main`, the PR says which checks were run and
   their numbers. Small doc or data-fact changes may go straight to `main`.
-- PR description: `Closes #N.`, what changes and why, a check table (line × check, before → after),
+- PR description: `Closes #N.` (or `Part of #N.`, below), what changes and why, a check table (line × check, before → after),
   and for rebuilt data what changed per line. Merged as a squash, subject `<PR title> (#PR)` (the title
   ends with `(#issue)`), branch deleted.
-- An issue done in parts (time-bound, waiting on data): each PR says `Part of #N`, and only the PR
-  that finishes it says `Closes #N`.
+- **`Closes #N` only when this PR meets every point of the issue's "Done when".** Anything still
+  open (the user's answers in a review queue, an import of those answers, a rebuild, a data-publish,
+  another line) makes it `Part of #N`; the PR and a comment on the issue list what remains. Only the PR
+  that finishes it says `Closes #N`. A reviewer who finds an open point changes the keyword before the
+  merge (#146 was nearly closed with six places still awaiting the user's answers).
+- Review findings: a reviewer posts them as a PR comment ("To fix before merge", "Smaller"); the author
+  answers point by point in a comment and pushes. A PR is marked ready and merged on the user's word only.
 - Rebuilt data: `python -I tools/snapshot.py data-publish --note "…"` from the branch, commit
   `data/MANIFEST.json` on it, then merge. `main`'s manifest always names data that is in the store.
 - New issues: what is now (with numbers), where in the code, what done means, which checks prove it.
@@ -54,12 +59,17 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   of line 17's open track: calibrated on street track only.
 - Heuristics standing in for missing data log what they decided (debug overlay F8, `window.game`) so they
   can be reviewed.
+- **Questions for the user go to a `?review` findings file** (`reports/review/`, README): the place,
+  imagery links, a picture where it helps, answer choices. Offer only answers that an importer turns into
+  evidence, and say on the card why another answer stays held (#162, #176). An answer is keyed by a
+  stable identity (a decision ID, a place), never by a generated array index.
 
 ## Unattended runs (overnight, Codex /goal, scheduled sessions)
 
 - The task states what may be done without the user. Default when it does not: push the issue
   branch, open and update a draft PR, open issues for findings. Not without saying so: data-publish,
-  marking a PR ready, merging, pushing to main, force-pushing, closing or editing other issues.
+  marking a PR ready, merging, pushing to main, force-pushing, closing or editing other issues, a
+  `Closes #N` for an issue with open points.
 - The progress log is the draft PR, opened after the first commit: its description holds the current
   state (open questions for the user first, then the check table), with a dated comment per step.
   No log files in the repo; scratch output goes to `reports/` (ignored) or outside the checkout.
@@ -76,7 +86,11 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 ## Data
 
 - **Never edit generated data by hand** (`data/line*.json` and sidecars): change the tool and rebuild.
-  Hand-made facts go to `data/truth.json`.
+  Hand-made facts go to `data/truth.json`: facts from the user or a source, each citing where it came
+  from. Not check exemptions, agent audits or lists of generated array indexes: a rebuild renumbers
+  them (#177's allowlist would have failed every line on the next rebuild). Key a fact by place, a
+  stable source ID or a stop. What a check can decide from geometry stays a rule in the check, counted
+  per class with its places, so `--compare` shows what a rebuild moved.
 - A provider that refuses scripted requests is waited out or read from a saved copy; requests are never
   disguised as a browser's (DATA.md, ZPS downloads).
 - Sources come only from the pinned snapshot in `raw/` (`python -I tools/snapshot.py fetch`); OSM only
@@ -105,6 +119,13 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
   (`--parallel` for several lines). Keep memory in check: long jobs size themselves by free memory
   (`tools/sysinfo.py`); don't start a second heavy job while one runs.
+- Which checks a change needs (`/regress` picks them from the diff): the game, traffic or the tram:
+  `u3,redruns,traffic,lint` on all lines; drawn geometry (surfaces, track beds, crossings, kerbs): also
+  `surfaces,crossing,canted`, and every seedless move needs a reason; the review page: `tools/test_review.py`
+  (phone and desktop sizes); docs or harness only: none, and the PR says so.
+- Tests that drive a page set a time limit for the whole test (`faulthandler.dump_traceback_later`, as
+  `tools/test_review.py`): Playwright's `page.evaluate` has none, and a promise that never resolves
+  hangs the run without output.
 - Checks in a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`, `lint({ traffic: true })` averages
   seeds 22, 7, 1234), `python tools/lint_report.py` against `reports/baseline/lineN.json` (an in-page
   baseline of 2026-10-23, before #7 and #84, not maintained: regressions use `headless.py --compare`); benches in `tools/bench/`
