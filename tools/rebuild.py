@@ -97,4 +97,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from baseline_store import HeavyJob
+    with HeavyJob("rebuild"):  # (the nightly baseline waits while this runs)
+        main()

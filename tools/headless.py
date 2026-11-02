@@ -52,6 +52,8 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
 from sysinfo import workers  # noqa: E402
+import baseline_store  # noqa: E402
+from baseline_store import MEASURED, HeavyJob  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
@@ -120,10 +122,11 @@ def judge(check, r):
 
 
 BASELINE = os.path.join(ROOT, "reports", "baseline", "headless.json")
-# (what the counts depend on: the game, the in-page checks, the data; not the build tools, whose output
-# the manifest covers, nor this harness)
-MEASURED = ("src", "index.html", "tools/bench", "tools/lint.js", "tools/traffic_lint.js", "tools/autopilot.js",
-            "data/MANIFEST.json")
+PLACES = os.path.join(ROOT, "reports", "baseline", "headless-places.json")  # where each counted problem was (#157)
+
+
+def load_places():
+    return json.load(open(PLACES, encoding="utf-8")) if os.path.exists(PLACES) else {}
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
@@ -153,14 +156,78 @@ def counts(check, r):
     return out
 
 
-def git(*args):
-    r = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else None
+def places(check, r):
+    """Where each counted problem was, as [x, y, s] per count (x, y null for the benches, which give the route
+    position only): the baseline keeps them so --compare lists places new and gone (#157)."""
+    if "error" in r:
+        return {}
+    if check == "u3":
+        return {k: [[None, None, round(i["s"])] for i in r.get(src) or [] if i.get("s") is not None]
+                for k, src in (("hits", "collisions"), ("closeCuts", "cuts"))}
+    if check == "redruns":
+        return {k: [[None, None, round(i["s"])] for i in r.get(src) or [] if isinstance(i, dict) and i.get("s") is not None]
+                for k, src in (("redRuns", "red"), ("aheadRedRuns", "aheadRed"))}
+    return {k: v["at"] for k, v in (r.get("checks") or {}).items() if isinstance(v, dict) and "at" in v}
 
 
-def trees(rev):
-    """The git objects the checks depend on, at a commit."""
-    return {p: git("rev-parse", f"{rev}:{p}") for p in MEASURED}
+NEAR = 15  # m: a place counts as the same within this (route metres when there is no x, y)
+
+
+def near(a, b):
+    if a[0] is not None and b[0] is not None:
+        return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 <= NEAR * NEAR
+    return a[2] is not None and b[2] is not None and abs(a[2] - b[2]) <= NEAR
+
+
+def place_rows(stored_places, found, limit=6):
+    """Markdown rows: per line, check and count, the places new on the branch (none of main's stored
+    runs of any seed had one within NEAR) and the places gone (main had them, no branch run has),
+    most repeated first: 'x,y (s S) ×runs'."""
+    groups = {}
+    for (line, check, seed), p in found.items():
+        groups.setdefault((line, check), []).append(p)
+    rows = []
+    for (line, check), runs in sorted(groups.items(), key=lambda kv: (int(kv[0][0]), kv[0][1])):
+        prefix = f"line{line}-{check}" + ("" if check in SEEDLESS else "-seed")
+        stored = [v for k, v in stored_places.items() if (k == prefix if check in SEEDLESS else k.startswith(prefix))]
+        if not stored:
+            continue
+        for k in sorted({k for p in runs for k in p} & {k for p in stored for k in p}):
+            mine = [p.get(k, []) for p in runs]
+            main = [p.get(k, []) for p in stored]
+
+            def lonely(lists, others):
+                out = []  # [place, how many runs]
+                flat = [q for o in others for q in o]
+                for lst in lists:
+                    for q in lst:
+                        if any(near(q, o) for o in flat):
+                            continue
+                        hit = next((x for x in out if near(x[0], q)), None)
+                        if hit:
+                            hit[1] += 1
+                        else:
+                            out.append([q, 1])
+                return sorted(out, key=lambda x: -x[1])
+
+            def fmt_places(ps):
+                # (a place in one run only is mostly the seed's reshuffle, as the counts' noise: counted, not
+                # listed; seedless checks list every place)
+                many = ps if check in SEEDLESS else [x for x in ps if x[1] > 1]
+                parts = [((f"{q[0]},{q[1]}" if q[0] is not None else "") + (f" (s {q[2]})" if q[2] is not None else "")
+                          + (f" ×{n}" if n > 1 else "")).strip() for q, n in many[:limit]]
+                if len(many) > limit:
+                    parts.append(f"+{len(many) - limit}")
+                if len(ps) > len(many):
+                    parts.append(f"{len(ps) - len(many)} once")
+                return f"{len(ps)}: " + "; ".join(parts) if parts else "0"
+            new, gone = lonely(mine, main), lonely(main, mine)
+            if new or gone:
+                rows.append(f"| {line} | {check} | {k} | {fmt_places(new)} | {fmt_places(gone)} |")
+    return rows
+
+
+git, trees = baseline_store.git, baseline_store.trees
 
 
 def data_matches(lines):
@@ -406,7 +473,8 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
     ap.add_argument("--baseline", action="store_true",
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
-    ap.add_argument("--compare", action="store_true", help="compare these runs with the baseline")
+    ap.add_argument("--compare", action="store_true", help="compare these runs with the baseline (main's published one when the local one is older)")
+    ap.add_argument("--publish", action="store_true", help="with --baseline: also publish it to the data store (the nightly run, #157)")
     a = ap.parse_args()
     a.seeds = a.seeds or (SPREAD_SEEDS if a.baseline or a.compare else "1-3")
     if a.timeout <= 0:
@@ -426,7 +494,7 @@ def main():
                              f"matching the manifest: {dirty or 'data differs: ' + ', '.join(bad)}")
     if a.compare and (bad := data_matches(lines)):
         print(f"note: data/ differs from data/MANIFEST.json ({', '.join(bad)}): comparing unpublished data")
-    results = {}
+    results, found = {}, {}
     server, url = (None, a.url) if a.url else serve(a.port)
     failed, t0 = 0, time.time()
 
@@ -436,6 +504,7 @@ def main():
         ok, text = judge(check, r)
         failed += not ok
         results[job] = counts(check, r)
+        found[job] = places(check, r)
         name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + ".json"
         with open(os.path.join(a.out, name), "w", encoding="utf-8") as f:
             json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "ok": ok,
@@ -443,7 +512,9 @@ def main():
         print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
+    heavy = HeavyJob("headless")  # (the nightly baseline waits while this runs, tools/baseline_store.py)
     try:
+        heavy.__enter__()
         os.makedirs(a.out, exist_ok=True)
         if a.jobs > 1 and len(jobs) > 1:
             with ProcessPoolExecutor(min(a.jobs, len(jobs))) as ex:
@@ -454,21 +525,33 @@ def main():
             for i, job in enumerate(jobs, 1):
                 report(i, *worker(job, url, a.headed, a.timeout))
     finally:
+        heavy.__exit__()
         if server:
             stop_server(server)
     print(f"{len(jobs) - failed}/{len(jobs)} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
           f"results in {os.path.relpath(a.out, ROOT)}")
     base = json.load(open(BASELINE, encoding="utf-8")) if os.path.exists(BASELINE) else {}
+    stored_places = load_places()
     if a.compare:
         main_rev = git("merge-base", "HEAD", "origin/main") or git("rev-parse", "main")
         want = trees(main_rev)
-        stale = sorted({key_of(*job) for job in results
-                        if (base.get(key_of(*job)) or {}).get("measured_on") not in (None, want)})
+        older = lambda b: {key_of(*job) for job in results if (b.get(key_of(*job)) or {}).get("measured_on") not in (None, want)}
+        if older(base):
+            # (main's nightly baseline, measured on exactly the merge base's code and data)
+            nightly, nightly_places = baseline_store.fetch(baseline_store.key(want))
+            if nightly is not None:
+                print(f"note: comparing with main's published baseline of {main_rev[:7]} (the local one is older)")
+                base, stored_places = nightly, nightly_places or {}
+        stale = sorted(older(base))
         if stale:
             print(f"\nWARNING: the baseline of {', '.join(stale)} was not measured on main ({main_rev[:7]}): "
                   "run --baseline on main first, or read the differences as main's changes plus yours")
         rows = ["| line | check | seeds | outside main's seed spread: mean [min–max] → now | moved inside it | per seed |",
                 "|---|---|---|---|---|---|", *compare_rows(base, results)]
+        prow = place_rows(stored_places, found)
+        if prow:
+            rows += ["", f"Places new on the branch and gone from it (none of main's stored runs, or none of the branch's, within {NEAR} m):",
+                     "", "| line | check | count | new | gone |", "|---|---|---|---|---|", *prow]
         print("\n" + "\n".join(rows))
         with open(os.path.join(a.out, "compare.md"), "w", encoding="utf-8") as f:
             f.write("\n".join(rows) + "\n")
@@ -480,7 +563,18 @@ def main():
         os.makedirs(os.path.dirname(BASELINE), exist_ok=True)
         with open(BASELINE, "w", encoding="utf-8") as f:
             json.dump(dict(sorted(base.items())), f, ensure_ascii=False, indent=1)
-        print(f"baseline: {len(results)} runs stored in {os.path.relpath(BASELINE, ROOT)} (commit it)")
+        stored = load_places()
+        stored.update({key_of(*job): p for job, p in found.items()})
+        with open(PLACES, "w", encoding="utf-8") as f:  # (one run per line: diffs stay readable)
+            rows = (f"{json.dumps(k)}: {json.dumps(v, separators=(',', ':'))}" for k, v in sorted(stored.items()))
+            f.write("{\n" + ",\n".join(rows) + "\n}\n")
+        print(f"baseline: {len(results)} runs stored in {os.path.relpath(BASELINE, ROOT)}"
+              + ("" if a.publish else " (commit it)"))
+        if a.publish:
+            t = trees(rev)
+            mine = {k: v for k, v in base.items() if v.get("measured_on") == t}
+            baseline_store.publish(baseline_store.key(t), mine, {k: v for k, v in stored.items() if k in mine})
+            print(f"published as baselines/{baseline_store.key(t)}.json ({len(mine)} runs of {rev[:7]})")
     sys.exit(1 if failed else 0)
 
 
