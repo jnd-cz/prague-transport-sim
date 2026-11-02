@@ -11,7 +11,7 @@
 // server; tools/deploy.py --pull-reviews (or reports/reviews/ locally) hands them to the agent.
 import * as THREE from 'three';
 import { toLatLon } from './geo.js';
-import { Verdicts } from './verdicts.js';
+import { Verdicts, readLineAnswers } from './verdicts.js';
 import { heightProfile } from './trackHeightProfile.js';
 
 const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
@@ -192,6 +192,7 @@ export class Review {
       this._markers();
       // (the stored answers arrive while the first finding is shown)
       this.verdicts.load().then(() => this._redraw());
+      if (this.findings.some((f) => f.kind === 'trackheight')) this._loadOtherAnswers();
       if (at) {
         [this.T.x, this.T.y, this.yaw, this.pitch, this.dist] = at;
         this.T.z = ground.at(this.T.x, this.T.y);
@@ -359,17 +360,38 @@ body.review #gl { touch-action: none }
   _fill() {
     const v = this.$('rvFilter').value, [src, kind] = v.split('|');
     const all = this.findings.filter((f) => !v || (f.src === src && (!kind || f.kind === kind)));
-    this.list = all.filter((f) => !this.todo || !this.verdicts.get(fid(f))?.v).sort((a, b) => b.mag - a.mag);
-    this.$('rvCount').textContent = `${all.filter((f) => this.verdicts.get(fid(f))?.v).length} / ${all.length} done`;
+    this.list = all.filter((f) => !this.todo || !this._answer(f)?.v).sort((a, b) => b.mag - a.mag);
+    const height = this.findings.filter((f) => f.kind === 'trackheight');
+    const across = height.length ? ` · track heights: ${height.filter((f) => this._answer(f)?.v).length} / ${height.length} answered across lines${this.otherAnswersReady ? '' : ' (loading or offline)'}` : '';
+    this.$('rvCount').textContent = `${all.filter((f) => this.verdicts.get(fid(f))?.v).length} / ${all.length} done${across}`;
     this.$('rvList').innerHTML = this.list.slice(0, 400).map((f, i) => {
       const w = this.where(f.x, f.y);
-      const r = this.verdicts.get(fid(f));
+      const r = this._answer(f);
       const lines = f.kind === 'trackheight' ? ` · lines ${[...new Set(f.spans.map((s) => s.line))].sort((a, b) => a - b).join(', ')}` : '';
       return `<div class="rvItem${r?.v ? ' done' : ''}" data-i="${i}"><span class="sw" style="background:${SRC_COLORS[f.src]}"></span><b>${f.kind}</b>${lines} · ${f.mag.toFixed(0)}${r?.v ? ` · <span class="vd">✓ ${esc(r.v)}</span>` : ''}<br>
 <span class="dim">${w.street || w.stop || ''}${w.s !== null ? ` · s ${w.s} m` : ''}</span></div>`;
     }).join('') + (this.list.length > 400 ? `<div class="rvItem dim">… ${this.list.length - 400} more (narrow the filter)</div>` : '');
     this.cur = -1;
     this._markers();
+  }
+
+  _answer(f) {
+    const local = this.verdicts.get(fid(f)), other = f.kind === 'trackheight' ? this.otherAnswers?.[fid(f)] : null;
+    return other && (!local || (other.t || 0) > (local.t || 0)) ? other : local;
+  }
+
+  async _loadOtherAnswers() {
+    try {
+      const response = await fetch('data/lines.json');
+      if (!response.ok) throw new Error('line list unavailable');
+      const lines = await response.json();
+      const stores = await Promise.all(lines.filter((l) => String(l.line) !== String(this.data.line)).map((l) => readLineAnswers(`line${l.line}`)));
+      this.otherAnswers = {};
+      for (const store of stores) for (const [k, v] of Object.entries(store.items))
+        if (!this.otherAnswers[k] || (v.t || 0) >= (this.otherAnswers[k].t || 0)) this.otherAnswers[k] = v;
+      this.otherAnswersReady = stores.every((s) => s.available);
+    } catch { this.otherAnswersReady = false; }
+    this._redraw();
   }
 
   select(i) {
@@ -413,12 +435,18 @@ ${this._verdictHtml(f)}`;
       this.$('rvCard').querySelectorAll('button[data-v]').forEach((button) => {
         const show = () => {
           const answer = options(f)[+button.dataset.v];
-          const reason = this.$('rvNote')?.value.trim() ? 'A note keeps this answer held for review.' : f.answer_explanations?.[answer];
-          preview.textContent = reason ? `Held: ${reason}` : 'Profile preview is not available for this answer.';
+          const reason = this.$('rvNote')?.value.trim() ? 'A note keeps this answer held for review.' :
+            f.answer_explanations?.[answer] || (['other level (deck / under)', 'unsure'].includes(answer) ? 'This answer stays held for review.' : null);
+          const hasPreview = !reason && !!f.answer_previews?.[answer];
+          svg.querySelectorAll('[data-preview]').forEach((item) => { item.style.display = hasPreview && item.dataset.preview === answer ? '' : 'none'; });
+          preview.textContent = reason ? `Held: ${reason}` : hasPreview ? 'Orange: imported profile at sampled points (DI keeps priority). Uncovered spans keep their existing rule.' : 'Preview unavailable: regenerate the findings file.';
         };
         button.addEventListener('mouseenter', show); button.addEventListener('focus', show);
-        button.addEventListener('mouseleave', () => { preview.textContent = ''; });
-        button.addEventListener('blur', () => { preview.textContent = ''; });
+        const clear = () => {
+          if (button.matches(':focus, :hover')) return;
+          preview.textContent = ''; svg.querySelectorAll('[data-preview]').forEach((item) => { item.style.display = 'none'; });
+        };
+        button.addEventListener('mouseleave', clear); button.addEventListener('blur', clear);
       });
       const pick = (e) => {
         const r = svg.getBoundingClientRect(), chart = this.heightChart;
@@ -491,7 +519,7 @@ ${this._verdictHtml(f)}`;
   }
 
   _verdictHtml(f) {
-    const r = this.verdicts.get(fid(f));
+    const r = this._answer(f);
     const reasons = f.kind === 'trackheight' && f.answer_explanations ? f.answer_explanations : null;
     let explanation = '';
     if (reasons) {
@@ -522,7 +550,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     this._record(f, v, this.$('rvNote')?.value.trim() || '');
     const n = this.list.length;
     let next = null;
-    if (v !== null) for (let k = 1; k <= n && !next; k++) { const g = this.list[(this.cur + k) % n]; if (!this.verdicts.get(fid(g))?.v) next = g; }
+    if (v !== null) for (let k = 1; k <= n && !next; k++) { const g = this.list[(this.cur + k) % n]; if (!this._answer(g)?.v) next = g; }
     this._redraw();
     if (next && this.list.includes(next)) this.select(this.list.indexOf(next));
   }
@@ -571,7 +599,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     const M = new THREE.Matrix4(), c = new THREE.Color();
     this.list.forEach((f, i) => {
       m.setMatrixAt(i, M.makeTranslation(f.x, f.z, -f.y));
-      m.setColorAt(i, c.set(this.verdicts.get(fid(f))?.v ? '#777' : HEIGHT_COLORS[f.status] || SRC_COLORS[f.src] || '#fff'));
+      m.setColorAt(i, c.set(this._answer(f)?.v ? '#777' : HEIGHT_COLORS[f.status] || SRC_COLORS[f.src] || '#fff'));
     });
     m.count = this.list.length;
     m.renderOrder = 6;

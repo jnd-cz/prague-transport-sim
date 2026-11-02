@@ -29,7 +29,8 @@ export function heightProfile(f, route, profile) {
     if (points.length) series.push({ span, points });
   }
   const pts = series.flatMap((s) => s.points), x0 = Math.min(-30, ...pts.map((p) => p.x)), x1 = Math.max(main.length_m + 30, ...pts.map((p) => p.x));
-  const zs = pts.flatMap((p) => [p.ipr_terrain_z, p.di_z, p.game, ...p.archive.map((a) => a.z), ...p.surfaces.map((a) => a.surface_z ?? a.z)]).filter(valid);
+  const zs = [...pts.flatMap((p) => [p.ipr_terrain_z, p.di_z, p.game, ...p.archive.map((a) => a.z), ...p.surfaces.map((a) => a.surface_z ?? a.z)]),
+    ...Object.values(f.answer_previews || {}).flatMap((spans) => Object.values(spans).flatMap((values) => values.map((v) => v[1])))].filter(valid);
   if (!zs.length) return null;
   const z0 = Math.floor(Math.min(...zs) - 1), z1 = Math.ceil(Math.max(...zs) + 1), w = 360, h = 210, left = 42, right = 350, top = 12, bottom = 180;
   const X = (x) => left + (x - x0) / (x1 - x0) * (right - left), Y = (z) => bottom - (z - z0) / (z1 - z0) * (bottom - top);
@@ -56,19 +57,11 @@ export function heightProfile(f, route, profile) {
     const dash = span.direction === 'pathBack' ? '4 2' : '';
     svg += `<g data-series="${esc(span.direction)}">${line(points, (p) => p.archive.find((a) => valid(a.z))?.z, span.direction === 'pathBack' ? '#5be59b' : '#eeeeee', dash)}</g>`;
     if (span === main) svg += `<g data-series="game">${line(points, (p) => p.game, '#48d5ff', '3 2')}</g>`;
-    if (span.proposal?.rule === 'linear_di_portals') {
-      const [a, b] = span.proposal.ends; svg += line(points, (p) => a + (b - a) * Math.max(0, Math.min(1, (p.s - span.start_s) / span.length_m)), '#ff9e31', '2 2');
-    } else if (['review_archive_profile', 'archive_agrees_with_survey'].includes(span.proposal?.rule))
-      svg += line(points, (p) => p.archive.find((a) => valid(a.z) && !a.excluded)?.z, '#ff9e31', '2 3');
-    // the answer "archive, bridged over a dip": the deck across what the archive measured below (#176), on a
-    // curve continuing the grade on both sides (#184; older findings give only the two ends)
-    for (const [a, za, b, zb, curve] of f.bridged?.[span.id] || []) {
-      // (x between the two points around s: a pathBack span is drawn reversed along the main one)
-      const byS = [...points].sort((p, q) => p.s - q.s), x = (s) => {
-        const i = byS.findIndex((q) => q.s >= s), p = byS[Math.max(0, i - 1)], q = byS[i < 0 ? byS.length - 1 : i];
-        return q.s > p.s ? p.x + (q.x - p.x) * (s - p.s) / (q.s - p.s) : q.x; };
-      const d = (curve || [[a, za], [b, zb]]).map(([s, z], i) => `${i ? 'L' : 'M'}${X(x(s)).toFixed(1)},${Y(z).toFixed(1)}`).join('');
-      svg += `<path d="${d}" stroke="#ff9e31" stroke-width="2.5" fill="none"${dash ? ` stroke-dasharray="${dash}"` : ''}><title>bridged: ${za.toFixed(2)} → ${zb.toFixed(2)} m</title></path>`;
+    for (const [choice, spans] of Object.entries(f.answer_previews || {})) {
+      if (!spans[span.id]) continue;
+      const samples = new Map(spans[span.id]);
+      const dots = points.filter((p) => valid(samples.get(p.s))).map((p) => `<circle cx="${X(p.x)}" cy="${Y(samples.get(p.s))}" r="2" fill="#ff9e31"/>`).join('');
+      svg += `<g data-preview="${esc(choice)}" style="display:none">${line(points, (p) => samples.get(p.s), '#ff9e31', dash)}${dots}</g>`;
     }
     for (const p of points) {
       for (const s of p.surfaces) {

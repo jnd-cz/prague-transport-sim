@@ -25,9 +25,10 @@ FILE = {"options": ["right", "wrong"],
                                        {"x": 30.0, "y": 0.0, "kind": "here", "mag": 4, "info": "30 m east"}]}}}
 HEIGHT = {'findings':[{'kind':'trackheight','id':'bridge-test','x':0,'y':0,'mag':10,'status':'review',
     'info':'test bridge','decision':{'span_ids':['span-test'],'structure':{'kind':'bridge'}},
-    'options':['archive profile ok','other level (deck / under)','unsure'],
+    'options':['archive profile ok','follows survey surface','other level (deck / under)','unsure'],
     'answer_explanations':{'archive profile ok':'structure level is not identified',
-                           'follows survey surface':'survey rail height missing or ambiguous'},
+                           'follows survey surface':None},
+    'answer_previews':{'follows survey surface':{'span-test':[[0,200.5],[10,201.5]]}},
     'spans':[{'id':'span-test','line':17,'direction':'path','length_m':10,'start_s':0,
               'structure':{'kind':'bridge'},'status':'review','review_flags':['known_archive_disagreement'],'proposal':{'rule':'independent_height_required'},
               'profile':[{'s':0,'xy':[0,0],'archive':[{'z':200}],'surfaces':[],'ipr_terrain_z':199,'di_z':200},
@@ -132,13 +133,24 @@ def main():
             }""")
             page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT_COMPACT)))
             page.route('**/test-spans.json',lambda q:q.fulfill(status=200,content_type='application/json',body=HEIGHT_BYTES))
+            with open(os.path.join(tmp, 'line22.json'), 'w', encoding='utf-8') as out:
+                json.dump({'items': {'file|trackheight|other-bridge': {'v': 'unsure', 't': 1}}}, out)
             page.goto(f'http://127.0.0.1:{server.server_port}/?line={args.line}&review=height-findings.json',timeout=180000)
             page.wait_for_function('window.review',timeout=180000)
+            page.wait_for_function('window.review.otherAnswersReady',timeout=30000)
             r['height'] = page.evaluate('''async () => {
               const R=window.review; await R.ready;
               R.$('rvFilter').value='file|'; R._fill();
+              const across=R.$('rvCount').textContent;
               const i=R.list.findIndex(f=>f.kind==='trackheight'); R.select(i);
               const svg=document.querySelector('#heightProfile');
+              const held=R.$('rvCard').querySelector('button[data-v="0"]'); held.dispatchEvent(new Event('mouseenter'));
+              const heldText=R.$('rvPreview').textContent;
+              const survey=R.$('rvCard').querySelector('button[data-v="1"]'); survey.focus();
+              const preview=svg.querySelector('[data-preview="follows survey surface"]');
+              const previewShown=preview?.style.display!== 'none' && preview?.querySelector('path')?.getAttribute('d').includes('L');
+              survey.blur();
+              R.otherAnswers={};
               const toggle=R.$('rvHeight').querySelector('[data-height-series="path"]');
               toggle.click(); const hidden=svg.querySelector('[data-series="path"]').style.display==='none'; toggle.click();
               const {heightProfile}=await import('/src/trackHeightProfile.js');
@@ -149,6 +161,9 @@ def main():
               const dom=new DOMParser().parseFromString(chart.html,'text/html');
               const archive=dom.querySelector('[data-series="path"] path').getAttribute('d');
               const projected=dom.querySelector('[data-series="pathBack"] path').getAttribute('d');
+              const gapPoint={...point(5,200,'missing'),archive:[]};
+              const gap=heightProfile({spans:[{...main,profile:[point(0,200,'a'),gapPoint,point(10,201,'b')]}]}, {nearest:()=>null}, {height:()=>null});
+              const gapPath=new DOMParser().parseFromString(gap.html,'text/html').querySelector('[data-series="path"] path').getAttribute('d');
               const button=[...document.querySelectorAll('#rvCard button[data-v]')].map(b=>b.textContent);
               if (svg) svg.dispatchEvent(new PointerEvent('pointermove',{clientX:svg.getBoundingClientRect().left+80}));
               const marker=!!R.heightMarker?.visible, cursor=R.$('heightCursor');
@@ -162,7 +177,7 @@ def main():
               return {count:R.list.filter(f=>f.kind==='trackheight').length, svg:!!svg, marker,
                 reverse:cursor?.getAttribute('visibility')==='visible',
                 conflict:R.hl.children.some(o=>o.material?.color?.getHex()===0xff3333), button,
-                explanation:R.$('rvCard').textContent, clickTo, hidden, archive, projected};
+                explanation:R.$('rvCard').textContent, clickTo, hidden, archive, gapPath, projected, across, heldText, previewShown};
             }''')
             page.click("#rvCard button[data-v='0']")
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
@@ -173,8 +188,11 @@ def main():
             r['desk'] = page.evaluate('''() => {
               const R=window.review, card=R.$('rvCard'), list=R.$('rvList');
               R.select(R.list.findIndex(f=>f.kind==='trackheight'));
+              const b=card.querySelector('button[data-v="1"]'); b.focus();
+              const preview=card.querySelector('[data-preview="follows survey surface"]');
               return {list:list.clientHeight, card:card.clientHeight, cardFull:card.scrollHeight,
-                cardScrolls:getComputedStyle(card).overflowY==='auto', bottom:R.box.getBoundingClientRect().bottom, vh:innerHeight};
+                cardScrolls:getComputedStyle(card).overflowY==='auto', bottom:R.box.getBoundingClientRect().bottom, vh:innerHeight,
+                preview:preview?.style.display !== 'none'};
             }''')
             browser.close()
     finally:
@@ -187,6 +205,8 @@ def main():
     d = r["desk"]
     if d["list"] < 150 or d["bottom"] > d["vh"] + 1 or (d["cardFull"] > d["card"] and not d["cardScrolls"]):
         fails.append(f"desktop panel: the list or the card is cut off: {d}")
+    if not d['preview']:
+        fails.append('answer preview is missing on desktop')
     if not r["by"].get("seams"):
         fails.append("no seam findings from the survey")
     if r["look"] > 30:
@@ -211,16 +231,16 @@ def main():
         fails.append(f"track height finding/profile/hover missing: {r['height']}")
     if r['height'].get('clickTo') != [10, 0]:
         fails.append(f"a click on the chart's end did not move the camera to it: {r['height'].get('clickTo')}")
-    if not r['height']['hidden'] or r['height']['archive'].count('M') != 1 or 'L' not in r['height']['archive']:
+    if not r['height']['hidden'] or r['height']['archive'].count('M') != 1 or 'L' not in r['height']['archive'] or r['height']['gapPath'].count('M') != 2:
         fails.append('archive record transition or legend toggle failed')
     if r['height']['projected'].count('L'):
         fails.append('an out-of-range point was clamped at the edge')
     if r['heightNext'] != 'other-bridge':
         fails.append(f"same-location decision was not independent: {r['heightNext']}")
-    if ('structure level is not identified' not in r['height']['explanation'] or
-            'survey rail height missing or ambiguous' not in r['height']['explanation'] or
-            any('follows survey surface' in b for b in r['height']['button'])):
-        fails.append('the held answer and unavailable survey choice were not explained')
+    if ('structure level is not identified' not in r['height']['heldText'] or not r['height']['previewShown']):
+        fails.append('held-answer reason or focused answer preview is missing')
+    if '1 / 2 answered across lines' not in r['height']['across']:
+        fails.append(f"cross-line answer count: {r['height']['across']}")
     if not any(v.get('decision_id')=='bridge-test' and v.get('span_ids')==['span-test'] and v.get('v')=='archive profile ok'
                and v.get('span_sha256')==HEIGHT_COMPACT['span_sha256']
                for v in r['heightSaved'].get('items',{}).values()):

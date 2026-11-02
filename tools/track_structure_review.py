@@ -29,7 +29,7 @@ from track_context import load_context
 from track_decks import load_decks
 from track_heights import usable
 from track_terrain_fallback import ordinary_fallback
-from track_span_evidence import ARCHIVE, BRIDGED, SURVEY, from_reviews
+from track_span_evidence import ARCHIVE, BRIDGED, SURVEY, SpanEvidence, from_reviews
 
 
 def structure_kind(tags):
@@ -304,12 +304,28 @@ def findings(result, inline=False, span_file='reports/review/track-height-spans.
         item = {'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
                     'mag':longest['length_m'],'info':f"{longest['from_stop']} → {longest['to_stop']}: {decision['structure']['kind']}",
                     'status':'conflict' if conflict else decision['status'],'decision':decision,'spans':linked}
-        explanations, bridged = {}, {}
+        explanations, bridged, previews = {}, {}, {}
         for choice in (ARCHIVE,BRIDGED,SURVEY):
             answer = {'decision_id':decision['id'],'span_ids':decision['span_ids'],'v':choice,'note':'','t':1793577600000}
             if all('approval_profile' in span for span in linked):
                 check = from_reviews({'items':{'preview':answer}},{'findings':[item]},'preview')
                 explanations[choice] = check['held'][0]['reason'] if check['held'] else None
+                if check['span_reviews']:
+                    entry = check['span_reviews'][0]
+                    previews[choice] = {}
+                    for span in linked:
+                        profile = next((p for p in entry['profiles'] if p['xy'] == span['approval_profile']['xy']), None)
+                        if profile is None:
+                            continue  # a short uncovered span keeps its existing rule
+                        evidence = SpanEvidence([{**entry, 'profiles': [profile]}])
+                        identity = profile['di_ids'][0]
+                        values = []
+                        for point in span['profile']:
+                            archive = [a for a in point['archive'] if usable(a.get('z')) and not a.get('excluded')]
+                            match = evidence.at(identity, *point['xy'], archive)
+                            z = point.get('di_z') if usable(point.get('di_z')) else (match[0]['z'] if match else None)
+                            values.append([point['s'], round(z, 3) if z is not None else None])
+                        previews[choice][span['id']] = values
                 if choice==BRIDGED and check['span_reviews']:
                     # (the chart draws the deck across each dip: [start s, z, end s, z] per span)
                     for span,profile in zip(linked,check['span_reviews'][0]['profiles']):
@@ -322,6 +338,7 @@ def findings(result, inline=False, span_file='reports/review/track-height-spans.
         if bridged:
             item['bridged'] = bridged
         item['answer_explanations'] = explanations
+        item['answer_previews'] = previews
         if not inline:
             del item['spans']
         out.append(item)
