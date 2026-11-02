@@ -8,7 +8,7 @@ repeated failed logins). The password comes from ~/.netrc (machine <host> login 
 or TRAM_DEPLOY_PASSWORD: there is nobody to ask.
 
 At night (NIGHT, local hours) it measures main's regression baseline once per change of what the
-checks depend on (tools/baseline_store.py: the game, the checks, the data manifest), with 2 pages at
+checks depend on (tools/baseline_store.py: the game, the checks, the data manifest, truth.json), with 2 pages at
 once, and publishes it to the data store for `headless.py --compare` (#157). Not while another heavy
 job runs on this computer (headless.py, rebuild.py) or memory is short; a merge of docs or tools only
 costs nothing, and several merges in a day cost one run.
@@ -32,7 +32,7 @@ STATE = os.path.join(ROOT, "reports", "autodeploy.json")
 TASK = "tram-autodeploy"
 RETRY = 3600  # s after a failed deploy of the same commit
 NIGHT = range(1, 5)  # local hours in which the nightly baseline may start
-LINES, CHECKS = "9,17,22,23,37", "u3,redruns,traffic,lint,surfaces"
+LINES, CHECKS = "9,17,22,23,37", "u3,redruns,traffic,lint,surfaces,canted,crossing"
 # (under pythonw a console child would open a window of its own on every run)
 QUIET = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 

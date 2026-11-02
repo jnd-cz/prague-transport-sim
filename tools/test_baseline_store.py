@@ -1,9 +1,13 @@
-"""The nightly baseline's key, lock and decision (#157): python -I tools/test_baseline_store.py"""
+"""The nightly baseline's key, inputs, lock and decision (#157, #126): python -I tools/test_baseline_store.py"""
 import datetime
+import glob
 import io
+import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -36,6 +40,51 @@ class Store(unittest.TestCase):
     def test_own_lock_is_not_busy(self):
         with baseline_store.HeavyJob("headless"):
             self.assertFalse(any(str(os.getpid()) in b for b in baseline_store.busy()))
+
+
+class Inputs(unittest.TestCase):
+    """The user's facts are measured like the code: truth.json alone changes a baseline's key (#126)."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = self.tmp.name
+        for p, text in (("src/main.js", "1"), ("data/MANIFEST.json", "{}"), ("data/truth.json", '{"a": 1}')):
+            os.makedirs(os.path.join(self.root, os.path.dirname(p)), exist_ok=True)
+            self.write(p, text)
+        self.commit()
+
+    def write(self, p, text):
+        with open(os.path.join(self.root, p), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def commit(self):
+        for cmd in (["init", "-q"], ["add", "-A"],
+                    ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"]):
+            subprocess.run(["git", *cmd], cwd=self.root, check=True, capture_output=True)
+
+    def test_a_truth_edit_is_dirty_and_then_a_new_key(self):
+        before = baseline_store.trees("HEAD", root=self.root)
+        self.assertEqual(baseline_store.dirty(root=self.root), "")
+        self.write("data/truth.json", '{"a": 2}')
+        self.assertIn("data/truth.json", baseline_store.dirty(root=self.root))  # (--baseline stops before any job)
+        self.commit()
+        after = baseline_store.trees("HEAD", root=self.root)
+        self.assertEqual(before["src"], after["src"])
+        self.assertNotEqual(baseline_store.key(before), baseline_store.key(after))
+
+    def test_a_baseline_from_before_truth_was_measured_is_stale(self):
+        now = baseline_store.trees("HEAD", root=self.root)
+        old = {k: v for k, v in now.items() if k != "data/truth.json"}  # (measured_on of a run stored before #126)
+        self.assertNotEqual(old, now)
+
+    def test_every_fixed_data_file_the_game_loads_is_measured(self):
+        # (a per-line file is covered by the manifest; a fixed one must be in it or in MEASURED)
+        root = baseline_store.ROOT
+        loaded = {m for p in glob.glob(os.path.join(root, "src", "*.js"))
+                  for m in re.findall(r"['`](data/[a-z_]+\.json)['`]", open(p, encoding="utf-8").read())}
+        manifest = {f"data/{f}" for f in json.load(open(os.path.join(root, "data", "MANIFEST.json"), encoding="utf-8"))["files"]}
+        self.assertIn("data/truth.json", loaded)
+        self.assertEqual(sorted(loaded - manifest - set(baseline_store.MEASURED)), [])
 
 
 class Nightly(unittest.TestCase):
