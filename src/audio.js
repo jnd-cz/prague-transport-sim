@@ -6,6 +6,8 @@ export class TramAudio {
     this.ctx = null;
     this.muted = false;
     this.active = false;
+    this.finishing = false;
+    this.epoch = 0;
     this.lastJoint = 0;
   }
 
@@ -73,13 +75,27 @@ export class TramAudio {
   }
 
   setMuted(m) {
+    if (this.muted === m) return;
     this.muted = m;
-    if (this.master) this.master.gain.value = this.active && !m ? 0.6 : 0;
+    this._fade(this.active && !m ? 0.6 : 0, 0.05);
   }
 
-  setActive(on) {
+  // On finish, let an already-started crash play as the shift fades out. A pause or menu
+  // transition mutes promptly; the separate preference remains unchanged.
+  setActive(on, finishing = false) {
+    if (this.active === on && this.finishing === finishing) return;
+    if (this.active && !on) this.epoch++;
     this.active = on;
-    if (this.master) this.master.gain.value = on && !this.muted ? 0.6 : 0;
+    this.finishing = finishing;
+    this._fade(on && !this.muted ? 0.6 : 0, finishing && !this.muted ? 1.3 : 0.05);
+  }
+
+  _fade(target, seconds) {
+    if (!this.master) return;
+    const g = this.master.gain, t = this.ctx.currentTime;
+    if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t);
+    else { const value = g.value; g.cancelScheduledValues(t); g.setValueAtTime(value, t); }
+    g.linearRampToValueAtTime(target, t + seconds);
   }
 
   update(tram, curvatureLimit, dt) {
@@ -108,7 +124,8 @@ export class TramAudio {
     if (joint !== this.lastJoint && v > 1 && !tram.slide) {
       this.lastJoint = joint;
       this.click(0.06 + Math.min(v / 18, 1) * 0.1, 140);
-      setTimeout(() => this.click(0.05 + Math.min(v / 18, 1) * 0.08, 120), (2.0 / Math.max(v, 1)) * 1000);
+      const epoch = this.epoch;
+      setTimeout(() => { if (epoch === this.epoch) this.click(0.05 + Math.min(v / 18, 1) * 0.08, 120); }, (2.0 / Math.max(v, 1)) * 1000);
     }
   }
 

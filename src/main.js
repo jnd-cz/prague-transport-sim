@@ -736,7 +736,7 @@ function frame(now) {
   if (game && !window.headless) {
     const inMenu = !$('menu').classList.contains('hidden');
     const sounding = !inMenu && !game.paused && !game.finished && !(inspect.active && inspect.paused);
-    audio.setActive(sounding);
+    audio.setActive(sounding, !inMenu && !game.paused && game.finished && !(inspect.active && inspect.paused));
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(dt) : [dt];
     steps.forEach((h, i) => {
@@ -752,7 +752,7 @@ function frame(now) {
     updateSnow(dt, now / 1000);
     if (!inspect.active && !game.paused && !game.finished) traffic.update(dt, camera);
     // The shift may have finished during game.update().
-    if (game.finished) audio.setActive(false);
+    if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
     audio.update(tram, game.currentLimit, dt);
     hudTimer -= dt;
     if (hudTimer <= 0 && !inMenu) { hudTimer = 1 / 30; hud.update(game, game.opts); }

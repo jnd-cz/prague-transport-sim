@@ -57,7 +57,17 @@ class AudioPause(unittest.TestCase):
                 gain(0)
                 page.click('#btnStart')
                 gain(0.6)
-                page.evaluate('game.finished = true')
+                crash = page.evaluate('''() => {
+                  const a = game.audio, source = a.ctx.createBufferSource.bind(a.ctx); let crashes = 0;
+                  a.ctx.createBufferSource = () => { crashes++; return source(); };
+                  Object.defineProperty(game, 'currentLimit', {value: 20, configurable: true});
+                  game.tram.v = 15; game._updateRules(0.01);
+                  a.ctx.createBufferSource = source;
+                  return {finished:game.finished, failed:game.failed, crashes};
+                }''')
+                self.assertEqual(crash, {'finished':True, 'failed':True, 'crashes':1})
+                page.wait_for_function('game.finished && !game.audio.active', timeout=30000)
+                self.assertGreater(page.evaluate('game.audio.master.gain.value'), 0.01)
                 gain(0)
                 browser.close()
         finally:
