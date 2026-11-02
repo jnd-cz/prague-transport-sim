@@ -712,7 +712,7 @@ export class DtmSurface {
     // underground areas (a road tunnel's floor: the Vyšehrad tunnel) are not drawn, but their outlines
     // tell the tunnel's width and where its road and footway are
     this.under = dtm.areas.filter((a) => a.l < 0 && a.r?.length > 2).map((a) => ({ c: a.c, ring: a.r }));
-    for (const a of dtm.areas) {
+    for (const [sourceId, a] of dtm.areas.entries()) {
       if (a.l < 0) continue; // metro and other underground levels
       const fill = (ring) => {
         // missing heights: neighbours on the ring, else the terrain
@@ -750,7 +750,7 @@ export class DtmSurface {
       let tri;
       try { tri = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2)); } catch { continue; }
       const all = [...outer, ...holes.flat()];
-      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs };
+      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId };
       // on a structure: a long deck outline (the Modřany estakáda's track bed runs from the foot of
       // one ramp to the other) must not be spanned by long triangles; inner points take the height
       // of the outline's own corners nearby

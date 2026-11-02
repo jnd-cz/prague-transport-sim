@@ -94,6 +94,7 @@ export function run({ unfiltered = false } = {}) {
     }
   }
   let samples = 0, missing = 0;
+  const hits = [], missingHeads = [];
   for (const bin of [...bins].sort((a, b) => a - b)) for (const side of [-1, 1]) {
     const s = bin * 2;
     let head = null;
@@ -103,7 +104,7 @@ export function run({ unfiltered = false } = {}) {
       head = ray.intersectObjects(rails, false)[0];
       if (head) break;
     }
-    if (!head) { missing++; continue; }
+    if (!head) { missing++; missingHeads.push({ s, side }); continue; }
     samples++;
     const surface = ray.intersectObjects(targets, false).find((h) => {
       if (h.point.y > head.point.y + 0.4) return false;
@@ -112,13 +113,28 @@ export function run({ unfiltered = false } = {}) {
       return a && (a[3] === 0 || profile.onBridge(s));
     });
     const excess = surface ? surface.point.y - head.point.y : -Infinity, key = Math.round(s / 20);
+    if (excess > 0.001) {
+      const source = surface.object.userData.surface === 'dtm' ? area(surface.object, surface.faceIndex) : null;
+      const way = source ? null : surface.object.userData.footwayRanges?.find((r) => r[0] <= surface.faceIndex && surface.faceIndex < r[1])?.[2];
+      hits.push({ s, side, x: head.point.x, y: -head.point.z, railZ: head.point.y, surfaceZ: surface.point.y, way: way ?? null,
+                  source: source ? 'dtm' : 'osm-footway', area: source?.[4] ?? null,
+                  class: source?.[2] ?? 'footway', level: source?.[3] ?? null, excess });
+    }
     if (excess > 0.001 && !(bad.get(key)?.mag >= excess)) bad.set(key, {
       s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: excess,
       info: `${surface.object.userData.surface === 'dtm' ? `dtm/${area(surface.object, surface.faceIndex)[2]}` : 'OSM footway'} ${(excess * 1000).toFixed(0)} mm above rail`,
     });
   }
   const places = [...bad.values()].sort((a, b) => b.mag - a.mag);
-  return { calibration: calibration(game), checks: { crossingSlab: { rule: 'pedestrian-surface-below-rail', count: places.length,
+  const areaIds = new Set([...hits.filter((h) => h.area !== null).map((h) => h.area),
+                           ...(route.ground.pedestrianCrossings?.review || []).map((s) => s.area)]);
+  const sourceAreas = [...areaIds].filter((id) => route.ground.dtm?.areas[id]).map((id) => {
+    const a = route.ground.dtm.areas[id];
+    return { id, sourceId: a.sourceId, class: a.c, level: a.l, ring: a.ring, holes: a.holes };
+  });
+  return { calibration: calibration(game), hits, missingHeads, sourceAreas,
+           reviewCandidates: route.ground.pedestrianCrossings?.review || [],
+           checks: { crossingSlab: { rule: 'pedestrian-surface-below-rail', count: places.length,
                                   of: samples, missing, sections: places.sort((a, b) => a.s - b.s),
                                   places: [...places].sort((a, b) => b.mag - a.mag).slice(0, 12) } } };
 }
