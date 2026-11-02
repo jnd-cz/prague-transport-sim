@@ -426,8 +426,10 @@ A findings file can bring its own answers (`"options": [...]`). Lists for review
 large track-height disagreements (`tools/dtmp_tracks.py --findings`).
 The grouped structure-height queue uses `?line=17&review=reports/review/track-heights.json`: select a
 decision to inspect its linked spans, height profile and sources. Answers with notes, uncertain choices
-and unspecified levels remain held; convert unambiguous answers with
-`python -P -E tools/track_span_evidence.py --from-reviews reports/reviews/line17.json`. Proposals stay separate from approved height evidence;
+and unspecified levels remain held. The card explains any held archive answer and omits the survey
+choice when its rail-height samples cannot cover the decision. Convert unambiguous answers with
+`python -P -E tools/track_span_evidence.py --from-reviews reports/reviews/line17.json`.
+Proposals stay separate from approved height evidence;
 the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
 reproduction commands and `--evidence` format.
 

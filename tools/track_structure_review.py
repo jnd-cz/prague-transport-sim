@@ -28,6 +28,7 @@ from track_context import load_context
 from track_decks import load_decks
 from track_heights import usable
 from track_terrain_fallback import ordinary_fallback
+from track_span_evidence import from_reviews
 
 
 def structure_kind(tags):
@@ -284,8 +285,12 @@ def review(report, structures, terrain, lines):
             'decisions':list(decisions.values()),'spans':spans,'ordinary_terrain_fallbacks':fallbacks}
 
 
-def findings(result):
-    """One review pin per decision, with the complete direction spans attached."""
+def queue_text(result):
+    return json.dumps(result,ensure_ascii=False,separators=(',',':'))+'\n'
+
+
+def findings(result, inline=False, span_file='reports/review/track-height-spans.json'):
+    """One pin per decision; the shared span queue is loaded only once."""
     spans = {s['id']:s for s in result['spans']}
     out = []
     for decision in result['decisions']:
@@ -295,10 +300,27 @@ def findings(result):
         longest = max(linked,key=lambda s:s['length_m'])
         point = longest['profile'][len(longest['profile'])//2]
         conflict = any('known_archive_disagreement' in s.get('review_flags',[]) or 'conflicting_level_evidence' in s.get('review_flags',[]) for s in linked)
-        out.append({'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
+        item = {'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
                     'mag':longest['length_m'],'info':f"{longest['from_stop']} → {longest['to_stop']}: {decision['structure']['kind']}",
-                    'status':'conflict' if conflict else decision['status'],'decision':decision,'spans':linked})
-    return {'schema':1,'snapshot':result['snapshot'],'findings':out}
+                    'status':'conflict' if conflict else decision['status'],'decision':decision,'spans':linked}
+        explanations = {}
+        for choice in ('archive profile ok','follows survey surface'):
+            answer = {'decision_id':decision['id'],'span_ids':decision['span_ids'],'v':choice,'note':'','t':1793577600000}
+            if all('approval_profile' in span for span in linked):
+                check = from_reviews({'items':{'preview':answer}},{'findings':[item]},'preview')
+                explanations[choice] = check['held'][0]['reason'] if check['held'] else None
+            else:
+                explanations[choice] = 'span approval data is incomplete'
+        item['options'] = ['archive profile ok'] + ([] if explanations['follows survey surface'] else ['follows survey surface']) + ['other level (deck / under)','unsure']
+        item['answer_explanations'] = explanations
+        if not inline:
+            del item['spans']
+        out.append(item)
+    payload = {'schema':1,'snapshot':result['snapshot'],'findings':out}
+    if not inline:
+        payload.update(span_file=span_file,
+                       span_sha256=hashlib.sha256(queue_text(result).encode('utf-8')).hexdigest())
+    return payload
 
 
 def markdown(result):
@@ -339,6 +361,10 @@ def main():
     ap.add_argument('--markdown-output',type=Path,default=ROOT/'reports/review/track-height-spans.md')
     ap.add_argument('--findings-output',type=Path,default=ROOT/'reports/review/track-heights.json')
     a = ap.parse_args()
+    try:
+        span_file = a.output.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        ap.error('--output must be inside the checkout so review mode can load it')
     report = json.loads(a.input.read_text(encoding='utf-8'))
     decks = load_decks(ROOT)
     context = load_context(decks)
@@ -347,9 +373,11 @@ def main():
         result = review(report,Structures(context.paths,decks.records),terrain,{n:load_line(n) for n in (9,17,22,23,37)})
     finally:
         terrain.f.close()
-    write_json(a.output,result)
-    write_json(a.findings_output,findings(result))
     from atomic import replacing
+    a.output.parent.mkdir(parents=True,exist_ok=True)
+    with replacing(a.output,'w',encoding='utf-8',newline='\n') as f:
+        f.write(queue_text(result))
+    write_json(a.findings_output,findings(result,span_file=span_file))
     a.markdown_output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(a.markdown_output,'w',encoding='utf-8') as f:
         f.write(markdown(result))

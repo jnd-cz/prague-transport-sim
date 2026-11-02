@@ -126,6 +126,33 @@ function fileFindings(json, label) {
   return out;
 }
 
+// A track-height findings file references the shared queue instead of repeating all profiles.
+export async function loadFindings(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const json = await response.json();
+  if (json.span_file) {
+    const r = await fetch(json.span_file);
+    if (!r.ok) throw new Error(`span queue: HTTP ${r.status}`);
+    const bytes = await r.arrayBuffer();
+    if (globalThis.crypto?.subtle) {
+      const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((n) => n.toString(16).padStart(2, '0')).join('');
+      if (hash !== json.span_sha256) throw new Error('span queue differs from the findings file');
+    }
+    const queue = JSON.parse(new TextDecoder().decode(bytes));
+    if (queue.snapshot !== json.snapshot) throw new Error('span queue snapshot differs from the findings file');
+    const spans = new Map(queue.spans.map((s) => [s.id, s]));
+    for (const f of json.findings) {
+      f.spans = f.decision.span_ids.map((id) => {
+        if (!spans.has(id)) throw new Error(`span queue missing ${id}`);
+        return spans.get(id);
+      });
+      f.span_sha256 = json.span_sha256;
+    }
+  }
+  return fileFindings(json, url.split('/').pop());
+}
+
 export class Review {
   constructor({ scene, camera, canvas, data, route, ground, world, url = '', at = null }) {
     Object.assign(this, { scene, camera, canvas, data, route, ground, world, dtm: ground.dtm });
@@ -154,7 +181,7 @@ export class Review {
       this.seams = pts;
       this.findings.push(...kerbFindings(data.dtm), ...grouped(pts));
     }
-    this.ready = (url ? fetch(url).then((r) => r.json()).then((j) => this.findings.push(...fileFindings(j, url.split('/').pop())))
+    this.ready = (url ? loadFindings(url).then((items) => this.findings.push(...items))
       .catch((e) => this._note(`could not read ${url}: ${e.message}`)) : Promise.resolve()).then(() => {
       for (const f of this.findings) {
         f.z ??= ground.at(f.x, f.y);
@@ -374,9 +401,9 @@ ${this._verdictHtml(f)}`;
       const svg = this.$('heightProfile');
       svg.addEventListener('pointermove', (e) => {
         const r = svg.getBoundingClientRect(), chart = this.heightChart;
-        const px = (e.clientX-r.left)/r.width*chart.width;
-        const s = chart.x0 + (px-chart.left)/(chart.right-chart.left)*(chart.x1-chart.x0);
-        const p = chart.points.reduce((a,b) => Math.abs(b.x-s)<Math.abs(a.x-s) ? b : a);
+        const px = (e.clientX - r.left) / r.width * chart.width;
+        const s = chart.x0 + (px - chart.left) / (chart.right - chart.left) * (chart.x1 - chart.x0);
+        const p = chart.points.reduce((a, b) => Math.abs(b.x - s) < Math.abs(a.x - s) ? b : a);
         this._heightCursor(p);
       });
     }
@@ -385,13 +412,13 @@ ${this._verdictHtml(f)}`;
   _heightCursor(p) {
     const chart = this.heightChart, cursor = this.$('heightCursor');
     if (!chart || !p || !cursor) return;
-    const x = chart.left + (p.x-chart.x0)/(chart.x1-chart.x0)*(chart.right-chart.left);
-    cursor.setAttribute('x1',x); cursor.setAttribute('x2',x); cursor.setAttribute('visibility','visible');
+    const x = chart.left + (p.x - chart.x0) / (chart.x1 - chart.x0) * (chart.right - chart.left);
+    cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.setAttribute('visibility', 'visible');
     if (!this.heightMarker) {
-      this.heightMarker = new THREE.Mesh(new THREE.SphereGeometry(1.2,12,8),new THREE.MeshBasicMaterial({color:'#ffffff',depthTest:false}));
+      this.heightMarker = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff', depthTest: false }));
       this.heightMarker.renderOrder = 10; this.group.add(this.heightMarker);
     }
-    this.heightMarker.position.set(p.xy[0],(p.game ?? this.ground.at(...p.xy))+1.5,-p.xy[1]);
+    this.heightMarker.position.set(p.xy[0], (p.game ?? this.ground.at(...p.xy)) + 1.5, -p.xy[1]);
     this.heightMarker.visible = true;
   }
 
@@ -437,8 +464,18 @@ ${this._verdictHtml(f)}`;
 
   _verdictHtml(f) {
     const r = this.verdicts.get(fid(f));
+    const reasons = f.kind === 'trackheight' && f.answer_explanations ? f.answer_explanations : null;
+    let explanation = '';
+    if (reasons) {
+      const lines = [];
+      if (reasons['archive profile ok']) lines.push(`Archive answer stays held: ${esc(reasons['archive profile ok'])}.`);
+      if (reasons['follows survey surface']) lines.push(`Survey answer unavailable: ${esc(reasons['follows survey surface'])}.`);
+      lines.push('Notes, unsure and unspecified other levels stay held for review.');
+      explanation = `<div class="dim">${lines.join('<br>')}</div>`;
+    }
     return `<div class="rvVerdict"><textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
 <div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
+${explanation}
 <div class="dim" id="rvSync">${this._syncText()}</div></div>`;
   }
 
@@ -467,7 +504,7 @@ ${this._verdictHtml(f)}`;
     const w = this.where(f.x, f.y);
     this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
       info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1],
-      ...(f.kind === 'trackheight' ? { decision_id: f.id, span_ids: f.decision.span_ids } : {}) });
+      ...(f.kind === 'trackheight' ? { decision_id: f.id, span_ids: f.decision.span_ids, span_sha256: f.span_sha256 } : {}) });
   }
 
   // the list, pins and card again after the answers changed, on the same finding
@@ -529,11 +566,11 @@ ${this._verdictHtml(f)}`;
     if (f.kind === 'trackheight') for (const span of f.spans) {
       const pts = span.profile.map((p) => {
         const n = this.route.nearest(...p.xy);
-        return [p.xy[0],p.xy[1],n && n.d < 8 ? this.ground.profile.height(n.s) : this.ground.at(...p.xy)];
+        return [p.xy[0], p.xy[1], n && n.d < 8 ? this.ground.profile.height(n.s) : this.ground.at(...p.xy)];
       });
       if (pts.length < 2) continue;
       const conflict = span.review_flags?.some((x) => x === 'known_archive_disagreement' || x === 'conflicting_level_evidence');
-      const o = new THREE.Mesh(band(pts,1.2,0.5),new THREE.MeshBasicMaterial({color:HEIGHT_COLORS[conflict ? 'conflict' : span.status] || HEIGHT_COLORS.review,depthTest:false,side:THREE.DoubleSide}));
+      const o = new THREE.Mesh(band(pts, 1.2, 0.5), new THREE.MeshBasicMaterial({ color: HEIGHT_COLORS[conflict ? 'conflict' : span.status] || HEIGHT_COLORS.review, depthTest: false, side: THREE.DoubleSide }));
       o.renderOrder = 8; this.hl.add(o);
     }
     const a = f.c && this.dtm?.areas.find((a) => a.c === f.c && a.l === 0 && inRing(f.x, f.y, a.ring));
@@ -750,8 +787,8 @@ ${this._verdictHtml(f)}`;
       const rect = this.canvas.getBoundingClientRect(), v = new THREE.Vector3();
       let best = null, distance = 22;
       for (const p of this.heightChart.points) {
-        v.set(p.xy[0],p.game ?? this.ground.at(...p.xy),-p.xy[1]).project(this.camera);
-        const d = Math.hypot(rect.left+(v.x+1)*rect.width/2-cx,rect.top+(1-v.y)*rect.height/2-cy);
+        v.set(p.xy[0], p.game ?? this.ground.at(...p.xy), -p.xy[1]).project(this.camera);
+        const d = Math.hypot(rect.left + (v.x + 1) * rect.width / 2 - cx, rect.top + (1 - v.y) * rect.height / 2 - cy);
         if (v.z < 1 && d < distance) { distance = d; best = p; }
       }
       if (best) this._heightCursor(best);

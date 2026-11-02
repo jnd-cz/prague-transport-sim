@@ -1,6 +1,7 @@
 """Explicitly reviewed structure profiles; no proposal is applied automatically (#106)."""
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -74,8 +75,34 @@ class SpanEvidence:
         return out
 
 
+def hydrate_findings(findings, root=None):
+    """Resolve a compact findings file against its exact generated span queue."""
+    ref = findings.get('span_file')
+    if not ref:
+        return findings
+    root = Path(root) if root else Path(__file__).resolve().parent.parent
+    relative = Path(ref)
+    if relative.is_absolute() or '..' in relative.parts:
+        raise ValueError('invalid span queue path')
+    raw = (root / relative).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != findings.get('span_sha256'):
+        raise ValueError('span queue differs from the findings file; regenerate both')
+    queue = json.loads(raw)
+    if queue.get('snapshot') != findings.get('snapshot'):
+        raise ValueError('span queue snapshot differs from the findings file')
+    spans = {s['id']:s for s in queue['spans']}
+    hydrated = []
+    for f in findings['findings']:
+        ids = f['decision']['span_ids']
+        if any(i not in spans for i in ids):
+            raise ValueError('span queue is missing a decision span')
+        hydrated.append({**f,'spans':[spans[i] for i in ids]})
+    return {**findings,'findings':hydrated}
+
+
 def from_reviews(verdicts, findings, source_name):
     """Convert unambiguous user answers; notes, other levels and uncertain choices stay held."""
+    findings = hydrate_findings(findings)
     by_id = {f['id']:f for f in findings['findings'] if f.get('kind')=='trackheight'}
     reviews, held, latest = [], [], {}
     for key,answer in verdicts.get('items',{}).items():
@@ -88,7 +115,8 @@ def from_reviews(verdicts, findings, source_name):
     for identity,(_,key,answer) in latest.items():
         item = by_id.get(identity)
         reason = None
-        if not item or set(answer.get('span_ids',[])) != set(item['decision']['span_ids']):
+        if (not item or set(answer.get('span_ids',[])) != set(item['decision']['span_ids'])
+                or (answer.get('span_sha256') and answer['span_sha256'] != findings.get('span_sha256'))):
             reason = 'missing or changed decision scope'
         elif answer.get('note') or answer.get('v') not in ('archive profile ok','follows survey surface'):
             reason = 'note, unsure or unspecified other level'
@@ -113,6 +141,14 @@ def from_reviews(verdicts, findings, source_name):
             if not p.get('di_ids'):
                 reason = 'span has no DI identities'; break
             if answer['v']=='archive profile ok':
+                for point in span['profile']:
+                    if isinstance(point.get('di_z'),(int,float)) and 100<point['di_z']<500:
+                        continue
+                    zs = [c['z'] for c in point.get('archive',[]) if isinstance(c.get('z'),(int,float))
+                          and 100<c['z']<500 and not c.get('excluded')]
+                    if not zs or max(zs)-min(zs)>.3:
+                        reason = 'archive rail height missing, excluded or conflicting on part of the span'; break
+                if reason: break
                 p['rule'] = {'type':'archive'}
             else:
                 line = LineString(p['xy']); samples, surface_ids = [], set()

@@ -1,6 +1,8 @@
 """Profile rendering: python -P -E tools/test_track_height_profile.py (free-port server)."""
 from pathlib import Path
 import json
+import hashlib
+import re
 import sys
 import unittest
 from playwright.sync_api import sync_playwright
@@ -10,13 +12,45 @@ from headless import serve,stop_server
 
 
 class HeightProfile(unittest.TestCase):
+    def test_compact_findings_load_and_reject_a_changed_queue(self):
+        queue = {'snapshot':'test','spans':[{'id':'s','profile':[]}]}
+        raw = json.dumps(queue).encode('utf-8')
+        data = {'snapshot':'test','span_file':'test-spans.json','span_sha256':hashlib.sha256(raw).hexdigest(),
+                'findings':[{'kind':'trackheight','id':'d','x':0,'y':0,'decision':{'span_ids':['s']}}]}
+        server,url=serve(0)
+        try:
+            with sync_playwright() as p:
+                browser=p.chromium.launch(headless=True)
+                page=browser.new_page()
+                page.route('**/test-findings.json',lambda r:r.fulfill(content_type='application/json',body=json.dumps(data)))
+                page.route('**/test-spans.json',lambda r:r.fulfill(content_type='application/json',body=raw))
+                html=(Path(__file__).resolve().parent.parent/'index.html').read_text(encoding='utf-8')
+                importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
+                page.route('**/profile-loader-test',lambda r:r.fulfill(body=importmap))
+                page.goto(url+'/profile-loader-test')
+                result=page.evaluate('''async () => {
+                  const {loadFindings}=await import('/src/review.js');
+                  const f=await loadFindings('/test-findings.json');
+                  return {count:f.length,id:f[0].spans[0].id,sha:f[0].span_sha256};
+                }''')
+                self.assertEqual(result,{'count':1,'id':'s','sha':data['span_sha256']})
+                data['span_sha256'] = '0'*64
+                message=page.evaluate('''async () => {
+                  try { await (await import('/src/review.js')).loadFindings('/test-findings.json'); return null; }
+                  catch (e) { return e.message; }
+                }''')
+                self.assertIn('differs',message)
+                browser.close()
+        finally:
+            stop_server(server)
+
     def test_all_pinned_review_decisions_render(self):
         source=Path(__file__).resolve().parent.parent/'reports/review/track-height-spans.json'
         if not source.exists():
             self.skipTest('the pinned review spans have not been generated')
         sys.path.insert(0,str(Path(__file__).resolve().parent))
         from track_structure_review import findings
-        items=findings(json.loads(source.read_text(encoding='utf-8')))['findings']
+        items=findings(json.loads(source.read_text(encoding='utf-8')),inline=True)['findings']
         server,url=serve(0)
         try:
             with sync_playwright() as p:

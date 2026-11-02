@@ -4,6 +4,8 @@ python -P -E tools/test_review.py [--line 17]
 served by the test, not written). An answer with a note goes to the server and comes back after a
 reload with the browser's storage cleared (#136)."""
 import argparse
+import faulthandler
+import hashlib
 import json
 import math
 import os
@@ -23,6 +25,9 @@ FILE = {"options": ["right", "wrong"],
                                        {"x": 30.0, "y": 0.0, "kind": "here", "mag": 4, "info": "30 m east"}]}}}
 HEIGHT = {'findings':[{'kind':'trackheight','id':'bridge-test','x':0,'y':0,'mag':10,'status':'review',
     'info':'test bridge','decision':{'span_ids':['span-test'],'structure':{'kind':'bridge'}},
+    'options':['archive profile ok','other level (deck / under)','unsure'],
+    'answer_explanations':{'archive profile ok':'structure level is not identified',
+                           'follows survey surface':'survey rail height missing or ambiguous'},
     'spans':[{'id':'span-test','line':17,'direction':'path','length_m':10,'start_s':0,
               'structure':{'kind':'bridge'},'status':'review','review_flags':['known_archive_disagreement'],'proposal':{'rule':'independent_height_required'},
               'profile':[{'s':0,'xy':[0,0],'archive':[{'z':200}],'surfaces':[],'ipr_terrain_z':199,'di_z':200},
@@ -30,6 +35,12 @@ HEIGHT = {'findings':[{'kind':'trackheight','id':'bridge-test','x':0,'y':0,'mag'
 # Two independent decisions may occupy the same coordinates.
 HEIGHT['findings'].append({**HEIGHT['findings'][0], 'id':'other-bridge',
                            'decision':{'span_ids':['other-span'],'structure':{'kind':'bridge'}}})
+HEIGHT_QUEUE = {'snapshot':'test','spans':[HEIGHT['findings'][0]['spans'][0],
+                {**HEIGHT['findings'][0]['spans'][0], 'id':'other-span'}]}
+HEIGHT_BYTES = json.dumps(HEIGHT_QUEUE).encode('utf-8')
+HEIGHT_COMPACT = {'snapshot':'test','span_file':'test-spans.json',
+                  'span_sha256':hashlib.sha256(HEIGHT_BYTES).hexdigest(),
+                  'findings':[{k:v for k,v in f.items() if k!='spans'} for f in HEIGHT['findings']]}
 
 
 class Quiet(serve.NoCache):
@@ -38,6 +49,7 @@ class Quiet(serve.NoCache):
 
 
 def main():
+    faulthandler.dump_traceback_later(600, exit=True)
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--line", default="17")
     args = ap.parse_args()
@@ -118,7 +130,8 @@ def main():
               R._fill();
               return { rec, count: R.$('rvCount').textContent };
             }""")
-            page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT)))
+            page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT_COMPACT)))
+            page.route('**/test-spans.json',lambda q:q.fulfill(status=200,content_type='application/json',body=HEIGHT_BYTES))
             page.goto(f'http://127.0.0.1:{server.server_port}/?line={args.line}&review=height-findings.json',timeout=180000)
             page.wait_for_function('window.review',timeout=180000)
             r['height'] = page.evaluate('''async () => {
@@ -135,7 +148,8 @@ def main():
               R._hover(rect.left+(v.x+1)*rect.width/2,rect.top+(1-v.y)*rect.height/2);
               return {count:R.list.filter(f=>f.kind==='trackheight').length, svg:!!svg, marker,
                 reverse:cursor?.getAttribute('visibility')==='visible',
-                conflict:R.hl.children.some(o=>o.material?.color?.getHex()===0xff3333), button};
+                conflict:R.hl.children.some(o=>o.material?.color?.getHex()===0xff3333), button,
+                explanation:R.$('rvCard').textContent};
             }''')
             page.click("#rvCard button[data-v='0']")
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
@@ -145,6 +159,7 @@ def main():
     finally:
         server.shutdown()
         shutil.rmtree(tmp, ignore_errors=True)
+        faulthandler.cancel_dump_traceback_later()
     print(json.dumps(r, ensure_ascii=False)[:1500])
     if not r["by"].get("file"):
         fails.append("no findings from the file")
@@ -172,7 +187,12 @@ def main():
         fails.append(f"track height finding/profile/hover missing: {r['height']}")
     if r['heightNext'] != 'other-bridge':
         fails.append(f"same-location decision was not independent: {r['heightNext']}")
+    if ('structure level is not identified' not in r['height']['explanation'] or
+            'survey rail height missing or ambiguous' not in r['height']['explanation'] or
+            any('follows survey surface' in b for b in r['height']['button'])):
+        fails.append('the held answer and unavailable survey choice were not explained')
     if not any(v.get('decision_id')=='bridge-test' and v.get('span_ids')==['span-test'] and v.get('v')=='archive profile ok'
+               and v.get('span_sha256')==HEIGHT_COMPACT['span_sha256']
                for v in r['heightSaved'].get('items',{}).values()):
         fails.append('track-height answer was not saved with its decision scope')
     if fails:
