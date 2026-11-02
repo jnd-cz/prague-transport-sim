@@ -922,7 +922,7 @@ export class Traffic {
 
   // Cars on our track and on the opposite one (within 1.6 m of a track centre: the car body then
   // overlaps a tram), as route positions: trams stop behind them (shared lanes, a car queuing on
-  // the tracks). this.game.carsOnTrack: [{s, v}] along our route, carsOnBack along the opposite one.
+  // the tracks). this.game.carsOnTrack: [{s, v, car}] along our route, carsOnBack along the opposite one.
   _carsOnTracks() {
     const ours = [], back = [];
     for (const c of this.cars) {

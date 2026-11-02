@@ -66,6 +66,16 @@ class TramCycles(unittest.TestCase):
         })''')
         self.assertEqual(r, [0]*6)
 
+    def test_two_trams_in_one_cycle_recover_only_one_car(self):
+        r = self.page.evaluate('''() => {
+          const {tr,t,cars}=fixture();
+          const ahead={id:2,s:90,v:0,dwell:0,stop:{s:90,why:'car on track'},waitFor:cars[2]};
+          tr.ahead=[ahead]; cars[0].waitFor=ahead;
+          tick(tr,100);
+          return {removed:cars.filter(c=>!c.active).length,n:tr.cyclesBroken,events:tr.game.trafficCycles.length};
+        }''')
+        self.assertEqual(r, {'removed':1, 'n':1, 'events':1})
+
     def test_movement_resets_the_wait_and_scene_names_the_cycle(self):
         r = self.page.evaluate('''async () => {
           const {tr,t,cars}=fixture(); tick(tr,25); cars[1].vNow=1; tick(tr,1);
