@@ -130,6 +130,13 @@ def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05):
         base[i] = 1e6
     rows, cap = _second(s), [1/r for r in rmin[1:-1]]
     w, state, c = list(base), (None,None,None), 4.685*scale
+    # A robust start: a plain first round bent the whole curve towards one bad record (Malovanka, an 83 m spike
+    # over 25 m, moved 32 good points by over 0.3 m; #190), and Tukey then dropped them too. A point further than
+    # 2c from the median of its 11 neighbours starts without a pull; the rounds below may bring it back.
+    for i in range(n):
+        near = sorted(z[max(0,i-5):i+6])
+        if abs(z[i]-near[len(near)//2]) > 2*c:
+            w[i] = 1e-4*base[i]
     for _ in range(ROBUST):
         f,u,y = _capped(s,z,w,cap,rows,*state)
         state = (f,u,y)
