@@ -473,9 +473,8 @@ ${this._verdictHtml(f)}`;
       lines.push('Notes, unsure and unspecified other levels stay held for review.');
       explanation = `<div class="dim">${lines.join('<br>')}</div>`;
     }
-    return `<div class="rvVerdict"><textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
+    return `<div class="rvVerdict">${explanation}<textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
 <div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
-${explanation}
 <div class="dim" id="rvSync">${this._syncText()}</div></div>`;
   }
 
