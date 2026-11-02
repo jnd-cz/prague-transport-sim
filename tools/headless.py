@@ -23,11 +23,11 @@ what free memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is s
 its own fresh page, so the counts are the same as one after another.
 
 Baseline (#89): `--baseline` stores each run's key counts in reports/baseline/headless.json (committed),
-with what they were measured on (the git trees of the game, the in-page checks and the data manifest:
-MEASURED; the data files must match the manifest and those paths be committed). `--compare` prints baseline -> now per
-run as a table for the PR (reports/headless/compare.md) and warns when the baseline was not measured on
-the code and data of main (the merge base). A PR that moves the numbers commits its new baseline, so
-main's stays current:
+with what they were measured on (the git trees of the game, the in-page checks, the data manifest and
+data/truth.json: MEASURED; the data files must match the manifest and those paths be committed). `--compare`
+prints baseline -> now per run as a table for the PR (reports/headless/compare.md) and warns when the
+baseline was not measured on the code, data and facts of main (the merge base). Main's baseline is
+measured at night (tools/autodeploy.py), not by PRs:
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
 
@@ -488,10 +488,10 @@ def main():
     lines = sorted({j[0] for j in jobs})
     if a.baseline:
         # (measured on what is committed and published, or the baseline would name the wrong trees)
-        dirty = git("status", "--porcelain", "--", *MEASURED)
+        dirty = baseline_store.dirty()
         if dirty or (bad := data_matches(lines)):
-            raise SystemExit("--baseline needs committed src/, tools/, index.html, data/MANIFEST.json and data/ "
-                             f"matching the manifest: {dirty or 'data differs: ' + ', '.join(bad)}")
+            raise SystemExit(f"--baseline needs {', '.join(MEASURED)} committed and data/ matching the manifest: "
+                             f"{dirty or 'data differs: ' + ', '.join(bad)}")
     if a.compare and (bad := data_matches(lines)):
         print(f"note: data/ differs from data/MANIFEST.json ({', '.join(bad)}): comparing unpublished data")
     results, found = {}, {}

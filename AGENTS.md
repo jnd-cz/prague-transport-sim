@@ -120,8 +120,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   the spread are listed as noise. Stuck, unfinished and penalty runs are listed per seed and need a reason,
   as does every move of the seedless checks (lint, surfaces) and every mean outside the spread. The table
   also lists places new and gone (#157). Main's baseline is measured at night by the deploy PC after a
-  merge that changes the game, the checks or the data (`tools/autodeploy.py`, 2 pages at once, not while a
-  heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base
+  merge that changes the game, the checks, the data or `data/truth.json` (`tools/autodeploy.py`, 2 pages at
+  once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base
   when the committed `reports/baseline/headless.json` is older. A PR does not refresh the baseline.
 
 ## Known failures (not caused by your change; remove a row when its issue closes)

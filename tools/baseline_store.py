@@ -3,7 +3,8 @@ tools/headless.py (--baseline --publish, --compare) and tools/autodeploy.py (the
 use it.
 
 A baseline is named by what its counts depend on (MEASURED: the git trees of the game, the in-page
-checks and the data manifest), hashed: `baselines/<key>.json` and `<key>.places.json` in the store. A
+checks, the data manifest and the user's facts in data/truth.json, which the game reads at run time),
+hashed: `baselines/<key>.json` and `<key>.places.json` in the store. A
 branch looks up the key of its merge base, so it gets main's numbers for exactly that code and data.
 
 Heavy jobs (headless.py, rebuild.py) hold a lock file in the system temp folder while they run; the
@@ -19,10 +20,11 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# (what the counts depend on: the game, the in-page checks, the data; not the build tools, whose output
-# the manifest covers, nor the harness)
+# (what the counts depend on: the game, the in-page checks, the data and the facts the game loads besides
+# it (truth.json: track styles and rail offsets, #126); not the build tools, whose output the manifest
+# covers, nor the harness)
 MEASURED = ("src", "index.html", "tools/bench", "tools/lint.js", "tools/traffic_lint.js", "tools/autopilot.js",
-            "data/MANIFEST.json")
+            "data/MANIFEST.json", "data/truth.json")
 LOCKS = os.path.join(tempfile.gettempdir(), "tram-heavy")
 
 
@@ -34,6 +36,11 @@ def git(*args, root=ROOT):
 def trees(rev, root=ROOT):
     """The git objects the checks depend on, at a commit."""
     return {p: git("rev-parse", f"{rev}:{p}", root=root) for p in MEASURED}
+
+
+def dirty(root=ROOT):
+    """Uncommitted changes to what a baseline is measured on ('' when none)."""
+    return git("status", "--porcelain", "--", *MEASURED, root=root)
 
 
 def key(t):
