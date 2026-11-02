@@ -364,7 +364,8 @@ body.review #gl { touch-action: none }
     this.$('rvList').innerHTML = this.list.slice(0, 400).map((f, i) => {
       const w = this.where(f.x, f.y);
       const r = this.verdicts.get(fid(f));
-      return `<div class="rvItem${r?.v ? ' done' : ''}" data-i="${i}"><span class="sw" style="background:${SRC_COLORS[f.src]}"></span><b>${f.kind}</b> · ${f.mag.toFixed(0)}${r?.v ? ` · <span class="vd">✓ ${esc(r.v)}</span>` : ''}<br>
+      const lines = f.kind === 'trackheight' ? ` · lines ${[...new Set(f.spans.map((s) => s.line))].sort((a, b) => a - b).join(', ')}` : '';
+      return `<div class="rvItem${r?.v ? ' done' : ''}" data-i="${i}"><span class="sw" style="background:${SRC_COLORS[f.src]}"></span><b>${f.kind}</b>${lines} · ${f.mag.toFixed(0)}${r?.v ? ` · <span class="vd">✓ ${esc(r.v)}</span>` : ''}<br>
 <span class="dim">${w.street || w.stop || ''}${w.s !== null ? ` · s ${w.s} m` : ''}</span></div>`;
     }).join('') + (this.list.length > 400 ? `<div class="rvItem dim">… ${this.list.length - 400} more (narrow the filter)</div>` : '');
     this.cur = -1;
@@ -403,6 +404,22 @@ ${this._verdictHtml(f)}`;
     if (this.heightChart) {
       this.$('rvHeight').innerHTML = this.heightChart.html;
       const svg = this.$('heightProfile');
+      this.$('rvHeight').querySelectorAll('[data-height-series]').forEach((button) => button.addEventListener('click', () => {
+        const visible = button.getAttribute('aria-pressed') !== 'true';
+        button.setAttribute('aria-pressed', String(visible));
+        svg.querySelectorAll(`[data-series="${button.dataset.heightSeries}"]`).forEach((item) => { item.style.display = visible ? '' : 'none'; });
+      }));
+      const preview = this.$('rvPreview');
+      this.$('rvCard').querySelectorAll('button[data-v]').forEach((button) => {
+        const show = () => {
+          const answer = options(f)[+button.dataset.v];
+          const reason = this.$('rvNote')?.value.trim() ? 'A note keeps this answer held for review.' : f.answer_explanations?.[answer];
+          preview.textContent = reason ? `Held: ${reason}` : 'Profile preview is not available for this answer.';
+        };
+        button.addEventListener('mouseenter', show); button.addEventListener('focus', show);
+        button.addEventListener('mouseleave', () => { preview.textContent = ''; });
+        button.addEventListener('blur', () => { preview.textContent = ''; });
+      });
       const pick = (e) => {
         const r = svg.getBoundingClientRect(), chart = this.heightChart;
         const px = (e.clientX - r.left) / r.width * chart.width;
@@ -486,7 +503,7 @@ ${this._verdictHtml(f)}`;
     }
     return `<div class="rvVerdict">${explanation}<textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
 <div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
-<div class="dim" id="rvSync">${this._syncText()}</div></div>`;
+${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"></div>' : ''}<div class="dim" id="rvSync">${this._syncText()}</div></div>`;
   }
 
   _syncText() {

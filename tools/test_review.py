@@ -139,6 +139,16 @@ def main():
               R.$('rvFilter').value='file|'; R._fill();
               const i=R.list.findIndex(f=>f.kind==='trackheight'); R.select(i);
               const svg=document.querySelector('#heightProfile');
+              const toggle=R.$('rvHeight').querySelector('[data-height-series="path"]');
+              toggle.click(); const hidden=svg.querySelector('[data-series="path"]').style.display==='none'; toggle.click();
+              const {heightProfile}=await import('/src/trackHeightProfile.js');
+              const point=(s,z,id)=>({s,xy:[s,0],archive:[{id,z}],surfaces:[],ipr_terrain_z:199,di_z:null});
+              const main={id:'a',line:17,direction:'path',length_m:10,start_s:0,structure:{kind:'unmapped'},profile:[point(0,200,'a'),point(10,201,'b')]};
+              const other={...main,id:'b',direction:'pathBack',profile:[point(0,200,'a'),point(20,202,'b')]};
+              const chart=heightProfile({spans:[main,other]}, {nearest:()=>null}, {height:()=>null});
+              const dom=new DOMParser().parseFromString(chart.html,'text/html');
+              const archive=dom.querySelector('[data-series="path"] path').getAttribute('d');
+              const projected=dom.querySelector('[data-series="pathBack"] path').getAttribute('d');
               const button=[...document.querySelectorAll('#rvCard button[data-v]')].map(b=>b.textContent);
               if (svg) svg.dispatchEvent(new PointerEvent('pointermove',{clientX:svg.getBoundingClientRect().left+80}));
               const marker=!!R.heightMarker?.visible, cursor=R.$('heightCursor');
@@ -152,7 +162,7 @@ def main():
               return {count:R.list.filter(f=>f.kind==='trackheight').length, svg:!!svg, marker,
                 reverse:cursor?.getAttribute('visibility')==='visible',
                 conflict:R.hl.children.some(o=>o.material?.color?.getHex()===0xff3333), button,
-                explanation:R.$('rvCard').textContent, clickTo};
+                explanation:R.$('rvCard').textContent, clickTo, hidden, archive, projected};
             }''')
             page.click("#rvCard button[data-v='0']")
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
@@ -201,6 +211,10 @@ def main():
         fails.append(f"track height finding/profile/hover missing: {r['height']}")
     if r['height'].get('clickTo') != [10, 0]:
         fails.append(f"a click on the chart's end did not move the camera to it: {r['height'].get('clickTo')}")
+    if not r['height']['hidden'] or r['height']['archive'].count('M') != 1 or 'L' not in r['height']['archive']:
+        fails.append('archive record transition or legend toggle failed')
+    if r['height']['projected'].count('L'):
+        fails.append('an out-of-range point was clamped at the edge')
     if r['heightNext'] != 'other-bridge':
         fails.append(f"same-location decision was not independent: {r['heightNext']}")
     if ('structure level is not identified' not in r['height']['explanation'] or
