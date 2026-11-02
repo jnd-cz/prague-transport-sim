@@ -66,6 +66,24 @@ class PedestrianCrossings(unittest.TestCase):
         self.assertIsNone(result['parallel'])
         self.assertIsNone(result['overpass'])
 
+    def test_long_outline_keeps_remote_edges_coarse(self):
+        result=self.page.evaluate('''async () => {
+          const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
+          const ring=[[-2,-300,200.05],[2,-300,200.05],[2,300,200.05],[-2,300,200.05]];
+          const a={c:'sidewalk',l:0,ring,holes:[],kerbs:[[0,1,0,1]],
+            mesh:[[[-2,-2,200.05],[2,-2,200.05],[2,2,200.05]]]};
+          const dtm={areas:[a],reindexGround(){},_split(p,q,r,ground,out){out.push([p,q,r]);}};
+          const track={smooth:[[-10,0],[10,0]],z:[200,200]};
+          preparePedestrianCrossings({tracks:[track],roads:[]},null,{dtm},()=>[0,0],()=>.05);
+          return {points:a.ring.length,far:a.ring.filter(p=>Math.abs(p[1])>10),
+            near:a.ring.filter(p=>Math.abs(p[1])<1).map(p=>p[2]+.05),flags:a.kerbs[0].length};
+        }''')
+        self.assertLess(result['points'],200)
+        self.assertEqual(result['far'],[[-2,-300,200.05],[2,-300,200.05],[2,300,200.05],[-2,300,200.05]])
+        self.assertEqual(result['flags'],result['points'])
+        self.assertTrue(result['near'])
+        self.assertTrue(all(z<200.012 for z in result['near']))
+
     def test_parallel_sidewalk_does_not_become_a_crossing(self):
         result=self.page.evaluate('''async () => {
           const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
@@ -80,10 +98,10 @@ class PedestrianCrossings(unittest.TestCase):
         }''')
         self.assertEqual(result,[0,0])
 
-    def test_unmatched_survey_patch_is_held_for_review(self):
+    def test_narrow_unmatched_survey_patch_is_held_for_review(self):
         result=self.page.evaluate('''async () => {
           const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
-          const p=[[-2,-4,200.05],[2,-4,200.05],[2,4,200.05],[-2,4,200.05]];
+          const p=[[-0.3,-0.5,200.05],[0.3,-0.5,200.05],[0.3,0.5,200.05],[-0.3,0.5,200.05]];
           const a={c:'sidewalk',l:0,ring:p,holes:[],mesh:[[p[0],p[1],p[2]],[p[0],p[2],p[3]]]};
           const dtm={areas:[a],reindexGround(){throw new Error('unmatched patch changed');}};
           const t={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]}, ground={dtm};
@@ -105,22 +123,42 @@ class PedestrianCrossings(unittest.TestCase):
         self.assertAlmostEqual(result[0],199.960,places=6)
         self.assertAlmostEqual(result[1],200.056,places=6)
 
+    def test_crossing_clears_overlapping_same_level_tracks(self):
+        result=self.page.evaluate('''async () => {
+          const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
+          const a={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]};
+          const b={smooth:[[-10,0.4],[0,0.4],[10,0.4]],z:[200.1,200.1,200.1]};
+          const crossing=preparePedestrianCrossings({tracks:[a,b]},null,{dtm:null},()=>[0,0,0],()=>0.05);
+          const height=crossing.footway([[0,-5],[0,5]],2,()=>200,0.16);
+          return height(0,0.72)+0.16;
+        }''')
+        self.assertAlmostEqual(result,200.008,places=6)
+
     def test_survey_lookup_matches_the_refined_drawn_surface(self):
         result=self.page.evaluate('''async () => {
           const THREE=await import('three');
           const {DtmSurface,DTM_LIFT}=await import('/src/terrain.js');
           const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
-          const dtm=new DtmSurface({areas:[{c:'sidewalk',l:0,r:[[-2,-4,200.05],[2,-4,200.05],[2,4,200.05],[-2,4,200.05]]}]},
+          const dtm=new DtmSurface({areas:[{c:'sidewalk',l:0,r:[[-2,-4,200.05],[2,-4,200.05],[2,4,200.05],[-2,4,200.05]],k:[[0,1,0,1]]}]},
                                    {height:()=>200},THREE);
           const before=dtm.surfaceAt(0,0.72).z+DTM_LIFT.sidewalk;
           const track={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]}, ground={dtm};
-          preparePedestrianCrossings({tracks:[track],roads:[{z:1,p:[[0,-5],[0,5]]}]},null,ground,()=>[0,0,0],kind=>DTM_LIFT[kind] ?? 0.03);
+          preparePedestrianCrossings({tracks:[track],roads:[]},null,ground,()=>[0,0,0],kind=>DTM_LIFT[kind] ?? 0.03);
+          const area=dtm.areas[0], edges=area.ring.filter(p=>Math.abs(p[1])<1);
+          if(area.kerbs[0].length!==area.ring.length)throw new Error('kerb flags lost');
+          for(let i=0;i<area.ring.length;i++) {
+            const p=area.ring[i],q=area.ring[(i+1)%area.ring.length];
+            if(!!area.kerbs[0][i] !== (Math.abs((p[0]+q[0])/2)===2))throw new Error('kerb moved to another edge');
+          }
           return {before,after:dtm.surfaceAt(0,0.72).z+DTM_LIFT.sidewalk,
+                  kerbTop:Math.max(...edges.map(p=>p[2]+DTM_LIFT.sidewalk)),edgePoints:edges.length,
                   areas:ground.pedestrianCrossings.survey.length};
         }''')
         self.assertEqual(result['areas'],1)
         self.assertGreater(result['before'],200.012)
         self.assertLess(result['after'],200.012)
+        self.assertGreater(result['edgePoints'],8)
+        self.assertLess(result['kerbTop'],200.012)
 
     def test_reported_survey_polygon_matches_the_mapped_pedestrian_crossing(self):
         root=Path(__file__).resolve().parent.parent

@@ -7,12 +7,71 @@ import unittest
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from headless import serve,stop_server
+from headless import serve,stop_server,judge
 
 ROOT=Path(__file__).resolve().parent.parent
 
 
 class CrossingCheck(unittest.TestCase):
+    def test_vertical_lip_between_surface_samples_is_detected(self):
+        server,url=serve(0)
+        try:
+            with sync_playwright() as pw:
+                browser=pw.chromium.launch(headless=True)
+                page=browser.new_page()
+                html=(ROOT/'index.html').read_text(encoding='utf-8')
+                importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
+                page.route('**/crossing-edge-test',lambda route:route.fulfill(body=importmap))
+                page.goto(url+'/crossing-edge-test')
+                result=page.evaluate('''async () => {
+                  const {crossingEdgeHits}=await import('/tools/bench/crossingSlab.js');
+                  const area={c:'sidewalk',l:0,ring:[[9.1,-2,200.05],[9.2,-2,200.05],[9.2,2,200.05],[9.1,2,200.05]],holes:[],kerbs:[[0,1,0,1]]};
+                  const game={route:{ground:{dtm:{areas:[area]},pedestrianCrossings:{survey:[{area:0}]}}}};
+                  const heads=[8,10].flatMap(s=>[-1,1].map(side=>({s,side,x:s,y:side*.72,z:200.012})));
+                  const before=crossingEdgeHits(game,heads);
+                  for(const p of area.ring)p[2]=200.008-.05;
+                  return {before,after:crossingEdgeHits(game,heads)};
+                }''')
+                self.assertEqual(result['before']['samples'],4)
+                self.assertEqual(len(result['before']['hits']),4)
+                self.assertGreater(result['before']['hits'][0]['excess'],.08)
+                self.assertEqual(result['after']['hits'],[])
+                browser.close()
+        finally:
+            stop_server(server)
+
+    def test_unresolved_crossings_fail_the_command(self):
+        self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':1,'of':10}}})[0])
+        self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':0,'of':0}}})[0])
+        self.assertTrue(judge('crossing',{'checks':{'crossingSlab':{'count':0,'of':10,'reviewCandidates':8}}})[0])
+        self.assertTrue(judge('crossing',{'checks':{'crossingSlab':{'count':0,'rawCount':4,'of':10}}})[0])
+
+    def test_reasons_separate_transverse_crossings_from_side_surfaces(self):
+        server,url=serve(0)
+        try:
+            with sync_playwright() as pw:
+                browser=pw.chromium.launch(headless=True)
+                page=browser.new_page()
+                html=(ROOT/'index.html').read_text(encoding='utf-8')
+                importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
+                page.route('**/crossing-reason-test',lambda route:route.fulfill(body=importmap))
+                page.goto(url+'/crossing-reason-test')
+                reasons=page.evaluate('''async () => {
+                  const {crossingReason}=await import('/tools/bench/crossingSlab.js');
+                  const rect=(x0,x1,y0,y1)=>({ring:[[x0,y0],[x1,y0],[x1,y1],[x0,y1]],holes:[]});
+                  const game={route:{at:()=>({x:0,y:0,hx:1,hy:0}),ground:{dtm:{areas:[
+                    rect(-2,2,-4,4),rect(-20,20,-1,1),rect(-2,2,.5,2)]}}},
+                    data:{roads:[{p:[[-10,1],[10,1]]},{p:[[0,-5],[0,5]]}]}};
+                  const hit={s:0,x:0,y:.72};
+                  return [0,1,2].map(id=>crossingReason(game,hit,[0,0,'sidewalk',0,id],null))
+                    .concat([0,1].map(id=>crossingReason(game,hit,null,id)));
+                }''')
+                self.assertEqual(reasons,[None,'survey-surface-runs-along-track','survey-edge-does-not-cross-gauge',
+                                          'mapped-footway-runs-along-track',None])
+                browser.close()
+        finally:
+            stop_server(server)
+
     def test_filtered_check_matches_drawn_pedestrian_geometry(self):
         server,url=serve(0)
         try:
@@ -40,13 +99,28 @@ class CrossingCheck(unittest.TestCase):
                   const route={length:20,ground:{profile:{height:()=>200,onBridge:()=>false}},
                     nearest:(x,y)=>x>=0&&x<=20?{s:x,d:Math.abs(y)}:null,offset:(s,l)=>({x:s,y:l})};
                   window.game={route,data:{roads:[]}};window.world=world;
-                  const a=run().checks.crossingSlab,b=run({unfiltered:true}).checks.crossingSlab;
-                  return {a,b};
+                  const a=(await run()).checks.crossingSlab,b=(await run({unfiltered:true})).checks.crossingSlab;
+                  route.at=s=>({x:s,y:0,hx:1,hy:0});
+                  route.ground.dtm={areas:[]};
+                  const parallel={c:'sidewalk',l:0,ring:[[0,-1],[20,-1],[20,1],[0,1]],holes:[]};
+                  surface.geometry.setAttribute('position',new THREE.Float32BufferAttribute(quad(0,20,-1,1,200.1),3));
+                  surface.geometry.computeBoundingSphere();
+                  route.ground.dtm.areas[7]=parallel;
+                  surface.userData.surfaceRanges=[[0,2,'sidewalk',0,7]];
+                  const classified=(await run()).checks;
+                  route.ground.dtm.areas[11]=parallel;delete route.ground.dtm.areas[7];
+                  surface.userData.surfaceRanges=[[0,2,'sidewalk',0,11]];
+                  const rebuilt=(await run()).checks;
+                  return {a,b,classified,rebuilt};
                 }''')
                 self.assertEqual(result['a']['count'],1)
                 self.assertEqual(result['a']['missing'],0)
                 self.assertAlmostEqual(result['a']['places'][0]['mag'],0.088,places=3)
                 self.assertEqual(result['a'],result['b'])
+                self.assertEqual(result['classified']['crossingSlab']['count'],0)
+                self.assertGreater(result['classified']['crossingAlongSurvey']['count'],0)
+                self.assertEqual(len(result['classified']['crossingAlongSurvey']['at']),result['classified']['crossingAlongSurvey']['count'])
+                self.assertEqual(result['classified']['crossingAlongSurvey'],result['rebuilt']['crossingAlongSurvey'])
                 browser.close()
         finally:
             stop_server(server)

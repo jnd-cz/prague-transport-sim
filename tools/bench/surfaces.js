@@ -44,16 +44,22 @@ export async function run() {
     }
   }
   // seams and kerbs: across the route every 0.25 m, a row every 4 m, where two areas meet
-  const seams = [], kerbs = [];
+  const seams = [], kerbs = [], seamSites = [], kerbSites = [];
   for (let s = 0; s < r.length; s += 4) {
     let prev = null;
     for (let lat = -25; lat <= 25; lat += 0.25) {
       const o = r.offset(s, lat), h = hit(o.x, o.y);
       if (h && prev && h.a !== prev.a) {
+        const p = r.offset(s, lat - 0.125), site = { x:p.x, y:p.y, s, lat:lat - 0.125,
+          areas:[prev.a,h.a], classes:[prev.c,h.c], heights:[prev.z,h.z] };
         // (street classes only: lawns and water meet at any height; over 1 m apart is another level)
-        if (STREETS.has(h.c) && (h.c === prev.c || (ROAD.has(h.c) && ROAD.has(prev.c))) && Math.abs(h.z - prev.z) <= 1) seams.push(Math.abs(h.z - prev.z));
-        else if (ROAD.has(h.c) && RAISED.has(prev.c)) kerbs.push(prev.z - h.z);
-        else if (RAISED.has(h.c) && ROAD.has(prev.c)) kerbs.push(h.z - prev.z);
+        if (STREETS.has(h.c) && (h.c === prev.c || (ROAD.has(h.c) && ROAD.has(prev.c))) && Math.abs(h.z - prev.z) <= 1) {
+          seams.push(Math.abs(h.z - prev.z)); seamSites.push({ ...site, step:Math.abs(h.z - prev.z) });
+        } else if (ROAD.has(h.c) && RAISED.has(prev.c)) {
+          kerbs.push(prev.z - h.z); kerbSites.push({ ...site, step:prev.z - h.z });
+        } else if (RAISED.has(h.c) && ROAD.has(prev.c)) {
+          kerbs.push(h.z - prev.z); kerbSites.push({ ...site, step:h.z - prev.z });
+        }
       }
       prev = h;
     }
@@ -61,12 +67,14 @@ export async function run() {
   const n = (a, f) => a.filter(f).length;
   const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
   return {
+    samples: { seams10:seamSites.filter((s) => s.step > 0.1),
+      flatKerbs:kerbSites.filter((s) => s.step < 0.05), sunkKerbs:kerbSites.filter((s) => s.step < -0.02) },
     checks: {
       waves: { count: waves, of: wn },
       seams3: { count: n(seams, (v) => v > 0.03), of: seams.length },
-      seams10: { count: n(seams, (v) => v > 0.1), of: seams.length },
-      flatKerbs: { count: n(kerbs, (v) => v < 0.05), of: kerbs.length },
-      sunkKerbs: { count: n(kerbs, (v) => v < -0.02), of: kerbs.length },
+      seams10: { count: n(seams, (v) => v > 0.1), of: seams.length, at:seamSites.filter((s) => s.step > 0.1).map((s) => [s.x,s.y,s.s]) },
+      flatKerbs: { count: n(kerbs, (v) => v < 0.05), of: kerbs.length, at:kerbSites.filter((s) => s.step < 0.05).map((s) => [s.x,s.y,s.s]) },
+      sunkKerbs: { count: n(kerbs, (v) => v < -0.02), of: kerbs.length, at:kerbSites.filter((s) => s.step < -0.02).map((s) => [s.x,s.y,s.s]) },
       kerbMedianCm: { count: Math.round(med(kerbs) * 100) },
     },
   };

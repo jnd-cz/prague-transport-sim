@@ -137,6 +137,11 @@ class ChunkedGeometry {
     return c;
   }
   tri(c, a, b, d, uvs, col) {
+    if (this.sourceId !== undefined) {
+      const start = c.pos.length / 9, ranges = (c.footwayRanges ||= []), last = ranges[ranges.length - 1];
+      if (last && last[2] === this.sourceId && last[1] === start) last[1]++;
+      else ranges.push([start, start + 1, this.sourceId]);
+    }
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
     const vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -161,6 +166,7 @@ class ChunkedGeometry {
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, this.material);
       if (c.surfaceRanges) m.userData.surfaceRanges = c.surfaceRanges;
+      if (c.footwayRanges) m.userData.footwayRanges = c.footwayRanges;
       m.matrixAutoUpdate = false;
       if (surface === 'building') m.userData.building = true;
       else if (surface) m.userData.surface = surface;
@@ -475,7 +481,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const roadsCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43'), { color: true });
   const footCg = new ChunkedGeometry(flatMat('#a39d90', '#86817a', FOOT_SNOW), { color: true });
   const asphalt = new THREE.Color('#55565a').toArray(), paving = new THREE.Color('#a39d90').toArray();
+  const roadIds = new Map(data.roads.map((r, i) => [r, i]));
+  const keepRoadRanges = /[?&](keepgeo|bot)\b/.test(location.search);
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
+    if (keepRoadRanges) footCg.sourceId = roadIds.get(r);
     if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
     if (r.t) continue; // (road tunnels: above)
     // where the surveyed DTM streets exist, they replace the OSM ribbons (on a bridge: its deck)
@@ -487,10 +496,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
       const across = r.tram || (r.w > 3 && run.some(([x, y]) => trackDist(x, y) < 8));
       const height = hf || wayHeight(run, false, ground), lift = r.f ? 0.16 : 0.12;
       const crossing = r.f ? pedestrianCrossings.footway(run, r.w, height, lift, r.n || null) : null;
-      addRibbon(r.f ? footCg : roadsCg, crossing ? densify(run, 0.75) : run, r.w, crossing || height, lift, r.f ? paving : asphalt, 0,
-        crossing ? Math.ceil(r.w / 0.5) : across ? Math.ceil(r.w / 2) : 1);
+      addRibbon(r.f ? footCg : roadsCg, crossing ? densify(run, 0.2) : run, r.w, crossing || height, lift, r.f ? paving : asphalt, 0,
+        crossing ? Math.ceil(r.w / 0.2) : across ? Math.ceil(r.w / 2) : 1);
     }
   }
+  footCg.sourceId = undefined;
   // (road tunnels: no snow inside)
   const tunnelCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43', 0), { color: true });
   for (const { r, inside, tf } of tunnelRoads) addRibbon(tunnelCg, inside, r.w, tf, 0.12, asphalt);
