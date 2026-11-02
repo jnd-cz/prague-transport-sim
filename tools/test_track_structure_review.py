@@ -53,7 +53,7 @@ class SpanReviews(unittest.TestCase):
             root=Path(tmp)
             (root/'answers.json').write_text(json.dumps({'items':{'pin':answer}}),encoding='utf-8')
             (root/'findings.json').write_text(json.dumps({'findings':[finding]}),encoding='utf-8')
-            subprocess.run([sys.executable,str(Path(__file__).with_name('track_span_evidence.py')),
+            subprocess.run([sys.executable,'-P','-E',str(Path(__file__).with_name('track_span_evidence.py')),
                 '--from-reviews',str(root/'answers.json'),'--findings',str(root/'findings.json'),
                 '--output',str(root/'out.json')],check=True,capture_output=True,text=True)
             self.assertEqual(json.loads((root/'out.json').read_text(encoding='utf-8'))['span_reviews'][0]['id'],'review-bridge-1')

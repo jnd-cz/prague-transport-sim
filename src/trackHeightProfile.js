@@ -87,6 +87,7 @@ export function heightProfile(f, route, profile) {
   svg += `<line id="heightCursor" x1="0" x2="0" y1="${top}" y2="${bottom}" stroke="#fff" visibility="hidden"/><text x="${left}" y="198" fill="#ddd" font-size="9">${Math.round(x0)} m</text><text x="${right}" y="198" fill="#ddd" font-size="9" text-anchor="end">${Math.round(x1)} m</text></svg>`;
   const exaggeration = ((bottom-top)/(right-left)*(x1-x0)/(z1-z0)).toFixed(1);
   const layers = [...new Set(Object.values(main.structure.tags || {}).map((t)=>t.layer).filter((x)=>x !== undefined))];
-  return { html:`<div class="dim">${esc(main.structure.kind)}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange</div>${svg}`,
+  const embankment = Object.values(main.structure.tags || {}).some((t)=>t.embankment && t.embankment !== 'no');
+  return { html:`<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange</div>${svg}`,
     points:series[0].points, x0, x1, left, right, width:w };
 }

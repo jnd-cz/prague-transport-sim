@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
+import sys
 
 from shapely.geometry import LineString, Point
 
@@ -149,6 +150,7 @@ def main():
     args = ap.parse_args()
     result = from_reviews(json.loads(args.from_reviews.read_text(encoding='utf-8')),
                           json.loads(args.findings.read_text(encoding='utf-8')),str(args.from_reviews))
+    sys.path.insert(0,str(Path(__file__).resolve().parent))
     from atomic import replacing
     args.output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(args.output,'w',encoding='utf-8') as f:
