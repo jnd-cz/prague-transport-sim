@@ -93,6 +93,6 @@ export function heightProfile(f, route, profile) {
   const exaggeration = ((bottom - top) / (right - left) * (x1 - x0) / (z1 - z0)).toFixed(1);
   const layers = [...new Set(Object.values(main.structure.tags || {}).map((t) => t.layer).filter((x) => x !== undefined))];
   const embankment = Object.values(main.structure.tags || {}).some((t) => t.embankment && t.embankment !== 'no');
-  return { html: `<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange${f.bridged ? ' · bridged deck orange solid' : ''}</div>${svg}`,
+  return { html: `<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange${f.bridged ? ' · bridged deck orange solid' : ''} · click: the camera goes there</div>${svg}`,
     points: series[0].points, x0, x1, left, right, width: w };
 }
