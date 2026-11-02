@@ -5,6 +5,7 @@ import { rng } from './random.js';
 import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
 import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
+import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
 const CELL = 350; // spatial chunk size (m) for merged meshes, so frustum culling can skip far chunks
@@ -149,7 +150,7 @@ class ChunkedGeometry {
   quad(c, a, b, d, e, col) { this.tri(c, a, b, d, null, col); this.tri(c, a, d, e, null, col); }
   // `surface` tags meshes cars and walkers stand on (read by the street bot); 'building' marks
   // building meshes instead (read by the lints)
-  build(group, surface = null) {
+  build(group, surface = null, surfaceKind = null) {
     for (const c of this.chunks.values()) {
       if (!c.pos.length) continue;
       const g = new THREE.BufferGeometry();
@@ -159,10 +160,12 @@ class ChunkedGeometry {
       if (this.useColor) g.setAttribute('color', new THREE.Float32BufferAttribute(c.col, 3));
       g.computeBoundingSphere();
       const m = new THREE.Mesh(g, this.material);
+      if (c.surfaceRanges) m.userData.surfaceRanges = c.surfaceRanges;
       m.matrixAutoUpdate = false;
       if (surface === 'building') m.userData.building = true;
       else if (surface) m.userData.surface = surface;
       if (c.trackRanges) m.userData.trackRanges = c.trackRanges;
+      if (surfaceKind) m.userData.surfaceKind = surfaceKind;
       group.add(m);
     }
   }
@@ -408,6 +411,23 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
   };
   for (const t of data.tracks) if (!t.z) t.z = trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))));
+  // Share the exact rail cant with pedestrian crossings; a crossing must meet each rail's height.
+  const tiltCache = new WeakMap();
+  const tiltOf = (t) => {
+    if (tiltCache.has(t)) return tiltCache.get(t);
+    const tilt = t.smooth.map(([x, y], i) => {
+      const n = route.nearest(x, y);
+      if (!n || n.d > 5) return 0;
+      const roll = route.rollAt(n.s);
+      if (!roll) return 0;
+      const L = t.smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
+      const h = route.at(n.s), same = (b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy >= 0 ? 1 : -1;
+      return -0.72 * Math.tan(roll) * same;
+    });
+    tiltCache.set(t, tilt); return tilt;
+  };
+  const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
+    (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);
   // our tunnels through rock (terrain.js carveCorridor): the hill stays whole above the track; its
   // terrain is not drawn in the tunnel's corridor, the vault, the rock over it and the portals are
   const rock = ground.walls?.rock || [];
@@ -465,14 +485,17 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // (a street with tracks in it, or crossing them: strips across, so the middle follows the track level)
     for (const run of runs) {
       const across = r.tram || (r.w > 3 && run.some(([x, y]) => trackDist(x, y) < 8));
-      addRibbon(r.f ? footCg : roadsCg, run, r.w, hf || wayHeight(run, false, ground), r.f ? 0.16 : 0.12, r.f ? paving : asphalt, 0, across ? Math.ceil(r.w / 2) : 1);
+      const height = hf || wayHeight(run, false, ground), lift = r.f ? 0.16 : 0.12;
+      const crossing = r.f ? pedestrianCrossings.footway(run, r.w, height, lift, r.n || null) : null;
+      addRibbon(r.f ? footCg : roadsCg, crossing ? densify(run, 0.75) : run, r.w, crossing || height, lift, r.f ? paving : asphalt, 0,
+        crossing ? Math.ceil(r.w / 0.5) : across ? Math.ceil(r.w / 2) : 1);
     }
   }
   // (road tunnels: no snow inside)
   const tunnelCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43', 0), { color: true });
   for (const { r, inside, tf } of tunnelRoads) addRibbon(tunnelCg, inside, r.w, tf, 0.12, asphalt);
   roadsCg.build(group, 'road');
-  footCg.build(group, 'road');
+  footCg.build(group, 'road', 'footway');
   tunnelCg.build(group, 'road');
   await mark('OSM roads');
 
@@ -492,15 +515,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     const lift = t.smooth.map(([x, y]) => liftAt(x, y));
     const zBed = t.z.map((z, i) => z - lift[i] - BED_BELOW);
     // on a canted curve of our route the outer rail is higher, the inner one lower
-    const tilt = t.smooth.map(([x, y], i) => {
-      const n = route.nearest(x, y);
-      if (!n || n.d > 5) return 0;
-      const roll = route.rollAt(n.s);
-      if (!roll) return 0;
-      const L = t.smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
-      const h = route.at(n.s), same = (b[0] - a[0]) * h.hx + (b[1] - a[1]) * h.hy >= 0 ? 1 : -1;
-      return -0.72 * Math.tan(roll) * same; // left rail (+0.72 along the track) goes up by this (down when leaning left)
-    });
+    const tilt = tiltOf(t);
     // The bed is the same canted plane as the rails, including its transition ramps.
     addRibbon(bedCg, t.smooth, 2.7, zBed, 0, bed, 0, 1, tilt.map((z) => z / 0.72));
     for (const side of [1, -1]) {
@@ -997,12 +1012,14 @@ function buildDtm(group, ground) {
   };
   const color = {};
   for (const [k, v] of Object.entries(DTM_COLORS)) color[k] = new THREE.Color(v).toArray();
-  for (const a of dtm.areas) {
+  const keepSurfaceRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  for (const [areaId, a] of dtm.areas.entries()) {
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
     const col = color[a.c] || color.paved;
     const cg = cgs[DTM_KIND[a.c] || 'other'];
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
+    const startFace = c.pos.length / 9;
     const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
     const fz = (v) => v[2];
@@ -1022,6 +1039,7 @@ function buildDtm(group, ground) {
       cg.tri(c, W(p[0], p[1], fz(p) + lift), W(q[0], q[1], fz(q) + lift), W(r[0], r[1], fz(r) + lift), null, col);
       if (slab) cg.tri(c, W(p[0], p[1], p[2] - under), W(r[0], r[1], r[2] - under), W(q[0], q[1], q[2] - under), null, col);
     }
+    if (keepSurfaceRanges) (c.surfaceRanges ||= []).push([startFace, c.pos.length / 9, a.c, a.l, areaId]);
     // kerbs (ground level) or slab sides (level 1) along every ring
     const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'platform' ? 0.18 : 0);
     if (!drop) continue;
@@ -1035,7 +1053,7 @@ function buildDtm(group, ground) {
     });
   }
   buildDtmSteps(cgs.other, ground, color.wall);
-  for (const cg of Object.values(cgs)) cg.build(group, 'dtm');
+  for (const [kind, cg] of Object.entries(cgs)) cg.build(group, 'dtm', kind);
 }
 
 // Our tunnels through rock: a vault over both tracks and the road (walls to 4.8 m, an arch to 7.2 m

@@ -702,6 +702,7 @@ export const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', '
 // level 1+ surfaces that carry traffic: what cars and walkers on a bridge stand on
 const DECK = new Set(['deck', 'road', 'tram', 'paved', 'sidewalk', 'cycle', 'island', 'parking']);
 const SURFACE_RANK = { tram: 9, road: 8, island: 7, platform: 7, sidewalk: 6, parking: 5, cycle: 5, paved: 4, stairs: 3, green: 2, water: 1 };
+const groundArea = (a) => a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && a.c !== 'rail';
 export class DtmSurface {
   constructor(dtm, terrain, THREE) {
     this.terrain = terrain;
@@ -759,7 +760,7 @@ export class DtmSurface {
         return sz / sw;
       } : null;
       const rank = SURFACE_RANK[a.c] || 1;
-      const ground = a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && a.c !== 'rail'; // (nobody stands on a wall)
+      const ground = groundArea(a); // (nobody stands on a wall)
       for (const [i, j, k] of tri) {
         const p = all[i], q = all[j], r = all[k];
         // render mesh: split to <= 5 m edges, linear between the surveyed vertices (the survey's own
@@ -780,6 +781,16 @@ export class DtmSurface {
     }
     this.grid.freeze();
     this.deckGrid.freeze();
+  }
+  // Crossings may gain vertices after track heights are known; lookups must use the drawn mesh.
+  reindexGround() {
+    const grid = new TriIndex(), decks = new TriIndex();
+    for (const a of this.areas) for (const tri of a.mesh) {
+      if (groundArea(a)) grid.add(tri, SURFACE_RANK[a.c] || 1, a.c);
+      if (a.l >= 1 && DECK.has(a.c)) decks.add(tri, a.l, a.c);
+    }
+    grid.freeze(); decks.freeze();
+    this.grid = grid; this.deckGrid = decks;
   }
   _hit(x, y) {
     const t = this._hitTri(x, y);
