@@ -110,6 +110,15 @@ def judge(check, r):
         if c.get("missingBed"):
             bad.append(f"{c['missingBed']} rail samples without their own bed")
         more = f"curves {c.get('curves')}, samples {c.get('of')}, missing samples {c.get('missing')}"
+    elif check == "crossing":
+        c = (r.get("checks") or {}).get("crossingSlab", {})
+        if not c.get("of"):
+            bad.append("no rail samples")
+        if c.get("count"):
+            bad.append(f"{c['count']} unexplained pedestrian obstructions")
+        if c.get("unreviewedCandidates"):
+            bad.append(f"{c['unreviewedCandidates']} survey candidates without a recorded review")
+        more = f"raw sections {c.get('rawCount')}, samples {c.get('of')}, missing samples {c.get('missing')}"
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):

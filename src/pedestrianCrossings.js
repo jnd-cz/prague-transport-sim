@@ -30,9 +30,16 @@ function chord(x, y, ux, uy, area) {
 
 // A crossing is short along the rails and at least as wide across them. A short but parallel
 // sidewalk is not a crossing (the reported ZPS crossing is 6.3 m along and 15.2 m across).
-function crossingSpan(x, y, ux, uy, area) {
+export function pedestrianShape(x, y, ux, uy, area) {
   const along = chord(x, y, ux, uy, area), across = chord(x, y, -uy, ux, area);
-  if (!along || !across || along[1] - along[0] > MAX_CROSSING ||
+  return along && across ? { along, across } : null;
+}
+
+export function crossingSpan(x, y, ux, uy, area) {
+  const shape = pedestrianShape(x, y, ux, uy, area);
+  if (!shape) return null;
+  const { along, across } = shape;
+  if (along[1] - along[0] > MAX_CROSSING ||
       across[1] - across[0] + 1 < along[1] - along[0]) return null;
   return { along, across };
 }
@@ -57,16 +64,17 @@ class TrackIndex {
       }
     }
   }
-  nearest(x, y, reach = REACH, ref = null) {
+  nearest(x, y, reach = REACH, ref = null, lowest = false) {
     const list = this.cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || [];
     let best = null, bestD = reach;
     for (const s of list) {
       const u = Math.max(0, Math.min(1, ((x - s.a[0]) * s.dx + (y - s.a[1]) * s.dy) / (s.len * s.len)));
       const px = s.a[0] + s.dx * u, py = s.a[1] + s.dy * u, d = Math.hypot(x - px, y - py);
-      if (d > bestD) continue;
+      if (d > (lowest ? reach : bestD)) continue;
       const lat = (-s.dy * (x - px) + s.dx * (y - py)) / s.len;
       const z = s.z0 + (s.z1 - s.z0) * u + (s.t0 + (s.t1 - s.t0) * u) * lat / 0.72;
       if (ref !== null && Math.abs(z - ref) > LEVEL_TOLERANCE) continue; // an overpass is another level
+      if (lowest && best && z >= best.z) continue;
       bestD = d;
       best = { x: px, y: py, d, z, ux: s.dx / s.len, uy: s.dy / s.len, id: s.id };
     }
@@ -77,7 +85,9 @@ class TrackIndex {
 // Lower only pedestrian surfaces that actually cross a matching-level track. Return raw height;
 // the caller adds the surface's normal draw lift. Outside the track zone the source is preserved.
 function lower(index, x, y, raw, lift) {
-  const rail = index.nearest(x, y, FADE_WIDTH, raw + lift);
+  // At a turnout several same-level track ribbons overlap. The crossing must clear all of
+  // their rail heads; following only the closest centre can leave a lower rail buried.
+  const rail = index.nearest(x, y, FULL_WIDTH, raw + lift, true) || index.nearest(x, y, FADE_WIDTH, raw + lift);
   if (!rail) return raw;
   const target = rail.z + RAIL_HEAD - CLEARANCE - lift;
   if (raw <= target) return raw;
@@ -85,8 +95,8 @@ function lower(index, x, y, raw, lift) {
   return target + (raw - target) * k * k * (3 - 2 * k);
 }
 
-// A surveyed patch alone can be a platform edge or a short parallel sidewalk. Require an
-// independently mapped pedestrian way crossing the track nearby before reshaping it.
+// Independently mapped transverse ways corroborate a survey patch, including narrow ones.
+// Without one, the patch must span the whole track ribbon (checked below).
 function pedestrianEvidence(roads) {
   const cells = new Map(), size = 25, reach = 5;
   for (const way of roads || []) {
@@ -135,11 +145,16 @@ export function preparePedestrianCrossings(data, route, ground, tiltOf, liftOf) 
         const site = { x: rail.x + (span.along[0] + span.along[1]) * rail.ux / 2,
                      y: rail.y + (span.along[0] + span.along[1]) * rail.uy / 2, track: rail.id, ux: rail.ux, uy: rail.uy,
                      radius: (span.along[1] - span.along[0]) / 2 + 5, width: span.along[1] - span.along[0],
-                     across: span.across[1] - span.across[0], heightDifference: z + lift - rail.z };
+                     across: span.across[1] - span.across[0], spansTrack: span.across[0] <= -1.35 && span.across[1] >= 1.35,
+                     heightDifference: z + lift - rail.z };
         site.evidence = evidence(site);
+        // The survey outline and independently mapped track axes also establish a crossing
+        // when the patch spans the entire 2.7 m track ribbon. Tiny islands and side edges fail.
+        if (!site.evidence && site.spansTrack)
+          site.evidence = 'survey-spans-track';
         if (!site.evidence) {
           if (!decisions.review.some((s) => s.area === areaId && Math.hypot(s.x - site.x, s.y - site.y) < 3))
-            decisions.review.push({ area: areaId, ...site });
+            decisions.review.push({ area: areaId, ...site, reason: 'survey-patch-does-not-span-track' });
           continue;
         }
         sites.push(site);

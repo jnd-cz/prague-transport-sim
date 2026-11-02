@@ -398,5 +398,128 @@
    "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
    "source": "user 2026-10-29"
   }
- ]
+ ],
+ "pedestrianSurfaceReviews": {
+  "source": "Source-geometry audit, issue #146 / PR #177, 2026-11-02; pinned OSM and ZPS outlines against the rendered route.",
+  "scope": "These are side-surface overlaps, not transverse crossings. Their physical levels remain the surface investigation in #166. A source rebuild or a changed geometric classification requires a new review.",
+  "lines": {
+   "9": {
+    "files": {
+     "line9.json": "61ebe1e4353de1a29484f037dd20ce73e3feda19a48fb2399a36ba55c4397c39"
+    },
+    "reasons": {
+     "mapped-footway-runs-along-track": {
+      "roads": [
+       372,
+       951,
+       969,
+       1782,
+       1861,
+       1914,
+       2530,
+       5786,
+       6006,
+       6015,
+       6016
+      ]
+     }
+    }
+   },
+   "17": {
+    "files": {
+     "line17.json": "c07308211cc62af2367ac6c6ad200a0fc65f150777de470735f206f7735bf673",
+     "line17.dtm.json": "5c16967013d2a868aaa5fe0ace649e4b008d969816910e7215ee3f6de8d3adce"
+    },
+    "reasons": {
+     "survey-edge-does-not-cross-gauge": {
+      "surveyAreas": [
+       120,
+       797,
+       799,
+       1367,
+       1403,
+       1516,
+       3341
+      ]
+     },
+     "survey-patch-does-not-span-track": {
+      "surveyAreas": [
+       201,
+       1373,
+       3441,
+       3442,
+       5790
+      ]
+     }
+    }
+   },
+   "22": {
+    "files": {
+     "line22.json": "59cd515314740aac0e01f4e939156babdaa7562be3d587e5afb9ee1dfad2fe40",
+     "line22.dtm.json": "7953178fd6e469afeec3eef58732027f7975560d8bf89beb13370a30f2d1b1a8"
+    },
+    "reasons": {
+     "survey-edge-does-not-cross-gauge": {
+      "surveyAreas": [
+       231
+      ]
+     }
+    }
+   },
+   "23": {
+    "files": {
+     "line23.json": "cf1d4c11b1fe685ecc5ba44056267a72ce5f44be137169ed6d526cad62337ea9"
+    },
+    "reasons": {
+     "mapped-footway-runs-along-track": {
+      "roads": [
+       217,
+       535,
+       919,
+       943,
+       1195,
+       1325,
+       2850,
+       2851,
+       2859,
+       3040,
+       3246,
+       3247,
+       3310,
+       3338,
+       3339
+      ]
+     }
+    },
+    "osmExamples": [
+     {
+      "road": 3040,
+      "way": 1197273916,
+      "name": "Chotkova",
+      "highway": "pedestrian",
+      "basis": "Pinned OSM way nodes match the rendered ribbon; a pedestrian street, not a mapped transverse crossing."
+     },
+     {
+      "road": 2859,
+      "way": 1072234529,
+      "name": "Havlíčkova",
+      "highway": "pedestrian",
+      "basis": "Pinned OSM way nodes match the rendered ribbon; a pedestrian street with psv=yes."
+     }
+    ]
+   },
+   "37": {
+    "files": {
+     "line37.json": "4b14913e528db74ebeea7ae259b0f5008ea564ac0aa312167d69f7b8da6539c6"
+    },
+    "reasons": {
+     "mapped-footway-runs-along-track": {
+      "roads": [
+       2716
+      ]
+     }
+    }
+   }
+  }
+ }
 }

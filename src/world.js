@@ -495,8 +495,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
       const across = r.tram || (r.w > 3 && run.some(([x, y]) => trackDist(x, y) < 8));
       const height = hf || wayHeight(run, false, ground), lift = r.f ? 0.16 : 0.12;
       const crossing = r.f ? pedestrianCrossings.footway(run, r.w, height, lift, r.n || null) : null;
-      addRibbon(r.f ? footCg : roadsCg, crossing ? densify(run, 0.75) : run, r.w, crossing || height, lift, r.f ? paving : asphalt, 0,
-        crossing ? Math.ceil(r.w / 0.5) : across ? Math.ceil(r.w / 2) : 1);
+      addRibbon(r.f ? footCg : roadsCg, crossing ? densify(run, 0.2) : run, r.w, crossing || height, lift, r.f ? paving : asphalt, 0,
+        crossing ? Math.ceil(r.w / 0.2) : across ? Math.ceil(r.w / 2) : 1);
     }
   }
   // (road tunnels: no snow inside)

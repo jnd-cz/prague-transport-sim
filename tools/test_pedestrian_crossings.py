@@ -80,10 +80,10 @@ class PedestrianCrossings(unittest.TestCase):
         }''')
         self.assertEqual(result,[0,0])
 
-    def test_unmatched_survey_patch_is_held_for_review(self):
+    def test_narrow_unmatched_survey_patch_is_held_for_review(self):
         result=self.page.evaluate('''async () => {
           const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
-          const p=[[-2,-4,200.05],[2,-4,200.05],[2,4,200.05],[-2,4,200.05]];
+          const p=[[-0.3,-0.5,200.05],[0.3,-0.5,200.05],[0.3,0.5,200.05],[-0.3,0.5,200.05]];
           const a={c:'sidewalk',l:0,ring:p,holes:[],mesh:[[p[0],p[1],p[2]],[p[0],p[2],p[3]]]};
           const dtm={areas:[a],reindexGround(){throw new Error('unmatched patch changed');}};
           const t={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]}, ground={dtm};
@@ -105,6 +105,17 @@ class PedestrianCrossings(unittest.TestCase):
         self.assertAlmostEqual(result[0],199.960,places=6)
         self.assertAlmostEqual(result[1],200.056,places=6)
 
+    def test_crossing_clears_overlapping_same_level_tracks(self):
+        result=self.page.evaluate('''async () => {
+          const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
+          const a={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]};
+          const b={smooth:[[-10,0.4],[0,0.4],[10,0.4]],z:[200.1,200.1,200.1]};
+          const crossing=preparePedestrianCrossings({tracks:[a,b]},null,{dtm:null},()=>[0,0,0],()=>0.05);
+          const height=crossing.footway([[0,-5],[0,5]],2,()=>200,0.16);
+          return height(0,0.72)+0.16;
+        }''')
+        self.assertAlmostEqual(result,200.008,places=6)
+
     def test_survey_lookup_matches_the_refined_drawn_surface(self):
         result=self.page.evaluate('''async () => {
           const THREE=await import('three');
@@ -114,7 +125,7 @@ class PedestrianCrossings(unittest.TestCase):
                                    {height:()=>200},THREE);
           const before=dtm.surfaceAt(0,0.72).z+DTM_LIFT.sidewalk;
           const track={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]}, ground={dtm};
-          preparePedestrianCrossings({tracks:[track],roads:[{z:1,p:[[0,-5],[0,5]]}]},null,ground,()=>[0,0,0],kind=>DTM_LIFT[kind] ?? 0.03);
+          preparePedestrianCrossings({tracks:[track],roads:[]},null,ground,()=>[0,0,0],kind=>DTM_LIFT[kind] ?? 0.03);
           return {before,after:dtm.surfaceAt(0,0.72).z+DTM_LIFT.sidewalk,
                   areas:ground.pedestrianCrossings.survey.length};
         }''')

@@ -1,6 +1,41 @@
 // Rendered pedestrian surfaces above rail heads, grouped in 20 m route sections (#146).
 // On a running shift loaded with ?keepgeo: (await import('/tools/bench/crossingSlab.js')).run()
 import * as THREE from 'three';
+import { pedestrianShape } from '../../src/pedestrianCrossings.js';
+
+export function crossingReason(game, hit, source, way) {
+  const r = game.route;
+  if (!r.at) return null;
+  const p = r.at(hit.s);
+  if (source) {
+    const a = r.ground.dtm?.areas[source[4]];
+    if (!a) return null;
+    const shape = pedestrianShape(p.x, p.y, p.hx, p.hy, a);
+    if (!shape || shape.across[0] > -0.72 || shape.across[1] < 0.72) return 'survey-edge-does-not-cross-gauge';
+    if (shape.along[1] - shape.along[0] > shape.across[1] - shape.across[0] + 1) return 'survey-surface-runs-along-track';
+    return null;
+  }
+  const road = game.data.roads[way];
+  if (!road) return null;
+  let distance = Infinity, alignment = 0;
+  for (let i = 1; i < road.p.length; i++) {
+    const a = road.p[i - 1], b = road.p[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    if (!l2) continue;
+    const t = Math.max(0, Math.min(1, ((hit.x - a[0]) * dx + (hit.y - a[1]) * dy) / l2));
+    const d = Math.hypot(hit.x - a[0] - t * dx, hit.y - a[1] - t * dy);
+    if (d < distance) { distance = d; alignment = Math.abs(dx * p.hx + dy * p.hy) / Math.sqrt(l2); }
+  }
+  return alignment >= 0.75 ? 'mapped-footway-runs-along-track' : null;
+}
+
+// A geometric classification is a review candidate, not a blanket exemption. Source IDs are
+// valid only for the exact published inputs audited in truth.json; the geometry must still agree.
+export function recordedReason(line, kind, id, reason, reviews, manifest) {
+  const review = reviews?.lines?.[line];
+  if (!reason || !review || !Object.keys(review.files || {}).length) return null;
+  if (Object.entries(review.files).some(([name, sha]) => manifest.files?.[name]?.sha256 !== sha)) return null;
+  return review.reasons?.[reason]?.[kind]?.includes(id) ? reason : null;
+}
 
 // Compare the survey-based crossing decisions with independently mapped OSM pedestrian ways.
 function calibration(game) {
@@ -17,7 +52,7 @@ function calibration(game) {
         }
     }
   }
-  let zebra = 0, footway = 0, unmatched = 0;
+  let zebra = 0, footway = 0, unmatched = 0, mappedSpansTrack = 0;
   const widths = [], examples = [];
   for (const area of decisions.survey) for (const site of area.sites) {
     widths.push(site.width);
@@ -29,16 +64,22 @@ function calibration(game) {
       if (Math.abs((dx * site.ux + dy * site.uy) / Math.sqrt(l2)) >= 0.75) continue;
       if (seg.zebra) z = true; else f = true;
     }
+    if ((z || f) && site.spansTrack) mappedSpansTrack++;
     if (z) zebra++; else if (f) footway++; else { unmatched++; if (examples.length < 20) examples.push(site); }
   }
-  return { surveyAreas: decisions.survey.length, surveySites: widths.length, zebra, footway, unmatched,
+  return { surveyAreas: decisions.survey.length, surveySites: widths.length, zebra, footway, unmatched, mappedSpansTrack,
            minWidth: widths.length ? Math.min(...widths) : null, maxWidth: widths.length ? Math.max(...widths) : null,
            unmatchedExamples: examples, reviewSites: decisions.review?.length || 0, adjustedFootways: decisions.footways.length };
 }
 
-export function run({ unfiltered = false } = {}) {
+export async function run({ unfiltered = false } = {}) {
   const game = window.game, world = window.world;
   if (!game || !world || !/[?&](keepgeo|bot)\b/.test(location.search)) throw new Error('start a shift with ?keepgeo');
+  const [truth, manifest] = await Promise.all(['truth.json', 'MANIFEST.json'].map(async (name) => {
+    const response = await fetch(new URL(`../../data/${name}`, import.meta.url));
+    if (!response.ok) throw new Error(`crossing review: could not load ${name}`);
+    return response.json();
+  }));
   const rails = [], footways = [];
   world.traverse((m) => {
     if (!m.isMesh) return;
@@ -94,7 +135,7 @@ export function run({ unfiltered = false } = {}) {
     }
   }
   let samples = 0, missing = 0;
-  const hits = [], missingHeads = [];
+  const hits = [], missingHeads = [], unresolved = new Map(), explained = new Map();
   for (const bin of [...bins].sort((a, b) => a - b)) for (const side of [-1, 1]) {
     const s = bin * 2;
     let head = null;
@@ -116,9 +157,16 @@ export function run({ unfiltered = false } = {}) {
     if (excess > 0.001) {
       const source = surface.object.userData.surface === 'dtm' ? area(surface.object, surface.faceIndex) : null;
       const way = source ? null : surface.object.userData.footwayRanges?.find((r) => r[0] <= surface.faceIndex && surface.faceIndex < r[1])?.[2];
-      hits.push({ s, side, x: head.point.x, y: -head.point.z, railZ: head.point.y, surfaceZ: surface.point.y, way: way ?? null,
+      const hit = { s, side, x: head.point.x, y: -head.point.z, railZ: head.point.y, surfaceZ: surface.point.y, way: way ?? null,
                   source: source ? 'dtm' : 'osm-footway', area: source?.[4] ?? null,
-                  class: source?.[2] ?? 'footway', level: source?.[3] ?? null, excess });
+                  class: source?.[2] ?? 'footway', level: source?.[3] ?? null, excess };
+      hit.geometryReason = crossingReason(game, hit, source, way);
+      hit.reason = recordedReason(game.data.line, source ? 'surveyAreas' : 'roads',
+        source ? route.ground.dtm?.areas[source[4]]?.sourceId : way,
+        hit.geometryReason, truth.pedestrianSurfaceReviews, manifest);
+      const target = hit.reason ? explained : unresolved;
+      if (!target.has(key) || target.get(key).excess < excess) target.set(key, hit);
+      hits.push(hit);
     }
     if (excess > 0.001 && !(bad.get(key)?.mag >= excess)) bad.set(key, {
       s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: excess,
@@ -132,9 +180,14 @@ export function run({ unfiltered = false } = {}) {
     const a = route.ground.dtm.areas[id];
     return { id, sourceId: a.sourceId, class: a.c, level: a.l, ring: a.ring, holes: a.holes };
   });
-  return { calibration: calibration(game), hits, missingHeads, sourceAreas,
-           reviewCandidates: route.ground.pedestrianCrossings?.review || [],
-           checks: { crossingSlab: { rule: 'pedestrian-surface-below-rail', count: places.length,
-                                  of: samples, missing, sections: places.sort((a, b) => a.s - b.s),
-                                  places: [...places].sort((a, b) => b.mag - a.mag).slice(0, 12) } } };
+  const reviewCandidates = (route.ground.pedestrianCrossings?.review || []).map((s) => ({ ...s,
+    recorded: !!recordedReason(game.data.line, 'surveyAreas', route.ground.dtm?.areas[s.area]?.sourceId,
+      s.reason, truth.pedestrianSurfaceReviews, manifest) }));
+  return { calibration: calibration(game), hits, missingHeads, sourceAreas, reviewCandidates,
+           checks: { crossingSlab: { rule: 'pedestrian-surface-below-rail', count: unresolved.size, rawCount: places.length,
+                                  unreviewedCandidates: reviewCandidates.filter((s) => !s.recorded).length,
+                                  of: samples, missing, sections: [...unresolved.values()].sort((a, b) => a.s - b.s),
+                                  explainedSections: [...explained.values()].sort((a, b) => a.s - b.s),
+                                  rawSections: places.sort((a, b) => a.s - b.s),
+                                  places: [...unresolved.values()].sort((a, b) => b.excess - a.excess).slice(0, 12).map((h) => ({...h, mag:h.excess})) } } };
 }
