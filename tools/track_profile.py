@@ -3,6 +3,7 @@ within the design radius (#188).
 
     python -P -E tools/track_profile.py --check          # the review queue's profiles before / after
     python -P -E tools/track_profile.py --calibrate      # against numeric DI (needs reports/track-heights.json)
+    python -P -E tools/track_profile.py --steps          # where the curve cannot follow the selected heights, by cause
 
 A tram track is built of grades joined by vertical curves of radius at least 500 m in a street in closed
 built-up areas and 1000 m on open track and in switches (data/truth.json trackGeometry, ČSN 73 6412 as quoted
@@ -159,12 +160,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--check',action='store_true',help="the review queue's profiles: tightest radius before / after")
     ap.add_argument('--calibrate',action='store_true',help='fit the archive along DI paths and compare with numeric DI')
+    ap.add_argument('--steps',action='store_true',help='steps of the selected heights by cause; exit 1 on unexplained ones over 1 m')
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')
-    if not (args.check or args.calibrate):
-        ap.error('choose --check or --calibrate')
+    if not (args.check or args.calibrate or args.steps):
+        ap.error('choose --check, --calibrate or --steps')
     if args.check:
         sys.exit(check())
+    if args.steps:
+        sys.exit(steps())
     calibrate()
 
 
@@ -355,6 +359,139 @@ def calibrate(path=ROOT/'reports/track-heights.json', out=ROOT/'reports/track-pr
         for k in ('vs_di','vs_lidar_paved'):
             c = g[k]
             print(f"  {k}: raw {c['raw']} -> smoothed {c['smoothed']}; closer {c['closer']}, further {c['further']}")
+
+
+HELD_GAP = 60  # m: a held stretch up to this long is bridged by the curve from both sides (#184); a longer one cuts
+BIG = 1.0  # m: a step this large needs its cause decided (#190)
+STRUCTURE = {'structure_hint','structure_unverified','tunnel_unverified'}
+
+
+def cause(points, misses, structure=False):
+    """Why the curve misses these selected heights: 'structure' (next to a held structure the curve bridges: its
+    deck level is the structure review's), 'di' (numeric DI, used as supplied), 'dip' (every point below the
+    curve: the archive on the ground under a deck no source maps, which #184's rule bridges with a curve from both
+    sides), 'survey', 'terrain' (the 2023 terrain has the same shape: no source disagrees, a question for review),
+    'archive' (the archive departs from the terrain, by less than the import's hold threshold)."""
+    if structure:
+        return 'structure'
+    src = [p['src'] for p in points]
+    if all(s == 'di' for s in src):
+        return 'di'
+    if all(m < 0 for m in misses):
+        return 'dip'
+    if any(s in ('survey','deck') for s in src):
+        return 'survey'
+    off = sorted(abs(p['z']-p['terrain']) for p in points if p['terrain'] is not None)
+    if off and off[len(off)//2] <= .5:
+        return 'terrain'
+    return 'archive'
+
+
+def _held_runs(series):
+    """Runs of bins no more than 10 m apart that start and end with a selected height; a held stretch over
+    HELD_GAP cuts the run, a shorter one stays in it at weight 0."""
+    runs, run = [], []
+    for x in series:
+        if run and x['s']-run[-1]['s'] > 2*BIN+1e-6:
+            runs.append(run); run = []
+        run.append(x)
+        held = 0
+        while held < len(run) and run[-1-held]['w'] == 0:
+            held += 1
+        if held and run[-1]['s']-run[-held]['s'] > HELD_GAP:
+            runs.append(run[:-held]); run = []
+    runs.append(run)
+    for run in runs:
+        while run and run[-1]['w'] == 0:
+            run.pop()
+        while run and run[0]['w'] == 0:
+            run.pop(0)
+    return [run for run in runs if len(run) >= 5]
+
+
+def steps(path=ROOT/'reports/track-heights.json', out=ROOT/'reports/track-profile-steps.json'):
+    """The import's selected heights along every chain of DI paths, held ones bridged by the curve at weight 0:
+    where it cannot follow within 0.3 m, a step, counted by cause (#190). Fails on a step over 1 m that no rule
+    explains: numeric DI is used as supplied, anything else that large is a question."""
+    from shapely.geometry import LineString, Point
+    from geo import Frame
+    print(f'reading {path.name}', flush=True)
+    staged = json.loads(path.read_text(encoding='utf-8'))
+    paths = {g['id']:[tuple(p) for p in g['xy']] for g in staged['geometry'] if g['dataset']=='di'}
+    lines = {pid:LineString(xy) for pid,xy in paths.items() if len(xy) >= 2}
+    per = {}
+    for h in staged['height_samples']:
+        if h['di_id'] not in lines:
+            continue
+        ok = h['status']=='selected' and isinstance(h.get('z'),(int,float))
+        per.setdefault(h['di_id'],[]).append((lines[h['di_id']].project(Point(h['xy'])),{
+            'z':h['z'] if ok else None,'src':(h.get('height_source') or {}).get('dataset') if ok else None,
+            'terrain':h.get('terrain_z'),'xy':h['xy'],'flags':h.get('review_flags',[])}))
+    del staged
+    r, F = radii(), Frame()
+    med = lambda xs: sorted(xs)[len(xs)//2]
+    found, stats = [], {'runs':0,'bins':0,'bridged_bins':0}
+    for chain in chains(paths):
+        offset, bins = 0.0, {}
+        for pid,rev in chain:
+            L = lines.get(pid)
+            if L is None:
+                continue
+            for s,p in per.get(pid,[]):
+                bins.setdefault(int((offset+(L.length-s if rev else s))//BIN),[]).append(p)
+            offset += L.length
+        series = []
+        for b in sorted(bins):
+            v = bins[b]
+            sel = [p for p in v if p['z'] is not None]
+            p = (sel or v)[len(sel or v)//2]
+            series.append({'s':(b+.5)*BIN,'z':med([q['z'] for q in sel]) if sel else None,'w':1.0 if sel else 0.0,
+                           'src':p['src'],'terrain':p['terrain'],'xy':p['xy'],'flags':p['flags']})
+        for run in _held_runs(series):
+            last = None
+            for x in run:  # (a held bin's height does not pull the curve: any finite value)
+                last = x['z'] if x['z'] is not None else last
+                x['zf'] = last
+            res = vertical_profile([x['s'] for x in run],[x['zf'] for x in run],r['street'],weight=[x['w'] for x in run])
+            stats['runs'] += 1
+            stats['bins'] += len(run)
+            stats['bridged_bins'] += sum(x['w'] == 0 for x in run)
+            groups = []
+            for i,x in enumerate(run):
+                if x['w'] and abs(res['z'][i]-x['z']) > STEP:
+                    if groups and x['s']-run[groups[-1][-1]]['s'] <= 20:
+                        groups[-1].append(i)
+                    else:
+                        groups.append([i])
+            for g in groups:
+                pts = [run[i] for i in g]
+                near = [x for x in run if x['w'] == 0 and min(abs(x['s']-p['s']) for p in pts) <= 20]
+                big = max(g,key=lambda i:abs(res['z'][i]-run[i]['z']))
+                lat, lon = F.ll(*run[big]['xy'])
+                t = run[big]['terrain']
+                found.append({'cause':cause(pts,[run[i]['z']-res['z'][i] for i in g],
+                                            any(STRUCTURE & set(x['flags']) for x in near)),'largest_m':round(run[big]['z']-res['z'][big],2),'points':len(g),
+                              'lat':round(float(lat),5),'lon':round(float(lon),5),'di_chain':chain[0][0],
+                              'height_minus_terrain_m':None if t is None else round(run[big]['z']-t,2),
+                              'flags':sorted({f for p in pts for f in p['flags']})})
+    found.sort(key=lambda f:-abs(f['largest_m']))
+    by = {}
+    for f in found:
+        c = by.setdefault(f['cause'],{'runs':0,'points':0,'over_1m':0})
+        c['runs'] += 1
+        c['points'] += f['points']
+        c['over_1m'] += abs(f['largest_m']) > BIG
+    bad = [f for f in found if abs(f['largest_m']) > BIG and f['cause'] not in ('di','dip','structure')]
+    out.write_text(json.dumps({'radius_m':r['street'],'held_gap_m':HELD_GAP,**stats,'by_cause':by,'steps':found},
+                              indent=1),encoding='utf-8')
+    print(stats)
+    for k,c in sorted(by.items()):
+        print(f'{k}: {c}')
+    for f in bad:
+        print(f"  {f['cause']} {f['largest_m']:+.2f} m, {f['points']} points at {f['lat']}, {f['lon']}"
+              f" (height - terrain {f['height_minus_terrain_m']}) {[x for x in f['flags'] if x != 'track_style_defaulted_panels']}")
+    print(f'{len(bad)} steps over {BIG:g} m without a rule to explain them')
+    return 1 if bad else 0
 
 
 def check():
