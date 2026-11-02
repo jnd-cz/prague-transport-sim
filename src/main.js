@@ -795,8 +795,23 @@ let review = null;
 if (params.has('review')) {
   review = new Review({ scene, camera, canvas, data, route, ground, world, url: params.get('review'), at: parseAt(params.get('at')) });
   window.review = review;
-} else $('menu').classList.remove('hidden');
+} else if (params.has('seed') && params.has('at')) replayTo(+params.get('seed'), +params.get('at'));
+else $('menu').classList.remove('hidden');
 requestAnimationFrame(frame);
+
+// ?seed=N&at=S: the traffic check's run with that seed (tools/traffic_lint.js: the same settings and
+// seeded stream, the autopilot driving), stepped without drawing until our tram reaches s, then handed
+// over paused with the inspector on: a stuck scene or a reported moment of such a run, as it was (#157)
+async function replayTo(seed, at) {
+  const { trafficRun } = await import('../tools/traffic_lint.js');
+  const t0 = performance.now();
+  await trafficRun({ seed, stopAt: at, progress: (msg) => { document.title = msg; } });
+  document.title = `Replay: seed ${seed}, s ${Math.round(window.game.tram.s)}`;
+  inspect.toggle(true); // (it starts the game running: paused after it)
+  inspect.paused = true;
+  window.game.paused = true;
+  window.game.msg(`Replay of the traffic check, seed ${seed}: s ${Math.round(window.game.tram.s)} after ${((performance.now() - t0) / 1000).toFixed(0)} s`, 'info', 10);
+}
 
 // ------------------------------------------------------------------ performance overlay
 // Menu option: frames per second, frame time (average and worst over the last second), what the

@@ -113,14 +113,16 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
-- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`.
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
   default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
   of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside
   the spread are listed as noise. Stuck, unfinished and penalty runs are listed per seed and need a reason,
-  as does every move of the seedless checks (lint, surfaces) and every mean outside the spread. When a PR moves the numbers, rerun with
-  `--baseline` once its code and data are committed and published, and commit
-  `reports/baseline/headless.json` with it.
+  as does every move of the seedless checks (lint, surfaces) and every mean outside the spread. The table
+  also lists places new and gone (#157). Main's baseline is measured at night by the deploy PC after a
+  merge that changes the game, the checks or the data (`tools/autodeploy.py`, 2 pages at once, not while a
+  heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base
+  when the committed `reports/baseline/headless.json` is older. A PR does not refresh the baseline.
 
 ## Known failures (not caused by your change; remove a row when its issue closes)
 

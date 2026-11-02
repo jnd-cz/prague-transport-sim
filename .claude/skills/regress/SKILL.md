@@ -32,7 +32,7 @@ rerunning the published data.
    - Every mean outside the spread, every per-seed failure and every seedless move needs a reason tied to
      the change (e.g. "roads changed at the corridor edge"). A **worse** mark without one is a regression:
      report it, don't paper over it.
-5. **For the PR:** the table from `reports/headless/compare.md`, the reasons, and for rebuilt data what
-   changed per line. When the numbers moved for good reasons, and code and data are committed and
-   published, rerun with `--baseline` instead of `--compare` and commit `reports/baseline/headless.json`
-   on the branch, so main's baseline is current after the merge.
+5. **For the PR:** the table from `reports/headless/compare.md` (counts and places), the reasons, and for
+   rebuilt data what changed per line. The baseline is not refreshed in the PR: the deploy PC measures
+   main's after the merge, at night, and publishes it (#157). A stuck run is opened with
+   `?line=N&seed=S&at=<its s>` (the traffic check's run, handed over paused).

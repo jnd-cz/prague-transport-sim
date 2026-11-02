@@ -71,5 +71,24 @@ class Spread(unittest.TestCase):
         self.assertEqual((cells[2], cells[3], cells[4]), ("1 (main: 5)", "–", "walkerHit"))
 
 
+class Places(unittest.TestCase):
+    def test_new_and_gone_places_across_seeds(self):
+        stored = {"line22-traffic-seed1": {"walkerHit": [[0, 0, 10], [100, 100, 50]]},
+                  "line22-traffic-seed2": {"walkerHit": [[5, 5, 12]]}}
+        found = {(22, "traffic", 1): {"walkerHit": [[2, 2, 11], [500, 500, 300]]},
+                 (22, "traffic", 2): {"walkerHit": [[501, 499, 301]]}}
+        cells = row(headless.place_rows(stored, found))
+        self.assertEqual(cells, ["22", "traffic", "walkerHit", "1: 500,500 (s 300) ×2", "1: 1 once"])
+
+    def test_bench_places_match_by_route_position(self):
+        stored = {"line17-u3-seed1": {"closeCuts": [[None, None, 14249]]}}
+        found = {(17, "u3", 1): {"closeCuts": [[None, None, 14260], [None, None, 20525]]}}
+        self.assertEqual(row(headless.place_rows(stored, found))[3:], ["1: 1 once", "0"])
+
+    def test_same_places_give_no_row(self):
+        stored = {"line17-lint": {"railSupport": [[1, 2, 3]]}}
+        self.assertEqual(headless.place_rows(stored, {(17, "lint", 0): {"railSupport": [[1, 2, 3]]}}), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
