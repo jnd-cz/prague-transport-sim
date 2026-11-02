@@ -1,6 +1,7 @@
 """Group held heights into structure decisions, without approving a height (#106).
 
     python -P -E tools/track_structure_review.py --input reports/track-heights.json
+    python -P -E tools/track_structure_review.py    # only the findings, from the committed queue
 
 The findings load in ?line=17&review=reports/review/track-heights.json.
 Each structure has contiguous spans with stop names, lengths per direction, dated candidates and
@@ -28,7 +29,7 @@ from track_context import load_context
 from track_decks import load_decks
 from track_heights import usable
 from track_terrain_fallback import ordinary_fallback
-from track_span_evidence import from_reviews
+from track_span_evidence import ARCHIVE, BRIDGED, SURVEY, from_reviews
 
 
 def structure_kind(tags):
@@ -303,15 +304,23 @@ def findings(result, inline=False, span_file='reports/review/track-height-spans.
         item = {'kind':'trackheight','id':decision['id'],'x':point['xy'][0],'y':point['xy'][1],
                     'mag':longest['length_m'],'info':f"{longest['from_stop']} → {longest['to_stop']}: {decision['structure']['kind']}",
                     'status':'conflict' if conflict else decision['status'],'decision':decision,'spans':linked}
-        explanations = {}
-        for choice in ('archive profile ok','follows survey surface'):
+        explanations, bridged = {}, {}
+        for choice in (ARCHIVE,BRIDGED,SURVEY):
             answer = {'decision_id':decision['id'],'span_ids':decision['span_ids'],'v':choice,'note':'','t':1793577600000}
             if all('approval_profile' in span for span in linked):
                 check = from_reviews({'items':{'preview':answer}},{'findings':[item]},'preview')
                 explanations[choice] = check['held'][0]['reason'] if check['held'] else None
+                if choice==BRIDGED and check['span_reviews']:
+                    # (the chart draws the deck across each dip: [start s, z, end s, z] per span)
+                    for span,profile in zip(linked,check['span_reviews'][0]['profiles']):
+                        if profile.get('bridged'):
+                            bridged[span['id']] = profile['bridged']
             else:
                 explanations[choice] = 'span approval data is incomplete'
-        item['options'] = ['archive profile ok'] + ([] if explanations['follows survey surface'] else ['follows survey surface']) + ['other level (deck / under)','unsure']
+        # (the archive is always offered, with why it stays held; the others only where they import)
+        item['options'] = [ARCHIVE,*(c for c in (BRIDGED,SURVEY) if not explanations[c]),'other level (deck / under)','unsure']
+        if bridged:
+            item['bridged'] = bridged
         item['answer_explanations'] = explanations
         if not inline:
             del item['spans']
@@ -356,7 +365,7 @@ def markdown(result):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--input',type=Path,required=True)
+    ap.add_argument('--input',type=Path,help='the import report (reports/track-heights.json); without it only the findings are rewritten from --output')
     ap.add_argument('--output',type=Path,default=ROOT/'reports/review/track-height-spans.json')
     ap.add_argument('--markdown-output',type=Path,default=ROOT/'reports/review/track-height-spans.md')
     ap.add_argument('--findings-output',type=Path,default=ROOT/'reports/review/track-heights.json')
@@ -365,6 +374,14 @@ def main():
         span_file = a.output.resolve().relative_to(ROOT.resolve()).as_posix()
     except ValueError:
         ap.error('--output must be inside the checkout so review mode can load it')
+    if not a.input:
+        # (the answers offered change with the import rules: the queue and its hash stay as they are)
+        result = json.loads(a.output.read_text(encoding='utf-8'))
+        if queue_text(result).encode('utf-8') != a.output.read_bytes():
+            sys.exit(f'{a.output} is not as this tool writes it: rebuild with --input')
+        write_json(a.findings_output,findings(result,span_file=span_file))
+        print(f"{a.findings_output}: {len(result['decisions'])} decisions rewritten from {span_file}")
+        return
     report = json.loads(a.input.read_text(encoding='utf-8'))
     decks = load_decks(ROOT)
     context = load_context(decks)

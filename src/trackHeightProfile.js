@@ -60,6 +60,11 @@ export function heightProfile(f, route, profile) {
       const [a, b] = span.proposal.ends; svg += line(points, (p) => a + (b - a) * Math.max(0, Math.min(1, (p.s - span.start_s) / span.length_m)), '#ff9e31', '2 2');
     } else if (['review_archive_profile', 'archive_agrees_with_survey'].includes(span.proposal?.rule))
       svg += line(points, (p) => p.archive.find((a) => valid(a.z) && !a.excluded)?.z, '#ff9e31', '2 3');
+    // the answer "archive, bridged over a dip": the deck straight across what the archive measured below (#176)
+    for (const [a, za, b, zb] of f.bridged?.[span.id] || []) {
+      const at = (s) => points.reduce((p, q) => Math.abs(q.s - s) < Math.abs(p.s - s) ? q : p).x;
+      svg += `<path d="M${X(at(a)).toFixed(1)},${Y(za).toFixed(1)}L${X(at(b)).toFixed(1)},${Y(zb).toFixed(1)}" stroke="#ff9e31" stroke-width="2.5" fill="none"${dash ? ` stroke-dasharray="${dash}"` : ''}><title>bridged: ${za.toFixed(2)} → ${zb.toFixed(2)} m</title></path>`;
+    }
     for (const p of points) {
       for (const s of p.surfaces) {
         const z = s.surface_z ?? s.z;
@@ -88,6 +93,6 @@ export function heightProfile(f, route, profile) {
   const exaggeration = ((bottom - top) / (right - left) * (x1 - x0) / (z1 - z0)).toFixed(1);
   const layers = [...new Set(Object.values(main.structure.tags || {}).map((t) => t.layer).filter((x) => x !== undefined))];
   const embankment = Object.values(main.structure.tags || {}).some((t) => t.embankment && t.embankment !== 'no');
-  return { html: `<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange</div>${svg}`,
+  return { html: `<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange${f.bridged ? ' · bridged deck orange solid' : ''}</div>${svg}`,
     points: series[0].points, x0, x1, left, right, width: w };
 }

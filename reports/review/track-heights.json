@@ -43,8 +43,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -115,8 +116,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "archive steps up 2.2 m at 11817 m without a dip before it",
+        "archive, bridged over a dip": "archive steps up 2.2 m at 11817 m without a dip before it",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -181,8 +183,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "archive steps up 2.2 m at 16465 m without a dip before it",
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -220,8 +223,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -257,8 +261,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -302,8 +307,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -343,8 +349,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -546,12 +553,14 @@
       },
       "options": [
         "archive profile ok",
+        "follows survey surface",
         "other level (deck / under)",
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "archive rail height missing, excluded or conflicting on part of the span",
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "archive rail heights conflict on part of the span",
+        "archive, bridged over a dip": "archive rail heights conflict on part of the span",
+        "follows survey surface": null
       }
     },
     {
@@ -690,8 +699,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "archive steps up 1.5 m at 17478 m without a dip before it",
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -806,12 +816,32 @@
       },
       "options": [
         "archive profile ok",
+        "archive, bridged over a dip",
         "other level (deck / under)",
         "unsure"
       ],
+      "bridged": {
+        "osm-4722520:line17:path:1": [
+          [
+            5071.952,
+            201.111,
+            5113.981,
+            201.256
+          ]
+        ],
+        "osm-4722520:line17:pathBack:1": [
+          [
+            16673.502,
+            201.282,
+            16717.061,
+            201.206
+          ]
+        ]
+      },
       "answer_explanations": {
-        "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "the archive dips 6.4 m between 436 and 478 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
+        "archive, bridged over a dip": null,
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -874,12 +904,32 @@
       },
       "options": [
         "archive profile ok",
+        "archive, bridged over a dip",
         "other level (deck / under)",
         "unsure"
       ],
+      "bridged": {
+        "osm-98560954:line17:path:1": [
+          [
+            5824.471,
+            200.838,
+            5867.256,
+            200.713
+          ]
+        ],
+        "osm-98560954:line17:pathBack:1": [
+          [
+            15918.032,
+            200.674,
+            15960.372,
+            200.908
+          ]
+        ]
+      },
       "answer_explanations": {
-        "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "the archive dips 6.5 m between 2 and 45 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
+        "archive, bridged over a dip": null,
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -990,12 +1040,32 @@
       },
       "options": [
         "archive profile ok",
+        "archive, bridged over a dip",
         "other level (deck / under)",
         "unsure"
       ],
+      "bridged": {
+        "osm-150611269:line17:path:1": [
+          [
+            6518.631,
+            198.283,
+            6580.995,
+            197.794
+          ]
+        ],
+        "osm-150611269:line17:pathBack:1": [
+          [
+            15223.21,
+            196.653,
+            15266.854,
+            198.156
+          ]
+        ]
+      },
       "answer_explanations": {
-        "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive profile ok": "the archive dips 5.2 m between 92 and 154 m (what lies under the track): answer \"archive, bridged over a dip\" if the track bridges it",
+        "archive, bridged over a dip": null,
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1087,7 +1157,8 @@
       ],
       "answer_explanations": {
         "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1152,7 +1223,8 @@
       ],
       "answer_explanations": {
         "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1218,6 +1290,7 @@
       ],
       "answer_explanations": {
         "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
         "follows survey surface": null
       }
     },
@@ -1256,8 +1329,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1367,7 +1441,8 @@
       ],
       "answer_explanations": {
         "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey covers only part of the span (a gap of 17 m)"
       }
     },
     {
@@ -1405,8 +1480,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1611,7 +1687,8 @@
       ],
       "answer_explanations": {
         "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail heights disagree on part of the span"
       }
     },
     {
@@ -1647,8 +1724,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1686,8 +1764,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1727,8 +1806,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": "archive steps up 0.7 m at 5744 m without a dip before it",
+        "archive, bridged over a dip": "archive steps up 0.7 m at 5744 m without a dip before it",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1776,12 +1856,14 @@
       },
       "options": [
         "archive profile ok",
+        "follows survey surface",
         "other level (deck / under)",
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": null
       }
     },
     {
@@ -1829,8 +1911,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1882,8 +1965,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     },
     {
@@ -1955,12 +2039,14 @@
       },
       "options": [
         "archive profile ok",
+        "follows survey surface",
         "other level (deck / under)",
         "unsure"
       ],
       "answer_explanations": {
         "archive profile ok": null,
-        "follows survey surface": "survey rail height missing or ambiguous"
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": null
       }
     },
     {
@@ -1994,8 +2080,9 @@
         "unsure"
       ],
       "answer_explanations": {
-        "archive profile ok": "structure level is not identified",
-        "follows survey surface": "structure level is not identified"
+        "archive profile ok": null,
+        "archive, bridged over a dip": "the archive has no dip to bridge",
+        "follows survey surface": "survey rail height missing"
       }
     }
   ],

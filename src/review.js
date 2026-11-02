@@ -267,10 +267,12 @@ body.review #gl { touch-action: none }
 #review button.on { background: #3d5a80; border-color: #6a8fc0 }
 #review .rvRow { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px }
 #review select { flex: 1; min-width: 0 }
-#review .rvCard { padding: 8px 10px; border-top: 1px solid #333; border-bottom: 1px solid #333; background: rgba(40,46,56,.6) }
+#review .rvCard { padding: 8px 10px; border-top: 1px solid #333; border-bottom: 1px solid #333; background: rgba(40,46,56,.6);
+  flex: 0 1 auto; min-height: 6em; overflow-y: auto; overscroll-behavior: contain }
 #review .rvCard .kind { font-weight: 700 }
 #review .rvCard .dim, #review .dim { opacity: .7 }
-#review .rvList { overflow: auto; flex: 1 1 auto; min-height: 0 }
+/* (the card first: a taller one, e.g. a track-height chart, scrolls on its own, the list keeps four rows, #178) */
+#review .rvList { overflow: auto; flex: 1 1 0; min-height: 16em }
 #review .rvItem { padding: 8px 10px; border-top: 1px solid #2a2a2a; cursor: pointer }
 #review .rvItem.sel { background: #3a4250 }
 #review .rvItem .sw, #review .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px }
@@ -286,7 +288,8 @@ body.review #gl { touch-action: none }
 @media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
   #review { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 52vh; border-radius: 12px 12px 0 0; font-size: 14px;
     overflow-y: auto; display: block }
-  #review .rvList { overflow: visible }
+  #review .rvList { overflow: visible; min-height: 0 }
+  #review .rvCard { overflow: visible }
   #review button, #review select, #review a.btn { min-height: 42px; padding: 8px 12px }
   #review .rvItem { padding: 11px 12px }
 }`;
@@ -379,6 +382,7 @@ body.review #gl { touch-action: none }
     if (getComputedStyle(this.$('rvList')).overflowY === 'auto') this.box.querySelector(`.rvItem[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
     else this.box.scrollTop = 0;
     this._card(f);
+    this.$('rvCard').scrollTop = 0;
     this._highlight(f);
     this._render();
   }

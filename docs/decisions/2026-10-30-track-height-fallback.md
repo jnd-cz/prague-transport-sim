@@ -251,6 +251,19 @@ archive, drawn rail, survey surfaces, terrain and numeric DI. Saved answers are 
 dated evidence by `tools/track_span_evidence.py --from-reviews`; notes, unsure, unspecified levels and
 stale span scopes stay held. A proposal is never applied as evidence.
 
+The answers and what they import (#176): `archive profile ok` is the archive rule, held where the
+archive steps more than 10 % between neighbouring points; `archive, bridged over a dip` samples the
+archive and draws a straight deck across each closed dip (a steep drop that climbs back to within 4 %
+plus 0.3 m of where it left, at most 150 m on, the ~30 m approach included); `follows survey surface`
+samples the survey's rail-eligible heights (one height where deck and road agree to 3 cm, at most 10 m
+between samples, an end span of at most 10 m that the survey misses is left to the other rules). A
+decision with no mapped structure (`unmapped`) imports as street surface, level 0; a surveyed deck
+(`survey_level`) at the survey's level. Measured on the 27 decisions of snapshot 2026-11-01: 23 have an
+answer that imports; the archive is held on 4 for a step (Hlavní nádraží tunnels: +6 m over the tunnel;
+Brusnice, Čechova čtvrť: a gradual drop and one steep climb) and on 3 for a dip under the bridge (Modřany,
+Hodkovičky, Černý kůň), and the survey answer is offered on 4, Palackého most among them, where the
+archive measured the river bed.
+
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
 datum. The queue's `ordinary_terrain_fallbacks` gives those proposals. No ambiguous level, known archive
