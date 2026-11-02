@@ -52,6 +52,16 @@ What sessions learned and later work needs. Kept current and short; the full log
   leaves Řepy and returns to it over the same tracks: s 0–8 km and 20–28 km): the closest piece of it can be our own track. Matching
   onto another route takes the heading into account (`Route.nearestOnHeading`); plain `nearest` there
   spawned oncoming trams on our track and made two false 8 km gauntlets on line 9 (28 signals lost).
+- **The archived track heights (the `archive` candidates, 2008 records) under a structure measure what
+  lies below it** (#176): at Modřany → Belárie the archive follows the embankment within 0.2 m of the
+  lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
+  stays on the river bed (187.3 m) across its whole span, Hlavní nádraží's tunnel climbs 6 m to the
+  street above. A track climbs a few per cent: an archive step over 10 % between points ~5 m apart is the
+  archive measuring something else (`tools/track_span_evidence.py` `dips`).
+- **ZPS track areas on the Modřany embankment lie ~2 m below the archive and the lidar ground** (s 408:
+  survey 198.6, archive 200.8, lidar 201.0 m; flagged `track_zps_level_unverified`), which is why the
+  drawn rail there is low and wavy. The level-1 tram area over the Modřany underpass carries the
+  ground's heights (194.9–195.8 m): the survey has the deck's outline but not its height.
 - **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
   `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,

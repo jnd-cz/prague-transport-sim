@@ -18,8 +18,10 @@ rerunning the published data.
    - a build tool only, data not rebuilt yet: rebuild first (`python -P -E tools/rebuild.py <lines>
      --parallel`), then the changed lines.
    - docs or harness only: no run needed; say so.
+   - the review page (`src/review.js`, `src/trackHeightProfile.js`) only: `python -P -E tools/test_review.py`
+     instead of the headless checks.
 3. **Run** (in the background; 47 minutes for all lines with 4 pages at once, seeds 1-5 by default):
-   `python -P -E tools/headless.py --lines <lines> --checks u3,redruns,traffic,lint,surfaces --compare`
+   `python -P -E tools/headless.py --lines <lines> --checks u3,redruns,traffic,lint,surfaces,canted,crossing --compare`
    (`--port 0` when another headless run uses 8745). Seeded counts are judged against main's spread over
    its seeds (#156); fewer seeds (`--seeds 1-2`) still compare against the full spread, only less surely.
 4. **Read the result:**
