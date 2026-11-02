@@ -68,6 +68,14 @@ What sessions learned and later work needs. Kept current and short; the full log
   radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
   1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
   ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
+- **Where only the archive has a height, the 2023 terrain checks it** (#190): where a ZPS survey confirms
+  the archive, the two differ by more than 1 m on 13 of 45,577 samples (0.03 %); without a survey 848 samples
+  do (Malovanka 83 m, the Libeň bridge's dips to the streets, Troja's old alignment). Numeric DI agreeing with
+  the archive 7 m under the terrain is a structure the terrain cannot see, not an error
+  ([height fallback](decisions/2026-10-30-track-height-fallback.md)).
+- **OSM maps a tram under reconstruction as `railway=disused` + `disused:railway=tram`** (Libeňský most,
+  `bridge=yes`, 2026-11 extract) while the 2026 DI keeps the track; tools that select `railway=tram` miss it.
+  The DI's own track there is new (inserted 2025-01-30, 24 m pieces, Z = 0).
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
   tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
   level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).

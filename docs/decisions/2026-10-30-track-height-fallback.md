@@ -291,6 +291,26 @@ in the walkthrough: DI, then the archive where it is smooth, then:
 
 The game does not take these profiles yet: profile assembly is #20.
 
+**The terrain checks an archive height nothing else confirms (#190).** Where there is no numeric DI and no
+ZPS surface within 0.3 m of the archive, the import compares the archive with the 2023 lidar terrain
+(`tools/import_track_heights.py` `Terrain`, `tools/track_heights.py` `TERRAIN`). Calibrated where a survey
+confirms the archive (45,577 samples): archive minus terrain p99.9 0.36 m on paved track, 0.78 m on unknown
+construction, 13 samples over 1 m (0.03 %). An archive height more than 1 m off is held
+(`archive_terrain_height_disagreement`, blocking like a survey disagreement), and the hold spreads along the
+track while neighbours stay more than 0.5 m off (`extend_holds`, above every class's p99). It never judges
+numeric DI, a structure or a tunnel: under a deck the terrain is another level. 2026-11-02 it holds 1395 m of
+the network (line 9 108 m, 17 185 m, 22 and 23 30 m, 37 none): a record 83 m above the street at Malovanka, the old archive alignment winding ±4 m around the
+new Trojský most's approach, the archive's dips onto the streets under the Libeň bridge, 45 m on line 9 at
+50.0727 N 14.4099 E (5.4 m under the street), two 5–8 m dips at Brusnice on lines 22/23, Modřany's dip on
+line 17 (its reviewed answer still wins). A held stretch is bridged by the vertical profile's curve from
+both sides ([vertical profile](2026-11-02-vertical-profile.md), #20), as the user asked for dips on #184.
+
+**A tram's structure stays one while OSM maps the track disused or under construction (#190).** The
+structure mask (`tools/dtmp_tracks.py` `structure_mask`) takes `railway=tram` and the tram values of
+`disused:railway`, `construction:railway` and `construction`: Libeňský most is `railway=disused` +
+`disused:railway=tram` on `bridge=yes` during its rebuild while the 2026 DI has the track. Disused heavy rail
+and the metro D construction tunnels stay out (a tram above them is not on them). +670 m of `structure_hint`.
+
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
 datum. The queue's `ordinary_terrain_fallbacks` gives those proposals. No ambiguous level, known archive
