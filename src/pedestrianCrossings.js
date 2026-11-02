@@ -166,11 +166,28 @@ export function preparePedestrianCrossings(data, route, ground, tiltOf, liftOf) 
       const rings = [area.ring, ...area.holes].map((ring, ri) => {
         const points = [], flags = [];
         for (let i = 0; i < ring.length; i++) {
-          const p = ring[i], q = ring[(i + 1) % ring.length], steps = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 0.2) || 1;
-          for (let k = 0; k < steps; k++) {
-            const t = k / steps, x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t;
-            points.push([x, y, height(x, y, p[2] + (q[2] - p[2]) * t)]);
-            flags.push(area.kerbs?.[ri]?.[i] || 0);
+          const p = ring[i], q = ring[(i + 1) % ring.length], dx = q[0] - p[0], dy = q[1] - p[1], l2 = dx * dx + dy * dy;
+          const cuts = [0, 1];
+          // Split at each site's radius first: a long edge can pass through the crossing while
+          // both its endpoints are hundreds of metres away. Its remote portions stay coarse.
+          if (l2 > 1e-9) for (const s of sites) {
+            const t = ((s.x - p[0]) * dx + (s.y - p[1]) * dy) / l2;
+            const d2 = (p[0] + t * dx - s.x) ** 2 + (p[1] + t * dy - s.y) ** 2;
+            if (d2 >= s.radius * s.radius) continue;
+            const half = Math.sqrt((s.radius * s.radius - d2) / l2);
+            for (const u of [t - half, t + half]) if (u > 0 && u < 1) cuts.push(u);
+          }
+          cuts.sort((a, b) => a - b);
+          for (let j = 1; j < cuts.length; j++) {
+            const lo = cuts[j - 1], hi = cuts[j];
+            if (hi - lo < 1e-9) continue;
+            const mid = (lo + hi) / 2, near = sites.some((s) => Math.hypot(p[0] + mid * dx - s.x, p[1] + mid * dy - s.y) <= s.radius);
+            const steps = near ? Math.max(1, Math.ceil(Math.sqrt(l2) * (hi - lo) / 0.2)) : 1;
+            for (let k = 0; k < steps; k++) {
+              const t = lo + (hi - lo) * k / steps, x = p[0] + dx * t, y = p[1] + dy * t;
+              points.push([x, y, height(x, y, p[2] + (q[2] - p[2]) * t)]);
+              flags.push(area.kerbs?.[ri]?.[i] || 0);
+            }
           }
         }
         return { points, flags };

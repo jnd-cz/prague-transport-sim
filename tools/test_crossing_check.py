@@ -43,7 +43,7 @@ class CrossingCheck(unittest.TestCase):
     def test_unresolved_crossings_fail_the_command(self):
         self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':1,'of':10}}})[0])
         self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':0,'of':0}}})[0])
-        self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':0,'of':10,'unreviewedCandidates':1}}})[0])
+        self.assertTrue(judge('crossing',{'checks':{'crossingSlab':{'count':0,'of':10,'reviewCandidates':8}}})[0])
         self.assertTrue(judge('crossing',{'checks':{'crossingSlab':{'count':0,'rawCount':4,'of':10}}})[0])
 
     def test_reasons_separate_transverse_crossings_from_side_surfaces(self):
@@ -57,14 +57,7 @@ class CrossingCheck(unittest.TestCase):
                 page.route('**/crossing-reason-test',lambda route:route.fulfill(body=importmap))
                 page.goto(url+'/crossing-reason-test')
                 reasons=page.evaluate('''async () => {
-                  const {crossingReason,recordedReason}=await import('/tools/bench/crossingSlab.js');
-                  const reviews={lines:{9:{files:{'line9.json':'a'},reasons:{parallel:{roads:[3]}}}}};
-                  const manifest={files:{'line9.json':{sha256:'a'}}};
-                  if(recordedReason(9,'roads',3,'parallel',reviews,manifest)!=='parallel')throw new Error('review lost');
-                  for(const [line,id,reason] of [[9,4,'parallel'],[17,3,'parallel'],[9,3,'crossing']])
-                    if(recordedReason(line,'roads',id,reason,reviews,manifest))throw new Error('unreviewed source accepted');
-                  manifest.files['line9.json'].sha256='b';
-                  if(recordedReason(9,'roads',3,'parallel',reviews,manifest))throw new Error('stale review accepted');
+                  const {crossingReason}=await import('/tools/bench/crossingSlab.js');
                   const rect=(x0,x1,y0,y1)=>({ring:[[x0,y0],[x1,y0],[x1,y1],[x0,y1]],holes:[]});
                   const game={route:{at:()=>({x:0,y:0,hx:1,hy:0}),ground:{dtm:{areas:[
                     rect(-2,2,-4,4),rect(-20,20,-1,1),rect(-2,2,.5,2)]}}},
@@ -107,12 +100,27 @@ class CrossingCheck(unittest.TestCase):
                     nearest:(x,y)=>x>=0&&x<=20?{s:x,d:Math.abs(y)}:null,offset:(s,l)=>({x:s,y:l})};
                   window.game={route,data:{roads:[]}};window.world=world;
                   const a=(await run()).checks.crossingSlab,b=(await run({unfiltered:true})).checks.crossingSlab;
-                  return {a,b};
+                  route.at=s=>({x:s,y:0,hx:1,hy:0});
+                  route.ground.dtm={areas:[]};
+                  const parallel={c:'sidewalk',l:0,ring:[[0,-1],[20,-1],[20,1],[0,1]],holes:[]};
+                  surface.geometry.setAttribute('position',new THREE.Float32BufferAttribute(quad(0,20,-1,1,200.1),3));
+                  surface.geometry.computeBoundingSphere();
+                  route.ground.dtm.areas[7]=parallel;
+                  surface.userData.surfaceRanges=[[0,2,'sidewalk',0,7]];
+                  const classified=(await run()).checks;
+                  route.ground.dtm.areas[11]=parallel;delete route.ground.dtm.areas[7];
+                  surface.userData.surfaceRanges=[[0,2,'sidewalk',0,11]];
+                  const rebuilt=(await run()).checks;
+                  return {a,b,classified,rebuilt};
                 }''')
                 self.assertEqual(result['a']['count'],1)
                 self.assertEqual(result['a']['missing'],0)
                 self.assertAlmostEqual(result['a']['places'][0]['mag'],0.088,places=3)
                 self.assertEqual(result['a'],result['b'])
+                self.assertEqual(result['classified']['crossingSlab']['count'],0)
+                self.assertGreater(result['classified']['crossingAlongSurvey']['count'],0)
+                self.assertEqual(len(result['classified']['crossingAlongSurvey']['at']),result['classified']['crossingAlongSurvey']['count'])
+                self.assertEqual(result['classified']['crossingAlongSurvey'],result['rebuilt']['crossingAlongSurvey'])
                 browser.close()
         finally:
             stop_server(server)

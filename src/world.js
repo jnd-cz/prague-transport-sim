@@ -482,8 +482,9 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const footCg = new ChunkedGeometry(flatMat('#a39d90', '#86817a', FOOT_SNOW), { color: true });
   const asphalt = new THREE.Color('#55565a').toArray(), paving = new THREE.Color('#a39d90').toArray();
   const roadIds = new Map(data.roads.map((r, i) => [r, i]));
+  const keepRoadRanges = /[?&](keepgeo|bot)\b/.test(location.search);
   for (const r of [...data.roads].sort((a, b) => b.w - a.w)) {
-    if (/[?&](keepgeo|bot)\b/.test(location.search)) footCg.sourceId = roadIds.get(r);
+    if (keepRoadRanges) footCg.sourceId = roadIds.get(r);
     if (r.z) continue; // painted crossings: zebra stripes below, the asphalt shows through
     if (r.t) continue; // (road tunnels: above)
     // where the surveyed DTM streets exist, they replace the OSM ribbons (on a bridge: its deck)
@@ -499,6 +500,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
         crossing ? Math.ceil(r.w / 0.2) : across ? Math.ceil(r.w / 2) : 1);
     }
   }
+  footCg.sourceId = undefined;
   // (road tunnels: no snow inside)
   const tunnelCg = new ChunkedGeometry(flatMat('#55565a', '#3e3f43', 0), { color: true });
   for (const { r, inside, tf } of tunnelRoads) addRibbon(tunnelCg, inside, r.w, tf, 0.12, asphalt);

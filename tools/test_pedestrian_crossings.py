@@ -66,6 +66,24 @@ class PedestrianCrossings(unittest.TestCase):
         self.assertIsNone(result['parallel'])
         self.assertIsNone(result['overpass'])
 
+    def test_long_outline_keeps_remote_edges_coarse(self):
+        result=self.page.evaluate('''async () => {
+          const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
+          const ring=[[-2,-300,200.05],[2,-300,200.05],[2,300,200.05],[-2,300,200.05]];
+          const a={c:'sidewalk',l:0,ring,holes:[],kerbs:[[0,1,0,1]],
+            mesh:[[[-2,-2,200.05],[2,-2,200.05],[2,2,200.05]]]};
+          const dtm={areas:[a],reindexGround(){},_split(p,q,r,ground,out){out.push([p,q,r]);}};
+          const track={smooth:[[-10,0],[10,0]],z:[200,200]};
+          preparePedestrianCrossings({tracks:[track],roads:[]},null,{dtm},()=>[0,0],()=>.05);
+          return {points:a.ring.length,far:a.ring.filter(p=>Math.abs(p[1])>10),
+            near:a.ring.filter(p=>Math.abs(p[1])<1).map(p=>p[2]+.05),flags:a.kerbs[0].length};
+        }''')
+        self.assertLess(result['points'],200)
+        self.assertEqual(result['far'],[[-2,-300,200.05],[2,-300,200.05],[2,300,200.05],[-2,300,200.05]])
+        self.assertEqual(result['flags'],result['points'])
+        self.assertTrue(result['near'])
+        self.assertTrue(all(z<200.012 for z in result['near']))
+
     def test_parallel_sidewalk_does_not_become_a_crossing(self):
         result=self.page.evaluate('''async () => {
           const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');

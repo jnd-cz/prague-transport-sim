@@ -157,9 +157,11 @@ Review these when realism matters; most move into the build in M2.
   triangles and survey outlines so their kerb faces also follow the height transition. Downward rays
   miss a vertical kerb: the crossing check intersects its drawn top edge with rail-head chords too.
   Decisions are in `window.game.route.ground.pedestrianCrossings`.
-  `--checks crossing` retains raw hits and source IDs, and fails on unreviewed obstructions or survey
-  candidates. Side-surface reasons in `truth.json` `pedestrianSurfaceReviews` require matching input
-  hashes and a matching geometric classification. Their physical levels remain #166.
+  `--checks crossing` retains raw hits and source IDs, and fails on unexplained crossing obstructions.
+  Geometric side-surface classes have separate counts and places for rebuild comparisons. Held
+  patches go through `tools/crossing_review.py` into `reports/review/pedestrian-crossings.json`, opened
+  with `?line=17&review=reports/review/pedestrian-crossings.json`; answers stay held until reviewed
+  evidence supplies a place-based fact. Overlapping survey slab sides remain #166.
 - **Vienna-type stops**: carriageway on the doors' side 2.2–3.4 m from the track along the stop (the
   tram bed is not a car lane); facts per stop and direction in `truth.json` `stopTypes`.
 - **Bridges on the model deck**: on tagged spans with model samples, the model deck is fixed like a

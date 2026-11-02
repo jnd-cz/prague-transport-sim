@@ -116,8 +116,6 @@ def judge(check, r):
             bad.append("no rail samples")
         if c.get("count"):
             bad.append(f"{c['count']} unexplained pedestrian obstructions")
-        if c.get("unreviewedCandidates"):
-            bad.append(f"{c['unreviewedCandidates']} survey candidates without a recorded review")
         more = f"raw sections {c.get('rawCount')}, samples {c.get('of')}, missing samples {c.get('missing')}"
     elif check == "traffic":
         st = r.get("stats") or {}

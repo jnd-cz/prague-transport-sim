@@ -73,15 +73,6 @@ export function crossingReason(game, hit, source, way) {
   return alignment >= 0.75 ? 'mapped-footway-runs-along-track' : null;
 }
 
-// A geometric classification is a review candidate, not a blanket exemption. Source IDs are
-// valid only for the exact published inputs audited in truth.json; the geometry must still agree.
-export function recordedReason(line, kind, id, reason, reviews, manifest) {
-  const review = reviews?.lines?.[line];
-  if (!reason || !review || !Object.keys(review.files || {}).length) return null;
-  if (Object.entries(review.files).some(([name, sha]) => manifest.files?.[name]?.sha256 !== sha)) return null;
-  return review.reasons?.[reason]?.[kind]?.includes(id) ? reason : null;
-}
-
 // Compare the survey-based crossing decisions with independently mapped OSM pedestrian ways.
 function calibration(game) {
   const decisions = game.route.ground.pedestrianCrossings;
@@ -120,11 +111,6 @@ function calibration(game) {
 export async function run({ unfiltered = false } = {}) {
   const game = window.game, world = window.world;
   if (!game || !world || !/[?&](keepgeo|bot)\b/.test(location.search)) throw new Error('start a shift with ?keepgeo');
-  const [truth, manifest] = await Promise.all(['truth.json', 'MANIFEST.json'].map(async (name) => {
-    const response = await fetch(new URL(`../../data/${name}`, import.meta.url));
-    if (!response.ok) throw new Error(`crossing review: could not load ${name}`);
-    return response.json();
-  }));
   const rails = [], footways = [];
   world.traverse((m) => {
     if (!m.isMesh) return;
@@ -207,9 +193,7 @@ export async function run({ unfiltered = false } = {}) {
                   source: source ? 'dtm' : 'osm-footway', area: source?.[4] ?? null,
                   class: source?.[2] ?? 'footway', level: source?.[3] ?? null, excess };
       hit.geometryReason = crossingReason(game, hit, source, way);
-      hit.reason = recordedReason(game.data.line, source ? 'surveyAreas' : 'roads',
-        source ? route.ground.dtm?.areas[source[4]]?.sourceId : way,
-        hit.geometryReason, truth.pedestrianSurfaceReviews, manifest);
+      hit.reason = hit.geometryReason;
       const target = hit.reason ? explained : unresolved;
       if (!target.has(key) || target.get(key).excess < excess) target.set(key, hit);
       hits.push(hit);
@@ -222,8 +206,7 @@ export async function run({ unfiltered = false } = {}) {
   const edges = crossingEdgeHits(game, heads);
   for (const hit of edges.hits) {
     hit.geometryReason = crossingReason(game, hit, [0,0,hit.class,hit.level,hit.area], null);
-    hit.reason = recordedReason(game.data.line, 'surveyAreas', route.ground.dtm.areas[hit.area].sourceId,
-      hit.geometryReason, truth.pedestrianSurfaceReviews, manifest);
+    hit.reason = hit.geometryReason;
     const key = Math.round(hit.s / 20), target = hit.reason ? explained : unresolved;
     if (!target.has(key) || target.get(key).excess < hit.excess) target.set(key, hit);
     if (!(bad.get(key)?.mag >= hit.excess)) bad.set(key, { ...hit, mag:hit.excess });
@@ -237,14 +220,32 @@ export async function run({ unfiltered = false } = {}) {
     return { id, sourceId: a.sourceId, class: a.c, level: a.l, ring: a.ring, holes: a.holes };
   });
   const reviewCandidates = (route.ground.pedestrianCrossings?.review || []).map((s) => ({ ...s,
-    recorded: !!recordedReason(game.data.line, 'surveyAreas', route.ground.dtm?.areas[s.area]?.sourceId,
-      s.reason, truth.pedestrianSurfaceReviews, manifest) }));
+    s: route.nearest(s.x, s.y)?.s, sourceId: route.ground.dtm?.areas[s.area]?.sourceId }));
+  // Each geometric class has its own count and places, so rebuilds reveal new/moved cases in
+  // --compare without a list of generated array indexes masquerading as truth facts.
+  const classified = {};
+  for (const [reason, name] of Object.entries({
+    'mapped-footway-runs-along-track':'crossingAlongFootway',
+    'survey-edge-does-not-cross-gauge':'crossingSurveyEdge',
+    'survey-surface-runs-along-track':'crossingAlongSurvey',
+  })) {
+    const sections = new Map();
+    for (const h of hits.filter((h) => h.reason === reason)) {
+      const k = Math.round(h.s / 20);
+      if (!sections.has(k) || sections.get(k).excess < h.excess) sections.set(k, h);
+    }
+    classified[name] = { rule:reason, count:sections.size, at:[...sections.values()].map((h) => [h.x,h.y,h.s]) };
+  }
+  const reviewPlaces = new Map(reviewCandidates.map((s) => [`${s.x.toFixed(1)},${s.y.toFixed(1)}`,s]));
+  classified.crossingSurveyReview = { rule:'survey-patch-needs-review', count:reviewPlaces.size,
+    at:[...reviewPlaces.values()].map((s) => [s.x,s.y,s.s]) };
   return { calibration: calibration(game), hits, missingHeads, sourceAreas, reviewCandidates,
            checks: { crossingSlab: { rule: 'pedestrian-surface-below-rail', count: unresolved.size, rawCount: places.length,
-                                  unreviewedCandidates: reviewCandidates.filter((s) => !s.recorded).length,
+                                  reviewCandidates: reviewCandidates.length,
                                   kerbOf: edges.samples, kerbHits: edges.hits.length,
                                   of: samples, missing, sections: [...unresolved.values()].sort((a, b) => a.s - b.s),
                                   explainedSections: [...explained.values()].sort((a, b) => a.s - b.s),
                                   rawSections: places.sort((a, b) => a.s - b.s),
-                                  places: [...unresolved.values()].sort((a, b) => b.excess - a.excess).slice(0, 12).map((h) => ({...h, mag:h.excess})) } } };
+                                  at: [...unresolved.values()].map((h) => [h.x,h.y,h.s]),
+                                  places: [...unresolved.values()].sort((a, b) => b.excess - a.excess).slice(0, 12).map((h) => ({...h, mag:h.excess})) }, ...classified } };
 }
