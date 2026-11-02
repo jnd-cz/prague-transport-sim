@@ -112,7 +112,7 @@ SURVEY_SPREAD, MAX_GAP = .03, 10  # m: deck and road of one survey agree to 3 cm
 # axes differ by p50 0.02, p90 0.09, p99 0.45 m, more than 1 m on 0.4 % of 64,712 samples (structures,
 # #184). A direction that leaves the other by more than 0.3 m (p98.4) and meets it again measured something
 # else there: the road over the tram at Hlavní nádraží (+6.9 m), the street under Modřany's bridge (-6 m).
-PARALLEL_GAP, DEPART = (2.5, 6), .3
+PARALLEL_GAP, DEPART, OFFSET = (2.5, 6), .3, .1
 SLOPE_RUN = 15  # m of archive on each side of a dip whose grade the bridging curve continues
 # On a structure the survey's generic track and deck areas are not rail height by themselves: on the queue's
 # bridges level-0 tram areas lie p10 -1.53 / median -0.26 / p90 +0.11 m from the archive (Modřany and
@@ -237,7 +237,7 @@ def _follow_parallel(known, others):
     two ends where they agree interpolated between), and the replaced (start s, end s) ranges."""
     beside = _parallel_z(known,others)
     d = [None if q is None else z-q for (_,(_,z)),q in zip(known,beside)]
-    out, ranges, i = list(known), [], 0
+    out, ranges, i, floor = list(known), [], 0, 0
     while i < len(known):
         if d[i] is None or abs(d[i]) <= DEPART:
             i += 1; continue
@@ -245,11 +245,23 @@ def _follow_parallel(known, others):
         while m < len(known) and d[m] is not None and abs(d[m]) > DEPART:
             m += 1
         if k >= 0 and d[k] is not None and m < len(known) and d[m] is not None:
+            # (0.3 m only triggers the repair: it reaches out to where the two are back at their offset of the
+            # 15 m beyond within 0.1 m (p90 0.09). The first point of Modřany's street record lies 0.04 m off
+            # but 0.12 m from the offset before it, Brusnice's sinking record 0.15 m, which left a kink.)
+            # (only over points under the trigger: Hlavní nádraží's next departure starts 5 m on)
+            calm = lambda i: d[i] is not None and abs(d[i]) <= DEPART
+            near = lambda j, side: [d[i] for i in (range(j-1,-1,-1) if side < 0 else range(j+1,len(known)))
+                                    if calm(i) and abs(known[i][1][0]-known[j][1][0]) <= SLOPE_RUN]
+            while k > floor and calm(k-1) and (loc := near(k,-1)) and abs(d[k]-sorted(loc)[len(loc)//2]) > OFFSET:
+                k -= 1
+            while m < len(known)-1 and calm(m+1) and (loc := near(m,1)) and abs(d[m]-sorted(loc)[len(loc)//2]) > OFFSET:
+                m += 1
             s0, s1 = known[k][1][0], known[m][1][0]
             for j in range(k+1,m):
                 s = known[j][1][0]
                 out[j] = (known[j][0],(s,beside[j]+d[k]+(d[m]-d[k])*(s-s0)/(s1-s0)))
             ranges.append([round(s0,3),round(s1,3)])
+            floor = m
         i = m
     return out, ranges
 

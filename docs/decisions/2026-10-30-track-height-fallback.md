@@ -273,7 +273,11 @@ in the walkthrough: DI, then the archive where it is smooth, then:
    the same line, 2.5–6 m away, is smooth, every stretch where the two differ by more than 0.3 m and
    agree again at both ends takes the other direction's heights, the offset at the two ends interpolated
    (`from_parallel` in the profile). Calibration: parallel archive axes city-wide differ by p50 0.02,
-   p90 0.09, p99 0.45 m; 0.3 m is p98.4. Mends Hlavní nádraží (2), Modřany inbound and Brusnice.
+   p90 0.09, p99 0.45 m; 0.3 m is p98.4. 0.3 m only triggers the repair: it reaches out over points under
+   the trigger to where the difference is back within 0.1 m (p90) of its median over the 15 m beyond, and
+   not into the previous repair. The departures start below 0.3 m: Modřany's street record 0.12 m off the
+   usual offset at its first point, Brusnice's sinking record 0.15 m, each leaving a kink (6.1 % at
+   Brusnice, now 0.5 %). Mends Hlavní nádraží (2), Modřany inbound and Brusnice.
 2. **The survey's track and deck areas on a structure** (`follows survey surface`, where no surface is
    rail-height eligible): only on a span where they meet the archive within 0.3 m at every smooth archive
    point, on both sides of every dip (`survey_rule: track_area_agrees_with_archive`). On the queue's

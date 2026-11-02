@@ -169,6 +169,14 @@ class SpanReviews(unittest.TestCase):
         self.assertEqual(entry['profiles'][0]['from_parallel'],[[25,55]])
         self.assertAlmostEqual(SpanEvidence([entry]).at('di-a',40,0,[])[0]['z'],200.4)
         self.assertEqual(entry['profiles'][1]['rule'],{'type':'archive'})  # (the smooth one keeps its archive)
+        # (Brusnice: the departure starts 0.15 m off at 25 m, under the 0.3 m trigger; the repair reaches
+        # back to where the two are at their usual offset, so no 6 % step is left there)
+        out['profile'][5]['archive'] = [{'z':out['profile'][5]['archive'][0]['z']-.15}]
+        entry = get()['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['from_parallel'],[[20,55]])
+        samples = entry['profiles'][0]['rule']['samples']
+        grades = [(b[1]-a[1])/(b[0]-a[0]) for a,b in zip(samples,samples[1:])]
+        self.assertLess(max(abs(g-.01) for g in grades),1e-6)
         for p in back['profile']:  # (the other direction 9 m away is another track: nothing to compare)
             p['xy'] = [p['xy'][0],9]
         self.assertIn('steps up',get()['held'][0]['reason'])
