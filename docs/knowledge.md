@@ -64,6 +64,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   2.5–6 m apart differ by p50 0.02, p90 0.09, p99 0.45 m; more than 1 m on 0.4 % of 64,712 samples, mostly
   structures. Where one direction leaves the other there, it measured something else: Hlavní nádraží
   +6.9 m and +6.6 m (the road over the tram), Modřany inbound −6 m (the street under), Brusnice −1.1 m.
+- **Archive and DI share their heights where both exist** (#188): where the archive breaks a 500 m vertical
+  radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
+  1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
+  ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
   tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
   level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).
