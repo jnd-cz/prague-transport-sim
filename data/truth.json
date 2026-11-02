@@ -426,6 +426,30 @@
     }
    },
    "17": {
+    "verticalFaceReview": {
+     "source": "Oblique rendered-face audit, PR #177, 2026-11-02; same pinned inputs as this line review.",
+     "issue": 166,
+     "status": "physical-level-review",
+     "route_m": [
+      7888,
+      7892
+     ],
+     "surveyAreas": [
+      1367,
+      1403,
+      1413,
+      1415,
+      1768
+     ],
+     "classes": {
+      "1367": "sidewalk level 0",
+      "1403": "sidewalk level 0",
+      "1413": "sidewalk level 1",
+      "1415": "sidewalk level 1",
+      "1768": "tram level 1"
+     },
+     "basis": "Forward rays at profile height + 0.012 m + 0.02/0.05/0.10 m hit vertical slab or kerb faces. The level-1 tram side is 0.122 m ahead of route s 7888 on rail side +1; duplicate sidewalk sides occur on side -1. This records the intersecting geometry; the physical levels require review under #166."
+    },
     "files": {
      "line17.json": "c07308211cc62af2367ac6c6ad200a0fc65f150777de470735f206f7735bf673",
      "line17.dtm.json": "5c16967013d2a868aaa5fe0ace649e4b008d969816910e7215ee3f6de8d3adce"
