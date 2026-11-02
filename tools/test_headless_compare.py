@@ -78,12 +78,12 @@ class Places(unittest.TestCase):
         found = {(22, "traffic", 1): {"walkerHit": [[2, 2, 11], [500, 500, 300]]},
                  (22, "traffic", 2): {"walkerHit": [[501, 499, 301]]}}
         cells = row(headless.place_rows(stored, found))
-        self.assertEqual(cells, ["22", "traffic", "walkerHit", "1: 500,500 (s 300) ×2", "1: 100,100 (s 50)"])
+        self.assertEqual(cells, ["22", "traffic", "walkerHit", "1: 500,500 (s 300) ×2", "1: 1 once"])
 
     def test_bench_places_match_by_route_position(self):
         stored = {"line17-u3-seed1": {"closeCuts": [[None, None, 14249]]}}
         found = {(17, "u3", 1): {"closeCuts": [[None, None, 14260], [None, None, 20525]]}}
-        self.assertEqual(row(headless.place_rows(stored, found))[3:], ["1: (s 20525)", "0:"])
+        self.assertEqual(row(headless.place_rows(stored, found))[3:], ["1: 1 once", "0"])
 
     def test_same_places_give_no_row(self):
         stored = {"line17-lint": {"railSupport": [[1, 2, 3]]}}

@@ -195,12 +195,19 @@ def place_rows(stored_places, found, limit=6):
                 return sorted(out, key=lambda x: -x[1])
 
             def fmt_places(ps):
-                cells = [(f"{q[0]},{q[1]}" if q[0] is not None else "") + (f" (s {q[2]})" if q[2] is not None else "")
-                         + (f" ×{n}" if n > 1 else "") for q, n in ps[:limit]]
-                return "; ".join(c.strip() for c in cells) + (f"; +{len(ps) - limit}" if len(ps) > limit else "")
+                # (a place in one run only is mostly the seed's reshuffle, as the counts' noise: counted, not
+                # listed; seedless checks list every place)
+                many = ps if check in SEEDLESS else [x for x in ps if x[1] > 1]
+                parts = [((f"{q[0]},{q[1]}" if q[0] is not None else "") + (f" (s {q[2]})" if q[2] is not None else "")
+                          + (f" ×{n}" if n > 1 else "")).strip() for q, n in many[:limit]]
+                if len(many) > limit:
+                    parts.append(f"+{len(many) - limit}")
+                if len(ps) > len(many):
+                    parts.append(f"{len(ps) - len(many)} once")
+                return f"{len(ps)}: " + "; ".join(parts) if parts else "0"
             new, gone = lonely(mine, main), lonely(main, mine)
             if new or gone:
-                rows.append(f"| {line} | {check} | {k} | {len(new)}: {fmt_places(new)} | {len(gone)}: {fmt_places(gone)} |")
+                rows.append(f"| {line} | {check} | {k} | {fmt_places(new)} | {fmt_places(gone)} |")
     return rows
 
 
