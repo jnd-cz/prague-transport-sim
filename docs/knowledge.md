@@ -185,6 +185,14 @@ Review these when realism matters; most move into the build in M2.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
   arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.
+- **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
+  car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
+  immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
+  (the controlling stop reason) and fades one car after the same closed cycle stands for 30 s.
+  Signal waits, boarding and moving vehicles end the chain. This is recovery for cars that cannot
+  reverse out in the present model. `window.game.trafficCycles` records the removed car, cycle and
+  reasons; the traffic check retains those events. `tools/bench/stuck.js` names both AI directions
+  and the nearby junction cars, including their `why`, `seen` and actual wait chains.
 
 ## Checks and what they measure
 

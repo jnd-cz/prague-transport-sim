@@ -194,7 +194,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   };
   const minutes = T / 60;
   return {
-    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
       // (a run that did not finish: what held the tram at the end, as u3 and redruns report it)
       ...(g.finished || g.nextStop >= until ? {} : { stuckScene: stuckScene(g, tr, ap) }) },
     checks: {

@@ -20,28 +20,34 @@ export function stuckScene(game, traffic, pilot) {
   const tr = game.tram, plan = pilot.step(game, 0) || {}, st = game.stops[game.nextStop];
   // (a walker: where it stands and why: waiting at the kerb for a car, crossing, on the pavement)
   const walker = (w) => ({ walker: true, state: w.waitKerb ? 'waits at the kerb' : w.door ? 'at a door' : 'walking', v: +(w.v ?? 0).toFixed(1), dir: w.dir });
+  const id = (o) => !o ? null : o === tr ? 'our tram' : o.kind === 'road' ? `car${o.id}` : `${traffic.ahead.includes(o) ? 'ahead' : 'oncoming'}${o.id}`;
+  const seen = (o) => !o ? null : o.car ? id(o.car) : o.tram ? id(o.tram) : o.walker ? walker(o.walker) : o.what;
   const waits = (car) => {
-    const out = [];
-    for (let c = car, n = 0; c && n < 8; n++) {
-      const o = c.seen;
-      // (the last car of the chain sees no car: why it stands - the tram, a light, a give-way)
-      if (!o) {
-        if (n) out.push({ id: c.id, v: +(c.vNow ?? 0).toFixed(1), conn: !!c.conn, yielding: !!c.yielding, keepClear: !!c.keepClear,
-          light: c.lane?.light ? traffic.lightAspect(c.lane.light) : null, why: c.why ?? null, junction: c.jBlock ?? null, for: null });
-        break;
-      }
-      out.push({ id: c.id, gap: +o.gap.toFixed(1), v: +(c.vNow ?? 0).toFixed(1), conn: !!c.conn, yielding: !!c.yielding, keepClear: !!c.keepClear, for: o.car ? o.car.id : o.walker ? walker(o.walker) : o.what });
-      if (!o.car || out.some((x) => x.id === o.car.id)) break;
-      c = o.car;
+    const out = [], visited = new Set();
+    for (let c = car; c && !visited.has(c) && out.length < 40; c = c.waitFor) {
+      visited.add(c);
+      out.push({ id: id(c), v: +(c.kind === 'road' ? c.vNow ?? 0 : c.v).toFixed(1),
+        why: c.kind === 'road' ? c.why ?? null : c.stop?.why ?? null, for: id(c.waitFor),
+        ...(c.kind === 'road' ? { gap: c.seen && +c.seen.gap.toFixed(1), seen: seen(c.seen), conn: !!c.conn,
+          yielding: !!c.yielding, keepClear: !!c.keepClear, light: c.lane?.light ? traffic.lightAspect(c.lane.light) : null, junction: c.jBlock ?? null }
+          : { s: Math.round(c.s), stopAt: c.stop && Math.round(c.stop.s), dwell: Math.max(0, c.dwell || 0) }) });
     }
     return out;
   };
   const sig = game.signals.find((q) => q.s > tr.s);
+  const junction = game.signals.reduce((a, q) => !a || Math.abs(q.cross - tr.s) < Math.abs(a.cross - tr.s) ? q : a, null);
+  const centre = game.route.at(junction?.cross ?? tr.s);
   return { s: Math.round(tr.s), v: tr.v, plan: { vt: plan.vt, stopAt: plan.stopAt && Math.round(plan.stopAt - tr.s) }, doors: game.doorState, action: !!game.action, hold: game.holdTimer,
     nextStop: st && { name: st.name, d: Math.round(st.target - tr.s), served: st.served, waiting: st.waiting, runners: (game.runners || []).length },
     signal: sig && { d: Math.round(sig.s - tr.s), state: sig.state, demand: !!sig.demand, t: sig.t },
     carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => Math.round(c.s - tr.s)),
     carsCrossing: (game.carsCrossing || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), onTrack: c.onTrack, v: c.car.vNow, light: c.car.lane?.light ? traffic.lightAspect(c.car.lane.light) : null, waits: waits(c.car) })),
     tramAhead: game.tramAheadGap ? game.tramAheadGap() : null,
+    aiTrams: [...traffic.ahead, ...traffic.oncoming].map((t) => ({ id: id(t), waits: waits(t), cycleSeconds: t.cycleT || 0 })),
+    junction: { s: Math.round(junction?.cross ?? tr.s), cars: traffic.cars.filter((c) => {
+      if (!c.active || !c.path) return false;
+      const p = c.path.at(c.s); return Math.hypot(p.x - centre.x, p.y - centre.y) < 100;
+    }).map((c) => ({ id: id(c), lane: c.lane?.id, waits: waits(c) })) },
+    recoveredCycles: game.trafficCycles || [],
     obstacles: (game.obstacles || []).filter((o) => o.state !== 'gone' && o.s > tr.s && o.s - tr.s < 100).map((o) => ({ d: Math.round(o.s - tr.s), lat: o.lat, type: o.type, state: o.state })) };
 }
