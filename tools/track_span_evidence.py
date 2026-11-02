@@ -114,15 +114,18 @@ def from_reviews(verdicts, findings, source_name):
             if answer['v']=='archive profile ok':
                 p['rule'] = {'type':'archive'}
             else:
-                line = LineString(p['xy']); samples = []
+                line = LineString(p['xy']); samples, surface_ids = [], set()
                 for point in span['profile']:
-                    candidates = [c['z'] for c in point['surfaces'] if c.get('rail_height_eligible')
+                    candidates = [c for c in point['surfaces'] if c.get('rail_height_eligible')
+                                  and c.get('excluded') in (None,'track_zps_level_unverified')
                                   and isinstance(c.get('z'),(int,float)) and math.isfinite(c['z']) and 100<c['z']<500]
-                    if not candidates or max(candidates)-min(candidates)>.3:
+                    if not candidates or max(c['z'] for c in candidates)-min(c['z'] for c in candidates)>.01:
                         reason = 'survey rail height missing or ambiguous'; break
-                    samples.append([round(line.project(Point(point['xy'])),3),sum(candidates)/len(candidates)])
+                    surface_ids.update(str(c['id']) for c in candidates if c.get('id') is not None)
+                    samples.append([round(line.project(Point(point['xy'])),3),candidates[0]['z']])
                 if reason: break
                 p['rule'] = {'type':'samples','samples':samples}
+                p['survey_ids'] = sorted(surface_ids)
             profiles.append(p)
         if reason:
             held.append({'id':identity,'reason':reason}); continue

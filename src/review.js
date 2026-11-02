@@ -39,7 +39,7 @@ const OPTIONS = {
 const LEVEL_COLORS = { '-1': '#3ee0ff', 0: '#ffffff', 1: '#ff9a3e' }; // the source's levels: under, at, over ground
 const options = (f) => f.options || (f.kind === 'trackheight' ? OPTIONS.trackheight : f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
 // (a finding's place and kind: the same after a rebuild that leaves it where it was)
-const fid = (f) => `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
+const fid = (f) => f.kind === 'trackheight' ? `${f.src}|trackheight|${f.id}` : `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // the kerb review list in the survey's provenance: wherever the stamp put it
@@ -362,11 +362,11 @@ body.review #gl { touch-action: none }
     this.$('rvCard').innerHTML = `
 <div><span class="kind">${f.kind}</span> <span class="dim">(${f.src}, ${this.cur + 1} / ${this.list.length})</span></div>
 <div>${f.info}</div>
+<div id="rvHeight"></div>
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
 <div class="rvRow" style="padding:6px 0 0"><button data-go="-1">◀ prev</button><button data-go="1">next ▶</button><button data-copy="1">Copy link</button></div>
 <div id="rvSrc">${this._srcHtml(f)}</div>
-<div id="rvHeight"></div>
 ${this._verdictHtml(f)}`;
     this.heightChart = f.kind === 'trackheight' ? heightProfile(f, this.route, this.ground.profile) : null;
     if (this.heightChart) {

@@ -2,7 +2,7 @@
 
     python -P -E tools/track_structure_review.py --input reports/track-heights.json
 
-The output loads in ?line=17&inspect&heightreview=reports/review/track-height-spans.json (F8).
+The findings load in ?line=17&review=reports/review/track-heights.json.
 Each structure has contiguous spans with stop names, lengths per direction, dated candidates and
 proposed rules. Copy reviewed profiles to --evidence span_reviews; a proposal is never evidence.
 """
@@ -304,7 +304,7 @@ def findings(result):
 def markdown(result):
     spans = {s['id']:s for s in result['spans']}
     out = ['# Structure height decisions', '',f"Snapshot `{result['snapshot']}`. Proposed rules are not approvals.", '',
-           'Open `?line=17&inspect&heightreview=reports/review/track-height-spans.json`; F8 toggles the spans.', '',
+           'Open `?line=17&review=reports/review/track-heights.json` to inspect and answer the decisions.', '',
            'Each decision may cover several lines and directions. A dated reviewed rule can include all its',
            '`approval_profile` entries in one `span_reviews` record. The placeholder rule deliberately fails',
            'validation until a height rule is explicitly chosen. Numeric DI always keeps priority.', '']

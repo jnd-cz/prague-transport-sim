@@ -44,8 +44,13 @@ export function heightProfile(f, route, profile) {
     const [a,b] = main.structure_extent.map((s)=>s-origin);
     svg += `<rect x="${X(a)}" y="${top}" width="${Math.max(0,X(b)-X(a))}" height="${bottom-top}" fill="#746339" opacity=".25"/>`;
   }
-  for (let z = z0; z <= z1; z++) svg += `<path d="M${left},${Y(z)}H${right}" stroke="#52565c" stroke-width=".5"/><text x="${left-4}" y="${Y(z)+3}" fill="#ddd" font-size="8" text-anchor="end">${z}</text>`;
+  const labelStep = Math.max(1,Math.ceil((z1-z0)*10/(bottom-top)));
+  for (let z = z0; z <= z1; z++) {
+    svg += `<path d="M${left},${Y(z)}H${right}" stroke="#52565c" stroke-width=".5"/>`;
+    if ((z-z0)%labelStep === 0) svg += `<text x="${left-4}" y="${Y(z)+3}" fill="#ddd" font-size="8" text-anchor="end">${z}</text>`;
+  }
   if (terrain.length) svg += `<path d="M${X(terrain[0].x)},${bottom} ${terrain.map((p)=>`L${X(p.x)},${Y(p.ipr_terrain_z)}`).join(' ')} L${X(terrain[terrain.length-1].x)},${bottom}Z" fill="#65583e" opacity=".45"/>`;
+  const diLabels = new Set();
   for (const {span,points} of series) {
     const dash = span.direction === 'pathBack' ? '4 2' : '';
     const archiveIds = new Set(points.flatMap((p)=>p.archive.filter((a)=>valid(a.z)).map((a)=>a.id)));
@@ -60,7 +65,11 @@ export function heightProfile(f, route, profile) {
         const z = s.surface_z ?? s.z;
         if (valid(z)) svg += `<circle cx="${X(p.x)}" cy="${Y(z)}" r="2.1" fill="${s.rail_height_eligible && !s.excluded ? '#eabf53' : 'none'}" stroke="#eabf53"><title>${esc(s.class)} level ${esc(s.level ?? '?')}: ${z.toFixed(2)} m</title></circle>`;
       }
-      if (valid(p.di_z)) svg += `<path d="M${X(p.x)},${Y(p.di_z)-3}l3,3 -3,3 -3,-3Z" fill="#e87eff"><title>DI ${p.di_z.toFixed(2)} m</title></path>`;
+      if (valid(p.di_z)) {
+        const x = X(p.x), y = Y(p.di_z), key = `${Math.round(x/20)},${Math.round(y/10)}`;
+        svg += `<path d="M${x},${y-3}l3,3 -3,3 -3,-3Z" fill="#e87eff"><title>DI ${p.di_z.toFixed(2)} m</title></path>`;
+        if (!diLabels.has(key)) { diLabels.add(key); svg += `<text x="${x+4}" y="${y-4}" fill="#e87eff" font-size="8">${p.di_z.toFixed(2)}</text>`; }
+      }
     }
   }
   const reverse = series.filter((s)=>s.span.line === main.line && s.span.direction !== main.direction);

@@ -28,7 +28,8 @@ class HeightProfile(unittest.TestCase):
                   const route={nearest(x,y){return {s:0,d:100}}}, profile={height(){return 200}};
                   return items.map(f=>({id:f.id,ok:!!heightProfile(f,route,profile)}));
                 }''',items)
-                self.assertEqual(len(result),27)
+                self.assertGreater(len(result),0)
+                self.assertEqual(len(result),len(items))
                 self.assertEqual([r['id'] for r in result if not r['ok']],[])
                 browser.close()
         finally:

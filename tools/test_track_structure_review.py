@@ -43,6 +43,9 @@ class SpanReviews(unittest.TestCase):
         self.assertEqual(SpanEvidence([survey]).at('di-1',5,0,[])[0]['z'],201)
         self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':None},match(),5,0,structure_hint=True)['z'],201)
         self.assertEqual(HeightGuard(span_reviews=[survey]).choose({'id':'di-1','z':205},match(),5,0,structure_hint=True)['z'],205)
+        span['profile'][0]['surfaces'].append({'id':'different','z':200.02,'rail_height_eligible':True})
+        self.assertFalse(get({**answer,'v':'follows survey surface'})['span_reviews'])
+        span['profile'][0]['surfaces'].pop()
         for changed in ({'note':'check level'}, {'v':'unsure'}, {'v':'other level (deck / under)'}, {'span_ids':['changed']}):
             self.assertFalse(get({**answer,**changed})['span_reviews'])
             self.assertTrue(get({**answer,**changed})['held'])
