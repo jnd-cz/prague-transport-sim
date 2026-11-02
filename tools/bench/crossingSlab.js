@@ -2,6 +2,51 @@
 // On a running shift loaded with ?keepgeo: (await import('/tools/bench/crossingSlab.js')).run()
 import * as THREE from 'three';
 import { pedestrianShape } from '../../src/pedestrianCrossings.js';
+import { DTM_LIFT } from '../../src/terrain.js';
+
+// A downward ray misses a vertical kerb. Intersect its actual drawn top edge with the sampled
+// rail-head chords instead; this also detects a narrow lip between the 2 m surface samples.
+export function crossingEdgeHits(game, heads) {
+  const cells = new Map(), last = new Map(), size = 12, hits = [];
+  const visit = (p, q, fn) => {
+    for (let x = Math.floor(Math.min(p.x, q.x) / size); x <= Math.floor(Math.max(p.x, q.x) / size); x++)
+      for (let y = Math.floor(Math.min(p.y, q.y) / size); y <= Math.floor(Math.max(p.y, q.y) / size); y++) fn(`${x},${y}`);
+  };
+  for (const q of heads) {
+    const p = last.get(q.side); last.set(q.side, q);
+    if (!p || q.s - p.s > 2.01) continue;
+    const seg = { p, q };
+    visit(p, q, (key) => { if (!cells.has(key)) cells.set(key, []); cells.get(key).push(seg); });
+  }
+  let samples = 0;
+  const ground = game.route.ground;
+  for (const { area: id } of ground.pedestrianCrossings?.survey || []) {
+    const area = ground.dtm.areas[id];
+    if (!['sidewalk', 'island'].includes(area.c)) continue;
+    [area.ring, ...area.holes].forEach((ring, ri) => {
+      for (let i = 0; i < ring.length; i++) {
+        if (area.kerbs && !area.kerbs[ri]?.[i]) continue;
+        const a = ring[i], b = ring[(i + 1) % ring.length], dx = b[0] - a[0], dy = b[1] - a[1], nearby = new Set();
+        visit({ x:a[0], y:a[1] }, { x:b[0], y:b[1] }, (key) => { for (const s of cells.get(key) || []) nearby.add(s); });
+        for (const { p, q } of nearby) {
+          const ex = q.x - p.x, ey = q.y - p.y, den = dx * ey - dy * ex;
+          if (Math.abs(den) < 1e-9) continue;
+          const ax = p.x - a[0], ay = p.y - a[1], u = (ax * ey - ay * ex) / den, v = (ax * dy - ay * dx) / den;
+          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+          const s = p.s + (q.s - p.s) * v;
+          if (area.l !== 0 && !ground.profile.onBridge(s)) continue;
+          samples++;
+          const railZ = p.z + (q.z - p.z) * v;
+          const surfaceZ = a[2] + (b[2] - a[2]) * u + (area.l > 0 ? 0.02 : DTM_LIFT[area.c] ?? 0.03);
+          if (surfaceZ - railZ <= 0.001) continue;
+          hits.push({ s, side:p.side, x:a[0]+dx*u, y:a[1]+dy*u, railZ, surfaceZ, excess:surfaceZ-railZ,
+                      source:'dtm', part:'kerb', area:id, class:area.c, level:area.l, way:null });
+        }
+      }
+    });
+  }
+  return { hits, samples };
+}
 
 export function crossingReason(game, hit, source, way) {
   const r = game.route;
@@ -135,7 +180,7 @@ export async function run({ unfiltered = false } = {}) {
     }
   }
   let samples = 0, missing = 0;
-  const hits = [], missingHeads = [], unresolved = new Map(), explained = new Map();
+  const hits = [], heads = [], missingHeads = [], unresolved = new Map(), explained = new Map();
   for (const bin of [...bins].sort((a, b) => a - b)) for (const side of [-1, 1]) {
     const s = bin * 2;
     let head = null;
@@ -146,6 +191,7 @@ export async function run({ unfiltered = false } = {}) {
       if (head) break;
     }
     if (!head) { missing++; missingHeads.push({ s, side }); continue; }
+    heads.push({ s, side, x:head.point.x, y:-head.point.z, z:head.point.y });
     samples++;
     const surface = ray.intersectObjects(targets, false).find((h) => {
       if (h.point.y > head.point.y + 0.4) return false;
@@ -173,6 +219,16 @@ export async function run({ unfiltered = false } = {}) {
       info: `${surface.object.userData.surface === 'dtm' ? `dtm/${area(surface.object, surface.faceIndex)[2]}` : 'OSM footway'} ${(excess * 1000).toFixed(0)} mm above rail`,
     });
   }
+  const edges = crossingEdgeHits(game, heads);
+  for (const hit of edges.hits) {
+    hit.geometryReason = crossingReason(game, hit, [0,0,hit.class,hit.level,hit.area], null);
+    hit.reason = recordedReason(game.data.line, 'surveyAreas', route.ground.dtm.areas[hit.area].sourceId,
+      hit.geometryReason, truth.pedestrianSurfaceReviews, manifest);
+    const key = Math.round(hit.s / 20), target = hit.reason ? explained : unresolved;
+    if (!target.has(key) || target.get(key).excess < hit.excess) target.set(key, hit);
+    if (!(bad.get(key)?.mag >= hit.excess)) bad.set(key, { ...hit, mag:hit.excess });
+    hits.push(hit);
+  }
   const places = [...bad.values()].sort((a, b) => b.mag - a.mag);
   const areaIds = new Set([...hits.filter((h) => h.area !== null).map((h) => h.area),
                            ...(route.ground.pedestrianCrossings?.review || []).map((s) => s.area)]);
@@ -186,6 +242,7 @@ export async function run({ unfiltered = false } = {}) {
   return { calibration: calibration(game), hits, missingHeads, sourceAreas, reviewCandidates,
            checks: { crossingSlab: { rule: 'pedestrian-surface-below-rail', count: unresolved.size, rawCount: places.length,
                                   unreviewedCandidates: reviewCandidates.filter((s) => !s.recorded).length,
+                                  kerbOf: edges.samples, kerbHits: edges.hits.length,
                                   of: samples, missing, sections: [...unresolved.values()].sort((a, b) => a.s - b.s),
                                   explainedSections: [...explained.values()].sort((a, b) => a.s - b.s),
                                   rawSections: places.sort((a, b) => a.s - b.s),

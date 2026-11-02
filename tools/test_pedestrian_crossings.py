@@ -121,17 +121,26 @@ class PedestrianCrossings(unittest.TestCase):
           const THREE=await import('three');
           const {DtmSurface,DTM_LIFT}=await import('/src/terrain.js');
           const {preparePedestrianCrossings}=await import('/src/pedestrianCrossings.js');
-          const dtm=new DtmSurface({areas:[{c:'sidewalk',l:0,r:[[-2,-4,200.05],[2,-4,200.05],[2,4,200.05],[-2,4,200.05]]}]},
+          const dtm=new DtmSurface({areas:[{c:'sidewalk',l:0,r:[[-2,-4,200.05],[2,-4,200.05],[2,4,200.05],[-2,4,200.05]],k:[[0,1,0,1]]}]},
                                    {height:()=>200},THREE);
           const before=dtm.surfaceAt(0,0.72).z+DTM_LIFT.sidewalk;
           const track={smooth:[[-10,0],[0,0],[10,0]],z:[200,200,200]}, ground={dtm};
           preparePedestrianCrossings({tracks:[track],roads:[]},null,ground,()=>[0,0,0],kind=>DTM_LIFT[kind] ?? 0.03);
+          const area=dtm.areas[0], edges=area.ring.filter(p=>Math.abs(p[1])<1);
+          if(area.kerbs[0].length!==area.ring.length)throw new Error('kerb flags lost');
+          for(let i=0;i<area.ring.length;i++) {
+            const p=area.ring[i],q=area.ring[(i+1)%area.ring.length];
+            if(!!area.kerbs[0][i] !== (Math.abs((p[0]+q[0])/2)===2))throw new Error('kerb moved to another edge');
+          }
           return {before,after:dtm.surfaceAt(0,0.72).z+DTM_LIFT.sidewalk,
+                  kerbTop:Math.max(...edges.map(p=>p[2]+DTM_LIFT.sidewalk)),edgePoints:edges.length,
                   areas:ground.pedestrianCrossings.survey.length};
         }''')
         self.assertEqual(result['areas'],1)
         self.assertGreater(result['before'],200.012)
         self.assertLess(result['after'],200.012)
+        self.assertGreater(result['edgePoints'],8)
+        self.assertLess(result['kerbTop'],200.012)
 
     def test_reported_survey_polygon_matches_the_mapped_pedestrian_crossing(self):
         root=Path(__file__).resolve().parent.parent

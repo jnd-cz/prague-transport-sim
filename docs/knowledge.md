@@ -154,7 +154,9 @@ Review these when realism matters; most move into the build in M2.
   an outline spanning the full track ribbon. The latter test matches 30 of 37 independently mapped
   survey crossing sites on lines 17/22; it adds eight sites without mapped footways. Narrow side
   patches stay unchanged. Crossings clear every overlapping same-level track, with refined ribbon
-  triangles to follow the height transition. Decisions are in `window.game.route.ground.pedestrianCrossings`.
+  triangles and survey outlines so their kerb faces also follow the height transition. Downward rays
+  miss a vertical kerb: the crossing check intersects its drawn top edge with rail-head chords too.
+  Decisions are in `window.game.route.ground.pedestrianCrossings`.
   `--checks crossing` retains raw hits and source IDs, and fails on unreviewed obstructions or survey
   candidates. Side-surface reasons in `truth.json` `pedestrianSurfaceReviews` require matching input
   hashes and a matching geometric classification. Their physical levels remain #166.

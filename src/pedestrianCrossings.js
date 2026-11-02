@@ -160,6 +160,21 @@ export function preparePedestrianCrossings(data, route, ground, tiltOf, liftOf) 
         sites.push(site);
       }
       if (!sites.length) continue;
+      const height = (x, y, z) => sites.some((s) => Math.hypot(s.x - x, s.y - y) <= s.radius) ? lower(index, x, y, z, lift) : z;
+      // Kerb faces use the outline, not the triangulated top. Refine both before lowering either:
+      // lowering only the top leaves the old vertical lip across the rails (line 17 s 7888).
+      const rings = [area.ring, ...area.holes].map((ring, ri) => {
+        const points = [], flags = [];
+        for (let i = 0; i < ring.length; i++) {
+          const p = ring[i], q = ring[(i + 1) % ring.length], steps = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 0.2) || 1;
+          for (let k = 0; k < steps; k++) {
+            const t = k / steps, x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t;
+            points.push([x, y, height(x, y, p[2] + (q[2] - p[2]) * t)]);
+            flags.push(area.kerbs?.[ri]?.[i] || 0);
+          }
+        }
+        return { points, flags };
+      });
       const mesh = [], adjusted = new Set();
       for (const tri of area.mesh) {
         const x = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, y = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
@@ -169,8 +184,11 @@ export function preparePedestrianCrossings(data, route, ground, tiltOf, liftOf) 
       for (const tri of mesh) for (const p of tri) {
         if (adjusted.has(p)) continue;
         adjusted.add(p);
-        if (sites.some((s) => Math.hypot(s.x - p[0], s.y - p[1]) <= s.radius)) p[2] = lower(index, p[0], p[1], p[2], lift);
+        p[2] = height(p[0], p[1], p[2]);
       }
+      area.ring = rings[0].points;
+      area.holes = rings.slice(1).map((r) => r.points);
+      if (area.kerbs) area.kerbs = rings.map((r) => r.flags);
       area.mesh = mesh;
       reindex = true;
       decisions.survey.push({ area: areaId, class: area.c, level: area.l, sites });

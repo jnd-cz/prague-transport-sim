@@ -13,6 +13,33 @@ ROOT=Path(__file__).resolve().parent.parent
 
 
 class CrossingCheck(unittest.TestCase):
+    def test_vertical_lip_between_surface_samples_is_detected(self):
+        server,url=serve(0)
+        try:
+            with sync_playwright() as pw:
+                browser=pw.chromium.launch(headless=True)
+                page=browser.new_page()
+                html=(ROOT/'index.html').read_text(encoding='utf-8')
+                importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
+                page.route('**/crossing-edge-test',lambda route:route.fulfill(body=importmap))
+                page.goto(url+'/crossing-edge-test')
+                result=page.evaluate('''async () => {
+                  const {crossingEdgeHits}=await import('/tools/bench/crossingSlab.js');
+                  const area={c:'sidewalk',l:0,ring:[[9.1,-2,200.05],[9.2,-2,200.05],[9.2,2,200.05],[9.1,2,200.05]],holes:[],kerbs:[[0,1,0,1]]};
+                  const game={route:{ground:{dtm:{areas:[area]},pedestrianCrossings:{survey:[{area:0}]}}}};
+                  const heads=[8,10].flatMap(s=>[-1,1].map(side=>({s,side,x:s,y:side*.72,z:200.012})));
+                  const before=crossingEdgeHits(game,heads);
+                  for(const p of area.ring)p[2]=200.008-.05;
+                  return {before,after:crossingEdgeHits(game,heads)};
+                }''')
+                self.assertEqual(result['before']['samples'],4)
+                self.assertEqual(len(result['before']['hits']),4)
+                self.assertGreater(result['before']['hits'][0]['excess'],.08)
+                self.assertEqual(result['after']['hits'],[])
+                browser.close()
+        finally:
+            stop_server(server)
+
     def test_unresolved_crossings_fail_the_command(self):
         self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':1,'of':10}}})[0])
         self.assertFalse(judge('crossing',{'checks':{'crossingSlab':{'count':0,'of':0}}})[0])
