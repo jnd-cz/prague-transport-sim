@@ -403,12 +403,19 @@ ${this._verdictHtml(f)}`;
     if (this.heightChart) {
       this.$('rvHeight').innerHTML = this.heightChart.html;
       const svg = this.$('heightProfile');
-      svg.addEventListener('pointermove', (e) => {
+      const pick = (e) => {
         const r = svg.getBoundingClientRect(), chart = this.heightChart;
         const px = (e.clientX - r.left) / r.width * chart.width;
         const s = chart.x0 + (px - chart.left) / (chart.right - chart.left) * (chart.x1 - chart.x0);
-        const p = chart.points.reduce((a, b) => Math.abs(b.x - s) < Math.abs(a.x - s) ? b : a);
+        return chart.points.reduce((a, b) => Math.abs(b.x - s) < Math.abs(a.x - s) ? b : a);
+      };
+      svg.addEventListener('pointermove', (e) => this._heightCursor(pick(e)));
+      // a click (a tap) on the chart centres the camera on that point, keeping direction and zoom (#182)
+      svg.addEventListener('click', (e) => {
+        const p = pick(e);
         this._heightCursor(p);
+        this.T = { x: p.xy[0], y: p.xy[1], z: p.game ?? this.ground.at(...p.xy) };
+        this._render();
       });
     }
   }

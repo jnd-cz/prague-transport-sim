@@ -142,6 +142,9 @@ def main():
               const button=[...document.querySelectorAll('#rvCard button[data-v]')].map(b=>b.textContent);
               if (svg) svg.dispatchEvent(new PointerEvent('pointermove',{clientX:svg.getBoundingClientRect().left+80}));
               const marker=!!R.heightMarker?.visible, cursor=R.$('heightCursor');
+              // a click on the chart centres the camera on that point (#182): the right end is the span's end, x 10
+              const rr=svg.getBoundingClientRect(); svg.dispatchEvent(new MouseEvent('click',{clientX:rr.right-2,clientY:rr.top+20}));
+              const clickTo=[R.T.x,R.T.y];
               if (cursor) cursor.setAttribute('visibility','hidden');
               const p=R.heightChart.points[0], v=R.camera.position.clone().set(p.xy[0],p.game ?? R.ground.at(...p.xy),-p.xy[1]).project(R.camera);
               const rect=R.canvas.getBoundingClientRect();
@@ -149,7 +152,7 @@ def main():
               return {count:R.list.filter(f=>f.kind==='trackheight').length, svg:!!svg, marker,
                 reverse:cursor?.getAttribute('visibility')==='visible',
                 conflict:R.hl.children.some(o=>o.material?.color?.getHex()===0xff3333), button,
-                explanation:R.$('rvCard').textContent};
+                explanation:R.$('rvCard').textContent, clickTo};
             }''')
             page.click("#rvCard button[data-v='0']")
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
@@ -196,6 +199,8 @@ def main():
         fails.append(f"after a reload without local storage: {r['back']}")
     if r['height']['count'] != 2 or not all(r['height'][k] for k in ('svg','marker','reverse','conflict')):
         fails.append(f"track height finding/profile/hover missing: {r['height']}")
+    if r['height'].get('clickTo') != [10, 0]:
+        fails.append(f"a click on the chart's end did not move the camera to it: {r['height'].get('clickTo')}")
     if r['heightNext'] != 'other-bridge':
         fails.append(f"same-location decision was not independent: {r['heightNext']}")
     if ('structure level is not identified' not in r['height']['explanation'] or
