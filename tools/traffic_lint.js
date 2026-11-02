@@ -11,6 +11,8 @@ import { stuckScene } from './bench/stuck.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
 const TOP = 12;
+const AT_MAX = 2000; // every place as [x, y, s] up to this many (headless.py keeps them in the baseline, #157)
+export const placesAt = (items) => (items.length <= AT_MAX ? { at: items.map((i) => [i.x == null ? null : Math.round(i.x), i.y == null ? null : Math.round(i.y), i.s == null ? null : Math.round(i.s)]) } : {});
 
 // rectangle as centre, unit heading, half length / width -> its 4 corners
 function corners(b) {
@@ -72,7 +74,8 @@ function snapshot(g, tr) {
   return out;
 }
 
-export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 / 30, maxT = 7200, seed = 22, progress = () => {} } = {}) {
+// stopAt: end the run when our tram reaches this route s (a replay of the moment, ?seed=N&at=S in src/main.js)
+export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 / 30, maxT = 7200, seed = 22, stopAt = Infinity, progress = () => {} } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = seed; // the run's seeded stream (src/random.js): the same run every time; cleared below
   $('menu').classList.remove('hidden');
@@ -98,8 +101,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   const camera = { position: { x: 0, z: 0 } };
   const step = sample;
   try {
-  while (T < maxT && g.nextStop < until && !g.finished) {
-    for (let k = 0; k < 600 && T < maxT && !g.finished; k++) {
+  while (T < maxT && g.nextStop < until && !g.finished && g.tram.s < stopAt) {
+    for (let k = 0; k < 600 && T < maxT && !g.finished && g.tram.s < stopAt; k++) {
       ap.step(g, dt);
       g.update(dt, ap.input);
       // oncoming trams crossing a junction's stop line on red (B10: they share the straight phase)
@@ -124,7 +127,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       camera.position.x = p.x; camera.position.z = -p.y;
       tr.update(dt, camera);
       T += dt;
-      if (T < nextSample) continue;
+      window.trafficWatch?.(g, tr, T); // (a dev probe of one moment: the cars around a stuck scene)
+      if (T < nextSample || stopAt !== Infinity) continue; // (a replay: the samples only read, they are skipped)
       nextSample = T + step;
       samples++;
       const snap = snapshot(g, tr);
@@ -186,11 +190,11 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
     for (const it of items) byKind[it.kind] = (byKind[it.kind] || 0) + 1;
     const byState = {};
     for (const it of items) if (it.states) byState[it.states] = (byState[it.states] || 0) + 1;
-    return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP) };
+    return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP), ...placesAt(items) };
   };
   const minutes = T / 60;
   return {
-    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
       // (a run that did not finish: what held the tram at the end, as u3 and redruns report it)
       ...(g.finished || g.nextStop >= until ? {} : { stuckScene: stuckScene(g, tr, ap) }) },
     checks: {

@@ -7,6 +7,12 @@ pulls the review verdicts from the host into reports/reviews/ (deploy.py --pull-
 repeated failed logins). The password comes from ~/.netrc (machine <host> login <user> password …)
 or TRAM_DEPLOY_PASSWORD: there is nobody to ask.
 
+At night (NIGHT, local hours) it measures main's regression baseline once per change of what the
+checks depend on (tools/baseline_store.py: the game, the checks, the data manifest), with 2 pages at
+once, and publishes it to the data store for `headless.py --compare` (#157). Not while another heavy
+job runs on this computer (headless.py, rebuild.py) or memory is short; a merge of docs or tools only
+costs nothing, and several merges in a day cost one run.
+
 --install registers a Windows scheduled task (every MIN minutes, default 10, while you are logged
 on) that runs this with pythonw (no window); --uninstall removes it. Log and state:
 reports/autodeploy.log, reports/autodeploy.json (both git-ignored).
@@ -25,6 +31,8 @@ LOG = os.path.join(ROOT, "reports", "autodeploy.log")
 STATE = os.path.join(ROOT, "reports", "autodeploy.json")
 TASK = "tram-autodeploy"
 RETRY = 3600  # s after a failed deploy of the same commit
+NIGHT = range(1, 5)  # local hours in which the nightly baseline may start
+LINES, CHECKS = "9,17,22,23,37", "u3,redruns,traffic,lint,surfaces"
 # (under pythonw a console child would open a window of its own on every run)
 QUIET = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 
@@ -84,7 +92,44 @@ def once(log):
         else:
             st.pop("pull_failed_at", None)
     save_state(st)
+    if code == 0 and st.get("deployed") == git("rev-parse", "HEAD"):
+        code = nightly(log, st)
+        save_state(st)
     return code
+
+
+def nightly(log, st, now=None):
+    """Main's baseline measured and published, if it is night and it is not in the store yet."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import baseline_store
+    from sysinfo import workers
+    now = now or datetime.datetime.now()
+    if now.hour not in NIGHT:
+        return 0
+    k = baseline_store.key(baseline_store.trees("HEAD"))
+    if st.get("baseline") == k or st.get("baseline_tried") == [k, f"{now:%Y-%m-%d}"]:
+        return 0
+    stamp = f"{now:%Y-%m-%d %H:%M:%S}"
+    if baseline_store.published(k):
+        st["baseline"] = k
+        return 0
+    if busy := baseline_store.busy():
+        print(f"{stamp} nightly baseline waits: {'; '.join(busy)}", file=log)
+        return 0
+    if workers(4.0) < 2:
+        print(f"{stamp} nightly baseline waits: not enough free memory for 2 pages", file=log)
+        return 0
+    print(f"{stamp} nightly baseline of {git('rev-parse', '--short', 'HEAD')} ({k[:12]})", file=log)
+    code = run(log, python(), "-P", "-E", "tools/headless.py", "--lines", LINES, "--checks", CHECKS,
+               "--baseline", "--publish", "--jobs", "2", "--port", "0")
+    # (the deploy checkout stays as checked out: the files --baseline wrote are only published)
+    run(log, "git", "checkout", "-q", "--", "reports/baseline")
+    if baseline_store.published(k):
+        st["baseline"] = k
+        return 0
+    print(f"{stamp} nightly baseline not published (exit {code}); next night again", file=log)
+    st["baseline_tried"] = [k, f"{now:%Y-%m-%d}"]  # (once a night: not again every 10 minutes)
+    return 1
 
 
 def deploy(log, st):
