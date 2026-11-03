@@ -769,7 +769,7 @@ def main():
         print(f"interlaced track: {sum(h[0] == 'between' for h in added.values())} tip nodes added, "
               f"{sum(h[0] == 'copy' for h in added.values())} nodes copied")
     edges = {(a, b) for ids in (path_ids, bids, *[w["nodes"] for w in tways]) for a, b in zip(ids, ids[1:])}
-    geo = di_tracks.TrackGeometry(allpos, edges, track_srcs)
+    geo = di_tracks.TrackGeometry(allpos, edges, track_srcs, di_tracks.switch_tips() if track_srcs else ())
     if not OSM_TRACKS:
         geo.fit_curves()   # smooth curves through the points, continuous at every node (#204)
     print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k not in ('fill', 'curve')})}")

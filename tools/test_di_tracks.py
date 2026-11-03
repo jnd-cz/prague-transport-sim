@@ -147,6 +147,14 @@ class Pairing(unittest.TestCase):
         geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
         self.assertEqual(geo.at(2), (50.0, 0.0))
 
+    def test_a_switch_whose_tip_the_user_placed_goes_there(self):
+        # Podolská vodárna: "the fork point should be further back right next to northern manhole", 3.3 m from DI's
+        # fork; the switch takes the point of its through track nearest the manhole
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (120, 0)]), rec(3, turnout(50))])
+        pos = {1: (0, 0.2), 2: (50.5, 0.2), 3: (120, 0.2), 4: turnout(50)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di], tips=[((50.5, 0.2), (46.7, -1.65))])
+        self.assertLess(math.dist(geo.at(2), (46.7, 0)), 1e-6)
+
     def test_a_fork_facing_the_other_way_is_not_the_switch(self):
         # a fork 6 m on whose branch leaves backwards: another switch
         back = [(56 - x, y) for x, y in [(p[0] - 50, p[1]) for p in turnout(50)]]

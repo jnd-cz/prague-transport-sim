@@ -495,7 +495,7 @@ class TrackGeometry:
     After construction: `at(node)` the node's position, `points(a, b)` the edge's points from a to b,
     `source(a, b)` {'src': 'di' | 'dtmp' | 'osm', 'records': [...]}, and `report` (counts and places)."""
 
-    def __init__(self, pos, edges, sources):
+    def __init__(self, pos, edges, sources, tips=()):
         self.orig = dict(pos)
         self.edges = {}
         adj = defaultdict(set)
@@ -562,6 +562,17 @@ class TrackGeometry:
                 collapse = self._past(n, f, pos)
                 if d <= FORK and collapse is not None and on(f) and same_way(dirs, src.branches[i]):
                     claims.append((d, n, (src.name, int(i)), f, collapse))
+            # a switch whose tip the user placed (data/truth.json trackSources.switchTips) takes the point of its
+            # through track nearest that place, before any fork
+            for i, (near, tip) in enumerate(tips):
+                if legs and math.dist(near, pos[n]) <= FORK:
+                    lines = [src.chains[c]['line'] for cs in on_chains for c in cs]
+                    if lines:
+                        line = min(lines, key=lambda l: l.distance(Point(tip)))
+                        q = line.interpolate(line.project(Point(tip)))
+                        collapse = self._past(n, (q.x, q.y), pos)
+                        if collapse is not None:
+                            claims.append((-1.0, n, ('tip', i), (q.x, q.y), collapse))
         fork_of, taken, collapsed = {}, set(), {}
         for d, n, key, f, collapse in sorted(claims, key=lambda c: c[0]):
             if n in fork_of or n in collapsed or key in taken or any(m in fork_of or m in collapsed for m in collapse):
@@ -948,6 +959,19 @@ def osm_graph(*answers):
                 for a, b in zip(e['nodes'], e['nodes'][1:]):
                     edges.add((a, b))
     return nodes, edges
+
+
+def switch_tips(truth=None):
+    """[(near, tip)] in city metres: switches whose tip the user placed (data/truth.json trackSources.switchTips)."""
+    import json
+    from geo import Frame
+    path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    facts = json.loads(Path(path).read_text(encoding='utf-8'))['trackSources'].get('switchTips', [])
+    frame, out = Frame(), []
+    for f in facts:
+        (nx, tx), (ny, ty) = frame.xy([f['near'][0], f['tip'][0]], [f['near'][1], f['tip'][1]])
+        out.append(((float(nx), float(ny)), (float(tx), float(ty))))
+    return out
 
 
 def load_sources():
