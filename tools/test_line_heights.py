@@ -81,6 +81,27 @@ class Assembly(unittest.TestCase):
         self.assertLess(worst, lh.MISS)
         self.assertTrue(c.tight)
 
+    def test_an_answer_to_hold_the_radius_keeps_it_and_the_place_is_reviewed(self):
+        def z(s):
+            if s < 94:
+                return 100 - .06 * s
+            if s < 106:
+                return 100 - .06 * s + (s - 94) ** 2 / 200
+            return 100 - .06 * 106 + 144 / 200 + .06 * (s - 106)
+        c = chain([(0, 0), (200, 0)], z, terrain=z)
+        lh.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': lh.HOLD}]
+        try:
+            quiet(lh.assemble, [c])
+        finally:
+            lh.RADIUS_ANSWERS = []
+        self.assertFalse(c.tight)
+        self.assertGreater(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.MISS)  # (the radius held)
+        self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('tight radius', 1)])
+        free = chain([(0, 0), (200, 0)], z, terrain=z)
+        quiet(lh.assemble, [free])
+        self.assertEqual([p['kind'] for p in free.review], ['tight radius'])
+        self.assertLess(free.review[0]['factor'], 1)
+
     def test_a_lone_bump_is_dropped(self):
         c = chain([(0, 0), (200, 0)], lambda s: 100.5 if abs(s - 102.5) < 1 else 100.0)
         quiet(lh.assemble, [c])

@@ -29,7 +29,7 @@ import shapely
 from shapely.geometry import LineString, Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, cause, chains, radii, vertical_profile  # noqa: E402
+from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, cause, chains, implied_radii, radii, vertical_profile  # noqa: E402
 
 OUT_STEP = 2.0  # m between heights along a line's path and tracks (the game's profile step, src/terrain.js)
 MATCH = 1.0     # m from a line's point to the chain it lies on (both are DI where the line is, #20)
@@ -54,6 +54,34 @@ ACROSS_MIN, ACROSS_MAX = 2.0, 6.0  # m: the opposite track beside ours (the game
 EXTEND = BIN    # m: a chain's height reaches this far past its first and last bin (its ends, junctions)
 CODE = {'di': 'di', 'archive': 'dtmp', 'reviewed': 'review', 'deck': 'zps', 'survey': 'zps'}  # staged dataset -> code
 LEVELS = ('di', 'dtmp', 'review', 'zps', 'curve', 'surface')  # codes in the order of sources.LAYERS['heights']
+
+
+RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
+HOLD, FOLLOW = 'hold the radius', 'follow the data'
+ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
+
+
+def load_radius_answers(truth):
+    """data/truth.json trackHeights.radiusAnswers: a place (lat, lon) and the user's choice there."""
+    from geo import Frame
+    F = Frame()
+    return [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer']}
+            for a in (truth.get('trackHeights') or {}).get('radiusAnswers', [])]
+
+
+def held_by_answer(xy):
+    """Whether the user answered to hold the design radius at this place."""
+    return xy is not None and any(a['answer'] == HOLD and math.dist(a['xy'], xy) <= ANSWER_REACH for a in RADIUS_ANSWERS)
+
+
+def review_place(c, kind, s0, s1, held, final, factor):
+    """A place where the radius gave way (or an answer held it): the stretch, the curve held to the design radius,
+    the final one and the staged heights, for the radius review (reports/review/track-radius.json)."""
+    terrain = {round(b['s'], 1): b['terrain'] for b in c.bins}
+    curve = lambda runs: [(si, zi) for run in runs for si, zi in zip(run['s'], run['z']) if s0 <= si <= s1]
+    data = [(si, raw, src) for run in final for si, raw, src in zip(run['s'], run['raw'], run['src']) if s0 <= si <= s1]
+    return {'kind': kind, 's0': s0, 's1': s1, 'factor': factor, 'held': curve(held), 'final': curve(final),
+            'data': [(si, raw, src, terrain.get(round(si, 1)), tuple(c.line.interpolate(si).coords[0])) for si, raw, src in data]}
 
 
 def staged_heights(path=None):
@@ -82,7 +110,7 @@ class Chain:
     def __init__(self, xy, bins):
         self.xy, self.line, self.bins = xy, LineString(xy), bins
         self.length = self.line.length
-        self.runs, self.held, self.steps, self.switch, self.tight = [], [], [], [], []
+        self.runs, self.held, self.steps, self.switch, self.tight, self.review = [], [], [], [], [], []
 
     def z_at(self, t):
         """(height, source code) at distance t along the chain, or (None, None) outside its runs."""
@@ -229,7 +257,7 @@ def solve(c, pins, r, relax=None):
     runs, cut = held_runs(series)
     c.held = [{'s0': h[0]['s'], 's1': h[-1]['s'], 'flags': sorted({f for x in h for f in x['flags']}),
                'xy': h[len(h) // 2]['xy']} for h in cut]
-    c.runs, c.steps, c.tight = [], [], []
+    c.runs, c.steps, c.tight, c.review = [], [], [], []
     for run in runs:
         # (a held bin starts on the straight line between its neighbours, at HOLD_WEIGHT: at weight 0 the curve was
         # free to sag anywhere the radius allows, 5 cm under a straight grade across 40 m)
@@ -249,6 +277,7 @@ def solve(c, pins, r, relax=None):
         # (where the curve misses a stretch of heights the terrain confirms at track grades, the track is tighter
         # than the design radius there: the radius gives way over the stretch and the place is listed; held to it,
         # the curve left a 300 m sag at Malostranská and Tukey dropped the stretch, 1 m under the data)
+        first = None
         for k in (1,) + RELAX:
             res = vertical_profile(s, [x['zf'] for x in run], rmin, weight=[x['w'] or HOLD_WEIGHT for x in run],
                                    pins=[i for i, x in enumerate(run) if x.get('pin')], pin_weight=PIN_WEIGHT)
@@ -276,12 +305,25 @@ def solve(c, pins, r, relax=None):
                               'track_like': all(p['terrain'] is not None and abs(p['z'] - p['terrain']) <= .5 for p in pts)
                                   and all(abs(b['z'] - a['z']) <= MAX_GRADE * (b['s'] - a['s']) for a, b in zip(pts, pts[1:]))})
             tight = [f for f in found if f.pop('track_like') and f['points'] >= 3]
+            if k == 1:
+                # (the curve held to the design radius, for the radius review; an answer to hold it keeps it)
+                first = (list(res['z']), [dict(f) for f in tight])
+                tight = [f for f in tight if not held_by_answer(f['xy'])]
             if not tight or k == RELAX[-1]:
                 break
             nk = RELAX[RELAX.index(k) + 1] if k in RELAX else RELAX[0]
             for f in tight:
                 rmin = [v * nk / k if f['s'][0] - 20 <= si <= f['s'][1] + 20 else v for si, v in zip(s, rmin)]
                 c.tight.append({'xy': f['xy'], 'factor': nk, 'points': f['points']})
+        if first and first[1]:
+            final = [{'s': s, 'z': res['z'], 'raw': [None if x.get('pin') else x['z'] for x in run],
+                      'src': [x['src'] for x in run]}]
+            held = [{'s': s, 'z': first[0]}]
+            for f in first[1]:
+                relaxed = not held_by_answer(f['xy'])
+                place = review_place(c, 'tight radius', f['s'][0] - 60, f['s'][1] + 60, held, final, k if relaxed else 1)
+                place['at'] = tuple(f['xy'])
+                c.review.append(place)
         for f in found:
             f.pop('s')
         c.steps += found
@@ -366,13 +408,31 @@ def assemble(chs):
             pinned += 1
             # (where the tracks it meets ask for more than the radius allows, the rails still join: the radius
             # gives way near the pin the curve misses, and the place is listed)
-            relax = {}
+            relax, before, kept = {}, None, set()
             for k in JOIN_RELAX:
                 miss = [t for t, z in pins.items() if c.z_at(t)[0] is None or abs(c.z_at(t)[0] - z) > .01]
+                kept |= {t for t in miss if held_by_answer(tuple(c.line.interpolate(t).coords[0]))}
+                miss = [t for t in miss if t not in kept]
                 if not miss:
                     break
+                if before is None:
+                    before = [dict(run) for run in c.runs]  # (held to the design radius, for the radius review)
                 relax.update({t: k for t in miss})
                 solve(c, pins, r, relax)
+            ts, group = sorted(set(relax) | kept), []
+            for t in ts + [None]:  # (pins within 30 m of each other: one place)
+                if t is not None and (not group or t - group[-1] <= 30):
+                    group.append(t)
+                    continue
+                if group:
+                    place = review_place(c, 'junction', group[0] - 60, group[-1] + 60, before or c.runs, c.runs,
+                                         min(relax.get(u, 1) for u in group))
+                    held_at = lambda u: next((zz for ss, zz in sorted(place['held'], key=lambda q: abs(q[0] - u))), None)
+                    place['at'] = tuple(c.line.interpolate(group[0]).coords[0])
+                    place['miss'] = max(abs(held_at(u) - c.z_at(u)[0]) for u in group
+                                        if held_at(u) is not None and c.z_at(u)[0] is not None) if place['held'] else 0
+                    c.review.append(place)
+                group = [t] if t is not None else []
             if relax:
                 p = c.line.interpolate(min(relax))
                 relaxed.append({'xy': [round(p.x, 1), round(p.y, 1)], 'factor': min(relax.values()),
@@ -668,12 +728,75 @@ def line_report(line, chs, lookup, data, summary):
     return out
 
 
+def radius_review(chs, snapshot):
+    """reports/review/track-radius.json: every place where the radius gave way (or an answer held it), the curve
+    held to the design radius and the final one as answer previews over the staged heights and the terrain."""
+    from geo import Frame
+    from atomic import replacing
+    F = Frame()
+    routes = {}
+    for n in ('9', '17', '22', '23', '37'):
+        f = ROOT / 'data' / f'line{n}.json'
+        if f.exists():
+            d = json.loads(f.read_text(encoding='utf-8'))
+            routes[n] = [LineString([tuple(p[:2]) for p in d[k]]) for k in ('path', 'pathBack') if d.get(k)]
+    by = {}
+    for c in chs:
+        for p in c.review:
+            if len(p['data']) >= 2:
+                lat, lon = (float(v) for v in F.ll(*p['at']))
+                by.setdefault(f'radius-{lat:.4f}-{lon:.4f}', []).append(p)
+    radius = lambda curve: min(implied_radii([a for a, _ in curve], [b for _, b in curve]), default=math.inf)
+    out = []
+    for ident, places in by.items():
+        main = max(places, key=lambda p: len(p['data']))
+        at = main['at']
+        lat, lon = (float(v) for v in F.ll(*at))
+        near = {n: min(g.distance(Point(at)) for g in gs) for n, gs in routes.items()}
+        lines = sorted((n for n, dd in near.items() if dd < 10), key=int)
+        spans, previews = [], {HOLD: {}, FOLLOW: {}}
+        for k, p in enumerate(sorted(places, key=lambda p: -len(p['data']))):
+            sid = f'{ident}:track{k + 1}'
+            spans.append({'id': sid, 'line': int(lines[0] if lines else min(near, key=near.get)), 'direction': 'path',
+                          'structure': {'kind': p['kind']},
+                          'status': 'review', 'start_s': round(p['s0'], 1), 'length_m': round(p['s1'] - p['s0'], 1),
+                          'profile': [{'s': round(si, 1), 'xy': [round(v, 2) for v in xy],
+                                       'archive': [{'z': round(raw, 3)}] if raw is not None and src == 'dtmp' else [],
+                                       'di_z': round(raw, 3) if raw is not None and src != 'dtmp' else None,
+                                       'surfaces': [], 'ipr_terrain_z': terr}
+                                      for si, raw, src, terr, xy in p['data']]})
+            previews[HOLD][sid] = [[round(a, 1), round(b, 3)] for a, b in p['held']]
+            previews[FOLLOW][sid] = [[round(a, 1), round(b, 3)] for a, b in p['final']]
+        if main['kind'] == 'tight radius':
+            staged = {round(si, 1): raw for si, raw, _, _, _ in main['data'] if raw is not None}
+            mag = max((abs(z - staged[round(si, 1)]) for si, z in main['held'] if round(si, 1) in staged), default=0)
+            info = (f"tight radius: the staged heights, which the terrain confirms, turn tighter than the design radius. "
+                    f"Held to it the curve departs up to {mag:.2f} m from the data (tightest {radius(main['held']):.0f} m); "
+                    f"following the data the radius is {radius(main['final']):.0f} m.")
+        else:
+            mag = max(p.get('miss', 0) for p in places)
+            info = (f"junction: a short track meets two or more others and cannot meet them all within the design radius. Held to it, the rails stay up to {mag * 100:.0f} cm apart at the "
+                    f"junction; joining them, the radius is {min(radius(p['final']) for p in places):.0f} m.")
+        out.append({'kind': 'trackheight', 'id': ident, 'x': at[0], 'y': at[1], 'mag': round(mag, 3),
+                    'status': 'review', 'place': [round(lat, 5), round(lon, 5)], 'lines_near': lines, 'info': info,
+                    'decision': {'span_ids': [sp['id'] for sp in spans], 'structure': {'kind': main['kind']}, 'status': 'review'},
+                    'spans': spans, 'options': [HOLD, FOLLOW, 'unsure'], 'answer_explanations': {},
+                    'answer_previews': previews})
+    out.sort(key=lambda f: -f['mag'])
+    dst = ROOT / 'reports' / 'review' / 'track-radius.json'
+    with replacing(dst, 'w', encoding='utf-8') as fh:
+        json.dump({'schema': 1, 'snapshot': snapshot, 'findings': out}, fh, ensure_ascii=False, indent=1)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('lines', nargs='+')
     ap.add_argument('--staged', help='an import of this checkout (tools/import_track_heights.py --evidence ...)')
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')
+    global RADIUS_ANSWERS
+    RADIUS_ANSWERS = load_radius_answers(json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8')))
     staged = staged_heights(args.staged)
     chs = build_chains(staged)
     del staged
@@ -696,6 +819,9 @@ def main():
     print(f'network: steps by cause {dict(by)}; {len(bad)} over {BIG:g} m without a rule to explain them')
     print(f'network: {len(held)} held stretches over {HELD_GAP} m, {sum(h["m"] for h in held):.0f} m; radius relaxed '
           f'near {len(summary["radius_relaxed"])} junctions and for {len(summary["radius_tight"])} stretches the terrain confirms')
+    review = radius_review(chs, (ROOT / 'snapshots/CURRENT').read_text().strip())
+    print(f"radius review: {len(review)} places ({sum(f['decision']['structure']['kind'] == 'tight radius' for f in review)} "
+          f"where the data is tighter, the rest at junctions), reports/review/track-radius.json")
     lookup, report = Lookup(chs), {'network': {**summary, 'steps_by_cause': dict(by), 'unexplained_steps': bad,
                                                'moved_m': {'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
                                                'held_over_60m': held}, 'lines': {}}

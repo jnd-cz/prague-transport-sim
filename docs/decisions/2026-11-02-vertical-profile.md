@@ -137,6 +137,16 @@ with (`heights.staged`).
   2026-11-03: 6 places. On game routes: Malostranská (50.0905 N 14.4101 E, lines 22 and 23) and Královka
   (50.0850 N 14.3809 E, line 23); off them: 50.0850 N 14.3792 E, 50.0939 N 14.3921 E, 50.1015 N 14.5041 E,
   50.0728 N 14.5309 E. Line 17 has none.
+- **The user reviews where the radius gave way** (asked 2026-11-03: "For the under 500m spots I'd like to review them
+  before/after aligning to fit 500m and then decide if we uphold that rule"): `reports/review/track-radius.json`, one
+  decision per place (`radius-<lat>-<lon>`) with the staged heights, the terrain, and as the previews of its two
+  answers the curve held to the design radius and the curve that gave way. An answer recorded in `data/truth.json`
+  `trackHeights.radiusAnswers` (the place, `hold the radius` or `follow the data`, with its quote) applies within
+  15 m; `hold the radius` keeps the design radius there. Without an answer the radius gives way as above.
+  2026-11-03: 22 places. Where the data is tighter (6), held to 500 m the curve departs 0.35–1.22 m from data the
+  terrain confirms (Královka, line 23: 1.22 m; Malostranská, lines 22 and 23: 1.02 m); following it the radius is
+  250 m (125 m at one place). At junctions (16), held to the radius the rails stay 1–8 cm apart; joining them the
+  radius is 62–500 m.
 - **A short hold** starts on the straight line between its neighbours, at weight 0.001: at weight 0 the curve was
   free to sag anywhere the radius allowed, 5 cm under a straight grade across 40 m.
 - **A line takes the heights of the chains under it,** weighted by how near each is within 1 m: past a fork both
