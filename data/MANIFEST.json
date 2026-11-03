@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-03",
- "built_at_commit": "33ffeb4",
- "published": "2026-11-03 06:34",
- "note": "line 17 rebuilt on DI track centrelines (#20)",
+ "built_at_commit": "d8e374c",
+ "published": "2026-11-03 10:21",
+ "note": "line 17: assembled top-of-rail heights (#197 draft, line_heights.py)",
  "files": {
   "line17.bld.bin": {
    "size": 6348150,
@@ -29,8 +29,8 @@
    "sha256": "69308a46603473c499a0db73287e24f9f58d016126e230819d1c7b60e721f43a"
   },
   "line17.json": {
-   "size": 5882476,
-   "sha256": "08abe922a019a748d42f0046d6d00aeb49b2e6d3c55069ef2aa78188d3fab7af"
+   "size": 6530640,
+   "sha256": "74c9c0d3ed89d82a50bb1fb1d2e6dfd405f18f1b152f4aadd99d215295ef4324"
   },
   "line17.signals.json": {
    "size": 36489,
