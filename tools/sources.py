@@ -77,7 +77,8 @@ SOURCES = {
 LAYERS = {
     "terrain": ("ipr-dtm", "dmr5g", "coarse"),
     "streets": ("zps", "dtmp", "osm"),  # areas and kerbs; OSM: road centre lines with widths
-    "tracks": ("dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); OSM reviewed gaps only
+    "tracks": ("ortho", "dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); the orthophoto only where the user took
+                                                          # it (truth.json photoTracks, #204); OSM reviewed gaps only
     "structures": ("zps", "mosty3d", "osm"),  # bridge decks (survey) over the model over OSM tags (#13)
     "furniture": ("dtmpoints", "osm", "rule:placement"),  # survey points over OSM over rules (#14)
     "buildings": ("lod2", "osm"),

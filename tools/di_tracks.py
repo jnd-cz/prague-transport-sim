@@ -35,6 +35,7 @@ INTERLACE = 0.05, 0.2, 10.0  # m: a branch running beside a track within 0.2 m f
                 # 5 cm or more, is interlaced track: the switch is at the branch's end, where it starts beside the
                 # track (Čechův most 13 cm for 28 m, Ohrada 12-13 cm for 51 m; a switch's branch is 0.2 m off within
                 # 4-9 m). The user, 2026-11-03: "the fork starts and ends well in front of/behind the road junction"
+PHOTO_COVER = 0.6  # m: an orthophoto track covers a source chain within this (Podolská vodárna: DI up to 0.34 m off)
 SECTION = 6.0   # m: a switch's two legs drawn as records this long or shorter from its tip (Dvorecký most: 4.7 m)
 TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the track at a record joint, the switch's tip
                 # lies this far back (the tongues DI draws: Ohrada, Dejvice 8.4-8.5 m, Chotkova 9 m; OSM's switches
@@ -495,7 +496,7 @@ class TrackGeometry:
     After construction: `at(node)` the node's position, `points(a, b)` the edge's points from a to b,
     `source(a, b)` {'src': 'di' | 'dtmp' | 'osm', 'records': [...]}, and `report` (counts and places)."""
 
-    def __init__(self, pos, edges, sources, tips=()):
+    def __init__(self, pos, edges, sources, tips=(), photo=None):
         self.orig = dict(pos)
         self.edges = {}
         adj = defaultdict(set)
@@ -527,6 +528,26 @@ class TrackGeometry:
                         self.edges[key] = (src, runs)
             self._by_ends(src, pos)
             self._no_branch(src, pos)
+        # 1b. a track measured on the orthophoto (data/truth.json photoTracks, `photo`) takes the edges matched to a
+        # source chain it covers (along 80 % of its length within PHOTO_COVER); not the tracks it only passes near
+        # at its ends (Podolská vodárna: its first 8 m run beside the straight track in Podolská)
+        if photo is not None:
+            lines = shapely.MultiLineString([c['line'] for c in photo.chains])
+            covered = {}
+            for key, hit in self.edges.items():
+                if hit is None:
+                    continue
+                for c, _, _ in hit[1]:
+                    if (id(hit[0]), c) not in covered:
+                        line = hit[0].chains[c]['line']
+                        n = max(2, int(line.length))
+                        near = sum(lines.distance(line.interpolate(line.length * i / n)) <= PHOTO_COVER for i in range(n + 1))
+                        covered[(id(hit[0]), c)] = near >= 0.8 * (n + 1)
+            for key, hit in self.edges.items():
+                if hit and all(covered[(id(hit[0]), c)] for c, _, _ in hit[1]):
+                    runs = photo.match(pos[key[0]], pos[key[1]])
+                    if runs:
+                        self.edges[key] = (photo, runs)
         # 2. node positions: a matched node moves onto its chain (a switch onto the source's fork when one is
         # within FORK), a node with only unmatched edges keeps OSM's position and takes up its neighbours' shift
         self.pos = {}
@@ -538,8 +559,9 @@ class TrackGeometry:
             if len(adj[n]) < 3:
                 continue
             hits = {m: self.edges[k(n, m)] for m in adj[n]}
-            src = next((h[0] for h in hits.values() if h), None)
-            if src is None or src.fork_tree is None:
+            # (the source of its edges that has forks: a branch taken from the orthophoto has none)
+            src = next((h[0] for h in hits.values() if h and h[0].fork_tree is not None), None)
+            if src is None:
                 continue
             ms = list(adj[n])
             dirs = [_unit((pos[m][0] - pos[n][0], pos[m][1] - pos[n][1])) for m in ms]
@@ -972,6 +994,27 @@ def switch_tips(truth=None):
         (nx, tx), (ny, ty) = frame.xy([f['near'][0], f['tip'][0]], [f['near'][1], f['tip'][1]])
         out.append(((float(nx), float(ny)), (float(tx), float(ty))))
     return out
+
+
+def photo_tracks(truth=None):
+    """Tracks measured on the orthophoto that the user took over DI's (data/truth.json trackSources.photoTracks, each
+    an exception), as source records in city metres."""
+    import json
+    from geo import Frame
+    path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    facts = json.loads(Path(path).read_text(encoding='utf-8'))['trackSources'].get('photoTracks', [])
+    frame, out = Frame(), []
+    for i, f in enumerate(facts):
+        xs, ys = frame.xy([p[0] for p in f['points']], [p[1] for p in f['points']])
+        out.append({'id': f'photo-{i}', 'coords': [(float(x), float(y), None) for x, y in zip(xs, ys)],
+                    'attrs': {}, 'sources': [], 'place': f['place']})
+    return out
+
+
+def photo_source():
+    """The orthophoto's tracks the user took over DI's as a source (TrackGeometry `photo`), or None."""
+    photo = photo_tracks()
+    return Source('ortho', photo) if photo else None
 
 
 def load_sources():

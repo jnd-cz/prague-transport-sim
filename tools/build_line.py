@@ -748,7 +748,7 @@ def main():
     track_srcs = [] if OSM_TRACKS else di_tracks.load_sources()
     if track_srcs:
         # interlaced track: OSM's one way from the switch to where the tracks part becomes one per track (#204)
-        added = di_tracks.split_interlaced(tways, [path_ids, bids], allpos, track_srcs[0].interlaced)
+        added = di_tracks.split_interlaced(tways, [path_ids, bids], allpos, next(s for s in track_srcs if s.name == 'di').interlaced)
         for n, how in added.items():
             if how[0] == "copy":
                 ll = lls[how[1]]
@@ -769,7 +769,8 @@ def main():
         print(f"interlaced track: {sum(h[0] == 'between' for h in added.values())} tip nodes added, "
               f"{sum(h[0] == 'copy' for h in added.values())} nodes copied")
     edges = {(a, b) for ids in (path_ids, bids, *[w["nodes"] for w in tways]) for a, b in zip(ids, ids[1:])}
-    geo = di_tracks.TrackGeometry(allpos, edges, track_srcs, di_tracks.switch_tips() if track_srcs else ())
+    geo = di_tracks.TrackGeometry(allpos, edges, track_srcs, di_tracks.switch_tips() if track_srcs else (),
+                                  di_tracks.photo_source() if track_srcs else None)
     if not OSM_TRACKS:
         geo.fit_curves()   # smooth curves through the points, continuous at every node (#204)
     print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k not in ('fill', 'curve')})}")
@@ -1279,11 +1280,11 @@ def main():
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
     one = sources.single
-    by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("di", "dtmp", "osm")]
+    by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("ortho", "di", "dtmp", "osm")]
     out["provenance"] = sources.stamp("build_line.py", {
         "path": sources.entry("tracks", by(track_source["path"]), "m"),
         "pathBack": sources.entry("tracks", by(track_source["pathBack"]), "m"),
-        "tracks": sources.entry("tracks", [sum(t["src"] == k for t in track_lines) for k in ("di", "dtmp", "osm")], "chains"),
+        "tracks": sources.entry("tracks", [sum(t["src"] == k for t in track_lines) for k in ("ortho", "di", "dtmp", "osm")], "chains"),
         "switches": one("tracks", "osm", len(switches)),
         "bridges": one("structures", "osm", len(bridges), "route ranges"),
         "tunnels": one("structures", "osm", len(tunnels), "route ranges"),

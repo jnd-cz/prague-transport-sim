@@ -87,6 +87,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   19.8 m along it); interlaced track (below), where the switch is the branch's start, not where it leaves. At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
   switches lie up to 7.4 m from DI's forks along the track (Jiráskovo náměstí; the user's answers of
   2026-11-03), and OSM and DI can disagree on which leg is the straight one in a curved switch (Křižovnická).
+- **DI can be off the rails by more than its class** (#204): Podolská vodárna's north curve (50.0591 N 14.4195 E)
+  runs 19-34 cm inside the rails measured on the orthophoto over 14 m and reads 14.6 m over 5 m (16.4 m in the
+  state of 2026-09-30, the archive 16.2 m); the rails read 18.3-20.1 m over 6 m. The south curve there agrees with
+  its rails within 9 cm. The track there is taken from the photo (`data/truth.json` `photoTracks`).
 - **DI draws some switches as a section** (#204): both legs as records from the tip to a joint 4-5 m on, where
   the track and the branch go on (48 in the 16 districts, Dvorecký most's of 2026-10-07 among them). The legs are
   apart only beyond the joint, so the fork of record ends lies there; the tip is where both legs start. At

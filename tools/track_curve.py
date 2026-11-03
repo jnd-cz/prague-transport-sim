@@ -28,6 +28,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 TOL = 0.02         # m: the curve within this of every surveyed point (DI, the archive)
 FILL_TOL = 0.3     # m: of OSM's nodes where neither has the track
+PHOTO_TOL = 0.05   # m: of track centres measured on the orthophoto (Podolská vodárna: 1.6-2.7 cm rms about a smooth
+                   # curve; held within TOL the curve followed that scatter, 10 m over 2 m)
+SURVEYED = ('di', 'dtmp', 'ortho')   # sources whose points the curve keeps within TOL (ortho: data/truth.json photoTracks)
 UNCLASSED = '3'    # the accuracy class of surveyed records that state none (the archive): the DTM's own minimum
                    # (data/truth.json `sourceAccuracy`, the decree's § 3 odst. 7)
 FILL_LIMIT = 0.5   # m: a fill point's tolerance grows at most to this (OSM against DI: p90 0.45 m at line 17's nodes)
@@ -301,7 +304,7 @@ class Network:
             if ra != rb:
                 key = k(ra, rb)
                 src = kind.get((a, b), 'osm')
-                lim = (limit or {}).get((a, b)) or errors[UNCLASSED] if src in ('di', 'dtmp') else FILL_LIMIT
+                lim = (limit or {}).get((a, b)) or errors[UNCLASSED] if src in SURVEYED else FILL_LIMIT
                 edges[key] = (list(p) if key == (ra, rb) else list(p[::-1]), src, lim)
                 adj[ra].add(rb)
                 adj[rb].add(ra)
@@ -397,29 +400,34 @@ class Network:
             pts_c, tol, lim, node_at = [], [], [], []
             for i, (a, b) in enumerate(zip(seq, seq[1:])):
                 line, src, l = along(a, b), edges[k(a, b)][1], edges[k(a, b)][2]
-                t = TOL if src in ('di', 'dtmp') else FILL_TOL
+                t = PHOTO_TOL if src == 'ortho' else TOL if src in SURVEYED else FILL_TOL
+                # (on a track measured on the orthophoto only the measured centres are data: a node there is OSM's
+                # projected onto its chords, 0.3 m inside the arc at Podolská vodárna)
+                photo = src == 'ortho'
                 if i == 0:
                     pts_c.append(line[0])
-                    tol.append(None if t == TOL and (a, k(a, b)) in loose else t)
+                    tol.append(None if photo or t == TOL and (a, k(a, b)) in loose else t)
                     lim.append(l)
                     node_at.append(0)
                 else:
                     lim[-1] = min(lim[-1], l)   # (a node between two edges: the stricter limit)
                     if t == TOL:
                         tol[-1] = None if tol[-1] is None or (a, k(a, b)) in loose else TOL
+                    elif photo:
+                        tol[-1] = None
                 for q in line[1:-1]:
                     pts_c.append(q)
                     tol.append(t)
                     lim.append(l)
                 pts_c.append(line[-1])
-                tol.append(None if t == TOL and (b, k(a, b)) in loose else t)
+                tol.append(None if photo or t == TOL and (b, k(a, b)) in loose else t)
                 lim.append(l)
                 node_at.append(len(pts_c) - 1)
             # where this track's records meet with a gap at a node (a branch DI starts 0.21 m off the through track's
             # line, Strossmayerovo náměstí), its points within GAP_REACH of it may move by the gap besides their class
             for j, n in enumerate(seq):
                 gap = max([loose.get((n, k(n, m)), 0.0) for m in (seq[j - 1] if j else None, seq[j + 1] if j + 1 < len(seq) else None)
-                           if m is not None and edges[k(n, m)][1] in ('di', 'dtmp')] or [0.0])
+                           if m is not None and edges[k(n, m)][1] in SURVEYED] or [0.0])
                 if 0.0 < gap <= GAP_MAX:
                     i0 = node_at[j]
                     for i in range(len(pts_c)):
@@ -475,7 +483,10 @@ class Network:
                 d = (d[0] * inward, d[1] * inward)
                 t0 = max(node[n]['dirs'], key=lambda t: abs(d[0] * t[0] + d[1] * t[1]))
                 dot = d[0] * t0[0] + d[1] * t0[1]
-                if abs(dot) >= math.cos(math.radians(START)):
+                # (a track measured on the orthophoto always joins tangent: the user, "try to join smootly on both
+                # ends if possible (smallest angle)"; its points start metres from the switch)
+                photo = edges[k(n, seq[1] if j == 0 else seq[-2])][1] == 'ortho'
+                if abs(dot) >= math.cos(math.radians(START)) or photo:
                     sg = 1 if dot > 0 else -1
                     heading[node_at[j]] = (sg * t0[0], sg * t0[1])
             samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim)

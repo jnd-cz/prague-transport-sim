@@ -25,6 +25,13 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   onto their switch machine covers and OSM's switches (0.09-0.13 m off).
 - Where DI starts the branch already 13 cm off at a record joint, the tip is `TONGUE` = 8.5 m back (the tongues
   DI draws elsewhere are 8.4-9 m; Čechův most's OSM switches lie 8.0 and 8.8 m back).
+- **Places the user corrects** (`data/truth.json` `trackSources`): a switch tip (`switchTips`: the switch takes the
+  point of its through track nearest a mark, Podolská vodárna's eastern switch at the archived map's manhole, 3.3 m
+  from DI's fork) and, as an exception, a track measured on the orthophoto (`photoTracks`: Podolská vodárna's north
+  curve, where DI's line is 19-34 cm off the rails and reads 14.6 m over 5 m). The measured track takes the edges
+  matched to a source chain it covers, joins both switches tangent, its centres held within 5 cm (`PHOTO_TOL`, their
+  scatter is 1.6-2.7 cm) and OSM's nodes on it not data. The curve: 17.9 m over 5 m, 3.5 cm from the rails (median);
+  the rails' western half alone reads 17.9 m.
 - **OSM's shared interlaced way is split** (`di_tracks.split_interlaced`, called by the build before matching):
   OSM draws one way from the switch to where the tracks part. The stretch from the tip to that junction is
   doubled and the copy carries the leg on the branch's side, so each track matches its own DI record, the switch

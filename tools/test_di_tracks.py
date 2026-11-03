@@ -155,6 +155,18 @@ class Pairing(unittest.TestCase):
         geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di], tips=[((50.5, 0.2), (46.7, -1.65))])
         self.assertLess(math.dist(geo.at(2), (46.7, 0)), 1e-6)
 
+    def test_a_track_measured_on_the_orthophoto_takes_its_edge_and_the_switch_keeps_dis_fork(self):
+        # Podolská vodárna (data/truth.json photoTracks): DI's curve is 0.3 m off the rails; the measured curve is
+        # drawn instead, the switch still on DI's fork
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (120, 0)]),
+                              rec(3, [(x, y + 0.3 * (x > 51)) for x, y in turnout(50)])])
+        photo = dt.Source('ortho', [rec(9, turnout(50))])
+        pos = {1: (0, 0.2), 2: (51, 0.2), 3: (120, 0.2), 4: turnout(50)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di], photo=photo)
+        self.assertEqual(geo.source(2, 4)['src'], 'ortho')
+        self.assertEqual(geo.source(1, 2)['src'], 'di')
+        self.assertLess(math.dist(geo.at(2), (50, 0)), 1e-6)
+
     def test_a_fork_facing_the_other_way_is_not_the_switch(self):
         # a fork 6 m on whose branch leaves backwards: another switch
         back = [(56 - x, y) for x, y in [(p[0] - 50, p[1]) for p in turnout(50)]]
