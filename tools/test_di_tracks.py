@@ -59,7 +59,7 @@ class Matching(unittest.TestCase):
         self.assertLess(max(abs(p[1]) for p in geo.points(1, 2)), 1e-6)
 
     def test_a_chord_between_both_tracks_takes_the_track_its_neighbours_are_on(self):
-        # Národní divadlo: a 60 m OSM edge cuts between the two tracks, 1-2 m from each
+        # Křižovnická: a 60 m OSM edge cuts between the two tracks, 1-2 m from each
         a = arc(0, -100, 100, math.radians(80), math.radians(120), 60)
         b = arc(0, -100, 96.5, math.radians(80), math.radians(120), 60)
         di = dt.Source('di', [rec(1, a), rec(2, b)])

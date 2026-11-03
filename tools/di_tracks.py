@@ -34,7 +34,7 @@ DUPLICATE = 0.2    # m: a record joining the same two places as another, never f
 FORK_MIN, FORK_OUT, FORK_APART = 3.0, 8.0, 0.3  # m: a fork's branches (records this long) are this far apart
                                                 # this far out
 CONTEXT = 4.0  # m: an unmatched stretch between two matched nodes takes the chain its ends lie on within this
-               # (Národní divadlo: OSM draws a 60 m chord of the curve between both tracks, 1-2 m from each;
+               # (Křižovnická: OSM draws a 60 m chord of the curve between both tracks, 1-2 m from each;
                # its neighbours fix which track it is)
 
 

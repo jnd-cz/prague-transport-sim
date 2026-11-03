@@ -204,9 +204,9 @@ route as before. A track only one source has is not added: depots are #35.
 - **Matching**: each stretch of OSM edges between switches is matched as one: every 2 m sample within 2 m of
   a source chain, at most 30° off its direction, with the least summed distance; the chain changes only
   where one continues another, within 4 m of their joint. Near a switch both tracks lie within centimetres
-  and an edge alone may lie nearer the other one (Národní divadlo north). An edge its stretch could not take
+  and an edge alone may lie nearer the other one (Staroměstská). An edge its stretch could not take
   is matched alone. A stretch still unmatched between matched nodes takes the chains its ends lie on within
-  4 m: OSM draws a 60 m chord of the curve at Národní divadlo between both tracks, and the neighbours fix
+  4 m: OSM draws a 60 m chord of the curve in Křižovnická between both tracks, and the neighbours fix
   which track it is. DI first; then the archived DTMP axes; then OSM, which takes up its neighbours' shift
   over 20 m.
 - **Nodes**: a switch takes the DI fork within 5 m that lies on its own chains (a crossover has a fork on
@@ -227,6 +227,13 @@ spacing`): 3.00–3.32 m before (`trackfix.js` moved 991 points), 3.489–3.517 
 review: `reports/review/track-sources-17.json` (`tools/track_sources.py`): the new track at 50.0502 N 14.4154 E
 that DI does not have yet (OSM, 202 m), 37 m from the archive at Kobylisy, three OSM switches without a DI
 fork and four DI forks without an OSM switch.
+
+**Křižovnická on the orthophoto** (between Karlovy lázně and Staroměstská, 50.0860–50.0871 N; IPR leaf-off
+2026, 0.1 m): averaged along 20 m, the brightness across the street dips at the rails, and the dips lie on
+DI's rails within ~0.1 m (−0.8 / +0.75 / +2.35 / +3.8 m against DI's −0.72 / +0.72 / +2.30 / +3.74). OSM has the
+pair 4.2 m apart and up to 3 m west, with no dip at its outer rails. Line 17's GTFS shapes are one line per
+direction on the double track's midline, and they follow OSM's midline to p50 0.04 m / p90 0.13 m (DI's:
+0.14 / 0.42 m): generated from OSM, so they are no independent check of DI.
 
 ## Inspectable comparisons and sources
 
