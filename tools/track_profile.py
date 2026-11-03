@@ -116,19 +116,20 @@ def _capped(s, z, w, cap, rows, f=None, u=None, y=None):
     return f,u,y
 
 
-def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05):
+def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05, pin_weight=1e6):
     """Heights along one track (s ascending, metres) bent least so that no change of grade is tighter than
     rmin (a number or one per point). weight: confidence per point (0 drops it), pins: indices held fixed (a
-    junction's height, a reviewed DI point). scale: the noise the curve may ignore, Tukey's c = 4.685 scale;
-    a point further off than c after a round no longer pulls the curve.
+    junction's height, a reviewed DI point) with pin_weight, never dropped as outliers. scale: the noise the curve
+    may ignore, Tukey's c = 4.685 scale; a point further off than c after a round no longer pulls the curve.
     Returns the heights, per point what was moved (> 2 cm) for the log, and the tightest radius left."""
     n = len(s)
     if n < 3:
         return {'z':list(z),'moved':[],'min_radius':math.inf}
     rmin = [rmin]*n if isinstance(rmin,(int,float)) else list(rmin)
     base = [1.0]*n if weight is None else [float(x) for x in weight]
-    for i in pins:
-        base[i] = 1e6
+    pinned = set(pins)
+    for i in pinned:
+        base[i] = pin_weight
     rows, cap = _second(s), [1/r for r in rmin[1:-1]]
     w, state, c = list(base), (None,None,None), 4.685*scale
     # A robust start: a plain first round bent the whole curve towards one bad record (Malovanka, an 83 m spike
@@ -136,12 +137,13 @@ def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05):
     # 2c from the median of its 11 neighbours starts without a pull; the rounds below may bring it back.
     for i in range(n):
         near = sorted(z[max(0,i-5):i+6])
-        if abs(z[i]-near[len(near)//2]) > 2*c:
+        if abs(z[i]-near[len(near)//2]) > 2*c and i not in pinned:
             w[i] = 1e-4*base[i]
     for _ in range(ROBUST):
         f,u,y = _capped(s,z,w,cap,rows,*state)
         state = (f,u,y)
-        nw = [base[i]*((1-((z[i]-f[i])/c)**2)**2 if abs(z[i]-f[i]) < c else 1e-4*base[i]) for i in range(n)]
+        nw = [base[i] if i in pinned else base[i]*((1-((z[i]-f[i])/c)**2)**2 if abs(z[i]-f[i]) < c else 1e-4*base[i])
+              for i in range(n)]
         if max(abs(a-b) for a,b in zip(nw,w)) < .01:
             break
         w = nw

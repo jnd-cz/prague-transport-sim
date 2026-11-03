@@ -73,6 +73,7 @@ class Source:
                 break
             recs = [r for i, r in enumerate(recs) if i not in drop]
         self.duplicates = len(paths) - len(recs)
+        self.records = [p for p, _ in recs]  # (the paths kept: tools/line_heights.py chains them for heights)
         members = defaultdict(list)
         for i in range(len(ends)):
             members[root(i)].append(i)

@@ -1,0 +1,129 @@
+"""Tests of the top-of-rail assembly (tools/line_heights.py, #197) on synthetic chains:
+python -P -E tools/test_line_heights.py"""
+import contextlib
+import io
+import math
+from pathlib import Path
+import sys
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import line_heights as lh  # noqa: E402
+
+
+def chain(xy, z, kind='paved', terrain=None):
+    """A Chain along the polyline xy with a staged height z(s) (None: held) every 5 m bin."""
+    c = lh.Chain(xy, [])
+    for b in range(int(c.length // lh.BIN) + 1):
+        s = min((b + .5) * lh.BIN, c.length)
+        h = z(s)
+        p = c.line.interpolate(s)
+        c.bins.append({'s': s, 'z': h, 'w': 0.0 if h is None else 1.0, 'src': None if h is None else 'dtmp',
+                       'kind': kind, 'terrain': terrain(s) if terrain else None, 'xy': (p.x, p.y), 'flags': []})
+    return c
+
+
+def arc(x0, y0, r, a0, a1, n=40):
+    return [(x0 + r * math.cos(a0 + (a1 - a0) * k / n), y0 + r * math.sin(a0 + (a1 - a0) * k / n)) for k in range(n + 1)]
+
+
+def quiet(f, *a):
+    with contextlib.redirect_stdout(io.StringIO()):
+        return f(*a)
+
+
+class Assembly(unittest.TestCase):
+    def test_fork_takes_the_through_tracks_height(self):
+        # a turnout leaving a 1 % grade, its own data 0.2 m higher: its end takes the through track's height
+        through = chain([(0, 0), (300, 0)], lambda s: 100 + .01 * s)
+        branch = chain([(100, 0)] + arc(100, 50, 50, -math.pi / 2, 0)[1:], lambda s: 101.2 + .01 * s)
+        summary = quiet(lh.assemble, [through, branch])
+        self.assertLess(abs(branch.z_at(0)[0] - through.z_at(100)[0]), .01)
+        self.assertEqual(summary['over_1cm'], 0)
+
+    def test_crossing_at_grade_shares_one_height(self):
+        a = chain([(0, 0), (200, 0)], lambda s: 100.0)
+        b = chain([(100, -100), (100, 100)], lambda s: 100.06)
+        summary = quiet(lh.assemble, [a, b])
+        self.assertLess(abs(a.z_at(100)[0] - b.z_at(100)[0]), .01)
+        self.assertEqual(summary['crossings_apart'], [])
+
+    def test_track_over_another_is_not_pinned(self):
+        a = chain([(0, 0), (200, 0)], lambda s: 100.0)
+        b = chain([(100, -100), (100, 100)], lambda s: 106.0)
+        summary = quiet(lh.assemble, [a, b])
+        self.assertGreater(abs(a.z_at(100)[0] - b.z_at(100)[0]), 5)
+        self.assertEqual(len(summary['crossings_apart']), 1)
+
+    def test_a_hold_over_60_m_cuts_the_profile(self):
+        c = chain([(0, 0), (300, 0)], lambda s: None if 100 < s < 190 else 100 + .005 * s)
+        quiet(lh.assemble, [c])
+        self.assertEqual(len(c.runs), 2)
+        self.assertEqual(len(c.held), 1)
+        self.assertIsNone(c.z_at(145)[0])
+        short = chain([(0, 0), (300, 0)], lambda s: None if 100 < s < 140 else 100 + .005 * s)
+        quiet(lh.assemble, [short])
+        self.assertEqual(len(short.runs), 1)
+        self.assertAlmostEqual(short.z_at(120)[0], 100.6, delta=.02)  # (bridged by the curve)
+        self.assertEqual(short.z_at(120)[1], 'curve')
+
+    def test_a_tight_sag_the_terrain_confirms_is_followed(self):
+        # -6 % into +6 % along a 100 m radius (the street's is 500 m), the terrain the same: followed, listed
+        def z(s):
+            if s < 94:
+                return 100 - .06 * s
+            if s < 106:
+                return 100 - .06 * s + (s - 94) ** 2 / 200
+            return 100 - .06 * 106 + 144 / 200 + .06 * (s - 106)
+        c = chain([(0, 0), (200, 0)], z, terrain=z)
+        quiet(lh.assemble, [c])
+        worst = max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins)
+        self.assertLess(worst, lh.MISS)
+        self.assertTrue(c.tight)
+
+    def test_a_lone_bump_is_dropped(self):
+        c = chain([(0, 0), (200, 0)], lambda s: 100.5 if abs(s - 102.5) < 1 else 100.0)
+        quiet(lh.assemble, [c])
+        self.assertLess(abs(c.z_at(102.5)[0] - 100), .05)
+        self.assertFalse(c.tight)
+
+
+class Lines(unittest.TestCase):
+    def test_a_line_past_a_fork_has_no_step(self):
+        through = chain([(0, 0), (300, 0)], lambda s: 100 + .01 * s)
+        branch = chain([(100, 0)] + arc(100, 50, 50, -math.pi / 2, 0)[1:], lambda s: 101.0 + .01 * s)
+        quiet(lh.assemble, [through, branch])
+        path = [(0, 0), (100, 0)] + arc(100, 50, 50, -math.pi / 2, 0)[1:]
+        zs, srcs, _ = lh.Lookup([through, branch]).along(path)
+        self.assertTrue(all(z is not None for z in zs))
+        steps = [abs(b - a) for a, b in zip(zs, zs[1:])]
+        self.assertLess(max(steps), .025)  # (2 m at grades of 1 %: no jump between the two tracks)
+
+    def test_the_opposite_track_beside_ours(self):
+        path = [(0, 0), (100, 0)]
+        back = [(100, 3.5), (0, 3.5)]
+        off, zs = lh.across(path, back, [200.0 + .01 * k for k in range(51)])
+        self.assertTrue(all(abs(o - 3.5) < 1e-6 for o in off))
+        self.assertAlmostEqual(zs[0], 200.5, places=3)  # (our s 0 is the opposite track's s 100)
+
+    def test_a_track_ending_on_another_takes_its_height(self):
+        through = {'p': [[0, 0], [40, 0]], 'zs': [100 + .02 * 2 * k for k in range(21)]}
+        branch = {'p': [[20, .3], [40, 10]], 'zs': [100.43 + .01 * k for k in range(13)]}
+        lh.join_ends([through, branch])
+        self.assertAlmostEqual(branch['zs'][0], 100.4, places=3)  # (the through track's height at x 20)
+        self.assertAlmostEqual(branch['zs'][-1], 100.43 + .12, places=3)  # (its far end, free, unchanged)
+
+    def test_ends_meeting_only_each_other_take_their_mean(self):
+        a = {'p': [[0, 0], [20, 0]], 'zs': [100.0] * 11}
+        b = {'p': [[20, .2], [40, 5]], 'zs': [100.04] * 12}
+        lh.join_ends([a, b])
+        self.assertAlmostEqual(a['zs'][-1], 100.02, places=3)
+        self.assertAlmostEqual(b['zs'][0], 100.02, places=3)
+
+    def test_ranges(self):
+        self.assertEqual(lh.ranges(['di', 'di', 'dtmp', 'dtmp', 'surface']),
+                         [[0, 3.0, 'di'], [3.0, 7.0, 'dtmp'], [7.0, 8, 'surface']])
+
+
+if __name__ == '__main__':
+    unittest.main()

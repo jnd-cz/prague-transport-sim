@@ -70,6 +70,11 @@ SOURCES = {
     "rule:assumed": Source("a default value (no data)", None, "", "", ""),
     "rule:placement": Source("placement rules (spacing, offsets from tracks and kerbs)", None, "", "", ""),
     "rule:curvature": Source("limits from track curvature and switches", None, "", "", ""),
+    "truth": Source("the user's answers and facts (data/truth.json, each with its quote)", None, "", "", ""),
+    "rule:curve": Source("the vertical profile's curve across a held stretch up to 60 m (tools/line_heights.py)", None,
+                         "", "", ""),
+    "rule:surface": Source("the surveyed surface or terrain under the track plus its style's offset (in the game)",
+                           None, "", "", ""),
 }
 
 # Each layer's sources, preferred first. Levels not built yet stay in the chain: a file's counts show
@@ -78,6 +83,9 @@ LAYERS = {
     "terrain": ("ipr-dtm", "dmr5g", "coarse"),
     "streets": ("zps", "dtmp", "osm"),  # areas and kerbs; OSM: road centre lines with widths
     "tracks": ("dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); OSM reviewed gaps only
+    # top of rail (#197): numeric DI, the archive, the user's reviewed spans, survey plus the style fact, the curve
+    # across a short hold; where none, the game's surface profile
+    "heights": ("dtm-di", "dtmp-tracks", "truth", "zps", "rule:curve", "rule:surface"),
     "structures": ("zps", "mosty3d", "osm"),  # bridge decks (survey) over the model over OSM tags (#13)
     "furniture": ("dtmpoints", "osm", "rule:placement"),  # survey points over OSM over rules (#14)
     "buildings": ("lod2", "osm"),
