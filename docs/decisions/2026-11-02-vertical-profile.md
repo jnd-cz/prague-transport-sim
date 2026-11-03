@@ -103,3 +103,63 @@ Assemble one profile per track chain across all lines and directions, smooth it 
 radius by construction (paved street 500 m, open track 1000 m, unknown 500 m) and 1000 m through switches; pin a
 junction's height so the tracks that meet there share it; hold the `steps`. The Gaussian in `src/world.js` then
 goes.
+
+## Assembly in the build (#197, 2026-11-03)
+
+`tools/line_heights.py` does the above for the game; `tools/rebuild.py` runs it after the lines' steps (it reads
+every line's survey sidecar). It stages the heights with the user's answers as span evidence
+(`track_span_evidence.py` from `data/truth.json`, in the same process), bins them every 5 m along the DI
+through-chains (`chains`, copies dropped as in `tools/di_tracks.py`: 656 chains, 66,820 bins on 2026-11-03) and
+writes into the line data the heights of path and pathBack every 2 m (`heights`, `heightSource`), the opposite
+track beside the path (`backOff`, `backZ`), each drawn track's `zs`, and the staged heights the check compares
+with (`heights.staged`).
+
+- **Radius by construction:** 500 m on paved street and where it is unknown, 1000 m on open track, in a turnout
+  (from the fork 15 m into the diverging track on both tracks, 3 m behind it) and 5 m either side of a diamond
+  crossing. A 20 m zone around every junction first held a 430 m sag at Nádraží Holešovice to 1000 m.
+- **Junctions, longest track first:** a chain meeting one already solved is pinned to its height there: a fork
+  (the diverging end on the through track), a crossing within 1 m of height, ends meeting each other, and two
+  tracks whose meets with a third lie within 2 m of each other along it (two track ends 0.65 m apart near Ke Stírce,
+  9 cm apart in height). At one spot a fork's or crossing's own point wins over ends nearby (on a 4 % grade the
+  end of a third track 0.5 m off was 4 cm higher), then the longer track. A pin weighs 1000 and is never dropped
+  as an outlier (`vertical_profile(pin_weight=…)`; with 10⁶ the solver stopped short of the radius on 30 chains
+  after 3000 steps). Crossings each pinned to the mean of their two tracks first: their pins a few metres apart
+  and centimetres off along a junction's diamonds asked for radii of a few metres, 172 s for 7 chains.
+  2026-11-03: 1514 pinned meets, the largest difference 8.4 mm; no crossing over 1 m apart in the data.
+- **Where the rails must still join, the radius gives way:** near a pin the curve misses by over 1 cm, ×0.5 down
+  to ×0.1 within 50 m (29 junctions, all short connecting tracks: at Nádraží Holešovice a 55 m track pinned to
+  three longer ones would rise 8.6 % after 1.6 %).
+- **Where the data is tighter than the design radius, it is followed:** a stretch of 3 or more heights the
+  curve misses by over 0.3 m, which the 2023 terrain confirms (within 0.5 m) at grades a tram climbs (≤ 9 %), is
+  the track itself, not the archive on the ground under a deck (that falls metres steeper). The radius gives way
+  there ×0.5, then ×0.25, and the place is listed. Held to it, the curve left a 300 m sag at Malostranská and
+  Tukey dropped the whole stretch: the curve ran 1 m under data that the archive and the terrain shared to 2 cm.
+  2026-11-03: 6 places. On game routes: Malostranská (50.0905 N 14.4101 E, lines 22 and 23) and Královka
+  (50.0850 N 14.3809 E, line 23); off them: 50.0850 N 14.3792 E, 50.0939 N 14.3921 E, 50.1015 N 14.5041 E,
+  50.0728 N 14.5309 E. Line 17 has none.
+- **A short hold** starts on the straight line between its neighbours, at weight 0.001: at weight 0 the curve was
+  free to sag anywhere the radius allowed, 5 cm under a straight grade across 40 m.
+- **A line takes the heights of the chains under it,** weighted by how near each is within 1 m: past a fork both
+  tracks lie within centimetres and share the junction's height (picking one, the line jumped between them;
+  staying on one, it stepped where it let go). Its last sample sits at n × 2 m past its end, along the chain: the
+  game reads every sample at k × 2 m. Where a drawn track ends on another, its end takes that track's height,
+  fading out over 10 m (ends meeting only ends take their mean): a junction's short edges ended up to 0.3 m off
+  the track they join and were sampled 3 cm apart on a 2 % grade.
+
+2026-11-03: 0 steps over 1 m without a rule (`archive` 9, `dip` 12, `di` 6, `structure` 1, `terrain` 3); moved
+from the staged heights on runs without a step p50 0.0 / p90 0.019 / p99 0.079 m; 93 held stretches over 60 m
+(6,045 m), 48 of them (3,120 m) structures and tunnels. Line 17, path and pathBack 43,632 m: DI 18,656 m, archive
+22,120 m, the user's reviewed spans 2,054 m, curve 348 m, no height 454 m (the game's surface profile there: the
+archive and the survey disagree over 60 m and more between Čechův most and Strossmayerovo náměstí in both
+directions, 115 m past Staroměstská and between Přístaviště and Dvorce). Against the staged heights: p90 0.018 m
+(path), 0.027 m (pathBack).
+
+**The game** (`src/terrain.js` Profile): the route's profile is the data's; where it has none, the surface profile
+stays, shifted to meet it at both ends (linear between the two shifts). Across the street the profile runs
+linearly from our track to the opposite one and is level beyond them (`heightAt`, from `backOff` / `backZ`); the
+two directions differ by p50 0.03, p90 0.10, max 0.95 m on line 17, which the opposite track taking our height
+would have kept. `trackAt` (the oncoming trams, the drawn track near the route), the street flush, the street rows
+and the track support use it. A drawn track with `zs` takes them unsmoothed; the ±9 m Gaussian stays for tracks
+without (OSM or archive fill, lines not rebuilt). `python -P -E tools/headless.py --checks heights` measures the
+game's track against `heights.staged` (p90 ≤ 0.10 m per direction) and the drawn tracks where they meet (over
+1 cm apart: two heights).

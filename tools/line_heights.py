@@ -41,8 +41,8 @@ SWITCH, BEHIND, DIAMOND = 15.0, 3.0, 5.0  # m: the switch radius from a fork int
 NEAR_PIN = 1.5  # m: a bin this near a pinned point gives way to it
 RELAX, RELAX_REACH = (.5, .25), 50.0  # radius factors tried for a stretch of heights the curve misses, and how far
 JOIN_RELAX = (.5, .25, .1)            # they reach; near a pin it misses (the rails join there)
-NEAR_MEET = 2.0  # m: two tracks meeting a third this near each other along it meet each other too (Kobylisy: two
-                 # track ends 0.65 m apart on the loop's track, 9 cm apart in height, pinned it to both)
+NEAR_MEET = 2.0  # m: two tracks meeting a third this near each other along it meet each other too (Ke Stírce: two
+                 # track ends 0.65 m apart on a third track, 9 cm apart in height, pinned it to both)
 MAX_GRADE = 0.09  # the steepest tram track (the game's grade limiter, src/terrain.js; Hercovka - Kobylisy 8-8.8 %)
 HOLD_WEIGHT = 1e-3  # a held bin's pull towards the straight line across its hold
 PIN_MERGE = 0.5  # m: pinned points this near each other along a track are one (their mean)

@@ -82,6 +82,17 @@ What sessions learned and later work needs. Kept current and short; the full log
   fork. OSM differs from DI by p50 0.13 m / p90 0.45 m at line 17's nodes, but draws curves as chords up to
   2–3 m off (Křižovnická, where the orthophoto's rails lie on DI's), switches up to 5 m from DI's forks, and Kobylisy's pair 2.5–3.3 m apart (DI
   3.5 m). DI (state 2026-09-30) lacks the track OSM maps at 50.0502 N 14.4154 E (ways of 2025–26).
+- **DI's tracks at junctions** (#197): joined straightest through each fork, the 16 districts' DI is 656 tracks
+  with 955 forks and 575 crossings. At a crossing the two tracks' staged heights differ by p50 1.6 cm, p90 7 cm.
+  A junction is not one point: a fork's diverging end and its crossing with the through track lie 0.003–1.6 m
+  apart, the ends of a junction's short pieces up to 0.5 m apart (on a 4 % grade, 2–4 cm in height), and near
+  Ke Stírce a piece lies along another for 30 m under its own records (not caught as a copy: it does not join the
+  same two places).
+- **The robust smoother runs away where its radius is wrong** (#197): `vertical_profile` stops pulling towards
+  points it misses by more than 0.23 m (Tukey). Where the design radius cannot follow a real sag (Malostranská,
+  ~300 m, the archive and the terrain agreeing to 2 cm), it drops the whole stretch and runs 1–3 m under the data,
+  not 0.3 m. Points at weight 0 do not fix a curve either: across a 40 m hold it sagged 5 cm under the straight
+  grade (`tools/line_heights.py` starts held points on that line at weight 0.001).
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
