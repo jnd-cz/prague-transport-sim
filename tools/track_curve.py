@@ -60,6 +60,10 @@ START = 6.0        # degrees: a track ending at a node leaves tangent to the tra
                    # (113 ends on line 17: 96 within 4°, 9 at 8-40°); beyond, at its own angle (`switch-start`: some
                    # designs start abruptly), listed by tools/lint.js trackJoins
 LOOK = 3.0         # m along an edge for its direction at a node
+PAIR_LOOK = 10.0   # m along an edge, on through the next nodes straightest first, for which edges continue each other:
+                   # over LOOK a tangential switch's branch is still 9 cm off (Strossmayerovo náměstí, its eastern
+                   # track: the turn read 0.1° straighter than the straight, which DI bends 0.9° there, and the
+                   # straight was fitted as the branch, swinging ±8 cm); over 10 m the turn is 1.04 m off
 CROSS = 10.0       # degrees: two tracks passing one node at more than this cross there (else they touch)
 MERGE = 0.5        # m: nodes joined by a shorter edge are one
 CLEAR = 0.5        # m from an end node held by a track fitted before: no data points
@@ -325,14 +329,25 @@ class Network:
                 root[n] = root[root[n]]
                 n = root[n]
             return n
+        # (the node with more edges stays, and the absorbed node's edges start at its point: a switch on its fork,
+        # not OSM's next node on its branch 0.21 m off, which bent the straight track 8 cm at Strossmayerovo náměstí)
+        degree = defaultdict(int)
+        for a, b in pts:
+            degree[a] += 1
+            degree[b] += 1
         for (a, b), p in pts.items():
             if sum(math.dist(x, y) for x, y in zip(p, p[1:])) < MERGE:
-                root[find(a)] = find(b)
+                ra, rb = find(a), find(b)
+                if ra != rb:
+                    keep, gone = (ra, rb) if degree[ra] >= degree[rb] else (rb, ra)
+                    root[gone] = keep
+                    degree[keep] += degree[gone]
         errors = class_errors()
         adj, edges = defaultdict(set), {}
         for (a, b), p in pts.items():
             ra, rb = find(a), find(b)
             if ra != rb:
+                p = [pos[ra] if a != ra else p[0], *p[1:-1], pos[rb] if b != rb else p[-1]]
                 key = k(ra, rb)
                 src = kind.get((a, b), 'osm')
                 lim = (limit or {}).get((a, b)) or errors[UNCLASSED] if src in SURVEYED else FILL_LIMIT
@@ -355,11 +370,32 @@ class Network:
             l = math.dist(p[0], q) or 1.0
             return ((q[0] - p[0][0]) / l, (q[1] - p[0][1]) / l)
 
+        def reach(n, m):
+            """The direction from n to the point PAIR_LOOK on along edge n-m, then the straightest edge at each node."""
+            pts, prev, cur, seen = list(along(n, m)), n, m, {n, m}
+            while sum(math.dist(a, b) for a, b in zip(pts, pts[1:])) < PAIR_LOOK:
+                d0 = direction(cur, prev)
+                nxt = [x for x in adj[cur] if x not in seen]
+                if not nxt:
+                    break
+                x = max(nxt, key=lambda x: -(d0[0] * direction(cur, x)[0] + d0[1] * direction(cur, x)[1]))
+                pts += along(cur, x)[1:]
+                prev, cur = cur, x
+                seen.add(x)
+            d, q = 0.0, pts[-1]
+            for a, b in zip(pts, pts[1:]):
+                d += math.dist(a, b)
+                if d >= PAIR_LOOK:
+                    q = b
+                    break
+            l = math.dist(pts[0], q) or 1.0
+            return ((q[0] - pts[0][0]) / l, (q[1] - pts[0][1]) / l)
+
         # at every node the straightest pairs of edges continue each other
         pair = {}
         for n, ms in adj.items():
             ms = list(ms)
-            dirs = {m: direction(n, m) for m in ms}
+            dirs = {m: reach(n, m) if len(ms) > 2 else direction(n, m) for m in ms}
             limit = PAIR_TWO if len(ms) == 2 else PAIR
             cands = []
             for i, a in enumerate(ms):

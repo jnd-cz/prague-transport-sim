@@ -134,12 +134,29 @@ class Matching(unittest.TestCase):
         self.assertEqual(geo.report['reversed_edges'], 0)
 
 
+    def test_the_straight_between_two_switches_takes_the_straight_beyond(self):
+        # Strossmayerovo náměstí: the 4.6 m between two switches lay nearer DI's branch 0.2 m beside the straight;
+        # matched with its continuation, it takes the straight, which the branch does not reach
+        right = [(50 + 50 * math.sin(k / 12 * 0.4), -50 * (1 - math.cos(k / 12 * 0.4))) for k in range(13)]
+        left = [(54.6 + 50 * math.sin(k / 12 * 0.4), 50 * (1 - math.cos(k / 12 * 0.4))) for k in range(13)]
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (54.6, 0)]), rec(3, [(54.6, 0), (120, 0)]),
+                              rec(4, right), rec(5, left)])
+        pos = {1: (0, 0.05), 2: (50, 0.05), 3: (54.6, -0.19), 4: (120, 0.05), 5: right[-1], 6: left[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (3, 4), (2, 5), (3, 6)], [di])
+        self.assertLess(max(abs(y) for _, y in geo.points(2, 3)), 0.02)
+
 def turnout(x0, side=1, n=12):
     """A branch leaving the x axis at x0 on a 50 m radius to the left (side 1) or right (-1), 20 m long."""
     return [(x0 + 50 * math.sin(k / n * 0.4), side * 50 * (1 - math.cos(k / n * 0.4))) for k in range(n + 1)]
 
 
 class Pairing(unittest.TestCase):
+    def test_which_side_a_branch_leaves_to(self):
+        a = lambda deg: (math.cos(math.radians(deg)), math.sin(math.radians(deg)))
+        self.assertEqual(dt.branch_side([a(180), a(0), a(5)]), 1)
+        self.assertEqual(dt.branch_side([a(180), a(0), a(-5)]), -1)
+        self.assertEqual(dt.branch_side([a(180), a(0), a(0.5)]), 0)
+
     def test_a_switch_takes_its_fork_on_the_same_track_up_to_15_m(self):
         # Jiráskovo náměstí (s 12,941): DI's fork 7.3 m from OSM's switch, "likely a bit further than 5m"
         di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (120, 0)]), rec(3, turnout(50))])

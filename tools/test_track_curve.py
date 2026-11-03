@@ -95,6 +95,20 @@ class Network(unittest.TestCase):
         self.assertGreater(math.degrees(heading(out[::-1], d=10.0)) % 180, 3.5)
         self.assertLess(math.dist(net.pos[2], (50, 0)), tc.TOL + 0.005)
 
+    def test_the_straight_continues_through_a_switch_whose_branch_starts_tangent(self):
+        # Strossmayerovo náměstí: DI bends the straight 0.9° at the switch, and over 3 m the branch (here R 150 m,
+        # 0.57° off) reads straighter than it; over PAIR_LOOK the straight continues, within 2 cm of its points
+        south = [(-50 + 2 * k, 0.0) for k in range(26)]
+        north = [(x * math.cos(math.radians(0.9)), x * math.sin(math.radians(0.9))) for x in range(0, 51, 2)]
+        branch = [(150 * math.sin(k / 20 * 0.2), -150 * (1 - math.cos(k / 20 * 0.2))) for k in range(21)]
+        pos = {1: south[0], 2: (0.0, 0.0), 3: north[-1], 4: branch[-1]}
+        net = tc.Network(pos, {(1, 2): south, (2, 3): north, (2, 4): branch}, {(1, 2): 'di', (2, 3): 'di', (2, 4): 'di'})
+        straight = net.pts[(1, 2)] + net.pts[(2, 3)][1:]
+        self.assertLess(max(off(p, straight) for p in south + north), tc.TOL + 0.005)
+        h_in = heading(net.pts[(1, 2)], at_start=False) + math.pi
+        h_out = heading(net.pts[(2, 3)])
+        self.assertLess(abs(math.degrees(h_out - h_in)), 0.5)
+
     def test_a_branch_starting_at_its_own_angle_keeps_it(self):
         # beyond START the branch leaves at its own angle (data/truth.json `switch-start`: some designs start abruptly)
         through = [(x, 0.0) for x in range(0, 101, 2)]
