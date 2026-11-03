@@ -82,14 +82,56 @@ What sessions learned and later work needs. Kept current and short; the full log
   fork. OSM differs from DI by p50 0.13 m / p90 0.45 m at line 17's nodes, but draws curves as chords up to
   2–3 m off (Křižovnická, where the orthophoto's rails lie on DI's), switches up to 5 m from DI's forks, and Kobylisy's pair 2.5–3.3 m apart (DI
   3.5 m). DI (state 2026-09-30) lacks the track OSM maps at 50.0502 N 14.4154 E (ways of 2025–26).
+- **DI draws a switch three ways** (#204): records ending together and leaving apart (a fork of record ends);
+  a branch ending on the middle of a through record that is not split there (Palackého náměstí, the branch
+  19.8 m along it); interlaced track (below), where the switch is the branch's start, not where it leaves. At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
+  switches lie up to 7.4 m from DI's forks along the track (Jiráskovo náměstí; the user's answers of
+  2026-11-03), and OSM and DI can disagree on which leg is the straight one in a curved switch (Křižovnická).
+- **DI can be off the rails by more than its class** (#204): Podolská vodárna's north curve (50.0591 N 14.4195 E)
+  runs 19-34 cm inside the rails measured on the orthophoto over 14 m and reads 14.6 m over 5 m (16.4 m in the
+  state of 2026-09-30, the archive 16.2 m); the rails read 18.3-20.1 m over 6 m. The south curve there agrees with
+  its rails within 9 cm. The track there is taken from the photo (`data/truth.json` `photoTracks`).
+- **DI draws some switches as a section** (#204): both legs as records from the tip to a joint 4-5 m on, where
+  the track and the branch go on (48 in the 16 districts, Dvorecký most's of 2026-10-07 among them). The legs are
+  apart only beyond the joint, so the fork of record ends lies there; the tip is where both legs start. At
+  Dvorecký most the tip has the ZPS survey's switch machine cover (a small rectangle among its traffic-area lines)
+  and OSM's switch (the user: "the OSM marker is on point there, it's right at the yellow rectangle which here fits
+  the přestavník"). Elsewhere OSM marks 29 of the 48 nearer the tip, 19 nearer the joint.
+- **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
+  edges) where DI has them 0.4-0.5 m apart; a node placed nearest all its tracks lies off each of them.
+- **The archive draws Dvorce's old connection** (#204): DI (2026-09-30) and the archive (2008-2024) have
+  no track onto the new Dvorecký most (opened 04/2026: "No data is related to new Dvorecký most put in
+  service in 04/2026", the user, track sources review, 2026-11-03); where OSM's new edges come within 2 m of
+  the archive's old track it takes them, as a zigzag with 20° breaks.
+- **Every DTM record states its accuracy class** (#204; `data/truth.json` `sourceAccuracy`, the classes of
+  vyhláška 393/2020 Sb.): DI's tram axes are class 3 (0.14 m in plan, 0.12 m in height) but 7 of 10,371 in
+  class 2; ZPS lines are class 3 in plan (3.2 M) or 4 (0.7 M) and **class 5 in height** (3.2 M lines, 0.35 m),
+  class 3 for 0.7 M. The archive states none; DMR 5G guarantees 0.18 m (0.30 m under dense vegetation); IPR's
+  1 m terrain and the orthophoto state nothing.
+- **A connecting curve held at both switches keeps the radius DI gives it** (#204): its ends and directions
+  are fixed by the through tracks, so widening the tolerance cannot change it; 24 places on line 17 read
+  18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off
+  to reach 20 m. A bend squeezed into a metre reads much wider over 5 m (10° as 29 m), so the curve fit
+  measures its own radius over 2 m.
 - **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
   and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
   split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to
   the old where both had them (median 0, p90 2 cm): DI heights now reach 63-71 % of each line's path (were
   25-47 %). The old records at Podolské nábřeží run on through the new Dvorecký most junction, where the re-entries
   end at its switches. `di_tracks._latest` drops an older record lying on newer ones (1,057 city-wide).
-- **Interlaced track after a switch** (Čechův most, Ohrada–Krejcárek, Chotkova, Flora): DI draws the second track
-  9-17 cm (mostly 12-13 cm) beside the first for 14-90 m after the switch's tip, before the tracks part.
+- **Interlaced track after a switch** (#204; `data/truth.json` `trackGeometry` `interlaced-switch`): at Čechův
+  most, Ke Stírce, Ohrada–Krejcárek, Biskupcova–Ohrada and 15 more places DI draws the branch 9-17 cm (mostly
+  12-13 cm) beside the track for 11-87 m from the switch's tip before the tracks part, either from a tongue it
+  draws (0 to 12 cm over 8-9 m: Ohrada, Dejvice) or from a record joint already 13 cm off (Čechův most). Where
+  both tracks are split into short records, their joints 12 cm apart fall into one cluster of ends. OSM puts
+  the switch at the tip (5-7 m from it at Čechův most), the user: "the fork starts and ends well in front
+  of/behind the road junction".
+- **OSM draws interlaced track as one way** (#204): a `railway=switch` node at the tip (often with its number,
+  `ref` 111 at Čechův most), one way both routes share, and the split where the tracks part at a
+  `railway=railway_crossing` node noted "rozjezdová/sjezdová splítka" (diverging/converging interlace). Where DI
+  draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
+  the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
+  is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
@@ -233,7 +275,10 @@ Review these when realism matters; most move into the build in M2.
 - `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
-  `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot.
+  `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
+  `trackRadius` (5 m window, under 20 m) and `trackJoins` (through tracks
+  breaking over 1° where chains meet, diverging start angles listed; direction from the parabola through
+  the first three drawn points: the game draws a point every 1.5 m).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
