@@ -53,7 +53,8 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 
 - 24 connecting curves on line 17 read 18.5-19.9 m: held at both switches, their radius is DI's; 20 m needs the
   switches about 0.5 m off. Real curves under 20 m, or switches DI places wrong (#210 measures DI's forks)?
-
-- Dvorecký most: DI (2026-09-30) and the archive lack the new tracks; the archive's old connection makes a
-  zigzag. Atlas Prahy draws the new junction, so a newer DI state may have it.
+- Dvorecký most (#209): DI (2026-09-30, the newest state offered) and the archive lack the new tracks, and
+  the archive's pieces on the old switch curves take OSM's new edges (a 25° break, 5-7 m curves). What Atlas
+  Prahy draws is DI's planned-works set (dataset 8, "_budoucí TT", 2024-08-22): one corridor axis per double
+  track, not track axes.
 - Strossmayerovo náměstí: OSM joins a crossing and a switch in one node 0.5 m from DI's.
