@@ -94,7 +94,7 @@ marks.
 
 | ID | Sign | Marks on the green field | Meaning | Game now | Status |
 |---|---|---|---|---|---|
-| SIG-W1 | *Úsekový dělič* (section insulator) | **three white dots in a row** (the website's drawing has four); diamond at least 300 mm | pass with **every pantograph up and no traction current** | not modelled (an idea in `docs/history/HANDOFF.md:316`) | missing: a skill of the same kind as the contacts (coast under it); needs the insulators' places |
+| SIG-W1 | *Úsekový dělič* (section insulator) | **three white dots in a row** (the website's drawing has four); diamond at least 300 mm | pass with **every pantograph up and no traction current** | not modelled (an idea in `docs/history/HANDOFF.md:316`) | missing: a skill of the same kind as the contacts (coast under it); needs the insulators' places. No public list found (2026-11-03): OSM does not tag them in Prague (its 57 `power=insulator` nodes are on 22 / 110 kV lines), the DTM snapshot (ZPS, DI) has no overhead-line equipment, the substations' feeding maps (2009) give sections only roughly ([web-notes.md](web-notes.md) 3.2); student slides say sections are about 300 m long. A survey from street-level imagery (the sign) is the open way. |
 | SIG-W2 | *Stáhni sběrač* (lower the pantograph) | five dots in a **V** (pointing down) | obstacle on the wire: no train may enter with a raised pantograph | – | missing (event) |
 | SIG-W3 | *Zvedni sběrač* (raise) | five dots in an **inverted V** | the driver may raise the pantograph and draw current | – | missing |
 | SIG-W4 | *Změna sběrače* | eight dots in a **ring** | double-ended trams change pantograph here when changing cab | – | n/a (T3 is single-ended) |

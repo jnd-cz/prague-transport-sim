@@ -63,7 +63,7 @@ note gives the page.
    before** the switch; the switch is thrown and blocked when the front passes the **receiver, 25–35 m
    before it**. Two line 17 switches are **hand-set lockable** ones that stay straight in service:
    **U07** at Podolská vodárna (from Kublov, next to the #204 work) and **U17** at Ke Stírce. The game
-   works every switch by contact, by design. The user decides ([switches.md](switches.md)).
+   works every switch by contact, by design; the user keeps both, the player chooses (answer 1 below).
 8. **Switch signal**: a **steady** arrow already means "set and locked"; **blinking** adds "blocked
    by a train in the circuit"; a centre dot means "assume not locked" (§ 45). The game blinks the
    arrow "while locked" and has no centre-dot aspect.
@@ -86,17 +86,33 @@ note gives the page.
     than 1 s red (over 60 s flashing), 180–419 s late yellow, 420 s and more flashing yellow
     ([web-notes.md](web-notes.md) 4.7): a ready design for the game's deviation display.
 
-## Open questions for the user
+## The user's answers (session 2026-11-03)
 
-1. Switches: keep contacts on every switch, or follow the register (radio, with the T3's on-board
-   computer in auto or manual mode)? If contacts stay, which direction does current set, and how far
+Quoted as given; they go into `data/truth.json` as the user's facts (picker: "Your answers").
+
+1. Switches: "For game purposes I'm keeping both historic current switch and new radios at the same
+   time. It costs nothing and player can choose which ones to use." OSM can mark which switches are
+   remote-controlled (`railway:switch:electric=yes` on 525 of 1017 tram switch nodes) and carries DP's
+   number in `ref` on 257 ([switches.md](switches.md)).
+2. Speeds: "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm
+   (openrailwaymap) track info."
+3. The T3 pedals: "currently there are only placeholder simplified controls without pedals, you can
+   research that and how to simulate zrychlovač behavior." Research in progress (#215).
+4. Request stops: the game's T3 has no request buttons; "In short driver should stop for any
+   passengers waiting on the stop." This agrees with D 1/2 § 27.14 a and d.
+5. Doors: "open door currently block adding power, not sure if brake is auto applied as well."
+6. Section insulators: not known. No public list was found; OSM does not tag them (its 57
+   `power=insulator` nodes in Prague all sit on 22 kV and 110 kV lines) and the DTM snapshot (ZPS, DI)
+   has no overhead-line equipment ([signals.md](signals.md) SIG-W1).
+7. Pantographs: "for t3 we use both cars pantographs as it is in real operation". The second car's
+   pantograph is why contact-worked switches are blocked until the whole set has passed
+   ([switches.md](switches.md) SW-C6).
+
+## Still open
+
+1. Where are line 17's Rychlostník signs (OSM tags 60, 65, 70)? With answer 2 only OSM's values are
+   needed.
+2. If contacts stay: which direction does current set (the game: current = diverging), and how far
    before the switch is the contact?
-2. Line 17's Rychlostník signs: where are they, and what do they show (the OSM tags say 60, 65, 70)?
-3. The T3SUCS pedals: how many drive and brake steps, how is the brake pedal parked, how long must
-   the driver coast between drive and brake?
-4. Does the game's T3SUCS have door- or stop-request buttons (D 1/2 § 27.14 d)?
-5. Does a T3SUCS refuse traction with a door open?
-6. Where are the section insulators on line 17? The substations' feeding maps (2009) give the
-   sections roughly ([web-notes.md](web-notes.md) 3.2), not the insulators' places.
-7. In a 2×T3 set, which car's pantograph is up? The website says the second car's (switch blocking
-   is released only after the whole set has passed); the game uses the first car's.
+3. Section insulators on our lines: a survey from street-level imagery (the green diamond signs), or
+   DP's data.

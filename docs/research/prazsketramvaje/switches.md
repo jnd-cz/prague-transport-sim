@@ -96,7 +96,8 @@ Speed switches in the register (speeds straight / diverging, km/h):
 | SW-C2 | The register lists every radio-controlled switch with its trolley contact as **"no / removed on <date>"** (most in April–August 2007, e.g. Výtoň 614–616, Strossmayerovo náměstí 529–532, Palmovka 617–622, Ohrada 626–628) or **"no / never fitted"**. | register 2006041262 | – |
 | SW-C3 | A remote-controlled switch may still have a **working trolley contact**, marked by SW-S12. | PPS Q102 | the game's contact sign |
 | SW-C5 | Two switches in a row: a black plate with a white **L** or **P** under the contact sign says which branches that contact serves; a contact out of use is covered by a **black plate with a yellow cross**. | website 2006041276 | – |
-| SW-C6 | Blocking is released when the **pantograph** passes the release contact; the website says that in a 2×T3 set the pantograph is on the **second** car, so the switch is released only after the whole set has passed. | website 2006041394 | only the first car's pantograph counts (`src/tram.js:34`) |
+| SW-C6 | Blocking is released when the **pantograph** passes the release contact; in a 2×T3 set the **second car's pantograph** is up too (the user, 2026-11-03: both cars' pantographs, as in real operation), so the switch is released only after the whole set has passed. | website 2006041394; user | only the first car's pantograph counts (`src/tram.js:34`) |
+| SW-C7 | Why switches are blocked: with 2×T3 sets the **second car's pantograph sometimes threw the switch** under the set and tore it apart. The blocking system: a **blocking contact** right after the working contact, an **auxiliary contact about 15 m** (a car length) past the switch, an **unblocking contact about 30 m** past it; the switch unblocks when a pantograph closes the unblocking contact **while the auxiliary contact is not closed**. Modern switches block by resonant track circuits and ultrasonic detectors instead. | student club slides *Technika pražských tramvají* (undated; [PDF](https://k5.sh.cvut.cz/~oskar/stah/technika_tramvaji_darkblue.pdf)) | the game sets a switch at the contact and has no second pantograph |
 | SW-C4 | With work going on at a switch, the driver must not enter its circuit (PPS Q90 offers "must not stop before the working contact" as a wrong answer). | PPS Q90; § 20.3 | – |
 
 **Finding for the user:** the register says the switches on our lines are radio-controlled without
@@ -131,6 +132,14 @@ Podolská vodárna (690, U07), Výtoň (614–616), Palackého náměstí (646�
 788; meeting ban "T - KT"), Staroměstská (689, 512), Čechův most (566, 733; a gauntlet on the bridge),
 Letenský tunel, Strossmayerovo náměstí (529–532), Výstaviště (783–787), Ke Stírce (656, U09, U17),
 Kobylisy (658–660), Vozovna Kobylisy (663, 664; safety stopping places in the loop).
+
+## Switches in OSM
+
+The local extract (`raw/osm/praha.osm.pbf`, 2026-10-22) has **1017 `railway=switch` nodes on tram
+track**: **257 carry DP's number in `ref`** (e.g. 616 at Výtoň, 625 "dolní Klárov", 674.L1 Lehovec),
+**525 have `railway:switch:electric=yes`**, 494 a `survey:date` (mostly September 2025). The build
+(`tools/build_line.py`, switches from OSM topology) could take the number for the plate (SW-S8) and mark
+remote-controlled switches from these tags instead of from the register's place names.
 
 ## Radio-controlled switches on our lines (register 2006041262)
 
