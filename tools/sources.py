@@ -82,7 +82,8 @@ SOURCES = {
 LAYERS = {
     "terrain": ("ipr-dtm", "dmr5g", "coarse"),
     "streets": ("zps", "dtmp", "osm"),  # areas and kerbs; OSM: road centre lines with widths
-    "tracks": ("dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); OSM reviewed gaps only
+    "tracks": ("ortho", "dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); the orthophoto only where the user took
+                                                          # it (truth.json photoTracks, #204); OSM reviewed gaps only
     # top of rail (#197): numeric DI, the archive, the user's reviewed spans, survey plus the style fact, the curve
     # across a short hold; where none, the game's surface profile
     "heights": ("dtm-di", "dtmp-tracks", "truth", "zps", "rule:curve", "rule:surface"),

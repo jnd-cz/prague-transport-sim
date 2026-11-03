@@ -91,10 +91,12 @@ export function extendAlongTracks(tracks, pts, len = 60) {
 
 // Track geometry from a survey (the line data's trackSource ranges and track chains' `src`, #20) is drawn
 // as it is: smoothing it would pull a tight curve inside the real one (an 18 m curve: 0.2 m with the 6 m
-// window). OSM fill keeps the window.
+// window). OSM fill keeps the window, unless the build already drew all of it as smooth curves (the line
+// data's `trackCurve`, tools/track_curve.py, #204).
 export const SURVEYED = new Set(['di', 'dtmp']);
 export const SMOOTH = 6, AS_SURVEYED = 0.1;
-export function radiusAlong(ranges, offset = 0) {
+export function radiusAlong(ranges, offset = 0, curved = false) {
+  if (curved) return AS_SURVEYED;
   if (!ranges?.length) return SMOOTH;
   return (s) => {
     const x = s - offset;
@@ -108,7 +110,7 @@ const A_LAT = 0.8, CANT_MAX = 0.1;
 
 export class Route {
   // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
-  constructor(pts, ext = null, sources = null) {
+  constructor(pts, ext = null, sources = null, curved = false) {
     // smooth curves but keep the original arc-length parameter (stops, switches and
     // signals were measured along the unsmoothed OSM path)
     const before = ext?.before || [], after = ext?.after || [];
@@ -117,7 +119,7 @@ export class Route {
     for (let i = 1; i <= before.length; i++) s0 += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
     let L = 0;
     for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    const sm = smoothPolyline(all, 1, radiusAlong(sources, s0));
+    const sm = smoothPolyline(all, 1, radiusAlong(sources, s0, curved));
     this.pts = sm.pts;
     this.s = Array.from(sm.s, (v) => v - s0);
     this.length = L; // the route itself ends here; the run-out continues past it

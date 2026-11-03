@@ -214,6 +214,7 @@ exports**. Until those packages exist, no post-1.5 compatibility conclusion has 
 
 | id | note |
 |---|---|
+| `2026-11-03b` | `2026-11-03` + DI set 7 at state 2026-10-31 for the same 16 districts (#209): Dvorecký most's tracks (2.9 km new, entered 2026-10-07 and 10-22) and records re-entered with heights. |
 | `2026-11-03` | `2026-11-02` + 8 Geoportál tiles of line 17's corridor (I3S buildings, trees, tree rows, walls) at its edge, moved by the DI track (#20). |
 | `2026-11-02` | `2026-11-01` + IPR Mosty 3D, the whole layer (`raw/geoportal/mosty3d/`, 49 meshes, 672 bridges, `python -I tools/mosty3d.py fetch`): a structure source for track heights (#192). |
 | `2026-11-01` | `2026-10-30c` + ZPS 2026-09-30 for lines 9, 23 and 37: 9 more districts (#125). |
@@ -231,7 +232,8 @@ lines and the snapshot's OSM district boundaries. Sources go to `raw/dtm-di/`, s
 ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and provider terms.
 The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
 altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
-The first acquisition is published in snapshot `2026-10-30` (#61).
+The first acquisition is published in snapshot `2026-10-30` (#61), the state 2026-10-31 in `2026-11-03b` (#209); the
+old records it keeps beside their re-entries: [knowledge](docs/knowledge.md#sources-and-their-quirks).
 
 ### IPR 1 m terrain
 

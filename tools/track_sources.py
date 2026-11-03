@@ -12,9 +12,10 @@ Reads data/lineN.json (its trackSource ranges, track chains with `src`, switches
 (tools/di_tracks.py). Findings:
   - fill: a stretch of the route or of a drawn track within CORRIDOR of it longer than FILL metres taken from
     the archived DTMP axes or OSM instead of DI;
-  - switch without a DI fork: a facing switch of the route with no DI fork within di_tracks.FORK;
+  - switch without a DI fork: a facing switch of the route the build did not pair with a DI fork (tools/di_tracks.py
+    moves a switch onto the fork on its tracks within di_tracks.FORK: then it lies within PAIRED of it);
   - DI fork without an OSM switch: a DI fork within NEAR of the route (either direction) with no OSM junction
-    (three or more track chain ends) within di_tracks.FORK.
+    (three or more track chain ends) within PAIRED.
 """
 import json
 import math
@@ -31,6 +32,7 @@ FILL = 10.0       # m: a fill stretch worth a finding (#20)
 CORRIDOR = 60.0   # m: drawn tracks the build takes (tools/build_line.py Q_TRACKS: around.w:60)
 NEAR = 3.0        # m from the route for a DI fork to be on it
 GROUP = 30.0      # m: drawn fill tracks this near each other are one place
+PAIRED = 1.0      # m: a switch paired with a fork lies on it (the fitted curve moves it by centimetres, #204)
 
 
 def nearest_d(p, pts):
@@ -86,7 +88,7 @@ def findings(data, di):
     path = routes['path']
     for w in data.get('switches', []):
         p = path.at(w['s'])
-        f = di.fork_near(*p)
+        f = di.fork_near(*p, reach=PAIRED)
         if f is None:
             out.append({'kind': 'switch without DI fork', 's': w['s'], 'x': round(p[0], 1), 'y': round(p[1], 1)})
     ends = Counter()
@@ -98,7 +100,7 @@ def findings(data, di):
     for f in di.forks:
         if min((l.distance(Point(f)) for l in lines.values()), default=math.inf) > NEAR:
             continue
-        hit = jtree is not None and any(math.dist(junctions[i], f) <= dt.FORK for i in jtree.query(Point(f).buffer(dt.FORK)))
+        hit = jtree is not None and any(math.dist(junctions[i], f) <= PAIRED for i in jtree.query(Point(f).buffer(PAIRED)))
         if not hit:
             s = path.project(f)
             out.append({'kind': 'DI fork without OSM switch', 's': round(s, 1) if s is not None else None,
@@ -111,10 +113,12 @@ INFO = {
     'track fill': 'This track is drawn from {src} here: DI (the current DTM, 2026-09-30) has no track within 2 m of it '
                   'over {length} m. Does the track run like this in the imagery? If not, say how in a note: the build '
                   'does not move tracks from answers yet.',
-    'switch without DI fork': 'OSM has a facing switch here that DI does not (no DI fork within 5 m). Is there a switch '
-                              'in the imagery? If not, say so in a note: switches are not removed from answers yet.',
-    'DI fork without OSM switch': 'DI forks here and OSM has no switch within 5 m. Is there a switch in the imagery? '
-                                  'If so, say where in a note: switches are not added from answers yet (#35).',
+    'switch without DI fork': 'OSM has a facing switch here that no DI fork was paired with (none on its tracks, leaving '
+                              'the same way, within 15 m). Is there a switch in the imagery? If not, say so in a note: '
+                              'switches are not removed from answers yet.',
+    'DI fork without OSM switch': 'DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same '
+                                  'way, within 15 m). Is there a switch in the imagery? If so, say where in a note: '
+                                  'switches are not added from answers yet (#35).',
 }
 CONFIRM = 3.0   # m: a recorded answer covers the finding of its kind this near
 

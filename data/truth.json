@@ -406,7 +406,9 @@
    {"id": "equilibrium-cant-factor", "value": 11.8, "unit": "mm·m/(km/h)²", "scope": "q_E for B1435 (8.3 for C1000): equilibrium cant D_EQ = q_E · V² / R", "basis": "the standard, Table 1; the formula is the one q_E is defined for (annex C, not in the sample)", "source": {"document": "EN 17636:2023 Railway applications – Infrastructure – Track alignment design parameters – Urban rail (CEN), public sample of SIST EN 17636:2023, pages 1–12 of the standard", "year": 2023, "url": "https://cdn.standards.iteh.ai/samples/65620/1c97af27e4784fa58baa665c1f7613b1/SIST-EN-17636-2023.pdf", "page": 11}},
    {"id": "chainage-horizontal", "value": "chainage and the lengths of alignment elements are measured along the horizontal projection of the track centre line", "unit": null, "scope": "how s is measured for gradients and vertical curves", "basis": "the standard, 3.4 note 1 and 3.5", "source": {"document": "EN 17636:2023 Railway applications – Infrastructure – Track alignment design parameters – Urban rail (CEN), public sample of SIST EN 17636:2023, pages 1–12 of the standard", "year": 2023, "url": "https://cdn.standards.iteh.ai/samples/65620/1c97af27e4784fa58baa665c1f7613b1/SIST-EN-17636-2023.pdf", "page": 6}},
    {"id": "switch-start", "value": "most modern switches are tangential; some designs start with an abrupt change of direction", "unit": null, "scope": "horizontal geometry at the start of a turnout", "basis": "the standard, 5.3", "source": {"document": "EN 17636:2023 Railway applications – Infrastructure – Track alignment design parameters – Urban rail (CEN), public sample of SIST EN 17636:2023, pages 1–12 of the standard", "year": 2023, "url": "https://cdn.standards.iteh.ai/samples/65620/1c97af27e4784fa58baa665c1f7613b1/SIST-EN-17636-2023.pdf", "page": 11}},
-   {"id": "limits-not-design-values", "value": "normal limits are not usual design values, substantial margins should be kept; exceptional limits are for special circumstances, not several at one place", "unit": null, "scope": "how a design limit (a radius) relates to what was built", "basis": "the standard, 3.3 and 5.1", "source": {"document": "EN 17636:2023 Railway applications – Infrastructure – Track alignment design parameters – Urban rail (CEN), public sample of SIST EN 17636:2023, pages 1–12 of the standard", "year": 2023, "url": "https://cdn.standards.iteh.ai/samples/65620/1c97af27e4784fa58baa665c1f7613b1/SIST-EN-17636-2023.pdf", "page": 10}}
+   {"id": "limits-not-design-values", "value": "normal limits are not usual design values, substantial margins should be kept; exceptional limits are for special circumstances, not several at one place", "unit": null, "scope": "how a design limit (a radius) relates to what was built", "basis": "the standard, 3.3 and 5.1", "source": {"document": "EN 17636:2023 Railway applications – Infrastructure – Track alignment design parameters – Urban rail (CEN), public sample of SIST EN 17636:2023, pages 1–12 of the standard", "year": 2023, "url": "https://cdn.standards.iteh.ai/samples/65620/1c97af27e4784fa58baa665c1f7613b1/SIST-EN-17636-2023.pdf", "page": 10}},
+   {"id": "interlaced-switch", "value": "a long switch: from its tip the branch runs interlaced beside the track to where the two part, so the switch starts well before the junction it serves", "unit": null, "scope": "Čechův most (both tracks), Ke Stírce towards Trojská, Ohrada to Krejcárek (line 37), Biskupcova to Ohrada; DI draws the branch 9-17 cm (mostly 12-13 cm) beside the track for 11-87 m, 19 such switches in the 16 districts of 2026-10-31", "basis": "the user (Mapy street view and Atlas Prahy at Čechův most); DI's records", "quote": "Čechův most shows another outlier case. The DI fork is wrong while OSM seems right [...] the fork starts and ends well in front of/behind the road junction. Atlas on max zoom also shows it. [...] These special long switches are use in couple other places, notably near Ke Stírce stop in direction of Trojská. Other places from top of my head are Ohrada to Krejcárek on line 37 and Biskupcova to Ohrada nearby", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"},
+   {"id": "min-radius-network", "value": 18, "unit": "m", "scope": "the smallest horizontal radius anywhere on Prague's network: 18-20 m are exceptions, under 18 m none", "basis": "the user; measured at Podolská vodárna: DI reads 14.6 m over 5 m, the rails in the orthophoto 18.3-20.1 m over 6 m, DI's line up to 0.31 m off them", "quote": "18m and over could be some exceptions, 19.9m looks like rounding error but under 18m there shouldn't be anything like that. [...] At which cost can we snap it to 18m curve? Because that should be the ultimate limit of the network.", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"}
   ]
  },
  "trackStyleKinds": {
@@ -463,5 +465,165 @@
    "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
    "source": "user 2026-10-29"
   }
- ]
+ ],
+ "trackSources": {
+  "note": "Answers to the track sources review (tools/track_sources.py, #20): 'matches reality' without a note takes the finding of its kind within 3 m off the list. Answers with a note stay held there.",
+  "reviewAnswers": [
+   {
+    "kind": "switch without DI fork",
+    "x": -976.6,
+    "y": -4070.4,
+    "line": 17,
+    "answer": "matches reality",
+    "quote": "",
+    "place": "Podolské nábřeží, Dvorce (the new Dvorecký most junction; DI of 2026-09-30 has no track there)",
+    "source": "track sources review (reports/review/track-sources-17.json) on the test host, 2026-11-03 (#20, #204)",
+    "date": "2026-11-03"
+   },
+   {
+    "kind": "track fill",
+    "x": 2984.0,
+    "y": 3537.7,
+    "line": 17,
+    "answer": "matches reality",
+    "quote": "",
+    "place": "Klapkova, Ke Stírce (the archived axis, 36.8 m)",
+    "source": "track sources review (reports/review/track-sources-17.json) on the test host, 2026-11-03 (#20, #204)",
+    "date": "2026-11-03"
+   }
+  ],
+  "switchTips": [
+   {"place": "Podolská vodárna, the eastern switch of the triangle, in Podolská (the curve towards Podolské nábřeží leaves it)", "near": [50.0591611, 14.4197127], "tip": [50.0591777, 14.4197579], "tipFrom": "the manhole north of the switch in the archived technical map (street detail, ctmtp_kod 106200, objectid 982271; raw/dtmpoints, state 2024-06-30), 1.65 m north of the track, 3.3 m east of DI's fork", "rule": "the switch takes the point of its through track nearest the manhole", "quote": "The north curve does look wrong, both the curve itself and the fork point should be further back right next to northern manhole [...] Manhole cover is north of the switch in Podolská street, the eastern point of the triangle.", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"}
+  ],
+  "photoTracks": [
+   {"place": "Podolská vodárna, the north curve of the triangle (from the eastern switch in Podolská to the switch on Podolské nábřeží)", "exception": true, "points": [[50.0591629, 14.4197586], [50.0591378, 14.4195993], [50.0591339, 14.4195904], [50.05913, 14.4195817], [50.059125, 14.4195699], [50.0591205, 14.4195619], [50.0591159, 14.419554], [50.0591115, 14.419546], [50.0591065, 14.4195387], [50.0590964, 14.4195246], [50.0590911, 14.419518], [50.0590853, 14.4195123], [50.0590759, 14.4195027], [50.0590702, 14.4194972], [50.0590642, 14.4194923], [50.0590483, 14.4194789], [50.059022, 14.4194685], [50.0590154, 14.4194668], [50.0589998, 14.4194633], [50.0589554, 14.4194605]], "measured": "IPR Praha's leaf-off orthophoto (flight 7-8 April 2026, 7 cm/px): every 0.25 m along DI's curve, dark rail lines across it paired 1.435 m apart; 44 track centres over 21 m (one isolated at the curve's start left out), within 3.1 cm of a smooth curve; circles through them 18.3-20.1 m over 6 m, 19.9 m over the whole. The ends are the two switches: the eastern at the northern manhole (switchTips), the western at DI's fork", "why": "DI's line is 19-34 cm off the rails over the first 14 m from the eastern switch and reads 14.6 m over 5 m (16.4 m in the state of 2026-09-30); the archive 16.2 m", "rule": "the curve between the two switches is drawn through these points instead of DI's, joining both switches tangent where it can", "quote": "I would still take option two, the DI is clearly wrong here for some reason (and inconsistent between versions), so I would force to the ortophoto measured curve and try to join smootly on both ends if possible (smallest angle). Note it as exception.", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"}
+  ]
+ },
+ "sourceAccuracy": {
+  "note": "How precise each source is, as its provider states it, and the accuracy classes counted in our snapshot (2026-11-03, #204). The user, 2026-11-03: \"register that data as a fact and the same for vertical accuracy (of each data source ideally) so we can work with it for tuning up the track laying algorithm\". The DTM records carry their class (TridaPresnostiPoloha, TridaPresnostiVyska); `classes` is the decree's table: mean coordinate error mxy and mean height error mH in metres. Class 9: worse than class 5 or unknown. New DTM data is kept at least in class 3 (§ 3 odst. 7).",
+  "classes": {
+   "1": {
+    "mxy": 0.04,
+    "mH": 0.03
+   },
+   "2": {
+    "mxy": 0.08,
+    "mH": 0.07
+   },
+   "3": {
+    "mxy": 0.14,
+    "mH": 0.12
+   },
+   "4": {
+    "mxy": 0.26,
+    "mH": 0.18
+   },
+   "5": {
+    "mxy": 0.5,
+    "mH": 0.35
+   }
+  },
+  "classesSource": {
+   "document": "Vyhláška č. 393/2020 Sb., o digitální technické mapě kraje",
+   "year": 2020,
+   "url": "https://www.zakonyprolidi.cz/cs/2020-393",
+   "part": "příloha č. 2, bod 1.1 (classes), bod 1.2 (9)"
+  },
+  "sources": [
+   {
+    "id": "dtm-di",
+    "scope": "DI tram track axes (OsaKolejeTramvajoveDrahy), 16 districts, state 2026-09-30",
+    "horizontalClasses": {
+     "3": 10364,
+     "2": 7
+    },
+    "heightClasses": {
+     "3": 10364,
+     "2": 7
+    },
+    "counted": "tools/dtmp_tracks.py di_data(), 2026-11-03"
+   },
+   {
+    "id": "zps",
+    "scope": "ZPS kresba lines (KR), 16 districts, state 2026-09-30",
+    "horizontalClasses": {
+     "2": 1065,
+     "3": 3226053,
+     "4": 701195,
+     "5": 5,
+     "9": 52246
+    },
+    "heightClasses": {
+     "1": 1,
+     "2": 1065,
+     "3": 700785,
+     "4": 21,
+     "5": 3156921,
+     "9": 121771
+    },
+    "counted": "the ZPS_KR.gpkg files of raw/dtm, 2026-11-03"
+   },
+   {
+    "id": "zps-areas",
+    "scope": "ZPS derived areas (OPL), 16 districts, state 2026-09-30",
+    "horizontalClasses": {
+     "2": 149,
+     "3": 266689,
+     "4": 193705,
+     "5": 6,
+     "9": 15863
+    },
+    "heightClasses": {
+     "2": 149,
+     "3": 50249,
+     "5": 378988,
+     "9": 47026
+    },
+    "counted": "the ZPS_OPL.gpkg files of raw/dtm, 2026-11-03"
+   },
+   {
+    "id": "dtmp-tracks",
+    "scope": "archived DTMP tram axes (2008-2024)",
+    "stated": null,
+    "note": "the archived records carry no accuracy class"
+   },
+   {
+    "id": "dmr5g",
+    "scope": "ČÚZK DMR 5G (bare-earth lidar, TIN)",
+    "heightError": 0.18,
+    "heightErrorDenseVegetation": 0.3,
+    "basis": "guaranteed total mean height error, in terrain without continuous vegetation and buildings; under dense vegetation",
+    "source": {
+     "document": "Zeměměřický úřad: Technická zpráva k Digitálnímu modelu reliéfu ČR DMR 5G a DMR 4G",
+     "year": 2026,
+     "date": "2026-01-27",
+     "part": "kapitola 6, Závěry a doporučení",
+     "url": "https://geoportal.cuzk.gov.cz/Dokumenty/TECHNICKA_ZPRAVA_DMR_4G_a_5G.pdf"
+    }
+   },
+   {
+    "id": "ipr-dtm",
+    "scope": "IPR Praha 1 m terrain (lidar 2023, at least 20 points/m²)",
+    "stated": null,
+    "note": "no accuracy in the file, its catalogue record or IPR's page; asked in #62",
+    "source": {
+     "document": "Geoportál Praha: Digital terrain model",
+     "year": 2026,
+     "url": "https://geoportalpraha.cz/en/data-and-services/articles-and-projects/3D-model/3D-model-dtm"
+    }
+   },
+   {
+    "id": "ortho",
+    "scope": "IPR Praha leaf-off orthophoto, flight 7-8 April 2026, 7 cm/px",
+    "stated": null,
+    "note": "no positional accuracy stated; its registration against the survey is measured in #210"
+   },
+   {
+    "id": "osm",
+    "scope": "OpenStreetMap tram ways",
+    "stated": null,
+    "note": "no accuracy; against DI p50 0.13 m, p90 0.45 m at line 17's nodes (#20, docs/knowledge.md)"
+   }
+  ]
+ }
 }
