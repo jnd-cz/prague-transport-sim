@@ -1009,22 +1009,41 @@ function flushDtm(ground) {
     }
   }
   // The surveyed decks of our own bridges carry the tracks: laid to the track profile the same way
-  // (the deck's offset at the route, full within 8 m, fading out by 15 m; crossfall kept), so the
-  // cars beside the tram drive on the deck at the rails' level. Measured first, then moved.
-  const deckMoves = [];
-  for (const a of dtm.areas) {
-    if (a.l < 1) continue;
+  // (each area's offset at the route, full within 8 m, fading out by 15 m; crossfall kept), so the
+  // cars beside the tram drive on the deck at the rails' level. Measured first, then moved. (One offset
+  // for every area, from the deck nearest the rails, left the bridge's outline (class deck) 0.2-0.47 m over
+  // the carriageway it overlaps on Čechův most and Trojský most once the rails followed DI, #197: each area
+  // takes its own, the outline 2 cm under the street.)
+  const deckMoves = [], own = new Map();
+  const ownAt = (a, ai, s, x, y, zt) => {
+    const key = `${ai}:${Math.round(s)}`;
+    if (own.has(key)) return own.get(key);
+    let z = null;
+    for (const [A, B, C] of a.mesh) {
+      const d = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+      if (Math.abs(d) < 1e-9) continue;
+      const u = ((B[0] - x) * (C[1] - y) - (B[1] - y) * (C[0] - x)) / d, v = ((C[0] - x) * (A[1] - y) - (C[1] - y) * (A[0] - x)) / d;
+      if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) continue;
+      const zz = u * A[2] + v * B[2] + (1 - u - v) * C[2];
+      if (Math.abs(zz - zt) <= 2.5 && (z === null || Math.abs(zz - zt) < Math.abs(z - zt))) z = zz;
+    }
+    own.set(key, z);
+    return z;
+  };
+  dtm.areas.forEach((a, ai) => {
+    if (a.l < 1) return;
     for (const p of [...a.ring, ...a.holes.flat(), ...a.mesh.flat()]) {
       if (done.has(p)) continue;
       done.add(p);
       const n = route.nearest(p[0], p[1]);
       if (!n || n.d >= 15 || !profile.onBridge(n.s)) continue;
-      const q = route.at(n.s), zt = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW, zr = dtm.deckAt(q.x, q.y, zt, 2.5);
+      const q = route.at(n.s), zt = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW - (a.c === 'deck' ? 0.02 : 0);
+      const zr = ownAt(a, ai, n.s, q.x, q.y, zt) ?? dtm.deckAt(q.x, q.y, zt, 2.5);
       if (zr === null) continue;
       const k = Math.max(0, Math.min(1, (n.d - 8) / 7));
       deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k))]);
     }
-  }
+  });
   for (const [p, dz] of deckMoves) p[2] += dz;
 }
 
