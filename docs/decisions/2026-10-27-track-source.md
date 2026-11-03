@@ -233,7 +233,11 @@ fork and four DI forks without an OSM switch.
 DI's rails within ~0.1 m (−0.8 / +0.75 / +2.35 / +3.8 m against DI's −0.72 / +0.72 / +2.30 / +3.74). OSM has the
 pair 4.2 m apart and up to 3 m west, with no dip at its outer rails. Line 17's GTFS shapes are one line per
 direction on the double track's midline, and they follow OSM's midline to p50 0.04 m / p90 0.13 m (DI's:
-0.14 / 0.42 m): generated from OSM, so they are no independent check of DI.
+0.14 / 0.42 m): generated from OSM, so they are no independent check of DI. The user, with street photos
+(Claude Code session 2026-11-03, #20): "Yeah di is right which also explains why our osm based track tried to
+clip the building there". Measured: on main's OSM build the southbound track centre came within 0.71 m of a
+building footprint at 50.08537 N 14.41393 E (22 m of it within the T3's half width, 1.25 m); with DI no track
+centre of line 17 comes within 1.6 m of a building.
 
 ## Inspectable comparisons and sources
 
