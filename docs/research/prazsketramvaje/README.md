@@ -11,6 +11,7 @@ set against what the game does now (main at 7cac287). The user picks from
 | [signals.md](signals.md) | every signal and sign in D 1/2, its look (for procedural drawing) and the website's photos |
 | [switches.md](switches.md) | switch kinds, the driver's duties, switch signals, speed switches, the register of radio switches on our lines |
 | [t3.md](t3.md) | the T3 from DP's textbook and exam sets: start-up, pedals, brakes, sanding, switches from the cab, lights, faults |
+| [t3-accelerator.md](t3-accelerator.md) | the T3SUCS pedals, accelerator and interlocks from ČKD's TR 37 documentation, numbers and a simulation model |
 | [places.md](places.md) | small-radius curves, night zones, speed switches on our lines |
 | [web-notes.md](web-notes.md) | the rest of the website: switch types and registers, signal photos, power, operating practice |
 | [truth-candidates.md](truth-candidates.md) | the facts proposed for `data/truth.json`, with priorities |
@@ -97,10 +98,11 @@ Quoted as given; they go into `data/truth.json` as the user's facts (picker: "Yo
 2. Speeds: "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm
    (openrailwaymap) track info."
 3. The T3 pedals: "currently there are only placeholder simplified controls without pedals, you can
-   research that and how to simulate zrychlovač behavior." Research in progress (#215).
+   research that and how to simulate zrychlovač behavior." Done: [t3-accelerator.md](t3-accelerator.md).
 4. Request stops: the game's T3 has no request buttons; "In short driver should stop for any
    passengers waiting on the stop." This agrees with D 1/2 § 27.14 a and d.
-5. Doors: "open door currently block adding power, not sure if brake is auto applied as well."
+5. Doors: "open door currently block adding power, not sure if brake is auto applied as well." ČKD:
+   a door relay blocks traction; no brake from the doors found ([t3-accelerator.md](t3-accelerator.md) 4).
 6. Section insulators: not known. No public list was found; OSM does not tag them (its 57
    `power=insulator` nodes in Prague all sit on 22 kV and 110 kV lines) and the DTM snapshot (ZPS, DI)
    has no overhead-line equipment ([signals.md](signals.md) SIG-W1).

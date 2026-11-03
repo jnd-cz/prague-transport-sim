@@ -133,10 +133,18 @@ date, as AGENTS.md asks.
 
 | ☐ | id | Value | Source | Prio | Serves |
 |---|---|---|---|---|---|
+| ☐ | `t3sucs-drive-steps` | 5 steps at 5/12/20/27/35° of 40°; 220/290/360/420/480 A per car | ČKD T-50172 p. 4, T-50407 p. 6 | A | the game's 4 force notches ([t3-accelerator.md](t3-accelerator.md)) |
+| ☐ | `t3sucs-brake-steps` | 5 steps at 3/7/12/18/23°; park 27°; track 37° / 40°; step 5 340–360 A | ČKD T-50407 p. 6, T-50361 p. 4 | A | the game's 4 brake notches |
+| ☐ | `t3sucs-accelerator` | 99 positions, 3.614 Ω, 5 s sweep; bridged at 75; fields at 80/85/90/95 | ČKD T-50408 p. 1, 5; T-50413 p. 8 | A | not modelled |
+| ☐ | `t3sucs-parking` | ratchet at 27°; full release only with the drive pedal | ČKD T-50407 p. 1, T-50413 p. 16 | B | no parked position |
+| ☐ | `t3sucs-door-interlock` | door relay blocks traction; no brake | ČKD T-50413 p. 7 | B | the user's answer 5 |
+| ☐ | `t3-no-deadman` | no dead-man pedal; safety button | ČKD T-50172 p. 7 | B | the game's optional dead-man pedal |
+| ☐ | `t3sucs-max-relay` | 750 A, latched until the drive pedal is at 0 | ČKD T-50413 p. 9 | C | fault events |
+| ☐ | `te022-motor` | 40 kW, 300 V, 150 A, 1750 rpm (max 4200); gear 7.43; wheel 700 mm | ČKD T-50272 p. 2; ru.wikipedia | B | the game's 172 kW table |
 | ☐ | `t3sucs-coasting-current` | 40–90 A | t3zr Q2853 | C | the ammeter while coasting |
 | ☐ | `t3sucs-mech-brake-cut-in` | 5–3 km/h | ucebnice p. 5 | B | the end of a stop |
 | ☐ | `t3sucs-track-brake-stages` | 2 (rear bogie, then both) | ucebnice p. 5 | C | – |
-| ☐ | `t3sucs-drive-to-brake` | fast change drops the dynamic brake | ucebnice p. 4 | B | a coasting skill |
+| ☐ | `t3sucs-drive-to-brake` | coast 2–3 s between braking and driving; a fast change drops the dynamic brake | ČKD T-50172 p. 11; ucebnice p. 4 | B | a coasting skill |
 | ☐ | `t3sucs-sand-axle` | first axle, both wheels | ucebnice p. 6 | C | – |
 | ☐ | `t3-dimensions` | 15.20 m, 2.50 m, 16 t, 24 + 86 | ucebnice p. 4 | C | already in the game |
 | ☐ | `t3rplf-profile` | 16.30 m, 20.5 t, profile "KT" | ucebnice p. 20 | C | KT meeting bans later |
