@@ -784,7 +784,7 @@ def radius_review(chs, snapshot):
                     'answer_previews': previews})
     out.sort(key=lambda f: -f['mag'])
     dst = ROOT / 'reports' / 'review' / 'track-radius.json'
-    with replacing(dst, 'w', encoding='utf-8') as fh:
+    with replacing(dst, 'w', encoding='utf-8', newline='') as fh:
         json.dump({'schema': 1, 'snapshot': snapshot, 'findings': out}, fh, ensure_ascii=False, indent=1)
     return out
 
