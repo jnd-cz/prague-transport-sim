@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-11-03",
- "built_at_commit": "eb1006f",
- "published": "2026-11-03 15:03",
- "note": "line 17: track curves through DI's points, switches paired by the track, 20 m held within the accuracy class (#204)",
+ "snapshot": "2026-11-03b",
+ "built_at_commit": "71044fe",
+ "published": "2026-11-03 18:07",
+ "note": "line 17 on DI 2026-10-31 (snapshot 2026-11-03b): interlaced track split per track, turning-loop ends held, 10 cm point spacing (#204)",
  "files": {
   "line17.bld.bin": {
    "size": 6348546,
@@ -25,12 +25,12 @@
    "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
-   "size": 228512,
-   "sha256": "13893c68d727c643818bdf4db6dfa5eab46d497f5557e2adeb7573b10c0fbb52"
+   "size": 228495,
+   "sha256": "905c2d71ff2117168727db63b42efcbb95c635edd509fdb130118d4b8017ae76"
   },
   "line17.json": {
-   "size": 6007642,
-   "sha256": "5291d6d9c7e6825072ddee363c87b473f813fd983aa25993a0a241f3a3c83acf"
+   "size": 5983614,
+   "sha256": "6958619a909b816bf799e17d36ae1bcf02e71c8881015fce8bca29a173d33254"
   },
   "line17.signals.json": {
    "size": 36904,
@@ -38,7 +38,7 @@
   },
   "line17.validate.json": {
    "size": 4439,
-   "sha256": "13c675ba5cf1ac92785a6018155039fdf63607f028479e91da8161421e53096e"
+   "sha256": "6c3ac08f0462bf04678d49889957aec5093bec5455ba4e6828df59ecc38fc2f0"
   },
   "line17.zps.json": {
    "size": 6548335,
