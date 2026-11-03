@@ -68,6 +68,22 @@ class SpanReviews(unittest.TestCase):
                 result = from_reviews({'items':{'pin':answer}},{'findings':[item]},'test')
                 reason = result['held'][0]['reason'] if result['held'] else None
                 self.assertEqual(item['answer_explanations'][choice],reason,(item['id'],choice))
+                if not reason:
+                    entry = result['span_reviews'][0]
+                    preview = item['answer_previews'][choice]
+                    for span in item['spans']:
+                        profile = next((p for p in entry['profiles'] if p['xy'] == span['approval_profile']['xy']), None)
+                        if profile is None:
+                            self.assertNotIn(span['id'], preview)
+                            continue
+                        evidence = SpanEvidence([{**entry, 'profiles':[profile]}])
+                        for point, (s, z) in zip(span['profile'], preview[span['id']]):
+                            self.assertEqual(s, point['s'])
+                            archived = [a for a in point['archive'] if isinstance(a.get('z'), (int, float)) and 100 < a['z'] < 500 and not a.get('excluded')]
+                            chosen = evidence.at(profile['di_ids'][0], *point['xy'], archived)
+                            di = point.get('di_z')
+                            expected = di if isinstance(di, (int, float)) and 100 < di < 500 else (chosen[0]['z'] if chosen else None)
+                            self.assertEqual(z, round(expected, 3) if expected is not None else None)
                 if choice != 'archive profile ok':
                     self.assertEqual(choice in item['options'],reason is None,item['id'])
                 elif reason:

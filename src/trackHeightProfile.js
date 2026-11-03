@@ -7,9 +7,10 @@ function project(p, base) {
   let best = { d: Infinity, s: 0 };
   for (let i = 1; i < base.length; i++) {
     const a = base[i - 1], b = base[i], dx = b.xy[0] - a.xy[0], dy = b.xy[1] - a.xy[1], l2 = dx * dx + dy * dy;
-    const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a.xy[0]) * dx + (p[1] - a.xy[1]) * dy) / l2)) : 0;
+    const raw = l2 ? ((p[0] - a.xy[0]) * dx + (p[1] - a.xy[1]) * dy) / l2 : 0;
+    const t = Math.max(0, Math.min(1, raw));
     const d = Math.hypot(p[0] - a.xy[0] - t * dx, p[1] - a.xy[1] - t * dy);
-    if (d < best.d) best = { d, s: a.s + (b.s - a.s) * t };
+    if (d < best.d) best = { d, s: a.s + (b.s - a.s) * t, outside: (i === 1 && raw < 0) || (i === base.length - 1 && raw > 1) };
   }
   return best;
 }
@@ -23,12 +24,13 @@ export function heightProfile(f, route, profile) {
     const points = [...(span.approach || []), ...span.profile].map((p) => {
       const pos = span === main ? { s: p.s, d: 0 } : project(p.xy, base);
       const n = route.nearest(...p.xy);
-      return { ...p, x: pos.s - origin, distance: pos.d, game: n && n.d < 8 ? profile.height(n.s) : null };
-    }).filter((p) => p.distance < 12).sort((a, b) => a.x - b.x);
+      return { ...p, x: pos.s - origin, distance: pos.d, outside: pos.outside, game: n && n.d < 8 ? profile.height(n.s) : null };
+    }).filter((p) => p.distance < 12 && !p.outside).sort((a, b) => a.x - b.x);
     if (points.length) series.push({ span, points });
   }
   const pts = series.flatMap((s) => s.points), x0 = Math.min(-30, ...pts.map((p) => p.x)), x1 = Math.max(main.length_m + 30, ...pts.map((p) => p.x));
-  const zs = pts.flatMap((p) => [p.ipr_terrain_z, p.di_z, p.game, ...p.archive.map((a) => a.z), ...p.surfaces.map((a) => a.surface_z ?? a.z)]).filter(valid);
+  const zs = [...pts.flatMap((p) => [p.ipr_terrain_z, p.di_z, p.game, ...p.archive.map((a) => a.z), ...p.surfaces.map((a) => a.surface_z ?? a.z)]),
+    ...Object.values(f.answer_previews || {}).flatMap((spans) => Object.values(spans).flatMap((values) => values.map((v) => v[1])))].filter(valid);
   if (!zs.length) return null;
   const z0 = Math.floor(Math.min(...zs) - 1), z1 = Math.ceil(Math.max(...zs) + 1), w = 360, h = 210, left = 42, right = 350, top = 12, bottom = 180;
   const X = (x) => left + (x - x0) / (x1 - x0) * (right - left), Y = (z) => bottom - (z - z0) / (z1 - z0) * (bottom - top);
@@ -49,36 +51,38 @@ export function heightProfile(f, route, profile) {
     svg += `<path d="M${left},${Y(z)}H${right}" stroke="#52565c" stroke-width=".5"/>`;
     if ((z - z0) % labelStep === 0) svg += `<text x="${left - 4}" y="${Y(z) + 3}" fill="#ddd" font-size="8" text-anchor="end">${z}</text>`;
   }
-  if (terrain.length) svg += `<path d="M${X(terrain[0].x)},${bottom} ${terrain.map((p) => `L${X(p.x)},${Y(p.ipr_terrain_z)}`).join(' ')} L${X(terrain[terrain.length - 1].x)},${bottom}Z" fill="#65583e" opacity=".45"/>`;
+  if (terrain.length) svg += `<g data-series="ground"><path d="M${X(terrain[0].x)},${bottom} ${terrain.map((p) => `L${X(p.x)},${Y(p.ipr_terrain_z)}`).join(' ')} L${X(terrain[terrain.length - 1].x)},${bottom}Z" fill="#65583e" opacity=".45"/></g>`;
   const diLabels = new Set();
   for (const { span, points } of series) {
     const dash = span.direction === 'pathBack' ? '4 2' : '';
-    const archiveIds = new Set(points.flatMap((p) => p.archive.filter((a) => valid(a.z)).map((a) => a.id)));
-    for (const id of archiveIds) svg += line(points, (p) => p.archive.find((a) => a.id === id)?.z, '#eeeeee', dash);
-    if (span === main) svg += line(points, (p) => p.game, '#48d5ff', '3 2');
-    if (span.proposal?.rule === 'linear_di_portals') {
-      const [a, b] = span.proposal.ends; svg += line(points, (p) => a + (b - a) * Math.max(0, Math.min(1, (p.s - span.start_s) / span.length_m)), '#ff9e31', '2 2');
-    } else if (['review_archive_profile', 'archive_agrees_with_survey'].includes(span.proposal?.rule))
-      svg += line(points, (p) => p.archive.find((a) => valid(a.z) && !a.excluded)?.z, '#ff9e31', '2 3');
-    // the answer "archive, bridged over a dip": the deck across what the archive measured below (#176), on a
-    // curve continuing the grade on both sides (#184; older findings give only the two ends)
-    for (const [a, za, b, zb, curve] of f.bridged?.[span.id] || []) {
-      // (x between the two points around s: a pathBack span is drawn reversed along the main one)
-      const byS = [...points].sort((p, q) => p.s - q.s), x = (s) => {
-        const i = byS.findIndex((q) => q.s >= s), p = byS[Math.max(0, i - 1)], q = byS[i < 0 ? byS.length - 1 : i];
-        return q.s > p.s ? p.x + (q.x - p.x) * (s - p.s) / (q.s - p.s) : q.x; };
-      const d = (curve || [[a, za], [b, zb]]).map(([s, z], i) => `${i ? 'L' : 'M'}${X(x(s)).toFixed(1)},${Y(z).toFixed(1)}`).join('');
-      svg += `<path d="${d}" stroke="#ff9e31" stroke-width="2.5" fill="none"${dash ? ` stroke-dasharray="${dash}"` : ''}><title>bridged: ${za.toFixed(2)} → ${zb.toFixed(2)} m</title></path>`;
+    // One archive line across record changes; where records overlap at other levels (Palackého most: the deck and
+    // a record diving to the river), the line keeps the one nearest the last height and the others are hollow dots.
+    const color = span.direction === 'pathBack' ? '#5be59b' : '#eeeeee', chosen = new Map();
+    let last = null, others = '';
+    for (const p of points) {
+      const zs = p.archive.filter((a) => valid(a.z)).sort((a, b) => !!a.excluded - !!b.excluded).map((a) => a.z);
+      if (!zs.length) { last = null; continue; }
+      const z = last === null ? zs[0] : zs.reduce((m, v) => Math.abs(v - last) < Math.abs(m - last) ? v : m);
+      chosen.set(p, z); last = z;
+      for (const v of zs) if (Math.abs(v - z) > 0.3) others += `<circle cx="${X(p.x)}" cy="${Y(v)}" r="1.8" fill="none" stroke="${color}"><title>other archive record: ${v.toFixed(2)} m</title></circle>`;
+    }
+    svg += `<g data-series="${esc(span.direction)}">${line(points, (p) => chosen.get(p), color, dash)}${others}</g>`;
+    if (span === main) svg += `<g data-series="game">${line(points, (p) => p.game, '#48d5ff', '3 2')}</g>`;
+    for (const [choice, spans] of Object.entries(f.answer_previews || {})) {
+      if (!spans[span.id]) continue;
+      const samples = new Map(spans[span.id]);
+      const dots = points.filter((p) => valid(samples.get(p.s))).map((p) => `<circle cx="${X(p.x)}" cy="${Y(samples.get(p.s))}" r="2" fill="#ff9e31"/>`).join('');
+      svg += `<g data-preview="${esc(choice)}" style="display:none">${line(points, (p) => samples.get(p.s), '#ff9e31', dash)}${dots}</g>`;
     }
     for (const p of points) {
       for (const s of p.surfaces) {
         const z = s.surface_z ?? s.z;
-        if (valid(z)) svg += `<circle cx="${X(p.x)}" cy="${Y(z)}" r="2.1" fill="${s.rail_height_eligible && !s.excluded ? '#eabf53' : 'none'}" stroke="#eabf53"><title>${esc(s.class)} level ${esc(s.level ?? '?')}: ${z.toFixed(2)} m</title></circle>`;
+        if (valid(z)) svg += `<circle data-series="survey" cx="${X(p.x)}" cy="${Y(z)}" r="2.1" fill="${s.rail_height_eligible && !s.excluded ? '#eabf53' : 'none'}" stroke="#eabf53"><title>${esc(s.class)} level ${esc(s.level ?? '?')}: ${z.toFixed(2)} m</title></circle>`;
       }
       if (valid(p.di_z)) {
         const x = X(p.x), y = Y(p.di_z), key = `${Math.round(x / 20)},${Math.round(y / 10)}`;
-        svg += `<path d="M${x},${y - 3}l3,3 -3,3 -3,-3Z" fill="#e87eff"><title>DI ${p.di_z.toFixed(2)} m</title></path>`;
-        if (!diLabels.has(key)) { diLabels.add(key); svg += `<text x="${x + 4}" y="${y - 4}" fill="#e87eff" font-size="8">${p.di_z.toFixed(2)}</text>`; }
+        svg += `<path data-series="di" d="M${x},${y - 3}l3,3 -3,3 -3,-3Z" fill="#e87eff"><title>DI ${p.di_z.toFixed(2)} m</title></path>`;
+        if (!diLabels.has(key)) { diLabels.add(key); svg += `<text data-series="di" x="${x + 4}" y="${y - 4}" fill="#e87eff" font-size="8">${p.di_z.toFixed(2)}</text>`; }
       }
     }
   }
@@ -98,6 +102,7 @@ export function heightProfile(f, route, profile) {
   const exaggeration = ((bottom - top) / (right - left) * (x1 - x0) / (z1 - z0)).toFixed(1);
   const layers = [...new Set(Object.values(main.structure.tags || {}).map((t) => t.layer).filter((x) => x !== undefined))];
   const embankment = Object.values(main.structure.tags || {}).some((t) => t.embankment && t.embankment !== 'no');
-  return { html: `<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}×<br>archive white · game cyan dashed · survey gold · DI purple · ground brown · proposal orange${f.bridged ? ' · bridged deck orange solid' : ''} · click: the camera goes there</div>${svg}`,
+  const legend = [['path','archive path','#eee','DTMP tram axis, 2008 records'], ['pathBack','archive pathBack','#5be59b','DTMP tram axis, 2008 records'], ['game','game','#48d5ff','Current game profile'], ['survey','survey','#eabf53','DTM ZPS surfaces: filled accepted as rail height; hollow not accepted'], ['di','DI','#e87eff','Current DTM transport layer, set 7, 2026-09-30'], ['ground','ground','#ad9870','IPR 1 m lidar terrain, 2023']];
+  return { html: `<div class="dim" style="font-size:11px;line-height:1.2">${esc(main.structure.kind)}${embankment ? ' · embankment' : ''}${layers.length ? ` · layer ${esc(layers.join(', '))}` : ''} · ${esc(main.direction)} · vertical exaggeration ${exaggeration}× · click chart: move camera</div><div class="rvRow">${legend.map(([id,name,color,title]) => `<button type="button" data-height-series="${id}" aria-pressed="true" title="${title}" style="color:${color}">${name}</button>`).join('')}</div>${svg}`,
     points: series[0].points, x0, x1, left, right, width: w };
 }
