@@ -53,6 +53,8 @@ LOOK = 3.0         # m along an edge for its direction at a node
 CROSS = 10.0       # degrees: two tracks passing one node at more than this cross there (else they touch)
 MERGE = 0.5        # m: nodes joined by a shorter edge are one
 CLEAR = 0.5        # m from an end node held by a track fitted before: no data points
+GAP_MAX = 1.0      # m: a gap between a track's records at a node up to this lets its points near the node move by it
+GAP_REACH = 5.0    # m around such a node
 THIN = 0.003       # m: the written points leave out samples a chord passes within this of
 THIN_MAX = 10.0    # m: at most this far apart
 KEEP = 2.5         # m from an edge's ends where every sample is kept
@@ -300,7 +302,7 @@ class Network:
                 edges[key] = (list(p) if key == (ra, rb) else list(p[::-1]), src, lim)
                 adj[ra].add(rb)
                 adj[rb].add(ra)
-        loose = {(find(n), k(find(a), find(b))) for n, (a, b) in loose}
+        loose = {(find(n), k(find(a), find(b))): (loose[(n, (a, b))] if isinstance(loose, dict) else 0.5) for n, (a, b) in loose}
 
         def along(n, m):
             p = edges[k(n, m)][0]
@@ -394,6 +396,16 @@ class Network:
                 tol.append(None if t == TOL and (b, k(a, b)) in loose else t)
                 lim.append(l)
                 node_at.append(len(pts_c) - 1)
+            # where this track's records meet with a gap at a node (a branch DI starts 0.21 m off the through track's
+            # line, Strossmayerovo náměstí), its points within GAP_REACH of it may move by the gap besides their class
+            for j, n in enumerate(seq):
+                gap = max([loose.get((n, k(n, m)), 0.0) for m in (seq[j - 1] if j else None, seq[j + 1] if j + 1 < len(seq) else None)
+                           if m is not None and edges[k(n, m)][1] in ('di', 'dtmp')] or [0.0])
+                if 0.0 < gap <= GAP_MAX:
+                    i0 = node_at[j]
+                    for i in range(len(pts_c)):
+                        if math.dist(pts_c[i], pts_c[i0]) <= GAP_REACH:
+                            lim[i] = max(lim[i], min(lim[i], errors[UNCLASSED]) + gap)
 
             def own(j):
                 """This track's direction at its j-th node, from its points LOOK either side."""
@@ -408,14 +420,19 @@ class Network:
             # nodes fitted before are held, except a crossing (this track passes a node another passes at an angle):
             # it slides to where the two curves cross (the node's position is the point nearest all its tracks,
             # 0.4 m off the long track at Strossmayerovo náměstí, where the crossing track ran through it)
-            fixed, crossing = {}, []
+            # (only while the track that fixed it is its only one: a track ending there holds it.) A node off this
+            # track's line where it crosses tracks fitted before keeps the node; this track crosses them at its own
+            # point (OSM joins two crossings 0.65 m apart in one node at Strossmayerovo náměstí)
+            fixed, crossing, private = {}, [], []
             for j, n in enumerate(seq):
                 if n not in node:
                     continue
-                # (only while the track that fixed it is its only one: a track ending there holds it)
-                inner = 0 < j < len(seq) - 1 and len(node[n]['at']) == 1 and all(0 < jj < len(chains[cc]) - 1 for cc, jj in node[n]['at'])
-                if inner and angle(own(j), node[n]['dirs']) > CROSS:
+                inner = 0 < j < len(seq) - 1 and all(0 < jj < len(chains[cc]) - 1 for cc, jj in node[n]['at'])
+                crosses = 0 < j < len(seq) - 1 and angle(own(j), node[n]['dirs']) > CROSS
+                if inner and crosses and len(node[n]['at']) == 1 and not node[n].get('off'):
                     crossing.append(j)
+                elif crosses and tol[node_at[j]] is None and any(0 < jj < len(chains[cc]) - 1 for cc, jj in node[n]['at']):
+                    private.append(j)
                 else:
                     fixed[node_at[j]] = node[n]['pos']
             # points within CLEAR of an end a track fitted before holds say no more than that node: they stand for
@@ -457,23 +474,47 @@ class Network:
                 q, (s_o, t_o) = hit
                 node[n]['pos'] = q
                 other['cut'][oj] = (s_o, t_o)
+            own_point = {}
+            for j in private:
+                n = seq[j]
+                hit = None
+                for oc, oj in node[n]['at']:
+                    if 0 < oj < len(chains[oc]) - 1:
+                        hit = crossing_point(px, py, at[node_at[j]], fitted[oc]['px'], fitted[oc]['py'], fitted[oc]['cut'][oj][0])
+                        if hit:
+                            break
+                if hit is None:   # (no crossing near it: hold the node after all)
+                    fixed[node_at[j]] = node[n]['pos']
+                    samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim)
+                    px, py = [q[0] for q in samples], [q[1] for q in samples]
+                    own_point.clear()
+                    continue
+                own_point[j] = hit[0]
             # each node where the curve passes nearest its position (the samples slide along the curve); a node
             # fitted before where it is
             cut = []
             for j, n in enumerate(seq):
                 s = at[node_at[j]]
-                _, seg, t = nearest(px, py, s - 10, s + 10, node[n]['pos'] if n in node else pts_c[node_at[j]])
+                _, seg, t = nearest(px, py, s - 10, s + 10, own_point[j] if j in own_point else
+                                    node[n]['pos'] if n in node else pts_c[node_at[j]])
                 if cut and (seg, t) < cut[-1]:
                     seg, t = cut[-1]
                 if n not in node:
                     q = (px[seg] + t * (px[seg + 1] - px[seg]), py[seg] + t * (py[seg + 1] - py[seg])) if len(px) > 1 else samples[0]
-                    node[n] = {'pos': q, 'dirs': [], 'at': []}
+                    if tol[node_at[j]] is None and any((n, k(n, m)) in loose for m in (seq[j - 1] if j else None,
+                                                       seq[j + 1] if j + 1 < len(seq) else None) if m is not None):
+                        # (a node off this track's line: it stays where it is, the track crosses at its own point;
+                        # the long track fixing it would move it off the tracks that do pass through it)
+                        node[n] = {'pos': tuple(pts_c[node_at[j]]), 'dirs': [], 'at': [], 'off': True}
+                        own_point[j] = q
+                    else:
+                        node[n] = {'pos': q, 'dirs': [], 'at': []}
                 cut.append((seg, t))
                 a, b = samples[max(0, seg - (t == 0.0 and seg > 0))], samples[min(len(samples) - 1, seg + 1)]
                 l = math.dist(a, b) or 1.0
                 node[n]['dirs'].append(((b[0] - a[0]) / l, (b[1] - a[1]) / l))
                 node[n]['at'].append((c, j))
-            fitted.append({'px': px, 'py': py, 'cut': cut})
+            fitted.append({'px': px, 'py': py, 'cut': cut, 'own': own_point})
             for i, p in enumerate(pts_c):
                 if tol[i] is None or tol[i] > TOL + 1e-9:
                     continue
@@ -489,7 +530,7 @@ class Network:
         for seq, f in zip(chains, fitted):
             px, py, cut = f['px'], f['py'], f['cut']
             for j, (a, b) in enumerate(zip(seq, seq[1:])):
-                p0, p1 = node[a]['pos'], node[b]['pos']
+                p0, p1 = f['own'].get(j, node[a]['pos']), f['own'].get(j + 1, node[b]['pos'])
                 piece = [p0]
                 for i in range(cut[j][0] + 1, cut[j + 1][0] + 1):
                     if math.dist((px[i], py[i]), piece[-1]) > 1e-3 and math.dist((px[i], py[i]), p1) > 1e-3:

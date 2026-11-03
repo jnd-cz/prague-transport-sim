@@ -754,10 +754,19 @@ def main():
         print(f"track curves: {json.dumps({k: v for k, v in geo.report['curve'].items() if not isinstance(v, list)})}")
 
     def expand(ids):
-        """The points along a node list through the moved edge geometry, and where each node lies in them."""
+        """The points along a node list through the moved edge geometry, and where each node lies in them. An edge
+        may end off its node: a track crossing others at a merged OSM node keeps its own crossing point (#204)."""
         out, at = [], []
+        segs = [geo.points(a, b) for a, b in zip(ids, ids[1:])]
+        # (an edge between two OSM nodes merged into one has no length: the next edge starts the line)
+        real = [s for s in segs if sum(dist(p, q) for p, q in zip(s, s[1:])) > 0.01]
         for i, n in enumerate(ids):
-            out += [geo.at(n)] if i == 0 else geo.points(ids[i - 1], n)[1:]
+            if i == 0:
+                out.append(real[0][0] if real else geo.at(n))
+            else:
+                seg = segs[i - 1]
+                if sum(dist(p, q) for p, q in zip(seg, seg[1:])) > 0.01:
+                    out += seg[1:] if dist(seg[0], out[-1]) <= 0.01 else seg
             at.append(len(out) - 1)
         return out, at
 

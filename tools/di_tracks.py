@@ -609,14 +609,15 @@ class TrackGeometry:
         (tools/track_curve.py, #204); `report['curve']` says what moved and what was left."""
         import track_curve
         kind = {key: (hit[0].name if hit else 'osm') for key, hit in self.edges.items()}
-        # a node off the chain an edge runs on at it (the point nearest all of a node's chains; a fork moved onto
-        # the through track, off the branch)
-        loose = set()
+        # a node off the chain an edge runs on at it, and how far (the point nearest all of a node's chains; a fork
+        # moved onto the through track, off the branch)
+        loose = {}
         for (a, b), hit in self.edges.items():
             if hit:
                 for n, run in ((a, hit[1][0]), (b, hit[1][-1])):
-                    if hit[0].chains[run[0]]['line'].distance(Point(self.pos[n])) > 0.01:
-                        loose.add((n, (a, b)))
+                    d = hit[0].chains[run[0]]['line'].distance(Point(self.pos[n]))
+                    if d > 0.01:
+                        loose[(n, (a, b))] = d
         # how far each surveyed edge may move where a curve would bend too tight: the mean coordinate error of the
         # worst accuracy class among its records (data/truth.json `sourceAccuracy`; the archive states none)
         errors, limit = track_curve.class_errors(), {}

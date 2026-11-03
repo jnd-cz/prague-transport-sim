@@ -106,8 +106,8 @@ class Network(unittest.TestCase):
         self.assertLess(abs(math.degrees((h_out - h_in + math.pi) % (2 * math.pi) - math.pi)), 3.0)
 
     def test_a_crossing_node_lies_on_both_curves(self):
-        # the node 0.3 m off the long track and 0.13 m off the other (the point nearest all its tracks): it slides
-        # to where they cross
+        # the node 0.3 m off the long track and 0.13 m off the other (the point nearest all its tracks): the tracks
+        # cross at their own point
         long = [(x, 0.0) for x in range(-60, 61, 2)]
         cross = [(0.3 + 0.5 * t, t) for t in range(-20, 21, 2)]
         pos = {1: (-60, 0), 2: (0.3, 0.3), 3: (60, 0), 4: cross[0], 5: cross[-1]}
@@ -115,9 +115,11 @@ class Network(unittest.TestCase):
                (2, 5): [(0.3, 0.3)] + cross[11:]}
         kind = {e: 'di' for e in pts}
         net = tc.Network(pos, pts, kind, loose={(2, e) for e in pts})
-        q = net.pos[2]
-        self.assertLess(abs(q[1]), tc.TOL + 0.005)
-        self.assertLess(off(q, cross), tc.TOL + 0.005)
+        # both tracks' edges end where they cross (each keeps its own point at a node off its line)
+        for e in pts:
+            q = net.pts[e][0] if e[0] == 2 else net.pts[e][-1]
+            self.assertLess(abs(q[1]), tc.TOL + 0.005)
+            self.assertLess(off(q, cross), tc.TOL + 0.005)
 
     def test_nodes_a_few_centimetres_apart_are_one(self):
         line = [(x, 0.0) for x in range(0, 41, 2)]
