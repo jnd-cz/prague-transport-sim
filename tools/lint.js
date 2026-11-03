@@ -400,7 +400,10 @@ function trackRadius(g) {
 // direction at an end is the tangent of the parabola through the drawn track's first three points (a chord, or
 // points between them, read a smooth 20 m curve as a 2-4° break). The bar stays 1° (the user, 2026-11-03: "Keep
 // 1°, fix the nodes"): 71 breaks on line 17 were the game's drawing (a three-point average and a 1.5 m resample
-// at short pieces' ends), the build's own points broke 2 joins over 1°.
+// at short pieces' ends). Where at least two drawn points lie within JOIN_REACH of the end, the tangent is the
+// least-squares parabola's through them: three points whose first step was 0.17 m read a smooth 21 m curve's
+// joint at a crossing as a 1.2° break (0.2° fitted over 2-3 m).
+const JOIN_REACH = 2.0;
 function trackJoins(g) {
   const ends = [];
   for (const t of g.data.tracks || []) {
@@ -411,7 +414,24 @@ function trackJoins(g) {
     for (const fwd of [true, false]) {
       const q = fwd ? p : [...p].reverse(), p0 = q[0];
       let dx = q[1][0] - p0[0], dy = q[1][1] - p0[1];
-      if (q.length > 2) {
+      const near = [];
+      for (let k = 1, c = 0; k < q.length; k++) {
+        c += Math.hypot(q[k][0] - q[k - 1][0], q[k][1] - q[k - 1][1]);
+        if (c > JOIN_REACH) break;
+        near.push(q[k]);
+      }
+      if (near.length >= 2) {
+        // y = a x + b x² through the end, least squares, in the frame of the chord to the farthest point
+        const f = near[near.length - 1], cl = Math.hypot(f[0] - p0[0], f[1] - p0[1]), ux = (f[0] - p0[0]) / cl, uy = (f[1] - p0[1]) / cl;
+        let x2 = 0, x3 = 0, x4 = 0, xy = 0, x2y = 0;
+        for (const [qx, qy] of near) {
+          const x = (qx - p0[0]) * ux + (qy - p0[1]) * uy, y = -(qx - p0[0]) * uy + (qy - p0[1]) * ux;
+          x2 += x * x; x3 += x * x * x; x4 += x * x * x * x; xy += x * y; x2y += x * x * y;
+        }
+        const a = (xy * x4 - x2y * x3) / (x2 * x4 - x3 * x3 || 1e-12);
+        dx = ux - a * uy;
+        dy = uy + a * ux;
+      } else if (q.length > 2) {
         const h1 = Math.hypot(dx, dy), h2 = Math.hypot(q[2][0] - q[1][0], q[2][1] - q[1][1]);
         if (h1 > 1e-6 && h2 > 1e-6) {
           const a = -(2 * h1 + h2) / (h1 * (h1 + h2)), b = (h1 + h2) / (h1 * h2), c = -h1 / (h2 * (h1 + h2));
