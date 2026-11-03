@@ -55,6 +55,9 @@ MERGE = 0.5        # m: nodes joined by a shorter edge are one
 CLEAR = 0.5        # m from an end node held by a track fitted before: no data points
 GAP_MAX = 1.0      # m: a gap between a track's records at a node up to this lets its points near the node move by it
 GAP_REACH = 5.0    # m around such a node
+OFF = 0.1          # m: a node off a track through it by more than this, where three edges meet, keeps its place and
+                   # the track passes at its own point (Národní divadlo 0.34 m, Strossmayerovo 0.15-0.18 m); a switch
+                   # this near its track joins it exactly (Čechův most 2 cm: the route broke there)
 THIN = 0.003       # m: the written points leave out samples a chord passes within this of
 THIN_MAX = 10.0    # m: at most this far apart
 KEEP = 2.5         # m from an edge's ends where every sample is kept
@@ -501,10 +504,11 @@ class Network:
                     seg, t = cut[-1]
                 if n not in node:
                     q = (px[seg] + t * (px[seg + 1] - px[seg]), py[seg] + t * (py[seg + 1] - py[seg])) if len(px) > 1 else samples[0]
-                    if tol[node_at[j]] is None and any((n, k(n, m)) in loose for m in (seq[j - 1] if j else None,
-                                                       seq[j + 1] if j + 1 < len(seq) else None) if m is not None):
-                        # (a node off this track's line: it stays where it is, the track crosses at its own point;
-                        # the long track fixing it would move it off the tracks that do pass through it)
+                    gap = max(loose.get((n, k(n, m)), 0.0) for m in (seq[j - 1], seq[j + 1])) if 0 < j < len(seq) - 1 else 0.0
+                    if tol[node_at[j]] is None and gap > (0.0 if len(adj[n]) >= 4 else OFF):
+                        # (a node off this track's line where it passes through: it stays where it is, the track
+                        # crosses at its own point; the long track fixing it would move it off the tracks that do pass
+                        # through it. A switch near its track joins it: OFF)
                         node[n] = {'pos': tuple(pts_c[node_at[j]]), 'dirs': [], 'at': [], 'off': True}
                         own_point[j] = q
                     else:

@@ -29,8 +29,15 @@ FORK = 15.0    # m: an OSM switch takes the position of a source fork on its own
                # this near (the user's answers of 2026-11-03, #204: forks 5.3-7.4 m from OSM's switch are the same
                # switch, "Switch is there, likely a bit further than 5m")
 OVERLAP = 0.03  # m: a branch ending on a track's middle stays within this of its distance at the end while it runs
-                # alongside (Čechův most: DI draws the branch 13 cm off the through track for 21 m before it leaves)
-OVERLAP_MIN = 3.0  # m: running alongside this far is an overlap: the fork is where it ends, else at the branch's end
+                # on it as a copy (Vozovna Kobylisy: two records 1-3 cm apart for 15 m, then they part)
+OVERLAP_MIN = 3.0  # m: running on as a copy this far: the fork is where it leaves, else at the branch's end
+INTERLACE = 0.05, 0.2, 10.0  # m: a branch running beside a track within 0.2 m for 10 m or more, at a median offset of
+                # 5 cm or more, is interlaced track: the switch is at the branch's end, where it starts beside the
+                # track (Čechův most 13 cm for 28 m, Ohrada 12-13 cm for 51 m; a switch's branch is 0.2 m off within
+                # 4-9 m). The user, 2026-11-03: "the fork starts and ends well in front of/behind the road junction"
+TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the track at a record joint, the switch's tip
+                # lies this far back (the tongues DI draws: Ohrada, Dejvice 8.4-8.5 m, Chotkova 9 m; OSM's switches
+                # at Čechův most lie 8.0 and 8.8 m behind DI's record joints)
 BLEND = 20.0   # m along an OSM fill stretch over which it takes up the shift of its matched neighbours
 CHANGE = 1.0   # m-equivalent cost of continuing on another chain along one OSM edge
 JOINT = 4.0    # m: the chain may change only this near the joint of the two chains (STEP + TOL)
@@ -209,9 +216,11 @@ class Source:
 
     def _branch_ends(self):
         """Forks the source does not split its records at: a chain's lone end on another chain's middle, leaving it
-        within ANGLE and moving apart (Palackého náměstí: the branch ends 19.8 m along the through track). A branch
-        that first runs alongside (within OVERLAP of its distance at the end, OVERLAP_MIN or more) forks where it
-        leaves (Čechův most: 13 cm off for 21 m)."""
+        within ANGLE and moving apart (Palackého náměstí: the branch ends 19.8 m along the through track). Interlaced
+        track (INTERLACE) forks where the branch starts beside the track, followed across record joints (Dejvice:
+        both tracks split every few metres, their joints 12 cm apart): at the tip of its tongue where DI draws one
+        (Ohrada: 0 to 12 cm over 9 m), else at the branch's end (Čechův most: 13 cm off at the through track's record
+        joint). A copy running on the track first forks where it leaves."""
         lines = [c['line'] for c in self.chains]
         if not lines:
             return
@@ -219,6 +228,42 @@ class Source:
         tips = [p for l in lines for p in (l.coords[0], l.coords[-1])]
         tip_tree = shapely.STRtree(shapely.points(tips))
         known = list(self.forks)
+        self.interlaced = []   # {'tip', 'dir' the branch leaves in, 'side' it lies on (1 left), 'run' m}
+        cos = math.cos(math.radians(ANGLE))
+
+        def onward(c, s, sign, length):
+            """Points every 0.5 m along chain c from s on (sign 1: towards its end), then on through the nearest chain
+            end within JOIN that continues it within ANGLE, up to length."""
+            out, seen = [], {c}
+            while True:
+                l = lines[c]
+                n = int((l.length - s if sign > 0 else s) / 0.5)
+                out += [l.interpolate(s + sign * 0.5 * i) for i in range(n + 1)]
+                if len(out) * 0.5 >= length:
+                    return out[:int(length / 0.5) + 1]
+                tip = l.coords[-1] if sign > 0 else l.coords[0]
+                q = l.interpolate(l.length - 1.0 if sign > 0 else 1.0)
+                d = _unit((tip[0] - q.x, tip[1] - q.y))
+                best = None
+                for i in tip_tree.query(Point(tip).buffer(JOIN)):
+                    c2, e2 = divmod(int(i), 2)
+                    g = math.dist(tips[int(i)], tip)
+                    if c2 in seen or g > JOIN:
+                        continue
+                    l2 = lines[c2]
+                    r = l2.interpolate(1.0 if e2 == 0 else l2.length - 1.0)
+                    d2 = _unit((r.x - tips[int(i)][0], r.y - tips[int(i)][1]))
+                    if d[0] * d2[0] + d[1] * d2[1] > cos and (best is None or g < best[0]):
+                        best = (g, c2, e2)
+                if best is None:
+                    return out
+                _, c, e2 = best
+                seen.add(c)
+                s, sign = (0.0, 1) if e2 == 0 else (lines[c].length, -1)
+
+        def geom(pts):
+            return LineString([(p.x, p.y) for p in pts]) if len(pts) > 1 else pts[0]
+
         for k, line in enumerate(lines):
             for first in (True, False):
                 e = tips[2 * k + (0 if first else 1)]
@@ -227,36 +272,85 @@ class Source:
                     continue
                 lone = not any(int(i) // 2 != k and math.dist(e, tips[int(i)]) <= JOIN for i in tip_tree.query(pe.buffer(JOIN)))
                 walk = (lambda s: line.interpolate(s)) if first else (lambda s: line.interpolate(line.length - s))
+                sign = 1 if first else -1
                 for j in tree.query(pe.buffer(JOIN)):
                     j = int(j)
                     thr = lines[j]
                     if j == k or thr.distance(pe) > JOIN:
                         continue
-                    d0, s = thr.distance(pe), 0.0
-                    while s + 0.5 <= line.length and thr.distance(walk(s + 0.5)) <= d0 + OVERLAP:
-                        s += 0.5
-                    if s < OVERLAP_MIN:
-                        s = 0.0
-                    # (a branch ending on the middle of a track, or leaving it after running alongside: where
-                    # other records end too, Čechův most's branch starts at the through track's record joint)
-                    p0 = walk(s)
-                    tt = thr.project(p0)
-                    if not (s or lone) or not JOIN < tt < thr.length - JOIN:
-                        continue
-                    if line.length - s < FORK_MIN or thr.distance(walk(min(s + FORK_OUT, line.length))) < FORK_APART:
-                        continue
-                    p1 = walk(s + 1.0)
-                    u = _unit((p1.x - p0.x, p1.y - p0.y))
-                    a, b = thr.interpolate(max(0.0, tt - 0.5)), thr.interpolate(min(thr.length, tt + 0.5))
-                    v = _unit((b.x - a.x, b.y - a.y))
+                    tt = thr.project(pe)
+                    # interlaced: the branch on from its end and back past it, against the track both ways (only
+                    # where it is beside the track 3 m on and still within INTERLACE 10 m on, or its record ends first)
+                    d3 = thr.distance(walk(min(3.0, line.length)))
+                    maybe = 0.03 <= d3 <= INTERLACE[1] and (line.length < INTERLACE[2] or
+                                                            thr.distance(walk(INTERLACE[2])) <= INTERLACE[1])
+                    ahead = onward(k, 0.0 if first else line.length, sign, 120.0) if maybe else [pe]
+                    track = shapely.MultiLineString([g for g in (geom(onward(j, tt, 1, 150.0)), geom(onward(j, tt, -1, 150.0)))
+                                                     if g.geom_type == 'LineString'] if maybe else [thr])
+                    da = shapely.distance(shapely.points([(p.x, p.y) for p in ahead]), track)
+                    n_a = next((i for i, d in enumerate(da) if d > INTERLACE[1]), len(da))
+                    behind = onward(k, 0.0 if first else line.length, -sign, 40.0)[1:] if maybe and not lone else []
+                    if behind:   # (the extension behind starts with the jump onto the next record)
+                        behind = [pe] + behind
+                    db = shapely.distance(shapely.points([(p.x, p.y) for p in behind]), track) if behind else []
+                    n_b = 0
+                    while n_b + 1 < len(db) and 0.01 < db[n_b + 1] <= INTERLACE[1]:
+                        n_b += 1
+                    offs = sorted(list(da[:n_a]) + list(db[1:n_b + 1]))
+                    run = (n_a - 1 + n_b) * 0.5
+                    inter = (maybe and run >= INTERLACE[2] and offs[len(offs) // 2] >= INTERLACE[0] and len(ahead) - n_a >= FORK_MIN / 0.5
+                             and da[min(len(da) - 1, n_a + int(FORK_OUT / 0.5))] >= FORK_APART)
+                    if inter:
+                        u = _unit((ahead[2].x - ahead[0].x, ahead[2].y - ahead[0].y))
+                        mine = False   # (this record is the track, the other the branch)
+                        if n_b:   # (the tongue DI draws)
+                            f = track.interpolate(track.project(behind[n_b]))
+                        elif da[0] >= INTERLACE[0]:   # (it starts beside the track at a record joint: the tip is a
+                                                      # tongue back along the track)
+                            back = max((onward(j, tt, sg, TONGUE + 1.0) for sg in (1, -1)),
+                                       key=lambda q: -((q[min(2, len(q) - 1)].x - q[0].x) * u[0] + (q[min(2, len(q) - 1)].y - q[0].y) * u[1]))
+                            f = geom(back).interpolate(TONGUE)
+                        elif not lone and math.dist(e, (behind[1].x, behind[1].y)) < 0.01 and da[min(2, len(da) - 1)] >= INTERLACE[0]:
+                            # (a record continuing another's end with the branch beside it from the joint: the same
+                            # switch seen from the track, a tongue back along it)
+                            f, mine = geom(behind).interpolate(TONGUE), True
+                        else:   # (the branch starts on the track)
+                            f = track.interpolate(track.project(pe))
+                        q0, q1 = track.interpolate(max(0.0, track.project(f) - 0.5)), track.interpolate(track.project(f) + 0.5)
+                        v = _unit((q1.x - q0.x, q1.y - q0.y))
+                        if v[0] * u[0] + v[1] * u[1] < 0:
+                            v = (-v[0], -v[1])
+                        # the side the branch lies on, where it parts: 1 left of its direction, -1 right
+                        q = ahead[max(0, n_a - 1)]
+                        r = track.interpolate(track.project(q))
+                        side = (1 if u[0] * (q.y - r.y) - u[1] * (q.x - r.x) > 0 else -1) * (-1 if mine else 1)
+                    else:
+                        d0, s = thr.distance(pe), 0.0
+                        while s + 0.5 <= line.length and thr.distance(walk(s + 0.5)) <= d0 + OVERLAP:
+                            s += 0.5
+                        if s < OVERLAP_MIN:
+                            s = 0.0
+                        # (a branch ending on the middle of a track, or leaving it after running on it as a copy)
+                        p0 = walk(s)
+                        tt = thr.project(p0)
+                        if not (s or lone) or not JOIN < tt < thr.length - JOIN:
+                            continue
+                        if line.length - s < FORK_MIN or thr.distance(walk(min(s + FORK_OUT, line.length))) < FORK_APART:
+                            continue
+                        p1 = walk(s + 1.0)
+                        u = _unit((p1.x - p0.x, p1.y - p0.y))
+                        q0, q1 = thr.interpolate(max(0.0, tt - 0.5)), thr.interpolate(min(thr.length, tt + 0.5))
+                        v = _unit((q1.x - q0.x, q1.y - q0.y))
+                        f = thr.interpolate(tt)
                     if math.degrees(math.acos(min(1.0, abs(u[0] * v[0] + u[1] * v[1])))) > ANGLE:
                         continue
-                    f = thr.interpolate(tt)
                     if any(math.dist((f.x, f.y), q) <= JOIN for q in known):
                         break   # (found from the other track's end too)
                     self.forks.append((f.x, f.y))
                     self.branches.append([v, (-v[0], -v[1]), u])
                     known.append((f.x, f.y))
+                    if inter:
+                        self.interlaced.append({'tip': (f.x, f.y), 'dir': u, 'side': side, 'run': run})
                     break
 
     def candidates(self, x, y, ux, uy, tol=TOL, only=None):
@@ -703,6 +797,125 @@ class TrackGeometry:
                 'reversed_edges': reversed_,
                 'switches_on_forks': len(self.forked), 'nodes_moved_with_a_switch': len(self.collapsed),
                 'fill': fill}
+
+
+def split_interlaced(ways, seqs, pos, interlaced, reach=20.0, snap=3.0):
+    """OSM draws interlaced track as one way from the switch to where the tracks part: a railway=switch node at
+    the tip, the split at a railway_crossing node ("rozjezdová splítka": Čechův most, Ke Stírce, Ohrada). For each
+    interlaced switch of the source (`Source.interlaced`) whose tip lies on an OSM edge running its way, the stretch
+    from the tip (an OSM node within `snap`, else a new one) to the next junction ahead within its run and `reach`
+    is doubled; the copy carries the leg on the branch's side, so each track has its own edges and the switch is at
+    the tip. Where OSM already splits at the tip nothing changes.
+
+    ways: [{'nodes': [...], 'tags': {...}}], seqs: route node lists, pos: {node: (x, y)}; all changed in place.
+    Returns {new node: ('copy', node) | ('between', a, b, t)} (t: from a towards b)."""
+    new, next_id = {}, min([0] + [n for w in ways for n in w['nodes'] if isinstance(n, int)]) - 1
+    for it in interlaced:
+        tip, u = it['tip'], it['dir']
+        adj = defaultdict(set)
+        for ns in [w['nodes'] for w in ways] + list(seqs):
+            for a, b in zip(ns, ns[1:]):
+                if a != b:
+                    adj[a].add(b)
+                    adj[b].add(a)
+        best = None
+        for a in adj:
+            for b in adj[a]:
+                if str(a) >= str(b):
+                    continue
+                (ax, ay), (bx, by) = pos[a], pos[b]
+                l2 = (bx - ax) ** 2 + (by - ay) ** 2
+                if l2 < 1e-6:
+                    continue
+                s = max(0.0, min(1.0, ((tip[0] - ax) * (bx - ax) + (tip[1] - ay) * (by - ay)) / l2))
+                d = math.dist(tip, (ax + s * (bx - ax), ay + s * (by - ay)))
+                cos = abs((bx - ax) * u[0] + (by - ay) * u[1]) / math.sqrt(l2)
+                if d <= TOL and cos > math.cos(math.radians(ANGLE)) and (best is None or d < best[0]):
+                    best = (d, a, b, s)
+        if best is None:
+            continue
+        _, a, b, s = best
+        if (pos[b][0] - pos[a][0]) * u[0] + (pos[b][1] - pos[a][1]) * u[1] < 0:
+            a, b, s = b, a, 1.0 - s
+        q = (pos[a][0] + s * (pos[b][0] - pos[a][0]), pos[a][1] + s * (pos[b][1] - pos[a][1]))
+        near = min((a, b), key=lambda n: math.dist(pos[n], q))
+        if math.dist(pos[near], q) <= snap:
+            if len(adj[near]) != 2:
+                continue   # (OSM splits there already)
+            S = near
+            ahead = b if near == a else next(m for m in adj[b] if m != a) if len(adj[b]) == 2 else None
+            if near == b and ahead is None:
+                continue
+            first = b if near == a else ahead
+        else:
+            S, first = next_id, b
+            next_id -= 1
+            new[S] = ('between', a, b, s)
+            pos[S] = q
+            for ns in [w['nodes'] for w in ways] + list(seqs):
+                for i in range(len(ns) - 1, 0, -1):
+                    if {ns[i - 1], ns[i]} == {a, b}:
+                        ns.insert(i, S)
+            adj[S] = {a, b}
+            adj[a].discard(b); adj[b].discard(a); adj[a].add(S); adj[b].add(S)
+        # the shared stretch ahead to the junction where the tracks part
+        path, prev, cur, run = [S], S, first, math.dist(pos[S], pos[first])
+        while len(adj[cur]) == 2 and run <= it['run'] + reach:
+            path.append(cur)
+            prev, cur = cur, next(m for m in adj[cur] if m != prev)
+            run += math.dist(pos[prev], pos[cur])
+        if len(adj[cur]) != 3 or run > it['run'] + reach:
+            continue
+        P = cur
+        d_in = _unit((pos[P][0] - pos[prev][0], pos[P][1] - pos[prev][1]))
+        legs = [m for m in adj[P] if m != prev]
+
+        def out(m):
+            """The leg's direction over its first metres."""
+            p0, c, r = P, m, math.dist(pos[P], pos[m])
+            while r < 5.0 and len(adj[c]) == 2:
+                p0, c = c, next(x for x in adj[c] if x != p0)
+                r += math.dist(pos[p0], pos[c])
+            return _unit((pos[c][0] - pos[P][0], pos[c][1] - pos[P][1]))
+        dirs = {m: out(m) for m in legs}
+        if any(d_in[0] * w[0] + d_in[1] * w[1] <= 0 for w in dirs.values()):
+            continue   # (not a split facing the tip)
+        leg = max(legs, key=lambda m: it['side'] * (d_in[0] * dirs[m][1] - d_in[1] * dirs[m][0]))
+        copy = {}
+        for n in path[1:] + [P]:
+            copy[n] = next_id
+            new[next_id] = ('copy', n)
+            pos[next_id] = pos[n]
+            next_id -= 1
+        # the leg leaves from P's copy; ways running on through P into it are cut there
+        for w in list(ways):
+            ns = w['nodes']
+            for i in range(len(ns) - 1):
+                if {ns[i], ns[i + 1]} == {P, leg}:
+                    k = i if ns[i] == P else i + 1
+                    head, tail = ns[:k + 1], ns[k:]
+                    if ns[i] == P:
+                        tail = [copy[P]] + tail[1:]
+                        parts = [head, tail]
+                    else:
+                        head = head[:-1] + [copy[P]]
+                        parts = [head, tail]
+                    ways.remove(w)
+                    ways.extend({**w, 'nodes': x} for x in parts if len(x) > 1)
+                    break
+        tags = next((w.get('tags', {}) for w in ways for i in range(len(w['nodes']) - 1)
+                     if {w['nodes'][i], w['nodes'][i + 1]} == {S, path[1] if len(path) > 1 else P}), {})
+        ways.append({'type': 'way', 'id': next_id, 'nodes': [S] + [copy[n] for n in path[1:] + [P]], 'tags': dict(tags)})
+        next_id -= 1
+        # routes on that leg take the copy
+        shared = path + [P]
+        for ns in seqs:
+            for i in range(len(ns) - len(shared)):
+                if ns[i:i + len(shared)] == shared and ns[i + len(shared)] == leg:
+                    ns[i + 1:i + len(shared)] = [copy[n] for n in shared[1:]]
+                elif ns[i + 1:i + 1 + len(shared)] == shared[::-1] and ns[i] == leg:
+                    ns[i + 1:i + len(shared)] = [copy[n] for n in shared[::-1][:-1]]
+    return new
 
 
 def osm_graph(*answers):

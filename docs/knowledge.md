@@ -84,8 +84,7 @@ What sessions learned and later work needs. Kept current and short; the full log
   3.5 m). DI (state 2026-09-30) lacks the track OSM maps at 50.0502 N 14.4154 E (ways of 2025–26).
 - **DI draws a switch three ways** (#204): records ending together and leaving apart (a fork of record ends);
   a branch ending on the middle of a through record that is not split there (Palackého náměstí, the branch
-  19.8 m along it); a branch running 13 cm off the through track for 21 m before it leaves (Čechův most, from
-  a record joint). At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
+  19.8 m along it); interlaced track (below), where the switch is the branch's start, not where it leaves. At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
   switches lie up to 7.4 m from DI's forks along the track (Jiráskovo náměstí; the user's answers of
   2026-11-03), and OSM and DI can disagree on which leg is the straight one in a curved switch (Křižovnická).
 - **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
@@ -110,8 +109,19 @@ What sessions learned and later work needs. Kept current and short; the full log
   the old where both had them (median 0, p90 2 cm): DI heights now reach 63-71 % of each line's path (were
   25-47 %). The old records at Podolské nábřeží run on through the new Dvorecký most junction, where the re-entries
   end at its switches. `di_tracks._latest` drops an older record lying on newer ones (1,057 city-wide).
-- **Interlaced track after a switch** (Čechův most, Ohrada–Krejcárek, Chotkova, Flora): DI draws the second track
-  9-17 cm (mostly 12-13 cm) beside the first for 14-90 m after the switch's tip, before the tracks part.
+- **Interlaced track after a switch** (#204; `data/truth.json` `trackGeometry` `interlaced-switch`): at Čechův
+  most, Ke Stírce, Ohrada–Krejcárek, Biskupcova–Ohrada and 15 more places DI draws the branch 9-17 cm (mostly
+  12-13 cm) beside the track for 11-87 m from the switch's tip before the tracks part, either from a tongue it
+  draws (0 to 12 cm over 8-9 m: Ohrada, Dejvice) or from a record joint already 13 cm off (Čechův most). Where
+  both tracks are split into short records, their joints 12 cm apart fall into one cluster of ends. OSM puts
+  the switch at the tip (5-7 m from it at Čechův most), the user: "the fork starts and ends well in front
+  of/behind the road junction".
+- **OSM draws interlaced track as one way** (#204): a `railway=switch` node at the tip (often with its number,
+  `ref` 111 at Čechův most), one way both routes share, and the split where the tracks part at a
+  `railway=railway_crossing` node noted "rozjezdová/sjezdová splítka" (diverging/converging interlace). Where DI
+  draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
+  the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
+  is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0

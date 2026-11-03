@@ -745,8 +745,31 @@ def main():
     lls = {**{nid: (e["lat"], e["lon"]) for nid, e in tnodes.items()}, **back_ll, **nodes}
     lls = {n: ll for n, ll in lls.items() if n in nodes or n in tnodes or n in back_ll}
     allpos = {n: P(*ll) for n, ll in lls.items()}
+    track_srcs = [] if OSM_TRACKS else di_tracks.load_sources()
+    if track_srcs:
+        # interlaced track: OSM's one way from the switch to where the tracks part becomes one per track (#204)
+        added = di_tracks.split_interlaced(tways, [path_ids, bids], allpos, track_srcs[0].interlaced)
+        for n, how in added.items():
+            if how[0] == "copy":
+                ll = lls[how[1]]
+            else:
+                a, b, f = how[1:]
+                ll = (lls[a][0] + f * (lls[b][0] - lls[a][0]), lls[a][1] + f * (lls[b][1] - lls[a][1]))
+            lls[n] = ll
+            tnodes[n] = {"type": "node", "id": n, "lat": ll[0], "lon": ll[1], "tags": {}}
+        # (the copies and a new tip node lie on the bridges and tunnels of what they copy or split)
+        def under(n):
+            how = added.get(n)
+            return (n,) if how is None else (how[1],) if how[0] == "copy" else how[1:3]
+        for pairs in (bridge_pairs, tunnel_pairs):
+            for ids in (path_ids, bids, *[w["nodes"] for w in tways]):
+                for a, b in zip(ids, ids[1:]):
+                    if (a in added or b in added) and any((x, y) in pairs for x in under(a) for y in under(b) if x != y):
+                        pairs.update({(a, b), (b, a)})
+        print(f"interlaced track: {sum(h[0] == 'between' for h in added.values())} tip nodes added, "
+              f"{sum(h[0] == 'copy' for h in added.values())} nodes copied")
     edges = {(a, b) for ids in (path_ids, bids, *[w["nodes"] for w in tways]) for a, b in zip(ids, ids[1:])}
-    geo = di_tracks.TrackGeometry(allpos, edges, [] if OSM_TRACKS else di_tracks.load_sources())
+    geo = di_tracks.TrackGeometry(allpos, edges, track_srcs)
     if not OSM_TRACKS:
         geo.fit_curves()   # smooth curves through the points, continuous at every node (#204)
     print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k not in ('fill', 'curve')})}")
@@ -755,7 +778,9 @@ def main():
 
     def expand(ids):
         """The points along a node list through the moved edge geometry, and where each node lies in them. An edge
-        may end off its node: a track crossing others at a merged OSM node keeps its own crossing point (#204)."""
+        may end off its node: a track crossing others at a merged OSM node keeps its own crossing point (#204).
+        Points within 2 cm of the one before are left out: rounded to the centimetre in the line file, a node and a
+        curve sample millimetres apart became 1 cm zigzags (122 turns over 60° on line 17's tracks and routes)."""
         out, at = [], []
         segs = [geo.points(a, b) for a, b in zip(ids, ids[1:])]
         # (an edge between two OSM nodes merged into one has no length: the next edge starts the line)
@@ -766,7 +791,11 @@ def main():
             else:
                 seg = segs[i - 1]
                 if sum(dist(p, q) for p, q in zip(seg, seg[1:])) > 0.01:
-                    out += seg[1:] if dist(seg[0], out[-1]) <= 0.01 else seg
+                    for q in seg:
+                        if dist(q, out[-1]) > 0.02:
+                            out.append(q)
+                        elif q is seg[-1] and at[-1] != len(out) - 1:   # (the node's own point, not the sample)
+                            out[-1] = q
             at.append(len(out) - 1)
         return out, at
 

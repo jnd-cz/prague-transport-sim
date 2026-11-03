@@ -164,12 +164,25 @@ class Pairing(unittest.TestCase):
         geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
         self.assertLess(math.dist(geo.at(2), (50, 0)), 1e-6)
 
-    def test_a_branch_running_alongside_forks_where_it_leaves(self):
-        # Čechův most: DI draws the branch 13 cm off the through track for 21 m, then it leaves
+    def test_an_interlaced_branch_forks_where_it_starts_beside_the_track(self):
+        # Čechův most: DI draws the branch 13 cm off the through track for 21 m from a record joint, then it leaves;
+        # the switch is a tongue before it ("the fork starts and ends well in front of/behind the road junction")
         branch = [(29, 0.13), (50, 0.13)] + [(x, y + 0.13) for x, y in turnout(50)[1:]]
         di = dt.Source('di', [rec(1, [(0, 0), (29, 0)]), rec(2, [(29, 0), (120, 0)]), rec(3, branch)])
         self.assertEqual(len(di.forks), 1)
-        # (where the branch is OVERLAP further off: 1.7 m on along a 50 m curve)
+        self.assertLess(math.dist(di.forks[0], (29 - dt.TONGUE, 0)), 0.01)
+        self.assertEqual(di.interlaced[0]['side'], 1)
+        # Ohrada: the branch leaves the through track's middle, 12 cm off after 9 m, and runs on beside it
+        ramp = [(20 + k, 0.012 * k) for k in range(10)] + [(50, 0.12)] + [(x, y + 0.12) for x, y in turnout(50)[1:]]
+        di = dt.Source('di', [rec(1, [(0, 0), (120, 0)]), rec(2, ramp)])
+        self.assertEqual(len(di.forks), 1)
+        self.assertLess(math.dist(di.forks[0], (20, 0)), 0.01)
+
+    def test_a_copy_running_on_the_track_forks_where_it_leaves(self):
+        # Vozovna Kobylisy: two records 1-3 cm apart for 15 m, then they part
+        branch = [(30, 0.02), (50, 0.02)] + [(x, y + 0.02) for x, y in turnout(50)[1:]]
+        di = dt.Source('di', [rec(1, [(0, 0), (120, 0)]), rec(2, branch)])
+        self.assertEqual(len(di.forks), 1)
         self.assertLess(abs(di.forks[0][0] - 50), 2.0)
 
     def test_a_branch_the_source_lacks_is_left_to_the_next_source(self):

@@ -14,7 +14,21 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 
 **Switches paired by the track** (`tools/di_tracks.py`):
 - A DI fork is where records end together and leave apart, where a branch ends on the middle of a through
-  record (Palackého náměstí), or where a branch that ran alongside leaves (Čechův most: 13 cm off for 21 m).
+  record (Palackého náměstí), or, on interlaced track, where the branch starts beside the track: at the tip of
+  the tongue DI draws, else at the branch's end (Čechův most: 13 cm off for 25 m, then the tracks part at the
+  junction). Interlaced is 0.05-0.2 m beside the track for 10 m or more, followed across record joints; a
+  switch's branch is 0.2 m off within 4-9 m. Placing that fork where the branch left (as first built) moved
+  Čechův most's switches 21 m onto the junction; the user: "The DI fork is wrong while OSM seems right [...]
+  the fork starts and ends well in front of/behind the road junction" (2026-11-03).
+- Where DI starts the branch already 13 cm off at a record joint, the tip is `TONGUE` = 8.5 m back (the tongues
+  DI draws elsewhere are 8.4-9 m; Čechův most's OSM switches lie 8.0 and 8.8 m back).
+- **OSM's shared interlaced way is split** (`di_tracks.split_interlaced`, called by the build before matching):
+  OSM draws one way from the switch to where the tracks part. The stretch from the tip to that junction is
+  doubled and the copy carries the leg on the branch's side, so each track matches its own DI record, the switch
+  sits at the tip, and the routes on either leg take their own track. Pairing OSM's split node with the tip
+  instead had pulled it 14 m along the shared way and left a zigzag at OSM's switch node (Čechův most, "a small
+  white kink south of the 829 marked DI fork", the user). Line 17: 3 tip nodes added, 12 nodes copied: interlaced
+  pairs at Čechův most, Ke Stírce and Březiněveská.
 - An OSM switch takes the fork on its through track (a chain its toe or through edge runs on), facing the same
   way, within `FORK` = 15 m (was 5 m), nearest first, one switch per fork. The user's four answered forks lie
   5.3-7.4 m from OSM's switches. "The same side" was dropped: OSM's legs near a switch are a few metres long,
