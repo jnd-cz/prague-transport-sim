@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-03",
- "built_at_commit": "d8e374c",
- "published": "2026-11-03 10:21",
- "note": "line 17: assembled top-of-rail heights (#197 draft, line_heights.py)",
+ "built_at_commit": "8bcac1c",
+ "published": "2026-11-03 11:45",
+ "note": "line 17: heights by the band rule (#197 draft)",
  "files": {
   "line17.bld.bin": {
    "size": 6348150,
@@ -29,8 +29,8 @@
    "sha256": "69308a46603473c499a0db73287e24f9f58d016126e230819d1c7b60e721f43a"
   },
   "line17.json": {
-   "size": 6530640,
-   "sha256": "74c9c0d3ed89d82a50bb1fb1d2e6dfd405f18f1b152f4aadd99d215295ef4324"
+   "size": 6530779,
+   "sha256": "ada25c3099b102453242e9bb6e1ec07ddaaf8ea58f1c56bd5f85c2efc8203899"
   },
   "line17.signals.json": {
    "size": 36489,
