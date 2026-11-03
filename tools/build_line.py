@@ -64,6 +64,9 @@ DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
 
 REFRESH = "--refresh" in sys.argv
 OSM_TRACKS = "--osm-tracks" in sys.argv  # OSM's track geometry as before #20 (for comparison)
+# decimals of the tracks' and paths' coordinates: the fitted curves (#204) to the millimetre (to the centimetre, points
+# 0.4 m apart scatter 0.7° in direction and a 19 m curve read 15.5 m over 2 m at Právnická fakulta)
+XY = 2 if OSM_TRACKS else 3
 
 
 # ---------------------------------------------------------------- OSM (the local extract of the snapshot)
@@ -776,6 +779,10 @@ def main():
     print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k not in ('fill', 'curve')})}")
     if "curve" in geo.report:
         print(f"track curves: {json.dumps({k: v for k, v in geo.report['curve'].items() if not isinstance(v, list)})}")
+        for h in geo.report["curve"]["held_to_network_radius"]:   # (the cost of 18 m, data/truth.json min-radius-network)
+            lat, lon = P.ll(*h["xy"])
+            print(f"  held to 18 m: points {h['m']} m off (class {h['class_m']} m), {h['radius_m']} m over 2 m, "
+                  f"{float(lat):.5f} N {float(lon):.5f} E")
 
     def expand(ids):
         """The points along a node list through the moved edge geometry, and where each node lies in them. An edge
@@ -935,7 +942,7 @@ def main():
         extend(chain, flag)
         chain.reverse()
         extend(chain, flag)
-        t = {"p": [[round(x, 2), round(y, 2)] for x, y in expand(chain)[0]], "src": flag[1]}
+        t = {"p": [[round(x, XY), round(y, XY)] for x, y in expand(chain)[0]], "src": flag[1]}
         if flag[0]:
             t["b"] = 1
         if sum(dist(a, b) for a, b in zip(t["p"], t["p"][1:])) >= 0.01:  # (two nodes landing on one point)
@@ -944,7 +951,7 @@ def main():
 
     # opposite direction of the line, for oncoming trams
     back_pts, back_at = expand(bids) if bids else ([], [])
-    path_back = [[round(x, 2), round(y, 2)] for x, y in back_pts]
+    path_back = [[round(x, XY), round(y, XY)] for x, y in back_pts]
     back_s = [0.0]
     for a, b in zip(back_pts, back_pts[1:]):
         back_s.append(back_s[-1] + dist(a, b))
@@ -1257,7 +1264,7 @@ def main():
         "name": rel["tags"].get("name"),
         "origin": [round(float(v), 7) for v in P.origin_ll()],  # the city origin (the Marian column)
         "frame": {"crs": "EPSG:5514", "origin": [P.E0, P.N0]},  # game metres = S-JTSK minus this
-        "path": [[round(x, 2), round(y, 2)] for x, y in pts],
+        "path": [[round(x, XY), round(y, XY)] for x, y in pts],
         "bridges": bridges,
         "tunnels": tunnels,
         "terrain": terrain,

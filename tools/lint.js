@@ -344,34 +344,51 @@ function along(p) {
   return { L, at };
 }
 
-// The drawn track in plan (#204): the radius over a 5 m window (the circle through the points 2.5 m either side)
-// every metre along the route, the opposite route and every drawn track, flagged under 20 m (data/truth.json
-// trackGeometry `min-radius-passenger`; tools/track_curve.py holds it, moving points at most by their accuracy
-// class's error). Places per 10 m of each line, counted per class (our, opposite, the track's source).
-const MIN_RADIUS = 20, SLACK = 0.995;
+// The track in plan (#204): the radius over 5 m, the circle through a point and the farthest points within 2.5 m
+// either side, at every point of the line's path, its opposite path and every track as the build drew them (its
+// points lie on the fitted curves; a circle through points interpolated on the game's 1.5 m resample read a 19 m
+// curve as 17.4 m: a 1 m chord sags 7 mm inside it). Flagged under 18 m (data/truth.json trackGeometry
+// `min-radius-network`, the user: "under 18m there shouldn't be anything like that"); 18-20 m are exceptions
+// (`min-radius-passenger`), listed in `exceptions`. tools/track_curve.py holds 20 m within the points' accuracy
+// class and 18 m past it. Places per 10 m of each line, counted per class (our, opposite, the track's source).
+const MIN_RADIUS = 18, EXCEPTION_RADIUS = 20, SLACK = 0.995, HALF = 2.5;
+function circleRadius(a, b, c) {
+  const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+  const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  return area2 > 1e-9 ? Math.min(1e6, (ab * bc * ca) / (2 * area2)) : 1e6;
+}
 function trackRadius(g) {
-  const lines = [['our', g.route.pts], ['opposite', g.backRoute?.pts], ...(g.data.tracks || []).map((t) => [t.src || 'osm', t.smooth || t.p])];
-  const bad = new Map(), kinds = {};
+  const d = g.data, lines = [['our', d.path], ['opposite', d.pathBack], ...(d.tracks || []).map((t) => [t.src || 'osm', t.p])];
+  const bad = new Map(), near = new Map(), kinds = {}, nearKinds = {};
   let n = 0, minR = Infinity;
   lines.forEach(([kind, p], li) => {
     if (!p || p.length < 3) return;
-    const { L, at } = along(p);
-    for (let s = 2.5; s <= L - 2.5; s += 1) {
-      const a = at(s - 2.5), b = at(s), c = at(s + 2.5);
-      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
-      const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
-      const R = area2 > 1e-9 ? (ab * bc * ca) / (2 * area2) : 1e6;
+    const cum = [0];
+    for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    const L = cum[cum.length - 1];
+    let j0 = 0, j1 = 0;
+    for (let i = 0; i < p.length; i++) {
+      if (cum[i] < HALF || cum[i] > L - HALF) continue;
+      while (cum[i] - cum[j0] > HALF + 1e-9) j0++;
+      j1 = Math.max(j1, i);
+      while (j1 < p.length - 1 && cum[j1 + 1] - cum[i] <= HALF + 1e-9) j1++;
+      if (cum[i] - cum[j0] < 0.6 * HALF || cum[j1] - cum[i] < 0.6 * HALF) continue; // (points far apart: a straight)
+      const R = circleRadius(p[j0], p[i], p[j1]);
       n++;
       minR = Math.min(minR, R);
-      const k = `${li}:${Math.round(s / 10)}`;
-      if (R < MIN_RADIUS * SLACK && !(bad.get(k)?.mag >= MIN_RADIUS / R))
-        bad.set(k, { kind, x: b[0], y: b[1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(s) } : {}), mag: MIN_RADIUS / R, info: `${kind} track radius ${R.toFixed(1)} m over 5 m` });
+      const k = `${li}:${Math.round(cum[i] / 10)}`, map = R < MIN_RADIUS * SLACK ? bad : R < EXCEPTION_RADIUS * SLACK ? near : null;
+      if (map && !(map.get(k)?.mag >= MIN_RADIUS / R))
+        map.set(k, { kind, x: p[i][0], y: p[i][1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(cum[i]) } : {}), mag: MIN_RADIUS / R, info: `${kind} track radius ${R.toFixed(1)} m over 5 m` });
     }
   });
+  for (const k of near.keys()) if (bad.has(k)) near.delete(k);
   for (const b of bad.values()) kinds[b.kind] = (kinds[b.kind] || 0) + 1;
+  for (const b of near.values()) nearKinds[b.kind] = (nearKinds[b.kind] || 0) + 1;
   const c = check('track-radius', n, [...bad.values()]);
   c.kinds = kinds;
   c.minRadius = Math.round(minR * 10) / 10;
+  const e = check('track-radius-exceptions', n, [...near.values()]);
+  c.exceptions = { count: e.count, kinds: nearKinds, places: e.places };
   return c;
 }
 
@@ -380,8 +397,10 @@ function trackRadius(g) {
 // whose directions break by more than 1° is flagged, per class (joint: two ends, switch: three, crossing: four
 // or more). The leg left over at a switch is the diverging track: its start angle against the through track is
 // listed, not flagged (data/truth.json `switch-start`: most switches start tangentially, some abruptly). The
-// direction at an end is the tangent of the parabola through the drawn track's first three points (the game draws
-// a point every 1.5 m: a chord, or points between them, read a smooth 20 m curve as a 2-4° break).
+// direction at an end is the tangent of the parabola through the drawn track's first three points (a chord, or
+// points between them, read a smooth 20 m curve as a 2-4° break). The bar stays 1° (the user, 2026-11-03: "Keep
+// 1°, fix the nodes"): 71 breaks on line 17 were the game's drawing (a three-point average and a 1.5 m resample
+// at short pieces' ends), the build's own points broke 2 joins over 1°.
 function trackJoins(g) {
   const ends = [];
   for (const t of g.data.tracks || []) {

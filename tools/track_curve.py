@@ -13,8 +13,11 @@ continues that one (a diverging track leaves tangent to
 the through track: data/truth.json trackGeometry `switch-start`, most switches are tangential). Where the curve
 would bend tighter than MIN_RADIUS (data/truth.json `min-radius-passenger`), the tolerance of the points around it
 grows by GROW, at most to the mean coordinate error of their records' accuracy class (data/truth.json
-`sourceAccuracy`: 0.14 m for DI's class 3), and the curve is fitted again; a point the curve still misses by more than
-TOL + REPORT is listed, and so is a curve left tighter than MIN_RADIUS.
+`sourceAccuracy`: 0.14 m for DI's class 3), and the curve is fitted again. Where it still bends tighter than
+NETWORK_RADIUS (`min-radius-network`: the user, "under 18m there shouldn't be anything like that"), the points around
+it keep growing past their class, at most to HOLD_LIMIT, and each such place is listed with how far its points moved
+(the cost). A point the curve still misses by more than TOL + REPORT is listed, and so is a curve left tighter than
+MIN_RADIUS.
 
 A Gaussian (the client's old smoothing, src/route.js) cuts inside a curve: 0.2 m on an 18 m curve with the 6 m
 window (#20); a curve held to the points does not.
@@ -38,6 +41,10 @@ SIGMAS = 1.0       # a point moves at most this many mean errors of its class (t
                    # limit; 2 on line 17: 6 bends over 10° inside tracks instead of 11, 32 joins over 1° instead of 39)
 GROW = 1.5         # the factor the tolerance grows by per round
 MIN_RADIUS = 20.0  # m: data/truth.json trackGeometry `min-radius-passenger`
+NETWORK_RADIUS = 18.0  # m: data/truth.json trackGeometry `min-radius-network`
+HOLD_LIMIT = 0.5   # m: past its class's error a point moves at most this far to hold NETWORK_RADIUS
+STIFFEN, STIFF_MAX = 1.5, 1.5 ** 12  # the bending weight's factor per round where the curve bends under it, and its
+                                     # most (x4 at once took a 15° corner to 49 m, its points 0.49 m off; x1.5: 18.2 m, 9 cm)
 SLACK = 0.995      # a curve held at MIN_RADIUS reads a few millimetres under it
 BEND = 1.0         # m either side of a sample for the fit's radius (a 5 m window reads a 10° bend squeezed into a
                    # metre as 29 m; the fitted curve has no noise to average out)
@@ -65,7 +72,8 @@ THIN = 0.003       # m: the written points leave out samples a chord passes with
 THIN_MAX = 10.0    # m: at most this far apart
 KEEP = 2.5         # m from an edge's ends where every sample is kept
 ROUNDS = 40        # reweighting rounds per fit
-WIDEN = 8          # rounds of widening the tolerance where the curve bends too tight
+WIDEN = 24         # rounds of widening the tolerance where the curve bends too tight (5 reach DI's class from TOL),
+                   # then of stiffening it under NETWORK_RADIUS
 
 
 def _solve(d0, d1, d2, rhs):
@@ -144,8 +152,9 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     """A smooth curve through polyline `pts` within `tol` of each of its points (None: not data). `fixed`
     {point index: (x, y)} holds positions; `heading` {point index: (ux, uy)} holds the direction the curve leaves
     that (fixed, end) point in, into the polyline; `limit` per point: how far its tolerance may grow where the curve
-    would bend tighter than MIN_RADIUS (default: as far as it starts). Returns (samples, each point's sample index,
-    the final tolerance per point, the radius per sample over 2 m). A point's miss is its distance to the curve (the
+    would bend tighter than MIN_RADIUS (default: as far as it starts); where it still bends tighter than
+    NETWORK_RADIUS the curve stiffens there and its points may move up to HOLD_LIMIT. Returns (samples, each point's sample index, the final tolerance per point,
+    the radius per sample over 2 m). A point's miss is its distance to the curve (the
     samples slide along it)."""
     fixed, heading = fixed or {}, heading or {}
     xs, ys, at = [], [], []
@@ -184,15 +193,20 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
         h0, h1 = u[i] - u[i - 1], u[i + 1] - u[i]
         a, c = 2 / ((h0 + h1) * h0), 2 / ((h0 + h1) * h1)
         rows.append((a, -(a + c), c, (h0 + h1) / 2))
-    d0, d1, d2 = [0.0] * n, [0.0] * max(0, n - 1), [0.0] * max(0, n - 2)
-    for j, (a, b, c, l) in enumerate(rows):
-        i, w = j + 1, LAMBDA * l
-        d0[i - 1] += w * a * a
-        d0[i] += w * b * b
-        d0[i + 1] += w * c * c
-        d1[i - 1] += w * a * b
-        d1[i] += w * b * c
-        d2[i - 1] += w * a * c
+    stiff = [1.0] * len(rows)   # the bending weight's factor per sample, raised where the curve bends under 18 m
+
+    def bending():
+        d0, d1, d2 = [0.0] * n, [0.0] * max(0, n - 1), [0.0] * max(0, n - 2)
+        for j, (a, b, c, l) in enumerate(rows):
+            i, w = j + 1, LAMBDA * l * stiff[j]
+            d0[i - 1] += w * a * a
+            d0[i] += w * b * b
+            d0[i + 1] += w * c * c
+            d1[i - 1] += w * a * b
+            d1[i] += w * b * c
+            d2[i - 1] += w * a * c
+        return d0, d1, d2
+    d0, d1, d2 = bending()
     tx, ty = list(xs), list(ys)
     for s, q in held.items():
         tx[s], ty[s] = q
@@ -223,7 +237,22 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
         tight = [u[i] for i in range(n) if r[i] < MIN_RADIUS * SLACK]
         grow = [i for i in data if tol[i] < limit[i] - 1e-9 and any(abs(u[at[i]] - t) <= NEAR for t in tight)]
         if not grow:
-            break
+            # every point near a curve under 20 m is at its class: under 18 m the curve stiffens there and its points'
+            # tolerance grows on up to HOLD_LIMIT (a wider tolerance alone only lets the curve go: on a 30° corner the
+            # bend moved to where the points at their class begin, 15 m)
+            under = [u[i] for i in range(n) if r[i] < NETWORK_RADIUS * SLACK]
+            zone = [j for j in range(len(rows)) if any(abs(u[j + 1] - t) <= NEAR for t in under)]
+            if not zone or max(stiff[j] for j in zone) >= STIFF_MAX:
+                break
+            for j in zone:
+                stiff[j] *= STIFFEN
+            for i in data:
+                if tol[i] < max(limit[i], HOLD_LIMIT) and any(abs(u[at[i]] - t) <= NEAR for t in under):
+                    tol[i] = min(max(limit[i], HOLD_LIMIT), tol[i] * GROW)
+                    weight[at[i]] = 1.0
+            d0, d1, d2 = bending()
+            px, py = solve()
+            continue
         for i in grow:
             tol[i] = min(limit[i], tol[i] * GROW)
             weight[at[i]] = 1.0
@@ -391,7 +420,7 @@ class Network:
         chains = [chains[c] for c in order]
 
         # node -> {'pos', 'dirs': directions of the tracks through it, 'at': [(track, index in its seq)]}
-        node, fitted, misses, tight, widened = {}, [], [], [], 0
+        node, fitted, misses, tight, held, widened = {}, [], [], [], [], 0
         for c, seq in enumerate(chains):
             # the points and their tolerance: a node off its surveyed tracks is no data point (the point nearest
             # all of them: 0.2 m off each at a junction at Národní divadlo, where the tracks run 1.3 m apart); the
@@ -551,6 +580,9 @@ class Network:
                     continue
                 widened += tol_out[i] > tol[i] + 1e-9
                 d, seg, t = nearest(px, py, at[i] - 3, at[i] + 3, p)
+                if tol_out[i] > lim[i] + 1e-9:   # (moved past its class to hold NETWORK_RADIUS)
+                    held.append({'m': round(d, 3), 'class_m': round(lim[i], 3), 'xy': [round(p[0], 1), round(p[1], 1)],
+                                 'radius_m': round(min(rad[max(0, at[i] - int(NEAR)):at[i] + int(NEAR) + 1]), 1)})
                 if d > TOL + REPORT:
                     misses.append({'m': round(d, 3), 'xy': [round(p[0], 1), round(p[1], 1)], 'widened': tol_out[i] > tol[i] + 1e-9})
             for i, r in enumerate(rad):
@@ -580,6 +612,7 @@ class Network:
         self.report = {'through_tracks': len(chains), 'points_widened': widened, 'missed_over_cm': len(misses),
                        'missed_unwidened': sum(not m['widened'] for m in misses),
                        'misses': self._places(misses, 'm', -1)[:15],
+                       'held_to_network_radius': self._places(held, 'm', -1),
                        'tighter_than_min_radius': self._places(tight, 'radius_m', 1)[:15]}
 
     @staticmethod
@@ -614,11 +647,12 @@ def main():
     print(f'track geometry: {t1 - t0:.0f} s, curves {time.time() - t1:.0f} s')
     r = geo.report['curve']
     print({k: v for k, v in r.items() if not isinstance(v, list)})
-    for key in ('misses', 'tighter_than_min_radius'):
+    for key in ('misses', 'held_to_network_radius', 'tighter_than_min_radius'):
         print(f'{key}:')
         for x in r[key]:
             lat, lon = frame.ll(*x['xy'])
-            print(f"  {x.get('m', x.get('radius_m'))}  {float(lat):.5f} N {float(lon):.5f} E  {x['xy']}")
+            print(f"  {x.get('m', x.get('radius_m'))}  {float(lat):.5f} N {float(lon):.5f} E  {x['xy']}"
+                  + (f"  (class {x['class_m']} m, {x['radius_m']} m over 2 m)" if 'class_m' in x else ''))
 
 
 if __name__ == '__main__':
