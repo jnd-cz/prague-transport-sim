@@ -364,6 +364,53 @@ function trackSpacing(g) {
   return check('tracks-apart', n, [...bad.values()]);
 }
 
+// Our track (both directions, as the game drives them) against the building footprints (OSM, data.buildings):
+// a centre nearer than half a T3's width puts the car into the wall. The game lifts a building the route passes
+// under (src/world.js), so the meshes hide it; main's OSM track came within 0.71 m of a wall at Karlovy lázně (#20).
+// Footprints with a passage (building:min_level) are not in the data. Places per 20 m.
+function trackInBuildings(g) {
+  const HALF = 1.25, CELL = 20, cells = new Map();
+  for (const b of g.data.buildings || []) {
+    const p = b.p;
+    if (!p || p.length < 3) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of p) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    for (let x = Math.floor((x0 - HALF) / CELL); x <= Math.floor((x1 + HALF) / CELL); x++)
+      for (let y = Math.floor((y0 - HALF) / CELL); y <= Math.floor((y1 + HALF) / CELL); y++) {
+        const k = `${x},${y}`;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(p);
+      }
+  }
+  const clearance = (x, y) => {   // distance to the nearest footprint edge, negative inside one
+    let best = Infinity;
+    for (const p of cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || []) {
+      let inside = false, d = Infinity;
+      for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+        const [ax, ay] = p[j], [bx, by] = p[i], dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+        d = Math.min(d, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+        if ((ay > y) !== (by > y) && x < ax + ((y - ay) * dx) / (dy || 1e-9)) inside = !inside;
+      }
+      best = Math.min(best, inside ? -d : d);
+    }
+    return best;
+  };
+  const bad = new Map();
+  let n = 0;
+  for (const [name, r] of [['our', g.route], ['opposite', g.backRoute]]) {
+    if (!r) continue;
+    for (let s = 0; s < r.length; s += 2) {
+      const p = r.at(s), d = clearance(p.x, p.y);
+      n++;
+      const k = `${name}${Math.round(s / 20)}`;
+      if (d < HALF && !(bad.get(k)?.mag >= HALF - d))
+        bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag: HALF - d, info: `${name} track ${d < 0 ? 'inside a building' : `${d.toFixed(2)} m from a building`}` });
+    }
+  }
+  return check('track-clear-of-buildings', n, [...bad.values()]);
+}
+
 // Car lanes and footways against the survey (DTM lines), the tracks and the platforms. Every lane
 // and every junction connector a car may take, every 2 m (ground level only):
 //   off       the lane centre on a sidewalk, island, platform, lawn, steps (not carriageway, parking,
@@ -552,6 +599,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
+    trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),
     underpassClearance: underpassClearance(g),

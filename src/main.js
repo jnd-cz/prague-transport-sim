@@ -85,7 +85,7 @@ if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
 // the track beyond both termini, so a two-car set standing at the first stop is on rails
-const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
+const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60), data.trackSource?.path);
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
 // banked curves on dedicated track; level at platforms (stop zone from the stop sign back 30 m
 // where the data has no platform)

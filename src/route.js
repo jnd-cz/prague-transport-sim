@@ -4,7 +4,8 @@
 // Resample a polyline every `step` metres of its arc length and smooth it with a Gaussian
 // window (the window shrinks symmetrically at the ends, so end points stay put). OSM draws
 // curves as straight segments; this turns them into continuous curves. Returns the points
-// and their arc-length positions along the ORIGINAL polyline.
+// and their arc-length positions along the ORIGINAL polyline. `radius` may be a function of that
+// arc length: surveyed track (DI, the archived DTMP axes; #20) is already curved and is only resampled.
 export function smoothPolyline(pts, step = 1, radius = 6) {
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
@@ -20,12 +21,14 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
     ys[i] = pts[j][1] + (pts[j + 1][1] - pts[j][1]) * t;
     ss[i] = s;
   }
-  const k = Math.max(1, Math.round(radius / (L / (n - 1) || 1)));
-  const sigma = k / 2;
-  const w = [];
-  for (let d = 0; d <= k; d++) w.push(Math.exp(-0.5 * (d / sigma) ** 2));
+  const kOf = (rad) => Math.max(1, Math.round(rad / (L / (n - 1) || 1)));
+  const weights = new Map(), win = (k) => {
+    if (!weights.has(k)) { const w = []; for (let d = 0; d <= k; d++) w.push(Math.exp(-0.5 * (d / (k / 2)) ** 2)); weights.set(k, w); }
+    return weights.get(k);
+  };
   const out = [];
   for (let i = 0; i < n; i++) {
+    const k = kOf(typeof radius === 'function' ? radius(ss[i]) : radius), w = win(k);
     const r = Math.min(k, i, n - 1 - i);
     let sx = 0, sy = 0, sw = 0;
     for (let d = -r; d <= r; d++) { const ww = w[Math.abs(d)]; sx += xs[i + d] * ww; sy += ys[i + d] * ww; sw += ww; }
@@ -86,12 +89,26 @@ export function extendAlongTracks(tracks, pts, len = 60) {
   return { before: walk(pts[0], h0[0] / l0, h0[1] / l0).reverse(), after: walk(pts[n - 1], h1[0] / l1, h1[1] / l1) };
 }
 
+// Track geometry from a survey (the line data's trackSource ranges and track chains' `src`, #20) is drawn
+// as it is: smoothing it would pull a tight curve inside the real one (an 18 m curve: 0.2 m with the 6 m
+// window). OSM fill keeps the window.
+export const SURVEYED = new Set(['di', 'dtmp']);
+export const SMOOTH = 6, AS_SURVEYED = 0.1;
+export function radiusAlong(ranges, offset = 0) {
+  if (!ranges?.length) return SMOOTH;
+  return (s) => {
+    const x = s - offset;
+    const r = ranges.find(([a, b]) => x >= a && x <= b) || (x < ranges[0][0] ? ranges[0] : ranges[ranges.length - 1]);
+    return SURVEYED.has(r[2]) ? AS_SURVEYED : SMOOTH;
+  };
+}
+
 // curve speeds: comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m)
 const A_LAT = 0.8, CANT_MAX = 0.1;
 
 export class Route {
   // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
-  constructor(pts, ext = null) {
+  constructor(pts, ext = null, sources = null) {
     // smooth curves but keep the original arc-length parameter (stops, switches and
     // signals were measured along the unsmoothed OSM path)
     const before = ext?.before || [], after = ext?.after || [];
@@ -100,7 +117,7 @@ export class Route {
     for (let i = 1; i <= before.length; i++) s0 += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
     let L = 0;
     for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    const sm = smoothPolyline(all, 1, 6);
+    const sm = smoothPolyline(all, 1, radiusAlong(sources, s0));
     this.pts = sm.pts;
     this.s = Array.from(sm.s, (v) => v - s0);
     this.length = L; // the route itself ends here; the run-out continues past it

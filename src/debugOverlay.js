@@ -6,6 +6,7 @@
 //   red dot              raw OSM stop-line node (data.osmSignals.stop)
 //   white bar            conflict on the route (street, footway or crossing): its near edge
 //   green bars / ball    platform start and end / where the tram front stops for passengers
+//   orange / olive line  track not from the current DTM (DI): OpenStreetMap / the archived DTMP axes (#20)
 import * as THREE from 'three';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
@@ -44,7 +45,7 @@ export function builtGeoJSON(game, traffic) {
 
 export function createDebugOverlay(scene) {
   let group = null;
-  const mats = {};
+  const mats = {}, lineMats = {};
   const mat = (c) => (mats[c] ||= new THREE.MeshBasicMaterial({ color: c, depthTest: false, transparent: true, opacity: 0.9 }));
   const geo = { ball: new THREE.SphereGeometry(0.9, 10, 8), dot: new THREE.SphereGeometry(0.6, 8, 6), bar: new THREE.BoxGeometry(3, 0.2, 0.6), wide: new THREE.BoxGeometry(5, 0.25, 0.6) };
 
@@ -59,6 +60,16 @@ export function createDebugOverlay(scene) {
       across(s.s - 3, 'wide', 0xff00ff);
     }
     for (const c of game._routeConflicts()) across(c.start, 'wide', 0xffffff, 0.15);
+    // track geometry not from DI (the line data's track chains, tools/di_tracks.py)
+    for (const t of game.data.tracks || []) {
+      if (!t.src || t.src === 'di' || !t.smooth || !t.z) continue;
+      const pts = t.smooth.map(([x, y], i) => new THREE.Vector3(x, t.z[i] + 0.4, -y));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+        lineMats[t.src] ||= new THREE.LineBasicMaterial({ color: t.src === 'osm' ? 0xff8c00 : 0x9acd32, depthTest: false }));
+      line.renderOrder = 999;
+      line.userData.dispose = () => line.geometry.dispose();
+      g.add(line);
+    }
     for (const st of game.stops) {
       if (st.p0 !== undefined) { across(st.p0, 'wide', 0x22cc55, 0.5); across(st.p1, 'wide', 0x22cc55, 0.5); }
       const q = R.at(st.target);

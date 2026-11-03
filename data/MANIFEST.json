@@ -1,16 +1,16 @@
 {
- "snapshot": "2026-11-01",
- "built_at_commit": "62795ac",
- "published": "2026-11-01 12:49",
- "note": "Lines 17 and 22: ZPS districts by rule, snapshot 2026-11-01 (#125)",
+ "snapshot": "2026-11-03",
+ "built_at_commit": "33ffeb4",
+ "published": "2026-11-03 06:34",
+ "note": "line 17 rebuilt on DI track centrelines (#20)",
  "files": {
   "line17.bld.bin": {
-   "size": 6341832,
-   "sha256": "001375e5882b556c2e5c2c3af8e5f31e9c1f357010413d1c3b4c35e0a7dbcc8e"
+   "size": 6348150,
+   "sha256": "4e66a2e895ab2be3fd844a957c8d1b060e9c99d7ffa52c1ebab8607f271dcc2c"
   },
   "line17.dtm.json": {
-   "size": 9663408,
-   "sha256": "5c16967013d2a868aaa5fe0ace649e4b008d969816910e7215ee3f6de8d3adce"
+   "size": 9787999,
+   "sha256": "e6242dfe1edfd1d28bbe9181b46d7b5c335db1aac65b4d10e633e21f855d4a09"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -18,31 +18,31 @@
   },
   "line17.fine.bin": {
    "size": 4436250,
-   "sha256": "b5564460864a51d17be07681e590bf0ee7a6f8bfacf3fed95b893a0af650967d"
+   "sha256": "60a34cb1fe277690b447c7cda479da51eae70d2b532007f13d5bbbabfceaad12"
   },
   "line17.fine.json": {
-   "size": 6360,
-   "sha256": "e6232f15b295d988394f18ec03dddd369fb01920a13fe9d7518170b975f1faae"
+   "size": 6359,
+   "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
-   "size": 227039,
-   "sha256": "2491267ae13fe66b2f8b3b8fc42bedf9ddaf91cb9858ed7150e25a8f46463df0"
+   "size": 228340,
+   "sha256": "69308a46603473c499a0db73287e24f9f58d016126e230819d1c7b60e721f43a"
   },
   "line17.json": {
-   "size": 5024273,
-   "sha256": "c07308211cc62af2367ac6c6ad200a0fc65f150777de470735f206f7735bf673"
+   "size": 5882476,
+   "sha256": "08abe922a019a748d42f0046d6d00aeb49b2e6d3c55069ef2aa78188d3fab7af"
   },
   "line17.signals.json": {
-   "size": 35510,
-   "sha256": "3e9bc1ee95869258d585775c48db22e81f06dc0b8dae784897e9705af53114b6"
+   "size": 36489,
+   "sha256": "a4ce11816a84f8631f5482d6dd7515dd31cffc80de18b5691b0a4623462792d0"
   },
   "line17.validate.json": {
-   "size": 4439,
-   "sha256": "30edab267311680d56ee52715b773c957457575f552776442d6b295c9fb0bffc"
+   "size": 4442,
+   "sha256": "960ca2e2bedcaf958036f77679a68d65b376ef7eb77d9cd67e9259d38ba52a09"
   },
   "line17.zps.json": {
-   "size": 6386309,
-   "sha256": "63f2e82b1511ae04c42f5d247af257867814710452030414cb6ad77de3dc0889"
+   "size": 6537836,
+   "sha256": "7198bc4422bedcfacf6353ae8ae7fed1b08051a9729a9f9aad6d41b32b78825f"
   },
   "line22.bld.bin": {
    "size": 8575524,
