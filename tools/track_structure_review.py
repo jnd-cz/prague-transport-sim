@@ -43,9 +43,13 @@ def structure_kind(tags):
 
 
 class Structures:
-    def __init__(self, paths, records=()):
+    def __init__(self, paths, records=(), bridges=()):
         self.paths = [p for p in paths if structure_kind(p['attrs'])]
         self.geoms = [LineString([v[:2] for v in p['coords']]) for p in self.paths]
+        # Track on a Mosty 3D bridge that OSM does not tag (the import's mosty3d_structures, #192)
+        for b in bridges:
+            self.paths.append({'id':b['id'],'coords':[(x,y,None) for x,y in b['xy']],'attrs':{'bridge':'yes','source':'mosty3d'}})
+            self.geoms.append(LineString(b['xy']))
         for r in records:
             if r['level']!=0 and r.get('class') in ('deck','tram','road','paved','parking'):
                 geom = Polygon([p[:2] for p in r['ring']],r.get('holes',[]))
@@ -63,9 +67,10 @@ class Structures:
             for j in self.tree.query(g.buffer(6)):
                 j = int(j)
                 q = self.paths[j]
+                mosty = 'mosty3d' in (p['attrs'].get('source'),q['attrs'].get('source'))  # (no layer of its own)
                 if (j>i and g.distance(self.geoms[j])<=6 and structure_kind(p['attrs'])==structure_kind(q['attrs'])
                         and p['attrs'].get('level')==q['attrs'].get('level')
-                        and p['attrs'].get('layer','0')==q['attrs'].get('layer','0')
+                        and (mosty or p['attrs'].get('layer','0')==q['attrs'].get('layer','0'))
                         and not (p['attrs'].get('name') and q['attrs'].get('name')
                                  and p['attrs']['name']!=q['attrs']['name'])):
                     parent[root(j)] = root(i)
@@ -76,12 +81,15 @@ class Structures:
         for group in self.groups.values():
             ids = sorted((p['id'] for p in group),key=str)
             osm = [i for i in ids if isinstance(i,int)]
-            identity = ('osm-'+str(min(osm)) if osm else
-                        'survey-'+hashlib.sha256('|'.join(ids).encode()).hexdigest()[:12])
+            mosty = sorted({int(i.split(':')[1]) for i in ids if isinstance(i,str) and i.startswith('mosty3d:')})
+            survey = [i for i in ids if isinstance(i,str) and not i.startswith('mosty3d:')]
+            identity = ('osm-'+str(min(osm)) if osm else 'survey-'+hashlib.sha256('|'.join(survey).encode()).hexdigest()[:12]
+                        if survey else 'mosty3d-'+str(mosty[0]))
             names = sorted({p['attrs']['name'] for p in group if p['attrs'].get('name')})
             self.catalog[identity] = {'id':identity,'kind':structure_kind(group[0]['attrs']),
-                'osm_ways':osm,'survey_records':[i for i in ids if isinstance(i,str)],
-                'names':names,'tags':{str(p['id']):p['attrs'] for p in group}}
+                'osm_ways':osm,'survey_records':survey,'names':names,
+                'tags':{str(p['id']):p['attrs'] for p in group if not str(p['id']).startswith('mosty3d:')},
+                **({'mosty3d_features':mosty} if mosty else {})}
             for p in group:
                 self.by_way[str(p['id'])] = identity
 
@@ -361,6 +369,8 @@ def markdown(result):
         names = ' / '.join(d['structure']['names']) or d['structure']['kind']
         out += [f"## {d['id']} · {names}", '',
                 'OSM ways: '+(', '.join(f'[{i}](https://www.openstreetmap.org/way/{i})' for i in d['structure']['osm_ways']) or 'not tagged')+'.', '',
+                *([f"Mosty 3D features: {', '.join(map(str,d['structure']['mosty3d_features']))} (the track meets the model's deck at an end).", '']
+                  if d['structure'].get('mosty3d_features') else []),
                 '| Line / direction | Nearest stops at ends | Length (m) | Proposed rule |',
                 '|---|---|---:|---|']
         for s in group:
@@ -404,7 +414,8 @@ def main():
     context = load_context(decks)
     terrain = IprDtm()
     try:
-        result = review(report,Structures(context.paths,decks.records),terrain,{n:load_line(n) for n in (9,17,22,23,37)})
+        result = review(report,Structures(context.paths,decks.records,report.get('mosty3d_structures',[])),terrain,
+                        {n:load_line(n) for n in (9,17,22,23,37)})
     finally:
         terrain.f.close()
     from atomic import replacing

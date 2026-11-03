@@ -209,6 +209,7 @@ class Guard(unittest.TestCase):
                     load_context=lambda decks: __import__('track_context').TrackContext(),
                     surface_evidence=lambda rows: None,
                     Terrain=lambda: lambda xs, ys: [None]*len(xs),
+                    bridge_structures=lambda structures, ids, *rest: (structures, ids, []),
                 ),
                 redirect_stdout(io.StringIO()),
             ):
@@ -252,6 +253,7 @@ class Guard(unittest.TestCase):
                     load_context=lambda decks: __import__('track_context').TrackContext(),
                     surface_evidence=lambda rows: None,
                     Terrain=lambda: lambda xs, ys: [None]*len(xs),
+                    bridge_structures=lambda structures, ids, *rest: (structures, ids, []),
                 ),
                 redirect_stdout(io.StringIO()),
             ):

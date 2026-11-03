@@ -129,7 +129,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   data), tree register (multipoint) and tree rows.
 - **Mosty 3D**: photogrammetry 2001–2008, ±0.5 m, blocks from the highest surface seen from the air
   (parapets) down; can predate rebuilds. **The survey deck wins wherever it exists**; the model gives
-  sides, piers and spans elsewhere, and is trimmed over surveyed decks.
+  sides, piers and spans elsewhere, and is trimmed over surveyed decks. The whole layer is small (49 meshes,
+  672 bridges, 7.7 MB): the height import reads it city-wide (`tools/mosty3d.py`). Its top at a tram bridge's
+  end is within 1.05 m of the rail (p50 0.13 m); a bridge over a tram is 3.3 m or more above it (#192). Its
+footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
+  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
+  river bridge and its viaduct (14.4624–14.4660 E).
 - **Regional DTM ZPS packages: what our tools rely on** (`tools/dtm.py`, `tools/gpkg.py`,
   `tools/registration.py`; audit of the 16 pinned packages of 2026-09-30, #63). What to compare after a
   format change (JVF 1.5.0.2 from 18 Nov 2026; refresh steps in DATA.md):

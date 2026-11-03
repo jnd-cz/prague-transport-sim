@@ -363,6 +363,16 @@ class SpanReviews(unittest.TestCase):
         runs = grouped(rows,structures)
         self.assertEqual([len(r) for _,r in runs],[1,2])
 
+    def test_a_mosty3d_bridge_joins_the_osm_bridge_beside_it_or_is_its_own_decision(self):
+        ways = [{'id':7,'coords':[(0,0,None),(10,0,None)],'attrs':{'bridge':'yes','layer':'1'}}]
+        bridges = [{'id':'mosty3d:540','xy':[[10,0],[30,0]]},{'id':'mosty3d:99','xy':[[100,0],[120,0]]}]
+        structures = Structures(ways,bridges=bridges)
+        self.assertEqual(structures.at((20,0)),'osm-7')
+        self.assertEqual(structures.at((110,0)),'mosty3d-99')
+        self.assertEqual(structures.catalog['mosty3d-99']['kind'],'bridge')
+        self.assertEqual(structures.catalog['osm-7']['mosty3d_features'],[540])
+        self.assertNotIn('mosty3d:540',structures.catalog['osm-7']['tags'])
+
     def test_report_has_both_stop_names_and_does_not_turn_terrain_into_rail_evidence(self):
         structures = Structures([{'id':1,'coords':[(0,0,None),(10,0,None)],'attrs':{'tunnel':'yes'}}])
         rows = [{'line':17,'direction':direction,'s':s,'weight_m':5,'xy':[x,0],
