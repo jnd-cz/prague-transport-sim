@@ -136,6 +136,16 @@ class Matching(unittest.TestCase):
         self.assertEqual(len(di.chains), 1)
         self.assertEqual(di.chains[0]['line'].length > 99, True)
 
+    def test_an_older_record_lying_on_newer_ones_is_dropped_but_interlaced_track_stays(self):
+        def dated(i, pts, day):
+            return rec(i, pts) | {'attrs': {'DatumVkladu': day}}
+        old = dated(1, [(0, 0), (100, 0)], '2025-01-30')               # re-entered later in two pieces, 6 cm off
+        new = [dated(2, [(0, 0.06), (60, 0.06)], '2026-10-07'), dated(3, [(60, 0.06), (100, 0.06)], '2026-10-07')]
+        partner = dated(4, [(20, 0.19), (50, 0.19), (60, 3)], '2025-01-30')   # interlaced, 13 cm beside the newer
+        di = dt.Source('di', [old, *new, partner])
+        self.assertEqual(di.superseded, 1)
+        self.assertEqual(sorted(r['id'] for c in di.chains for r in c['records']), ['2', '3', '4'])
+
 
 if __name__ == '__main__':
     unittest.main()

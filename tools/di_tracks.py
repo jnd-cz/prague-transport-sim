@@ -31,11 +31,37 @@ CHANGE = 1.0   # m-equivalent cost of continuing on another chain along one OSM 
 JOINT = 4.0    # m: the chain may change only this near the joint of the two chains (STEP + TOL)
 MIN_RECORD = 0.05  # m: shorter source records are dropped
 DUPLICATE = 0.2    # m: a record joining the same two places as another, never farther from it, is a copy
+SUPERSEDED = 0.95, 0.09  # share of an older record's length within DUPLICATE of newer records, and their median
+                         # distance at most (m), for the older one to be an earlier copy: DI 2026-10-31's re-entries
+                         # differ from the old records by up to 8.8 cm; interlaced track runs 9-17 cm beside its
+                         # partner (Malostranské náměstí 9-10 cm, Čechův most 13 cm)
 FORK_MIN, FORK_OUT, FORK_APART = 3.0, 8.0, 0.3  # m: a fork's branches (records this long) are this far apart
                                                 # this far out
 CONTEXT = 4.0  # m: an unmatched stretch between two matched nodes takes the chain its ends lie on within this
                # (Křižovnická: OSM draws a 60 m chord of the curve between both tracks, 1-2 m from each;
                # its neighbours fix which track it is)
+
+
+def _latest(recs):
+    """Records without the earlier copies of re-entered ones. The provider enters a track again under a new ID and
+    leaves the old record in the export: DI 2026-10-31 has 1,112 records of 2025-01-30 and 2026-05-27 (30 km) lying
+    on records entered 2026-10-07, which carry the heights 967 of the old ones lacked, and the old records at
+    Podolské nábřeží run on through the new Dvorecký most junction where the re-entries end at its switches."""
+    lines = [LineString(xy) for _, xy in recs]
+    date = [p['attrs'].get('DatumVkladu') or '' for p, _ in recs]
+    tree = shapely.STRtree(lines)
+    keep = []
+    for i, line in enumerate(lines):
+        newer = [lines[int(j)] for j in tree.query(line, predicate='dwithin', distance=DUPLICATE) if date[int(j)] > date[i]]
+        if newer:
+            n = max(2, int(line.length / 0.5) + 1)
+            d = shapely.distance(shapely.line_interpolate_point(line, [line.length * k / (n - 1) for k in range(n)]),
+                                 shapely.MultiLineString(newer))
+            near = sorted(d[d <= DUPLICATE])
+            if len(near) >= SUPERSEDED[0] * n and near[len(near) // 2] <= SUPERSEDED[1]:
+                continue
+        keep.append(recs[i])
+    return keep
 
 
 class Source:
@@ -47,6 +73,9 @@ class Source:
         # straight track look like a fork)
         recs = [(p, [tuple(c[:2]) for c in p['coords']]) for p in paths if len(p['coords']) > 1]
         recs = [r for r in recs if LineString(r[1]).length >= MIN_RECORD]
+        n = len(recs)
+        recs = _latest(recs)
+        self.superseded = n - len(recs)
         while True:   # clusters, then again without the duplicates found
             ends = [(r, k, xy[0 if k == 0 else -1]) for r, (_, xy) in enumerate(recs) for k in (0, 1)]
             tree = shapely.STRtree(shapely.points([e[2] for e in ends]))
@@ -72,7 +101,7 @@ class Source:
             if not drop:
                 break
             recs = [r for i, r in enumerate(recs) if i not in drop]
-        self.duplicates = len(paths) - len(recs)
+        self.duplicates = len(paths) - self.superseded - len(recs)
         members = defaultdict(list)
         for i in range(len(ends)):
             members[root(i)].append(i)
