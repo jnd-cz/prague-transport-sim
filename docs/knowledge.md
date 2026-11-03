@@ -104,6 +104,14 @@ What sessions learned and later work needs. Kept current and short; the full log
   18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off
   to reach 20 m. A bend squeezed into a metre reads much wider over 5 m (10° as 29 m), so the curve fit
   measures its own radius over 2 m.
+- **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
+  and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
+  split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to
+  the old where both had them (median 0, p90 2 cm): DI heights now reach 63-71 % of each line's path (were
+  25-47 %). The old records at Podolské nábřeží run on through the new Dvorecký most junction, where the re-entries
+  end at its switches. `di_tracks._latest` drops an older record lying on newer ones (1,057 city-wide).
+- **Interlaced track after a switch** (Čechův most, Ohrada–Krejcárek, Chotkova, Flora): DI draws the second track
+  9-17 cm (mostly 12-13 cm) beside the first for 14-90 m after the switch's tip, before the tracks part.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
