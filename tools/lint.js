@@ -156,7 +156,9 @@ function levelsAtBridges(g) {
 
 // Our track and the opposite one as drawn: within 6 m of the route every track lies on the track
 // profile (a step between the two tracks, or a drawn track off the profile, is a vertical jump in the
-// rails and the wire above them; the Modřany corridor had up to 6 m). Every 1.5 m of track, counted per 10 m.
+// rails and the wire above them; the Modřany corridor had up to 6 m). The profile is read across the
+// street (heightAt): with the build's heights the opposite track has its own (#197). Every 1.5 m of track,
+// counted per 10 m.
 function trackLevels(g) {
   const r = g.route, pr = r.ground.profile, bad = new Map();
   let n = 0;
@@ -166,7 +168,8 @@ function trackLevels(g) {
       const [x, y] = t.smooth[i], q = r.nearest(x, y);
       if (!q || q.d > 5) continue;
       n++;
-      const dev = t.z[i] - pr.height(q.s), k = Math.round(q.s / 10);
+      const p = r.at(q.s), l = (y - p.y) * p.hx - (x - p.x) * p.hy; // (left > 0, as src/terrain.js near)
+      const dev = t.z[i] - pr.heightAt(q.s, l), k = Math.round(q.s / 10);
       if (Math.abs(dev) > 0.3 && !(bad.get(k)?.mag >= Math.abs(dev))) bad.set(k, { s: Math.round(q.s), x, y, mag: Math.abs(dev), info: `track ${dev.toFixed(2)} m off the profile, ${q.d.toFixed(1)} m from the route` });
     }
   }

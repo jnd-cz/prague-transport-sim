@@ -141,8 +141,8 @@ def build_chains(staged):
     """Chains of DI paths (copies dropped), each with its staged heights binned every BIN m."""
     import di_tracks
     geo = [g for g in staged['geometry'] if g['dataset'] == 'di']
-    source = di_tracks.Source('di', [{'id': g['id'], 'coords': [(x, y, z) for (x, y), z in zip(g['xy'], g['raw_z'])]}
-                                     for g in geo])
+    source = di_tracks.Source('di', [{'id': g['id'], 'coords': [(x, y, z) for (x, y), z in zip(g['xy'], g['raw_z'])],
+                                      'attrs': g.get('attributes') or {}} for g in geo])  # (dates: re-entries, #209)
     paths = {p['id']: [tuple(c[:2]) for c in p['coords']] for p in source.records}
     lines = {pid: LineString(xy) for pid, xy in paths.items()}
     per = defaultdict(list)
