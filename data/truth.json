@@ -375,7 +375,9 @@
    {"decision": "osm-476017592", "place": "Palackého most", "lines": [9], "answer": "follows survey surface", "quote": "follow survey surface until bridge ends (page note, lines 9 and 17)", "source": "Claude Code session 2026-11-02 (#184)", "date": "2026-11-02"},
    {"decision": "osm-150611269", "place": "Černý kůň", "lines": [17], "answer": "follows survey surface", "quote": "maybe I meant the gold points that seem to follow the track height from both sides", "source": "Claude Code session 2026-11-02 (#184)", "date": "2026-11-02"},
    {"decision": "osm-4722520", "place": "Modřany bridge", "lines": [17], "answer": "archive, bridged over a dip", "quote": "page answer 'archive, bridged over a dip' (reports/reviews/line17.json)", "source": "Claude Code session 2026-11-02 (#184)", "date": "2026-11-02"},
-   {"decision": "osm-98560954", "place": "Hodkovičky", "lines": [17], "answer": "archive, bridged over a dip", "quote": "bridge over dip, approximate the curve from adjacent valid archive track instead of straight line (page note)", "source": "Claude Code session 2026-11-02 (#184)", "date": "2026-11-02"}
+   {"decision": "osm-98560954", "place": "Hodkovičky", "lines": [17], "answer": "archive, bridged over a dip", "quote": "bridge over dip, approximate the curve from adjacent valid archive track instead of straight line (page note)", "source": "Claude Code session 2026-11-02 (#184)", "date": "2026-11-02"},
+   {"decision": "street-80aed900b37f", "place": "Strossmayerovo náměstí, towards Čechův most", "lines": [17], "answer": "archive profile ok", "quote": "archive profile ok (review page answer, no note)", "source": "review page, test host, 2026-11-03 (#202)", "date": "2026-11-03"},
+   {"decision": "street-a1b8a48c85b7", "place": "Staroměstská → Právnická fakulta", "lines": [17], "answer": "archive profile ok", "quote": "archive profile ok (review page answer, no note)", "source": "review page, test host, 2026-11-03 (#202)", "date": "2026-11-03"}
   ]
  },
  "trackGeometry": {
