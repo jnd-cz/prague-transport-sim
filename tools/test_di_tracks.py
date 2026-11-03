@@ -115,12 +115,73 @@ class Matching(unittest.TestCase):
         pos = {1: (0, 0.2), 2: (56.0, 0.6), 3: (120, 0.2), 4: (52.0, 3.2)}
         geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
         self.assertLess(abs(geo.at(2)[1]), 0.01)            # stays on its own track
-        # a fork behind the previous node: the node keeps its own place
-        di2 = dt.Source('di', [rec(1, [(0, 0), (40, 0)]), rec(2, [(40, 0), (100, 0)]), rec(3, [(40, 0), (80, 10)])])
-        pos2 = {1: (0, 0.2), 2: (41.0, 0.2), 3: (44.0, 0.2), 4: (100, 0.2), 5: (80, 10.2)}
-        geo2 = dt.TrackGeometry(pos2, [(1, 2), (2, 3), (3, 4), (3, 5)], [di2])
-        self.assertGreater(geo2.at(3)[0], geo2.at(2)[0])
+        # a fork behind the previous node, a junction: the node keeps its own place (Holešovice: moving it turned
+        # the route back)
+        di2 = dt.Source('di', [rec(1, [(0, 0), (40, 0)]), rec(2, [(40, 0), (100, 0)]), rec(3, [(40, 0), (80, 10)]),
+                               rec(4, [(41, 0), (41, -30)])])
+        pos2 = {1: (0, 0.2), 2: (41.0, 0.2), 3: (44.0, 0.2), 4: (100, 0.2), 5: (80, 10.2), 6: (41, -30)}
+        geo2 = dt.TrackGeometry(pos2, [(1, 2), (2, 3), (3, 4), (3, 5), (2, 6)], [di2])
+        self.assertGreater(geo2.at(3)[0], geo2.at(2)[0] + 2)
         self.assertEqual(geo2.report['reversed_edges'], 0)
+
+    def test_a_node_between_the_switch_and_its_fork_moves_with_it(self):
+        # Křižovnická: OSM's node 0.5 m from the switch lies at the fork, 5 m on; both take the fork
+        di = dt.Source('di', [rec(1, [(0, 0), (40, 0)]), rec(2, [(40, 0), (100, 0)]), rec(3, [(40, 0), (80, 10)])])
+        pos = {1: (0, 0.2), 2: (41.0, 0.2), 3: (44.0, 0.2), 4: (100, 0.2), 5: (80, 10.2)}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (3, 4), (3, 5)], [di])
+        self.assertEqual(geo.at(3), (40.0, 0.0))
+        self.assertEqual(geo.at(2), (40.0, 0.0))
+        self.assertEqual(geo.report['reversed_edges'], 0)
+
+
+def turnout(x0, side=1, n=12):
+    """A branch leaving the x axis at x0 on a 50 m radius to the left (side 1) or right (-1), 20 m long."""
+    return [(x0 + 50 * math.sin(k / n * 0.4), side * 50 * (1 - math.cos(k / n * 0.4))) for k in range(n + 1)]
+
+
+class Pairing(unittest.TestCase):
+    def test_a_switch_takes_its_fork_on_the_same_track_up_to_15_m(self):
+        # Jiráskovo náměstí (s 12,941): DI's fork 7.3 m from OSM's switch, "likely a bit further than 5m"
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (120, 0)]), rec(3, turnout(50))])
+        pos = {1: (0, 0.2), 2: (57.3, 0.2), 3: (120, 0.2), 4: turnout(50)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
+        self.assertEqual(geo.at(2), (50.0, 0.0))
+
+    def test_a_fork_facing_the_other_way_is_not_the_switch(self):
+        # a fork 6 m on whose branch leaves backwards: another switch
+        back = [(56 - x, y) for x, y in [(p[0] - 50, p[1]) for p in turnout(50)]]
+        di = dt.Source('di', [rec(1, [(0, 0), (56, 0)]), rec(2, [(56, 0), (120, 0)]), rec(3, back)])
+        pos = {1: (0, 0.2), 2: (50.0, 0.2), 3: (120, 0.2), 4: turnout(50)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
+        self.assertNotEqual(geo.at(2), (56.0, 0.0))
+
+    def test_a_branch_ending_on_the_middle_of_a_track_is_a_fork(self):
+        # Palackého náměstí: DI does not split the through record; the branch ends 19.8 m along it
+        di = dt.Source('di', [rec(1, [(0, 0), (120, 0)]), rec(2, turnout(50))])
+        self.assertEqual(len(di.forks), 1)
+        self.assertLess(math.dist(di.forks[0], (50, 0)), 1e-6)
+        pos = {1: (0, 0.2), 2: (54.4, 0.2), 3: (120, 0.2), 4: turnout(50)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
+        self.assertLess(math.dist(geo.at(2), (50, 0)), 1e-6)
+
+    def test_a_branch_running_alongside_forks_where_it_leaves(self):
+        # Čechův most: DI draws the branch 13 cm off the through track for 21 m, then it leaves
+        branch = [(29, 0.13), (50, 0.13)] + [(x, y + 0.13) for x, y in turnout(50)[1:]]
+        di = dt.Source('di', [rec(1, [(0, 0), (29, 0)]), rec(2, [(29, 0), (120, 0)]), rec(3, branch)])
+        self.assertEqual(len(di.forks), 1)
+        # (where the branch is OVERLAP further off: 1.7 m on along a 50 m curve)
+        self.assertLess(abs(di.forks[0][0] - 50), 2.0)
+
+    def test_a_branch_the_source_lacks_is_left_to_the_next_source(self):
+        # Dvorce: DI has no track onto the new Dvorecký most; OSM's diverging edge lies within 2 m of the through
+        # track only and took it; the archive has the branch
+        di = dt.Source('di', [rec(1, [(0, 0), (120, 0)])])
+        archive = dt.Source('dtmp', [rec(9, turnout(50)[:5])])
+        end = turnout(50)[4]
+        pos = {1: (0, 0.2), 2: (50, 0.2), 3: (120, 0.2), 4: (end[0], end[1] + 0.2)}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di, archive])
+        self.assertEqual(geo.source(2, 4)['src'], 'dtmp')
+        self.assertEqual(geo.source(1, 2)['src'], 'di')
 
     def test_no_source_leaves_osm_unchanged_and_no_track_is_added(self):
         di = dt.Source('di', [rec(1, [(0, 0), (100, 0)]), rec(2, [(0, 10), (100, 10)])])

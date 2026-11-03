@@ -741,12 +741,17 @@ def main():
     # ---------------- geometry from the current DTM centrelines (#20): the OSM nodes and edges move onto DI
     # (archived DTMP, then OSM, where it has none) before any route position is computed (tools/di_tracks.py)
     import di_tracks
+    import track_curve
     lls = {**{nid: (e["lat"], e["lon"]) for nid, e in tnodes.items()}, **back_ll, **nodes}
     lls = {n: ll for n, ll in lls.items() if n in nodes or n in tnodes or n in back_ll}
     allpos = {n: P(*ll) for n, ll in lls.items()}
     edges = {(a, b) for ids in (path_ids, bids, *[w["nodes"] for w in tways]) for a, b in zip(ids, ids[1:])}
     geo = di_tracks.TrackGeometry(allpos, edges, [] if OSM_TRACKS else di_tracks.load_sources())
-    print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k != 'fill'})}")
+    if not OSM_TRACKS:
+        geo.fit_curves()   # smooth curves through the points, continuous at every node (#204)
+    print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k not in ('fill', 'curve')})}")
+    if "curve" in geo.report:
+        print(f"track curves: {json.dumps({k: v for k, v in geo.report['curve'].items() if not isinstance(v, list)})}")
 
     def expand(ids):
         """The points along a node list through the moved edge geometry, and where each node lies in them."""
@@ -1224,6 +1229,7 @@ def main():
         "tracks": track_lines,
         "pathBack": path_back,
         "trackSource": track_source,
+        **({"trackCurve": {"tol": track_curve.TOL, "fill": track_curve.FILL_TOL}} if not OSM_TRACKS else {}),
         "buildings": buildings,
         "roads": roads,
         "green": green,

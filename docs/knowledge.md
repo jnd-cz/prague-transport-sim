@@ -82,6 +82,21 @@ What sessions learned and later work needs. Kept current and short; the full log
   fork. OSM differs from DI by p50 0.13 m / p90 0.45 m at line 17's nodes, but draws curves as chords up to
   2–3 m off (Křižovnická, where the orthophoto's rails lie on DI's), switches up to 5 m from DI's forks, and Kobylisy's pair 2.5–3.3 m apart (DI
   3.5 m). DI (state 2026-09-30) lacks the track OSM maps at 50.0502 N 14.4154 E (ways of 2025–26).
+- **DI draws a switch three ways** (#204): records ending together and leaving apart (a fork of record ends);
+  a branch ending on the middle of a through record that is not split there (Palackého náměstí, the branch
+  19.8 m along it); a branch running 13 cm off the through track for 21 m before it leaves (Čechův most, from
+  a record joint). At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
+  switches lie up to 7.4 m from DI's forks along the track (Jiráskovo náměstí; the user's answers of
+  2026-11-03), and OSM and DI can disagree on which leg is the straight one in a curved switch (Křižovnická).
+- **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
+  edges) where DI has them 0.4-0.5 m apart; a node placed nearest all its tracks lies off each of them.
+- **The archive draws Dvorce's old connection** (#204): DI (2026-09-30) and the archive (2008-2024) have
+  no track onto the new Dvorecký most (opened 04/2026: "No data is related to new Dvorecký most put in
+  service in 04/2026", the user, track sources review, 2026-11-03); where OSM's new edges come within 2 m of
+  the archive's old track it takes them, as a zigzag with 20° breaks.
+- **A 5 m window reads a curve held within 2 cm at 90 % of its radius** (#204): the sagitta over 5 m of a
+  20 m curve is 0.16 m, 2 cm of it is 12 %; line 17's DI-fitted 20 m curves read 18-20 m. A bend squeezed
+  into a metre reads much wider over 5 m (10° as 29 m), so the curve fit measures over 2 m.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
@@ -225,7 +240,10 @@ Review these when realism matters; most move into the build in M2.
 - `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
-  `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot.
+  `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
+  `trackRadius` (5 m window, under 18 m; 18-20 m counted as `nearMin`) and `trackJoins` (through tracks
+  breaking over 1° where chains meet, diverging start angles listed; direction from the parabola through
+  the first three drawn points: the game draws a point every 1.5 m).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.

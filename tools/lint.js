@@ -328,6 +328,135 @@ function verticalCurves(g) {
   return c;
 }
 
+// Points at arc lengths along a polyline (linear between its points), with its length.
+function along(p) {
+  const cum = [0];
+  for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  const L = cum[cum.length - 1];
+  let j = 0;
+  const at = (s) => {
+    s = Math.max(0, Math.min(L, s));
+    if (s < cum[j]) j = 0;
+    while (j < p.length - 2 && cum[j + 1] < s) j++;
+    const t = (s - cum[j]) / (cum[j + 1] - cum[j] || 1e-9);
+    return [p[j][0] + (p[j + 1][0] - p[j][0]) * t, p[j][1] + (p[j + 1][1] - p[j][1]) * t];
+  };
+  return { L, at };
+}
+
+// The drawn track in plan (#204): the radius over a 5 m window (the circle through the points 2.5 m either side)
+// every metre along the route, the opposite route and every drawn track, flagged under 90 % of 20 m (data/truth.json
+// trackGeometry `min-radius-passenger`): a curve held within 2 cm of noisy survey points reads 90 % of its radius
+// over 5 m at worst (tools/track_curve.py READ; line 17's 20 m curves read 18-20 m), counted apart as `nearMin`.
+// Places per 10 m of each line, counted per class (our, opposite, the track's source).
+const MIN_RADIUS = 20, READ = 0.9;
+function trackRadius(g) {
+  const lines = [['our', g.route.pts], ['opposite', g.backRoute?.pts], ...(g.data.tracks || []).map((t) => [t.src || 'osm', t.smooth || t.p])];
+  const bad = new Map(), near = new Map(), kinds = {};
+  let n = 0, minR = Infinity;
+  lines.forEach(([kind, p], li) => {
+    if (!p || p.length < 3) return;
+    const { L, at } = along(p);
+    for (let s = 2.5; s <= L - 2.5; s += 1) {
+      const a = at(s - 2.5), b = at(s), c = at(s + 2.5);
+      const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+      const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+      const R = area2 > 1e-9 ? (ab * bc * ca) / (2 * area2) : 1e6;
+      n++;
+      minR = Math.min(minR, R);
+      const k = `${li}:${Math.round(s / 10)}`, into = R < MIN_RADIUS * READ ? bad : R < MIN_RADIUS ? near : null;
+      if (into && !(into.get(k)?.mag >= MIN_RADIUS / R))
+        into.set(k, { kind, x: b[0], y: b[1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(s) } : {}), mag: MIN_RADIUS / R, info: `${kind} track radius ${R.toFixed(1)} m over 5 m` });
+    }
+  });
+  for (const b of bad.values()) kinds[b.kind] = (kinds[b.kind] || 0) + 1;
+  const c = check('track-radius', n, [...bad.values()]);
+  c.kinds = kinds;
+  c.nearMin = [...near.keys()].filter((k) => !bad.has(k)).length;
+  c.minRadius = Math.round(minR * 10) / 10;
+  return c;
+}
+
+// Where drawn tracks meet (#204): at every node where track chains end (a record or source joint, a switch, a
+// crossing), the chains that continue each other (directions within 30°) are paired straightest first; a pair
+// whose directions break by more than 1° is flagged, per class (joint: two ends, switch: three, crossing: four
+// or more). The leg left over at a switch is the diverging track: its start angle against the through track is
+// listed, not flagged (data/truth.json `switch-start`: most switches start tangentially, some abruptly). The
+// direction at an end is the tangent of the parabola through the drawn track's first three points (the game draws
+// a point every 1.5 m: a chord, or points between them, read a smooth 20 m curve as a 2-4° break).
+function trackJoins(g) {
+  const ends = [];
+  for (const t of g.data.tracks || []) {
+    const p = t.smooth || t.p;
+    if (!p || p.length < 2) continue;
+    const { L } = along(p);
+    if (L < 0.5) continue;
+    for (const fwd of [true, false]) {
+      const q = fwd ? p : [...p].reverse(), p0 = q[0];
+      let dx = q[1][0] - p0[0], dy = q[1][1] - p0[1];
+      if (q.length > 2) {
+        const h1 = Math.hypot(dx, dy), h2 = Math.hypot(q[2][0] - q[1][0], q[2][1] - q[1][1]);
+        if (h1 > 1e-6 && h2 > 1e-6) {
+          const a = -(2 * h1 + h2) / (h1 * (h1 + h2)), b = (h1 + h2) / (h1 * h2), c = -h1 / (h2 * (h1 + h2));
+          dx = a * p0[0] + b * q[1][0] + c * q[2][0];
+          dy = a * p0[1] + b * q[1][1] + c * q[2][1];
+        }
+      }
+      const l = Math.hypot(dx, dy) || 1;
+      ends.push({ x: p0[0], y: p0[1], dx: dx / l, dy: dy / l, src: t.src || 'osm' });
+    }
+  }
+  // ends at one node: within 5 cm (each chain ends at the node's position)
+  const cell = new Map(), key = (x, y) => `${Math.round(x / 0.1)},${Math.round(y / 0.1)}`;
+  ends.forEach((e, i) => { const k = key(e.x, e.y); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(i); });
+  const group = new Array(ends.length).fill(-1), groups = [];
+  ends.forEach((e, i) => {
+    if (group[i] >= 0) return;
+    const gi = groups.length, members = [i];
+    group[i] = gi;
+    for (let m = 0; m < members.length; m++) {
+      const a = ends[members[m]], kx = Math.round(a.x / 0.1), ky = Math.round(a.y / 0.1);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++)
+        for (const j of cell.get(`${kx + ox},${ky + oy}`) || [])
+          if (group[j] < 0 && Math.hypot(ends[j].x - a.x, ends[j].y - a.y) <= 0.05) { group[j] = gi; members.push(j); }
+    }
+    groups.push(members);
+  });
+  const deg = (u, v) => (Math.acos(Math.max(-1, Math.min(1, u.dx * v.dx + u.dy * v.dy))) * 180) / Math.PI;
+  const bad = [], diverging = [], kinds = {};
+  let n = 0;
+  for (const ms of groups) {
+    if (ms.length < 2) continue;
+    const pairs = [];
+    for (let a = 0; a < ms.length; a++) for (let b = a + 1; b < ms.length; b++) {
+      const u = ends[ms[a]], v = ends[ms[b]];
+      const brk = deg(u, { dx: -v.dx, dy: -v.dy });
+      if (brk < 30) pairs.push([brk, ms[a], ms[b]]);
+    }
+    pairs.sort((p, q) => p[0] - q[0]);
+    const used = new Set(), through = [];
+    for (const [brk, a, b] of pairs) if (!used.has(a) && !used.has(b)) { used.add(a); used.add(b); through.push([brk, a, b]); }
+    const kind = ms.length === 2 ? 'joint' : ms.length === 3 ? 'switch' : 'crossing';
+    for (const [brk, a, b] of through) {
+      n++;
+      if (brk > 1) {
+        kinds[kind] = (kinds[kind] || 0) + 1;
+        bad.push({ kind, x: ends[a].x, y: ends[a].y, mag: brk, info: `${kind}: the through track breaks ${brk.toFixed(1)}° (${ends[a].src}/${ends[b].src})` });
+      }
+    }
+    if (through.length)
+      for (const d of ms.filter((m) => !used.has(m))) {
+        const e = ends[d], ang = Math.min(...through.flatMap(([, a, b]) => [deg(e, ends[a]), deg(e, ends[b])]));
+        diverging.push({ x: Math.round(e.x), y: Math.round(e.y), deg: Math.round(ang * 10) / 10, src: e.src });
+      }
+  }
+  const c = check('track-joins', n, bad);
+  c.kinds = kinds;
+  const angles = diverging.map((d) => d.deg).sort((a, b) => a - b), q = (f) => angles[Math.min(angles.length - 1, Math.floor(f * angles.length))];
+  c.diverging = { n: angles.length, p50: q(0.5), p90: q(0.9), max: angles[angles.length - 1], places: diverging.sort((a, b) => b.deg - a.deg).slice(0, TOP) };
+  return c;
+}
+
 // Overhead line: every span (or bracket arm) carries the contact wire from above, at least 0.6 m over
 // it (wire 5.6 m above the rails), and the two ends of a span are level (within 0.5 m).
 function catenarySpans(g) {
@@ -599,6 +728,8 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
+    trackRadius: trackRadius(g),
+    trackJoins: trackJoins(g),
     trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),

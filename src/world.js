@@ -397,8 +397,9 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
 
   // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
   // then the terrain is lowered under every track so it can't poke through the bed
-  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20)
-  for (const t of data.tracks) if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) ? SMOOTH : AS_SURVEYED).pts;
+  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20),
+  // and every track where the build drew smooth curves (data.trackCurve, #204)
+  for (const t of data.tracks) if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) && !data.trackCurve ? SMOOTH : AS_SURVEYED).pts;
   // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
   // street surfaces laid flush with the track bed
   const tracks = new SegmentIndex(10);

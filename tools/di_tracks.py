@@ -25,7 +25,12 @@ ANGLE = 30     # degrees between the OSM edge and the source line
 STEP = 2.0     # m between samples along an OSM edge
 JOIN = 0.5     # m: source record ends closer than this continue each other (DI: 19,227 of 20,742 ends meet
                # exactly, 1,168 more within 0.5 m)
-FORK = 5.0     # m: an OSM switch takes the position of a source fork this near
+FORK = 15.0    # m: an OSM switch takes the position of a source fork on its own tracks, diverging to the same side,
+               # this near (the user's answers of 2026-11-03, #204: forks 5.3-7.4 m from OSM's switch are the same
+               # switch, "Switch is there, likely a bit further than 5m")
+OVERLAP = 0.03  # m: a branch ending on a track's middle stays within this of its distance at the end while it runs
+                # alongside (Čechův most: DI draws the branch 13 cm off the through track for 21 m before it leaves)
+OVERLAP_MIN = 3.0  # m: running alongside this far is an overlap: the fork is where it ends, else at the branch's end
 BLEND = 20.0   # m along an OSM fill stretch over which it takes up the shift of its matched neighbours
 CHANGE = 1.0   # m-equivalent cost of continuing on another chain along one OSM edge
 JOINT = 4.0    # m: the chain may change only this near the joint of the two chains (STEP + TOL)
@@ -36,6 +41,38 @@ FORK_MIN, FORK_OUT, FORK_APART = 3.0, 8.0, 0.3  # m: a fork's branches (records 
 CONTEXT = 4.0  # m: an unmatched stretch between two matched nodes takes the chain its ends lie on within this
                # (Křižovnická: OSM draws a 60 m chord of the curve between both tracks, 1-2 m from each;
                # its neighbours fix which track it is)
+
+
+def _unit(v):
+    l = math.hypot(*v) or 1.0
+    return (v[0] / l, v[1] / l)
+
+
+def switch_legs(dirs):
+    """A switch among three unit directions out of a node: (toe, (through leg, diverging leg)) as indices. The
+    through track is the most nearly opposite pair; the diverging leg leaves within 90° of the through leg it runs
+    beside, the toe the other way. None for another number of legs or a crossing."""
+    if len(dirs) != 3:
+        return None
+    dot = lambda a, b: dirs[a][0] * dirs[b][0] + dirs[a][1] * dirs[b][1]
+    i, j = min(((0, 1), (0, 2), (1, 2)), key=lambda p: dot(*p))
+    d = 3 - i - j
+    t = i if dot(i, d) > dot(j, d) else j
+    if dot(t, d) <= 0:
+        return None
+    return (j if t == i else i), (t, d)
+
+
+def same_way(dirs, branches):
+    """An OSM switch (unit directions to its neighbours) and a source fork (its branches) face the same way: the
+    two legs of each leave within 45° of the other's (the opposite of the toe). Which leg is the through one is not
+    compared: OSM's legs near a switch are a few metres long, and in a curved switch the straighter one differs
+    (Křižovnická, 50.0884 N 14.4155 E: OSM's diverging leg left, DI's right). Either not a switch: not decided."""
+    a, b = switch_legs(dirs), switch_legs(branches)
+    if not a or not b:
+        return True
+    u, v = dirs[a[0]], branches[b[0]]
+    return u[0] * v[0] + u[1] * v[1] > math.cos(math.radians(45))
 
 
 class Source:
@@ -77,8 +114,9 @@ class Source:
         for i in range(len(ends)):
             members[root(i)].append(i)
         # forks: places where two records leave in the same direction and move apart (two copies of one track
-        # leave together and stay within centimetres: Vozovna Kobylisy, 10 m each at 98-99 degrees)
-        self.forks = []
+        # leave together and stay within centimetres: Vozovna Kobylisy, 10 m each at 98-99 degrees); each with the
+        # directions its branches leave in (`branches`, unit vectors out of the fork)
+        self.forks, self.branches = [], []
         for c, ms in members.items():
             if len(ms) < 3:
                 continue
@@ -96,6 +134,7 @@ class Source:
             if split:
                 xs = [ends[m][2] for m in ms]
                 self.forks.append((sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs)))
+                self.branches.append([_unit(u) for u, _ in out])
         # merge records through clusters of exactly two ends
         at = {i: members[root(i)] for i in range(len(ends))}
         used, self.chains = set(), []
@@ -126,6 +165,7 @@ class Source:
             line = LineString(pts)
             if line.length > 0:
                 self.chains.append({'line': line, 'records': ids})
+        self._branch_ends()
         # segments for matching
         self.seg_chain, segs = [], []
         for c, ch in enumerate(self.chains):
@@ -137,6 +177,58 @@ class Source:
         self.segs = segs
         self.tree = shapely.STRtree(segs)
         self.fork_tree = shapely.STRtree(shapely.points(self.forks)) if self.forks else None
+
+    def _branch_ends(self):
+        """Forks the source does not split its records at: a chain's lone end on another chain's middle, leaving it
+        within ANGLE and moving apart (Palackého náměstí: the branch ends 19.8 m along the through track). A branch
+        that first runs alongside (within OVERLAP of its distance at the end, OVERLAP_MIN or more) forks where it
+        leaves (Čechův most: 13 cm off for 21 m)."""
+        lines = [c['line'] for c in self.chains]
+        if not lines:
+            return
+        tree = shapely.STRtree(lines)
+        tips = [p for l in lines for p in (l.coords[0], l.coords[-1])]
+        tip_tree = shapely.STRtree(shapely.points(tips))
+        known = list(self.forks)
+        for k, line in enumerate(lines):
+            for first in (True, False):
+                e = tips[2 * k + (0 if first else 1)]
+                pe = Point(e)
+                if any(math.dist(e, f) <= JOIN for f in known):
+                    continue
+                lone = not any(int(i) // 2 != k and math.dist(e, tips[int(i)]) <= JOIN for i in tip_tree.query(pe.buffer(JOIN)))
+                walk = (lambda s: line.interpolate(s)) if first else (lambda s: line.interpolate(line.length - s))
+                for j in tree.query(pe.buffer(JOIN)):
+                    j = int(j)
+                    thr = lines[j]
+                    if j == k or thr.distance(pe) > JOIN:
+                        continue
+                    d0, s = thr.distance(pe), 0.0
+                    while s + 0.5 <= line.length and thr.distance(walk(s + 0.5)) <= d0 + OVERLAP:
+                        s += 0.5
+                    if s < OVERLAP_MIN:
+                        s = 0.0
+                    # (a branch ending on the middle of a track, or leaving it after running alongside: where
+                    # other records end too, Čechův most's branch starts at the through track's record joint)
+                    p0 = walk(s)
+                    tt = thr.project(p0)
+                    if not (s or lone) or not JOIN < tt < thr.length - JOIN:
+                        continue
+                    if line.length - s < FORK_MIN or thr.distance(walk(min(s + FORK_OUT, line.length))) < FORK_APART:
+                        continue
+                    p1 = walk(s + 1.0)
+                    u = _unit((p1.x - p0.x, p1.y - p0.y))
+                    a, b = thr.interpolate(max(0.0, tt - 0.5)), thr.interpolate(min(thr.length, tt + 0.5))
+                    v = _unit((b.x - a.x, b.y - a.y))
+                    if math.degrees(math.acos(min(1.0, abs(u[0] * v[0] + u[1] * v[1])))) > ANGLE:
+                        continue
+                    f = thr.interpolate(tt)
+                    if any(math.dist((f.x, f.y), q) <= JOIN for q in known):
+                        break   # (found from the other track's end too)
+                    self.forks.append((f.x, f.y))
+                    self.branches.append([v, (-v[0], -v[1]), u])
+                    known.append((f.x, f.y))
+                    break
 
     def candidates(self, x, y, ux, uy, tol=TOL, only=None):
         """{chain: distance} of the source chains within tol whose direction there is within ANGLE."""
@@ -293,36 +385,49 @@ class TrackGeometry:
                     if runs:
                         self.edges[key] = (src, runs)
             self._by_ends(src, pos)
+            self._no_branch(src, pos)
         # 2. node positions: a matched node moves onto its chain (a switch onto the source's fork when one is
         # within FORK), a node with only unmatched edges keeps OSM's position and takes up its neighbours' shift
         self.pos = {}
-        # each source fork goes to the nearest OSM switch within FORK, one node per fork (Palackého náměstí: two
-        # switches 4-5 m apart would both take one fork and the edge between them would vanish)
+        # each source fork goes to the nearest OSM switch within FORK on its tracks that leaves the same way, one
+        # node per fork (Palackého náměstí: two switches 4-5 m apart would both take one fork and the edge between
+        # them would vanish)
         claims = []
         for n in adj:
             if len(adj[n]) < 3:
                 continue
-            hits = [(m, self.edges[(n, m) if str(n) < str(m) else (m, n)]) for m in adj[n]]
-            src = next((h[0] for _, h in hits if h), None)
+            hits = {m: self.edges[k(n, m)] for m in adj[n]}
+            src = next((h[0] for h in hits.values() if h), None)
             if src is None or src.fork_tree is None:
                 continue
-            # the chains this node's edges run on at it: a fork must lie on all of them (a crossover has a fork on
-            # each track; the other track's one 4 m sideways may be the nearer, Holešovice)
-            mine = {(h[1][0][0] if str(n) < str(m) else h[1][-1][0]) for m, h in hits if h and h[0] is src}
+            ms = list(adj[n])
+            dirs = [_unit((pos[m][0] - pos[n][0], pos[m][1] - pos[n][1])) for m in ms]
+            legs = switch_legs(dirs)
+            if legs:
+                # a switch: the fork lies on a chain its through track runs on (OSM's node may lie past the
+                # source's fork and a record joint, Jiráskovo náměstí); not the diverging edge's, whose far end
+                # may be the other track's fork of a crossover
+                toe, (t, _) = legs
+                on_chains = [{r[0] for r in hits[ms[x]][1]} for x in (toe, t) if hits[ms[x]] and hits[ms[x]][0] is src]
+                on = lambda f: any(src.chains[c]['line'].distance(Point(f)) <= JOIN for cs in on_chains for c in cs)
+            else:
+                # (a crossing or more legs: on every chain the node's edges run on at it; a crossover has a fork on
+                # each track, the other track's one 4 m sideways may be the nearer, Holešovice)
+                mine = {(h[1][0][0] if str(n) < str(m) else h[1][-1][0]) for m, h in hits.items() if h and h[0] is src}
+                on = lambda f: all(src.chains[c]['line'].distance(Point(f)) <= JOIN for c in mine)
             for i in src.fork_tree.query(Point(pos[n]).buffer(FORK)):
                 f = src.forks[i]
                 d = math.dist(f, pos[n])
-                # never past a neighbour (Holešovice: a fork 3.7 m behind the previous node turned the route back)
-                keeps = all(math.dist(f, pos[m]) > 0.5 and (f[0] - pos[m][0]) * (pos[n][0] - pos[m][0])
-                            + (f[1] - pos[m][1]) * (pos[n][1] - pos[m][1]) > 0 for m in adj[n])
-                on = all(src.chains[c]['line'].distance(Point(f)) <= JOIN for c in mine)
-                if d <= FORK and keeps and on:
-                    claims.append((d, n, (src.name, int(i)), f))
-        fork_of, taken = {}, set()
-        for d, n, key, f in sorted(claims, key=lambda c: c[0]):
-            if n not in fork_of and key not in taken:
-                fork_of[n] = f
-                taken.add(key)
+                collapse = self._past(n, f, pos)
+                if d <= FORK and collapse is not None and on(f) and same_way(dirs, src.branches[i]):
+                    claims.append((d, n, (src.name, int(i)), f, collapse))
+        fork_of, taken, collapsed = {}, set(), {}
+        for d, n, key, f, collapse in sorted(claims, key=lambda c: c[0]):
+            if n in fork_of or n in collapsed or key in taken or any(m in fork_of or m in collapsed for m in collapse):
+                continue
+            fork_of[n] = f
+            taken.add(key)
+            collapsed.update({m: f for m in collapse})
         for n in adj:
             ends = []
             for m in adj[n]:
@@ -358,8 +463,10 @@ class TrackGeometry:
                                 cands.append(q)
                 self.pos[n] = min(cands, key=lambda q: (round(sum(l.distance(Point(q)) for l in lines), 3),
                                                         math.dist(q, pos[n])))
+        self.pos.update(collapsed)
+        self.forked, self.collapsed = fork_of, collapsed
         matched = set(self.pos)
-        shift = {n: (self.pos[n][0] - pos[n][0], self.pos[n][1] - pos[n][1]) for n in matched}
+        shift ={n: (self.pos[n][0] - pos[n][0], self.pos[n][1] - pos[n][1]) for n in matched}
         # fill nodes: the shift of the nearest matched node along the graph, fading to 0 over BLEND
         best = {}
         frontier = [(0.0, n, n) for n in matched]
@@ -440,6 +547,47 @@ class TrackGeometry:
                     for e, runs in found.items():
                         self.edges[e] = (src, runs, 'context')
 
+    def _past(self, n, f, pos):
+        """The nodes that move onto fork f with switch node n: none when f lies on n's side of every neighbour; a
+        two-edge neighbour at f or behind it moves with n when the node after it lies beyond f (Křižovnická: OSM's
+        node 0.5 m from the switch, the fork 5 m on). None when f lies past a junction or further (Holešovice: a
+        fork 3.7 m behind the previous node turned the route back)."""
+        beyond = lambda m, a: math.dist(f, pos[m]) > 0.5 and (f[0] - pos[m][0]) * (pos[a][0] - pos[m][0]) \
+            + (f[1] - pos[m][1]) * (pos[a][1] - pos[m][1]) > 0
+        out = []
+        for m in self.adj[n]:
+            if beyond(m, n):
+                continue
+            nxt = [x for x in self.adj[m] if x != n]
+            if len(nxt) != 1 or not beyond(nxt[0], m):
+                return None
+            out.append(m)
+        return out
+
+    def _no_branch(self, src, pos):
+        """A switch's diverging edge matched only to the one chain both its through edges run on at the switch: the
+        source has no branch there (Dvorce: DI of 2026-09-30 has no track onto the new Dvorecký most), so the edge
+        is left to the next source or OSM. (OSM's switch past the source's fork has its through edges on the two
+        tracks leaving it, Jiráskovo náměstí: that is a branch.)"""
+        k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
+        at = lambda n, m: (lambda h: h[1][0][0] if n == k(n, m)[0] else h[1][-1][0])(self.edges[k(n, m)])
+        for n, ms in self.adj.items():
+            if len(ms) != 3:
+                continue
+            ms = list(ms)
+            legs = switch_legs([_unit((pos[m][0] - pos[n][0], pos[m][1] - pos[n][1])) for m in ms])
+            if not legs:
+                continue
+            dv = ms[legs[1][1]]
+            hit = self.edges[k(n, dv)]
+            if not hit or hit[0] is not src or len({r[0] for r in hit[1]}) != 1:
+                continue
+            others = [m for m in ms if m != dv]
+            if not all(self.edges[k(n, m)] and self.edges[k(n, m)][0] is src for m in others):
+                continue
+            if {at(n, m) for m in others} == {hit[1][0][0]}:
+                self.edges[k(n, dv)] = None
+
     def _stretch(self, key):
         """The unmatched edges through two-edge nodes around `key`, and its ends: [(node, matched edge at it)]."""
         k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
@@ -455,6 +603,24 @@ class TrackGeometry:
                 e = others[0]
                 todo.append((e[1] if e[0] == n else e[0], e))
         return stretch, ends
+
+    def fit_curves(self):
+        """The edges as smooth curves through their points, continuous in direction at every node
+        (tools/track_curve.py, #204); `report['curve']` says what moved and what was left."""
+        import track_curve
+        kind = {key: (hit[0].name if hit else 'osm') for key, hit in self.edges.items()}
+        # a node off the chain an edge runs on at it (the point nearest all of a node's chains; a fork moved onto
+        # the through track, off the branch)
+        loose = set()
+        for (a, b), hit in self.edges.items():
+            if hit:
+                for n, run in ((a, hit[1][0]), (b, hit[1][-1])):
+                    if hit[0].chains[run[0]]['line'].distance(Point(self.pos[n])) > 0.01:
+                        loose.add((n, (a, b)))
+        net = track_curve.Network(self.pos, self.pts, kind, loose)
+        self.pos.update(net.pos)
+        self.pts = net.pts
+        self.report['curve'] = net.report
 
     def at(self, n):
         return self.pos.get(n, self.orig.get(n))
@@ -496,6 +662,7 @@ class TrackGeometry:
         return {'edges_m': {k: round(v, 1) for k, v in length.items()},
                 'node_moves_m': {'n': len(moves), 'p50': q(.5), 'p90': q(.9), 'p99': q(.99), 'max': q(1)},
                 'reversed_edges': reversed_,
+                'switches_on_forks': len(self.forked), 'nodes_moved_with_a_switch': len(self.collapsed),
                 'fill': fill}
 
 

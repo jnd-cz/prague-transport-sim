@@ -463,5 +463,32 @@
    "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
    "source": "user 2026-10-29"
   }
- ]
+ ],
+ "trackSources": {
+  "note": "Answers to the track sources review (tools/track_sources.py, #20): 'matches reality' without a note takes the finding of its kind within 3 m off the list. Answers with a note stay held there.",
+  "reviewAnswers": [
+   {
+    "kind": "switch without DI fork",
+    "x": -976.6,
+    "y": -4070.4,
+    "line": 17,
+    "answer": "matches reality",
+    "quote": "",
+    "place": "Podolské nábřeží, Dvorce (the new Dvorecký most junction; DI of 2026-09-30 has no track there)",
+    "source": "track sources review (reports/review/track-sources-17.json) on the test host, 2026-11-03 (#20, #204)",
+    "date": "2026-11-03"
+   },
+   {
+    "kind": "track fill",
+    "x": 2984.0,
+    "y": 3537.7,
+    "line": 17,
+    "answer": "matches reality",
+    "quote": "",
+    "place": "Klapkova, Ke Stírce (the archived axis, 36.8 m)",
+    "source": "track sources review (reports/review/track-sources-17.json) on the test host, 2026-11-03 (#20, #204)",
+    "date": "2026-11-03"
+   }
+  ]
+ }
 }
