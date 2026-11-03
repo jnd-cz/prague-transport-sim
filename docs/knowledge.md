@@ -76,6 +76,12 @@ What sessions learned and later work needs. Kept current and short; the full log
 - **OSM maps a tram under reconstruction as `railway=disused` + `disused:railway=tram`** (Libeňský most,
   `bridge=yes`, 2026-11 extract) while the 2026 DI keeps the track; tools that select `railway=tram` miss it.
   The DI's own track there is new (inserted 2025-01-30, 24 m pieces, Z = 0).
+- **DI track records** (#20): pieces from 0.1 m to a few hundred metres, ending where the next begins
+  (19,227 of 20,742 ends exactly, 1,168 more within 0.5 m). Some pieces are there twice under two IDs and
+  some have zero length (45 dropped city-wide); counting record ends alone, a straight track looks like a
+  fork. OSM differs from DI by p50 0.13 m / p90 0.45 m at line 17's nodes, but draws curves as chords up to
+  2–3 m off (Národní divadlo), switches up to 5 m from DI's forks, and Kobylisy's pair 2.5–3.3 m apart (DI
+  3.5 m). DI (state 2026-09-30) lacks the track OSM maps at 50.0502 N 14.4154 E (ways of 2025–26).
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
   tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
   level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).

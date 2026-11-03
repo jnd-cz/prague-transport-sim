@@ -429,6 +429,9 @@ Each answer keeps the finding's kind, place, street and info with it, so it can 
 A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
 `reports/review/` and deployed with the site: `?line=17&review=reports/review/track-z.json` is #106's
 large track-height disagreements (`tools/dtmp_tracks.py --findings`).
+`?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
+OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
+(`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.
 The grouped structure-height queue uses `?line=17&review=reports/review/track-heights.json`: select a
 decision to inspect its linked spans, height profile and sources. Answers with notes, uncertain choices
 and unspecified levels remain held. The card explains any held archive answer (a dip under a bridge, a

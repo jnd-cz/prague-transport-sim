@@ -72,8 +72,10 @@ CALLS = {
                 "const { run } = await import('/tools/bench/crossingSlab.js'); return run();",
     "surfaces": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
                 "const { run } = await import('/tools/bench/surfaces.js'); return await run();",
+    "spacing": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+               "const { run } = await import('/tools/bench/spacing.js'); return run();",
 }
-SEEDLESS = {"lint", "surfaces", "canted", "crossing"}
+SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing"}
 
 
 def judge(check, r):
@@ -117,6 +119,15 @@ def judge(check, r):
         if c.get("count"):
             bad.append(f"{c['count']} unexplained pedestrian obstructions")
         more = f"raw sections {c.get('rawCount')}, samples {c.get('of')}, missing samples {c.get('missing')}"
+    elif check == "spacing":
+        c = (r.get("checks") or {}).get("spacing", {})
+        for sec in c.get("sections") or []:
+            if sec.get("outside"):
+                bad.append(f"{sec['name']}: {sec['outside']} sections outside {sec['expect']}")
+            if sec.get("expect") and sec.get("kinks"):
+                bad.append(f"{sec['name']}: {sec['kinks']} kinks")
+        more = "; ".join(f"{s['name']} {s['min']}-{s['max']} m ({s['alongside']}/{s['sections']})"
+                         for s in c.get("sections") or []) or "no pilot section on this line"
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):

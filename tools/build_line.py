@@ -63,6 +63,7 @@ DEM_STEP = 10.0     # terrain grid spacing (m)
 DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
 
 REFRESH = "--refresh" in sys.argv
+OSM_TRACKS = "--osm-tracks" in sys.argv  # OSM's track geometry as before #20 (for comparison)
 
 
 # ---------------------------------------------------------------- OSM (the local extract of the snapshot)
@@ -721,38 +722,81 @@ def main():
     # drop consecutive duplicates
     path_ids = [n for i, n in enumerate(path_ids) if i == 0 or n != path_ids[i - 1]]
     P = Proj()
-    pts = [P(*nodes[n]) for n in path_ids]
+
+    # ---------------- track network (OSM topology) and the opposite direction of the line
+    tracks = overpass("tracks", Q_TRACKS)
+    tnodes = {e["id"]: e for e in tracks["elements"] if e["type"] == "node"}
+    tways = [e for e in tracks["elements"] if e["type"] == "way"]
+    back_ll, bids = {}, []
+    if RUN and back_ids:
+        back_ll, bids = nodes, list(back_ids)
+    elif Q_ROUTE_BACK:
+        back = overpass(f"route_{OSM_RELATION_BACK}", Q_ROUTE_BACK)
+        brel = next(e for e in back["elements"] if e["type"] == "relation")
+        back_ll = {e["id"]: (e["lat"], e["lon"]) for e in back["elements"] if e["type"] == "node"}
+        bways = {e["id"]: e["nodes"] for e in back["elements"] if e["type"] == "way"}
+        bids = chain_route(brel, bways)
+        bids = [n for i, n in enumerate(bids) if i == 0 or n != bids[i - 1]]
+
+    # ---------------- geometry from the current DTM centrelines (#20): the OSM nodes and edges move onto DI
+    # (archived DTMP, then OSM, where it has none) before any route position is computed (tools/di_tracks.py)
+    import di_tracks
+    lls = {**{nid: (e["lat"], e["lon"]) for nid, e in tnodes.items()}, **back_ll, **nodes}
+    lls = {n: ll for n, ll in lls.items() if n in nodes or n in tnodes or n in back_ll}
+    allpos = {n: P(*ll) for n, ll in lls.items()}
+    edges = {(a, b) for ids in (path_ids, bids, *[w["nodes"] for w in tways]) for a, b in zip(ids, ids[1:])}
+    geo = di_tracks.TrackGeometry(allpos, edges, [] if OSM_TRACKS else di_tracks.load_sources())
+    print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k != 'fill'})}")
+
+    def expand(ids):
+        """The points along a node list through the moved edge geometry, and where each node lies in them."""
+        out, at = [], []
+        for i, n in enumerate(ids):
+            out += [geo.at(n)] if i == 0 else geo.points(ids[i - 1], n)[1:]
+            at.append(len(out) - 1)
+        return out, at
+
+    def source_ranges(ids, s_at):
+        """[[s0, s1, source], ...] along a node list (s at each node)."""
+        out = []
+        for i in range(1, len(ids)):
+            src = geo.source(ids[i - 1], ids[i])["src"]
+            if out and out[-1][2] == src and abs(out[-1][1] - s_at[i - 1]) < 0.01:
+                out[-1][1] = s_at[i]
+            else:
+                out.append([s_at[i - 1], s_at[i], src])
+        return [[round(a, 1), round(b, 1), c] for a, b, c in out]
+
+    pts, node_at = expand(path_ids)
     for i in range(1, len(pts)):
         if dist(pts[i - 1], pts[i]) > 400:
             print(f"  ! long segment {dist(pts[i-1], pts[i]):.0f} m at index {i}")
     path = Polyline(pts)
-    print(f"route: {len(pts)} nodes, {path.length/1000:.2f} km")
+    node_s = [path.s[k] for k in node_at]  # route position of each route node
+    print(f"route: {len(path_ids)} nodes, {len(pts)} points, {path.length/1000:.2f} km")
     def spans(pairs, min_len):
         out = []
         for i in range(len(path_ids) - 1):
             if (path_ids[i], path_ids[i + 1]) in pairs:
-                if out and abs(out[-1][1] - path.s[i]) < 1:
-                    out[-1][1] = path.s[i + 1]
+                if out and abs(out[-1][1] - node_s[i]) < 1:
+                    out[-1][1] = node_s[i + 1]
                 else:
-                    out.append([path.s[i], path.s[i + 1]])
+                    out.append([node_s[i], node_s[i + 1]])
         return [[round(a, 1), round(b, 1)] for a, b in out if b - a > min_len]
     bridges = spans(bridge_pairs, 8)
     tunnels = spans(tunnel_pairs, 3)
     print(f"route bridges: {bridges}  underpasses/tunnels: {tunnels}")
 
     # ---------------- track network
-    tracks = overpass("tracks", Q_TRACKS)
-    tnodes = {e["id"]: e for e in tracks["elements"] if e["type"] == "node"}
-    tways = [e for e in tracks["elements"] if e["type"] == "way"]
     adj = defaultdict(set)
     for w in tways:
         ns = w["nodes"]
         for a, b in zip(ns, ns[1:]):
             adj[a].add(b)
             adj[b].add(a)
-    tpos = {nid: P(e["lat"], e["lon"]) for nid, e in tnodes.items()}
+    tpos = {nid: geo.at(nid) for nid in tnodes}
     for nid in path_ids:
-        tpos.setdefault(nid, P(*nodes[nid]))
+        tpos.setdefault(nid, geo.at(nid))
 
     def walk(start, first, length=14.0):
         """Follow track from `start` through `first`, taking the straightest continuation."""
@@ -800,7 +844,7 @@ def main():
             cross_r = d_in[0] * v_route[1] - d_in[1] * v_route[0]
             cross_a = d_in[0] * v_alt[1] - d_in[1] * v_alt[0]
             route_side = "left" if cross_r > cross_a else "right"
-            s = path.s[i]
+            s = node_s[i]
             if switches and s - switches[-1]["s"] < 3:
                 continue
             switches.append({
@@ -814,12 +858,12 @@ def main():
 
     # merge ways into continuous chains (split only at junctions/switches and bridge ends),
     # so the client can smooth each chain without kinks at way boundaries
-    edge_bridge = {}
+    edge_bridge = {}  # (bridge, source) per edge: a chain also ends where its source changes (#20)
     for w in tways:
         b = w.get("tags", {}).get("bridge") not in (None, "no")
         for a, c in zip(w["nodes"], w["nodes"][1:]):
             if a in tpos and c in tpos and a != c:
-                edge_bridge[frozenset((a, c))] = b
+                edge_bridge[frozenset((a, c))] = (b, geo.source(a, c)["src"])
     used = set()
 
     def extend(chain, flag):
@@ -846,24 +890,30 @@ def main():
         extend(chain, flag)
         chain.reverse()
         extend(chain, flag)
-        t = {"p": [[round(tpos[n][0], 2), round(tpos[n][1], 2)] for n in chain]}
-        if flag:
+        t = {"p": [[round(x, 2), round(y, 2)] for x, y in expand(chain)[0]], "src": flag[1]}
+        if flag[0]:
             t["b"] = 1
-        track_lines.append(t)
+        if sum(dist(a, b) for a, b in zip(t["p"], t["p"][1:])) >= 0.01:  # (two nodes landing on one point)
+            track_lines.append(t)
     print(f"track chains: {len(track_lines)} (from {len(tways)} ways)")
 
     # opposite direction of the line, for oncoming trams
-    path_back = []
-    if RUN and back_ids:
-        path_back = [[round(x, 2), round(y, 2)] for x, y in (P(*nodes[n]) for n in back_ids)]
-    elif Q_ROUTE_BACK:
-        back = overpass(f"route_{OSM_RELATION_BACK}", Q_ROUTE_BACK)
-        brel = next(e for e in back["elements"] if e["type"] == "relation")
-        bnodes = {e["id"]: (e["lat"], e["lon"]) for e in back["elements"] if e["type"] == "node"}
-        bways = {e["id"]: e["nodes"] for e in back["elements"] if e["type"] == "way"}
-        bids = chain_route(brel, bways)
-        bids = [n for i, n in enumerate(bids) if i == 0 or n != bids[i - 1]]
-        path_back = [[round(x, 2), round(y, 2)] for x, y in (P(*bnodes[n]) for n in bids)]
+    back_pts, back_at = expand(bids) if bids else ([], [])
+    path_back = [[round(x, 2), round(y, 2)] for x, y in back_pts]
+    back_s = [0.0]
+    for a, b in zip(back_pts, back_pts[1:]):
+        back_s.append(back_s[-1] + dist(a, b))
+    def sharp(points):
+        # turns over 60 degrees between segments over 0.3 m: the moved geometry running back on itself (#20)
+        n = 0
+        for a, b, c in zip(points, points[1:], points[2:]):
+            u, v = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+            lu, lv = math.hypot(*u), math.hypot(*v)
+            n += lu > 0.3 and lv > 0.3 and (u[0] * v[0] + u[1] * v[1]) / (lu * lv) < 0.5
+        return n
+    print(f"sharp turns (over 60 degrees): path {sharp(pts)}, pathBack {sharp(back_pts)}")
+    track_source = {"path": source_ranges(path_ids, node_s),
+                    "pathBack": source_ranges(bids, [back_s[k] for k in back_at]) if bids else []}
     print(f"opposite route: {len(path_back)} nodes")
 
     # ---------------- crossings and signals
@@ -1173,6 +1223,7 @@ def main():
         "crossings": crossings,
         "tracks": track_lines,
         "pathBack": path_back,
+        "trackSource": track_source,
         "buildings": buildings,
         "roads": roads,
         "green": green,
@@ -1183,9 +1234,12 @@ def main():
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
     one = sources.single
+    by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("di", "dtmp", "osm")]
     out["provenance"] = sources.stamp("build_line.py", {
-        "path": one("tracks", "osm", 1, "route"), "pathBack": one("tracks", "osm", 1 if path_back else 0, "route"),
-        "tracks": one("tracks", "osm", len(track_lines), "ways"), "switches": one("tracks", "osm", len(switches)),
+        "path": sources.entry("tracks", by(track_source["path"]), "m"),
+        "pathBack": sources.entry("tracks", by(track_source["pathBack"]), "m"),
+        "tracks": sources.entry("tracks", [sum(t["src"] == k for t in track_lines) for k in ("di", "dtmp", "osm")], "chains"),
+        "switches": one("tracks", "osm", len(switches)),
         "bridges": one("structures", "osm", len(bridges), "route ranges"),
         "tunnels": one("structures", "osm", len(tunnels), "route ranges"),
         "terrain": one("terrain", "coarse", terrain["nx"] * terrain["ny"], "cells"),
