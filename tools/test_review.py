@@ -164,6 +164,11 @@ def main():
               const gapPoint={...point(5,200,'missing'),archive:[]};
               const gap=heightProfile({spans:[{...main,profile:[point(0,200,'a'),gapPoint,point(10,201,'b')]}]}, {nearest:()=>null}, {height:()=>null});
               const gapPath=new DOMParser().parseFromString(gap.html,'text/html').querySelector('[data-series="path"] path').getAttribute('d');
+              // (two records at other levels: the line stays on the continuing one, the other is a hollow dot)
+              const both={...point(5,190,'dive'),archive:[{id:'dive',z:190},{id:'a',z:200.5}]};
+              const overlap=new DOMParser().parseFromString(heightProfile({spans:[{...main,profile:[point(0,200,'a'),both,point(10,201,'a')]}]}, {nearest:()=>null}, {height:()=>null}).html,'text/html');
+              const overlapPath=overlap.querySelector('[data-series="path"] path').getAttribute('d').match(/[ML][0-9.]+,[0-9.]+/g).map(c=>+c.split(',')[1]);
+              const overlapDots=overlap.querySelectorAll('[data-series="path"] circle').length;
               const button=[...document.querySelectorAll('#rvCard button[data-v]')].map(b=>b.textContent);
               if (svg) svg.dispatchEvent(new PointerEvent('pointermove',{clientX:svg.getBoundingClientRect().left+80}));
               const marker=!!R.heightMarker?.visible, cursor=R.$('heightCursor');
@@ -177,7 +182,8 @@ def main():
               return {count:R.list.filter(f=>f.kind==='trackheight').length, svg:!!svg, marker,
                 reverse:cursor?.getAttribute('visibility')==='visible',
                 conflict:R.hl.children.some(o=>o.material?.color?.getHex()===0xff3333), button,
-                explanation:R.$('rvCard').textContent, clickTo, hidden, archive, gapPath, projected, across, heldText, previewShown};
+                explanation:R.$('rvCard').textContent, clickTo, hidden, archive, gapPath, projected, across, heldText, previewShown,
+                overlapSpread:Math.max(...overlapPath)-Math.min(...overlapPath), overlapDots};
             }''')
             page.click("#rvCard button[data-v='0']")
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
@@ -233,6 +239,8 @@ def main():
         fails.append(f"a click on the chart's end did not move the camera to it: {r['height'].get('clickTo')}")
     if not r['height']['hidden'] or r['height']['archive'].count('M') != 1 or 'L' not in r['height']['archive'] or r['height']['gapPath'].count('M') != 2:
         fails.append('archive record transition or legend toggle failed')
+    if r['height']['overlapDots'] != 1 or r['height']['overlapSpread'] > 20:
+        fails.append(f"overlapping archive levels: the line jumped or the other record is hidden: {r['height']['overlapSpread']}, {r['height']['overlapDots']} dots")
     if r['height']['projected'].count('L'):
         fails.append('an out-of-range point was clamped at the edge')
     if r['heightNext'] != 'other-bridge':

@@ -55,7 +55,18 @@ export function heightProfile(f, route, profile) {
   const diLabels = new Set();
   for (const { span, points } of series) {
     const dash = span.direction === 'pathBack' ? '4 2' : '';
-    svg += `<g data-series="${esc(span.direction)}">${line(points, (p) => p.archive.find((a) => valid(a.z))?.z, span.direction === 'pathBack' ? '#5be59b' : '#eeeeee', dash)}</g>`;
+    // One archive line across record changes; where records overlap at other levels (Palackého most: the deck and
+    // a record diving to the river), the line keeps the one nearest the last height and the others are hollow dots.
+    const color = span.direction === 'pathBack' ? '#5be59b' : '#eeeeee', chosen = new Map();
+    let last = null, others = '';
+    for (const p of points) {
+      const zs = p.archive.filter((a) => valid(a.z)).sort((a, b) => !!a.excluded - !!b.excluded).map((a) => a.z);
+      if (!zs.length) { last = null; continue; }
+      const z = last === null ? zs[0] : zs.reduce((m, v) => Math.abs(v - last) < Math.abs(m - last) ? v : m);
+      chosen.set(p, z); last = z;
+      for (const v of zs) if (Math.abs(v - z) > 0.3) others += `<circle cx="${X(p.x)}" cy="${Y(v)}" r="1.8" fill="none" stroke="${color}"><title>other archive record: ${v.toFixed(2)} m</title></circle>`;
+    }
+    svg += `<g data-series="${esc(span.direction)}">${line(points, (p) => chosen.get(p), color, dash)}${others}</g>`;
     if (span === main) svg += `<g data-series="game">${line(points, (p) => p.game, '#48d5ff', '3 2')}</g>`;
     for (const [choice, spans] of Object.entries(f.answer_previews || {})) {
       if (!spans[span.id]) continue;
