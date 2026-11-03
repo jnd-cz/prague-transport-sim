@@ -1,16 +1,16 @@
 {
  "snapshot": "2026-11-03",
- "built_at_commit": "33ffeb4",
- "published": "2026-11-03 06:34",
- "note": "line 17 rebuilt on DI track centrelines (#20)",
+ "built_at_commit": "eb1006f",
+ "published": "2026-11-03 15:03",
+ "note": "line 17: track curves through DI's points, switches paired by the track, 20 m held within the accuracy class (#204)",
  "files": {
   "line17.bld.bin": {
-   "size": 6348150,
-   "sha256": "4e66a2e895ab2be3fd844a957c8d1b060e9c99d7ffa52c1ebab8607f271dcc2c"
+   "size": 6348546,
+   "sha256": "a1029f73d31ab3e1823de3726ff55c42ae7caff1c09525cd47ab7b8fbfc7b8e4"
   },
   "line17.dtm.json": {
-   "size": 9787999,
-   "sha256": "e6242dfe1edfd1d28bbe9181b46d7b5c335db1aac65b4d10e633e21f855d4a09"
+   "size": 9799447,
+   "sha256": "03450390bfe9504965844e01cb294873f81cc71154ef69cde50374b565eb6ff6"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -25,24 +25,24 @@
    "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
-   "size": 228340,
-   "sha256": "69308a46603473c499a0db73287e24f9f58d016126e230819d1c7b60e721f43a"
+   "size": 228512,
+   "sha256": "13893c68d727c643818bdf4db6dfa5eab46d497f5557e2adeb7573b10c0fbb52"
   },
   "line17.json": {
-   "size": 5882476,
-   "sha256": "08abe922a019a748d42f0046d6d00aeb49b2e6d3c55069ef2aa78188d3fab7af"
+   "size": 6007642,
+   "sha256": "5291d6d9c7e6825072ddee363c87b473f813fd983aa25993a0a241f3a3c83acf"
   },
   "line17.signals.json": {
-   "size": 36489,
-   "sha256": "a4ce11816a84f8631f5482d6dd7515dd31cffc80de18b5691b0a4623462792d0"
+   "size": 36904,
+   "sha256": "67b6936dcdf3d5314e034be59c26ad54c41475c29fc5b79d7ac3394d5230c542"
   },
   "line17.validate.json": {
-   "size": 4442,
-   "sha256": "960ca2e2bedcaf958036f77679a68d65b376ef7eb77d9cd67e9259d38ba52a09"
+   "size": 4439,
+   "sha256": "13c675ba5cf1ac92785a6018155039fdf63607f028479e91da8161421e53096e"
   },
   "line17.zps.json": {
-   "size": 6537836,
-   "sha256": "7198bc4422bedcfacf6353ae8ae7fed1b08051a9729a9f9aad6d41b32b78825f"
+   "size": 6548335,
+   "sha256": "d42ef0144017f9a515cdf6b844d4cb2ce57b0b6c43c5966ae2ac7db6f539f541"
   },
   "line22.bld.bin": {
    "size": 8575524,
