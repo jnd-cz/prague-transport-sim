@@ -121,6 +121,23 @@ class Network(unittest.TestCase):
             self.assertLess(abs(q[1]), tc.TOL + 0.005)
             self.assertLess(off(q, cross), tc.TOL + 0.005)
 
+    def test_a_turning_loop_comes_back_onto_its_switch(self):
+        # Dvorce: the track runs through the switch, round a 13 m loop and back into the same switch; the loop's end
+        # was free, and with the points eased for the tight loop it landed off the switch (a 13° kink here)
+        random.seed(4)
+        loop = [(x + random.uniform(-0.03, 0.03), y + random.uniform(-0.03, 0.03))
+                for x, y in arc(5, 12, 13, math.atan2(-12, 5), math.atan2(-12, -5) + 2 * math.pi, 0.5)]
+        loop[0], loop[-1] = (10, 0), (0, 0)
+        line = [(x, 0.0) for x in range(-60, 11, 2)]
+        m = len(loop) // 2
+        pos = {1: (-60, 0), 2: (0, 0), 3: (10, 0), 4: loop[m]}
+        pts = {(1, 2): line[:31], (2, 3): line[30:], (3, 4): loop[:m + 1], (2, 4): loop[m:][::-1]}
+        net = tc.Network(pos, pts, {e: 'di' for e in pts})
+        end = net.pts[(2, 4)]
+        self.assertLess(math.dist(end[0], net.pos[2]), 0.001)
+        u, v = (end[1][0] - end[0][0], end[1][1] - end[0][1]), (end[2][0] - end[1][0], end[2][1] - end[1][1])
+        self.assertLess(abs(math.degrees(math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]))), 3)
+
     def test_nodes_a_few_centimetres_apart_are_one(self):
         line = [(x, 0.0) for x in range(0, 41, 2)]
         pos = {1: (0, 0), 2: (20, 0), 3: (20.04, 0), 4: (40, 0)}

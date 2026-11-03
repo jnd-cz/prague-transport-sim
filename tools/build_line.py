@@ -779,8 +779,9 @@ def main():
     def expand(ids):
         """The points along a node list through the moved edge geometry, and where each node lies in them. An edge
         may end off its node: a track crossing others at a merged OSM node keeps its own crossing point (#204).
-        Points within 2 cm of the one before are left out: rounded to the centimetre in the line file, a node and a
-        curve sample millimetres apart became 1 cm zigzags (122 turns over 60° on line 17's tracks and routes)."""
+        Points within 10 cm of the one before are left out: rounded to the centimetre in the line file, a node and a
+        curve sample millimetres apart became 1 cm zigzags (122 turns over 60° on line 17's tracks and routes), and a
+        3 cm end segment read 10° off in the direction tools/lint.js takes from a track's first points."""
         out, at = [], []
         segs = [geo.points(a, b) for a, b in zip(ids, ids[1:])]
         # (an edge between two OSM nodes merged into one has no length: the next edge starts the line)
@@ -792,7 +793,7 @@ def main():
                 seg = segs[i - 1]
                 if sum(dist(p, q) for p, q in zip(seg, seg[1:])) > 0.01:
                     for q in seg:
-                        if dist(q, out[-1]) > 0.02:
+                        if dist(q, out[-1]) > 0.1:
                             out.append(q)
                         elif q is seg[-1] and at[-1] != len(out) - 1:   # (the node's own point, not the sample)
                             out[-1] = q

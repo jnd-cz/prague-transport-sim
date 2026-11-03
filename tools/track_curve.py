@@ -355,6 +355,22 @@ class Network:
                         seq.insert(0, nxt)
             chains.append(seq)
         length = lambda seq: sum(math.dist(x, y) for a, b in zip(seq, seq[1:]) for x, y in zip(along(a, b), along(a, b)[1:]))
+        # a track that comes back into a node it passes through (a turning loop: through its switch, round and back
+        # into it) is cut in the middle, so its end is held at the switch like any track ending there (Dvorce: the
+        # free end landed 0.21 m off the switch, and the edge jumped to it in a 2.3 m kink)
+        cut = []
+        for seq in chains:
+            if len(seq) > 3 and (seq[0] in seq[1:-1] or seq[-1] in seq[1:-1]):
+                half, run, m = length(seq) / 2, 0.0, 1
+                for i in range(1, len(seq) - 1):
+                    run += length(seq[i - 1:i + 1])
+                    if run >= half:
+                        m = i
+                        break
+                cut += [seq[:m + 1], seq[m:]]
+            else:
+                cut.append(seq)
+        chains = cut
         chains.sort(key=lambda s: -length(s))
         # longest first, but a track passing through a node before a track ending there: the one through it fixes it
         # (Holešovice: a longer track ending at a node 2 m off its own line fixed it, and the track through it bent
