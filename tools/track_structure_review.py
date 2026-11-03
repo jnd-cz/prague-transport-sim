@@ -30,6 +30,13 @@ from track_decks import load_decks
 from track_heights import usable
 from track_terrain_fallback import ordinary_fallback
 from track_span_evidence import ARCHIVE, BRIDGED, SURVEY, SpanEvidence, from_reviews
+from track_profile import HELD_GAP
+
+# A held stretch of ordinary track longer than the profile bridges (#202, tools/line_heights.py): the archive and the
+# survey disagree on a paved street, or neither has a height. Its own kind, so its decisions never join an unmapped
+# structure's and take its answer.
+STREET = 'street'
+STREET_META = {'id':STREET,'kind':STREET,'osm_ways':[],'names':[]}
 
 
 def structure_kind(tags):
@@ -133,6 +140,22 @@ def grouped(rows, structures):
             last_key, last_end = key,r['s']+r['weight_m']/2
     if run:
         runs.append((last_key,run))
+    # (then the holds of ordinary track over HELD_GAP: the vertical profile bridges shorter ones, a longer one cuts it
+    # and keeps no height, #202)
+    taken = {id(r) for _,run in runs for r in run}
+    street, last_end = [], None
+    for r in rows + [None]:
+        start = None if r is None else r['s']-r['weight_m']/2
+        if r is not None and r['status']=='review' and id(r) not in taken and (not street or (
+                (r['line'],r['direction'])==(street[-1]['line'],street[-1]['direction']) and abs(start-last_end)<=.01)):
+            street.append(r)
+            last_end = r['s']+r['weight_m']/2
+            continue
+        if street and sum(x['weight_m'] for x in street) > HELD_GAP:
+            runs.append(((street[0]['line'],street[0]['direction'],STREET),street))
+        street = []
+        if r is not None and r['status']=='review' and id(r) not in taken:
+            street, last_end = [r], r['s']+r['weight_m']/2
     return runs
 
 
@@ -153,6 +176,11 @@ def review(report, structures, terrain, lines):
     spans, counters = [], defaultdict(int)
     for key,rows in grouped(report['route_samples'],structures):
         line,direction,structure = key
+        # (a held piece under 1 m with no DI sample carries no evidence and the profile bridges it; line 17's DI
+        # route has 0.2 m pieces at Čechův most's switches that matched no one DI track, and holding them held the
+        # bridge's whole answer, #202)
+        if sum(r['weight_m'] for r in rows) < 1 and not any(r.get('di_id') for r in rows):
+            continue
         counters[key] += 1
         a,b = rows[0]['s']-rows[0]['weight_m']/2,rows[-1]['s']+rows[-1]['weight_m']/2
         data = lines[line]
@@ -212,7 +240,7 @@ def review(report, structures, terrain, lines):
                                  'excluded':c.get('excluded')}
                                 for c in r.get('candidates',[]) if c['dataset'] in ('deck','survey') and c.get('inside')],
                     'ipr_terrain_z':float(z) if math.isfinite(z) and 100<z<500 else None})
-        metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
+        metadata = STREET_META if structure==STREET else structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
         route_line = LineString([p[:2] for p in data[direction]])
         osm_positions = []
         corridor = substring(route_line,max(0,a-30),min(route_line.length,b+30)).buffer(8)
@@ -268,16 +296,20 @@ def review(report, structures, terrain, lines):
     decisions = {}
     for span in spans:
         identity = span['structure_id']
-        # Unmapped fragments are one corridor question, without claiming a common physical level.
-        if identity=='unmapped':
+        # Unmapped fragments are one corridor question, without claiming a common physical level; so are the street
+        # holds between two stops (#202), under their own prefix
+        if identity in ('unmapped',STREET):
             stops = sorted({span['from_stop'] or '?',span['to_stop'] or '?'})
-            identity = 'unmapped-'+hashlib.sha256('|'.join(stops).encode()).hexdigest()[:12]
+            identity = identity+'-'+hashlib.sha256('|'.join(stops).encode()).hexdigest()[:12]
         d = decisions.setdefault(identity,{'id':identity,'structure':span['structure'],'span_ids':[],
                                           'length_per_direction_m':{},'status':span['status']})
         if span['status']=='review':
             d['status'] = 'review'
         if span['structure_id']=='unmapped':
             d['scope_note'] = 'Grouped by nearest stops for review; not evidence of one structure or level.'
+        if span['structure_id']==STREET:
+            d['scope_note'] = (f'Ordinary track held over {HELD_GAP} m (the vertical profile bridges shorter holds): the '
+                               'archive and the paved survey disagree, or neither has a height. Grouped by nearest stops.')
         d['span_ids'].append(span['id'])
         key = f"line{span['line']}:{span['direction']}"
         d['length_per_direction_m'][key] = round(d['length_per_direction_m'].get(key,0)+span['length_m'],3)
@@ -342,7 +374,9 @@ def findings(result, inline=False, span_file='reports/review/track-height-spans.
             else:
                 explanations[choice] = 'span approval data is incomplete'
         # (the archive is always offered, with why it stays held; the others only where they import)
-        item['options'] = [ARCHIVE,*(c for c in (BRIDGED,SURVEY) if not explanations[c]),'other level (deck / under)','unsure']
+        # (a street hold has no other level to point at, #202)
+        other = [] if decision['structure']['kind']==STREET else ['other level (deck / under)']
+        item['options'] = [ARCHIVE,*(c for c in (BRIDGED,SURVEY) if not explanations[c]),*other,'unsure']
         if bridged:
             item['bridged'] = bridged
         item['answer_explanations'] = explanations

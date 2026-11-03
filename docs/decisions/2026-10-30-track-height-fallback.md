@@ -351,6 +351,19 @@ the model has no bridge: there the user's fact is the only source. Network effec
 17,029 → 17,382 m (of the game lines only line 37, +29 m: the rest lies on OSM bridges already), selected
 heights −44 m, none newly selected; the review queue stays 27 decisions, 120 spans. The review lists a decision's Mosty features.
 
+**Street holds over 60 m join the review queue (#202).** The vertical profile bridges a held stretch up to 60 m
+(`tools/line_heights.py`, #197); a longer one keeps no height and the game its old surface profile there. Such a
+run of held route samples that is not a structure's is a `street` decision (`tools/track_structure_review.py`
+`grouped`), grouped by its nearest stops under its own prefix (`street-…`, never joining an `unmapped` structure's
+decision and its answer), at street level 0 when answered (`track_span_evidence.py`), without the "other level"
+answer. 2026-11-03: 4 decisions, by their nearest stops: line 17 Přístaviště (84 m / 74 m per direction, towards
+Dvorce), Staroměstská → Právnická fakulta (75 / 67 m), Strossmayerovo náměstí (195 / 209 m, 400–500 m towards
+Čechův most), and line 22 Malý Břevnov (84 / 83 m; neither the archive nor the survey has rail heights there, so
+only "unsure" can be answered). A held piece under
+1 m with no DI sample is not a span: line 17's DI route has 0.2 m pieces at Čechův most's switches that matched no
+one DI track, and holding them held that bridge's whole answer (26 of 27 imported). The queue is built from an
+import without `--evidence`: with the answers applied, the answered spans are no longer held and drop out.
+
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
 datum. The queue's `ordinary_terrain_fallbacks` gives those proposals. No ambiguous level, known archive

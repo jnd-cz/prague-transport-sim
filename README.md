@@ -433,7 +433,9 @@ large track-height disagreements (`tools/dtmp_tracks.py --findings`).
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.
 The grouped structure-height queue uses `?line=17&review=reports/review/track-heights.json`: select a
-decision to inspect its linked spans, height profile and sources. Answers with notes, uncertain choices
+decision to inspect its linked spans, height profile and sources. Besides structures it holds the `street` decisions:
+ordinary track held over 60 m, which the vertical profile does not bridge (#202; it is built from an import without
+`--evidence`, so the answered decisions stay in it). Answers with notes, uncertain choices
 and unspecified levels remain held. The card explains any held archive answer (a dip under a bridge, a
 steep step) and offers `archive, bridged over a dip` and `follows survey surface` only where they import;
 `python -P -E tools/track_structure_review.py` rewrites those offers from the committed queue after the

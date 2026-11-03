@@ -1,6 +1,6 @@
 # Structure height decisions
 
-Snapshot `2026-11-02`. Proposed rules are not approvals.
+Snapshot `2026-11-03`. Proposed rules are not approvals.
 
 Open `?line=17&review=reports/review/track-heights.json` to inspect and answer the decisions.
 
@@ -160,14 +160,14 @@ Mosty 3D features: 64, 69 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Čechova čtvrť → Nádraží Modřany | 397.6 | review_archive_profile |
-| 17 / pathBack | Nádraží Modřany → Čechova čtvrť | 401.9 | review_archive_profile |
+| 17 / path | Čechova čtvrť → Nádraží Modřany | 400.1 | review_archive_profile |
+| 17 / pathBack | Nádraží Modřany → Čechova čtvrť | 400.2 | review_archive_profile |
 
-Archive candidates: `2820098` (2012-03-08; range 200.95–205.253 m); `2855932` (2012-03-08; range 198.04–202.728 m); `1929698` (2012-07-18; range 197.448–198.037 m); `3406756` (2012-07-18; range 196.782–197.29 m); `1937198` (2012-07-18; range 196.254–196.609 m); `2864566` (2012-07-18; range 195.487–196.078 m); `4267369` (2008-03-10; range 195.276–195.354 m); `2341230` (2012-07-18; range 195.33–195.33 m); `1932977` (2012-07-18; range 192.811–195.335 m); `3831232` (2012-07-18; range 191.357–192.448 m); `2220598` (2012-07-18; range 191.226–197.036 m); `3907577` (2012-03-08; range 198.113–202.81 m); `4076997` (2012-03-08; range 201.005–205.325 m).
+Archive candidates: `2820098` (2012-03-08; range 200.755–205.26 m); `2855932` (2012-03-08; range 198.078–202.71 m); `1929698` (2012-07-18; range 197.361–197.994 m); `3406756` (2012-07-18; range 196.702–197.36 m); `1937198` (2012-07-18; range 196.239–196.625 m); `2864566` (2012-07-18; range 195.392–196.062 m); `4267369` (2008-03-10; range 195.256–195.336 m); `2341230` (2012-07-18; range 195.324–195.384 m); `4256089` (2012-07-18; range 195.387–195.387 m); `1932977` (2012-07-18; range 192.745–195.39 m); `3831232` (2012-07-18; range 191.199–192.731 m); `2220598` (2012-07-18; range 191.288–197.714 m); `3907577` (2012-03-08; range 198.114–202.791 m); `4076997` (2012-03-08; range 201.031–205.329 m).
 
 DI at span ends: no numeric DI within 50 m.
 
-Flags: `archive_surface_height_disagreement`, `structure_hint`, `structure_unverified`, `survey_construction_unverified`, `survey_surface_height_unavailable`, `track_style_defaulted_panels`, `track_zps_level_unverified`.
+Flags: `ambiguous_survey_heights`, `archive_surface_height_disagreement`, `structure_hint`, `structure_unverified`, `survey_construction_unverified`, `survey_surface_height_unavailable`, `track_style_defaulted_panels`, `track_zps_level_unverified`.
 
 ## osm-4722520 · bridge
 
@@ -177,10 +177,10 @@ Mosty 3D features: 74, 86 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Nádraží Modřany → Belárie | 628.2 | review_archive_profile |
-| 17 / pathBack | Belárie → Nádraží Modřany | 627.3 | review_archive_profile |
+| 17 / path | Nádraží Modřany → Belárie | 628.6 | review_archive_profile |
+| 17 / pathBack | Belárie → Nádraží Modřany | 629.0 | review_archive_profile |
 
-Archive candidates: `1926769` (2008-03-10; range 195.56–195.61 m); `1833321` (2008-03-10; range 195.661–195.822 m); `4497469` (2008-03-10; range 195.881–195.944 m); `4268986` (2008-03-10; range 196.004–196.059 m); `1930821` (2008-03-10; range 196.106–196.354 m); `4043381` (2008-03-10; range 196.384–196.407 m); `1930819` (2008-03-10; range 196.438–196.856 m); `3781041` (2008-03-10; range 196.918–197.059 m); `1930086` (2008-03-10; range 197.101–197.267 m); `3403333` (2008-03-10; range 197.337–197.561 m); `4370452` (2008-03-10; range 197.62–197.756 m); `4293593` (2008-03-10; range 197.8–198.168 m); `3941068` (2008-03-10; range 198.251–199.683 m); `1930087` (2008-03-10; range 199.759–200.144 m); `1925912` (2008-03-10; range 200.219–200.441 m); `1935877` (2008-03-10; range 200.446–200.661 m); `1930091` (2008-03-10; range 200.737–201.027 m); `4371401` (2008-03-10; range 195.629–201.224 m); `1837553` (2008-03-10; range 194.695–195.492 m); `1930088` (2008-03-10; range 197.207–201.583 m); `3885059` (2008-03-10; range 201.121–201.46 m); `3860603` (2008-03-10; range 200.71–201.002 m); `1930089` (2008-03-10; range 200.403–200.558 m); `1937199` (2008-03-10; range 199.705–200.239 m); `1921892` (2008-03-10; range 199.027–199.535 m); `3860919` (2008-03-10; range 198.359–199.025 m); `1841676` (2008-03-10; range 197.658–198.194 m); `4068612` (2008-03-10; range 196.881–197.461 m); `1928827` (2008-03-10; range 196.903–197.515 m); `2423689` (2008-03-10; range 197.722–198.254 m); `4274505` (2008-03-10; range 198.412–199.042 m); `3902793` (2008-03-10; range 199.05–199.561 m); `1922078` (2008-03-10; range 199.739–200.271 m); `2861682` (2008-03-10; range 200.272–200.565 m); `1937200` (2008-03-10; range 200.709–200.988 m); `4170262` (2008-03-10; range 195.888–201.562 m); `2798588` (2008-03-10; range 194.517–195.811 m); `1930090` (2008-03-10; range 196.475–201.206 m); `2537307` (2008-03-10; range 200.794–201.02 m); `1918810` (2008-03-10; range 200.477–200.717 m); `4196268` (2008-03-10; range 200.218–200.392 m); `2679208` (2008-03-10; range 199.717–200.13 m); `1934580` (2008-03-10; range 198.373–199.715 m); `2262442` (2008-03-10; range 197.852–198.326 m); `1927260` (2008-03-10; range 197.558–197.783 m); `3904340` (2008-03-10; range 197.235–197.489 m); `1941357` (2008-03-10; range 197.057–197.17 m); `1825896` (2008-03-10; range 196.866–197.009 m); `2832107` (2008-03-10; range 196.337–196.806 m); `1929874` (2008-03-10; range 196.303–196.311 m); `3414690` (2008-03-10; range 196.133–196.291 m); `4082421` (2008-03-10; range 196.03–196.085 m); `4103469` (2008-03-10; range 195.912–195.971 m); `2473806` (2008-03-10; range 195.717–195.86 m); `1927305` (2008-03-10; range 195.627–195.671 m).
+Archive candidates: `1926769` (2008-03-10; range 195.538–195.641 m); `1833321` (2008-03-10; range 195.656–195.867 m); `4497469` (2008-03-10; range 195.87–195.984 m); `4268986` (2008-03-10; range 195.987–196.091 m); `1930821` (2008-03-10; range 196.107–196.372 m); `4043381` (2008-03-10; range 196.388–196.407 m); `1930819` (2008-03-10; range 196.423–196.884 m); `3781041` (2008-03-10; range 196.885–197.074 m); `1930086` (2008-03-10; range 197.076–197.293 m); `3403333` (2008-03-10; range 197.296–197.596 m); `4370452` (2008-03-10; range 197.597–197.785 m); `4293593` (2008-03-10; range 197.8–198.2 m); `3941068` (2008-03-10; range 198.202–199.731 m); `1930087` (2008-03-10; range 199.788–200.146 m); `1925912` (2008-03-10; range 200.15–200.446 m); `1935877` (2008-03-10; range 200.446–200.706 m); `1930091` (2008-03-10; range 200.74–201.065 m); `4371401` (2008-03-10; range 194.692–201.224 m); `1837553` (2008-03-10; range 194.666–196.18 m); `1930088` (2008-03-10; range 196.283–201.628 m); `3885059` (2008-03-10; range 201.117–201.499 m); `3860603` (2008-03-10; range 200.707–201.025 m); `1930089` (2008-03-10; range 200.312–200.629 m); `1937199` (2008-03-10; range 199.647–200.224 m); `1921892` (2008-03-10; range 199.064–199.571 m); `3860919` (2008-03-10; range 198.375–198.995 m); `1841676` (2008-03-10; range 197.597–198.304 m); `4068612` (2008-03-10; range 196.84–197.513 m); `1928827` (2008-03-10; range 196.834–197.525 m); `2423689` (2008-03-10; range 197.61–198.322 m); `4274505` (2008-03-10; range 198.392–199.008 m); `3902793` (2008-03-10; range 199.077–199.642 m); `1922078` (2008-03-10; range 199.655–200.225 m); `2861682` (2008-03-10; range 200.301–200.586 m); `1937200` (2008-03-10; range 200.684–201.001 m); `4170262` (2008-03-10; range 195.888–201.601 m); `2798588` (2008-03-10; range 194.511–195.816 m); `1930090` (2008-03-10; range 194.51–201.224 m); `2537307` (2008-03-10; range 200.744–201.077 m); `1918810` (2008-03-10; range 200.453–200.74 m); `4196268` (2008-03-10; range 200.142–200.451 m); `2679208` (2008-03-10; range 199.753–200.141 m); `1934580` (2008-03-10; range 198.366–199.697 m); `2262442` (2008-03-10; range 197.837–198.347 m); `1927260` (2008-03-10; range 197.541–197.824 m); `3904340` (2008-03-10; range 197.236–197.526 m); `1941357` (2008-03-10; range 197.014–197.217 m); `1825896` (2008-03-10; range 196.821–197.014 m); `2832107` (2008-03-10; range 196.322–196.797 m); `1929874` (2008-03-10; range 196.305–196.312 m); `3414690` (2008-03-10; range 196.138–196.3 m); `4082421` (2008-03-10; range 196.016–196.125 m); `4103469` (2008-03-10; range 195.9–196.014 m); `2473806` (2008-03-10; range 195.715–195.884 m); `1927305` (2008-03-10; range 195.599–195.702 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -194,10 +194,10 @@ Mosty 3D features: 99 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Hodkovičky → Hodkovičky | 38.2 | review_archive_profile |
-| 17 / pathBack | Hodkovičky → Hodkovičky | 37.6 | review_archive_profile |
+| 17 / path | Hodkovičky → Hodkovičky | 38.6 | review_archive_profile |
+| 17 / pathBack | Hodkovičky → Hodkovičky | 38.8 | review_archive_profile |
 
-Archive candidates: `2342048` (2008-03-10; range 200.838–200.838 m); `1939301` (2008-03-10; range 194.346–198.652 m); `1928411` (2008-03-10; range 194.686–197.191 m); `4123333` (2008-03-10; range 194.438–197.12 m); `1926766` (2008-03-10; range 194.022–198.098 m); `4217290` (2008-03-10; range 200.908–200.908 m).
+Archive candidates: `2342048` (2008-03-10; range 200.805–200.867 m); `1939301` (2008-03-10; range 194.34–200.87 m); `1928411` (2008-03-10; range 194.656–197.893 m); `4123333` (2008-03-10; range 194.344–197.65 m); `1926766` (2008-03-10; range 194.008–200.811 m); `4217290` (2008-03-10; range 200.848–200.92 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -211,10 +211,10 @@ Mosty 3D features: 112 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Černý kůň → Černý kůň | 151.8 | review_archive_profile |
-| 17 / pathBack | Černý kůň → Černý kůň | 152.0 | review_archive_profile |
+| 17 / path | Černý kůň → Černý kůň | 152.5 | review_archive_profile |
+| 17 / pathBack | Černý kůň → Černý kůň | 155.2 | review_archive_profile |
 
-Archive candidates: `4315636` (2008-03-10; range 197.095–197.945 m); `1927639` (2008-03-10; range 193.107–198.56 m); `2794356` (2008-03-10; range 192.664–198.579 m); `4316210` (2008-03-10; range 197.108–197.891 m).
+Archive candidates: `4315636` (2008-03-10; range 197.057–198.029 m); `1927639` (2008-03-10; range 193.29–198.584 m); `2794356` (2008-03-10; range 192.64–198.6 m); `4316210` (2008-03-10; range 197.018–197.918 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -228,14 +228,14 @@ Mosty 3D features: 129 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Nádraží Braník → Nádraží Braník | 379.9 | review_archive_profile |
-| 17 / pathBack | Nádraží Braník → Nádraží Braník | 380.4 | review_archive_profile |
+| 17 / path | Nádraží Braník → Nádraží Braník | 380.5 | review_archive_profile |
+| 17 / pathBack | Nádraží Braník → Nádraží Braník | 380.7 | review_archive_profile |
 
-Archive candidates: `1930346` (2023-07-20; range 195.269–195.405 m); `2224493` (2023-07-20; range 195.45–195.633 m); `1928729` (2023-07-20; range 195.675–196.037 m); `2816051` (2023-07-20; range 196.079–196.256 m); `2213722` (2023-07-20; range 196.288–196.504 m); `1928843` (2023-07-20; range 196.536–196.696 m); `1941397` (2023-07-20; range 196.733–197.957 m); `4303050` (2023-07-20; range 198.126–201.012 m); `3904699` (2023-07-20; range 198.26–201.03 m); `2454421` (2023-07-20; range 196.272–198.257 m); `3398206` (2023-07-20; range 196.066–196.239 m); `1833778` (2023-07-20; range 195.64–196.023 m); `2798658` (2023-07-20; range 195.444–195.59 m); `1924345` (2023-07-20; range 195.247–195.397 m).
+Archive candidates: `1930346` (2023-07-20; range 195.255–195.409 m); `2224493` (2023-07-20; range 195.423–195.654 m); `1928729` (2023-07-20; range 195.667–196.033 m); `2816051` (2023-07-20; range 196.046–196.255 m); `2213722` (2023-07-20; range 196.266–196.523 m); `1928843` (2023-07-20; range 196.54–196.716 m); `1941397` (2023-07-20; range 196.74–197.978 m); `4303050` (2023-07-20; range 198.092–201.0 m); `3904699` (2023-07-20; range 198.262–201.03 m); `2454421` (2023-07-20; range 196.274–198.26 m); `3398206` (2023-07-20; range 196.043–196.265 m); `1833778` (2023-07-20; range 195.62–196.029 m); `2798658` (2023-07-20; range 195.41–195.62 m); `1924345` (2023-07-20; range 195.229–195.41 m).
 
 DI at span ends: no numeric DI within 50 m.
 
-Flags: `structure_hint`, `structure_unverified`, `survey_construction_unverified`, `track_style_defaulted_panels`, `track_zps_level_unverified`.
+Flags: `deck_surface_height_unavailable`, `structure_hint`, `structure_unverified`, `survey_construction_unverified`, `survey_surface_height_unavailable`, `track_style_defaulted_panels`, `track_zps_level_unverified`.
 
 ## osm-462183789 · tunnel
 
@@ -243,12 +243,11 @@ OSM ways: [462183789](https://www.openstreetmap.org/way/462183789), [462183790](
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Podolská vodárna → Podolská vodárna | 15.0 | independent_height_required |
-| 17 / path | Podolská vodárna → Výtoň | 4.4 | independent_height_required |
-| 17 / pathBack | Výtoň → Podolská vodárna | 12.1 | independent_height_required |
-| 17 / pathBack | Podolská vodárna → Podolská vodárna | 27.4 | independent_height_required |
+| 17 / path | Podolská vodárna → Podolská vodárna | 16.4 | independent_height_required |
+| 17 / path | Podolská vodárna → Výtoň | 3.3 | independent_height_required |
+| 17 / pathBack | Výtoň → Podolská vodárna | 46.0 | independent_height_required |
 
-Archive candidates: `1925710` (2009-06-01; range 193.086–193.189 m); `2468121` (2009-06-01; range 193.184–193.184 m); `2537504` (2009-06-01; range 193.17–193.17 m); `1761755` (2009-06-01; range 193.196–193.22 m); `2223354` (2009-06-01; range 193.24–193.24 m); `2897110` (2009-06-01; range 193.16–193.231 m); `1932693` (2009-06-01; range 193.1–193.16 m).
+Archive candidates: `1925710` (2009-06-01; range 193.082–193.195 m); `2220327` (2009-06-01; range 193.2–193.225 m); `2468121` (2009-06-01; range 193.158–193.182 m); `2537504` (2009-06-01; range 193.157–193.177 m); `1761755` (2009-06-01; range 193.183–193.238 m); `2223354` (2009-06-01; range 193.24–193.24 m); `2897110` (2009-06-01; range 193.16–193.24 m); `1932693` (2009-06-01; range 193.094–193.16 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -260,10 +259,9 @@ OSM ways: [4890563](https://www.openstreetmap.org/way/4890563).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Podolská vodárna → Podolská vodárna | 29.5 | independent_height_required |
-| 17 / pathBack | Podolská vodárna → Podolská vodárna | 6.9 | independent_height_required |
+| 17 / path | Podolská vodárna → Podolská vodárna | 28.9 | independent_height_required |
 
-Archive candidates: `2220327` (2009-06-01; range 193.232–193.269 m); `2933076` (2009-06-01; range 193.28–193.28 m); `1940123` (2009-06-01; range 193.217–193.278 m).
+Archive candidates: `2220327` (2009-06-01; range 193.231–193.28 m); `2933076` (2009-06-01; range 193.28–193.28 m); `1940123` (2009-06-01; range 193.21–193.278 m); `2468121` (2009-06-01; range 193.193–193.209 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -276,11 +274,11 @@ OSM ways: not tagged.
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
 | 17 / path | Palackého náměstí → Palackého náměstí | 7.3 | independent_height_required |
-| 17 / path | Palackého náměstí → Palackého náměstí | 4.8 | independent_height_required |
-| 17 / pathBack | Palackého náměstí → Palackého náměstí | 4.8 | independent_height_required |
-| 17 / pathBack | Palackého náměstí → Palackého náměstí | 4.9 | independent_height_required |
+| 17 / path | Palackého náměstí → Palackého náměstí | 7.0 | independent_height_required |
+| 17 / pathBack | Palackého náměstí → Palackého náměstí | 2.5 | independent_height_required |
+| 17 / pathBack | Palackého náměstí → Palackého náměstí | 7.0 | independent_height_required |
 
-Archive candidates: `1916265` (2008-09-23; range 197.529–197.555 m); `1937325` (2008-09-23; range 197.251–197.251 m); `3870784` (2008-09-23; range 197.249–197.249 m); `2679156` (2008-09-23; range 197.577–197.577 m); `2213522` (2008-09-23; range 197.542–197.542 m).
+Archive candidates: `1916265` (2008-09-23; range 197.534–197.559 m); `1936314` (2008-09-23; range 197.29–197.29 m); `4166278` (2008-09-23; range 197.289–197.289 m); `1937325` (2008-09-23; range 197.237–197.237 m); `3870784` (2008-09-23; range 197.255–197.255 m); `1839180` (2008-09-23; range 197.555–197.555 m); `2679156` (2008-09-23; range 197.578–197.578 m); `2213522` (2008-09-23; range 197.537–197.537 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -292,12 +290,12 @@ OSM ways: [30619203](https://www.openstreetmap.org/way/30619203), [476507490](ht
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Karlovy lázně → Karlovy lázně | 19.3 | retain_numeric_di |
-| 17 / pathBack | Karlovy lázně → Karlovy lázně | 19.2 | retain_numeric_di |
+| 17 / path | Karlovy lázně → Karlovy lázně | 18.7 | retain_numeric_di |
+| 17 / pathBack | Karlovy lázně → Karlovy lázně | 18.0 | retain_numeric_di |
 
-Archive candidates: `2183734` (2008-03-10; range 191.276–191.276 m); `1930617` (2008-03-10; range 191.402–191.402 m); `1939280` (2008-03-10; range 191.513–191.513 m); `3920592` (2008-03-10; range 191.586–191.586 m); `2261790` (2008-03-10; range 191.59–191.616 m); `3961674` (2012-01-19; range 191.201–191.7 m).
+Archive candidates: `2183734` (2008-03-10; range 191.257–191.265 m); `1831564` (2008-03-10; range 191.325–191.325 m); `1930617` (2008-03-10; range 191.365–191.47 m); `1939280` (2008-03-10; range 191.474–191.563 m); `3920592` (2008-03-10; range 191.564–191.59 m); `2261790` (2008-03-10; range 191.59–191.627 m); `3961674` (2012-01-19; range 191.22–191.71 m).
 
-DI at span ends: 191.134 m / 1000420073071 / 2.3 m away / export 2026-09-30T00:00; 191.659 m / 1000420073056 / 2.2 m away / export 2026-09-30T00:00; 191.712 m / 1000420072954 / 2.5 m away / export 2026-09-30T00:00; 191.128 m / 1000420072954 / 2.4 m away / export 2026-09-30T00:00.
+DI at span ends: 191.175 m / 1000420073071 / 1.4 m away / export 2026-09-30T00:00; 191.630 m / 1000420073056 / 0.1 m away / export 2026-09-30T00:00; 191.712 m / 1000420072954 / 2.5 m away / export 2026-09-30T00:00; 191.179 m / 1000420072954 / 1.8 m away / export 2026-09-30T00:00.
 
 Flags: `structure_hint`, `structure_unverified`, `track_style_defaulted_panels`, `track_zps_level_unverified`, `tunnel_unverified`.
 
@@ -307,14 +305,14 @@ OSM ways: not tagged.
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Staroměstská → Staroměstská | 7.7 | independent_height_required |
-| 17 / path | Staroměstská → Staroměstská | 4.9 | independent_height_required |
-| 17 / pathBack | Staroměstská → Staroměstská | 6.9 | independent_height_required |
+| 17 / path | Staroměstská → Staroměstská | 7.3 | independent_height_required |
+| 17 / path | Staroměstská → Staroměstská | 3.6 | independent_height_required |
 | 17 / pathBack | Staroměstská → Staroměstská | 4.6 | independent_height_required |
+| 17 / pathBack | Staroměstská → Staroměstská | 7.5 | independent_height_required |
 
-Archive candidates: `1926449` (2012-06-25; range 191.158–191.158 m); `3943492` (2012-01-19; range 191.183–191.183 m); `4184461` (2008-03-10; range 191.296–191.296 m); `2935831` (2012-06-25; range 191.236–191.389 m).
+Archive candidates: `3943492` (2012-01-19; range 191.176–191.184 m); `4184461` (2008-03-10; range 191.308–191.308 m); `2935831` (2012-06-25; range 191.226–191.379 m).
 
-DI at span ends: 191.151 m / 1000420072865 / 6.3 m away / export 2026-09-30T00:00; 191.151 m / 1000420072865 / 28.2 m away / export 2026-09-30T00:00; 191.132 m / 1000420072959 / 32.8 m away / export 2026-09-30T00:00; 191.132 m / 1000420072959 / 11.5 m away / export 2026-09-30T00:00.
+DI at span ends: 191.150 m / 1000420072865 / 7.2 m away / export 2026-09-30T00:00; 191.150 m / 1000420072865 / 30.8 m away / export 2026-09-30T00:00; 191.130 m / 1000420072959 / 34.5 m away / export 2026-09-30T00:00; 191.130 m / 1000420072959 / 11.2 m away / export 2026-09-30T00:00.
 
 Flags: `track_style_defaulted_panels`, `track_zps_level_unverified`.
 
@@ -326,14 +324,14 @@ Mosty 3D features: 506 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
-| 17 / path | Právnická fakulta → Právnická fakulta | 9.0 | review_archive_profile |
-| 17 / path | Právnická fakulta → Čechův most | 44.2 | review_archive_profile |
-| 17 / path | Čechův most → Čechův most | 6.5 | review_archive_profile |
-| 17 / pathBack | Čechův most → Čechův most | 2.8 | review_archive_profile |
-| 17 / pathBack | Právnická fakulta → Právnická fakulta | 39.7 | review_archive_profile |
-| 17 / pathBack | Právnická fakulta → Právnická fakulta | 11.9 | review_archive_profile |
+| 17 / path | Právnická fakulta → Právnická fakulta | 10.0 | review_archive_profile |
+| 17 / path | Právnická fakulta → Čechův most | 46.4 | review_archive_profile |
+| 17 / path | Čechův most → Čechův most | 4.7 | review_archive_profile |
+| 17 / pathBack | Čechův most → Čechův most | 3.9 | review_archive_profile |
+| 17 / pathBack | Právnická fakulta → Právnická fakulta | 41.6 | review_archive_profile |
+| 17 / pathBack | Právnická fakulta → Právnická fakulta | 10.0 | review_archive_profile |
 
-Archive candidates: `2462149` (2024-04-08; range 192.932–193.028 m); `3861178` (2008-03-10; range 193.782–194.565 m); `4348952` (2008-03-10; range 196.707–196.71 m); `1836414` (2008-03-10; range 196.71–196.71 m); `1939286` (2008-03-10; range 196.815–196.815 m); `3886784` (2008-03-10; range 193.099–194.535 m); `2795568` (2008-03-10; range 192.954–193.037 m).
+Archive candidates: `2462149` (2024-04-08; range 192.927–193.062 m); `3861178` (2008-03-10; range 193.785–194.62 m); `4348952` (2008-03-10; range 196.706–196.71 m); `1939286` (2008-03-10; range 196.795–196.826 m); `3886784` (2008-03-10; range 193.785–194.522 m); `2795568` (2008-03-10; range 192.95–193.081 m).
 
 DI at span ends: no numeric DI within 50 m.
 
@@ -492,6 +490,68 @@ Archive candidates: `4075925` (2008-03-10; range 297.507–297.711 m); `2423824`
 DI at span ends: no numeric DI within 50 m.
 
 Flags: `track_style_defaulted_panels`, `track_zps_level_unverified`.
+
+## street-ec75ac2ff9d3 · street
+
+OSM ways: not tagged.
+
+| Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
+|---|---|---:|---|
+| 17 / path | Přístaviště → Přístaviště | 83.5 | independent_height_required |
+| 17 / pathBack | Přístaviště → Přístaviště | 74.1 | independent_height_required |
+
+Archive candidates: `1973821` (2011-11-27; range 196.095–196.857 m); `2233338` (2011-11-27; range 196.245–196.947 m).
+
+DI at span ends: no numeric DI within 50 m.
+
+Flags: `archive_surface_height_disagreement`, `archive_terrain_height_disagreement`, `survey_construction_unverified`, `survey_surface_height_unavailable`, `track_style_defaulted_panels`.
+
+## street-a1b8a48c85b7 · street
+
+OSM ways: not tagged.
+
+| Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
+|---|---|---:|---|
+| 17 / path | Staroměstská → Právnická fakulta | 74.9 | independent_height_required |
+| 17 / pathBack | Právnická fakulta → Staroměstská | 66.6 | independent_height_required |
+
+Archive candidates: `3886871` (2008-03-10; range 191.596–191.888 m); `2540987` (2008-03-10; range 191.87–191.87 m); `4183735` (2008-03-10; range 191.327–191.596 m); `2803289` (2008-03-10; range 191.337–191.906 m).
+
+DI at span ends: no numeric DI within 50 m.
+
+Flags: `archive_surface_height_disagreement`, `paved_surface_height_disagreement`, `track_style_defaulted_panels`.
+
+## street-80aed900b37f · street
+
+OSM ways: not tagged.
+
+| Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
+|---|---|---:|---|
+| 17 / path | Strossmayerovo náměstí → Strossmayerovo náměstí | 63.4 | independent_height_required |
+| 17 / path | Strossmayerovo náměstí → Strossmayerovo náměstí | 132.1 | independent_height_required |
+| 17 / pathBack | Strossmayerovo náměstí → Strossmayerovo náměstí | 112.9 | independent_height_required |
+| 17 / pathBack | Strossmayerovo náměstí → Strossmayerovo náměstí | 96.3 | independent_height_required |
+
+Archive candidates: `1933746` (2008-08-13; range 197.263–197.263 m); `2806476` (2008-08-13; range 197.275–197.355 m); `2215794` (2013-03-18; range 197.367–197.455 m); `3890030` (2013-03-18; range 197.56–197.608 m); `1939776` (2013-03-18; range 197.601–197.656 m); `1938026` (2013-03-18; range 197.661–197.689 m); `1932681` (2013-03-18; range 197.641–197.689 m); `4078918` (2013-03-18; range 197.587–197.636 m); `2839401` (2013-03-18; range 197.619–197.65 m); `2803501` (2013-03-18; range 197.621–197.63 m); `2832626` (2013-03-18; range 197.574–197.619 m); `3883499` (2013-03-18; range 197.515–197.538 m); `3893502` (2013-03-18; range 197.441–197.515 m); `4086945` (2023-02-21; range 197.245–197.439 m); `2816058` (2008-08-13; range 197.43–197.439 m).
+
+DI at span ends: no numeric DI within 50 m.
+
+Flags: `archive_surface_height_disagreement`, `paved_surface_height_disagreement`, `survey_surface_height_unavailable`, `track_style_defaulted_panels`.
+
+## street-a8a3da496f48 · street
+
+OSM ways: not tagged.
+
+| Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
+|---|---|---:|---|
+| 22 / path | Malý Břevnov → Malý Břevnov | 84.0 | independent_height_required |
+| 22 / pathBack | Malý Břevnov → Malý Břevnov | 82.5 | independent_height_required |
+
+Archive candidates: none.
+
+DI at span ends: no numeric DI within 50 m.
+
+Flags: `no_usable_height`, `survey_construction_unverified`, `survey_not_rail_height`, `survey_surface_height_unavailable`, `track_style_defaulted_panels`.
 
 ## Ordinary no-data proposals
 

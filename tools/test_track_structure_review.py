@@ -283,8 +283,10 @@ class SpanReviews(unittest.TestCase):
         self.assertNotIn('follows survey surface',items['osm-4722520']['options'])
         self.assertIn('follows survey surface',items['osm-476017592']['options'])
         self.assertNotIn('archive, bridged over a dip',items['osm-476017592']['options'])
+        # (the deck at the embankment's level, ~201 m, not the street 6 m under it; its ends move with the route: on
+        # line 17's DI route of #198 the inbound end lies 0.6 m further on, at 201.61 m)
         for spans in items['osm-4722520']['bridged'].values():
-            self.assertTrue(all(200.5 < z < 201.6 for b in spans for z in b[1::2]), spans)
+            self.assertTrue(all(200.5 < z < 201.7 for b in spans for z in b[1:4:2]), spans)
 
     def test_findings_keep_all_spans_and_pin_the_longest(self):
         spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},
@@ -362,6 +364,33 @@ class SpanReviews(unittest.TestCase):
                                            ('pathBack',2.5,'review'),('pathBack',7.5,'review')]]
         runs = grouped(rows,structures)
         self.assertEqual([len(r) for _,r in runs],[1,2])
+
+    def test_a_street_hold_over_60_m_is_a_decision_of_its_own(self):
+        # (#202: held ordinary track the profile cannot bridge; a structure's own hold keeps its key)
+        structures = Structures([{'id':1,'coords':[(500,-5,None),(500,5,None)],'attrs':{'bridge':'yes'}}])
+        row = lambda direction, s, status, flags=('paved_surface_height_disagreement',): {
+            'line':17,'direction':direction,'s':s,'weight_m':5,'xy':[s,0],'status':status,'review_flags':list(flags)}
+        rows = ([row('path',2.5+5*k,'review') for k in range(14)] +            # 70 m held: a street hold
+                [row('path',72.5,'selected')] +
+                [row('path',77.5+5*k,'review') for k in range(8)] +            # 40 m: the curve bridges it
+                [row('path',500,'review',('structure_unverified',))] +           # on the bridge: its own key
+                [row('pathBack',2.5+5*k,'review') for k in range(13)])         # 65 m on the other direction
+        runs = grouped(rows,structures)
+        street = [(k,len(r)) for k,r in runs if k[2]=='street']
+        self.assertEqual(street,[((17,'path','street'),14),((17,'pathBack','street'),13)])
+        self.assertEqual([k[2] for k,_ in runs if k[2]!='street'],[structures.by_way['1']])
+
+    def test_a_street_hold_imports_at_street_level_and_offers_no_other_level(self):
+        span = {'id':'street:line17:path:1','start_s':0,'length_m':10,'from_stop':'A','to_stop':'B',
+                'profile':[{'s':s,'xy':[s,0],'archive':[{'z':250}],'surfaces':[]} for s in (0,5,10)],
+                'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        decision = {'id':'street-1','status':'review','span_ids':[span['id']],'structure':{'kind':'street'}}
+        item = findings({'snapshot':'test','spans':[span],'decisions':[decision]},inline=True)['findings'][0]
+        self.assertNotIn('other level (deck / under)',item['options'])
+        self.assertIn('archive profile ok',item['options'])
+        entry = from_reviews({'items':{'pin':{'decision_id':'street-1','span_ids':[span['id']],'v':'archive profile ok',
+                                              'note':'','t':1761955200000}}},{'findings':[item]},'reviews/line17.json')['span_reviews'][0]
+        self.assertEqual((entry['kind'],entry['level']),('surface',0))
 
     def test_a_mosty3d_bridge_joins_the_osm_bridge_beside_it_or_is_its_own_decision(self):
         ways = [{'id':7,'coords':[(0,0,None),(10,0,None)],'attrs':{'bridge':'yes','layer':'1'}}]

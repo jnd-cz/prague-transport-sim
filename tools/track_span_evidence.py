@@ -132,8 +132,8 @@ def _valid(z):
 def _structure_level(structure):
     """(evidence kind, physical level) of a decision's structure, or Held."""
     kind = structure['kind']
-    if kind=='unmapped':
-        return 'surface',0  # (no bridge or tunnel mapped or surveyed here: the track lies on the street)
+    if kind in ('unmapped','street'):
+        return 'surface',0  # (no bridge or tunnel mapped or surveyed here: the track lies on the street; #202's holds)
     key = 'level' if kind=='survey_level' else 'layer'
     try:
         levels = {int(t[key]) for t in structure.get('tags',{}).values() if t.get(key) is not None}
