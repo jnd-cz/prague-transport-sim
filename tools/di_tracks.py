@@ -575,7 +575,7 @@ class TrackGeometry:
         # each source fork goes to the nearest OSM switch within FORK on its tracks that leaves the same way, one
         # node per fork (Palackého náměstí: two switches 4-5 m apart would both take one fork and the edge between
         # them would vanish)
-        claims = []
+        claims, refused = [], []
         for n in adj:
             if len(adj[n]) < 3:
                 continue
@@ -604,12 +604,13 @@ class TrackGeometry:
                 f = src.forks[i]
                 d = math.dist(f, pos[n])
                 collapse = self._past(n, f, pos)
-                if d <= FORK and collapse is not None and on(f) and same_way(dirs, src.branches[i]):
+                if d <= FORK and on(f) and same_way(dirs, src.branches[i]):
                     # (a switch whose branch leaves to the other side, over CONTEXT m, takes it only if no switch
                     # nearby fits: Strossmayerovo náměstí's westward turn left its fork to OSM's switch 2.1 m on,
                     # whose branch leaves the other way, and started 3.8 m late at 12°)
-                    claims.append((d + (FORK if legs and branch_side(far_dirs) * branch_side(src.far[i]) < 0 else 0.0),
-                                   n, (src.name, int(i)), f, collapse))
+                    c = (d + (FORK if legs and branch_side(far_dirs) * branch_side(src.far[i]) < 0 else 0.0),
+                         n, (src.name, int(i)), f, collapse)
+                    (claims if collapse is not None else refused).append(c)
             # a switch whose tip the user placed (data/truth.json trackSources.switchTips) takes the point of its
             # through track nearest that place, before any fork
             for i, (near, tip) in enumerate(tips):
@@ -628,6 +629,20 @@ class TrackGeometry:
             fork_of[n] = f
             taken.add(key)
             collapsed.update({m: f for m in collapse})
+        # a fork past a neighbouring switch, once that switch is on its own fork further on: the order along the
+        # track kept (Strossmayerovo náměstí, Milady Horákové: OSM's two switches 2.1 m apart, DI's forks 4.7 m apart
+        # and 4-5 m further west; the eastern switch's branch ran on the track 3.8 m past DI's fork)
+        placed = {**pos, **fork_of, **collapsed}
+        for d, n, key, f, _ in sorted(refused, key=lambda c: c[0]):
+            if n in fork_of or n in collapsed or key in taken:
+                continue
+            collapse = self._past(n, f, placed)
+            if collapse is None or any(m in fork_of or m in collapsed for m in collapse):
+                continue
+            fork_of[n] = f
+            taken.add(key)
+            collapsed.update({m: f for m in collapse})
+            placed.update({n: f, **{m: f for m in collapse}})
         for n in adj:
             ends = []
             for m in adj[n]:

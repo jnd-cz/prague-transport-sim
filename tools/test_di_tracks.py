@@ -164,6 +164,16 @@ class Pairing(unittest.TestCase):
         geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
         self.assertEqual(geo.at(2), (50.0, 0.0))
 
+    def test_a_switch_takes_its_fork_past_its_neighbour_once_that_one_moved_on(self):
+        # Milady Horákové at Strossmayerovo náměstí: OSM's switches 2.1 m apart, DI's forks 4.7 m apart and 5 m
+        # further on, the branches to either side; the second takes its fork once the first is on its own
+        di = dt.Source('di', [rec(1, [(-100, 0), (0, 0)]), rec(2, [(0, 0), (4.7, 0)]), rec(3, [(4.7, 0), (100, 0)]),
+                              rec(4, turnout(0, 1)), rec(5, turnout(4.7, -1))])
+        pos = {1: (-100, 0.05), 2: (5.0, 0.05), 3: (7.1, 0.05), 4: (100, 0.05), 5: turnout(0, 1)[-1], 6: turnout(4.7, -1)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (3, 4), (2, 5), (3, 6)], [di])
+        self.assertEqual(geo.at(2), (0.0, 0.0))
+        self.assertEqual(geo.at(3), (4.7, 0.0))
+
     def test_a_switch_whose_tip_the_user_placed_goes_there(self):
         # Podolská vodárna: "the fork point should be further back right next to northern manhole", 3.3 m from DI's
         # fork; the switch takes the point of its through track nearest the manhole
