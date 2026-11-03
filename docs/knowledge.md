@@ -113,6 +113,17 @@ What sessions learned and later work needs. Kept current and short; the full log
   18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off
   to reach 20 m. A bend squeezed into a metre reads much wider over 5 m (10° as 29 m), so the curve fit
   measures its own radius over 2 m.
+- **Near a switch the branch is the nearer track for metres** (#204, Strossmayerovo náměstí): a tangential
+  branch is 0.09 m off the straight at 3 m, 0.16 m at 4.2 m and 0.5 m at 7.3 m, and DI bends the straight 0.9°
+  at the switch, so over 3 m the branch reads straighter than the straight, and a 4.75 m OSM edge between two
+  switches lies nearer the branch. Two switches 4.6 m apart on each track there (DI): the west track's to the
+  left first, then to the right; the east track's mirrored. OSM puts the westward turn's switch on the
+  east-west track 3.8 m past DI's fork, beside another switch 2.1 m away whose branch leaves the other way.
+- **A resampled curve reads tighter than it is** (#204): points interpolated on chords lie inside the arc (7 mm
+  on a 1 m chord of a 19 m curve, 15 mm on a 1.5 m one), so a circle through them read 19.1 m as 17.4-17.6 m
+  (Právnická fakulta), and the game's three-point average with a 1.5 m resample turned a 0.9° joint into 3.7°
+  at a short piece's end. Rounded to the centimetre, points 0.4 m apart read a 19 m curve as 15.5 m over 2 m.
+  Radii and joins are measured on the build's own points, written to the millimetre.
 - **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
   and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
   split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to
@@ -276,9 +287,9 @@ Review these when realism matters; most move into the build in M2.
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
   `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
-  `trackRadius` (5 m window, under 20 m) and `trackJoins` (through tracks
-  breaking over 1° where chains meet, diverging start angles listed; direction from the parabola through
-  the first three drawn points: the game draws a point every 1.5 m).
+  `trackRadius` (over 5 m through the build's points, under 18 m; 18-20 m listed as exceptions) and `trackJoins`
+  (through tracks breaking over 1° where chains meet, diverging start angles listed; direction from the parabola
+  through the first three drawn points).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
