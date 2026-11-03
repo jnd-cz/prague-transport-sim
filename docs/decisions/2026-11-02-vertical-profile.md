@@ -1,7 +1,8 @@
 # Vertical track profile: the design radius, not a blur
 
 **Date:** 2026-11-02. **Issue:** #188. **Rule:** `tools/track_profile.py` (`vertical_profile`).
-Applying it to the game's profile is #20's profile assembly.
+Applying it to the game's profile is #197 (`tools/line_heights.py`): since 2026-11-03 by the band rule
+(`banded_profile`, below), the design radius within 10 cm of the data, the rest for the user's review.
 
 ## Why
 
@@ -126,27 +127,34 @@ with (`heights.staged`).
   after 3000 steps). Crossings each pinned to the mean of their two tracks first: their pins a few metres apart
   and centimetres off along a junction's diamonds asked for radii of a few metres, 172 s for 7 chains.
   2026-11-03: 1514 pinned meets, the largest difference 8.4 mm; no crossing over 1 m apart in the data.
-- **Where the rails must still join, the radius gives way:** near a pin the curve misses by over 1 cm, ×0.5 down
-  to ×0.1 within 50 m (29 junctions, all short connecting tracks: at Nádraží Holešovice a 55 m track pinned to
-  three longer ones would rise 8.6 % after 1.6 %).
-- **Where the data is tighter than the design radius, it is followed:** a stretch of 3 or more heights the
-  curve misses by over 0.3 m, which the 2023 terrain confirms (within 0.5 m) at grades a tram climbs (≤ 9 %), is
-  the track itself, not the archive on the ground under a deck (that falls metres steeper). The radius gives way
-  there ×0.5, then ×0.25, and the place is listed. Held to it, the curve left a 300 m sag at Malostranská and
-  Tukey dropped the whole stretch: the curve ran 1 m under data that the archive and the terrain shared to 2 cm.
-  2026-11-03: 6 places. On game routes: Malostranská (50.0905 N 14.4101 E, lines 22 and 23) and Královka
-  (50.0850 N 14.3809 E, line 23); off them: 50.0850 N 14.3792 E, 50.0939 N 14.3921 E, 50.1015 N 14.5041 E,
-  50.0728 N 14.5309 E. Line 17 has none.
-- **The user reviews where the radius gave way** (asked 2026-11-03: "For the under 500m spots I'd like to review them
-  before/after aligning to fit 500m and then decide if we uphold that rule"): `reports/review/track-radius.json`, one
-  decision per place (`radius-<lat>-<lon>`) with the staged heights, the terrain, and as the previews of its two
-  answers the curve held to the design radius and the curve that gave way. An answer recorded in `data/truth.json`
-  `trackHeights.radiusAnswers` (the place, `hold the radius` or `follow the data`, with its quote) applies within
-  15 m; `hold the radius` keeps the design radius there. Without an answer the radius gives way as above.
-  2026-11-03: 22 places. Where the data is tighter (6), held to 500 m the curve departs 0.35–1.22 m from data the
-  terrain confirms (Královka, line 23: 1.22 m; Malostranská, lines 22 and 23: 1.02 m); following it the radius is
-  250 m (125 m at one place). At junctions (16), held to the radius the rails stay 1–8 cm apart; joining them the
-  radius is 62–500 m.
+- **The band rule** (the user, 2026-11-03: "If the curve >=500m fits within 10cm then it's solved, otherwise let's keep
+  it for review again so we can find the root cause together"; `banded_profile`). The heights nearest the staged ones
+  (least squares, with a curvature penalty of h⁴ that smooths noise over ~5 m and leaves no short humps) that stay
+  within `BAND` = 10 cm of them and turn no tighter than the design radius. Within a turnout or a diamond the band is
+  15 cm (the user: "there can be little play within the junction if we account for input data errors, noise"), and
+  a junction's pinned height holds within 5 mm. Not held to the band: a lone bad point (one or two bins the robust
+  fit at the design radius misses by over 10 cm) and a stretch steeper than any track (9 %, the archive on the
+  ground under a deck); those are the steps by cause, as before.
+- **Where no curve at the design radius fits,** the radius gives way ×0.8 at a time within 50 m of the points outside
+  the band (at most 12 times, never under 20 m) so the game has a curve within the band, and the place goes to the
+  user's review if the band was missed by over 1 cm (a few millimetres at a pin only bend the radius). Where even
+  that cannot meet a pin, the rails join first and the band gives way within 15 m of it.
+- **Why not the radius held at any cost** (the first assembly, the same day): with L2 and Tukey, a stretch the curve
+  missed by over 23 cm was dropped and the curve ran away: at Královka the loop's track, pinned at three junctions
+  with five 1000 m zones (a diamond inside the sag), departed 1.22 m from data that a 500 m curve meets within 4 cm
+  when neither pins nor zones bind; at Malostranská 1.02 m where 500 m fits within 2 cm. Relaxing the radius there to
+  250 m hid that. At junctions, short tracks of 44–58 m with 9–12 heights carried 4–7 pins from tracks with their own
+  noise: a 44 m track at Strossmayerovo náměstí missed its data by 12 cm with them, 1 cm without.
+- **The user's review** (`reports/review/track-radius.json`, one decision per place `radius-<lat>-<lon>`, the staged
+  heights, the terrain, and as the previews of its two answers the curve held to the design radius and the one
+  within the band). An answer recorded in `data/truth.json` `trackHeights.radiusAnswers` (the place, `hold the
+  radius` or `follow the data`, with its quote) applies to the place it is within 15 m of; `hold the radius` keeps the
+  radius there and leaves the band. 2026-11-03: 25 places, 3 on plain track (1.2, 2.2 and 7.8 cm outside the band at
+  the design radius) and 22 at junctions (1.1–12 cm; at 2 the band gives way near pins). On line 17 one, at
+  Strossmayerovo náměstí (3.5 cm). Malostranská and Královka's plain stretch fit; at Královka two junctions stay:
+  the loop's entry, where the through track carries three overlapping 1000 m zones (turnouts and a diamond, 129–160 m)
+  on the descent (without them its miss halves, 0.78 → 0.36 m), and an archive record that lies up to 0.43 m from
+  the terrain and pulls the loop's track through its pins.
 - **A short hold** starts on the straight line between its neighbours, at weight 0.001: at weight 0 the curve was
   free to sag anywhere the radius allowed, 5 cm under a straight grade across 40 m.
 - **A line takes the heights of the chains under it,** weighted by how near each is within 1 m: past a fork both
@@ -156,13 +164,14 @@ with (`heights.staged`).
   fading out over 10 m (ends meeting only ends take their mean): a junction's short edges ended up to 0.3 m off
   the track they join and were sampled 3 cm apart on a 2 % grade.
 
-2026-11-03: 0 steps over 1 m without a rule (`archive` 9, `dip` 12, `di` 6, `structure` 1, `terrain` 3); moved
-from the staged heights on runs without a step p50 0.0 / p90 0.019 / p99 0.079 m; 93 held stretches over 60 m
+2026-11-03 (the band rule): 0 steps over 1 m without a rule (`archive` 8, `dip` 14, `di` 5, `structure` 1, `terrain`
+7); no pinned junction over 1 cm apart (the largest 7 mm); moved from the staged heights on runs without a step
+p50 0.005 / p90 0.03 / p99 0.08 m; 93 held stretches over 60 m
 (6,045 m), 48 of them (3,120 m) structures and tunnels. Line 17, path and pathBack 43,632 m: DI 18,656 m, archive
 22,120 m, the user's reviewed spans 2,054 m, curve 348 m, no height 454 m (the game's surface profile there: the
 archive and the survey disagree over 60 m and more between Čechův most and Strossmayerovo náměstí in both
-directions, 115 m past Staroměstská and between Přístaviště and Dvorce). Against the staged heights: p90 0.018 m
-(path), 0.027 m (pathBack).
+directions, 115 m past Staroměstská and between Přístaviště and Dvorce). Against the staged heights: p90 0.027 m
+(path), 0.037 m (pathBack).
 
 **The game** (`src/terrain.js` Profile): the route's profile is the data's; where it has none, the surface profile
 stays, shifted to meet it at both ends (linear between the two shifts). Across the street the profile runs

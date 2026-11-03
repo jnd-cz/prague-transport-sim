@@ -53,8 +53,8 @@ python -P -E tools/line_heights.py 17 22           # top of rail (#197), after t
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights.
-`?line=23&review=reports/review/track-radius.json` shows where the design radius gave way (to follow the data, or for
-the rails to join at a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
+`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
+data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
 (`trackHeights.radiusAnswers`) keeps the radius at that place.
 
 After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.

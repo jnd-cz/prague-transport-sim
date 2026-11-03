@@ -153,6 +153,52 @@ def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05, pin_weight=1e6
     return {'z':f,'moved':moved,'steps':steps,'min_radius':min(implied_radii(s,f),default=math.inf)}
 
 
+SMOOTH = 1.0  # curvature penalty of the band rule, in h^4 (h the median spacing): smooths noise over ~h, not more
+
+
+def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
+    """Heights nearest z (least squares, `weight` per point) that stay within `tol` of it (a number or one per point;
+    None: no band there, a held bin or a lone bad point) and turn no tighter than rmin, with a small penalty on
+    curvature so that a short noisy stretch is not followed into humps (the band rule, #197, 2026-11-03: "If the
+    curve >=500m fits within 10cm then it's solved"). ADMM on u = D f (the radius) and v = f (the band), one banded
+    factorisation. Returns the heights, whether the band and the radius are met (`fits`), how far each point lies
+    outside its band (`excess`) and the tightest radius."""
+    n = len(s)
+    rmin = [rmin]*n if isinstance(rmin,(int,float)) else list(rmin)
+    tol = [tol]*n if tol is None or isinstance(tol,(int,float)) else list(tol)
+    if n < 3:
+        return {'z':list(z),'fits':True,'excess':[0.0]*n,'min_radius':math.inf}
+    w = [1.0]*n if weight is None else [float(x) for x in weight]
+    rows, cap = _second(s), [1/r for r in rmin[1:-1]]
+    h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
+    rho1, rho2 = max(h,.5)**4, 1.0
+    L = _factor(n,[wi+rho2 for wi in w],rows,[(smooth+1)*rho1]*len(rows))
+    Df = lambda f: [sum(c*f[j] for j,c in r.items()) for r in rows]
+    box = lambda f, y: [fi+yi if t is None else max(zi-t,min(zi+t,fi+yi)) for fi,yi,zi,t in zip(f,y,z,tol)]
+    f = list(z)
+    u, v = [max(-c,min(c,d)) for d,c in zip(Df(f),cap)], box(f,[0.0]*n)
+    y1, y2 = [0.0]*len(rows), [0.0]*n
+    for it in range(ITERATIONS):
+        last = f
+        b = [wi*zi+rho2*(vi-yi) for wi,zi,vi,yi in zip(w,z,v,y2)]
+        for r,ui,yi in zip(rows,u,y1):
+            for j,c in r.items():
+                b[j] += rho1*c*(ui-yi)
+        f = _back(L,b)
+        d = Df(f)
+        u = [max(-c,min(c,di+yi)) for di,yi,c in zip(d,y1,cap)]
+        v = box(f,y2)
+        y1 = [yi+di-ui for yi,di,ui in zip(y1,d,u)]
+        y2 = [yi+fi-vi for yi,fi,vi in zip(y2,f,v)]
+        # (feasible is not yet optimal: the curvature penalty acts only as the curve settles, so it must stop moving)
+        if (it % 25 == 24 and all(abs(di) <= c*TOL for di,c in zip(d,cap)) and max(abs(fi-vi) for fi,vi in zip(f,v)) < 1e-3
+                and max(abs(fi-li) for fi,li in zip(f,last)) < 1e-6):
+            break
+    excess = [0.0 if t is None else max(0.0,abs(fi-zi)-t) for fi,zi,t in zip(f,z,tol)]
+    fits = max(excess) <= .005 and all(abs(di) <= c*TOL for di,c in zip(Df(f),cap))
+    return {'z':f,'fits':fits,'excess':excess,'min_radius':min(implied_radii(s,f),default=math.inf)}
+
+
 def implied_radii(s, z):
     """The radius each inner point's change of grade implies (inf on a straight grade)."""
     return [1/abs(c) if c else math.inf for c in curvature(s,z)]

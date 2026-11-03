@@ -29,7 +29,7 @@ import shapely
 from shapely.geometry import LineString, Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, cause, chains, implied_radii, radii, vertical_profile  # noqa: E402
+from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, banded_profile, cause, chains, implied_radii, radii, vertical_profile  # noqa: E402
 
 OUT_STEP = 2.0  # m between heights along a line's path and tracks (the game's profile step, src/terrain.js)
 MATCH = 1.0     # m from a line's point to the chain it lies on (both are DI where the line is, #20)
@@ -39,8 +39,15 @@ SWITCH, BEHIND, DIAMOND = 15.0, 3.0, 5.0  # m: the switch radius from a fork int
                                           # on both tracks, and either side of a crossing (a 20 m zone around every pin
                                           # held a 430 m sag at Nádraží Holešovice to 1000 m, the curve 3 m under it)
 NEAR_PIN = 1.5  # m: a bin this near a pinned point gives way to it
-RELAX, RELAX_REACH = (.5, .25), 50.0  # radius factors tried for a stretch of heights the curve misses, and how far
-JOIN_RELAX = (.5, .25, .1)            # they reach; near a pin it misses (the rails join there)
+BAND = 0.10     # m: the curve stays within this of the staged heights (the user, 2026-11-03: "If the curve >=500m fits
+                # within 10cm then it's solved, otherwise let's keep it for review again so we can find the root cause")
+JUNCTION_BAND = 0.15  # m within a turnout or a diamond: the play the user allowed there for input errors and noise
+                      # ("there can be little play within the junction if we account for input data errors, noise")
+FIT, PIN_FIT = 0.01, 0.002  # m outside the band that still fits (the solver's convergence); at a pin, where rails join
+PIN_TOL = 0.005  # m: a junction's pinned height, within this
+LONE = 2        # bins: a group of misses this small is a lone bad point, not held to the band
+RELAX_STEP, RELAX_STEPS, RELAX_REACH = 0.8, 12, 50.0  # where the band is missed: the radius x0.8 within 50 m, at most
+MIN_RADIUS = 20.0  # m: 12 times, never under the tightest horizontal radius (data/truth.json min-radius-passenger)
 NEAR_MEET = 2.0  # m: two tracks meeting a third this near each other along it meet each other too (Ke Stírce: two
                  # track ends 0.65 m apart on a third track, 9 cm apart in height, pinned it to both)
 MAX_GRADE = 0.09  # the steepest tram track (the game's grade limiter, src/terrain.js; Hercovka - Kobylisy 8-8.8 %)
@@ -110,7 +117,7 @@ class Chain:
     def __init__(self, xy, bins):
         self.xy, self.line, self.bins = xy, LineString(xy), bins
         self.length = self.line.length
-        self.runs, self.held, self.steps, self.switch, self.tight, self.review = [], [], [], [], [], []
+        self.runs, self.held, self.steps, self.switch, self.review = [], [], [], [], []
 
     def z_at(self, t):
         """(height, source code) at distance t along the chain, or (None, None) outside its runs."""
@@ -257,7 +264,7 @@ def solve(c, pins, r, relax=None):
     runs, cut = held_runs(series)
     c.held = [{'s0': h[0]['s'], 's1': h[-1]['s'], 'flags': sorted({f for x in h for f in x['flags']}),
                'xy': h[len(h) // 2]['xy']} for h in cut]
-    c.runs, c.steps, c.tight, c.review = [], [], [], []
+    c.runs, c.steps, c.review = [], [], []
     for run in runs:
         # (a held bin starts on the straight line between its neighbours, at HOLD_WEIGHT: at weight 0 the curve was
         # free to sag anywhere the radius allows, 5 cm under a straight grade across 40 m)
@@ -269,68 +276,96 @@ def solve(c, pins, r, relax=None):
             k = bisect.bisect_left(known, (x['s'],))
             (s0, z0), (s1, z1) = known[max(0, k - 1)], known[min(len(known) - 1, k)]
             x['zf'] = z0 if s1 == s0 else z0 + (z1 - z0) * (x['s'] - s0) / (s1 - s0)
-        s = [x['s'] for x in run]
-        rmin = [r['switch'] if any(a <= si <= b for a, b in c.switch)
-                else r['open'] if x['kind'] == 'open' else r['street'] for si, x in zip(s, run)]
-        for t, k in (relax or {}).items():
-            rmin = [v * k if abs(si - t) <= RELAX_REACH else v for si, v in zip(s, rmin)]
-        # (where the curve misses a stretch of heights the terrain confirms at track grades, the track is tighter
-        # than the design radius there: the radius gives way over the stretch and the place is listed; held to it,
-        # the curve left a 300 m sag at Malostranská and Tukey dropped the stretch, 1 m under the data)
-        first = None
-        for k in (1,) + RELAX:
-            res = vertical_profile(s, [x['zf'] for x in run], rmin, weight=[x['w'] or HOLD_WEIGHT for x in run],
-                                   pins=[i for i, x in enumerate(run) if x.get('pin')], pin_weight=PIN_WEIGHT)
-            groups = []
-            for i, x in enumerate(run):
-                if x['w'] and not x.get('pin') and abs(res['z'][i] - x['z']) > MISS:
-                    if groups and x['s'] - run[groups[-1][-1]]['s'] <= 20:
-                        groups[-1].append(i)
-                    else:
-                        groups.append([i])
-            found = []
-            for g in groups:
-                pts = [run[i] for i in g]
-                held = [x for x in run if x['w'] == 0 and min(abs(x['s'] - p['s']) for p in pts) <= 20]
-                big = max(g, key=lambda i: abs(res['z'][i] - run[i]['z']))
-                found.append({'cause': cause([{'src': {'dtmp': 'archive', 'zps': 'survey'}.get(p['src'], p['src']),
-                                               'z': p['z'], 'terrain': p['terrain']} for p in pts],
-                                             [run[i]['z'] - res['z'][i] for i in g],
-                                             any(STRUCTURE & set(x['flags']) for x in held)),
-                              'largest_m': round(run[big]['z'] - res['z'][big], 2), 'points': len(g),
-                              'xy': run[big]['xy'], 'flags': sorted({f for p in pts for f in p['flags']}),
-                              's': (pts[0]['s'], pts[-1]['s']),
-                              # (heights the terrain confirms at grades a tram climbs: the track itself, not the
-                              # archive on the ground under a deck, which falls metres steeper than that)
-                              'track_like': all(p['terrain'] is not None and abs(p['z'] - p['terrain']) <= .5 for p in pts)
-                                  and all(abs(b['z'] - a['z']) <= MAX_GRADE * (b['s'] - a['s']) for a, b in zip(pts, pts[1:]))})
-            tight = [f for f in found if f.pop('track_like') and f['points'] >= 3]
-            if k == 1:
-                # (the curve held to the design radius, for the radius review; an answer to hold it keeps it)
-                first = (list(res['z']), [dict(f) for f in tight])
-                tight = [f for f in tight if not held_by_answer(f['xy'])]
-            if not tight or k == RELAX[-1]:
+        s, zf = [x['s'] for x in run], [x['zf'] for x in run]
+        rmin0 = [r['switch'] if any(a <= si <= b for a, b in c.switch)
+                 else r['open'] if x['kind'] == 'open' else r['street'] for si, x in zip(s, run)]
+        weight = [PIN_WEIGHT if x.get('pin') else (x['w'] or HOLD_WEIGHT) for x in run]
+        # (what the band does not hold: a lone bad point, one or two bins, and a stretch steeper than any track, the
+        # archive on the ground under a deck; the robust fit at the design radius, without the pins, finds them)
+        rob = vertical_profile(s, zf, rmin0, weight=[0.0 if x.get('pin') else w for x, w in zip(run, weight)])['z']
+        groups = []
+        for i, x in enumerate(run):
+            if x['w'] and not x.get('pin') and abs(rob[i] - x['z']) > BAND:
+                if groups and x['s'] - run[groups[-1][-1]]['s'] <= 20:
+                    groups[-1].append(i)
+                else:
+                    groups.append([i])
+        def steep(g):
+            idx = [i for i in range(max(0, g[0] - 1), min(len(run), g[-1] + 2)) if run[i]['z'] is not None]
+            return any(abs(run[b]['z'] - run[a]['z']) > MAX_GRADE * (run[b]['s'] - run[a]['s']) for a, b in zip(idx, idx[1:]))
+        out = [g for g in groups if len(g) <= LONE or steep(g)]
+        dropped = {i for g in out for i in g}
+        zone = lambda si: any(a <= si <= b for a, b in c.switch)
+        tol = [PIN_TOL if x.get('pin') else None if (not x['w'] or i in dropped) else JUNCTION_BAND if zone(x['s'])
+               else BAND for i, x in enumerate(run)]
+        weight = [0.0 if i in dropped else w for i, w in enumerate(weight)]
+        # the band rule: within BAND of the staged heights at the design radius, else the radius gives way where the
+        # band is missed (an answer to hold the radius keeps it) and the place goes to the user's review
+        rmin = list(rmin0)
+        fit = [PIN_FIT if x.get('pin') else FIT for x in run]
+        over = lambda r_: [i for i, e in enumerate(r_['excess']) if e > fit[i]]
+        res = first = banded_profile(s, zf, rmin, tol, weight)
+        for _ in range(RELAX_STEPS):
+            # (an answer to hold the radius holds the whole place: the points outside the band within 50 m of each other)
+            bad, group = [], []
+            for i in over(res) + [None]:
+                if i is not None and (not group or s[i] - s[group[-1]] <= 50):
+                    group.append(i)
+                    continue
+                if group and not any(held_by_answer(run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0]))
+                                     for j in group):
+                    bad += group
+                group = [i] if i is not None else []
+            if not bad:
                 break
-            nk = RELAX[RELAX.index(k) + 1] if k in RELAX else RELAX[0]
-            for f in tight:
-                rmin = [v * nk / k if f['s'][0] - 20 <= si <= f['s'][1] + 20 else v for si, v in zip(s, rmin)]
-                c.tight.append({'xy': f['xy'], 'factor': nk, 'points': f['points']})
-        if first and first[1]:
-            final = [{'s': s, 'z': res['z'], 'raw': [None if x.get('pin') else x['z'] for x in run],
-                      'src': [x['src'] for x in run]}]
-            held = [{'s': s, 'z': first[0]}]
-            for f in first[1]:
-                relaxed = not held_by_answer(f['xy'])
-                place = review_place(c, 'tight radius', f['s'][0] - 60, f['s'][1] + 60, held, final, k if relaxed else 1)
-                place['at'] = tuple(f['xy'])
-                c.review.append(place)
-        for f in found:
-            f.pop('s')
-        c.steps += found
-        step_s = {run[i]['s'] for g in groups for i in g}
-        c.runs.append({'s': s, 'z': res['z'], 'raw': [None if x.get('pin') else x['z'] for x in run],
-                       'src': [('curve' if x['w'] == 0 else x['src']) for x in run],
-                       'step': [x['s'] in step_s for x in run], 'min_radius': res['min_radius']})
+            near = lambda si: any(abs(si - s[i]) <= RELAX_REACH for i in bad)
+            rmin = [max(v * RELAX_STEP, MIN_RADIUS) if near(si) else v for si, v in zip(s, rmin)]
+            res = banded_profile(s, zf, rmin, tol, weight)
+        # (where even that cannot meet a pin, the rails join first: the band gives way within 15 m of it)
+        apart = [i for i in over(res) if run[i].get('pin')]
+        if apart:
+            tol = [None if t is not None and not run[i].get('pin') and min(abs(s[i] - s[j]) for j in apart) <= 15 else t
+                   for i, t in enumerate(tol)]
+            res = banded_profile(s, zf, rmin, tol, weight)
+        raw = [None if x.get('pin') else x['z'] for x in run]
+        # (for review: the band missed by over FIT at the design radius, or rails over FIT apart; a few mm at a pin
+        # only bend the radius, they are no question)
+        review = [i for i, e in enumerate(first['excess']) if e > FIT]
+        if review:
+            worst, place = review, []
+            for i in worst + [None]:
+                if i is not None and (not place or s[i] - s[place[-1]] <= 50):
+                    place.append(i)
+                    continue
+                if place:
+                    big = max(place, key=lambda j: first['excess'][j])
+                    junction = any(x.get('pin') and min(abs(x['s'] - s[j]) for j in place) <= 10 for x in run)
+                    rec = review_place(c, 'junction' if junction else 'band', s[place[0]] - 60, s[place[-1]] + 60,
+                                       [{'s': s, 'z': first['z']}], [{'s': s, 'z': res['z'], 'raw': raw,
+                                       'src': [x['src'] for x in run]}],
+                                       round(min(a / b for a, b in zip(rmin, rmin0)), 2))
+                    rec['at'] = tuple(run[big]['xy'] or c.line.interpolate(s[big]).coords[0])
+                    rec['excess'] = first['excess'][big]
+                    rec['fits'] = not over(res) and not apart
+                    c.review.append(rec)
+                place = [i] if i is not None else []
+        # steps: what the band did not hold, and anything still outside it, by cause
+        left = [over(res)] if over(res) else []
+        for g in out + [g for g in left if g]:
+            pts = [run[i] for i in g]
+            held = [x for x in run if x['w'] == 0 and min(abs(x['s'] - p['s']) for p in pts) <= 20]
+            big = max(g, key=lambda i: abs(res['z'][i] - run[i]['z']))
+            if abs(res['z'][big] - run[big]['z']) <= MISS:
+                continue
+            c.steps.append({'cause': cause([{'src': {'dtmp': 'archive', 'zps': 'survey'}.get(p['src'], p['src']),
+                                             'z': p['z'], 'terrain': p['terrain']} for p in pts],
+                                           [run[i]['z'] - res['z'][i] for i in g],
+                                           any(STRUCTURE & set(x['flags']) for x in held)),
+                            'largest_m': round(run[big]['z'] - res['z'][big], 2), 'points': len(g),
+                            'xy': run[big]['xy'], 'flags': sorted({f for p in pts for f in p['flags']})})
+        step_s = {s[i] for g in out + left for i in g if abs(res['z'][i] - zf[i]) > MISS}  # (steps as #190 counts them)
+        c.runs.append({'s': s, 'z': res['z'], 'raw': raw, 'src': [('curve' if x['w'] == 0 else x['src']) for x in run],
+                       'step': [si in step_s for si in s], 'min_radius': res['min_radius']})
     # (a pin's source is that of its neighbours: the junction's height comes from the through track)
     for run in c.runs:
         for i, v in enumerate(run['src']):
@@ -380,7 +415,7 @@ def assemble(chs):
                 if j1 != j2 and not any(m[1] == j2 and abs(m[0] - u1) <= NEAR_MEET for m in meets[j1]):
                     meets[j1].append((u1, j2, u2, 'near'))
                     meets[j2].append((u2, j1, u1, 'near'))
-    solved, pinned, used, apart, relaxed, t0 = set(), 0, [], {}, [], time.time()
+    solved, pinned, used, apart, t0 = set(), 0, [], {}, time.time()
     for n, i in enumerate(sorted(range(len(chs)), key=lambda i: -chs[i].length)):
         c = chs[i]
         solve(c, {}, r)
@@ -406,39 +441,6 @@ def assemble(chs):
         if pins:
             solve(c, pins, r)
             pinned += 1
-            # (where the tracks it meets ask for more than the radius allows, the rails still join: the radius
-            # gives way near the pin the curve misses, and the place is listed)
-            relax, before, kept = {}, None, set()
-            for k in JOIN_RELAX:
-                miss = [t for t, z in pins.items() if c.z_at(t)[0] is None or abs(c.z_at(t)[0] - z) > .01]
-                kept |= {t for t in miss if held_by_answer(tuple(c.line.interpolate(t).coords[0]))}
-                miss = [t for t in miss if t not in kept]
-                if not miss:
-                    break
-                if before is None:
-                    before = [dict(run) for run in c.runs]  # (held to the design radius, for the radius review)
-                relax.update({t: k for t in miss})
-                solve(c, pins, r, relax)
-            ts, group = sorted(set(relax) | kept), []
-            for t in ts + [None]:  # (pins within 30 m of each other: one place)
-                if t is not None and (not group or t - group[-1] <= 30):
-                    group.append(t)
-                    continue
-                if group:
-                    place = review_place(c, 'junction', group[0] - 60, group[-1] + 60, before or c.runs, c.runs,
-                                         min(relax.get(u, 1) for u in group))
-                    held_at = lambda u: next((zz for ss, zz in sorted(place['held'], key=lambda q: abs(q[0] - u))), None)
-                    place['at'] = tuple(c.line.interpolate(group[0]).coords[0])
-                    place['miss'] = max(abs(held_at(u) - c.z_at(u)[0]) for u in group
-                                        if held_at(u) is not None and c.z_at(u)[0] is not None) if place['held'] else 0
-                    c.review.append(place)
-                group = [t] if t is not None else []
-            if relax:
-                p = c.line.interpolate(min(relax))
-                relaxed.append({'xy': [round(p.x, 1), round(p.y, 1)], 'factor': min(relax.values()),
-                                'min_radius': min((round(ru['min_radius']) for ru in c.runs
-                                                   if ru['min_radius'] < math.inf), default=None),
-                                'chain_m': round(c.length)})
         solved.add(i)
         if n % 200 == 199:
             print(f'  {n + 1} of {len(chs)} chains solved ({pinned} pinned), {time.time() - t0:.0f} s', flush=True)
@@ -454,9 +456,8 @@ def assemble(chs):
             'junction_heights_apart': [{'m': round(d, 4), 'xy': xy(p)} for d, p in worst[:10]],
             'over_1cm': sum(1 for d, _ in worst if d > .01),
             'crossings_apart': [{'m': round(d, 2), 'xy': xy(p)} for d, p in sorted(apart.values(), key=lambda v: -v[0])],
-            'radius_relaxed': relaxed,
-            'radius_tight': [{'xy': [round(v, 1) for v in x['xy']], 'factor': x['factor'], 'points': x['points']}
-                             for c in chs for x in c.tight if x['xy']]}
+            'review_places': [{'kind': p['kind'], 'xy': [round(v, 1) for v in p['at']], 'factor': p['factor'],
+                               'excess_m': round(p['excess'], 3), 'fits': p['fits']} for c in chs for p in c.review]}
 
 
 class Lookup:
@@ -713,16 +714,14 @@ def line_report(line, chs, lookup, data, summary):
         near = lambda items: [dict(x, lat=round(float(F.ll(*x['xy'])[0]), 5), lon=round(float(F.ll(*x['xy'])[1]), 5),
                                    s=round(line_.project(Point(x['xy'])))) for x in items if line_.distance(Point(x['xy'])) < 10]
         out[key] = {'without_height': gaps, 'vs_staged': {'bins': len(diffs), 'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
-                    'radius_relaxed': near(summary['radius_relaxed']), 'crossings_apart': near(summary['crossings_apart']),
-                    'radius_tight': near(summary['radius_tight'])}
+                    'review_places': near(summary['review_places']), 'crossings_apart': near(summary['crossings_apart'])}
         print(f'  {key}: heights vs staged on runs without a step: {out[key]["vs_staged"]}; '
               f'{len(gaps)} stretches without a height over 10 m', flush=True)
         for g in gaps:
             print(f"    s {g['s0']:.0f}-{g['s1']:.0f} ({g['m']:.0f} m) at {g['lat']} N {g['lon']} E: {g['why']} {g['flags']}")
-        for x in out[key]['radius_relaxed']:
-            print(f"    radius relaxed x{x['factor']} at s {x['s']} ({x['lat']} N {x['lon']} E): tightest {x['min_radius']} m")
-        for x in out[key]['radius_tight']:
-            print(f"    radius x{x['factor']} for the data ({x['points']} heights the terrain confirms) at s {x['s']} ({x['lat']} N {x['lon']} E)")
+        for x in out[key]['review_places']:
+            print(f"    for review ({x['kind']}): at the design radius {x['excess_m']} m outside the band at s {x['s']} "
+                  f"({x['lat']} N {x['lon']} E); radius x{x['factor']}{'' if x['fits'] else ', still outside'}")
         for x in out[key]['crossings_apart']:
             print(f"    crossing {x['m']} m apart in the data at s {x['s']} ({x['lat']} N {x['lon']} E), not pinned")
     return out
@@ -767,16 +766,13 @@ def radius_review(chs, snapshot):
                                       for si, raw, src, terr, xy in p['data']]})
             previews[HOLD][sid] = [[round(a, 1), round(b, 3)] for a, b in p['held']]
             previews[FOLLOW][sid] = [[round(a, 1), round(b, 3)] for a, b in p['final']]
-        if main['kind'] == 'tight radius':
-            staged = {round(si, 1): raw for si, raw, _, _, _ in main['data'] if raw is not None}
-            mag = max((abs(z - staged[round(si, 1)]) for si, z in main['held'] if round(si, 1) in staged), default=0)
-            info = (f"tight radius: the staged heights, which the terrain confirms, turn tighter than the design radius. "
-                    f"Held to it the curve departs up to {mag:.2f} m from the data (tightest {radius(main['held']):.0f} m); "
-                    f"following the data the radius is {radius(main['final']):.0f} m.")
-        else:
-            mag = max(p.get('miss', 0) for p in places)
-            info = (f"junction: a short track meets two or more others and cannot meet them all within the design radius. Held to it, the rails stay up to {mag * 100:.0f} cm apart at the "
-                    f"junction; joining them, the radius is {min(radius(p['final']) for p in places):.0f} m.")
+        mag = max(p['excess'] for p in places)
+        r_final = min(radius(p['final']) for p in places)
+        where = 'at a junction (the rails meet there within 5 mm)' if main['kind'] == 'junction' else 'on plain track'
+        info = (f"{main['kind']}: {where}, no curve at the design radius stays within {BAND * 100:.0f} cm of the staged "
+                f"heights: held to it, the curve leaves that band by up to {mag * 100:.0f} cm (tightest "
+                f"{radius(main['held']):.0f} m). Within the band the radius is {r_final:.0f} m"
+                f"{'' if all(p['fits'] for p in places) else ', and the band is still missed'}.")
         out.append({'kind': 'trackheight', 'id': ident, 'x': at[0], 'y': at[1], 'mag': round(mag, 3),
                     'status': 'review', 'place': [round(lat, 5), round(lon, 5)], 'lines_near': lines, 'info': info,
                     'decision': {'span_ids': [sp['id'] for sp in spans], 'structure': {'kind': main['kind']}, 'status': 'review'},
@@ -817,11 +813,12 @@ def main():
           f"{len(summary['crossings_apart'])} crossings over {CROSS:g} m apart in the data, not pinned")
     print(f'network: moved from the staged heights on runs without a step: p50 {q(.5)}, p90 {q(.9)}, p99 {q(.99)} m')
     print(f'network: steps by cause {dict(by)}; {len(bad)} over {BIG:g} m without a rule to explain them')
-    print(f'network: {len(held)} held stretches over {HELD_GAP} m, {sum(h["m"] for h in held):.0f} m; radius relaxed '
-          f'near {len(summary["radius_relaxed"])} junctions and for {len(summary["radius_tight"])} stretches the terrain confirms')
+    kinds = Counter(p['kind'] for p in summary['review_places'])
+    print(f'network: {len(held)} held stretches over {HELD_GAP} m, {sum(h["m"] for h in held):.0f} m; for review where no '
+          f'curve at the design radius fits within {BAND:g} m: {kinds.get("band", 0)} places, {kinds.get("junction", 0)} at junctions')
     review = radius_review(chs, (ROOT / 'snapshots/CURRENT').read_text().strip())
-    print(f"radius review: {len(review)} places ({sum(f['decision']['structure']['kind'] == 'tight radius' for f in review)} "
-          f"where the data is tighter, the rest at junctions), reports/review/track-radius.json")
+    print(f"radius review: {len(review)} places ({sum(f['decision']['structure']['kind'] == 'junction' for f in review)} "
+          f"at junctions), reports/review/track-radius.json")
     lookup, report = Lookup(chs), {'network': {**summary, 'steps_by_cause': dict(by), 'unexplained_steps': bad,
                                                'moved_m': {'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
                                                'held_over_60m': held}, 'lines': {}}

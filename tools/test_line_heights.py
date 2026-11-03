@@ -67,47 +67,54 @@ class Assembly(unittest.TestCase):
         self.assertAlmostEqual(short.z_at(120)[0], 100.6, delta=.02)  # (bridged by the curve)
         self.assertEqual(short.z_at(120)[1], 'curve')
 
-    def test_a_tight_sag_the_terrain_confirms_is_followed(self):
-        # -6 % into +6 % along a 100 m radius (the street's is 500 m), the terrain the same: followed, listed
-        def z(s):
-            if s < 94:
-                return 100 - .06 * s
-            if s < 106:
-                return 100 - .06 * s + (s - 94) ** 2 / 200
-            return 100 - .06 * 106 + 144 / 200 + .06 * (s - 106)
-        c = chain([(0, 0), (200, 0)], z, terrain=z)
+    @staticmethod
+    def sag(s):
+        # -6 % into +6 % along a 100 m radius: no curve at the street's 500 m stays within 10 cm of it
+        if s < 94:
+            return 100 - .06 * s
+        if s < 106:
+            return 100 - .06 * s + (s - 94) ** 2 / 200
+        return 100 - .06 * 106 + 144 / 200 + .06 * (s - 106)
+
+    def test_a_sag_tighter_than_the_radius_stays_in_the_band_and_goes_to_review(self):
+        c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
         quiet(lh.assemble, [c])
-        worst = max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins)
-        self.assertLess(worst, lh.MISS)
-        self.assertTrue(c.tight)
+        self.assertLess(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + lh.FIT)
+        self.assertEqual([p['kind'] for p in c.review], ['band'])
+        self.assertLess(c.review[0]['factor'], 1)
+        self.assertTrue(c.review[0]['fits'])
+
+    def test_a_curve_at_the_radius_within_the_band_is_solved(self):
+        # (a 600 m sag with +-4 cm of noise: within 10 cm at 500 m, nothing for review, the noise not followed)
+        noise = lambda s: .04 if int(s // 5) % 2 else -.04
+        c = chain([(0, 0), (300, 0)], lambda s: 100 + (s - 150) ** 2 / 1200 + noise(s))
+        quiet(lh.assemble, [c])
+        self.assertEqual(c.review, [])
+        self.assertLess(max(abs(c.z_at(s)[0] - (100 + (s - 150) ** 2 / 1200)) for s in range(10, 290, 5)), .03)
 
     def test_an_answer_to_hold_the_radius_keeps_it_and_the_place_is_reviewed(self):
-        def z(s):
-            if s < 94:
-                return 100 - .06 * s
-            if s < 106:
-                return 100 - .06 * s + (s - 94) ** 2 / 200
-            return 100 - .06 * 106 + 144 / 200 + .06 * (s - 106)
-        c = chain([(0, 0), (200, 0)], z, terrain=z)
+        c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
         lh.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': lh.HOLD}]
         try:
             quiet(lh.assemble, [c])
         finally:
             lh.RADIUS_ANSWERS = []
-        self.assertFalse(c.tight)
-        self.assertGreater(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.MISS)  # (the radius held)
-        self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('tight radius', 1)])
-        free = chain([(0, 0), (200, 0)], z, terrain=z)
-        quiet(lh.assemble, [free])
-        self.assertEqual([p['kind'] for p in free.review], ['tight radius'])
-        self.assertLess(free.review[0]['factor'], 1)
+        self.assertGreater(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + .005)  # (the radius held)
+        self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('band', 1.0)])
 
     def test_a_lone_bump_is_dropped(self):
         c = chain([(0, 0), (200, 0)], lambda s: 100.5 if abs(s - 102.5) < 1 else 100.0)
         quiet(lh.assemble, [c])
         self.assertLess(abs(c.z_at(102.5)[0] - 100), .05)
-        self.assertFalse(c.tight)
+        self.assertEqual(c.review, [])
 
+    def test_the_archive_on_the_ground_under_a_deck_is_not_followed(self):
+        # (a 5 m dive over 20 m and back, steeper than any track: a step, not a sag)
+        c = chain([(0, 0), (300, 0)], lambda s: 195.0 if 140 < s < 160 else 200.0)
+        quiet(lh.assemble, [c])
+        self.assertLess(abs(c.z_at(150)[0] - 200), .05)
+        self.assertEqual(c.review, [])
+        self.assertTrue(c.steps)
 
 class Lines(unittest.TestCase):
     def test_a_line_past_a_fork_has_no_step(self):
