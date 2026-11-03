@@ -39,7 +39,8 @@ import tempfile
 import time
 import zipfile
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stdout:  # (None under pythonw: the nightly baseline imports Store, #195)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I leaves it out)
 from atomic import replacing  # noqa: E402
 
