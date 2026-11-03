@@ -74,19 +74,21 @@ the ground under a deck no source maps, bridged by #184's curve from both sides)
 has the same shape, no source disagrees: a question), `archive` (off the terrain by less than the 1 m hold).
 It fails on a step over 1 m whose cause is not `di`, `dip` or `structure`.
 
-2026-11-02 (`reports/track-profile-steps.json`): 610 runs, 63,905 bins, 497 bridged. 34 groups, 56 points:
-`archive` 10 (none over 1 m), `di` 6 (2 over 1 m), `dip` 15 (4), `terrain` 3 (none). 0 fail. Over 1 m:
+2026-11-02 (`reports/track-profile-steps.json`, with the Mosty 3D structures of #192): 610 runs, 63,907 bins,
+507 bridged. 35 groups, 57 points: `archive` 10 (none over 1 m), `di` 6 (2 over 1 m), `dip` 15 (2), `structure`
+1 (none), `terrain` 3 (none). 0 fail. Over 1 m:
 
 - `di` +1.76 m at Strašnice (50.0691 N 14.4687 E): numeric DI rises 1.9 m above the archive, the survey and the
   terrain, which agree; −1.14 m at 50.0861 N 14.4319 E. DI wins by the import's rule; both are flagged
   `known_archive_disagreement`.
-- `dip` −5.5 m and −4.2 m at 50.0549 N 14.4723 E, −4.7 m at the end of the Libeň river bridge (14.4642 E, the
-  street under it), −3.6 m at Modřany.
+- `dip` −4.7 m at the end of the Libeň river bridge (14.4642 E, the street under it, where Mosty 3D has no
+  bridge), −3.6 m at Modřany (50.0142 N 14.4018 E). The −5.5 m and −4.2 m dips at 50.0549 N 14.4723 E are a
+  Mosty 3D bridge now (feature 237).
 - Before the user's answer, `terrain` +3.9 m in both directions on the Libeň bridge's rebuilt eastern approach
   (the archive and the lidar alternate between the deck, ~190 m, and the ground under it, ~184 m). It is now the
   user's structure ([height fallback](2026-10-30-track-height-fallback.md)).
 
-Under 1 m (0.3–1 m): `archive` 10 groups, `di` 4, `dip` 11, `terrain` 3, most of one or two points.
+Under 1 m (0.3–1 m): `archive` 10 groups, `di` 4, `dip` 12, `structure` 1, `terrain` 3, most of one or two points.
 
 ## Check
 
