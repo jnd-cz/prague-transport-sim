@@ -93,6 +93,29 @@ def osm_switches(area):
     return found
 
 
+def drawn_tracks(path):
+    """A line file's drawn tracks and both routes, resampled every 0.5 m, each point with the radius over 5 m."""
+    from track_curve import radii
+    d = json.load(open(path, encoding='utf-8'))
+    out = []
+    for p in [t['p'] for t in d['tracks']] + [d['path'], d.get('pathBack') or []]:
+        c = [0.0]
+        for a, b in zip(p, p[1:]):
+            c.append(c[-1] + math.dist(a, b))
+        if len(p) < 2 or c[-1] < 1:
+            continue
+        n, j, pts = max(2, int(c[-1] / 0.5)), 0, []
+        for i in range(n + 1):
+            s = c[-1] * i / n
+            while j < len(p) - 2 and c[j + 1] < s:
+                j += 1
+            t = (s - c[j]) / ((c[j + 1] - c[j]) or 1e-9)
+            pts.append((p[j][0] + (p[j + 1][0] - p[j][0]) * t, p[j][1] + (p[j + 1][1] - p[j][1]) * t))
+        r = radii([q[0] for q in pts], [q[1] for q in pts], 2.5)
+        out.append(list(zip(pts, r)))
+    return out
+
+
 def osm_ways(area):
     """OSM railway=tram ways near an area (the local extract), city metres."""
     import osmium
@@ -125,6 +148,7 @@ def main():
     ap.add_argument('--name')
     ap.add_argument('--sources', action='store_true', help='also OSM tram ways (green), the archive (orange)')
     ap.add_argument('--geojson', help='lines to draw in purple (city metres), e.g. DI planned works')
+    ap.add_argument('--data', help="a line file whose drawn tracks and routes to draw: white, red under 20 m over 5 m")
     a = ap.parse_args()
     di = dt.Source('di', di_data()[1])
     if a.fork is not None:
@@ -147,6 +171,8 @@ def main():
     if a.geojson:
         g = json.load(open(a.geojson, encoding='utf-8'))
         extra.append(((200, 40, 200, 220), [f['geometry']['coordinates'] for f in g['features']]))
+    if a.data:
+        extra.append(('drawn', drawn_tracks(a.data)))
     forks = draw(name, cx, cy, half, di, zps, osm, extra)
     # a close view of every fork in the place (CLOSE m either side), and of every OSM switch DI has no fork near
     for f in forks:
@@ -175,7 +201,11 @@ def draw(name, cx, cy, half, di, zps, osm, extra=()):
         d.line([px(p) for p in line], fill=(255, 220, 0, 230), width=lw)
     for colour, lines in extra:
         for line in lines:
-            if len(line) > 1 and any(x0 - 5 <= x <= x1 + 5 and y0 - 5 <= y <= y1 + 5 for x, y in line):
+            if colour == 'drawn':   # (points with their radius)
+                for (p, r), (q, _) in zip(line, line[1:]):
+                    if x0 - 5 <= p[0] <= x1 + 5 and y0 - 5 <= p[1] <= y1 + 5:
+                        d.line([px(p), px(q)], fill=(255, 40, 40, 255) if r < 20 else (255, 255, 255, 170), width=lw + 1)
+            elif len(line) > 1 and any(x0 - 5 <= x <= x1 + 5 and y0 - 5 <= y <= y1 + 5 for x, y in line):
                 d.line([px(p) for p in line], fill=colour, width=lw)
     for ch in di.chains:
         if ch['line'].intersects(area):
@@ -197,7 +227,7 @@ def draw(name, cx, cy, half, di, zps, osm, extra=()):
         d.rectangle([q[0] - r, q[1] - r, q[0] + r, q[1] + r], outline=(40, 220, 80, 255), width=lw)
     d.rectangle([8, 8, 8 + int(5 / RES), 14], fill=(255, 255, 255, 220))
     d.text((10, 16), f'5 m · {name} · DI axes blue, DI forks red, OSM switches green squares, ZPS lines yellow'
-           + (' · OSM tram green, archive orange, planned purple' if extra else ''), fill=(255, 255, 255, 255), font=font)
+           + (' · OSM tram green, archive orange, planned purple, drawn track white (red under 20 m)' if extra else ''), fill=(255, 255, 255, 255), font=font)
     OUT.mkdir(parents=True, exist_ok=True)
     if half <= CLOSE:   # a close view: the bare photo beside the drawn one, twice the size
         pair = Image.new('RGB', (2 * W + 6, H), 'white')
