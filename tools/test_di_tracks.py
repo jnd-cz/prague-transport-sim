@@ -178,6 +178,16 @@ class Pairing(unittest.TestCase):
         self.assertEqual(len(di.forks), 1)
         self.assertLess(math.dist(di.forks[0], (20, 0)), 0.01)
 
+    def test_a_switch_drawn_as_a_section_forks_at_its_tip(self):
+        # Dvorecký most (DI 2026-10-07): both legs drawn as 4.7 m records from the tip, where OSM's switch and the
+        # switch machine cover are, to a joint where the track and the branch go on
+        leg = [(50 + d, 0.0113 * d * d) for d in (0, 1, 2, 3, 4, 4.7)]   # (25 cm off at the joint)
+        branch = [leg[-1]] + [(x, y) for x, y in turnout(50)[1:] if x > 54.7]
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (54.7, 0)]), rec(3, leg),
+                              rec(4, [(54.7, 0), (120, 0)]), rec(5, branch)])
+        self.assertEqual(di.sections, 1)
+        self.assertLess(min(math.dist(f, (50, 0)) for f in di.forks), 0.01)
+
     def test_a_copy_running_on_the_track_forks_where_it_leaves(self):
         # Vozovna Kobylisy: two records 1-3 cm apart for 15 m, then they part
         branch = [(30, 0.02), (50, 0.02)] + [(x, y + 0.02) for x, y in turnout(50)[1:]]

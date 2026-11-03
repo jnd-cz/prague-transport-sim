@@ -35,6 +35,7 @@ INTERLACE = 0.05, 0.2, 10.0  # m: a branch running beside a track within 0.2 m f
                 # 5 cm or more, is interlaced track: the switch is at the branch's end, where it starts beside the
                 # track (Čechův most 13 cm for 28 m, Ohrada 12-13 cm for 51 m; a switch's branch is 0.2 m off within
                 # 4-9 m). The user, 2026-11-03: "the fork starts and ends well in front of/behind the road junction"
+SECTION = 6.0   # m: a switch's two legs drawn as records this long or shorter from its tip (Dvorecký most: 4.7 m)
 TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the track at a record joint, the switch's tip
                 # lies this far back (the tongues DI draws: Ohrada, Dejvice 8.4-8.5 m, Chotkova 9 m; OSM's switches
                 # at Čechův most lie 8.0 and 8.8 m behind DI's record joints)
@@ -152,7 +153,7 @@ class Source:
         # forks: places where two records leave in the same direction and move apart (two copies of one track
         # leave together and stay within centimetres: Vozovna Kobylisy, 10 m each at 98-99 degrees); each with the
         # directions its branches leave in (`branches`, unit vectors out of the fork)
-        self.forks, self.branches = [], []
+        self.forks, self.branches, self.sections = [], [], 0
         for c, ms in members.items():
             if len(ms) < 3:
                 continue
@@ -168,6 +169,23 @@ class Source:
                         and math.dist(pu, pv) >= FORK_APART
                         for i, (u, pu) in enumerate(out) for v, pv in out[:i])
             if split:
+                # a switch drawn as a section: both legs as records from the tip to a joint SECTION or less on, where
+                # the track and the branch go on (Dvorecký most, DI 2026-10-07: 4.7 m, the switch machine cover and
+                # OSM's switch at the tip); the switch is at the tip
+                far = defaultdict(list)
+                for m in ms:
+                    r, k = divmod(m, 2)
+                    if LineString(recs[r][1]).length <= SECTION:
+                        far[root(2 * r + 1 - k)].append(m)
+                tip = next((c2 for c2, legs in far.items() if len(legs) >= 2 and c2 != c), None)
+                if tip is not None:
+                    c, ms, out = tip, members[tip], []
+                    for m in ms:
+                        r, k = divmod(m, 2)
+                        line = LineString(recs[r][1] if k == 0 else recs[r][1][::-1])
+                        p0 = line.interpolate(min(1.0, line.length))
+                        out.append(((p0.x - line.coords[0][0], p0.y - line.coords[0][1]), None))
+                    self.sections += 1
                 xs = [ends[m][2] for m in ms]
                 self.forks.append((sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs)))
                 self.branches.append([_unit(u) for u, _ in out])

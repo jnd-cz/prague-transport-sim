@@ -87,6 +87,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   19.8 m along it); interlaced track (below), where the switch is the branch's start, not where it leaves. At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
   switches lie up to 7.4 m from DI's forks along the track (Jiráskovo náměstí; the user's answers of
   2026-11-03), and OSM and DI can disagree on which leg is the straight one in a curved switch (Křižovnická).
+- **DI draws some switches as a section** (#204): both legs as records from the tip to a joint 4-5 m on, where
+  the track and the branch go on (48 in the 16 districts, Dvorecký most's of 2026-10-07 among them). The legs are
+  apart only beyond the joint, so the fork of record ends lies there; the tip is where both legs start. At
+  Dvorecký most the tip has the ZPS survey's switch machine cover (a small rectangle among its traffic-area lines)
+  and OSM's switch (the user: "the OSM marker is on point there, it's right at the yellow rectangle which here fits
+  the přestavník"). Elsewhere OSM marks 29 of the 48 nearer the tip, 19 nearer the joint.
 - **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
   edges) where DI has them 0.4-0.5 m apart; a node placed nearest all its tracks lies off each of them.
 - **The archive draws Dvorce's old connection** (#204): DI (2026-09-30) and the archive (2008-2024) have

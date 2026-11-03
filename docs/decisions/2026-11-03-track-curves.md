@@ -20,6 +20,9 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   switch's branch is 0.2 m off within 4-9 m. Placing that fork where the branch left (as first built) moved
   Čechův most's switches 21 m onto the junction; the user: "The DI fork is wrong while OSM seems right [...]
   the fork starts and ends well in front of/behind the road junction" (2026-11-03).
+- A switch DI draws as a section (both legs as records up to `SECTION` = 6 m from the tip, the fork of record
+  ends at their far joint) forks at the tip: Dvorecký most's switches on line 17's eastern track moved 4.6-4.8 m
+  onto their switch machine covers and OSM's switches (0.09-0.13 m off).
 - Where DI starts the branch already 13 cm off at a record joint, the tip is `TONGUE` = 8.5 m back (the tongues
   DI draws elsewhere are 8.4-9 m; Čechův most's OSM switches lie 8.0 and 8.8 m back).
 - **OSM's shared interlaced way is split** (`di_tracks.split_interlaced`, called by the build before matching):
