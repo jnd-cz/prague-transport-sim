@@ -39,18 +39,6 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
   return { pts: out, s: ss };
 }
 
-// Every point of a polyline, with points added evenly along any segment longer than `step` (a curve the build
-// drew, #204: resampled, a 4.6 m piece's end became a chord and its joint at Strossmayerovo náměstí broke 2.9°).
-export function densify(pts, step = 1.5) {
-  const out = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i], m = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step);
-    for (let k = 1; k < m; k++) out.push([a[0] + ((b[0] - a[0]) * k) / m, a[1] + ((b[1] - a[1]) * k) / m]);
-    out.push(b);
-  }
-  return out;
-}
-
 // The track beyond the ends of a route: the GTFS path starts and ends at the terminus stops, but a
 // two-car set standing there reaches 30 m further back. Walk the OSM track chains from each end
 // (continuing across chain joints in the most aligned direction) for `len` metres; where no track
