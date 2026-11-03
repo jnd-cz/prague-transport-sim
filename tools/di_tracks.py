@@ -617,7 +617,16 @@ class TrackGeometry:
                 for n, run in ((a, hit[1][0]), (b, hit[1][-1])):
                     if hit[0].chains[run[0]]['line'].distance(Point(self.pos[n])) > 0.01:
                         loose.add((n, (a, b)))
-        net = track_curve.Network(self.pos, self.pts, kind, loose)
+        # how far each surveyed edge may move where a curve would bend too tight: the mean coordinate error of the
+        # worst accuracy class among its records (data/truth.json `sourceAccuracy`; the archive states none)
+        errors, limit = track_curve.class_errors(), {}
+        for key, hit in self.edges.items():
+            if hit:
+                classes = {r['attrs'].get('TridaPresnostiPoloha') for c, _, _ in hit[1] for r in hit[0].chains[c]['records']}
+                known = [errors[c] for c in classes if c in errors]
+                if known and None not in classes:
+                    limit[key] = max(known)
+        net = track_curve.Network(self.pos, self.pts, kind, loose, limit)
         self.pos.update(net.pos)
         self.pts = net.pts
         self.report['curve'] = net.report

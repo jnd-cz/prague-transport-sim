@@ -28,24 +28,31 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 - Edges join into through tracks (the straightest pair continues at every node), fitted longest first as a
   penalised spline on 1 m samples: as little bending as the points allow, within `TOL` = 2 cm of every DI or
   archive point (`FILL_TOL` = 0.3 m of OSM fill). Weights grow only where the curve misses (Lawson).
-- A node a longer track fixed is held; a track ending there leaves tangent to the track through it it starts
-  within `START` = 6° of (113 ends on line 17: 96 within 4°); beyond, at its own angle (`switch-start`).
+- Tracks are fitted longest first, but a track through a node before one ending there (Holešovice: a longer
+  track ending at a node 2 m off its line fixed it, and the track through it bent at 4 m to reach it).
+- A node a track fitted before fixed is held; a track ending there leaves tangent to the track through it it
+  starts within `START` = 6° of (113 ends on line 17: 96 within 4°); beyond, at its own angle (`switch-start`).
 - A crossing node slides to where the two curves cross. A node off its surveyed track (the point nearest all
   its tracks) is no data point; nodes under 0.5 m apart are one.
-- Where the curve bends under 90 % of 20 m over 2 m, the tolerance of the points within 10 m grows by 1.5 up
-  to 25 cm; what still misses 2 cm by more than 1 cm is listed in the build log (`track curves`).
+- Where the curve bends under 20 m over 2 m, the tolerance of the points within 10 m grows by 1.5, at most to
+  the mean coordinate error of their records' accuracy class (`data/truth.json` `sourceAccuracy`: DI class 3
+  0.14 m, class 2 0.08 m; the archive states none and is taken as class 3, the DTM's minimum; OSM fill 0.5 m).
+  The user, 2026-11-03: "keep stricter rules and relax only where we get under the specified radius". Twice the
+  error (a 95 % bound; the decree states no limit) gave 6 bends over 10° inside tracks instead of 11 and 32
+  joins over 1° instead of 39, and is not used.
 - The written points leave out samples a chord passes within 3 mm of, except within 2.5 m of a node. The
   line data says `trackCurve`, and the game draws such data as it is (no Gaussian, `src/route.js`).
 
 ## Checks
 
 `tools/lint.js`:
-- `trackRadius`: the radius over 5 m along every drawn track and both routes, flagged under 18 m. A curve held
-  within 2 cm of noisy points reads 90 % of its radius over 5 m (sagitta 0.16 m on a 20 m curve), so 18-20 m
-  is counted apart (`nearMin`).
+- `trackRadius`: the radius over 5 m along every drawn track and both routes, flagged under 20 m.
 - `trackJoins`: through tracks breaking over 1° where chains meet, per class; diverging start angles listed.
 
 ## Left open
+
+- 24 connecting curves on line 17 read 18.5-19.9 m: held at both switches, their radius is DI's; 20 m needs the
+  switches about 0.5 m off. Real curves under 20 m, or switches DI places wrong (#210 measures DI's forks)?
 
 - Dvorecký most: DI (2026-09-30) and the archive lack the new tracks; the archive's old connection makes a
   zigzag. Atlas Prahy draws the new junction, so a newer DI state may have it.

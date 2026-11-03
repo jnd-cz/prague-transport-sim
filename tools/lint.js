@@ -345,14 +345,13 @@ function along(p) {
 }
 
 // The drawn track in plan (#204): the radius over a 5 m window (the circle through the points 2.5 m either side)
-// every metre along the route, the opposite route and every drawn track, flagged under 90 % of 20 m (data/truth.json
-// trackGeometry `min-radius-passenger`): a curve held within 2 cm of noisy survey points reads 90 % of its radius
-// over 5 m at worst (tools/track_curve.py READ; line 17's 20 m curves read 18-20 m), counted apart as `nearMin`.
-// Places per 10 m of each line, counted per class (our, opposite, the track's source).
-const MIN_RADIUS = 20, READ = 0.9;
+// every metre along the route, the opposite route and every drawn track, flagged under 20 m (data/truth.json
+// trackGeometry `min-radius-passenger`; tools/track_curve.py holds it, moving points at most by their accuracy
+// class's error). Places per 10 m of each line, counted per class (our, opposite, the track's source).
+const MIN_RADIUS = 20, SLACK = 0.995;
 function trackRadius(g) {
   const lines = [['our', g.route.pts], ['opposite', g.backRoute?.pts], ...(g.data.tracks || []).map((t) => [t.src || 'osm', t.smooth || t.p])];
-  const bad = new Map(), near = new Map(), kinds = {};
+  const bad = new Map(), kinds = {};
   let n = 0, minR = Infinity;
   lines.forEach(([kind, p], li) => {
     if (!p || p.length < 3) return;
@@ -364,15 +363,14 @@ function trackRadius(g) {
       const R = area2 > 1e-9 ? (ab * bc * ca) / (2 * area2) : 1e6;
       n++;
       minR = Math.min(minR, R);
-      const k = `${li}:${Math.round(s / 10)}`, into = R < MIN_RADIUS * READ ? bad : R < MIN_RADIUS ? near : null;
-      if (into && !(into.get(k)?.mag >= MIN_RADIUS / R))
-        into.set(k, { kind, x: b[0], y: b[1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(s) } : {}), mag: MIN_RADIUS / R, info: `${kind} track radius ${R.toFixed(1)} m over 5 m` });
+      const k = `${li}:${Math.round(s / 10)}`;
+      if (R < MIN_RADIUS * SLACK && !(bad.get(k)?.mag >= MIN_RADIUS / R))
+        bad.set(k, { kind, x: b[0], y: b[1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(s) } : {}), mag: MIN_RADIUS / R, info: `${kind} track radius ${R.toFixed(1)} m over 5 m` });
     }
   });
   for (const b of bad.values()) kinds[b.kind] = (kinds[b.kind] || 0) + 1;
   const c = check('track-radius', n, [...bad.values()]);
   c.kinds = kinds;
-  c.nearMin = [...near.keys()].filter((k) => !bad.has(k)).length;
   c.minRadius = Math.round(minR * 10) / 10;
   return c;
 }

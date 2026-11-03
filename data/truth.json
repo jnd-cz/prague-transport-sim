@@ -490,5 +490,132 @@
     "date": "2026-11-03"
    }
   ]
+ },
+ "sourceAccuracy": {
+  "note": "How precise each source is, as its provider states it, and the accuracy classes counted in our snapshot (2026-11-03, #204). The user, 2026-11-03: \"register that data as a fact and the same for vertical accuracy (of each data source ideally) so we can work with it for tuning up the track laying algorithm\". The DTM records carry their class (TridaPresnostiPoloha, TridaPresnostiVyska); `classes` is the decree's table: mean coordinate error mxy and mean height error mH in metres. Class 9: worse than class 5 or unknown. New DTM data is kept at least in class 3 (§ 3 odst. 7).",
+  "classes": {
+   "1": {
+    "mxy": 0.04,
+    "mH": 0.03
+   },
+   "2": {
+    "mxy": 0.08,
+    "mH": 0.07
+   },
+   "3": {
+    "mxy": 0.14,
+    "mH": 0.12
+   },
+   "4": {
+    "mxy": 0.26,
+    "mH": 0.18
+   },
+   "5": {
+    "mxy": 0.5,
+    "mH": 0.35
+   }
+  },
+  "classesSource": {
+   "document": "Vyhláška č. 393/2020 Sb., o digitální technické mapě kraje",
+   "year": 2020,
+   "url": "https://www.zakonyprolidi.cz/cs/2020-393",
+   "part": "příloha č. 2, bod 1.1 (classes), bod 1.2 (9)"
+  },
+  "sources": [
+   {
+    "id": "dtm-di",
+    "scope": "DI tram track axes (OsaKolejeTramvajoveDrahy), 16 districts, state 2026-09-30",
+    "horizontalClasses": {
+     "3": 10364,
+     "2": 7
+    },
+    "heightClasses": {
+     "3": 10364,
+     "2": 7
+    },
+    "counted": "tools/dtmp_tracks.py di_data(), 2026-11-03"
+   },
+   {
+    "id": "zps",
+    "scope": "ZPS kresba lines (KR), 16 districts, state 2026-09-30",
+    "horizontalClasses": {
+     "2": 1065,
+     "3": 3226053,
+     "4": 701195,
+     "5": 5,
+     "9": 52246
+    },
+    "heightClasses": {
+     "1": 1,
+     "2": 1065,
+     "3": 700785,
+     "4": 21,
+     "5": 3156921,
+     "9": 121771
+    },
+    "counted": "the ZPS_KR.gpkg files of raw/dtm, 2026-11-03"
+   },
+   {
+    "id": "zps-areas",
+    "scope": "ZPS derived areas (OPL), 16 districts, state 2026-09-30",
+    "horizontalClasses": {
+     "2": 149,
+     "3": 266689,
+     "4": 193705,
+     "5": 6,
+     "9": 15863
+    },
+    "heightClasses": {
+     "2": 149,
+     "3": 50249,
+     "5": 378988,
+     "9": 47026
+    },
+    "counted": "the ZPS_OPL.gpkg files of raw/dtm, 2026-11-03"
+   },
+   {
+    "id": "dtmp-tracks",
+    "scope": "archived DTMP tram axes (2008-2024)",
+    "stated": null,
+    "note": "the archived records carry no accuracy class"
+   },
+   {
+    "id": "dmr5g",
+    "scope": "ČÚZK DMR 5G (bare-earth lidar, TIN)",
+    "heightError": 0.18,
+    "heightErrorDenseVegetation": 0.3,
+    "basis": "guaranteed total mean height error, in terrain without continuous vegetation and buildings; under dense vegetation",
+    "source": {
+     "document": "Zeměměřický úřad: Technická zpráva k Digitálnímu modelu reliéfu ČR DMR 5G a DMR 4G",
+     "year": 2026,
+     "date": "2026-01-27",
+     "part": "kapitola 6, Závěry a doporučení",
+     "url": "https://geoportal.cuzk.gov.cz/Dokumenty/TECHNICKA_ZPRAVA_DMR_4G_a_5G.pdf"
+    }
+   },
+   {
+    "id": "ipr-dtm",
+    "scope": "IPR Praha 1 m terrain (lidar 2023, at least 20 points/m²)",
+    "stated": null,
+    "note": "no accuracy in the file, its catalogue record or IPR's page; asked in #62",
+    "source": {
+     "document": "Geoportál Praha: Digital terrain model",
+     "year": 2026,
+     "url": "https://geoportalpraha.cz/en/data-and-services/articles-and-projects/3D-model/3D-model-dtm"
+    }
+   },
+   {
+    "id": "ortho",
+    "scope": "IPR Praha leaf-off orthophoto, flight 7-8 April 2026, 7 cm/px",
+    "stated": null,
+    "note": "no positional accuracy stated; its registration against the survey is measured in #210"
+   },
+   {
+    "id": "osm",
+    "scope": "OpenStreetMap tram ways",
+    "stated": null,
+    "note": "no accuracy; against DI p50 0.13 m, p90 0.45 m at line 17's nodes (#20, docs/knowledge.md)"
+   }
+  ]
  }
 }

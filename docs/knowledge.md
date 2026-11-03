@@ -94,9 +94,16 @@ What sessions learned and later work needs. Kept current and short; the full log
   no track onto the new Dvorecký most (opened 04/2026: "No data is related to new Dvorecký most put in
   service in 04/2026", the user, track sources review, 2026-11-03); where OSM's new edges come within 2 m of
   the archive's old track it takes them, as a zigzag with 20° breaks.
-- **A 5 m window reads a curve held within 2 cm at 90 % of its radius** (#204): the sagitta over 5 m of a
-  20 m curve is 0.16 m, 2 cm of it is 12 %; line 17's DI-fitted 20 m curves read 18-20 m. A bend squeezed
-  into a metre reads much wider over 5 m (10° as 29 m), so the curve fit measures over 2 m.
+- **Every DTM record states its accuracy class** (#204; `data/truth.json` `sourceAccuracy`, the classes of
+  vyhláška 393/2020 Sb.): DI's tram axes are class 3 (0.14 m in plan, 0.12 m in height) but 7 of 10,371 in
+  class 2; ZPS lines are class 3 in plan (3.2 M) or 4 (0.7 M) and **class 5 in height** (3.2 M lines, 0.35 m),
+  class 3 for 0.7 M. The archive states none; DMR 5G guarantees 0.18 m (0.30 m under dense vegetation); IPR's
+  1 m terrain and the orthophoto state nothing.
+- **A connecting curve held at both switches keeps the radius DI gives it** (#204): its ends and directions
+  are fixed by the through tracks, so widening the tolerance cannot change it; 24 places on line 17 read
+  18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off
+  to reach 20 m. A bend squeezed into a metre reads much wider over 5 m (10° as 29 m), so the curve fit
+  measures its own radius over 2 m.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
@@ -241,7 +248,7 @@ Review these when realism matters; most move into the build in M2.
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
   `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
-  `trackRadius` (5 m window, under 18 m; 18-20 m counted as `nearMin`) and `trackJoins` (through tracks
+  `trackRadius` (5 m window, under 20 m) and `trackJoins` (through tracks
   breaking over 1° where chains meet, diverging start angles listed; direction from the parabola through
   the first three drawn points: the game draws a point every 1.5 m).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
