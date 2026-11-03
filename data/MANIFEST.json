@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-03b",
- "built_at_commit": "71044fe",
- "published": "2026-11-03 18:07",
- "note": "line 17 on DI 2026-10-31 (snapshot 2026-11-03b): interlaced track split per track, turning-loop ends held, 10 cm point spacing (#204)",
+ "built_at_commit": "8fe3751",
+ "published": "2026-11-03 19:48",
+ "note": "line 17: switch section forks, Podolska vodarna's switch tip and north curve from the orthophoto (#204)",
  "files": {
   "line17.bld.bin": {
    "size": 6348546,
@@ -29,8 +29,8 @@
    "sha256": "905c2d71ff2117168727db63b42efcbb95c635edd509fdb130118d4b8017ae76"
   },
   "line17.json": {
-   "size": 5983614,
-   "sha256": "6958619a909b816bf799e17d36ae1bcf02e71c8881015fce8bca29a173d33254"
+   "size": 5983225,
+   "sha256": "d5af85635dc40468e021ffcf748ab84982fd42f7b1479e2afd521646d5e6cf24"
   },
   "line17.signals.json": {
    "size": 36904,
