@@ -65,9 +65,11 @@ MERGE = 0.5        # m: nodes joined by a shorter edge are one
 CLEAR = 0.5        # m from an end node held by a track fitted before: no data points
 GAP_MAX = 1.0      # m: a gap between a track's records at a node up to this lets its points near the node move by it
 GAP_REACH = 5.0    # m around such a node
-OFF = 0.1          # m: a node off a track through it by more than this, where three edges meet, keeps its place and
-                   # the track passes at its own point (Národní divadlo 0.34 m, Strossmayerovo 0.15-0.18 m); a switch
-                   # this near its track joins it exactly (Čechův most 2 cm: the route broke there)
+OFF = 0.2          # m: a node off a track through it by more than this, where three edges meet, keeps its place and
+                   # the track passes at its own point (Národní divadlo 0.34 m); a switch this near its track joins it
+                   # exactly (Čechův most 2 cm: the route broke there). DI's branches start up to 0.18 m apart at a
+                   # fork: at 0.1 m Strossmayerovo náměstí's crossover branches began 0.15-0.17 m beside their
+                   # through tracks, which broke 1.2-1.3° there
 THIN = 0.003       # m: the written points leave out samples a chord passes within this of
 THIN_MAX = 10.0    # m: at most this far apart
 KEEP = 2.5         # m from an edge's ends where every sample is kept
