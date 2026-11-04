@@ -1,9 +1,9 @@
 # The older asset labs: inventory
 
-The user built prototypes and asset labs in ChatGPT sites (25–29 Oct 2026) before this repo existed. Four
-unpacked archives sit outside the repo in `transport-assets-inbox/`. They were read on 2026-11-04 (#247).
-Nothing from them is in the repo or the data store. Every file, including the members of the two zips, was
-compared by SHA-256.
+The user built prototypes and asset labs in ChatGPT sites (25–29 Oct 2026) before this repo existed. Six
+unpacked archives sit outside the repo in `transport-assets-inbox/`: four labs, and two T3 archives the user
+added on 2026-11-04. They were read on 2026-11-04 (#247). Nothing from them is in the repo or the data store.
+Every file, including the members of the nested zips, was compared by SHA-256.
 
 ## The archives and which copy is current
 
@@ -13,6 +13,8 @@ compared by SHA-256.
 | `prague-street-assets-lab/` | 40, 15 MB | street furniture lab of 28 Oct: procedural furniture, shelters, traction poles, converted IPR GLBs, a viewer | **current** for furniture |
 | `ipr-models-review/` | 28, 8.5 MB | IPR models and LOD scripts | duplicate: all 28 files are byte-identical to `prague-street-assets-lab/ipr-models-review.zip` and to the same 28 files in that lab |
 | `prague-vehicle-and-pedestrian-integration-handoff/` | 45, 6.5 MB | handoff of 29 Oct: a patch of the old prototype, its bridge and tests, the T3 source zip, cabin metadata | current only for the patch, the bridge (`overlay/src/`) and its tests |
+| `tatra_t3-SimonStrikesBack/` | 3, 7.4 MB | SimonStrikesBack's T3 as downloaded from Sketchfab (glTF + bin), CC BY 4.0 | the source of the hybrid's base |
+| `tatra-t3-simplified/` | 8, 3.3 MB | a first simplification of that model, from before the hybrid work: two GLBs | the CC BY versions before the hybrid |
 
 Duplicates inside the handoff:
 
@@ -58,6 +60,20 @@ read from the GLBs and agree with the labs' catalogs.
 
 For comparison, the game's detailed T3 today is conflig's model alone (`assets/t3/`, CC BY-NC 4.0 in
 `ASSETS.md`): 19,886 triangles, 36 meshes, one 2048 px texture, one clip.
+
+**The CC BY versions** (`tatra_t3-SimonStrikesBack/`, `tatra-t3-simplified/`). The hybrid's first 25
+materials are this model's own.
+
+| file | triangles | what |
+|---|---|---|
+| `scene.gltf` + `scene.bin`, 7.38 MB | 206,364; 223 meshes, 384 nodes, 25 materials | the original as downloaded. No textures, no rig, no clips |
+| `tatra-t3-balanced.glb`, 1.56 MB | 64,188 | the 24 seat-frame tubes 6,524 → 600 triangles each (meshoptimizer); every other mesh, node and material unchanged; Khronos validator 0 errors |
+| `tatra-t3-light.glb`, 1.55 MB | 54,588 | the same with 200 triangles per tube |
+
+- **Parts:** the model has its own pantograph, mirrors, headlights, 8 wheels, doors and 24 seats as separate nodes, and number signs "6900" and "26".
+- **Axes:** the length lies along X, but the origin is off the body: Y −0.74 to 4.89, Z −3.71 to −1.12. It needs recentring onto the rail plane, as the hybrid did.
+- **Licence:** CC BY 4.0, both the original and the simplified versions (their `ATTRIBUTION.txt`: keep the credit, the licence link and the note that the geometry was simplified).
+- **Still missing:** the "earlier CC BY-only version" with a rig, which the hybrid's README mentions, is not among these files either.
 
 ### Cars, vans and trucks (`dist/traffic/assets/`, `catalog.json` 0.2.0)
 
@@ -165,11 +181,11 @@ over 20 ms in 5,031 frames. Its tests (`tests/*.mjs`) need Node and `@napi-rs/ca
 
 | package | replaces / extends | integration needs | gap to the repo's rules |
 |---|---|---|---|
-| T3 model | `src/models.js`: `loadDetailedT3` (conflig glTF) and `makeT3` (procedural fallback); `placeConsist`. AI trams through `makeT3` (`src/traffic.js` ≈ l. 1547) | **Axes:** a −90° turn. **Bogies:** pivot spacing from a source fact (`data/truth.json`), not three different numbers. **Mechanisms from game state:** doors from `game.js` (#246's DVEŘE I/II), the collector at the catenary height (#71), brakes and indicators. **Cards** through the controller, in place of `setConsistLine`'s boxes. **LOD:** a lighter level for AI trams (none exists: 262 meshes per car). **Performance:** the frame time on line 17 before and after, a headed run (headless draws once a second, #205) | the licence (Q1); an `ASSETS.md` row; 2.9 MB: git (as `assets/t3/` today) or the store (DATA.md has no class for runtime assets) |
+| T3 model | `src/models.js`: `loadDetailedT3` (conflig glTF) and `makeT3` (procedural fallback); `placeConsist`. AI trams through `makeT3` (`src/traffic.js` ≈ l. 1547) | **Axes:** a −90° turn. **Bogies:** pivot spacing from a source fact (`data/truth.json`), not three different numbers. **Mechanisms from game state:** doors from `game.js` (#246's DVEŘE I/II), the collector at the catenary height (#71), brakes and indicators. **Cards** through the controller, in place of `setConsistLine`'s boxes. **LOD:** a lighter level for AI trams (none exists: 262 meshes per car). **Performance:** the frame time on line 17 before and after, a headed run (headless draws once a second, #205) | CC BY-NC, accepted (Q1); an `ASSETS.md` row; 2.9 MB: git (as `assets/t3/` today) or the store (DATA.md has no class for runtime assets) |
 | passengers and boarding | `src/game.js`: passengers are counts (`tram.passengers`, `st.waiting`, a flow per door); only runners are figures (`makePerson`) | the Three-free core behind the counts; the cabin layout needs the hybrid T3 (hash-bound); the people need the pedestrian rig; doors per #246; demand from `demandAt`; figures only near our tram | the Node tests become Python + Playwright tests (`tools/test_*.py`); randomness from `src/random.js` |
-| street vehicles | `src/traffic.js`: `makeCar` (3 boxes + 4 wheels, +Z), `MAX_CARS` 30, `CAR_HALF` 2.2 m; parked-car obstacles in `game.js` | **Axes:** a −90° turn. **Lengths:** half length and width per type in the traffic rules, redone on today's `traffic.js`. **Detail:** near and far meshes, the far ones instanced. Plates; brake lamps. **Checks:** u3, redruns, traffic and lint with `--compare` | the recipe is Node (`prepare-traffic-assets.mjs`): take the GLBs as prepared assets, or port the recipe (the 2026-10-29 decision allows no Node toolchain yet); the asset licence (Q3) |
+| street vehicles | `src/traffic.js`: `makeCar` (3 boxes + 4 wheels, +Z), `MAX_CARS` 30, `CAR_HALF` 2.2 m; parked-car obstacles in `game.js` | **Axes:** a −90° turn. **Lengths:** half length and width per type in the traffic rules, redone on today's `traffic.js`. **Detail:** near and far meshes, the far ones instanced. Plates; brake lamps. **Checks:** u3, redruns, traffic and lint with `--compare` | the recipe is Node (`prepare-traffic-assets.mjs`): take the GLBs as prepared assets, or port the recipe (the 2026-10-29 decision allows no Node toolchain yet); own work, GPL-3.0 (Q3) |
 | pedestrians | `src/traffic.js` walkers: one `InstancedMesh` of boxes, `MAX_WALKERS` 90, no animation. `game.js` stop crowds (`makeCrowd(120)`), runners, the driver, obstacle pedestrians | skinned near people (a clone and a mixer each), far people instanced. Walk phase from distance (the catalog's stride). The ground lookup under cars and walkers is already 23 % of a seeded run (#245) | the same as the vehicles; the user's art review comes first (A02 open) |
-| street furniture | `game.js` `makeShelter` (glass box, where OSM tags a shelter); `world.js` catenary poles (an instanced 7.4 m cylinder) and wall rosettes. No benches, bins, bollards or railings | placement from a feature layer (#14: OSM tags, DTM points; `tools/dtm_points.py` reads poles and lights, not benches). One geometry per type and level, instanced. Distance bands rather than a `THREE.LOD` per object (#31). The pole type per place from a source | IPR rights (Q2); the converted GLBs (7–57k triangles each) stay references |
+| street furniture | `game.js` `makeShelter` (glass box, where OSM tags a shelter); `world.js` catenary poles (an instanced 7.4 m cylinder) and wall rosettes. No benches, bins, bollards or railings | placement from a feature layer (#14: OSM tags, DTM points; `tools/dtm_points.py` reads poles and lights, not benches). One geometry per type and level, instanced. Distance bands rather than a `THREE.LOD` per object (#31). The pole type per place from a source | IPR's answer (Q2): the IPR-based studies are development only, out of git and the deploy; the made-up models ship. The converted GLBs (7–57k triangles each) stay references |
 
 The patch itself does not apply: `src/traffic.js` has had 9 commits since 2026-10-24 (e.g. #100, #123,
 #152, #154), `src/main.js` and `index.html` 22, and #220 (PR #231) has the car slots open. Two of its ideas
@@ -180,36 +196,44 @@ simulation's state (#228).
 
 | asset | licence | allows | needs |
 |---|---|---|---|
-| hybrid T3: GLB, textures, `rig.json` | CC BY-NC 4.0 (combined) | copy, adapt and share; **non-commercial only** | both credits, licence links, the modification notice |
-| SimonStrikesBack's T3 (Sketchfab `2c08e2e3…`) | CC BY 4.0 | any use, including commercial | the credit; not in the archives as a file of its own |
+| hybrid T3: GLB, textures, `rig.json` | CC BY-NC 4.0 (combined) | copy, adapt and share; **non-commercial only** | both credits, licence links, the modification notice; accepted (Q1) |
+| SimonStrikesBack's T3 (Sketchfab `2c08e2e3…`): `tatra_t3-SimonStrikesBack/`, `tatra-t3-simplified/` | CC BY 4.0 | any use, including commercial | the credit, the licence link, a note of the changes |
 | conflig's T3 (Sketchfab `76aa08d7…`), already `assets/t3/` | CC BY-NC 4.0 | non-commercial | in `ASSETS.md` |
-| 13 car, van, truck and person GLBs, `catalog.json` | the project's own work (the catalog: "original parametric study assets … for this project") | what the project chooses | an own-asset licence (Q3) |
+| 13 car, van, truck and person GLBs, `catalog.json`; the older made-up furniture (`assets.js`) | the project's own work, made by agents (the catalog: "original parametric study assets … for this project") | **GPL-3.0**, like the code (Q3) | an `ASSETS.md` entry when it enters the repo |
 | lab code: presentation, passenger core, `t3-controller.js`, furniture factories, the patch | the project's own work, no licence stated | GPL-3.0 once in the repo | — |
-| converted IPR furniture GLBs | **none stated** in IPR's archive or on iprpraha.cz/mobiliar. The page names the design's author, Olgoj Chorchoj (with Aleš Kachlík), and says the City of Prague holds the licence | unknown | Q2 |
-| procedural furniture and shelters | own code; the shapes follow IPR's catalogue designs | unknown for the shapes | Q2 |
+| converted IPR furniture GLBs | **none stated.** Neither IPR's archive nor its pages (iprpraha.cz/mobiliar, /stranka/3413/3d-vykresy-mobiliare) give terms. The first names the design's author, Olgoj Chorchoj (with Aleš Kachlík), and says the City of Prague holds the licence | unknown: the user asks IPR (Q2) | references only |
+| procedural furniture and shelters after IPR's drawings | own code; the shapes follow IPR's designs | unknown for the shapes (Q2) | development only until IPR answers |
 | three.js r160, GLTFExporter, SkeletonUtils, OrbitControls | MIT | any use | not needed (the game loads r160) |
 | `sor-nb12-reference.jpg` | unknown (a user-supplied plan) | — | stays out |
 | DPMB T3 110, DPP NB12 88, SOR NB12 dimensions | facts | cite them | `data/truth.json` when used |
 
-### Questions for the user
+### The user's answers (Claude Code session, 2026-11-04)
 
-- **Q1, the hybrid T3's CC BY-NC parts.** The game already ships a CC BY-NC T3 (conflig's), and the procedural model is the one without restrictions.
-  - (a) Accept non-commercial: the hybrid replaces conflig's model with the same restriction.
-  - (b) CC BY only: start from SimonStrikesBack's base and rebuild the collector, mirror arm, route-plate support and lamps as our own work. The CC BY-only rig is not in the archives: do you still have it?
-  - (c) (a) now, and (b) as a later issue.
-- **Q2, IPR furniture rights.** Neither the archive nor IPR's page states reuse terms. The design is Olgoj Chorchoj's, licensed to the City.
-  - (a) Ask IPR (or the City) for permission to ship the converted models and the procedural studies.
-  - (b) Use only the procedural studies, after the published catalogue: the question about the design remains.
-  - (c) Keep both out until answered.
-  - Do the poles and wall anchors fall under it too? They follow IPR's tramway standard, not the furniture design.
-- **Q3, the licence of the project's own assets** (the 13 GLBs; #72 left it open):
-  - GPL-3.0, like the procedural models in `src/models.js`;
-  - or CC BY-SA 4.0 or CC BY-NC-SA 4.0, as the 2026-10-29 decision suggests.
+- **Q1, the hybrid T3's CC BY-NC parts: accepted.** "I would start with option a since we already use the original model and accepted that game source is openly licensed while assets have each their own license and so far there's no plan to ship this game commercially. If we manage to rebuild the model cleanly then I would attempt it, but that's a backlog issue."
+  - #248 brings in the hybrid as CC BY-NC 4.0.
+  - The clean CC BY version is #254 (Backlog), from the two CC BY archives the user added.
+- **Q2, IPR furniture: the user asks IPR.** The user sourced the models and drawings "mostly here https://iprpraha.cz/stranka/3413/3d-vykresy-mobiliare plus some other public IPR documents". The user "would like to keep the simplified models for development work". The older made-up models "can be stored for eventual use but those would be eventually replaced with more realistic representation".
+  - The IPR-based studies (the procedural factories and shelters) stay out of git and the deploy until IPR answers. The repo is public; the test site is password-protected but still a distribution.
+  - The older made-up furniture (`assets.js`) is own work (GPL-3.0) and can serve as the placeholder that ships.
+  - The converted IPR GLBs stay references.
+- **Q3, own assets: GPL-3.0.** "for the project's own models, made by chatgpt agent, I will choose the same as source, GPL 3.0."
+
+### A model built from IPR's technical drawings
+
+The user asked what licence impact a model made from the drawings has. This is not legal advice; the facts
+for IPR's answer are these:
+
+- **Two things can be protected:**
+  - **the drawing and CAD files themselves.** A model we build ourselves from them, rather than converting the `.3dm` files, copies none of the files. Their terms then do not reach it.
+  - **the furniture's design.** Czech copyright protects a work of applied art that is "the unique result of the author's creative activity" (Act 121/2000 Sb., § 2(1)); a registered design can protect a shape too. A faithful 3D model reproduces the design however it was built. So building it ourselves does not settle this part.
+- **The public-space exception** (§ 33(1)) lets anyone depict a work that stands permanently in a street, "by drawing, painting, photography, film" or otherwise, and use that depiction. § 33(2) excludes making or distributing a three-dimensional copy. Whether a game's 3D model is such a copy, or a depiction like a drawing, is not settled.
+- **So one question to IPR covers both:** may the project redistribute 3D models of the Prague furniture, converted or redrawn, in a free (GPL / CC) game? The City holds a "time- and territory-unlimited" licence from the designers (iprpraha.cz/mobiliar). Whether it may grant that to third parties is IPR's to say.
+- **Generic furniture** (a bench, a bin, not the Prague design) needs no permission. That is what the made-up models are.
 
 ## Work packages, in the suggested order
 
-1. **#250, street vehicles** (part of #66). No third-party licence (only Q3), and the user accepted their appearance. It adds the frame-time bench the others reuse. It goes after #220 (PR #231) and #168 (PR #186), which change `src/traffic.js`.
-2. **#248, the T3 model** (part of #68), once Q1 is answered. It works in `src/models.js`, apart from #221's `src/tram.js`, and needs a lighter level for AI trams.
+1. **#250, street vehicles** (part of #66). No third-party licence (own work, GPL-3.0), and the user accepted their appearance. It adds the frame-time bench the others reuse. It goes after #220 (PR #231) and #168 (PR #186), which change `src/traffic.js`.
+2. **#248, the T3 model** (part of #68), as CC BY-NC (Q1). It works in `src/models.js`, apart from #221's `src/tram.js`, and needs a lighter level for AI trams. The clean CC BY version is #254 (Backlog), after #248.
 3. **#251, pedestrians** (part of #66), after the user's art review and #245.
 4. **#249, passengers and boarding** (part of #68). It needs #248 (the hash-bound cabin layout), #251 (the rig) and #246's doors.
-5. **#252, street furniture** (part of #67), after Q2 and the feature layer (#14).
+5. **#252, street furniture** (part of #67), after the feature layer (#14). It ships the made-up models; the IPR-based ones are development only until IPR answers.
