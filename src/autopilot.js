@@ -81,6 +81,16 @@ export class Autopilot {
       vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0));
       if (d < 1) vt = 0;
     }
+    // drive only if still under the plan 2.5 s on: a careful driver coasts into a braking curve (on the T3
+    // the brake builds slowly within ≈2.5 s of driving; it drove up to 16.5 km/h 11 m before Ruská and
+    // overran, line 22 seed 4, #241's check)
+    const look = Math.max(0, tr.v) * 2.5;
+    let vtDrive = vt;
+    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12 - look)) - 0.3);
+    if (stopAt !== null) {
+      const d = stopAt - tr.s;
+      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
+    }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
     // IRC: select the route direction for radio switches in range
@@ -122,10 +132,12 @@ export class Autopilot {
     // the force wanted: acceleration plus gravity on the gradient and the running resistance; the vehicle's
     // equipment works its own controls for it (the T3's pedals: src/tr37.js autoDrive)
     const grade = g.profile.grade(tr.s - 7);
-    const aWant = Math.max(-1.1, Math.min(1.0, (vt - tr.v) * 0.9));
+    // (between the drive plan and the brake plan: coast)
+    const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
+    const aWant = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + 650 * tr.cars + 4.2 * tr.v * tr.v;
     const stand = g.doorState !== 'closed' || vt <= 0.05;
-    const coast = Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000;
+    const coast = between || (Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
     // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
     const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
     // a turn under a contact while braking: the switch button draws the current, the drive pedal stays off
