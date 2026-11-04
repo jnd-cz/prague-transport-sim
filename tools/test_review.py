@@ -46,11 +46,14 @@ HEIGHT_COMPACT = {'snapshot':'test','span_file':'test-spans.json',
                   'findings':[{k:v for k,v in f.items() if k!='spans'} for f in HEIGHT['findings']]}
 
 
-def png(w, h, rgb):
-    """A plain w×h PNG of one colour (the orthophoto as the mocked service sends it)."""
+def png(w, h, rgb, stripe=None):
+    """A w×h PNG of one colour, with dark 3 px columns every `stripe` px (the orthophoto as the mocked
+    service sends it: the columns stand for rails)."""
     def chunk(t, d):
         return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
-    raw = b"".join(b"\0" + bytes(rgb) * w for _ in range(h))
+    dark = bytes(c // 3 for c in rgb)
+    row = b"".join(dark if stripe and x % stripe < 3 else bytes(rgb) for x in range(w))
+    raw = b"".join(b"\0" + row for _ in range(h))
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 
 
@@ -116,7 +119,7 @@ def main():
             errors, ortho = [], []
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.route("https://gs-pub.praha.eu/**", lambda q: (ortho.append(q.request.url), q.fulfill(
-                status=200, content_type="image/png", headers={"Access-Control-Allow-Origin": "*"}, body=png(64, 64, (200, 40, 40)))))
+                status=200, content_type="image/png", headers={"Access-Control-Allow-Origin": "*"}, body=png(1500, 1500, (150, 150, 140), 100))))
             r["ortho"] = page.evaluate("""async () => {
               const R = window.review, wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((ok) => setTimeout(ok, 100)); return f(); };
               R.T.x = 12; R.T.y = -40; R._render();
@@ -132,8 +135,16 @@ def main():
               const p = R.orthoMesh.geometry.attributes.position.array, b = R.orthoUrl.match(/bbox=([^&]+)/)[1].split(',').map(Number);
               let nan = 0; for (let i = 1; i < p.length; i += 3) if (!Number.isFinite(p[i])) nan++;
               const near = { box: b[2] - b[0], nan, classes: R.layers.classes };
+              // the look: contrast, then lines (a stripe at x 100–102 of the 1500 px image, plain paving at x 150)
+              const px = (x) => [...R.orthoMesh.material.map.image.getContext('2d').getImageData(x, 750, 1, 1).data].slice(0, 3);
+              document.querySelector('[data-look="contrast"]').click();
+              const contrast = { canvas: R.orthoMesh.material.map.isCanvasTexture === true, line: px(101), plain: px(150) };
+              document.querySelector('[data-look="lines"]').click();
+              const lines = { line: px(101), plain: px(150), maps: Object.keys(R.orthoMaps).sort().join() };
+              document.querySelector('[data-look="contrast"]').click(); document.querySelector('[data-look="lines"]').click();
+              const back = R.orthoMesh.material.map === R.orthoMaps['00'];
               R.dist = dist; R._render();
-              return { loaded: !!loaded, w: first?.material.map.image.width, url, near, credit, shown,
+              return { loaded: !!loaded, w: first?.material.map.image.width, url, near, contrast, lines, back, credit, shown,
                        overPanel: c.bottom > panel.top && c.right > panel.left,
                        sources: R.sourceLines?.geometry.attributes.position.count || 0, tracks: (R.data.tracks || []).length };
             }""")
@@ -266,7 +277,12 @@ def main():
     o, od = r["ortho"], r["orthoDown"]
     origin = (-742806.0, -1043024.0)  # (data/line17.json frame; the request's box is centred on the 50 m cell of x 12, y -40)
     want = f"bbox={origin[0] + 0 - 75:.1f},{origin[1] - 50 - 75:.1f},{origin[0] + 0 + 75:.1f},{origin[1] - 50 + 75:.1f}&bboxSR=5514"
-    if not o["loaded"] or o["w"] != 64:
+    c, ln = o["contrast"], o["lines"]
+    if not c["canvas"] or c["line"][0] >= 60:
+        fails.append(f"orthophoto contrast: no processed image, or the dark stripe not kept dark: {c}")
+    if not (ln["line"][2] > ln["line"][0] + 80 and abs(ln["plain"][2] - ln["plain"][0]) < 40) or ln["maps"] != "00,10,11" or not o["back"]:
+        fails.append(f"orthophoto lines: the stripe not cyan, the paving tinted, or the looks not kept per image: {ln}, back {o['back']}")
+    if not o["loaded"] or o["w"] != 1500:
         fails.append(f"orthophoto layer: no image draped from the service: {o}")
     if args.line == "17" and want not in (o["url"] or ""):
         fails.append(f"orthophoto request is not the 150 m box around the target's cell: {o['url']} (wanted {want})")
