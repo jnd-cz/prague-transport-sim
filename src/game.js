@@ -353,7 +353,9 @@ export class Game {
             d.s = Math.max(d.s, Math.min(st.target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
             // (and the front stops for the passengers no further than that: the crossing began 4 m before
             // the platform's end at Staroměstská, the tram served the stop 3 m past its red stop point)
-            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], st.target + 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
+            // (served up to 0.5 m before the signal, 2.5 m past the stop point: 0.5 m was too little to stop a T3
+            // in, the user, #255)
+            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
           }
         }
       }
