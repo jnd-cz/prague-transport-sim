@@ -895,10 +895,13 @@ export class Traffic {
     // back off in this model. After 30 s it leaves (fades out, as at the edge of the traffic area).
     // Rules that kept the tram short of such crossings, or cars off the track, moved the cycle elsewhere
     // (line 22 s 12619 seed 3; 10 new stuck runs over 5 lines x 5 seeds; #154)
+    // The same with an AI tram ahead of ours in the tram's place: it stopped for the car on the track,
+    // which waited for that tram (line 9 seed 4 s 7581, line 23 seed 5 s 7693: 7200 s jams, #259).
+    const fronts = [tram, ...this.ahead].filter((t) => t.v < 0.3).map((t) => t.s);
     for (const x of crossing) {
       const a = x.car;
       let ends = false;
-      if (x.onTrack && tram.v < 0.3 && x.s > tram.s && x.s - tram.s < 15 && (a.vNow ?? 0) < 0.3) {
+      if (x.onTrack && fronts.some((f) => x.s > f && x.s - f < 15) && (a.vNow ?? 0) < 0.3) {
         for (let o = a, n = 0; o && n < 6; n++) {
           const sn = o.seen;
           if (!sn || (o.vNow ?? 0) > 0.3) break;
