@@ -1597,7 +1597,8 @@ export class Traffic {
         else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
       }
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
-      if (other && other.s - other.length - 6 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 6;
+      // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 6 m kept two 2-car sets off long platforms, #258)
+      if (other && other.s - other.length - 2 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 2;
       // a car on the track ahead (along it, or crossing it: it gives way to our tram only)
       for (const c of g.carsOnTrack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       for (const c of g.carsCrossing || []) if (c.s > t.s && c.s - 6 < (stopAt ?? Infinity)) stopAt = c.s - 6;
@@ -1656,7 +1657,7 @@ export class Traffic {
       const isStop = stopAt !== null;
       for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       // keep a distance to the oncoming tram in front
-      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 6 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 6;
+      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 2 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 2;
       // junction signals: the opposite direction has GO together with our straight phase; a tram
       // that can still stop comfortably when its GO starts blinking (or is red) waits at its stop
       // line, and keeps waiting for that signal until it shows GO again. One that cannot is in the
