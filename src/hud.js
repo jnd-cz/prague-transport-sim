@@ -101,7 +101,8 @@ const LAMPS = [
 export class Hud {
   constructor() {
     this.speed = makeGauge($('g-speed'), { size: 160, min: 0, max: 80, major: 10, minor: 5, label: 'km/h', unit: 'TATRA', redFrom: 65 });
-    this.amp = makeGauge($('g-amp'), { size: 76, min: -400, max: 600, major: 200, minor: 100, label: 'A', unit: '', fmt: (v) => (v === 0 ? '0' : v / 100) });
+    // the T3's ammeter reads 0–600 A for drive and brake alike (the user saw only a positive scale in the cab, #221)
+    this.amp = makeGauge($('g-amp'), { size: 76, min: 0, max: 600, major: 200, minor: 100, label: 'A', unit: '', fmt: (v) => (v === 0 ? '0' : v / 100) });
     this.volt = makeGauge($('g-volt'), { size: 76, min: 0, max: 800, major: 200, minor: 100, label: 'V', unit: '', fmt: (v) => v / 100 });
     const notch = $('notch');
     this.pedals = document.createElement('canvas');
@@ -136,7 +137,7 @@ export class Hud {
     const tram = game.tram;
     this.speed.set(tram.kmh);
     this.speed.marker(game.currentLimit);
-    this.amp.set(tram.current);
+    this.amp.set(Math.abs(tram.current));
     this.volt.set(tram.voltage);
     if (tram.eq.kind === 'pedals') drawPedals(this.pedals, tram.eq, TR37_SPEC);
     const lamps = tram.eq.lamps;
