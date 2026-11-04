@@ -18,10 +18,12 @@ Needs Playwright (`python -m pip install --user playwright`, `python -m playwrig
 Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
 any job; an occupied port fails. --url explicitly uses an existing server. WebGL runs on
 SwiftShader (software): slower than a desktop browser, the same results (the checks step the
-simulation themselves). --jobs N runs N pages at once, each in a worker process with its own
-browser (default: half the cores, at most 4, and
-what free memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded in
-its own fresh page, so the counts are the same as one after another.
+simulation themselves). --batch N (default 6) runs up to N checks of one line one after another in one
+loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
+counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). --jobs N runs N pages
+at once, each in a worker process with its own browser (default: half the cores, at most 4, and what free
+memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded, so the counts are the same as
+one after another.
 
 Baseline (#89): `--baseline` stores each run's key counts in reports/baseline/headless.json (committed),
 with what they were measured on (the git trees of the game, the in-page checks, the data manifest and
@@ -40,7 +42,9 @@ signal penalties, a traffic run that does not finish) are compared per seed as b
 """
 import argparse
 import json
+import multiprocessing
 import os
+import queue
 import secrets
 import subprocess
 import sys
@@ -435,22 +439,67 @@ ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-
         "--disable-backgrounding-occluded-windows"]
 
 
-def worker(job, url, headed, timeout):
-    """One job in a worker process, with a browser of its own (sync Playwright is one per process)."""
-    line, check, seed = job
+def worker(jobs, url, headed, timeout, done=None):
+    """A batch of one line's jobs in a worker process, with a browser of its own (sync Playwright is one per
+    process): one page load for all of them, the next shift started in the same page (#205: the load is ~60 s
+    of a ~145 s run). A run that fails or times out leaves the page; the rest of the batch gets a fresh one.
+    Each result also goes to the queue `done` as it comes, for the progress lines."""
+    out = []
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed, args=ARGS)
         try:
-            r, secs = run_one(browser, url, line, check, seed, timeout)
+            page = None
+            for line, check, seed in jobs:
+                if page is None:
+                    page, errors, load = load_page(browser, url, line, timeout)
+                r, secs = run_one(page, errors, check, seed, timeout, load)
+                load = 0
+                out.append(((line, check, seed), r, secs))
+                if done is not None:
+                    done.put(out[-1])
+                if r.get("error") or r.get("pageErrors"):
+                    page.close()
+                    page = None
+            if page is not None:
+                page.close()
         finally:
             browser.close()
-    return job, r, secs
+    return out
 
 
-def run_one(browser, url, line, check, seed, timeout):
+def load_page(browser, url, line, timeout):
+    """A page with the line loaded: (page, its page errors, seconds or an error)."""
     page = browser.new_page(viewport={"width": 960, "height": 540})
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
+    t0 = time.monotonic()
+    try:
+        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=min(120_000, timeout * 1000))
+        # loaded: the loading screen is hidden and the title names the line (as batch.html waits)
+        page.wait_for_function(
+            f"() => document.getElementById('loading')?.classList.contains('hidden') && document.title.includes('{line}')",
+            timeout=max(1, min(600_000, (timeout - (time.monotonic() - t0)) * 1000)), polling=1000)
+    except PlaywrightTimeoutError:
+        return page, errors, {"error": "timeout"}
+    except Exception as e:  # noqa: BLE001 (a failed load is a result)
+        return page, errors, {"error": f"{type(e).__name__}: {e}"}
+    return page, errors, round(time.monotonic() - t0)
+
+
+def run_single(browser, url, line, check, seed, timeout):
+    """One run in a fresh page, closed after it."""
+    page, errors, load = load_page(browser, url, line, timeout)
+    try:
+        return run_one(page, errors, check, seed, timeout, load)
+    finally:
+        page.close()
+
+
+def run_one(page, errors, check, seed, timeout, load=0):
+    """One check in a loaded page; its seconds include the page load when it is the first in the page."""
+    if isinstance(load, dict):
+        return dict(load, **({"pageErrors": errors[:20]} if errors else {})), 0
+    errors.clear()
     t0 = time.monotonic()
 
     def remaining(cap):
@@ -460,11 +509,6 @@ def run_one(browser, url, line, check, seed, timeout):
         return min(cap, ms)
 
     try:
-        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=remaining(120_000))
-        # loaded: the loading screen is hidden and the title names the line (as batch.html waits)
-        page.wait_for_function(
-            f"() => document.getElementById('loading')?.classList.contains('hidden') && document.title.includes('{line}')",
-            timeout=remaining(600_000), polling=1000)
         js = CALLS[check].replace("SEED", str(seed))
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
@@ -482,11 +526,9 @@ def run_one(browser, url, line, check, seed, timeout):
         r = {"error": "timeout"}
     except Exception as e:  # noqa: BLE001 (a failed run is a result)
         r = {"error": f"{type(e).__name__}: {e}"}
-    finally:
-        page.close()
     if errors:
         r["pageErrors"] = errors[:20]
-    return r, round(time.monotonic() - t0)
+    return r, round(time.monotonic() - t0) + load
 
 
 def main():
@@ -500,6 +542,8 @@ def main():
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
     ap.add_argument("--jobs", type=int, default=workers(4.0),
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
+    ap.add_argument("--batch", type=int, default=6,
+                    help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
     ap.add_argument("--baseline", action="store_true",
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
@@ -546,14 +590,32 @@ def main():
     try:
         heavy.__enter__()
         os.makedirs(a.out, exist_ok=True)
-        if a.jobs > 1 and len(jobs) > 1:
-            with ProcessPoolExecutor(min(a.jobs, len(jobs))) as ex:
-                futs = [ex.submit(worker, job, url, a.headed, a.timeout) for job in jobs]
-                for i, fu in enumerate(as_completed(futs), 1):
-                    report(i, *fu.result())
+        # (batches of one line's runs, each in one page; the longest lines' batches first)
+        batches = []
+        for line in lines:
+            mine = [j for j in jobs if j[0] == line]
+            batches += [mine[k:k + max(1, a.batch)] for k in range(0, len(mine), max(1, a.batch))]
+        i = 0
+        if a.jobs > 1 and len(batches) > 1:
+            with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
+                done = mgr.Queue()
+                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done) for b in batches]
+                while i < len(jobs):
+                    try:
+                        res = done.get(timeout=5)
+                    except queue.Empty:
+                        if all(fu.done() for fu in futs):
+                            for fu in futs:
+                                fu.result()  # (a worker that failed outside a run)
+                            break
+                        continue
+                    i += 1
+                    report(i, *res)
         else:
-            for i, job in enumerate(jobs, 1):
-                report(i, *worker(job, url, a.headed, a.timeout))
+            for b in batches:
+                for res in worker(b, url, a.headed, a.timeout):
+                    i += 1
+                    report(i, *res)
     finally:
         heavy.__exit__()
         if server:

@@ -14,7 +14,9 @@ export async function run(seed = 1, opts = {}) {
   window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
   const $ = (id) => document.getElementById(id);
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
-  $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal';
+  // (nothing from the real weather: the menu's default temperature is today's Prague forecast, which sets
+  // the autopilot's heaters and flap, #205; autumn as tools/traffic_lint.js)
+  $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
   $('btnStart').click();
   window.headless = true;
   const { Autopilot } = await import('/src/autopilot.js');
