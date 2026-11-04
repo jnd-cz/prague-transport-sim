@@ -522,6 +522,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
+  ground.dtm?.seal(); // (the survey's heights are final from here: its lookups from typed arrays, #244, #245)
   if (ground.dtm) buildDtm(group, ground);
   await mark('DTM streets');
 
@@ -1036,7 +1037,11 @@ function flushDtm(ground) {
     for (const tri of a.mesh) for (const p of tri) { pts.push(p); inBed(a, p); }
     for (const r of [a.ring, ...a.holes]) for (const p of r) { pts.push(p); inBed(a, p); }
   }
+  // (nothing moves until every row is measured: meanwhile the survey is read from typed arrays, as in the
+  // simulation (DtmSurface.seal), and they are dropped before the vertices move, #244)
+  dtm.grid.seal(); dtm.deckGrid.seal();
   for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) srow(Math.round(n.s / 2)); } // (rows and their neighbours, before anything moves)
+  dtm.grid.flat = dtm.deckGrid.flat = null;
   for (const p of pts) shift(p);
   for (const a of dtm.areas) {
     if (a.l !== 0 || !(FLUSH.has(a.c) || a.c === 'green')) continue;
@@ -1264,8 +1269,18 @@ function fitDtmToMouths(dtm, mouths) {
   dtm.mouthsFitted = true;
   const seen = new Set();
   let n = 0;
+  // (each mouth's reach as a box in plan; an area whose outline lies outside every box has no vertex to bring
+  // down: the millions of others were tested against every mouth, #244)
+  const boxes = mouths.map((m) => {
+    const xs = [], ys = [], l = m.w + 1.5;
+    for (const d of [-3, m.D]) for (const t of [-l, l]) { xs.push(m.p[0] + d * m.hx + t * m.nx); ys.push(m.p[1] + d * m.hy + t * m.ny); }
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  });
   for (const a of dtm.areas) {
     if (a.l !== 0 || !MOUTH_FIT.has(a.c)) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of a.ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    if (!boxes.some((b) => x0 <= b[2] + 1e-6 && x1 >= b[0] - 1e-6 && y0 <= b[3] + 1e-6 && y1 >= b[1] - 1e-6)) continue;
     for (const p of [...a.ring, ...a.holes.flat(), ...a.mesh.flat()]) {
       if (seen.has(p)) continue;
       seen.add(p);

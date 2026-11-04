@@ -850,6 +850,7 @@ export class DtmSurface {
   // their heights after the index is built, and lookups read them live until then): the triangles' terms
   // copied into typed arrays for the lookups of the simulation (#245: _hitTri was ~22 % of a seeded run).
   seal() {
+    if (this.sealed) return;
     this.grid.seal(); this.deckGrid.seal();
     this.sealed = true;
   }
