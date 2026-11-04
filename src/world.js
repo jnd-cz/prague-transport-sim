@@ -51,9 +51,9 @@ class SegmentIndex {
     const i0 = Math.floor((Math.min(a[0], b[0]) - seg[4]) / c), i1 = Math.floor((Math.max(a[0], b[0]) + seg[4]) / c);
     const j0 = Math.floor((Math.min(a[1], b[1]) - seg[4]) / c), j1 = Math.floor((Math.max(a[1], b[1]) + seg[4]) / c);
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-      const k = `${i},${j}`;
-      if (!this.map.has(k)) this.map.set(k, []);
-      this.map.get(k).push(seg);
+      const k = i * 65536 + j; // (a number, not "i,j": #205)
+      const arr = this.map.get(k);
+      if (arr) arr.push(seg); else this.map.set(k, [seg]);
     }
   }
   addLine(line, w = 0) { for (let i = 1; i < line.length; i++) this.add(line[i - 1], line[i], w); }
@@ -62,7 +62,7 @@ class SegmentIndex {
     const c = this.cell, ci = Math.floor(x / c), cj = Math.floor(y / c);
     let best = Infinity;
     for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-      const arr = this.map.get(`${i},${j}`);
+      const arr = this.map.get(i * 65536 + j);
       if (!arr) continue;
       for (const [ax, ay, bx, by, hw] of arr) {
         const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
@@ -892,7 +892,13 @@ function lowerTerrainUnderDtm(dtm, T) {
   for (const a of dtm.areas) {
     if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
     for (const [p, q, r] of a.mesh) {
-      for (const [x, y, z] of [p, q, r, mid(p, q), mid(q, r), mid(r, p)]) lowerTerrainAt(T, x, y, z - 0.25);
+      // (the corners and edge midpoints, without an array each: millions at load, #205)
+      lowerTerrainAt(T, p[0], p[1], p[2] - 0.25);
+      lowerTerrainAt(T, q[0], q[1], q[2] - 0.25);
+      lowerTerrainAt(T, r[0], r[1], r[2] - 0.25);
+      lowerTerrainAt(T, (p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2 - 0.25);
+      lowerTerrainAt(T, (q[0] + r[0]) / 2, (q[1] + r[1]) / 2, (q[2] + r[2]) / 2 - 0.25);
+      lowerTerrainAt(T, (r[0] + p[0]) / 2, (r[1] + p[1]) / 2, (r[2] + p[2]) / 2 - 0.25);
     }
   }
 }

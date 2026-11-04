@@ -39,8 +39,11 @@ export class Grid {
     const excess = this.height(x, y) - zmax;
     if (excess <= 0 || excess > cap) return;
     const tx = fx - ix, ty = fy - iy;
-    const A = iy * this.nx + ix, B = A + 1, C = A + this.nx, D = C + 1;
-    for (const k of tx + ty <= 1 ? [A, B, C] : [D, C, B]) this.h[k] -= excess;
+    const A = iy * this.nx + ix, B = A + 1, C = A + this.nx;
+    if (tx + ty <= 1) this.h[A] -= excess;
+    else this.h[C + 1] -= excess;
+    this.h[B] -= excess;
+    this.h[C] -= excess;
   }
 }
 
@@ -61,6 +64,7 @@ export class Terrain extends Grid {
     for (const v of this.h) min = Math.min(min, v);
     this.min = min;
     this.fine = new Map(); // "bi,bj" -> Grid
+    this.fineIdx = new Map(); // bi * 65536 + bj -> the same Grid
     this.fineMeta = null;
   }
 
@@ -70,7 +74,9 @@ export class Terrain extends Grid {
     meta.blocks.forEach(([bi, bj], k) => {
       const h = new Float32Array(n * n);
       for (let i = 0; i < n * n; i++) h[i] = meta.base + q[k * n * n + i] * meta.scale;
-      this.fine.set(`${bi},${bj}`, Object.assign(new Grid(meta.x0 + bi * bs, meta.y0 - bj * bs, meta.step, -meta.step, n, n, h), { bi, bj }));
+      const g = Object.assign(new Grid(meta.x0 + bi * bs, meta.y0 - bj * bs, meta.step, -meta.step, n, n, h), { bi, bj });
+      this.fine.set(`${bi},${bj}`, g);
+      this.fineIdx.set(bi * 65536 + bj, g);
     });
     this.fineMeta = { ...meta, bs };
   }
@@ -78,7 +84,7 @@ export class Terrain extends Grid {
   fineAt(x, y) {
     const m = this.fineMeta;
     if (!m) return null;
-    return this.fine.get(`${Math.floor((x - m.x0) / m.bs)},${Math.floor((m.y0 - y) / m.bs)}`) || null;
+    return this.fineIdx.get(Math.floor((x - m.x0) / m.bs) * 65536 + Math.floor((m.y0 - y) / m.bs)) || null;
   }
 
   height(x, y) {
@@ -105,7 +111,14 @@ export class Terrain extends Grid {
   lowerAt(x, y, zmax, cap = Infinity) {
     const c = this.coarse();
     if (c.contains(x, y)) c.lowerAt(x, y, zmax, cap);
-    for (const g of this.finesAt(x, y)) g.lowerAt(x, y, zmax, Math.max(cap, 15));
+    const m = this.fineMeta;
+    if (!m) return;
+    // (as finesAt, inline: millions of calls under the streets at load, #205)
+    const bi = Math.floor((x - m.x0) / m.bs), bj = Math.floor((m.y0 - y) / m.bs), fcap = Math.max(cap, 15);
+    for (let i = bi - 1; i <= bi; i++) for (let j = bj - 1; j <= bj; j++) {
+      const g = this.fineIdx.get(i * 65536 + j);
+      if (g && g.contains(x, y)) g.lowerAt(x, y, zmax, fcap);
+    }
   }
 
   // the fine blocks whose area (edges included) holds (x, y): at most the four around a block corner,
