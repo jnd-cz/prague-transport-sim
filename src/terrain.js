@@ -842,7 +842,16 @@ export class DtmSurface {
       if (a.l >= 1 && DECK.has(a.c)) decks.add(tri, a.l, a.c);
     }
     grid.freeze(); decks.freeze();
+    if (this.sealed) { grid.seal(); decks.seal(); }
     this.grid = grid; this.deckGrid = decks;
+  }
+
+  // The load is done and the survey's vertices final (flushDtm, the deck moves and fitDtmToMouths change
+  // their heights after the index is built, and lookups read them live until then): the triangles' terms
+  // copied into typed arrays for the lookups of the simulation (#245: _hitTri was ~22 % of a seeded run).
+  seal() {
+    this.grid.seal(); this.deckGrid.seal();
+    this.sealed = true;
   }
   _hit(x, y) {
     const t = this._hitTri(x, y);
@@ -859,6 +868,23 @@ export class DtmSurface {
     // overlapping ground-level areas: the one closest to the lidar ground (or to `ref`), then by rank
     const g = ref ?? this.terrain.height(x, y);
     let best = -1, bestZ = 0, bestScore = Infinity;
+    const f = ix.flat;
+    if (f) {
+      // (sealed: the same terms from typed arrays, the same arithmetic in the same order; #245)
+      for (let n = ix.start[k], end = ix.start[k + 1]; n < end; n++) {
+        const id = ix.ids[n], o = id * 10, d = f[o + 9];
+        if (Math.abs(d) < 1e-9) continue;
+        const dx = x - f[o + 4], dy = y - f[o + 5];
+        const w1 = (f[o] * dx + f[o + 1] * dy) / d;
+        const w2 = (f[o + 2] * dx + f[o + 3] * dy) / d;
+        const w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        const z = w1 * f[o + 6] + w2 * f[o + 7] + w3 * f[o + 8];
+        const score = Math.abs(z - g) - ix.val[id] * 0.05;
+        if (score < bestScore) { best = id; bestZ = z; bestScore = score; }
+      }
+      return best < 0 ? null : { z: bestZ, c: ix.classOf(best) };
+    }
     for (let n = ix.start[k], end = ix.start[k + 1]; n < end; n++) {
       const id = ix.ids[n], t = ix.tris[id], p = t[0], q = t[1], r = t[2];
       const d = (q[1] - r[1]) * (p[0] - r[0]) + (r[0] - q[0]) * (p[1] - r[1]);
@@ -894,6 +920,25 @@ export class DtmSurface {
     const ix = this.deckGrid, k = ix.at(x, y);
     if (k < 0) return null;
     let best = null, score = Infinity;
+    const f = ix.flat;
+    if (f) {
+      // (sealed: as in _hitTri)
+      for (let n = ix.start[k], end = ix.start[k + 1]; n < end; n++) {
+        const id = ix.ids[n], o = id * 10, l = ix.val[id];
+        if (cls && ix.classOf(id) !== cls) continue;
+        const d = f[o + 9];
+        if (Math.abs(d) < 1e-9) continue;
+        const dx = x - f[o + 4], dy = y - f[o + 5];
+        const w1 = (f[o] * dx + f[o + 1] * dy) / d;
+        const w2 = (f[o + 2] * dx + f[o + 3] * dy) / d;
+        const w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        const z = w1 * f[o + 6] + w2 * f[o + 7] + w3 * f[o + 8];
+        const sc = ref !== null ? Math.abs(z - ref) : (l === 1 ? 0 : 1e4) - z;
+        if (sc < score && (ref === null || sc <= tol)) { best = z; score = sc; }
+      }
+      return best;
+    }
     for (let n = ix.start[k], end = ix.start[k + 1]; n < end; n++) {
       const id = ix.ids[n], t = ix.tris[id], p = t[0], q = t[1], r = t[2], l = ix.val[id];
       if (cls && ix.classOf(id) !== cls) continue;
@@ -984,6 +1029,18 @@ class TriIndex {
     this.val = Float32Array.from(this.vals);
     this.cls = Uint8Array.from(this.clsIds);
     this.lists = this.vals = this.clsIds = null;
+  }
+
+  // per triangle: q1-r1, r0-q0, r1-p1, p0-r0, r0, r1, pz, qz, rz and the determinant, as the lookups compute them
+  seal() {
+    const n = this.tris.length, f = new Float64Array(n * 10);
+    for (let i = 0; i < n; i++) {
+      const [p, q, r] = this.tris[i], o = i * 10;
+      f[o] = q[1] - r[1]; f[o + 1] = r[0] - q[0]; f[o + 2] = r[1] - p[1]; f[o + 3] = p[0] - r[0];
+      f[o + 4] = r[0]; f[o + 5] = r[1]; f[o + 6] = p[2]; f[o + 7] = q[2]; f[o + 8] = r[2];
+      f[o + 9] = (q[1] - r[1]) * (p[0] - r[0]) + (r[0] - q[0]) * (p[1] - r[1]);
+    }
+    this.flat = f;
   }
 
   // the cell number at (x, y), or -1
