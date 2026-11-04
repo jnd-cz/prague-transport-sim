@@ -37,7 +37,7 @@ export const TR37_SPEC = {
   relayBand: [1.0, 1.1],     // the limiting relay steps on below the setting, back above +10 % (±5 % held, [ckd03] p. 4) [assumed]
   maxRelay: 750,             // A: MR opens the line contactor until the drive pedal is back at 0 ([ckd24] p. 9)
   loCurrent: 120,            // A: LO drops below it ([ckd24] p. 16) …
-  loDelay: 0.3,              // s … after the relay's drop time [assumed]
+  loDelay: 0.1,              // s … after the relay's drop time [assumed]
   // the accelerator and the circuit
   accRate: 20,               // positions/s ([ckd17] p. 5: 1 → 99 in 5 s)
   accDrive: 2.835,           // Ω over positions 1–77 in drive (§ 8.1)
@@ -231,12 +231,12 @@ export class TR37 {
       if (s > 0 && this.brakeT < C.coastSettle) s = 0;
     }
     // at a crawl (below ≈9 km/h) steps 1–2 fade out to nothing and steps 3–4 leave only the shoes partly
-    // applied (≈0.5 m/s², less than a downhill grade takes): a stop point still needing more than 0.3 m/s²
-    // gets step 5, so LO hands over to the full shoes, as a driver does (it overran stops by 1–4 m and a red
-    // signal at 0.9 km/h on step 3–4: #241's first check)
+    // applied (≈0.5 m/s², less than a downhill grade takes): a stop point within 8 m or needing more than
+    // 0.15 m/s² gets step 5, so LO hands over to the full shoes, as a driver does (it overran stops by 1–4 m
+    // and red signals at 0.8 km/h on step 3–4: #241's checks)
     if (s < 0 && Math.abs(w.v) < 2.5) {
       const need = w.stopDist == null ? 0 : (w.v * w.v) / (2 * Math.max(0.3, w.stopDist));
-      s = need > 0.3 ? -5 : Math.min(s, -3);
+      s = need > 0.15 || (w.stopDist != null && w.stopDist < 8) ? -5 : Math.min(s, -3);
     }
     if (s !== A.step && (A.hold <= 0 || w.urgent || (s < A.step && s < 0) || w.power != null)) {
       A.step = s; A.hold = 0.6;
@@ -309,7 +309,9 @@ export class TR37 {
     else if (this.shoe === 2) this.shoe = 1;
     if (!this.ls && b >= C.br1Angle && this.p < 2) this.shoe = Math.max(this.shoe, 1);
     const shoeT = C.shoeForce[this.shoe] * k;
-    this.shoeF += Math.max(-60000 * k * dt, Math.min(40000 * k * dt, shoeT - this.shoeF)); // (springs, magnets)
+    // (the springs apply in ≈0.3 s, the magnets release in ≈0.5 s [assumed]: slower, the fade left 1–2 m of
+    // weak braking at 3.5–5 km/h and the autopilot overran stops, #241's check)
+    this.shoeF += Math.max(-60000 * k * dt, Math.min(100000 * k * dt, shoeT - this.shoeF));
 
     // the tractive force builds with the motors' inductance (≈0.15 s)
     this.drive += (fDrive - this.drive) * Math.min(1, dt / 0.15);
