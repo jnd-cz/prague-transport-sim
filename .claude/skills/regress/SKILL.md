@@ -20,7 +20,7 @@ rerunning the published data.
    - docs or harness only: no run needed; say so.
    - the review page (`src/review.js`, `src/trackHeightProfile.js`) only: `python -P -E tools/test_review.py`
      instead of the headless checks.
-3. **Run** (in the background; 47 minutes for all lines with 4 pages at once, seeds 1-5 by default):
+3. **Run** (in the background; 27 minutes for all lines and checks with 4 pages at once, seeds 1-5 by default (#205: six runs per page load, u3 and redruns from one drive)):
    `python -P -E tools/headless.py --lines <lines> --checks u3,redruns,traffic,lint,surfaces,canted,crossing,spacing,heights --compare`
    (`--port 0` when another headless run uses 8745). Seeded counts are judged against main's spread over
    its seeds (#156); fewer seeds (`--seeds 1-2`) still compare against the full spread, only less surely.

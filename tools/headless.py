@@ -34,6 +34,8 @@ measured at night (tools/autodeploy.py), not by PRs:
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
 
+The full run (all lines, all checks, seeds 1-5) takes ~27 min at 4 pages (2026-11-04, #205; ~2 h before).
+
 Seed spread (#156): a change to the tram's timing reshuffles traffic like a new seed (#151 moved walkerHit
 +54 % on one seed and -33 % on another). So --baseline and --compare run seeds 1-5 by default, and a
 count is judged by the branch's mean over its seeds against the min-max of main's stored seeds; inside
