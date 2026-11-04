@@ -14,7 +14,7 @@ import headless
 
 
 HTML = """<!doctype html><title>9</title><div id="loading" class="hidden"></div>
-<input id="selStop"><input id="selTrip"><input id="optWeather"><input id="optObst">
+<input id="selStop"><input id="selTrip"><input id="optWeather"><input id="optObst"><input id="optTemp">
 <button id="btnStart"></button><script>
 const mode = location.pathname.split('/')[1];
 if (mode === 'loading') document.getElementById('loading').className = '';
