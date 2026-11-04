@@ -317,6 +317,19 @@ Review these when realism matters; most move into the build in M2.
   `railSupport`, `cantedRailVisibility` and `deckClip` cast `THREE.Raycaster` rays at whole meshes without a
   spatial index, so every ray tests every triangle of the merged street meshes (537 s with 7 other jobs running;
   #205 measured 254 s mean per lint run).
+- **The ground under cars and walkers** (#245, line 17 u3 seed 1): `_hitTri` is called from `carPose` (4 points per
+  car per step, ~9 s of a 66 s run), the walkers (~3 s) and `_fitRoad` at traffic set-up (~2 s). Reading the
+  triangles from typed arrays once the load is done (`DtmSurface.seal`) took its share from 22 to 13 %, with the
+  same counts on all 75 seeded runs. What did not help, measured:
+  - reading the lidar height only when two triangles hold the point: most points have two (kerbs, overlapping
+    areas), so the reads stayed;
+  - `inLane` in 2 m instead of 4 m cells: the same 6.6 s, the cost is the map lookups, not the points;
+  - the triangle found last tried first, when it overlaps no other: a triangle spans several 3 m cells holding
+    dozens of others, so proving that cost more (14 s) than the lookups it saved, and the four pose points rarely
+    share a triangle.
+
+  What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
+  only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
 
 ## Environment (Windows dev machines)
 
