@@ -72,6 +72,21 @@ class SegmentIndex {
     }
     return best;
   }
+  // whether dist(x, y) < r: the same terms, done at the first segment that is (#244: the street flush asks this
+  // of every road-bed vertex, and needed no minimum)
+  within(x, y, r) {
+    const c = this.cell, ci = Math.floor(x / c), cj = Math.floor(y / c);
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const arr = this.map.get(i * 65536 + j);
+      if (!arr) continue;
+      for (const [ax, ay, bx, by, hw] of arr) {
+        const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+        if (Math.hypot(ax + dx * t - x, ay + dy * t - y) - hw < r) return true;
+      }
+    }
+    return false;
+  }
 }
 
 // Building footprints on a grid, for point-in-building tests.
@@ -438,6 +453,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   for (const t of data.tracks) tracks.addLine(t.smooth);
   const trackDist = (x, y) => tracks.dist(x, y);
   ground.trackDist = trackDist;
+  ground.trackWithin = (x, y, r) => tracks.within(x, y, r);
   if (ground.dtm) flushDtm(ground);
   // track heights after the streets are laid to the track profile, so other lines' tracks sit in them
   // (another line's track in a street: its top of rail is the street surface, as on our own route)
@@ -1003,7 +1019,7 @@ function flushDtm(ground) {
     // in the track corridor (3 m from our tracks) a carriageway or tram bed is the bed, whatever
     // the survey says there (a 2 m bump at s 2420 stood 3.6 m over the rails); a structure well above
     // the track (over 4.5 m) is another level
-    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackDist(p[0], p[1]) < 3 && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
+    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackWithin(p[0], p[1], 3) && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
