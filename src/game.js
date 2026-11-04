@@ -353,7 +353,9 @@ export class Game {
             d.s = Math.max(d.s, Math.min(st.target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
             // (and the front stops for the passengers no further than that: the crossing began 4 m before
             // the platform's end at Staroměstská, the tram served the stop 3 m past its red stop point)
-            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], st.target + 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
+            // (served up to 0.5 m before the signal, 2.5 m past the stop point: 0.5 m was too little to stop a T3
+            // in, the user, #255)
+            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
           }
         }
       }
@@ -1119,7 +1121,7 @@ export class Game {
       radius: this.route.radiusAt(tram.s - 4),
       mu: this.muAt(tram.s),
       sandKey: !!input.sand,
-      autoHold: this.doorState !== 'closed',
+      doorsOpen: this.doorState !== 'closed', // (the door relay keeps the line contactor out; no brake from it)
     });
 
     this._updateDoors(dt);
@@ -1205,7 +1207,9 @@ export class Game {
     // departure detection
     if (st.served && st.departClock === null && tram.v > 0.3) st.departClock = this.clock;
 
-    const passed = tram.s > st.zone[1] + 1;
+    // (past the zone it is passed: a tram standing in the metre after it was neither at the stop nor past
+    // it, and stood for good, the autopilot aiming at a stop point behind it: #241's checks)
+    const passed = tram.s > st.zone[1];
     const last = this.nextStop === this.stops.length - 1;
     if (last && st.served && st.alight === 0 && this.doorState === 'open') {
       this._finishStop(st);
@@ -1284,7 +1288,7 @@ export class Game {
   heatingDraws() { const c = this.climate; return c.saloon > 0 || c.cab >= 2; }
   contactCurrent() {
     const inp = this.input || {};
-    return this.tram.force > 500 || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
+    return this.tram.drawing || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
   }
 
   setHeating(which) {
@@ -1592,7 +1596,7 @@ export class Game {
       if (this.latAcc > 1.4 && !this.latWarned) { this.latWarned = true; this.msg(t('msg.lateral'), 'warn'); }
       if (this.latAcc < 0.8) this.latWarned = false;
     }
-    if (tram.notch === -5 && tram.v > 4 && !this.emergencyFlag) {
+    if (tram.trackBrake && tram.v > 4 && !this.emergencyFlag) {
       this.emergencyFlag = true;
       if (tram.passengers > 20) this.msg(t('msg.emergencyPax'), 'warn');
     }
