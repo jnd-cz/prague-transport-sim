@@ -7,6 +7,7 @@
 
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
 const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
+const SAG = 1.1, OVER = 0.6; // m/s: under the plan before pressing on, over it before braking (4 and 2 km/h)
 
 export class Autopilot {
   constructor() {
@@ -31,11 +32,11 @@ export class Autopilot {
     let vt = g.currentLimit / 3.6 - 0.6;
     const nl = g.nextLimitChange();
     if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12)) - 0.3);
-    let stopAt = null;
+    let stopAt = null, stopTarget = null, creep = false;
     const consider = (s) => { if (stopAt === null || s < stopAt) stopAt = s; };
     if (st) {
       const needStop = !st.request || st.waiting > 0 || st.alightFrac > 0;
-      if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target);
+      if ((!st.served && needStop) || g.doorState !== 'closed') { consider(st.target); stopTarget = st.target; }
     }
     // a signal: when its GO starts blinking, stop if that is comfortable (~0.9 m/s2), else clear the
     // junction on it and keep going (the controller holds the phase for a committed tram); braking
@@ -78,8 +79,11 @@ export class Autopilot {
       // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
       // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
       // (and from there it creeps at ≤ 3 km/h to 1 m short: a stop zone may start only 2.5 m before the point)
-      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0));
-      if (d < 1) vt = 0;
+      // (the creep only towards a stop and more than 2.2 m short of it: within that it has stopped well,
+      // and a stop zone may start 2.5 m before the point; short of a signal or a tram ahead it just stays)
+      creep = stopAt === stopTarget && d > 2.2;
+      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), creep ? 0.8 : 0));
+      if (d < (stopAt === stopTarget ? 1 : STOP_SHORT)) vt = 0;
     }
     // drive only if still under the plan 2.5 s on: a careful driver coasts into a braking curve (on the T3
     // the brake builds slowly within ≈2.5 s of driving; it drove up to 16.5 km/h 11 m before Ruská and
@@ -89,7 +93,7 @@ export class Autopilot {
     if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12 - look)) - 0.3);
     if (stopAt !== null) {
       const d = stopAt - tr.s;
-      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
+      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), creep ? 0.8 : 0));
     }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
@@ -133,11 +137,23 @@ export class Autopilot {
     // equipment works its own controls for it (the T3's pedals: src/tr37.js autoDrive)
     const grade = g.profile.grade(tr.s - 7);
     // (between the drive plan and the brake plan: coast)
-    const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
-    const aWant = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    // drive, coast or brake, with bands as a driver holds a speed: press on once it has sagged SAG under
+    // the plan and let go at it; brake once OVER above it (a little over the curve into a stop) and let go
+    // at it; coast in between. Without the bands it pressed drive and brake every 5 s at 48 km/h and
+    // pressed power at 1.6 km/h rolling into a stop (line 22 trace, 2026-11-04). The creep only starts a
+    // tram standing short of its stop.
+    const stopping = stopAt !== null && stopAt - tr.s < (tr.v * tr.v) / (2 * 0.5) + 15;
+    if (this.mode === 'drive' && (tr.v >= vtDrive - 0.1 || (stopping && tr.v > 0.3))) this.mode = null;
+    if (this.mode === 'brake' && tr.v <= vt - (stopping ? 0.15 : 0)) this.mode = null;
+    if (!this.mode) {
+      if (tr.v > vt + (stopping ? 0.15 : OVER)) this.mode = 'brake';
+      else if (stopping ? tr.v < 0.05 && creep : tr.v < vtDrive - SAG) this.mode = 'drive';
+    }
+    const aWant = this.mode === 'drive' ? Math.min(1.0, Math.max(0.3, (vtDrive - tr.v) * 0.9))
+      : this.mode === 'brake' ? Math.max(-1.1, Math.min(-0.15, (vt - tr.v) * 0.9)) : 0;
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + 650 * tr.cars + 4.2 * tr.v * tr.v;
     const stand = g.doorState !== 'closed' || vt <= 0.05;
-    const coast = between || (Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
+    const coast = !this.mode;
     // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
     const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
     // a turn under a contact while braking: the switch button draws the current, the drive pedal stays off
