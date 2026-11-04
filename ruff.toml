@@ -1,6 +1,6 @@
 # Python lint / format settings (issue #5): `ruff check tools` and `ruff format --diff tools`.
-# Not enforced yet: the existing tools were written to a 110-120 column style; reformat a file only
-# together with a real change to it.
+# `ruff check tools` is enforced by CI (#222, .github/workflows/tests.yml); `ruff format` is not: the tools
+# were written to a 110-120 column style, reformat a file only together with a real change to it.
 line-length = 120
 target-version = "py312"
 
@@ -10,4 +10,24 @@ line-ending = "lf"
 
 [lint]
 select = ["E", "F", "W", "B"]
-ignore = ["E501", "E731", "E741"]
+# house style: long lines, lambdas, short names, compact one-line statements, zip() without strict=,
+# loop variables left unused
+ignore = ["E501", "E731", "E741", "E701", "E702", "B905", "B007"]
+
+# What the files did not pass when CI started (2026-11-04): kept per file, so the rule holds everywhere
+# else. Fix a file's entries together with a real change to it, then delete them here.
+[lint.per-file-ignores]
+"tools/build_line.py" = ["B023", "B904", "F401", "F841"]
+"tools/deploy.py" = ["B008"]
+"tools/di_tracks.py" = ["B023"]
+"tools/dtm_schema.py" = ["B904"]
+"tools/dtmp_tracks.py" = ["F401"]
+"tools/geoportal.py" = ["F841"]
+"tools/headless.py" = ["B023"]
+"tools/line_heights.py" = ["B023"]
+"tools/osm_local.py" = ["F401"]
+"tools/test_track_profile.py" = ["F401"]
+"tools/track_curve.py" = ["B023"]
+"tools/track_span_evidence.py" = ["B023", "B904"]
+"tools/track_structure_review.py" = ["B023"]
+"tools/tunnel_roads.py" = ["F401"]

@@ -1,5 +1,4 @@
 """Screenshot controls and isolation: python -P -E tools/test_shot.py."""
-import json
 from pathlib import Path
 import sys
 import tempfile

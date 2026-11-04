@@ -304,7 +304,8 @@ Review these when realism matters; most move into the build in M2.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
-- Line 17's full lint after the merge is the pre-rebuild reference (`reports/line17.json`).
+- Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
+  report, not in git); regressions compare with `reports/baseline/headless.json`.
 - **Where a check's time goes** (#205, `tools/profile_check.py`, line 17 seed 1, 2026-11-04, 3 pages at once):
   the page load to the hidden loading screen takes 56-67 s, 78 % of it in `world.js` and `terrain.js`
   (`finesAt` 11 %, `_hitTri` 9 %, `dist` 7 %, garbage collection 7 %, `route.nearest` 6 %). The seeded runs
