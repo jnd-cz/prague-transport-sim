@@ -24,7 +24,6 @@ with it before data-publish, #223).
 """
 import io
 import json
-import math
 import os
 import sys
 import time

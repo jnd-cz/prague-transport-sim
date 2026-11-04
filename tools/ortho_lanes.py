@@ -12,7 +12,6 @@ Prints the lines and lanes per 20 m, writes reports/ortho_lanes_<line>_<from>.pn
 the detected marks: red = stripe, yellow = kept line) and reports/ortho_lanes_<line>.json.
 Image tiles are cached in raw/ortho/.
 """
-import io
 import json
 import math
 import os
