@@ -306,6 +306,17 @@ Review these when realism matters; most move into the build in M2.
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with `reports/baseline/headless.json`.
+- **Where a check's time goes** (#205, `tools/profile_check.py`, line 17 seed 1, 2026-11-04, 3 pages at once):
+  the page load to the hidden loading screen takes 56-67 s, 78 % of it in `world.js` and `terrain.js`
+  (`finesAt` 11 %, `_hitTri` 9 %, `dist` 7 %, garbage collection 7 %, `route.nearest` 6 %). The seeded runs
+  take 85 s each (u3, traffic) with the main thread busy 99 % of it, so drawing is not what costs (headless
+  draws once a second): traffic.js 40 %, terrain.js 29 % (all of it `_hitTri`, the ground triangle under a car
+  or walker: 23 % of the run), route.js 11 % (`nearest` 7 %), three.js 4 %, game.js 3 %. The JS heap is
+  1.1 GB after load and 1.3 GB after a run.
+  The lint run is 95 % three.js ray casting (`intersectTriangle`, `getVertexPosition`, `fromBufferAttribute`):
+  `railSupport`, `cantedRailVisibility` and `deckClip` cast `THREE.Raycaster` rays at whole meshes without a
+  spatial index, so every ray tests every triangle of the merged street meshes (537 s with 7 other jobs running;
+  #205 measured 254 s mean per lint run).
 
 ## Environment (Windows dev machines)
 

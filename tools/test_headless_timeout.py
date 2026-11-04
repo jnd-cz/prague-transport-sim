@@ -14,7 +14,7 @@ import headless
 
 
 HTML = """<!doctype html><title>9</title><div id="loading" class="hidden"></div>
-<input id="selStop"><input id="selTrip"><input id="optWeather"><input id="optObst">
+<input id="selStop"><input id="selTrip"><input id="optWeather"><input id="optObst"><input id="optTemp">
 <button id="btnStart"></button><script>
 const mode = location.pathname.split('/')[1];
 if (mode === 'loading') document.getElementById('loading').className = '';
@@ -72,7 +72,7 @@ class TimeoutTests(unittest.TestCase):
         cls.thread.join()
 
     def run_bench(self, mode='', timeout=5):
-        result, _ = headless.run_one(self.browser, self.url + '/' + mode, '9', 'redruns', 2, timeout)
+        result, _ = headless.run_single(self.browser, self.url + '/' + mode, '9', 'redruns', 2, timeout)
         self.assertEqual(self.browser.contexts, [], 'each job must close its page/context')
         return result
 
