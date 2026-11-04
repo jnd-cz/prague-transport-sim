@@ -229,8 +229,10 @@ hour. Log: `reports/autodeploy.log`.
 - Buildings are textured by type (old tenement, panel block, church, industrial hall, glass office)
   from the OSM tag under each LOD2 building, its roof shape and size. Real 3D bridges (Mosty 3D) set
   the deck height on tagged bridges and the clearance under structures (station canopies included).
-- Tram model: detailed ("Tatra T3" by Jakub Vaja (conflig), [Sketchfab](https://sketchfab.com/3d-models/tatra-t3-76aa08d7c06340fc89229551c45e3c3a), CC BY-NC 4.0, simplified — see `assets/t3/LICENSE.txt`)
-  or the built-in simple one (menu).
+- Tram model: detailed (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3" by Jakub Vaja
+  (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0, see `assets/t3h/LICENSE.txt` and `ASSETS.md`) or the
+  built-in simple one (menu). Its doors, collector, brake lamps and track-brake shoes follow the game; the
+  second car of a set hangs on the coupling (#248).
 - Overhead line: span wires anchored on poles at the kerb (between carriageway and sidewalk), on wall
   rosettes where a building stands close, or a bracket arm where one side has no room; closer spacing
   on curves. Street trees are kept (pruned) clear of all tracks.

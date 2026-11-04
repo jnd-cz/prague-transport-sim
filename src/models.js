@@ -1,5 +1,6 @@
 // Low-poly models built from primitives: T3 tram, cars, pedestrians, signals and signs.
 import * as THREE from 'three';
+import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -61,12 +62,7 @@ function band(y0, y1, inset, mat) {
   return new THREE.Mesh(geo, mat);
 }
 
-// The T3's number plates and cards (user photos, 2026-10-23): the route number on the roof box at
-// the front and on the mirror arm (white digits on DPP blue, no border; the mirror one smaller and
-// taller than wide), on the rear at the bottom of the rear window inverted (blue digits on white),
-// and behind the windscreen the destination card (blue capitals on white with a blue frame, two
-// lines, centred) and the run number card (white on black, on the side pane left of the frame support
-// as seen from the front).
+// The procedural car's route number box (white digits on DPP blue; the T3's plates and cards: src/t3h.js)
 const DPP_BLUE = '#1f57a8';
 // (fill: the font size as a share of the plate height; digits are ~0.72 of it)
 function numberTexture(line, w, h, fg, bg, fill = 0.85) {
@@ -84,38 +80,6 @@ function numberTexture(line, w, h, fg, bg, fill = 0.85) {
   });
 }
 const routeBoxTexture = (line) => numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9);
-const mirrorPlateTexture = (line) => numberTexture(line, 104, 128, '#ffffff', DPP_BLUE, 0.85);
-const rearPlateTexture = (line) => numberTexture(line, 144, 128, '#1d3f86', '#f4f4f0', 1.0);
-const runCardTexture = (run) => numberTexture(run, 112, 72, '#f4f4f0', '#151515', 0.8);
-// the destination in capitals on two lines when it is more than one word (split nearest the middle)
-function destinationTexture(name) {
-  return canvasTexture(320, 128, (g, w, h) => {
-    g.fillStyle = '#f4f4f0';
-    g.fillRect(0, 0, w, h);
-    g.strokeStyle = DPP_BLUE;
-    g.lineWidth = 6;
-    g.strokeRect(5, 5, w - 10, h - 10);
-    if (!name) return;
-    const words = name.toUpperCase().split(/\s+/);
-    let lines = [words.join(' ')];
-    if (words.length > 1) {
-      let best = null;
-      for (let k = 1; k < words.length; k++) {
-        const a = words.slice(0, k).join(' '), b = words.slice(k).join(' ');
-        if (!best || Math.abs(a.length - b.length) < Math.abs(best[0].length - best[1].length)) best = [a, b];
-      }
-      lines = best;
-    }
-    g.fillStyle = DPP_BLUE;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    let size = lines.length > 1 ? 46 : 56;
-    const fit = () => lines.every((l) => g.measureText(l).width < w - 28);
-    g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`;
-    while (!fit() && size > 14) { size -= 2; g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`; }
-    lines.forEach((l, i) => g.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * size * 1.05 + 2));
-  });
-}
 
 // Tatra T3 in the Prague livery: red lower body, cream window band and upper body, dark grey
 // roof, cream four-leaf folding doors, blue route number boxes, orange diamond pantograph.
@@ -275,7 +239,7 @@ function makeT3Car(line, mats) {
 export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '' } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
-  if (detailed && detailedProto) return makeDetailedSet(root, line, cars, dest, run);
+  if (detailed && hybridReady()) return makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP);
   root.userData.bogie = 3.8;     // bogie pivots of the built-in model
   root.userData.bodyFront = 7.0;
   const mats = {
@@ -293,229 +257,17 @@ export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, ru
   return root;
 }
 
-// Detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt),
-// reduced to a single 2048 px colour texture with the ambient occlusion baked in. Its axes were
-// found by principal component analysis of the body: length e1 (front = wipers), width e2
-// (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
-let detailedProto = null;
+// The detailed T3 is the hybrid model (src/t3h.js, #248); the procedural car above is the fallback.
 export const CONTACT_WIRE = 5.34;  // contact wire over top of rail (the track profile; src/heights.js)
 export const RAIL_TOP = 0;         // the wheels stand on the profile: it is the top of rail (src/heights.js)
 
-// files: { url: blob URL } of parts already downloaded (the loading screen counts their bytes)
-export async function loadDetailedT3(url = 'assets/t3/t3.gltf', files = {}) {
-  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-  const manager = new THREE.LoadingManager();
-  manager.setURLModifier((u) => files[u] || u);
-  const gl = await new GLTFLoader(manager).loadAsync(url);
-  const src = gl.scene;
-  src.updateMatrixWorld(true);
-  // The car's axes come from its 8 wheels (the body is too box-like for a reliable principal
-  // axis analysis): forward from the rear to the front axle midpoints, left from the right to the
-  // left wheels, up square to both. A rough length axis only sorts the wheels into groups.
-  const rough = new THREE.Vector3(0.678, -0.157, 0.718).normalize();
-  const wheelPts = [];
-  const v = new THREE.Vector3();
-  src.traverse((o) => {
-    if (!o.isMesh || !o.name.startsWith('wheels')) return;
-    const p = o.geometry.attributes.position;
-    for (let i = 0; i < p.count; i++) wheelPts.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
-  });
-  const mid = wheelPts.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(wheelPts.length);
-  const bodyMid = new THREE.Vector3(); let nb = 0;
-  src.traverse((o) => {
-    if (!o.isMesh || !o.name.startsWith('body')) return;
-    const p = o.geometry.attributes.position;
-    for (let i = 0; i < p.count; i++) { bodyMid.add(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld)); nb++; }
-  });
-  bodyMid.divideScalar(nb);
-  const roughUp = bodyMid.clone().sub(mid);
-  roughUp.addScaledVector(rough, -roughUp.dot(rough)).normalize();
-  const roughLeft = new THREE.Vector3().crossVectors(roughUp, rough); // up x forward = left
-  const groups = new Map(); // "front/rear" + "left/right" -> mean point
-  for (const p of wheelPts) {
-    const d = p.clone().sub(mid);
-    const k = (d.dot(rough) > 0 ? 'F' : 'B') + (d.dot(roughLeft) > 0 ? 'L' : 'R');
-    if (!groups.has(k)) groups.set(k, { c: new THREE.Vector3(), n: 0 });
-    const g = groups.get(k); g.c.add(p); g.n++;
-  }
-  const G = (k) => groups.get(k).c.clone().divideScalar(groups.get(k).n);
-  const fwd = G('FL').add(G('FR')).sub(G('BL')).sub(G('BR')).normalize();
-  const left = G('FL').add(G('BL')).sub(G('FR')).sub(G('BR'));
-  left.addScaledVector(fwd, -left.dot(fwd)).normalize();
-  const up = new THREE.Vector3().crossVectors(fwd, left); // forward x left = up
-  // local car axes: x = left, y = up, z = forward
-  const rot = new THREE.Matrix4().set(left.x, left.y, left.z, 0, up.x, up.y, up.z, 0, fwd.x, fwd.y, fwd.z, 0, 0, 0, 0, 1);
-  const proto = new THREE.Group();
-  src.traverse((o) => {
-    if (!o.isMesh) return;
-    const g = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(rot, o.matrixWorld));
-    const m = new THREE.Mesh(g, o.material);
-    m.name = o.name;
-    proto.add(m);
-  });
-  // origin: on the rails (bottom of the wheels), centred between the wheels across and along
-  const wb = new THREE.Box3();
-  for (const m of proto.children) if (m.name.startsWith('wheels')) { m.geometry.computeBoundingBox(); wb.union(m.geometry.boundingBox); }
-  const shift = new THREE.Matrix4().makeTranslation(-(wb.min.x + wb.max.x) / 2, -wb.min.y, -(wb.min.z + wb.max.z) / 2);
-  for (const m of proto.children) m.geometry.applyMatrix4(shift);
-  // bogie pivots (between each bogie's two axles) and the pantograph
-  const wheelZ = [];
-  for (const m of proto.children) if (m.name.startsWith('wheels')) {
-    const p = m.geometry.attributes.position;
-    for (let i = 0; i < p.count; i++) wheelZ.push(p.getZ(i));
-  }
-  const front = wheelZ.filter((z) => z > 0), rear = wheelZ.filter((z) => z < 0);
-  const bogie = ((front.reduce((a, b) => a + b, 0) / front.length) - (rear.reduce((a, b) => a + b, 0) / rear.length)) / 2;
-  // raise the pantograph head to the contact wire: stretch the frame up from its base
-  const pan = proto.children.filter((m) => m.name.startsWith('power'));
-  const pb = new THREE.Box3();
-  for (const m of pan) { m.geometry.computeBoundingBox(); pb.union(m.geometry.boundingBox); }
-  const base = pb.min.y, k = (CONTACT_WIRE - RAIL_TOP - 0.01 - base) / (pb.max.y - base);
-  for (const m of pan) {
-    const p = m.geometry.attributes.position;
-    for (let i = 0; i < p.count; i++) p.setY(i, base + (p.getY(i) - base) * k);
-    p.needsUpdate = true;
-  }
-  for (const m of proto.children) { m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere(); }
-  const body = new THREE.Box3();
-  for (const m of proto.children) if (m.name.startsWith('body')) body.union(m.geometry.boundingBox);
-  proto.userData = { bogie, panto: (pb.min.z + pb.max.z) / 2, bodyFront: body.max.z, boxes: paintedBoxes(proto), cards: glassCards(proto) };
-  const mat = proto.children[0].material;
-  mat.metalness = 0; mat.roughness = 0.75;
-  // (not the material: each set clones it, and a clone copies userData)
-  for (const m of proto.children) for (const x of [m.geometry, ...texturesOf(m.material)]) x.userData.shared = true;
-  detailedProto = proto;
-  return proto;
-}
-
-// The route number boxes painted in the model's texture (pixel rectangles in t3_color.jpg, found
-// by colour): map each rectangle's corners onto the model through the triangle whose texture
-// coordinates contain its centre (glTF texture v runs downwards), then make an upright quad over
-// it, a little proud of the surface and a little larger. The rear box mirrors the front one.
-const PAINTED = [[513, 46, 550, 92], [1873, 1078, 1909, 1124]]; // front dome, front right corner
-function paintedBoxes(proto, W = 2048, H = 2048) {
-  const boxes = [];
-  for (const [x0, y0, x1, y1] of PAINTED) {
-    const uc = (x0 + x1) / 2 / W, vc = (y0 + y1) / 2 / H;
-    let tri = null;
-    for (const m of proto.children) {
-      const g = m.geometry, P = g.attributes.position, U = g.attributes.uv;
-      if (!U || tri) continue;
-      const cnt = g.index ? g.index.count : P.count;
-      for (let t = 0; t < cnt && !tri; t += 3) {
-        const ii = [0, 1, 2].map((q) => (g.index ? g.index.getX(t + q) : t + q));
-        const a = ii.map((i) => [U.getX(i), U.getY(i)]);
-        const w = bary(a, uc, vc);
-        if (w && w.every((x) => x > -1e-4)) tri = { a, p: ii.map((i) => new THREE.Vector3().fromBufferAttribute(P, i)) };
-      }
-    }
-    if (!tri) continue;
-    const at = (u, v) => { const w = bary(tri.a, u, v); return tri.p[0].clone().multiplyScalar(w[0]).addScaledVector(tri.p[1], w[1]).addScaledVector(tri.p[2], w[2]); };
-    const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => at(x / W, y / H));
-    const n = new THREE.Vector3().crossVectors(tri.p[1].clone().sub(tri.p[0]), tri.p[2].clone().sub(tri.p[0])).normalize();
-    const c = corners.reduce((s, v) => s.add(v), new THREE.Vector3()).divideScalar(4);
-    if (n.dot(c.clone().setY(0)) < 0) n.negate(); // outwards
-    const up = new THREE.Vector3(0, 1, 0).addScaledVector(n, -n.y).normalize();
-    const right = new THREE.Vector3().crossVectors(up, n).normalize();
-    let r0 = Infinity, r1 = -Infinity, u0 = Infinity, u1 = -Infinity;
-    for (const v of corners) { const d = v.clone().sub(c); r0 = Math.min(r0, d.dot(right)); r1 = Math.max(r1, d.dot(right)); u0 = Math.min(u0, d.dot(up)); u1 = Math.max(u1, d.dot(up)); }
-    boxes.push({ c: c.addScaledVector(n, 0.012), n, up, right, w: (r1 - r0) * 1.12, h: (u1 - u0) * 1.12 });
-  }
-  return boxes;
-}
-
-// The cards on the windows: the model's windows are painted in its (opaque) texture, so the cards lie
-// on the glass, 5 mm proud, following its slope: found by casting a ray at the window from outside.
-// [name, x (left +), bottom height, width, height, end (+1 front, -1 rear)] in metres; the windscreen's
-// flat middle pane runs from x −0.62 to +0.58 between the frame supports (measured by raycasting), from
-// 1.71 m up; a wiper arm stands out at x −0.36; the side panes curve back beyond the supports. The
-// destination card in the middle pane's middle, the run number on the right-hand side pane (left as
-// seen from the front), just past the frame support.
-const CARDS = [
-  ['dest', -0.02, 1.75, 0.46, 0.19, 1],
-  ['run', -0.75, 1.75, 0.15, 0.1, 1],
-  ['rear', 0, 1.75, 0.34, 0.3, -1],
-];
-function glassCards(proto) {
-  proto.updateMatrixWorld(true);
-  const ray = new THREE.Raycaster(), out = {};
-  for (const [name, x, y0, w, h, end] of CARDS) {
-    const y = y0 + h / 2;
-    ray.set(new THREE.Vector3(x, y, end * 20), new THREE.Vector3(0, 0, -end));
-    const hit = ray.intersectObjects(proto.children, false)[0];
-    if (!hit) continue;
-    const n = hit.face.normal.clone();
-    if (n.z * end < 0) n.negate(); // outwards
-    const up = new THREE.Vector3(0, 1, 0).addScaledVector(n, -n.y).normalize();
-    const right = new THREE.Vector3().crossVectors(up, n).normalize();
-    out[name] = { c: hit.point.clone().addScaledVector(n, 0.005), n, up, right, w, h };
-  }
-  return out;
-}
-function bary(a, u, v) {
-  const d = (a[1][1] - a[2][1]) * (a[0][0] - a[2][0]) + (a[2][0] - a[1][0]) * (a[0][1] - a[2][1]);
-  if (Math.abs(d) < 1e-12) return null;
-  const w1 = ((a[1][1] - a[2][1]) * (u - a[2][0]) + (a[2][0] - a[1][0]) * (v - a[2][1])) / d;
-  const w2 = ((a[2][1] - a[0][1]) * (u - a[2][0]) + (a[0][0] - a[2][0]) * (v - a[2][1])) / d;
-  return [w1, w2, 1 - w1 - w2];
-}
-function boxQuad(b) {
-  // upright quad: x along `right`, y along `up`, facing `n`
-  const g = new THREE.PlaneGeometry(b.w, b.h);
-  g.applyMatrix4(new THREE.Matrix4().makeBasis(b.right, b.up, b.n).setPosition(b.c));
-  return g;
-}
-
-function makeDetailedSet(root, line, cars, dest, run) {
-  // own material per set (traffic fades sets individually), shared geometry
-  const mat = detailedProto.children[0].material.clone();
-  const plate = (map) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
-  // (cards on the glass: lit like the body, not glowing)
-  const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
-  const mats = {
-    rbMat: plate(routeBoxTexture(line)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
-    destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)), body: mat,
-  };
-  root.userData.mats = mats;
-  root.userData.dest = dest;
-  root.userData.run = run;
-  root.userData.bogie = detailedProto.userData.bogie;
-  root.userData.bodyFront = detailedProto.userData.bodyFront;
-  root.userData.cars = [];
-  const { boxes, cards } = detailedProto.userData;
-  for (let k = 0; k < cars; k++) {
-    const car = new THREE.Group();
-    car.rotation.order = 'YXZ';
-    for (const m of detailedProto.children) car.add(new THREE.Mesh(m.geometry, mat));
-    // the leading car: the roof and mirror plates over the boxes painted in the texture, the cards
-    // behind the windscreen (no destination card on a tram whose destination we do not know); the
-    // last car: the inverted plate in the rear window
-    if (k === 0) {
-      if (boxes[0]) car.add(new THREE.Mesh(boxQuad(boxes[0]), mats.rbMat));
-      // (the mirror plate is smaller than the box painted there, and taller than wide)
-      if (boxes[1]) car.add(new THREE.Mesh(boxQuad({ ...boxes[1], w: 0.22, h: 0.28 }), mats.mirMat));
-      if (cards.dest && dest) car.add(new THREE.Mesh(boxQuad(cards.dest), mats.destMat));
-      if (cards.run) car.add(new THREE.Mesh(boxQuad(cards.run), mats.runMat));
-    }
-    if (k === cars - 1 && cards.rear) car.add(new THREE.Mesh(boxQuad(cards.rear), mats.rearMat));
-    root.add(car);
-    root.userData.cars.push(car);
-  }
-  return root;
-}
-
 // Change the route number on the plates, the destination card and the run number (a new shift, a run
-// continuing as another line). (A set made without a destination has no card to change.)
+// continuing as another line). (The procedural car has the roof boxes only.)
 export function setConsistLine(model, line, dest = model.userData.dest, run = model.userData.run) {
+  if (model.userData.hybrid) { setHybridLine(model, line, dest, run); return; }
   const u = model.userData, { mats } = u;
   const swap = (m, tex) => { if (!m) return; const old = m.map; m.map = tex; m.needsUpdate = true; old?.dispose(); };
-  if (u.line !== line) {
-    swap(mats.rbMat, routeBoxTexture(line));
-    swap(mats.mirMat, mirrorPlateTexture(line));
-    swap(mats.rearMat, rearPlateTexture(line));
-  }
-  if (u.dest !== dest) swap(mats.destMat, destinationTexture(dest));
-  if (u.run !== run) swap(mats.runMat, runCardTexture(run));
+  if (u.line !== line) swap(mats.rbMat, routeBoxTexture(line));
   Object.assign(u, { line, dest, run });
 }
 
@@ -523,6 +275,7 @@ export function setConsistLine(model, line, dest = model.userData.dest, run = mo
 // behind the coupler face; the car rests on its two bogie pivots (the model's own spacing), so
 // it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y, track bed height].
 export function placeConsist(model, sFront, at) {
+  if (model.userData.hybrid) { placeHybridConsist(model, sFront, at); return; }
   const { bogie, bodyFront } = model.userData;
   model.userData.cars.forEach((car, k) => {
     const c = sFront - k * 15.2 - 0.6 - bodyFront; // car origin (midway between the bogies)

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
 import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights, disposeModel } from './models.js';
 import { T3, COUPLING_GAP } from './tram.js';
+import { poseHybrid, setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
@@ -69,10 +70,14 @@ function limitSpeed(lim, s, len) {
 function setOpacity(obj, a) {
   obj.visible = a > 0.01;
   obj.traverse((o) => {
-    if (!o.material) return;
-    o.material.transparent = a < 0.999;
-    o.material.opacity = a;
-    o.material.depthWrite = a > 0.5;
+    const m = o.material;
+    if (!m) return;
+    // (glass keeps its own opacity: userData.opacity, src/t3h.js)
+    const base = m.userData.opacity ?? 1;
+    m.userData.fade = a;
+    m.transparent = a < 0.999 || base < 1;
+    m.opacity = a * base;
+    m.depthWrite = a > 0.5 && base === 1;
   });
 }
 
@@ -596,6 +601,7 @@ export class Traffic {
   update(dt, camera, draw = true) {
     const tram = this.game.tram;
     const cx = camera.position.x, cy = -camera.position.z;
+    this.cam = [cx, cy];
     this._carsOnTracks();
     this._updateRoadCars(dt, cx, cy, draw);
     this._updateWalkers(dt, cx, cy, draw);
@@ -1520,8 +1526,18 @@ export class Traffic {
   }
 
   // --------------------------------------------------------------------- other trams
-  _placeTram(t, route, s, profileZ) {
+  _placeTram(t, route, s, profileZ, dt = 0) {
     placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p), route.rollAt(q)]; });
+    const u = t.mesh.userData;
+    if (!u.hybrid) return;
+    // the detailed model: its full level near the camera; the doors open while it dwells at a stop (shut
+    // 2 s before it leaves, 2 s to move); the brake lamps while it slows or stands
+    const c = u.cars[0].position, d = this.cam ? Math.hypot(c.x - this.cam[0], -c.z - this.cam[1]) : 0;
+    setHybridLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
+    t.doorU = Math.max(0, Math.min(1, (t.doorU ?? 0) + ((t.dwell ?? 0) > 2 ? dt : -dt) / 2));
+    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
+    t.vWas = t.v;
+    if (u.level === 'full') poseHybrid(t.mesh, { doors: t.doorU, braking });
   }
 
   // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it
@@ -1619,7 +1635,7 @@ export class Traffic {
       t.s += t.v * dt;
       t.leaving = t.s - tram.s > 1000 || t.s > this.route.length - 20 || (t.endS !== null && t.s > t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, this.route, t.s, (s) => profile.height(s));
+      this._placeTram(t, this.route, t.s, (s) => profile.height(s), dt);
     }
     this.ahead = this.ahead.filter((t) => {
       if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
@@ -1700,7 +1716,7 @@ export class Traffic {
       const ourS = t.endS !== null ? this.route.nearestOnHeading(p.x, p.y, -p.hx, -p.hy)?.s : null;
       t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y));
+      this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y), dt);
     }
     this.oncoming = this.oncoming.filter((t) => {
       if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }

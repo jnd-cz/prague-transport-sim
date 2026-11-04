@@ -10,6 +10,10 @@ const G = 9.81;
 // the Tatra T3's body (per car)
 export const T3 = {
   length: 15.2,              // over couplers (body 14.0 m), DPP training manual
+  // (#248, the sources in the issue's research comment of 2026-11-04)
+  bogies: 6.4,               // bogie pivots apart (J. Dynybyl, ČVUT FS bachelor thesis 2018, Table 3: 3.8 m from each frame end)
+  trackBrakeGap: 0.012,      // the released magnet's pole pieces over the rail, new wheels (ČKD T-50496 p. 1: 8-12 mm)
+  couplerPivot: 6.25,        // the coupler yoke's pin from the car centre [estimated on the frame figure of Ivanov et al. 1977]
   emptyMass: 16000,          // kg
   rotMass: 2400,             // kg: motors, gears and wheels turning, ≈15 % of the empty car (t3-accelerator.md § 5.3)
   paxMass: 72,               // kg / passenger
@@ -43,6 +47,7 @@ export class Tram {
     this.electric = 0;     // W drawn from the line (+) or burnt in the brake resistors (−)
     this.voltage = T3.lineVoltage;
     this.trackBrake = false;
+    this.trackMagnets = 0;
     this.sanding = false;
     this.sand = 1;         // sand box level 0..1
     this.slip = false;     // wheels spinning under traction
@@ -87,6 +92,7 @@ export class Tram {
     if (this.slide) fB = 0.75 * adhesion;
     this.slideTime = this.slide ? this.slideTime + dt : 0;
     this.trackBrake = out.trackOn && speed > 0.3;
+    this.trackMagnets = out.trackPairs; // (0 off, 1 the rear bogies', 2 all: the shoes on the rail)
     const fTrack = this.trackBrake ? out.track : 0; // (the magnets: no adhesion limit)
 
     this.time = (this.time || 0) + dt; // (simulation time: the same drive gives the same result)
