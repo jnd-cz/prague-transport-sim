@@ -210,9 +210,10 @@ threading.Event().wait()
         out = self.root/'results'
         with fixture_listener() as (_,url):
             argv = ['headless.py','--lines','17','--checks','lint','--jobs','1','--url',url,'--out',str(out)]
-            def worker(job, actual_url, headed, timeout):
+            # (a worker takes a batch of jobs and gives a result per job since #205)
+            def worker(batch, actual_url, headed, timeout):
                 self.assertEqual(actual_url,url)
-                return job, {'checks':{}}, 0
+                return [(job, {'checks':{}}, 0) for job in batch]
             with patch.object(sys,'argv',argv), patch.object(headless,'BASELINE',str(self.root/'absent.json')), \
                     patch.object(headless,'serve') as own, patch.object(headless,'worker',side_effect=worker), \
                     redirect_stdout(io.StringIO()):
