@@ -76,6 +76,15 @@ def plan(pattern):
     return rows
 
 
+def kill_tree(p):
+    """Stops a test and everything it started."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
+    else:
+        import signal
+        os.killpg(p.pid, signal.SIGKILL)
+
+
 def summary(out):
     """unittest's last lines: 'Ran 12 tests', 'OK (skipped=2)' or 'FAILED (failures=1)'."""
     ran = re.findall(r"^Ran (\d+) tests?", out, re.M)
@@ -107,14 +116,18 @@ def main():
             continue
         flags = ["-I"] if kind == "-I" else ["-P", "-E"]
         t1 = time.time()
+        # (its own process group: on a timeout the servers and browsers it started go with it)
+        p = subprocess.Popen([sys.executable, *flags, os.path.join(TOOLS, t)], cwd=ROOT, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                             env={**os.environ, "PYTHONIOENCODING": "utf-8"}, start_new_session=os.name != "nt",
+                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         try:
-            r = subprocess.run([sys.executable, *flags, os.path.join(TOOLS, t)], cwd=ROOT, capture_output=True,
-                               text=True, encoding="utf-8", errors="replace", timeout=a.timeout,
-                               env={**os.environ, "PYTHONIOENCODING": "utf-8"})
-            code, out = r.returncode, r.stdout + r.stderr
-        except subprocess.TimeoutExpired as e:  # (its output comes as bytes even with text=True)
-            text = lambda b: b.decode("utf-8", "replace") if isinstance(b, bytes) else (b or "")
-            code, out = "timeout", text(e.stdout) + text(e.stderr) + f"\n(timed out after {a.timeout} s)"
+            out, _ = p.communicate(timeout=a.timeout)
+            code = p.returncode
+        except subprocess.TimeoutExpired:
+            kill_tree(p)
+            out, _ = p.communicate()
+            code, out = "timeout", (out or "") + f"\n(timed out after {a.timeout} s)"
         ok = code == 0
         print(f"{'ok  ' if ok else 'FAIL'} {t:40} {kind:8} {time.time() - t1:6.1f} s  {summary(out)}", flush=True)
         if not ok:
