@@ -162,10 +162,11 @@ class ChunkedGeometry {
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     const l = Math.hypot(nx, ny, nz) || 1;
     nx /= l; ny /= l; nz /= l;
-    c.pos.push(...a, ...b, ...d);
+    // (the values written out, not spread: millions of triangles at load, #244)
+    c.pos.push(a[0], a[1], a[2], b[0], b[1], b[2], d[0], d[1], d[2]);
     c.nor.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    if (this.useUv) c.uv.push(...(uvs || [0, 0, 0, 0, 0, 0]));
-    if (this.useColor) c.col.push(...col, ...col, ...col);
+    if (this.useUv) { if (uvs) c.uv.push(uvs[0], uvs[1], uvs[2], uvs[3], uvs[4], uvs[5]); else c.uv.push(0, 0, 0, 0, 0, 0); }
+    if (this.useColor) c.col.push(col[0], col[1], col[2], col[0], col[1], col[2], col[0], col[1], col[2]);
   }
   quad(c, a, b, d, e, col) { this.tri(c, a, b, d, null, col); this.tri(c, a, d, e, null, col); }
   // `surface` tags meshes cars and walkers stand on (read by the street bot); 'building' marks
