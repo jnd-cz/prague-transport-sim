@@ -1,5 +1,18 @@
 {
- "note": "Ground truth from the user, used to score detectors and lints (docs/history/PLAN.md §2.4). Add facts here, not special cases in code.",
+ "note": "Facts from the user and from sources, each citing where it came from: what checks score the game against and what the build obeys. Add facts here, not special cases in code. Every section has a reader, or says in `readers` that it is reference only (AGENTS.md, #224).",
+ "readers": {
+  "stops": "tools/lint.js stopFacts: the stop detector (src/game.js _vienna) scored against the facts of the loaded line",
+  "stopTypes": "reference: what the types in stops mean",
+  "rules": "reference: signal-not-in-platform is checked by tools/lint.js signalsInPlatforms, consist-coupled by consistAtStops; the facts themselves are not read",
+  "places": "reference: places the user described, for the scenery and structure work",
+  "notes": "reference",
+  "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py",
+  "trackGeometry": "tools/track_profile.py; the radii are still copied in tools/track_curve.py and tools/lint.js (#224)",
+  "trackStyleKinds": "src/heights.js",
+  "trackStyles": "src/heights.js",
+  "trackSources": "tools/di_tracks.py, track_sources.py",
+  "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)"
+ },
  "stops": [
   {
    "name": "Čechův most",

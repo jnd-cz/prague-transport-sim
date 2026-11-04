@@ -743,6 +743,35 @@ function underpassClearance(g) {
   return check('underpass-clearance', cs.length, bad);
 }
 
+// The user's stop facts (data/truth.json `stops`) against the game's stop type: boarding across a car
+// lane, a Vienna-type or street stop (`stop.vienna`, src/game.js _vienna), or at a kerb or island. A
+// fact names a stop and a direction: towards a stop further on, from one behind, or "*" both; facts for
+// other lines, unknown directions ("?", "centrum") and multi-platform stops are not counted. vienna-cycle
+// (only the cycle strip raised, a classic kerb for cars) is listed but not counted: the detector's
+// car-lane test does not decide it (#224).
+async function stopFacts(g) {
+  let facts = [];
+  try { facts = (await (await fetch('/data/truth.json', { cache: 'no-store' })).json()).stops || []; } catch { /* no truth file */ }
+  const index = new Map(g.stops.map((st, i) => [st.name, i]));
+  const ACROSS = new Set(['vienna', 'street']), KERB = new Set(['island', 'kerb']);
+  const bad = [], listed = [];
+  let of = 0;
+  for (const f of facts) {
+    const i = index.get(f.name);
+    if (i === undefined) continue;
+    const ahead = index.get(f.towards), behind = index.get(f.from);
+    const ours = f.towards === '*' || (ahead !== undefined && ahead > i) || (behind !== undefined && behind < i);
+    if (!ours) continue;
+    const st = g.stops[i], p = g.route.at(st.target);
+    const where = { stop: st.name, s: Math.round(st.target), x: p.x, y: p.y };
+    if (f.type === 'vienna-cycle') { listed.push({ ...where, info: `vienna-cycle; game: ${st.vienna ? 'across a lane' : 'at a kerb'}` }); continue; }
+    if (!ACROSS.has(f.type) && !KERB.has(f.type)) continue;
+    of++;
+    if (ACROSS.has(f.type) !== !!st.vienna) bad.push({ ...where, mag: 1, info: `fact ${f.type} (${f.source}); game: ${st.vienna ? 'across a lane' : 'at a kerb'}` });
+  }
+  return { ...check('stop-facts', of, bad), listed };
+}
+
 export async function lint({ bot = false, traffic = false, save = true, seeds = SEEDS } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
@@ -752,6 +781,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
   const trees = treesInBuildings(world);
   const checks = {
     consist: consistAtStops(g),
+    stopFacts: await stopFacts(g),
     signalsInPlatforms: signalsInPlatforms(g),
     treeTrunks: trees.trunk,
     treeCrowns: trees.crown,

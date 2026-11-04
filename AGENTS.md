@@ -87,7 +87,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 
 - **Never edit generated data by hand** (`data/line*.json` and sidecars): change the tool and rebuild.
   Hand-made facts go to `data/truth.json`: facts from the user or a source, each citing where it came
-  from. Not check exemptions, agent audits or lists of generated array indexes: a rebuild renumbers
+  from; a new section names its reader in the file's `readers`, or that it is reference only (#224).
+  Not check exemptions, agent audits or lists of generated array indexes: a rebuild renumbers
   them (#177's allowlist would have failed every line on the next rebuild). Key a fact by place, a
   stable source ID or a stop. What a check can decide from geometry stays a rule in the check, counted
   per class with its places, so `--compare` shows what a rebuild moved.
