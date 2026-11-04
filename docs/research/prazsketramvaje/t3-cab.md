@@ -147,3 +147,33 @@ Two dates are relevant: the safety button dates from ČKD's 1982 change, and the
 4. Whether the warning lights at each door (Výstražné světlo ×3) flash with NEVYSTUPOVAT, and their colour.
 5. Where the saloon-heating switch PT sits on a T3SUCS.
 6. Whether 6921's plain-T3 wiring differs from the T3SU texts in the door blocking (TLV/RBD, DBR) and the lamp feeds.
+
+## Brno's driver training material (Skorus 2015): what it confirms or adds
+
+D. Skorus, *Výukový materiál pro uchazeče o práci řidiče tramvaje*, master's thesis, Masaryk University
+2015 (https://is.muni.cz/th/rjmst/DP_Daniel_Skorus.pdf, behind a browser check; read from a copy the
+user sent). It is training material for DPMB (Brno) drivers. Only its general parts are used here:
+Brno's T3s carry the same TR 37 equipment. [B] = an operator's training text.
+
+| topic | what it says | page | relation to our notes |
+|---|---|---|---|
+| preparation current | "about 50 A" in coasting. It sets the resistors to the speed for a smooth restart or brake, and keeps the motors excited, so the electric brake acts at once | 55, 60 | confirms the model's 50 A and the fast build from coasting (t3-accelerator.md § 3.5) |
+| electric brake fade | it stops braking below 5 km/h, and the shoe (or disc) brakes take over | 57, 60 | agrees with ≈4–5 km/h (LO, § 3.6) |
+| electric brake failure | if it does not brake, the shoe brakes act at full force whatever the speed, down to the stop | 57 | agrees with LO's hand-over below 120 A |
+| ammeter | measures the drive and the brake current | 57, 61 | agrees with the positive-only scale (the user) |
+| voltmeter | measures the battery voltage | 61 | agrees with Q1 |
+| emergency brake | the pedal to the floor: full electric brake with the track brakes; shoes below 5 km/h; cancelled by letting the pedal back | 59 | agrees |
+| track-brake order | on the T3, past the parking position, first **bogie 1's** track brakes, then bogie 2's at the floor | 59 | **differs** from [ckd24] p. 16 (the **rear** bogie first). Brno's wiring may differ; open |
+| rescue brake | the safety button or the saloon rescue buttons: all track brakes and the shoe brakes, **no electric brake**; reset by the control switch to 2 or a restart. The driver may leave the cab (head-on danger) | 59 | DPP: plus the electric brake if the pedal is parked (§ 2.3); the T3SU circuit drops LS, M1 |
+| maximum relay | MR in LS opens it above 750 A; a tripped MR lights the **MR lamp, and pressing it** restores LS | 59 | [ckd24]: held until the drive pedal is back at 0. The lamp-button is the T3M's "MAX. RELÉ" (photo 1); Brno's T3s may have it too |
+| track brakes | 5–7 t attraction each, 4 on a T3; for a sudden obstacle only, they jerk the car and injure passengers | 58–59 | agrees with 60 kN; supports penalising their use without need |
+| driving rules | forbidden: holding the car on a gradient with the motors' traction; using traction and braking together to regulate speed. Coast as much as possible to save energy | 16, 60 | candidate penalties for #221 (economy, contacts) |
+| resistors | the accelerator's resistors take no long load: starts must be short; no slow running on them | 54 | the burnt-resistor fault (§ 3.6) |
+| pulse control | thyristor equipment (T3M) draws only the current needed: ≈33 % less energy than the resistors | 55 | a figure for comparing models later |
+| dead-man | only cars with a hand controller (K2, KT8D5…): 3 s after the handle is let go, the safety relay stops the car | 63–64 | the pedal T3 has none (§ 2.3) |
+| brake lamp | the red brake lamp on the panel must go out while driving (brakes released) | 58 | agrees with BRZDY I / II / VLAK (Q3) |
+| doors | the driver gives "Nevystupujte, nenastupujte" before closing; all trams block starting with doors open, set to a few centimetres, so check the mirror for trapped passengers | 73 | agrees with NEVYSTUPOVAT before closing (Q2) and DBR |
+| cab heater | kalorifer: 0 off, 1 ventilation, 2 half, 3 full | 66 | agrees with Q4 |
+| saloon heating | some T3s use the accelerator's waste heat, switched by a lever at door 2; otherwise heaters in the seats or the sides | 54, 66 | agrees with Q4 |
+| gear ratio | the T3 / K2 motor bogie's single-stage hypoid gear: 7.36 | 53 | [ckd-schema]: 7.43 for the T3SU/ČSSR; both ratios exist (§ 5.1) |
+| fuses | shoe brakes 40 A / 24 V for all four brake actuators; track brakes 60 A per bogie; control 20 A; the motor-generator 20 A (600 V) | 58, 66 | — |
