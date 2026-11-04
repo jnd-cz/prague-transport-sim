@@ -46,7 +46,18 @@ python -P -E tools/build_line.py --line 22 --headsign "Zahradní Město"
 python -P -E tools/build_line.py --line 23         # any Prague tram line
 python -P -E tools/build_line.py --line 17 --refresh  # recompute the OSM answers cached in raw/line17/
 python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
+python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
 ```
+
+`rebuild.py` ends with `line_heights.py` for all the lines it built (~6 min: it stages the network's heights
+with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
+`reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
+the steps. `headless.py --checks heights` compares the game's track with the staged heights.
+`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
+data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
+(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
+outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
+place leaves the list; `reports/line-heights.json` lists the dropped points.
 
 After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
 

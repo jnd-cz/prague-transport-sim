@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 
-from track_profile import vertical_profile, implied_radii, radii, _solve
+from track_profile import banded_profile, vertical_profile, implied_radii, radii, _solve
 
 S = [float(x) for x in range(0,201,5)]
 
@@ -59,6 +59,35 @@ class VerticalProfile(unittest.TestCase):
             D[i,i-1], D[i,i], D[i,i+1] = c/h0, -c*(1/h0+1/h1), c/h1
         dense = np.linalg.solve(np.diag(w)+D.T@np.diag(lam)@D,np.array(w)*np.array(z))
         self.assertLess(max(abs(a-b) for a,b in zip(dense,_solve(s,z,w,lam))),1e-9)
+
+
+class BandRule(unittest.TestCase):
+    s = [2.5+5*k for k in range(60)]
+
+    def test_a_noisy_curve_at_the_radius_fits_the_band_and_its_noise_is_not_followed(self):
+        true = [100+(x-150)**2/1500 for x in self.s]                       # a 750 m sag
+        z = [t+(.04 if k % 2 else -.04) for k,t in enumerate(true)]        # +-4 cm of noise
+        out = banded_profile(self.s,z,500,.10)
+        self.assertTrue(out['fits'])
+        self.assertLess(max(abs(a-b) for a,b in list(zip(out['z'],true))[2:-2]),.015)  # (a free end follows its point)
+        self.assertGreater(out['min_radius'],490)
+
+    def test_a_sag_tighter_than_the_radius_does_not_fit_and_says_where(self):
+        z = [100-.06*x if x < 144 else 100-.06*144+.06*(x-156) if x > 156 else 100-.06*x+(x-144)**2/200 for x in self.s]
+        out = banded_profile(self.s,z,500,.10)
+        self.assertFalse(out['fits'])
+        worst = max(range(len(z)),key=lambda i: out['excess'][i])
+        self.assertLess(abs(self.s[worst]-150),25)  # (in the sag or the ends of its wider 500 m transition)
+        self.assertTrue(banded_profile(self.s,z,100,.10)['fits'])
+
+    def test_a_point_without_band_and_weight_does_not_pull(self):
+        z = [100.0]*len(self.s)
+        z[30] = 101.0                                                      # a lone bad point, given no band
+        tol = [.10]*len(z)
+        tol[30] = None
+        out = banded_profile(self.s,z,500,tol,weight=[0.0 if k == 30 else 1.0 for k in range(len(z))])
+        self.assertTrue(out['fits'])
+        self.assertLess(abs(out['z'][30]-100),.05)
 
 
 if __name__=='__main__':
