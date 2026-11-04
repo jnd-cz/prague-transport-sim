@@ -114,6 +114,11 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - Python: `python -I` for stdlib-only tools; `python -P -E` for tools needing the user site packages
   (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it: shell
   heredocs with quotes can break in the Windows shells.
+- Tests: `python -I tools/test_all.py` runs every `tools/test_*.py` the way it must run (`-I` or `-P -E`
+  from its imports; `--browser` adds the page tests, `-k name` picks some). A tool's test is
+  `tools/test_<tool>.py`: a change to a tool runs it, a new tool gets one. CI
+  (`.github/workflows/tests.yml`) runs the tests that need no `data/` or `raw/` and `ruff check tools` on
+  every PR; a test that needs them skips without them, saying what to fetch.
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
   --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
   once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
