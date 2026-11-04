@@ -1,9 +1,10 @@
 """The pedestrians' figures (#251): python -P -E tools/test_people.py [--line 17] [--synthetic]
 (its own server on a free port). Part 1, without world data: the figures (src/people.js, assets/people/)
 load with their skeleton and clips, and on a synthetic crowd of 100 walkers in a row the nearest ones
-become animated figures (at most 64, in within 80 m, out beyond 88 m), walk or run by their speed and keep
-the crowd's shirt colours, with hair colours of their own; the rest go to the far batch and the box crowd
-is hidden. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
+become animated figures (at most 64, in within 80 m, out beyond 88 m; the full figure within 40 m, the
+simplified one further out, which must be the far figure's body unbaked), walk or run by their speed and
+keep the crowd's shirt colours, with hair colours and styles of their own; the rest go to the far batch and
+the box crowd is hidden. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
 walkers and the stop crowd are drawn by figures, the box meshes are on the hidden layer, and ?boxpeople
 leaves the box figures."""
 import argparse
@@ -53,6 +54,14 @@ SYNTHETIC = """async () => {
   let nearHair = 0;
   assets.near.scene.traverse((o) => { if (o.isMesh && o.geometry.attributes.hairMask) nearHair = count(o.geometry.attributes.hairMask); });
   out.hairVertices = [nearHair, count(people.far.geometry.attributes.hairMask)];
+  out.styles = new Set([...people.near.values()].map((f) => f.style)).size;
+  // the middle level is the far figure's body unbaked: the same triangles, the same bounds standing
+  const mid = people.levels.middle, parts = [mid.shirt, mid.trousers, mid.citizen_detail.short];
+  out.middleTris = parts.reduce((s, g) => s + g.index.count / 3, 0);
+  const box = new THREE.Box3();
+  for (const g of parts) { g.computeBoundingBox(); box.union(g.boundingBox); }
+  people.far.geometry.computeBoundingBox();
+  out.middleBoxGap = Math.max(box.min.distanceTo(people.far.geometry.boundingBox.min), box.max.distanceTo(people.far.geometry.boundingBox.max));
   return out;
 }"""
 
@@ -105,6 +114,11 @@ def main():
                 "the 8 clips": s["clips"] == sorted(["Walk", "Idle", "Run", "StairUp", "StairDown", "TramStepUp", "TramStepDown", "Sit"]),
                 "4228 / 840 triangles": (s["tris"], s["farTris"]) == (4228, 840),
                 "40 near within 80 m, 60 far": (s["at0"]["near"], s["at0"]["far"]) == (40, 60),
+                "of them 20 full within 40 m, 20 middle": (s["at0"]["full"], s["at0"]["middle"]) == (20, 20),
+                "full kept up to 46 m": (s["back6"]["full"], s["back10"]["full"]) == (20, 18),
+                "the middle level: the far figure's 840 triangles": s["middleTris"] == 840,
+                "the middle level: the far figure's bounds (2 mm)": s["middleBoxGap"] < 0.002,
+                "hair styles vary": s["styles"] >= 4,
                 "the box crowd hidden (layer 1)": s["at0"]["hidden"] == 2,
                 "kept near up to 88 m": s["back6"]["near"] == 40,
                 "far beyond 88 m": s["back10"]["near"] == 39,
