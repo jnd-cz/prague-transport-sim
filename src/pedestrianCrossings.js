@@ -57,15 +57,15 @@ class TrackIndex {
         const x0 = Math.floor((Math.min(a[0], b[0]) - REACH) / CELL), x1 = Math.floor((Math.max(a[0], b[0]) + REACH) / CELL);
         const y0 = Math.floor((Math.min(a[1], b[1]) - REACH) / CELL), y1 = Math.floor((Math.max(a[1], b[1]) + REACH) / CELL);
         for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-          const key = `${x},${y}`;
-          if (!this.cells.has(key)) this.cells.set(key, []);
-          this.cells.get(key).push(seg);
+          const key = x * 65536 + y; // (a number, not "x,y": every survey vertex near a crossing asks, #244)
+          const list = this.cells.get(key);
+          if (list) list.push(seg); else this.cells.set(key, [seg]);
         }
       }
     }
   }
   nearest(x, y, reach = REACH, ref = null, lowest = false) {
-    const list = this.cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || [];
+    const list = this.cells.get(Math.floor(x / CELL) * 65536 + Math.floor(y / CELL)) || [];
     let best = null, bestD = reach;
     for (const s of list) {
       const u = Math.max(0, Math.min(1, ((x - s.a[0]) * s.dx + (y - s.a[1]) * s.dy) / (s.len * s.len)));
