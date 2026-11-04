@@ -368,6 +368,8 @@ Choosing one (a row, a tapped pin, N / B) moves the camera there. The card says:
 - links to Mapillary, Panoramax, the Mapy.com aerial and Google Street View at that place (facing the camera's heading).
 
 **Layers** toggles the survey classes as colours, the wireframe of the survey triangles, the survey's own lines (**Source**), kerb edges, seam posts, pins, our track, the buildings and the trees.
+**Orthophoto** drapes IPR's leaf-off orthophoto (2026, CC BY 4.0) over the ground around the target: 150 m at 0.1 m, or 75 m at the native 0.05 m with the camera within 40 m (rails show only then). The browser loads it straight from IPR's ImageServer; nothing is stored on our server. It is drawn over the world and the classes (switched off with it), under the other overlays; the credit and a failed load show at the top left. Beside it, **contrast** sets each spot's brightness against its 1 m surround (rails in pavement and kerbs show over sun and shade alike) and **lines** draws thin dark lines (rails, joints, also shadow and people outlines) in cyan: `orthoLook` in `src/review.js`, which says what else was tried.
+**Track sources** draws the line's track centrelines as the build took them (`tracks[].src`): orange DI, violet OSM, yellow DTM points, green orthophoto. Over the orthophoto they show where a source lies against the rails, e.g. for `reports/review/track-sources-N.json`.
 The classes and the wireframe are the game's build of the survey (`tools/dtm.py`: merged areas,
 fitted heights). **Source** draws the survey's 3D lines as they come (`data/lineN.zps.json`,
 `tools/zps_source.py`, lines with surveyed streets) at their own heights: white at ground level, cyan
