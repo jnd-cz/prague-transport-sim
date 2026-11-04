@@ -871,7 +871,12 @@ def main():
         if not others:
             continue
         here = tpos[nid]
-        d_in = norm((here[0] - tpos[path_ids[i - 1]][0], here[1] - tpos[path_ids[i - 1]][1]))
+        # (from the last route node apart from this one: the track fit merges nodes under 0.5 m onto one place, and
+        # a zero direction lost Palackého náměstí's and Národní divadlo's switches on line 17, #219)
+        j = i - 1
+        while j > 0 and dist(tpos[path_ids[j]], here) < 0.01:
+            j -= 1
+        d_in = norm((here[0] - tpos[path_ids[j]][0], here[1] - tpos[path_ids[j]][1]))
         route_tgt = walk(nid, path_ids[i + 1])
         v_route = (route_tgt[0] - here[0], route_tgt[1] - here[1])
         def through(o):
