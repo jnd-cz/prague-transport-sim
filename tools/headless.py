@@ -67,6 +67,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 CALLS = {
     "u3": "const { run } = await import('/tools/bench/u3.js'); return await run(SEED);",
     "redruns": "const { run } = await import('/tools/bench/redruns.js'); return await run(SEED);",
+    # u3 and redruns drive the same trip with the same seed: one drive, both watchers (#205), reported as both
+    "drive": "const { run } = await import('/tools/bench/u3.js'); const { redrunsWatch } = await import('/tools/bench/redruns.js');"
+             "const r = await run(SEED, { also: [redrunsWatch] }); const red = r.also[0]; delete r.also; return { u3: r, redruns: red };",
     "traffic": "const { trafficRun } = await import('/tools/traffic_lint.js'); return await trafficRun({ seed: SEED });",
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
@@ -542,6 +545,8 @@ def main():
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
     ap.add_argument("--jobs", type=int, default=workers(4.0),
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
+    ap.add_argument("--separate", action="store_true",
+                    help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
     ap.add_argument("--batch", type=int, default=6,
                     help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
@@ -586,14 +591,28 @@ def main():
         print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
+    def split(res):
+        """A drive's result as the u3 and redruns results it holds (an error goes to both)."""
+        (line, check, seed), r, secs = res
+        if check != "drive":
+            return [res]
+        extra = {"pageErrors": r["pageErrors"]} if r.get("pageErrors") else {}
+        return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs)
+                for c in ("u3", "redruns")]
+
     heavy = HeavyJob("headless")  # (the nightly baseline waits while this runs, tools/baseline_store.py)
     try:
         heavy.__enter__()
         os.makedirs(a.out, exist_ok=True)
-        # (batches of one line's runs, each in one page; the longest lines' batches first)
+        # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
+        runs = list(jobs)
+        if not a.separate:
+            both = {(l, s) for l, c, s in jobs if c == "u3"} & {(l, s) for l, c, s in jobs if c == "redruns"}
+            runs = [(l, "drive", s) if c == "u3" and (l, s) in both else (l, c, s) for l, c, s in jobs
+                    if not (c == "redruns" and (l, s) in both)]
         batches = []
         for line in lines:
-            mine = [j for j in jobs if j[0] == line]
+            mine = [j for j in runs if j[0] == line]
             batches += [mine[k:k + max(1, a.batch)] for k in range(0, len(mine), max(1, a.batch))]
         i = 0
         if a.jobs > 1 and len(batches) > 1:
@@ -609,13 +628,15 @@ def main():
                                 fu.result()  # (a worker that failed outside a run)
                             break
                         continue
-                    i += 1
-                    report(i, *res)
+                    for part in split(res):
+                        i += 1
+                        report(i, *part)
         else:
             for b in batches:
                 for res in worker(b, url, a.headed, a.timeout):
-                    i += 1
-                    report(i, *res)
+                    for part in split(res):
+                        i += 1
+                        report(i, *part)
     finally:
         heavy.__exit__()
         if server:

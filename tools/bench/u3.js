@@ -23,6 +23,8 @@ export async function run(seed = 1, opts = {}) {
   const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
   const stuck = stuckWatch(game);
+  // (other checks' watchers along on the same drive, opts.also: [(game, traffic) => watcher], #205)
+  const also = (opts.also || []).map((make) => make(game, traffic));
   game.autopilot = true; game.paused = false;
   const R = window._u3 = { seed, steps: 0, done: false, bells: 0, hits: [], cuts: [] };
   const yielded = new Set(), crossed = new Set(), cut = new Set();
@@ -51,6 +53,7 @@ export async function run(seed = 1, opts = {}) {
     const tick = () => {
       for (let k = 0; k < chunk; k++) {
         if (game.finished || game.tram.s > game.route.length - 5) { R.done = true; break; }
+        const alsoBefore = also.map((w) => w.before());
         // (headless nothing moves the camera, and the cars spawn around it: keep it at the cab)
         const tr = game.tram, q = game.route.at(tr.s);
         camera.position.set(q.x, game.profile.height(tr.s) + 2.6, -q.y);
@@ -60,6 +63,7 @@ export async function run(seed = 1, opts = {}) {
         const lit = new Map(traffic.cars.filter((c) => c.active && !c.conn && c.lane?.light).map((c) => [c, { lane: c.lane, a: traffic.lightAspect(c.lane.light), go: c.lightGo === c.lane, v: c.vNow, age: c._age = (c._lane === c.lane ? (c._age || 0) + 1 : 0), spawnedOn: c._spawnLane === c.lane, front: c.toEnd - c.lane.light.back - 3.2 }]));
         for (const c of traffic.cars) { if (c.active && c._lane !== c.lane) { if (c._lane === undefined || c.id !== c._id) { c._spawnLane = c.lane; c._spawnS = c.s; } c._lane = c.lane; c._id = c.id; } }
         pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera); R.steps++;
+        also.forEach((w, i) => w.after(alsoBefore[i]));
         for (const [c, b] of lit) {
           if (!c.conn && c.lane === b.lane && b.front > -0.5 && c.toEnd - b.lane.light.back - 3.2 <= -0.5) c._atLine = { lane: b.lane, a: traffic.lightAspect(b.lane.light), go: c.lightGo === b.lane };
         }
@@ -122,5 +126,6 @@ export async function run(seed = 1, opts = {}) {
   const bump = [...(R.bumper || new Map()).values()].sort((a, b) => a - b);
   const q = (p) => (bump.length ? +bump[Math.min(bump.length - 1, Math.floor(p * bump.length))].toFixed(1) : null);
   return { seed, watch: R.watch || [], stuck: R.stuck ?? null, carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) }, yielded: yielded.size, crossedAhead: crossed.size, closeCuts: R.cuts.length, closeCutsBold: R.cuts.filter((c) => c.bold).length,
-    bells: R.bells, hits: R.hits.length, collisions: R.hits, cuts: R.cuts, signalPenalty: game.penalties.signal || 0, signalEvents: R.sig || [], collisionPenalty: Math.round(game.penalties.collision || 0) };
+    bells: R.bells, hits: R.hits.length, collisions: R.hits, cuts: R.cuts, signalPenalty: game.penalties.signal || 0, signalEvents: R.sig || [], collisionPenalty: Math.round(game.penalties.collision || 0),
+    also: also.map((w) => w.result(seed, R.stuck ?? null, R.stuckScene || null)) };
 }
