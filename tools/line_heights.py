@@ -66,19 +66,23 @@ LEVELS = ('di', 'dtmp', 'review', 'zps', 'curve', 'surface')  # codes in the ord
 RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
 HOLD, FOLLOW = 'hold the radius', 'follow the data'
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
+DROP_MAX = 12     # rounds: where an answer holds the radius and discards the outliers, one point dropped per round
 
 
 def load_radius_answers(truth):
     """data/truth.json trackHeights.radiusAnswers: a place (lat, lon) and the user's choice there."""
     from geo import Frame
     F = Frame()
-    return [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer']}
+    return [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer'], 'outliers': a.get('outliers')}
             for a in (truth.get('trackHeights') or {}).get('radiusAnswers', [])]
 
 
-def held_by_answer(xy):
-    """Whether the user answered to hold the design radius at this place."""
-    return xy is not None and any(a['answer'] == HOLD and math.dist(a['xy'], xy) <= ANSWER_REACH for a in RADIUS_ANSWERS)
+def answer_at(xys, kinds=(HOLD,)):
+    """The user's answer (of `kinds`) at a place: the nearest within ANSWER_REACH of any of its points, else None."""
+    near = [(math.dist(a['xy'], xy), k, a) for k, a in enumerate(RADIUS_ANSWERS) if a['answer'] in kinds
+            for xy in xys if xy is not None]
+    near = [x for x in near if x[0] <= ANSWER_REACH]
+    return min(near)[2] if near else None
 
 
 def review_place(c, kind, s0, s1, held, final, factor):
@@ -117,7 +121,7 @@ class Chain:
     def __init__(self, xy, bins):
         self.xy, self.line, self.bins = xy, LineString(xy), bins
         self.length = self.line.length
-        self.runs, self.held, self.steps, self.switch, self.review = [], [], [], [], []
+        self.runs, self.held, self.steps, self.switch, self.review, self.dropped = [], [], [], [], [], []
 
     def z_at(self, t):
         """(height, source code) at distance t along the chain, or (None, None) outside its runs."""
@@ -264,7 +268,7 @@ def solve(c, pins, r, relax=None):
     runs, cut = held_runs(series)
     c.held = [{'s0': h[0]['s'], 's1': h[-1]['s'], 'flags': sorted({f for x in h for f in x['flags']}),
                'xy': h[len(h) // 2]['xy']} for h in cut]
-    c.runs, c.steps, c.review = [], [], []
+    c.runs, c.steps, c.review, c.dropped = [], [], [], []
     for run in runs:
         # (a held bin starts on the straight line between its neighbours, at HOLD_WEIGHT: at weight 0 the curve was
         # free to sag anywhere the radius allows, 5 cm under a straight grade across 40 m)
@@ -305,21 +309,33 @@ def solve(c, pins, r, relax=None):
         fit = [PIN_FIT if x.get('pin') else FIT for x in run]
         over = lambda r_: [i for i, e in enumerate(r_['excess']) if e > fit[i]]
         res = first = banded_profile(s, zf, rmin, tol, weight)
-        for _ in range(RELAX_STEPS):
-            # (an answer to hold the radius holds the whole place: the points outside the band within 50 m of each other)
-            bad, group = [], []
+        relaxed = drops = 0
+        while relaxed < RELAX_STEPS and drops < DROP_MAX:
+            # (an answer to hold the radius holds the whole place: the points outside the band within 50 m of each
+            # other; one that discards the outliers drops the worst of them and fits the rest again, data/truth.json)
+            bad, worst, group = [], [], []
             for i in over(res) + [None]:
                 if i is not None and (not group or s[i] - s[group[-1]] <= 50):
                     group.append(i)
                     continue
-                if group and not any(held_by_answer(run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0]))
-                                     for j in group):
-                    bad += group
+                if group:
+                    a = answer_at([run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0]) for j in group])
+                    free = [j for j in group if not run[j].get('pin')]
+                    if a is None:
+                        bad += group
+                    elif a.get('outliers') == 'drop' and free:
+                        worst.append(max(free, key=lambda j: res['excess'][j]))
                 group = [i] if i is not None else []
-            if not bad:
+            if not bad and not worst:
                 break
-            near = lambda si: any(abs(si - s[i]) <= RELAX_REACH for i in bad)
-            rmin = [max(v * RELAX_STEP, MIN_RADIUS) if near(si) else v for si, v in zip(s, rmin)]
+            for j in worst:
+                tol[j], weight[j] = None, 0.0
+                c.dropped.append(run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0]))
+            drops += bool(worst)
+            if bad:
+                relaxed += 1
+                near = lambda si: any(abs(si - s[i]) <= RELAX_REACH for i in bad)
+                rmin = [max(v * RELAX_STEP, MIN_RADIUS) if near(si) else v for si, v in zip(s, rmin)]
             res = banded_profile(s, zf, rmin, tol, weight)
         # (where even that cannot meet a pin, the rails join first: the band gives way within 15 m of it)
         apart = [i for i in over(res) if run[i].get('pin')]
@@ -327,6 +343,15 @@ def solve(c, pins, r, relax=None):
             tol = [None if t is not None and not run[i].get('pin') and min(abs(s[i] - s[j]) for j in apart) <= 15 else t
                    for i, t in enumerate(tol)]
             res = banded_profile(s, zf, rmin, tol, weight)
+            # (an answer holds the radius against the band, not against the rails joining: where they still miss, the
+            # radius gives way near the pin as it would without the answer; 24 junctions 1-2.5 cm apart, 2026-11-04)
+            for _ in range(RELAX_STEPS):
+                apart = [i for i in over(res) if run[i].get('pin')]
+                if not apart:
+                    break
+                near = lambda si: any(abs(si - s[i]) <= RELAX_REACH for i in apart)
+                rmin = [max(v * RELAX_STEP, MIN_RADIUS) if near(si) else v for si, v in zip(s, rmin)]
+                res = banded_profile(s, zf, rmin, tol, weight)
         raw = [None if x.get('pin') else x['z'] for x in run]
         # (for review: the band missed by over FIT at the design radius, or rails over FIT apart; a few mm at a pin
         # only bend the radius, they are no question)
@@ -729,7 +754,8 @@ def line_report(line, chs, lookup, data, summary):
 
 def radius_review(chs, snapshot):
     """reports/review/track-radius.json: every place where the radius gave way (or an answer held it), the curve
-    held to the design radius and the final one as answer previews over the staged heights and the terrain."""
+    held to the design radius and the final one as answer previews over the staged heights and the terrain. A place
+    the user answered (data/truth.json radiusAnswers) leaves the list."""
     from geo import Frame
     from atomic import replacing
     F = Frame()
@@ -742,7 +768,7 @@ def radius_review(chs, snapshot):
     by = {}
     for c in chs:
         for p in c.review:
-            if len(p['data']) >= 2:
+            if len(p['data']) >= 2 and not answer_at([p['at']], (HOLD, FOLLOW)):
                 lat, lon = (float(v) for v in F.ll(*p['at']))
                 by.setdefault(f'radius-{lat:.4f}-{lon:.4f}', []).append(p)
     radius = lambda curve: min(implied_radii([a for a, _ in curve], [b for _, b in curve]), default=math.inf)
@@ -816,12 +842,17 @@ def main():
     kinds = Counter(p['kind'] for p in summary['review_places'])
     print(f'network: {len(held)} held stretches over {HELD_GAP} m, {sum(h["m"] for h in held):.0f} m; for review where no '
           f'curve at the design radius fits within {BAND:g} m: {kinds.get("band", 0)} places, {kinds.get("junction", 0)} at junctions')
+    answered = {id(a) for c in chs for p in c.review if (a := answer_at([p['at']], (HOLD, FOLLOW)))}
+    print(f"radius answers: {len(answered)} of {len(RADIUS_ANSWERS)} met a place; "
+          f"{sum(len(c.dropped) for c in chs)} points dropped where an answer discards the outliers")
     review = radius_review(chs, (ROOT / 'snapshots/CURRENT').read_text().strip())
     print(f"radius review: {len(review)} places ({sum(f['decision']['structure']['kind'] == 'junction' for f in review)} "
           f"at junctions), reports/review/track-radius.json")
     lookup, report = Lookup(chs), {'network': {**summary, 'steps_by_cause': dict(by), 'unexplained_steps': bad,
                                                'moved_m': {'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
-                                               'held_over_60m': held}, 'lines': {}}
+                                               'held_over_60m': held,
+                                               'dropped_by_answers': [[round(float(v), 5) for v in F.ll(*xy)]
+                                                                      for c in chs for xy in c.dropped]}, 'lines': {}}
     for line in args.lines:
         _, _, data = write_line(line, lookup, chs)
         report['lines'][line] = line_report(line, chs, lookup, data, summary)

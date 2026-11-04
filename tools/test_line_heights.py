@@ -102,6 +102,23 @@ class Assembly(unittest.TestCase):
         self.assertGreater(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + .005)  # (the radius held)
         self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('band', 1.0)])
 
+    def test_an_answer_that_discards_the_outliers_fits_the_radius_to_the_rest(self):
+        # (a 1 m hump over 30 m, 50 m radius at its top: without the answer the radius gives way to follow it, held
+        # alone the curve misses the top by 16 cm)
+        hump = lambda s: 100 + math.exp(-((s - 100) / 10) ** 2)
+        c = chain([(0, 0), (200, 0)], hump, terrain=hump)
+        lh.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': lh.HOLD, 'outliers': 'drop'}]
+        try:
+            quiet(lh.assemble, [c])
+        finally:
+            lh.RADIUS_ANSWERS = []
+        # (the four top bins dropped; the curve at the radius within the band of the rest)
+        self.assertEqual(len(c.dropped), 4)
+        self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('band', 1.0)])
+        self.assertLess(c.z_at(100)[0], hump(100) - .5)
+        top = lambda si: any(abs(x - si) < .01 for x, _ in c.dropped)
+        self.assertTrue(all(abs(c.z_at(b['s'])[0] - b['z']) <= lh.BAND + lh.FIT for b in c.bins if not top(b['s'])))
+
     def test_a_lone_bump_is_dropped(self):
         c = chain([(0, 0), (200, 0)], lambda s: 100.5 if abs(s - 102.5) < 1 else 100.0)
         quiet(lh.assemble, [c])

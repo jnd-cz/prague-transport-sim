@@ -155,6 +155,14 @@ with (`heights.staged`).
   the loop's entry, where the through track carries three overlapping 1000 m zones (turnouts and a diamond, 129–160 m)
   on the descent (without them its miss halves, 0.78 → 0.36 m), and an archive record that lies up to 0.43 m from
   the terrain and pulls the loop's track through its pins.
+- **The answers of 2026-11-03/04** (31 places, all answered on the test host; recorded in `radiusAnswers` with the
+  page notes as quotes): 28 hold the radius, 1 follows the data, 2 unsure (left on the list); one more answer to
+  follow the data is for a place of an earlier list. Where the note says "Discard the outliers" (12 places) the answer carries `"outliers": "drop"`: the worst point the held curve misses
+  the band at is dropped (weight 0, no band), one per round, at most 12 rounds, and the curve at the design radius is
+  fitted to the rest (the user: "Drop outliers, fit the rest"; a 1 m hump over 30 m: four points dropped, the rest
+  within the band). An answer holds the radius against the band, not against the rails joining: where held curves
+  left 24 junctions 1-2.5 cm apart, the radius gives way near the pin as without the answer. An answered place
+  leaves the review list; `reports/line-heights.json` lists the dropped points.
 - **A short hold** starts on the straight line between its neighbours, at weight 0.001: at weight 0 the curve was
   free to sag anywhere the radius allowed, 5 cm under a straight grade across 40 m.
 - **A line takes the heights of the chains under it,** weighted by how near each is within 1 m: past a fork both

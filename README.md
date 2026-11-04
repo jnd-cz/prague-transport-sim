@@ -55,7 +55,9 @@ with the user's answers and assembles one profile per DI track, docs/decisions/2
 the steps. `headless.py --checks heights` compares the game's track with the staged heights.
 `?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
 data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
-(`trackHeights.radiusAnswers`) keeps the radius at that place.
+(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
+outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
+place leaves the list; `reports/line-heights.json` lists the dropped points.
 
 After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
 
