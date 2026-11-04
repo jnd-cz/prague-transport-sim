@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-03b",
- "built_at_commit": "c6fed90",
- "published": "2026-11-04 05:39",
- "note": "line 17: heights with the user's radius answers (outliers dropped, rails join first) on #217's track (#197)",
+ "built_at_commit": "9a18a49",
+ "published": "2026-11-04 06:24",
+ "note": "line 17: facing switches behind merged nodes, 17 -> 19 (#219)",
  "files": {
   "line17.bld.bin": {
    "size": 6348546,
@@ -29,8 +29,8 @@
    "sha256": "905c2d71ff2117168727db63b42efcbb95c635edd509fdb130118d4b8017ae76"
   },
   "line17.json": {
-   "size": 6752409,
-   "sha256": "6f685d3b554ac312d98be4b1e6562b38c33cc4e90f5fb785df6dd0934fac8112"
+   "size": 6752566,
+   "sha256": "5ec55cef1a20b744e04450cb33402ee8a6ed2ac8683adbdb0732163d4d368d56"
   },
   "line17.signals.json": {
    "size": 36904,

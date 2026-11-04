@@ -240,8 +240,10 @@ def main(argv=None, connect=connect):
     ftp = connect(cfg, password(cfg))
     try:
         remote = remote_manifest(ftp)
-        # (version.json changes every time; it goes up whenever anything else does)
-        up, gone = plan({r: h for r, h in hashes.items() if r != "version.json"}, remote)
+        # (version.json changes every time; it goes up last, whatever else does. Planned with the rest, so
+        # the manifest's entry for it is not taken for a file gone from the site: #207)
+        up, gone = plan(hashes, remote)
+        up = [r for r in up if r != "version.json"]
         size = sum(len(local[r]) if isinstance(local[r], bytes) else os.path.getsize(local[r]) for r in up)
         print(f"{commit[:7]}: {len(up)} files to upload ({size / 1e6:.1f} MB), {len(gone)} to delete, "
               f"{len(hashes) - 1 - len(up)} unchanged")

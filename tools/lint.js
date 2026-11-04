@@ -1,12 +1,12 @@
-// Dev tool: lints for the loaded line (docs/history/PLAN.md §2). Each check counts one kind of problem over the
+// Dev tool: lints for the loaded line. Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
 // In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
 //   const { lint } = await import('/tools/lint.js?v=' + Date.now());
 //   await lint();                 // quick checks (a few seconds)
 //   await lint({ bot: true });    // + the street bot (DTM lines, about a minute)
 //   await lint({ traffic: true }); // + the whole line driven headless, traffic watched (a minute or two)
-// The report is saved to reports/lineN.json by tools/serve.py; compare with the committed baseline:
-//   python tools/lint_report.py            (--accept makes the current reports the baseline)
+// The report is saved to reports/lineN.json by tools/serve.py; regressions:
+//   python -P -E tools/headless.py --checks lint --compare
 import { makeT3, placeConsist, CONTACT_WIRE } from '../src/models.js';
 import { roofIndex } from '../src/world.js';
 import { tramClearance } from '../src/tram.js';
@@ -17,6 +17,71 @@ import { trafficRun, placesAt } from './traffic_lint.js';
 const TOP = 12; // places listed per check
 
 // one check's result: how many, out of how many, and the worst places
+// Rays straight down against meshes, as THREE.Raycaster.intersectObjects(meshes, false) with a ray down from
+// (x, y0, z) and `far`: every hit, nearest first ({ point, distance, object, faceIndex }), faces culled by their
+// material's side as three.js does. The triangles are put in a grid in plan once, so a ray tests only those
+// of its cell (#205: the lint's rays tested every triangle of the merged street meshes, 95 % of its time).
+export class DownRays {
+  constructor(meshes, cell = 4) {
+    this.cell = cell;
+    this.grid = new Map();
+    this.tris = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (const m of meshes) {
+      m.updateWorldMatrix(true, false);
+      const g = m.geometry, pos = g.attributes.position, idx = g.index;
+      const count = idx ? idx.count : pos.count;
+      const start = Math.max(0, g.drawRange.start), end = Math.min(count, g.drawRange.start + g.drawRange.count);
+      const sideOf = (i) => {
+        const mat = Array.isArray(m.material)
+          ? m.material[(g.groups.find((gr) => i >= gr.start && i < gr.start + gr.count) || {}).materialIndex]
+          : m.material;
+        return mat ? mat.side : null;
+      };
+      for (let i = start - (start % 3); i + 2 < end; i += 3) {
+        const side = sideOf(i);
+        if (side === null || side === undefined) continue;
+        const ia = idx ? idx.getX(i) : i, ib = idx ? idx.getX(i + 1) : i + 1, ic = idx ? idx.getX(i + 2) : i + 2;
+        a.fromBufferAttribute(pos, ia).applyMatrix4(m.matrixWorld);
+        b.fromBufferAttribute(pos, ib).applyMatrix4(m.matrixWorld);
+        c.fromBufferAttribute(pos, ic).applyMatrix4(m.matrixWorld);
+        const t = { m, face: Math.floor(i / 3), side, ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z, cx: c.x, cy: c.y, cz: c.z };
+        const k = this.tris.push(t) - 1;
+        const x0 = Math.floor(Math.min(a.x, b.x, c.x) / cell), x1 = Math.floor(Math.max(a.x, b.x, c.x) / cell);
+        const z0 = Math.floor(Math.min(a.z, b.z, c.z) / cell), z1 = Math.floor(Math.max(a.z, b.z, c.z) / cell);
+        for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++) {
+          const key = gx * 65536 + gz;
+          let list = this.grid.get(key);
+          if (!list) this.grid.set(key, list = []);
+          list.push(k);
+        }
+      }
+    }
+  }
+
+  cast(x, y0, z, far = Infinity) {
+    const list = this.grid.get(Math.floor(x / this.cell) * 65536 + Math.floor(z / this.cell)) || [];
+    const out = [];
+    for (const k of list) {
+      const t = this.tris[k];
+      // the triangle's normal points up (front face for a ray down) when its winding is counter-clockwise
+      // seen from above: in x, z (z towards the viewer) that is a negative cross product
+      const cross = (t.bx - t.ax) * (t.cz - t.az) - (t.bz - t.az) * (t.cx - t.ax);
+      if (cross === 0) continue;
+      const up = cross < 0;
+      if ((t.side === THREE.FrontSide && !up) || (t.side === THREE.BackSide && up)) continue;
+      const w1 = ((t.bz - t.cz) * (x - t.cx) + (t.cx - t.bx) * (z - t.cz)) / ((t.bz - t.cz) * (t.ax - t.cx) + (t.cx - t.bx) * (t.az - t.cz));
+      const w2 = ((t.cz - t.az) * (x - t.cx) + (t.ax - t.cx) * (z - t.cz)) / ((t.bz - t.cz) * (t.ax - t.cx) + (t.cx - t.bx) * (t.az - t.cz));
+      const w3 = 1 - w1 - w2;
+      if (w1 < 0 || w2 < 0 || w3 < 0) continue;
+      const y = w1 * t.ay + w2 * t.by + w3 * t.cy, d = y0 - y;
+      if (d < 0 || d > far) continue;
+      out.push({ point: new THREE.Vector3(x, y, z), distance: d, object: t.m, faceIndex: t.face });
+    }
+    return out.sort((p, q) => p.distance - q.distance);
+  }
+}
+
 function check(rule, of, items, key = (p) => p.mag) {
   const places = [...items].sort((a, b) => key(b) - key(a)).slice(0, TOP);
   return { rule, count: items.length, of, places, ...placesAt(items) };
@@ -233,15 +298,12 @@ function railSupport(g, world) {
   const r = g.route, pr = r.ground.profile;
   const targets = [];
   world.traverse((m) => { if (m.isMesh && (m.userData.building || ['terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
-  ray.far = 9;
+  const rays = new DownRays(targets);
   let n = 0;
   const bad = new Map();
   for (let s = 0; s < r.length; s += 2) {
     const p = r.at(s), zb = pr.height(s) - pr.lift(s); // bed top (src/heights.js)
-    o.set(p.x, zb + 2.5, -p.y);
-    ray.set(o, down);
-    const hit = ray.intersectObjects(targets, false)[0];
+    const hit = rays.cast(p.x, zb + 2.5, -p.y, 9)[0];
     n++;
     const top = hit ? hit.point.y : -Infinity, bridge = pr.onBridge(s);
     let info = null, mag = 0;
@@ -262,8 +324,7 @@ export function cantedRailVisibility(g, world) {
     if (m.userData.surface === 'rail') rails.push(m);
     else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
   });
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
-  ray.far = 4;
+  const railRays = new DownRays(rails), surfaceRays = new DownRays(surfaces);
   // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
   // ribbon is a separate obstruction, not a cant error on this one.
   const owner = (hit) => {
@@ -281,20 +342,20 @@ export function cantedRailVisibility(g, world) {
     if (!inCurve) { curve++; inCurve = true; }
     for (const side of [-1, 1]) {
       const p = r.offset(s, side * 0.72);
-      o.set(p.x, prof.height(s) + 1, -p.y); ray.set(o, down);
-      let head = ray.intersectObjects(rails, false)[0];
+      let o = [p.x, prof.height(s) + 1, -p.y];
+      let head = railRays.cast(...o, 4)[0];
       // The route and the smoothed track axis can differ slightly at switches.
       for (const shift of [-0.1, 0.1, -0.2, 0.2, -0.3, 0.3, -0.4, 0.4]) {
         if (head) break;
         const q = r.offset(s, side * 0.72 + shift);
-        o.set(q.x, prof.height(s) + 1, -q.y); ray.set(o, down);
-        head = ray.intersectObjects(rails, false)[0];
+        o = [q.x, prof.height(s) + 1, -q.y];
+        head = railRays.cast(...o, 4)[0];
       }
       if (!head) { missing++; continue; }
       const trackId = owner(head);
       if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
       samples++;
-      const hits = ray.intersectObjects(surfaces, false).filter((h) => h.point.y <= head.point.y + 0.4);
+      const hits = surfaceRays.cast(...o, 4).filter((h) => h.point.y <= head.point.y + 0.4);
       const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId);
       if (!ownBed) missingBed++;
       else covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
@@ -710,14 +771,12 @@ function deckClip(g, world) {
   // meshes, Mosty 3D bridges among them, after the tram's envelope is cut out of them)
   const meshes = [];
   world.traverse((o) => { if (o.isMesh && o.userData.building) meshes.push(o); });
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), from = new THREE.Vector3();
+  const rays = new DownRays(meshes);
   const bad = new Map();
   let n = 0;
   const test = (x, y, z, s, what) => {
     n++;
-    ray.set(from.set(x, z + 2.5, -y), down);
-    ray.far = 2.35;
-    const hit = ray.intersectObjects(meshes, false)[0];
+    const hit = rays.cast(x, z + 2.5, -y, 2.35)[0];
     if (!hit) return;
     const mag = hit.point.y - z, k = `${what}${Math.round(x / 20)},${Math.round(y / 20)}`;
     if (!(bad.get(k)?.mag >= mag)) bad.set(k, { s: Math.round(s), x, y, mag, info: `${what}: model ${mag.toFixed(2)} m over it` });

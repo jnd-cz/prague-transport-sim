@@ -196,6 +196,7 @@ async function buildCity() {
   await load.parts(WORLD_PARTS);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground));
+  ground.dtm?.seal(); // (the survey's heights are final now: faster lookups for the simulation, #245)
   window.world = world; // read by the lints (tools/lint.js)
 }
 

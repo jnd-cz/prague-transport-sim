@@ -304,7 +304,32 @@ Review these when realism matters; most move into the build in M2.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
-- Line 17's full lint after the merge is the pre-rebuild reference (`reports/line17.json`).
+- Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
+  report, not in git); regressions compare with `reports/baseline/headless.json`.
+- **Where a check's time goes** (#205, `tools/profile_check.py`, line 17 seed 1, 2026-11-04, 3 pages at once):
+  the page load to the hidden loading screen takes 56-67 s, 78 % of it in `world.js` and `terrain.js`
+  (`finesAt` 11 %, `_hitTri` 9 %, `dist` 7 %, garbage collection 7 %, `route.nearest` 6 %). The seeded runs
+  take 85 s each (u3, traffic) with the main thread busy 99 % of it, so drawing is not what costs (headless
+  draws once a second): traffic.js 40 %, terrain.js 29 % (all of it `_hitTri`, the ground triangle under a car
+  or walker: 23 % of the run), route.js 11 % (`nearest` 7 %), three.js 4 %, game.js 3 %. The JS heap is
+  1.1 GB after load and 1.3 GB after a run.
+  The lint run is 95 % three.js ray casting (`intersectTriangle`, `getVertexPosition`, `fromBufferAttribute`):
+  `railSupport`, `cantedRailVisibility` and `deckClip` cast `THREE.Raycaster` rays at whole meshes without a
+  spatial index, so every ray tests every triangle of the merged street meshes (537 s with 7 other jobs running;
+  #205 measured 254 s mean per lint run).
+- **The ground under cars and walkers** (#245, line 17 u3 seed 1): `_hitTri` is called from `carPose` (4 points per
+  car per step, ~9 s of a 66 s run), the walkers (~3 s) and `_fitRoad` at traffic set-up (~2 s). Reading the
+  triangles from typed arrays once the load is done (`DtmSurface.seal`) took its share from 22 to 13 %, with the
+  same counts on all 75 seeded runs. What did not help, measured:
+  - reading the lidar height only when two triangles hold the point: most points have two (kerbs, overlapping
+    areas), so the reads stayed;
+  - `inLane` in 2 m instead of 4 m cells: the same 6.6 s, the cost is the map lookups, not the points;
+  - the triangle found last tried first, when it overlaps no other: a triangle spans several 3 m cells holding
+    dozens of others, so proving that cost more (14 s) than the lookups it saved, and the four pose points rarely
+    share a triangle.
+
+  What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
+  only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
 
 ## Environment (Windows dev machines)
 

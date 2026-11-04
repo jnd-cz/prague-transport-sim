@@ -1193,7 +1193,7 @@ export class Traffic {
           const { back, src } = this._stopLine(lane, kind, P, osmStops);
           // (the head 4 m past the stop line, never past the lane's end: the surveyed signal poles of the
           // technical map stand a median 4.2 m past the OSM stop line, 10-90 % −0.7 to +7.1 m, line 17,
-          // .claude/bench/heads.js; on the line they were 5.5 m off)
+          // tools/bench/heads.js; on the line they were 5.5 m off)
           const e = lane.path.at(Math.min(lane.path.length, lane.path.length - back + 4));
           const x = e.x + e.hy * 2.2, y = e.y - e.hx * 2.2, face = Math.atan2(-e.hx, e.hy);
           // lanes side by side share a head (within 4 m, facing the same way)
