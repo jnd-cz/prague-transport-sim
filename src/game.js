@@ -1205,7 +1205,9 @@ export class Game {
     // departure detection
     if (st.served && st.departClock === null && tram.v > 0.3) st.departClock = this.clock;
 
-    const passed = tram.s > st.zone[1] + 1;
+    // (past the zone it is passed: a tram standing in the metre after it was neither at the stop nor past
+    // it, and stood for good, the autopilot aiming at a stop point behind it: #241's checks)
+    const passed = tram.s > st.zone[1];
     const last = this.nextStop === this.stops.length - 1;
     if (last && st.served && st.alight === 0 && this.doorState === 'open') {
       this._finishStop(st);
