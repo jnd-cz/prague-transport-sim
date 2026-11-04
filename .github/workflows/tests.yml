@@ -1,0 +1,25 @@
+# The tools' tests that need neither data/ nor raw/ (a fresh clone has neither), and ruff (#222).
+# The game's headless checks need the data store and run on the deploy PC (#102).
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # (tests that compare with a published version read git history)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # the versions on the development PCs; playwright only as a module (headless.py imports it),
+      # the browser tests are not run here
+      - run: python -m pip install ruff==0.17.3 numpy~=2.5 shapely~=2.2 pyproj~=3.8 osmium~=4.3 Pillow~=13.0 playwright~=1.64
+      - run: ruff check tools
+      - run: python -I tools/test_all.py

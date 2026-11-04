@@ -12,7 +12,6 @@ Adds "clearances": [{"s", "x", "y", "mh", "src", "kind", "name"}] to data/lineN.
 """
 import glob
 import json
-import math
 import os
 import re
 import sys

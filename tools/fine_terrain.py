@@ -22,7 +22,6 @@ samples a side (shared edges, so neighbouring blocks meet exactly). Export tiles
 """
 import io
 import json
-import math
 import os
 import sys
 import time

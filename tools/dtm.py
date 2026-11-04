@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 import sources  # noqa: E402
 import gpkg  # noqa: E402
-from dtm_packages import CORRIDOR, DTM, select_packages  # noqa: E402
+from dtm_packages import DTM, select_packages  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
