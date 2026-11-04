@@ -396,8 +396,9 @@ class Source:
                     break
 
     def _gauntlets(self):
-        """Interlaced track with no switch at either end (GAUNTLET): neither tip is a fork; both go to
-        self.gauntlets [(tip, tip)]."""
+        """Interlaced track with no switch at either end (GAUNTLET): neither tip is a fork, nor a joint between
+        them (the two tracks' record ends 9 cm apart meet within JOIN: Malostranské náměstí's middle); the tips go
+        to self.gauntlets [(tip, tip)]."""
         it, pairs = getattr(self, 'interlaced', []), []
         for a in range(len(it)):
             for b in range(a + 1, len(it)):
@@ -410,7 +411,8 @@ class Source:
         self.gauntlets = [(it[a]['tip'], it[b]['tip']) for a, b in pairs]
         drop = {k for pr in pairs for k in pr}
         tips = {it[k]['tip'] for k in drop}
-        keep = [i for i, f in enumerate(self.forks) if f not in tips]
+        between = [LineString(g) for g in self.gauntlets]
+        keep = [i for i, f in enumerate(self.forks) if f not in tips and not any(g.distance(Point(f)) <= JOIN for g in between)]
         self.forks = [self.forks[i] for i in keep]
         self.branches = [self.branches[i] for i in keep]
         self.far = [self.far[i] for i in keep]

@@ -230,7 +230,7 @@ class Pairing(unittest.TestCase):
         # nodes at both ends); an interlaced switch's tip facing the other way, or with a run that ends elsewhere, stays
         di = dt.Source('di', [rec(1, [(0, 0), (200, 0)])])
         tips = [(10, 0), (54.3, 0), (80, 0), (150, 0)]
-        di.forks, di.branches, di.far = list(tips), [[k] for k in range(4)], [[k] for k in range(4)]
+        di.forks, di.branches, di.far = list(tips) + [(30, 0.05)], [[k] for k in range(5)], [[k] for k in range(5)]   # (a joint between)
         di.interlaced = [{'tip': tips[0], 'dir': (1, 0), 'side': 1, 'run': 45.0},
                          {'tip': tips[1], 'dir': (-1, 0), 'side': -1, 'run': 45.0},
                          {'tip': tips[2], 'dir': (1, 0), 'side': 1, 'run': 28.0},
