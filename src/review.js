@@ -37,6 +37,15 @@ const OPTIONS = {
   trackheight: ['archive profile ok', 'follows survey surface', 'other level (deck / under)', 'unsure'],
 };
 const LEVEL_COLORS = { '-1': '#3ee0ff', 0: '#ffffff', 1: '#ff9a3e' }; // the source's levels: under, at, over ground
+// the IPR orthophoto (#201): leaf-off flight 2026, 0.05 m, CC BY 4.0. The browser loads it straight from
+// IPR (the service answers CORS for any origin): nothing goes through or stays on our server. One image
+// of ORTHO_M around the target at 0.1 m (~280 kB), taken again when the target leaves its middle ORTHO_STEP;
+// close up (the camera within ORTHO_NEAR) half of it at the native 0.05 m: a rail head (~6 cm) is lost at 0.1 m.
+const ORTHO = 'https://gs-pub.praha.eu/imgs/rest/services/ort/mimovegetacni_letecke_snimkovani/ImageServer';
+const ORTHO_M = 150, ORTHO_PX = 1500, ORTHO_STEP = 50, ORTHO_GRID = 2, ORTHO_NEAR = 40; // m, px, m, m between draped vertices, m
+const ORTHO_CREDIT = 'Ortofoto: IPR Praha (CC BY 4.0)';
+// the line's track centrelines by source (data/lineN.json tracks[].src, tools/build_line.py)
+const TRACK_COLORS = { di: '#ff8c1a', osm: '#e040fb', dtmp: '#ffe14a', ortho: '#7cff6b' };
 const options = (f) => f.options || (f.kind === 'trackheight' ? OPTIONS.trackheight : f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
 // (a finding's place and kind: the same after a rebuild that leaves it where it was)
 const fid = (f) => f.kind === 'trackheight' ? `${f.src}|trackheight|${f.id}` : `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
@@ -161,7 +170,7 @@ export class Review {
     this.cur = -1;
     this.T = { x: 0, y: 0, z: 0 };
     this.yaw = 0; this.pitch = 0.75; this.dist = 90;
-    this.layers = { classes: true, wire: false, source: false, kerbs: true, seams: true, findings: true, track: true, buildings: true, trees: true };
+    this.layers = { classes: true, wire: false, source: false, kerbs: true, seams: true, findings: true, track: true, buildings: true, trees: true, ortho: false, sources: false };
     this.held = new Set();
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -285,6 +294,9 @@ body.review #gl { touch-action: none }
 #review textarea { width: 100%; font: inherit; color: #eee; background: #1d2026; border: 1px solid #444; border-radius: 6px; padding: 6px 8px; resize: vertical }
 #review .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 10px 6px; font-size: 11px }
 #review:not(.lay) #rvLayers, #review:not(.lay) .legend { display: none }
+#rvCredit { position: fixed; top: 6px; left: 6px; z-index: 60; max-width: calc(100% - 12px); background: rgba(18,20,24,.8); color: #eee;
+  font: 12px/1.3 system-ui, sans-serif; padding: 3px 8px; border-radius: 6px; display: none }
+#rvCredit.err { color: #ffb0b0 }
 #review.min .rvList, #review.min .rvRow.more, #review.min .legend { display: none }
 @media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
   #review { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 52vh; border-radius: 12px 12px 0 0; font-size: 14px;
@@ -302,20 +314,32 @@ body.review #gl { touch-action: none }
 <div class="rvHead"><b>Review · line ${this.data.line}</b><span class="dim" id="rvCount"></span><button id="rvLay">Layers</button><button id="rvMin" title="fold the panel">▾</button></div>
 <div class="rvRow more" id="rvLayers"></div>
 <div class="legend" id="rvLegend">${Object.entries(CLASS_COLORS).map(([c, col]) => `<span><span class="sw" style="background:${col}"></span>${c}</span>`).join('')}</div>
+<div class="legend" id="rvTrackLegend">tracks: ${Object.entries(TRACK_COLORS).map(([c, col]) => `<span><span class="sw" style="background:${col}"></span>${c}</span>`).join('')}</div>
 <div class="rvRow more"><select id="rvFilter"></select><button id="rvTodo" title="hide the findings with an answer">to do</button></div>
 <div class="rvCard" id="rvCard"><span class="dim">loading findings…</span></div>
 <div class="rvList" id="rvList"></div>`;
     document.body.appendChild(box);
+    // (over the map, where the panel is not: the orthophoto's credit and whether it loaded)
+    this.credit = document.createElement('div');
+    this.credit.id = 'rvCredit';
+    document.body.appendChild(this.credit);
     const $ = (id) => box.querySelector(`#${id}`);
-    const names = { classes: 'Classes', wire: 'Wireframe', source: 'Source', kerbs: 'Kerbs', seams: 'Seams', findings: 'Pins', track: 'Track', buildings: 'Buildings', trees: 'Trees, wires' };
+    const names = { classes: 'Classes', wire: 'Wireframe', source: 'Source', kerbs: 'Kerbs', seams: 'Seams', findings: 'Pins', track: 'Track', buildings: 'Buildings', trees: 'Trees, wires', ortho: 'Orthophoto', sources: 'Track sources' };
     for (const [k, label] of Object.entries(names)) {
       const b = document.createElement('button');
       b.textContent = label;
+      b.dataset.layer = k;
       b.classList.toggle('on', this.layers[k]);
       b.onclick = () => {
         this.layers[k] = !this.layers[k];
         b.classList.toggle('on', this.layers[k]);
         if (k === 'source' && this.layers.source) this._loadSource();
+        if (k === 'ortho') {
+          this.orthoAt = null; this._ortho(); // (switched on again: a failed load is tried again)
+          // (the classes are drawn after any opaque mesh, over the photo: off with it, one click brings them back)
+          if (this.layers.ortho && this.layers.classes) $('rvLayers').querySelector('[data-layer="classes"]').click();
+        }
+        if (k === 'sources' && this.layers.sources) this._trackSources();
         this._applyLayers();
       };
       $('rvLayers').appendChild(b);
@@ -713,6 +737,10 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (this.seamBars) this.seamBars.visible = L.seams;
     if (this.markers) this.markers.visible = L.findings;
     if (this.trackLine) this.trackLine.visible = L.track;
+    if (this.orthoMesh) this.orthoMesh.visible = L.ortho;
+    this.credit.style.display = L.ortho ? 'block' : 'none';
+    if (this.sourceLines) this.sourceLines.visible = L.sources;
+    this.$('rvTrackLegend').style.display = L.sources ? '' : 'none';
     // (the world's meshes carry their build part, src/world.js buildWorld)
     for (const o of this.world?.children || []) {
       if (o.userData.part === 'buildings') o.visible = L.buildings;
@@ -732,7 +760,90 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     cam.lookAt(T.x, T.z, -T.y);
     this.moved = performance.now();
     if (!this.nearAt || Math.hypot(T.x - this.nearAt.x, T.y - this.nearAt.y) > NEAR / 3) this._near();
+    this._ortho();
     this.dirty = true;
+  }
+
+  // ------------------------------------------------------------------ the orthophoto and the track sources (#201)
+  // the image of the ORTHO_STEP cell around the target, draped over the ground: drawn over the world (the
+  // survey surfaces and the track bed lie up to ~0.3 m over the terrain and would cut it), under the overlays
+  _ortho() {
+    if (!this.layers.ortho) return;
+    const k = this.dist < ORTHO_NEAR ? 0.5 : 1, step = ORTHO_STEP * k, M = ORTHO_M * k;
+    const cx = Math.round(this.T.x / step) * step, cy = Math.round(this.T.y / step) * step;
+    if (this.orthoAt && this.orthoAt[0] === cx && this.orthoAt[1] === cy && this.orthoAt[2] === k) return;
+    const at = (this.orthoAt = [cx, cy, k]), [ox, oy] = this.data.frame.origin, h = M / 2;
+    const bbox = [ox + cx - h, oy + cy - h, ox + cx + h, oy + cy + h].map((v) => v.toFixed(1)).join(',');
+    this.orthoUrl = `${ORTHO}/exportImage?bbox=${bbox}&bboxSR=5514&imageSR=5514&size=${ORTHO_PX},${ORTHO_PX}&format=jpg&f=image`;
+    this._credit('loading…');
+    new THREE.TextureLoader().setCrossOrigin('anonymous').load(this.orthoUrl, (tex) => {
+      if (this.orthoAt !== at) { tex.dispose(); return; } // (the target moved on meanwhile)
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      const n = Math.round(M / ORTHO_GRID), G = M / n, pos = [], uv = [], idx = [], N = n + 1; // (75 m: 38 cells)
+      // the ground smoothed over 10 m (5 × 5 vertices): its kerb steps and the track blend, seen close up
+      // and off the camera's axis, shifted the photo's rows sideways by up to ~20 px
+      const z0 = new Float32Array(N * N), z1 = new Float32Array(N * N), R = 2;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) z0[j * N + i] = this.ground.at(cx - h + i * G, cy - h + j * G);
+      for (const [src, dst, di, dj] of [[z0, z1, 1, 0], [z1, z0, 0, 1]]) for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        let s = 0, c = 0;
+        for (let k = -R; k <= R; k++) { const a = i + k * di, b = j + k * dj; if (a >= 0 && a < N && b >= 0 && b < N) { s += src[b * N + a]; c++; } }
+        dst[j * N + i] = s / c;
+      }
+      for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+        const x = cx - h + i * G, y = cy - h + j * G;
+        pos.push(x, z0[j * N + i] + 0.05, -y);
+        uv.push(i / n, j / n);
+        if (i && j) { const a = (j - 1) * (n + 1) + i - 1, b = a + n + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      this._dropOrtho();
+      // (opaque: three.js draws the opaque pass first, by renderOrder, so the overlay lines, which are opaque,
+      // come after it; a transparent image would be drawn over all of them)
+      this.orthoMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, depthTest: false, side: THREE.DoubleSide }));
+      this.orthoMesh.renderOrder = 2;
+      this.group.add(this.orthoMesh);
+      this._credit(null);
+      this._applyLayers();
+    }, undefined, () => {
+      if (this.orthoAt === at) this._credit('not available: the IPR service did not answer or refused the page. Switch the layer off and on to try again.');
+    });
+  }
+
+  _dropOrtho() {
+    if (!this.orthoMesh) return;
+    this.group.remove(this.orthoMesh);
+    this.orthoMesh.geometry.dispose(); this.orthoMesh.material.map.dispose(); this.orthoMesh.material.dispose();
+    this.orthoMesh = null;
+  }
+
+  _credit(state) {
+    this.credit.textContent = state ? `${ORTHO_CREDIT}: ${state}` : ORTHO_CREDIT;
+    this.credit.classList.toggle('err', !!state && state.startsWith('not'));
+  }
+
+  // the line's track centrelines as the build took them, coloured by source: 1 px lines (as thin as can
+  // be seen at any zoom), to lay over the rails on the orthophoto
+  _trackSources() {
+    if (this.sourceLines) return;
+    const pos = [], col = [], c = new THREE.Color();
+    for (const t of this.data.tracks || []) {
+      c.set(TRACK_COLORS[t.src] || '#ffffff');
+      for (let i = 1; i < t.p.length; i++) {
+        const [x0, y0] = t.p[i - 1], [x1, y1] = t.p[i];
+        pos.push(x0, this.ground.at(x0, y0) + 0.3, -y0, x1, this.ground.at(x1, y1) + 0.3, -y1);
+        col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    this.sourceLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+    this.sourceLines.renderOrder = 6;
+    this.group.add(this.sourceLines);
   }
 
   _pan(dx, dy) {
