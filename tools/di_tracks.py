@@ -43,7 +43,7 @@ TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the tra
 BLEND = 20.0   # m along an OSM fill stretch over which it takes up the shift of its matched neighbours
 CHANGE = 1.0   # m-equivalent cost of continuing on another chain along one OSM edge
 JOINT = 4.0    # m: the chain may change only this near the joint of the two chains (STEP + TOL)
-CONTEXT = 10.0  # m of the straightest continuation on either side a stretch is matched with: the 4.75 m between two
+STRAIGHT_ON = 4.0  # m of the straightest continuation on either side a stretch is matched with: the 4.75 m between two
                 # switches at Strossmayerovo náměstí, alone, lay nearer the branch DI draws 0.19 m beside the straight
                 # (the straight was drawn bent onto it, 8 cm); the branch's chain does not reach the straight beyond
 CONTINUE = 30.0  # degrees: an edge continues another within this
@@ -605,7 +605,7 @@ class TrackGeometry:
                 d = math.dist(f, pos[n])
                 collapse = self._past(n, f, pos)
                 if d <= FORK and on(f) and same_way(dirs, src.branches[i]):
-                    # (a switch whose branch leaves to the other side, over CONTEXT m, takes it only if no switch
+                    # (a switch whose branch leaves to the other side, over STRAIGHT_ON m, takes it only if no switch
                     # nearby fits: Strossmayerovo náměstí's westward turn left its fork to OSM's switch 2.1 m on,
                     # whose branch leaves the other way, and started 3.8 m late at 12°)
                     c = (d + (FORK if legs and branch_side(far_dirs) * branch_side(src.far[i]) < 0 else 0.0),
@@ -714,7 +714,7 @@ class TrackGeometry:
                 self.pts[(a, b)] = [self.pos[a], self.pos[b]]
         self.report = self._report(sources)
 
-    def _far(self, n, m, pos, length=CONTEXT):
+    def _far(self, n, m, pos, length=STRAIGHT_ON):
         """The unit direction from node n to the point `length` m on along n-m and its straightest continuations."""
         prev, cur, d, seen = n, m, math.dist(pos[n], pos[m]), {n, m}
         while d < length:
@@ -729,14 +729,14 @@ class TrackGeometry:
         return _unit((pos[cur][0] - pos[n][0], pos[cur][1] - pos[n][1]))
 
     def _context(self, nodes, pos):
-        """The nodes continuing a node sequence straight on at either end, up to CONTEXT m: through two-edge nodes,
-        and through a switch only from its toe or through leg into the other (its legs by their directions over
-        CONTEXT m: OSM's first metres made a crossover the through leg at Strossmayerovo náměstí). None from a
+        """The nodes continuing a node sequence straight on at either end, up to STRAIGHT_ON m: through two-edge
+        nodes, and through a switch only from its toe or through leg into the other (its legs by their directions over
+        STRAIGHT_ON m: OSM's first metres made a crossover the through leg at Strossmayerovo náměstí). None from a
         diverging leg, at a crossing or past a turn over CONTINUE degrees."""
         out = []
         for seq in (nodes[::-1], nodes):
             prev, cur, ext, d = seq[-2], seq[-1], [], 0.0
-            while d < CONTEXT:
+            while d < STRAIGHT_ON:
                 ms = [m for m in self.adj[cur]]
                 if len(ms) == 2:
                     nxt = next(m for m in ms if m != prev)

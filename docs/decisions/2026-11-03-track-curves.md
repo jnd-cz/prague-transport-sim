@@ -52,11 +52,11 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   direction should be straight without any kinks, first switch is to the left, then further to the right"; "I
   would put higher priority to keep the through track straight, then let other track branch from it to the
   side"). There the straights swung 8-12 cm over 21 m, though DI draws them straight within 0.1°:
-  - A stretch is matched with up to `CONTEXT` = 10 m of its straight continuation: through two-edge nodes, and
-    through a switch only from its toe or through leg (its legs by their directions over 10 m). Alone, the
+  - A stretch is matched with up to `STRAIGHT_ON` = 4 m of its straight continuation: through two-edge nodes, and
+    through a switch only from its toe or through leg (its legs by their directions over 4 m). Alone, the
     4.75 m between two switches lay nearer the branch DI draws 0.19 m beside the straight, and the straight was
     drawn onto it; the branch's chain does not reach the straight beyond.
-  - A DI fork goes to an OSM switch whose branch leaves to the other side (over 10 m) only if no switch nearby
+  - A DI fork goes to an OSM switch whose branch leaves to the other side (OSM's over 4 m, DI's over 8 m) only if no switch nearby
     fits: the westward turn's fork went to OSM's switch 2.1 m on, whose branch leaves the other way, and the turn
     started 3.8 m late at 12°.
 
