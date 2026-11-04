@@ -13,6 +13,9 @@ Generated in code, part of the GPL-3.0 code: the procedural tram, cars, people, 
 street furniture (`src/models.js`), textures drawn on canvas (plates, facades, signs), and all sound
 (Web Audio synthesis, `src/audio.js`).
 
+Not in the repository yet: the older asset labs' T3, cars, pedestrians and street furniture, listed with
+their licences in [docs/assets-inventory.md](docs/assets-inventory.md).
+
 Not in the repository: the world data built from public sources (see [NOTICE.md](NOTICE.md)) and the
 raw sources themselves, both in the data store ([DATA.md](DATA.md)).
 
