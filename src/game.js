@@ -6,7 +6,7 @@ import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
   makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
-  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign,
+  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign, disposeModel,
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
@@ -1463,7 +1463,7 @@ export class Game {
       }
     }
     sig.cars = sig.cars.filter((c) => {
-      if (c.s < -1 || c.s > X.length + 1) { this.objects.remove(c.mesh); return false; }
+      if (c.s < -1 || c.s > X.length + 1) { this.objects.remove(c.mesh); disposeModel(c.mesh); return false; }
       return true;
     });
   }

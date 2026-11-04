@@ -15,6 +15,7 @@ export async function run(seed = 1, opts = {}) {
   const $ = (id) => document.getElementById(id);
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
   $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal';
+  $('optTemp').value = 'autumn'; // (not the live weather: the heating and climate penalties follow it; as traffic_lint)
   $('btnStart').click();
   window.headless = true;
   const { Autopilot } = await import('/src/autopilot.js');
