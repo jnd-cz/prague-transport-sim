@@ -219,6 +219,13 @@ export class TR37 {
     // (into a stop on step 3 or more: at the fade the shoes come in partly and the car stops gently)
     const brake = -pick(-w.force, (k) => this.brakeForce(k));
     let s = w.stand ? Math.min(-3, brake) : w.coast ? 0 : w.force > 0 ? pick(w.force, (k) => this.driveForce(k)) : brake;
+    // a step is held while it does the job: a brake step while its force is 75–160 % of the force wanted (it
+    // took steps 2 and 3 by turns every 0.6 s braking into a stop), a drive step for the whole press
+    if (s < 0 && s >= -5 && A.step < 0 && A.step >= -5) {
+      const f = -w.force, cur = this.brakeForce(-A.step);
+      if (cur >= f * 0.75 && cur <= f * 1.6) s = A.step;
+    }
+    if (s > 0 && A.step > 0) s = A.step;
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
     if (w.slip && s > 1) s--;
