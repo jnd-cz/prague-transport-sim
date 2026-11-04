@@ -821,16 +821,6 @@ class TrackGeometry:
                 hit = self.edges[via]
                 if hit[0] is src:
                     only.add(hit[1][0][0] if n == via[0] else hit[1][-1][0])
-                    # (and the chains leaving n the stretch's way: DI's chains end at crossings, and at Anděl the
-                    # track south of a crossing starts there, 2.2 m from OSM's, while the end's matched edge is the
-                    # crossing track's, #20)
-                    e = next(e for e in stretch if n in e)
-                    m = e[1] if e[0] == n else e[0]
-                    l = math.dist(pos[n], pos[m]) or 1
-                    near = src.candidates(*pos[n], (pos[m][0] - pos[n][0]) / l, (pos[m][1] - pos[n][1]) / l, CONTEXT)
-                    if near:
-                        best = min(near.values())
-                        only.update(c for c, d in near.items() if d <= best + 1.0)
                     continue
                 m = via[1] if via[0] == n else via[0]
                 l = math.dist(pos[n], pos[m]) or 1

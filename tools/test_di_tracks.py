@@ -71,17 +71,6 @@ class Matching(unittest.TestCase):
         geo = dt.TrackGeometry({1: p0, 2: p1, 3: p2, 4: p3}, [(1, 2), (2, 3), (3, 4)], [di])
         self.assertLess(max(off_line(p, a) for p in geo.points(2, 3)), 0.01)
 
-    def test_a_track_past_a_crossing_beyond_the_tolerance_takes_the_chain_through_the_crossing(self):
-        # Anděl: OSM's track runs 2.2 m from DI's south of a crossing (past TOL) to a switch; the matched edges at
-        # its ends are the crossing track's and the switch's branch: the stretch still takes DI's through track
-        di = dt.Source('di', [rec(1, [(0, -100), (0, -60)]), rec(2, [(0, -60), (0, 60)]), rec(3, [(0, -60), (15, -95)]),
-                              rec(4, [(-60, 0), (60, 0)])])
-        pos = {1: (1.9, 0.0), 2: (-60, 0.3), 3: (60, 0.3), 4: (1.0, 60), 5: (2.2, -30), 6: (1.8, -60), 7: (15.5, -95),
-               8: (0.5, -100)}
-        geo = dt.TrackGeometry(pos, [(2, 1), (1, 3), (1, 4), (1, 5), (5, 6), (6, 7), (6, 8)], [di])
-        self.assertEqual(geo.source(1, 5)['src'], 'di')
-        self.assertLess(max(abs(p[0]) for p in geo.points(1, 5)), 0.01)
-
     def test_the_archive_fills_where_di_has_no_track_and_osm_where_neither_has(self):
         di = dt.Source('di', [rec(1, [(0, 0), (100, 0)])])
         archive = dt.Source('dtmp', [rec(9, [(100, 0), (200, 0)])])
