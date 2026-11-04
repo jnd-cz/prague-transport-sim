@@ -238,6 +238,13 @@ export class TR37 {
       const need = w.stopDist == null ? 0 : (w.v * w.v) / (2 * Math.max(0.3, w.stopDist));
       s = need > 0.15 || (w.stopDist != null && w.stopDist < 8) ? -5 : Math.min(s, -3);
     }
+    // a stop the service brake (≈1.3 m/s² on step 5) cannot make: the pedal to the floor, the track brakes
+    // with it, as a driver does for a signal turning red too close (line 17 seed 3: red 36 m ahead at
+    // 38 km/h, 1.6 m/s² needed; the old force model braked 1.8 m/s²); let go once it is in hand
+    if (w.stopDist != null && Math.abs(w.v) > 2) {
+      const need = (w.v * w.v) / (2 * Math.max(0.5, w.stopDist));
+      if (need > 1.15 || (A.step === -6 && need > 0.6)) s = -6;
+    }
     if (s !== A.step && (A.hold <= 0 || w.urgent || (s < A.step && s < 0) || w.power != null)) {
       A.step = s; A.hold = 0.6;
       this.setStep(s);
