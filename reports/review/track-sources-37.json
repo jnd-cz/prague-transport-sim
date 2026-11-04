@@ -1,0 +1,115 @@
+{
+ "schema": 1,
+ "issue": 20,
+ "line": "37",
+ "options": [
+  "matches reality",
+  "unsure"
+ ],
+ "findings": [
+  {
+   "kind": "switch without DI fork",
+   "id": "switch without DI fork|3437.7,-114.3",
+   "line": "37",
+   "x": 3437.7,
+   "y": -114.3,
+   "s": 2137.0,
+   "mag": 5,
+   "status": "review",
+   "info": "OSM has a facing switch here that no DI fork was paired with (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If not, say so in a note: switches are not removed from answers yet.",
+   "lat": 50.090557,
+   "lon": 14.469137
+  },
+  {
+   "kind": "switch without DI fork",
+   "id": "switch without DI fork|5997.6,809.9",
+   "line": "37",
+   "x": 5997.6,
+   "y": 809.9,
+   "s": 6225.5,
+   "mag": 5,
+   "status": "review",
+   "info": "OSM has a facing switch here that no DI fork was paired with (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If not, say so in a note: switches are not removed from answers yet.",
+   "lat": 50.101908,
+   "lon": 14.502837
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|3928.1,1245.2",
+   "line": "37",
+   "x": 3928.1,
+   "y": 1245.2,
+   "s": 3930.1,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.103265,
+   "lon": 14.47335
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|3924.5,1239.8",
+   "line": "37",
+   "x": 3924.5,
+   "y": 1239.8,
+   "s": 3924.3,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.103213,
+   "lon": 14.473311
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|3965.5,1280.4",
+   "line": "37",
+   "x": 3965.5,
+   "y": 1280.4,
+   "s": 3981.7,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.103624,
+   "lon": 14.473802
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|3961.1,1282.4",
+   "line": "37",
+   "x": 3961.1,
+   "y": 1282.4,
+   "s": 3978.8,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.103637,
+   "lon": 14.473737
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|6040.4,802.8",
+   "line": "37",
+   "x": 6040.4,
+   "y": 802.8,
+   "s": 6269.2,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.101897,
+   "lon": 14.503444
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|3427.8,-115.7",
+   "line": "37",
+   "x": 3427.8,
+   "y": -115.7,
+   "s": 2147.0,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.090532,
+   "lon": 14.469003
+  }
+ ]
+}

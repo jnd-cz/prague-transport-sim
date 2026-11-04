@@ -1,0 +1,50 @@
+{
+ "schema": 1,
+ "issue": 20,
+ "line": "23",
+ "options": [
+  "matches reality",
+  "unsure"
+ ],
+ "findings": [
+  {
+   "kind": "switch without DI fork",
+   "id": "switch without DI fork|-2892.5,142.1",
+   "line": "23",
+   "x": -2892.5,
+   "y": 142.1,
+   "s": 44.7,
+   "mag": 5,
+   "status": "review",
+   "info": "OSM has a facing switch here that no DI fork was paired with (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If not, say so in a note: switches are not removed from answers yet.",
+   "lat": 50.085084,
+   "lon": 14.381012
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|-1259.2,-520.1",
+   "line": "23",
+   "x": -1259.2,
+   "y": -520.1,
+   "s": 4975.6,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.081194,
+   "lon": 14.404885
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|-2984.7,168.7",
+   "line": "23",
+   "x": -2984.7,
+   "y": 168.7,
+   "s": 0.0,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.085208,
+   "lon": 14.379685
+  }
+ ]
+}
