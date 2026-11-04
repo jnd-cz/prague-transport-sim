@@ -815,7 +815,9 @@ export class Traffic {
           // behind its tail, which waited for it, line 9 s 18390, #152; not a car before the junction: let
           // through, cars drove in behind one waiting for the tram and blocked the track, line 22 s 11969;
           // and a car only enters when its exit lane has room: it never stops inside the junction)
-          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7);
+          // (nor does one in the exit's mouth that waits for this one: car 1299 stood on the track there
+          // waiting for 1290, which waited for the exit to clear, line 9 s 18394 seed 1, #259)
+          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7 && o.seen?.car !== c && o.lead !== c);
           const blocker = live.find((o) => o !== c && (
             (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan) && o.seen?.car !== c)
             || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, c.plan)
