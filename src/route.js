@@ -6,6 +6,7 @@
 // curves as straight segments; this turns them into continuous curves. Returns the points
 // and their arc-length positions along the ORIGINAL polyline. `radius` may be a function of that
 // arc length: surveyed track (DI, the archived DTMP axes; #20) is already curved and is only resampled.
+// A radius of 0 resamples only (a window under one step still averaged three points).
 export function smoothPolyline(pts, step = 1, radius = 6) {
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
@@ -21,15 +22,16 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
     ys[i] = pts[j][1] + (pts[j + 1][1] - pts[j][1]) * t;
     ss[i] = s;
   }
-  const kOf = (rad) => Math.max(1, Math.round(rad / (L / (n - 1) || 1)));
+  const kOf = (rad) => (rad > 0 ? Math.max(1, Math.round(rad / (L / (n - 1) || 1))) : 0);
   const weights = new Map(), win = (k) => {
     if (!weights.has(k)) { const w = []; for (let d = 0; d <= k; d++) w.push(Math.exp(-0.5 * (d / (k / 2)) ** 2)); weights.set(k, w); }
     return weights.get(k);
   };
   const out = [];
   for (let i = 0; i < n; i++) {
-    const k = kOf(typeof radius === 'function' ? radius(ss[i]) : radius), w = win(k);
-    const r = Math.min(k, i, n - 1 - i);
+    const k = kOf(typeof radius === 'function' ? radius(ss[i]) : radius);
+    if (!k) { out.push([xs[i], ys[i]]); continue; }
+    const w = win(k), r = Math.min(k, i, n - 1 - i);
     let sx = 0, sy = 0, sw = 0;
     for (let d = -r; d <= r; d++) { const ww = w[Math.abs(d)]; sx += xs[i + d] * ww; sy += ys[i + d] * ww; sw += ww; }
     out.push([sx / sw, sy / sw]);
@@ -92,11 +94,13 @@ export function extendAlongTracks(tracks, pts, len = 60) {
 // Track geometry from a survey (the line data's trackSource ranges and track chains' `src`, #20) is drawn
 // as it is: smoothing it would pull a tight curve inside the real one (an 18 m curve: 0.2 m with the 6 m
 // window). OSM fill keeps the window, unless the build already drew all of it as smooth curves (the line
-// data's `trackCurve`, tools/track_curve.py, #204).
+// data's `trackCurve`, tools/track_curve.py, #204): those are resampled only (AS_CURVED). Averaging three
+// points 1.5 m apart turned a 0.9° joint of the build at Strossmayerovo náměstí into 3.7° at the end of a 4.6 m
+// piece.
 export const SURVEYED = new Set(['di', 'dtmp']);
-export const SMOOTH = 6, AS_SURVEYED = 0.1;
+export const SMOOTH = 6, AS_SURVEYED = 0.1, AS_CURVED = 0;
 export function radiusAlong(ranges, offset = 0, curved = false) {
-  if (curved) return AS_SURVEYED;
+  if (curved) return AS_CURVED;
   if (!ranges?.length) return SMOOTH;
   return (s) => {
     const x = s - offset;

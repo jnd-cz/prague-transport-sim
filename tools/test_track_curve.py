@@ -71,6 +71,16 @@ class Fit(unittest.TestCase):
         self.assertLess(min(rad), tc.MIN_RADIUS)
         self.assertLess(max(off(p, samples) for p in pts), errors['1'] + 0.005)
 
+    def test_a_curve_under_18_m_moves_past_its_class(self):
+        # a 30° corner: within class 1 it bends under 18 m (`min-radius-network`, the user: "under 18m there
+        # shouldn't be anything like that"), so its points move further, at most HOLD_LIMIT
+        pts = [(x / 2, 0.0) for x in range(0, 61)] + [(30 + x / 2 * math.cos(math.radians(30)), x / 2 * math.sin(math.radians(30))) for x in range(1, 61)]
+        errors = tc.class_errors()
+        samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), limit=[errors['1']] * len(pts))
+        self.assertGreater(min(rad), tc.NETWORK_RADIUS * tc.SLACK)
+        self.assertGreater(max(tol), errors['1'])
+        self.assertLessEqual(max(tol), tc.HOLD_LIMIT + 1e-9)
+
 
 class Network(unittest.TestCase):
     def test_a_diverging_track_leaves_tangent_to_the_through_track(self):
@@ -84,6 +94,20 @@ class Network(unittest.TestCase):
         self.assertLess(abs(math.degrees(math.atan2(out[1][1] - out[0][1], out[1][0] - out[0][0]))), 1.0)
         self.assertGreater(math.degrees(heading(out[::-1], d=10.0)) % 180, 3.5)
         self.assertLess(math.dist(net.pos[2], (50, 0)), tc.TOL + 0.005)
+
+    def test_the_straight_continues_through_a_switch_whose_branch_starts_tangent(self):
+        # Strossmayerovo náměstí: DI bends the straight 0.9° at the switch, and over 3 m the branch (here R 150 m,
+        # 0.57° off) reads straighter than it; over PAIR_LOOK the straight continues, within 2 cm of its points
+        south = [(-50 + 2 * k, 0.0) for k in range(26)]
+        north = [(x * math.cos(math.radians(0.9)), x * math.sin(math.radians(0.9))) for x in range(0, 51, 2)]
+        branch = [(150 * math.sin(k / 20 * 0.2), -150 * (1 - math.cos(k / 20 * 0.2))) for k in range(21)]
+        pos = {1: south[0], 2: (0.0, 0.0), 3: north[-1], 4: branch[-1]}
+        net = tc.Network(pos, {(1, 2): south, (2, 3): north, (2, 4): branch}, {(1, 2): 'di', (2, 3): 'di', (2, 4): 'di'})
+        straight = net.pts[(1, 2)] + net.pts[(2, 3)][1:]
+        self.assertLess(max(off(p, straight) for p in south + north), tc.TOL + 0.005)
+        h_in = heading(net.pts[(1, 2)], at_start=False) + math.pi
+        h_out = heading(net.pts[(2, 3)])
+        self.assertLess(abs(math.degrees(h_out - h_in)), 0.5)
 
     def test_a_branch_starting_at_its_own_angle_keeps_it(self):
         # beyond START the branch leaves at its own angle (data/truth.json `switch-start`: some designs start abruptly)
