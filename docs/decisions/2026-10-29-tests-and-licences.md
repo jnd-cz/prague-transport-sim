@@ -1,7 +1,7 @@
 # Headless tests in Python + Playwright; licence direction
 
 **Date:** 2026-10-29
-**Status:** agreed; implementation in M1 issues.
+**Status:** agreed; implemented in M1 (`tools/headless.py`, #2; licences, #72). CI for the data-free tests: #222.
 
 ## Tests
 

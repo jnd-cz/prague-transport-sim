@@ -1,7 +1,9 @@
 # Architecture proposal: from one line to a city network
 
 > Moved 2026-10-29 from the root (was ARCHITECTURE-PROPOSAL.md); the companions it names are in
-> [history/](history/). The design is current; its tasks are GitHub issues (see [ROADMAP.md](../ROADMAP.md)).
+> [history/](history/). §§0–8 and 10 are the current design; its tasks are GitHub issues (see
+> [ROADMAP.md](../ROADMAP.md)). §9 is mostly done (the GitHub repository, worktrees, the data store with
+> `tools/snapshot.py` in place of `fetch_data.py`; CI: #222, #102). §11 is done and kept as history.
 
 Written in the remote session (2026-10-24) for the original project, after a long stretch of work on
 line 17: performance, signals, traffic, pedestrians, weather and OSM data. The companions are
@@ -123,7 +125,7 @@ Ranked by impact versus cost:
    doors), but it is very simplified and does not sound like a real T3 (user, 2026-10-24).
    - **The tram itself:** move from pure synthesis to recorded or sampled sources layered by speed and
      load: the traction motor and its accelerator and resistor-stepping steps, gear whine, the
-     compressor cycling, the brakes, door mechanisms, bogie noise over switches and joints, and the
+     motor-generator and its fans (the T3 has no compressor), the brakes, door mechanisms, bogie noise over switches and joints, and the
      flange squeal in curves.
      - Pitch and blend layers by speed and current.
      - Model the space: in the cab vs outside, tunnels, under bridges, open streets.

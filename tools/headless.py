@@ -10,9 +10,9 @@
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
 check and awaits it, exactly like tools/bench/batch.html. Results: one JSON per run in reports/headless/
-and a table; the exit code is 1 when a run fails its thresholds (docs/history/BUILD-TOOLS-HANDOFF.md
-§4.2: u3 no red entries, collisions, stuck tram or signal penalty; redruns no red runs; traffic must
-finish; lint has no thresholds here, compare with `python tools/lint_report.py`).
+and a table; the exit code is 1 when a run fails its thresholds (HARD below: u3 no red entries,
+collisions, stuck tram or signal penalty; redruns no red runs; traffic must finish; lint has no
+thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
 Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before

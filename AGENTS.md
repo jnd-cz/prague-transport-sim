@@ -133,8 +133,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   `tools/test_review.py`): Playwright's `page.evaluate` has none, and a promise that never resolves
   hangs the run without output.
 - Checks in a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`, `lint({ traffic: true })` averages
-  seeds 22, 7, 1234), `python tools/lint_report.py` against `reports/baseline/lineN.json` (an in-page
-  baseline of 2026-10-23, before #7 and #84, not maintained: regressions use `headless.py --compare`); benches in `tools/bench/`
+  seeds 22, 7, 1234), regressions through `headless.py --compare`; benches in `tools/bench/`
   (u3, redruns, walkers; `batch.html`). Run long browser jobs unawaited and poll (script calls time out
   at 45 s); a background window throttles frames, so no fps readings then.
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
