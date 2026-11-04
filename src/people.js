@@ -32,6 +32,17 @@ const HAIRS = [[0x342a23, 30], [0x1e1a18, 14], [0x4e3627, 20], [0x6e5038, 10], [
 const hairOf = (n) => HAIRS[(Math.imul(n + 1, 2654435761) >>> 0) % HAIRS.length];
 // the colour where the hair is: a bald head's cap is skin, a cap's wearer shows the cap at a distance
 const hairFor = (n, style, far) => style === 'bald' ? SKIN_COLOR : far && style === 'cap' ? HAT_COLOR : hairOf(n);
+// each person's build: height 0.88-1.05 of the figure's 1.845 m (1.62-1.94 m), width 0.92-1.08; it
+// replaces the stop crowd's own height scale (0.85-1.15 of the box figure)
+const unit = (n, k) => (Math.imul(n + k, 0x85ebca6b) >>> 0) / 4294967296;
+const buildOf = (n) => [0.92 + 0.16 * unit(n, 11), 0.88 + 0.17 * unit(n, 3)];
+function rescale(m, w, h) { // (keeps the rotation and the position)
+  const e = m.elements;
+  for (const [c, k] of [[0, w], [4, h], [8, w]]) {
+    const f = k / (Math.hypot(e[c], e[c + 1], e[c + 2]) || 1);
+    e[c] *= f; e[c + 1] *= f; e[c + 2] *= f;
+  }
+}
 
 // 1 where a vertex has colour c (a region of the baked vertex colours), else 0
 function maskOf(geo, c) {
@@ -203,6 +214,8 @@ export class People {
       s.x = r.x; s.z = r.z; s.t = t; s.seen = sweep;
       r.s = s;
       if (r.box) r.m.makeRotationY(s.heading).setPosition(r.x, r.y, r.z);
+      [r.w, r.h] = buildOf(r.n);
+      rescale(r.m, r.w, r.h);
     }
     for (const [k, s] of this.track) if (s.seen !== sweep) this.track.delete(k);
     // the nearest ones (a near one keeps its place): animated figures; the rest: the far batch
@@ -254,7 +267,8 @@ export class People {
       f.actions[motion].play();
       f.motion = motion;
     }
-    const a = f.actions[motion], phase = STRIDE[motion] ? r.s.dist / STRIDE[motion] : t * 0.5 + r.n * 0.137;
+    // (a stride is the clip's foot travel along the figure's forward axis, scaled with the person's build)
+    const a = f.actions[motion], phase = STRIDE[motion] ? r.s.dist / (STRIDE[motion] * r.w) : t * 0.5 + r.n * 0.137;
     a.time = (phase - Math.floor(phase)) * a.getClip().duration;
     f.mixer.update(0);
     if (f.mats.shirt) f.mats.shirt.color.copy(r.shirt);

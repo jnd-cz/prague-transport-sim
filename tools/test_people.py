@@ -55,6 +55,9 @@ SYNTHETIC = """async () => {
   assets.near.scene.traverse((o) => { if (o.isMesh && o.geometry.attributes.hairMask) nearHair = count(o.geometry.attributes.hairMask); });
   out.hairVertices = [nearHair, count(people.far.geometry.attributes.hairMask)];
   out.styles = new Set([...people.near.values()].map((f) => f.style)).size;
+  // each person's own height (the figure's y axis), within 0.88-1.05
+  const hs = [...people.near.values()].map((f) => { const e = f.root.matrix.elements; return Math.hypot(e[4], e[5], e[6]); });
+  out.heights = [Math.min(...hs), Math.max(...hs), new Set(hs.map((h) => h.toFixed(3))).size];
   // the middle level is the far figure's body unbaked: the same triangles, the same bounds standing
   const mid = people.levels.middle, parts = [mid.shirt, mid.trousers, mid.citizen_detail.short];
   out.middleTris = parts.reduce((s, g) => s + g.index.count / 3, 0);
@@ -119,6 +122,7 @@ def main():
                 "the middle level: the far figure's 840 triangles": s["middleTris"] == 840,
                 "the middle level: the far figure's bounds (2 mm)": s["middleBoxGap"] < 0.002,
                 "hair styles vary": s["styles"] >= 4,
+                "heights 0.88-1.05, varied": s["heights"][0] >= 0.879 and s["heights"][1] <= 1.051 and s["heights"][2] >= 20,
                 "the box crowd hidden (layer 1)": s["at0"]["hidden"] == 2,
                 "kept near up to 88 m": s["back6"]["near"] == 40,
                 "far beyond 88 m": s["back10"]["near"] == 39,

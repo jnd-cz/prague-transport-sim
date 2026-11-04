@@ -1634,7 +1634,11 @@ export class Game {
         const o = this.route.offset(along, lat);
         p.set(o.x, this.profile.height(along) + 0.18, -o.y);
         sc.set(1, 0.85 + r() * 0.3, 1);
-        q.setFromEuler(new THREE.Euler(0, r() * 6.28, 0));
+        // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
+        // as before, so everyone stands where they stood (#251)
+        const h = this.route.heading(along), v = r();
+        const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
+        q.setFromEuler(new THREE.Euler(0, yaw, 0));
         m.compose(p, q, sc);
         this.crowd.setMatrixAt(n++, m);
       }
