@@ -1119,7 +1119,8 @@ export class Game {
       deadmanTrip,
       grade: this.profile.grade(mid),
       radius: this.route.radiusAt(tram.s - 4),
-      mu: this.muAt(tram.s),
+      mu: this._muAt ??= (s) => this.muAt(s), // (per axle: a patch or sand reaches them one by one)
+      weather: this.weather,
       sandKey: !!input.sand,
       doorsOpen: this.doorState !== 'closed', // (the door relay keeps the line contactor out; no brake from it)
     });

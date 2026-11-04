@@ -225,10 +225,11 @@ export class TR37 {
       const f = -w.force, cur = this.brakeForce(-A.step);
       if (cur >= f * 0.75 && cur <= f * 1.6) s = A.step;
     }
-    if (s > 0 && A.step > 0) s = A.step;
-    if (w.power === true) s = Math.max(1, s);
+    // (held against stepping down, not up: on a grade at step 1 it stood for good, snow trace 2026-11-04)
+    if (s > 0 && A.step > 0 && s < A.step) s = A.step;
+    if (w.maxStep != null && s > w.maxStep) s = w.maxStep; // (easing off a spin, then a step lower)
+    if (w.power === true) s = Math.max(w.maxStep === 0 ? 0 : 1, s);
     if (w.power === false) s = Math.min(0, s);
-    if (w.slip && s > 1) s--;
     if (w.slide && s < -1) s++;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast
@@ -241,9 +242,12 @@ export class TR37 {
     // applied (≈0.5 m/s², less than a downhill grade takes): a stop point within 8 m or needing more than
     // 0.15 m/s² gets step 5, so LO hands over to the full shoes, as a driver does (it overran stops by 1–4 m
     // and red signals at 0.8 km/h on step 3–4: #241's checks)
+    // On slippery rail the full shoes (≈1.6 m/s²) lock the wheels (leaves: 240 slides in the last 30 m of
+    // stops on line 17): the shoes partly, step 5 only for a stop within 1.5 m or needing over 0.5 m/s² (#265)
     if (s < 0 && Math.abs(w.v) < 2.5) {
       const need = w.stopDist == null ? 0 : (w.v * w.v) / (2 * Math.max(0.3, w.stopDist));
-      s = need > 0.15 || (w.stopDist != null && w.stopDist < 8) ? -5 : Math.min(s, -3);
+      if (w.lowMu) s = need > 0.5 || (w.stopDist != null && w.stopDist < 1.5) ? -5 : Math.min(s, -3);
+      else s = need > 0.15 || (w.stopDist != null && w.stopDist < 8) ? -5 : Math.min(s, -3);
     }
     // a stop the service brake (≈1.3 m/s² on step 5) cannot make: the pedal to the floor, the track brakes
     // with it, as a driver does for a signal turning red too close (line 17 seed 3: red 36 m ahead at
@@ -252,6 +256,7 @@ export class TR37 {
       const need = (w.v * w.v) / (2 * Math.max(0.5, w.stopDist));
       if (need > 1.15 || (A.step === -6 && need > 0.6)) s = -6;
     }
+    if (w.minStep != null && s < w.minStep && s !== -6 && !w.stand) s = w.minStep; // (freeing a slide, then a step lighter: last, over the stop rules)
     if (s !== A.step && (A.hold <= 0 || w.urgent || (s < A.step && s < 0) || w.power != null)) {
       A.step = s; A.hold = 0.6;
       this.setStep(s);

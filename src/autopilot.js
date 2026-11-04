@@ -5,10 +5,19 @@
 // passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
 
+import { muSpeed, sandedMu } from './tram.js';
+
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
 const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
 const SAG = 1.1, OVER = 0.6; // m/s: under the plan before pressing on, over it before braking (4 and 2 km/h)
+// On slippery rail (#265): the driver knows the weather's grip (game.muBase), not where a leaf patch lies.
+// Planned braking and the force asked for stay within GRIP_USE of the rail's grip at the speed (margin for
+// the patches and the second car); a spin is noticed after REACT s, the drive eased off until the wheels
+// grip, then tried one step lower (the user, 2026-11-04: "They ease of the drive and try again with less
+// power"); sand at once braking harder than the rail allows ("he needs to apply sand quickly"), starting only
+// on a grade or after spinning twice ("Only at grades where it would be difficult to get moving")
+const GRIP_USE = 0.5, REACT = 0.5, LOW_MU = 0.25;
 
 export class Autopilot {
   constructor() {
@@ -18,6 +27,10 @@ export class Autopilot {
 
   step(g, dt) {
     const tr = g.tram;
+    // (in autumn it plans for a leaf patch with sand, not the rail between them: braking for the rail's 0.22 it
+    // hit a patch 7 m before a stop and slid past it, line 17 leaves trace 2026-11-04)
+    const muK = Math.min(g.muBase ?? 0.3, g.patches?.length ? sandedMu(0.06) : 1), lowMu = muK < LOW_MU, gripN = (v) => GRIP_USE * muK * muSpeed(v) * tr.mass * 9.81;
+    const D = Math.min(DECEL, (gripN(11) / tr.inertia) * 0.9); // (planned at 40 km/h's grip)
     const st = g.stops[g.nextStop];
     this.bellCooldown -= dt;
 
@@ -32,7 +45,7 @@ export class Autopilot {
     // target speed: line speed, upcoming restrictions, then everything we must stop for
     let vt = g.currentLimit / 3.6 - 0.6;
     const nl = g.nextLimitChange();
-    if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12)) - 0.3);
+    if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * D * Math.max(0, nl.d - 12)) - 0.3);
     let stopAt = null, stopTarget = null, creep = false;
     const consider = (s) => { if (stopAt === null || s < stopAt) stopAt = s; };
     if (st) {
@@ -89,7 +102,7 @@ export class Autopilot {
       // (the creep only towards a stop and more than 2.2 m short of it: within that it has stopped well,
       // and a stop zone may start 2.5 m before the point; short of a signal or a tram ahead it just stays)
       creep = stopAt === stopTarget && d > 2.2;
-      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), creep ? 0.8 : 0));
+      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * D * Math.max(0, d - STOP_SHORT))), creep ? 0.8 : 0));
       if (d < (stopAt === stopTarget ? 1 : STOP_SHORT)) vt = 0;
     }
     // drive only if still under the plan 2.5 s on: a careful driver coasts into a braking curve (on the T3
@@ -97,10 +110,10 @@ export class Autopilot {
     // overran, line 22 seed 4, #241's check)
     const look = Math.max(0, tr.v) * 2.5;
     let vtDrive = vt;
-    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12 - look)) - 0.3);
+    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * D * Math.max(0, nl.d - 12 - look)) - 0.3);
     if (stopAt !== null) {
       const d = stopAt - tr.s;
-      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), creep ? 0.8 : 0));
+      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * D * Math.max(0, d - look - STOP_SHORT))), creep ? 0.8 : 0));
     }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
@@ -154,21 +167,53 @@ export class Autopilot {
     if (this.mode === 'brake' && tr.v <= vt - (stopping ? 0.15 : 0)) this.mode = null;
     if (!this.mode) {
       if (tr.v > vt + (stopping ? 0.15 : OVER)) this.mode = 'brake';
-      else if (stopping ? tr.v < 0.05 && creep : tr.v < vtDrive - SAG) this.mode = 'drive';
+      // (standing well short of a signal or the tram ahead it closes up: coasting uphill in snow it stopped
+      // 10 m short of a signal and never moved again, 2026-11-04)
+      else if (stopping ? tr.v < 0.05 && (creep || (stopAt - tr.s > STOP_SHORT + 3 && vtDrive > 0.3)) : tr.v < vtDrive - SAG) this.mode = 'drive';
     }
     const aWant = this.mode === 'drive' ? Math.min(1.0, Math.max(0.3, (vtDrive - tr.v) * 0.9))
       : this.mode === 'brake' ? Math.max(-1.1, Math.min(-0.15, (vt - tr.v) * 0.9)) : 0;
-    const need = tr.inertia * aWant + tr.mass * 9.81 * grade + 650 * tr.cars + 4.2 * tr.v * tr.v;
-    const stand = g.doorState !== 'closed' || vt <= 0.05;
+    let need = tr.inertia * aWant + tr.mass * 9.81 * grade + 650 * tr.cars + 4.2 * tr.v * tr.v;
+    // within the rail's grip on slippery rail (a steep start still gets what it takes to move, with sand)
+    if (lowMu && need > 0) need = Math.min(need, Math.max(gripN(tr.v), tr.mass * 9.81 * grade + 650 * tr.cars + 0.15 * tr.inertia));
+    // (rolling back: brake to a stand, then start again; it rolled back 20 m spinning in snow)
+    const stand = g.doorState !== 'closed' || vt <= 0.05 || tr.v < -0.3;
     const coast = !this.mode;
     // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
-    const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
+    const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > D * 1.3;
     // a turn under a contact while braking: the switch button draws the current, the drive pedal stays off
     const button = wantPower === true && need < 0;
     this.input.switchBtn = button;
-    this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
+    // a spin: noticed after REACT s, drive off until the wheels grip, then one step lower for a while
+    this.spinT = tr.slip ? (this.spinT || 0) + dt : 0;
+    if (this.spinT > REACT && !this.easing) {
+      this.easing = true; this.spins = (this.spins || 0) + 1;
+      this.cap = Math.max(1, (tr.notch > 0 ? tr.notch : 1) - 1);
+    }
+    if (this.easing && !tr.slipping) this.easing = false;
+    this.capT = tr.slip ? 0 : (this.capT || 0) + dt;
+    if (this.cap && (this.capT > 8 || tr.v > 8)) { this.cap = null; this.spins = 0; }
+    // a slide: noticed after REACT s, the brake let off until the wheels roll, then braking a step lighter
+    // with sand (the shoes held locked wheels locked for up to 10 s on leaves; easing a step at a time did
+    // not free them). Not for an urgent stop: the track brakes do not depend on the rail's grip
+    // (only a stop needing the track brakes keeps the pedal down: "urgent" at the gentle autumn plan, 0.57 m/s²,
+    // held locked wheels at 17 → 5 km/h for 5.7 s)
+    const hard = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > 1.0;
+    this.slideT = tr.slide ? (this.slideT || 0) + dt : 0;
+    if (this.slideT > REACT && !this.freeing && !hard) {
+      this.freeing = true;
+      this.bCap = Math.min(-1, (tr.notch < 0 ? tr.notch : -1) + 1);
+    }
+    if (this.freeing && !tr.slipping) this.freeing = false;
+    this.bCapT = tr.slide ? 0 : (this.bCapT || 0) + dt;
+    if (this.bCap && (this.bCapT > 6 || tr.v < 1)) this.bCap = null;
+    // sand: braking harder than the rail allows, or sliding; starting up a grade, or after two spins
+    const braking = need < 0 && !stand;
+    // (braking: near the rail's limit, 0.8 of its grip; at half of it the box was empty by stop 14 in snow)
+    this.input.sand = tr.slide || (braking && lowMu && (urgent || -need > 1.6 * gripN(tr.v)))
+      || (need > 0 && tr.v < 3 && ((grade > 0.02 && need > gripN(tr.v)) || this.spins >= 2) && tr.slip);
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s });
+      stopDist: stopAt === null ? null : stopAt - tr.s, maxStep: this.easing ? 0 : this.cap, minStep: hard ? null : this.freeing ? 0 : this.bCap, lowMu });
     return { vt, stopAt, notch: tr.notch };
   }
 }
