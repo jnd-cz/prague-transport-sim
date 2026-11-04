@@ -119,6 +119,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   switches lies nearer the branch. Two switches 4.6 m apart on each track there (DI): the west track's to the
   left first, then to the right; the east track's mirrored. OSM puts the westward turn's switch on the
   east-west track 3.8 m past DI's fork, beside another switch 2.1 m away whose branch leaves the other way.
+- **A gauntlet looks like two interlaced switches** (#20, Malostranské náměstí): DI draws the two tracks 9-10 cm
+  apart for 45 m, and each end reads as an interlaced branch whose run ends at the other's tip; OSM has
+  railway_crossing nodes at both ends and no switch. In DI 2026-10-31 it is the only such pair.
+- **Merged track nodes share one place** (#20): the curve fit puts nodes joined by an edge under 0.5 m on one
+  point, so a direction taken between consecutive route nodes can be zero. The facing-switch detection lost 2 of
+  line 17's 19 switches that way after #208, and Újezd and Lazarská on lines 9, 22 and 23.
 - **A resampled curve reads tighter than it is** (#204): points interpolated on chords lie inside the arc (7 mm
   on a 1 m chord of a 19 m curve, 15 mm on a 1.5 m one), so a circle through them read 19.1 m as 17.4-17.6 m
   (Právnická fakulta), and the game's three-point average with a 1.5 m resample turned a 0.9° joint into 3.7°
