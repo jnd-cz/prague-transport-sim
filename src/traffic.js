@@ -4,7 +4,7 @@
 // instead of popping.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
-import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights } from './models.js';
+import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights, disposeModel } from './models.js';
 import { T3, COUPLING_GAP } from './tram.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 
@@ -589,7 +589,7 @@ export class Traffic {
     return hit;
   }
 
-  dispose() { this.scene.remove(this.group); }
+  dispose() { this.scene.remove(this.group); disposeModel(this.group); }
 
   // draw: false for a step whose result is not shown (inspect mode runs several steps per frame):
   // cars and walkers move but are not posed (their height and matrices wait for the drawn step)
@@ -665,7 +665,7 @@ export class Traffic {
           // line 17 s 19919)
           const sp = lane.path.at(s), close = Math.hypot(sp.x - cx, sp.y - cy) < 50;
           const c = redNear || close || cars.some((o) => o.active && o.path === lane.path && Math.abs(o.s - s) < 12) ? null : this._carSlot();
-          if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, next2: undefined, next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null });
+          if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, next2: undefined, next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null, hitTram: false, cycleT: 0, z: undefined, seen: null, why: null });
         }
       }
     }
@@ -1630,7 +1630,7 @@ export class Traffic {
       this._placeTram(t, this.route, t.s, (s) => profile.height(s));
     }
     this.ahead = this.ahead.filter((t) => {
-      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); return false; }
+      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
       return true;
     });
     g.aiTrams = this.ahead;
@@ -1711,7 +1711,7 @@ export class Traffic {
       this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y));
     }
     this.oncoming = this.oncoming.filter((t) => {
-      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); return false; }
+      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
       return true;
     });
   }

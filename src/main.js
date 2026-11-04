@@ -6,7 +6,7 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.js';
+import { makeT3, placeConsist, setConsistLine, loadDetailedT3, disposeModel } from './models.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
@@ -125,7 +125,9 @@ window.renderer = renderer; // (from the start, also in the menu: performance ch
 // instead of a frozen black screen.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
-  if (game) game.paused = true;
+  // (window.game, not game: the context can be lost while the world uploads, before `let game` below
+  // is reached, and reading it then threw instead of showing this card)
+  if (window.game) window.game.paused = true;
   const card = $('resultsCard');
   card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
   $('results').classList.remove('hidden');
@@ -365,10 +367,11 @@ function start() {
   tram.eq.mode = controlMode();
   if (tramModel.userData.cars.length !== cars || !!tramModel.userData.mats.body !== useDetailed()) {
     scene.remove(tramModel);
+    disposeModel(tramModel);
     tramModel = makeT3({ line: data.line, cars, detailed: useDetailed(), dest: lastStop, run: runNumber(0) });
     scene.add(tramModel);
   }
-  if (game) scene.remove(game.objects);
+  if (game) { scene.remove(game.objects); disposeModel(game.objects); }
   // one seeded stream for the whole run (rules and traffic), apart from Math.random
   const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
