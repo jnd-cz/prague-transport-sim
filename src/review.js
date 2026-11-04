@@ -598,10 +598,12 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (next && this.list.includes(next)) this.select(this.list.indexOf(next));
   }
 
-  // extra: a point placed on the map (px, py); kept while the answer stays the same (a note typed after it)
+  // extra: a point placed on the map (px, py); kept with any later answer or note until the answer is
+  // removed (✕) or the point placed again. (Kept only while the answer stayed the same, it was lost when
+  // an answer button followed the placing: 10 of 10 on line 22's stop signs, 2026-11-04, #258)
   _record(f, v, note, extra = null) {
     const w = this.where(f.x, f.y), old = this.verdicts.get(fid(f));
-    const placed = extra || (old && old.v === v && old.px !== undefined ? { px: old.px, py: old.py } : {});
+    const placed = extra || (v && old?.px !== undefined ? { px: old.px, py: old.py } : {});
     this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
       info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1], ...placed, ...(f.id ? { id: f.id } : {}),
       ...(f.kind === 'trackheight' ? { decision_id: f.id, span_ids: f.decision.span_ids, span_sha256: f.span_sha256 } : {}) });
