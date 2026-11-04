@@ -16,7 +16,7 @@ Usage (python -I is enough; the store is reached with the system's `sftp`, ssh c
     python -I tools/snapshot.py data-fetch         # data/ for data/MANIFEST.json
     python -I tools/snapshot.py status             # what differs locally
     python -I tools/snapshot.py publish 2026-11-05 --note "new OSM and GTFS"   # raw/ -> new snapshot
-    python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST
+    python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST (raw/ must match the snapshot)
     python -I tools/snapshot.py verify [--base main]   # after a publish: all in the store, new files intact
     python -I tools/snapshot.py cache-prune [--dry-run]   # drop cached files no checkout links any more
 Options: --store HOST:DIR (default tramdata:store, or $TRAMDATA_STORE); --cache DIR (default
@@ -448,7 +448,8 @@ def fetch(store, sid, cache=None):
                         shutil.copyfileobj(src, dst)
 
 
-def status(sid):
+def raw_drift(sid):
+    """raw/ against snapshot sid: [(missing|changed, path)], [paths of input files in no group's list]."""
     snap = load_snapshot(sid)
     listed = set()
     bad = []
@@ -461,6 +462,11 @@ def status(sid):
             elif os.path.getsize(p) != f["size"] or sha256(p) != f["sha256"]:
                 bad.append(("changed", f["path"]))
     extra = [g2["path"] for g2 in [f for g in scan_sources() for f in g["files"]] if g2["path"] not in listed]
+    return bad, extra
+
+
+def status(sid):
+    bad, extra = raw_drift(sid)
     for k, p in bad:
         print(f"{k:8} {p}")
     for p in extra:
@@ -476,7 +482,21 @@ def data_files():
     return sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)) and f not in DATA_KEEP)
 
 
-def data_publish(store, note, sid=None, cache=None):
+def data_publish(store, note, sid=None, cache=None, allow_drift=False):
+    # the build must come from the snapshot it names (#223): a changed or new input file means it did not
+    sid = sid or (current_id() if os.path.exists(os.path.join(SNAPDIR, "CURRENT")) else None)
+    if sid:
+        bad, extra = raw_drift(sid)
+        drift = [p for k, p in bad if k == "changed"] + extra
+        missing = sum(k == "missing" for k, _ in bad)
+        if missing:
+            print(f"note: {missing} files of snapshot {sid} are not in raw/ (lines not rebuilt here?)")
+        if drift and not allow_drift:
+            raise SystemExit(f"raw/ differs from snapshot {sid}: {len(drift)} changed or new input files ({drift[0]}"
+                             f"{', …' if len(drift) > 1 else ''}; tools/snapshot.py status lists them). Publish a"
+                             " snapshot with them first, or pass --allow-drift with a --note saying why.")
+        if drift:
+            note = f"{note} [raw/ differs from snapshot {sid}: {len(drift)} files]".strip()
     files = {}
     for f in data_files():
         p = os.path.join(ROOT, "data", f)
@@ -580,7 +600,7 @@ if __name__ == "__main__":
     elif cmd == "status":
         status(opt("--snapshot") or current_id())
     elif cmd == "data-publish":
-        data_publish(store, opt("--note", ""), opt("--snapshot"), cache)
+        data_publish(store, opt("--note", ""), opt("--snapshot"), cache, "--allow-drift" in args)
     elif cmd == "verify":
         verify(store, opt("--snapshot") or current_id(), opt("--base", "main"))
     elif cmd == "data-fetch":

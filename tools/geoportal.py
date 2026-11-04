@@ -7,8 +7,11 @@ Sources (CC BY 4.0, "data base © IPR Praha"):
   - Sdílená data o zeleni - vegetační prvky - body (individual trees)
   - Stromořadí (tree rows)
 
-Usage:  python -I tools/geoportal.py --line 22 [--refresh]
+Usage:  python -P -E tools/geoportal.py --line 22 [--fetch] [--refresh]
 Needs data/lineN.json (from build_line.py). Writes data/lineN.geo.json + data/lineN.bld.bin.
+Reads the services' answers from the snapshot (raw/geoportal/lineN/); an answer that is not there is an
+error unless --fetch downloads it (then publish a new snapshot with it before data-publish, #223).
+--refresh downloads every answer again.
 """
 import gzip
 import json
@@ -26,6 +29,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 REFRESH = "--refresh" in sys.argv
+FETCH = "--fetch" in sys.argv or REFRESH
+FETCHED = []  # (answers downloaded in this run: new snapshot files)
 CACHE = os.path.join(ROOT, "raw", "geoportal", f"line{LINE}")
 os.makedirs(os.path.join(CACHE, "i3s"), exist_ok=True)
 
@@ -47,6 +52,10 @@ def fetch(url, cache_name=None, binary=False):
         with open(path, "rb") as f:
             data = f.read()
     else:
+        # (a cache miss used to download silently: the 2026-11-03 snapshot had to add 8 such tiles, #223)
+        if not FETCH:
+            raise SystemExit(f"{os.path.relpath(path, ROOT) if path else url}: not in raw/ (the snapshot, tools/snapshot.py fetch); --fetch downloads it, then publish a new snapshot before data-publish")
+        FETCHED.append(path)
         for attempt in range(6):
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "tram-game-prototype/0.1"})
@@ -331,6 +340,8 @@ def main():
     with replacing(dst, "w", encoding="utf-8") as f:
         json.dump(geo, f, ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {dst}")
+    if FETCHED:
+        print(f"{len(FETCHED)} answers downloaded into raw/geoportal/line{LINE}/: publish a snapshot with them before data-publish")
 
 
 if __name__ == "__main__":
