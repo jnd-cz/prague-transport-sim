@@ -1599,6 +1599,8 @@ export class Traffic {
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
       // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 6 m kept two 2-car sets off long platforms, #258)
       if (other && other.s - other.length - 2 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 2;
+      const clear = other && g.keepClear(t.s, other.s - other.length);
+      if (clear !== null && clear !== undefined && clear < (stopAt ?? Infinity)) stopAt = clear;
       // a car on the track ahead (along it, or crossing it: it gives way to our tram only)
       for (const c of g.carsOnTrack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       for (const c of g.carsCrossing || []) if (c.s > t.s && c.s - 6 < (stopAt ?? Infinity)) stopAt = c.s - 6;
