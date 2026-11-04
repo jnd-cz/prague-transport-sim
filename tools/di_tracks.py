@@ -35,6 +35,9 @@ INTERLACE = 0.05, 0.2, 10.0  # m: a branch running beside a track within 0.2 m f
                 # 5 cm or more, is interlaced track: the switch is at the branch's end, where it starts beside the
                 # track (Čechův most 13 cm for 28 m, Ohrada 12-13 cm for 51 m; a switch's branch is 0.2 m off within
                 # 4-9 m). The user, 2026-11-03: "the fork starts and ends well in front of/behind the road junction"
+GAUNTLET = 5.0  # m: two interlaced branches facing each other, each tip this near the end of the other's run, are a
+                # gauntlet ("splítka"), no switch: the tracks interlace and part again at both ends (Malostranské
+                # náměstí: tips 44.3 m apart, runs 45 m, 9-10 cm apart; OSM: railway_crossing nodes at both ends)
 PHOTO_COVER = 0.6  # m: an orthophoto track covers a source chain within this (Podolská vodárna: DI up to 0.34 m off)
 SECTION = 6.0   # m: a switch's two legs drawn as records this long or shorter from its tip (Dvorecký most: 4.7 m)
 TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the track at a record joint, the switch's tip
@@ -239,6 +242,7 @@ class Source:
             if line.length > 0:
                 self.chains.append({'line': line, 'records': ids})
         self._branch_ends()
+        self._gauntlets()
         # segments for matching
         self.seg_chain, segs = [], []
         for c, ch in enumerate(self.chains):
@@ -390,6 +394,27 @@ class Source:
                     if inter:
                         self.interlaced.append({'tip': (f.x, f.y), 'dir': u, 'side': side, 'run': run})
                     break
+
+    def _gauntlets(self):
+        """Interlaced track with no switch at either end (GAUNTLET): neither tip is a fork; both go to
+        self.gauntlets [(tip, tip)]."""
+        it, pairs = getattr(self, 'interlaced', []), []
+        for a in range(len(it)):
+            for b in range(a + 1, len(it)):
+                p, q = it[a], it[b]
+                d = math.dist(p['tip'], q['tip'])
+                along = (q['tip'][0] - p['tip'][0]) * p['dir'][0] + (q['tip'][1] - p['tip'][1]) * p['dir'][1]
+                if (p['dir'][0] * q['dir'][0] + p['dir'][1] * q['dir'][1] < -math.cos(math.radians(ANGLE)) and along > 0
+                        and abs(d - p['run']) <= GAUNTLET and abs(d - q['run']) <= GAUNTLET):
+                    pairs.append((a, b))
+        self.gauntlets = [(it[a]['tip'], it[b]['tip']) for a, b in pairs]
+        drop = {k for pr in pairs for k in pr}
+        tips = {it[k]['tip'] for k in drop}
+        keep = [i for i, f in enumerate(self.forks) if f not in tips]
+        self.forks = [self.forks[i] for i in keep]
+        self.branches = [self.branches[i] for i in keep]
+        self.far = [self.far[i] for i in keep]
+        self.interlaced = [x for k, x in enumerate(it) if k not in drop]
 
     def candidates(self, x, y, ux, uy, tol=TOL, only=None):
         """{chain: distance} of the source chains within tol whose direction there is within ANGLE."""

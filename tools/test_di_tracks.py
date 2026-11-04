@@ -225,6 +225,22 @@ class Pairing(unittest.TestCase):
         self.assertEqual(len(di.forks), 1)
         self.assertLess(math.dist(di.forks[0], (20, 0)), 0.01)
 
+    def test_two_interlaced_branches_facing_each_other_are_a_gauntlet_without_a_switch(self):
+        # Malostranské náměstí: DI's two tips 44.3 m apart face each other, each run 45 m (OSM: railway_crossing
+        # nodes at both ends); an interlaced switch's tip facing the other way, or with a run that ends elsewhere, stays
+        di = dt.Source('di', [rec(1, [(0, 0), (200, 0)])])
+        tips = [(10, 0), (54.3, 0), (80, 0), (150, 0)]
+        di.forks, di.branches, di.far = list(tips), [[k] for k in range(4)], [[k] for k in range(4)]
+        di.interlaced = [{'tip': tips[0], 'dir': (1, 0), 'side': 1, 'run': 45.0},
+                         {'tip': tips[1], 'dir': (-1, 0), 'side': -1, 'run': 45.0},
+                         {'tip': tips[2], 'dir': (1, 0), 'side': 1, 'run': 28.0},
+                         {'tip': tips[3], 'dir': (-1, 0), 'side': 1, 'run': 28.0}]
+        di._gauntlets()
+        self.assertEqual(di.gauntlets, [(tips[0], tips[1])])
+        self.assertEqual(di.forks, tips[2:])
+        self.assertEqual(di.branches, [[2], [3]])
+        self.assertEqual([x['tip'] for x in di.interlaced], tips[2:])
+
     def test_a_switch_drawn_as_a_section_forks_at_its_tip(self):
         # Dvorecký most (DI 2026-10-07): both legs drawn as 4.7 m records from the tip, where OSM's switch and the
         # switch machine cover are, to a joint where the track and the branch go on
