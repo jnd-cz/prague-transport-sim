@@ -9,11 +9,14 @@ const G = 9.81;
 
 // the Tatra T3's body (per car)
 export const T3 = {
-  length: 15.2,              // over couplers (body 14.0 m), DPP training manual
+  length: 15.2,              // over couplers (body 14.0 m), DPP training manual: the head's face to the other's
   // (#248, the sources in the issue's research comment of 2026-11-04)
   bogies: 6.4,               // bogie pivots apart (J. Dynybyl, ČVUT FS bachelor thesis 2018, Table 3: 3.8 m from each frame end)
   trackBrakeGap: 0.012,      // the released magnet's pole pieces over the rail, new wheels (ČKD T-50496 p. 1: 8-12 mm)
   couplerPivot: 6.25,        // the coupler yoke's pin from the car centre [estimated on the frame figure of Ivanov et al. 1977]
+  // two coupled Prague heads overlap: each reaches 80 mm past the plane they couple in (its pins 45 mm
+  // either side of it; M. Barnet, ČVUT FS diploma thesis 2019, drawing DP-2018-01, the head in plan)
+  couplerOverlap: 0.16,
   emptyMass: 16000,          // kg
   rotMass: 2400,             // kg: motors, gears and wheels turning, ≈15 % of the empty car (t3-accelerator.md § 5.3)
   paxMass: 72,               // kg / passenger
@@ -29,7 +32,10 @@ export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15, snow: 0.12 };
 
 // Prague ran the T3 mostly as two-car multiple-unit sets (both cars motored, one driver).
 // Everything that scales with the cars lives here.
-export const COUPLING_GAP = 0;     // cars are 15.2 m over couplers, coupled buffer to buffer
+// coupled cars stand 15.04 m apart: 15.2 m over couplers less the heads' overlap (the user, 2026-11-04: "length
+// over couplers minus body length minus shortening because how the couplers fit together"), the bodies 1.04 m
+export const COUPLING_GAP = -T3.couplerOverlap;
+export const CAR_PITCH = T3.length + COUPLING_GAP;
 export const PANTO_FROM_FRONT = 4.5; // the (first car's) pantograph, which works the overhead contacts
                                      // (coupler 0.6 m + half body 7.0 m - 3.1 m ahead of the centre)
 
@@ -137,7 +143,8 @@ export class Tram {
 }
 
 // Half width of the space a T3 sweeps at s, measured from the track centre: 1.25 m body, the ends
-// of a 14 m car with bogies 6.36 m apart swing out by (7² − 3.18²) / 2R in a curve, 0.25 m margin.
+// of a 14 m car with its bogies T3.bogies apart swing out by (7² − 3.2²) / 2R in a curve, 0.25 m margin.
+const SWING = (7 ** 2 - (T3.bogies / 2) ** 2) / 2;
 export function tramClearance(route, s) {
-  return 1.25 + 19.5 / Math.max(15, route.radiusAt(s)) + 0.25;
+  return 1.25 + SWING / Math.max(15, route.radiusAt(s)) + 0.25;
 }

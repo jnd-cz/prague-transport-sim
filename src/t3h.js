@@ -10,13 +10,14 @@
 // Each set owns its materials (traffic fades AI trams one by one) and its cards. The asset's axes: +X
 // forward, +Y up, +Z right, origin on the rail plane midway between the bogies; the game's cars face +Z.
 import * as THREE from 'three';
-import { T3 } from './tram.js';
+import { T3, CAR_PITCH } from './tram.js';
 
 export const T3H_FILES = ['assets/t3h/tatra-t3-hybrid-nc.glb', 'assets/t3h/rig.json'];
 export const T3H_CREDIT = 'Tatra T3 3D model: hybrid of "Tatra T3" by SimonStrikesBack (sketchfab.com, CC BY 4.0) '
   + 'and "Tatra T3" by Jakub Vaja (conflig) (sketchfab.com, CC BY-NC 4.0), modified; CC BY-NC 4.0.';
 
 const HALF = T3.length / 2;     // the coupler head's face from the car centre
+const PLANE = CAR_PITCH / 2;    // the plane two coupled heads meet in, from the car centre
 // saloon materials: the seats, their frames and the grab rails, the ceiling and its lamps, the cab desk
 const INSIDE = new Set(['Handles', 'Control_Panel', 'Red_Seat', 'Blue_Seat', 'Leather', 'Material',
   'Inner_Plastic_Glass', 'Interior_Walls', 'White_Ceiling']);
@@ -160,13 +161,14 @@ export async function loadHybridT3(responses, contact) {
     copy.get(s.f).add(piv);
   }
   // the couplers: each bar turns about the yoke's pin under the body end (T3.couplerPivot); the asset's
-  // bar (5.28-7.41 m) is refitted to run from just behind the pin to the head's face at HALF
+  // bar (5.28-7.41 m) is refitted to run from just behind the pin to the coupling plane (the heads' 80 mm
+  // beyond it are not drawn: two bars would overlap there)
   for (const c of couplers) {
     const e = c.b.min.x > 0 ? 1 : -1, x0 = e > 0 ? c.b.min.x : -c.b.max.x, x1 = e > 0 ? c.b.max.x : -c.b.min.x;
     const pin = T3.couplerPivot, a = pin - 0.1, P = c.g.attributes.position, y = (c.b.min.y + c.b.max.y) / 2;
     for (let i = 0; i < P.count; i++) {
       const x = P.getX(i) * e;
-      P.setX(i, e * (a + (x - x0) * (HALF - a) / (x1 - x0)) - e * pin);
+      P.setX(i, e * (a + (x - x0) * (PLANE - a) / (x1 - x0)) - e * pin);
       P.setY(i, P.getY(i) - y);
     }
     P.needsUpdate = true;
@@ -185,6 +187,8 @@ export async function loadHybridT3(responses, contact) {
     o.geometry.userData.shared = true;
     for (const t of Object.values(o.material)) if (t?.isTexture) t.userData.shared = true;
   });
+  // the bogies at the real T3's pivots (T3.bogies; the asset has them 6.485 m apart), their shoes with them
+  for (const b of rig.bogies) { const n = template.getObjectByName(b.name); if (n) n.position.x = Math.sign(b.x) * T3.bogies / 2; }
   // the lamps' glow: off, bright when on
   for (const n of [...rig.signals.left, ...rig.signals.right, ...(rig.brakes || [])]) {
     const g = template.getObjectByName(n);
@@ -226,7 +230,7 @@ export async function loadHybridT3(responses, contact) {
     }
   }
   mixer.stopAllAction(); mixer.uncacheRoot(template);
-  const bogie = Math.abs(rig.bogies[0].x);
+  const bogie = T3.bogies / 2;
   proto = { template, light, rig, clips: gl.animations, bogie, stats };
   return proto;
 }
@@ -238,13 +242,8 @@ function collectorU(rig, h) {
 }
 
 // ------------------------------------------------------------------------------------------- cards
-// The T3's number plates and cards (user photos, 2026-10-23): the route number on the roof box at
-// the front and on the mirror arm (white digits on DPP blue, no border; the mirror one smaller and
-// taller than wide), on the rear at the bottom of the rear window inverted (blue digits on white),
-// and behind the windscreen the destination card (blue capitals on white with a blue frame, two
-// lines, centred) and the run number card (white on black, on the side pane left of the frame support
-// as seen from the front).
-// (drawn so here over the asset's own plates, which have cream on navy and no frame)
+// The plates and cards as the user described them (src/models.js, "The T3's number plates and cards"),
+// drawn here over the asset's own plates, which have cream on navy and no frame.
 function canvas(w, h, bg) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const x = c.getContext('2d');
@@ -465,7 +464,7 @@ const carPoint = (car, x, y, z, out) => { car.updateMatrix(); return out.set(x, 
 // hangs on the coupling: the two coupled bars are one stiff link from pin to pin (the Prague head's two
 // pins, #248), so the next car stands where its front pin is that link's length from the car ahead's rear
 // pin, a few cm closer along the track in a curve than on the straight.
-export function placeHybridConsist(model, sFront, at, pitch = T3.length) {
+export function placeHybridConsist(model, sFront, at, pitch = CAR_PITCH) {
   const { cars, bogie } = model.userData, pin = T3.couplerPivot, link = pitch - 2 * pin;
   let c = sFront - HALF;
   cars.forEach((car, k) => {

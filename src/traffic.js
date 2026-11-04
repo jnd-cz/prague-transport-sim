@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
 import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights, disposeModel } from './models.js';
-import { T3, COUPLING_GAP } from './tram.js';
+import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
 import { poseHybrid, setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 
@@ -994,7 +994,7 @@ export class Traffic {
   _pathObstacles() {
     const out = [], g = this.game, tram = g.tram;
     for (let k = 0; k < (tram.cars || 1); k++) {
-      const s = tram.s - 0.6 - 7.6 - k * 15.2, p = this.route.at(s), h = this.route.heading(s, 3);
+      const s = tram.s - 0.6 - 7.6 - k * CAR_PITCH, p = this.route.at(s), h = this.route.heading(s, 3);
       out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v, what: 'our tram' });
     }
     for (const t of [...this.ahead, ...this.oncoming]) {

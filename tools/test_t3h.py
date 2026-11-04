@@ -3,10 +3,11 @@
 Usage: python -P -E tools/test_t3h.py [--line 17] [--synthetic]
 
 Part 1 (no world data needed; the asset is in git): the model loads; the saloon, the lighter level and the
-draw calls; a set on a straight and on a 20 m curve: the second car hangs on the stiff coupling link, the
-couplers turn about their pins, the bogies turn to the track; the track-brake shoes hang 12 mm over the rail
-and drop by bogie; the doors, the collector at the wire, the cards. Part 2 (with data/line<N>.json): the
-game draws our tram with it, credits it, and its doors follow the game's.
+draw calls; a set on a straight and on a 20 m curve: the second car hangs on the stiff coupling link (cars
+15.04 m apart), the couplers turn about their pins, the bogies (6.4 m apart) turn to the track; the
+track-brake shoes hang 12 mm over the rail and drop by bogie; the doors, the collector at the wire, the
+cards. Part 2 (with data/line<N>.json): the game draws our tram with it, credits it, and its doors follow
+the game's; with the classic model picked in the menu it loads that one.
 """
 import argparse
 import faulthandler
@@ -125,14 +126,15 @@ def main():
             page.goto(base + "/__t3h.html")
             r["synthetic"] = s = page.evaluate(SYNTHETIC)
             st, cv = s["straight"], s["curve"]
-            # On R 20, both cars on the circle: the bogie pivots stand 3.242 m along the arc from the car's centre,
-            # so a bogie turns 3.242 / 20 rad to the body and the body's chord is rc from the circle's centre; its
-            # pins (6.25 m from the car's centre) are rp from it; the 2.7 m link spans dt at rp; the car centres
-            # are R (2 a + dt) apart along the track, and each coupler stands at a + dt / 2 to its car.
-            bogie = math.degrees(3.2425 / 20)
-            rc = 20 * math.cos(3.2425 / 20)
+            # On R 20, both cars on the circle: the bogie pivots stand 3.2 m along the arc from the car's centre,
+            # so a bogie turns 3.2 / 20 rad to the body and the body's chord is rc from the circle's centre; its
+            # pins (6.25 m from the car's centre) are rp from it; the 2.54 m link (15.04 - 2 x 6.25) spans dt at
+            # rp; the car centres are R (2 a + dt) apart along the track, and each coupler stands at a + dt / 2
+            # to its car.
+            bogie = math.degrees(3.2 / 20)
+            rc = 20 * math.cos(3.2 / 20)
             rp, a = math.hypot(rc, 6.25), math.atan2(6.25, rc)
-            dt = 2 * math.asin(1.35 / rp)
+            dt = 2 * math.asin(1.27 / rp)
             pitch, angle = 20 * (2 * a + dt), math.degrees(a + dt / 2)
             want = {
                 "the model loads, 43,668 triangles (the asset's 43,792 less a hidden helper)": s["fullTris"] == 43668,
@@ -141,9 +143,10 @@ def main():
                 "a hybrid set": s["hybrid"],
                 "draw calls per car: full <= 70, lighter <= 16": s["drawnFull"] <= 70 and s["drawnLight"] <= 16,
                 "the levels swap": s["levels"] == [False, True],
-                "straight: the second car 15.2 m behind": abs(st["c1"] - st["c2"] - 15.2) < 1e-3,
-                "straight: the link 2.7 m, the couplers straight": abs(st["link"] - 2.7) < 1e-3 and abs(st["rear"]) < 0.01 and abs(st["front"]) < 0.01,
-                "R 20: the link keeps its length (1 mm)": abs(cv["link"] - 2.7) < 1e-3,
+                "straight: the first car's centre 7.6 m behind the front": abs(st["c1"] - 92.4) < 1e-3,
+                "straight: the second car 15.04 m behind": abs(st["c1"] - st["c2"] - 15.04) < 1e-3,
+                "straight: the link 2.54 m, the couplers straight": abs(st["link"] - 2.54) < 1e-3 and abs(st["rear"]) < 0.01 and abs(st["front"]) < 0.01,
+                "R 20: the link keeps its length (1 mm)": abs(cv["link"] - 2.54) < 1e-3,
                 f"R 20: the second car {pitch:.3f} m along the track (1 mm)": abs(cv["pitch"] - pitch) < 1e-3,
                 f"R 20: each coupler {angle:.1f} degrees to its car, the two alike": abs(abs(cv["rear"]) - angle) < 0.05 and abs(abs(cv["front"]) - angle) < 0.05,
                 "R 20: the bogies turn to the track": all(abs(abs(x) - bogie) < 0.01 for x in cv["bogies"]) and cv["bogies"][0] * cv["bogies"][1] < 0,
@@ -173,6 +176,15 @@ def main():
                     fails.append(f"game: the drawn doors {g['doors']} do not follow the game's {g['open']}")
                 if not g["credit"]:
                     fails.append("game: the hybrid's credit is missing")
+                # the classic model, downloaded when picked
+                page.goto(f"{base}/?line={args.line}", timeout=300000)
+                page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                page.evaluate("document.getElementById('optAuto').checked = false; const o = document.getElementById('optModel'); o.value = 'classic'; o.dispatchEvent(new Event('change'))")
+                page.evaluate("document.getElementById('btnStart').click()")
+                page.wait_for_function("window.game && window.tramModel && window.camera", timeout=120000)
+                r["classic"] = c = page.evaluate("({ kind: window.tramModel.userData.kind, cars: window.tramModel.userData.cars.length, credit: /conflig/.test(document.getElementById('attrib').textContent) })")
+                if c["kind"] != "classic" or not c["credit"]:
+                    fails.append(f"game: the classic model picked, got {c}")
             elif not args.synthetic:
                 print(f"(part 2 skipped: no data/line{args.line}.json; python -I tools/snapshot.py data-fetch)")
             if errors:

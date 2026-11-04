@@ -6,7 +6,7 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
+import { makeT3, placeConsist, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
 import { T3H_FILES, T3H_CREDIT, loadHybridT3, poseHybrid } from './t3h.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
@@ -273,7 +273,29 @@ await load.begin('tram');
 let detailedOk = false;
 try { await loadHybridT3(t3Res, CONTACT_WIRE - RAIL_TOP); detailedOk = true; data.attribution += ` ${T3H_CREDIT}`; }
 catch (e) { console.warn('detailed T3 model not loaded', e); }
-const useDetailed = () => detailedOk && $('optModel').value === 'detailed';
+// conflig's classic model (CC BY-NC 4.0): simpler, no saloon and no moving parts; downloaded when the player
+// picks it in the menu (the user, 2026-11-04: "make it available for user's choice to load")
+const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.jpg'];
+const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg: 'image/jpeg' };
+const T3_CREDIT = 'Tatra T3 3D model (classic): "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).';
+let classicLoad = null;
+function loadClassic() {
+  classicLoad ??= (async () => {
+    const res = await Promise.all(T3_FILES.map((f) => load.get(f))), blobs = {};
+    for (const r of res) if (r.ok) blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
+    await loadDetailedT3(T3_FILES[0], blobs);
+    data.attribution += ` ${T3_CREDIT}`;
+    $('attrib').textContent = data.attribution;
+  })().catch((e) => console.warn('classic T3 model not loaded', e));
+  return classicLoad;
+}
+// the model the menu asks for: 'hybrid', 'classic' or false (the procedural car); makeT3 falls back
+const modelKind = () => {
+  const v = $('optModel').value;
+  if (v === 'simple' || !detailedOk && !classicReady()) return false;
+  return v === 'classic' ? 'classic' : 'hybrid';
+};
+$('optModel').addEventListener('change', () => { if ($('optModel').value === 'classic') loadClassic(); });
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -289,7 +311,7 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk, dest: lastStop, run: runNumber(0) });
+let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0) });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -357,15 +379,17 @@ fillTrips();
 
 $('btnStart').addEventListener('click', start);
 
-function start() {
+async function start() {
+  if ($('optModel').value === 'classic') await loadClassic();
   audio.start();
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   tram.eq.mode = controlMode();
-  if (tramModel.userData.cars.length !== cars || !!tramModel.userData.mats.body !== useDetailed()) {
+  const kind = modelKind(), have = kind === 'classic' && !classicReady() ? 'hybrid' : kind || 'simple';
+  if (tramModel.userData.cars.length !== cars || tramModel.userData.kind !== have) {
     scene.remove(tramModel);
     disposeModel(tramModel);
-    tramModel = makeT3({ line: data.line, cars, detailed: useDetailed(), dest: lastStop, run: runNumber(0) });
+    tramModel = makeT3({ line: data.line, cars, detailed: kind, dest: lastStop, run: runNumber(0) });
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
@@ -384,7 +408,7 @@ function start() {
     autoIrc: $('optAutoSwitch').checked,
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
-    detailed: useDetailed(),
+    detailed: modelKind(),
     seed: Math.floor(random() * 1e9),
   });
   game.runSeed = seed; // (replay: ?seed=N)
