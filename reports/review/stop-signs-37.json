@@ -1,0 +1,11 @@
+{
+ "schema": 1,
+ "issue": 258,
+ "options": [
+  "sign at the pin (OSM)",
+  "sign at the timetable point (GTFS)",
+  "unsure"
+ ],
+ "over_m": 5.0,
+ "findings": []
+}

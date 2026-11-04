@@ -815,7 +815,9 @@ export class Traffic {
           // behind its tail, which waited for it, line 9 s 18390, #152; not a car before the junction: let
           // through, cars drove in behind one waiting for the tram and blocked the track, line 22 s 11969;
           // and a car only enters when its exit lane has room: it never stops inside the junction)
-          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7);
+          // (nor does one in the exit's mouth that waits for this one: car 1299 stood on the track there
+          // waiting for 1290, which waited for the exit to clear, line 9 s 18394 seed 1, #259)
+          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7 && o.seen?.car !== c && o.lead !== c);
           const blocker = live.find((o) => o !== c && (
             (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan) && o.seen?.car !== c)
             || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, c.plan)
@@ -895,10 +897,13 @@ export class Traffic {
     // back off in this model. After 30 s it leaves (fades out, as at the edge of the traffic area).
     // Rules that kept the tram short of such crossings, or cars off the track, moved the cycle elsewhere
     // (line 22 s 12619 seed 3; 10 new stuck runs over 5 lines x 5 seeds; #154)
+    // The same with an AI tram ahead of ours in the tram's place: it stopped for the car on the track,
+    // which waited for that tram (line 9 seed 4 s 7581, line 23 seed 5 s 7693: 7200 s jams, #259).
+    const fronts = [tram, ...this.ahead].filter((t) => t.v < 0.3).map((t) => t.s);
     for (const x of crossing) {
       const a = x.car;
       let ends = false;
-      if (x.onTrack && tram.v < 0.3 && x.s > tram.s && x.s - tram.s < 15 && (a.vNow ?? 0) < 0.3) {
+      if (x.onTrack && fronts.some((f) => x.s > f && x.s - f < 15) && (a.vNow ?? 0) < 0.3) {
         for (let o = a, n = 0; o && n < 6; n++) {
           const sn = o.seen;
           if (!sn || (o.vNow ?? 0) > 0.3) break;
@@ -1597,7 +1602,10 @@ export class Traffic {
         else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
       }
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
-      if (other && other.s - other.length - 6 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 6;
+      // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 6 m kept two 2-car sets off long platforms, #258)
+      if (other && other.s - other.length - 2 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 2;
+      const clear = other && g.keepClear(t.s, other.s - other.length);
+      if (clear !== null && clear !== undefined && clear < (stopAt ?? Infinity)) stopAt = clear;
       // a car on the track ahead (along it, or crossing it: it gives way to our tram only)
       for (const c of g.carsOnTrack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       for (const c of g.carsCrossing || []) if (c.s > t.s && c.s - 6 < (stopAt ?? Infinity)) stopAt = c.s - 6;
@@ -1656,7 +1664,7 @@ export class Traffic {
       const isStop = stopAt !== null;
       for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       // keep a distance to the oncoming tram in front
-      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 6 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 6;
+      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 2 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 2;
       // junction signals: the opposite direction has GO together with our straight phase; a tram
       // that can still stop comfortably when its GO starts blinking (or is red) waits at its stop
       // line, and keeps waiting for that signal until it shows GO again. One that cannot is in the

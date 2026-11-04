@@ -1546,6 +1546,20 @@ export class Game {
   }
 
   // gap from our front to the rear of the next tram ahead (m), or null
+  // Keep the junction clear (#259): a tram whose front is still before a signal does not follow a tram
+  // whose rear is between that signal and the junction's far side; it waits at the stop line (s − 3) until
+  // the junction is clear. With trams queueing 2 m apart, one following into a junction stood across it
+  // with a car crossing in front (line 9 seed 5: the traffic check jammed). The far side is taken as
+  // symmetric about the crossing's centre. Returns the stop point, or null.
+  keepClear(front, leaderRear) {
+    for (const sig of this.signals) {
+      if (sig.s < front + 0.5 || leaderRear < sig.s - 2) continue;
+      const far = sig.cross + (sig.cross - (sig.edge ?? sig.s)) + 2;
+      if (leaderRear < far) return sig.s - 3;
+    }
+    return null;
+  }
+
   tramAheadGap() {
     let gap = null;
     for (const ai of this.aiTrams) {

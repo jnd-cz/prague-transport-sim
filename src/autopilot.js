@@ -5,6 +5,7 @@
 // passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
 
+const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
 const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
 
@@ -61,7 +62,13 @@ export class Autopilot {
       }
     }
     const gap = g.tramAheadGap();
-    if (gap !== null) consider(tr.s + gap - 8);
+    // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 8 m since the prototype kept two 2-car sets off
+    // long platforms, the user, #258)
+    if (gap !== null) {
+      consider(tr.s + gap - TRAM_GAP);
+      const clear = g.keepClear(tr.s, tr.s + gap); // (not into a junction the tram ahead has not cleared)
+      if (clear !== null) consider(clear);
+    }
     // a car on our track ahead (shared lane, queuing on the tracks): stop behind it
     for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5);
     // a car crossing our track ahead (turning across, U3), or committed to it (too close to stop): stop
