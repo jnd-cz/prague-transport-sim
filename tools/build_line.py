@@ -977,7 +977,9 @@ def main():
     pts_osm = overpass("points", Q_POINTS)
     sig_s, cross_s = [], []
     for e in pts_osm["elements"]:
-        p = P(e["lat"], e["lon"])
+        # (a node of the track takes its place on DI: line 22's level crossing at s 6,911, on the opposite track,
+        # lay 3.4 m from OSM's route and 4.1 m from DI's, past the 4 m it may be off, #20)
+        p = tpos.get(e["id"]) or P(e["lat"], e["lon"])
         s, d, side = path.project(p)
         if s is None:
             continue
