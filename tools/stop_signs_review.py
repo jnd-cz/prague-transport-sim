@@ -107,7 +107,7 @@ def main():
                                  "info": f"{st['name']} (towards {nxt}): OSM's stop position (the pin, node {nid}) is {where} "
                                          f"the timetable (GTFS) point.{plat} Where is the stop sign?"})
         out = {"schema": 1, "issue": 258, "options": OPTIONS, "over_m": args.over, "findings": findings}
-        with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8") as fh:
+        with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
         q = lambda a, f: sorted(a)[int(f * (len(a) - 1))]  # noqa: E731
         print(f"line {line}: {len(diffs)}/{len(stops)} matched; OSM - GTFS median {statistics.median(diffs):+.1f} m "
