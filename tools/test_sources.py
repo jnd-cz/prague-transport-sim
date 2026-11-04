@@ -7,6 +7,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import snapshot  # noqa: E402
 import sources as S  # noqa: E402
 
+RAW = Path(__file__).resolve().parent.parent / 'raw'
+
 
 class Registry(unittest.TestCase):
     def test_every_chain_names_known_sources_once(self):
@@ -26,6 +28,7 @@ class Registry(unittest.TestCase):
                 self.assertIn(s.group, groups, sid)
                 self.assertIn(": ", s.attribution, sid)
 
+    @unittest.skipUnless((RAW / 'dtm-di/provenance.json').exists(), 'fetch the snapshot: raw/dtm-di/')
     def test_snapshot_dates_resolve(self):
         for sid in S.SOURCES:
             self.assertTrue(S.dated(sid) or sid.startswith("rule:"), sid)

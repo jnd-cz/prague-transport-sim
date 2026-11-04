@@ -22,6 +22,10 @@ from track_heights import HeightGuard
 import import_track_heights as stage
 from track_decks import Decks, load_decks
 
+# the city frame's transformation grid is in the snapshot (raw/proj/): tests that convert coordinates
+# skip without it (a checkout with data/ only, CI)
+HAS_GRID = (ROOT / 'raw/proj/cz_cuzk_table_-y-x_3_v1710.tif').exists()
+
 
 def path(identity, z, y=0):
     return {'id': identity, 'coords': [(0, y, z), (10, y, z)], 'attrs': {}, 'sources': []}
@@ -120,6 +124,7 @@ class Guard(unittest.TestCase):
         held = [r['decision']['status'] for r in stage.extend_holds(rows, guard)]
         self.assertEqual(held, ['selected', 'review', 'review', 'review', 'selected'])
 
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
     def test_the_users_libensky_most_holds_its_eastern_approach_as_a_structure(self):
         from geo import Frame
         mask, ids = stage.truth_structures(ROOT, box(0, 0, 0, 0), [])
@@ -471,6 +476,7 @@ class DeckFallback(unittest.TestCase):
         self.assertEqual({r['class'] for r in decks.records}, {'road', 'tram', 'water'})
         self.assertEqual(len(decks.records), 3)
 
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
     def test_structure_masks_distinguish_bridge_tunnel_covered_and_negative_layer(self):
         from geo import Frame
 
@@ -491,6 +497,7 @@ class DeckFallback(unittest.TestCase):
             _, _, tunnel_mask = research.structure_mask(separate_tunnels=True)
         self.assertTrue(tunnel_mask.is_empty)
 
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
     def test_a_disused_or_unfinished_tram_keeps_its_structure_but_other_rail_does_not(self):
         from geo import Frame
 
