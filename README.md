@@ -1,8 +1,9 @@
 # Tatra T3 — Prague trams (browser prototype)
 
-Arcade tram driving in a 3D Prague built from real data: OpenStreetMap track network, buildings,
-roads and greenery, ČÚZK DMR 5G lidar terrain (10 m grid), and the PID GTFS timetable for
-line 22 (Bílá Hora 382 m → Malostranská 189 m → Náměstí Míru 246 m → Zahradní Město 237 m).
+Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (line 17
+is rebuilt from the survey first): OpenStreetMap (track network, roads, greenery), the Prague Digital
+Technical Map (surveyed streets, the transport layer DI for the track), IPR Praha 3D buildings and
+bridges, lidar terrain, and the PID GTFS timetable.
 
 Project docs: [ROADMAP.md](ROADMAP.md) (milestones; tasks are GitHub issues), [AGENTS.md](AGENTS.md)
 (working rules for agents and contributors), [docs/knowledge.md](docs/knowledge.md),
@@ -79,62 +80,24 @@ them. A line without an OSM route
 relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
 it). Built lines: 9, 17, 22, 23, 37.
 
-Then, optionally, import the Geoportál Praha data for the line (recommended):
+The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
+list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
+as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
+pyosmium, pyproj, shapely, numpy and Pillow live in the user site packages):
 
-```bash
-python -I tools/geoportal.py --line 22
-```
+| step | writes | what |
+|---|---|---|
+| `platforms` | `lineN.json` | tram platforms of both directions: PID GTFS positions, names and lines, OSM shapes where mapped (`--fetch` re-reads them from the snapshot's extract) |
+| `osm_speeds` | `lineN.json` | posted speeds and dedicated track: the speed limits and banked curves |
+| `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them) |
+| `osm_signals`, `dtm_points`, `osm_validate` | `lineN.signals.json`, `.dtmpoints.json`, `.validate.json` | line 17 only: OSM traffic signals, street furniture from the survey, a check of the line against OSM |
+| `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
+| `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
+| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
 
-This fetches, for the corridor 110 m either side of the route, the IPR Praha LOD2 3D buildings
-and the Mosty 3D bridges (I3S scene services: real roof shapes, absolute heights matching the
-terrain), retaining walls with
-their heights and the city tree register (individual trees and tree rows). It writes
-`data/lineN.geo.json` and the quantised building geometry `data/lineN.bld.bin` (2.6–4.6 MB per
-line). Without it the game falls back to extruded OSM footprints. Underpasses and tunnels on the
-route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track profile.
-
-Optionally, the surveyed streets from the Prague Digital Technical Map (DTM, open part "ZPS", per
-city district, CC BY 4.0) — imported for line 22 (Praha 2 and 10) and all of line 17 (Praha 1, 2, 4,
-7, 8, 12 and Troja):
-
-```bash
-python -m pip install --user pyproj shapely
-python tools/dtm.py --line 22 raw/dtm/<..._500089_..._ZPS_OPL.gpkg> raw/dtm/<..._500224_..._ZPS_OPL.gpkg>
-python -P -E tools/dtm.py --line 17 raw/dtm/*_{500054,500089,500119,500186,500208,547107,547174}_*_ZPS_OPL.gpkg
-```
-
-(`-P -E` instead of `-I`: pyproj and shapely live in the user site-packages.)
-
-Posted speeds and dedicated track (after `build_line.py`; needed for the speed limits and banked
-curves):
-
-```bash
-python -I tools/osm_speeds.py --line 22
-```
-
-Only the vegetation from Geoportál again (tree categories): `python -I tools/geoportal.py --line 22 --trees-only`.
-
-Tram platforms of both directions (PID GTFS positions, names and lines; OSM shapes where mapped):
-`python -P -E tools/platforms.py --line 22` (`--fetch` re-reads the OSM platforms from the snapshot's extract).
-`python -P -E tools/clearances.py --line 17` lists the roads passing under the route with their OSM `maxheight` (the profile keeps the track over them).
-
-The **fine terrain** near the tracks (ČÚZK DMR 5G on a 2 m grid in 128 m blocks within 120 m of either
-track; the 10 x 15 m grid stays elsewhere): `python -P -E tools/fine_terrain.py --line 17` writes
-`data/lineN.fine.bin` + `.fine.json` (2-5 MB; export tiles cached in raw/dem/). `?nofine` loads
-without it.
-
-`dtm.py` also puts the kerbs back: the survey records a kerb as one line with one height, and
-`tools/kerbs.py` decides per sidewalk, island and platform which side that line belongs to and moves
-the other side by the step (0.10 m, platforms measured; #21). Surfaces are drawn straight between the
-surveyed vertices.
-
-Download the district GeoPackages from geoportalpraha.cz → Data a služby → "DTM kraje - ZPS Sada 2"
-(areas, `*_ZPS_OPL.gpkg.zip`) and "ZPS Sada 3" (3D lines, `*_ZPS_KR.gpkg.zip`), unzip both into
-`raw/dtm/` (the tool pairs each OPL folder with its KR folder). It writes `data/lineN.dtm.json`.
-
-Expects `raw/PID_GTFS.zip` (download from https://data.pid.cz/PID_GTFS.zip). Terrain comes from the
-ČÚZK DMR 5G ImageServer (`exportImage`, cached as `raw/terrain.tif`). Writes `data/line22.json`.
-The service date is a constant at the top of the script.
+Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
+profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
+packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
 
 ## Deploy
 
@@ -282,16 +245,6 @@ Strings live in `src/i18n.js`.
 each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
 `reports/headless/`:
 
-For a combined GTFS run, independently check every logged pair and the built timetable against the
-pinned GTFS, including eligible pairs omitted from both the log and timetable:
-
-```bash
-python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
-```
-
-The audit takes the service date from the build log (`service date …`, `SERVICE_DATE` in
-`tools/build_line.py`).
-
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
 python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
@@ -323,6 +276,16 @@ problem counts that rose (traffic counts beyond a 15 % + 5 noise band). It warns
 measured on main's code and data. `--baseline` stores the run as the new baseline; it needs the game,
 the in-page checks and `data/MANIFEST.json` committed and `data/` matching the manifest.
 
+For a combined GTFS run, independently check every logged pair and the built timetable against the
+pinned GTFS, including eligible pairs omitted from both the log and timetable:
+
+```bash
+python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
+```
+
+The audit takes the service date from the build log (`service date …`, `SERVICE_DATE` in
+`tools/build_line.py`).
+
 `tools/autopilot.js` drives the game headlessly to check the rules. In the browser console:
 
 ```js
@@ -349,17 +312,8 @@ a vehicle (`walkerHit`), each with its cause where known (next road, lane beside
 seeded and uses the first trip, autumn and dry weather, so a run on a **freshly loaded page** gives
 the same counts every time (a second run in the same page differs slightly).
 
-Reports go to `reports/lineN.json`. Compare with the in-page baseline (exit code 1 if a count rose).
-That baseline (`reports/baseline/lineN.json`) dates from 2026-10-23, before the city frame (#7) and top of
-rail (#84), and is no longer maintained: for regression checks use `tools/headless.py --compare`, whose
-baseline follows main.
-
-```bash
-python tools/lint_report.py
-```
-
-After an intended improvement, run it with `--accept` to make the current reports the new baseline.
-Facts from the user that checks are scored against live in `data/truth.json`.
+Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
+(above), whose baseline follows main.
 
 Mirror rendering cost (#79): `python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed`.
 Keep its game window in front until it closes: the report records the graphics backend, focus,

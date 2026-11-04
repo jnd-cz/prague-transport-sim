@@ -1,12 +1,12 @@
-// Dev tool: lints for the loaded line (docs/history/PLAN.md §2). Each check counts one kind of problem over the
+// Dev tool: lints for the loaded line. Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
 // In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
 //   const { lint } = await import('/tools/lint.js?v=' + Date.now());
 //   await lint();                 // quick checks (a few seconds)
 //   await lint({ bot: true });    // + the street bot (DTM lines, about a minute)
 //   await lint({ traffic: true }); // + the whole line driven headless, traffic watched (a minute or two)
-// The report is saved to reports/lineN.json by tools/serve.py; compare with the committed baseline:
-//   python tools/lint_report.py            (--accept makes the current reports the baseline)
+// The report is saved to reports/lineN.json by tools/serve.py; regressions:
+//   python -P -E tools/headless.py --checks lint --compare
 import { makeT3, placeConsist, CONTACT_WIRE } from '../src/models.js';
 import { roofIndex } from '../src/world.js';
 import { tramClearance } from '../src/tram.js';

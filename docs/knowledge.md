@@ -304,7 +304,8 @@ Review these when realism matters; most move into the build in M2.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
-- Line 17's full lint after the merge is the pre-rebuild reference (`reports/line17.json`).
+- Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
+  report, not in git); regressions compare with `reports/baseline/headless.json`.
 
 ## Environment (Windows dev machines)
 

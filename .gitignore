@@ -1,4 +1,4 @@
-# download caches (OSM, GTFS, terrain, Geoportál) — ~420 MB, rebuilt by the tools
+# the pinned source snapshot (OSM, GTFS, survey, terrain, Geoportál) — ~2 GB, DATA.md
 raw/
 
 # Python / OS / editor noise
@@ -23,8 +23,10 @@ data/*
 !data/truth.json
 !data/MANIFEST.json
 
-# headless check results (tools/headless.py)
+# headless check results (tools/headless.py) and runs' logs and folders kept beside them
 reports/headless/
+reports/headless-*/
+reports/*.log
 
 # comparison evidence (tools/shot.py, tools/datadiff.py)
 reports/shots/
