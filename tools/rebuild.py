@@ -10,7 +10,10 @@ group writes data/lineN.json, each writer whole and renamed):
   fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
     the source lines for review mode)
-Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log. After it: python -I tools/snapshot.py data-publish.
+then line_heights once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's
+survey sidecar, so it runs after them all).
+Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log, reports/rebuild/heights.log. After it:
+python -I tools/snapshot.py data-publish.
 """
 import os
 import subprocess
@@ -75,6 +78,17 @@ def rebuild(line):
     return f"line {line}: done in {(time.time() - t0) / 60:.1f} min"
 
 
+def heights(lines):
+    """The top of rail of the lines rebuilt (tools/line_heights.py), after all their steps."""
+    t = time.time()
+    with open(os.path.join(ROOT, "reports", "rebuild", "heights.log"), "w", encoding="utf-8") as f:
+        r = subprocess.run([*PY, os.path.join(ROOT, "tools", "line_heights.py"), *lines], cwd=ROOT, stdout=f,
+                           stderr=subprocess.STDOUT, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    if r.returncode:
+        return f"heights of {', '.join(lines)}: FAILED, see reports/rebuild/heights.log"
+    return f"heights of {', '.join(lines)}: done in {(time.time() - t) / 60:.1f} min"
+
+
 def main():
     # (any other flag, --help too, used to fall through to a rebuild of every line)
     flags = [a for a in sys.argv[1:] if a.startswith("-") and a != "--parallel"]
@@ -92,6 +106,9 @@ def main():
             results = list(ex.map(rebuild, lines))
     else:
         results = [rebuild(line) for line in lines]
+    built = [line for line, r in zip(lines, results) if "FAILED" not in r]
+    if built:
+        results.append(heights(built))
     print("\n".join(results))
     sys.exit(1 if any("FAILED" in r for r in results) else 0)
 

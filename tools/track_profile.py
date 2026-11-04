@@ -116,19 +116,20 @@ def _capped(s, z, w, cap, rows, f=None, u=None, y=None):
     return f,u,y
 
 
-def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05):
+def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05, pin_weight=1e6):
     """Heights along one track (s ascending, metres) bent least so that no change of grade is tighter than
     rmin (a number or one per point). weight: confidence per point (0 drops it), pins: indices held fixed (a
-    junction's height, a reviewed DI point). scale: the noise the curve may ignore, Tukey's c = 4.685 scale;
-    a point further off than c after a round no longer pulls the curve.
+    junction's height, a reviewed DI point) with pin_weight, never dropped as outliers. scale: the noise the curve
+    may ignore, Tukey's c = 4.685 scale; a point further off than c after a round no longer pulls the curve.
     Returns the heights, per point what was moved (> 2 cm) for the log, and the tightest radius left."""
     n = len(s)
     if n < 3:
         return {'z':list(z),'moved':[],'min_radius':math.inf}
     rmin = [rmin]*n if isinstance(rmin,(int,float)) else list(rmin)
     base = [1.0]*n if weight is None else [float(x) for x in weight]
-    for i in pins:
-        base[i] = 1e6
+    pinned = set(pins)
+    for i in pinned:
+        base[i] = pin_weight
     rows, cap = _second(s), [1/r for r in rmin[1:-1]]
     w, state, c = list(base), (None,None,None), 4.685*scale
     # A robust start: a plain first round bent the whole curve towards one bad record (Malovanka, an 83 m spike
@@ -136,12 +137,13 @@ def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05):
     # 2c from the median of its 11 neighbours starts without a pull; the rounds below may bring it back.
     for i in range(n):
         near = sorted(z[max(0,i-5):i+6])
-        if abs(z[i]-near[len(near)//2]) > 2*c:
+        if abs(z[i]-near[len(near)//2]) > 2*c and i not in pinned:
             w[i] = 1e-4*base[i]
     for _ in range(ROBUST):
         f,u,y = _capped(s,z,w,cap,rows,*state)
         state = (f,u,y)
-        nw = [base[i]*((1-((z[i]-f[i])/c)**2)**2 if abs(z[i]-f[i]) < c else 1e-4*base[i]) for i in range(n)]
+        nw = [base[i] if i in pinned else base[i]*((1-((z[i]-f[i])/c)**2)**2 if abs(z[i]-f[i]) < c else 1e-4*base[i])
+              for i in range(n)]
         if max(abs(a-b) for a,b in zip(nw,w)) < .01:
             break
         w = nw
@@ -149,6 +151,52 @@ def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05):
     # (a point the curve misses by more than 0.3 m is not a wiggle but a step: another rule's business, #184)
     steps = [m for m in moved if abs(m['to']-m['from']) > STEP]
     return {'z':f,'moved':moved,'steps':steps,'min_radius':min(implied_radii(s,f),default=math.inf)}
+
+
+SMOOTH = 1.0  # curvature penalty of the band rule, in h^4 (h the median spacing): smooths noise over ~h, not more
+
+
+def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
+    """Heights nearest z (least squares, `weight` per point) that stay within `tol` of it (a number or one per point;
+    None: no band there, a held bin or a lone bad point) and turn no tighter than rmin, with a small penalty on
+    curvature so that a short noisy stretch is not followed into humps (the band rule, #197, 2026-11-03: "If the
+    curve >=500m fits within 10cm then it's solved"). ADMM on u = D f (the radius) and v = f (the band), one banded
+    factorisation. Returns the heights, whether the band and the radius are met (`fits`), how far each point lies
+    outside its band (`excess`) and the tightest radius."""
+    n = len(s)
+    rmin = [rmin]*n if isinstance(rmin,(int,float)) else list(rmin)
+    tol = [tol]*n if tol is None or isinstance(tol,(int,float)) else list(tol)
+    if n < 3:
+        return {'z':list(z),'fits':True,'excess':[0.0]*n,'min_radius':math.inf}
+    w = [1.0]*n if weight is None else [float(x) for x in weight]
+    rows, cap = _second(s), [1/r for r in rmin[1:-1]]
+    h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
+    rho1, rho2 = max(h,.5)**4, 1.0
+    L = _factor(n,[wi+rho2 for wi in w],rows,[(smooth+1)*rho1]*len(rows))
+    Df = lambda f: [sum(c*f[j] for j,c in r.items()) for r in rows]
+    box = lambda f, y: [fi+yi if t is None else max(zi-t,min(zi+t,fi+yi)) for fi,yi,zi,t in zip(f,y,z,tol)]
+    f = list(z)
+    u, v = [max(-c,min(c,d)) for d,c in zip(Df(f),cap)], box(f,[0.0]*n)
+    y1, y2 = [0.0]*len(rows), [0.0]*n
+    for it in range(ITERATIONS):
+        last = f
+        b = [wi*zi+rho2*(vi-yi) for wi,zi,vi,yi in zip(w,z,v,y2)]
+        for r,ui,yi in zip(rows,u,y1):
+            for j,c in r.items():
+                b[j] += rho1*c*(ui-yi)
+        f = _back(L,b)
+        d = Df(f)
+        u = [max(-c,min(c,di+yi)) for di,yi,c in zip(d,y1,cap)]
+        v = box(f,y2)
+        y1 = [yi+di-ui for yi,di,ui in zip(y1,d,u)]
+        y2 = [yi+fi-vi for yi,fi,vi in zip(y2,f,v)]
+        # (feasible is not yet optimal: the curvature penalty acts only as the curve settles, so it must stop moving)
+        if (it % 25 == 24 and all(abs(di) <= c*TOL for di,c in zip(d,cap)) and max(abs(fi-vi) for fi,vi in zip(f,v)) < 1e-3
+                and max(abs(fi-li) for fi,li in zip(f,last)) < 1e-6):
+            break
+    excess = [0.0 if t is None else max(0.0,abs(fi-zi)-t) for fi,zi,t in zip(f,z,tol)]
+    fits = max(excess) <= .005 and all(abs(di) <= c*TOL for di,c in zip(Df(f),cap))
+    return {'z':f,'fits':fits,'excess':excess,'min_radius':min(implied_radii(s,f),default=math.inf)}
 
 
 def implied_radii(s, z):
