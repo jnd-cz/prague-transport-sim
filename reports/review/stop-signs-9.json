@@ -1,0 +1,130 @@
+{
+ "schema": 1,
+ "issue": 258,
+ "options": [
+  "sign at the pin (OSM)",
+  "sign at the timetable point (GTFS)",
+  "elsewhere: see the note",
+  "unsure"
+ ],
+ "over_m": 5.0,
+ "findings": [
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Klamovka-1",
+   "line": "9",
+   "x": -3182.3,
+   "y": -1439.7,
+   "s": 6088.8,
+   "mag": 42.8,
+   "status": "review",
+   "osm_node": 340039721,
+   "gtfs_s": 6131.6,
+   "info": "Klamovka (towards U Zvonu): OSM's stop position (the pin, node 340039721) is 43 m before the timetable (GTFS) point. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Arbesovo náměstí-1",
+   "line": "9",
+   "x": -1389.6,
+   "y": -1063.7,
+   "s": 8298.9,
+   "mag": 6.9,
+   "status": "review",
+   "osm_node": 4719188950,
+   "gtfs_s": 8305.8,
+   "info": "Arbesovo náměstí (towards Švandovo divadlo): OSM's stop position (the pin, node 4719188950) is 7 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Národní divadlo-1",
+   "line": "9",
+   "x": -541.4,
+   "y": -593.6,
+   "s": 9600.6,
+   "mag": 5.4,
+   "status": "review",
+   "osm_node": 4714677494,
+   "gtfs_s": 9595.2,
+   "info": "Národní divadlo (towards Národní třída): OSM's stop position (the pin, node 4714677494) is 5 m after the timetable (GTFS) point. The platform's front end is 3 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Hlavní nádraží-1",
+   "line": "9",
+   "x": 1002.2,
+   "y": -315.6,
+   "s": 11758.2,
+   "mag": 12.8,
+   "status": "review",
+   "osm_node": 255617362,
+   "gtfs_s": 11771.0,
+   "info": "Hlavní nádraží (towards Viktoria Žižkov): OSM's stop position (the pin, node 255617362) is 13 m before the timetable (GTFS) point. The platform's front end is 11 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Olšanské náměstí-1",
+   "line": "9",
+   "x": 2491.3,
+   "y": -891.4,
+   "s": 13453.6,
+   "mag": 15.6,
+   "status": "review",
+   "osm_node": 4704851514,
+   "gtfs_s": 13469.2,
+   "info": "Olšanské náměstí (towards Olšanská): OSM's stop position (the pin, node 4704851514) is 16 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Mezi Hřbitovy-1",
+   "line": "9",
+   "x": 3488.7,
+   "y": -1107.8,
+   "s": 14706.9,
+   "mag": 12.3,
+   "status": "review",
+   "osm_node": 255617355,
+   "gtfs_s": 14719.2,
+   "info": "Mezi Hřbitovy (towards Želivského): OSM's stop position (the pin, node 255617355) is 12 m before the timetable (GTFS) point. The platform's front end is 8 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Vinohradská vodárna-1",
+   "line": "9",
+   "x": 1812.7,
+   "y": -1593.1,
+   "s": 17032.2,
+   "mag": 8.8,
+   "status": "review",
+   "osm_node": 4718170734,
+   "gtfs_s": 17041.0,
+   "info": "Vinohradská vodárna (towards Šumavská): OSM's stop position (the pin, node 4718170734) is 9 m before the timetable (GTFS) point. The platform's front end is 10 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Karlovo náměstí-1",
+   "line": "9",
+   "x": -283.4,
+   "y": -1253.8,
+   "s": 19293.0,
+   "mag": 13.4,
+   "status": "review",
+   "osm_node": 8569961260,
+   "gtfs_s": 19306.4,
+   "info": "Karlovo náměstí (towards Moráň): OSM's stop position (the pin, node 8569961260) is 13 m before the timetable (GTFS) point. The platform's front end is 4 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Moráň-1",
+   "line": "9",
+   "x": -382.4,
+   "y": -1439.5,
+   "s": 19533.6,
+   "mag": 6.6,
+   "status": "review",
+   "osm_node": 4701097445,
+   "gtfs_s": 19540.2,
+   "info": "Moráň (towards Palackého náměstí): OSM's stop position (the pin, node 4701097445) is 7 m before the timetable (GTFS) point. The platform's front end is 3 m past the pin. Where is the stop sign?"
+  }
+ ]
+}

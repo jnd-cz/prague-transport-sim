@@ -1,0 +1,65 @@
+{
+ "schema": 1,
+ "issue": 258,
+ "options": [
+  "sign at the pin (OSM)",
+  "sign at the timetable point (GTFS)",
+  "elsewhere: see the note",
+  "unsure"
+ ],
+ "over_m": 5.0,
+ "findings": [
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-Královka-1",
+   "line": "23",
+   "x": -2923.9,
+   "y": 115.3,
+   "s": 2.6,
+   "mag": 15.7,
+   "status": "review",
+   "osm_node": 338859782,
+   "gtfs_s": 18.3,
+   "info": "Královka (towards Malovanka): OSM's stop position (the pin, node 338859782) is 16 m before the timetable (GTFS) point. The platform's front end is 18 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-Brusnice-1",
+   "line": "23",
+   "x": -2019.7,
+   "y": 909.2,
+   "s": 1422.3,
+   "mag": 7.1,
+   "status": "review",
+   "osm_node": 4721894504,
+   "gtfs_s": 1429.4,
+   "info": "Brusnice (towards Pražský hrad): OSM's stop position (the pin, node 4721894504) is 7 m before the timetable (GTFS) point. The platform's front end is 8 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-Malostranské náměstí-1",
+   "line": "23",
+   "x": -1191.2,
+   "y": 242.3,
+   "s": 4163.1,
+   "mag": 10.3,
+   "status": "review",
+   "osm_node": 7002486683,
+   "gtfs_s": 4173.4,
+   "info": "Malostranské náměstí (towards Pražské Jezulátko): OSM's stop position (the pin, node 7002486683) is 10 m before the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-Národní divadlo-1",
+   "line": "23",
+   "x": -541.4,
+   "y": -593.6,
+   "s": 5698.1,
+   "mag": 5.4,
+   "status": "review",
+   "osm_node": 4714677494,
+   "gtfs_s": 5692.7,
+   "info": "Národní divadlo (towards Národní třída): OSM's stop position (the pin, node 4714677494) is 5 m after the timetable (GTFS) point. The platform's front end is 3 m past the pin. Where is the stop sign?"
+  }
+ ]
+}
