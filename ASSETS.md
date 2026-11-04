@@ -8,6 +8,7 @@ the project's own assets are listed with their own licence.
 | Files | What | Author / source | Licence | Changes |
 |---|---|---|---|---|
 | `assets/t3/t3.gltf`, `t3.bin`, `t3_color.jpg` | Detailed Tatra T3 tram model | "Tatra T3" by Jakub Vaja (conflig), [Sketchfab](https://sketchfab.com/3d-models/tatra-t3-76aa08d7c06340fc89229551c45e3c3a) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) | Maps reduced to one 2048 px colour map with baked AO; see `assets/t3/LICENSE.txt`. **Non-commercial**: not for a commercial release (the procedural model in `src/models.js` is). |
+| `assets/people/person-near.glb`, `person-far.glb` | Pedestrian figures: animated (8 clips) and distant | the project's own asset lab (street-life-boarding v14, 2026-10-27), made by an agent for the project | GPL-3.0 (own work) | none; see `assets/people/LICENSE.txt` |
 
 Generated in code, part of the GPL-3.0 code: the procedural tram, cars, people, signals, signs and
 street furniture (`src/models.js`), textures drawn on canvas (plates, facades, signs), and all sound

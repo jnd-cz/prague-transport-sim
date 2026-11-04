@@ -22,6 +22,7 @@ import { rng, runSeed } from './random.js';
 import { trackStyles, loadHeightFacts } from './heights.js';
 import { credits, logProvenance, fallbacks } from './provenance.js';
 import { Mirror } from './mirror.js';
+import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -39,6 +40,9 @@ const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.j
 for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json']) load.prefetch(`data/line${lineId}.${f}`);
 if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
 for (const f of T3_FILES) load.prefetch(f);
+// the pedestrians' figures (#251); ?boxpeople keeps the box figures
+const figures = !params.has('boxpeople');
+if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const data = await (await load.get(`data/line${lineId}.json`)).json();
@@ -276,6 +280,12 @@ const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg
 for (const r of t3Res) if (r.ok) t3Blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
 try { await loadDetailedT3(T3_FILES[0], t3Blobs); detailedOk = true; data.attribution += ' Tatra T3 3D model: "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).'; }
 catch (e) { console.warn('detailed T3 model not loaded', e); }
+let people = null;
+if (figures) {
+  try { people = new People(scene, await loadPeople(await Promise.all(PEOPLE_FILES.map((f) => load.get(f))))); }
+  catch (e) { console.warn('pedestrian figures not loaded: the box figures stay', e); }
+}
+window.people = people;
 const useDetailed = () => detailedOk && $('optModel').value === 'detailed';
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
@@ -778,7 +788,10 @@ function frame(now) {
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
   const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
-  if (draw) { renderer.render(scene, camera); lastDraw = now; window.drawCount++; }
+  if (draw) {
+    if (people && game) people.sync(camera, traffic, game);
+    renderer.render(scene, camera); lastDraw = now; window.drawCount++;
+  }
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
