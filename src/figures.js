@@ -6,25 +6,28 @@
 // weights; the bind pose is read from person-near.glb. Hair styles are extra pieces on the Head bone,
 // in the baked hair colour so that each person's hair colour replaces them as it does the base cap.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const SKIN = 0xd5a67e, HAIR = 0x342a23, SHOE = 0x292b30, HAT = 0x2e3138;
 export const SKIN_COLOR = new THREE.Color(SKIN), HAT_COLOR = new THREE.Color(HAT);
 
-// in the Head bone's frame (+x the face, +y up, z the sides); the skull is an ellipsoid at (0, .02, 0)
+// In the Head bone's frame (+x the face, +y up, z the sides): the skull is an ellipsoid at (0, .02, 0)
 // with radii (.104, .144, .103), the base hair cap one at (-.015, .107, 0) with (.105, .066, .105).
-// [centre, radii, colour]; 'bald' recolours the cap (the hair colour is the skin's), 'cap' is a hat.
+// A style is pieces: ellipsoids [centre, radii, colour], or a hood: the longer hair as one shell from
+// the crown down to `back` (y at the back of the neck), flaring by `flare` at its ends; its face side
+// goes in under the skin, and the base cap is sunk into the skull under it, so no seam shows where a
+// top and a back part would meet. 'bald' recolours the cap (the hair colour is the skin's), 'cap' is a hat.
 const STYLE_PIECES = {
   short: [],
   bald: [],
-  collar: [[[-0.035, 0.005, 0], [0.095, 0.15, 0.118], HAIR]], // long at the back, down to the collar
-  bob: [[[-0.02, 0.03, 0], [0.108, 0.115, 0.135], HAIR], [[0.082, 0.085, 0], [0.022, 0.028, 0.09], HAIR]], // to the jaw, wide, a flat fringe
+  collar: [{ back: -0.125, flare: 0.05 }], // to the collar
+  shoulder: [{ back: -0.19, flare: 0.18 }], // to the shoulders, resting on the upper back
   ponytail: [[[-0.125, 0.03, 0], [0.035, 0.09, 0.032], HAIR], [[-0.105, 0.09, 0], [0.022, 0.022, 0.022], HAIR]],
   bun: [[[-0.085, 0.135, 0], [0.048, 0.045, 0.048], HAIR]],
   cap: [[[-0.01, 0.115, 0], [0.112, 0.06, 0.11], HAT], [[0.1, 0.1, 0], [0.07, 0.012, 0.085], HAT]], // crown and peak
 };
 // rough shares in 100
-const STYLE_SHARES = { short: 30, collar: 16, bob: 12, ponytail: 10, bun: 6, bald: 12, cap: 14 };
+const STYLE_SHARES = { short: 30, collar: 16, shoulder: 12, ponytail: 10, bun: 6, bald: 12, cap: 14 };
 export const STYLES = Object.keys(STYLE_PIECES);
 const STYLE_OF = Object.entries(STYLE_SHARES).flatMap(([s, w]) => Array(w).fill(s));
 export const styleOf = (n) => STYLE_OF[(Math.imul(n + 7, 0x9e3779b1) >>> 0) % STYLE_OF.length];
@@ -106,8 +109,45 @@ export function middleBody(pose) {
   return Object.fromEntries(Object.entries(parts).map(([k, gs]) => [k, mergeGeometries(gs)]));
 }
 
+// the longer hair as one shell round the skull and the base cap (about 1 cm out), open under the neck
+function hood({ back, flare }, seg) {
+  const s = THREE.MathUtils.smoothstep, C = [-0.012, 0.025, 0], R = [0.13, 0.158, 0.132]; // (z: over the ears)
+  let g = new THREE.SphereGeometry(1, seg === 6 ? 8 : 18, seg === 6 ? 6 : 12, 0, Math.PI * 2, 0, Math.PI * 0.8);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const dx = p.getX(i), dy = p.getY(i), dz = p.getZ(i), down = Math.max(0, -dy);
+    // as low as `back` behind, the jaw beside the face; the ends flare out a little
+    const bottom = back + (-0.07 - back) * s(dx, -0.2, 0.6), ry = dy >= 0 ? R[1] : C[1] - bottom, spread = 1 + flare * down;
+    let x = C[0] + R[0] * dx * spread, z = R[2] * dz * spread;
+    // in front of the ears and below the hairline the shell goes in under the skin: the face shows
+    const k = 1 - 0.3 * s(dx, 0.25, 0.5) * (1 - s(dy, 0.35, 0.6));
+    x = C[0] + (x - C[0]) * k; z *= k;
+    p.setXYZ(i, x, C[1] + ry * dy, z);
+  }
+  // (one surface: the sphere's seam column merged, normals smooth across it)
+  g.deleteAttribute('uv'); g.deleteAttribute('normal');
+  g = mergeVertices(g);
+  g.computeVertexNormals();
+  return g;
+}
+
+// the base cap sunk into the skull (for a hood over it): its vertices drawn in towards the skull's centre
+function sunkCap(detail, pose) {
+  const g = detail.clone(), p = g.attributes.position, col = g.attributes.color, hair = new THREE.Color(HAIR);
+  const head = pose.Head.world, inv = head.clone().invert(), v = new THREE.Vector3(), mid = new THREE.Vector3(0, 0.02, 0);
+  for (let i = 0; i < p.count; i++) {
+    if (Math.abs(col.getX(i) - hair.r) > 2e-3 || Math.abs(col.getY(i) - hair.g) > 2e-3 || Math.abs(col.getZ(i) - hair.b) > 2e-3) continue;
+    v.fromBufferAttribute(p, i).applyMatrix4(inv).sub(mid).multiplyScalar(0.85).add(mid).applyMatrix4(head);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  return g;
+}
+
 // a detail geometry (skin, eyes, shoes, hair cap) with a hair style's pieces; seg: 12 near, 6 middle
 export function withStyle(detail, style, seg, pose) {
-  const pieces = STYLE_PIECES[style].map(([p, s, color]) => shaped(sphere(p, s, seg), 'Head', color, pose));
-  return pieces.length ? mergeGeometries([detail, ...pieces]) : detail;
+  const defs = STYLE_PIECES[style];
+  if (!defs.length) return detail;
+  const hooded = defs.some((d) => !Array.isArray(d));
+  const pieces = defs.map((d) => Array.isArray(d) ? shaped(sphere(d[0], d[1], seg), 'Head', d[2], pose) : shaped(hood(d, seg), 'Head', HAIR, pose));
+  return mergeGeometries([hooded ? sunkCap(detail, pose) : detail, ...pieces]);
 }
