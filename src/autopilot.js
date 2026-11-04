@@ -6,6 +6,7 @@
 // headless rule tests (tools/autopilot.js).
 
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
+const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
 
 export class Autopilot {
   constructor() {
@@ -73,8 +74,12 @@ export class Autopilot {
     }
     if (stopAt !== null) {
       const d = stopAt - tr.s;
-      vt = Math.min(vt, Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - 1.5))));
-      if (d < 1.5) vt = 0;
+      // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
+      // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
+      // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
+      // (and from there it creeps at ≤ 3 km/h to 1 m short: a stop zone may start only 2.5 m before the point)
+      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0));
+      if (d < 1) vt = 0;
     }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
