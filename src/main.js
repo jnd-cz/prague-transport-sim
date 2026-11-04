@@ -6,7 +6,7 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.js';
+import { makeT3, placeConsist, setConsistLine, loadDetailedT3, disposeModel } from './models.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
@@ -125,7 +125,9 @@ window.renderer = renderer; // (from the start, also in the menu: performance ch
 // instead of a frozen black screen.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
-  if (game) game.paused = true;
+  // (window.game, not game: the context can be lost while the world uploads, before `let game` below
+  // is reached, and reading it then threw instead of showing this card)
+  if (window.game) window.game.paused = true;
   const card = $('resultsCard');
   card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
   $('results').classList.remove('hidden');
@@ -362,12 +364,14 @@ function start() {
   audio.start();
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
+  tram.eq.mode = controlMode();
   if (tramModel.userData.cars.length !== cars || !!tramModel.userData.mats.body !== useDetailed()) {
     scene.remove(tramModel);
+    disposeModel(tramModel);
     tramModel = makeT3({ line: data.line, cars, detailed: useDetailed(), dest: lastStop, run: runNumber(0) });
     scene.add(tramModel);
   }
-  if (game) scene.remove(game.objects);
+  if (game) { scene.remove(game.objects); disposeModel(game.objects); }
   // one seeded stream for the whole run (rules and traffic), apart from Math.random
   const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
@@ -396,6 +400,7 @@ function start() {
   debugOverlay.reset();
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
+  pedalKey = null;
   window.game = game; // handy for debugging from the console
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   game.mirror = mirror.stats;
@@ -508,13 +513,15 @@ window.addEventListener('keydown', (e) => {
   if (k === 'o' && !e.repeat) {
     pilot = pilot ? null : new Autopilot();
     game.autopilot = !!pilot;
+    if (!pilot) takeOver();
     game.msg(t(pilot ? 'msg.autoOn' : 'msg.autoOff'), 'info', 4);
     return;
   }
   // touching the controller or the doors takes over from the autopilot
-  if (pilot && ['w', 's', 'arrowup', 'arrowdown', ' ', 'n', 'd'].includes(k)) {
+  if (pilot && (['w', 's', 'arrowup', 'arrowdown', ' ', 'n', 'd', 'r'].includes(k) || /^Digit[0-5]$/.test(e.code))) {
     pilot = null;
     game.autopilot = false;
+    takeOver();
     game.msg(t('msg.autoOff'), 'info', 4);
   }
   if (e.key === 'Shift') input.deadman = true;
@@ -525,12 +532,16 @@ window.addEventListener('keydown', (e) => {
   if (k === 'p' || k === 'escape') { game.paused = !game.paused; return; }
   if (game.paused) return;
   if (e.repeat && k !== 'w' && k !== 's' && k !== 'arrowup' && k !== 'arrowdown') return;
-  const prev = tram.notch;
+  const prev = command();
+  // number keys: a drive step, with Shift a brake step, 0 both pedals released
+  const digit = /^Digit[0-5]$/.test(e.code) ? +e.code.slice(5) : null;
+  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit);
   switch (k) {
-    case 'w': case 'arrowup': if (tram.notch === -5) tram.notch = -4; else tram.notch = Math.min(4, tram.notch + 1); break;
-    case 's': case 'arrowdown': tram.notch = Math.max(-4, tram.notch - 1); break;
-    case ' ': tram.notch = -5; break;
-    case 'n': tram.notch = 0; break;
+    case 'w': case 'arrowup': control(+1, e.repeat); break;
+    case 's': case 'arrowdown': control(-1, e.repeat); break;
+    case ' ': setStep(-6); break;
+    case 'n': setStep(0); break;
+    case 'r': if (!arcade()) tram.eq.park(); break; // the brake pedal's ratchet (arcade parks by itself)
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
@@ -543,11 +554,11 @@ window.addEventListener('keydown', (e) => {
     case 'v': chase = !chase; document.body.classList.toggle('chase', chase); break;
     case 'm': audio.setMuted(!audio.muted); break;
   }
-  if (tram.notch > 0 && game.doorState !== 'closed') {
-    tram.notch = prev > 0 ? prev : 0;
-    if (prev <= 0) { audio.warning(); game.msg(t('msg.closeDoors'), 'warn'); }
+  if (command() > 0 && prev <= 0 && game.doorState !== 'closed') {
+    if (arcade()) tram.eq.lever = 0;
+    audio.warning(); game.msg(t('msg.closeDoors'), 'warn');
   }
-  if (tram.notch !== prev) audio.click(0.12, 1600);
+  if (command() !== prev) audio.click(0.12, 1600);
 });
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') input.deadman = false;
@@ -556,8 +567,30 @@ window.addEventListener('keyup', (e) => {
   if (ku === 'c') input.cutout = false;
   if (ku === 'y') input.switchBtn = false;
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
-  if (e.key === ' ' && tram.notch === -5) tram.notch = -4;
+  if (e.key === ' ' && command() === -6) setStep(-5); // (the emergency stop let go: brake step 5)
+  if ((ku === 'w' || ku === 'arrowup' || ku === 's' || ku === 'arrowdown') && pedalKey) pedalKey = null;
 });
+
+// The controls (#221): 'arcade' moves a lever in steps and a helper works the pedals; 'advanced' moves the
+// pedals (a tap to the next step's angle, held on at 20°/s) and the ratchet (R) is the driver's
+function controlMode() { return $('optControls').value === 'advanced' ? 'advanced' : 'arcade'; }
+function arcade() { return tram.eq.mode === 'arcade'; }
+// what the driver has set: the lever (arcade, the helper moves the pedals on the next step) or the pedals' step
+function command() { return arcade() ? tram.eq.lever : tram.notch; }
+function takeOver() {
+  tram.eq.mode = controlMode();
+  tram.eq.lever = Math.max(-5, Math.min(5, tram.notch));
+}
+let pedalKey = null; // advanced: a held W / S moves the pedal on after 0.35 s
+function control(dir, repeat) {
+  const eq = tram.eq;
+  if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
+  if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
+}
+function setStep(n) {
+  if (arcade()) tram.eq.lever = n;
+  else tram.eq.setStep(n);
+}
 window.addEventListener('blur', () => {
   if (game && !game.finished && !pilot) { game.paused = true; audio.setActive(false); }
 }); // keep riding on autopilot
@@ -714,6 +747,7 @@ function frame(now) {
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(dt) : [dt];
     steps.forEach((h, i) => {
+      if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       game.update(h, pilot ? pilot.input : input);
       // (the traffic is posed for drawing on the frame's last step only)

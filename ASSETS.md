@@ -11,7 +11,11 @@ the project's own assets are listed with their own licence.
 
 Generated in code, part of the GPL-3.0 code: the procedural tram, cars, people, signals, signs and
 street furniture (`src/models.js`), textures drawn on canvas (plates, facades, signs), and all sound
-(Web Audio synthesis, `src/audio.js`).
+(Web Audio synthesis, `src/audio.js`). Models made for the project by agents are GPL-3.0 as well
+([decision](docs/decisions/2026-10-29-tests-and-licences.md)), each with an entry here.
+
+Not in the repository yet: the older asset labs' T3, cars, pedestrians and street furniture, listed with
+their licences in [docs/assets-inventory.md](docs/assets-inventory.md).
 
 Not in the repository: the world data built from public sources (see [NOTICE.md](NOTICE.md)) and the
 raw sources themselves, both in the data store ([DATA.md](DATA.md)).
