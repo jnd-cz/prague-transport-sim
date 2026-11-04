@@ -37,6 +37,35 @@ export const BED_BELOW = 0.006; // bed surface under the surface level the style
 export const STREET_BELOW = 0.012 + 0.04; // a surveyed street vertex next to the track, under the surface level
 export const ROAD_BELOW = 0.012 + 0.12; // the ground under an OSM road ribbon next to the track
 
+// The assembled heights of the line data (#197, tools/line_heights.py) come every `step` m with null where there
+// is none: `resampleHeights` reads them at another spacing (NaN where a neighbour is null), `meetHeights` fills the
+// NaN runs from another profile, shifted at both ends so it meets the data (linear between the two shifts).
+export function resampleHeights(arr, step, n, at) {
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const k = (i * at) / step, i0 = Math.min(Math.floor(k), arr.length - 1), f = k - i0;
+    const a = arr[i0], b = arr[Math.min(i0 + 1, arr.length - 1)];
+    out[i] = a == null ? NaN : f < 1e-6 || i0 + 1 >= arr.length ? a : b == null ? NaN : a + (b - a) * f;
+  }
+  return out;
+}
+
+export function meetHeights(d, base) {
+  const out = Float32Array.from(d), n = d.length;
+  for (let i = 0; i < n; i++) {
+    if (!Number.isNaN(d[i])) continue;
+    let j = i;
+    while (j + 1 < n && Number.isNaN(d[j + 1])) j++;
+    const a = i > 0 ? d[i - 1] - base[i - 1] : null, b = j < n - 1 ? d[j + 1] - base[j + 1] : null;
+    for (let k = i; k <= j; k++) {
+      const u = (k - i + 1) / (j - i + 2);
+      out[k] = base[k] + (a === null ? (b ?? 0) : b === null ? a : a + (b - a) * u);
+    }
+    i = j;
+  }
+  return out;
+}
+
 const RAMP = 15; // m: a style's offset blends in and out over this at the ends of its section
 
 // The line's track styles, as functions of the route position: `at(s)` the style ('panels' where nothing

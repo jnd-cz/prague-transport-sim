@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-03b",
- "built_at_commit": "cddcbeb",
- "published": "2026-11-03 23:29",
- "note": "line 17: 18 m held, the through track first, millimetre track coordinates (#204)",
+ "built_at_commit": "c6fed90",
+ "published": "2026-11-04 05:39",
+ "note": "line 17: heights with the user's radius answers (outliers dropped, rails join first) on #217's track (#197)",
  "files": {
   "line17.bld.bin": {
    "size": 6348546,
@@ -29,8 +29,8 @@
    "sha256": "905c2d71ff2117168727db63b42efcbb95c635edd509fdb130118d4b8017ae76"
   },
   "line17.json": {
-   "size": 6093022,
-   "sha256": "ffdbfb4aad8a67b2b6fd853f8b849f6298fc3c837d77055f4c60fd9ffda5ba8b"
+   "size": 6752409,
+   "sha256": "6f685d3b554ac312d98be4b1e6562b38c33cc4e90f5fb785df6dd0934fac8112"
   },
   "line17.signals.json": {
    "size": 36904,

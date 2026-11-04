@@ -121,7 +121,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   (`tools/sysinfo.py`); don't start a second heavy job while one runs.
 - Which checks a change needs (`/regress` picks them from the diff): the game, traffic or the tram:
   `u3,redruns,traffic,lint` on all lines; drawn geometry (surfaces, track beds, crossings, kerbs): also
-  `surfaces,crossing,canted`, and every seedless move needs a reason; the review page: `tools/test_review.py`
+  `surfaces,crossing,canted`, and every seedless move needs a reason; track heights (`tools/line_heights.py`, the
+  profile): also `heights`; the review page: `tools/test_review.py`
   (phone and desktop sizes); docs or harness only: none, and the PR says so.
 - Tests that drive a page set a time limit for the whole test (`faulthandler.dump_traceback_later`, as
   `tools/test_review.py`): Playwright's `page.evaluate` has none, and a promise that never resolves
