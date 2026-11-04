@@ -20,7 +20,7 @@ Conventions
   circuit or text, not a sentence of a source; **[assumed]** a value proposed for the game with no
   source.
 - "Car current" = total current of all four motors (two parallel branches, each two motors in series).
-  The cab ammeter shows car current (see 2.8).
+  The cab ammeter's shunt is in the 4M+3M group; its scale is said to show car current (3.8, 8.1).
 
 ## 0. Answers to the open questions of the brief (short)
 
@@ -31,8 +31,8 @@ Conventions
 | shunting position | none on the pedals; the rear auxiliary station (*manipulační zpětný pojezd*) starts on drive step 2 and brakes on brake step 2 | [ckd03] p. 15 [A] |
 | park / unpark | press to the station position and tip the pedal plate forward (toe) into a ratchet (*ozubec*); tip it back (heel) to release, springs return it to 0 | [ckd16] p. 1, [ckd03] p. 8 [A] |
 | coast between drive and brake | ČKD recommends about 2–3 s of coasting between service braking and driving | [ckd03] p. 11 [A] |
-| doors | a door relay contact (DBR, *relé blokování rozjezdu*) is in the line contactor circuit: open doors prevent traction; no source says doors apply a brake on T3SU(CS) | [ckd24] p. 7 (hand-added), [mf1] [A]/[C] |
-| dead-man | not on Czechoslovak T3 (dropped from the T2 design); the Soviet T-3 had a safety pedal; T3SU(CS) has a safety button | [cswikiT3], [rubook], [ckd03] p. 3, 7 |
+| doors | a door relay contact (DBR, *relé blokování rozjezdu*) is in the line contactor circuit: an open door cuts traction at any speed; no brake from the doors | [ckd24] p. 7 (hand-added), [ckd-schema] (8.2), [mf1] [A]/[C] |
+| dead-man | not on Czechoslovak T3 (dropped from the T2 design); the Soviet T-3 had a safety pedal; T3SU(CS) has a safety button (ČKD change 82-09-018 of 1982 replaced the pedal with it) | [cswikiT3], [rubook], [ckd03] p. 3, 7, [ckd-schema] |
 
 ## Game now (main at 7cac287)
 
@@ -76,14 +76,15 @@ Conventions
 | [prco] | Pittsburgh Railways mailing list: J. Holland on the PCC (Westinghouse) accelerator | 2007-09-01 | [C] |
 | [rypn] | Railway Preservation forum: PCC limit relay settings quoted from GE GEI-21676 and Westinghouse R-994 | 2020-01 | [C] quoting [A] |
 | [tmsv] | Tramway Museum Society of Victoria, *ČKD-Tatra* (brochure data) | c. 1967–68 (inferred) | [B] |
+| [ckd-schema] | ČKD, *Základní schema tramvaje T3SU/ČSSR*, drawing 1-38-370 444, issue F, one sheet (`T3SU-schema.pdf`) | drawn 1981-11-10, revised to 1987-03-10 | [A] |
 
 The ČKD parts are scans without a text layer: every number was read from the page images (PDF page
 cited). Checked again for this note: the step currents ([ckd03] p. 4) and the drive pedal angles
 ([ckd16] p. 6).
 
 Searched without result: a description of the accelerator's sound; Czech/Slovak theses on the TR 37
-accelerator in detail (only [vsb], secondary); tram-forum threads (not reached). Not read: the
-complete wiring diagram `T3SU-schema.pdf` / `schema.html` in [ckd-dir] (see Open questions).
+accelerator in detail (only [vsb], secondary); tram-forum threads (not reached). The complete
+wiring diagram ([ckd-schema]) was read on 2026-11-04: section 8.
 
 ## 2. Pedals (*šlapkový řadič* HG 14)
 
@@ -151,7 +152,8 @@ book: the positions are not fixed (*нефиксированные*), i.e. no de
 | track brake 2 | ≈40° (BK6 → K1), pedal at its stop | track brakes on **both** bogies | same |
 
 - Five selectable electric brake steps ([ckd03] p. 6; [ckd24] p. 14; [rubook]) [A]. Only the step-5
-  current is documented (340–360 A, at ≈25° in the test). Steps 1–4: not found (Open questions).
+  current is documented (340–360 A, at ≈25° in the test). Steps 1–4: inferred from the wiring
+  diagram as 160 / 211 / 262 / 306 A (8.2).
 - The electric brake works above about 4 km/h; below it the motor shoe brake (*motorová čelisťová
   brzda*) stops the car by itself ([ckd03] p. 6–7) [A]. DP Praha: comes in by itself at 5–3 km/h
   ([ucebnice] via [t3.md](t3.md)) [B].
@@ -162,8 +164,8 @@ book: the positions are not fixed (*нефиксированные*), i.e. no de
   [inferred].
 - Wording differences: [ckd24] p. 15 says LO is held only by its current coil "from the 3rd brake step";
   the HG 14 program (BK8 open from ≈20°) and [rubook] ("BK8 (0–4)") say from step 5; the forum says
-  "near the 5th step, close to the parked position" ([mf1]). Treat step 5 as the better-supported
-  value; the drawing carries a change of 11/86.
+  "near the 5th step, close to the parked position" ([mf1]). Step 5: the wiring diagram's program
+  opens BK8 between steps 4 and 5 (8.3); the drawing carries a change of 11/86.
 - Parking at higher speed is "bad style" that wears the linings (forum, [mf1]) [C]. ČKD's own brake
   test pushes the pedal into the station position from 30–50 km/h and measures the electric brake
   ([ckd26] p. 5) [A], so parking at speed brakes electrically first.
@@ -255,9 +257,10 @@ From [ckd24] p. 3–9, [rubook], [mf1] [A]/[B]/[C]:
    contactors B1/B2 → **line contactor LS** closes (conditions: brake pedal at 0, reverser set,
    charging contactor SN = motor-generator running on line voltage, door relay DBR, maximum relay MR
    not tripped, safety relay RB up). M1 also closes **BR1** → shoe brakes fully released.
-3. LS → **R1** bypasses damping resistor 1 (0.7 Ω); R1 → **R2** bypasses resistor 2 (0.7 Ω) and opens
+3. LS → **R1** bypasses damping resistor 1 (0.35 Ω); R1 → **R2** bypasses resistor 2 (0.7 Ω) and opens
    F2 (field shunt off). The dampers and the brief field shunt soften the first current rush and take
-   up gear backlash ([ckd24] p. 7; 0.7 Ω values from [rubook]). The cs.wiki says they are bridged
+   up gear backlash ([ckd24] p. 7; values from [ckd-schema], [rubook] has 0.7 + 0.7 Ω). The cs.wiki
+   says they are bridged
    "within the first seconds" ([cswikiZ]) [C].
 4. The pilot motor turns the accelerator from step 1 upward under the limiting relay.
 5. **Step 75: contactor M2 bridges the whole accelerator** ([ckd24] p. 8; [ckd03] p. 2). The
@@ -268,15 +271,16 @@ From [ckd24] p. 3–9, [rubook], [mf1] [A]/[B]/[C]:
    ([ckd24] p. 8; [rubook]): 80 → F4 (1st stage, motors 2M+1M); 85 → F1 (1st stage, 4M+3M); 90 → F3
    (2nd stage, 4M+3M); 95 → F2 (2nd stage, 2M+1M). The accelerator's own contact program drawing
    shows the contacts at about 85, 89, 93 and 97 instead ([ckd17] p. 9, scan reading) [A, low
-   legibility]. Motor field at full weakening 55 % ([ckd04] p. 2); the intermediate stage is not given.
+   legibility]; the wiring diagram's program reads 80 / 85 / 90 / 95 clearly (8.3). Motor field at
+   full weakening 55 % ([ckd04] p. 2); the intermediate stage is not given.
 7. **Step 97**: contact ZR7 cuts the pilot motor; the cross coasts on to **99** and stays
    ([ckd24] p. 12; [rubook]). From then on the car runs on the motor characteristic ("on the
    trolley", [mf2]) up to 65 km/h; letting the pedal partly back has no effect until it returns to 0
    ([ckd24] p. 12) [A].
 
-Auxiliary accelerator contacts ([ckd17] p. 9 and texts) [A]: ZR1 lamp (closed ≈1–78); ZR2 M2 (75–99);
+Auxiliary accelerator contacts ([ckd17] p. 9, [ckd-schema]) [A]: ZR1 lamp (1–80); ZR2 M2 (75–99);
 ZR3/ZR4/ZR5/ZR6 field stages; ZR7 pilot motor stop at 97; ZR8 pilot-motor return path (3–99); ZR10
-holds BR1 (3–99); ZR9 purpose not read.
+holds BR1 (3–99); ZR9 (1–30) enables the switch button (8.3).
 
 ### 3.5 Coasting (*doběh*) and "preparation" (*příprava*)
 
@@ -382,7 +386,7 @@ holds BR1 (3–99); ZR9 purpose not read.
 - **Doors and brakes**: no source says an open door applies a brake on T3SU/T3SUCS. If a door opened
   while running, LS would drop and the car would coast with the preparation current [inferred]. (On
   the T3M, door 1 opened while moving applies the shoe brake — T3M only, [ucebnice] via [t3.md](t3.md).)
-  Whether DBR also has a speed condition is unknown.
+  The wiring diagram shows no speed condition (8.2).
 - Door indication: lamp lit when all doors are closed ([ckd03] p. 9) [A]; [ruwiki]: lamp for "a door
   not closed" [C].
 - Other conditions for LS ([ckd24] p. 7) [A]: brake pedal at 0 (BK2), drive pedal ≥ step 1 (JK1),
@@ -393,7 +397,8 @@ holds BR1 (3–99); ZR9 purpose not read.
 - Electric points (*elektrické ovládání výhybek*): the button TV, through a contact of M1, closes
   contactor SV, which draws line current through the points resistor RV and R1/R2 so the overhead
   points contact registers current; the button must not be held over 10 s ([ckd24] p. 18; [ckd03]
-  p. 10–11) [A]. Whether the M1 contact is a make or break contact was not read [open].
+  p. 10–11) [A]. The diagram puts M1's rest contact and ZR9 (accelerator 1–30) in series with TV:
+  drive off, below about 12 km/h (8.2).
 
 ## 5. Numbers for the simulation
 
@@ -406,7 +411,7 @@ holds BR1 (3–99); ZR9 purpose not read.
 | motor rating | 40 kW, 300 V, 150 A, 1750 rpm (hourly 45 kW per [ruwiki]) | – | [ckd04] p. 2 | A |
 | motor max speed | 4200 | rpm | [ckd04] p. 2 | A |
 | field weakening | 100 / 55 % (chart drawn for 50 %) | – | [ckd04] p. 2, 14 | A |
-| gear ratio | 7.43 (hypoid; also 7.36 plain two-stage, 9.36 "mountain") | – | [ruwiki] citing *Вагоны Т-3* 1977 | B/C |
+| gear ratio | 7.43 (hypoid; also 7.36 plain two-stage, 9.36 "mountain") | – | [ruwiki] citing *Вагоны Т-3* 1977; 7.43 on [ckd-schema] | A |
 | wheel diameter | 700 new (min. 600 turned) | mm | [ruwiki]; [vsb] | B |
 | speed per motor rpm | 1750 rpm = 31.1 km/h; 4200 rpm = 74.6 km/h (ratio 7.43, 700 mm) | – | – | calc |
 | max speed | 65 (empty, level) | km/h | [ckd03] p. 4; [imhd] | A |
@@ -425,10 +430,12 @@ holds BR1 (3–99); ZR9 purpose not read.
 | coasting (preparation) current | 25 ± 5 (relay) / 30–60 / 40–90 (ammeter) / ≈50 | A | [rubook]; [ruwiki]; [t3zr]; [mf2] | disagree |
 | coasting decel from preparation | ≤ 0.14 | m/s² | [rubook] | B |
 | accelerator steps | 99 total; drive 1–75 resistive, 80–95 field stages; brake 1–99 | – | [ckd17] p. 1; [ckd24] p. 8 | A |
-| accelerator resistance | 3.614 total, ≈0.035–0.041 per element | Ω | [ckd17] p. 1, 6 | A |
+| accelerator resistance | 3.614 total (brake), 2.835 in drive; ≈0.037 per position | Ω | [ckd17] p. 1, 6; [ckd-schema] | A / inferred |
 | accelerator full sweep | 5 ± 0.5 each way (≈20 steps/s) | s | [ckd17] p. 5 | A (shop setting) |
 | M2 (end of resistors) | step 75; 30–35 km/h (forum), ≈35 km/h (cs.wiki); 26–37 km/h by step | – | [ckd24] p. 8; [mf1]; [cswikiZ]; 5.3 | A/C/calc |
-| damping resistors R1, R2 | 0.7 + 0.7 | Ω | [rubook] | B |
+| damping resistors R1, R2 | 0.35 + 0.7 (Soviet car 0.7 + 0.7) | Ω | [ckd-schema]; [rubook] | A |
+| brake currents steps 1–5 | 160, 211, 262, 306, 350 | A (car) | step 5 [ckd26] p. 4; 1–4 inferred (8.2) | A / inferred |
+| switch button | drive off and accelerator at 1–30 (≈ below 12 km/h); RV ≈3.5 Ω, 63 A fuse, ≈80–130 A, ≤ 10 s | – | [ckd-schema]; [ckd24] p. 18 | A / calc |
 | pilot motor | 26 W, 300 rpm, 10.5 V armature, 24 V field | – | [ckd18] p. 1 | A |
 | maximum relay | 750 | A | [ckd24]; [rubook]; [mf2] | A |
 | drive pedal angles, steps 1–5 / max | 5, 12, 20, 27, 35 / 40 | ° | [ckd16] p. 6 | A |
@@ -437,7 +444,7 @@ holds BR1 (3–99); ZR9 purpose not read.
 | shoe brakes | MB 225 on each motor shaft, drum 280 mm, spring-applied, solenoid-released (BR 232: spring 1320 N, rod force 540 N) | – | [ckd05] p. 1, 3 | A |
 | gradients | up to 80 ‰ (90 ‰ for ≤ 800 m) | – | [ckd03] p. 3 | A |
 | between brake and drive | coast 2–3 | s | [ckd03] p. 11 | A |
-| ammeter | car current, 600 A scale, shunt in motors 3+4 | – | [ruwiki] | C |
+| ammeter | shunt in the 4M+3M group's lead; 600 A scale for car current | – | [ckd-schema]; [ruwiki] | A / C |
 
 ### 5.2 TE 022 characteristic at 300 V (read from the scanned chart, [ckd04] p. 14, ±5 %)
 
@@ -513,14 +520,15 @@ Variables: v (m/s), p (accelerator position 1–99, continuous), I (car current)
 - Motor speed n = 202.7 × v rpm (7.43, 700 mm) [calc].
 - Motor at terminal voltage U_m and current I_m with field factor φ (1, or field stage): back-EMF
   E = (300 − I_m·R_m) × n / n300(I_m, φ), with n300 from table 5.2 and R_m ≈ 0.11 Ω per motor
-  [assumed from 91 % efficiency]. Torque T(I_m, φ) from table 5.2.
+  [assumed from 91 % efficiency]. Torque T(I_m, φ) from table 5.2. (Section 8.4 replaces R_acc,
+  R_damp and the start currents below with the wiring diagram's values.)
 - **Drive, p < 75**: 600 = I·(R_acc(p) + R_damp) + 2·(E + I_m·R_m). R_acc(p) [assumed]: linear,
-  R_acc = 3.6 Ω × (75 − p)/74 (so M2 at 75 makes no jump). R_damp = 1.4 Ω, then 0.7, then 0 in the
-  first ≈0.2 s. Solve for I each tick (bisection on I_m).
+  R_acc = 2.835 Ω × (77 − p)/76 [inferred, 8.1]. R_damp = 1.05 Ω, then 0.7, then 0 in the first
+  ≈0.2 s [A, 8.1]. Solve for I each tick (bisection on I_m).
 - **Limiting relay**: if I < I_set·0.97 → p += 20·dt; if I > I_set·1.15 → p −= 20·dt; else hold
   (band [assumed]; the real relay chatters). Under this rule the current at standstill reaches its
-  setting once p ≈ 21 (step 1) to ≈52 (step 5) [calc with the assumed R_acc]; with the dampers the very
-  first current is ≈120 A, then ≈160 A [calc].
+  setting once p ≈ 7 (step 1) to ≈46 (step 5), after 0.3–2.3 s; with the dampers the very first
+  current is ≈150 A, then ≈165 A, then ≈204 A [calc, 8.4].
 - **Drive, p ≥ 75**: R_acc = 0 (M2), fields step at 80/85/90/95 to φ = 0.89, 0.78, 0.66, 0.55 of
   full flux on average over the car [assumed, evenly spaced; real stages alternate bogies], each step
   taken only while I < I_set; p frozen at 99 after 97.
@@ -528,8 +536,8 @@ Variables: v (m/s), p (accelerator position 1–99, continuous), I (car current)
   I_prep ≈ 50 A car current, i.e. ≈0.05–0.1 m/s² above ≈5 km/h, fading to 0 below [assumed within the
   sourced 0–0.14 m/s²]. p tracks p_match(v) at ≤ 20 /s, where p_match is the drive equilibrium position
   for step 1 at speed v [assumed]; after drive it runs back from 99.
-- **Braking**: I_brake(step) = 160, 210, 260, 305, 350 A for steps 1–5 [step 5 sourced; 1–4 assumed by
-  scaling the drive table to 350 A]. Brake force = 4·T(I_brake/2)·7.43/0.97/0.35. Available current is
+- **Braking**: I_brake(step) = 160, 211, 262, 306, 350 A for steps 1–5 [step 5 sourced; 1–4 inferred
+  from the wiring diagram, 8.2]. Brake force = 4·T(I_brake/2)·7.43/0.97/0.35. Available current is
   limited by speed: the accelerator must first reach the needed position (≤ 20 /s, starting from
   p_match or from 99 after drive) and at low speed the loop resistance cannot fall further; model
   I_avail = I_brake × min(1, v / v_fade) with v_fade ≈ 5 km/h [assumed], plus a build-up ramp of
@@ -550,31 +558,160 @@ accelerator overheating on long resistor running (lamp), MR trip from slamming s
 
 ## 7. Open questions
 
-1. **Brake currents on steps 1–4**: only step 5 (340–360 A) is documented. The divider values RP1–3
-   and RCR/RCP are in [ckd19] p. 2 (RP 30 Ω, RCR 210 Ω, RCP 42 Ω); computing the settings needs the
-   relay's spring and ampere-turn balance, not documented. Ask the user, or a depot.
-2. **Accelerator resistance profile and wiring**: how the two halves are connected in drive and in
-   braking (series/parallel, which ends), and so the true R(p). The full wiring diagram
-   (`T3SU-schema.pdf`, `schema.html` in [ckd-dir]) was not read; a uniform series chain of 3.6 Ω does
-   not fit the documented M2 point at 30–35 km/h without a jump, so the real profile differs.
+1. ~~Brake currents on steps 1–4~~: inferred from the wiring diagram as drive × 350/480 (8.2); a
+   measurement in a car would confirm them.
+2. ~~Accelerator resistance profile and wiring~~: drive 2.835 Ω up to finger ≈77, brake 3.614 Ω, uniform
+   per position (8.1). How the two halves share the current inside the device is still not drawn.
 3. **Pilot motor rate in the car**: 5 s per sweep is the shop setting at 24 V; the car feeds 10.5 V
    through RPM.
-4. **LO from brake step 3 or 5** (text vs drum program, 2.2).
+4. ~~LO from brake step 3 or 5~~: step 5 (8.3).
 5. **Coasting current**: 25 ± 5 A (relay, maybe per group) vs 30–60 vs 40–90 A (ammeter) vs ≈50 A.
 6. **Ammeter in braking**: same direction, centre zero, or not shown?
-7. **Door relay DBR**: added by hand to the ČKD text; does it act only at standstill (start blocking)
-   or always, and does it do anything else? Does Prague's T3SUCS have it in this form?
-8. **Field-weakening positions**: 80/85/90/95 (text) or ≈85/89/93/97 (contact program scan); flux of
-   the intermediate stage.
+7. ~~Door relay DBR~~: always, no speed condition, no brake (8.2). Whether Prague's T3SUCS kept it in
+   this form is not known.
+8. ~~Field-weakening positions~~: 80 / 85 / 90 / 95 (8.3). Still open: the flux of the intermediate
+   stage.
 9. **Shoe-brake retarding force** for stages 1 and 2 and its response time; track brake friction.
 10. **Brake pedal "half stroke"**: the text calls the parking position the middle of the stroke, the
     drum program puts it at 27° of 40°.
 11. **Sound**: no description or recording found; a recording from a historic Prague T3SUCS
     (e.g. car 7122, [fdrive]) would settle the pilot-motor whir and contactor sequence.
-12. Prague modifications to the TR 37 after 1986 (the DBR addition and the 11/86 HG 14 change are the
-    only traces seen).
+12. Prague modifications to the TR 37 after 1987 (the drawing's revisions end in March 1987).
+13. The points resistor RV: ≈3.5 Ω with its first digit written over (8.1); which bogie the first
+    track-brake pair KB3 + KB4 is on.
+
+## 8. What the wiring diagram adds (read 2026-11-04)
+
+ČKD drawing **1-38-370 444**, *Základní schema tramvaje T3SU/ČSSR*, drawn 10 Nov 1981, issue F
+([ckd-schema]): one sheet, a 10363 × 6991 px scan, read from enlarged crops. The Czechoslovak version
+of the circuit, with its revisions in the title block [A]:
+
+| rev. | date | change |
+|---|---|---|
+| a | 20 Sep 1982 | change 82-09-018: the vigilance pedal (*šlapka bdělosti*) removed and replaced by a button |
+| b | 28 Apr 1983 | interference filter added; the line contactor circuit changed: blocking by DBR |
+| C | 24 Jan 1984 | control from the rear station added (84-01-032) |
+| d | 16 Oct 1984 | resistors R1 + R2 + RV rewired |
+| E | 19 Nov 1986 | changes for the 1987 series |
+| F | 10 Mar 1987 | relay RK removed |
+
+The sheet also says the motor terminal names in brackets apply to the **gear ratio 1:7.43**, which
+confirms 7.43 for these cars [A].
+
+### 8.1 Power circuit
+
+- Pantograph → lightning arrester BL; trolley–earth disconnector OT → line contactor LS → maximum
+  relay MR → the two motor groups in parallel: **4M+3M** (armatures, the limiting relay's current
+  coil OR, reverser contactors P3/P4/Z3/Z4, fields, field-shunt contactors F1/F3 with the shunt SHM)
+  and **2M+1M** (fields with P1/P2/Z1/Z2 and F2/F4, then armatures). They join at wire 9 → M1 → the
+  accelerator → the damping resistors → earth [A].
+- **Ammeter**: its shunt Sh lies in the 4M+3M group's lead before the groups join, so the meter
+  measures one group [A]. That the scale is calibrated for the whole car ([ruwiki], 3.8) is not on the
+  drawing.
+- **Accelerator ZR**: drawn as two strips. The whole is labelled **3.614 Ω** (the [ckd17] total); the
+  strip M1 feeds in drive is labelled **2.835 Ω**. Its terminals carry finger numbers: 77 and 79 on one
+  strip, 78 on the other, matching [ckd17]'s odd and even halves [A]. Drive current enters at finger 79
+  (wire 24 from M1) and leaves at finger 78 (wire 91 to R1/R2, where M2 bridges it) [A]. Reading
+  [inferred]: drive uses the fingers up to about 77–79, 2.835 Ω; fingers 79–99 (3.614 − 2.835 =
+  0.779 Ω) only brake. Both parts give 0.037 Ω per finger (2.835 / 76 and 0.779 / 21) [calc], so
+  the resistance per position is uniform. At position 75, where M2 bridges, about 0.075 Ω is left
+  [calc]: no current jump, which settles open question 2's misfit of a uniform 3.6 Ω chain.
+- **Damping resistors**: **0.35 Ω** bridged by R1, then **0.7 Ω** bridged by R2 [A], not 0.7 + 0.7
+  ([rubook], the Soviet car; revision d rewired them in 1984).
+- **Points (switch) circuit**: wire 70 taken behind OT but ahead of LS, so independent of the line
+  contactor → fuse **63 A** → contactor SV → resistor **RV ≈ 3.5 Ω** (the first digit is written over)
+  → wire 90 → accelerator finger 77 → finger 78 → damping resistors → earth [A]. Line current while the
+  button is held ≈ 600 V / (3.5 + 1.05 Ω + part of the accelerator) ≈ 80–130 A [calc]: hence ČKD's
+  "not over 10 s".
+- Auxiliaries: motor-generator behind a 20 A fuse, its series resistor RMG ≈ 4 Ω and the coil of SN in
+  series with the MG motor (SN = "motor-generator running on line voltage"); calorifer (SK1, SK2),
+  heating, lighting on 10 / 10 / 6 / 10 A fuses; line-voltage glow lamp KN through 160 kΩ [A].
+
+### 8.2 Control circuits (24 V)
+
+- **LS coil**: BK2 (brake pedal at 0) → JK1 (drive ≥ step 1, or R2's holding contact) → reverser PZ
+  → SN → DBR → B2 rest contact → MR → LS, with the safety relay RB in the return [A]. **M1** via P1 or
+  Z1 (a direction chosen); **M2** via ZR2 (75–99); **F2** in coasting via R1's rest contact (behind
+  BK2), in drive via ZR3 (95–99) and M2; **F1** via ZR6 (85–99) [A].
+- The button **TLM** (*tlačítko průjezdu mycím strojem*, "washing plant") bridges SN and DBR [A]: LS
+  and M1 close without line voltage. M1 releases the shoe brakes (BR1), so this is the circuit behind
+  DP's procedure for a car stopped on a section insulator: unpark, press "Mycí stroj" with the drive
+  pedal and roll off by gravity ([ucebnice] via [t3.md](t3.md)) [B + inferred], and behind ČKD's
+  procedure for a failed motor-generator (3.7).
+- **Doors**: DBR's coil is fed through the door contacts DK1–DK3, one per door, in parallel; DBR's
+  contact is in series in the LS coil circuit [A]. Nothing in DBR's circuit depends on speed and DBR
+  has no contact in a brake circuit [A]. So an open door drops LS at any speed (traction off, the car
+  coasts) and applies no brake [inferred]. The door contacts change over within the first 10–20 % of
+  the door's travel from closed (contact program A–D) [A].
+- **Regulating coil RC** (current setting): 24 V → RC (210 Ω) → RCR (210 Ω) → a divider RP1–RP3
+  (3 × 10 Ω); RP4 15 kΩ across RC [A]. The tap per step: step 1 → 0 V (JK3 in series with BK3),
+  step 2 → 8 V (JK4 or BK4), step 3 → 12 V (JK4 + JK5 short RP2), step 4 → 16 V (JK5 or BK5),
+  step 5 → RC open [A]. The brake pedal's BK3–BK5 reach **the same taps in the same pattern** as
+  JK3–JK5 [A], so brake step n has drive step n's RC current: 57 / 38 / 28 / 19 / 0 mA [calc]. A linear
+  ampere-turn balance of OR (2 turns) and RC (3550 turns), set on step 5, gives 277 / 347 / 380 / 413 /
+  480 A against ČKD's 220 / 290 / 360 / 420 / 480 A: close on steps 3–5, too high on 1–2, so the
+  relay is not modelled from the circuit; the game uses ČKD's table [calc].
+- **Brake currents on steps 1–4** [inferred]: in braking, the relay differs from drive only by the
+  preparation coil CP, which sits across one group's fields through RCP (42 Ω; F2 is open). Its current,
+  and so its ampere-turns, are proportional to the brake current. With RC the same per step,
+  I_brake(n) = I_drive(n) × 350 / 480: **160 / 211 / 262 / 306 / 350 A** car current. Section 6.3
+  assumed this scaling; the circuit supports it.
+- **Switch button TV**: 24 V → **M1's rest contact** → TV → **ZR9** → SV coil [A]. ZR9 is closed only at
+  accelerator positions **1–30** [A]. The button works only with drive off (coasting or braking) and
+  the accelerator at 1–30. In coasting the accelerator tracks speed; position 30 is about 12 km/h
+  matched to drive step 1, or 8–14 km/h for a self-excited brake loop of 1.3–2.4 Ω [calc]. So a switch
+  can be set from the cab only below roughly 10–15 km/h, in line with D 1/2's 15 km/h over a facing
+  switch [inferred].
+- The accelerator lamp is ZR1, closed at positions **1–80**, fed through BK9 (brake pedal 0–2) or ZR10
+  (positions 3–99) [A]: it can light in coasting and braking too, whenever the accelerator is below 80
+  [inferred].
+- **Track brakes**: K2 via BK7 → magnets KB3 + KB4; K1 via BK6, or via RB's rest contact → KB1 + KB2,
+  and K1's contact also feeds K2, so the rescue brake applies all four [A]. 60 A fuse per pair. Which
+  bogie KB3 + KB4 are is not on the sheet; [ckd24] says the rear bogie comes first.
+- **Shoe brakes**: the release magnets Č1–Č4 get full current through BR1 (fully released) or reduced
+  current through BR2 and the economy resistor RČ (partly released); selenium diode SČ across them;
+  40 A fuse [A].
+- **Safety relay RB** latches: an on-coil RBZ and an off-coil RBV; two rescue buttons (2 × ZS) and BS
+  (the former vigilance pedal, a button since revision a) drop it [A].
+
+### 8.3 Contact programs on the sheet [A]
+
+| contact | closed at | does |
+|---|---|---|
+| JK1 | step 1 to max | M1, LS |
+| JK2, JK6 | just off 0 to max | R1 circuit; MR hold |
+| JK3 / JK4 / JK5 | 0–2 / ≈1.7–4 / 3–5 | current settings (overlap of JK3 and JK4 at step 2) |
+| BK1 | past step 5 to the end | parking and track-brake range |
+| BK2 | 0 to step 1 | LS, M1, F2 (drive possible) |
+| BK3 / BK4 / BK5 | 0–2 / ≈1.5–4 / 3–5 | current settings |
+| BK7, then BK6 | the last part of the stroke | track brakes K2, then K1 |
+| BK8 | 0 to between steps 4 and 5 | LO's voltage coil: **LO hand-over from step 5** (answers open question 4) |
+| BK9 | 0 to between steps 2 and 3 | BR1 hold |
+| BK10 | just off 0 to the end | (not traced) |
+| ZR1 | 1–80 | accelerator lamp |
+| ZR2 | 75–99 | M2 |
+| ZR4 / ZR6 / ZR5 / ZR3 | 80 / 85 / 90 / 95–99 | field stages F4 / F1 / F3 / F2 |
+| ZR7 | 1–97 | pilot motor stops at 97 |
+| ZR8, ZR10 | ≈3–99 | pilot-motor return path; BR1 hold |
+| ZR9 | 1–30 | switch button |
+
+The field stages at **80 / 85 / 90 / 95** are legible here; the 85 / 89 / 93 / 97 read from [ckd17]
+p. 9 (3.4) was a misreading of a poor scan (answers open question 8).
+
+### 8.4 What changes in the model (section 6)
+
+- R_acc(p) = 2.835 Ω × (77 − p) / 76 in drive, M2 at 75; braking uses the whole 3.614 Ω.
+- R_damp = 1.05 Ω (0.35 + 0.7), then 0.7, then 0. First currents at standstill on position 1:
+  150 → 165 → 204 A [calc] (the old 0.7 + 0.7 gave ≈120–140 A).
+- At standstill the current reaches its setting at positions ≈7 / 25 / 35 / 42 / 46 for steps 1–5,
+  that is after **0.3 / 1.2 / 1.7 / 2.0 / 2.3 s** of accelerator travel at 20 positions/s [calc]: a
+  full-pedal start builds its force over about 2 s, a step-1 start almost at once.
+- I_brake(1–5) = 160 / 211 / 262 / 306 / 350 A [inferred, was assumed].
+- Switch button: only with drive off and the accelerator at 1–30 (below ≈12 km/h).
+- Doors: traction cut at any speed, no brake.
 
 [ckd-dir]: https://k5.sh.cvut.cz/~oskar/T3SU/
+[ckd-schema]: https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-schema.pdf
 [ckd03]: https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-03-Funkce.a.obsluha.El.vyzbroje.TR.37.pdf
 [ckd04]: https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-04-Trakcni.motor.TE.022.pdf
 [ckd05]: https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-05-Celistova.brzda.a.brzdic.pdf

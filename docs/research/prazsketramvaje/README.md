@@ -115,6 +115,7 @@ Quoted as given; they go into `data/truth.json` as the user's facts (picker: "Yo
 1. Where are line 17's Rychlostník signs (OSM tags 60, 65, 70)? With answer 2 only OSM's values are
    needed.
 2. If contacts stay: which direction does current set (the game: current = diverging), and how far
-   before the switch is the contact?
+   before the switch is the contact? The T3SUCS side is known: its switch button draws current only
+   with drive off and below about 12 km/h ([t3-accelerator.md](t3-accelerator.md) 8.2).
 3. Section insulators on our lines: a survey from street-level imagery (the green diamond signs), or
    DP's data.
