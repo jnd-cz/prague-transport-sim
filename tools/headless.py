@@ -53,7 +53,7 @@ import sys
 import tempfile
 import time
 import urllib.request
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 

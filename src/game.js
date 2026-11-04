@@ -1119,7 +1119,7 @@ export class Game {
       radius: this.route.radiusAt(tram.s - 4),
       mu: this.muAt(tram.s),
       sandKey: !!input.sand,
-      autoHold: this.doorState !== 'closed',
+      doorsOpen: this.doorState !== 'closed', // (the door relay keeps the line contactor out; no brake from it)
     });
 
     this._updateDoors(dt);
@@ -1284,7 +1284,7 @@ export class Game {
   heatingDraws() { const c = this.climate; return c.saloon > 0 || c.cab >= 2; }
   contactCurrent() {
     const inp = this.input || {};
-    return this.tram.force > 500 || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
+    return this.tram.drawing || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
   }
 
   setHeating(which) {
@@ -1592,7 +1592,7 @@ export class Game {
       if (this.latAcc > 1.4 && !this.latWarned) { this.latWarned = true; this.msg(t('msg.lateral'), 'warn'); }
       if (this.latAcc < 0.8) this.latWarned = false;
     }
-    if (tram.notch === -5 && tram.v > 4 && !this.emergencyFlag) {
+    if (tram.trackBrake && tram.v > 4 && !this.emergencyFlag) {
       this.emergencyFlag = true;
       if (tram.passengers > 20) this.msg(t('msg.emergencyPax'), 'warn');
     }

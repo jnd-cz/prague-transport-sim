@@ -126,10 +126,10 @@ hour. Log: `reports/autodeploy.log`.
 
 - **On a phone or tablet** (#79): on-screen buttons, shown on a touch screen by default and switched by
   🎮 in the menu (remembered per device). They send the keyboard's keys:
-  - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive, STOP (the emergency brake, held), and
+  - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held), and
     the dead-man button when that option is on;
   - the left column: doors, bell, sand (held), look left / right (held), view, mirror, pause;
-  - ⋯ for the rest: switch contact, switch iron, heating cut-out, heating, autopilot, sound, ⚑ report.
+  - ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating, autopilot, sound, ⚑ report.
 
   On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
 - **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
@@ -139,9 +139,19 @@ hour. Log: `reports/autodeploy.log`.
   pixels. The texture updates at most 30 times a second, with a 300 m horizon. Flat covers/grates are
   omitted; people, vehicles, poles, overhead wires and the tram remain. Its cached picture is
   composited after every main redraw, including while paused.
-- Pedal-style controller: J1–J4 drive, B1–B4 electrodynamic brake, emergency with magnetic track brake.
-  Forces follow the ČKD T3 pamphlet (1.8 m/s² acceleration and service braking for an empty 16 t car),
-  so a full car is slower; gravity on gradients (Chotkova ~7 %), curve resistance, rolling back
+- **The T3's TR 37 equipment** (#221, `src/tr37.js`; sources and derivation in
+  `docs/research/prazsketramvaje/t3-accelerator.md`): two pedals without detents. A drive step (J1–J5)
+  sets a current, which the accelerator holds by stepping through its 99 positions (resistors to 75, field
+  weakening at 80–95); a brake step (B1–B5) sets a brake current; the electric brake fades below ≈6 km/h,
+  where the shoe brakes come in (partly on steps 3–4, fully from step 5 or parked); the end of the brake
+  stroke adds the track brakes. An open door or a brake pedal off zero cuts traction. Right after driving
+  the brake builds slowly, and step 5 then brings the shoes in at speed: coast 2–3 s between them.
+  The dashboard's pedal bar shows the pedal (drive up, brake down, P parked) and the accelerator.
+- **Controls** (menu): *Simple* moves a lever by steps (W/S, 1–5, Shift+1–5) and works the pedals as a
+  driver would, parking whenever the car stands; *Advanced* moves the pedals themselves (a tap to the next
+  step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
+  parking the shoes release fully only with the drive pedal. Space is the emergency stop in both.
+  An empty car accelerates at 0.6–1.8 m/s² by step (tools/test_traction.py), a full car more slowly; gravity on gradients (Chotkova ~7 %), curve resistance, rolling back
   when the brake is released on a hill, lateral comfort in curves.
 - Weather: dry / rain / autumn leaves sets wheel–rail adhesion. Too much power spins the wheels,
   too much brake locks them (flats). Hold A to sand; the emergency brake sands automatically and its
@@ -229,9 +239,10 @@ hour. Log: `reports/autodeploy.log`.
 
 Tick "Autopilot — just watch the ride" in the menu, or press **O** during a shift. It drives like the
 headless test bot: plans speed from limits, stops, signals, obstacles and the tram ahead, picks the
-notch from the forces needed on the gradient, works the doors, departs on time, rings the bell, sands
+force needed on the gradient and lets the equipment work the pedals as a careful driver (the advanced
+model: brakes on step 3+ into stops, parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands
 on slippery rail, and gives a short pulse of power (turn) or coasts (straight) under contacts. Press **V** for the outside
-view. Any controller or door key (W/S/Space/N/D) takes over; O hands back to the autopilot. The
+view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the menu; O hands back to the autopilot. The
 same driver lives in `src/autopilot.js` and is used by `tools/autopilot.js`.
 
 ## Language

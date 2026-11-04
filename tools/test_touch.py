@@ -53,16 +53,16 @@ def main():
             tap("n")
             tap("w")
             tap("w")
-            r["notch"] = page.evaluate("window.game.tram.notch")
+            r["notch"] = page.evaluate("window.game.tram.eq.lever")  # (arcade: the lever; the pedals follow on the next step)
             step(4)
             r["kmh"] = round(page.evaluate("window.game.tram.v") * 3.6, 1)
-            # the emergency brake: held, then let go (back to B4)
+            # the emergency brake: held, then let go (back to brake step 5)
             stop = page.locator("#touch button[data-k='space']").bounding_box()
             page.mouse.move(stop["x"] + 20, stop["y"] + 20)
             page.mouse.down()
-            r["held"] = page.evaluate("window.game.tram.notch")
+            r["held"] = page.evaluate("window.game.tram.eq.lever")
             page.mouse.up()
-            r["released"] = page.evaluate("window.game.tram.notch")
+            r["released"] = page.evaluate("window.game.tram.eq.lever")
             tap("v")
             page.wait_for_timeout(600)
             a = page.evaluate("[camera.position.x, camera.position.z]")
@@ -90,8 +90,8 @@ def main():
         fails.append("no on-screen controls on a phone")
     if r["doors"] != "closed" or r["notch"] != 2 or r["kmh"] <= 1:
         fails.append(f"the buttons did not drive the tram (doors {r['doors']}, notch {r['notch']}, {r['kmh']} km/h)")
-    if r["held"] != -5 or r["released"] != -4:
-        fails.append(f"emergency brake held {r['held']}, released {r['released']} (want -5, -4)")
+    if r["held"] != -6 or r["released"] != -5:
+        fails.append(f"emergency brake held {r['held']}, released {r['released']} (want -6, -5)")
     if r["orbit"] < 5:
         fails.append("a drag does not turn the outside view")
     if r["phoneErrors"]:
