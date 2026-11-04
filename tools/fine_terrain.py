@@ -14,11 +14,13 @@ the surface over it, which DMR 5G kept. Near an OSM passage, a point where IPR i
 below DMR 5G takes DMR 5G (level 1): measured 2026-10-30, the track would otherwise dip 5-6 m into
 Divadelní's underpass at Národní divadlo (lines 9, 22, 23) and the Rokytka culvert (line 37).
 
-Usage:  python -P -E tools/fine_terrain.py --line 17 [--band 120] [--step 2]
+Usage:  python -P -E tools/fine_terrain.py --line 17 [--band 120] [--step 2] [--fetch]
 Writes data/lineN.fine.bin (Int16, centimetres over `base`, block after block, rows north to south
 like the coarse grid: y = y0 - j * step) and data/lineN.fine.json {step, B, base, scale, x0, y0, blocks:
 [[bi, bj], ...]}: block (bi, bj) covers x0 + bi*B*step .. +(B)*step, y0 - bj*B*step .. down, with B+1
-samples a side (shared edges, so neighbouring blocks meet exactly). Export tiles are cached in raw/dem/.
+samples a side (shared edges, so neighbouring blocks meet exactly). The export tiles come from the snapshot
+(raw/dem/); a tile that is not there is an error unless --fetch downloads it (then publish a new snapshot
+with it before data-publish, #223).
 """
 import io
 import json
@@ -112,6 +114,7 @@ if covers is not None:
 print(f"passages: {len(plines)} OSM ways in the box")
 
 tiles = {}
+FETCHED = []  # (tiles downloaded in this run: new snapshot files)
 
 
 def tile(ix, iy):
@@ -119,6 +122,10 @@ def tile(ix, iy):
         return tiles[(ix, iy)]
     f = os.path.join(CACHE, f"{ix}_{iy}.tif")
     if not os.path.exists(f):
+        # (a cache miss used to download silently: the 2026-11-03 snapshot had to add 8 such tiles, #223)
+        if "--fetch" not in sys.argv:
+            raise SystemExit(f"raw/dem/{ix}_{iy}.tif: not in raw/ (the snapshot, tools/snapshot.py fetch); --fetch downloads it, then publish a new snapshot before data-publish")
+        FETCHED.append(f)
         x0, y0, n = ix * TILE, iy * TILE, int(TILE / PX)
         q = urllib.parse.urlencode({"bbox": f"{x0},{y0},{x0 + TILE},{y0 + TILE}", "bboxSR": 5514, "imageSR": 5514,
                                     "size": f"{n},{n}", "format": "tiff", "pixelType": "F32",
@@ -227,3 +234,5 @@ meta["attribution"] = sources.attribution(meta["provenance"])
 with replacing(os.path.join(ROOT, "data", f"line{LINE}.fine.json"), "w") as fh:
     json.dump(meta, fh, separators=(",", ":"))
 print(f"wrote data/line{LINE}.fine.bin ({q.nbytes / 1e6:.1f} MB), {len(blocks)} blocks, heights {base:.0f}-{allz.max():.0f} m, {time.time() - t0:.0f} s")
+if FETCHED:
+    print(f"{len(FETCHED)} tiles downloaded into raw/dem/: publish a snapshot with them before data-publish")
