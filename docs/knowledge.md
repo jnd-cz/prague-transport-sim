@@ -301,6 +301,10 @@ Review these when realism matters; most move into the build in M2.
   draws once a second): traffic.js 40 %, terrain.js 29 % (all of it `_hitTri`, the ground triangle under a car
   or walker: 23 % of the run), route.js 11 % (`nearest` 7 %), three.js 4 %, game.js 3 %. The JS heap is
   1.1 GB after load and 1.3 GB after a run.
+  The lint run is 95 % three.js ray casting (`intersectTriangle`, `getVertexPosition`, `fromBufferAttribute`):
+  `railSupport`, `cantedRailVisibility` and `deckClip` cast `THREE.Raycaster` rays at whole meshes without a
+  spatial index, so every ray tests every triangle of the merged street meshes (537 s with 7 other jobs running;
+  #205 measured 254 s mean per lint run).
 
 ## Environment (Windows dev machines)
 
