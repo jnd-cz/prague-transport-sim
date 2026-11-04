@@ -126,7 +126,11 @@ function fileFindings(json, label) {
         return;
       }
       const k = [kind, o.kind].filter(Boolean).join(': ') || label;
-      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts });
+      // (marks: other points to show with it, {x, y, label, color}; pick: the answer may be a point placed
+      // on the map, #258)
+      const marks = Array.isArray(o.marks) ? o.marks.filter((m) => typeof m?.x === 'number' && typeof m?.y === 'number') : undefined;
+      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts,
+        ...(marks?.length ? { marks } : {}), ...(o.pick ? { pick: true } : {}), ...(o.id ? { id: String(o.id) } : {}) });
       return;
     }
     for (const [k, v] of Object.entries(o)) walk(v, skip.has(k) ? kind : k);
@@ -365,6 +369,7 @@ body.review #gl { touch-action: none }
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.go) this.select(Math.max(0, Math.min(this.list.length - 1, this.cur + +b.dataset.go)));
+      if (b.dataset.place) { this.placing = this.list[this.cur]; b.classList.add('on'); b.textContent = 'Now click the map where it is'; }
       if (b.dataset.copy) navigator.clipboard?.writeText(location.href).then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Copy failed'; });
       if (b.dataset.v !== undefined) this.verdict(b.dataset.v === '' ? null : options(this.list[this.cur])[+b.dataset.v]);
     });
@@ -452,6 +457,8 @@ body.review #gl { touch-action: none }
     this.$('rvCard').innerHTML = `
 <div><span class="kind">${f.kind}</span> <span class="dim">(${f.src}, ${this.cur + 1} / ${this.list.length})</span></div>
 <div>${f.info}</div>
+${f.marks ? `<div class="dim">${f.marks.map((m) => `<span style="color:${esc(m.color || '#fff')}">●</span> ${esc(m.label || '')}`).join(' · ')}</div>` : ''}
+${f.pick ? `<div class="rvRow" style="padding:6px 0 0"><button data-place="1">Place it on the map</button><span class="dim" id="rvPlaced">${this._placedText(f)}</span></div>` : ''}
 <div id="rvHeight"></div>
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
@@ -591,10 +598,12 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (next && this.list.includes(next)) this.select(this.list.indexOf(next));
   }
 
-  _record(f, v, note) {
-    const w = this.where(f.x, f.y);
+  // extra: a point placed on the map (px, py); kept while the answer stays the same (a note typed after it)
+  _record(f, v, note, extra = null) {
+    const w = this.where(f.x, f.y), old = this.verdicts.get(fid(f));
+    const placed = extra || (old && old.v === v && old.px !== undefined ? { px: old.px, py: old.py } : {});
     this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
-      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1],
+      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1], ...placed, ...(f.id ? { id: f.id } : {}),
       ...(f.kind === 'trackheight' ? { decision_id: f.id, span_ids: f.decision.span_ids, span_sha256: f.span_sha256 } : {}) });
   }
 
@@ -645,10 +654,43 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
   }
 
   // the selected finding: a ring on the ground and, for an area finding, the area's outline
+  _placedText(f) {
+    const r = this._answer(f);
+    return r?.px !== undefined ? `placed at x ${r.px}, y ${r.py} (${Math.hypot(r.px - f.x, r.py - f.y).toFixed(1)} m from the pin)` : '';
+  }
+
+  // a click on the map while placing: the point on the ground under it, saved as the answer (#258)
+  _place(cx, cy) {
+    const f = this.placing, r = this.canvas.getBoundingClientRect();
+    this.placing = null;
+    const ray = new THREE.Raycaster();
+    this.camera.updateMatrixWorld();
+    ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.camera);
+    const hit = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(f.z ?? 0)), hit)) { this._redraw(); return; }
+    this._record(f, 'placed on the map', this.$('rvNote')?.value.trim() || '', { px: +hit.x.toFixed(2), py: +(-hit.z).toFixed(2) });
+    this._redraw();
+    this._highlight(f);
+    this._render();
+  }
+
   _highlight(f) {
     if (this.hl) { this.group.remove(this.hl); this.hl.traverse((o) => o.geometry?.dispose()); }
     if (this.heightMarker) this.heightMarker.visible = false;
     this.hl = new THREE.Group();
+    // the finding's other points, and a point placed as its answer: a thin pin and a ring each
+    const r0 = this._answer(f);
+    const marks = [...(f.marks || []), ...(r0?.px !== undefined ? [{ x: r0.px, y: r0.py, color: '#c070ff' }] : [])];
+    for (const m of marks) {
+      const z = this.ground.at(m.x, m.y), mat = new THREE.MeshBasicMaterial({ color: m.color || '#ffffff', depthTest: false, side: THREE.DoubleSide });
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 6).translate(0, 2, 0), mat);
+      pin.position.set(m.x, z, -m.y);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.95, 32), mat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(m.x, z + 0.3, -m.y);
+      pin.renderOrder = ring.renderOrder = 8;
+      this.hl.add(pin, ring);
+    }
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.25, 2.75, 40), new THREE.MeshBasicMaterial({ color: HL, depthTest: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(f.x, f.z + 0.3, -f.y);
@@ -974,6 +1016,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
 
   // a tap or click: the pin there (a finger is wider than a mouse)
   _pick(cx, cy, touch) {
+    if (this.placing) { this._place(cx, cy); return; }
     const i = this._hit(cx, cy, touch ? 34 : 18);
     if (i >= 0) this.select(i);
   }

@@ -21,7 +21,9 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 
-OPTIONS = ["sign at the pin (OSM)", "sign at the timetable point (GTFS)", "elsewhere: see the note", "unsure"]
+# (elsewhere: "Place it on the map", the point saved with the answer as px, py)
+OPTIONS = ["sign at the pin (OSM)", "sign at the timetable point (GTFS)", "unsure"]
+OSM, GTFS, END = "#3e9dff", "#ff9e31", "#ffffff"
 
 
 class StopPositions(osmium.SimpleHandler):
@@ -89,7 +91,8 @@ def main():
             if not cands:
                 gx, gy = at(path, st["s"])
                 findings.append({"kind": "stop sign", "id": sid, "line": line, "x": round(gx, 1), "y": round(gy, 1), "s": st["s"],
-                                 "mag": 10, "status": "review",
+                                 "mag": 10, "status": "review", "pick": True,
+                                 "marks": [{"x": round(gx, 1), "y": round(gy, 1), "label": "timetable (GTFS) point", "color": GTFS}],
                                  "info": f"{st['name']} (towards {nxt}): no OSM stop position near the track. The pin is the timetable "
                                          f"(GTFS) point. Where is the stop sign?"})
                 continue
@@ -102,10 +105,16 @@ def main():
             if abs(diff) > args.over:
                 where = f"{abs(diff):.0f} m {'before' if diff < 0 else 'after'}"
                 plat = f" The platform's front end is {end:.0f} m past the pin." if end is not None else ""
+                gx, gy = at(path, st["s"])
+                marks = [{"x": round(x, 1), "y": round(y, 1), "label": "OSM stop position (the pin)", "color": OSM},
+                         {"x": round(gx, 1), "y": round(gy, 1), "label": "timetable (GTFS) point", "color": GTFS}]
+                if end is not None:
+                    ex, ey = at(path, st["p1"])
+                    marks.append({"x": round(ex, 1), "y": round(ey, 1), "label": "platform's front end", "color": END})
                 findings.append({"kind": "stop sign", "id": sid, "line": line, "x": round(x, 1), "y": round(y, 1), "s": round(s_osm, 1),
-                                 "mag": round(abs(diff), 1), "status": "review", "osm_node": nid, "gtfs_s": st["s"],
+                                 "mag": round(abs(diff), 1), "status": "review", "osm_node": nid, "gtfs_s": st["s"], "pick": True, "marks": marks,
                                  "info": f"{st['name']} (towards {nxt}): OSM's stop position (the pin, node {nid}) is {where} "
-                                         f"the timetable (GTFS) point.{plat} Where is the stop sign?"})
+                                         f"the timetable (GTFS) point.{plat} Where is the stop sign? (Not at either: place it on the map.)"})
         out = {"schema": 1, "issue": 258, "options": OPTIONS, "over_m": args.over, "findings": findings}
         with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
