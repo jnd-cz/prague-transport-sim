@@ -127,7 +127,8 @@ export class Autopilot {
     const button = wantPower === true && need < 0;
     this.input.switchBtn = button;
     this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
-    tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide });
+    tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+      stopDist: stopAt === null ? null : stopAt - tr.s });
     return { vt, stopAt, notch: tr.notch };
   }
 }

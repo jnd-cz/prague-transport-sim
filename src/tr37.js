@@ -206,7 +206,8 @@ export class TR37 {
 
   // the autopilot's wish on the pedals, as a careful driver: want = { force (N, + drive / − brake), stand
   // (stop and stay), coast, power (true: current through the pantograph, false: none), urgent, v, dt,
-  // slip, slide }. Stands parked; brakes on step 3 or more into the stop (BR1: the shoes partly); coasts 2.5 s
+  // slip, slide, stopDist (m to the stop point, or null) }. Stands parked; brakes on step 3 or more into the
+  // stop (BR1: the shoes partly), step 5 at a crawl when the stop needs it (LO: fully); coasts 2.5 s
   // between drive and brake unless urgent ([ckd03] p. 11); one step change per 0.6 s unless urgent.
   autoDrive(w) {
     this.mode = 'advanced';
@@ -218,8 +219,6 @@ export class TR37 {
     // (into a stop on step 3 or more: at the fade the shoes come in partly and the car stops gently)
     const brake = -pick(-w.force, (k) => this.brakeForce(k));
     let s = w.stand ? Math.min(-3, brake) : w.coast ? 0 : w.force > 0 ? pick(w.force, (k) => this.driveForce(k)) : brake;
-    // (below ≈9 km/h steps 1–2 fade out to nothing: braking there is on step 3+, the shoes taking over)
-    if (s < 0 && Math.abs(w.v) < 2.5) s = Math.min(s, -3);
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
     if (w.slip && s > 1) s--;
@@ -230,6 +229,14 @@ export class TR37 {
     if (!w.urgent && Math.abs(w.v) > 2) {
       if (s < -4 && (this.ls || this.coastT < C.coastSettle)) s = -4;
       if (s > 0 && this.brakeT < C.coastSettle) s = 0;
+    }
+    // at a crawl (below ≈9 km/h) steps 1–2 fade out to nothing and steps 3–4 leave only the shoes partly
+    // applied (≈0.5 m/s², less than a downhill grade takes): a stop point still needing more than 0.3 m/s²
+    // gets step 5, so LO hands over to the full shoes, as a driver does (it overran stops by 1–4 m and a red
+    // signal at 0.9 km/h on step 3–4: #241's first check)
+    if (s < 0 && Math.abs(w.v) < 2.5) {
+      const need = w.stopDist == null ? 0 : (w.v * w.v) / (2 * Math.max(0.3, w.stopDist));
+      s = need > 0.3 ? -5 : Math.min(s, -3);
     }
     if (s !== A.step && (A.hold <= 0 || w.urgent || (s < A.step && s < 0) || w.power != null)) {
       A.step = s; A.hold = 0.6;
