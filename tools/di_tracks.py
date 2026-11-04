@@ -43,6 +43,10 @@ TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the tra
 BLEND = 20.0   # m along an OSM fill stretch over which it takes up the shift of its matched neighbours
 CHANGE = 1.0   # m-equivalent cost of continuing on another chain along one OSM edge
 JOINT = 4.0    # m: the chain may change only this near the joint of the two chains (STEP + TOL)
+CONTEXT = 10.0  # m of the straightest continuation on either side a stretch is matched with: the 4.75 m between two
+                # switches at Strossmayerovo náměstí, alone, lay nearer the branch DI draws 0.19 m beside the straight
+                # (the straight was drawn bent onto it, 8 cm); the branch's chain does not reach the straight beyond
+CONTINUE = 30.0  # degrees: an edge continues another within this
 MIN_RECORD = 0.05  # m: shorter source records are dropped
 DUPLICATE = 0.2    # m: a record joining the same two places as another, never farther from it, is a copy
 SUPERSEDED = 0.95, 0.09  # share of an older record's length within DUPLICATE of newer records, and their median
@@ -74,6 +78,16 @@ def switch_legs(dirs):
     if dot(t, d) <= 0:
         return None
     return (j if t == i else i), (t, d)
+
+
+def branch_side(dirs, legs=None):
+    """Which side of its through leg a switch's diverging leg leaves to: 1 left, -1 right, 0 not clear (within 1°)."""
+    legs = legs or switch_legs(dirs)
+    if not legs:
+        return 0
+    t, d = dirs[legs[1][0]], dirs[legs[1][1]]
+    c = t[0] * d[1] - t[1] * d[0]
+    return 0 if abs(c) < math.sin(math.radians(1)) else (1 if c > 0 else -1)
 
 
 def same_way(dirs, branches):
@@ -155,7 +169,7 @@ class Source:
         # forks: places where two records leave in the same direction and move apart (two copies of one track
         # leave together and stay within centimetres: Vozovna Kobylisy, 10 m each at 98-99 degrees); each with the
         # directions its branches leave in (`branches`, unit vectors out of the fork)
-        self.forks, self.branches, self.sections = [], [], 0
+        self.forks, self.branches, self.far, self.sections = [], [], [], 0
         for c, ms in members.items():
             if len(ms) < 3:
                 continue
@@ -189,8 +203,12 @@ class Source:
                         out.append(((p0.x - line.coords[0][0], p0.y - line.coords[0][1]), None))
                     self.sections += 1
                 xs = [ends[m][2] for m in ms]
-                self.forks.append((sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs)))
+                fx, fy = sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs)
+                self.forks.append((fx, fy))
                 self.branches.append([_unit(u) for u, _ in out])
+                # (and to FORK_OUT on: a tangential switch's branch is 1° off at 1 m, which side it leaves to only
+                # shows further on)
+                self.far.append([_unit((q[0] - fx, q[1] - fy)) if q else _unit(u) for u, q in out])
         # merge records through clusters of exactly two ends
         at = {i: members[root(i)] for i in range(len(ends))}
         used, self.chains = set(), []
@@ -368,6 +386,7 @@ class Source:
                         break   # (found from the other track's end too)
                     self.forks.append((f.x, f.y))
                     self.branches.append([v, (-v[0], -v[1]), u])
+                    self.far.append(list(self.branches[-1]))
                     known.append((f.x, f.y))
                     if inter:
                         self.interlaced.append({'tip': (f.x, f.y), 'dir': u, 'side': side, 'run': run})
@@ -518,7 +537,9 @@ class TrackGeometry:
                 keys = [k(a, b) for a, b in zip(nodes, nodes[1:])]
                 if any(self.edges[e] is not None for e in keys):
                     continue
-                found = src.match_path([pos[n] for n in nodes])
+                before, after = self._context(nodes, pos)
+                found = src.match_path([pos[n] for n in before + nodes + after]) if before or after else None
+                found = found[len(before):len(before) + len(keys)] if found else src.match_path([pos[n] for n in nodes])
                 if found:
                     for (a, b), e, runs in zip(zip(nodes, nodes[1:]), keys, found):
                         self.edges[e] = (src, runs if (a, b) == e else [[c, q, p] for c, p, q in runs[::-1]])
@@ -555,7 +576,7 @@ class TrackGeometry:
         # each source fork goes to the nearest OSM switch within FORK on its tracks that leaves the same way, one
         # node per fork (Palackého náměstí: two switches 4-5 m apart would both take one fork and the edge between
         # them would vanish)
-        claims = []
+        claims, refused = [], []
         for n in adj:
             if len(adj[n]) < 3:
                 continue
@@ -567,6 +588,7 @@ class TrackGeometry:
             ms = list(adj[n])
             dirs = [_unit((pos[m][0] - pos[n][0], pos[m][1] - pos[n][1])) for m in ms]
             legs = switch_legs(dirs)
+            far_dirs = [self._far(n, m, pos) for m in ms] if legs else None
             if legs:
                 # a switch: the fork lies on a chain its through track runs on (OSM's node may lie past the
                 # source's fork and a record joint, Jiráskovo náměstí); not the diverging edge's, whose far end
@@ -583,8 +605,13 @@ class TrackGeometry:
                 f = src.forks[i]
                 d = math.dist(f, pos[n])
                 collapse = self._past(n, f, pos)
-                if d <= FORK and collapse is not None and on(f) and same_way(dirs, src.branches[i]):
-                    claims.append((d, n, (src.name, int(i)), f, collapse))
+                if d <= FORK and on(f) and same_way(dirs, src.branches[i]):
+                    # (a switch whose branch leaves to the other side, over CONTEXT m, takes it only if no switch
+                    # nearby fits: Strossmayerovo náměstí's westward turn left its fork to OSM's switch 2.1 m on,
+                    # whose branch leaves the other way, and started 3.8 m late at 12°)
+                    c = (d + (FORK if legs and branch_side(far_dirs) * branch_side(src.far[i]) < 0 else 0.0),
+                         n, (src.name, int(i)), f, collapse)
+                    (claims if collapse is not None else refused).append(c)
             # a switch whose tip the user placed (data/truth.json trackSources.switchTips) takes the point of its
             # through track nearest that place, before any fork
             for i, (near, tip) in enumerate(tips):
@@ -603,6 +630,20 @@ class TrackGeometry:
             fork_of[n] = f
             taken.add(key)
             collapsed.update({m: f for m in collapse})
+        # a fork past a neighbouring switch, once that switch is on its own fork further on: the order along the
+        # track kept (Strossmayerovo náměstí, Milady Horákové: OSM's two switches 2.1 m apart, DI's forks 4.7 m apart
+        # and 4-5 m further west; the eastern switch's branch ran on the track 3.8 m past DI's fork)
+        placed = {**pos, **fork_of, **collapsed}
+        for d, n, key, f, _ in sorted(refused, key=lambda c: c[0]):
+            if n in fork_of or n in collapsed or key in taken:
+                continue
+            collapse = self._past(n, f, placed)
+            if collapse is None or any(m in fork_of or m in collapsed for m in collapse):
+                continue
+            fork_of[n] = f
+            taken.add(key)
+            collapsed.update({m: f for m in collapse})
+            placed.update({n: f, **{m: f for m in collapse}})
         for n in adj:
             ends = []
             for m in adj[n]:
@@ -673,6 +714,50 @@ class TrackGeometry:
             else:
                 self.pts[(a, b)] = [self.pos[a], self.pos[b]]
         self.report = self._report(sources)
+
+    def _far(self, n, m, pos, length=CONTEXT):
+        """The unit direction from node n to the point `length` m on along n-m and its straightest continuations."""
+        prev, cur, d, seen = n, m, math.dist(pos[n], pos[m]), {n, m}
+        while d < length:
+            u = _unit((pos[cur][0] - pos[prev][0], pos[cur][1] - pos[prev][1]))
+            nxt = [x for x in self.adj[cur] if x not in seen]
+            if not nxt:
+                break
+            x = max(nxt, key=lambda x: (lambda v: u[0] * v[0] + u[1] * v[1])(_unit((pos[x][0] - pos[cur][0], pos[x][1] - pos[cur][1]))))
+            d += math.dist(pos[cur], pos[x])
+            prev, cur = cur, x
+            seen.add(x)
+        return _unit((pos[cur][0] - pos[n][0], pos[cur][1] - pos[n][1]))
+
+    def _context(self, nodes, pos):
+        """The nodes continuing a node sequence straight on at either end, up to CONTEXT m: through two-edge nodes,
+        and through a switch only from its toe or through leg into the other (its legs by their directions over
+        CONTEXT m: OSM's first metres made a crossover the through leg at Strossmayerovo náměstí). None from a
+        diverging leg, at a crossing or past a turn over CONTINUE degrees."""
+        out = []
+        for seq in (nodes[::-1], nodes):
+            prev, cur, ext, d = seq[-2], seq[-1], [], 0.0
+            while d < CONTEXT:
+                ms = [m for m in self.adj[cur]]
+                if len(ms) == 2:
+                    nxt = next(m for m in ms if m != prev)
+                elif len(ms) == 3:
+                    dirs = [self._far(cur, m, pos) for m in ms]
+                    legs = switch_legs(dirs)
+                    if legs is None or ms[legs[1][1]] == prev:
+                        break
+                    nxt = next(ms[i] for i in (legs[0], legs[1][0]) if ms[i] != prev)
+                else:
+                    break
+                u = _unit((pos[cur][0] - pos[prev][0], pos[cur][1] - pos[prev][1]))
+                v = _unit((pos[nxt][0] - pos[cur][0], pos[nxt][1] - pos[cur][1]))
+                if nxt in nodes or nxt in ext or u[0] * v[0] + u[1] * v[1] < math.cos(math.radians(CONTINUE)):
+                    break
+                d += math.dist(pos[cur], pos[nxt])
+                ext.append(nxt)
+                prev, cur = cur, nxt
+            out.append(ext)
+        return out[0][::-1], out[1]
 
     def _stretches(self):
         """Node sequences through nodes with two edges, from a node with another count to the next (closed loops

@@ -13,8 +13,11 @@ continues that one (a diverging track leaves tangent to
 the through track: data/truth.json trackGeometry `switch-start`, most switches are tangential). Where the curve
 would bend tighter than MIN_RADIUS (data/truth.json `min-radius-passenger`), the tolerance of the points around it
 grows by GROW, at most to the mean coordinate error of their records' accuracy class (data/truth.json
-`sourceAccuracy`: 0.14 m for DI's class 3), and the curve is fitted again; a point the curve still misses by more than
-TOL + REPORT is listed, and so is a curve left tighter than MIN_RADIUS.
+`sourceAccuracy`: 0.14 m for DI's class 3), and the curve is fitted again. Where it still bends tighter than
+NETWORK_RADIUS (`min-radius-network`: the user, "under 18m there shouldn't be anything like that"), the points around
+it keep growing past their class, at most to HOLD_LIMIT, and each such place is listed with how far its points moved
+(the cost). A point the curve still misses by more than TOL + REPORT is listed, and so is a curve left tighter than
+MIN_RADIUS.
 
 A Gaussian (the client's old smoothing, src/route.js) cuts inside a curve: 0.2 m on an 18 m curve with the 6 m
 window (#20); a curve held to the points does not.
@@ -38,6 +41,10 @@ SIGMAS = 1.0       # a point moves at most this many mean errors of its class (t
                    # limit; 2 on line 17: 6 bends over 10° inside tracks instead of 11, 32 joins over 1° instead of 39)
 GROW = 1.5         # the factor the tolerance grows by per round
 MIN_RADIUS = 20.0  # m: data/truth.json trackGeometry `min-radius-passenger`
+NETWORK_RADIUS = 18.0  # m: data/truth.json trackGeometry `min-radius-network`
+HOLD_LIMIT = 0.5   # m: past its class's error a point moves at most this far to hold NETWORK_RADIUS
+STIFFEN, STIFF_MAX = 1.5, 1.5 ** 12  # the bending weight's factor per round where the curve bends under it, and its
+                                     # most (x4 at once took a 15° corner to 49 m, its points 0.49 m off; x1.5: 18.2 m, 9 cm)
 SLACK = 0.995      # a curve held at MIN_RADIUS reads a few millimetres under it
 BEND = 1.0         # m either side of a sample for the fit's radius (a 5 m window reads a 10° bend squeezed into a
                    # metre as 29 m; the fitted curve has no noise to average out)
@@ -53,19 +60,26 @@ START = 6.0        # degrees: a track ending at a node leaves tangent to the tra
                    # (113 ends on line 17: 96 within 4°, 9 at 8-40°); beyond, at its own angle (`switch-start`: some
                    # designs start abruptly), listed by tools/lint.js trackJoins
 LOOK = 3.0         # m along an edge for its direction at a node
+PAIR_LOOK = 10.0   # m along an edge, on through the next nodes straightest first, for which edges continue each other:
+                   # over LOOK a tangential switch's branch is still 9 cm off (Strossmayerovo náměstí, its eastern
+                   # track: the turn read 0.1° straighter than the straight, which DI bends 0.9° there, and the
+                   # straight was fitted as the branch, swinging ±8 cm); over 10 m the turn is 1.04 m off
 CROSS = 10.0       # degrees: two tracks passing one node at more than this cross there (else they touch)
 MERGE = 0.5        # m: nodes joined by a shorter edge are one
 CLEAR = 0.5        # m from an end node held by a track fitted before: no data points
 GAP_MAX = 1.0      # m: a gap between a track's records at a node up to this lets its points near the node move by it
 GAP_REACH = 5.0    # m around such a node
-OFF = 0.1          # m: a node off a track through it by more than this, where three edges meet, keeps its place and
-                   # the track passes at its own point (Národní divadlo 0.34 m, Strossmayerovo 0.15-0.18 m); a switch
-                   # this near its track joins it exactly (Čechův most 2 cm: the route broke there)
+OFF = 0.2          # m: a node off a track through it by more than this, where three edges meet, keeps its place and
+                   # the track passes at its own point (Národní divadlo 0.34 m); a switch this near its track joins it
+                   # exactly (Čechův most 2 cm: the route broke there). DI's branches start up to 0.18 m apart at a
+                   # fork: at 0.1 m Strossmayerovo náměstí's crossover branches began 0.15-0.17 m beside their
+                   # through tracks, which broke 1.2-1.3° there
 THIN = 0.003       # m: the written points leave out samples a chord passes within this of
 THIN_MAX = 10.0    # m: at most this far apart
 KEEP = 2.5         # m from an edge's ends where every sample is kept
 ROUNDS = 40        # reweighting rounds per fit
-WIDEN = 8          # rounds of widening the tolerance where the curve bends too tight
+WIDEN = 24         # rounds of widening the tolerance where the curve bends too tight (5 reach DI's class from TOL),
+                   # then of stiffening it under NETWORK_RADIUS
 
 
 def _solve(d0, d1, d2, rhs):
@@ -144,8 +158,9 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     """A smooth curve through polyline `pts` within `tol` of each of its points (None: not data). `fixed`
     {point index: (x, y)} holds positions; `heading` {point index: (ux, uy)} holds the direction the curve leaves
     that (fixed, end) point in, into the polyline; `limit` per point: how far its tolerance may grow where the curve
-    would bend tighter than MIN_RADIUS (default: as far as it starts). Returns (samples, each point's sample index,
-    the final tolerance per point, the radius per sample over 2 m). A point's miss is its distance to the curve (the
+    would bend tighter than MIN_RADIUS (default: as far as it starts); where it still bends tighter than
+    NETWORK_RADIUS the curve stiffens there and its points may move up to HOLD_LIMIT. Returns (samples, each point's sample index, the final tolerance per point,
+    the radius per sample over 2 m). A point's miss is its distance to the curve (the
     samples slide along it)."""
     fixed, heading = fixed or {}, heading or {}
     xs, ys, at = [], [], []
@@ -184,15 +199,20 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
         h0, h1 = u[i] - u[i - 1], u[i + 1] - u[i]
         a, c = 2 / ((h0 + h1) * h0), 2 / ((h0 + h1) * h1)
         rows.append((a, -(a + c), c, (h0 + h1) / 2))
-    d0, d1, d2 = [0.0] * n, [0.0] * max(0, n - 1), [0.0] * max(0, n - 2)
-    for j, (a, b, c, l) in enumerate(rows):
-        i, w = j + 1, LAMBDA * l
-        d0[i - 1] += w * a * a
-        d0[i] += w * b * b
-        d0[i + 1] += w * c * c
-        d1[i - 1] += w * a * b
-        d1[i] += w * b * c
-        d2[i - 1] += w * a * c
+    stiff = [1.0] * len(rows)   # the bending weight's factor per sample, raised where the curve bends under 18 m
+
+    def bending():
+        d0, d1, d2 = [0.0] * n, [0.0] * max(0, n - 1), [0.0] * max(0, n - 2)
+        for j, (a, b, c, l) in enumerate(rows):
+            i, w = j + 1, LAMBDA * l * stiff[j]
+            d0[i - 1] += w * a * a
+            d0[i] += w * b * b
+            d0[i + 1] += w * c * c
+            d1[i - 1] += w * a * b
+            d1[i] += w * b * c
+            d2[i - 1] += w * a * c
+        return d0, d1, d2
+    d0, d1, d2 = bending()
     tx, ty = list(xs), list(ys)
     for s, q in held.items():
         tx[s], ty[s] = q
@@ -223,7 +243,22 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
         tight = [u[i] for i in range(n) if r[i] < MIN_RADIUS * SLACK]
         grow = [i for i in data if tol[i] < limit[i] - 1e-9 and any(abs(u[at[i]] - t) <= NEAR for t in tight)]
         if not grow:
-            break
+            # every point near a curve under 20 m is at its class: under 18 m the curve stiffens there and its points'
+            # tolerance grows on up to HOLD_LIMIT (a wider tolerance alone only lets the curve go: on a 30° corner the
+            # bend moved to where the points at their class begin, 15 m)
+            under = [u[i] for i in range(n) if r[i] < NETWORK_RADIUS * SLACK]
+            zone = [j for j in range(len(rows)) if any(abs(u[j + 1] - t) <= NEAR for t in under)]
+            if not zone or max(stiff[j] for j in zone) >= STIFF_MAX:
+                break
+            for j in zone:
+                stiff[j] *= STIFFEN
+            for i in data:
+                if tol[i] < max(limit[i], HOLD_LIMIT) and any(abs(u[at[i]] - t) <= NEAR for t in under):
+                    tol[i] = min(max(limit[i], HOLD_LIMIT), tol[i] * GROW)
+                    weight[at[i]] = 1.0
+            d0, d1, d2 = bending()
+            px, py = solve()
+            continue
         for i in grow:
             tol[i] = min(limit[i], tol[i] * GROW)
             weight[at[i]] = 1.0
@@ -294,14 +329,25 @@ class Network:
                 root[n] = root[root[n]]
                 n = root[n]
             return n
+        # (the node with more edges stays, and the absorbed node's edges start at its point: a switch on its fork,
+        # not OSM's next node on its branch 0.21 m off, which bent the straight track 8 cm at Strossmayerovo náměstí)
+        degree = defaultdict(int)
+        for a, b in pts:
+            degree[a] += 1
+            degree[b] += 1
         for (a, b), p in pts.items():
             if sum(math.dist(x, y) for x, y in zip(p, p[1:])) < MERGE:
-                root[find(a)] = find(b)
+                ra, rb = find(a), find(b)
+                if ra != rb:
+                    keep, gone = (ra, rb) if degree[ra] >= degree[rb] else (rb, ra)
+                    root[gone] = keep
+                    degree[keep] += degree[gone]
         errors = class_errors()
         adj, edges = defaultdict(set), {}
         for (a, b), p in pts.items():
             ra, rb = find(a), find(b)
             if ra != rb:
+                p = [pos[ra] if a != ra else p[0], *p[1:-1], pos[rb] if b != rb else p[-1]]
                 key = k(ra, rb)
                 src = kind.get((a, b), 'osm')
                 lim = (limit or {}).get((a, b)) or errors[UNCLASSED] if src in SURVEYED else FILL_LIMIT
@@ -324,11 +370,32 @@ class Network:
             l = math.dist(p[0], q) or 1.0
             return ((q[0] - p[0][0]) / l, (q[1] - p[0][1]) / l)
 
+        def reach(n, m):
+            """The direction from n to the point PAIR_LOOK on along edge n-m, then the straightest edge at each node."""
+            pts, prev, cur, seen = list(along(n, m)), n, m, {n, m}
+            while sum(math.dist(a, b) for a, b in zip(pts, pts[1:])) < PAIR_LOOK:
+                d0 = direction(cur, prev)
+                nxt = [x for x in adj[cur] if x not in seen]
+                if not nxt:
+                    break
+                x = max(nxt, key=lambda x: -(d0[0] * direction(cur, x)[0] + d0[1] * direction(cur, x)[1]))
+                pts += along(cur, x)[1:]
+                prev, cur = cur, x
+                seen.add(x)
+            d, q = 0.0, pts[-1]
+            for a, b in zip(pts, pts[1:]):
+                d += math.dist(a, b)
+                if d >= PAIR_LOOK:
+                    q = b
+                    break
+            l = math.dist(pts[0], q) or 1.0
+            return ((q[0] - pts[0][0]) / l, (q[1] - pts[0][1]) / l)
+
         # at every node the straightest pairs of edges continue each other
         pair = {}
         for n, ms in adj.items():
             ms = list(ms)
-            dirs = {m: direction(n, m) for m in ms}
+            dirs = {m: reach(n, m) if len(ms) > 2 else direction(n, m) for m in ms}
             limit = PAIR_TWO if len(ms) == 2 else PAIR
             cands = []
             for i, a in enumerate(ms):
@@ -391,7 +458,7 @@ class Network:
         chains = [chains[c] for c in order]
 
         # node -> {'pos', 'dirs': directions of the tracks through it, 'at': [(track, index in its seq)]}
-        node, fitted, misses, tight, widened = {}, [], [], [], 0
+        node, fitted, misses, tight, held, widened = {}, [], [], [], [], 0
         for c, seq in enumerate(chains):
             # the points and their tolerance: a node off its surveyed tracks is no data point (the point nearest
             # all of them: 0.2 m off each at a junction at Národní divadlo, where the tracks run 1.3 m apart); the
@@ -551,6 +618,9 @@ class Network:
                     continue
                 widened += tol_out[i] > tol[i] + 1e-9
                 d, seg, t = nearest(px, py, at[i] - 3, at[i] + 3, p)
+                if tol_out[i] > lim[i] + 1e-9:   # (moved past its class to hold NETWORK_RADIUS)
+                    held.append({'m': round(d, 3), 'class_m': round(lim[i], 3), 'xy': [round(p[0], 1), round(p[1], 1)],
+                                 'radius_m': round(min(rad[max(0, at[i] - int(NEAR)):at[i] + int(NEAR) + 1]), 1)})
                 if d > TOL + REPORT:
                     misses.append({'m': round(d, 3), 'xy': [round(p[0], 1), round(p[1], 1)], 'widened': tol_out[i] > tol[i] + 1e-9})
             for i, r in enumerate(rad):
@@ -580,6 +650,7 @@ class Network:
         self.report = {'through_tracks': len(chains), 'points_widened': widened, 'missed_over_cm': len(misses),
                        'missed_unwidened': sum(not m['widened'] for m in misses),
                        'misses': self._places(misses, 'm', -1)[:15],
+                       'held_to_network_radius': self._places(held, 'm', -1),
                        'tighter_than_min_radius': self._places(tight, 'radius_m', 1)[:15]}
 
     @staticmethod
@@ -614,11 +685,12 @@ def main():
     print(f'track geometry: {t1 - t0:.0f} s, curves {time.time() - t1:.0f} s')
     r = geo.report['curve']
     print({k: v for k, v in r.items() if not isinstance(v, list)})
-    for key in ('misses', 'tighter_than_min_radius'):
+    for key in ('misses', 'held_to_network_radius', 'tighter_than_min_radius'):
         print(f'{key}:')
         for x in r[key]:
             lat, lon = frame.ll(*x['xy'])
-            print(f"  {x.get('m', x.get('radius_m'))}  {float(lat):.5f} N {float(lon):.5f} E  {x['xy']}")
+            print(f"  {x.get('m', x.get('radius_m'))}  {float(lat):.5f} N {float(lon):.5f} E  {x['xy']}"
+                  + (f"  (class {x['class_m']} m, {x['radius_m']} m over 2 m)" if 'class_m' in x else ''))
 
 
 if __name__ == '__main__':

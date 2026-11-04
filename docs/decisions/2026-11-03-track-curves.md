@@ -1,6 +1,7 @@
 # Track joins in plan: smooth curves through the survey, switches paired by the track (#204)
 
-Status: in review (PR for #204), line 17.
+Status: accepted (PR #208), line 17; the 18 m hold, the checks' measures and the drawing of the fitted curves
+followed (the second PR for #204).
 
 ## Why
 
@@ -47,9 +48,22 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   with it; a fork behind a junction is still refused (Holešovice).
 - A switch's diverging edge matched only to the chain both through edges run on is left to the next source
   (Dvorce: DI has no branch onto the new Dvorecký most).
+- **The through track first** (the user, 2026-11-03, at Strossmayerovo náměstí with a photo: "The straight
+  direction should be straight without any kinks, first switch is to the left, then further to the right"; "I
+  would put higher priority to keep the through track straight, then let other track branch from it to the
+  side"). There the straights swung 8-12 cm over 21 m, though DI draws them straight within 0.1°:
+  - A stretch is matched with up to `CONTEXT` = 10 m of its straight continuation: through two-edge nodes, and
+    through a switch only from its toe or through leg (its legs by their directions over 10 m). Alone, the
+    4.75 m between two switches lay nearer the branch DI draws 0.19 m beside the straight, and the straight was
+    drawn onto it; the branch's chain does not reach the straight beyond.
+  - A DI fork goes to an OSM switch whose branch leaves to the other side (over 10 m) only if no switch nearby
+    fits: the westward turn's fork went to OSM's switch 2.1 m on, whose branch leaves the other way, and the turn
+    started 3.8 m late at 12°.
 
 **Smooth curves** (`tools/track_curve.py`, called by the build after the match):
-- Edges join into through tracks (the straightest pair continues at every node), fitted longest first as a
+- Edges join into through tracks (the straightest pair continues at every node, judged at a junction over
+  `PAIR_LOOK` = 10 m on through the next nodes: over 3 m a tangential branch read 0.1° straighter than the
+  straight, which DI bends 0.9° at the switch, and the straight was fitted as the branch), fitted longest first as a
   penalised spline on 1 m samples: as little bending as the points allow, within `TOL` = 2 cm of every DI or
   archive point (`FILL_TOL` = 0.3 m of OSM fill). Weights grow only where the curve misses (Lawson).
 - Tracks are fitted longest first, but a track through a node before one ending there (Holešovice: a longer
@@ -57,28 +71,47 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 - A node a track fitted before fixed is held; a track ending there leaves tangent to the track through it it
   starts within `START` = 6° of (113 ends on line 17: 96 within 4°); beyond, at its own angle (`switch-start`).
 - A crossing node slides to where the two curves cross. A node off its surveyed track (the point nearest all
-  its tracks) is no data point; nodes under 0.5 m apart are one.
+  its tracks) is no data point; nodes joined by an edge under 0.5 m are one, the one with more edges kept.
+- A switch within `OFF` = 0.2 m of its through track joins it exactly; a node further off, where three edges
+  meet, keeps its place and the track passes at its own point (Národní divadlo, 0.34 m). DI's branches start up
+  to 0.18 m apart at a fork: with `OFF` = 0.1 m Strossmayerovo náměstí's crossover branches began 0.15-0.17 m
+  beside their through tracks, which broke 1.2-1.3° at the joint there.
 - Where the curve bends under 20 m over 2 m, the tolerance of the points within 10 m grows by 1.5, at most to
   the mean coordinate error of their records' accuracy class (`data/truth.json` `sourceAccuracy`: DI class 3
   0.14 m, class 2 0.08 m; the archive states none and is taken as class 3, the DTM's minimum; OSM fill 0.5 m).
   The user, 2026-11-03: "keep stricter rules and relax only where we get under the specified radius". Twice the
   error (a 95 % bound; the decree states no limit) gave 6 bends over 10° inside tracks instead of 11 and 32
   joins over 1° instead of 39, and is not used.
-- The written points leave out samples a chord passes within 3 mm of, except within 2.5 m of a node. The
-  line data says `trackCurve`, and the game draws such data as it is (no Gaussian, `src/route.js`).
+- **18 m is held past the class** (`data/truth.json` `min-radius-network`, the user: "18m and over could be some
+  exceptions [...] under 18m there shouldn't be anything like that. [...] At which cost can we snap it to 18m
+  curve?"; asked how, the user chose "18 m held, cost reported", 2026-11-03): where the curve still bends under
+  18 m with every point near it at its class, its bending weight there grows by `STIFFEN` = 1.5 per round and
+  those points' tolerance keeps growing, at most to `HOLD_LIMIT` = 0.5 m. The build logs each such place with how
+  far its points moved. A wider tolerance alone does not widen a curve, it only stops pulling it: on a 30° test
+  corner the bend moved to where the points at their class began (15 m); a factor of 4 at once took a 15° corner
+  to 49 m with its points 0.49 m off, 1.5 to 18.2 m with 9 cm.
+- The written points leave out samples a chord passes within 3 mm of, except within 2.5 m of a node, and are
+  written to the millimetre (to the centimetre, points 0.4 m apart scatter 0.7° in direction). The line data says
+  `trackCurve`, and the game draws such data as it is: the tracks' own points, with points added only on segments
+  over 1.5 m (`densify`), their heights smoothed over metres instead of points; the route resampled at 1 m with no
+  Gaussian. Before, a "0.1 m" window still averaged three points 1.5 m apart and the tracks were resampled: a
+  joint the build made 0.9° drew as 3.7° at the end of a 4.6 m piece (Strossmayerovo náměstí).
 
 ## Checks
 
 `tools/lint.js`:
-- `trackRadius`: the radius over 5 m along every drawn track and both routes, flagged under 20 m.
-- `trackJoins`: through tracks breaking over 1° where chains meet, per class; diverging start angles listed.
+- `trackRadius`: the radius over 5 m (the circle through a point and the farthest points within 2.5 m either side)
+  along every track and both paths as the build wrote them, flagged under 18 m; 18-20 m listed as `exceptions`.
+  It first read points interpolated on the game's 1.5 m resample: a 1 m chord sags 7 mm inside a 19 m curve, and
+  it read 19.1 m (the fit's own measure) as 17.6 m at Právnická fakulta.
+- `trackJoins`: through tracks breaking over 1° where chains meet, per class; diverging start angles listed. The
+  user kept 1° (2026-11-03: "Keep 1°, fix the nodes"). An end's direction is the tangent of the least-squares
+  parabola through the drawn points within 2 m (the parabola through the first three read a smooth 21 m curve
+  as a 1.2° break where the first step was 0.17 m).
 
 ## Left open
 
-- 24 connecting curves on line 17 read 18.5-19.9 m: held at both switches, their radius is DI's; 20 m needs the
-  switches about 0.5 m off. Real curves under 20 m, or switches DI places wrong (#210 measures DI's forks)?
-- Dvorecký most (#209): DI (2026-09-30, the newest state offered) and the archive lack the new tracks, and
-  the archive's pieces on the old switch curves take OSM's new edges (a 25° break, 5-7 m curves). What Atlas
-  Prahy draws is DI's planned-works set (dataset 8, "_budoucí TT", 2024-08-22): one corridor axis per double
-  track, not track axes.
-- Strossmayerovo náměstí: OSM joins a crossing and a switch in one node 0.5 m from DI's.
+- 64 places on line 17 read 18-20 m over 5 m (58 on DI's tracks, 2 each on both paths and the photo curve),
+  listed as exceptions: connecting curves held at both switches keep DI's radius, and 20 m needs the switches
+  about 0.5 m off. Real curves under 20 m, or switches DI places wrong (#210 measures DI's forks)?
+- Dvorecký most: resolved by DI's state of 2026-10-31 (#209, PR #213), which has the new tracks.

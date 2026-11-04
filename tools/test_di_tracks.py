@@ -134,18 +134,45 @@ class Matching(unittest.TestCase):
         self.assertEqual(geo.report['reversed_edges'], 0)
 
 
+    def test_the_straight_between_two_switches_takes_the_straight_beyond(self):
+        # Strossmayerovo náměstí: the 4.6 m between two switches lay nearer DI's branch 0.2 m beside the straight;
+        # matched with its continuation, it takes the straight, which the branch does not reach
+        right = [(50 + 50 * math.sin(k / 12 * 0.4), -50 * (1 - math.cos(k / 12 * 0.4))) for k in range(13)]
+        left = [(54.6 + 50 * math.sin(k / 12 * 0.4), 50 * (1 - math.cos(k / 12 * 0.4))) for k in range(13)]
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (54.6, 0)]), rec(3, [(54.6, 0), (120, 0)]),
+                              rec(4, right), rec(5, left)])
+        pos = {1: (0, 0.05), 2: (50, 0.05), 3: (54.6, -0.19), 4: (120, 0.05), 5: right[-1], 6: left[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (3, 4), (2, 5), (3, 6)], [di])
+        self.assertLess(max(abs(y) for _, y in geo.points(2, 3)), 0.02)
+
 def turnout(x0, side=1, n=12):
     """A branch leaving the x axis at x0 on a 50 m radius to the left (side 1) or right (-1), 20 m long."""
     return [(x0 + 50 * math.sin(k / n * 0.4), side * 50 * (1 - math.cos(k / n * 0.4))) for k in range(n + 1)]
 
 
 class Pairing(unittest.TestCase):
+    def test_which_side_a_branch_leaves_to(self):
+        a = lambda deg: (math.cos(math.radians(deg)), math.sin(math.radians(deg)))
+        self.assertEqual(dt.branch_side([a(180), a(0), a(5)]), 1)
+        self.assertEqual(dt.branch_side([a(180), a(0), a(-5)]), -1)
+        self.assertEqual(dt.branch_side([a(180), a(0), a(0.5)]), 0)
+
     def test_a_switch_takes_its_fork_on_the_same_track_up_to_15_m(self):
         # Jiráskovo náměstí (s 12,941): DI's fork 7.3 m from OSM's switch, "likely a bit further than 5m"
         di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (120, 0)]), rec(3, turnout(50))])
         pos = {1: (0, 0.2), 2: (57.3, 0.2), 3: (120, 0.2), 4: turnout(50)[-1]}
         geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (2, 4)], [di])
         self.assertEqual(geo.at(2), (50.0, 0.0))
+
+    def test_a_switch_takes_its_fork_past_its_neighbour_once_that_one_moved_on(self):
+        # Milady Horákové at Strossmayerovo náměstí: OSM's switches 2.1 m apart, DI's forks 4.7 m apart and 5 m
+        # further on, the branches to either side; the second takes its fork once the first is on its own
+        di = dt.Source('di', [rec(1, [(-100, 0), (0, 0)]), rec(2, [(0, 0), (4.7, 0)]), rec(3, [(4.7, 0), (100, 0)]),
+                              rec(4, turnout(0, 1)), rec(5, turnout(4.7, -1))])
+        pos = {1: (-100, 0.05), 2: (5.0, 0.05), 3: (7.1, 0.05), 4: (100, 0.05), 5: turnout(0, 1)[-1], 6: turnout(4.7, -1)[-1]}
+        geo = dt.TrackGeometry(pos, [(1, 2), (2, 3), (3, 4), (2, 5), (3, 6)], [di])
+        self.assertEqual(geo.at(2), (0.0, 0.0))
+        self.assertEqual(geo.at(3), (4.7, 0.0))
 
     def test_a_switch_whose_tip_the_user_placed_goes_there(self):
         # Podolská vodárna: "the fork point should be further back right next to northern manhole", 3.3 m from DI's

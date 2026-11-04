@@ -245,9 +245,25 @@ function addSide(cg, line, offset, zTop, zBot) {
 // Heights along a track chain without assembled heights (#197: OSM or archive fill, lines not rebuilt yet),
 // smoothed along its length (Gaussian, ±9 m) so rails never step where the ground function changes regime
 // (route profile / terrain / bridge).
-function trackHeights(line, hf) {
+function trackHeights(line, hf, byDistance = false) {
   const raw = line.map((p) => hf(p[0], p[1]));
   const n = raw.length, k = 6, out = new Float32Array(n);
+  if (byDistance) {
+    // (points unevenly spaced, the build's curves: the same window in metres, ±9 m with σ 4.5 m)
+    const s = [0];
+    for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+    let lo = 0, hi = 0;
+    for (let i = 0; i < n; i++) {
+      const r = Math.min(9, s[i], s[n - 1] - s[i]);
+      while (s[i] - s[lo] > r + 1e-6) lo++;
+      hi = Math.max(hi, i);
+      while (hi < n - 1 && s[hi + 1] - s[i] <= r + 1e-6) hi++;
+      let acc = 0, wsum = 0;
+      for (let j = lo; j <= hi; j++) { const w = Math.exp(-0.5 * ((s[j] - s[i]) / 4.5) ** 2); acc += raw[j] * w; wsum += w; }
+      out[i] = acc / wsum;
+    }
+    return Array.from(out);
+  }
   for (let i = 0; i < n; i++) {
     const r = Math.min(k, i, n - 1 - i);
     let acc = 0, wsum = 0;
@@ -412,9 +428,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
 
   // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
   // then the terrain is lowered under every track so it can't poke through the bed
-  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20),
-  // and every track where the build drew smooth curves (data.trackCurve, #204)
-  for (const t of data.tracks) if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) && !data.trackCurve ? SMOOTH : AS_SURVEYED).pts;
+  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20);
+  // where the build drew smooth curves (data.trackCurve, #204) its points as they are, a point every 1.5 m at most
+  // (resampled, a 4.6 m piece's end became a chord and its joint at Strossmayerovo náměstí broke 2.9°)
+  for (const t of data.tracks) if (!t.smooth) t.smooth = data.trackCurve ? densify(t.p, 1.5) : smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) ? SMOOTH : AS_SURVEYED).pts;
   // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
   // street surfaces laid flush with the track bed
   const tracks = new SegmentIndex(10);
@@ -432,7 +449,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     const n = route.nearest(x, y);
     return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
   };
-  const old = (t) => trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))));
+  const old = (t) => trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))), !!data.trackCurve);
   // a track with assembled heights (#197: `zs` every 2 m along t.p, tools/line_heights.py) takes its own top of
   // rail, unsmoothed; a stretch without one takes the heights above, shifted to meet it at both ends
   for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights?.step ?? 2, old) : old(t);

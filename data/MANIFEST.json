@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-03b",
- "built_at_commit": "f37ce96",
- "published": "2026-11-03 21:11",
- "note": "line 17: heights on DI 2026-10-31 with the band rule (#197 draft)",
+ "built_at_commit": "cddcbeb",
+ "published": "2026-11-03 23:29",
+ "note": "line 17: 18 m held, the through track first, millimetre track coordinates (#204)",
  "files": {
   "line17.bld.bin": {
    "size": 6348546,
@@ -29,16 +29,16 @@
    "sha256": "905c2d71ff2117168727db63b42efcbb95c635edd509fdb130118d4b8017ae76"
   },
   "line17.json": {
-   "size": 6642647,
-   "sha256": "4ec52f33144d10ba182268e7af2bc479303d9f1519dac14326949262ac72bace"
+   "size": 6093022,
+   "sha256": "ffdbfb4aad8a67b2b6fd853f8b849f6298fc3c837d77055f4c60fd9ffda5ba8b"
   },
   "line17.signals.json": {
    "size": 36904,
    "sha256": "67b6936dcdf3d5314e034be59c26ad54c41475c29fc5b79d7ac3394d5230c542"
   },
   "line17.validate.json": {
-   "size": 4439,
-   "sha256": "6c3ac08f0462bf04678d49889957aec5093bec5455ba4e6828df59ecc38fc2f0"
+   "size": 4441,
+   "sha256": "54bb35413d9571e60d96a64bf14ae8e792342d1444b17a2068c95fe984575928"
   },
   "line17.zps.json": {
    "size": 6548335,
