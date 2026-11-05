@@ -738,12 +738,12 @@ class Network:
                 by[self.edges[x[0]].get('chain')].append(x)
             # (each chain running through: its two ends pass only each other; the other ends not into them)
             through = {k: v for k, v in by.items() if k is not None and len(v) == 2}
-            paired = {x for v in through.values() for x in v}
+            runs = {x for v in through.values() for x in v}
             for a, b in through.values():
                 self.passes[a], self.passes[b] = [b], [a]
             for x in ends:
-                if x not in paired:
-                    self.passes[x] = [y for y in self.passes[x] if y not in paired]
+                if x not in runs:
+                    self.passes[x] = [y for y in self.passes[x] if y not in runs]
         # (two track ends joined across a gap: a train passes, whatever the bend; the fit smooths it)
         for n, ends in self.at.items():
             if self.nodes[n]['kind'] == 'gap' and len(ends) == 2:
