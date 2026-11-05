@@ -257,6 +257,9 @@ Review these when realism matters; most move into the build in M2.
 - **Signals**: from OSM `traffic_signals` clusters near the route; never past the crossing they were
   made for (except along platforms, where the platform-head rules decide); two at one stop line are one.
   GO held for a tram in its dilemma zone (15 + v²/1.6 m). Distant signals where R < 110 m within 140 m.
+  A tram standing past its signal before the crossing (stopped behind something): the cross street gives
+  way whatever its lights show, and the tram waits until the cars already on the crossing are off it; a
+  driver past the signal no longer sees it (the user, 2026-11-05, #268).
 - **Gauntlets**: opposite route < 1.8 m away for ≥ 25 m along one continuous opposing traversal
   (needs exact `Route.nearest`, which refines onto the chords: 4 m samples read 0.3 m tracks as up to
   1.9 m apart).

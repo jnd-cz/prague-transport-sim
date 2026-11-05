@@ -1429,8 +1429,11 @@ export class Game {
     if (!X) return; // pedestrian signal: no crossing street
     const near = Math.abs(sig.cross - tram.s) < 400;
     const tramOnCrossing = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 4;
-    // drivers also see a tram about to enter (e.g. one that stopped past its signal)
-    const tramComing = tramOnCrossing || (sig.cross > tram.s && sig.cross < tram.s + 6 + tram.v * 2.5 && tram.v > 0.1);
+    // drivers also see a tram about to enter, and give way to one standing in the junction past its
+    // signal, whatever the lights show them (the user, #268: "cars should give way"; a tram stopped
+    // there behind a car, the cross street's green came, and its cars drove on, line 9 s 8852)
+    const inJunction = sig.s <= tram.s && sig.cross > tram.s;
+    const tramComing = tramOnCrossing || inJunction || (sig.cross > tram.s && sig.cross < tram.s + 6 + tram.v * 2.5 && tram.v > 0.1);
     if (near && sig.state === 'stop' && sig.timer > 5) {
       sig.spawn -= dt;
       if (sig.spawn <= 0 && sig.cars.length < 4) {
@@ -1467,7 +1470,10 @@ export class Game {
       car.mesh.position.set(x, (zf + zb) / 2 + 0.1, -y);
       car.mesh.rotation.y = Math.atan2(hx, -hy);
       car.mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
-      if (Math.abs(toX) < 2.3 && tramOnCrossing && tram.v > 0.2 && !car.hit) {
+      // a hit: the car inside the tram's body on the crossing (its front plus the car's half width), not
+      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268)
+      const inBody = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 1;
+      if (Math.abs(toX) < 2.3 && inBody && tram.v > 0.2 && !car.hit) {
         car.hit = true;
         this._collision(t('obj.crossingCar'));
       }
