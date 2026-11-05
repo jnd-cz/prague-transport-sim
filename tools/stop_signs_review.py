@@ -37,7 +37,13 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 
-# (elsewhere: "Place it on the map", the point saved with the answer as px, py)
+# A card's answers: the sources it has, the user's own point and unsure (the user, 2026-11-05: "pick which is
+# right: DTM, OSM, GTFS/timetable, other - my own mark", #310). The own mark starts placing on the review page;
+# the point is saved with the answer as px, py.
+BY_SOURCE = {"DTM": "the DTM sign (red)", "OSM": "OSM's stop position (blue)", "GTFS": "the timetable point, GTFS (orange)"}
+OWN, UNSURE = "my own mark: place it on the map", "unsure"
+MARK_OF = {"DTM": "DTM stop sign", "OSM": "OSM stop position", "GTFS": "timetable (GTFS) point"}  # (the marks' labels)
+# the wording before #310 (answers already given keep importing)
 OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
 OSM, GTFS, END, DTM = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30"
 # The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
@@ -164,11 +170,13 @@ def review(line, path, stops, nodes, dtm, facts, over, back=False):
         else:
             why = "no DTM sign beside the track"
         towards = nxt or "end"
+        opts = [BY_SOURCE[k] for k, have in (("DTM", m), ("OSM", o), ("GTFS", True)) if have] + [OWN, UNSURE]
         findings.append({"kind": "stop sign", "id": sid, "line": line, **key, "x": round(px, 1), "y": round(py, 1), "s": round(ps, 1),
                          "mag": round(abs(m[1] - ref), 1) if m else 10, "status": "review", "pick": True, "marks": marks,
+                         "options": opts, "place_option": OWN,
                          **({"osm_node": o[4]} if o else {}), "gtfs_s": st["s"],
                          "info": f"{st['name']} (towards {towards}){dirn}: {why} The pin is {what}. Where is the stop sign? "
-                                 f"(Not at the pin: place it on the map.)"})
+                                 f"Pick the source that is right, or place your own mark."})
     return findings, rows
 
 
@@ -186,8 +194,12 @@ def sign_facts(cards, answers):
         for i, r in newest.items():
             c = by_id[i]
             gtfs = next((m for m in c["marks"] if m["label"].startswith("timetable")), None)
+            src = next((k for k, v in BY_SOURCE.items() if r["v"] == v), None)
+            mark = next((m for m in c["marks"] if src and m["label"].startswith(MARK_OF[src])), None)
             if "px" in r:
                 x, y, how = r["px"], r["py"], "placed on the map"
+            elif mark:
+                x, y, how = mark["x"], mark["y"], r["v"]
             elif r["v"].startswith("sign at the pin"):
                 x, y, how = c["x"], c["y"], r["v"]
             elif r["v"] == OPTIONS[1] and gtfs:
@@ -287,7 +299,7 @@ def main():
                   f"DTM sign {len(dd)} (DTM - OSM/GTFS median {statistics.median(dd) if dd else float('nan'):+.1f} m, "
                   f"over {args.over:.0f} m {sum(abs(x) > args.over for x in dd)}), OSM {sum(r['osm'] is not None for r in rows)}; "
                   f"{len(f)} to review")
-        out = {"schema": 1, "issue": 258, "options": OPTIONS, "over_m": args.over, "findings": findings}
+        out = {"schema": 1, "issue": 258, "over_m": args.over, "findings": findings}
         with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
 

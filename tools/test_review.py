@@ -27,7 +27,11 @@ FILE = {"options": ["right", "wrong"],
                                        {"x": 30.0, "y": 0.0, "kind": "here", "mag": 4, "info": "30 m east"},
                                        # (#258: other points drawn with it, and an answer placed on the map)
                                        {"x": 60.0, "y": 0.0, "kind": "here", "mag": 3, "info": "60 m east", "pick": True,
-                                        "marks": [{"x": 62.0, "y": 2.0, "label": "the other source", "color": "#ff9e31"}]}]}}}
+                                        "marks": [{"x": 62.0, "y": 2.0, "label": "the other source", "color": "#ff9e31"}]},
+                                       # (#310: its own answers, one of them a point placed on the map)
+                                       {"x": 90.0, "y": 0.0, "kind": "here", "mag": 2, "info": "90 m east", "pick": True,
+                                        "options": ["the source", "my own mark: place it on the map", "unsure"],
+                                        "place_option": "my own mark: place it on the map"}]}}}
 HEIGHT = {'findings':[{'kind':'trackheight','id':'bridge-test','x':0,'y':0,'mag':10,'status':'review',
     'info':'test bridge','decision':{'span_ids':['span-test'],'structure':{'kind':'bridge'}},
     'options':['archive profile ok','follows survey surface','other level (deck / under)','unsure'],
@@ -217,6 +221,30 @@ def main():
             got = json.load(open(saved, encoding="utf-8"))
             rec = next((v for v in got.get("items", {}).values() if v.get("info") == "60 m east"), {})
             r["place"]["after"] = {"v": rec.get("v"), "px": rec.get("px")}
+            # &todo (#310): a finding answered there, or given a point of one's own, stays in the list (placed: on the
+            # card too; answered: the card moves on to the next without an answer, as before)
+            todo = page.evaluate("""() => {
+              const R = window.review;
+              R.todo = true; R.kept.clear(); R._fill();
+              const i = R.list.findIndex((f) => f.info === '90 m east'), f = R.list[i];
+              R.select(i);
+              R.T.x = f.x; R.T.y = f.y; R.yaw = 0; R.pitch = 1.4; R.dist = 40; R._render(); R.camera.updateMatrixWorld();
+              const r = R.canvas.getBoundingClientRect(), v = R.camera.position.clone().set(f.x + 5, f.z, -f.y).project(R.camera);
+              return { place: !!R.$('rvCard').querySelector('button[data-place]'), x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+            }""")
+            page.click("#rvCard button[data-v='1']")
+            page.mouse.click(todo["x"], todo["y"])
+            page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length", timeout=20000)
+            seen = "() => { const R = window.review; return { listed: R.list.some((f) => f.info === '90 m east'), card: R.$('rvCard').textContent.includes('90 m east') }; }"
+            todo["placed"] = page.evaluate(seen)
+            got = json.load(open(saved, encoding="utf-8"))
+            rec = next((v for v in got.get("items", {}).values() if v.get("info") == "90 m east"), {})
+            todo["placed"].update(v=rec.get("v"), px=rec.get("px"))
+            page.click("#rvCard button[data-v='0']")
+            page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length", timeout=20000)
+            todo["answered"] = page.evaluate(seen)
+            page.evaluate("() => { const R = window.review; R.todo = false; R._fill(); }")
+            r["todo"] = todo
             page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT_COMPACT)))
             page.route('**/test-spans.json',lambda q:q.fulfill(status=200,content_type='application/json',body=HEIGHT_BYTES))
             with open(os.path.join(tmp, 'line22.json'), 'w', encoding='utf-8') as out:
@@ -339,13 +367,17 @@ def main():
         fails.append(f"the answer did not reach the server: {r['saved']}")
     if r["next"] != "30 m east":
         fails.append(f"after the answer the card shows {r['next']!r}, not the next finding without one")
+    t = r["todo"]
+    if t["place"] or not (t["placed"]["listed"] and t["placed"]["card"] and t["placed"]["v"] == "my own mark: place it on the map"
+                          and abs((t["placed"]["px"] or 0) - 95) < 1.5 and t["answered"]["listed"]):
+        fails.append(f"&todo: an answered or placed finding left the list or the card, or the own mark was not placed (want px ≈ 95): {t}")
     p = r["place"]
     if not (p["legend"] and p["button"] and p["marks"] >= 2 and p["v"] == "placed on the map"
             and p["px"] is not None and abs(p["px"] - 65) < 1.5 and abs(p["py"]) < 1.5):
         fails.append(f"a mark or the answer placed on the map (want px ≈ 65, py ≈ 0): {p}")
     if p["after"]["px"] != p["px"] or p["after"]["v"] in (None, "placed on the map"):
         fails.append(f"an answer after placing keeps the placed point: {p}")
-    if (r["back"]["rec"] or {}).get("v") != "wrong" or not r["back"]["count"].startswith("1 / 3"):
+    if (r["back"]["rec"] or {}).get("v") != "wrong" or not r["back"]["count"].startswith("1 / 4"):
         fails.append(f"after a reload without local storage: {r['back']}")
     if r['height']['count'] != 2 or not all(r['height'][k] for k in ('svg','marker','reverse','conflict')):
         fails.append(f"track height finding/profile/hover missing: {r['height']}")

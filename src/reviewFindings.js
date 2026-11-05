@@ -22,7 +22,8 @@ export function fileFindings(json, label) {
       // (marks: other points to show with it, {x, y, label, color}; pick: the answer may be a point placed
       // on the map, #258)
       const marks = Array.isArray(o.marks) ? o.marks.filter((m) => typeof m?.x === 'number' && typeof m?.y === 'number') : undefined;
-      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts,
+      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '',
+        options: Array.isArray(o.options) ? o.options.map(String) : opts, ...(typeof o.place_option === 'string' ? { placeOption: o.place_option } : {}),
         ...(marks?.length ? { marks } : {}), ...(o.pick ? { pick: true } : {}), ...(o.id ? { id: String(o.id) } : {}) });
       return;
     }
