@@ -1,6 +1,6 @@
 # OSM2World: its ideas in our tools, not the tool in our build (#15)
 
-Status: proposed (draft for the user, PR for #15).
+Status: accepted by the user (OSM2World Picks page, 2026-11-05; PR #299).
 
 ## Why
 
@@ -14,7 +14,7 @@ builds from OSM alone and guesses widths, positions and heights from tags.
   survey data; it converts each tile on its own, so neighbours can disagree at junctions; its height
   constraints are declared but, at this commit, only a merge-to-mean is enforced.
 - **Its methods are reimplemented in our tools** where the study found them useful (the candidates in the
-  study's README, picked by the user). A tool that ends up a close translation of its code carries
+  study's README, picked by the user: #276, #14, #65, #277, #55, #30, #31 and #301-#309). A tool that ends up a close translation of its code carries
   OSM2World's MIT notice in its header.
 - **No new library.** The constrained triangulation #276 needs is shapely's `constrained_delaunay_triangles`
   (shapely 2.1+, GEOS 3.10+), already a build dependency: line 17's ground-level survey (9,437 areas,

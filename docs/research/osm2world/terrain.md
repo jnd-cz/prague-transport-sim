@@ -113,5 +113,23 @@ does: a partition by priority instead of layers drawn over each other and lowere
 - **Check:** every source edge (kerb, bed edge, footprint) is an edge of the mesh, counted per class; no two
   triangles of one level overlap in plan.
 
+## Simplifying the terrain by error (asked on #15, 2026-11-05)
+
+#276 now builds the terrain over the line's whole box as one mesh from IPR's 1 m lidar, simplified by an error
+tolerance that grows with distance from the tracks. OSM2World does no such simplification:
+- Empty land and every ground area get a fixed **30 m point grid** (`map_data/creation/EmptyTerrainBuilder.java`
+  `POINT_GRID_DIST = 30`, used in `world/modules/SurfaceAreaModule.java` `getTriangulationXZ`), triangulated together
+  with the features' outline vertices.
+- The height of each point is **interpolated** from the elevation sites, one per SRTM pixel
+  (`map_elevation/creation/SRTMData.java` `addTileSites`), by one of the interpolators (T7). Nothing is dropped by
+  error and nothing depends on distance.
+- Terrain has **no level of detail**: the LOD filter in the output (output.md) drops objects, not terrain triangles.
+
+So nothing here answers #276's simplification. Known methods for a regular height grid, none installed here:
+greedy insertion by maximum error (Garland and Heckbert 1995; Delatin, ISC licence), the right-triangulated
+irregular network (RTIN, Martini, ISC; needs a 2^n+1 grid), and quadric edge-collapse decimation of a full mesh.
+Greedy insertion takes a per-point tolerance directly, which fits "error grows with distance from the tracks";
+the kerbs, bed edges and footprints of T1-T3 stay fixed edges in all three.
+
 Port of OSM2World code: none needed. Its algorithms here are short (priority subtraction, union-find of
 connectors); the reimplementation is in Python over shapely, so no MIT notice is carried.

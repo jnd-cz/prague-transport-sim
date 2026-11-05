@@ -45,30 +45,34 @@ to whole window bays, and the tile encoding.
   (asphalt, sett, paving, gravel, concrete, steel) from ambientCG itself and enter them in `ASSETS.md`. Not its
   cars, its DE / PL signs or its power towers ([assets.md](assets.md)).
 
-A decision record draft: [2026-11-05-osm2world-ideas-not-the-tool.md](../../decisions/2026-11-05-osm2world-ideas-not-the-tool.md).
+Decision record: [2026-11-05-osm2world-ideas-not-the-tool.md](../../decisions/2026-11-05-osm2world-ideas-not-the-tool.md).
 
-## Candidates (for the user to pick)
+## Candidates and the user's picks
 
-Each becomes an issue once picked, or a point on the issue named. Lane / milestone as proposed.
+Picked by the user in the OSM2World Picks page (2026-11-05), with their notes; each taken one is an issue or a
+comment on the issue named.
 
-| # | candidate | note | lane, milestone | where |
+| # | candidate | pick | where now | the user's note |
 |---|---|---|---|---|
-| 1 | The ground as a priority partition (survey > OSM street > track bed > building plot > terrain, each cut by those above), triangulated with shapely's constrained Delaunay along the lidar grid; buildings as holes, the 2.5 m foundation sink gone | terrain, roads | world, W3 | a decision comment on #276 |
-| 2 | Streets outside the survey: junction areas and cut-back ribbons with kerb fillets, carriageway width from tags, the class defaults measured on lines 17 and 22's survey | roads | world, W3 | new issue; feeds #16, #276 for lines 23, 37, 9 |
-| 3 | Sidewalks outside the survey: `footway=sidewalk` ways joined to the carriageway's kerb line | roads | world, W3 | new issue, after 2 |
-| 4 | Lowered kerbs at crossings from OSM `kerb=*` nodes (5,863 `kerb=lowered`) | roads | world, W3 | new issue; related #142 |
-| 5 | Car lane graph from `lanes` / `turn:lanes` with OSM2World's lane matching | roads | sim, Backlog | new issue; feeds #16, #46 |
-| 6 | Lane markings and arrows from the lane layout where the orthophoto pilot has none | roads | world, W4 | new issue; feeds #46 |
-| 7 | OSM street furniture (19,569 benches, 6,411 bins, 2,692 bicycle parkings, bollards…) into the feature layer, the DTM first where it records the kind; OSM lamps measured against DTM lamps first | objects | world, W4 | new issue; blocked by #14, feeds #252 |
-| 8 | Orientation and mounting: `direction`, else facing the nearest street; a mount field (ground / wall / pole / span) for the nearest surface within 10 m | objects | world, W4 | a point on #14 |
-| 9 | Tree rows minus register trees, sizes from attributes | objects | world, W4 | new issue |
-| 10 | Ballasted track with sleepers, near and far LOD, our own dimensions | railways | world, W4 | a point on #65 |
-| 11 | OSM catenary masts (988 within 15 m of tram track) as a check on pole placement; the 42 combined lamp-and-traction poles | railways | world, W4 | a point on #277 |
-| 12 | No contact wire on `electrified=no` tram ways (37) | railways | world, Backlog | new issue |
-| 13 | Facades: RÚIAN use and storeys joined to LOD2 buildings, a defaults table per type, facade texture coordinates fitted to whole window bays per storey, roof textures down the slope | buildings | world + assets, W4 | points on #55 |
-| 14 | Tile container: GLB with `KHR_mesh_quantization` measured against #276's ground format on line 17 | output | world, M3 | new issue; feeds #30 |
-| 15 | Tile levels as content filters switched by screen-space error from tight per-tile bounds; clipping with interpolated attributes, tiles rebuilt only when their inputs change | output | world, M3 | points on #30, #31 |
-| 16 | ambientCG textures for asphalt, sett, paving, ballast, concrete, steel | assets | assets, W3 / W4 | new issue; feeds #65, #276 |
+| 1 | The ground as a priority partition, shapely's constrained Delaunay along the lidar grid, buildings as holes | take | #276 (decision comment) | "does this mean the fused ground model?" (yes: its method) |
+| 2 | Streets outside the survey: junction areas, cut-back ribbons with kerb fillets, widths calibrated on the survey | take | #301 | |
+| 3 | Sidewalks outside the survey joined to the kerb line | take | #302 (blocked by #301) | |
+| 4 | Lowered kerbs at crossings | take | #303 | "Take if not in zps layer" (the ZPS has no kerb type; its heights first, OSM as fallback) |
+| 5 | Car lane graph from `lanes` / `turn:lanes` | take | #304 | "Check where available" (11-16 % of car ways along our lines carry `turn:lanes`) |
+| 6 | Lane markings from OSM's lane layout where the orthophoto has none | later | fallback in #309 | "which lane layout is meant by that?" (OSM2World's cross-section from `lanes`, `divider`) |
+| 7 | OSM street furniture into the feature layer, the DTM first | take | #305 (blocked by #14) | "Osm as fallback for lamps" |
+| 8 | Orientation and mounting of placed objects | take | #14 (comment) | "Please explain orientation of what" |
+| 9 | Trees | take | #306 | "Our current trees (source?), then newly found tree holes in dtm, osm as fallback" |
+| 10 | Ballast with sleepers | take | #65 (comment) | "We already have different types of track styles, ballasted track is one of them, remains to be visualized for each" |
+| 11 | OSM catenary masts as a check on poles | take | #277 (comment) | "Yes only as a check, DTM should have the data more precisely" |
+| 12 | No contact wire on `electrified=no` tram ways | later | – | "Explore where it exists": all 37 are depot and yard tracks (Pankrác ~25, Hostivař workshops 8, Hloubětín 1, 2 short), none on our lines |
+| 13 | Facades: RÚIAN joined to LOD2, bays per storey, roof textures down the slope | take | #55 (comment) | |
+| 14 | Tile container: GLB + `KHR_mesh_quantization` against #276's format | take | #307 | "Try and see what's better" |
+| 15 | Tile levels as content filters, clipping, rebuild only what changed | take | #30, #31 (comments) | "Please explain what it means" |
+| 16 | ambientCG textures | take | #308 | "If we don't find or generate anything better" |
+| 17 | Road paint from the orthophoto: stop lines, zebras, arrows, lane lines | take | #309 | "Evaluate compute resources needed to scan ortophotos at highest detail across the whole city" (7 cm: 1.5 s and 2.3 MB per ha; the city 116 GB / ~21 h, our lines' streets ~2 GB / 20 min) |
+
+The decision record is accepted.
 
 Not taken: OSM2World's terrain interpolators, its ±5 m bridge and tunnel offsets, its constraint solver, roof
 shapes from tags (IPR's LOD2 roofs are measured), indoor, its sidewalk-as-a-lane model (Prague maps 17,802
