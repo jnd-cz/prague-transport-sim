@@ -10,7 +10,7 @@ import {
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
-const STOP_AHEAD = 6;          // tram front stops this far past the projected platform point
+const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
 // The platform is 30 m long: any front position that puts the 14 m car alongside it counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
@@ -150,7 +150,8 @@ export class Game {
       if (request && r() < 0.55) waiting = 0;
       const stop = {
         i, name: s.name, request,
-        target: Math.min(s.s + STOP_AHEAD, this.route.length - 2),
+        // the front stops beside the stop sign (D 1/2 § 27.6; tools/build_line.py, #258)
+        target: Math.min(s.sign ?? s.s + STOP_AHEAD, this.route.length - 2),
         p0: s.p0, p1: s.p1,
         sched: this.trip[i],
         waiting, alightFrac: 0.08 + r() * 0.25 + central * 0.05,
