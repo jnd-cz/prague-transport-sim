@@ -1,9 +1,9 @@
 """The drawn track in plan as smooth curves through the surveyed points, continuous in direction at every node (#204).
 
-    python -P -E tools/track_curve.py --line 17     # fit line 17's track graph, print what moved and what was left
+    python -P -E tools/track_curve.py --line 17     # fit the DI edges line 17's routes run on, print what moved and what was left
 
-The track graph's edges (tools/di_tracks.py `TrackGeometry`) are polylines through DI's or the archive's points,
-or OSM's nodes where neither has the track (fill). They are joined into through tracks: at every node the
+The track graph's edges (tools/di_network.py `Drawn`) are polylines through DI's points, or the orthophoto's
+(data/truth.json photoTracks), or OSM's where DI has no track (fill). They are joined into through tracks: at every node the
 straightest pair of edges continues (a switch's diverging edge, a track's end and a crossing track end or pass
 there). Each through track, longest first, is fitted with a curve that bends as little as it can (a penalised
 spline in plan, bending energy on 1 m samples) while it stays within TOL of every surveyed point (FILL_TOL of fill):
@@ -311,8 +311,8 @@ def thin(pts):
 
 
 class Network:
-    """The fitted track graph. pos {node: (x, y)}, pts {(a, b): points from a to b} keyed as tools/di_tracks.py
-    keys its edges (a before b as strings), kind {(a, b): 'di' | 'dtmp' | 'osm'}, `loose` {(node, edge)}: a node off
+    """The fitted track graph. pos {node: (x, y)}, pts {(a, b): points from a to b} keyed by their nodes
+    (a before b as strings), kind {(a, b): 'di' | 'dtmp' | 'osm'}, `loose` {(node, edge)}: a node off
     the surveyed track its edge runs on (no data point for it: the point nearest all of a node's tracks), `limit`
     {(a, b): metres} how far a surveyed edge's points may move where a curve would bend too tight (the mean coordinate
     error of its records' accuracy class; default the class UNCLASSED). After construction: `pos` and
@@ -664,26 +664,24 @@ class Network:
 
 
 def main():
-    import glob
     import json
     import time
-    import di_tracks as dt
+    import di_network
     from geo import Frame
     line = sys.argv[sys.argv.index('--line') + 1] if '--line' in sys.argv else '17'
     root = Path(__file__).resolve().parent.parent
-    raw = root / 'raw' / f'line{line}'
-    answers = [json.loads(Path(f).read_text(encoding='utf-8')) for f in [raw / 'tracks.json', *glob.glob(str(raw / 'route_*.json'))]]
-    nodes, edges = dt.osm_graph(*answers)
+    data = json.loads((root / 'data' / f'line{line}.json').read_text(encoding='utf-8'))
     frame = Frame()
-    ids = list(nodes)
-    x, y = frame.xy([nodes[i][0] for i in ids], [nodes[i][1] for i in ids])
-    pos = {i: (float(a), float(b)) for i, a, b in zip(ids, x, y)}
     t0 = time.time()
-    geo = dt.TrackGeometry(pos, edges, dt.load_sources())
+    net = di_network.load_network()
+    edges = set()
+    for key in ('path', 'pathBack'):
+        if data.get(key):
+            edges |= di_network.Match(net, [tuple(p[:2]) for p in data[key]]).edges
     t1 = time.time()
-    geo.fit_curves()
-    print(f'track geometry: {t1 - t0:.0f} s, curves {time.time() - t1:.0f} s')
-    r = geo.report['curve']
+    drawn = di_network.Drawn(net, edges)
+    print(f"network and the line's routes: {t1 - t0:.0f} s, curves {time.time() - t1:.0f} s")
+    r = drawn.report
     print({k: v for k, v in r.items() if not isinstance(v, list)})
     for key in ('misses', 'held_to_network_radius', 'tighter_than_min_radius'):
         print(f'{key}:')

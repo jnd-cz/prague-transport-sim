@@ -778,6 +778,10 @@ def main():
     route_m = di_network.Match(net, [allpos[n] for n in path_ids])
     back_m = di_network.Match(net, [allpos[n] for n in bids]) if bids else None
     print(f"route matched: {json.dumps(route_m.report)}" + (f", opposite: {json.dumps(back_m.report)}" if back_m else ""))
+    for m in [route_m] + ([back_m] if back_m else []):
+        for xy, length in m.off:   # (where DI has no track the route runs on OSM: listed for review)
+            lat, lon = P.ll(*xy)
+            print(f"  off DI's network: {length:.1f} m from {float(lat):.5f} N {float(lon):.5f} E")
     bridge_ways = {w["id"] for w in tways if w.get("tags", {}).get("bridge") not in (None, "no")}
     stretches, flags = di_network.corridor(net, tways, allpos, bridge_ways)
     whole = route_m.edges | (back_m.edges if back_m else set())

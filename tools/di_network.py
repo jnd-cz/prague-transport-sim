@@ -46,6 +46,7 @@ TURN = 16.0              # degrees: two edges at a node continue each other when
                          # the shallow crossings from 15°: Nádraží Braník's at 21-29°)
 PARALLEL = 5.0           # degrees: ends of one node this near one direction run parallel
 GAUNTLET_LOOK = 5.0      # m out along parallel ends where their order across the track is read
+GAUNTLET_RUN = 10.0      # m out along parallel ends where a gauntlet's tracks still lie within its width
 GAP = 2.0                # m: two track ends facing each other this near are one track
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
@@ -521,7 +522,16 @@ class Network:
             d = dirs[ends[0]]
             one = [x for x in ends if dirs[x][0] * d[0] + dirs[x][1] * d[1] >= par]
             two = [x for x in ends if dirs[x][0] * d[0] + dirs[x][1] * d[1] <= -par]
-            if len(one) >= 2 and len(one) == len(two) and len(one) + len(two) == len(ends):
+            # (only where the tracks on each side still run within a gauntlet's width 10 m out: two switches meeting at
+            # one node, Královka, spread apart there)
+            def close(xs):
+                for i, a in enumerate(xs):
+                    for b in xs[:i]:
+                        d = min(GAUNTLET_RUN, self.edges[a[0]]['line'].length, self.edges[b[0]]['line'].length)
+                        if self.edges[b[0]]['line'].distance(self._ahead(a, d)) > di_tracks.INTERLACE[1]:
+                            return False
+                return True
+            if len(one) >= 2 and len(one) == len(two) and len(one) + len(two) == len(ends) and close(one) and close(two):
                 nx, ny = self.nodes[n]['xy']
                 side = lambda x, d=d, nx=nx, ny=ny: (lambda q: d[0] * (q.y - ny) - d[1] * (q.x - nx))(self._ahead(x, GAUNTLET_LOOK))
                 one.sort(key=side)
@@ -767,6 +777,8 @@ class Match:
         off = sum(math.dist(a, b) for p in self.pieces if p[0] == 'off' for a, b in zip(p[1], p[1][1:]))
         self.report = {'samples': len(self.samples), 'pieces': len(self.pieces), 'edges': len(self.edges),
                        'off_m': round(off, 1), 'length_m': round(s, 1), 'cost': round(self.cost, 1)}
+        # (where the route ran off the network: the first point and the length of each such piece)
+        self.off = [(p[1][0], sum(math.dist(a, b) for a, b in zip(p[1], p[1][1:]))) for p in self.pieces if p[0] == 'off']
 
     def _between(self, a, b):
         """[(edge, dir, t0, t1)] from state a to state b over the passes, a's edge to its end first."""
