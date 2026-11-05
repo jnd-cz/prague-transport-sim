@@ -850,6 +850,7 @@ export class DtmSurface {
   // their heights after the index is built, and lookups read them live until then): the triangles' terms
   // copied into typed arrays for the lookups of the simulation (#245: _hitTri was ~22 % of a seeded run).
   seal() {
+    if (this.sealed) return;
     this.grid.seal(); this.deckGrid.seal();
     this.sealed = true;
   }
@@ -990,7 +991,7 @@ class TriIndex {
     this.clsIds = [];
     this.classes = [];
     this.classId = new Map();
-    this.lists = new Map(); // key -> triangle numbers while building
+    this.box = []; // per triangle its cells' range ix0, ix1, iy0, iy1, while building
     this.cover = new Set(); // 10 m keys with a triangle
   }
 
@@ -1002,33 +1003,47 @@ class TriIndex {
     this.clsIds.push(this.classId.get(c));
     const ax = t[0][0], ay = t[0][1], bx = t[1][0], by = t[1][1], cx = t[2][0], cy = t[2][1];
     const x0 = Math.min(ax, bx, cx), x1 = Math.max(ax, bx, cx), y0 = Math.min(ay, by, cy), y1 = Math.max(ay, by, cy);
-    for (let ix = Math.floor(x0 / TRI_CELL); ix <= Math.floor(x1 / TRI_CELL); ix++) for (let iy = Math.floor(y0 / TRI_CELL); iy <= Math.floor(y1 / TRI_CELL); iy++) {
-      const key = ix * 100003 + iy;
-      let arr = this.lists.get(key);
-      if (!arr) this.lists.set(key, arr = []);
-      arr.push(id);
-    }
+    this.box.push(Math.floor(x0 / TRI_CELL), Math.floor(x1 / TRI_CELL), Math.floor(y0 / TRI_CELL), Math.floor(y1 / TRI_CELL));
     for (let ix = Math.floor(x0 / COVER_CELL); ix <= Math.floor(x1 / COVER_CELL); ix++) for (let iy = Math.floor(y0 / COVER_CELL); iy <= Math.floor(y1 / COVER_CELL); iy++) this.cover.add(ix * 100003 + iy);
   }
 
-  // after the last add: the compact form
+  // after the last add: the compact form. The cells' triangles are counted and placed on a grid over all
+  // the triangles' cells (typed arrays, dropped after), each cell's in the order added, as a list per cell
+  // did (a Map of growing lists: ~1 s per index on line 17, built twice at load, #244)
   freeze() {
-    let n = 0;
-    for (const arr of this.lists.values()) n += arr.length;
-    this.ids = new Int32Array(n);
-    this.start = new Int32Array(this.lists.size + 1);
-    this.cells = new Map(); // key -> cell number
-    let k = 0, o = 0;
-    for (const [key, arr] of this.lists) {
-      this.cells.set(key, k);
-      this.start[k++] = o;
-      this.ids.set(arr, o);
-      o += arr.length;
+    const b = this.box, nt = b.length / 4;
+    let gx0 = Infinity, gx1 = -Infinity, gy0 = Infinity, gy1 = -Infinity;
+    for (let i = 0; i < b.length; i += 4) {
+      if (b[i] < gx0) gx0 = b[i]; if (b[i + 1] > gx1) gx1 = b[i + 1];
+      if (b[i + 2] < gy0) gy0 = b[i + 2]; if (b[i + 3] > gy1) gy1 = b[i + 3];
     }
-    this.start[k] = o;
+    const W = nt ? gx1 - gx0 + 1 : 0, H = nt ? gy1 - gy0 + 1 : 0, at = new Int32Array(W * H + 1);
+    let n = 0;
+    for (let i = 0; i < b.length; i += 4) {
+      for (let ix = b[i]; ix <= b[i + 1]; ix++) for (let iy = b[i + 2]; iy <= b[i + 3]; iy++) at[(ix - gx0) * H + iy - gy0]++;
+      n += (b[i + 1] - b[i] + 1) * (b[i + 3] - b[i + 2] + 1);
+    }
+    // (cell numbers by grid order; at[] becomes each cell's fill position)
+    this.cells = new Map(); // key -> cell number
+    const starts = [];
+    let o = 0;
+    for (let g = 0; g < W * H; g++) {
+      const c = at[g];
+      if (!c) continue;
+      this.cells.set((Math.floor(g / H) + gx0) * 100003 + (g % H) + gy0, starts.length);
+      starts.push(o);
+      at[g] = o;
+      o += c;
+    }
+    starts.push(o);
+    this.start = Int32Array.from(starts);
+    this.ids = new Int32Array(n);
+    for (let i = 0, id = 0; id < nt; i += 4, id++) {
+      for (let ix = b[i]; ix <= b[i + 1]; ix++) for (let iy = b[i + 2]; iy <= b[i + 3]; iy++) this.ids[at[(ix - gx0) * H + iy - gy0]++] = id;
+    }
     this.val = Float32Array.from(this.vals);
     this.cls = Uint8Array.from(this.clsIds);
-    this.lists = this.vals = this.clsIds = null;
+    this.box = this.vals = this.clsIds = null;
   }
 
   // per triangle: q1-r1, r0-q0, r1-p1, p0-r0, r0, r1, pz, qz, rz and the determinant, as the lookups compute them
