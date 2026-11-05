@@ -21,7 +21,7 @@ class Import(unittest.TestCase):
         cards = [card("a", "A", "B"), card("b", "B", "C"), card("c", "C", None, "B"), card("d", "D", "E"),
                  card("e", "E", "F", line="23")]
         answers = {"22": [
-            {"kind": "stop sign", "id": "a", "v": R.OPTIONS[0], "t": 1}, # the pin
+            {"kind": "stop sign", "id": "a", "v": R.OPTIONS[0], "t": 1},  # the pin
             {"kind": "stop sign", "id": "b", "v": R.OPTIONS[1], "t": 1},  # the GTFS point
             {"kind": "stop sign", "id": "c", "v": "unsure", "t": 1},  # held
             {"kind": "stop sign", "id": "d", "v": "unsure", "px": 5.0, "py": 1.0, "note": "here", "t": 1},  # placed wins

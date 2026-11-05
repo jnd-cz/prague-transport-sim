@@ -18,8 +18,9 @@ What sessions learned and later work needs. Kept current and short; the full log
   IPR's hosted feature layers are stored in Web Mercator, and each was loaded from S-JTSK with its own
   datum shift: the **tree register's lat/lon is ~10 m off** (ask its service for S-JTSK, `outSR=5514`,
   which `geoportal.py` does), while the tree rows and the archived DTM street points are right as
-  lat/lon (asking those for S-JTSK puts them 6–10 m off). A new Geoportál layer gets measured both ways
-  before use.
+  lat/lon (asking those for S-JTSK puts them 6–10 m off: −6.24, −7.67 m at Trojanova; naming a
+  `datumTransformation` makes it 170–300 m, 2026-11-05, #258). A new Geoportál layer gets measured both ways
+  before use. The current DTM's JVF packages (DI, TI, ZPS) are S-JTSK natively.
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
 - Archived track Z is guarded separately from DI geometry by `tools/track_heights.py`; the staging

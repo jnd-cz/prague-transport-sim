@@ -2,7 +2,7 @@
  "schema": 1,
  "issue": 258,
  "options": [
-  "sign at the pin (OSM)",
+  "sign at the pin",
   "sign at the timetable point (GTFS)",
   "unsure"
  ],
@@ -10,447 +10,549 @@
  "findings": [
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Čechova čtvrť-1",
+   "id": "stop-sign-17-Modřanská škola-1",
    "line": "17",
-   "stop": "Čechova čtvrť",
-   "towards": "Nádraží Modřany",
-   "from": "Poliklinika Modřany",
+   "stop": "Modřanská škola",
+   "towards": "Belárie",
+   "from": "Nádraží Modřany",
    "back": false,
-   "x": -2121.9,
-   "y": -9268.1,
-   "s": 3791.1,
-   "mag": 5.2,
+   "x": -2484.9,
+   "y": -8432.4,
+   "s": 4960.5,
+   "mag": 10,
    "status": "review",
-   "osm_node": 30079593,
-   "gtfs_s": 3785.9,
    "pick": true,
    "marks": [
     {
-     "x": -2121.9,
-     "y": -9268.1,
-     "label": "OSM stop position (the pin)",
+     "x": -2484.9,
+     "y": -8432.4,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -2116.7,
-     "y": -9268.5,
+     "x": -2484.7,
+     "y": -8431.7,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -2121.2,
-     "y": -9268.1,
-     "label": "platform's front end",
+     "x": -2484.7,
+     "y": -8432.4,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Čechova čtvrť (towards Nádraží Modřany): OSM's stop position (the pin, node 30079593) is 5 m after the timetable (GTFS) point. The platform's front end is -1 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 30079641,
+   "gtfs_s": 4961.2,
+   "info": "Modřanská škola (towards Belárie): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Pobřežní cesta-1",
+   "id": "stop-sign-17-Belárie-1",
    "line": "17",
-   "stop": "Pobřežní cesta",
-   "towards": "Přístaviště",
-   "from": "Nádraží Braník",
+   "stop": "Belárie",
+   "towards": "Hodkovičky",
+   "from": "Modřanská škola",
    "back": false,
-   "x": -1789.6,
-   "y": -5730.4,
-   "s": 7879.9,
-   "mag": 7.9,
+   "x": -2500.9,
+   "y": -7936.3,
+   "s": 5459.0,
+   "mag": 10,
    "status": "review",
-   "osm_node": 31030377,
-   "gtfs_s": 7887.8,
    "pick": true,
    "marks": [
     {
-     "x": -1789.6,
-     "y": -5730.4,
-     "label": "OSM stop position (the pin)",
+     "x": -2500.9,
+     "y": -7936.3,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -1793.3,
-     "y": -5723.4,
+     "x": -2501.3,
+     "y": -7936.6,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -1794.1,
-     "y": -5721.9,
-     "label": "platform's front end",
+     "x": -2501.2,
+     "y": -7935.6,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Pobřežní cesta (towards Přístaviště): OSM's stop position (the pin, node 31030377) is 8 m before the timetable (GTFS) point. The platform's front end is 10 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 30079843,
+   "gtfs_s": 5458.6,
+   "info": "Belárie (towards Hodkovičky): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Podolská vodárna-1",
+   "id": "stop-sign-17-Hodkovičky-1",
    "line": "17",
-   "stop": "Podolská vodárna",
-   "towards": "Výtoň",
-   "from": "Kublov",
+   "stop": "Hodkovičky",
+   "towards": "Černý kůň",
+   "from": "Belárie",
    "back": false,
-   "x": -557.0,
-   "y": -3000.2,
-   "s": 10934.4,
-   "mag": 8.9,
+   "x": -2380.0,
+   "y": -7409.6,
+   "s": 6001.4,
+   "mag": 10,
    "status": "review",
-   "osm_node": 278467793,
-   "gtfs_s": 10925.5,
    "pick": true,
    "marks": [
     {
-     "x": -557.0,
-     "y": -3000.2,
-     "label": "OSM stop position (the pin)",
+     "x": -2380.0,
+     "y": -7409.6,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -557.1,
-     "y": -3009.1,
+     "x": -2380.0,
+     "y": -7409.2,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -557.2,
-     "y": -2998.1,
-     "label": "platform's front end",
+     "x": -2380.1,
+     "y": -7409.5,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Podolská vodárna (towards Výtoň): OSM's stop position (the pin, node 278467793) is 9 m after the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 13275534335,
+   "gtfs_s": 6001.8,
+   "info": "Hodkovičky (towards Černý kůň): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Výtoň-1",
+   "id": "stop-sign-17-Karlovy lázně-1",
    "line": "17",
-   "stop": "Výtoň",
-   "towards": "Palackého náměstí",
-   "from": "Podolská vodárna",
+   "stop": "Karlovy lázně",
+   "towards": "Staroměstská",
+   "from": "Národní divadlo",
    "back": false,
-   "x": -745.0,
-   "y": -2065.3,
-   "s": 11923.7,
-   "mag": 5.9,
+   "x": -579.6,
+   "y": -207.8,
+   "s": 13812.4,
+   "mag": 10,
    "status": "review",
-   "osm_node": 4759185035,
-   "gtfs_s": 11929.6,
    "pick": true,
    "marks": [
     {
-     "x": -745.0,
-     "y": -2065.3,
-     "label": "OSM stop position (the pin)",
+     "x": -579.6,
+     "y": -207.8,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -745.2,
-     "y": -2059.4,
+     "x": -581.7,
+     "y": -210.8,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -745.0,
-     "y": -2065.0,
-     "label": "platform's front end",
+     "x": -576.8,
+     "y": -201.5,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Výtoň (towards Palackého náměstí): OSM's stop position (the pin, node 4759185035) is 6 m before the timetable (GTFS) point. The platform's front end is 0 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 9802497363,
+   "gtfs_s": 13808.8,
+   "info": "Karlovy lázně (towards Staroměstská): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Jiráskovo náměstí-1",
+   "id": "stop-sign-17-Veletržní palác-1",
    "line": "17",
-   "stop": "Jiráskovo náměstí",
-   "towards": "Národní divadlo",
-   "from": "Palackého náměstí",
+   "stop": "Veletržní palác",
+   "towards": "Výstaviště",
+   "from": "Strossmayerovo náměstí",
    "back": false,
-   "x": -681.4,
-   "y": -1163.9,
-   "s": 12831.0,
-   "mag": 9.7,
+   "x": 1054.6,
+   "y": 1445.9,
+   "s": 16661.2,
+   "mag": 7.0,
    "status": "review",
-   "osm_node": 4696978879,
-   "gtfs_s": 12840.7,
    "pick": true,
    "marks": [
     {
-     "x": -681.4,
-     "y": -1163.9,
-     "label": "OSM stop position (the pin)",
+     "x": 1054.6,
+     "y": 1445.9,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 1051.3,
+     "y": 1438.8,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -678.9,
-     "y": -1154.6,
+     "x": 1051.2,
+     "y": 1439.2,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -680.1,
-     "y": -1158.9,
-     "label": "platform's front end",
+     "x": 1051.0,
+     "y": 1445.8,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Jiráskovo náměstí (towards Národní divadlo): OSM's stop position (the pin, node 4696978879) is 10 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 320248553,
+   "gtfs_s": 16654.6,
+   "info": "Veletržní palác (towards Výstaviště): the DTM's sign (2024) lies 7 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Národní divadlo-1",
+   "id": "stop-sign-17-Nádraží Holešovice-1",
    "line": "17",
-   "stop": "Národní divadlo",
-   "towards": "Karlovy lázně",
-   "from": "Jiráskovo náměstí",
+   "stop": "Nádraží Holešovice",
+   "towards": "Trojská",
+   "from": "Výstaviště",
    "back": false,
-   "x": -656.5,
-   "y": -703.3,
-   "s": 13299.6,
-   "mag": 9.4,
+   "x": 1486.4,
+   "y": 2336.4,
+   "s": 17780.1,
+   "mag": 10,
    "status": "review",
-   "osm_node": 4700724588,
-   "gtfs_s": 13309.0,
    "pick": true,
    "marks": [
     {
-     "x": -656.5,
-     "y": -703.3,
-     "label": "OSM stop position (the pin)",
+     "x": 1486.4,
+     "y": 2336.4,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -659.5,
-     "y": -694.4,
+     "x": 1486.7,
+     "y": 2331.6,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -656.6,
-     "y": -703.6,
-     "label": "platform's front end",
+     "x": 1483.6,
+     "y": 2360.4,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Národní divadlo (towards Karlovy lázně): OSM's stop position (the pin, node 4700724588) is 9 m before the timetable (GTFS) point. The platform's front end is -0 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4097081443,
+   "gtfs_s": 17775.3,
+   "info": "Nádraží Holešovice (towards Trojská): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Právnická fakulta-1",
+   "id": "stop-sign-17-Březiněveská-1",
    "line": "17",
-   "stop": "Právnická fakulta",
-   "towards": "Čechův most",
-   "from": "Staroměstská",
+   "stop": "Březiněveská",
+   "towards": "Líbeznická",
+   "from": "Kobylisy",
    "back": false,
-   "x": -192.1,
-   "y": 479.9,
-   "s": 14616.2,
-   "mag": 19.3,
+   "x": 3104.4,
+   "y": 4025.7,
+   "s": 21091.7,
+   "mag": 10,
    "status": "review",
-   "osm_node": 354684526,
-   "gtfs_s": 14596.9,
    "pick": true,
    "marks": [
     {
-     "x": -192.1,
-     "y": 479.9,
-     "label": "OSM stop position (the pin)",
+     "x": 3104.4,
+     "y": 4025.7,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -208.4,
-     "y": 469.6,
+     "x": 3104.6,
+     "y": 4024.8,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -190.9,
-     "y": 479.9,
-     "label": "platform's front end",
+     "x": 3104.4,
+     "y": 4025.9,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Právnická fakulta (towards Čechův most): OSM's stop position (the pin, node 354684526) is 19 m after the timetable (GTFS) point. The platform's front end is 1 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4096977777,
+   "gtfs_s": 21090.7,
+   "info": "Březiněveská (towards Líbeznická): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-17-Čechův most-1",
+   "id": "stop-sign-17-Líbeznická-1",
+   "line": "17",
+   "stop": "Líbeznická",
+   "towards": "Vozovna Kobylisy",
+   "from": "Březiněveská",
+   "back": false,
+   "x": 3052.2,
+   "y": 4272.8,
+   "s": 21344.1,
+   "mag": 7.0,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 3052.2,
+     "y": 4272.8,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 3048.7,
+     "y": 4264.8,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3049.2,
+     "y": 4264.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": 3047.5,
+     "y": 4271.6,
+     "label": "platform's front end (OSM)",
+     "color": "#ffffff"
+    }
+   ],
+   "osm_node": 4096977779,
+   "gtfs_s": 21336.6,
+   "info": "Líbeznická (towards Vozovna Kobylisy): the DTM's sign (2024) lies 7 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Vozovna Kobylisy-2",
+   "line": "17",
+   "stop": "Vozovna Kobylisy",
+   "towards": "Líbeznická",
+   "from": "Vozovna Kobylisy",
+   "back": true,
+   "x": 2968.6,
+   "y": 4588.6,
+   "s": 114.3,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 2968.6,
+     "y": 4588.6,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2969.0,
+     "y": 4587.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 4680784421,
+   "gtfs_s": 115.8,
+   "info": "Vozovna Kobylisy (towards Líbeznická) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Líbeznická-1",
+   "line": "17",
+   "stop": "Líbeznická",
+   "towards": "Březiněveská",
+   "from": "Vozovna Kobylisy",
+   "back": true,
+   "x": 3051.0,
+   "y": 4223.6,
+   "s": 488.4,
+   "mag": 5.8,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 3051.0,
+     "y": 4223.6,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 3053.5,
+     "y": 4230.2,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3053.3,
+     "y": 4230.8,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 4096977780,
+   "gtfs_s": 481.9,
+   "info": "Líbeznická (towards Březiněveská) (the other direction): the DTM's sign (2024) lies 6 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Březiněveská-1",
+   "line": "17",
+   "stop": "Březiněveská",
+   "towards": "Kobylisy",
+   "from": "Líbeznická",
+   "back": true,
+   "x": 3126.2,
+   "y": 3912.1,
+   "s": 808.9,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 3126.2,
+     "y": 3912.1,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3126.3,
+     "y": 3911.5,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 4096977771,
+   "gtfs_s": 809.5,
+   "info": "Březiněveská (towards Kobylisy) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Ke Stírce-1",
+   "line": "17",
+   "stop": "Ke Stírce",
+   "towards": "Hercovka",
+   "from": "Kobylisy",
+   "back": true,
+   "x": 2987.7,
+   "y": 3551.2,
+   "s": 1214.3,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 2987.7,
+     "y": 3551.2,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2987.7,
+     "y": 3550.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 4096977750,
+   "gtfs_s": 1215.0,
+   "info": "Ke Stírce (towards Hercovka) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Nádraží Holešovice-1",
+   "line": "17",
+   "stop": "Nádraží Holešovice",
+   "towards": "Výstaviště",
+   "from": "Trojská",
+   "back": true,
+   "x": 1487.1,
+   "y": 2295.5,
+   "s": 4043.6,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 1487.1,
+     "y": 2295.5,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 1487.2,
+     "y": 2294.0,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 25681629,
+   "gtfs_s": 4045.1,
+   "info": "Nádraží Holešovice (towards Výstaviště) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Veletržní palác-1",
+   "line": "17",
+   "stop": "Veletržní palác",
+   "towards": "Strossmayerovo náměstí",
+   "from": "Výstaviště",
+   "back": true,
+   "x": 1040.5,
+   "y": 1526.1,
+   "s": 5042.0,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 1040.5,
+     "y": 1526.1,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 1040.1,
+     "y": 1527.0,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 1024913035,
+   "gtfs_s": 5041.0,
+   "info": "Veletržní palác (towards Strossmayerovo náměstí) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Čechův most-1",
    "line": "17",
    "stop": "Čechův most",
-   "towards": "Strossmayerovo náměstí",
-   "from": "Právnická fakulta",
-   "back": false,
-   "x": -167.0,
-   "y": 776.0,
-   "s": 14983.6,
-   "mag": 10.2,
-   "status": "review",
-   "osm_node": 21257811,
-   "gtfs_s": 14993.8,
-   "pick": true,
-   "marks": [
-    {
-     "x": -167.0,
-     "y": 776.0,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": -156.9,
-     "y": 776.9,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    },
-    {
-     "x": -164.9,
-     "y": 776.2,
-     "label": "platform's front end",
-     "color": "#ffffff"
-    }
-   ],
-   "info": "Čechův most (towards Strossmayerovo náměstí): OSM's stop position (the pin, node 21257811) is 10 m before the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-17-Výstaviště-1",
-   "line": "17",
-   "stop": "Výstaviště",
-   "towards": "Nádraží Holešovice",
-   "from": "Veletržní palác",
-   "back": false,
-   "x": 1061.2,
-   "y": 1806.4,
-   "s": 17065.2,
-   "mag": 16.9,
-   "status": "review",
-   "osm_node": 4690489335,
-   "gtfs_s": 17082.1,
-   "pick": true,
-   "marks": [
-    {
-     "x": 1061.2,
-     "y": 1806.4,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": 1074.7,
-     "y": 1816.6,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    },
-    {
-     "x": 1063.0,
-     "y": 1807.9,
-     "label": "platform's front end",
-     "color": "#ffffff"
-    }
-   ],
-   "info": "Výstaviště (towards Nádraží Holešovice): OSM's stop position (the pin, node 4690489335) is 17 m before the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-17-Hercovka-1",
-   "line": "17",
-   "stop": "Hercovka",
-   "towards": "Ke Stírce",
-   "from": "Nad Trojou",
-   "back": false,
-   "x": 2772.7,
-   "y": 3501.3,
-   "s": 20289.8,
-   "mag": 86.2,
-   "status": "review",
-   "osm_node": 4097081445,
-   "gtfs_s": 20203.6,
-   "pick": true,
-   "marks": [
-    {
-     "x": 2772.7,
-     "y": 3501.3,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": 2689.1,
-     "y": 3521.6,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    },
-    {
-     "x": 2681.7,
-     "y": 3522.5,
-     "label": "platform's front end",
-     "color": "#ffffff"
-    }
-   ],
-   "info": "Hercovka (towards Ke Stírce): OSM's stop position (the pin, node 4097081445) is 86 m after the timetable (GTFS) point. The platform's front end is -94 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-17-back-Hercovka-1",
-   "line": "17",
-   "stop": "Hercovka",
-   "towards": "Nad Trojou",
-   "from": "Ke Stírce",
+   "towards": "Právnická fakulta",
+   "from": "Nábřeží Kapitána Jaroše",
    "back": true,
-   "x": 2655.2,
-   "y": 3528.8,
-   "s": 1607.9,
-   "mag": 11.2,
+   "x": -212.6,
+   "y": 774.5,
+   "s": 6841.4,
+   "mag": 10,
    "status": "review",
-   "osm_node": 4097081444,
-   "gtfs_s": 1619.1,
    "pick": true,
    "marks": [
     {
-     "x": 2655.2,
-     "y": 3528.8,
-     "label": "OSM stop position (the pin)",
+     "x": -212.6,
+     "y": 774.5,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": 2644.0,
-     "y": 3530.1,
+     "x": -212.4,
+     "y": 774.6,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     }
    ],
-   "info": "Hercovka (towards Nad Trojou) (the other direction): OSM's stop position (the pin, node 4097081444) is 11 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-17-back-Nábřeží Kapitána Jaroše-1",
-   "line": "17",
-   "stop": "Nábřeží Kapitána Jaroše",
-   "towards": "Čechův most",
-   "from": "Strossmayerovo náměstí",
-   "back": true,
-   "x": 851.3,
-   "y": 886.9,
-   "s": 5763.1,
-   "mag": 7.8,
-   "status": "review",
-   "osm_node": 332148453,
-   "gtfs_s": 5770.9,
-   "pick": true,
-   "marks": [
-    {
-     "x": 851.3,
-     "y": 886.9,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": 843.8,
-     "y": 884.9,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    }
-   ],
-   "info": "Nábřeží Kapitána Jaroše (towards Čechův most) (the other direction): OSM's stop position (the pin, node 332148453) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4691199630,
+   "gtfs_s": 6841.2,
+   "info": "Čechův most (towards Právnická fakulta) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
@@ -460,19 +562,23 @@
    "towards": "Národní divadlo",
    "from": "Staroměstská",
    "back": true,
-   "x": -593.1,
-   "y": -226.3,
-   "s": 7994.1,
-   "mag": 7.7,
+   "x": -599.6,
+   "y": -231.8,
+   "s": 8001.9,
+   "mag": 7.8,
    "status": "review",
-   "osm_node": 4700724587,
-   "gtfs_s": 8001.8,
    "pick": true,
    "marks": [
     {
+     "x": -599.6,
+     "y": -231.8,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": -593.1,
      "y": -226.3,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -482,7 +588,9 @@
      "color": "#ff9e31"
     }
    ],
-   "info": "Karlovy lázně (towards Národní divadlo) (the other direction): OSM's stop position (the pin, node 4700724587) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4700724587,
+   "gtfs_s": 8001.8,
+   "info": "Karlovy lázně (towards Národní divadlo) (the other direction): the DTM's sign (2024) lies 8 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
@@ -495,16 +603,14 @@
    "x": -747.0,
    "y": -2102.1,
    "s": 9898.5,
-   "mag": 6.2,
+   "mag": 10,
    "status": "review",
-   "osm_node": 4759185034,
-   "gtfs_s": 9904.7,
    "pick": true,
    "marks": [
     {
      "x": -747.0,
      "y": -2102.1,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -514,7 +620,9 @@
      "color": "#ff9e31"
     }
    ],
-   "info": "Výtoň (towards Podolská vodárna) (the other direction): OSM's stop position (the pin, node 4759185034) is 6 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4759185034,
+   "gtfs_s": 9904.7,
+   "info": "Výtoň (towards Podolská vodárna) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
@@ -524,19 +632,23 @@
    "towards": "Nádraží Braník",
    "from": "Přístaviště",
    "back": true,
-   "x": -1766.1,
-   "y": -5785.1,
-   "s": 13967.1,
+   "x": -1764.9,
+   "y": -5793.3,
+   "s": 13975.0,
    "mag": 7.9,
    "status": "review",
-   "osm_node": 3234296486,
-   "gtfs_s": 13975.0,
    "pick": true,
    "marks": [
     {
+     "x": -1764.9,
+     "y": -5793.3,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": -1766.1,
      "y": -5785.1,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -546,7 +658,73 @@
      "color": "#ff9e31"
     }
    ],
-   "info": "Pobřežní cesta (towards Nádraží Braník) (the other direction): OSM's stop position (the pin, node 3234296486) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 3234296486,
+   "gtfs_s": 13975.0,
+   "info": "Pobřežní cesta (towards Nádraží Braník) (the other direction): the DTM's sign (2024) lies 8 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Hodkovičky-1",
+   "line": "17",
+   "stop": "Hodkovičky",
+   "towards": "Belárie",
+   "from": "Černý kůň",
+   "back": true,
+   "x": -2380.5,
+   "y": -7398.4,
+   "s": 15771.9,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": -2380.5,
+     "y": -7398.4,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2380.5,
+     "y": -7398.0,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 13275534336,
+   "gtfs_s": 15771.5,
+   "info": "Hodkovičky (towards Belárie) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Belárie-1",
+   "line": "17",
+   "stop": "Belárie",
+   "towards": "Modřanská škola",
+   "from": "Hodkovičky",
+   "back": true,
+   "x": -2512.0,
+   "y": -8006.7,
+   "s": 16397.0,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": -2512.0,
+     "y": -8006.7,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2512.3,
+     "y": -8007.7,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 3457515879,
+   "gtfs_s": 16398.0,
+   "info": "Belárie (towards Modřanská škola) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   }
  ]
 }

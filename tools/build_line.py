@@ -1091,10 +1091,15 @@ def main():
         s_last = s
     # The stop sign (označník): the tram front stops beside it (D 1/2 § 27.6, #258). The user's placed sign
     # (data/truth.json stopSigns, keyed by the stop and the next one, or the previous one at a last stop), else
-    # OSM's stop position on our own track (the other direction's lies 3-6 m off, on the parallel track, and
-    # was taken at 5 stops within 6 m: tools/stop_signs_review.py), else none (the game: GTFS + STOP_AHEAD).
+    # the archive DTM's sign beside our track (raw/dtmpoints/lineN.signs.json, tools/dtm_points.py --signs:
+    # within 2 m of 22 of the user's 23 placed signs, median 0.4 m; the one miss, Výstaviště, is a street rebuilt
+    # since 2024), else OSM's stop position on our own track (the other direction's lies 3-6 m off, on the
+    # parallel track, and was taken at 5 stops within 6 m: tools/stop_signs_review.py; within 2 m of 14 of 25),
+    # else none (the game: GTFS + STOP_AHEAD).
     truth_signs = json.load(open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8")).get("stopSigns", {}).get("signs", [])
     spos = overpass("stop_positions", Q_STOPPOS, optional=True)["elements"]
+    sp_ = os.path.join(ROOT, "raw", "dtmpoints", f"line{LINE}.signs.json")
+    dtm_signs = [P(g["lat"], g["lon"]) for g in json.load(open(sp_, encoding="utf-8"))["signs"]] if os.path.exists(sp_) else []
     for k, st_ in enumerate(stops):
         nxt = stops[k + 1]["name"] if k + 1 < len(stops) else None
         prv = stops[k - 1]["name"] if k else None
@@ -1112,9 +1117,21 @@ def main():
                 s, d, _ = path.project(P(e["lat"], e["lon"]), st_["s"] - 100, st_["s"] + 100, radius=3)
                 if s is not None and d < 1.5:
                     cand.append((abs(s - st_["s"]), s))
-        if cand:
-            st_["sign"], st_["signSrc"] = round(min(cand)[1], 1), "osm"
-    print("stop signs: " + ", ".join(f"{sum(st_.get('signSrc') == k for st_ in stops)} {k}" for k in ("truth", "osm"))
+        osm_s = min(cand)[1] if cand else None
+        # the DTM's: on the platform side (right of travel), within 6 m of the track and 40 m of OSM's point
+        # (else the GTFS point), the nearest to it (the opposite direction's sign stands on the left: 6 of the
+        # 295 stops had a DTM sign on the left only)
+        ref = osm_s if osm_s is not None else st_["s"]
+        near = []
+        for q in dtm_signs:
+            s, d, side = path.project(q, ref - 45, ref + 45, radius=3)
+            if s is not None and d < 6 and side < 0 and abs(s - ref) < 40:
+                near.append((abs(s - ref), s))
+        if near:
+            st_["sign"], st_["signSrc"] = round(min(near)[1], 1), "dtmpoints"
+        elif osm_s is not None:
+            st_["sign"], st_["signSrc"] = round(osm_s, 1), "osm"
+    print("stop signs: " + ", ".join(f"{sum(st_.get('signSrc') == k for st_ in stops)} {k}" for k in ("truth", "dtmpoints", "osm"))
           + f", {sum('sign' not in st_ for st_ in stops)} none")
     # platforms (OSM): where along the route each stop's platform begins and ends, so the game
     # can require the whole set to stand alongside it (and let two sets stop one behind another).
@@ -1336,7 +1353,7 @@ def main():
         "tunnels": one("structures", "osm", len(tunnels), "route ranges"),
         "terrain": one("terrain", "coarse", terrain["nx"] * terrain["ny"], "cells"),
         "stops": one("stops", "gtfs", len(stops)),
-        "signs": sources.entry("signs", [sum(st_.get("signSrc") == k for st_ in stops) for k in ("truth", "osm")]
+        "signs": sources.entry("signs", [sum(st_.get("signSrc") == k for st_ in stops) for k in ("truth", "dtmpoints", "osm")]
                                + [sum("sign" not in st_ for st_ in stops)], "stops"),
         "timetable": one("timetable", "gtfs", len(timetable), "trips"),
         "signals": one("signals", "osm", len(signals)), "crossings": one("crossings", "osm", len(crossings)),
