@@ -200,6 +200,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
+| crossing | 17 | 1 unexplained pedestrian obstruction (main at 14b71c4 and 9a7b1a0 alike) | #146 |
 
 ## Code style
 
