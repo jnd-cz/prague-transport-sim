@@ -21,7 +21,9 @@ target design) and [docs/decisions/](docs/decisions/).
    failures below are not yours.
 
 In Claude Code, `/issue N` runs these steps and `/regress` the regression check before a PR
-(`.claude/skills/`).
+(`.claude/skills/`). `/housekeeping` is the weekly pass, also run every Monday at 06:30, and with
+`checkpoint` the architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md));
+both post on the pinned #291 and only propose.
 
 ## Work
 
