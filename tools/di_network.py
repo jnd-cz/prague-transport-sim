@@ -249,8 +249,11 @@ class Network:
         (Nádraží Braník, line 17: a shallow crossing as two four-way nodes 0.7 m apart, its middle drawn twice as 1 m
         records; read apart, a train could turn from the route into the crossing track)."""
         while True:
+            # (never a crossing point of two DI chains: it lies exactly on both; three chains crossing within 2 m at
+            # Strossmayerovo náměstí, merged at their midpoint, bent all three 0.3 m towards it)
             hit = next((e for e, ed in self.edges.items() if ed['line'].length < SHORT and ed['a'] != ed['b']
-                        and len(self.at[ed['a']]) >= 3 and len(self.at[ed['b']]) >= 3), None)
+                        and len(self.at[ed['a']]) >= 3 and len(self.at[ed['b']]) >= 3
+                        and 'crossing' not in (self.nodes[ed['a']]['kind'], self.nodes[ed['b']]['kind'])), None)
             if hit is None:
                 return
             a, b = self.edges[hit]['a'], self.edges[hit]['b']
@@ -601,7 +604,11 @@ class Network:
 
     # ------------------------------------------------------------------ editing
     def add_edge(self, a, b, coords, src, records, chain=None):
-        coords = list(coords)
+        # (the line gets points every END_STEP before its ends go to its nodes' places: a node sits where record ends
+        # meet, at a crossing point or between merged nodes, up to decimetres off this record's end, and DI draws
+        # straight track with vertices tens of metres apart; moved alone, the end point turned the whole first
+        # segment: Strossmayerovo náměstí, 12 m of straight 0.1-0.4 m off its record)
+        coords = dense(list(coords), END_STEP) if len(coords) > 1 else list(coords)
         coords[0], coords[-1] = self.nodes[a]['xy'], self.nodes[b]['xy']
         e = max(self.edges, default=-1) + 1
         self.edges[e] = {'a': a, 'b': b, 'line': LineString(coords), 'src': src, 'records': records, 'chain': chain}
@@ -724,14 +731,19 @@ class Network:
         # two DI chains crossing through each other (a node of kind 'crossing'): each goes on only as itself, however
         # shallow (Vozovna Kobylisy: 14-15°, within TURN)
         for n, ends in self.at.items():
-            if self.nodes[n]['kind'] != 'crossing' or len(ends) != 4:
+            if self.nodes[n]['kind'] != 'crossing':
                 continue
             by = defaultdict(list)
             for x in ends:
                 by[self.edges[x[0]].get('chain')].append(x)
-            if len(by) == 2 and all(len(v) == 2 and k is not None for k, v in by.items()):
-                for a, b in by.values():
-                    self.passes[a], self.passes[b] = [b], [a]
+            # (each chain running through: its two ends pass only each other; the other ends not into them)
+            through = {k: v for k, v in by.items() if k is not None and len(v) == 2}
+            paired = {x for v in through.values() for x in v}
+            for a, b in through.values():
+                self.passes[a], self.passes[b] = [b], [a]
+            for x in ends:
+                if x not in paired:
+                    self.passes[x] = [y for y in self.passes[x] if y not in paired]
         # (two track ends joined across a gap: a train passes, whatever the bend; the fit smooths it)
         for n, ends in self.at.items():
             if self.nodes[n]['kind'] == 'gap' and len(ends) == 2:
@@ -1035,6 +1047,7 @@ class Match:
         return out
 
 
+END_STEP = 1.0      # m: an edge's line has points this far apart before its ends go to its nodes' places
 DENSE = 2.0         # m: at most this between a surveyed line's points given to the curve fit
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
@@ -1096,9 +1109,11 @@ class Drawn:
                     if f in self.edges and f != e:
                         other = lambda x, xend: net.edges[x]['b'] if xend == 0 else net.edges[x]['a']
                         continues[n].add(frozenset((other(e, end), other(f, fend))))
+        self.pos = dict(pos)
         if fit:
             tc = track_curve.Network(pos, pts, kind, {}, limit, continues)
             fitted, self.report = tc.pts, tc.report
+            self.pos = dict(tc.pos)
         else:
             fitted = pts
         self.pts = {}
