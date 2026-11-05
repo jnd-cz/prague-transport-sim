@@ -93,8 +93,9 @@ the tool changes that produced it.
 `data-publish` refuses when `raw/` differs from that snapshot (a changed input, or an input file in no
 snapshot): the build would not come from the snapshot it names. Publish a snapshot with the new files first;
 `--allow-drift` overrides it on purpose and writes the difference into the note. The build tools read only the
-snapshot: `geoportal.py` and `fine_terrain.py` stop at an answer or tile missing from `raw/` and name it, and
-download it only with `--fetch` (#223).
+snapshot: `geoportal.py`, `fine_terrain.py` and `build_line.py` (its 10 m terrain grid, also when the cached grid
+covers less than half of its margin around the route) stop at an answer, tile or grid missing from `raw/` and name it,
+and download it only with `--fetch` (#223).
 
 **A new source snapshot** (new OSM, GTFS, survey packages, …), a deliberate step:
 1. Refresh the inputs in `raw/` (each group's `refresh` in the manifest; OSM: download Geofabrik's

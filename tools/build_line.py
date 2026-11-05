@@ -1,14 +1,17 @@
 """Build a compact game data file for one Prague tram line.
 
 Sources:
-  - OpenStreetMap via Overpass API (route geometry, tram track network, crossings,
+  - OpenStreetMap from the snapshot's local extract (route geometry, tram track network, crossings,
     traffic signals, buildings, roads, green areas, water)  -- (c) OSM contributors, ODbL
   - PID GTFS (stops + timetable)  -- ROPID / data.pid.cz, CC BY 4.0
   - ČÚZK DMR 5G bare-earth terrain (lidar) via the ags.cuzk.gov.cz ImageServer  -- CC BY 4.0
 
-Usage:  python -I tools/build_line.py --line N [--headsign "..."] [--refresh]
-        python -I tools/build_line.py --line 9 --then 10      (one vehicle run: 9, continuing as 10)
-Raw downloads are cached in raw/, output goes to data/lineN.json.
+Usage:  python -P -E tools/build_line.py --line N [--headsign "..."] [--refresh] [--fetch]
+        python -P -E tools/build_line.py --line 9 --then 10      (one vehicle run: 9, continuing as 10)
+The sources come from the pinned snapshot in raw/; output goes to data/lineN.json. A terrain grid that is
+not in raw/, or covers too little of the route's box, is an error unless --fetch downloads it (then publish
+a new snapshot before data-publish). --refresh redoes the cached OSM answers; with --fetch it also
+downloads the terrain again.
 
 With --then, the path is not taken from the OSM route relations (they describe the regular
 route, not diversions) but from the PID GTFS shapes of the two trips, matched onto the OSM tram
@@ -63,6 +66,7 @@ DEM_STEP = 10.0     # terrain grid spacing (m)
 DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
 
 REFRESH = "--refresh" in sys.argv
+FETCH = "--fetch" in sys.argv  # downloads what raw/ lacks; a cache miss is an error without it (#223)
 OSM_TRACKS = "--osm-tracks" in sys.argv  # OSM's track geometry as before #20 (for comparison)
 # decimals of the tracks' and paths' coordinates: the fitted curves (#204) to the millimetre (to the centimetre, points
 # 0.4 m apart scatter 0.7° in direction and a 19 m curve read 15.5 m over 2 m at Právnická fakulta)
@@ -372,7 +376,20 @@ def fetch_terrain(P, x_min, x_max, y_min, y_max):
     e1, n1 = math.ceil(e1 / DEM_STEP) * DEM_STEP, math.ceil(n1 / DEM_STEP) * DEM_STEP
     nx, ny = round((e1 - e0) / DEM_STEP), round((n1 - n0) / DEM_STEP)
     path, meta_path = os.path.join(RAW, "terrain5514.tif"), os.path.join(RAW, "terrain5514.json")
-    if not (os.path.exists(path) and os.path.exists(meta_path)) or REFRESH:
+    have = os.path.exists(path) and os.path.exists(meta_path)
+    short = 0.0
+    if have:
+        with open(meta_path) as f:
+            ext = json.load(f)["extent"]
+        short = max(0.0, ext["xmin"] - e0, ext["ymin"] - n0, e1 - ext["xmax"], n1 - ext["ymax"])
+    # a cached grid a few cells short (the route's ends moved) still leaves most of the margin; one short
+    # by more than half of it no longer surrounds the route (a cache miss used to download silently, #223)
+    if not have or short > DEM_MARGIN / 2 or (REFRESH and FETCH):
+        rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+        if not FETCH:
+            why = "not in raw/" if not have else f"covers the route's box {short:.0f} m short of its {DEM_MARGIN:.0f} m margin"
+            raise SystemExit(f"{rel}: {why} (the snapshot, tools/snapshot.py fetch); --fetch downloads it,"
+                             " then publish a new snapshot before data-publish")
         q = urllib.parse.urlencode({
             "bbox": f"{e0},{n0},{e1},{n1}", "bboxSR": 5514, "imageSR": 5514,
             "size": f"{nx},{ny}", "format": "tiff", "pixelType": "F32", "noData": -9999,
@@ -389,6 +406,9 @@ def fetch_terrain(P, x_min, x_max, y_min, y_max):
             f.write(tif)
         with replacing(meta_path, "w") as f:
             json.dump(meta, f)
+        print(f"terrain: {rel} downloaded: publish a snapshot with it before data-publish")
+    elif short:
+        print(f"terrain: the cached grid covers the route's box {short:.0f} m short of the margin (kept)")
     with open(path, "rb") as f:
         grid = read_tiff_f32(f.read())
     with open(meta_path) as f:
