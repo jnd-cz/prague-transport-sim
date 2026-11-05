@@ -370,6 +370,15 @@ or **fly** (C; drag to look, W/A/S/D, R/F up/down, Shift faster, wheel = flying 
 (or . / ,) put the camera at the next / previous stop, T back to the tram, I leaves (the autopilot keeps
 driving: O hands back the controls). The camera's route position is on the panel, handy with the lints.
 
+**The review directory** (`reviews.html`, linked from the menu; #288) lists every review set in
+`reports/review/` under the issue that waits for it, with answered, unsure and waiting counted live from
+the answer store, a link per line that opens the set with only its unanswered findings (`&todo`), and
+the open PRs' questions for the user. Its index (`reports/review/index.json`: the sets, their issues and
+lines, the issues' titles and states, the PRs' questions) is built at each deploy by
+`tools/review_sets.py`; locally, `python -I tools/review_sets.py` writes it. A set names its issue and
+lines in the file (`issue`, `line`, or per finding `line` / `lines_near`); `KNOWN` there covers the
+tools that do not write them yet.
+
 **Review mode** (the checks' findings on the map, desktop or phone; #129): open
 `index.html?line=17&review`, no shift needed. The panel lists findings worst first:
 - the kerb review list from the survey's provenance (`tools/kerbs.py`);

@@ -91,7 +91,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - **Questions for the user go to a `?review` findings file** (`reports/review/`, README): the place,
   imagery links, a picture where it helps, answer choices. Offer only answers that an importer turns into
   evidence, and say on the card why another answer stays held (#162, #176). An answer is keyed by a
-  stable identity (a decision ID, a place), never by a generated array index.
+  stable identity (a decision ID, a place), never by a generated array index. The file names its `issue`
+  and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under them.
 
 ## Unattended runs (overnight, Codex /goal, scheduled sessions)
 
