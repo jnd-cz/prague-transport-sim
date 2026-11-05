@@ -91,7 +91,11 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - **Questions for the user go to a `?review` findings file** (`reports/review/`, README): the place,
   imagery links, a picture where it helps, answer choices. Offer only answers that an importer turns into
   evidence, and say on the card why another answer stays held (#162, #176). An answer is keyed by a
-  stable identity (a decision ID, a place), never by a generated array index.
+  stable identity (a decision ID, a place), never by a generated array index. The file names its `issue`
+  and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under them. A set whose
+  issue is closed while findings wait is out of date: delete its file (the user, 2026-11-05: "If the issue
+  is closed and reviews are unasnwered then it's out of date and can be deleted"); the directory lists
+  such sets apart.
 
 ## Unattended runs (overnight, Codex /goal, scheduled sessions)
 
@@ -116,7 +120,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 
 - **Never edit generated data by hand** (`data/line*.json` and sidecars): change the tool and rebuild.
   Hand-made facts go to `data/truth.json`: facts from the user or a source, each citing where it came
-  from. Not check exemptions, agent audits or lists of generated array indexes: a rebuild renumbers
+  from; a new section names its reader in the file's `readers`, or that it is reference only (#224).
+  Not check exemptions, agent audits or lists of generated array indexes: a rebuild renumbers
   them (#177's allowlist would have failed every line on the next rebuild). Key a fact by place, a
   stable source ID or a stop. What a check can decide from geometry stays a rule in the check, counted
   per class with its places, so `--compare` shows what a rebuild moved.
@@ -199,7 +204,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
-| traffic seed 4 | 37 | did not finish (stop 8, 7200 s): AI trams and cars gridlocked at Balabenka | #168 |
+| crossing | 17 | 1 unexplained pedestrian obstruction (main at 14b71c4 and 9a7b1a0 alike) | #146 |
 
 ## Code style
 

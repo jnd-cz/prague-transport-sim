@@ -119,9 +119,16 @@ and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any
 
 ## Regional DTM monthly downloads and JVF transition (#63)
 
-**Status checked 2026-10-30:** the two live ZPS indexes each list all **57 Prague districts** and only
-state **2026-09-30**. No October (`2026-10-31`) package is listed yet. Existing source and built-data
-manifests remain unchanged. Snapshotting a newer month is a separate decision after inspection.
+**Status 2026-11-05:** the two live ZPS indexes list all **57 Prague districts** at state **2026-10-31**
+only, in all four formats (GPKG, JVF, SHP, DGN); the 2026-09-30 packages are no longer listed (ours stay
+in the store and in snapshots up to `2026-11-05`). October is the last state published before the JVF
+1.5.0.2 freeze (2026-11-10 22:00). **Snapshot `2026-11-05b` pins it** for the 17 districts of the five
+lines (the user, 2026-11-05: "yes we should snapshot the October data"). Its schema is September's:
+`tools/dtm_schema.py --compare` of all 34 packages finds 24 identical and 10 that differ only in which
+classes a district has objects of (layers new or gone in that district), each class with the same
+columns as in other districts' September packages; the one of them our tools read, the tree pits
+(`Vegetační mísa`), is unchanged. Built data stays on September until the next rebuild of all lines
+(W1, ROADMAP.md).
 
 The [regional distribution page](https://portal.dtm-praha-sck.cz/poskytovani-dat) links to Geoportál's
 monthly public ZPS packages. [Provider guidance](https://portal.dtm-praha-sck.cz/poskytovani-dat/zpusoby-poskytovani-prazskych-dat-dtm)
@@ -149,8 +156,21 @@ Current pattern: `VS_CZ010_MOMC_<district>_<yyyymmdd>_ZPS_OPL|KR.gpkg.zip`.
 
 `python -I tools/dtm_packages.py --fetch` does this for every district in `DTM` that lacks a pair in
 `raw/dtm/`: the index's newest month, the size checked against `velikost`, the ZIP tested, and the URL
-and state recorded in `raw/dtm/provenance.json` (in the `dtm` group). Packages pinned before #125 have
-no recorded URL.
+and state recorded in `raw/dtm/provenance.json` (in the `dtm` group) after each package. Packages
+pinned before #125 have no recorded URL.
+
+**A new month:** `python -I tools/dtm_packages.py --fetch --refresh` also takes every district whose
+local month is older than the index's newest; once a district's newer pair is complete, the older one
+leaves `raw/dtm/` (ZIPs, unzipped packages, provenance), so the snapshot published from it holds one
+month per district. Then `tools/dtm_schema.py --compare` per package, `snapshot.py publish`, `verify`,
+and `snapshot.py fetch` (it unzips the new packages). The download server closes the connection after
+a few dozen packages (2026-11-05: at 27 and 29 of 34): a rerun 5 minutes later fetches the rest and
+records what the stopped run had fetched.
+
+**Other checkouts after such a snapshot:** `snapshot.py fetch` adds the new month but leaves the older
+one in `raw/dtm/`, which `status` then lists as new input files (`data-publish` refuses on them). Remove
+the older month's entries, e.g. `raw/dtm/*_20260930_ZPS_*` after `2026-11-05b`: they are links to the
+machine cache, and the store and the older snapshots keep the files.
 
 For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
 GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned
@@ -219,6 +239,7 @@ exports**. Until those packages exist, no post-1.5 compatibility conclusion has 
 
 | id | note |
 |---|---|
+| `2026-11-05b` | `2026-11-05` with the ZPS street survey at state 2026-10-31 instead of 2026-09-30 for the 17 districts of lines 9, 17, 22, 23 and 37 (34 packages, 263 MB, `python -I tools/dtm_packages.py --fetch --refresh`): the last state before the JVF 1.5.0.2 switch, schema as September's (#63). |
 | `2026-11-05` | `2026-11-03b` + the archive DTM's stop signs along lines 9, 17, 22, 23 and 37, both point layers (`raw/dtmpoints/lineN.signs.json`, `python -P -E tools/dtm_points.py N --signs`, fetched 2026-11-05): the stop sign's second source after the user's (#258). |
 | `2026-11-03b` | `2026-11-03` + DI set 7 at state 2026-10-31 for the same 16 districts (#209): Dvorecký most's tracks (2.9 km new, entered 2026-10-07 and 10-22) and records re-entered with heights. |
 | `2026-11-03` | `2026-11-02` + 8 Geoportál tiles of line 17's corridor (I3S buildings, trees, tree rows, walls) at its edge, moved by the DI track (#20). |

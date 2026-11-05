@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review sets · Tatra T3 Prague</title>
+<!-- The review directory (#288): every review set, the issue that waits for it, answered and waiting
+     (src/reviewIndex.js; the index from tools/review_sets.py, built at each deploy) -->
+<style>
+  :root { --bg: #1d2520; --panel: #2f3a33; --edge: #435146; --ink: #e9e4d4; --dim: #a9b2a3; --wait: #ffb02e;
+          --done: #6fcf8a; --unsure: #8db4f2; --bad: #ff8a7a; }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 20px max(16px, env(safe-area-inset-left)) 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 32px 0 10px; padding-top: 10px; border-top: 1px solid var(--edge); }
+  a { color: #ffd27a; }
+  .dim { color: var(--dim); font-size: .88rem; }
+  .issue { background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+  .issue h3 { margin: 0 0 8px; font-size: 1rem; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .state { font-size: .75rem; padding: 1px 7px; border-radius: 9px; background: var(--edge); }
+  .state.CLOSED { background: #5a3a35; color: var(--bad); }
+  .set { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; padding: 8px 0; border-top: 1px solid var(--edge); }
+  .set:first-of-type { border-top: 0; }
+  .set .name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .set .counts { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .set .links, .set .bar, .set .note { grid-column: 1 / -1; }
+  .links a { display: inline-block; margin: 2px 8px 2px 0; padding: 3px 10px; border: 1px solid var(--edge); border-radius: 6px; text-decoration: none; background: #26302a; }
+  .links a:hover, .links a:focus-visible { border-color: #ffd27a; }
+  .bar { height: 6px; background: #26302a; border-radius: 3px; overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; }
+  .wait { color: var(--wait); } .done { color: var(--done); } .unsure { color: var(--unsure); } .bad { color: var(--bad); }
+  .q li { margin: 4px 0; }
+  details summary { cursor: pointer; color: var(--dim); }
+  #status { margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Review sets</h1>
+  <div class="dim">Every set of findings waiting for an answer in review mode, with the issue that needs it. Answers are counted live from the answer store; each link opens the set with only the unanswered findings. <a href="index.html">Back to the game</a></div>
+  <div id="status" class="dim">loading…</div>
+  <section id="waiting"></section>
+  <section id="questions"></section>
+  <section id="answered"></section>
+</main>
+<script type="module" src="src/reviewIndex.js"></script>
+</body>
+</html>

@@ -72,6 +72,21 @@ class SegmentIndex {
     }
     return best;
   }
+  // whether dist(x, y) < r: the same terms, done at the first segment that is (#244: the street flush asks this
+  // of every road-bed vertex, and needed no minimum)
+  within(x, y, r) {
+    const c = this.cell, ci = Math.floor(x / c), cj = Math.floor(y / c);
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const arr = this.map.get(i * 65536 + j);
+      if (!arr) continue;
+      for (const [ax, ay, bx, by, hw] of arr) {
+        const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+        if (Math.hypot(ax + dx * t - x, ay + dy * t - y) - hw < r) return true;
+      }
+    }
+    return false;
+  }
 }
 
 // Building footprints on a grid, for point-in-building tests.
@@ -147,10 +162,11 @@ class ChunkedGeometry {
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     const l = Math.hypot(nx, ny, nz) || 1;
     nx /= l; ny /= l; nz /= l;
-    c.pos.push(...a, ...b, ...d);
+    // (the values written out, not spread: millions of triangles at load, #244)
+    c.pos.push(a[0], a[1], a[2], b[0], b[1], b[2], d[0], d[1], d[2]);
     c.nor.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    if (this.useUv) c.uv.push(...(uvs || [0, 0, 0, 0, 0, 0]));
-    if (this.useColor) c.col.push(...col, ...col, ...col);
+    if (this.useUv) { if (uvs) c.uv.push(uvs[0], uvs[1], uvs[2], uvs[3], uvs[4], uvs[5]); else c.uv.push(0, 0, 0, 0, 0, 0); }
+    if (this.useColor) c.col.push(col[0], col[1], col[2], col[0], col[1], col[2], col[0], col[1], col[2]);
   }
   quad(c, a, b, d, e, col) { this.tri(c, a, b, d, null, col); this.tri(c, a, d, e, null, col); }
   // `surface` tags meshes cars and walkers stand on (read by the street bot); 'building' marks
@@ -438,6 +454,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   for (const t of data.tracks) tracks.addLine(t.smooth);
   const trackDist = (x, y) => tracks.dist(x, y);
   ground.trackDist = trackDist;
+  // (whether a track is within r <= 4 m: the same answer from 4 m cells, a ninth of the area searched; the
+  // street flush and the track support ask it millions of times at load, #244)
+  const near = new SegmentIndex(4);
+  for (const t of data.tracks) near.addLine(t.smooth);
+  ground.trackWithin = (x, y, r) => near.within(x, y, r);
   if (ground.dtm) flushDtm(ground);
   // track heights after the streets are laid to the track profile, so other lines' tracks sit in them
   // (another line's track in a street: its top of rail is the street surface, as on our own route)
@@ -506,6 +527,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
+  ground.dtm?.seal(); // (the survey's heights are final from here: its lookups from typed arrays, #244, #245)
   if (ground.dtm) buildDtm(group, ground);
   await mark('DTM streets');
 
@@ -575,7 +597,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   bedCg.build(group, 'bed');
   railCg.build(group, 'rail');
   await mark('track bed + rails');
-  buildTrackSupport(group, route, ground, trackDist);
+  buildTrackSupport(group, route, ground);
   await mark('track support');
 
   buildZebras(group, data, ground, trackDist);
@@ -994,16 +1016,15 @@ function flushDtm(ground) {
     const f = Math.max(0, Math.min(30, lat + 15)), k = Math.min(29, Math.floor(f)), u = f - k;
     return e[k] * (1 - u) + e[k + 1] * u;
   };
-  const shift = (p) => {
-    if (done.has(p)) return;
-    done.add(p);
-    const n = route.nearest(p[0], p[1]);
-    if (!n || n.d >= 15) return;
+  // (vertex i of pts, its nearest route point measured before anything moved: ns, nd)
+  const shift = (i) => {
+    const p = pts[i], n = { s: ns[i], d: nd[i] };
+    if (!(n.d < 15)) return;
     const q = route.at(n.s), lat = q.hx * (p[1] - q.y) - q.hy * (p[0] - q.x);
     // in the track corridor (3 m from our tracks) a carriageway or tram bed is the bed, whatever
     // the survey says there (a 2 m bump at s 2420 stood 3.6 m over the rails); a structure well above
     // the track (over 4.5 m) is another level
-    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackDist(p[0], p[1]) < 3 && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
+    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackWithin(p[0], p[1], 3) && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
@@ -1012,16 +1033,28 @@ function flushDtm(ground) {
   // measure everything first, then move
   // (bed: vertices of carriageway and tram areas, laid flush with the tracks; green ones too where the
   // track is grass track: src/heights.js)
+  // (each vertex once, in the order first met: a vertex is in every triangle around it, #244)
   const pts = [], bed = new Set(), green = new Set();
   const inBed = (a, p) => { if (FLUSH.has(a.c)) bed.add(p); else if (a.c === 'green') { bed.add(p); green.add(p); } };
+  const take = (a, p) => { if (!done.has(p)) { done.add(p); pts.push(p); } inBed(a, p); };
   // (every ground-level street area, sidewalks too: road and sidewalk move together, so the kerbs
   // tools/kerbs.py gave them keep their height)
   for (const a of dtm.areas) if (a.l === 0 && STREET.has(a.c)) {
-    for (const tri of a.mesh) for (const p of tri) { pts.push(p); inBed(a, p); }
-    for (const r of [a.ring, ...a.holes]) for (const p of r) { pts.push(p); inBed(a, p); }
+    for (const tri of a.mesh) for (const p of tri) take(a, p);
+    for (const r of [a.ring, ...a.holes]) for (const p of r) take(a, p);
   }
-  for (const p of pts) { const n = route.nearest(p[0], p[1]); if (n && n.d < 15) srow(Math.round(n.s / 2)); } // (rows and their neighbours, before anything moves)
-  for (const p of pts) shift(p);
+  // (nothing moves until every row is measured: meanwhile the survey is read from typed arrays, as in the
+  // simulation (DtmSurface.seal), and they are dropped before the vertices move, #244)
+  dtm.grid.seal(); dtm.deckGrid.seal();
+  const ns = new Float64Array(pts.length), nd = new Float64Array(pts.length).fill(Infinity);
+  for (let i = 0; i < pts.length; i++) {
+    const n = route.nearest(pts[i][0], pts[i][1]);
+    if (!n) continue;
+    ns[i] = n.s; nd[i] = n.d;
+    if (n.d < 15) srow(Math.round(n.s / 2)); // (rows and their neighbours, before anything moves)
+  }
+  dtm.grid.flat = dtm.deckGrid.flat = null;
+  for (let i = 0; i < pts.length; i++) shift(i);
   for (const a of dtm.areas) {
     if (a.l !== 0 || !(FLUSH.has(a.c) || a.c === 'green')) continue;
     for (const tri of a.mesh) for (const p of tri) {
@@ -1248,8 +1281,18 @@ function fitDtmToMouths(dtm, mouths) {
   dtm.mouthsFitted = true;
   const seen = new Set();
   let n = 0;
+  // (each mouth's reach as a box in plan; an area whose outline lies outside every box has no vertex to bring
+  // down: the millions of others were tested against every mouth, #244)
+  const boxes = mouths.map((m) => {
+    const xs = [], ys = [], l = m.w + 1.5;
+    for (const d of [-3, m.D]) for (const t of [-l, l]) { xs.push(m.p[0] + d * m.hx + t * m.nx); ys.push(m.p[1] + d * m.hy + t * m.ny); }
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  });
   for (const a of dtm.areas) {
     if (a.l !== 0 || !MOUTH_FIT.has(a.c)) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of a.ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    if (!boxes.some((b) => x0 <= b[2] + 1e-6 && x1 >= b[0] - 1e-6 && y0 <= b[3] + 1e-6 && y1 >= b[1] - 1e-6)) continue;
     for (const p of [...a.ring, ...a.holes.flat(), ...a.mesh.flat()]) {
       if (seen.has(p)) continue;
       seen.add(p);
@@ -1331,14 +1374,14 @@ function buildRoadPortals(group, mouths, T) {
 // the bridges whose survey or model stops short, an embankment over a lower street): off the bridges,
 // walls from the bed down to the ground at the outer bed edges and a top between the two tracks; on
 // our bridges, a 0.8 m deck under the beds where the ground is far below. Every 2 m along the route.
-function buildTrackSupport(group, route, ground, trackDist) {
+function buildTrackSupport(group, route, ground) {
   const { profile, dtm, terrain } = ground;
   const below = (x, y) => { const t = dtm?.surfaceAt(x, y); return t ? t.z : terrain.height(x, y); };
   const cg = new ChunkedGeometry(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { wet: wetFactor('#8a8376', '#6d675d'), snow: GROUND_SNOW }), { color: true });
   const stone = new THREE.Color('#8a8376').toArray(), ballast = new THREE.Color('#77736a').toArray();
   const edges = (s) => {
     let lo = 0, hi = 0;
-    for (let lat = -6; lat <= 6; lat += 0.25) { const o = route.offset(s, lat); if (trackDist(o.x, o.y) < 0.2) { lo = Math.min(lo, lat); hi = Math.max(hi, lat); } }
+    for (let lat = -6; lat <= 6; lat += 0.25) { const o = route.offset(s, lat); if (ground.trackWithin(o.x, o.y, 0.2)) { lo = Math.min(lo, lat); hi = Math.max(hi, lat); } }
     return [lo - 1.4, hi + 1.4];
   };
   let prev = null, walls = 0;

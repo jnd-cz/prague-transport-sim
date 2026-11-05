@@ -111,8 +111,9 @@ def kind(f):
     return "tools"
 
 
-def questions(body):
-    """The question sections of a PR description: [(heading, [first line of each item])]."""
+def questions(body, width=160):
+    """The question sections of a PR description: [(heading, [first line of each item])], each item cut at
+    width characters (None: whole, for the review directory, tools/review_sets.py)."""
     out, cur, level = [], None, 0
     for line in (body or "").splitlines():
         h = re.match(r"^(#+)\s", line)
@@ -126,7 +127,7 @@ def questions(body):
         if cur is not None:
             m = re.match(r"^(?:[-*]|\d+\.)\s+(.*)", line)  # top-level items only: their sub-points stay out
             if m:
-                cur.append(m.group(1).strip()[:160])
+                cur.append(m.group(1).strip()[:width] if width else m.group(1).strip())
     return [(t, items) for t, items in out if items]
 
 

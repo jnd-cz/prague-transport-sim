@@ -232,5 +232,106 @@ class Readers(unittest.TestCase):
             self.assertIn(NEW,args[-1])
 
 
+def zipped(kind):
+    import io
+    import zipfile
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, 'w') as z:
+        z.writestr(f'ZPS_{kind}.gpkg', f'{kind} survey')
+    return b.getvalue()
+
+
+class Fetch(unittest.TestCase):
+    """--fetch --refresh: the index's newer month replaces the older pair in raw/dtm/ (#63)."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.folder = self.root / 'raw/dtm'
+        self.folder.mkdir(parents=True)
+        prov = {'packages': {}}
+        for kind in ('OPL', 'KR'):
+            self.local(OLD, kind)
+            prov['packages'][f'VS_CZ010_MOMC_{DISTRICT}_{OLD}_ZPS_{kind}.gpkg.zip'] = {'state': OLD}
+        (self.folder / 'provenance.json').write_text(json.dumps(prov), encoding='utf-8')
+        patcher = patch.object(packages, 'DTM', {'17': [DISTRICT]})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.downloads = []
+
+    def local(self, date, kind):
+        name = f'VS_CZ010_MOMC_{DISTRICT}_{date}_ZPS_{kind}.gpkg'
+        (self.folder / f'{name}.zip').write_bytes(zipped(kind))
+        package(self.root, date, kind).write_text('unzipped', encoding='utf-8')
+
+    def opener(self, months):
+        """An index listing months[kind] for the district, and its downloads."""
+        import io
+        def entry(kind, date):
+            name = f'VS_CZ010_MOMC_{DISTRICT}_{date}_ZPS_{kind}.gpkg.zip'
+            return {'obec_kod': DISTRICT, 'format': 'GPKG', 'platnost': f'{date[:4]}-{date[4:6]}-{date[6:]}T00:00',
+                    'soubor_nazev': name, 'kod_stazeni': f'uuid/{name}', 'velikost': len(zipped(kind))}
+        def open_(url, timeout=None):
+            if 'get-dtm-download-metadata' in url:
+                kind = 'OPL' if url.endswith('02') else 'KR'
+                return io.BytesIO(json.dumps([{'formats': [entry(kind, d) for d in months[kind]]}]).encode())
+            self.downloads.append(url.rsplit('/', 1)[1])
+            return io.BytesIO(zipped('OPL' if '_OPL' in url else 'KR'))
+        return open_
+
+    def names(self):
+        return sorted(p.name for p in self.folder.iterdir() if p.name != 'provenance.json')
+
+    def provenance(self):
+        return sorted(json.loads((self.folder / 'provenance.json').read_text(encoding='utf-8'))['packages'])
+
+    def fetch(self, months, refresh):
+        with patch('builtins.print'):
+            packages.fetch(self.root, refresh=refresh, opener=self.opener(months))
+
+    def test_without_refresh_a_complete_older_pair_stays(self):
+        self.fetch({'OPL': [OLD, NEW], 'KR': [OLD, NEW]}, refresh=False)
+        self.assertEqual(self.downloads, [])
+        self.assertTrue(all(OLD in n for n in self.names()))
+
+    def test_refresh_replaces_the_older_pair_with_the_newer(self):
+        self.fetch({'OPL': [OLD, NEW], 'KR': [OLD, NEW]}, refresh=True)
+        self.assertEqual(sorted(self.downloads), [f'VS_CZ010_MOMC_{DISTRICT}_{NEW}_ZPS_{k}.gpkg.zip' for k in ('KR', 'OPL')])
+        self.assertEqual(self.names(), [f'VS_CZ010_MOMC_{DISTRICT}_{NEW}_ZPS_{k}.gpkg.zip' for k in ('KR', 'OPL')])
+        self.assertEqual(self.provenance(), self.names())  # (snapshot.py fetch unzips them after the publish)
+
+    def test_an_incomplete_newer_pair_leaves_the_older_one(self):
+        self.fetch({'OPL': [OLD, NEW], 'KR': [OLD]}, refresh=True)
+        self.assertEqual(self.downloads, [f'VS_CZ010_MOMC_{DISTRICT}_{NEW}_ZPS_OPL.gpkg.zip'])
+        self.assertIn(f'VS_CZ010_MOMC_{DISTRICT}_{OLD}_ZPS_OPL.gpkg.zip', self.names())
+        self.assertIn(f'VS_CZ010_MOMC_{DISTRICT}_{OLD}_ZPS_KR.gpkg.zip', self.names())
+
+    def test_a_run_the_server_stops_keeps_what_it_fetched_and_a_rerun_records_it(self):
+        import urllib.error
+        months = {'OPL': [OLD, NEW], 'KR': [OLD, NEW]}
+        good = self.opener(months)
+
+        def refusing(url, timeout=None):  # (the server refused the 28th of 34 downloads, 2026-11-05)
+            if '_KR' in url and 'get-dtm' not in url:
+                raise urllib.error.URLError('refused')
+            return good(url, timeout)
+        with patch('builtins.print'), self.assertRaises(urllib.error.URLError):
+            packages.fetch(self.root, refresh=True, opener=refusing)
+        new_opl = f'VS_CZ010_MOMC_{DISTRICT}_{NEW}_ZPS_OPL.gpkg.zip'
+        self.assertIn(new_opl, self.provenance())
+        self.downloads.clear()
+        (self.folder / 'provenance.json').write_text(json.dumps({'packages': {}}), encoding='utf-8')  # (as the old code left it)
+        self.fetch(months, refresh=True)
+        self.assertEqual(self.downloads, [f'VS_CZ010_MOMC_{DISTRICT}_{NEW}_ZPS_KR.gpkg.zip'])
+        self.assertEqual(self.provenance(), self.names())
+
+    def test_refresh_never_goes_back_to_an_older_month(self):
+        for kind in ('OPL', 'KR'):
+            self.local(NEW, kind)
+        self.fetch({'OPL': [OLD], 'KR': [OLD]}, refresh=True)
+        self.assertEqual(self.downloads, [])
+        self.assertEqual(len(self.names()), 8)  # (both months' ZIPs and unzipped packages stay)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -295,6 +295,14 @@ Review these when realism matters; most move into the build in M2.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
   arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.
+- **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
+  car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
+  immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
+  (the controlling stop reason) and fades one car after the same closed cycle stands for 30 s.
+  Signal waits, boarding and moving vehicles end the chain. This is recovery for cars that cannot
+  reverse out in the present model. `window.game.trafficCycles` records the removed car, cycle and
+  reasons; the traffic check retains those events. `tools/bench/stuck.js` names both AI directions
+  and the nearby junction cars, including their `why`, `seen` and actual wait chains.
 
 ## Checks and what they measure
 
@@ -331,6 +339,18 @@ Review these when realism matters; most move into the build in M2.
   - the triangle found last tried first, when it overlaps no other: a triangle spans several 3 m cells holding
     dozens of others, so proving that cost more (14 s) than the lookups it saved, and the four pose points rarely
     share a triangle.
+- **The load by part** (#244, idle machine, `window.loadTimes` / `window.worldTimes`, 5 loads each, 2026-11-05):
+  line 17 38.9 s on main 14b71c4 (20.8 s on 2026-10-23, `docs/history/PERF-ANALYSIS.md`), 28.0 s after #244.
+  What grew since 10-23 is the part "tracks + tunnel roads" (1.6 -> 11.6 s): the street flush to the rails
+  (`flushDtm`, 8 s before #244: `route.nearest` asked about 4 times per vertex, a vertex being listed once per
+  triangle around it) and the crossings' split with a full rebuild of the survey index (2.2 s). Not done,
+  measured: lowering the terrain once per survey vertex instead of per triangle corner is not exact (the 32-bit
+  heights leave a remainder that the repeated calls take off).
+- **What the layered ground costs** (#244, 2026-11-05, lines 17 / 22): of the fine terrain's 2 m samples,
+  92-94 % within 10 m of a track and 61-78 % at 10-120 m lie under the survey's ground-level areas, lowered
+  0.25 m and drawn hidden (line 17 draws ~4.4 M fine triangles). Where it is visible, 2 m against IPR's 1 m
+  raster is off by 1.4-2.4 cm on average; the 99th percentile is 36-73 cm within 10 m of the tracks (walls,
+  cutting edges) and ~20 cm further out.
 
   What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
   only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.

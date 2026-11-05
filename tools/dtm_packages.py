@@ -3,6 +3,7 @@
     python -P -E tools/dtm_packages.py --check     # DTM below against the rule (OSM district boundaries)
     python -I tools/dtm_packages.py --fetch        # missing OPL/KR pairs from the monthly index into raw/dtm/
     python -I tools/dtm_packages.py --fetch --index FILE   # the same from a saved copy of the index
+    python -I tools/dtm_packages.py --fetch --refresh      # also newer months: the older pair leaves raw/dtm/
 """
 from dataclasses import dataclass
 import glob
@@ -10,6 +11,7 @@ import json
 import logging
 from pathlib import Path
 import re
+import shutil
 import sys
 import urllib.request
 import zipfile
@@ -166,28 +168,34 @@ def check():
     return 0
 
 
-def fetch(root, index=None):
+def fetch(root, index=None, refresh=False, opener=urllib.request.urlopen):
     """Missing OPL/KR pairs of DTM's districts, the index's newest month; each checked against the
     index's size and as a ZIP, written whole, with its URL and state in raw/dtm/provenance.json.
     index: a saved copy, {"02": [format entries], "03": [...]}, for when the API turns scripts away
-    (2026-10-31: 502 to scripts for hours while a browser read it)."""
+    (2026-10-31: 502 to scripts for hours while a browser read it).
+    refresh: also every district whose local month is older than the index's newest. Once a district's
+    newer pair is complete, the older one (its ZIPs, unzipped packages and provenance) leaves raw/dtm/,
+    so a snapshot published from it holds one month per district; the older stays in the store and in
+    its snapshots (#63: the October 2026 state, the last before the JVF 1.5.0.2 switch)."""
     from atomic import replacing
     root, have = Path(root), {}
     folder = root / "raw" / "dtm"
     for f in folder.glob("*.gpkg.zip"):
         m = NAME.fullmatch(f.name)
-        have.setdefault(m[1], set()).add(m[3])
+        have.setdefault(m[1], {}).setdefault(m[3], set()).add(m[2])
     prov_path = folder / "provenance.json"
     prov = json.loads(prov_path.read_text(encoding="utf-8")) if prov_path.exists() else {"packages": {}}
-    need = sorted({d for ds in DTM.values() for d in ds if have.get(d) != {"OPL", "KR"}})
+    districts = sorted({d for ds in DTM.values() for d in ds})
+    newest = {}  # (district, kind) -> the index's newest month
     for code, kind in (("02", "OPL"), ("03", "KR")):
         if index:
             formats = json.loads(Path(index).read_text(encoding="utf-8"))[code]
         else:
-            with urllib.request.urlopen(INDEX.format(code), timeout=120) as r:
+            with opener(INDEX.format(code), timeout=120) as r:
                 formats = [f for row in json.load(r) for f in row["formats"]]
-        for district in need:
-            if kind in have.get(district, ()):
+        for district in districts:
+            local = have.get(district, {}).get(kind, set())
+            if local and not refresh:
                 continue
             entries = [f for f in formats if f["obec_kod"] == district and f["format"] == "GPKG"]
             if not entries:
@@ -196,20 +204,53 @@ def fetch(root, index=None):
             name = e["soubor_nazev"]
             if not (m := NAME.fullmatch(name)) or m[1] != district or m[3] != kind or not name.endswith(".zip"):
                 raise ValueError(f"district {district}: unexpected package name {name}")
+            newest[(district, kind)] = m[2]
             url = BASE + e["kod_stazeni"]
-            with urllib.request.urlopen(url, timeout=600) as r:
+            record = {"url": url, "index": INDEX.format(code) + (" (saved copy)" if index else ""), "state": e["platnost"],
+                      "size": int(e["velikost"])}
+            if m[2] in local:
+                # (fetched by a run that stopped before writing the provenance: the server refused the
+                # 28th of 34 downloads, 2026-11-05; recorded once its size is the index's)
+                if name not in prov["packages"] and (folder / name).stat().st_size == record["size"]:
+                    prov["packages"][name] = record
+                    write(prov_path, prov, replacing)
+                continue
+            if local and max(local) > m[2]:
+                continue  # (newer than the index: never back to an older month)
+            with opener(url, timeout=600) as r:
                 content = r.read()
-            if len(content) != int(e["velikost"]):
+            if len(content) != record["size"]:
                 raise ValueError(f"{name}: {len(content)} bytes, the index says {e['velikost']}")
             with replacing(folder / name, "wb") as f:
                 f.write(content)
             with zipfile.ZipFile(folder / name) as z:
                 if z.testzip():
                     raise ValueError(f"{name}: corrupt ZIP")
-            prov["packages"][name] = {"url": url, "index": INDEX.format(code) + (" (saved copy)" if index else ""), "state": e["platnost"],
-                                      "size": len(content)}
+            prov["packages"][name] = record
+            write(prov_path, prov, replacing)  # (after each package: a run that stops keeps what it fetched)
+            have.setdefault(district, {}).setdefault(kind, set()).add(m[2])
             print(f"{name}: {len(content):,} bytes", flush=True)
-    with replacing(prov_path, "w", encoding="utf-8") as f:
+    if refresh:  # (only a complete newer pair replaces the older: selection never mixes months)
+        for district in districts:
+            new = {newest.get((district, k)) for k in ("OPL", "KR")}
+            if len(new) != 1 or None in new or not all(new <= have.get(district, {}).get(k, set()) for k in ("OPL", "KR")):
+                continue
+            date = new.pop()
+            for kind in ("OPL", "KR"):
+                for old in sorted(d for d in have[district][kind] if d < date):
+                    stem = f"VS_CZ010_MOMC_{district}_{old}_ZPS_{kind}.gpkg"
+                    for p in (folder / f"{stem}.zip", folder / stem):
+                        if p.is_dir():
+                            shutil.rmtree(p)
+                        elif p.exists():
+                            p.unlink()
+                    prov["packages"].pop(f"{stem}.zip", None)
+                    print(f"{stem}.zip: replaced by {date}", flush=True)
+    write(prov_path, prov, replacing)
+
+
+def write(path, prov, replacing):
+    with replacing(path, "w", encoding="utf-8") as f:
         json.dump(prov, f, ensure_ascii=False, indent=1)
 
 
@@ -218,6 +259,7 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         sys.exit(check())
     if "--fetch" in sys.argv:
-        fetch(Path(__file__).resolve().parent.parent, sys.argv[sys.argv.index("--index") + 1] if "--index" in sys.argv else None)
+        fetch(Path(__file__).resolve().parent.parent, sys.argv[sys.argv.index("--index") + 1] if "--index" in sys.argv else None,
+              refresh="--refresh" in sys.argv)
     else:
         print(__doc__)
