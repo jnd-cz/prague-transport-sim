@@ -318,18 +318,18 @@
    "kind": "stop sign",
    "id": "stop-sign-17-Hercovka-1",
    "line": "17",
-   "x": 2655.2,
-   "y": 3528.8,
-   "s": 20169.1,
-   "mag": 34.5,
+   "x": 2772.7,
+   "y": 3501.3,
+   "s": 20289.8,
+   "mag": 86.2,
    "status": "review",
-   "osm_node": 4097081444,
+   "osm_node": 4097081445,
    "gtfs_s": 20203.6,
    "pick": true,
    "marks": [
     {
-     "x": 2655.2,
-     "y": 3528.8,
+     "x": 2772.7,
+     "y": 3501.3,
      "label": "OSM stop position (the pin)",
      "color": "#3e9dff"
     },
@@ -346,7 +346,147 @@
      "color": "#ffffff"
     }
    ],
-   "info": "Hercovka (towards Ke Stírce): OSM's stop position (the pin, node 4097081444) is 35 m before the timetable (GTFS) point. The platform's front end is 27 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "info": "Hercovka (towards Ke Stírce): OSM's stop position (the pin, node 4097081445) is 86 m after the timetable (GTFS) point. The platform's front end is -94 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Hercovka-1",
+   "line": "17",
+   "x": 2655.2,
+   "y": 3528.8,
+   "s": 1607.9,
+   "mag": 11.2,
+   "status": "review",
+   "osm_node": 4097081444,
+   "gtfs_s": 1619.1,
+   "pick": true,
+   "marks": [
+    {
+     "x": 2655.2,
+     "y": 3528.8,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2644.0,
+     "y": 3530.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Hercovka (towards Nad Trojou) (the other direction): OSM's stop position (the pin, node 4097081444) is 11 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Nábřeží Kapitána Jaroše-1",
+   "line": "17",
+   "x": 851.3,
+   "y": 886.9,
+   "s": 5763.1,
+   "mag": 7.8,
+   "status": "review",
+   "osm_node": 332148453,
+   "gtfs_s": 5770.9,
+   "pick": true,
+   "marks": [
+    {
+     "x": 851.3,
+     "y": 886.9,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 843.8,
+     "y": 884.9,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Nábřeží Kapitána Jaroše (towards Čechův most) (the other direction): OSM's stop position (the pin, node 332148453) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Karlovy lázně-1",
+   "line": "17",
+   "x": -593.1,
+   "y": -226.3,
+   "s": 7994.1,
+   "mag": 7.7,
+   "status": "review",
+   "osm_node": 4700724587,
+   "gtfs_s": 8001.8,
+   "pick": true,
+   "marks": [
+    {
+     "x": -593.1,
+     "y": -226.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -596.8,
+     "y": -233.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Karlovy lázně (towards Národní divadlo) (the other direction): OSM's stop position (the pin, node 4700724587) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Výtoň-1",
+   "line": "17",
+   "x": -747.0,
+   "y": -2102.1,
+   "s": 9898.5,
+   "mag": 6.2,
+   "status": "review",
+   "osm_node": 4759185034,
+   "gtfs_s": 9904.7,
+   "pick": true,
+   "marks": [
+    {
+     "x": -747.0,
+     "y": -2102.1,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -746.8,
+     "y": -2108.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Výtoň (towards Podolská vodárna) (the other direction): OSM's stop position (the pin, node 4759185034) is 6 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-back-Pobřežní cesta-1",
+   "line": "17",
+   "x": -1766.1,
+   "y": -5785.1,
+   "s": 13967.1,
+   "mag": 7.9,
+   "status": "review",
+   "osm_node": 3234296486,
+   "gtfs_s": 13975.0,
+   "pick": true,
+   "marks": [
+    {
+     "x": -1766.1,
+     "y": -5785.1,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -1762.4,
+     "y": -5792.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Pobřežní cesta (towards Nádraží Braník) (the other direction): OSM's stop position (the pin, node 3234296486) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
   }
  ]
 }

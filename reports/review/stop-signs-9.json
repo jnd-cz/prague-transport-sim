@@ -142,18 +142,18 @@
    "kind": "stop sign",
    "id": "stop-sign-9-Olšanské náměstí-1",
    "line": "9",
-   "x": 2491.3,
-   "y": -891.4,
-   "s": 13453.6,
-   "mag": 15.6,
+   "x": 2490.9,
+   "y": -895.2,
+   "s": 13453.0,
+   "mag": 16.2,
    "status": "review",
-   "osm_node": 4704851514,
+   "osm_node": 244178530,
    "gtfs_s": 13469.2,
    "pick": true,
    "marks": [
     {
-     "x": 2491.3,
-     "y": -891.4,
+     "x": 2490.9,
+     "y": -895.2,
      "label": "OSM stop position (the pin)",
      "color": "#3e9dff"
     },
@@ -170,7 +170,7 @@
      "color": "#ffffff"
     }
    ],
-   "info": "Olšanské náměstí (towards Olšanská): OSM's stop position (the pin, node 4704851514) is 16 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "info": "Olšanské náměstí (towards Olšanská): OSM's stop position (the pin, node 244178530) is 16 m before the timetable (GTFS) point. The platform's front end is 6 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
   },
   {
    "kind": "stop sign",

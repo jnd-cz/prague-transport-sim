@@ -7,5 +7,110 @@
   "unsure"
  ],
  "over_m": 5.0,
- "findings": []
+ "findings": [
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-back-Lehovec-1",
+   "line": "37",
+   "x": 9219.7,
+   "y": 926.3,
+   "s": 0.0,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 9219.7,
+     "y": 926.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Lehovec (towards Sídliště Hloubětín) (the other direction): no OSM stop position near the track. The pin is the timetable (GTFS) point. Where is the stop sign?"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-back-Sídliště Hloubětín-1",
+   "line": "37",
+   "x": 8874.5,
+   "y": 935.3,
+   "s": 346.2,
+   "mag": 31.8,
+   "status": "review",
+   "osm_node": 4450425893,
+   "gtfs_s": 314.4,
+   "pick": true,
+   "marks": [
+    {
+     "x": 8874.5,
+     "y": 935.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 8906.3,
+     "y": 934.0,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Sídliště Hloubětín (towards Hloubětín) (the other direction): OSM's stop position (the pin, node 4450425893) is 32 m after the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-back-Hloubětín-1",
+   "line": "37",
+   "x": 8467.2,
+   "y": 951.2,
+   "s": 753.9,
+   "mag": 5.7,
+   "status": "review",
+   "osm_node": 4450425892,
+   "gtfs_s": 759.6,
+   "pick": true,
+   "marks": [
+    {
+     "x": 8467.2,
+     "y": 951.2,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 8461.5,
+     "y": 950.9,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Hloubětín (towards Starý Hloubětín) (the other direction): OSM's stop position (the pin, node 4450425892) is 6 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-back-Palmovka-1",
+   "line": "37",
+   "x": 4120.1,
+   "y": 1334.3,
+   "s": 5321.9,
+   "mag": 13.6,
+   "status": "review",
+   "osm_node": 1298749754,
+   "gtfs_s": 5335.5,
+   "pick": true,
+   "marks": [
+    {
+     "x": 4120.1,
+     "y": 1334.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4107.1,
+     "y": 1330.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Palmovka (towards Palmovka) (the other direction): OSM's stop position (the pin, node 1298749754) is 14 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  }
+ ]
 }
