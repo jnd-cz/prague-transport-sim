@@ -48,6 +48,9 @@ PARALLEL = 5.0           # degrees: ends of one node this near one direction run
 GAUNTLET_LOOK = 5.0      # m out along parallel ends where their order across the track is read
 GAUNTLET_RUN = 10.0      # m out along parallel ends where a gauntlet's tracks still lie within its width
 GAP = 2.0                # m: two track ends facing each other this near are one track
+CROSS_GAP = 8.0          # m: two track ends facing each other across a crossing this far apart are one track
+CROSS_TURN = 30.0        # degrees: such ends face each other, and the gap runs along them, within this
+ARCHIVE_NEAR = 1.0       # m: the archive's axis this near both ends of a gap fills it
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
@@ -67,8 +70,9 @@ class Network:
     """nodes: {id: {'xy', 'kind'}}; edges: {id: {'a', 'b', 'line', 'src', 'records'}}, `line` from a to b;
     at[node]: [(edge, end)] the edge ends at the node (end 0: the edge starts there)."""
 
-    def __init__(self, source, tips=(), photo=None):
+    def __init__(self, source, tips=(), photo=None, archive=None):
         self.source = source
+        self.archive = archive
         self.nodes, self.edges = {}, {}
         self.at = defaultdict(list)
         self.report = defaultdict(int)
@@ -140,6 +144,13 @@ class Network:
                 continue
             _, j, s = best
             line = chains[c] if e == 0 else LineString(chains[c].coords[::-1])
+            # (a branch leaves its track within TURN: an end meeting a track's middle steeper is a crossing track the
+            # provider broke there, Ohrada; _crossing_gaps joins it to its continuation)
+            q = line.interpolate(min(1.0, line.length))
+            vb, vt = _unit((q.x - xy[0], q.y - xy[1])), _unit(self._dir(chains[j], s))
+            if abs(vb[0] * vt[0] + vb[1] * vt[1]) < math.cos(math.radians(TURN)):
+                self.report['steep ends not joined as branches'] += 1
+                continue
             # an interlaced branch: joins at its tip on the through track (TONGUE back where DI starts it beside)
             tip = next((t for t, it in inter if chains[j].distance(Point(t)) <= JOIN and math.dist(t, xy) <= di_tracks.TONGUE + 2.0), None)
             if tip is not None:
@@ -211,6 +222,7 @@ class Network:
         self._interlaced_tips(getattr(src, 'interlaced', []))
         self._gaps()
         self._stubs()
+        self._crossing_gaps(self.archive)
         self._contract()
         self._sections()
         self._sections_into_junctions()
@@ -333,8 +345,12 @@ class Network:
             branch = [x for x in free if cos_max <= dev(x) < cos_t]
             if len(straight) != 1 or len(branch) != 1:
                 continue
-            # (the leg nearer the branch's side goes; both run within centimetres)
-            gone = legs[1]
+            # (the leg off the straight track's line goes: both run within centimetres, the kept one must continue the
+            # straight track without an angle; Strossmayerovo náměstí kept the branch's and bent it 0.21 m)
+            yx, yy = self.nodes[Y]['xy']
+            off = lambda leg, u=u, yx=yx, yy=yy: max(abs(u[0] * (q[1] - yy) - u[1] * (q[0] - yx))
+                                                    for q in self.edges[leg[0]]['line'].coords)
+            gone = max(legs, key=off)
             self.remove_edge(gone[0])
             b, bend = branch[0]
             ed = self.remove_edge(b)
@@ -360,6 +376,92 @@ class Network:
                 if e in self.edges and self.edges[e]['line'].hausdorff_distance(self.edges[keep]['line']) <= TWICE:
                     self.remove_edge(e)
                     self.report['tracks drawn twice'] += 1
+
+    def split_at(self, e, s, n):
+        """Edge e split s m along it at the existing node n (moved nowhere: the pieces end at n's place)."""
+        ed = self.remove_edge(e)
+        line = ed['line']
+        self.add_edge(ed['a'], n, substring(line, 0, s).coords, ed['src'], ed['records'], ed.get('chain'))
+        self.add_edge(n, ed['b'], substring(line, s, line.length).coords, ed['src'], ed['records'], ed.get('chain'))
+
+    def _crossing_gaps(self, archive):
+        """Two track ends facing each other across a gap of up to CROSS_GAP are one track the provider broke where
+        it crosses another (Ohrada: the track from the east ends on the through track, its continuation starts 5 m on;
+        the user, 2026-11-05: "sadly missing piece of data ... fill it here with a nice curve fit"). They are joined
+        along the archive's axis where it runs within ARCHIVE_NEAR of both ends, else straight (the curve fit smooths
+        it as fill); where the joint crosses another track the two meet in a crossing, each going on as itself."""
+        # (an end left without a continuation at a node where tracks meet: none of the node's other ends lies within
+        # TURN of opposite it, Ohrada; it leaves the node for its own, to be joined across the gap)
+        cos_t = math.cos(math.radians(180 - TURN))
+        for n0 in [n for n in list(self.at) if len(self.at[n]) >= 3]:
+            for x in list(self.at[n0]):
+                d = self.out_dir(*x)
+                if any(d[0] * self.out_dir(*y)[0] + d[1] * self.out_dir(*y)[1] <= cos_t for y in self.at[n0] if y != x):
+                    continue
+                e, end = x
+                n1 = self._node(self.nodes[n0]['xy'], 'end')
+                self.at[n0].remove(x)
+                self.at[n1].append(x)
+                self.edges[e]['a' if end == 0 else 'b'] = n1
+                self.report['dead ends detached from a junction'] += 1
+        ends = [n for n, v in self.nodes.items() if len(self.at[n]) == 1]
+        if not ends:
+            return
+        tree = shapely.STRtree(shapely.points([self.nodes[n]['xy'] for n in ends]))
+        arch = [c['line'] for c in archive.chains] if archive is not None else []
+        atree = shapely.STRtree(arch) if arch else None
+        cos_face = math.cos(math.radians(180 - CROSS_TURN))
+        done = set()
+        for n in ends:
+            if n in done or len(self.at[n]) != 1:
+                continue
+            p = self.nodes[n]['xy']
+            u = self.out_dir(*self.at[n][0])      # into the track: the gap lies the other way
+            best = None
+            for j in tree.query(Point(p).buffer(CROSS_GAP)):
+                m = ends[int(j)]
+                if m == n or m in done or len(self.at[m]) != 1:
+                    continue
+                q = self.nodes[m]['xy']
+                v = self.out_dir(*self.at[m][0])
+                g = math.dist(p, q)
+                w = _unit((q[0] - p[0], q[1] - p[1]))
+                if GAP < g <= CROSS_GAP and u[0] * v[0] + u[1] * v[1] <= cos_face \
+                        and -(u[0] * w[0] + u[1] * w[1]) >= math.cos(math.radians(CROSS_TURN)) and (best is None or g < best[0]):
+                    best = (g, m)
+            if best is None:
+                continue
+            m = best[1]
+            q = self.nodes[m]['xy']
+            coords, src = [p, q], 'gap'
+            if atree is not None:
+                for k in atree.query(LineString([p, q]).buffer(ARCHIVE_NEAR)):
+                    a = arch[int(k)]
+                    if a.distance(Point(p)) <= ARCHIVE_NEAR and a.distance(Point(q)) <= ARCHIVE_NEAR:
+                        s0, s1 = a.project(Point(p)), a.project(Point(q))
+                        piece = substring(a, min(s0, s1), max(s0, s1))
+                        c = list(piece.coords) if s0 <= s1 else list(piece.coords)[::-1]
+                        coords, src = [p] + c[1:-1] + [q], 'dtmp'
+                        break
+            chain = f'gap-{n}-{m}'
+            e = self.add_edge(n, m, coords, src, [], chain)
+            done.update((n, m))
+            self.nodes[n]['kind'] = self.nodes[m]['kind'] = 'gap'
+            self.report['crossing gaps filled'] += 1
+            # where the joint crosses another track: a crossing node on both
+            for f in [f for f, fd in self.edges.items() if f != e and fd['line'].crosses(self.edges[e]['line'])]:
+                x = self.edges[f]['line'].intersection(self.edges[e]['line'])
+                if x.geom_type != 'Point':
+                    continue
+                le, lf = self.edges[e]['line'], self.edges[f]['line']
+                se, sf = le.project(x), lf.project(x)
+                if not (END_CLEAR < sf < lf.length - END_CLEAR and END_CLEAR < se < le.length - END_CLEAR):
+                    continue
+                c = self._node((x.x, x.y), 'crossing')
+                self.split_at(f, sf, c)
+                self.split_at(e, se, c)
+                e = next(g for g, gd in self.edges.items() if gd.get('chain') == chain and c in (gd['a'], gd['b']) and m in (gd['a'], gd['b']))
+                self.report['crossings on filled gaps'] += 1
 
     def _gaps(self):
         """Two track ends facing each other within GAP join with a straight edge: a record the provider ended short
@@ -630,6 +732,10 @@ class Network:
             if len(by) == 2 and all(len(v) == 2 and k is not None for k, v in by.items()):
                 for a, b in by.values():
                     self.passes[a], self.passes[b] = [b], [a]
+        # (two track ends joined across a gap: a train passes, whatever the bend; the fit smooths it)
+        for n, ends in self.at.items():
+            if self.nodes[n]['kind'] == 'gap' and len(ends) == 2:
+                self.passes[ends[0]], self.passes[ends[1]] = [ends[1]], [ends[0]]
         dead = sum(1 for n, ends in self.at.items() if len(ends) >= 2 and all(not self.passes[x] for x in ends))
         self.report['nodes nobody passes'] = dead
         self.report['parallel meets paired'] = paired
@@ -939,8 +1045,8 @@ SWITCH_GAP = 3.0    # m: a facing switch this near the one before is the same pl
 
 def load_network():
     """DI's network with the user's switch tips and orthophoto tracks (data/truth.json trackSources)."""
-    di, _ = di_tracks.load_sources()
-    return Network(di, di_tracks.switch_tips(), di_tracks.photo_source())
+    di, archive = di_tracks.load_sources()
+    return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive)
 
 
 class Drawn:
