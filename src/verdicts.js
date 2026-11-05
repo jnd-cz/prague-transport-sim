@@ -5,6 +5,23 @@
 // localStorage and go with the next save or retry.
 const KEY = (name) => `tram-review:${name}`;
 
+// Read other line files without sending their pending changes or changing the current store.
+export async function readLineAnswers(name) {
+  let local = {};
+  try { local = JSON.parse(localStorage.getItem(KEY(name)) || '{}').items || {}; } catch { /* private window */ }
+  let remote = null;
+  for (const url of [`review.php?f=${name}`, `reports/reviews/${name}.json`]) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (r.status === 404) { if (url.startsWith('reports/')) remote = {}; continue; }
+      if (r.ok && (r.headers.get('content-type') || '').includes('json')) { remote = (await r.json()).items || {}; break; }
+    } catch { /* try the other endpoint */ }
+  }
+  const items = { ...(remote || {}) };
+  for (const [k, v] of Object.entries(local)) if (!items[k] || (v.t || 0) > (items[k].t || 0)) items[k] = v;
+  return { items, available: remote !== null };
+}
+
 // one record file to the store (src/report.js): review.php, else tools/serve.py; true when stored
 export async function postRecord(name, body) {
   const opts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Review': '1' }, body: JSON.stringify(body) };

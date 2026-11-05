@@ -6,21 +6,24 @@
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 4   # 4 pages at once
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks canted             # rail/bed visibility
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing           # pedestrian surfaces over rails
+    python -P -E tools/headless.py --lines 17 --checks heights   # top of rail against the staged heights, junctions (#197)
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
 check and awaits it, exactly like tools/bench/batch.html. Results: one JSON per run in reports/headless/
-and a table; the exit code is 1 when a run fails its thresholds (docs/history/BUILD-TOOLS-HANDOFF.md
-§4.2: u3 no red entries, collisions, stuck tram or signal penalty; redruns no red runs; traffic must
-finish; lint has no thresholds here, compare with `python tools/lint_report.py`).
+and a table; the exit code is 1 when a run fails its thresholds (HARD below: u3 no red entries,
+collisions, stuck tram or signal penalty; redruns no red runs; traffic must finish; lint has no
+thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
 Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
 any job; an occupied port fails. --url explicitly uses an existing server. WebGL runs on
 SwiftShader (software): slower than a desktop browser, the same results (the checks step the
-simulation themselves). --jobs N runs N pages at once, each in a worker process with its own
-browser (default: half the cores, at most 4, and
-what free memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded in
-its own fresh page, so the counts are the same as one after another.
+simulation themselves). --batch N (default 6) runs up to N checks of one line one after another in one
+loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
+counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). --jobs N runs N pages
+at once, each in a worker process with its own browser (default: half the cores, at most 4, and what free
+memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded, so the counts are the same as
+one after another.
 
 Baseline (#89): `--baseline` stores each run's key counts in reports/baseline/headless.json (committed),
 with what they were measured on (the git trees of the game, the in-page checks, the data manifest and
@@ -31,6 +34,8 @@ measured at night (tools/autodeploy.py), not by PRs:
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
 
+The full run (all lines, all checks, seeds 1-5) takes ~27 min at 4 pages (2026-11-04, #205; ~2 h before).
+
 Seed spread (#156): a change to the tram's timing reshuffles traffic like a new seed (#151 moved walkerHit
 +54 % on one seed and -33 % on another). So --baseline and --compare run seeds 1-5 by default, and a
 count is judged by the branch's mean over its seeds against the min-max of main's stored seeds; inside
@@ -39,14 +44,16 @@ signal penalties, a traffic run that does not finish) are compared per seed as b
 """
 import argparse
 import json
+import multiprocessing
 import os
+import queue
 import secrets
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
@@ -62,6 +69,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 CALLS = {
     "u3": "const { run } = await import('/tools/bench/u3.js'); return await run(SEED);",
     "redruns": "const { run } = await import('/tools/bench/redruns.js'); return await run(SEED);",
+    # u3 and redruns drive the same trip with the same seed: one drive, both watchers (#205), reported as both
+    "drive": "const { run } = await import('/tools/bench/u3.js'); const { redrunsWatch } = await import('/tools/bench/redruns.js');"
+             "const r = await run(SEED, { also: [redrunsWatch] }); const red = r.also[0]; delete r.also; return { u3: r, redruns: red };",
     "traffic": "const { trafficRun } = await import('/tools/traffic_lint.js'); return await trafficRun({ seed: SEED });",
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
@@ -72,8 +82,12 @@ CALLS = {
                 "const { run } = await import('/tools/bench/crossingSlab.js'); return run();",
     "surfaces": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
                 "const { run } = await import('/tools/bench/surfaces.js'); return await run();",
+    "spacing": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+               "const { run } = await import('/tools/bench/spacing.js'); return run();",
+    "heights": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+               "const { run } = await import('/tools/bench/heights.js'); return run();",
 }
-SEEDLESS = {"lint", "surfaces", "canted", "crossing"}
+SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights"}
 
 
 def judge(check, r):
@@ -117,6 +131,24 @@ def judge(check, r):
         if c.get("count"):
             bad.append(f"{c['count']} unexplained pedestrian obstructions")
         more = f"raw sections {c.get('rawCount')}, samples {c.get('of')}, missing samples {c.get('missing')}"
+    elif check == "spacing":
+        c = (r.get("checks") or {}).get("spacing", {})
+        for sec in c.get("sections") or []:
+            if sec.get("outside"):
+                bad.append(f"{sec['name']}: {sec['outside']} sections outside {sec['expect']}")
+            if sec.get("expect") and sec.get("kinks"):
+                bad.append(f"{sec['name']}: {sec['kinks']} kinks")
+        more = "; ".join(f"{s['name']} {s['min']}-{s['max']} m ({s['alongside']}/{s['sections']})"
+                         for s in c.get("sections") or []) or "no pilot section on this line"
+    elif check == "heights":
+        c = (r.get("checks") or {}).get("heights", {})
+        for k in ("path", "pathBack"):
+            if (c.get(k) or {}).get("p90") is not None and c[k]["p90"] > 0.10:
+                bad.append(f"{k} p90 {c[k]['p90']} m from the staged heights")
+        if c.get("apartCount"):
+            bad.append(f"{c['apartCount']} junctions with two heights")
+        more = (f"path {c.get('path')}, pathBack {c.get('pathBack')}, junctions {c.get('junctions')}"
+                if c.get("assembled") else "no assembled heights on this line")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):
@@ -412,22 +444,67 @@ ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-
         "--disable-backgrounding-occluded-windows"]
 
 
-def worker(job, url, headed, timeout):
-    """One job in a worker process, with a browser of its own (sync Playwright is one per process)."""
-    line, check, seed = job
+def worker(jobs, url, headed, timeout, done=None):
+    """A batch of one line's jobs in a worker process, with a browser of its own (sync Playwright is one per
+    process): one page load for all of them, the next shift started in the same page (#205: the load is ~60 s
+    of a ~145 s run). A run that fails or times out leaves the page; the rest of the batch gets a fresh one.
+    Each result also goes to the queue `done` as it comes, for the progress lines."""
+    out = []
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed, args=ARGS)
         try:
-            r, secs = run_one(browser, url, line, check, seed, timeout)
+            page = None
+            for line, check, seed in jobs:
+                if page is None:
+                    page, errors, load = load_page(browser, url, line, timeout)
+                r, secs = run_one(page, errors, check, seed, timeout, load)
+                load = 0
+                out.append(((line, check, seed), r, secs))
+                if done is not None:
+                    done.put(out[-1])
+                if r.get("error") or r.get("pageErrors"):
+                    page.close()
+                    page = None
+            if page is not None:
+                page.close()
         finally:
             browser.close()
-    return job, r, secs
+    return out
 
 
-def run_one(browser, url, line, check, seed, timeout):
+def load_page(browser, url, line, timeout):
+    """A page with the line loaded: (page, its page errors, seconds or an error)."""
     page = browser.new_page(viewport={"width": 960, "height": 540})
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
+    t0 = time.monotonic()
+    try:
+        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=min(120_000, timeout * 1000))
+        # loaded: the loading screen is hidden and the title names the line (as batch.html waits)
+        page.wait_for_function(
+            f"() => document.getElementById('loading')?.classList.contains('hidden') && document.title.includes('{line}')",
+            timeout=max(1, min(600_000, (timeout - (time.monotonic() - t0)) * 1000)), polling=1000)
+    except PlaywrightTimeoutError:
+        return page, errors, {"error": "timeout"}
+    except Exception as e:  # noqa: BLE001 (a failed load is a result)
+        return page, errors, {"error": f"{type(e).__name__}: {e}"}
+    return page, errors, round(time.monotonic() - t0)
+
+
+def run_single(browser, url, line, check, seed, timeout):
+    """One run in a fresh page, closed after it."""
+    page, errors, load = load_page(browser, url, line, timeout)
+    try:
+        return run_one(page, errors, check, seed, timeout, load)
+    finally:
+        page.close()
+
+
+def run_one(page, errors, check, seed, timeout, load=0):
+    """One check in a loaded page; its seconds include the page load when it is the first in the page."""
+    if isinstance(load, dict):
+        return dict(load, **({"pageErrors": errors[:20]} if errors else {})), 0
+    errors.clear()
     t0 = time.monotonic()
 
     def remaining(cap):
@@ -437,11 +514,6 @@ def run_one(browser, url, line, check, seed, timeout):
         return min(cap, ms)
 
     try:
-        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=remaining(120_000))
-        # loaded: the loading screen is hidden and the title names the line (as batch.html waits)
-        page.wait_for_function(
-            f"() => document.getElementById('loading')?.classList.contains('hidden') && document.title.includes('{line}')",
-            timeout=remaining(600_000), polling=1000)
         js = CALLS[check].replace("SEED", str(seed))
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
@@ -459,17 +531,15 @@ def run_one(browser, url, line, check, seed, timeout):
         r = {"error": "timeout"}
     except Exception as e:  # noqa: BLE001 (a failed run is a result)
         r = {"error": f"{type(e).__name__}: {e}"}
-    finally:
-        page.close()
     if errors:
         r["pageErrors"] = errors[:20]
-    return r, round(time.monotonic() - t0)
+    return r, round(time.monotonic() - t0) + load
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="17")
-    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint, canted, crossing, surfaces")
+    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, traffic, lint, canted, crossing, surfaces, spacing, heights")
     ap.add_argument("--seeds", help=f"default 1-3; {SPREAD_SEEDS} with --baseline or --compare (the seed spread)")
     ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
@@ -477,6 +547,10 @@ def main():
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
     ap.add_argument("--jobs", type=int, default=workers(4.0),
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
+    ap.add_argument("--separate", action="store_true",
+                    help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
+    ap.add_argument("--batch", type=int, default=6,
+                    help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
     ap.add_argument("--baseline", action="store_true",
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
@@ -519,18 +593,52 @@ def main():
         print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
+    def split(res):
+        """A drive's result as the u3 and redruns results it holds (an error goes to both)."""
+        (line, check, seed), r, secs = res
+        if check != "drive":
+            return [res]
+        extra = {"pageErrors": r["pageErrors"]} if r.get("pageErrors") else {}
+        return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs)
+                for c in ("u3", "redruns")]
+
     heavy = HeavyJob("headless")  # (the nightly baseline waits while this runs, tools/baseline_store.py)
     try:
         heavy.__enter__()
         os.makedirs(a.out, exist_ok=True)
-        if a.jobs > 1 and len(jobs) > 1:
-            with ProcessPoolExecutor(min(a.jobs, len(jobs))) as ex:
-                futs = [ex.submit(worker, job, url, a.headed, a.timeout) for job in jobs]
-                for i, fu in enumerate(as_completed(futs), 1):
-                    report(i, *fu.result())
+        # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
+        runs = list(jobs)
+        if not a.separate:
+            both = {(l, s) for l, c, s in jobs if c == "u3"} & {(l, s) for l, c, s in jobs if c == "redruns"}
+            runs = [(l, "drive", s) if c == "u3" and (l, s) in both else (l, c, s) for l, c, s in jobs
+                    if not (c == "redruns" and (l, s) in both)]
+        batches = []
+        for line in lines:
+            mine = [j for j in runs if j[0] == line]
+            batches += [mine[k:k + max(1, a.batch)] for k in range(0, len(mine), max(1, a.batch))]
+        i = 0
+        if a.jobs > 1 and len(batches) > 1:
+            with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
+                done = mgr.Queue()
+                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done) for b in batches]
+                while i < len(jobs):
+                    try:
+                        res = done.get(timeout=5)
+                    except queue.Empty:
+                        if all(fu.done() for fu in futs):
+                            for fu in futs:
+                                fu.result()  # (a worker that failed outside a run)
+                            break
+                        continue
+                    for part in split(res):
+                        i += 1
+                        report(i, *part)
         else:
-            for i, job in enumerate(jobs, 1):
-                report(i, *worker(job, url, a.headed, a.timeout))
+            for b in batches:
+                for res in worker(b, url, a.headed, a.timeout):
+                    for part in split(res):
+                        i += 1
+                        report(i, *part)
     finally:
         heavy.__exit__()
         if server:

@@ -90,6 +90,11 @@ git add data/MANIFEST.json && git commit
 ```
 The manifest records the snapshot the build used and the commit it was built at. Commit it together with
 the tool changes that produced it.
+`data-publish` refuses when `raw/` differs from that snapshot (a changed input, or an input file in no
+snapshot): the build would not come from the snapshot it names. Publish a snapshot with the new files first;
+`--allow-drift` overrides it on purpose and writes the difference into the note. The build tools read only the
+snapshot: `geoportal.py` and `fine_terrain.py` stop at an answer or tile missing from `raw/` and name it, and
+download it only with `--fetch` (#223).
 
 **A new source snapshot** (new OSM, GTFS, survey packages, …), a deliberate step:
 1. Refresh the inputs in `raw/` (each group's `refresh` in the manifest; OSM: download Geofabrik's
@@ -214,6 +219,11 @@ exports**. Until those packages exist, no post-1.5 compatibility conclusion has 
 
 | id | note |
 |---|---|
+| `2026-11-05` | `2026-11-03b` + the archive DTM's stop signs along lines 9, 17, 22, 23 and 37, both point layers (`raw/dtmpoints/lineN.signs.json`, `python -P -E tools/dtm_points.py N --signs`, fetched 2026-11-05): the stop sign's second source after the user's (#258). |
+| `2026-11-03b` | `2026-11-03` + DI set 7 at state 2026-10-31 for the same 16 districts (#209): Dvorecký most's tracks (2.9 km new, entered 2026-10-07 and 10-22) and records re-entered with heights. |
+| `2026-11-03` | `2026-11-02` + 8 Geoportál tiles of line 17's corridor (I3S buildings, trees, tree rows, walls) at its edge, moved by the DI track (#20). |
+| `2026-11-02` | `2026-11-01` + IPR Mosty 3D, the whole layer (`raw/geoportal/mosty3d/`, 49 meshes, 672 bridges, `python -I tools/mosty3d.py fetch`): a structure source for track heights (#192). |
+| `2026-11-01` | `2026-10-30c` + ZPS 2026-09-30 for lines 9, 23 and 37: 9 more districts (#125). |
 | `2026-10-30c` | `2026-10-30b` + IPR Praha's 1 m terrain raster (`raw/ipr-dtm/`, lidar 2023, resampled 2025-07-10), the first level of the terrain chain (#10). |
 | `2026-10-30b` | `2026-10-30` + complete archived DTMP tram-axis layer (55010) with Z, IDs, metadata and provenance; assessed as a height fallback in the same 16 DI districts. |
 | `2026-10-30` | `2026-10-29c` + DI set 7 JVF packages for the 16 districts crossed by lines 9, 17, 22, 23 and 37 (state 2026-09-30), exact download provenance and provider access/licence evidence. |
@@ -228,7 +238,8 @@ lines and the snapshot's OSM district boundaries. Sources go to `raw/dtm-di/`, s
 ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and provider terms.
 The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
 altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
-The first acquisition is published in snapshot `2026-10-30` (#61).
+The first acquisition is published in snapshot `2026-10-30` (#61), the state 2026-10-31 in `2026-11-03b` (#209); the
+old records it keeps beside their re-entries: [knowledge](docs/knowledge.md#sources-and-their-quirks).
 
 ### IPR 1 m terrain
 

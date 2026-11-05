@@ -1,7 +1,31 @@
 // Low-poly models built from primitives: T3 tram, cars, pedestrians, signals and signs.
 import * as THREE from 'three';
+import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
+import { CAR_PITCH } from './tram.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
+
+// Resources that outlive one object carry userData.shared: the detailed T3's geometry and textures
+// (every set shares them), the cached sign and leaf textures. disposeModel leaves them alone.
+const shared = (x) => !!x.userData?.shared;
+const texturesOf = (m) => Object.values(m).filter((v) => v?.isTexture);
+
+// Frees the GPU memory of an object that leaves for good (an AI tram, a cross-street car, the last
+// shift's objects): its geometries, materials and their textures. It skips the shared ones and the
+// world's geometry, whose arrays are dropped after upload (main.js uploadWorld), so it could not be
+// uploaded again. (Without it, every AI tram left 5 canvas textures and a material on the GPU.)
+export function disposeModel(root) {
+  root.traverse((o) => {
+    const g = o.geometry;
+    if (g && !g.userData.release && !shared(g)) g.dispose();
+    if (o.isInstancedMesh) o.dispose();
+    for (const m of [o.material].flat()) {
+      if (!m || shared(m)) continue;
+      for (const tex of texturesOf(m)) if (!shared(tex)) tex.dispose();
+      m.dispose();
+    }
+  });
+}
 
 function canvasTexture(w, h, draw) {
   const cv = document.createElement('canvas');
@@ -12,6 +36,9 @@ function canvasTexture(w, h, draw) {
   t.anisotropy = 4;
   return t;
 }
+
+// a texture cached for the whole page (signs, plates): marked shared, so disposeModel keeps it
+const keptTexture = (w, h, draw) => { const tex = canvasTexture(w, h, draw); tex.userData.shared = true; return tex; };
 
 // Plan outline of the car body: straight sides with elliptical ends.
 function planShape(halfW, halfL, endDepth) {
@@ -247,10 +274,15 @@ function makeT3Car(line, mats) {
 // separate children so each can follow the track on its own bogies: see placeConsist().
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
+// detailed: 'hybrid' (or true: the animated hybrid, src/t3h.js), 'classic' (conflig's model, loaded on the
+// player's choice), false (the procedural car); a model not loaded falls back to the next simpler one
 export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '' } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
-  if (detailed && detailedProto) return makeDetailedSet(root, line, cars, dest, run);
+  if (detailed === 'classic' && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
+  if (detailed && hybridReady()) { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP); root.userData.kind = 'hybrid'; return root; }
+  if (detailed && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
+  root.userData.kind = 'simple';
   root.userData.bogie = 3.8;     // bogie pivots of the built-in model
   root.userData.bodyFront = 7.0;
   const mats = {
@@ -268,11 +300,13 @@ export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, ru
   return root;
 }
 
-// Detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt),
+// The classic detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt), the
+// player's choice beside the hybrid (src/t3h.js): simpler, no saloon and no moving parts.
 // reduced to a single 2048 px colour texture with the ambient occlusion baked in. Its axes were
 // found by principal component analysis of the body: length e1 (front = wipers), width e2
 // (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
 let detailedProto = null;
+export const classicReady = () => !!detailedProto;
 export const CONTACT_WIRE = 5.34;  // contact wire over top of rail (the track profile; src/heights.js)
 export const RAIL_TOP = 0;         // the wheels stand on the profile: it is the top of rail (src/heights.js)
 
@@ -357,6 +391,8 @@ export async function loadDetailedT3(url = 'assets/t3/t3.gltf', files = {}) {
   proto.userData = { bogie, panto: (pb.min.z + pb.max.z) / 2, bodyFront: body.max.z, boxes: paintedBoxes(proto), cards: glassCards(proto) };
   const mat = proto.children[0].material;
   mat.metalness = 0; mat.roughness = 0.75;
+  // (not the material: each set clones it, and a clone copies userData)
+  for (const m of proto.children) for (const x of [m.geometry, ...texturesOf(m.material)]) x.userData.shared = true;
   detailedProto = proto;
   return proto;
 }
@@ -480,6 +516,7 @@ function makeDetailedSet(root, line, cars, dest, run) {
 // Change the route number on the plates, the destination card and the run number (a new shift, a run
 // continuing as another line). (A set made without a destination has no card to change.)
 export function setConsistLine(model, line, dest = model.userData.dest, run = model.userData.run) {
+  if (model.userData.hybrid) { setHybridLine(model, line, dest, run); return; }
   const u = model.userData, { mats } = u;
   const swap = (m, tex) => { if (!m) return; const old = m.map; m.map = tex; m.needsUpdate = true; old?.dispose(); };
   if (u.line !== line) {
@@ -493,12 +530,14 @@ export function setConsistLine(model, line, dest = model.userData.dest, run = mo
 }
 
 // Put each car of a set on the track: cars are 15.2 m over couplers, the body starts 0.6 m
-// behind the coupler face; the car rests on its two bogie pivots (the model's own spacing), so
-// it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y, track bed height].
+// behind the coupler face, coupled cars CAR_PITCH apart; the car rests on its two bogie pivots (the
+// model's own spacing), so it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y,
+// track bed height]. (The hybrid hangs its cars on the coupling: src/t3h.js.)
 export function placeConsist(model, sFront, at) {
+  if (model.userData.hybrid) { placeHybridConsist(model, sFront, at); return; }
   const { bogie, bodyFront } = model.userData;
   model.userData.cars.forEach((car, k) => {
-    const c = sFront - k * 15.2 - 0.6 - bodyFront; // car origin (midway between the bogies)
+    const c = sFront - k * CAR_PITCH - 0.6 - bodyFront; // car origin (midway between the bogies)
     const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
     car.position.set((ax + bx) / 2, (za + zb) / 2 + RAIL_TOP, -(ay + by) / 2);
     car.rotation.order = 'YXZ'; // heading, then pitch, then the lean into a canted curve
@@ -690,7 +729,7 @@ let pPlateTex = null, backplateTex = null;
 const callTex = {};
 function callTexture(dir) {
   if (callTex[dir]) return callTex[dir];
-  callTex[dir] = canvasTexture(128, 128, (c, w, h) => {
+  callTex[dir] = keptTexture(128, 128, (c, w, h) => {
     c.fillStyle = '#0a0a0a';
     c.fillRect(0, 0, w, h);
     const bars = { left: [[28, 30], [58, 98]], straight: [[64, 26], [64, 102]], right: [[100, 30], [70, 98]] };
@@ -719,7 +758,7 @@ export function makeTramSignal({ distant = false } = {}) {
   g.add(pole);
   g.userData.pole = pole;
   g.userData.boardTop = top + 0.43;
-  if (!backplateTex) backplateTex = canvasTexture(128, 128, (c, w, h) => {
+  if (!backplateTex) backplateTex = keptTexture(128, 128, (c, w, h) => {
     c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(0, 0, w, h, 10); c.fill();
     c.strokeStyle = '#111'; c.lineWidth = 5; c.beginPath(); c.roundRect(9, 9, w - 18, h - 18, 6); c.stroke();
   });
@@ -744,7 +783,7 @@ export function makeTramSignal({ distant = false } = {}) {
   }
   let callFace = null;
   if (distant) {
-    if (!pPlateTex) pPlateTex = canvasTexture(96, 128, (c, w, h) => {
+    if (!pPlateTex) pPlateTex = keptTexture(96, 128, (c, w, h) => {
       c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
       c.fillStyle = '#ffe600'; c.fillRect(8, 8, w - 16, h - 16);
       c.strokeStyle = '#111'; c.lineWidth = 4; c.strokeRect(12, 12, w - 24, h - 24);
@@ -781,7 +820,7 @@ export function makeTramSignal({ distant = false } = {}) {
 const arrowTextures = {};
 function arrowTexture(dir) {
   if (arrowTextures[dir]) return arrowTextures[dir];
-  arrowTextures[dir] = canvasTexture(160, 128, (g, w, h) => {
+  arrowTextures[dir] = keptTexture(160, 128, (g, w, h) => {
     g.fillStyle = '#0b0b0b';
     g.fillRect(0, 0, w, h);
     // chevron as two thick strokes meeting at a tip
@@ -843,7 +882,7 @@ function signOnPole(tex, w, h, y, poleH = y + h / 2) {
 }
 
 const signTex = new Map();
-const cached = (key, make) => { if (!signTex.has(key)) signTex.set(key, make()); return signTex.get(key); };
+const cached = (key, make) => { if (!signTex.has(key)) { const tex = make(); tex.userData.shared = true; signTex.set(key, tex); } return signTex.get(key); };
 
 // Tram speed sign (rychlostník): black number on a white board with a black border.
 export function makeSpeedSign(v) {
@@ -926,7 +965,7 @@ export function makeStopSign(name, request = false, lines = ['22']) {
     g.add(m);
   };
   // tram stop sign
-  if (!stopTopTex) stopTopTex = canvasTexture(160, 160, (c, w, h) => {
+  if (!stopTopTex) stopTopTex = keptTexture(160, 160, (c, w, h) => {
     c.fillStyle = '#d5161e'; c.fillRect(0, 0, w, h);
     c.fillStyle = '#ffffff'; c.fillRect(10, 10, w - 20, h - 20);
     c.fillStyle = '#1f5fb4'; c.fillRect(16, 16, w - 32, h - 32);
@@ -973,7 +1012,7 @@ export function makeStopSign(name, request = false, lines = ['22']) {
   const redGlass = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.08, 0.32), lambert(0xc41018));
   redGlass.position.set(0, 2.12, 0.045);
   g.add(redGlass);
-  if (!timetableTex) timetableTex = canvasTexture(128, 160, (c, w, h) => {
+  if (!timetableTex) timetableTex = keptTexture(128, 160, (c, w, h) => {
     c.fillStyle = '#b8b8b2'; c.fillRect(0, 0, w, h);
     for (const [x, y, ww, hh, col] of [[6, 6, 56, 46, '#fafafa'], [66, 6, 56, 46, '#fafafa'], [6, 56, 56, 46, '#fafafa'], [66, 56, 56, 46, '#fafafa'], [6, 106, 56, 48, '#f3d24a'], [66, 106, 56, 48, '#fafafa']]) {
       c.fillStyle = col; c.fillRect(x, y, ww, hh);
@@ -984,7 +1023,7 @@ export function makeStopSign(name, request = false, lines = ['22']) {
   panel(1.55, 0.7, red);
   face(1.55, 0.66, timetableTex);
   // base box with the "danger: electrical equipment" sticker
-  if (!baseTex) baseTex = canvasTexture(128, 128, (c, w, h) => {
+  if (!baseTex) baseTex = keptTexture(128, 128, (c, w, h) => {
     c.fillStyle = '#d5161e'; c.fillRect(0, 0, w, h);
     c.fillStyle = '#f5d000'; c.fillRect(44, 30, 40, 50);
     c.fillStyle = '#111';

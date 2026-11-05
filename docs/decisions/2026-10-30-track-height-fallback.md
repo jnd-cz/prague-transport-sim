@@ -264,6 +264,93 @@ Brusnice, Čechova čtvrť: a gradual drop and one steep climb) and on 3 for a d
 Hodkovičky, Černý kůň), and the survey answer is offered on 4, Palackého most among them, where the
 archive measured the river bed.
 
+**Fallback order of the 2026-11-02 review (#184).** The user's answers, one per decision, are facts in
+`data/truth.json` (`trackHeights.reviewAnswers`, keyed by decision id, scoped by its lines, each with the
+quote it rests on); `python -P -E tools/track_span_evidence.py` imports them (27 of 27). The order agreed
+in the walkthrough: DI, then the archive where it is smooth, then:
+
+1. **The other direction's archive.** Where a span's archive steps or dips and the other direction of
+   the same line, 2.5–6 m away, is smooth, every stretch where the two differ by more than 0.3 m and
+   agree again at both ends takes the other direction's heights, the offset at the two ends interpolated
+   (`from_parallel` in the profile). Calibration: parallel archive axes city-wide differ by p50 0.02,
+   p90 0.09, p99 0.45 m; 0.3 m is p98.4. 0.3 m only triggers the repair: it reaches out over points under
+   the trigger to where the difference is back within 0.1 m (p90) of its median over the 15 m beyond, and
+   not into the previous repair. The departures start below 0.3 m: Modřany's street record 0.12 m off the
+   usual offset at its first point, Brusnice's sinking record 0.15 m, each leaving a kink (6.1 % at
+   Brusnice, now 0.5 %). Mends Hlavní nádraží (2), Modřany inbound and Brusnice.
+2. **The survey's track and deck areas on a structure** (`follows survey surface`, where no surface is
+   rail-height eligible): only on a span where they meet the archive within 0.3 m at every smooth archive
+   point, on both sides of every dip (`survey_rule: track_area_agrees_with_archive`). On the queue's
+   bridges those areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive, so the test is
+   per span. Černý kůň imports; Hodkovičky's (2 m below) is held.
+3. **A curve across a dip** (`archive, bridged over a dip`): a cubic between the dip's ends that continues
+   the archive's least-squares grade over 15 m on each side (the chord where one side has fewer than
+   two points), instead of a straight deck. Hodkovičky: a crest 0.3 m above the chord, Modřany 0.2 m. A dip extends
+   over the descent and climb above 4 % around its steep part (Černý kůň's archive falls 4–5 % for 14 m
+   before the drop, while the deck rises).
+
+The game does not take these profiles yet: profile assembly is #20.
+
+**The terrain checks an archive height nothing else confirms (#190).** Where there is no numeric DI and no
+ZPS surface within 0.3 m of the archive, the import compares the archive with the 2023 lidar terrain
+(`tools/import_track_heights.py` `Terrain`, `tools/track_heights.py` `TERRAIN`). Calibrated where a survey
+confirms the archive (45,577 samples): archive minus terrain p99.9 0.36 m on paved track, 0.78 m on unknown
+construction, 13 samples over 1 m (0.03 %). An archive height more than 1 m off is held
+(`archive_terrain_height_disagreement`, blocking like a survey disagreement), and the hold spreads along the
+track while neighbours stay more than 0.5 m off (`extend_holds`, above every class's p99). It never judges
+numeric DI, a structure or a tunnel: under a deck the terrain is another level. 2026-11-02 it holds 866 m of
+the network (line 9 108 m, 17 185 m, 22 and 23 30 m, 37 none): a record 83 m above the street at Malovanka,
+the old archive alignment winding ±4 m around the new Trojský most's approach, 45 m on line 9 at
+50.0727 N 14.4099 E (Palackého most's Smíchov abutment, on land: the archive dives 5.4 m below the street), two
+5–8 m dips at Brusnice on lines 22/23, Modřany's dip on line 17 (its reviewed answer still wins). Mosty 3D decks
+(below) took 159 m of it off the game lines. A held stretch is bridged by the vertical profile's curve from
+both sides ([vertical profile](2026-11-02-vertical-profile.md), #20), as the user asked for dips on #184.
+
+**A tram's structure stays one while OSM maps the track disused or under construction (#190).** The
+structure mask (`tools/dtmp_tracks.py` `structure_mask`) takes `railway=tram` and the tram values of
+`disused:railway`, `construction:railway` and `construction`: Libeňský most is `railway=disused` +
+`disused:railway=tram` on `bridge=yes` during its rebuild while the 2026 DI has the track. Disused heavy rail
+and the metro D construction tunnels stay out (a tram above them is not on them).
+
+**The user's structures (#190).** A structure no source maps is a fact from the user in `data/truth.json`
+`trackHeights.structures`, keyed by place (from / to along the track), added to the structure mask as a 6 m
+corridor (`truth_structures`). The first: Libeňský most from the end of the river bridge (50.1034 N, 14.4645 E)
+to the street towards Palmovka (14.4693 E). The old viaduct there is demolished (OSM `railway=razed`), the
+2026 DI track has no heights, and the archive and the lidar fall onto the ground 6–8 m under the deck; the new
+deck keeps the original height, level to ~14.4665 E (192.4 m), then ~1.2 % down to the street (190.0 m), a curve
+between the selected heights at both ends. With both rules `structure_hint` grows 15,650 → 17,029 m.
+
+**Track on a Mosty 3D bridge (#192).** IPR's Mosty 3D (photogrammetry 2001–2008, 672 bridges in 49 meshes,
+the whole layer in `raw/geoportal/mosty3d/`, `tools/mosty3d.py`) maps bridges OSM does not tag on the tram
+way. A footprint alone also covers track under a road bridge, so `tools/track_bridges.py` splits the merged DI
+track at each footprint and compares the track's height just outside each end (numeric DI alone where it
+exists, else the archive and the lidar terrain) with the model's top just inside (the median at 1.5–6 m, past
+a statue or pylon at a bridge's end). A piece is **on** the bridge when a height at an end is within
+`ON` = 1.5 m of the top; **under** when every height at every end is `UNDER` = 3 m or more below it; a piece
+continuing an "on" piece of a bridge split into features is on. One matching end is enough: the other end, or
+the archive, may be the ground under the deck (the Libeň river-bridge end; the archive across Palackého most
+falls to the river). Of an "on" piece only the deck over open space joins the structure mask (a 5 m corridor):
+where the model's top is within `ABUTMENT` = 1.5 m of the lidar terrain the bridge stands on land or the bare
+earth spans a short gap, the track is at grade and the terrain check holds there (Palackého most's Smíchov
+abutment: top 197.5 m, terrain 197.2–197.5 m, the archive 5 m below; the user's answer for that bridge stays in
+scope). The model never supplies a height.
+
+Calibrated against OSM 2026-11-02 (`python -P -E tools/track_bridges.py`, `reports/track-bridges.json`):
+
+| OSM's word | pieces | on | under | unknown | nearest end to the top |
+|---|---:|---:|---:|---:|---|
+| tram way on `bridge=*` | 79 (8,773 m; 7,902 m over open space) | 79 | 0 | 0 | p50 0.13 m, p90 0.42 m, max 1.05 m |
+| another bridge crossing tram track | 114 (1,815 m) | 0 | 114 | 0 | min 3.30 m, p50 6.70 m |
+| untagged | 50 (1,227 m) | 35 (943 m; 546 m over open space) | 12 | 3 | |
+
+The untagged decks over open space: Libeňský most's viaduct (14.4661–14.4691 E, 360 m of both directions; 0.1–0.2 m
+at the river end, 3.0–3.4 m from the archive's dip at the street end), the Petřín funicular's viaduct (DI maps
+the funicular as tram track) and short bridges of 6–18 m (among them 50.0549 N 14.4723 E, whose 5.5 m and
+4.2 m archive dips were #190's `dip` steps). Between the Libeň river bridge and the viaduct (14.4645–14.4661 E)
+the model has no bridge: there the user's fact is the only source. Network effect: `structure_hint`
+17,029 → 17,382 m (of the game lines only line 37, +29 m: the rest lies on OSM bridges already), selected
+heights −44 m, none newly selected; the review queue stays 27 decisions, 120 spans. The review lists a decision's Mosty features.
+
 **Last no-data fallback for #20:** ordinary track may use IPR's 1 m bare-earth terrain plus its approved
 style drawing offset, flagged `terrain_fallback_unvalidated` with raster provenance and its assumed Bpv
 datum. The queue's `ordinary_terrain_fallbacks` gives those proposals. No ambiguous level, known archive
@@ -321,6 +408,8 @@ python -I tools/snapshot.py data-fetch
 python -P -E tools/test_dtmp_tracks.py
 python -P -E tools/dtmp_tracks.py
 python -P -E tools/test_track_heights.py
+python -P -E tools/test_track_bridges.py
+python -P -E tools/track_bridges.py
 python -P -E tools/import_track_heights.py
 python -P -E tools/calibrate_track_heights.py --input reports/track-heights.json
 python -P -E tools/track_structure_review.py --input reports/track-heights.json

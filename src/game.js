@@ -6,11 +6,11 @@ import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
   makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
-  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign,
+  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign, disposeModel,
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
-const STOP_AHEAD = 6;          // tram front stops this far past the projected platform point
+const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
 // The platform is 30 m long: any front position that puts the 14 m car alongside it counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
@@ -107,7 +107,7 @@ export class Game {
     this.segments = data.segments || [{ line: String(data.line), from: 0 }];
     this.line = this.segments.filter((g) => g.from <= opts.startStop).pop().line; // starting at the change stop = new line
     this.onLineChange = null;
-    this.backRoute = data.pathBack?.length > 1 ? new Route(data.pathBack) : null;
+    this.backRoute = data.pathBack?.length > 1 ? new Route(data.pathBack, null, data.trackSource?.pathBack, !!data.trackCurve) : null;
     this.backRoute && (this.backRoute.ground = route.ground);
     this._initStops();
     this._initSignals();
@@ -150,7 +150,8 @@ export class Game {
       if (request && r() < 0.55) waiting = 0;
       const stop = {
         i, name: s.name, request,
-        target: Math.min(s.s + STOP_AHEAD, this.route.length - 2),
+        // the front stops beside the stop sign (D 1/2 § 27.6; tools/build_line.py, #258)
+        target: Math.min(s.sign ?? s.s + STOP_AHEAD, this.route.length - 2),
         p0: s.p0, p1: s.p1,
         sched: this.trip[i],
         waiting, alightFrac: 0.08 + r() * 0.25 + central * 0.05,
@@ -353,7 +354,9 @@ export class Game {
             d.s = Math.max(d.s, Math.min(st.target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
             // (and the front stops for the passengers no further than that: the crossing began 4 m before
             // the platform's end at Staroměstská, the tram served the stop 3 m past its red stop point)
-            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], st.target + 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
+            // (served up to 0.5 m before the signal, 2.5 m past the stop point: 0.5 m was too little to stop a T3
+            // in, the user, #255)
+            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
           }
         }
       }
@@ -961,6 +964,11 @@ export class Game {
   }
 
   get doorsClosed() { return this.doorState === 'closed'; }
+  // how far the doors are open, 0..1 (the drawn doors follow it)
+  get doorOpenness() {
+    const d = this.doorState;
+    return d === 'open' ? 1 : d === 'closed' ? 0 : d === 'opening' ? 1 - this.doorTimer / DOOR_OPEN_TIME : this.doorTimer / DOOR_CLOSE_TIME;
+  }
 
   // ------------------------------------------------------------------ input
   toggleDoors() {
@@ -1119,7 +1127,7 @@ export class Game {
       radius: this.route.radiusAt(tram.s - 4),
       mu: this.muAt(tram.s),
       sandKey: !!input.sand,
-      autoHold: this.doorState !== 'closed',
+      doorsOpen: this.doorState !== 'closed', // (the door relay keeps the line contactor out; no brake from it)
     });
 
     this._updateDoors(dt);
@@ -1205,7 +1213,9 @@ export class Game {
     // departure detection
     if (st.served && st.departClock === null && tram.v > 0.3) st.departClock = this.clock;
 
-    const passed = tram.s > st.zone[1] + 1;
+    // (past the zone it is passed: a tram standing in the metre after it was neither at the stop nor past
+    // it, and stood for good, the autopilot aiming at a stop point behind it: #241's checks)
+    const passed = tram.s > st.zone[1];
     const last = this.nextStop === this.stops.length - 1;
     if (last && st.served && st.alight === 0 && this.doorState === 'open') {
       this._finishStop(st);
@@ -1284,7 +1294,7 @@ export class Game {
   heatingDraws() { const c = this.climate; return c.saloon > 0 || c.cab >= 2; }
   contactCurrent() {
     const inp = this.input || {};
-    return this.tram.force > 500 || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
+    return this.tram.drawing || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
   }
 
   setHeating(which) {
@@ -1463,7 +1473,7 @@ export class Game {
       }
     }
     sig.cars = sig.cars.filter((c) => {
-      if (c.s < -1 || c.s > X.length + 1) { this.objects.remove(c.mesh); return false; }
+      if (c.s < -1 || c.s > X.length + 1) { this.objects.remove(c.mesh); disposeModel(c.mesh); return false; }
       return true;
     });
   }
@@ -1542,6 +1552,20 @@ export class Game {
   }
 
   // gap from our front to the rear of the next tram ahead (m), or null
+  // Keep the junction clear (#259): a tram whose front is still before a signal does not follow a tram
+  // whose rear is between that signal and the junction's far side; it waits at the stop line (s − 3) until
+  // the junction is clear. With trams queueing 2 m apart, one following into a junction stood across it
+  // with a car crossing in front (line 9 seed 5: the traffic check jammed). The far side is taken as
+  // symmetric about the crossing's centre. Returns the stop point, or null.
+  keepClear(front, leaderRear) {
+    for (const sig of this.signals) {
+      if (sig.s < front + 0.5 || leaderRear < sig.s - 2) continue;
+      const far = sig.cross + (sig.cross - (sig.edge ?? sig.s)) + 2;
+      if (leaderRear < far) return sig.s - 3;
+    }
+    return null;
+  }
+
   tramAheadGap() {
     let gap = null;
     for (const ai of this.aiTrams) {
@@ -1592,7 +1616,7 @@ export class Game {
       if (this.latAcc > 1.4 && !this.latWarned) { this.latWarned = true; this.msg(t('msg.lateral'), 'warn'); }
       if (this.latAcc < 0.8) this.latWarned = false;
     }
-    if (tram.notch === -5 && tram.v > 4 && !this.emergencyFlag) {
+    if (tram.trackBrake && tram.v > 4 && !this.emergencyFlag) {
       this.emergencyFlag = true;
       if (tram.passengers > 20) this.msg(t('msg.emergencyPax'), 'warn');
     }
@@ -1630,7 +1654,11 @@ export class Game {
         const o = this.route.offset(along, lat);
         p.set(o.x, this.profile.height(along) + 0.18, -o.y);
         sc.set(1, 0.85 + r() * 0.3, 1);
-        q.setFromEuler(new THREE.Euler(0, r() * 6.28, 0));
+        // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
+        // as before, so everyone stands where they stood (#251)
+        const h = this.route.heading(along), v = r();
+        const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
+        q.setFromEuler(new THREE.Euler(0, yaw, 0));
         m.compose(p, q, sc);
         this.crowd.setMatrixAt(n++, m);
       }

@@ -14,7 +14,6 @@ Writes reports/registration_lineN.json. An offset over ~0.5 m means the layer's 
 import json
 import math
 import os
-import struct
 import sys
 from functools import cache
 

@@ -22,6 +22,10 @@ from track_heights import HeightGuard
 import import_track_heights as stage
 from track_decks import Decks, load_decks
 
+# the city frame's transformation grid is in the snapshot (raw/proj/): tests that convert coordinates
+# skip without it (a checkout with data/ only, CI)
+HAS_GRID = (ROOT / 'raw/proj/cz_cuzk_table_-y-x_3_v1710.tif').exists()
+
 
 def path(identity, z, y=0):
     return {'id': identity, 'coords': [(0, y, z), (10, y, z)], 'attrs': {}, 'sources': []}
@@ -101,6 +105,43 @@ class Guard(unittest.TestCase):
         self.assertEqual(result['z'], 200)
         self.assertEqual(result['height_source']['dataset'], 'archive')
 
+    def test_terrain_holds_an_archive_height_nothing_else_confirms(self):
+        # Malovanka (#190): one archive record 83 m above the street, with neither DI nor a survey there
+        held = HeightGuard().choose({'id': 'di-1', 'z': None}, match(path(1, 354.6)), 5, 0, terrain=271.2)
+        self.assertEqual(held['status'], 'review')
+        self.assertIn('archive_terrain_height_disagreement', held['review_flags'])
+        self.assertEqual(held['terrain_z'], 271.2)
+        kept = HeightGuard().choose({'id': 'di-1', 'z': None}, match(path(1, 200.4)), 5, 0, terrain=199.6)
+        self.assertEqual((kept['status'], kept['z']), ('selected', 200.4))
+        self.assertNotIn('archive_terrain_height_disagreement', kept['review_flags'])
+
+    def test_a_terrain_hold_spreads_to_neighbours_still_half_a_metre_off(self):
+        # Troja (#190): a wrong record held at 4 m off, its remnant at 0.94 m would survive the 1 m limit alone
+        guard, rows = HeightGuard(), []
+        for i, z in enumerate((271.1, 271.94, 275.0, 271.7, 271.3)):
+            choice = ({'id': 'di-1', 'z': None}, match(path(1, z)), 5 * i, 0, False, (), False, None, 271.0)
+            rows.append({'x': 5 * i, 'y': 0, 'choice': choice, 'decision': guard.choose(*choice)})
+        held = [r['decision']['status'] for r in stage.extend_holds(rows, guard)]
+        self.assertEqual(held, ['selected', 'review', 'review', 'review', 'selected'])
+
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
+    def test_the_users_libensky_most_holds_its_eastern_approach_as_a_structure(self):
+        from geo import Frame
+        mask, ids = stage.truth_structures(ROOT, box(0, 0, 0, 0), [])
+        self.assertIn('truth:libensky-most-east', ids)
+        frame = Frame()
+        deck = frame.xy(50.10347, 14.46767)     # archive 184.0 m on the ground under the demolished section
+        palmovka = frame.xy(50.10352, 14.47100)  # at grade
+        self.assertTrue(mask.intersects(Point(float(deck[0]), float(deck[1]))))
+        self.assertFalse(mask.intersects(Point(float(palmovka[0]), float(palmovka[1]))))
+
+    def test_terrain_never_judges_numeric_di_or_a_flagged_structure(self):
+        di = HeightGuard().choose({'id': 'di-1', 'z': 192.7}, match(path(1, 192.7)), 5, 0, terrain=180.4)
+        self.assertEqual((di['status'], di['z']), ('selected', 192.7))
+        bridge = HeightGuard().choose({'id': 'di-1', 'z': None}, match(path(1, 192.7)), 5, 0, True, terrain=180.4)
+        for result in (di, bridge):
+            self.assertNotIn('archive_terrain_height_disagreement', result['review_flags'])
+
     def test_ambiguous_levels_need_local_level_evidence(self):
         m = match(path(1, 200), path(2, 205, .1))
         self.assertEqual(m['status'], 'ambiguous')
@@ -172,6 +213,8 @@ class Guard(unittest.TestCase):
                     load_decks=lambda root: Decks([]),
                     load_context=lambda decks: __import__('track_context').TrackContext(),
                     surface_evidence=lambda rows: None,
+                    Terrain=lambda: lambda xs, ys: [None]*len(xs),
+                    bridge_structures=lambda structures, ids, *rest: (structures, ids, []),
                 ),
                 redirect_stdout(io.StringIO()),
             ):
@@ -214,6 +257,8 @@ class Guard(unittest.TestCase):
                     load_decks=lambda root: Decks([]),
                     load_context=lambda decks: __import__('track_context').TrackContext(),
                     surface_evidence=lambda rows: None,
+                    Terrain=lambda: lambda xs, ys: [None]*len(xs),
+                    bridge_structures=lambda structures, ids, *rest: (structures, ids, []),
                 ),
                 redirect_stdout(io.StringIO()),
             ):
@@ -431,6 +476,7 @@ class DeckFallback(unittest.TestCase):
         self.assertEqual({r['class'] for r in decks.records}, {'road', 'tram', 'water'})
         self.assertEqual(len(decks.records), 3)
 
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
     def test_structure_masks_distinguish_bridge_tunnel_covered_and_negative_layer(self):
         from geo import Frame
 
@@ -450,6 +496,23 @@ class DeckFallback(unittest.TestCase):
         with patch('osm_local.ways', return_value=ways[:1]):
             _, _, tunnel_mask = research.structure_mask(separate_tunnels=True)
         self.assertTrue(tunnel_mask.is_empty)
+
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
+    def test_a_disused_or_unfinished_tram_keeps_its_structure_but_other_rail_does_not(self):
+        from geo import Frame
+
+        lat, lon = Frame().ll(0, 0)
+        geometry = [{'lat': float(lat), 'lon': float(lon)}, {'lat': float(lat) + 0.0001, 'lon': float(lon)}]
+        tags = [{'railway': 'tram', 'bridge': 'yes'},
+                {'railway': 'disused', 'disused:railway': 'tram', 'bridge': 'yes', 'layer': '2'},  # Libeňský most
+                {'railway': 'construction', 'construction:railway': 'tram', 'bridge': 'yes'},
+                {'railway': 'construction', 'construction': 'subway', 'tunnel': 'yes'},  # metro D under a street
+                {'railway': 'disused', 'disused:railway': 'rail', 'bridge': 'yes'},
+                {'railway': 'tram'}]
+        ways = [{'id': i, 'tags': t, 'geometry': geometry} for i, t in enumerate(tags)]
+        with patch('osm_local.ways', side_effect=lambda keep: [w for w in ways if keep(w['tags'])]):
+            _, ids = research.structure_mask()
+        self.assertEqual(ids, [0, 1, 2])
 
 
 @unittest.skipUnless(

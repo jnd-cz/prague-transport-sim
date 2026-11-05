@@ -45,7 +45,11 @@ ANGLE = 15.0
 def structure_mask(*, separate_tunnels=False):
     """A plan match cannot establish track Z on a structure (archive has ground Z on Trojsky most)."""
     from osm_local import ways
-    tagged = ways(lambda t: t.get('railway') == 'tram' and (
+    # A tram's structure is one while OSM maps the track disused or under construction (Libeňský most,
+    # disused:railway=tram on bridge=yes during its rebuild, still a track in the 2026 DI; #190).
+    tram = lambda t: 'tram' in (t.get('railway'), t.get('disused:railway'), t.get('construction:railway'),
+                                t.get('construction'))
+    tagged = ways(lambda t: tram(t) and (
         t.get('bridge', 'no') != 'no' or t.get('tunnel', 'no') != 'no'
         or t.get('covered') == 'yes' or t.get('layer', '0') != '0'))
     geoms, tunnels = [], []
@@ -208,7 +212,8 @@ class Segments:
 
     def match(self, x, y, ux, uy, radius=RADIUS, details=False):
         candidates = []
-        for index in self.tree.query(Point(x, y).buffer(radius)):
+        # (the box the buffered point's envelope was: the same candidates without building a circle, #205)
+        for index in self.tree.query(shapely.box(x - radius, y - radius, x + radius, y + radius)):
             row = self.rows[index]
             a, b, length = row['a'], row['b'], row['length']
             vx, vy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
@@ -247,10 +252,15 @@ class Segments:
 
 def samples(segments, area):
     """Clip first, then equal midpoint bins <= 5 m; each observation represents its exact bin length."""
-    for row, geom in zip(segments.rows, segments.geoms):
-        if area is not None and not area.intersects(geom):
+    if area is not None:
+        # (all segments against the prepared area at once; only those crossing its edge are clipped, #205)
+        shapely.prepare(area)
+        hit = shapely.intersects(area, segments.geoms)
+        inside = shapely.contains_properly(area, segments.geoms)
+    for k, (row, geom) in enumerate(zip(segments.rows, segments.geoms)):
+        if area is not None and not hit[k]:
             continue
-        clipped = geom if area is None else geom.intersection(area)
+        clipped = geom if area is None or inside[k] else geom.intersection(area)
         parts = list(clipped.geoms) if hasattr(clipped, 'geoms') else [clipped]
         a, b, length = row['a'], row['b'], row['length']
         ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length

@@ -217,6 +217,8 @@ def protected(url):
 
 
 def main(argv=None, connect=connect):
+    if hasattr(sys.stdout, "reconfigure"):  # (a Czech note in a report broke the print on cp1252 consoles, #258)
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--dry-run", action="store_true", help="list what would change, write nothing")
     ap.add_argument("--reports", action="store_true", help="also upload reports/headless/*.json")
@@ -240,8 +242,10 @@ def main(argv=None, connect=connect):
     ftp = connect(cfg, password(cfg))
     try:
         remote = remote_manifest(ftp)
-        # (version.json changes every time; it goes up whenever anything else does)
-        up, gone = plan({r: h for r, h in hashes.items() if r != "version.json"}, remote)
+        # (version.json changes every time; it goes up last, whatever else does. Planned with the rest, so
+        # the manifest's entry for it is not taken for a file gone from the site: #207)
+        up, gone = plan(hashes, remote)
+        up = [r for r in up if r != "version.json"]
         size = sum(len(local[r]) if isinstance(local[r], bytes) else os.path.getsize(local[r]) for r in up)
         print(f"{commit[:7]}: {len(up)} files to upload ({size / 1e6:.1f} MB), {len(gone)} to delete, "
               f"{len(hashes) - 1 - len(up)} unchanged")

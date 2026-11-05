@@ -3,7 +3,7 @@
 > Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [../history/](../history/).
 
 **Date:** 2026-10-27  
-**Status:** agreed direction; research and comparison only, not implemented in the game.  
+**Status:** agreed direction, being implemented: line 17's track comes from the DTM transport layer (DI) since PR #198 (#20; the other lines: #218), its curves from #204. Below: the research as of 2026-10-27.  
 **Scope:** Prague tram-track placement, depot coverage and heights. Metro and railway observations are included where relevant. The measured game is the line 17 code and data in `transport-game-remote-2026-10-24.zip`; this is a deployed copy without the original build tools, raw caches or Git history.
 
 ## Decision
@@ -188,6 +188,56 @@ Do not confuse “DTM” as **digital technical map** (transport objects and sur
 3. **Adapt the game’s route and distance-dependent features together.** Rebuild or remap the driven and opposite paths, cumulative distance, stop positions, platforms, signals, crossings, switches, speed metadata, traffic routes, overhead and depot access from the reconciled graph. The current `Route` smooths geometry while preserving distances from the original OSM polyline; a new path changes those distances. Decide how the current spacing adjustment in `src/trackfix.js` should apply to verified DTM geometry, rather than blindly moving an already surveyed pair.
 4. **Keep geometry and height processing separate.** Define the vertical reference and what each height measures before combining track Z, street surfaces and terrain. Interpolate along valid track records, avoid zero/mixed Z, handle missing values and source transitions explicitly, and verify bridges/tunnels independently. Shape nearby terrain and surfaces to the resulting track-bed model where appropriate, then revisit the separate bed/rail lifts, cant and vehicle contact together. Do not mask an incorrect alignment by globally lifting rails.
 5. **Validate with concrete regressions.** Recheck the Březiněveská straight section (both centreline positions, spacing and lateral curvature), the full Kobylisy–Vozovna approach and its terminal endpoint, the loop’s switches and depot connections, and Hostivař’s loop and metro/railway yard. Compare metres of coverage and separate both directions, rather than only median nearest-track distance. Test source transitions, vertical profiles, terrain clipping, tram/rail/bed contact and complete route driving; run the project’s normal lints/autopilot checks on the actual development copy. Verify real-world geometry and dates with suitable independent reference data where available.
+
+## Import into the build, 2026-11-03 (#20)
+
+`tools/build_line.py` keeps OSM's track graph (nodes, ways, switches, route relations) and moves its
+geometry onto DI before any route position is computed (`tools/di_tracks.py` `TrackGeometry`). Every
+`s` (stops, signals, crossings, switches, bridges, clearances, speed bins) is then projected onto the new
+route as before. A track only one source has is not added: depots are #35.
+
+- **Sources** (`Source`): DI records are merged into chains through ends within 0.5 m (19,227 of 20,742 ends
+  meet another exactly, 1,168 more within 0.5 m). Zero-length records and copies are dropped first: DI has
+  the same piece under two IDs, and short pieces at switches (Čechův most, Kobylisy). A **fork** is
+  a place where two records leave in the same direction and are 0.3 m or more apart 8 m out; copies leave
+  together and stay within centimetres.
+- **Matching**: each stretch of OSM edges between switches is matched as one: every 2 m sample within 2 m of
+  a source chain, at most 30° off its direction, with the least summed distance; the chain changes only
+  where one continues another, within 4 m of their joint. Near a switch both tracks lie within centimetres
+  and an edge alone may lie nearer the other one (Staroměstská). An edge its stretch could not take
+  is matched alone. A stretch still unmatched between matched nodes takes the chains its ends lie on within
+  4 m: OSM draws a 60 m chord of the curve in Křižovnická between both tracks, and the neighbours fix
+  which track it is. DI first; then the archived DTMP axes; then OSM, which takes up its neighbours' shift
+  over 20 m.
+- **Nodes**: a switch takes the DI fork within 5 m that lies on its own chains (a crossover has a fork on
+  each track) and is not behind a neighbour; one node per fork (two switches 4–5 m apart at Palackého
+  náměstí). Other nodes take the point nearest all their chains: a projection, or where two chains cross
+  (a diamond crossing at Dlouhá třída). The build prints reversed edges and sharp turns; both are 0.
+- **In the game** (`trackSource` ranges in the line data, `src` per track chain): surveyed track (DI,
+  archive) is resampled, not smoothed: the 6 m Gaussian pulls an 18 m curve 0.2 m inside the real one.
+  `src/trackfix.js` leaves a pair alone where both tracks are surveyed. OSM fill keeps both.
+
+Line 17, 2026-11-03: of the 59.8 km of OSM edges in its corridor, DI 59,530 m, archive 57 m, OSM 207 m;
+nodes moved p50 0.13 m, p90 0.45 m, p99 1.65 m, at most 4.70 m (a switch onto its fork). The route is
+21,796.8 m (21,796.5 m before); stops moved at most 0.58 m, signals 0.83 m, crossings 2.50 m, switches
+3.04 m (onto DI's forks; `tools/track_moves.py`). Facing switches 18 → 19: two switches 4.6 m apart at
+Dlouhá třída, which OSM drew 2.7 m apart (merged by the build's 3 m rule). Kobylisy – Vozovna, the pair
+300–500 m from Kobylisy every 5 m as the game drives it (`tools/bench/spacing.js`, `headless.py --checks
+spacing`): 3.00–3.32 m before (`trackfix.js` moved 991 points), 3.489–3.517 m now, nothing moved. Findings for
+review: `reports/review/track-sources-17.json` (`tools/track_sources.py`): the new track at 50.0502 N 14.4154 E
+that DI does not have yet (OSM, 202 m), 37 m from the archive at Kobylisy, three OSM switches without a DI
+fork and four DI forks without an OSM switch.
+
+**Křižovnická on the orthophoto** (between Karlovy lázně and Staroměstská, 50.0860–50.0871 N; IPR leaf-off
+2026, 0.1 m): averaged along 20 m, the brightness across the street dips at the rails, and the dips lie on
+DI's rails within ~0.1 m (−0.8 / +0.75 / +2.35 / +3.8 m against DI's −0.72 / +0.72 / +2.30 / +3.74). OSM has the
+pair 4.2 m apart and up to 3 m west, with no dip at its outer rails. Line 17's GTFS shapes are one line per
+direction on the double track's midline, and they follow OSM's midline to p50 0.04 m / p90 0.13 m (DI's:
+0.14 / 0.42 m): generated from OSM, so they are no independent check of DI. The user, with street photos
+(Claude Code session 2026-11-03, #20): "Yeah di is right which also explains why our osm based track tried to
+clip the building there". Measured: on main's OSM build the southbound track centre came within 0.71 m of a
+building footprint at 50.08537 N 14.41393 E (22 m of it within the T3's half width, 1.25 m); with DI no track
+centre of line 17 comes within 1.6 m of a building.
 
 ## Inspectable comparisons and sources
 

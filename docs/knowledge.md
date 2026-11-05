@@ -18,8 +18,9 @@ What sessions learned and later work needs. Kept current and short; the full log
   IPR's hosted feature layers are stored in Web Mercator, and each was loaded from S-JTSK with its own
   datum shift: the **tree register's lat/lon is ~10 m off** (ask its service for S-JTSK, `outSR=5514`,
   which `geoportal.py` does), while the tree rows and the archived DTM street points are right as
-  lat/lon (asking those for S-JTSK puts them 6–10 m off). A new Geoportál layer gets measured both ways
-  before use.
+  lat/lon (asking those for S-JTSK puts them 6–10 m off: −6.24, −7.67 m at Trojanova; naming a
+  `datumTransformation` makes it 170–300 m, 2026-11-05, #258). A new Geoportál layer gets measured both ways
+  before use. The current DTM's JVF packages (DI, TI, ZPS) are S-JTSK natively.
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
 - Archived track Z is guarded separately from DI geometry by `tools/track_heights.py`; the staging
@@ -57,7 +58,108 @@ What sessions learned and later work needs. Kept current and short; the full log
   lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
   stays on the river bed (187.3 m) across its whole span, Hlavní nádraží's tunnel climbs 6 m to the
   street above. A track climbs a few per cent: an archive step over 10 % between points ~5 m apart is the
-  archive measuring something else (`tools/track_span_evidence.py` `dips`).
+  archive measuring something else (`tools/track_span_evidence.py` `dips`). It starts down before the steep
+  drop (Černý kůň: 4–5 % for 14 m, Modřany inbound ~8 % for 50 m), so a dip extends over the descent
+  and climb above 4 % around it (#184).
+- **The two directions of a line agree in the archive** (#184): over the 9806 archived axes, parallel axes
+  2.5–6 m apart differ by p50 0.02, p90 0.09, p99 0.45 m; more than 1 m on 0.4 % of 64,712 samples, mostly
+  structures. Where one direction leaves the other there, it measured something else: Hlavní nádraží
+  +6.9 m and +6.6 m (the road over the tram), Modřany inbound −6 m (the street under), Brusnice −1.1 m.
+- **Archive and DI share their heights where both exist** (#188): where the archive breaks a 500 m vertical
+  radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
+  1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
+  ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
+- **Where only the archive has a height, the 2023 terrain checks it** (#190): where a ZPS survey confirms
+  the archive, the two differ by more than 1 m on 13 of 45,577 samples (0.03 %); without a survey 848 samples
+  do (Malovanka 83 m, the Libeň bridge's dips to the streets, Troja's old alignment). Numeric DI agreeing with
+  the archive 7 m under the terrain is a structure the terrain cannot see, not an error
+  ([height fallback](decisions/2026-10-30-track-height-fallback.md)).
+- **OSM maps a tram under reconstruction as `railway=disused` + `disused:railway=tram`** (Libeňský most,
+  `bridge=yes`, 2026-11 extract) while the 2026 DI keeps the track; tools that select `railway=tram` miss it.
+  The DI's own track there is new (inserted 2025-01-30, 24 m pieces, Z = 0).
+- **DI track records** (#20): pieces from 0.1 m to a few hundred metres, ending where the next begins
+  (19,227 of 20,742 ends exactly, 1,168 more within 0.5 m). Some pieces are there twice under two IDs and
+  some have zero length (45 dropped city-wide); counting record ends alone, a straight track looks like a
+  fork. OSM differs from DI by p50 0.13 m / p90 0.45 m at line 17's nodes, but draws curves as chords up to
+  2–3 m off (Křižovnická, where the orthophoto's rails lie on DI's), switches up to 5 m from DI's forks, and Kobylisy's pair 2.5–3.3 m apart (DI
+  3.5 m). DI (state 2026-09-30) lacks the track OSM maps at 50.0502 N 14.4154 E (ways of 2025–26).
+- **DI's tracks at junctions** (#197): joined straightest through each fork, the 16 districts' DI is 656 tracks
+  with 955 forks and 575 crossings. At a crossing the two tracks' staged heights differ by p50 1.6 cm, p90 7 cm.
+  A junction is not one point: a fork's diverging end and its crossing with the through track lie 0.003–1.6 m
+  apart, the ends of a junction's short pieces up to 0.5 m apart (on a 4 % grade, 2–4 cm in height), and near
+  Ke Stírce a piece lies along another for 30 m under its own records (not caught as a copy: it does not join the
+  same two places).
+- **The robust smoother runs away where its radius is wrong** (#197): `vertical_profile` stops pulling towards
+  points it misses by more than 0.23 m (Tukey). Where the design radius cannot follow a real sag (Malostranská,
+  ~300 m, the archive and the terrain agreeing to 2 cm), it drops the whole stretch and runs 1–3 m under the data,
+  not 0.3 m. Points at weight 0 do not fix a curve either: across a 40 m hold it sagged 5 cm under the straight
+  grade (`tools/line_heights.py` starts held points on that line at weight 0.001).
+- **DI draws a switch three ways** (#204): records ending together and leaving apart (a fork of record ends);
+  a branch ending on the middle of a through record that is not split there (Palackého náměstí, the branch
+  19.8 m along it); interlaced track (below), where the switch is the branch's start, not where it leaves. At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
+  switches lie up to 7.4 m from DI's forks along the track (Jiráskovo náměstí; the user's answers of
+  2026-11-03), and OSM and DI can disagree on which leg is the straight one in a curved switch (Křižovnická).
+- **DI can be off the rails by more than its class** (#204): Podolská vodárna's north curve (50.0591 N 14.4195 E)
+  runs 19-34 cm inside the rails measured on the orthophoto over 14 m and reads 14.6 m over 5 m (16.4 m in the
+  state of 2026-09-30, the archive 16.2 m); the rails read 18.3-20.1 m over 6 m. The south curve there agrees with
+  its rails within 9 cm. The track there is taken from the photo (`data/truth.json` `photoTracks`).
+- **DI draws some switches as a section** (#204): both legs as records from the tip to a joint 4-5 m on, where
+  the track and the branch go on (48 in the 16 districts, Dvorecký most's of 2026-10-07 among them). The legs are
+  apart only beyond the joint, so the fork of record ends lies there; the tip is where both legs start. At
+  Dvorecký most the tip has the ZPS survey's switch machine cover (a small rectangle among its traffic-area lines)
+  and OSM's switch (the user: "the OSM marker is on point there, it's right at the yellow rectangle which here fits
+  the přestavník"). Elsewhere OSM marks 29 of the 48 nearer the tip, 19 nearer the joint.
+- **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
+  edges) where DI has them 0.4-0.5 m apart; a node placed nearest all its tracks lies off each of them.
+- **The archive draws Dvorce's old connection** (#204): DI (2026-09-30) and the archive (2008-2024) have
+  no track onto the new Dvorecký most (opened 04/2026: "No data is related to new Dvorecký most put in
+  service in 04/2026", the user, track sources review, 2026-11-03); where OSM's new edges come within 2 m of
+  the archive's old track it takes them, as a zigzag with 20° breaks.
+- **Every DTM record states its accuracy class** (#204; `data/truth.json` `sourceAccuracy`, the classes of
+  vyhláška 393/2020 Sb.): DI's tram axes are class 3 (0.14 m in plan, 0.12 m in height) but 7 of 10,371 in
+  class 2; ZPS lines are class 3 in plan (3.2 M) or 4 (0.7 M) and **class 5 in height** (3.2 M lines, 0.35 m),
+  class 3 for 0.7 M. The archive states none; DMR 5G guarantees 0.18 m (0.30 m under dense vegetation); IPR's
+  1 m terrain and the orthophoto state nothing.
+- **A connecting curve held at both switches keeps the radius DI gives it** (#204): its ends and directions
+  are fixed by the through tracks, so widening the tolerance cannot change it; 24 places on line 17 read
+  18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off
+  to reach 20 m. A bend squeezed into a metre reads much wider over 5 m (10° as 29 m), so the curve fit
+  measures its own radius over 2 m.
+- **Near a switch the branch is the nearer track for metres** (#204, Strossmayerovo náměstí): a tangential
+  branch is 0.09 m off the straight at 3 m, 0.16 m at 4.2 m and 0.5 m at 7.3 m, and DI bends the straight 0.9°
+  at the switch, so over 3 m the branch reads straighter than the straight, and a 4.75 m OSM edge between two
+  switches lies nearer the branch. Two switches 4.6 m apart on each track there (DI): the west track's to the
+  left first, then to the right; the east track's mirrored. OSM puts the westward turn's switch on the
+  east-west track 3.8 m past DI's fork, beside another switch 2.1 m away whose branch leaves the other way.
+- **A resampled curve reads tighter than it is** (#204): points interpolated on chords lie inside the arc (7 mm
+  on a 1 m chord of a 19 m curve, 15 mm on a 1.5 m one), so a circle through them read 19.1 m as 17.4-17.6 m
+  (Právnická fakulta), and the game's three-point average with a 1.5 m resample turned a 0.9° joint into 3.7°
+  at a short piece's end. Rounded to the centimetre, points 0.4 m apart read a 19 m curve as 15.5 m over 2 m.
+  Radii and joins are measured on the build's own points, written to the millimetre.
+- **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
+  and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
+  split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to
+  the old where both had them (median 0, p90 2 cm): DI heights now reach 63-71 % of each line's path (were
+  25-47 %). The old records at Podolské nábřeží run on through the new Dvorecký most junction, where the re-entries
+  end at its switches. `di_tracks._latest` drops an older record lying on newer ones (1,057 city-wide).
+- **Interlaced track after a switch** (#204; `data/truth.json` `trackGeometry` `interlaced-switch`): at Čechův
+  most, Ke Stírce, Ohrada–Krejcárek, Biskupcova–Ohrada and 15 more places DI draws the branch 9-17 cm (mostly
+  12-13 cm) beside the track for 11-87 m from the switch's tip before the tracks part, either from a tongue it
+  draws (0 to 12 cm over 8-9 m: Ohrada, Dejvice) or from a record joint already 13 cm off (Čechův most). Where
+  both tracks are split into short records, their joints 12 cm apart fall into one cluster of ends. OSM puts
+  the switch at the tip (5-7 m from it at Čechův most), the user: "the fork starts and ends well in front
+  of/behind the road junction".
+- **OSM draws interlaced track as one way** (#204): a `railway=switch` node at the tip (often with its number,
+  `ref` 111 at Čechův most), one way both routes share, and the split where the tracks part at a
+  `railway=railway_crossing` node noted "rozjezdová/sjezdová splítka" (diverging/converging interlace). Where DI
+  draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
+  the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
+  is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
+- **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
+  to p50 0.04 m (#20); they cannot judge OSM against DI.
+- **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
+  tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
+  level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).
 - **ZPS track areas on the Modřany embankment lie ~2 m below the archive and the lidar ground** (s 408:
   survey 198.6, archive 200.8, lidar 201.0 m; flagged `track_zps_level_unverified`), which is why the
   drawn rail there is low and wavy. The level-1 tram area over the Modřany underpass carries the
@@ -108,7 +210,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   data), tree register (multipoint) and tree rows.
 - **Mosty 3D**: photogrammetry 2001–2008, ±0.5 m, blocks from the highest surface seen from the air
   (parapets) down; can predate rebuilds. **The survey deck wins wherever it exists**; the model gives
-  sides, piers and spans elsewhere, and is trimmed over surveyed decks.
+  sides, piers and spans elsewhere, and is trimmed over surveyed decks. The whole layer is small (49 meshes,
+  672 bridges, 7.7 MB): the height import reads it city-wide (`tools/mosty3d.py`). Its top at a tram bridge's
+  end is within 1.05 m of the rail (p50 0.13 m); a bridge over a tram is 3.3 m or more above it (#192). Its
+footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
+  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
+  river bridge and its viaduct (14.4624–14.4660 E).
 - **Regional DTM ZPS packages: what our tools rely on** (`tools/dtm.py`, `tools/gpkg.py`,
   `tools/registration.py`; audit of the 16 pinned packages of 2026-09-30, #63). What to compare after a
   format change (JVF 1.5.0.2 from 18 Nov 2026; refresh steps in DATA.md):
@@ -199,11 +306,39 @@ Review these when realism matters; most move into the build in M2.
 - `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,
-  `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot.
+  `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
+  `trackRadius` (over 5 m through the build's points, under 18 m; 18-20 m listed as exceptions) and `trackJoins`
+  (through tracks breaking over 1° where chains meet, diverging start angles listed; direction from the parabola
+  through the first three drawn points).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
-- Line 17's full lint after the merge is the pre-rebuild reference (`reports/line17.json`).
+- Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
+  report, not in git); regressions compare with `reports/baseline/headless.json`.
+- **Where a check's time goes** (#205, `tools/profile_check.py`, line 17 seed 1, 2026-11-04, 3 pages at once):
+  the page load to the hidden loading screen takes 56-67 s, 78 % of it in `world.js` and `terrain.js`
+  (`finesAt` 11 %, `_hitTri` 9 %, `dist` 7 %, garbage collection 7 %, `route.nearest` 6 %). The seeded runs
+  take 85 s each (u3, traffic) with the main thread busy 99 % of it, so drawing is not what costs (headless
+  draws once a second): traffic.js 40 %, terrain.js 29 % (all of it `_hitTri`, the ground triangle under a car
+  or walker: 23 % of the run), route.js 11 % (`nearest` 7 %), three.js 4 %, game.js 3 %. The JS heap is
+  1.1 GB after load and 1.3 GB after a run.
+  The lint run is 95 % three.js ray casting (`intersectTriangle`, `getVertexPosition`, `fromBufferAttribute`):
+  `railSupport`, `cantedRailVisibility` and `deckClip` cast `THREE.Raycaster` rays at whole meshes without a
+  spatial index, so every ray tests every triangle of the merged street meshes (537 s with 7 other jobs running;
+  #205 measured 254 s mean per lint run).
+- **The ground under cars and walkers** (#245, line 17 u3 seed 1): `_hitTri` is called from `carPose` (4 points per
+  car per step, ~9 s of a 66 s run), the walkers (~3 s) and `_fitRoad` at traffic set-up (~2 s). Reading the
+  triangles from typed arrays once the load is done (`DtmSurface.seal`) took its share from 22 to 13 %, with the
+  same counts on all 75 seeded runs. What did not help, measured:
+  - reading the lidar height only when two triangles hold the point: most points have two (kerbs, overlapping
+    areas), so the reads stayed;
+  - `inLane` in 2 m instead of 4 m cells: the same 6.6 s, the cost is the map lookups, not the points;
+  - the triangle found last tried first, when it overlaps no other: a triangle spans several 3 m cells holding
+    dozens of others, so proving that cost more (14 s) than the lookups it saved, and the four pose points rarely
+    share a triangle.
+
+  What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
+  only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
 
 ## Environment (Windows dev machines)
 

@@ -1,15 +1,15 @@
-// Dev tool: lints for the loaded line (docs/history/PLAN.md §2). Each check counts one kind of problem over the
+// Dev tool: lints for the loaded line. Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
 // In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
 //   const { lint } = await import('/tools/lint.js?v=' + Date.now());
 //   await lint();                 // quick checks (a few seconds)
 //   await lint({ bot: true });    // + the street bot (DTM lines, about a minute)
 //   await lint({ traffic: true }); // + the whole line driven headless, traffic watched (a minute or two)
-// The report is saved to reports/lineN.json by tools/serve.py; compare with the committed baseline:
-//   python tools/lint_report.py            (--accept makes the current reports the baseline)
+// The report is saved to reports/lineN.json by tools/serve.py; regressions:
+//   python -P -E tools/headless.py --checks lint --compare
 import { makeT3, placeConsist, CONTACT_WIRE } from '../src/models.js';
 import { roofIndex } from '../src/world.js';
-import { tramClearance } from '../src/tram.js';
+import { tramClearance, CAR_PITCH } from '../src/tram.js';
 import * as THREE from 'three';
 import { runStreetBot } from '../src/streetbot.js';
 import { trafficRun, placesAt } from './traffic_lint.js';
@@ -17,12 +17,77 @@ import { trafficRun, placesAt } from './traffic_lint.js';
 const TOP = 12; // places listed per check
 
 // one check's result: how many, out of how many, and the worst places
+// Rays straight down against meshes, as THREE.Raycaster.intersectObjects(meshes, false) with a ray down from
+// (x, y0, z) and `far`: every hit, nearest first ({ point, distance, object, faceIndex }), faces culled by their
+// material's side as three.js does. The triangles are put in a grid in plan once, so a ray tests only those
+// of its cell (#205: the lint's rays tested every triangle of the merged street meshes, 95 % of its time).
+export class DownRays {
+  constructor(meshes, cell = 4) {
+    this.cell = cell;
+    this.grid = new Map();
+    this.tris = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (const m of meshes) {
+      m.updateWorldMatrix(true, false);
+      const g = m.geometry, pos = g.attributes.position, idx = g.index;
+      const count = idx ? idx.count : pos.count;
+      const start = Math.max(0, g.drawRange.start), end = Math.min(count, g.drawRange.start + g.drawRange.count);
+      const sideOf = (i) => {
+        const mat = Array.isArray(m.material)
+          ? m.material[(g.groups.find((gr) => i >= gr.start && i < gr.start + gr.count) || {}).materialIndex]
+          : m.material;
+        return mat ? mat.side : null;
+      };
+      for (let i = start - (start % 3); i + 2 < end; i += 3) {
+        const side = sideOf(i);
+        if (side === null || side === undefined) continue;
+        const ia = idx ? idx.getX(i) : i, ib = idx ? idx.getX(i + 1) : i + 1, ic = idx ? idx.getX(i + 2) : i + 2;
+        a.fromBufferAttribute(pos, ia).applyMatrix4(m.matrixWorld);
+        b.fromBufferAttribute(pos, ib).applyMatrix4(m.matrixWorld);
+        c.fromBufferAttribute(pos, ic).applyMatrix4(m.matrixWorld);
+        const t = { m, face: Math.floor(i / 3), side, ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z, cx: c.x, cy: c.y, cz: c.z };
+        const k = this.tris.push(t) - 1;
+        const x0 = Math.floor(Math.min(a.x, b.x, c.x) / cell), x1 = Math.floor(Math.max(a.x, b.x, c.x) / cell);
+        const z0 = Math.floor(Math.min(a.z, b.z, c.z) / cell), z1 = Math.floor(Math.max(a.z, b.z, c.z) / cell);
+        for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++) {
+          const key = gx * 65536 + gz;
+          let list = this.grid.get(key);
+          if (!list) this.grid.set(key, list = []);
+          list.push(k);
+        }
+      }
+    }
+  }
+
+  cast(x, y0, z, far = Infinity) {
+    const list = this.grid.get(Math.floor(x / this.cell) * 65536 + Math.floor(z / this.cell)) || [];
+    const out = [];
+    for (const k of list) {
+      const t = this.tris[k];
+      // the triangle's normal points up (front face for a ray down) when its winding is counter-clockwise
+      // seen from above: in x, z (z towards the viewer) that is a negative cross product
+      const cross = (t.bx - t.ax) * (t.cz - t.az) - (t.bz - t.az) * (t.cx - t.ax);
+      if (cross === 0) continue;
+      const up = cross < 0;
+      if ((t.side === THREE.FrontSide && !up) || (t.side === THREE.BackSide && up)) continue;
+      const w1 = ((t.bz - t.cz) * (x - t.cx) + (t.cx - t.bx) * (z - t.cz)) / ((t.bz - t.cz) * (t.ax - t.cx) + (t.cx - t.bx) * (t.az - t.cz));
+      const w2 = ((t.cz - t.az) * (x - t.cx) + (t.ax - t.cx) * (z - t.cz)) / ((t.bz - t.cz) * (t.ax - t.cx) + (t.cx - t.bx) * (t.az - t.cz));
+      const w3 = 1 - w1 - w2;
+      if (w1 < 0 || w2 < 0 || w3 < 0) continue;
+      const y = w1 * t.ay + w2 * t.by + w3 * t.cy, d = y0 - y;
+      if (d < 0 || d > far) continue;
+      out.push({ point: new THREE.Vector3(x, y, z), distance: d, object: t.m, faceIndex: t.face });
+    }
+    return out.sort((p, q) => p.distance - q.distance);
+  }
+}
+
 function check(rule, of, items, key = (p) => p.mag) {
   const places = [...items].sort((a, b) => key(b) - key(a)).slice(0, TOP);
   return { rule, count: items.length, of, places, ...placesAt(items) };
 }
 
-// A two-car set standing at every stop: both cars on the track, coupled (centres 15.2 m apart
+// A two-car set standing at every stop: both cars on the track, coupled (centres CAR_PITCH apart
 // along the track, a little less as a chord on curves). Catches routes that end at a terminus stop
 // with no track behind it (the second car was drawn inside the first at Sídliště Řepy).
 function consistAtStops(g) {
@@ -41,8 +106,8 @@ function consistAtStops(g) {
     placeConsist(model, st.target, at);
     const c = model.userData.cars.map((m) => m.position);
     const gap = Math.hypot(c[0].x - c[1].x, c[0].z - c[1].z);
-    const off = Math.max(...c.map((p, k) => offTrack(p.x, -p.z, st.target - 7.6 - k * 15.2)));
-    if (gap < 14 || gap > 15.5 || off > 0.5) bad.push({ stop: st.name, s: Math.round(st.target), mag: Math.max(Math.abs(15.2 - gap), off), info: `gap ${gap.toFixed(2)} m, ${off.toFixed(2)} m off the track` });
+    const off = Math.max(...c.map((p, k) => offTrack(p.x, -p.z, st.target - 7.6 - k * CAR_PITCH)));
+    if (gap < 14 || gap > 15.5 || off > 0.5) bad.push({ stop: st.name, s: Math.round(st.target), mag: Math.max(Math.abs(CAR_PITCH - gap), off), info: `gap ${gap.toFixed(2)} m, ${off.toFixed(2)} m off the track` });
   }
   if (keep) model.userData.cars.forEach((m, k) => { m.position.copy(keep[k][0]); m.rotation.copy(keep[k][1]); });
   return check('consist-coupled', g.stops.length, bad);
@@ -156,7 +221,9 @@ function levelsAtBridges(g) {
 
 // Our track and the opposite one as drawn: within 6 m of the route every track lies on the track
 // profile (a step between the two tracks, or a drawn track off the profile, is a vertical jump in the
-// rails and the wire above them; the Modřany corridor had up to 6 m). Every 1.5 m of track, counted per 10 m.
+// rails and the wire above them; the Modřany corridor had up to 6 m). The profile is read across the
+// street (heightAt): with the build's heights the opposite track has its own (#197). Every 1.5 m of track,
+// counted per 10 m.
 function trackLevels(g) {
   const r = g.route, pr = r.ground.profile, bad = new Map();
   let n = 0;
@@ -166,7 +233,8 @@ function trackLevels(g) {
       const [x, y] = t.smooth[i], q = r.nearest(x, y);
       if (!q || q.d > 5) continue;
       n++;
-      const dev = t.z[i] - pr.height(q.s), k = Math.round(q.s / 10);
+      const p = r.at(q.s), l = (y - p.y) * p.hx - (x - p.x) * p.hy; // (left > 0, as src/terrain.js near)
+      const dev = t.z[i] - pr.heightAt(q.s, l), k = Math.round(q.s / 10);
       if (Math.abs(dev) > 0.3 && !(bad.get(k)?.mag >= Math.abs(dev))) bad.set(k, { s: Math.round(q.s), x, y, mag: Math.abs(dev), info: `track ${dev.toFixed(2)} m off the profile, ${q.d.toFixed(1)} m from the route` });
     }
   }
@@ -230,15 +298,12 @@ function railSupport(g, world) {
   const r = g.route, pr = r.ground.profile;
   const targets = [];
   world.traverse((m) => { if (m.isMesh && (m.userData.building || ['terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
-  ray.far = 9;
+  const rays = new DownRays(targets);
   let n = 0;
   const bad = new Map();
   for (let s = 0; s < r.length; s += 2) {
     const p = r.at(s), zb = pr.height(s) - pr.lift(s); // bed top (src/heights.js)
-    o.set(p.x, zb + 2.5, -p.y);
-    ray.set(o, down);
-    const hit = ray.intersectObjects(targets, false)[0];
+    const hit = rays.cast(p.x, zb + 2.5, -p.y, 9)[0];
     n++;
     const top = hit ? hit.point.y : -Infinity, bridge = pr.onBridge(s);
     let info = null, mag = 0;
@@ -259,8 +324,7 @@ export function cantedRailVisibility(g, world) {
     if (m.userData.surface === 'rail') rails.push(m);
     else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
   });
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
-  ray.far = 4;
+  const railRays = new DownRays(rails), surfaceRays = new DownRays(surfaces);
   // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
   // ribbon is a separate obstruction, not a cant error on this one.
   const owner = (hit) => {
@@ -278,20 +342,20 @@ export function cantedRailVisibility(g, world) {
     if (!inCurve) { curve++; inCurve = true; }
     for (const side of [-1, 1]) {
       const p = r.offset(s, side * 0.72);
-      o.set(p.x, prof.height(s) + 1, -p.y); ray.set(o, down);
-      let head = ray.intersectObjects(rails, false)[0];
+      let o = [p.x, prof.height(s) + 1, -p.y];
+      let head = railRays.cast(...o, 4)[0];
       // The route and the smoothed track axis can differ slightly at switches.
       for (const shift of [-0.1, 0.1, -0.2, 0.2, -0.3, 0.3, -0.4, 0.4]) {
         if (head) break;
         const q = r.offset(s, side * 0.72 + shift);
-        o.set(q.x, prof.height(s) + 1, -q.y); ray.set(o, down);
-        head = ray.intersectObjects(rails, false)[0];
+        o = [q.x, prof.height(s) + 1, -q.y];
+        head = railRays.cast(...o, 4)[0];
       }
       if (!head) { missing++; continue; }
       const trackId = owner(head);
       if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
       samples++;
-      const hits = ray.intersectObjects(surfaces, false).filter((h) => h.point.y <= head.point.y + 0.4);
+      const hits = surfaceRays.cast(...o, 4).filter((h) => h.point.y <= head.point.y + 0.4);
       const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId);
       if (!ownBed) missingBed++;
       else covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
@@ -325,6 +389,172 @@ function verticalCurves(g) {
   }
   const c = check('vertical-curves', n, [...bad.values()]);
   c.minRadius = Math.round(minR);
+  return c;
+}
+
+// Points at arc lengths along a polyline (linear between its points), with its length.
+function along(p) {
+  const cum = [0];
+  for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  const L = cum[cum.length - 1];
+  let j = 0;
+  const at = (s) => {
+    s = Math.max(0, Math.min(L, s));
+    if (s < cum[j]) j = 0;
+    while (j < p.length - 2 && cum[j + 1] < s) j++;
+    const t = (s - cum[j]) / (cum[j + 1] - cum[j] || 1e-9);
+    return [p[j][0] + (p[j + 1][0] - p[j][0]) * t, p[j][1] + (p[j + 1][1] - p[j][1]) * t];
+  };
+  return { L, at };
+}
+
+// The track in plan (#204): the radius over 5 m, the circle through a point and the farthest points within 2.5 m
+// either side, at every point of the line's path, its opposite path and every track as the build drew them (its
+// points lie on the fitted curves; a circle through points interpolated on the game's 1.5 m resample read a 19 m
+// curve as 17.4 m: a 1 m chord sags 7 mm inside it). Flagged under 18 m (data/truth.json trackGeometry
+// `min-radius-network`, the user: "under 18m there shouldn't be anything like that"); 18-20 m are exceptions
+// (`min-radius-passenger`), listed in `exceptions`. tools/track_curve.py holds 20 m within the points' accuracy
+// class and 18 m past it. Places per 10 m of each line, counted per class (our, opposite, the track's source).
+const MIN_RADIUS = 18, EXCEPTION_RADIUS = 20, SLACK = 0.995, HALF = 2.5;
+function circleRadius(a, b, c) {
+  const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+  const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  return area2 > 1e-9 ? Math.min(1e6, (ab * bc * ca) / (2 * area2)) : 1e6;
+}
+function trackRadius(g) {
+  const d = g.data, lines = [['our', d.path], ['opposite', d.pathBack], ...(d.tracks || []).map((t) => [t.src || 'osm', t.p])];
+  const bad = new Map(), near = new Map(), kinds = {}, nearKinds = {};
+  let n = 0, minR = Infinity;
+  lines.forEach(([kind, p], li) => {
+    if (!p || p.length < 3) return;
+    const cum = [0];
+    for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    const L = cum[cum.length - 1];
+    let j0 = 0, j1 = 0;
+    for (let i = 0; i < p.length; i++) {
+      if (cum[i] < HALF || cum[i] > L - HALF) continue;
+      while (cum[i] - cum[j0] > HALF + 1e-9) j0++;
+      j1 = Math.max(j1, i);
+      while (j1 < p.length - 1 && cum[j1 + 1] - cum[i] <= HALF + 1e-9) j1++;
+      if (cum[i] - cum[j0] < 0.6 * HALF || cum[j1] - cum[i] < 0.6 * HALF) continue; // (points far apart: a straight)
+      const R = circleRadius(p[j0], p[i], p[j1]);
+      n++;
+      minR = Math.min(minR, R);
+      const k = `${li}:${Math.round(cum[i] / 10)}`, map = R < MIN_RADIUS * SLACK ? bad : R < EXCEPTION_RADIUS * SLACK ? near : null;
+      if (map && !(map.get(k)?.mag >= MIN_RADIUS / R))
+        map.set(k, { kind, x: p[i][0], y: p[i][1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(cum[i]) } : {}), mag: MIN_RADIUS / R, info: `${kind} track radius ${R.toFixed(1)} m over 5 m` });
+    }
+  });
+  for (const k of near.keys()) if (bad.has(k)) near.delete(k);
+  for (const b of bad.values()) kinds[b.kind] = (kinds[b.kind] || 0) + 1;
+  for (const b of near.values()) nearKinds[b.kind] = (nearKinds[b.kind] || 0) + 1;
+  const c = check('track-radius', n, [...bad.values()]);
+  c.kinds = kinds;
+  c.minRadius = Math.round(minR * 10) / 10;
+  const e = check('track-radius-exceptions', n, [...near.values()]);
+  c.exceptions = { count: e.count, kinds: nearKinds, places: e.places };
+  return c;
+}
+
+// Where drawn tracks meet (#204): at every node where track chains end (a record or source joint, a switch, a
+// crossing), the chains that continue each other (directions within 30°) are paired straightest first; a pair
+// whose directions break by more than 1° is flagged, per class (joint: two ends, switch: three, crossing: four
+// or more). The leg left over at a switch is the diverging track: its start angle against the through track is
+// listed, not flagged (data/truth.json `switch-start`: most switches start tangentially, some abruptly). The
+// direction at an end is the tangent of the parabola through the drawn track's first three points (a chord, or
+// points between them, read a smooth 20 m curve as a 2-4° break). The bar stays 1° (the user, 2026-11-03: "Keep
+// 1°, fix the nodes"): 71 breaks on line 17 were the game's drawing (a three-point average and a 1.5 m resample
+// at short pieces' ends). Where at least two drawn points lie within JOIN_REACH of the end, the tangent is the
+// least-squares parabola's through them: three points whose first step was 0.17 m read a smooth 21 m curve's
+// joint at a crossing as a 1.2° break (0.2° fitted over 2-3 m).
+const JOIN_REACH = 2.0;
+function trackJoins(g) {
+  const ends = [];
+  for (const t of g.data.tracks || []) {
+    const p = t.smooth || t.p;
+    if (!p || p.length < 2) continue;
+    const { L } = along(p);
+    if (L < 0.5) continue;
+    for (const fwd of [true, false]) {
+      const q = fwd ? p : [...p].reverse(), p0 = q[0];
+      let dx = q[1][0] - p0[0], dy = q[1][1] - p0[1];
+      const near = [];
+      for (let k = 1, c = 0; k < q.length; k++) {
+        c += Math.hypot(q[k][0] - q[k - 1][0], q[k][1] - q[k - 1][1]);
+        if (c > JOIN_REACH) break;
+        near.push(q[k]);
+      }
+      if (near.length >= 2) {
+        // y = a x + b x² through the end, least squares, in the frame of the chord to the farthest point
+        const f = near[near.length - 1], cl = Math.hypot(f[0] - p0[0], f[1] - p0[1]), ux = (f[0] - p0[0]) / cl, uy = (f[1] - p0[1]) / cl;
+        let x2 = 0, x3 = 0, x4 = 0, xy = 0, x2y = 0;
+        for (const [qx, qy] of near) {
+          const x = (qx - p0[0]) * ux + (qy - p0[1]) * uy, y = -(qx - p0[0]) * uy + (qy - p0[1]) * ux;
+          x2 += x * x; x3 += x * x * x; x4 += x * x * x * x; xy += x * y; x2y += x * x * y;
+        }
+        const a = (xy * x4 - x2y * x3) / (x2 * x4 - x3 * x3 || 1e-12);
+        dx = ux - a * uy;
+        dy = uy + a * ux;
+      } else if (q.length > 2) {
+        const h1 = Math.hypot(dx, dy), h2 = Math.hypot(q[2][0] - q[1][0], q[2][1] - q[1][1]);
+        if (h1 > 1e-6 && h2 > 1e-6) {
+          const a = -(2 * h1 + h2) / (h1 * (h1 + h2)), b = (h1 + h2) / (h1 * h2), c = -h1 / (h2 * (h1 + h2));
+          dx = a * p0[0] + b * q[1][0] + c * q[2][0];
+          dy = a * p0[1] + b * q[1][1] + c * q[2][1];
+        }
+      }
+      const l = Math.hypot(dx, dy) || 1;
+      ends.push({ x: p0[0], y: p0[1], dx: dx / l, dy: dy / l, src: t.src || 'osm' });
+    }
+  }
+  // ends at one node: within 5 cm (each chain ends at the node's position)
+  const cell = new Map(), key = (x, y) => `${Math.round(x / 0.1)},${Math.round(y / 0.1)}`;
+  ends.forEach((e, i) => { const k = key(e.x, e.y); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(i); });
+  const group = new Array(ends.length).fill(-1), groups = [];
+  ends.forEach((e, i) => {
+    if (group[i] >= 0) return;
+    const gi = groups.length, members = [i];
+    group[i] = gi;
+    for (let m = 0; m < members.length; m++) {
+      const a = ends[members[m]], kx = Math.round(a.x / 0.1), ky = Math.round(a.y / 0.1);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++)
+        for (const j of cell.get(`${kx + ox},${ky + oy}`) || [])
+          if (group[j] < 0 && Math.hypot(ends[j].x - a.x, ends[j].y - a.y) <= 0.05) { group[j] = gi; members.push(j); }
+    }
+    groups.push(members);
+  });
+  const deg = (u, v) => (Math.acos(Math.max(-1, Math.min(1, u.dx * v.dx + u.dy * v.dy))) * 180) / Math.PI;
+  const bad = [], diverging = [], kinds = {};
+  let n = 0;
+  for (const ms of groups) {
+    if (ms.length < 2) continue;
+    const pairs = [];
+    for (let a = 0; a < ms.length; a++) for (let b = a + 1; b < ms.length; b++) {
+      const u = ends[ms[a]], v = ends[ms[b]];
+      const brk = deg(u, { dx: -v.dx, dy: -v.dy });
+      if (brk < 30) pairs.push([brk, ms[a], ms[b]]);
+    }
+    pairs.sort((p, q) => p[0] - q[0]);
+    const used = new Set(), through = [];
+    for (const [brk, a, b] of pairs) if (!used.has(a) && !used.has(b)) { used.add(a); used.add(b); through.push([brk, a, b]); }
+    const kind = ms.length === 2 ? 'joint' : ms.length === 3 ? 'switch' : 'crossing';
+    for (const [brk, a, b] of through) {
+      n++;
+      if (brk > 1) {
+        kinds[kind] = (kinds[kind] || 0) + 1;
+        bad.push({ kind, x: ends[a].x, y: ends[a].y, mag: brk, info: `${kind}: the through track breaks ${brk.toFixed(1)}° (${ends[a].src}/${ends[b].src})` });
+      }
+    }
+    if (through.length)
+      for (const d of ms.filter((m) => !used.has(m))) {
+        const e = ends[d], ang = Math.min(...through.flatMap(([, a, b]) => [deg(e, ends[a]), deg(e, ends[b])]));
+        diverging.push({ x: Math.round(e.x), y: Math.round(e.y), deg: Math.round(ang * 10) / 10, src: e.src });
+      }
+  }
+  const c = check('track-joins', n, bad);
+  c.kinds = kinds;
+  const angles = diverging.map((d) => d.deg).sort((a, b) => a - b), q = (f) => angles[Math.min(angles.length - 1, Math.floor(f * angles.length))];
+  c.diverging = { n: angles.length, p50: q(0.5), p90: q(0.9), max: angles[angles.length - 1], places: diverging.sort((a, b) => b.deg - a.deg).slice(0, TOP) };
   return c;
 }
 
@@ -362,6 +592,53 @@ function trackSpacing(g) {
     if (q.d < 2.9 && !(bad.get(k)?.mag >= 2.9 - q.d)) bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag: 2.9 - q.d, info: `tracks ${q.d.toFixed(2)} m apart` });
   }
   return check('tracks-apart', n, [...bad.values()]);
+}
+
+// Our track (both directions, as the game drives them) against the building footprints (OSM, data.buildings):
+// a centre nearer than half a T3's width puts the car into the wall. The game lifts a building the route passes
+// under (src/world.js), so the meshes hide it; main's OSM track came within 0.71 m of a wall at Karlovy lázně (#20).
+// Footprints with a passage (building:min_level) are not in the data. Places per 20 m.
+function trackInBuildings(g) {
+  const HALF = 1.25, CELL = 20, cells = new Map();
+  for (const b of g.data.buildings || []) {
+    const p = b.p;
+    if (!p || p.length < 3) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of p) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    for (let x = Math.floor((x0 - HALF) / CELL); x <= Math.floor((x1 + HALF) / CELL); x++)
+      for (let y = Math.floor((y0 - HALF) / CELL); y <= Math.floor((y1 + HALF) / CELL); y++) {
+        const k = `${x},${y}`;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(p);
+      }
+  }
+  const clearance = (x, y) => {   // distance to the nearest footprint edge, negative inside one
+    let best = Infinity;
+    for (const p of cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || []) {
+      let inside = false, d = Infinity;
+      for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+        const [ax, ay] = p[j], [bx, by] = p[i], dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+        d = Math.min(d, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+        if ((ay > y) !== (by > y) && x < ax + ((y - ay) * dx) / (dy || 1e-9)) inside = !inside;
+      }
+      best = Math.min(best, inside ? -d : d);
+    }
+    return best;
+  };
+  const bad = new Map();
+  let n = 0;
+  for (const [name, r] of [['our', g.route], ['opposite', g.backRoute]]) {
+    if (!r) continue;
+    for (let s = 0; s < r.length; s += 2) {
+      const p = r.at(s), d = clearance(p.x, p.y);
+      n++;
+      const k = `${name}${Math.round(s / 20)}`;
+      if (d < HALF && !(bad.get(k)?.mag >= HALF - d))
+        bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag: HALF - d, info: `${name} track ${d < 0 ? 'inside a building' : `${d.toFixed(2)} m from a building`}` });
+    }
+  }
+  return check('track-clear-of-buildings', n, [...bad.values()]);
 }
 
 // Car lanes and footways against the survey (DTM lines), the tracks and the platforms. Every lane
@@ -494,14 +771,12 @@ function deckClip(g, world) {
   // meshes, Mosty 3D bridges among them, after the tram's envelope is cut out of them)
   const meshes = [];
   world.traverse((o) => { if (o.isMesh && o.userData.building) meshes.push(o); });
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), from = new THREE.Vector3();
+  const rays = new DownRays(meshes);
   const bad = new Map();
   let n = 0;
   const test = (x, y, z, s, what) => {
     n++;
-    ray.set(from.set(x, z + 2.5, -y), down);
-    ray.far = 2.35;
-    const hit = ray.intersectObjects(meshes, false)[0];
+    const hit = rays.cast(x, z + 2.5, -y, 2.35)[0];
     if (!hit) return;
     const mag = hit.point.y - z, k = `${what}${Math.round(x / 20)},${Math.round(y / 20)}`;
     if (!(bad.get(k)?.mag >= mag)) bad.set(k, { s: Math.round(s), x, y, mag, info: `${what}: model ${mag.toFixed(2)} m over it` });
@@ -552,6 +827,9 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     verticalCurves: verticalCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
+    trackRadius: trackRadius(g),
+    trackJoins: trackJoins(g),
+    trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),
     underpassClearance: underpassClearance(g),

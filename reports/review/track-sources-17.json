@@ -1,0 +1,115 @@
+{
+ "schema": 1,
+ "issue": 20,
+ "line": "17",
+ "options": [
+  "matches reality",
+  "unsure"
+ ],
+ "findings": [
+  {
+   "kind": "track fill",
+   "id": "track fill|-954.8,-4019.1",
+   "line": "17",
+   "x": -954.8,
+   "y": -4019.1,
+   "s": 11945.9,
+   "mag": 18.5,
+   "status": "review",
+   "info": "This track is drawn from the archived technical map (DTMP, 2008-2024 records) here: DI (the current DTM, 2026-09-30) has no track within 2 m of it over 18.5 m. Does the track run like this in the imagery? If not, say how in a note: the build does not move tracks from answers yet.",
+   "lat": 50.050401,
+   "lon": 14.415767
+  },
+  {
+   "kind": "track fill",
+   "id": "track fill|1045.3,1146.5",
+   "line": "17",
+   "x": 1045.3,
+   "y": 1146.5,
+   "s": null,
+   "mag": 11.2,
+   "status": "review",
+   "info": "This track is drawn from the archived technical map (DTMP, 2008-2024 records) here: DI (the current DTM, 2026-09-30) has no track within 2 m of it over 11.2 m. Does the track run like this in the imagery? If not, say how in a note: the build does not move tracks from answers yet.",
+   "lat": 50.098864,
+   "lon": 14.433615
+  },
+  {
+   "kind": "track fill",
+   "id": "track fill|-977.1,-4059.1",
+   "line": "17",
+   "x": -977.1,
+   "y": -4059.1,
+   "s": null,
+   "mag": 10.4,
+   "status": "review",
+   "info": "This track is drawn from the archived technical map (DTMP, 2008-2024 records) here: DI (the current DTM, 2026-09-30) has no track within 2 m of it over 10.4 m. Does the track run like this in the imagery? If not, say how in a note: the build does not move tracks from answers yet.",
+   "lat": 50.050018,
+   "lon": 14.415535
+  },
+  {
+   "kind": "track fill",
+   "id": "track fill|-982.6,-4038.9",
+   "line": "17",
+   "x": -982.6,
+   "y": -4038.9,
+   "s": null,
+   "mag": 201.6,
+   "status": "review",
+   "info": "This track is drawn from OpenStreetMap here: DI (the current DTM, 2026-09-30) has no track within 2 m of it over 201.6 m. Does the track run like this in the imagery? If not, say how in a note: the build does not move tracks from answers yet.",
+   "lat": 50.050191,
+   "lon": 14.41542
+  },
+  {
+   "kind": "switch without DI fork",
+   "id": "switch without DI fork|1404.0,2091.2",
+   "line": "17",
+   "x": 1404.0,
+   "y": 2091.2,
+   "s": 17516.1,
+   "mag": 5,
+   "status": "review",
+   "info": "OSM has a facing switch here that no DI fork was paired with (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If not, say so in a note: switches are not removed from answers yet.",
+   "lat": 50.107718,
+   "lon": 14.436784
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|-1812.7,-6043.4",
+   "line": "17",
+   "x": -1812.7,
+   "y": -6043.4,
+   "s": 7525.5,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.031318,
+   "lon": 14.407758
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|1022.5,1173.2",
+   "line": "17",
+   "x": 1022.5,
+   "y": 1173.2,
+   "s": 16386.0,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.099074,
+   "lon": 14.433248
+  },
+  {
+   "kind": "DI fork without OSM switch",
+   "id": "DI fork without OSM switch|1341.1,2011.3",
+   "line": "17",
+   "x": 1341.1,
+   "y": 2011.3,
+   "s": 17412.6,
+   "mag": 5,
+   "status": "review",
+   "info": "DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same way, within 15 m). Is there a switch in the imagery? If so, say where in a note: switches are not added from answers yet (#35).",
+   "lat": 50.106929,
+   "lon": 14.436065
+  }
+ ]
+}

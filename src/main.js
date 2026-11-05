@@ -6,7 +6,8 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, loadDetailedT3 } from './models.js';
+import { makeT3, placeConsist, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
+import { T3H_FILES, T3H_CREDIT, loadHybridT3, poseHybrid } from './t3h.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
@@ -22,6 +23,7 @@ import { rng, runSeed } from './random.js';
 import { trackStyles, loadHeightFacts } from './heights.js';
 import { credits, logProvenance, fallbacks } from './provenance.js';
 import { Mirror } from './mirror.js';
+import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,10 +37,12 @@ let lineId = params.get('line');
 try { lineId = lineId || localStorage.getItem('tram.line'); } catch { /* storage unavailable */ }
 if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId = lines[0]?.line || '22';
 // every file of the line at once (the optional ones may be missing); the T3 model alongside
-const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.jpg'];
 for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json']) load.prefetch(`data/line${lineId}.${f}`);
 if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
-for (const f of T3_FILES) load.prefetch(f);
+for (const f of T3H_FILES) load.prefetch(f);
+// the pedestrians' figures (#251); ?boxpeople keeps the box figures
+const figures = !params.has('boxpeople');
+if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const data = await (await load.get(`data/line${lineId}.json`)).json();
@@ -77,7 +81,7 @@ let truth;
 try { truth = await loadHeightFacts(); }
 catch (error) { load.fail(error); throw error; }
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
-const t3Res = await Promise.all(T3_FILES.map((f) => load.get(f)));
+const t3Res = await Promise.all(T3H_FILES.map((f) => load.get(f)));
 await load.begin('terrain');
 // the two tracks of a double-track line at least 3 m apart (OSM sometimes draws them closer)
 // (dev switches for comparing lint runs: ?nospread, ?notunnels)
@@ -85,7 +89,7 @@ if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
 // the track beyond both termini, so a two-car set standing at the first stop is on rails
-const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60));
+const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60), data.trackSource?.path, !!data.trackCurve);
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
 // banked curves on dedicated track; level at platforms (stop zone from the stop sign back 30 m
 // where the data has no platform)
@@ -107,7 +111,8 @@ const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 await load.begin('profile');
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
 const styles = trackStyles(truth, data, dtm ? (s) => { const p = route.at(s); return dtm.classAt(p.x, p.y); } : null, route.length);
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || [], styles.lift);
+const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || [], styles.lift,
+  data.heights ? { ...data.heights, source: data.heightSource } : null); // (the assembled top of rail, #197)
 const ground = makeGround(route, terrain, profile, dtm);
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
@@ -124,7 +129,9 @@ window.renderer = renderer; // (from the start, also in the menu: performance ch
 // instead of a frozen black screen.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
-  if (game) game.paused = true;
+  // (window.game, not game: the context can be lost while the world uploads, before `let game` below
+  // is reached, and reading it then threw instead of showing this card)
+  if (window.game) window.game.paused = true;
   const card = $('resultsCard');
   card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
   $('results').classList.remove('hidden');
@@ -193,6 +200,7 @@ async function buildCity() {
   await load.parts(WORLD_PARTS);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground));
+  ground.dtm?.seal(); // (the survey's heights are final now: faster lookups for the simulation, #245)
   window.world = world; // read by the lints (tools/lint.js)
 }
 
@@ -265,14 +273,39 @@ applyWeather('dry');
 await load.begin('gpu');
 uploadWorld();
 await load.begin('tram');
-// detailed T3 model (Sketchfab, CC BY-NC 4.0); the built-in low-poly one is the fallback
+// the detailed T3 (the hybrid model, CC BY-NC 4.0, #248); the built-in low-poly one is the fallback
 let detailedOk = false;
-const t3Blobs = {};
-const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg: 'image/jpeg' };
-for (const r of t3Res) if (r.ok) t3Blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
-try { await loadDetailedT3(T3_FILES[0], t3Blobs); detailedOk = true; data.attribution += ' Tatra T3 3D model: "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).'; }
+try { await loadHybridT3(t3Res, CONTACT_WIRE - RAIL_TOP); detailedOk = true; data.attribution += ` ${T3H_CREDIT}`; }
 catch (e) { console.warn('detailed T3 model not loaded', e); }
-const useDetailed = () => detailedOk && $('optModel').value === 'detailed';
+let people = null;
+if (figures) {
+  try { people = new People(scene, await loadPeople(await Promise.all(PEOPLE_FILES.map((f) => load.get(f))))); }
+  catch (e) { console.warn('pedestrian figures not loaded: the box figures stay', e); }
+}
+window.people = people;
+// conflig's classic model (CC BY-NC 4.0): simpler, no saloon and no moving parts; downloaded when the player
+// picks it in the menu (the user, 2026-11-04: "make it available for user's choice to load")
+const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.jpg'];
+const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg: 'image/jpeg' };
+const T3_CREDIT = 'Tatra T3 3D model (classic): "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).';
+let classicLoad = null;
+function loadClassic() {
+  classicLoad ??= (async () => {
+    const res = await Promise.all(T3_FILES.map((f) => load.get(f))), blobs = {};
+    for (const r of res) if (r.ok) blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
+    await loadDetailedT3(T3_FILES[0], blobs);
+    data.attribution += ` ${T3_CREDIT}`;
+    $('attrib').textContent = data.attribution;
+  })().catch((e) => console.warn('classic T3 model not loaded', e));
+  return classicLoad;
+}
+// the model the menu asks for: 'hybrid', 'classic' or false (the procedural car); makeT3 falls back
+const modelKind = () => {
+  const v = $('optModel').value;
+  if (v === 'simple' || !detailedOk && !classicReady()) return false;
+  return v === 'classic' ? 'classic' : 'hybrid';
+};
+$('optModel').addEventListener('change', () => { if ($('optModel').value === 'classic') loadClassic(); });
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -288,7 +321,7 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk, dest: lastStop, run: runNumber(0) });
+let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0) });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -356,16 +389,20 @@ fillTrips();
 
 $('btnStart').addEventListener('click', start);
 
-function start() {
+async function start() {
+  if ($('optModel').value === 'classic') await loadClassic();
   audio.start();
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
-  if (tramModel.userData.cars.length !== cars || !!tramModel.userData.mats.body !== useDetailed()) {
+  tram.eq.mode = controlMode();
+  const kind = modelKind(), have = kind === 'classic' && !classicReady() ? 'hybrid' : kind || 'simple';
+  if (tramModel.userData.cars.length !== cars || tramModel.userData.kind !== have) {
     scene.remove(tramModel);
-    tramModel = makeT3({ line: data.line, cars, detailed: useDetailed(), dest: lastStop, run: runNumber(0) });
+    disposeModel(tramModel);
+    tramModel = makeT3({ line: data.line, cars, detailed: kind, dest: lastStop, run: runNumber(0) });
     scene.add(tramModel);
   }
-  if (game) scene.remove(game.objects);
+  if (game) { scene.remove(game.objects); disposeModel(game.objects); }
   // one seeded stream for the whole run (rules and traffic), apart from Math.random
   const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
@@ -381,7 +418,7 @@ function start() {
     autoIrc: $('optAutoSwitch').checked,
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
-    detailed: useDetailed(),
+    detailed: modelKind(),
     seed: Math.floor(random() * 1e9),
   });
   game.runSeed = seed; // (replay: ?seed=N)
@@ -394,6 +431,7 @@ function start() {
   debugOverlay.reset();
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
+  pedalKey = null;
   window.game = game; // handy for debugging from the console
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   game.mirror = mirror.stats;
@@ -506,13 +544,15 @@ window.addEventListener('keydown', (e) => {
   if (k === 'o' && !e.repeat) {
     pilot = pilot ? null : new Autopilot();
     game.autopilot = !!pilot;
+    if (!pilot) takeOver();
     game.msg(t(pilot ? 'msg.autoOn' : 'msg.autoOff'), 'info', 4);
     return;
   }
   // touching the controller or the doors takes over from the autopilot
-  if (pilot && ['w', 's', 'arrowup', 'arrowdown', ' ', 'n', 'd'].includes(k)) {
+  if (pilot && (['w', 's', 'arrowup', 'arrowdown', ' ', 'n', 'd', 'r'].includes(k) || /^Digit[0-5]$/.test(e.code))) {
     pilot = null;
     game.autopilot = false;
+    takeOver();
     game.msg(t('msg.autoOff'), 'info', 4);
   }
   if (e.key === 'Shift') input.deadman = true;
@@ -523,12 +563,16 @@ window.addEventListener('keydown', (e) => {
   if (k === 'p' || k === 'escape') { game.paused = !game.paused; return; }
   if (game.paused) return;
   if (e.repeat && k !== 'w' && k !== 's' && k !== 'arrowup' && k !== 'arrowdown') return;
-  const prev = tram.notch;
+  const prev = command();
+  // number keys: a drive step, with Shift a brake step, 0 both pedals released
+  const digit = /^Digit[0-5]$/.test(e.code) ? +e.code.slice(5) : null;
+  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit);
   switch (k) {
-    case 'w': case 'arrowup': if (tram.notch === -5) tram.notch = -4; else tram.notch = Math.min(4, tram.notch + 1); break;
-    case 's': case 'arrowdown': tram.notch = Math.max(-4, tram.notch - 1); break;
-    case ' ': tram.notch = -5; break;
-    case 'n': tram.notch = 0; break;
+    case 'w': case 'arrowup': control(+1, e.repeat); break;
+    case 's': case 'arrowdown': control(-1, e.repeat); break;
+    case ' ': setStep(-6); break;
+    case 'n': setStep(0); break;
+    case 'r': if (!arcade()) tram.eq.park(); break; // the brake pedal's ratchet (arcade parks by itself)
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
@@ -541,11 +585,11 @@ window.addEventListener('keydown', (e) => {
     case 'v': chase = !chase; document.body.classList.toggle('chase', chase); break;
     case 'm': audio.setMuted(!audio.muted); break;
   }
-  if (tram.notch > 0 && game.doorState !== 'closed') {
-    tram.notch = prev > 0 ? prev : 0;
-    if (prev <= 0) { audio.warning(); game.msg(t('msg.closeDoors'), 'warn'); }
+  if (command() > 0 && prev <= 0 && game.doorState !== 'closed') {
+    if (arcade()) tram.eq.lever = 0;
+    audio.warning(); game.msg(t('msg.closeDoors'), 'warn');
   }
-  if (tram.notch !== prev) audio.click(0.12, 1600);
+  if (command() !== prev) audio.click(0.12, 1600);
 });
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') input.deadman = false;
@@ -554,8 +598,30 @@ window.addEventListener('keyup', (e) => {
   if (ku === 'c') input.cutout = false;
   if (ku === 'y') input.switchBtn = false;
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
-  if (e.key === ' ' && tram.notch === -5) tram.notch = -4;
+  if (e.key === ' ' && command() === -6) setStep(-5); // (the emergency stop let go: brake step 5)
+  if ((ku === 'w' || ku === 'arrowup' || ku === 's' || ku === 'arrowdown') && pedalKey) pedalKey = null;
 });
+
+// The controls (#221): 'arcade' moves a lever in steps and a helper works the pedals; 'advanced' moves the
+// pedals (a tap to the next step's angle, held on at 20°/s) and the ratchet (R) is the driver's
+function controlMode() { return $('optControls').value === 'advanced' ? 'advanced' : 'arcade'; }
+function arcade() { return tram.eq.mode === 'arcade'; }
+// what the driver has set: the lever (arcade, the helper moves the pedals on the next step) or the pedals' step
+function command() { return arcade() ? tram.eq.lever : tram.notch; }
+function takeOver() {
+  tram.eq.mode = controlMode();
+  tram.eq.lever = Math.max(-5, Math.min(5, tram.notch));
+}
+let pedalKey = null; // advanced: a held W / S moves the pedal on after 0.35 s
+function control(dir, repeat) {
+  const eq = tram.eq;
+  if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
+  if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
+}
+function setStep(n) {
+  if (arcade()) tram.eq.lever = n;
+  else tram.eq.setStep(n);
+}
 window.addEventListener('blur', () => {
   if (game && !game.finished && !pilot) { game.paused = true; audio.setActive(false); }
 }); // keep riding on autopilot
@@ -606,6 +672,8 @@ function previewAt(s) {
 function placeTram(s) {
   // each car rests on its two bogies, so it follows curves and pitches with the gradient
   placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q), route.rollAt(q)]; });
+  // the doors, the brake lamps and the track-brake shoes from the game (the detailed model's)
+  if (tramModel.userData.hybrid && game) poseHybrid(tramModel, { doors: game.doorOpenness, braking: tram.brake > 500, track: tram.trackMagnets });
 }
 
 function updateCamera(dt, t) {
@@ -712,6 +780,7 @@ function frame(now) {
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(dt) : [dt];
     steps.forEach((h, i) => {
+      if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       game.update(h, pilot ? pilot.input : input);
       // (the traffic is posed for drawing on the frame's last step only)
@@ -742,7 +811,10 @@ function frame(now) {
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
   const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
-  if (draw) { renderer.render(scene, camera); lastDraw = now; window.drawCount++; }
+  if (draw) {
+    if (people && game) people.sync(camera, traffic, game);
+    renderer.render(scene, camera); lastDraw = now; window.drawCount++;
+  }
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {

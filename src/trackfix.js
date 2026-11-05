@@ -4,6 +4,8 @@
 // 40 m from any switch), its axis is pushed out to MIN, blended over ±20 m; the drawn tracks that are
 // that track move with it. Our own route stays where it is (every stop, signal and profile is on it).
 // Interlaced track (a gauntlet: under 1.8 m, Letenská 0.7 m) and 40 m around it are left alone.
+// Where both tracks are surveyed (DI or the archived axes, the line data's trackSource; #20) their spacing
+// is real (Kobylisy: 3.49-3.52 m, OSM 2.53-3.31 m) and nothing moves.
 const MIN = 3.0, BLEND = 20, SWITCH_CLEAR = 40;
 
 // points every <= step m along a polyline (a long OSM segment has no vertex where it comes too close)
@@ -15,6 +17,9 @@ function densify(line, step = 4) {
   }
   return out;
 }
+
+const SURVEYED = new Set(['di', 'dtmp']);
+const surveyedAt = (ranges) => (s) => !!ranges?.length && SURVEYED.has((ranges.find(([a, b]) => s >= a && s <= b) || [])[2]);
 
 export function spreadTracks(data) {
   if (!data.pathBack || data.pathBack.length < 2) return { moved: 0, min: null };
@@ -48,6 +53,7 @@ export function spreadTracks(data) {
     return best;
   };
   const switches = (data.switches || []).map((w) => w.s ?? w);
+  const oursSurveyed = surveyedAt(data.trackSource?.path), backSurveyed = surveyedAt(data.trackSource?.pathBack);
   // the push each back point needs (along our normal, away from our track)
   const bacc = [0];
   for (let i = 1; i < back.length; i++) bacc.push(bacc[i - 1] + Math.hypot(back[i][0] - back[i - 1][0], back[i][1] - back[i - 1][1]));
@@ -59,6 +65,7 @@ export function spreadTracks(data) {
     const j = Math.min(back.length - 1, i + 1), k = Math.max(0, i - 1);
     const bx = back[j][0] - back[k][0], by = back[j][1] - back[k][1], bl = Math.hypot(bx, by) || 1;
     if ((bx * n.hx + by * n.hy) / bl > -0.97) return null; // not alongside, the other way
+    if (oursSurveyed(n.s) && backSurveyed(bacc[i])) return null;
     if (switches.some((s) => Math.abs(s - n.s) < SWITCH_CLEAR)) return null;
     const ux = (x - n.px) / n.d, uy = (y - n.py) / n.d;
     return { push: MIN - n.d, ux, uy };

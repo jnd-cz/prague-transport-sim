@@ -1,0 +1,18 @@
+Pedestrian figures (assets/people/person-near.glb, person-far.glb)
+
+Source: the project's own asset lab "street-life-boarding" v14 (2026-10-27), made for this project by a
+        ChatGPT agent working for the project owner; parametric figures prepared offline by the lab's
+        recipe (tools/prepare-traffic-assets.mjs, Node with three.js r160; not in this repository).
+        Inventory and provenance: docs/assets-inventory.md (#247). Not based on a third-party model.
+Licence: GNU GPL v3, like the code (the project owner's choice, 2026-11-04;
+         docs/decisions/2026-10-29-tests-and-licences.md).
+
+person-near.glb  258,800 B  sha256 fa5680c9b161a7cf42c3fcf90da65668c8d7a9dff60fbf97174e306214e523d4
+  4,228 triangles, 3 skinned primitives (trousers, shirt, detail), 17 bones, 1.845 m tall.
+  Clips (1 s, in place): Walk, Idle, Run, StairUp, StairDown, TramStepUp, TramStepDown, Sit.
+  One Walk cycle covers 16/15 m, one Run cycle 2.15 m.
+person-far.glb    26,692 B  sha256 5d7bc31fb8dd1dd7c3b345dc88d19b40e4d4862f291d227a9706da5a782edb2c
+  840 triangles, one primitive, colours baked into the vertices, standing.
+
+Axes: metres, +X forward, +Y up, +Z right, origin at the feet. Unchanged from the lab (src/people.js
+turns them to the game's +Z forward).

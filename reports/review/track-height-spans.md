@@ -1,6 +1,6 @@
 # Structure height decisions
 
-Snapshot `2026-11-01`. Proposed rules are not approvals.
+Snapshot `2026-11-02`. Proposed rules are not approvals.
 
 Open `?line=17&review=reports/review/track-heights.json` to inspect and answer the decisions.
 
@@ -134,6 +134,8 @@ Flags: `track_style_defaulted_panels`, `track_zps_level_unverified`.
 
 OSM ways: [476017592](https://www.openstreetmap.org/way/476017592), [476017594](https://www.openstreetmap.org/way/476017594), [476017595](https://www.openstreetmap.org/way/476017595), [476073795](https://www.openstreetmap.org/way/476073795), [938201414](https://www.openstreetmap.org/way/938201414), [938201415](https://www.openstreetmap.org/way/938201415), [938201416](https://www.openstreetmap.org/way/938201416), [938201417](https://www.openstreetmap.org/way/938201417), [996102484](https://www.openstreetmap.org/way/996102484), [996102485](https://www.openstreetmap.org/way/996102485), [996102490](https://www.openstreetmap.org/way/996102490).
 
+Mosty 3D features: 398 (the track meets the model's deck at an end).
+
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
 | 9 / path | Palackého náměstí → Palackého náměstí | 6.1 | review_archive_profile |
@@ -154,6 +156,8 @@ Flags: `ambiguous_archive_match`, `archive_surface_height_disagreement`, `paved_
 
 OSM ways: [1176355489](https://www.openstreetmap.org/way/1176355489), [1176355495](https://www.openstreetmap.org/way/1176355495), [338644891](https://www.openstreetmap.org/way/338644891), [338644915](https://www.openstreetmap.org/way/338644915), [4722514](https://www.openstreetmap.org/way/4722514), [4722515](https://www.openstreetmap.org/way/4722515), [495700333](https://www.openstreetmap.org/way/495700333), [495700334](https://www.openstreetmap.org/way/495700334).
 
+Mosty 3D features: 64, 69 (the track meets the model's deck at an end).
+
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
 | 17 / path | Čechova čtvrť → Nádraží Modřany | 397.6 | review_archive_profile |
@@ -168,6 +172,8 @@ Flags: `archive_surface_height_disagreement`, `structure_hint`, `structure_unver
 ## osm-4722520 · bridge
 
 OSM ways: [338644883](https://www.openstreetmap.org/way/338644883), [4722520](https://www.openstreetmap.org/way/4722520), [495705767](https://www.openstreetmap.org/way/495705767), [495705768](https://www.openstreetmap.org/way/495705768), [495705769](https://www.openstreetmap.org/way/495705769), [495705770](https://www.openstreetmap.org/way/495705770).
+
+Mosty 3D features: 74, 86 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
@@ -184,6 +190,8 @@ Flags: `archive_surface_height_disagreement`, `structure_hint`, `structure_unver
 
 OSM ways: [338644894](https://www.openstreetmap.org/way/338644894), [98560954](https://www.openstreetmap.org/way/98560954).
 
+Mosty 3D features: 99 (the track meets the model's deck at an end).
+
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
 | 17 / path | Hodkovičky → Hodkovičky | 38.2 | review_archive_profile |
@@ -199,6 +207,8 @@ Flags: `archive_surface_height_disagreement`, `structure_hint`, `structure_unver
 
 OSM ways: [1176355492](https://www.openstreetmap.org/way/1176355492), [1176355503](https://www.openstreetmap.org/way/1176355503), [150611269](https://www.openstreetmap.org/way/150611269), [338644907](https://www.openstreetmap.org/way/338644907), [495705765](https://www.openstreetmap.org/way/495705765), [495705766](https://www.openstreetmap.org/way/495705766).
 
+Mosty 3D features: 112 (the track meets the model's deck at an end).
+
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
 | 17 / path | Černý kůň → Černý kůň | 151.8 | review_archive_profile |
@@ -213,6 +223,8 @@ Flags: `archive_surface_height_disagreement`, `structure_hint`, `structure_unver
 ## osm-150611136 · bridge
 
 OSM ways: [150611136](https://www.openstreetmap.org/way/150611136), [317188281](https://www.openstreetmap.org/way/317188281), [495705763](https://www.openstreetmap.org/way/495705763), [495705764](https://www.openstreetmap.org/way/495705764).
+
+Mosty 3D features: 129 (the track meets the model's deck at an end).
 
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
@@ -310,6 +322,8 @@ Flags: `track_style_defaulted_panels`, `track_zps_level_unverified`.
 
 OSM ways: [127867974](https://www.openstreetmap.org/way/127867974), [1328077842](https://www.openstreetmap.org/way/1328077842), [136122214](https://www.openstreetmap.org/way/136122214), [475364602](https://www.openstreetmap.org/way/475364602), [475364605](https://www.openstreetmap.org/way/475364605), [475364616](https://www.openstreetmap.org/way/475364616), [475364617](https://www.openstreetmap.org/way/475364617), [476507512](https://www.openstreetmap.org/way/476507512), [476507514](https://www.openstreetmap.org/way/476507514).
 
+Mosty 3D features: 506 (the track meets the model's deck at an end).
+
 | Line / direction | Nearest stops at ends | Length (m) | Proposed rule |
 |---|---|---:|---|
 | 17 / path | Právnická fakulta → Právnická fakulta | 9.0 | review_archive_profile |
@@ -371,7 +385,7 @@ Archive candidates: `2424348` (2008-03-10; range 268.329–268.799 m); `2214139`
 
 DI at span ends: no numeric DI within 50 m.
 
-Flags: `track_zps_level_unverified`.
+Flags: `archive_terrain_height_disagreement`, `track_zps_level_unverified`.
 
 ## unmapped-8880185638fb · unmapped
 

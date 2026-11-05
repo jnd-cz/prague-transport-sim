@@ -7,6 +7,7 @@
 //   walker - a walker inside a vehicle
 // Used by tools/lint.js ({ traffic: true }); returns checks in the same shape.
 import { Autopilot } from '../src/autopilot.js';
+import { CAR_PITCH } from '../src/tram.js';
 import { stuckScene } from './bench/stuck.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
@@ -61,7 +62,7 @@ function snapshot(g, tr) {
   // our own set: car centres along the route behind the front
   const cars = g.tram.cars || 1;
   for (let k = 0; k < cars; k++) {
-    const s = g.tram.s - 0.6 - 7.6 - k * 15.2, p = g.route.at(s), h = g.route.heading(s, 3);
+    const s = g.tram.s - 0.6 - 7.6 - k * CAR_PITCH, p = g.route.at(s), h = g.route.heading(s, 3);
     out.veh.push({ id: `us/${k}`, group: 'us', kind: 'our tram', x: p.x, y: p.y, z: g.route.ground.profile.height(s), hx: h.hx, hy: h.hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
   }
   const M = new tr.crowd.matrix.constructor();

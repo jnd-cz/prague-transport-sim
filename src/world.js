@@ -1,10 +1,10 @@
 // Static 3D scenery built from the preprocessed OSM data, draped on the DMR 5G terrain.
 import * as THREE from 'three';
-import { smoothPolyline } from './route.js';
+import { smoothPolyline, SURVEYED, SMOOTH, AS_SURVEYED } from './route.js';
 import { rng } from './random.js';
 import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
-import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
+import { RAIL_HEAD, BED_BELOW, STREET_BELOW, meetHeights } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
@@ -51,9 +51,9 @@ class SegmentIndex {
     const i0 = Math.floor((Math.min(a[0], b[0]) - seg[4]) / c), i1 = Math.floor((Math.max(a[0], b[0]) + seg[4]) / c);
     const j0 = Math.floor((Math.min(a[1], b[1]) - seg[4]) / c), j1 = Math.floor((Math.max(a[1], b[1]) + seg[4]) / c);
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-      const k = `${i},${j}`;
-      if (!this.map.has(k)) this.map.set(k, []);
-      this.map.get(k).push(seg);
+      const k = i * 65536 + j; // (a number, not "i,j": #205)
+      const arr = this.map.get(k);
+      if (arr) arr.push(seg); else this.map.set(k, [seg]);
     }
   }
   addLine(line, w = 0) { for (let i = 1; i < line.length; i++) this.add(line[i - 1], line[i], w); }
@@ -62,7 +62,7 @@ class SegmentIndex {
     const c = this.cell, ci = Math.floor(x / c), cj = Math.floor(y / c);
     let best = Infinity;
     for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-      const arr = this.map.get(`${i},${j}`);
+      const arr = this.map.get(i * 65536 + j);
       if (!arr) continue;
       for (const [ax, ay, bx, by, hw] of arr) {
         const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
@@ -242,11 +242,28 @@ function addSide(cg, line, offset, zTop, zBot) {
   }
 }
 
-// Heights along a track chain, smoothed along its length (Gaussian, ±9 m) so rails never
-// step even where the ground function changes regime (route profile / terrain / bridge).
-function trackHeights(line, hf) {
+// Heights along a track chain without assembled heights (#197: OSM or archive fill, lines not rebuilt yet),
+// smoothed along its length (Gaussian, ±9 m) so rails never step where the ground function changes regime
+// (route profile / terrain / bridge).
+function trackHeights(line, hf, byDistance = false) {
   const raw = line.map((p) => hf(p[0], p[1]));
   const n = raw.length, k = 6, out = new Float32Array(n);
+  if (byDistance) {
+    // (points unevenly spaced, the build's curves: the same window in metres, ±9 m with σ 4.5 m)
+    const s = [0];
+    for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+    let lo = 0, hi = 0;
+    for (let i = 0; i < n; i++) {
+      const r = Math.min(9, s[i], s[n - 1] - s[i]);
+      while (s[i] - s[lo] > r + 1e-6) lo++;
+      hi = Math.max(hi, i);
+      while (hi < n - 1 && s[hi + 1] - s[i] <= r + 1e-6) hi++;
+      let acc = 0, wsum = 0;
+      for (let j = lo; j <= hi; j++) { const w = Math.exp(-0.5 * ((s[j] - s[i]) / 4.5) ** 2); acc += raw[j] * w; wsum += w; }
+      out[i] = acc / wsum;
+    }
+    return Array.from(out);
+  }
   for (let i = 0; i < n; i++) {
     const r = Math.min(k, i, n - 1 - i);
     let acc = 0, wsum = 0;
@@ -254,6 +271,20 @@ function trackHeights(line, hf) {
     out[i] = acc / wsum;
   }
   return Array.from(out);
+}
+
+// A track's assembled heights at its drawn points: `zs` comes every `step` m along the raw line t.p; the drawn
+// line t.smooth is resampled (and smoothed where it is OSM), so its arc length is scaled to the raw one.
+function ownHeights(t, step, old) {
+  const len = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
+  const sm = t.smooth, k = len(t.p) / (len(sm) || 1), d = new Float32Array(sm.length);
+  let acc = 0;
+  for (let i = 0; i < sm.length; i++) {
+    if (i) acc += Math.hypot(sm[i][0] - sm[i - 1][0], sm[i][1] - sm[i - 1][1]);
+    const f = (acc * k) / step, i0 = Math.min(Math.floor(f), t.zs.length - 1), a = t.zs[i0], b = t.zs[Math.min(i0 + 1, t.zs.length - 1)];
+    d[i] = a == null || b == null ? NaN : a + (b - a) * (f - i0);
+  }
+  return Array.from(d.some(Number.isNaN) ? meetHeights(d, old(t)) : d);
 }
 
 // Height function for an OSM way: bridges not on our route span linearly between their ends.
@@ -397,8 +428,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
 
   // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
   // then the terrain is lowered under every track so it can't poke through the bed
-  // OSM draws curves as straight segments: render tracks as smoothed curves
-  for (const t of data.tracks) if (!t.smooth) t.smooth = smoothPolyline(t.p, 1.5, t.p.length > 2 ? 6 : 0.1).pts;
+  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20);
+  // where the build drew smooth curves (data.trackCurve, #204) its points as they are, a point every 1.5 m at most
+  // (resampled, a 4.6 m piece's end became a chord and its joint at Strossmayerovo náměstí broke 2.9°)
+  for (const t of data.tracks) if (!t.smooth) t.smooth = data.trackCurve ? densify(t.p, 1.5) : smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) ? SMOOTH : AS_SURVEYED).pts;
   // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
   // street surfaces laid flush with the track bed
   const tracks = new SegmentIndex(10);
@@ -416,7 +449,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     const n = route.nearest(x, y);
     return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
   };
-  for (const t of data.tracks) if (!t.z) t.z = trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))));
+  const old = (t) => trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))), !!data.trackCurve);
+  // a track with assembled heights (#197: `zs` every 2 m along t.p, tools/line_heights.py) takes its own top of
+  // rail, unsmoothed; a stretch without one takes the heights above, shifted to meet it at both ends
+  for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights?.step ?? 2, old) : old(t);
   // Share the exact rail cant with pedestrian crossings; a crossing must meet each rail's height.
   const tiltCache = new WeakMap();
   const tiltOf = (t) => {
@@ -856,7 +892,13 @@ function lowerTerrainUnderDtm(dtm, T) {
   for (const a of dtm.areas) {
     if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
     for (const [p, q, r] of a.mesh) {
-      for (const [x, y, z] of [p, q, r, mid(p, q), mid(q, r), mid(r, p)]) lowerTerrainAt(T, x, y, z - 0.25);
+      // (the corners and edge midpoints, without an array each: millions at load, #205)
+      lowerTerrainAt(T, p[0], p[1], p[2] - 0.25);
+      lowerTerrainAt(T, q[0], q[1], q[2] - 0.25);
+      lowerTerrainAt(T, r[0], r[1], r[2] - 0.25);
+      lowerTerrainAt(T, (p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2 - 0.25);
+      lowerTerrainAt(T, (q[0] + r[0]) / 2, (q[1] + r[1]) / 2, (q[2] + r[2]) / 2 - 0.25);
+      lowerTerrainAt(T, (r[0] + p[0]) / 2, (r[1] + p[1]) / 2, (r[2] + p[2]) / 2 - 0.25);
     }
   }
 }
@@ -904,13 +946,14 @@ function flushDtm(ground) {
   const rows = new Map();
   const row = (i) => {
     if (rows.has(i)) return rows.get(i);
-    const s = i * 2, zt = profile.height(s) - profile.lift(s) - STREET_BELOW, e = [];
+    const s = i * 2, e = [];
     // under our bridge the street below keeps its own level
     if (profile.onBridge(s)) { rows.set(i, new Array(31).fill(null)); return rows.get(i); }
     // (the street at the rails' level: a road below or above it in plan is another level, never
     // measured; at the north end of Čechův most the embankment road 5.6 m below lifted the street)
+    // (the tracks' surface level across the street: ours, the opposite track's beyond it, #197)
     for (let l = -15; l <= 15; l++) {
-      const o = route.offset(s, l), t = dtm.surfaceAt(o.x, o.y, zt);
+      const zt = profile.heightAt(s, l) - profile.lift(s) - STREET_BELOW, o = route.offset(s, l), t = dtm.surfaceAt(o.x, o.y, zt);
       e.push(t && FLUSH.has(t.c) && Math.abs(zt - t.z) < 1.5 ? zt - t.z : null);
     }
     for (let k = 0; k < e.length; k++) if (e[k] === null) {
@@ -960,7 +1003,7 @@ function flushDtm(ground) {
     // in the track corridor (3 m from our tracks) a carriageway or tram bed is the bed, whatever
     // the survey says there (a 2 m bump at s 2420 stood 3.6 m over the rails); a structure well above
     // the track (over 4.5 m) is another level
-    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackDist(p[0], p[1]) < 3 && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW; return; }
+    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackDist(p[0], p[1]) < 3 && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
@@ -989,22 +1032,41 @@ function flushDtm(ground) {
     }
   }
   // The surveyed decks of our own bridges carry the tracks: laid to the track profile the same way
-  // (the deck's offset at the route, full within 8 m, fading out by 15 m; crossfall kept), so the
-  // cars beside the tram drive on the deck at the rails' level. Measured first, then moved.
-  const deckMoves = [];
-  for (const a of dtm.areas) {
-    if (a.l < 1) continue;
+  // (each area's offset at the route, full within 8 m, fading out by 15 m; crossfall kept), so the
+  // cars beside the tram drive on the deck at the rails' level. Measured first, then moved. (One offset
+  // for every area, from the deck nearest the rails, left the bridge's outline (class deck) 0.2-0.47 m over
+  // the carriageway it overlaps on Čechův most and Trojský most once the rails followed DI, #197: each area
+  // takes its own, the outline 2 cm under the street.)
+  const deckMoves = [], own = new Map();
+  const ownAt = (a, ai, s, x, y, zt) => {
+    const key = `${ai}:${Math.round(s)}`;
+    if (own.has(key)) return own.get(key);
+    let z = null;
+    for (const [A, B, C] of a.mesh) {
+      const d = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+      if (Math.abs(d) < 1e-9) continue;
+      const u = ((B[0] - x) * (C[1] - y) - (B[1] - y) * (C[0] - x)) / d, v = ((C[0] - x) * (A[1] - y) - (C[1] - y) * (A[0] - x)) / d;
+      if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) continue;
+      const zz = u * A[2] + v * B[2] + (1 - u - v) * C[2];
+      if (Math.abs(zz - zt) <= 2.5 && (z === null || Math.abs(zz - zt) < Math.abs(z - zt))) z = zz;
+    }
+    own.set(key, z);
+    return z;
+  };
+  dtm.areas.forEach((a, ai) => {
+    if (a.l < 1) return;
     for (const p of [...a.ring, ...a.holes.flat(), ...a.mesh.flat()]) {
       if (done.has(p)) continue;
       done.add(p);
       const n = route.nearest(p[0], p[1]);
       if (!n || n.d >= 15 || !profile.onBridge(n.s)) continue;
-      const q = route.at(n.s), zt = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW, zr = dtm.deckAt(q.x, q.y, zt, 2.5);
+      const q = route.at(n.s), zt = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW - (a.c === 'deck' ? 0.02 : 0);
+      const zr = ownAt(a, ai, n.s, q.x, q.y, zt) ?? dtm.deckAt(q.x, q.y, zt, 2.5);
       if (zr === null) continue;
       const k = Math.max(0, Math.min(1, (n.d - 8) / 7));
       deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k))]);
     }
-  }
+  });
   for (const [p, dz] of deckMoves) p[2] += dz;
 }
 
@@ -1281,19 +1343,20 @@ function buildTrackSupport(group, route, ground, trackDist) {
   };
   let prev = null, walls = 0;
   for (let s = 0; s <= route.length; s += 2) {
-    const zb = profile.height(s) - profile.lift(s), [lo, hi] = edges(s), bridge = profile.onBridge(s);
+    const [lo, hi] = edges(s), bridge = profile.onBridge(s), zb = profile.height(s) - profile.lift(s);
+    const zL = profile.heightAt(s, hi) - profile.lift(s), zR = profile.heightAt(s, lo) - profile.lift(s); // (each edge at its track's level, #197)
     const L = route.offset(s, hi), R = route.offset(s, lo);
     const gL = below(L.x, L.y), gR = below(R.x, R.y), C = route.at(s), gC = below(C.x, C.y);
-    const cur = { s, zb, L, R, gL, gR, bridge, need: bridge ? zb - Math.min(gL, gR, gC) > 1 : Math.max(zb - gL, zb - gR) > 0.6 };
+    const cur = { s, zb, zL, zR, L, R, gL, gR, bridge, need: bridge ? Math.max(zL, zR) - Math.min(gL, gR, gC) > 1 : Math.max(zL - gL, zR - gR) > 0.6 };
     if (prev && prev.need && cur.need) {
       const c = cg._chunk(L.x, L.y);
       const P = (o, z) => W(o.x, o.y, z);
       // top (ballast) between the outer bed edges, just under the beds
-      cg.quad(c, P(prev.R, prev.zb - 0.03), P(R, zb - 0.03), P(L, zb - 0.03), P(prev.L, prev.zb - 0.03), ballast);
-      const footL = bridge ? zb - 0.8 : Math.min(zb, gL) - 0.1, footLp = prev.bridge ? prev.zb - 0.8 : Math.min(prev.zb, prev.gL) - 0.1;
-      const footR = bridge ? zb - 0.8 : Math.min(zb, gR) - 0.1, footRp = prev.bridge ? prev.zb - 0.8 : Math.min(prev.zb, prev.gR) - 0.1;
-      cg.quad(c, P(prev.L, footLp), P(L, footL), P(L, zb), P(prev.L, prev.zb), stone);
-      cg.quad(c, P(prev.R, footRp), P(R, footR), P(R, zb), P(prev.R, prev.zb), stone);
+      cg.quad(c, P(prev.R, prev.zR - 0.03), P(R, cur.zR - 0.03), P(L, cur.zL - 0.03), P(prev.L, prev.zL - 0.03), ballast);
+      const footL = bridge ? cur.zL - 0.8 : Math.min(cur.zL, gL) - 0.1, footLp = prev.bridge ? prev.zL - 0.8 : Math.min(prev.zL, prev.gL) - 0.1;
+      const footR = bridge ? cur.zR - 0.8 : Math.min(cur.zR, gR) - 0.1, footRp = prev.bridge ? prev.zR - 0.8 : Math.min(prev.zR, prev.gR) - 0.1;
+      cg.quad(c, P(prev.L, footLp), P(L, footL), P(L, cur.zL), P(prev.L, prev.zL), stone);
+      cg.quad(c, P(prev.R, footRp), P(R, footR), P(R, cur.zR), P(prev.R, prev.zR), stone);
       if (bridge) cg.quad(c, P(prev.L, footLp), P(prev.R, footRp), P(R, footR), P(L, footL), stone);
       walls++;
     }

@@ -1,23 +1,24 @@
 // Autopilot driver: plans a target speed from limits, stops, signals, obstacles and the tram
-// ahead, then picks the controller notch from the forces needed (incl. gradient). It also works
+// ahead, then asks the vehicle's equipment for the force needed (incl. gradient); the T3's works its
+// pedals as a careful driver (the advanced model, #221: src/tr37.js autoDrive). It also works
 // the doors, departs on time, rings the bell, sands on slippery rail, sets IRC switches and
 // passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
 
+const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
+const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
 
 export class Autopilot {
   constructor() {
-    this.hold = 0;       // s until the notch may change again (smooth, fewer clicks)
     this.bellCooldown = 0;
-    this.input = { deadman: true, sand: false };
+    this.input = { deadman: true, sand: false, switchBtn: false };
   }
 
   step(g, dt) {
     const tr = g.tram;
     const st = g.stops[g.nextStop];
     this.bellCooldown -= dt;
-    this.hold -= dt;
 
     // doors: open at the platform, close once everyone is aboard and it is departure time
     if (st) {
@@ -61,7 +62,13 @@ export class Autopilot {
       }
     }
     const gap = g.tramAheadGap();
-    if (gap !== null) consider(tr.s + gap - 8);
+    // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 8 m since the prototype kept two 2-car sets off
+    // long platforms, the user, #258)
+    if (gap !== null) {
+      consider(tr.s + gap - TRAM_GAP);
+      const clear = g.keepClear(tr.s, tr.s + gap); // (not into a junction the tram ahead has not cleared)
+      if (clear !== null) consider(clear);
+    }
     // a car on our track ahead (shared lane, queuing on the tracks): stop behind it
     for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5);
     // a car crossing our track ahead (turning across, U3), or committed to it (too close to stop): stop
@@ -74,8 +81,22 @@ export class Autopilot {
     }
     if (stopAt !== null) {
       const d = stopAt - tr.s;
-      vt = Math.min(vt, Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - 1.5))));
-      if (d < 1.5) vt = 0;
+      // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
+      // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
+      // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
+      // (and from there it creeps at ≤ 3 km/h to 1 m short: a stop zone may start only 2.5 m before the point)
+      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0));
+      if (d < 1) vt = 0;
+    }
+    // drive only if still under the plan 2.5 s on: a careful driver coasts into a braking curve (on the T3
+    // the brake builds slowly within ≈2.5 s of driving; it drove up to 16.5 km/h 11 m before Ruská and
+    // overran, line 22 seed 4, #241's check)
+    const look = Math.max(0, tr.v) * 2.5;
+    let vtDrive = vt;
+    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12 - look)) - 0.3);
+    if (stopAt !== null) {
+      const d = stopAt - tr.s;
+      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
     }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
@@ -115,30 +136,23 @@ export class Autopilot {
     }
     this.input.cutout = wantPower === false && g.heatingDraws();
 
-    // force-based notch choice: wanted acceleration plus gravity on the gradient
+    // the force wanted: acceleration plus gravity on the gradient and the running resistance; the vehicle's
+    // equipment works its own controls for it (the T3's pedals: src/tr37.js autoDrive)
     const grade = g.profile.grade(tr.s - 7);
-    const aWant = Math.max(-1.1, Math.min(1.0, (vt - tr.v) * 0.9));
-    const need = tr.mass * (aWant + 9.81 * grade) + 650 * tr.cars + 4.2 * tr.v * tr.v;
-    const pick = (force, f) => { for (let k = 1; k <= 4; k++) if (force(k) >= f) return k; return 4; };
-    let notch;
-    if (g.doorState !== 'closed') notch = -2;
-    else if (vt <= 0.05) notch = tr.v > 1.5 || Math.abs(grade) > 0.03 ? -4 : -2;
-    else if (Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) notch = 0;
-    else if (need > 0) notch = pick((k) => tr.driveForce(k), need);
-    else notch = -pick((k) => tr.brakeForce(k), -need);
-    if (wantPower === true) notch = Math.max(1, notch);
-    if (wantPower === false) notch = Math.min(0, notch);
-    // slippery rail: ease off one notch and sand
-    this.input.sand = tr.slip || tr.slide;
-    if (tr.slip && notch > 1) notch--;
-    if (tr.slide && notch < -1) notch++;
-
-    // change notches calmly unless braking harder is needed right now
-    const urgent = notch < tr.notch && notch < 0 || wantPower !== null || vt <= 0.05;
-    if (notch !== tr.notch && (this.hold <= 0 || urgent)) {
-      tr.notch = notch;
-      this.hold = 0.6;
-    }
+    // (between the drive plan and the brake plan: coast)
+    const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
+    const aWant = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    const need = tr.inertia * aWant + tr.mass * 9.81 * grade + 650 * tr.cars + 4.2 * tr.v * tr.v;
+    const stand = g.doorState !== 'closed' || vt <= 0.05;
+    const coast = between || (Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
+    // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
+    const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
+    // a turn under a contact while braking: the switch button draws the current, the drive pedal stays off
+    const button = wantPower === true && need < 0;
+    this.input.switchBtn = button;
+    this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
+    tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+      stopDist: stopAt === null ? null : stopAt - tr.s });
     return { vt, stopAt, notch: tr.notch };
   }
 }

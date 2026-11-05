@@ -10,13 +10,15 @@ The file: BigTIFF, 35001 x 26001 float32, tiled 128 x 128, LZW without predictor
 (-757500.2778, -1034000.3889), so it is sampled bilinear at our lattice points, never copied cell by
 cell. It states no vertical datum (Bpv assumed and checked against DMR 5G on every build: fine_terrain.py).
 
-Only the tiles a build touches are decoded (a line's band is ~1000 of the 55896), with the small
-TIFF-LZW decoder below: Pillow decodes LZW only through libtiff, for whole images (3.6 GB here).
+Only the tiles a build touches are decoded (a line's band is ~1000 of the 55896): each tile wrapped as a TIFF of
+its own for Pillow's libtiff (6-7x faster than the small TIFF-LZW decoder below, which stays the fallback; #205:
+decoding was 9 % of tools/line_heights.py). Pillow opens the whole file only as one image (3.6 GB here).
 
     python -P -E tools/ipr_dtm.py --fetch      # download the ZIP (2.05 GB), its catalogue records, provenance.json
     python -P -E tools/ipr_dtm.py              # check the file and print a few heights
 """
 import hashlib
+import io
 import json
 import os
 import struct
@@ -25,6 +27,12 @@ import time
 import urllib.request
 
 import numpy as np
+
+try:
+    from PIL import Image, features
+    PILLOW_LZW = features.check("libtiff")
+except ImportError:
+    PILLOW_LZW = False
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "raw", "ipr-dtm")
@@ -60,6 +68,18 @@ def lzw(data):
         out += entry
         prev = entry
     return bytes(out)
+
+
+def tile_tiff(data, w, h):
+    """One LZW float32 tile as a classic little-endian TIFF of its own (one strip), for Pillow."""
+    entries = [(256, 3, w), (257, 3, h), (258, 3, 32), (259, 3, 5), (262, 3, 1), (273, 4, 0), (277, 3, 1),
+               (278, 3, h), (279, 4, len(data)), (284, 3, 1), (339, 3, 3)]
+    start = 8 + 2 + 12 * len(entries) + 4
+    out = bytearray(b"II*\0" + struct.pack("<IH", 8, len(entries)))
+    for tag, typ, v in entries:
+        v = start if tag == 273 else v
+        out += struct.pack("<HHI", tag, typ, 1) + (struct.pack("<HH", v, 0) if typ == 3 else struct.pack("<I", v))
+    return bytes(out + struct.pack("<I", 0) + bytes(data))
 
 
 class IprDtm:
@@ -108,7 +128,12 @@ class IprDtm:
         if k not in self.tiles:
             i = ty * self.ntx + tx
             self.f.seek(int(self.offs[i]))
-            a = np.frombuffer(lzw(self.f.read(int(self.cnts[i]))), dtype="<f4").reshape(self.th, self.tw).copy()
+            raw = self.f.read(int(self.cnts[i]))
+            if PILLOW_LZW:
+                with Image.open(io.BytesIO(tile_tiff(raw, self.tw, self.th))) as im:
+                    a = np.array(im, dtype="<f4")
+            else:
+                a = np.frombuffer(lzw(raw), dtype="<f4").reshape(self.th, self.tw).copy()
             a[a < -1e30] = np.nan
             self.tiles[k] = a
         return self.tiles[k]

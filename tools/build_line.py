@@ -63,6 +63,10 @@ DEM_STEP = 10.0     # terrain grid spacing (m)
 DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
 
 REFRESH = "--refresh" in sys.argv
+OSM_TRACKS = "--osm-tracks" in sys.argv  # OSM's track geometry as before #20 (for comparison)
+# decimals of the tracks' and paths' coordinates: the fitted curves (#204) to the millimetre (to the centimetre, points
+# 0.4 m apart scatter 0.7° in direction and a 19 m curve read 15.5 m over 2 m at Právnická fakulta)
+XY = 2 if OSM_TRACKS else 3
 
 
 # ---------------------------------------------------------------- OSM (the local extract of the snapshot)
@@ -162,7 +166,7 @@ RUN = bool(THEN or GTFS_ONLY)  # path, stops and timetable from GTFS (plan_run /
 
 def corridor_queries(R):
     """Overpass queries for everything around the route ways in set .w (defined by R)."""
-    global Q_TRACKS, Q_POINTS, Q_BUILDINGS, Q_ROADS, Q_GREEN, Q_WATER, Q_PLATFORMS
+    global Q_TRACKS, Q_POINTS, Q_BUILDINGS, Q_ROADS, Q_GREEN, Q_WATER, Q_PLATFORMS, Q_STOPPOS
     Q_TRACKS = f"[out:json][timeout:120];{R}way(around.w:60)[railway~\"^(tram|light_rail)$\"]->.t;.t out body;.t >;out body qt;"
     Q_POINTS = (f"[out:json][timeout:120];{R}"
                 "(node(around.w:35)[highway=traffic_signals];"
@@ -170,6 +174,8 @@ def corridor_queries(R):
                 "node(around.w:15)[highway=crossing];);out body qt;")
     Q_PLATFORMS = (f"[out:json][timeout:120];{R}(way(around.w:20)[public_transport=platform];"
                    "way(around.w:20)[railway=platform];);out tags geom qt;")
+    Q_STOPPOS = (f"[out:json][timeout:120];{R}(node(around.w:6)[public_transport=stop_position][tram=yes];"
+                 "node(around.w:6)[railway=tram_stop];);out body qt;")
     # (the world reaches ~220 m either side: roads, buildings and green; 2026-10-23, was 90-120 m)
     Q_BUILDINGS = f"[out:json][timeout:180];{R}way(around.w:220)[building];out tags geom qt;"
     Q_ROADS = (f"[out:json][timeout:180];{R}way(around.w:200)[highway~\"^(motorway|trunk|primary|secondary|tertiary|"
@@ -721,38 +727,130 @@ def main():
     # drop consecutive duplicates
     path_ids = [n for i, n in enumerate(path_ids) if i == 0 or n != path_ids[i - 1]]
     P = Proj()
-    pts = [P(*nodes[n]) for n in path_ids]
+
+    # ---------------- track network (OSM topology) and the opposite direction of the line
+    tracks = overpass("tracks", Q_TRACKS)
+    tnodes = {e["id"]: e for e in tracks["elements"] if e["type"] == "node"}
+    tways = [e for e in tracks["elements"] if e["type"] == "way"]
+    back_ll, bids = {}, []
+    if RUN and back_ids:
+        back_ll, bids = nodes, list(back_ids)
+    elif Q_ROUTE_BACK:
+        back = overpass(f"route_{OSM_RELATION_BACK}", Q_ROUTE_BACK)
+        brel = next(e for e in back["elements"] if e["type"] == "relation")
+        back_ll = {e["id"]: (e["lat"], e["lon"]) for e in back["elements"] if e["type"] == "node"}
+        bways = {e["id"]: e["nodes"] for e in back["elements"] if e["type"] == "way"}
+        bids = chain_route(brel, bways)
+        bids = [n for i, n in enumerate(bids) if i == 0 or n != bids[i - 1]]
+
+    # ---------------- geometry from the current DTM centrelines (#20): the OSM nodes and edges move onto DI
+    # (archived DTMP, then OSM, where it has none) before any route position is computed (tools/di_tracks.py)
+    import di_tracks
+    import track_curve
+    lls = {**{nid: (e["lat"], e["lon"]) for nid, e in tnodes.items()}, **back_ll, **nodes}
+    lls = {n: ll for n, ll in lls.items() if n in nodes or n in tnodes or n in back_ll}
+    allpos = {n: P(*ll) for n, ll in lls.items()}
+    track_srcs = [] if OSM_TRACKS else di_tracks.load_sources()
+    if track_srcs:
+        # interlaced track: OSM's one way from the switch to where the tracks part becomes one per track (#204)
+        added = di_tracks.split_interlaced(tways, [path_ids, bids], allpos, next(s for s in track_srcs if s.name == 'di').interlaced)
+        for n, how in added.items():
+            if how[0] == "copy":
+                ll = lls[how[1]]
+            else:
+                a, b, f = how[1:]
+                ll = (lls[a][0] + f * (lls[b][0] - lls[a][0]), lls[a][1] + f * (lls[b][1] - lls[a][1]))
+            lls[n] = ll
+            tnodes[n] = {"type": "node", "id": n, "lat": ll[0], "lon": ll[1], "tags": {}}
+        # (the copies and a new tip node lie on the bridges and tunnels of what they copy or split)
+        def under(n):
+            how = added.get(n)
+            return (n,) if how is None else (how[1],) if how[0] == "copy" else how[1:3]
+        for pairs in (bridge_pairs, tunnel_pairs):
+            for ids in (path_ids, bids, *[w["nodes"] for w in tways]):
+                for a, b in zip(ids, ids[1:]):
+                    if (a in added or b in added) and any((x, y) in pairs for x in under(a) for y in under(b) if x != y):
+                        pairs.update({(a, b), (b, a)})
+        print(f"interlaced track: {sum(h[0] == 'between' for h in added.values())} tip nodes added, "
+              f"{sum(h[0] == 'copy' for h in added.values())} nodes copied")
+    edges = {(a, b) for ids in (path_ids, bids, *[w["nodes"] for w in tways]) for a, b in zip(ids, ids[1:])}
+    geo = di_tracks.TrackGeometry(allpos, edges, track_srcs, di_tracks.switch_tips() if track_srcs else (),
+                                  di_tracks.photo_source() if track_srcs else None)
+    if not OSM_TRACKS:
+        geo.fit_curves()   # smooth curves through the points, continuous at every node (#204)
+    print(f"track geometry: {json.dumps({k: v for k, v in geo.report.items() if k not in ('fill', 'curve')})}")
+    if "curve" in geo.report:
+        print(f"track curves: {json.dumps({k: v for k, v in geo.report['curve'].items() if not isinstance(v, list)})}")
+        for h in geo.report["curve"]["held_to_network_radius"]:   # (the cost of 18 m, data/truth.json min-radius-network)
+            lat, lon = P.ll(*h["xy"])
+            print(f"  held to 18 m: points {h['m']} m off (class {h['class_m']} m), {h['radius_m']} m over 2 m, "
+                  f"{float(lat):.5f} N {float(lon):.5f} E")
+
+    def expand(ids):
+        """The points along a node list through the moved edge geometry, and where each node lies in them. An edge
+        may end off its node: a track crossing others at a merged OSM node keeps its own crossing point (#204).
+        Points within 10 cm of the one before are left out: rounded to the centimetre in the line file, a node and a
+        curve sample millimetres apart became 1 cm zigzags (122 turns over 60° on line 17's tracks and routes), and a
+        3 cm end segment read 10° off in the direction tools/lint.js takes from a track's first points."""
+        out, at = [], []
+        segs = [geo.points(a, b) for a, b in zip(ids, ids[1:])]
+        # (an edge between two OSM nodes merged into one has no length: the next edge starts the line)
+        real = [s for s in segs if sum(dist(p, q) for p, q in zip(s, s[1:])) > 0.01]
+        for i, n in enumerate(ids):
+            if i == 0:
+                out.append(real[0][0] if real else geo.at(n))
+            else:
+                seg = segs[i - 1]
+                if sum(dist(p, q) for p, q in zip(seg, seg[1:])) > 0.01:
+                    for q in seg:
+                        if dist(q, out[-1]) > 0.1:
+                            out.append(q)
+                        elif q is seg[-1] and at[-1] != len(out) - 1:   # (the node's own point, not the sample)
+                            out[-1] = q
+            at.append(len(out) - 1)
+        return out, at
+
+    def source_ranges(ids, s_at):
+        """[[s0, s1, source], ...] along a node list (s at each node)."""
+        out = []
+        for i in range(1, len(ids)):
+            src = geo.source(ids[i - 1], ids[i])["src"]
+            if out and out[-1][2] == src and abs(out[-1][1] - s_at[i - 1]) < 0.01:
+                out[-1][1] = s_at[i]
+            else:
+                out.append([s_at[i - 1], s_at[i], src])
+        return [[round(a, 1), round(b, 1), c] for a, b, c in out]
+
+    pts, node_at = expand(path_ids)
     for i in range(1, len(pts)):
         if dist(pts[i - 1], pts[i]) > 400:
             print(f"  ! long segment {dist(pts[i-1], pts[i]):.0f} m at index {i}")
     path = Polyline(pts)
-    print(f"route: {len(pts)} nodes, {path.length/1000:.2f} km")
+    node_s = [path.s[k] for k in node_at]  # route position of each route node
+    print(f"route: {len(path_ids)} nodes, {len(pts)} points, {path.length/1000:.2f} km")
     def spans(pairs, min_len):
         out = []
         for i in range(len(path_ids) - 1):
             if (path_ids[i], path_ids[i + 1]) in pairs:
-                if out and abs(out[-1][1] - path.s[i]) < 1:
-                    out[-1][1] = path.s[i + 1]
+                if out and abs(out[-1][1] - node_s[i]) < 1:
+                    out[-1][1] = node_s[i + 1]
                 else:
-                    out.append([path.s[i], path.s[i + 1]])
+                    out.append([node_s[i], node_s[i + 1]])
         return [[round(a, 1), round(b, 1)] for a, b in out if b - a > min_len]
     bridges = spans(bridge_pairs, 8)
     tunnels = spans(tunnel_pairs, 3)
     print(f"route bridges: {bridges}  underpasses/tunnels: {tunnels}")
 
     # ---------------- track network
-    tracks = overpass("tracks", Q_TRACKS)
-    tnodes = {e["id"]: e for e in tracks["elements"] if e["type"] == "node"}
-    tways = [e for e in tracks["elements"] if e["type"] == "way"]
     adj = defaultdict(set)
     for w in tways:
         ns = w["nodes"]
         for a, b in zip(ns, ns[1:]):
             adj[a].add(b)
             adj[b].add(a)
-    tpos = {nid: P(e["lat"], e["lon"]) for nid, e in tnodes.items()}
+    tpos = {nid: geo.at(nid) for nid in tnodes}
     for nid in path_ids:
-        tpos.setdefault(nid, P(*nodes[nid]))
+        tpos.setdefault(nid, geo.at(nid))
 
     def walk(start, first, length=14.0):
         """Follow track from `start` through `first`, taking the straightest continuation."""
@@ -775,7 +873,12 @@ def main():
         if not others:
             continue
         here = tpos[nid]
-        d_in = norm((here[0] - tpos[path_ids[i - 1]][0], here[1] - tpos[path_ids[i - 1]][1]))
+        # (from the last route node apart from this one: the track fit merges nodes under 0.5 m onto one place, and
+        # a zero direction lost Palackého náměstí's and Národní divadlo's switches on line 17, #219)
+        j = i - 1
+        while j > 0 and dist(tpos[path_ids[j]], here) < 0.01:
+            j -= 1
+        d_in = norm((here[0] - tpos[path_ids[j]][0], here[1] - tpos[path_ids[j]][1]))
         route_tgt = walk(nid, path_ids[i + 1])
         v_route = (route_tgt[0] - here[0], route_tgt[1] - here[1])
         def through(o):
@@ -800,7 +903,7 @@ def main():
             cross_r = d_in[0] * v_route[1] - d_in[1] * v_route[0]
             cross_a = d_in[0] * v_alt[1] - d_in[1] * v_alt[0]
             route_side = "left" if cross_r > cross_a else "right"
-            s = path.s[i]
+            s = node_s[i]
             if switches and s - switches[-1]["s"] < 3:
                 continue
             switches.append({
@@ -814,12 +917,12 @@ def main():
 
     # merge ways into continuous chains (split only at junctions/switches and bridge ends),
     # so the client can smooth each chain without kinks at way boundaries
-    edge_bridge = {}
+    edge_bridge = {}  # (bridge, source) per edge: a chain also ends where its source changes (#20)
     for w in tways:
         b = w.get("tags", {}).get("bridge") not in (None, "no")
         for a, c in zip(w["nodes"], w["nodes"][1:]):
             if a in tpos and c in tpos and a != c:
-                edge_bridge[frozenset((a, c))] = b
+                edge_bridge[frozenset((a, c))] = (b, geo.source(a, c)["src"])
     used = set()
 
     def extend(chain, flag):
@@ -846,24 +949,30 @@ def main():
         extend(chain, flag)
         chain.reverse()
         extend(chain, flag)
-        t = {"p": [[round(tpos[n][0], 2), round(tpos[n][1], 2)] for n in chain]}
-        if flag:
+        t = {"p": [[round(x, XY), round(y, XY)] for x, y in expand(chain)[0]], "src": flag[1]}
+        if flag[0]:
             t["b"] = 1
-        track_lines.append(t)
+        if sum(dist(a, b) for a, b in zip(t["p"], t["p"][1:])) >= 0.01:  # (two nodes landing on one point)
+            track_lines.append(t)
     print(f"track chains: {len(track_lines)} (from {len(tways)} ways)")
 
     # opposite direction of the line, for oncoming trams
-    path_back = []
-    if RUN and back_ids:
-        path_back = [[round(x, 2), round(y, 2)] for x, y in (P(*nodes[n]) for n in back_ids)]
-    elif Q_ROUTE_BACK:
-        back = overpass(f"route_{OSM_RELATION_BACK}", Q_ROUTE_BACK)
-        brel = next(e for e in back["elements"] if e["type"] == "relation")
-        bnodes = {e["id"]: (e["lat"], e["lon"]) for e in back["elements"] if e["type"] == "node"}
-        bways = {e["id"]: e["nodes"] for e in back["elements"] if e["type"] == "way"}
-        bids = chain_route(brel, bways)
-        bids = [n for i, n in enumerate(bids) if i == 0 or n != bids[i - 1]]
-        path_back = [[round(x, 2), round(y, 2)] for x, y in (P(*bnodes[n]) for n in bids)]
+    back_pts, back_at = expand(bids) if bids else ([], [])
+    path_back = [[round(x, XY), round(y, XY)] for x, y in back_pts]
+    back_s = [0.0]
+    for a, b in zip(back_pts, back_pts[1:]):
+        back_s.append(back_s[-1] + dist(a, b))
+    def sharp(points):
+        # turns over 60 degrees between segments over 0.3 m: the moved geometry running back on itself (#20)
+        n = 0
+        for a, b, c in zip(points, points[1:], points[2:]):
+            u, v = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+            lu, lv = math.hypot(*u), math.hypot(*v)
+            n += lu > 0.3 and lv > 0.3 and (u[0] * v[0] + u[1] * v[1]) / (lu * lv) < 0.5
+        return n
+    print(f"sharp turns (over 60 degrees): path {sharp(pts)}, pathBack {sharp(back_pts)}")
+    track_source = {"path": source_ranges(path_ids, node_s),
+                    "pathBack": source_ranges(bids, [back_s[k] for k in back_at]) if bids else []}
     print(f"opposite route: {len(path_back)} nodes")
 
     # ---------------- crossings and signals
@@ -980,30 +1089,79 @@ def main():
         stops.append({"name": r["stop_name"], "s": round(s, 1), "off": round(d, 1),
                       "side": "left" if side > 0 else "right", "request": flags.get(sid, False), "lines": lines})
         s_last = s
+    # The stop sign (označník): the tram front stops beside it (D 1/2 § 27.6, #258). The user's placed sign
+    # (data/truth.json stopSigns, keyed by the stop and the next one, or the previous one at a last stop), else
+    # the archive DTM's sign beside our track (raw/dtmpoints/lineN.signs.json, tools/dtm_points.py --signs:
+    # within 2 m of 22 of the user's 23 placed signs, median 0.4 m; the one miss, Výstaviště, is a street rebuilt
+    # since 2024), else OSM's stop position on our own track (the other direction's lies 3-6 m off, on the
+    # parallel track, and was taken at 5 stops within 6 m: tools/stop_signs_review.py; within 2 m of 14 of 25),
+    # else none (the game: GTFS + STOP_AHEAD).
+    truth_signs = json.load(open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8")).get("stopSigns", {}).get("signs", [])
+    spos = overpass("stop_positions", Q_STOPPOS, optional=True)["elements"]
+    sp_ = os.path.join(ROOT, "raw", "dtmpoints", f"line{LINE}.signs.json")
+    dtm_signs = [P(g["lat"], g["lon"]) for g in json.load(open(sp_, encoding="utf-8"))["signs"]] if os.path.exists(sp_) else []
+    for k, st_ in enumerate(stops):
+        nxt = stops[k + 1]["name"] if k + 1 < len(stops) else None
+        prv = stops[k - 1]["name"] if k else None
+        f = next((f for f in truth_signs if f["stop"] == st_["name"]
+                  and (f.get("towards") == nxt if nxt else f.get("from") == prv)), None)
+        if f:
+            s, d, _ = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
+            if s is not None and d < 8:
+                st_["sign"], st_["signSrc"] = round(s, 1), "truth"
+                continue
+            print(f"  ! stop sign of {st_['name']} (truth.json) is not beside the route near the stop: {s} {d}")
+        cand = []
+        for e in spos:
+            if e.get("tags", {}).get("name") == st_["name"]:
+                s, d, _ = path.project(P(e["lat"], e["lon"]), st_["s"] - 100, st_["s"] + 100, radius=3)
+                if s is not None and d < 1.5:
+                    cand.append((abs(s - st_["s"]), s))
+        osm_s = min(cand)[1] if cand else None
+        # the DTM's: on the platform side (right of travel), within 6 m of the track and 40 m of OSM's point
+        # (else the GTFS point), the nearest to it (the opposite direction's sign stands on the left: 6 of the
+        # 295 stops had a DTM sign on the left only)
+        ref = osm_s if osm_s is not None else st_["s"]
+        near = []
+        for q in dtm_signs:
+            s, d, side = path.project(q, ref - 45, ref + 45, radius=3)
+            if s is not None and d < 6 and side < 0 and abs(s - ref) < 40:
+                near.append((abs(s - ref), s))
+        if near:
+            st_["sign"], st_["signSrc"] = round(min(near)[1], 1), "dtmpoints"
+        elif osm_s is not None:
+            st_["sign"], st_["signSrc"] = round(osm_s, 1), "osm"
+    print("stop signs: " + ", ".join(f"{sum(st_.get('signSrc') == k for st_ in stops)} {k}" for k in ("truth", "dtmpoints", "osm"))
+          + f", {sum('sign' not in st_ for st_ in stops)} none")
     # platforms (OSM): where along the route each stop's platform begins and ends, so the game
-    # can require the whole set to stand alongside it (and let two sets stop one behind another)
+    # can require the whole set to stand alongside it (and let two sets stop one behind another).
+    # Matched around the sign where there is one (Hercovka's timetable point is 86 m short of the sign,
+    # by the other direction's platform)
     pjs = overpass("platforms", Q_PLATFORMS, optional=True)
     plats = [e for e in pjs["elements"] if "geometry" in e and e.get("tags", {}).get("bus") != "yes"
              or "geometry" in e and e.get("tags", {}).get("tram") == "yes"]
     for st_ in stops:
         best = None
+        at = st_.get("sign", st_["s"])
         for e in plats:
             pp = [P(g["lat"], g["lon"]) for g in e["geometry"]]
-            if min(dist(q, path.at(st_["s"])) for q in pp) > 60:
+            if min(dist(q, path.at(at)) for q in pp) > 60:
                 continue
-            pr = [path.project(q, st_["s"] - 150, st_["s"] + 150, radius=3) for q in pp]
+            pr = [path.project(q, at - 150, at + 150, radius=3) for q in pp]
             pr = [x for x in pr if x[0] is not None and x[1] < 9]
             if len(pr) < 2:
                 continue
             s0, s1 = min(x[0] for x in pr), max(x[0] for x in pr)
             right = sum(1 for x in pr if x[2] < 0) > len(pr) / 2
-            if s1 - s0 < 10 or s1 - s0 > 160 or st_["s"] < s0 - 25 or st_["s"] > s1 + 25:
+            if s1 - s0 < 10 or s1 - s0 > 160 or at < s0 - 25 or at > s1 + 25:
                 continue
-            score = (0 if right else 1, abs((s0 + s1) / 2 - st_["s"]))
+            score = (0 if right else 1, abs((s0 + s1) / 2 - at))
             if best is None or score < best[0]:
                 best = (score, s0, s1)
         if best:
-            st_["p0"], st_["p1"] = round(best[1], 1), round(best[2], 1)
+            # (the platform reaches the sign at least: OSM's Malostranské náměstí is 7 m too short, the user
+            # 2026-11-05: "malostranské náměstí on osm maps is too short")
+            st_["p0"], st_["p1"] = round(best[1], 1), round(max(best[2], st_.get("sign", best[2])), 1)
     with_p = [st_ for st_ in stops if "p0" in st_]
     if with_p:
         lens = sorted(st_["p1"] - st_["p0"] for st_ in with_p)
@@ -1162,7 +1320,7 @@ def main():
         "name": rel["tags"].get("name"),
         "origin": [round(float(v), 7) for v in P.origin_ll()],  # the city origin (the Marian column)
         "frame": {"crs": "EPSG:5514", "origin": [P.E0, P.N0]},  # game metres = S-JTSK minus this
-        "path": [[round(x, 2), round(y, 2)] for x, y in pts],
+        "path": [[round(x, XY), round(y, XY)] for x, y in pts],
         "bridges": bridges,
         "tunnels": tunnels,
         "terrain": terrain,
@@ -1173,6 +1331,8 @@ def main():
         "crossings": crossings,
         "tracks": track_lines,
         "pathBack": path_back,
+        "trackSource": track_source,
+        **({"trackCurve": {"tol": track_curve.TOL, "fill": track_curve.FILL_TOL}} if not OSM_TRACKS else {}),
         "buildings": buildings,
         "roads": roads,
         "green": green,
@@ -1183,13 +1343,19 @@ def main():
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
     one = sources.single
+    by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("ortho", "di", "dtmp", "osm")]
     out["provenance"] = sources.stamp("build_line.py", {
-        "path": one("tracks", "osm", 1, "route"), "pathBack": one("tracks", "osm", 1 if path_back else 0, "route"),
-        "tracks": one("tracks", "osm", len(track_lines), "ways"), "switches": one("tracks", "osm", len(switches)),
+        "path": sources.entry("tracks", by(track_source["path"]), "m"),
+        "pathBack": sources.entry("tracks", by(track_source["pathBack"]), "m"),
+        "tracks": sources.entry("tracks", [sum(t["src"] == k for t in track_lines) for k in ("ortho", "di", "dtmp", "osm")], "chains"),
+        "switches": one("tracks", "osm", len(switches)),
         "bridges": one("structures", "osm", len(bridges), "route ranges"),
         "tunnels": one("structures", "osm", len(tunnels), "route ranges"),
         "terrain": one("terrain", "coarse", terrain["nx"] * terrain["ny"], "cells"),
-        "stops": one("stops", "gtfs", len(stops)), "timetable": one("timetable", "gtfs", len(timetable), "trips"),
+        "stops": one("stops", "gtfs", len(stops)),
+        "signs": sources.entry("signs", [sum(st_.get("signSrc") == k for st_ in stops) for k in ("truth", "dtmpoints", "osm")]
+                               + [sum("sign" not in st_ for st_ in stops)], "stops"),
+        "timetable": one("timetable", "gtfs", len(timetable), "trips"),
         "signals": one("signals", "osm", len(signals)), "crossings": one("crossings", "osm", len(crossings)),
         "buildings": one("buildings", "osm", len(buildings)), "roads": one("streets", "osm", len(roads)),
         "green": one("areas", "osm", len(green)), "water": one("areas", "osm", len(water))})
