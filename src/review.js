@@ -4,6 +4,7 @@
 //                               provenance, tools/kerbs.py) and seams / flat kerbs between survey areas
 //   ?review=reports/x.json      plus every {x, y} in that file (lint, headless results, a hand-made list)
 //   &at=x,y,yaw,pitch,dist      the camera (the address follows it, so a place can be bookmarked or sent)
+//   &todo                       only the findings without an answer (the review directory, reviews.html)
 // Mouse: drag pans, right-drag (or Shift-drag) turns and tilts, wheel zooms, click a marker selects it.
 // Touch: one finger pans, two fingers pinch, twist and tilt (move up / down together), tap a marker.
 // Keys: W/A/S/D pan, Q/E turn, R/F tilt, + / − zoom, N / B next / previous finding, 1–4 an answer.
@@ -13,6 +14,7 @@ import * as THREE from 'three';
 import { toLatLon } from './geo.js';
 import { Verdicts, readLineAnswers } from './verdicts.js';
 import { heightProfile } from './trackHeightProfile.js';
+import { fid, loadFindings } from './reviewFindings.js';
 
 const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
 const STREETS = new Set([...CARR, ...RAISED, 'paved', 'cycle']);
@@ -47,8 +49,6 @@ const ORTHO_CREDIT = 'Ortofoto: IPR Praha (CC BY 4.0)';
 // the line's track centrelines by source (data/lineN.json tracks[].src, tools/build_line.py)
 const TRACK_COLORS = { di: '#ff8c1a', osm: '#e040fb', dtmp: '#ffe14a', ortho: '#7cff6b' };
 const options = (f) => f.options || (f.kind === 'trackheight' ? OPTIONS.trackheight : f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
-// (a finding's place and kind: the same after a rebuild that leaves it where it was)
-const fid = (f) => f.kind === 'trackheight' ? `${f.src}|trackheight|${f.id}` : `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // the kerb review list in the survey's provenance: wherever the stamp put it
@@ -113,58 +113,8 @@ function grouped(pts) {
   }));
 }
 
-// every object with numeric x and y in a findings file; its kind from the keys above it
-function fileFindings(json, label) {
-  const out = [], skip = new Set(['places', 'checks', 'result', 'review', 'findings', 'bad']);
-  const opts = Array.isArray(json?.options) ? json.options.map(String) : undefined;
-  const walk = (o, kind) => {
-    if (Array.isArray(o)) { for (const v of o) walk(v, kind); return; }
-    if (!o || typeof o !== 'object') return;
-    if (typeof o.x === 'number' && typeof o.y === 'number') {
-      if (o.kind === 'trackheight' && Array.isArray(o.spans)) {
-        out.push({ ...o, src: 'file', mag: typeof o.mag === 'number' ? o.mag : 1 });
-        return;
-      }
-      const k = [kind, o.kind].filter(Boolean).join(': ') || label;
-      // (marks: other points to show with it, {x, y, label, color}; pick: the answer may be a point placed
-      // on the map, #258)
-      const marks = Array.isArray(o.marks) ? o.marks.filter((m) => typeof m?.x === 'number' && typeof m?.y === 'number') : undefined;
-      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts,
-        ...(marks?.length ? { marks } : {}), ...(o.pick ? { pick: true } : {}), ...(o.id ? { id: String(o.id) } : {}) });
-      return;
-    }
-    for (const [k, v] of Object.entries(o)) walk(v, skip.has(k) ? kind : k);
-  };
-  walk(json, '');
-  return out;
-}
-
-// A track-height findings file references the shared queue instead of repeating all profiles.
-export async function loadFindings(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const json = await response.json();
-  if (json.span_file) {
-    const r = await fetch(json.span_file);
-    if (!r.ok) throw new Error(`span queue: HTTP ${r.status}`);
-    const bytes = await r.arrayBuffer();
-    if (globalThis.crypto?.subtle) {
-      const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((n) => n.toString(16).padStart(2, '0')).join('');
-      if (hash !== json.span_sha256) throw new Error('span queue differs from the findings file');
-    }
-    const queue = JSON.parse(new TextDecoder().decode(bytes));
-    if (queue.snapshot !== json.snapshot) throw new Error('span queue snapshot differs from the findings file');
-    const spans = new Map(queue.spans.map((s) => [s.id, s]));
-    for (const f of json.findings) {
-      f.spans = f.decision.span_ids.map((id) => {
-        if (!spans.has(id)) throw new Error(`span queue missing ${id}`);
-        return spans.get(id);
-      });
-      f.span_sha256 = json.span_sha256;
-    }
-  }
-  return fileFindings(json, url.split('/').pop());
-}
+// (the findings' reading and identity: src/reviewFindings.js, shared with the review directory, #288)
+export { loadFindings };
 
 export class Review {
   constructor({ scene, camera, canvas, data, route, ground, world, url = '', at = null }) {
@@ -182,7 +132,8 @@ export class Review {
     this.near = new THREE.Group(); // the survey layers around the target, rebuilt as it moves
     this.group.add(this.near);
     this.nearAt = null;
-    this.todo = false;
+    // (&todo: only the findings without an answer, as the review directory's links open it, #288)
+    this.todo = new URLSearchParams(location.search).has('todo');
     this._names();
     this._ui();
     this.verdicts = new Verdicts(`line${data.line}`, { line: data.line, file: url || null }, () => this._sync());
@@ -364,6 +315,7 @@ body.review #gl { touch-action: none }
     $('rvMin').onclick = () => { box.classList.toggle('min'); $('rvMin').textContent = box.classList.contains('min') ? '▴' : '▾'; this._render(); };
     $('rvFilter').onchange = () => { this._fill(); if (this.list.length) this.select(0); };
     $('rvTodo').onclick = () => { this.todo = !this.todo; $('rvTodo').classList.toggle('on', this.todo); this._fill(); if (this.list.length) this.select(0); };
+    $('rvTodo').classList.toggle('on', this.todo);
     $('rvList').addEventListener('click', (e) => { const r = e.target.closest('.rvItem'); if (r) this.select(+r.dataset.i); });
     $('rvCard').addEventListener('click', (e) => {
       const b = e.target.closest('button');

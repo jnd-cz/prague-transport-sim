@@ -43,3 +43,6 @@ reports/reviews/
 
 # tools/autodeploy.py log and state
 reports/autodeploy.*
+
+# the review directory's index (tools/review_sets.py; tools/deploy.py builds it at each deploy, #288)
+reports/review/index.json

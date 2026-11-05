@@ -31,6 +31,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import reviews  # noqa: E402
+import review_sets  # noqa: E402
 from make_dist import ROOT, files  # noqa: E402
 
 CONFIG = os.path.join(ROOT, "deploy.local.json")
@@ -69,8 +70,9 @@ def checks(allow_dirty):
     return git("rev-parse", "HEAD")
 
 
-def site(commit, reports=False):
-    """{path: bytes or a local file path} of everything that goes up."""
+def site(commit, reports=False, github=True):
+    """{path: bytes or a local file path} of everything that goes up (github: the review index asks it for the
+    issues' titles and the PRs' questions)."""
     out = {rel: os.path.join(ROOT, rel) for rel in files()}
     if reports:
         d = os.path.join(ROOT, "reports", "headless")
@@ -86,6 +88,8 @@ def site(commit, reports=False):
     out["version.json"] = json.dumps(version, ensure_ascii=False, indent=1).encode()
     out["review.php"] = os.path.join(ROOT, "tools", "review.php")
     out["reviews/.htaccess"] = b"Require all denied\n"
+    # the review directory's index (reviews.html, #288), built at each deploy: a new set shows up by itself
+    out["reports/review/index.json"] = json.dumps(review_sets.build(github=github), ensure_ascii=False, indent=1).encode()
     out[".htaccess"] = HTACCESS.encode()
     return out
 
