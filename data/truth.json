@@ -222,6 +222,11 @@
    "id": "right-hand-track",
    "text": "regular service always runs on the right-hand track; a double-track line has two tracks the whole way (line 37 Spojovací - Kněžská luka included)",
    "source": "user 2026-10-29"
+  },
+  {
+   "id": "stop-before-wheel",
+   "text": "On slippery rail a driver plans the approach to a stop so the tram does not slide past it; if it slides anyway, holding the brake and taking a wheel flat is the price, not sliding through the stop",
+   "source": "user 2026-11-05, answering PR #270: \"ideally we shouldn't get to situation where we slide through the stop, although if it happens flat wheel is the price to pay (and happens in reality sometimes, mostly due to bad driving skill, lack of foreseight or obstacle appearing in front of the tram suddenly)\""
   }
  ],
  "places": [

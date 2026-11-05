@@ -11,13 +11,23 @@ const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at 
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
 const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
 const SAG = 1.1, OVER = 0.6; // m/s: under the plan before pressing on, over it before braking (4 and 2 km/h)
-// On slippery rail (#265): the driver knows the weather's grip (game.muBase), not where a leaf patch lies.
+// On slippery rail (#265): the driver knows the weather's grip (game.muBase) and sees a leaf patch on the
+// rail just ahead (the game draws it), braking onto it with sand (SAND_LEAD).
 // Planned braking and the force asked for stay within GRIP_USE of the rail's grip at the speed (margin for
 // the patches and the second car); a spin is noticed after REACT s, the drive eased off until the wheels
 // grip, then tried one step lower (the user, 2026-11-04: "They ease of the drive and try again with less
 // power"); sand at once braking harder than the rail allows ("he needs to apply sand quickly"), starting only
 // on a grade or after spinning twice ("Only at grades where it would be difficult to get moving")
 const GRIP_USE = 0.5, REACT = 0.5, LOW_MU = 0.25;
+// sand from this many seconds before a leaf patch when braking onto it: the plan counts on a sanded patch, but
+// the sand came only once a slide was noticed (two slides on the patch before stop 14, line 17 leaves trace of
+// 2026-11-05); the first axle lays it where the others brake
+const SAND_LEAD = 1.5;
+// a slide is freed (the brake let off until the wheels roll) only if the stop can still be made after FREE_T s
+// with the brake off; otherwise the brake stays on and a wheel flat is the price (the user, PR #270, 2026-11-05:
+// "ideally we shouldn't get to situation where we slide through the stop, although if it happens flat wheel is
+// the price to pay"; data/truth.json rules, stop-before-wheel)
+const FREE_T = 1.0;
 
 export class Autopilot {
   constructor() {
@@ -203,7 +213,12 @@ export class Autopilot {
     // not free them). Not for an urgent stop: the track brakes do not depend on the rail's grip
     // (only a stop needing the track brakes keeps the pedal down: "urgent" at the gentle autumn plan, 0.57 m/s²,
     // held locked wheels at 17 → 5 km/h for 5.7 s)
-    const hard = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > 1.0;
+    // (or one that freeing the wheels would cost: FREE_T s rolling with the brake off, then what rolling wheels
+    // give on this rail, 0.8 of its grip)
+    const room = stopAt === null ? null : stopAt - tr.s - 1.5;
+    const aRoll = 0.8 * gripN(tr.v) / GRIP_USE / tr.inertia;
+    const hard = room !== null && tr.v > 1 && ((tr.v * tr.v) / (2 * Math.max(0.5, room)) > 1.0
+      || room - tr.v * FREE_T < 0.5 || (tr.v * tr.v) / (2 * (room - tr.v * FREE_T)) > aRoll);
     this.slideT = tr.slide ? (this.slideT || 0) + dt : 0;
     if (this.slideT > REACT && !this.freeing && !hard) {
       this.freeing = true;
@@ -215,7 +230,10 @@ export class Autopilot {
     // sand: braking harder than the rail allows, or sliding; starting up a grade, or after two spins
     const braking = need < 0 && !stand;
     // (braking: near the rail's limit, 0.8 of its grip; at half of it the box was empty by stop 14 in snow)
-    this.input.sand = tr.slide || (braking && lowMu && (urgent || -need > 1.6 * gripN(tr.v)))
+    // (and braking or stopping onto a leaf patch it sees coming: SAND_LEAD)
+    const lead = Math.max(3, tr.v * SAND_LEAD);
+    const patchAhead = (braking || stopping) && tr.v > 0.5 && g.patches?.some(([a, b]) => a < tr.s + lead && b > tr.s);
+    this.input.sand = tr.slide || patchAhead || (braking && lowMu && (urgent || -need > 1.6 * gripN(tr.v)))
       || (need > 0 && tr.v < 3 && ((grade > 0.02 && need > gripN(tr.v)) || this.spins >= 2) && tr.slip);
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, maxStep: this.easing ? 0 : this.cap, minStep: hard ? null : this.freeing ? 0 : this.bCap, lowMu });
