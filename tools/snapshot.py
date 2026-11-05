@@ -16,7 +16,8 @@ Usage (python -I is enough; the store is reached with the system's `sftp`, ssh c
     python -I tools/snapshot.py data-fetch         # data/ for data/MANIFEST.json
     python -I tools/snapshot.py status             # what differs locally
     python -I tools/snapshot.py publish 2026-11-05 --note "new OSM and GTFS"   # raw/ -> new snapshot
-    python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST (raw/ must match the snapshot)
+    python -I tools/snapshot.py data-publish --note "line 17 rebuilt"        # data/ -> MANIFEST (raw/ must match the snapshot;
+                                                   # the branch's issue holds the `rebuild` label, #280)
     python -I tools/snapshot.py verify [--base main]   # after a publish: all in the store, new files intact
     python -I tools/snapshot.py cache-prune [--dry-run]   # drop cached files no checkout links any more
 Options: --store HOST:DIR (default tramdata:store, or $TRAMDATA_STORE); --cache DIR (default
@@ -600,7 +601,13 @@ if __name__ == "__main__":
     elif cmd == "status":
         status(opt("--snapshot") or current_id())
     elif cmd == "data-publish":
-        data_publish(store, opt("--note", ""), opt("--snapshot"), cache, "--allow-drift" in args)
+        note = opt("--note", "")
+        if "--without-rebuild-label" in args:
+            note = f"{note} [published without the rebuild label]".strip()
+        else:
+            from board import check_rebuild_label
+            check_rebuild_label("data-publish")  # (one branch rebuilds and publishes at a time, #280)
+        data_publish(store, note, opt("--snapshot"), cache, "--allow-drift" in args)
     elif cmd == "verify":
         verify(store, opt("--snapshot") or current_id(), opt("--base", "main"))
     elif cmd == "data-fetch":

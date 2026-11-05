@@ -114,6 +114,10 @@ def main():
 
 
 if __name__ == "__main__":
+    if [a for a in sys.argv[1:] if a.startswith("-") and a != "--parallel"]:
+        main()  # (prints the usage and exits: no turn in the queue for that)
     from baseline_store import HeavyJob
-    with HeavyJob("rebuild"):  # (the nightly baseline waits while this runs)
+    from board import check_rebuild_label
+    check_rebuild_label("rebuild", warn_only=True)  # (a local rebuild is fine; its publish needs the label, #280)
+    with HeavyJob("rebuild"):  # (waits its turn among the heavy jobs, and the nightly baseline for it)
         main()

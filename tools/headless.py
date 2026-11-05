@@ -545,7 +545,7 @@ def main():
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
-    ap.add_argument("--jobs", type=int, default=workers(4.0),
+    ap.add_argument("--jobs", type=int, default=None,
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
     ap.add_argument("--separate", action="store_true",
                     help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
@@ -602,9 +602,12 @@ def main():
         return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs)
                 for c in ("u3", "redruns")]
 
-    heavy = HeavyJob("headless")  # (the nightly baseline waits while this runs, tools/baseline_store.py)
+    heavy = HeavyJob("headless")  # (waits its turn among the heavy jobs, and the nightly baseline for it: #280)
     try:
         heavy.__enter__()
+        t0 = time.time()  # (the run's time, not the wait's)
+        if a.jobs is None:
+            a.jobs = workers(4.0)  # (sized by the memory free once its turn comes)
         os.makedirs(a.out, exist_ok=True)
         # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs)

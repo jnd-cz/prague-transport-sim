@@ -14,6 +14,8 @@ import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import headless
+import os
+os.environ["TRAM_HEAVY_NOWAIT"] = "1"  # (headless.main() here runs mocked workers: no turn among the real heavy jobs, #280)
 
 SERVE = Path(__file__).with_name('serve.py')
 

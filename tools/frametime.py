@@ -6,7 +6,8 @@ Its own server on a free port; for each model a fresh page at 1280 x 720 loads t
 trip with that model, adds three more sets ahead and measures `--frames` frames with vsync off (so the
 interval is what a frame costs, not the display's 60 Hz). Headed by default: headless Chromium draws in
 software, so its times say nothing about a GPU (#205); `--headless` only checks that the bench runs. Run it
-on a quiet machine, the window in front. Prints a table and writes reports/frametime.json.
+on a quiet machine, the window in front: it waits its turn among the heavy jobs (tools/baseline_store.py).
+Prints a table and writes reports/frametime.json.
 """
 import argparse
 import faulthandler
@@ -76,9 +77,12 @@ def main():
     args = ap.parse_args()
     if not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):
         sys.exit(f"no data/line{args.line}.json: python -I tools/snapshot.py data-fetch")
-    faulthandler.dump_traceback_later(1800, exit=True)  # page.evaluate has no time limit
-    rows = measure(args.line, args.models.split(","), args.frames, args.headless)
-    faulthandler.cancel_dump_traceback_later()
+    sys.path.insert(0, os.path.join(ROOT, "tools"))  # (python -P leaves it out)
+    from baseline_store import HeavyJob
+    with HeavyJob("frametime"):  # (frame times need the machine to itself: it waits for the heavy jobs, #280)
+        faulthandler.dump_traceback_later(1800, exit=True)  # page.evaluate has no time limit
+        rows = measure(args.line, args.models.split(","), args.frames, args.headless)
+        faulthandler.cancel_dump_traceback_later()
     os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
     with open(os.path.join(ROOT, "reports", "frametime.json"), "w", encoding="utf-8", newline="") as f:
         json.dump({"line": args.line, "headless": args.headless, "runs": rows}, f, indent=1)
