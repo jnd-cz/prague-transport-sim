@@ -1,0 +1,11 @@
+This hybrid contains assets from two sources:
+
+1. Base body, interior and cab
+This work is based on "Tatra T3" (https://sketchfab.com/3d-models/tatra-t3-2c08e2e39ace45569c45a2fdbb4052c0) by SimonStrikesBack (https://sketchfab.com/SimonStrikesBack) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+
+2. Collector, mirror arm, route-plate support, lamp geometry/textures and exterior visual reference
+This work also incorporates the collector, mirror assembly, small route-plate support, lamp geometry and texture regions from "Tatra T3" (https://sketchfab.com/3d-models/tatra-t3-76aa08d7c06340fc89229551c45e3c3a) by conflig (https://sketchfab.com/conflig), licensed under CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/).
+
+Modifications: simplified repeated interior tubing; added rigid-node folding doors, an articulated Conflig collector with adjustable contact height, bogie and wheel pivots, emissive signal lenses, editable fleet/route-number decals; enlarged fleet numbers; adjusted paint colours; extracted and repacked lamp UV texture regions; aligned transferred lamps with the rigged body; narrowed door glass and frame apertures; added red brake lenses/emission, rear fleet number, editable mirror-arm route numbering and inverted rear route colours; raised the rear route card and added front destination, white-on-black run number and side route/text cards based on user-supplied reference photos. Seated the front/rear cards at the lower window frames, moved the forward side card to the second window, removed left-side cards, and lowered the protruding dashboard shelf tip to clear the front card. Squared the front destination card, fitted the run-number card to the right wraparound pane, cleared the dashboard and tilted the upper route plate upward by ten degrees. No reference-photo pixels are embedded.
+
+The combined hybrid includes CC BY-NC assets and is supplied for noncommercial use under CC BY-NC 4.0. Retain both source credits, licence links, and the modification notice. The separate original base and earlier rig remain available under their original CC BY 4.0 terms. No endorsement by either original author is implied.

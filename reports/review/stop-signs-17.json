@@ -1,0 +1,352 @@
+{
+ "schema": 1,
+ "issue": 258,
+ "options": [
+  "sign at the pin (OSM)",
+  "sign at the timetable point (GTFS)",
+  "unsure"
+ ],
+ "over_m": 5.0,
+ "findings": [
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Čechova čtvrť-1",
+   "line": "17",
+   "x": -2121.9,
+   "y": -9268.1,
+   "s": 3791.1,
+   "mag": 5.2,
+   "status": "review",
+   "osm_node": 30079593,
+   "gtfs_s": 3785.9,
+   "pick": true,
+   "marks": [
+    {
+     "x": -2121.9,
+     "y": -9268.1,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2116.7,
+     "y": -9268.5,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -2121.2,
+     "y": -9268.1,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Čechova čtvrť (towards Nádraží Modřany): OSM's stop position (the pin, node 30079593) is 5 m after the timetable (GTFS) point. The platform's front end is -1 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Pobřežní cesta-1",
+   "line": "17",
+   "x": -1789.6,
+   "y": -5730.4,
+   "s": 7879.9,
+   "mag": 7.9,
+   "status": "review",
+   "osm_node": 31030377,
+   "gtfs_s": 7887.8,
+   "pick": true,
+   "marks": [
+    {
+     "x": -1789.6,
+     "y": -5730.4,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -1793.3,
+     "y": -5723.4,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -1794.1,
+     "y": -5721.9,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Pobřežní cesta (towards Přístaviště): OSM's stop position (the pin, node 31030377) is 8 m before the timetable (GTFS) point. The platform's front end is 10 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Podolská vodárna-1",
+   "line": "17",
+   "x": -557.0,
+   "y": -3000.2,
+   "s": 10934.4,
+   "mag": 8.9,
+   "status": "review",
+   "osm_node": 278467793,
+   "gtfs_s": 10925.5,
+   "pick": true,
+   "marks": [
+    {
+     "x": -557.0,
+     "y": -3000.2,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -557.1,
+     "y": -3009.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -557.2,
+     "y": -2998.1,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Podolská vodárna (towards Výtoň): OSM's stop position (the pin, node 278467793) is 9 m after the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Výtoň-1",
+   "line": "17",
+   "x": -745.0,
+   "y": -2065.3,
+   "s": 11923.7,
+   "mag": 5.9,
+   "status": "review",
+   "osm_node": 4759185035,
+   "gtfs_s": 11929.6,
+   "pick": true,
+   "marks": [
+    {
+     "x": -745.0,
+     "y": -2065.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -745.2,
+     "y": -2059.4,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -745.0,
+     "y": -2065.0,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Výtoň (towards Palackého náměstí): OSM's stop position (the pin, node 4759185035) is 6 m before the timetable (GTFS) point. The platform's front end is 0 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Jiráskovo náměstí-1",
+   "line": "17",
+   "x": -681.4,
+   "y": -1163.9,
+   "s": 12831.0,
+   "mag": 9.7,
+   "status": "review",
+   "osm_node": 4696978879,
+   "gtfs_s": 12840.7,
+   "pick": true,
+   "marks": [
+    {
+     "x": -681.4,
+     "y": -1163.9,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -678.9,
+     "y": -1154.6,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -680.1,
+     "y": -1158.9,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Jiráskovo náměstí (towards Národní divadlo): OSM's stop position (the pin, node 4696978879) is 10 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Národní divadlo-1",
+   "line": "17",
+   "x": -656.5,
+   "y": -703.3,
+   "s": 13299.6,
+   "mag": 9.4,
+   "status": "review",
+   "osm_node": 4700724588,
+   "gtfs_s": 13309.0,
+   "pick": true,
+   "marks": [
+    {
+     "x": -656.5,
+     "y": -703.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -659.5,
+     "y": -694.4,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -656.6,
+     "y": -703.6,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Národní divadlo (towards Karlovy lázně): OSM's stop position (the pin, node 4700724588) is 9 m before the timetable (GTFS) point. The platform's front end is -0 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Právnická fakulta-1",
+   "line": "17",
+   "x": -192.1,
+   "y": 479.9,
+   "s": 14616.2,
+   "mag": 19.3,
+   "status": "review",
+   "osm_node": 354684526,
+   "gtfs_s": 14596.9,
+   "pick": true,
+   "marks": [
+    {
+     "x": -192.1,
+     "y": 479.9,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -208.4,
+     "y": 469.6,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -190.9,
+     "y": 479.9,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Právnická fakulta (towards Čechův most): OSM's stop position (the pin, node 354684526) is 19 m after the timetable (GTFS) point. The platform's front end is 1 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Čechův most-1",
+   "line": "17",
+   "x": -167.0,
+   "y": 776.0,
+   "s": 14983.6,
+   "mag": 10.2,
+   "status": "review",
+   "osm_node": 21257811,
+   "gtfs_s": 14993.8,
+   "pick": true,
+   "marks": [
+    {
+     "x": -167.0,
+     "y": 776.0,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -156.9,
+     "y": 776.9,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -164.9,
+     "y": 776.2,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Čechův most (towards Strossmayerovo náměstí): OSM's stop position (the pin, node 21257811) is 10 m before the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Výstaviště-1",
+   "line": "17",
+   "x": 1061.2,
+   "y": 1806.4,
+   "s": 17065.2,
+   "mag": 16.9,
+   "status": "review",
+   "osm_node": 4690489335,
+   "gtfs_s": 17082.1,
+   "pick": true,
+   "marks": [
+    {
+     "x": 1061.2,
+     "y": 1806.4,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 1074.7,
+     "y": 1816.6,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": 1063.0,
+     "y": 1807.9,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Výstaviště (towards Nádraží Holešovice): OSM's stop position (the pin, node 4690489335) is 17 m before the timetable (GTFS) point. The platform's front end is 2 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-17-Hercovka-1",
+   "line": "17",
+   "x": 2655.2,
+   "y": 3528.8,
+   "s": 20169.1,
+   "mag": 34.5,
+   "status": "review",
+   "osm_node": 4097081444,
+   "gtfs_s": 20203.6,
+   "pick": true,
+   "marks": [
+    {
+     "x": 2655.2,
+     "y": 3528.8,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2689.1,
+     "y": 3521.6,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": 2681.7,
+     "y": 3522.5,
+     "label": "platform's front end",
+     "color": "#ffffff"
+    }
+   ],
+   "info": "Hercovka (towards Ke Stírce): OSM's stop position (the pin, node 4097081444) is 35 m before the timetable (GTFS) point. The platform's front end is 27 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  }
+ ]
+}

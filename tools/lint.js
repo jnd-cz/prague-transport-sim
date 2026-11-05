@@ -9,7 +9,7 @@
 //   python -P -E tools/headless.py --checks lint --compare
 import { makeT3, placeConsist, CONTACT_WIRE } from '../src/models.js';
 import { roofIndex } from '../src/world.js';
-import { tramClearance } from '../src/tram.js';
+import { tramClearance, CAR_PITCH } from '../src/tram.js';
 import * as THREE from 'three';
 import { runStreetBot } from '../src/streetbot.js';
 import { trafficRun, placesAt } from './traffic_lint.js';
@@ -87,7 +87,7 @@ function check(rule, of, items, key = (p) => p.mag) {
   return { rule, count: items.length, of, places, ...placesAt(items) };
 }
 
-// A two-car set standing at every stop: both cars on the track, coupled (centres 15.2 m apart
+// A two-car set standing at every stop: both cars on the track, coupled (centres CAR_PITCH apart
 // along the track, a little less as a chord on curves). Catches routes that end at a terminus stop
 // with no track behind it (the second car was drawn inside the first at Sídliště Řepy).
 function consistAtStops(g) {
@@ -106,8 +106,8 @@ function consistAtStops(g) {
     placeConsist(model, st.target, at);
     const c = model.userData.cars.map((m) => m.position);
     const gap = Math.hypot(c[0].x - c[1].x, c[0].z - c[1].z);
-    const off = Math.max(...c.map((p, k) => offTrack(p.x, -p.z, st.target - 7.6 - k * 15.2)));
-    if (gap < 14 || gap > 15.5 || off > 0.5) bad.push({ stop: st.name, s: Math.round(st.target), mag: Math.max(Math.abs(15.2 - gap), off), info: `gap ${gap.toFixed(2)} m, ${off.toFixed(2)} m off the track` });
+    const off = Math.max(...c.map((p, k) => offTrack(p.x, -p.z, st.target - 7.6 - k * CAR_PITCH)));
+    if (gap < 14 || gap > 15.5 || off > 0.5) bad.push({ stop: st.name, s: Math.round(st.target), mag: Math.max(Math.abs(CAR_PITCH - gap), off), info: `gap ${gap.toFixed(2)} m, ${off.toFixed(2)} m off the track` });
   }
   if (keep) model.userData.cars.forEach((m, k) => { m.position.copy(keep[k][0]); m.rotation.copy(keep[k][1]); });
   return check('consist-coupled', g.stops.length, bad);
