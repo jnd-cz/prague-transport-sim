@@ -217,6 +217,8 @@ def protected(url):
 
 
 def main(argv=None, connect=connect):
+    if hasattr(sys.stdout, "reconfigure"):  # (a Czech note in a report broke the print on cp1252 consoles, #258)
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--dry-run", action="store_true", help="list what would change, write nothing")
     ap.add_argument("--reports", action="store_true", help="also upload reports/headless/*.json")

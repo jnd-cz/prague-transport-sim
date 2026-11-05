@@ -139,7 +139,7 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
-- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
   default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
   of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside

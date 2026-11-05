@@ -10,7 +10,7 @@ import {
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
-const STOP_AHEAD = 6;          // tram front stops this far past the projected platform point
+const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
 // The platform is 30 m long: any front position that puts the 14 m car alongside it counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
@@ -150,7 +150,8 @@ export class Game {
       if (request && r() < 0.55) waiting = 0;
       const stop = {
         i, name: s.name, request,
-        target: Math.min(s.s + STOP_AHEAD, this.route.length - 2),
+        // the front stops beside the stop sign (D 1/2 § 27.6; tools/build_line.py, #258)
+        target: Math.min(s.sign ?? s.s + STOP_AHEAD, this.route.length - 2),
         p0: s.p0, p1: s.p1,
         sched: this.trip[i],
         waiting, alightFrac: 0.08 + r() * 0.25 + central * 0.05,
@@ -963,6 +964,11 @@ export class Game {
   }
 
   get doorsClosed() { return this.doorState === 'closed'; }
+  // how far the doors are open, 0..1 (the drawn doors follow it)
+  get doorOpenness() {
+    const d = this.doorState;
+    return d === 'open' ? 1 : d === 'closed' ? 0 : d === 'opening' ? 1 - this.doorTimer / DOOR_OPEN_TIME : this.doorTimer / DOOR_CLOSE_TIME;
+  }
 
   // ------------------------------------------------------------------ input
   toggleDoors() {
@@ -1546,6 +1552,20 @@ export class Game {
   }
 
   // gap from our front to the rear of the next tram ahead (m), or null
+  // Keep the junction clear (#259): a tram whose front is still before a signal does not follow a tram
+  // whose rear is between that signal and the junction's far side; it waits at the stop line (s − 3) until
+  // the junction is clear. With trams queueing 2 m apart, one following into a junction stood across it
+  // with a car crossing in front (line 9 seed 5: the traffic check jammed). The far side is taken as
+  // symmetric about the crossing's centre. Returns the stop point, or null.
+  keepClear(front, leaderRear) {
+    for (const sig of this.signals) {
+      if (sig.s < front + 0.5 || leaderRear < sig.s - 2) continue;
+      const far = sig.cross + (sig.cross - (sig.edge ?? sig.s)) + 2;
+      if (leaderRear < far) return sig.s - 3;
+    }
+    return null;
+  }
+
   tramAheadGap() {
     let gap = null;
     for (const ai of this.aiTrams) {
@@ -1634,7 +1654,11 @@ export class Game {
         const o = this.route.offset(along, lat);
         p.set(o.x, this.profile.height(along) + 0.18, -o.y);
         sc.set(1, 0.85 + r() * 0.3, 1);
-        q.setFromEuler(new THREE.Euler(0, r() * 6.28, 0));
+        // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
+        // as before, so everyone stands where they stood (#251)
+        const h = this.route.heading(along), v = r();
+        const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
+        q.setFromEuler(new THREE.Euler(0, yaw, 0));
         m.compose(p, q, sc);
         this.crowd.setMatrixAt(n++, m);
       }

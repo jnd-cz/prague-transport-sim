@@ -324,7 +324,7 @@ export class TR37 {
     this.drive += (fDrive - this.drive) * Math.min(1, dt / 0.15);
     const track = rescue || b >= C.trackAngles[1] ? 2 : b >= C.trackAngles[0] ? 1 : 0;
     return {
-      drive: this.drive, brake: fElec + this.shoeF, track: track * C.trackForce * k, trackOn: track > 0,
+      drive: this.drive, brake: fElec + this.shoeF, track: track * C.trackForce * k, trackOn: track > 0, trackPairs: track,
       current: I, line: this.ls ? I * k : 0, dissipated: fElec * speed,
     };
   }

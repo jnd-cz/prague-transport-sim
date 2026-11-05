@@ -177,6 +177,11 @@ POINT_RULES = [(lambda t: t.get("highway") == "traffic_signals", 35),
                (lambda t: t.get("highway") == "crossing", 15)]
 
 
+def is_stop_position(t):
+    """a tram stop position (build_line's "stop_positions"; tools/stop_signs_review.py)"""
+    return t.get("railway") == "tram_stop" or (t.get("public_transport") == "stop_position" and t.get("tram") == "yes")
+
+
 def _store():
     """Everything build_line's queries read, from one pass over the extract (once per process; a line's
     build asked for ~25 passes before): relations, tagged nodes, and the tagged ways any query can return,
@@ -192,7 +197,7 @@ def _store():
     t0 = time.time()
     rels = relations(lambda t: True)
     ways_, by_kind = {}, {k: [] for k in ("tracks", "platforms", "buildings", "roads", "green", "water")}
-    node_tags, points = {}, []
+    node_tags, points, stoppos = {}, [], []
     member_ways = {m["ref"] for r in rels for m in r["members"] if m["type"] == "way"}
     seq = 0
     fp = osmium.FileProcessor(PRAHA, osmium.osm.NODE | osmium.osm.WAY).with_locations()
@@ -203,6 +208,8 @@ def _store():
                 node_tags[o.id] = json.dumps(tags)
                 if any(f(tags) for f, _ in POINT_RULES):
                     points.append({"type": "node", "id": o.id, "lat": o.location.lat, "lon": o.location.lon, "tags": tags})
+                if is_stop_position(tags):
+                    stoppos.append({"type": "node", "id": o.id, "lat": o.location.lat, "lon": o.location.lon, "tags": tags})
             continue
         seq += 1
         tags = dict(o.tags)
@@ -220,7 +227,7 @@ def _store():
         ways_[o.id] = w
         for k in kinds:
             by_kind[k].append(w)
-    _STORE = {"rels": rels, "node_tags": node_tags, "points": points, "ways": ways_, "kinds": by_kind}
+    _STORE = {"rels": rels, "node_tags": node_tags, "points": points, "stoppos": stoppos, "ways": ways_, "kinds": by_kind}
     print(f"  local extract read once: {len(rels)} relations, {len(node_tags)} tagged nodes, {len(ways_)} ways, "
           f"{time.time() - t0:.0f} s")
     return _STORE
@@ -332,6 +339,8 @@ def emulate(name, query):
         res = {"elements": out}
     elif name == "points":
         res = {"elements": [n for n in _store()["points"] if any(f(n["tags"]) and near([n], r) for f, r in POINT_RULES)]}
+    elif name == "stop_positions":
+        res = {"elements": [n for n in _store()["stoppos"] if near([n], radius())]}
     else:
         r = radius()
         ws = [_way(w) for w in _store()["kinds"][name] if near_way(w, r)]
