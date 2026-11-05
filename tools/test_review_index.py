@@ -17,12 +17,16 @@ import serve  # noqa: E402
 
 A = {"issue": 258, "findings": [{"x": 1.0, "y": 2.0, "kind": "stop"}, {"x": 3.0, "y": 4.0, "kind": "stop"}, {"x": 5.0, "y": 6.0, "kind": "stop"}]}
 B = {"issue": 106, "findings": [{"x": 7.0, "y": 8.0, "kind": "z"}]}
+OLD = {"issue": 107, "findings": [{"x": 9.0, "y": 9.0, "kind": "old"}]}  # (its issue closed, nothing answered: out of date)
 INDEX = {"built": "2026-11-05 15:00", "commit": "abc1234", "repo": "jnd-cz/prague-transport-sim", "lines": ["9", "17"],
          "sets": [{"file": "reports/review/test-a.json", "title": "Stop signs, line 17", "issue": 258, "waitsFor": 258,
                    "issueInfo": {"title": "Stop point at the stop sign", "state": "OPEN"}, "waitsForInfo": {"title": "Stop point at the stop sign", "state": "OPEN"},
                    "lines": ["17"], "findings": 3, "unknown": []},
                   {"file": "reports/review/test-b.json", "title": None, "issue": 106, "waitsFor": 106,
                    "issueInfo": {"title": "Track z", "state": "CLOSED"}, "waitsForInfo": {"title": "Track z", "state": "CLOSED"},
+                   "lines": ["9"], "findings": 1, "unknown": []},
+                  {"file": "reports/review/test-old.json", "title": "Old", "issue": 107, "waitsFor": 107,
+                   "issueInfo": {"title": "Done long ago", "state": "CLOSED"}, "waitsForInfo": {"title": "Done long ago", "state": "CLOSED"},
                    "lines": ["9"], "findings": 1, "unknown": []},
                   {"file": "reports/review/test-gone.json", "title": "Gone", "issue": None, "waitsFor": None, "issueInfo": None,
                    "waitsForInfo": None, "lines": [], "findings": 2, "unknown": ["issue", "lines"]}],
@@ -73,7 +77,8 @@ def main():
             page = b.new_page(viewport=size)
             errors = []
             page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
-            fulfil(page, {"reports/review/index.json": INDEX, "reports/review/test-a.json": A, "reports/review/test-b.json": B, "_only": True}, STORES)
+            fulfil(page, {"reports/review/index.json": INDEX, "reports/review/test-a.json": A, "reports/review/test-b.json": B,
+                          "reports/review/test-old.json": OLD, "_only": True}, STORES)
             page.goto(url)
             page.wait_for_function("() => window.reviewIndex", timeout=30000)
             sets = page.evaluate("() => window.reviewIndex.sets.map((s) => [s.file.split('/').pop(), s.c || null, s.error || null])")
@@ -91,7 +96,10 @@ def main():
             check(f"{w}: B among the answered, its closed issue marked", "test-b.json" in answered and "CLOSED" in answered and "test-b.json" not in waiting)
             q = page.inner_html("#questions")
             check(f"{w}: the PR's question without its Markdown", "PR #270" in q and "Autumn costs time: 3-5 min" in q and "**" not in q)
-            check(f"{w}: the status sums the waiting", "1 finding waiting in 2 of 3 sets" in page.inner_text("#status"))
+            check(f"{w}: the status sums the waiting, not the out of date", "1 finding waiting in 2 of 4 sets" in page.inner_text("#status"))
+            old = page.evaluate("() => window.reviewIndex.old")
+            check(f"{w}: a set with a closed issue and findings waiting is out of date",
+                  old == ["reports/review/test-old.json"] and "Out of date" in waiting and waiting.index("test-old.json") > waiting.index("Out of date"))
             check(f"{w}: no sideways scroll", page.evaluate("() => document.documentElement.scrollWidth <= innerWidth"))
             check(f"{w}: no page errors", not errors)
             page.close()

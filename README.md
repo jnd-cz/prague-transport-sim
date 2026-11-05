@@ -417,8 +417,9 @@ grey. The answers are kept per line in the browser and sent to the server, which
 
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
 A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
-`reports/review/` and deployed with the site: `?line=17&review=reports/review/track-z.json` is #106's
-large track-height disagreements (`tools/dtmp_tracks.py --findings`).
+`reports/review/` and deployed with the site (the review directory lists them). A set whose issue is
+closed while findings wait is out of date and is deleted (the user, 2026-11-05): #106's track-height
+disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
 `?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.

@@ -91,14 +91,18 @@ export async function main() {
   const sets = await Promise.all(index.sets.map(async (s) => {
     try { return { ...s, c: await count(s, items) }; } catch (e) { return { ...s, error: e.message }; }
   }));
-  const waiting = sets.filter((s) => s.error || s.c.waiting > 0), answered = sets.filter((s) => !s.error && s.c.waiting === 0);
+  // (a set whose issue is closed while findings wait is out of date and is deleted: the user, 2026-11-05)
+  const stale = (s) => !s.error && s.c.waiting > 0 && s.waitsForInfo?.state === 'CLOSED';
+  const old = sets.filter(stale);
+  const waiting = sets.filter((s) => !stale(s) && (s.error || s.c.waiting > 0)), answered = sets.filter((s) => !s.error && s.c.waiting === 0);
   const total = waiting.reduce((a, s) => a + (s.c?.waiting || 0), 0);
   $('status').innerHTML = `${total} finding${total === 1 ? '' : 's'} waiting in ${waiting.length} of ${sets.length} sets · index of ${esc(index.built)} (${esc(index.commit || '')})`
     + (online ? '' : ' · <span class="bad">the answer store did not answer: counts from this device only</span>');
-  $('waiting').innerHTML = waiting.length ? `<h2>Waiting for answers</h2>${grouped(index.repo, waiting)}` : '<h2>Nothing waiting</h2>';
+  $('waiting').innerHTML = (waiting.length ? `<h2>Waiting for answers</h2>${grouped(index.repo, waiting)}` : '<h2>Nothing waiting</h2>')
+    + (old.length ? `<h2>Out of date</h2><div class="dim">Their issue is closed while findings wait: these sets are out of date, and their files in <code>reports/review/</code> are to be deleted.</div>${grouped(index.repo, old)}` : '');
   $('questions').innerHTML = questions(index);
   $('answered').innerHTML = answered.length ? `<h2>Answered</h2><details><summary>${answered.length} sets with every finding answered</summary>${grouped(index.repo, answered)}</details>` : '';
-  window.reviewIndex = { index, sets }; // (for the page test, tools/test_review_index.py)
+  window.reviewIndex = { index, sets, old: old.map((s) => s.file) }; // (for the page test, tools/test_review_index.py)
 }
 
 main();

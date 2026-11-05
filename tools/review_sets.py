@@ -31,7 +31,6 @@ OUT = os.path.join(FOLDER, "index.json")
 KNOWN = {
     "track-heights.json": {"title": "Track heights: structure and street decisions", "issue": 202, "lines": ["17"]},
     "track-radius.json": {"title": "Track radius: where the design radius gave way", "issue": 197},
-    "track-z.json": {"issue": 106, "lines": ["17"]},
 }
 # issues closed into another, whose sets wait for that one now (the issue's closing comment says so)
 MOVED = {20: 237}

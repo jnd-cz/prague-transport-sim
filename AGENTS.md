@@ -92,7 +92,10 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   imagery links, a picture where it helps, answer choices. Offer only answers that an importer turns into
   evidence, and say on the card why another answer stays held (#162, #176). An answer is keyed by a
   stable identity (a decision ID, a place), never by a generated array index. The file names its `issue`
-  and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under them.
+  and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under them. A set whose
+  issue is closed while findings wait is out of date: delete its file (the user, 2026-11-05: "If the issue
+  is closed and reviews are unasnwered then it's out of date and can be deleted"); the directory lists
+  such sets apart.
 
 ## Unattended runs (overnight, Codex /goal, scheduled sessions)
 
