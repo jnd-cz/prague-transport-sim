@@ -14,6 +14,22 @@ what each milestone is for; the issues hold the tasks.
 | **M6 Buses and passengers** | Buses and trolleybuses on the lane graph; one passenger model. |
 | **Backlog** | Realism and content not tied to a step: signals and traffic detail, sound, lighting, weather, assets, sources to obtain. |
 
+## The world first, one layer at a time
+
+The user's plan of 2026-11-05: the static world is built bottom-up, one layer at a time on all five
+lines, and each layer ends at a **checkpoint**: one run of every check on every line, a PR that explains
+what moved, and a tag on main (`W1` …). Within a layer one branch rebuilds and publishes (the `rebuild`
+label, AGENTS.md). The simulation lane waits for W2. GitHub's blocked-by links hold the order between
+the issues.
+
+| Checkpoint | The layer | Issues |
+|---|---|---|
+| **W1 Track network** | DI's chain graph as the network, the routes map-matched over it, all five lines | #237 (#210 as input) |
+| **W2 On the track** | the top-of-rail profile on all lines, the stop signs, the speed limits; one rebuild at the end | #202, #166, #258, #211, #224 |
+| **W3 The ground** | one ground surface built offline: survey, track beds, building plots and terrain | #276 |
+| **W4 Structures and scenery** | passages, bridge decks, railway tracks; buildings, street furniture, power data, doors | #199, #13, #57, #65, #55, #252, #277, #27 |
+| then **M3** | tiles and streaming | #30, #31 |
+
 Deferred on purpose: walker "slides" and the line 17 regression checks wait for the rebuilt world; red
 runs of oncoming trams wait for the junction controllers (M4).
 

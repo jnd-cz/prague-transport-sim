@@ -10,7 +10,7 @@ import {
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
-const STOP_AHEAD = 6;          // tram front stops this far past the projected platform point
+const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
 // The platform is 30 m long: any front position that puts the 14 m car alongside it counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
@@ -150,7 +150,8 @@ export class Game {
       if (request && r() < 0.55) waiting = 0;
       const stop = {
         i, name: s.name, request,
-        target: Math.min(s.s + STOP_AHEAD, this.route.length - 2),
+        // the front stops beside the stop sign (D 1/2 § 27.6; tools/build_line.py, #258)
+        target: Math.min(s.sign ?? s.s + STOP_AHEAD, this.route.length - 2),
         p0: s.p0, p1: s.p1,
         sched: this.trip[i],
         waiting, alightFrac: 0.08 + r() * 0.25 + central * 0.05,
@@ -963,6 +964,11 @@ export class Game {
   }
 
   get doorsClosed() { return this.doorState === 'closed'; }
+  // how far the doors are open, 0..1 (the drawn doors follow it)
+  get doorOpenness() {
+    const d = this.doorState;
+    return d === 'open' ? 1 : d === 'closed' ? 0 : d === 'opening' ? 1 - this.doorTimer / DOOR_OPEN_TIME : this.doorTimer / DOOR_CLOSE_TIME;
+  }
 
   // ------------------------------------------------------------------ input
   toggleDoors() {
@@ -1424,8 +1430,11 @@ export class Game {
     if (!X) return; // pedestrian signal: no crossing street
     const near = Math.abs(sig.cross - tram.s) < 400;
     const tramOnCrossing = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 4;
-    // drivers also see a tram about to enter (e.g. one that stopped past its signal)
-    const tramComing = tramOnCrossing || (sig.cross > tram.s && sig.cross < tram.s + 6 + tram.v * 2.5 && tram.v > 0.1);
+    // drivers also see a tram about to enter, and give way to one standing in the junction past its
+    // signal, whatever the lights show them (the user, #268: "cars should give way"; a tram stopped
+    // there behind a car, the cross street's green came, and its cars drove on, line 9 s 8852)
+    const inJunction = sig.s <= tram.s && sig.cross > tram.s;
+    const tramComing = tramOnCrossing || inJunction || (sig.cross > tram.s && sig.cross < tram.s + 6 + tram.v * 2.5 && tram.v > 0.1);
     if (near && sig.state === 'stop' && sig.timer > 5) {
       sig.spawn -= dt;
       if (sig.spawn <= 0 && sig.cars.length < 4) {
@@ -1462,7 +1471,10 @@ export class Game {
       car.mesh.position.set(x, (zf + zb) / 2 + 0.1, -y);
       car.mesh.rotation.y = Math.atan2(hx, -hy);
       car.mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
-      if (Math.abs(toX) < 2.3 && tramOnCrossing && tram.v > 0.2 && !car.hit) {
+      // a hit: the car inside the tram's body on the crossing (its front plus the car's half width), not
+      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268)
+      const inBody = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 1;
+      if (Math.abs(toX) < 2.3 && inBody && tram.v > 0.2 && !car.hit) {
         car.hit = true;
         this._collision(t('obj.crossingCar'));
       }
@@ -1649,7 +1661,11 @@ export class Game {
         const o = this.route.offset(along, lat);
         p.set(o.x, this.profile.height(along) + 0.18, -o.y);
         sc.set(1, 0.85 + r() * 0.3, 1);
-        q.setFromEuler(new THREE.Euler(0, r() * 6.28, 0));
+        // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
+        // as before, so everyone stands where they stood (#251)
+        const h = this.route.heading(along), v = r();
+        const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
+        q.setFromEuler(new THREE.Euler(0, yaw, 0));
         m.compose(p, q, sc);
         this.crowd.setMatrixAt(n++, m);
       }

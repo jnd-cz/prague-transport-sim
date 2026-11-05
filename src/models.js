@@ -1,5 +1,7 @@
 // Low-poly models built from primitives: T3 tram, cars, pedestrians, signals and signs.
 import * as THREE from 'three';
+import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
+import { CAR_PITCH } from './tram.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -272,10 +274,15 @@ function makeT3Car(line, mats) {
 // separate children so each can follow the track on its own bogies: see placeConsist().
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
+// detailed: 'hybrid' (or true: the animated hybrid, src/t3h.js), 'classic' (conflig's model, loaded on the
+// player's choice), false (the procedural car); a model not loaded falls back to the next simpler one
 export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '' } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
-  if (detailed && detailedProto) return makeDetailedSet(root, line, cars, dest, run);
+  if (detailed === 'classic' && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
+  if (detailed && hybridReady()) { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP); root.userData.kind = 'hybrid'; return root; }
+  if (detailed && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
+  root.userData.kind = 'simple';
   root.userData.bogie = 3.8;     // bogie pivots of the built-in model
   root.userData.bodyFront = 7.0;
   const mats = {
@@ -293,11 +300,13 @@ export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, ru
   return root;
 }
 
-// Detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt),
+// The classic detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt), the
+// player's choice beside the hybrid (src/t3h.js): simpler, no saloon and no moving parts.
 // reduced to a single 2048 px colour texture with the ambient occlusion baked in. Its axes were
 // found by principal component analysis of the body: length e1 (front = wipers), width e2
 // (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
 let detailedProto = null;
+export const classicReady = () => !!detailedProto;
 export const CONTACT_WIRE = 5.34;  // contact wire over top of rail (the track profile; src/heights.js)
 export const RAIL_TOP = 0;         // the wheels stand on the profile: it is the top of rail (src/heights.js)
 
@@ -507,6 +516,7 @@ function makeDetailedSet(root, line, cars, dest, run) {
 // Change the route number on the plates, the destination card and the run number (a new shift, a run
 // continuing as another line). (A set made without a destination has no card to change.)
 export function setConsistLine(model, line, dest = model.userData.dest, run = model.userData.run) {
+  if (model.userData.hybrid) { setHybridLine(model, line, dest, run); return; }
   const u = model.userData, { mats } = u;
   const swap = (m, tex) => { if (!m) return; const old = m.map; m.map = tex; m.needsUpdate = true; old?.dispose(); };
   if (u.line !== line) {
@@ -520,12 +530,14 @@ export function setConsistLine(model, line, dest = model.userData.dest, run = mo
 }
 
 // Put each car of a set on the track: cars are 15.2 m over couplers, the body starts 0.6 m
-// behind the coupler face; the car rests on its two bogie pivots (the model's own spacing), so
-// it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y, track bed height].
+// behind the coupler face, coupled cars CAR_PITCH apart; the car rests on its two bogie pivots (the
+// model's own spacing), so it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y,
+// track bed height]. (The hybrid hangs its cars on the coupling: src/t3h.js.)
 export function placeConsist(model, sFront, at) {
+  if (model.userData.hybrid) { placeHybridConsist(model, sFront, at); return; }
   const { bogie, bodyFront } = model.userData;
   model.userData.cars.forEach((car, k) => {
-    const c = sFront - k * 15.2 - 0.6 - bodyFront; // car origin (midway between the bogies)
+    const c = sFront - k * CAR_PITCH - 0.6 - bodyFront; // car origin (midway between the bogies)
     const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
     car.position.set((ax + bx) / 2, (za + zb) / 2 + RAIL_TOP, -(ay + by) / 2);
     car.rotation.order = 'YXZ'; // heading, then pitch, then the lean into a canted curve

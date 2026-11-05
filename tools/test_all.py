@@ -119,7 +119,9 @@ def main():
         # (its own process group: on a timeout the servers and browsers it started go with it)
         p = subprocess.Popen([sys.executable, *flags, os.path.join(TOOLS, t)], cwd=ROOT, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                             env={**os.environ, "PYTHONIOENCODING": "utf-8"}, start_new_session=os.name != "nt",
+                             # (a test that runs a heavy tool's main does not queue behind the real jobs, #280)
+                             env={**os.environ, "PYTHONIOENCODING": "utf-8", "TRAM_HEAVY_NOWAIT": "1"},
+                             start_new_session=os.name != "nt",
                              creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         try:
             out, _ = p.communicate(timeout=a.timeout)

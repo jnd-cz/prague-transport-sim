@@ -68,6 +68,11 @@ export class Autopilot {
       if (this.goThrough === sig && tr.v < 0.3) this.goThrough = null;
       if (this.goThrough !== sig) consider(sig.s - 3);
     }
+    // past a signal, its crossing still ahead (stopped in the junction behind something): the driver no
+    // longer sees the signal, and the cross street gives way to a tram in the junction; cars already on
+    // the crossing drive off it first (the user, #268: "tram driver should wait until the tracks clear")
+    const past = g.signals.find((x) => x.xroad && x.s <= tr.s && x.cross > tr.s + 1);
+    if (past && past.cars.some((c) => Math.abs((past.xroad.sX - c.s) * c.dir) < 4 && c.v > 0.1)) consider(past.cross - 3);
     let hazard = false;
     for (const ob of g.obstacles) {
       if (ob.state !== 'gone' && Math.abs(ob.lat) < 2.5 && ob.s > tr.s) {

@@ -1,0 +1,235 @@
+{
+  "root": "T3_Rig",
+  "body": "Body",
+  "doors": [
+    {
+      "name": "Middle",
+      "leaves": [
+        {
+          "outer": "Door_Middle_Left_Outer",
+          "inner": "Door_Middle_Left_Inner",
+          "baseYaw": 0.001726413778413419,
+          "sign": 1
+        },
+        {
+          "outer": "Door_Middle_Right_Outer",
+          "inner": "Door_Middle_Right_Inner",
+          "baseYaw": 3.1433190673682065,
+          "sign": -1
+        }
+      ],
+      "openAngle": 1.4311699866353502,
+      "leafWidth": 0.3538948634828115,
+      "openingWidth": 1.439579453931246
+    },
+    {
+      "name": "Rear",
+      "leaves": [
+        {
+          "outer": "Door_Rear_Left_Outer",
+          "inner": "Door_Rear_Left_Inner",
+          "baseYaw": -0.22619445134033056,
+          "sign": 1
+        },
+        {
+          "outer": "Door_Rear_Right_Outer",
+          "inner": "Door_Rear_Right_Inner",
+          "baseYaw": 2.9153982022494627,
+          "sign": -1
+        }
+      ],
+      "openAngle": 1.4311699866353502,
+      "leafWidth": 0.3538950073136813,
+      "openingWidth": 1.4395800292547252
+    },
+    {
+      "name": "Front",
+      "leaves": [
+        {
+          "outer": "Door_Front_Left_Outer",
+          "inner": "Door_Front_Left_Inner",
+          "baseYaw": 0.1988719607162581,
+          "sign": 1
+        },
+        {
+          "outer": "Door_Front_Right_Outer",
+          "inner": "Door_Front_Right_Inner",
+          "baseYaw": 3.3404646143060512,
+          "sign": -1
+        }
+      ],
+      "openAngle": 1.4311699866353502,
+      "leafWidth": 0.3538947103195036,
+      "openingWidth": 1.4395788412780144
+    }
+  ],
+  "bogies": [
+    {
+      "name": "Bogie_Rear",
+      "x": -3.242462193356623,
+      "pivot": [
+        -3.242462193356623,
+        0.8359355081642837,
+        0.0
+      ]
+    },
+    {
+      "name": "Bogie_Front",
+      "x": 3.242462193356623,
+      "pivot": [
+        3.242462193356623,
+        0.8359355081642837,
+        0.0
+      ]
+    }
+  ],
+  "wheels": [
+    {
+      "name": "Wheel_118",
+      "radius": 0.39584783636274024
+    },
+    {
+      "name": "Wheel_119",
+      "radius": 0.39584783636274024
+    },
+    {
+      "name": "Wheel_120",
+      "radius": 0.3958478377297836
+    },
+    {
+      "name": "Wheel_121",
+      "radius": 0.3958478377297835
+    },
+    {
+      "name": "Wheel_125",
+      "radius": 0.39584783636274024
+    },
+    {
+      "name": "Wheel_126",
+      "radius": 0.39584783636274024
+    },
+    {
+      "name": "Wheel_127",
+      "radius": 0.3958478377297836
+    },
+    {
+      "name": "Wheel_128",
+      "radius": 0.3958478377297835
+    }
+  ],
+  "signals": {
+    "left": [
+      "Lamp_left_Front_Amber_Glow",
+      "Lamp_left_Repeater_Amber_Glow",
+      "Lamp_left_Rear_Amber_Glow"
+    ],
+    "right": [
+      "Lamp_right_Front_Amber_Glow",
+      "Lamp_right_Repeater_Amber_Glow",
+      "Lamp_right_Rear_Amber_Glow"
+    ]
+  },
+  "numberPlates": [
+    "Fleet_Number_Front",
+    "Fleet_Number_Right",
+    "Fleet_Number_Left",
+    "Fleet_Number_Rear"
+  ],
+  "routePlates": [
+    "Route_Number_Front",
+    "Route_Number_Rear",
+    "Route_Number_Mirror"
+  ],
+  "wheelbase": 6.484924386713246,
+  "trackGauge": 1.435,
+  "forward": "+X",
+  "up": "+Y",
+  "pantograph": {
+    "root": "Pantograph",
+    "head": "Pantograph_Head",
+    "source": "conflig",
+    "lowerArmLength": 1.3707817499562336,
+    "upperArmLength": 1.7100701609671065,
+    "linkages": [
+      {
+        "lower": "Collector_Front_Lower",
+        "upper": "Collector_Front_Upper",
+        "baseX": 0.3538195850000001,
+        "headX": 0.04954216500000008
+      },
+      {
+        "lower": "Collector_Rear_Lower",
+        "upper": "Collector_Rear_Upper",
+        "baseX": -0.3538195850000001,
+        "headX": -0.04954216500000008
+      }
+    ],
+    "loweredHeight": 0.42,
+    "raisedHeight": 2.9,
+    "baseHeight": 3.2646179935296846,
+    "contactHeadOffset": 0.2044359326431855,
+    "minContactHeight": 3.88905392617287,
+    "maxContactHeight": 6.369053926172871,
+    "defaultContactHeight": 6.0
+  },
+  "triangleCount": 43792,
+  "animationCount": 13,
+  "license": "CC-BY-NC-4.0",
+  "referenceAuthor": "conflig",
+  "routeStyles": {
+    "Route_Number_Front": "normal",
+    "Route_Number_Rear": "inverted",
+    "Route_Number_Mirror": "mirror"
+  },
+  "brakes": [
+    "Brake_left_Glow",
+    "Brake_right_Glow"
+  ],
+  "revision": 5,
+  "infoPlates": {
+    "frontDestination": "Destination_Front",
+    "runNumber": "Run_Number_Front",
+    "sideBoards": [
+      "Side_Information_Right_Front",
+      "Side_Information_Right_Rear"
+    ],
+    "defaults": {
+      "destination": "VOZOVNA\n\u017dI\u017dKOV",
+      "runNumber": "801",
+      "route": "26",
+      "sideText": [
+        "DIVOK\u00c1 \u0160\u00c1RKA",
+        "HRAD\u010cANSK\u00c1",
+        "N\u00c1M\u011aST\u00cd REPUBLIKY",
+        "HLAVN\u00cd N\u00c1DRA\u017d\u00cd",
+        "OL\u0160ANSK\u00c9 H\u0158BITOVY",
+        "N\u00c1DRA\u017d\u00cd HOSTIVA\u0158"
+      ]
+    },
+    "colours": {
+      "blue": "#245378",
+      "ivory": "#f5f1e5",
+      "runForeground": "#fffdf4",
+      "runBackground": "#101418"
+    },
+    "rearRouteCentre": [
+      -6.97571853065801,
+      1.9941010983093757,
+      -0.0022196806945373737
+    ],
+    "rearRouteLiftMetres": 0.0931599990686216,
+    "sideBoardNote": "Exactly two right-hand-side boards. The forward board is in the second passenger window from the front; the rear board is unchanged.",
+    "frontSillDatum": 1.810453,
+    "rearSillDatum": 1.82171,
+    "cardBottomSillGapMetres": 0.014,
+    "frontDestinationYawDegrees": 0,
+    "frontDestinationRollDegrees": 0,
+    "runNumberPane": "right wraparound windscreen pane",
+    "runNumberYawDegrees": 74.06778192935867,
+    "upperRoutePlateUpwardTiltDegrees": 10,
+    "upperRoutePlateForwardOffsetMetres": 0.010808351108381409,
+    "upperRouteBodyClearanceSamples": 81,
+    "upperRouteBodyMinimumGapMetres": 0.008000000000000007,
+    "dashboardDestinationPlaneClearanceMetres": 0.012
+  }
+}

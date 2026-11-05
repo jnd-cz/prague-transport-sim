@@ -2,7 +2,7 @@
  "schema": 1,
  "issue": 258,
  "options": [
-  "sign at the pin (OSM)",
+  "sign at the pin",
   "sign at the timetable point (GTFS)",
   "unsure"
  ],
@@ -10,117 +10,73 @@
  "findings": [
   {
    "kind": "stop sign",
-   "id": "stop-sign-9-Klamovka-1",
+   "id": "stop-sign-9-Václavské náměstí-1",
    "line": "9",
-   "x": -3182.3,
-   "y": -1439.7,
-   "s": 6088.8,
-   "mag": 42.8,
+   "stop": "Václavské náměstí",
+   "towards": "Jindřišská",
+   "from": "Vodičkova",
+   "back": false,
+   "x": 240.5,
+   "y": -627.1,
+   "s": 10863.2,
+   "mag": 17.1,
    "status": "review",
-   "osm_node": 340039721,
-   "gtfs_s": 6131.6,
    "pick": true,
    "marks": [
     {
-     "x": -3182.3,
-     "y": -1439.7,
-     "label": "OSM stop position (the pin)",
+     "x": 240.5,
+     "y": -627.1,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 227.5,
+     "y": -638.4,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -3139.5,
-     "y": -1436.5,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    }
-   ],
-   "info": "Klamovka (towards U Zvonu): OSM's stop position (the pin, node 340039721) is 43 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-9-Arbesovo náměstí-1",
-   "line": "9",
-   "x": -1389.6,
-   "y": -1063.7,
-   "s": 8298.9,
-   "mag": 6.9,
-   "status": "review",
-   "osm_node": 4719188950,
-   "gtfs_s": 8305.8,
-   "pick": true,
-   "marks": [
-    {
-     "x": -1389.6,
-     "y": -1063.7,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": -1387.9,
-     "y": -1057.0,
+     "x": 228.7,
+     "y": -637.2,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -1388.5,
-     "y": -1059.4,
-     "label": "platform's front end",
+     "x": 229.3,
+     "y": -636.4,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Arbesovo náměstí (towards Švandovo divadlo): OSM's stop position (the pin, node 4719188950) is 7 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-9-Národní divadlo-1",
-   "line": "9",
-   "x": -541.4,
-   "y": -593.6,
-   "s": 9600.6,
-   "mag": 5.4,
-   "status": "review",
-   "osm_node": 4714677494,
-   "gtfs_s": 9595.2,
-   "pick": true,
-   "marks": [
-    {
-     "x": -541.4,
-     "y": -593.6,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": -546.7,
-     "y": -592.9,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    },
-    {
-     "x": -538.3,
-     "y": -593.9,
-     "label": "platform's front end",
-     "color": "#ffffff"
-    }
-   ],
-   "info": "Národní divadlo (towards Národní třída): OSM's stop position (the pin, node 4714677494) is 5 m after the timetable (GTFS) point. The platform's front end is 3 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4704944966,
+   "gtfs_s": 10847.8,
+   "info": "Václavské náměstí (towards Jindřišská): the DTM's sign (2024) lies 17 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-9-Hlavní nádraží-1",
    "line": "9",
-   "x": 1002.2,
-   "y": -315.6,
-   "s": 11758.2,
-   "mag": 12.8,
+   "stop": "Hlavní nádraží",
+   "towards": "Viktoria Žižkov",
+   "from": "Jindřišská",
+   "back": false,
+   "x": 1006.2,
+   "y": -320.9,
+   "s": 11764.5,
+   "mag": 6.3,
    "status": "review",
-   "osm_node": 255617362,
-   "gtfs_s": 11771.0,
    "pick": true,
    "marks": [
     {
+     "x": 1006.2,
+     "y": -320.9,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": 1002.2,
      "y": -315.6,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -132,29 +88,39 @@
     {
      "x": 1011.4,
      "y": -321.9,
-     "label": "platform's front end",
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Hlavní nádraží (towards Viktoria Žižkov): OSM's stop position (the pin, node 255617362) is 13 m before the timetable (GTFS) point. The platform's front end is 11 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 255617362,
+   "gtfs_s": 11771.0,
+   "info": "Hlavní nádraží (towards Viktoria Žižkov): the DTM's sign (2024) lies 6 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-9-Olšanské náměstí-1",
    "line": "9",
-   "x": 2491.3,
-   "y": -891.4,
-   "s": 13453.6,
-   "mag": 15.6,
+   "stop": "Olšanské náměstí",
+   "towards": "Olšanská",
+   "from": "Lipanská",
+   "back": false,
+   "x": 2507.1,
+   "y": -896.9,
+   "s": 13469.2,
+   "mag": 16.2,
    "status": "review",
-   "osm_node": 4704851514,
-   "gtfs_s": 13469.2,
    "pick": true,
    "marks": [
     {
-     "x": 2491.3,
-     "y": -891.4,
-     "label": "OSM stop position (the pin)",
+     "x": 2507.1,
+     "y": -896.9,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 2490.9,
+     "y": -895.2,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -166,63 +132,39 @@
     {
      "x": 2496.9,
      "y": -894.9,
-     "label": "platform's front end",
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Olšanské náměstí (towards Olšanská): OSM's stop position (the pin, node 4704851514) is 16 m before the timetable (GTFS) point. The platform's front end is 5 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
-  },
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-9-Mezi Hřbitovy-1",
-   "line": "9",
-   "x": 3488.7,
-   "y": -1107.8,
-   "s": 14706.9,
-   "mag": 12.3,
-   "status": "review",
-   "osm_node": 255617355,
-   "gtfs_s": 14719.2,
-   "pick": true,
-   "marks": [
-    {
-     "x": 3488.7,
-     "y": -1107.8,
-     "label": "OSM stop position (the pin)",
-     "color": "#3e9dff"
-    },
-    {
-     "x": 3490.0,
-     "y": -1120.0,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    },
-    {
-     "x": 3489.5,
-     "y": -1115.6,
-     "label": "platform's front end",
-     "color": "#ffffff"
-    }
-   ],
-   "info": "Mezi Hřbitovy (towards Želivského): OSM's stop position (the pin, node 255617355) is 12 m before the timetable (GTFS) point. The platform's front end is 8 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 244178530,
+   "gtfs_s": 13469.2,
+   "info": "Olšanské náměstí (towards Olšanská): the DTM's sign (2024) lies 16 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-9-Vinohradská vodárna-1",
    "line": "9",
-   "x": 1812.7,
-   "y": -1593.1,
-   "s": 17032.2,
+   "stop": "Vinohradská vodárna",
+   "towards": "Šumavská",
+   "from": "Perunova",
+   "back": false,
+   "x": 1804.6,
+   "y": -1587.5,
+   "s": 17041.0,
    "mag": 8.8,
    "status": "review",
-   "osm_node": 4718170734,
-   "gtfs_s": 17041.0,
    "pick": true,
    "marks": [
     {
+     "x": 1804.6,
+     "y": -1587.5,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": 1812.7,
      "y": -1593.1,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -234,29 +176,39 @@
     {
      "x": 1803.0,
      "y": -1591.9,
-     "label": "platform's front end",
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Vinohradská vodárna (towards Šumavská): OSM's stop position (the pin, node 4718170734) is 9 m before the timetable (GTFS) point. The platform's front end is 10 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4718170734,
+   "gtfs_s": 17041.0,
+   "info": "Vinohradská vodárna (towards Šumavská): the DTM's sign (2024) lies 9 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-9-Karlovo náměstí-1",
    "line": "9",
-   "x": -283.4,
-   "y": -1253.8,
-   "s": 19293.0,
-   "mag": 13.4,
+   "stop": "Karlovo náměstí",
+   "towards": "Moráň",
+   "from": "Štěpánská",
+   "back": false,
+   "x": -294.5,
+   "y": -1247.2,
+   "s": 19305.5,
+   "mag": 12.5,
    "status": "review",
-   "osm_node": 8569961260,
-   "gtfs_s": 19306.4,
    "pick": true,
    "marks": [
     {
+     "x": -294.5,
+     "y": -1247.2,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": -283.4,
      "y": -1253.8,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -268,45 +220,101 @@
     {
      "x": -287.0,
      "y": -1252.7,
-     "label": "platform's front end",
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Karlovo náměstí (towards Moráň): OSM's stop position (the pin, node 8569961260) is 13 m before the timetable (GTFS) point. The platform's front end is 4 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 8569961260,
+   "gtfs_s": 19306.4,
+   "info": "Karlovo náměstí (towards Moráň): the DTM's sign (2024) lies 13 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
-   "id": "stop-sign-9-Moráň-1",
+   "id": "stop-sign-9-Bertramka-2",
    "line": "9",
-   "x": -382.4,
-   "y": -1439.5,
-   "s": 19533.6,
-   "mag": 6.6,
+   "stop": "Bertramka",
+   "towards": "U Zvonu",
+   "from": "Anděl",
+   "back": false,
+   "x": -2280.9,
+   "y": -1384.8,
+   "s": 21481.7,
+   "mag": 7.6,
    "status": "review",
-   "osm_node": 4701097445,
-   "gtfs_s": 19540.2,
    "pick": true,
    "marks": [
     {
-     "x": -382.4,
-     "y": -1439.5,
-     "label": "OSM stop position (the pin)",
+     "x": -2280.9,
+     "y": -1384.8,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": -2273.3,
+     "y": -1386.4,
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
-     "x": -384.2,
-     "y": -1445.9,
+     "x": -2278.0,
+     "y": -1386.5,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
     },
     {
-     "x": -383.3,
-     "y": -1442.7,
-     "label": "platform's front end",
+     "x": -2278.3,
+     "y": -1386.5,
+     "label": "platform's front end (OSM)",
      "color": "#ffffff"
     }
    ],
-   "info": "Moráň (towards Palackého náměstí): OSM's stop position (the pin, node 4701097445) is 7 m before the timetable (GTFS) point. The platform's front end is 3 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4533064817,
+   "gtfs_s": 21478.8,
+   "info": "Bertramka (towards U Zvonu): the DTM's sign (2024) lies 8 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-9-Klamovka-2",
+   "line": "9",
+   "stop": "Klamovka",
+   "towards": "Kavalírka",
+   "from": "U Zvonu",
+   "back": false,
+   "x": -3250.6,
+   "y": -1437.8,
+   "s": 22452.9,
+   "mag": 7.5,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": -3250.6,
+     "y": -1437.8,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": -3243.0,
+     "y": -1439.1,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -3245.7,
+     "y": -1439.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -3245.9,
+     "y": -1439.3,
+     "label": "platform's front end (OSM)",
+     "color": "#ffffff"
+    }
+   ],
+   "osm_node": 4533064822,
+   "gtfs_s": 22448.1,
+   "info": "Klamovka (towards Kavalírka): the DTM's sign (2024) lies 7 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   }
  ]
 }
