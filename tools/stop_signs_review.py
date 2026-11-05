@@ -8,11 +8,15 @@ more than --over metres along the track are written to reports/review/stop-signs
 point, for the user to say where the sign really stands (?line=N&review=reports/review/stop-signs-N.json).
 Prints per line how the two compare, and the platform's front end against OSM's point."""
 import argparse
+import csv
+import io
 import json
 import math
 import os
 import statistics
 import sys
+import zipfile
+from collections import Counter, defaultdict
 
 import osmium
 
@@ -68,6 +72,77 @@ def at(path, s):
     return path[-1][0], path[-1][1]
 
 
+def back_stops(line, path, back):
+    """The opposite direction's stops on pathBack: the GTFS pattern of route L<line> (direction 0 or 1,
+    whichever lies along pathBack) most trips run, each stop's point projected onto pathBack."""
+    z = zipfile.ZipFile(os.path.join(ROOT, "raw", "PID_GTFS.zip"))
+    rd = lambda n: csv.DictReader(io.TextIOWrapper(z.open(n), encoding="utf-8-sig"))  # noqa: E731
+    trips = {t["trip_id"]: t["direction_id"] for t in rd("trips.txt") if t["route_id"] == f"L{line}"}
+    seq = defaultdict(list)
+    for r in rd("stop_times.txt"):
+        if r["trip_id"] in trips:
+            seq[r["trip_id"]].append((int(r["stop_sequence"]), r["stop_id"]))
+    pats = Counter((trips[t], tuple(i for _, i in sorted(v))) for t, v in seq.items())
+    ids = {i for (_, p), _ in pats.items() for i in p}
+    frame = Frame()
+    xy = {r["stop_id"]: (frame.xy(float(r["stop_lat"]), float(r["stop_lon"])), r["stop_name"]) for r in rd("stops.txt") if r["stop_id"] in ids}
+    best = None
+    for dirn in ("0", "1"):
+        top = max(((n, p) for (d, p), n in pats.items() if d == dirn), default=None)
+        if not top:
+            continue
+        pr = [(project(back, *xy[i][0]), xy[i][1]) for i in top[1]]
+        fit = statistics.median(d for (d, _), _ in pr)
+        if best is None or fit < best[0]:
+            best = (fit, [{"name": nm, "s": round(sb, 1)} for (d, sb), nm in pr if d < 25])
+    return best[1] if best else []
+
+
+def review(line, path, stops, nodes, over, back=False):
+    """Findings for one direction's stops on its path; (findings, OSM - GTFS diffs, platform end - OSM)"""
+    diffs, ends, findings, seen = [], [], [], {}
+    tag, dirn = ("back-", " (the other direction)") if back else ("", "")
+    for k, st in enumerate(stops):
+        cands = []
+        for name, x, y, nid in nodes:
+            if name != st["name"]:
+                continue
+            d, s = project(path, x, y)
+            if d < ON_TRACK and abs(s - st["s"]) < ALONG:
+                cands.append((abs(s - st["s"]), s, x, y, nid))
+        nxt = stops[k + 1]["name"] if k + 1 < len(stops) else "end"
+        seen[st["name"]] = seen.get(st["name"], 0) + 1
+        sid = f"stop-sign-{line}-{tag}{st['name']}-{seen[st['name']]}"
+        if not cands:
+            gx, gy = at(path, st["s"])
+            findings.append({"kind": "stop sign", "id": sid, "line": line, "x": round(gx, 1), "y": round(gy, 1), "s": st["s"],
+                             "mag": 10, "status": "review", "pick": True,
+                             "marks": [{"x": round(gx, 1), "y": round(gy, 1), "label": "timetable (GTFS) point", "color": GTFS}],
+                             "info": f"{st['name']} (towards {nxt}){dirn}: no OSM stop position near the track. The pin is the timetable "
+                                     f"(GTFS) point. Where is the stop sign?"})
+            continue
+        _, s_osm, x, y, nid = min(cands)
+        diff = s_osm - st["s"]
+        diffs.append(diff)
+        end = st["p1"] - s_osm if st.get("p0") is not None and st.get("p1") is not None and st["p1"] - st["p0"] >= 15 else None
+        if end is not None:
+            ends.append(end)
+        if abs(diff) > over:
+            where = f"{abs(diff):.0f} m {'before' if diff < 0 else 'after'}"
+            plat = f" The platform's front end is {end:.0f} m past the pin." if end is not None else ""
+            gx, gy = at(path, st["s"])
+            marks = [{"x": round(x, 1), "y": round(y, 1), "label": "OSM stop position (the pin)", "color": OSM},
+                     {"x": round(gx, 1), "y": round(gy, 1), "label": "timetable (GTFS) point", "color": GTFS}]
+            if end is not None:
+                ex, ey = at(path, st["p1"])
+                marks.append({"x": round(ex, 1), "y": round(ey, 1), "label": "platform's front end", "color": END})
+            findings.append({"kind": "stop sign", "id": sid, "line": line, "x": round(x, 1), "y": round(y, 1), "s": round(s_osm, 1),
+                             "mag": round(abs(diff), 1), "status": "review", "osm_node": nid, "gtfs_s": st["s"], "pick": True, "marks": marks,
+                             "info": f"{st['name']} (towards {nxt}){dirn}: OSM's stop position (the pin, node {nid}) is {where} "
+                                     f"the timetable (GTFS) point.{plat} Where is the stop sign? (Not at either: place it on the map.)"})
+    return findings, diffs, ends
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="9,17,22,23,37")
@@ -77,55 +152,25 @@ def main():
     h.apply_file(os.path.join(ROOT, "raw", "osm", "praha.osm.pbf"))
     frame = Frame()
     nodes = [(name, *frame.xy(lat, lon), nid) for name, lat, lon, nid in h.nodes]
+    q = lambda a, f: sorted(a)[int(f * (len(a) - 1))] if a else float("nan")  # noqa: E731
+    med = lambda a: statistics.median(a) if a else float("nan")  # noqa: E731
     for line in args.lines.split(","):
         data = json.load(open(os.path.join(ROOT, "data", f"line{line}.json"), encoding="utf-8"))
-        path, stops = data["path"], data["stops"]
-        diffs, ends, findings, seen = [], [], [], {}
-        for k, st in enumerate(stops):
-            cands = []
-            for name, x, y, nid in nodes:
-                if name != st["name"]:
-                    continue
-                d, s = project(path, x, y)
-                if d < ON_TRACK and abs(s - st["s"]) < ALONG:
-                    cands.append((abs(s - st["s"]), s, x, y, nid))
-            nxt = stops[k + 1]["name"] if k + 1 < len(stops) else "end"
-            seen[st["name"]] = seen.get(st["name"], 0) + 1
-            sid = f"stop-sign-{line}-{st['name']}-{seen[st['name']]}"
-            if not cands:
-                gx, gy = at(path, st["s"])
-                findings.append({"kind": "stop sign", "id": sid, "line": line, "x": round(gx, 1), "y": round(gy, 1), "s": st["s"],
-                                 "mag": 10, "status": "review", "pick": True,
-                                 "marks": [{"x": round(gx, 1), "y": round(gy, 1), "label": "timetable (GTFS) point", "color": GTFS}],
-                                 "info": f"{st['name']} (towards {nxt}): no OSM stop position near the track. The pin is the timetable "
-                                         f"(GTFS) point. Where is the stop sign?"})
-                continue
-            _, s_osm, x, y, nid = min(cands)
-            diff = s_osm - st["s"]
-            diffs.append(diff)
-            end = st["p1"] - s_osm if st.get("p0") is not None and st.get("p1") is not None and st["p1"] - st["p0"] >= 15 else None
-            if end is not None:
-                ends.append(end)
-            if abs(diff) > args.over:
-                where = f"{abs(diff):.0f} m {'before' if diff < 0 else 'after'}"
-                plat = f" The platform's front end is {end:.0f} m past the pin." if end is not None else ""
-                gx, gy = at(path, st["s"])
-                marks = [{"x": round(x, 1), "y": round(y, 1), "label": "OSM stop position (the pin)", "color": OSM},
-                         {"x": round(gx, 1), "y": round(gy, 1), "label": "timetable (GTFS) point", "color": GTFS}]
-                if end is not None:
-                    ex, ey = at(path, st["p1"])
-                    marks.append({"x": round(ex, 1), "y": round(ey, 1), "label": "platform's front end", "color": END})
-                findings.append({"kind": "stop sign", "id": sid, "line": line, "x": round(x, 1), "y": round(y, 1), "s": round(s_osm, 1),
-                                 "mag": round(abs(diff), 1), "status": "review", "osm_node": nid, "gtfs_s": st["s"], "pick": True, "marks": marks,
-                                 "info": f"{st['name']} (towards {nxt}): OSM's stop position (the pin, node {nid}) is {where} "
-                                         f"the timetable (GTFS) point.{plat} Where is the stop sign? (Not at either: place it on the map.)"})
+        path, stops, back = data["path"], data["stops"], data.get("pathBack") or []
+        findings, diffs, ends = review(line, path, stops, nodes, args.over)
+        print(f"line {line}: {len(diffs)}/{len(stops)} matched; OSM - GTFS median {med(diffs):+.1f} m "
+              f"[10 % {q(diffs, .1):+.1f}, 90 % {q(diffs, .9):+.1f}]; platform end - OSM median {med(ends):+.1f} m; "
+              f"{len(findings)} to review")
+        # a run that returns to its start (line 9's) drives both directions on its own path
+        if back and math.dist(back[0][:2], path[-1][:2]) < math.dist(back[0][:2], path[0][:2]):
+            bst = back_stops(line, path, back)
+            bf, bd, _ = review(line, back, bst, nodes, args.over, back=True)
+            findings += bf
+            print(f"  other direction: {len(bd)}/{len(bst)} matched; OSM - GTFS median {med(bd):+.1f} m "
+                  f"[10 % {q(bd, .1):+.1f}, 90 % {q(bd, .9):+.1f}]; {len(bf)} to review")
         out = {"schema": 1, "issue": 258, "options": OPTIONS, "over_m": args.over, "findings": findings}
         with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
-        q = lambda a, f: sorted(a)[int(f * (len(a) - 1))]  # noqa: E731
-        print(f"line {line}: {len(diffs)}/{len(stops)} matched; OSM - GTFS median {statistics.median(diffs):+.1f} m "
-              f"[10 % {q(diffs, .1):+.1f}, 90 % {q(diffs, .9):+.1f}]; platform end - OSM median {statistics.median(ends):+.1f} m; "
-              f"{len(findings)} to review")
 
 
 if __name__ == "__main__":

@@ -347,6 +347,230 @@
     }
    ],
    "info": "Nádraží Zahradní Město (towards Zahradní Město): OSM's stop position (the pin, node 9105335202) is 21 m before the timetable (GTFS) point. The platform's front end is 17 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Nádraží Zahradní Město-1",
+   "line": "22",
+   "x": 5505.3,
+   "y": -3554.7,
+   "s": 256.7,
+   "mag": 14.4,
+   "status": "review",
+   "osm_node": 9105335203,
+   "gtfs_s": 242.3,
+   "pick": true,
+   "marks": [
+    {
+     "x": 5505.3,
+     "y": -3554.7,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 5500.5,
+     "y": -3568.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Nádraží Zahradní Město (towards Dubečská) (the other direction): OSM's stop position (the pin, node 9105335203) is 14 m after the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Dubečská-1",
+   "line": "22",
+   "x": 5385.7,
+   "y": -3197.6,
+   "s": 702.5,
+   "mag": 5.4,
+   "status": "review",
+   "osm_node": 4408698033,
+   "gtfs_s": 707.9,
+   "pick": true,
+   "marks": [
+    {
+     "x": 5385.7,
+     "y": -3197.6,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 5380.8,
+     "y": -3195.3,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Dubečská (towards Radošovická) (the other direction): OSM's stop position (the pin, node 4408698033) is 5 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Slavia - Nádraží Eden-1",
+   "line": "22",
+   "x": 3236.3,
+   "y": -2444.6,
+   "s": 3195.2,
+   "mag": 7.5,
+   "status": "review",
+   "osm_node": 290174940,
+   "gtfs_s": 3202.7,
+   "pick": true,
+   "marks": [
+    {
+     "x": 3236.3,
+     "y": -2444.6,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3228.9,
+     "y": -2445.9,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Slavia - Nádraží Eden (towards Koh-i-noor) (the other direction): OSM's stop position (the pin, node 290174940) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Vršovické náměstí-1",
+   "line": "22",
+   "x": 2071.3,
+   "y": -2332.8,
+   "s": 4471.3,
+   "mag": 15.3,
+   "status": "review",
+   "osm_node": 4721776301,
+   "gtfs_s": 4486.6,
+   "pick": true,
+   "marks": [
+    {
+     "x": 2071.3,
+     "y": -2332.8,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2056.3,
+     "y": -2329.5,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Vršovické náměstí (towards Ruská) (the other direction): OSM's stop position (the pin, node 4721776301) is 15 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Karlovo náměstí-1",
+   "line": "22",
+   "x": -283.4,
+   "y": -1253.8,
+   "s": 7290.0,
+   "mag": 13.4,
+   "status": "review",
+   "osm_node": 8569961260,
+   "gtfs_s": 7303.4,
+   "pick": true,
+   "marks": [
+    {
+     "x": -283.4,
+     "y": -1253.8,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -296.2,
+     "y": -1249.9,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Karlovo náměstí (towards Novoměstská radnice) (the other direction): OSM's stop position (the pin, node 8569961260) is 13 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Novoměstská radnice-1",
+   "line": "22",
+   "x": -275.7,
+   "y": -1073.5,
+   "s": 7494.9,
+   "mag": 5.6,
+   "status": "review",
+   "osm_node": 3026879036,
+   "gtfs_s": 7500.5,
+   "pick": true,
+   "marks": [
+    {
+     "x": -275.7,
+     "y": -1073.5,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -274.4,
+     "y": -1068.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Novoměstská radnice (towards Národní třída) (the other direction): OSM's stop position (the pin, node 3026879036) is 6 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Brusnice-1",
+   "line": "22",
+   "x": -2052.7,
+   "y": 911.3,
+   "s": 12664.6,
+   "mag": 7.2,
+   "status": "review",
+   "osm_node": 276837845,
+   "gtfs_s": 12657.4,
+   "pick": true,
+   "marks": [
+    {
+     "x": -2052.7,
+     "y": 911.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2045.5,
+     "y": 911.6,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Brusnice (towards Pohořelec) (the other direction): OSM's stop position (the pin, node 276837845) is 7 m after the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-22-back-Vypich-1",
+   "line": "22",
+   "x": -5398.7,
+   "y": -113.3,
+   "s": 16550.4,
+   "mag": 8.2,
+   "status": "review",
+   "osm_node": 340037057,
+   "gtfs_s": 16558.6,
+   "pick": true,
+   "marks": [
+    {
+     "x": -5398.7,
+     "y": -113.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -5406.6,
+     "y": -115.2,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Vypich (towards Obora Hvězda) (the other direction): OSM's stop position (the pin, node 340037057) is 8 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
   }
  ]
 }

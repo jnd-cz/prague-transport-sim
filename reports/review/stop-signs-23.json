@@ -143,6 +143,118 @@
     }
    ],
    "info": "Národní divadlo (towards Národní třída): OSM's stop position (the pin, node 4714677494) is 5 m after the timetable (GTFS) point. The platform's front end is 3 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-back-Václavské náměstí-1",
+   "line": "23",
+   "x": 208.5,
+   "y": -654.2,
+   "s": 1301.7,
+   "mag": 19.2,
+   "status": "review",
+   "osm_node": 4704944965,
+   "gtfs_s": 1320.9,
+   "pick": true,
+   "marks": [
+    {
+     "x": 208.5,
+     "y": -654.2,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 195.3,
+     "y": -668.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Václavské náměstí (towards Vodičkova) (the other direction): OSM's stop position (the pin, node 4704944965) is 19 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-back-Lazarská-1",
+   "line": "23",
+   "x": -196.7,
+   "y": -893.2,
+   "s": 1807.6,
+   "mag": 27.6,
+   "status": "review",
+   "osm_node": 4704961989,
+   "gtfs_s": 1835.2,
+   "pick": true,
+   "marks": [
+    {
+     "x": -196.7,
+     "y": -893.2,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -223.8,
+     "y": -888.2,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Lazarská (towards Národní třída) (the other direction): OSM's stop position (the pin, node 4704961989) is 28 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-back-Brusnice-1",
+   "line": "23",
+   "x": -2052.7,
+   "y": 911.3,
+   "s": 6826.6,
+   "mag": 7.2,
+   "status": "review",
+   "osm_node": 276837845,
+   "gtfs_s": 6819.4,
+   "pick": true,
+   "marks": [
+    {
+     "x": -2052.7,
+     "y": 911.3,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2045.5,
+     "y": 911.6,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Brusnice (towards Pohořelec) (the other direction): OSM's stop position (the pin, node 276837845) is 7 m after the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-back-Královka-1",
+   "line": "23",
+   "x": -2946.1,
+   "y": 100.7,
+   "s": 8401.9,
+   "mag": 14.8,
+   "status": "review",
+   "osm_node": 14163025013,
+   "gtfs_s": 8387.1,
+   "pick": true,
+   "marks": [
+    {
+     "x": -2946.1,
+     "y": 100.7,
+     "label": "OSM stop position (the pin)",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2960.2,
+     "y": 96.2,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "info": "Královka (towards end) (the other direction): OSM's stop position (the pin, node 14163025013) is 15 m after the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
   }
  ]
 }
