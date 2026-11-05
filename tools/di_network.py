@@ -51,6 +51,7 @@ GAP = 2.0                # m: two track ends facing each other this near are one
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
+SECTION_TURN = 60.0      # degrees: the most a section's branch may leave its legs' line at the node they end at
 TWICE = 0.5              # m: two short edges between the same nodes this near each other are one track drawn twice
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
@@ -212,6 +213,7 @@ class Network:
         self._stubs()
         self._contract()
         self._sections()
+        self._sections_into_junctions()
         self._twice()
         self.index()
 
@@ -295,6 +297,54 @@ class Network:
             self.nodes[X]['kind'] = 'fork'
             self.nodes[Y]['kind'] = 'gone'
             self.report['sections to their tips'] += 1
+
+    def _sections_into_junctions(self):
+        """A switch drawn as a section whose two legs end at a node where other tracks meet too (Strossmayerovo náměstí:
+        from the fork both legs run side by side 8 m into a crossing, where the diverging curve leaves 35° off; the user,
+        2026-11-05, "the both di forks are fine"): the straight leg stays; the other leg goes and the diverging track
+        starts at the fork, DI's points from where it leaves on (the fit joins it to the fork tangent). Tracks crossing
+        through the node (two ends of one chain) are not the branch."""
+        cos_t = math.cos(math.radians(TURN))
+        cos_max = math.cos(math.radians(SECTION_TURN))
+        for X in list(self.at):
+            ends = self.at[X]
+            if len(ends) != 3:
+                continue
+            far = defaultdict(list)
+            for e, end in ends:
+                ed = self.edges[e]
+                if ed['line'].length <= SECTION_LEGS:
+                    far[ed['b'] if end == 0 else ed['a']].append((e, end))
+            Y, legs = next(((y, ls) for y, ls in far.items() if len(ls) == 2 and y != X), (None, None))
+            if Y is None or len(self.at[Y]) <= 4:
+                continue
+            leg_ids = {e for e, _ in legs}
+            at_y = [x for x in self.at[Y] if x[0] not in leg_ids]
+            chain_n = defaultdict(int)
+            for e, _ in at_y:
+                chain_n[self.edges[e].get('chain')] += 1
+            free = [x for x in at_y if chain_n[self.edges[x[0]].get('chain')] < 2]
+            # the legs arrive at Y in direction u (into Y): the straight continuation leaves along u, the branch off it
+            l0 = legs[0]
+            arrive = self.out_dir(l0[0], 1 - l0[1])
+            u = (-arrive[0], -arrive[1])
+            dev = lambda x, u=u: u[0] * self.out_dir(*x)[0] + u[1] * self.out_dir(*x)[1]
+            straight = [x for x in free if dev(x) >= cos_t]
+            branch = [x for x in free if cos_max <= dev(x) < cos_t]
+            if len(straight) != 1 or len(branch) != 1:
+                continue
+            # (the leg nearer the branch's side goes; both run within centimetres)
+            gone = legs[1]
+            self.remove_edge(gone[0])
+            b, bend = branch[0]
+            ed = self.remove_edge(b)
+            c = list(ed['line'].coords)
+            xy = self.nodes[X]['xy']
+            if bend == 0:
+                self.add_edge(X, ed['b'], [xy] + c[1:], ed['src'], ed['records'], ed.get('chain'))
+            else:
+                self.add_edge(ed['a'], X, c[:-1] + [xy], ed['src'], ed['records'], ed.get('chain'))
+            self.report['sections into junctions'] += 1
 
     def _twice(self):
         """Two short edges (SECTION_LEGS or less) between the same two nodes, within TWICE of each other, are one track
