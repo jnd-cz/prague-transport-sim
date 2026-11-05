@@ -166,7 +166,7 @@ RUN = bool(THEN or GTFS_ONLY)  # path, stops and timetable from GTFS (plan_run /
 
 def corridor_queries(R):
     """Overpass queries for everything around the route ways in set .w (defined by R)."""
-    global Q_TRACKS, Q_POINTS, Q_BUILDINGS, Q_ROADS, Q_GREEN, Q_WATER, Q_PLATFORMS
+    global Q_TRACKS, Q_POINTS, Q_BUILDINGS, Q_ROADS, Q_GREEN, Q_WATER, Q_PLATFORMS, Q_STOPPOS
     Q_TRACKS = f"[out:json][timeout:120];{R}way(around.w:60)[railway~\"^(tram|light_rail)$\"]->.t;.t out body;.t >;out body qt;"
     Q_POINTS = (f"[out:json][timeout:120];{R}"
                 "(node(around.w:35)[highway=traffic_signals];"
@@ -174,6 +174,8 @@ def corridor_queries(R):
                 "node(around.w:15)[highway=crossing];);out body qt;")
     Q_PLATFORMS = (f"[out:json][timeout:120];{R}(way(around.w:20)[public_transport=platform];"
                    "way(around.w:20)[railway=platform];);out tags geom qt;")
+    Q_STOPPOS = (f"[out:json][timeout:120];{R}(node(around.w:6)[public_transport=stop_position][tram=yes];"
+                 "node(around.w:6)[railway=tram_stop];);out body qt;")
     # (the world reaches ~220 m either side: roads, buildings and green; 2026-10-23, was 90-120 m)
     Q_BUILDINGS = f"[out:json][timeout:180];{R}way(around.w:220)[building];out tags geom qt;"
     Q_ROADS = (f"[out:json][timeout:180];{R}way(around.w:200)[highway~\"^(motorway|trunk|primary|secondary|tertiary|"
@@ -1087,30 +1089,79 @@ def main():
         stops.append({"name": r["stop_name"], "s": round(s, 1), "off": round(d, 1),
                       "side": "left" if side > 0 else "right", "request": flags.get(sid, False), "lines": lines})
         s_last = s
+    # The stop sign (označník): the tram front stops beside it (D 1/2 § 27.6, #258). The user's placed sign
+    # (data/truth.json stopSigns, keyed by the stop and the next one, or the previous one at a last stop), else
+    # the archive DTM's sign beside our track (raw/dtmpoints/lineN.signs.json, tools/dtm_points.py --signs:
+    # within 2 m of 22 of the user's 23 placed signs, median 0.4 m; the one miss, Výstaviště, is a street rebuilt
+    # since 2024), else OSM's stop position on our own track (the other direction's lies 3-6 m off, on the
+    # parallel track, and was taken at 5 stops within 6 m: tools/stop_signs_review.py; within 2 m of 14 of 25),
+    # else none (the game: GTFS + STOP_AHEAD).
+    truth_signs = json.load(open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8")).get("stopSigns", {}).get("signs", [])
+    spos = overpass("stop_positions", Q_STOPPOS, optional=True)["elements"]
+    sp_ = os.path.join(ROOT, "raw", "dtmpoints", f"line{LINE}.signs.json")
+    dtm_signs = [P(g["lat"], g["lon"]) for g in json.load(open(sp_, encoding="utf-8"))["signs"]] if os.path.exists(sp_) else []
+    for k, st_ in enumerate(stops):
+        nxt = stops[k + 1]["name"] if k + 1 < len(stops) else None
+        prv = stops[k - 1]["name"] if k else None
+        f = next((f for f in truth_signs if f["stop"] == st_["name"]
+                  and (f.get("towards") == nxt if nxt else f.get("from") == prv)), None)
+        if f:
+            s, d, _ = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
+            if s is not None and d < 8:
+                st_["sign"], st_["signSrc"] = round(s, 1), "truth"
+                continue
+            print(f"  ! stop sign of {st_['name']} (truth.json) is not beside the route near the stop: {s} {d}")
+        cand = []
+        for e in spos:
+            if e.get("tags", {}).get("name") == st_["name"]:
+                s, d, _ = path.project(P(e["lat"], e["lon"]), st_["s"] - 100, st_["s"] + 100, radius=3)
+                if s is not None and d < 1.5:
+                    cand.append((abs(s - st_["s"]), s))
+        osm_s = min(cand)[1] if cand else None
+        # the DTM's: on the platform side (right of travel), within 6 m of the track and 40 m of OSM's point
+        # (else the GTFS point), the nearest to it (the opposite direction's sign stands on the left: 6 of the
+        # 295 stops had a DTM sign on the left only)
+        ref = osm_s if osm_s is not None else st_["s"]
+        near = []
+        for q in dtm_signs:
+            s, d, side = path.project(q, ref - 45, ref + 45, radius=3)
+            if s is not None and d < 6 and side < 0 and abs(s - ref) < 40:
+                near.append((abs(s - ref), s))
+        if near:
+            st_["sign"], st_["signSrc"] = round(min(near)[1], 1), "dtmpoints"
+        elif osm_s is not None:
+            st_["sign"], st_["signSrc"] = round(osm_s, 1), "osm"
+    print("stop signs: " + ", ".join(f"{sum(st_.get('signSrc') == k for st_ in stops)} {k}" for k in ("truth", "dtmpoints", "osm"))
+          + f", {sum('sign' not in st_ for st_ in stops)} none")
     # platforms (OSM): where along the route each stop's platform begins and ends, so the game
-    # can require the whole set to stand alongside it (and let two sets stop one behind another)
+    # can require the whole set to stand alongside it (and let two sets stop one behind another).
+    # Matched around the sign where there is one (Hercovka's timetable point is 86 m short of the sign,
+    # by the other direction's platform)
     pjs = overpass("platforms", Q_PLATFORMS, optional=True)
     plats = [e for e in pjs["elements"] if "geometry" in e and e.get("tags", {}).get("bus") != "yes"
              or "geometry" in e and e.get("tags", {}).get("tram") == "yes"]
     for st_ in stops:
         best = None
+        at = st_.get("sign", st_["s"])
         for e in plats:
             pp = [P(g["lat"], g["lon"]) for g in e["geometry"]]
-            if min(dist(q, path.at(st_["s"])) for q in pp) > 60:
+            if min(dist(q, path.at(at)) for q in pp) > 60:
                 continue
-            pr = [path.project(q, st_["s"] - 150, st_["s"] + 150, radius=3) for q in pp]
+            pr = [path.project(q, at - 150, at + 150, radius=3) for q in pp]
             pr = [x for x in pr if x[0] is not None and x[1] < 9]
             if len(pr) < 2:
                 continue
             s0, s1 = min(x[0] for x in pr), max(x[0] for x in pr)
             right = sum(1 for x in pr if x[2] < 0) > len(pr) / 2
-            if s1 - s0 < 10 or s1 - s0 > 160 or st_["s"] < s0 - 25 or st_["s"] > s1 + 25:
+            if s1 - s0 < 10 or s1 - s0 > 160 or at < s0 - 25 or at > s1 + 25:
                 continue
-            score = (0 if right else 1, abs((s0 + s1) / 2 - st_["s"]))
+            score = (0 if right else 1, abs((s0 + s1) / 2 - at))
             if best is None or score < best[0]:
                 best = (score, s0, s1)
         if best:
-            st_["p0"], st_["p1"] = round(best[1], 1), round(best[2], 1)
+            # (the platform reaches the sign at least: OSM's Malostranské náměstí is 7 m too short, the user
+            # 2026-11-05: "malostranské náměstí on osm maps is too short")
+            st_["p0"], st_["p1"] = round(best[1], 1), round(max(best[2], st_.get("sign", best[2])), 1)
     with_p = [st_ for st_ in stops if "p0" in st_]
     if with_p:
         lens = sorted(st_["p1"] - st_["p0"] for st_ in with_p)
@@ -1301,7 +1352,10 @@ def main():
         "bridges": one("structures", "osm", len(bridges), "route ranges"),
         "tunnels": one("structures", "osm", len(tunnels), "route ranges"),
         "terrain": one("terrain", "coarse", terrain["nx"] * terrain["ny"], "cells"),
-        "stops": one("stops", "gtfs", len(stops)), "timetable": one("timetable", "gtfs", len(timetable), "trips"),
+        "stops": one("stops", "gtfs", len(stops)),
+        "signs": sources.entry("signs", [sum(st_.get("signSrc") == k for st_ in stops) for k in ("truth", "dtmpoints", "osm")]
+                               + [sum("sign" not in st_ for st_ in stops)], "stops"),
+        "timetable": one("timetable", "gtfs", len(timetable), "trips"),
         "signals": one("signals", "osm", len(signals)), "crossings": one("crossings", "osm", len(crossings)),
         "buildings": one("buildings", "osm", len(buildings)), "roads": one("streets", "osm", len(roads)),
         "green": one("areas", "osm", len(green)), "water": one("areas", "osm", len(water))})

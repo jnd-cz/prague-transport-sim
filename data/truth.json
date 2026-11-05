@@ -658,5 +658,292 @@
     "note": "no accuracy; against DI p50 0.13 m, p90 0.45 m at line 17's nodes (#20, docs/knowledge.md)"
    }
   ]
+ },
+ "stopSigns": {
+  "note": "Where the stop signs (označníky) stand: the point the tram front stops at (D 1/2 § 27.6), from the user's stop-sign review (#258), imported by tools/stop_signs_review.py --import; the build makes it the stop's point (tools/build_line.py). x, y in the city frame (tools/geo.py). osm_node and gtfs: the open data at the time of the answer. The user, 2026-11-05: \"Hercovka on gtfs mapy pid looks indeed wrong, malostranské náměstí on osm maps is too short\"; the sign usually stands \"slightly before platform's front end\" (2026-11-04).",
+  "signs": [
+   {
+    "stop": "Brusnice",
+    "towards": "Pražský hrad",
+    "x": -2012.53,
+    "y": 906.55,
+    "how": "placed on the map",
+    "osm_node": 4721894504,
+    "gtfs": [
+     -2012.5,
+     909.4
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Dubečská",
+    "towards": "Nádraží Zahradní Město",
+    "x": 5443.96,
+    "y": -3230.13,
+    "how": "placed on the map",
+    "note": "stop sign right at the edge of the platform",
+    "osm_node": 3866008501,
+    "gtfs": [
+     5447.1,
+     -3229.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Hercovka",
+    "towards": "Ke Stírce",
+    "x": 2770.88,
+    "y": 3498.07,
+    "how": "placed on the map",
+    "note": "pins is placed in the opposite direction",
+    "osm_node": 4097081445,
+    "gtfs": [
+     2689.1,
+     3521.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Jana Masaryka",
+    "towards": "Krymská",
+    "x": 1207.48,
+    "y": -1764.85,
+    "how": "placed on the map",
+    "osm_node": 4721776305,
+    "gtfs": [
+     1215.8,
+     -1768.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Jiráskovo náměstí",
+    "towards": "Národní divadlo",
+    "x": -677.88,
+    "y": -1160.03,
+    "how": "placed on the map",
+    "note": "towards platforms end",
+    "osm_node": 4696978879,
+    "gtfs": [
+     -678.9,
+     -1154.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Koh-i-noor",
+    "towards": "Slavia - Nádraží Eden",
+    "x": 2602.31,
+    "y": -2567.28,
+    "how": "placed on the map",
+    "note": "in between both",
+    "osm_node": 4721776293,
+    "gtfs": [
+     2604.1,
+     -2564.7
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Královka",
+    "towards": "Malovanka",
+    "x": -2919.09,
+    "y": 114.12,
+    "how": "placed on the map",
+    "osm_node": 338859814,
+    "gtfs": [
+     -2909.4,
+     122.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Malostranské náměstí",
+    "towards": "Pražské Jezulátko",
+    "x": -1195.47,
+    "y": 234.14,
+    "how": "placed on the map",
+    "note": "orange one is closest",
+    "osm_node": 7002486683,
+    "gtfs": [
+     -1193.4,
+     232.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Nádraží Zahradní Město",
+    "towards": "Zahradní Město",
+    "x": 5476.5,
+    "y": -3619.43,
+    "how": "placed on the map",
+    "note": "OSM is closer, GTFS is past platform's end, real stop sign marked and sits in between.",
+    "osm_node": 9105335202,
+    "gtfs": [
+     5474.5,
+     -3631.4
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Národní divadlo",
+    "towards": "Karlovy lázně",
+    "x": -654.5,
+    "y": -701.92,
+    "how": "placed on the map",
+    "osm_node": 4700724588,
+    "gtfs": [
+     -659.5,
+     -694.4
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Národní divadlo",
+    "towards": "Národní třída",
+    "x": -543.48,
+    "y": -595.14,
+    "how": "placed on the map",
+    "note": "hard to see but very close to GTFS point",
+    "osm_node": 4714677494,
+    "gtfs": [
+     -546.7,
+     -592.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Pobřežní cesta",
+    "towards": "Přístaviště",
+    "x": -1790.79,
+    "y": -5722.12,
+    "how": "placed on the map",
+    "osm_node": 31030377,
+    "gtfs": [
+     -1793.3,
+     -5723.4
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Podolská vodárna",
+    "towards": "Výtoň",
+    "x": -554.46,
+    "y": -3000.41,
+    "how": "placed on the map",
+    "osm_node": 278467793,
+    "gtfs": [
+     -557.1,
+     -3009.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Pohořelec",
+    "towards": "Brusnice",
+    "x": -2338.66,
+    "y": 358.79,
+    "how": "placed on the map",
+    "osm_node": 3791255555,
+    "gtfs": [
+     -2341.0,
+     359.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Právnická fakulta",
+    "towards": "Čechův most",
+    "x": -191.2,
+    "y": 475.76,
+    "how": "placed on the map",
+    "osm_node": 354684526,
+    "gtfs": [
+     -208.4,
+     469.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Vršovické náměstí",
+    "towards": "Čechovo náměstí",
+    "x": 2153.09,
+    "y": -2357.9,
+    "how": "placed on the map",
+    "note": "There's some mix up. White point is close to platform's end. Orange point is far back, close to the opposite direction's stop but on a track in our direction. Blue pin seem to get matched at the start of opposite direction's stop.",
+    "osm_node": 4721776300,
+    "gtfs": [
+     2102.4,
+     -2344.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Vypich",
+    "towards": "Říčanova",
+    "x": -5337.13,
+    "y": -104.75,
+    "how": "placed on the map",
+    "note": "again right at the platform's edge",
+    "osm_node": 3476362418,
+    "gtfs": [
+     -5344.2,
+     -103.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Výstaviště",
+    "towards": "Nádraží Holešovice",
+    "x": 1065.07,
+    "y": 1804.36,
+    "how": "placed on the map",
+    "osm_node": 4690489335,
+    "gtfs": [
+     1074.7,
+     1816.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Výtoň",
+    "towards": "Palackého náměstí",
+    "x": -741.97,
+    "y": -2065.57,
+    "how": "placed on the map",
+    "osm_node": 4759185035,
+    "gtfs": [
+     -745.2,
+     -2059.4
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Čechova čtvrť",
+    "towards": "Nádraží Modřany",
+    "x": -2122.01,
+    "y": -9265.44,
+    "how": "placed on the map",
+    "osm_node": 30079593,
+    "gtfs": [
+     -2116.7,
+     -9268.5
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Čechův most",
+    "towards": "Strossmayerovo náměstí",
+    "x": -165,
+    "y": 772.48,
+    "how": "placed on the map",
+    "osm_node": 21257811,
+    "gtfs": [
+     -156.9,
+     776.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   }
+  ]
  }
 }

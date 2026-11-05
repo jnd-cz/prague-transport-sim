@@ -93,6 +93,8 @@ LAYERS = {
     "walls": ("zps", "walls", "rule:placement"),
     "trees": ("trees", "osm"),
     "stops": ("osm", "gtfs"),  # platforms and stop positions from OSM, names and lines from the timetable
+    "signs": ("truth", "dtmpoints", "osm", "gtfs"),  # where the tram front stops: the user's placed sign, the archive
+                                                     # DTM's sign, OSM's stop position (#258)
     "timetable": ("gtfs",),
     "signals": ("osm", "rule:placement"),
     "speeds": ("osm", "rule:curvature"),

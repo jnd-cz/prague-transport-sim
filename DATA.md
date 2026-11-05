@@ -219,6 +219,7 @@ exports**. Until those packages exist, no post-1.5 compatibility conclusion has 
 
 | id | note |
 |---|---|
+| `2026-11-05` | `2026-11-03b` + the archive DTM's stop signs along lines 9, 17, 22, 23 and 37, both point layers (`raw/dtmpoints/lineN.signs.json`, `python -P -E tools/dtm_points.py N --signs`, fetched 2026-11-05): the stop sign's second source after the user's (#258). |
 | `2026-11-03b` | `2026-11-03` + DI set 7 at state 2026-10-31 for the same 16 districts (#209): Dvorecký most's tracks (2.9 km new, entered 2026-10-07 and 10-22) and records re-entered with heights. |
 | `2026-11-03` | `2026-11-02` + 8 Geoportál tiles of line 17's corridor (I3S buildings, trees, tree rows, walls) at its edge, moved by the DI track (#20). |
 | `2026-11-02` | `2026-11-01` + IPR Mosty 3D, the whole layer (`raw/geoportal/mosty3d/`, 49 meshes, 672 bridges, `python -I tools/mosty3d.py fetch`): a structure source for track heights (#192). |

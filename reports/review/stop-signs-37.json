@@ -2,7 +2,7 @@
  "schema": 1,
  "issue": 258,
  "options": [
-  "sign at the pin (OSM)",
+  "sign at the pin",
   "sign at the timetable point (GTFS)",
   "unsure"
  ],
@@ -10,41 +10,117 @@
  "findings": [
   {
    "kind": "stop sign",
-   "id": "stop-sign-37-back-Lehovec-1",
+   "id": "stop-sign-37-Krejcárek-1",
    "line": "37",
-   "x": 9219.7,
-   "y": 926.3,
-   "s": 0.0,
-   "mag": 10,
+   "stop": "Krejcárek",
+   "towards": "Palmovka",
+   "from": "Ohrada",
+   "back": false,
+   "x": 3909.4,
+   "y": 318.7,
+   "s": 2956.9,
+   "mag": 13.4,
    "status": "review",
    "pick": true,
    "marks": [
     {
-     "x": 9219.7,
-     "y": 926.3,
+     "x": 3909.4,
+     "y": 318.7,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 3918.7,
+     "y": 329.0,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3917.4,
+     "y": 328.2,
      "label": "timetable (GTFS) point",
      "color": "#ff9e31"
+    },
+    {
+     "x": 3921.3,
+     "y": 330.8,
+     "label": "platform's front end (OSM)",
+     "color": "#ffffff"
     }
    ],
-   "info": "Lehovec (towards Sídliště Hloubětín) (the other direction): no OSM stop position near the track. The pin is the timetable (GTFS) point. Where is the stop sign?"
+   "osm_node": 3412553283,
+   "gtfs_s": 2968.8,
+   "info": "Krejcárek (towards Palmovka): the DTM's sign (2024) lies 13 m before OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-Starý Hloubětín-1",
+   "line": "37",
+   "stop": "Starý Hloubětín",
+   "towards": "Hloubětín",
+   "from": "Nademlejnská",
+   "back": false,
+   "x": 8027.9,
+   "y": 854.7,
+   "s": 8264.2,
+   "mag": 6.5,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 8027.9,
+     "y": 854.7,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 8020.9,
+     "y": 856.5,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 8025.7,
+     "y": 857.5,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": 8029.8,
+     "y": 858.3,
+     "label": "platform's front end (OSM)",
+     "color": "#ffffff"
+    }
+   ],
+   "osm_node": 158747117,
+   "gtfs_s": 8262.6,
+   "info": "Starý Hloubětín (towards Hloubětín): the DTM's sign (2024) lies 7 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-37-back-Sídliště Hloubětín-1",
    "line": "37",
-   "x": 8874.5,
-   "y": 935.3,
-   "s": 346.2,
-   "mag": 31.8,
+   "stop": "Sídliště Hloubětín",
+   "towards": "Hloubětín",
+   "from": "Lehovec",
+   "back": true,
+   "x": 8908.0,
+   "y": 937.1,
+   "s": 312.9,
+   "mag": 33.3,
    "status": "review",
-   "osm_node": 4450425893,
-   "gtfs_s": 314.4,
    "pick": true,
    "marks": [
     {
+     "x": 8908.0,
+     "y": 937.1,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": 8874.5,
      "y": 935.3,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -54,25 +130,35 @@
      "color": "#ff9e31"
     }
    ],
-   "info": "Sídliště Hloubětín (towards Hloubětín) (the other direction): OSM's stop position (the pin, node 4450425893) is 32 m after the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4450425893,
+   "gtfs_s": 314.4,
+   "info": "Sídliště Hloubětín (towards Hloubětín) (the other direction): the DTM's sign (2024) lies 33 m before OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-37-back-Hloubětín-1",
    "line": "37",
-   "x": 8467.2,
-   "y": 951.2,
-   "s": 753.9,
-   "mag": 5.7,
+   "stop": "Hloubětín",
+   "towards": "Starý Hloubětín",
+   "from": "Sídliště Hloubětín",
+   "back": true,
+   "x": 8461.8,
+   "y": 953.9,
+   "s": 759.0,
+   "mag": 5.1,
    "status": "review",
-   "osm_node": 4450425892,
-   "gtfs_s": 759.6,
    "pick": true,
    "marks": [
     {
+     "x": 8461.8,
+     "y": 953.9,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": 8467.2,
      "y": 951.2,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -82,25 +168,35 @@
      "color": "#ff9e31"
     }
    ],
-   "info": "Hloubětín (towards Starý Hloubětín) (the other direction): OSM's stop position (the pin, node 4450425892) is 6 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 4450425892,
+   "gtfs_s": 759.6,
+   "info": "Hloubětín (towards Starý Hloubětín) (the other direction): the DTM's sign (2024) lies 5 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
   },
   {
    "kind": "stop sign",
    "id": "stop-sign-37-back-Palmovka-1",
    "line": "37",
-   "x": 4120.1,
-   "y": 1334.3,
-   "s": 5321.9,
-   "mag": 13.6,
+   "stop": "Palmovka",
+   "towards": "Palmovka",
+   "from": "Balabenka",
+   "back": true,
+   "x": 4129.1,
+   "y": 1339.7,
+   "s": 5311.6,
+   "mag": 10.3,
    "status": "review",
-   "osm_node": 1298749754,
-   "gtfs_s": 5335.5,
    "pick": true,
    "marks": [
     {
+     "x": 4129.1,
+     "y": 1339.7,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
      "x": 4120.1,
      "y": 1334.3,
-     "label": "OSM stop position (the pin)",
+     "label": "OSM stop position",
      "color": "#3e9dff"
     },
     {
@@ -110,7 +206,73 @@
      "color": "#ff9e31"
     }
    ],
-   "info": "Palmovka (towards Palmovka) (the other direction): OSM's stop position (the pin, node 1298749754) is 14 m before the timetable (GTFS) point. Where is the stop sign? (Not at either: place it on the map.)"
+   "osm_node": 1298749754,
+   "gtfs_s": 5335.5,
+   "info": "Palmovka (towards Palmovka) (the other direction): the DTM's sign (2024) lies 10 m before OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-back-Krejcárek-1",
+   "line": "37",
+   "stop": "Krejcárek",
+   "towards": "Ohrada",
+   "from": "Palmovka",
+   "back": true,
+   "x": 3862.0,
+   "y": 296.2,
+   "s": 6566.4,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 3862.0,
+     "y": 296.2,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3863.5,
+     "y": 297.2,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 31624631,
+   "gtfs_s": 6564.6,
+   "info": "Krejcárek (towards Ohrada) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+  },
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-37-back-Spojovací-1",
+   "line": "37",
+   "stop": "Spojovací",
+   "towards": null,
+   "from": "Kněžská luka",
+   "back": true,
+   "x": 5600.1,
+   "y": -300.7,
+   "s": 9551.1,
+   "mag": 10,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": 5600.1,
+     "y": -300.7,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 5600.1,
+     "y": -300.7,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    }
+   ],
+   "osm_node": 1371099971,
+   "gtfs_s": 9551.1,
+   "info": "Spojovací (towards end) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
   }
  ]
 }

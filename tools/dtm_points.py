@@ -1,8 +1,10 @@
 # Street furniture points from Prague's technical map (archived DTMP, state as of 30 June 2024, CC BY,
 # "datový podklad © IPR Praha") along a line: traffic signals, public transport stop signs, poles and
 # masts, street lights, traffic sign carriers, ground covers (docs/history/REMOTE-CHANGES.md §20, §22).
-#   python -I tools/dtm_points.py 17             -> data/lineN.dtmpoints.json (from the snapshot's raw answer)
-#   python -I tools/dtm_points.py 17 --refresh   (asks the service again: a new raw answer for a new snapshot)
+#   python -P -E tools/dtm_points.py 17             -> data/lineN.dtmpoints.json (from the snapshot's raw answer)
+#   python -P -E tools/dtm_points.py 17 --refresh   (asks the service again: a new raw answer for a new snapshot)
+#   python -P -E tools/dtm_points.py 17 --signs     -> raw/dtmpoints/lineN.signs.json: the stop signs of both
+#                                                   archive layers, for tools/build_line.py's stop points (#258)
 # Source: https://mp.iprpraha.cz/arcgis/rest/services/Hosted/DTMP_CUR_TMISZNAK_B/FeatureServer/0
 # (open data hub item d4418172a31b46b7b875668eaa354f22). Points have no heights. The raw answer is a
 # snapshot input: raw/dtmpoints/lineN.json (tools/snapshot.py).
@@ -40,8 +42,8 @@ frame = Frame()
 to_xy, to_ll = frame.xy, frame.ll
 
 
-def get(params):
-    q = URL + '?' + urllib.parse.urlencode(params)
+def get(params, url=URL):
+    q = url + '?' + urllib.parse.urlencode(params)
     for k in range(4):
         try:
             with urllib.request.urlopen(urllib.request.Request(q, headers={'User-Agent': 'tatra-t3-prague-game/0.1 (dtm points)'}), timeout=120) as r:
@@ -52,16 +54,53 @@ def get(params):
     raise SystemExit('the map server did not answer')
 
 
-cache = os.path.join(ROOT, 'raw', 'dtmpoints', f'line{line}.json')
-if '--refresh' in sys.argv or not os.path.exists(cache):
-    path, boxes, cur, acc = data['path'], [], [data['path'][0]], 0.0
+def path_boxes(path):
+    """the line in pieces of ~800 m, each queried as its bounding box"""
+    boxes, cur, acc = [], [path[0]], 0.0
     for a, b in zip(path, path[1:]):
-        acc += math.dist(a, b)
+        acc += math.dist(a[:2], b[:2])
         cur.append(b)
         if acc > 800:
             boxes.append(cur); cur, acc = [b], 0.0
     if len(cur) > 1:
         boxes.append(cur)
+    return boxes
+
+
+# The stop signs (zastávka MHD, 605240/605241) are in two layers of the archive: the second (_ADS_B) has as many
+# again as the first, and the two together put a sign beside 275 of the 295 stops (both directions) of lines 9,
+# 17, 22, 23 and 37, the first alone 154 (#258). The layers are stored in Web Mercator: asked for S-JTSK the
+# server leaves out the datum shift (9.9 m off), so WGS 84 out and tools/geo.py, as for the points below.
+SIGN_LAYERS = ('DTMP_CUR_TMISZNAK_B', 'DTMP_CUR_TMISZNAK_ADS_B')
+if '--signs' in sys.argv:
+    feats = {}
+    for layer in SIGN_LAYERS:
+        url = URL.replace('DTMP_CUR_TMISZNAK_B', layer)
+        for i, pts in enumerate(path_boxes(data['path'])):
+            xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+            s, w = to_ll(min(xs) - 60, min(ys) - 60)
+            n, e = to_ll(max(xs) + 60, max(ys) + 60)
+            res = get({'where': 'ctmtp_kod IN (605240,605241)', 'geometry': f'{w},{s},{e},{n}', 'geometryType': 'esriGeometryEnvelope',
+                       'inSR': 4326, 'spatialRel': 'esriSpatialRelIntersects', 'outFields': 'objectid,ctmtp_kod', 'returnGeometry': 'true',
+                       'outSR': 4326, 'resultRecordCount': 2000, 'f': 'json'}, url)
+            for f in res.get('features', []):
+                if 'geometry' in f:
+                    feats[(layer, f['attributes']['objectid'])] = {'layer': layer, 'id': f['attributes']['objectid'],
+                                                                   'kod': f['attributes']['ctmtp_kod'],
+                                                                   'lat': f['geometry']['y'], 'lon': f['geometry']['x']}
+            time.sleep(1)
+        print(f'{layer}: {sum(k[0] == layer for k in feats)} stop signs', file=sys.stderr)
+    dst = os.path.join(ROOT, 'raw', 'dtmpoints', f'line{line}.signs.json')
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    with replacing(dst, 'w', encoding='utf-8') as fh:
+        json.dump({'fetched': time.strftime('%Y-%m-%d'), 'source': 'Archivní DTM Prahy (stav k 30. 6. 2024), datový podklad © IPR Praha (CC BY 4.0)',
+                   'layers': list(SIGN_LAYERS), 'signs': sorted(feats.values(), key=lambda f: (f['layer'], f['id']))}, fh, ensure_ascii=False)
+    print(f'line {line}: {len(feats)} stop signs -> {os.path.relpath(dst, ROOT)}')
+    sys.exit(0)
+
+cache = os.path.join(ROOT, 'raw', 'dtmpoints', f'line{line}.json')
+if '--refresh' in sys.argv or not os.path.exists(cache):
+    boxes = path_boxes(data['path'])
     feats = {}
     where = 'ctmtp_kod IN (' + ','.join(map(str, KINDS)) + ')'
     for i, pts in enumerate(boxes):
