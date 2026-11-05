@@ -134,6 +134,9 @@ export class Review {
     this.nearAt = null;
     // (&todo: only the findings without an answer, as the review directory's links open it, #288)
     this.todo = new URLSearchParams(location.search).has('todo');
+    // (findings answered since the list was last filtered stay in it, to be revisited or changed: they
+    // left it at once, and a point placed took its card away, #310)
+    this.kept = new Set();
     this._names();
     this._ui();
     this.verdicts = new Verdicts(`line${data.line}`, { line: data.line, file: url || null }, () => this._sync());
@@ -313,15 +316,19 @@ body.review #gl { touch-action: none }
     }
     $('rvLay').onclick = () => { box.classList.toggle('lay'); $('rvLay').classList.toggle('on', box.classList.contains('lay')); this._render(); };
     $('rvMin').onclick = () => { box.classList.toggle('min'); $('rvMin').textContent = box.classList.contains('min') ? '▴' : '▾'; this._render(); };
-    $('rvFilter').onchange = () => { this._fill(); if (this.list.length) this.select(0); };
-    $('rvTodo').onclick = () => { this.todo = !this.todo; $('rvTodo').classList.toggle('on', this.todo); this._fill(); if (this.list.length) this.select(0); };
+    $('rvFilter').onchange = () => { this.kept.clear(); this._fill(); if (this.list.length) this.select(0); };
+    $('rvTodo').onclick = () => { this.todo = !this.todo; this.kept.clear(); $('rvTodo').classList.toggle('on', this.todo); this._fill(); if (this.list.length) this.select(0); };
     $('rvTodo').classList.toggle('on', this.todo);
     $('rvList').addEventListener('click', (e) => { const r = e.target.closest('.rvItem'); if (r) this.select(+r.dataset.i); });
     $('rvCard').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.go) this.select(Math.max(0, Math.min(this.list.length - 1, this.cur + +b.dataset.go)));
-      if (b.dataset.place) { this.placing = this.list[this.cur]; b.classList.add('on'); b.textContent = 'Now click the map where it is'; }
+      const opt = b.dataset.v ? options(this.list[this.cur])[+b.dataset.v] : null;
+      if (b.dataset.place || (opt && opt === this.list[this.cur]?.placeOption)) {
+        this.placing = this.list[this.cur]; b.classList.add('on'); b.textContent = 'Now click the map where it is';
+        return;
+      }
       if (b.dataset.copy) navigator.clipboard?.writeText(location.href).then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Copy failed'; });
       if (b.dataset.v !== undefined) this.verdict(b.dataset.v === '' ? null : options(this.list[this.cur])[+b.dataset.v]);
     });
@@ -353,7 +360,7 @@ body.review #gl { touch-action: none }
   _fill() {
     const v = this.$('rvFilter').value, [src, kind] = v.split('|');
     const all = this.findings.filter((f) => !v || (f.src === src && (!kind || f.kind === kind)));
-    this.list = all.filter((f) => !this.todo || !this._answer(f)?.v).sort((a, b) => b.mag - a.mag);
+    this.list = all.filter((f) => !this.todo || !this._answer(f)?.v || this.kept.has(fid(f))).sort((a, b) => b.mag - a.mag);
     const height = this.findings.filter((f) => f.kind === 'trackheight');
     const across = height.length ? ` · track heights: ${height.filter((f) => this._answer(f)?.v).length} / ${height.length} answered across lines${this.otherAnswersReady ? '' : ' (loading or offline)'}` : '';
     this.$('rvCount').textContent = `${all.filter((f) => this.verdicts.get(fid(f))?.v).length} / ${all.length} done${across}`;
@@ -410,7 +417,7 @@ body.review #gl { touch-action: none }
 <div><span class="kind">${f.kind}</span> <span class="dim">(${f.src}, ${this.cur + 1} / ${this.list.length})</span></div>
 <div>${f.info}</div>
 ${f.marks ? `<div class="dim">${f.marks.map((m) => `<span style="color:${esc(m.color || '#fff')}">●</span> ${esc(m.label || '')}`).join(' · ')}</div>` : ''}
-${f.pick ? `<div class="rvRow" style="padding:6px 0 0"><button data-place="1">Place it on the map</button><span class="dim" id="rvPlaced">${this._placedText(f)}</span></div>` : ''}
+${f.pick ? `<div class="rvRow" style="padding:6px 0 0">${f.placeOption ? '' : '<button data-place="1">Place it on the map</button>'}<span class="dim" id="rvPlaced">${this._placedText(f)}</span></div>` : ''}
 <div id="rvHeight"></div>
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
@@ -555,6 +562,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
   // an answer button followed the placing: 10 of 10 on line 22's stop signs, 2026-11-04, #258)
   _record(f, v, note, extra = null) {
     const w = this.where(f.x, f.y), old = this.verdicts.get(fid(f));
+    if (this.todo) this.kept.add(fid(f));
     const placed = extra || (v && old?.px !== undefined ? { px: old.px, py: old.py } : {});
     this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
       info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1], ...placed, ...(f.id ? { id: f.id } : {}),
@@ -570,7 +578,8 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
       this.cur = i;
       this.box.querySelectorAll('.rvItem').forEach((r) => r.classList.toggle('sel', +r.dataset.i === i));
       this._card(f);
-    }
+    } else if (this.list.length) this.select(Math.min(Math.max(this.cur, 0), this.list.length - 1));
+    else { this.cur = -1; this.$('rvCard').innerHTML = '<div class="dim">nothing left in this list</div>'; }
   }
 
   // ------------------------------------------------------------------ layers
@@ -622,7 +631,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.camera);
     const hit = new THREE.Vector3();
     if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(f.z ?? 0)), hit)) { this._redraw(); return; }
-    this._record(f, 'placed on the map', this.$('rvNote')?.value.trim() || '', { px: +hit.x.toFixed(2), py: +(-hit.z).toFixed(2) });
+    this._record(f, f.placeOption || 'placed on the map', this.$('rvNote')?.value.trim() || '', { px: +hit.x.toFixed(2), py: +(-hit.z).toFixed(2) });
     this._redraw();
     this._highlight(f);
     this._render();
@@ -934,6 +943,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
       if (e.target.closest?.('select, input, textarea')) return;
       const k = e.key.toLowerCase();
       const o = this.cur >= 0 && /^[1-9]$/.test(k) && options(this.list[this.cur])[+k - 1];
+      if (o && o === this.list[this.cur].placeOption) { this.$('rvCard').querySelector(`button[data-v="${+k - 1}"]`)?.click(); return; }
       if (o) { this.verdict(o); return; }
       if (k === 'n') this.select(Math.min(this.list.length - 1, this.cur + 1));
       else if (k === 'b') this.select(Math.max(0, this.cur - 1));

@@ -35,6 +35,22 @@ class Import(unittest.TestCase):
         self.assertIn("stop-signs-23.json", f["E"]["source"])
         self.assertNotIn("t", f["E"])
 
+    def test_answers_name_their_source(self):
+        # #310: the user picks the right source, or places an own mark
+        cards = [card("o", "O", "P"), card("g", "G", "H"), card("m", "M", "N"), card("n", "Q", "R"), card("u", "U", "V")]
+        cards[2]["marks"].insert(0, {"x": 7.0, "y": 0.5, "label": "DTM stop sign, state 2024", "color": R.DTM})
+        answers = {"22": [
+            {"kind": "stop sign", "id": "o", "v": R.BY_SOURCE["OSM"], "t": 1},
+            {"kind": "stop sign", "id": "g", "v": R.BY_SOURCE["GTFS"], "t": 1},
+            {"kind": "stop sign", "id": "m", "v": R.BY_SOURCE["DTM"], "t": 1},
+            {"kind": "stop sign", "id": "n", "v": R.OWN, "t": 1},  # no point placed: held
+            {"kind": "stop sign", "id": "u", "v": R.OWN, "px": 4.0, "py": 0.2, "t": 1},
+        ]}
+        f = {x["stop"]: x for x in R.sign_facts(cards, answers)}
+        self.assertEqual(set(f), {"O", "G", "M", "U"})
+        self.assertEqual((f["O"]["x"], f["G"]["x"], f["M"]["x"], f["M"]["y"]), (10.0, 2.0, 7.0, 0.5))
+        self.assertEqual((f["U"]["x"], f["U"]["how"]), (4.0, "placed on the map"))
+
     def test_same_sign_from_two_lines_keeps_the_newest(self):
         cards = [card("x22", "S", "T"), card("x23", "S", "T", line="23")]
         answers = {"22": [{"kind": "stop sign", "id": "x22", "v": "p", "px": 1.0, "py": 0.0, "t": 5}],

@@ -1,11 +1,6 @@
 {
  "schema": 1,
  "issue": 258,
- "options": [
-  "sign at the pin",
-  "sign at the timetable point (GTFS)",
-  "unsure"
- ],
  "over_m": 5.0,
  "findings": [
   {
@@ -42,9 +37,17 @@
      "color": "#ff9e31"
     }
    ],
+   "options": [
+    "the DTM sign (red)",
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
    "osm_node": 21711416,
    "gtfs_s": 8762.9,
-   "info": "Pražské Jezulátko (towards Újezd): the DTM's sign (2024) lies 11 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+   "info": "Pražské Jezulátko (towards Újezd): the DTM's sign (2024) lies 11 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
   },
   {
    "kind": "stop sign",
@@ -80,9 +83,16 @@
      "color": "#ffffff"
     }
    ],
+   "options": [
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
    "osm_node": 4718117470,
    "gtfs_s": 13192.9,
-   "info": "Krymská (towards Ruská): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? (Not at the pin: place it on the map.)"
+   "info": "Krymská (towards Ruská): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? Pick the source that is right, or place your own mark."
   },
   {
    "kind": "stop sign",
@@ -118,9 +128,17 @@
      "color": "#ff9e31"
     }
    ],
+   "options": [
+    "the DTM sign (red)",
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
    "osm_node": 8569961260,
    "gtfs_s": 7303.4,
-   "info": "Karlovo náměstí (towards Novoměstská radnice) (the other direction): the DTM's sign (2024) lies 13 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+   "info": "Karlovo náměstí (towards Novoměstská radnice) (the other direction): the DTM's sign (2024) lies 13 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
   },
   {
    "kind": "stop sign",
@@ -156,9 +174,17 @@
      "color": "#ff9e31"
     }
    ],
+   "options": [
+    "the DTM sign (red)",
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
    "osm_node": 3026879036,
    "gtfs_s": 7500.5,
-   "info": "Novoměstská radnice (towards Národní třída) (the other direction): the DTM's sign (2024) lies 8 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+   "info": "Novoměstská radnice (towards Národní třída) (the other direction): the DTM's sign (2024) lies 8 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
   },
   {
    "kind": "stop sign",
@@ -194,9 +220,17 @@
      "color": "#ff9e31"
     }
    ],
+   "options": [
+    "the DTM sign (red)",
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
    "osm_node": 74218292,
    "gtfs_s": 9428.9,
-   "info": "Tyršův dům (towards Malostranské náměstí) (the other direction): the DTM's sign (2024) lies 5 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+   "info": "Tyršův dům (towards Malostranské náměstí) (the other direction): the DTM's sign (2024) lies 5 m after OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
   },
   {
    "kind": "stop sign",
@@ -232,9 +266,17 @@
      "color": "#ff9e31"
     }
    ],
+   "options": [
+    "the DTM sign (red)",
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
    "osm_node": 276837845,
    "gtfs_s": 12657.4,
-   "info": "Brusnice (towards Pohořelec) (the other direction): the DTM's sign (2024) lies 7 m before OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? (Not at the pin: place it on the map.)"
+   "info": "Brusnice (towards Pohořelec) (the other direction): the DTM's sign (2024) lies 7 m before OSM's point: rebuilt since? The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
   }
  ]
 }
