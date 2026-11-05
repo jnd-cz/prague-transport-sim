@@ -167,6 +167,11 @@ and `snapshot.py fetch` (it unzips the new packages). The download server closes
 a few dozen packages (2026-11-05: at 27 and 29 of 34): a rerun 5 minutes later fetches the rest and
 records what the stopped run had fetched.
 
+**Other checkouts after such a snapshot:** `snapshot.py fetch` adds the new month but leaves the older
+one in `raw/dtm/`, which `status` then lists as new input files (`data-publish` refuses on them). Remove
+the older month's entries, e.g. `raw/dtm/*_20260930_ZPS_*` after `2026-11-05b`: they are links to the
+machine cache, and the store and the older snapshots keep the files.
+
 For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
 GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned
 sources:
