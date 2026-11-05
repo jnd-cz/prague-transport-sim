@@ -318,7 +318,7 @@ class Network:
     error of its records' accuracy class; default the class UNCLASSED). After construction: `pos` and
     `pts` fitted, `report` (counts, the largest misses and the curves left tighter than MIN_RADIUS, with places)."""
 
-    def __init__(self, pos, pts, kind, loose=(), limit=None):
+    def __init__(self, pos, pts, kind, loose=(), limit=None, continues=None):
         k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
         # nodes joined by an edge under MERGE are one (a switch's node and a neighbour moved onto one fork; two nodes
         # 4 cm apart at Národní divadlo, each fitted onto another track, would join with a 0.2 m radius)
@@ -343,6 +343,9 @@ class Network:
                     root[gone] = keep
                     degree[keep] += degree[gone]
         errors = class_errors()
+        members = defaultdict(list)
+        for n in pos:
+            members[find(n)].append(n)
         adj, edges = defaultdict(set), {}
         for (a, b), p in pts.items():
             ra, rb = find(a), find(b)
@@ -398,10 +401,15 @@ class Network:
             dirs = {m: reach(n, m) if len(ms) > 2 else direction(n, m) for m in ms}
             limit = PAIR_TWO if len(ms) == 2 else PAIR
             cands = []
+            # (`continues` {node: {frozenset((a, b))}}: the edges to a and b continue each other through the node, as the
+            # network lets a train pass, tools/di_network.py; other edges meet there at their own angle, #237)
+            ok = None
+            if continues is not None:
+                ok = {frozenset(find(x) for x in pr) for m0 in members[n] for pr in continues.get(m0, ())}
             for i, a in enumerate(ms):
                 for b in ms[:i]:
                     dev = math.degrees(math.acos(max(-1.0, min(1.0, -(dirs[a][0] * dirs[b][0] + dirs[a][1] * dirs[b][1])))))
-                    if dev < limit:
+                    if (dev < limit) if ok is None else frozenset((a, b)) in ok:
                         cands.append((dev, a, b))
             for _, a, b in sorted(cands, key=lambda c: c[0]):
                 if (n, a) not in pair and (n, b) not in pair:

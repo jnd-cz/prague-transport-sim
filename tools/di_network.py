@@ -49,6 +49,7 @@ GAUNTLET_LOOK = 5.0      # m out along parallel ends where their order across th
 GAUNTLET_RUN = 10.0      # m out along parallel ends where a gauntlet's tracks still lie within its width
 GAP = 2.0                # m: two track ends facing each other this near are one track
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
+ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
@@ -70,6 +71,7 @@ class Network:
         self.at = defaultdict(list)
         self.report = defaultdict(int)
         self._reach = {}
+        self._zones = {}
         self._build(source)
         if tips or photo is not None:
             self.move_tips(tips)
@@ -413,6 +415,7 @@ class Network:
 
     def index(self):
         """The search tree and the passes, after the edges changed."""
+        self._zones, self._reach = {}, {}
         self.eids = list(self.edges)
         self.tree = shapely.STRtree([self.edges[e]['line'] for e in self.eids])
         self._passes()
@@ -564,6 +567,31 @@ class Network:
             kinds[v['kind']] += 1
         return {'nodes': len(self.nodes), 'edges': len(self.edges), 'kinds': dict(kinds), **self.report}
 
+    def in_zone(self, e, t):
+        """Whether t m along edge e lies in a junction: another track within ZONE m, not one this edge continues into
+        at its ends (DI 2026-10-31: plain double track lies 2.75-3.5 m apart, 205 km of it; junctions below)."""
+        z = self._zones.get(e)
+        if z is None:
+            ed = self.edges[e]
+            skip = {e} | {f for end in (0, 1) for f, _ in self.passes.get((e, end), ())}
+            line = ed['line']
+            n = max(1, int(line.length))
+            inside = []
+            for i in range(n + 1):
+                p = line.interpolate(line.length * i / n)
+                near = [self.eids[int(j)] for j in self.tree.query(p.buffer(ZONE))]
+                inside.append(any(f not in skip and self.edges[f]['line'].distance(p) < ZONE for f in near))
+            z = []
+            for i, v in enumerate(inside):
+                if v:
+                    a, b = line.length * max(0, i - 1) / n, line.length * min(n, i + 1) / n
+                    if z and a <= z[-1][1]:
+                        z[-1] = (z[-1][0], b)
+                    else:
+                        z.append((a, b))
+            self._zones[e] = z
+        return any(a <= t <= b for a, b in z)
+
     # ------------------------------------------------------------------ travel
     def reach(self, e, end, bound):
         """{(edge, end entered by): distance} from leaving edge e by its end `end` (at that node), over the passes, up
@@ -598,6 +626,8 @@ TURN_COST = 2.0     # per unit of (1 - cos) between the route's direction and th
 BETA = 1.0          # m: a metre of difference between the route's step and the distance along the network costs 1
 OFF_COST = 8.0      # per sample off the network (OSM's own line): a sample 4.9 m from a track costs as much
 OFF_SWITCH = 20.0   # to leave the network or come back to it
+ZONE_WEIGHT = 0.05  # of a sample's position and heading cost inside a junction: OSM's line there is not trusted (it
+                    # snaps to the wrong track, Anděl); the network's connections between the anchors decide
 
 
 class Match:
@@ -679,7 +709,8 @@ class Match:
             if abs(c) < cos:
                 continue
             dr = 1 if c > 0 else -1
-            out[(e, dr)] = (e, dr, t, 0.5 * (d / SIGMA) ** 2 + TURN_COST * (1 - abs(c)))
+            w = ZONE_WEIGHT if self.net.in_zone(e, t) else 1.0
+            out[(e, dr)] = (e, dr, t, w * (0.5 * (d / SIGMA) ** 2 + TURN_COST * (1 - abs(c))))
         return out
 
     def _transition(self, pc, pinfo, c, info, step):
@@ -823,6 +854,8 @@ class Match:
 
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
+EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
+CONTINUE = 30.0     # degrees: OSM's track continues a way within this
 ALT_LOOK = 14.0     # m along a switch's other leg for the point the game shows it by (`alt`)
 SWITCH_GAP = 3.0    # m: a facing switch this near the one before is the same place (two forks of one crossover)
 
@@ -856,8 +889,17 @@ class Drawn:
             if known and None not in classes:
                 limit[key] = max(known)
         self.report = {}
+        # which drawn edges continue each other at each node: the passes (the fit joins only these into one curve)
+        continues = defaultdict(set)
+        for e in self.edges:
+            ed = net.edges[e]
+            for end, n in ((0, ed['a']), (1, ed['b'])):
+                for f, fend in net.passes.get((e, end), ()):
+                    if f in self.edges and f != e:
+                        other = lambda x, xend: net.edges[x]['b'] if xend == 0 else net.edges[x]['a']
+                        continues[n].add(frozenset((other(e, end), other(f, fend))))
         if fit:
-            tc = track_curve.Network(pos, pts, kind, {}, limit)
+            tc = track_curve.Network(pos, pts, kind, {}, limit, continues)
             fitted, self.report = tc.pts, tc.report
         else:
             fitted = pts
@@ -1012,29 +1054,77 @@ class Drawn:
         return [[round(a, 1), round(b, 1), c] for a, b, c in out if b - a > 0.05]
 
 
+def extend(ids, adj, pos, length=EXTEND):
+    """A way's nodes lengthened at both ends along OSM's straightest continuation (within CONTINUE degrees) up to
+    `length` m: it enters and leaves a junction anchored on plain track. (nodes, index of the way's first node)."""
+    def on(seq):
+        out, run = [], 0.0
+        prev, cur = seq[-2], seq[-1]
+        seen = set(seq)
+        while run < length:
+            u = _unit((pos[cur][0] - pos[prev][0], pos[cur][1] - pos[prev][1]))
+            nxt = [m for m in adj[cur] if m not in seen and pos[m] != pos[cur]]
+            if not nxt:
+                break
+            m = max(nxt, key=lambda m: (lambda v: u[0] * v[0] + u[1] * v[1])(_unit((pos[m][0] - pos[cur][0], pos[m][1] - pos[cur][1]))))
+            v = _unit((pos[m][0] - pos[cur][0], pos[m][1] - pos[cur][1]))
+            if u[0] * v[0] + u[1] * v[1] < math.cos(math.radians(CONTINUE)):
+                break
+            out.append(m)
+            seen.add(m)
+            run += math.dist(pos[cur], pos[m])
+            prev, cur = cur, m
+        return out
+    if len(ids) < 2:
+        return ids, 0
+    head = on(ids[::-1])[::-1]
+    tail = on(ids)
+    return head + ids + tail, len(head)
+
+
 def corridor(net, ways, pos, bridges=()):
-    """Where OSM's track ways of the corridor run on the network: each way matched as a route; per edge the stretch
-    they cover ({edge: (t0, t1)}, m along it, from the first to the last metre covered), and whether it is on a
-    bridge (`bridges`: the ids of the ways on one, by length)."""
+    """Where OSM's track ways of the corridor run on the network: each way lengthened along OSM's track (`extend`) and
+    matched as a route; per edge the stretch the way itself covers ({edge: (t0, t1)}, m along it, from the first to
+    the last metre covered), and whether it is on a bridge (`bridges`: the ids of the ways on one, by length)."""
+    adj = defaultdict(set)
+    for w in ways:
+        ns = [n for n in w['nodes'] if n in pos]
+        for a, b in zip(ns, ns[1:]):
+            if a != b:
+                adj[a].add(b)
+                adj[b].add(a)
     spans, on_bridge, run_on = {}, defaultdict(float), defaultdict(float)
     for w in ways:
         ids = [n for n in w['nodes'] if n in pos]
         ids = [n for i, n in enumerate(ids) if i == 0 or pos[n] != pos[ids[i - 1]]]
         if len(ids) < 2:
             continue
-        m = Match(net, [pos[n] for n in ids])
+        ext, first = extend(ids, adj, pos)
+        m = Match(net, [pos[n] for n in ext])
+        s0, s1 = m.node_s[first], m.node_s[first + len(ids) - 1]
+        s = 0.0
         for p in m.pieces:
             if p[0] == 'off':
+                s += sum(math.dist(a, b) for a, b in zip(p[1], p[1][1:]))
                 continue
-            a, b = sorted((p[2], p[3]))
-            if b - a < 1e-3:
-                continue
-            old = spans.get(p[0])
-            spans[p[0]] = (a, b) if old is None else (min(old[0], a), max(old[1], b))
-            run_on[p[0]] += b - a
-            if w.get('id') in bridges:
-                on_bridge[p[0]] += b - a
-    spans = {e: s for e, s in spans.items() if s[1] - s[0] >= MIN_SPAN}
+            run = abs(p[3] - p[2])
+            lo, hi = max(s, s0), min(s + run, s1)
+            if hi - lo > 1e-3:
+                # (the part of this piece between the way's own ends, in t along the edge)
+                ta = p[2] + (lo - s) * p[1]
+                tb = p[2] + (hi - s) * p[1]
+                a, b = sorted((ta, tb))
+                old = spans.get(p[0])
+                spans[p[0]] = (a, b) if old is None else (min(old[0], a), max(old[1], b))
+                run_on[p[0]] += b - a
+                if w.get('id') in bridges:
+                    on_bridge[p[0]] += b - a
+            s += run
+    # (a stretch never ends inside a junction: from there it runs on to the edge's end, the network's connection)
+    for e, (a, b) in list(spans.items()):
+        length = net.edges[e]['line'].length
+        spans[e] = (0.0 if net.in_zone(e, a) else a, length if net.in_zone(e, b) else b)
+    spans = {e: sp for e, sp in spans.items() if sp[1] - sp[0] >= MIN_SPAN}
     flags = {e: on_bridge[e] >= 0.5 * run_on[e] for e in spans}
     return spans, flags
 
