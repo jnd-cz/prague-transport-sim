@@ -963,6 +963,11 @@ export class Game {
   }
 
   get doorsClosed() { return this.doorState === 'closed'; }
+  // how far the doors are open, 0..1 (the drawn doors follow it)
+  get doorOpenness() {
+    const d = this.doorState;
+    return d === 'open' ? 1 : d === 'closed' ? 0 : d === 'opening' ? 1 - this.doorTimer / DOOR_OPEN_TIME : this.doorTimer / DOOR_CLOSE_TIME;
+  }
 
   // ------------------------------------------------------------------ input
   toggleDoors() {
