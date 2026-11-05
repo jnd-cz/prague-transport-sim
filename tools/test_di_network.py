@@ -191,6 +191,14 @@ class Drawing(unittest.TestCase):
         line = dn.LineString(pts)
         self.assertEqual(g.facing(m, ends, lambda s: (lambda p: (p.x, p.y))(line.interpolate(s))), [])
 
+    def test_two_legs_of_a_switch_drawn_without_its_toe_are_two_chains(self):
+        # (joined through the fork they made a V: the track ran back on itself)
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50))
+        legs = {e for e, ed in net.edges.items() if ed['line'].coords[0][0] >= 49.9 and ed['line'].coords[-1][0] > 60
+                or ed['line'].coords[-1][0] >= 49.9 and ed['line'].coords[0][0] > 60}
+        g = dn.Drawn(net, legs, fit=False)
+        self.assertEqual(len(g.chains({})), 2)
+
     def test_a_corridor_way_draws_the_stretch_it_runs_on(self):
         # a DI edge running far past the corridor: only the stretch OSM's way covers is drawn
         net = net_of([(0, 0), (500, 0)])

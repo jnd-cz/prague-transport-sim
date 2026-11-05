@@ -962,6 +962,10 @@ class Drawn:
                 f = at[n][0] if at[n][1] == e else at[n][1]
                 if f in used or key(f) != key(e) or f == e:
                     break
+                # (only into an edge a train passes to: two legs of a switch drawn without its toe are two chains)
+                end_e, end_f = (0 if net.edges[e]['a'] == n else 1), (0 if net.edges[f]['a'] == n else 1)
+                if (f, end_f) not in net.passes.get((e, end_e), ()):
+                    break
                 used.add(f)
                 seq.append((f, n))
                 e = f
