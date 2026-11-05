@@ -43,7 +43,8 @@ both post on the pinned #291 and only propose.
 
   The world comes first, one layer at a time with a checkpoint after each (ROADMAP.md). The simulation
   lane waits for checkpoint W2, apart from the PRs in flight on 2026-11-05 (the user, 2026-11-05: "pause
-  simulation work after finishing the current PRs").
+  simulation work after finishing the current PRs"); the board shows it paused (`tools/board.py` `PAUSED`, removed at
+  that checkpoint).
 - **One rebuild at a time:** only the branch whose issue holds the `rebuild` label rebuilds every line
   and publishes (`snapshot.py data-publish` refuses on another branch). It is taken with `gh issue edit N
   --add-label rebuild` while nobody holds it (the board shows the holder) and removed when that data's PR

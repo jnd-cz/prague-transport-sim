@@ -19,7 +19,9 @@ A row is a branch with a worktree or an open PR. Flags:
   ready     its PR is ready and waits for the user's merge
 Clashes are pairs of rows that change the same files, or that both rebuild data. Lanes are the issues'
 `lane:*` labels, with a limit of sessions each (LIMITS), counted over the rows a session works on now. Ready to start: open issues of a lane with no
-agent, not parked or waiting for the user, whose blockers (GitHub's blocked-by links) are all closed.
+agent, not parked or waiting for the user, whose blockers (GitHub's blocked-by links) are all closed, in milestone
+order (W1, W2 … first, the Backlog last); a paused lane (PAUSED) shows only how many wait. Listed apart: issues
+with an agent's label but no branch, worktree or open PR (the label may be stale).
 Changes nothing but the remote refs the fetch updates.
 """
 import argparse
@@ -44,6 +46,9 @@ DATA_INPUTS = ("data/MANIFEST.json", "snapshots/")
 ASKS = re.compile(r"^(#+\s*|\*\*)(open questions|questions|for the user|to decide|the user decides)", re.I)
 # sessions at once per lane (AGENTS.md, Lanes): the world lane's second writes tools without publishing
 LIMITS = {"world": 2, "sim": 1, "assets": 1, "tooling": 1}
+# lanes that wait: none of their issues is offered as ready (AGENTS.md, Lanes; lifted at that checkpoint)
+PAUSED = {"sim": "until checkpoint W2"}
+SHOW = 6  # ready issues printed per lane
 REBUILD = "rebuild"  # the label: the one issue whose branch may rebuild and publish data
 
 
@@ -67,6 +72,19 @@ def labels(issue):
 def lane(issue):
     ls = sorted(n[5:] for n in labels(issue) if n.startswith("lane:"))
     return ls[0] if ls else None
+
+
+def milestone(issue):
+    return ((issue or {}).get("milestone") or {}).get("title") or ""
+
+
+def milestone_order(title):
+    """The world's layers first (W1, W2 …), then the other milestones by number (M1, M3 …), any other
+    title, issues without a milestone, and the Backlog last (ROADMAP.md: the world first)."""
+    m = re.match(r"([WM])(\d+)\b", title)
+    if m:
+        return ("WM".index(m[1]), int(m[2]))
+    return (4, 0) if title == "Backlog" else (3, 0) if not title else (2, 0)
 
 
 def build_tools(tools=TOOLS):
@@ -206,7 +224,7 @@ def fetch_github():
             ("pr", "list", "--state", "open", "--limit", "100", "--json",
              "number,title,headRefName,isDraft,mergeable,updatedAt,body,labels"),
             ("pr", "list", "--state", "all", "--limit", "300", "--json", "number,headRefName,state"),
-            ("issue", "list", "--state", "open", "--limit", "400", "--json", "number,title,labels,blockedBy")]))
+            ("issue", "list", "--state", "open", "--limit", "400", "--json", "number,title,labels,blockedBy,milestone")]))
 
 
 def rows(prs_open, prs_all, issues, now=None):
@@ -315,19 +333,27 @@ def lanes(rs, now):
     return by, over
 
 
-def ready(issues, rs, per_lane=6):
+def ready(issues, rs):
     """{lane: [issues]} open, with no agent and not parked or waiting for the user, every blocker closed,
-    and no branch of their own yet."""
+    and no branch of their own yet; in milestone order, then by number."""
     busy = {r["issue"] for r in rs if r["issue"]}
     out = {}
-    for i in sorted(issues or [], key=lambda i: i["number"]):
+    for i in sorted(issues or [], key=lambda i: (milestone_order(milestone(i)), i["number"])):
         ls = labels(i)
         if not lane(i) or any(n.startswith("agent:") for n in ls) or {"parked", "needs-user"} & ls or i["number"] in busy:
             continue
         if any(b.get("state") != "CLOSED" for b in (i.get("blockedBy") or {}).get("nodes", [])):
             continue
         out.setdefault(lane(i), []).append(i)
-    return {k: v[:per_lane] for k, v in out.items()}
+    return out
+
+
+def claimed(issues, rs):
+    """Open issues with an agent's label but no branch, worktree or open PR of their own (#297: #210 and #223
+    carried `agent:claude` with nobody on them, which kept them off the ready list)."""
+    busy = {r["issue"] for r in rs if r["issue"]}
+    return [i for i in sorted(issues or [], key=lambda i: i["number"])
+            if any(n.startswith("agent:") for n in labels(i)) and i["number"] not in busy]
 
 
 def ago(t, now):
@@ -383,14 +409,27 @@ def show(rs, issues, jobs, now):
         print(f"  {c['kind']:5} {name(c['a'])} {c['a']['branch']} × {name(c['b'])} {c['b']['branch']}"
               + (f": {c['why']}" if c["why"] else "") + (f" [{f}]" if f else ""))
     by, over = lanes(rs, now)
-    print("\nLanes (live rows / limit): " + ", ".join(f"{k} {len(by.get(k, []))}/{n}" for k, n in LIMITS.items()))
+    print("\nLanes (live rows / limit): " + ", ".join(f"{k} {len(by.get(k, []))}/{n}" + (" paused" if k in PAUSED else "")
+                                                     for k, n in LIMITS.items()))
     for k, v in over.items():
         print(f"  over the limit: {k}: {', '.join(name(r) for r in v)}")
     rd = ready(issues, rs)
-    print("\nReady to start (no agent, blockers closed)" + ("" if rd else ": none with a lane label"))
+    print("\nReady to start (no agent, blockers closed; milestone order)" + ("" if rd else ": none with a lane label"))
     for k in LIMITS:
-        for i in rd.get(k, []):
-            print(f"  {k:8} #{i['number']} {i['title'][:90]}")
+        v = rd.get(k, [])
+        if k in PAUSED:
+            if v:
+                print(f"  {k:8} paused {PAUSED[k]}: {len(v)} issues wait")
+            continue
+        for i in v[:SHOW]:
+            print(f"  {k:8} {(milestone(i).split() or ['-'])[0][:7]:7} #{i['number']} {i['title'][:84]}")
+        if len(v) > SHOW:
+            print(f"  {k:8} … and {len(v) - SHOW} more")
+    cl = claimed(issues, rs)
+    if cl:
+        print("\nAn agent's label but no branch, worktree or PR (stale? gh issue edit N --remove-label agent:…)")
+        for i in cl:
+            print(f"  #{i['number']} {','.join(sorted(n for n in labels(i) if n.startswith('agent:')))} {i['title'][:84]}")
     show_questions(rs)
 
 
@@ -424,7 +463,8 @@ def main():
     if a.json:
         cl = [{**c, "a": c["a"]["branch"], "b": c["b"]["branch"]} for c in clashes(rs)]
         rd = {k: [i["number"] for i in v] for k, v in ready(issues, rs).items()}
-        print(json.dumps({"rows": rs, "clashes": cl, "heavy": jobs, "ready": rd,
+        print(json.dumps({"rows": rs, "clashes": cl, "heavy": jobs, "ready": rd, "paused": PAUSED,
+                          "claimed": [i["number"] for i in claimed(issues, rs)],
                           "rebuildLabel": [i["number"] for i in issues or [] if REBUILD in labels(i)]},
                          ensure_ascii=False, indent=1))
     elif a.questions:

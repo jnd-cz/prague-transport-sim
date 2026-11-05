@@ -18,9 +18,10 @@ def row(branch, files, flags=(), tools=frozenset(), lane=None, touched=NOW):
             "rebuilds": board.rebuilds(files, tools), "lane": lane, "touched": touched}
 
 
-def issue(n, *labels, blockers=()):
+def issue(n, *labels, blockers=(), milestone=None):
     return {"number": n, "title": f"issue {n}", "labels": [{"name": x} for x in labels],
-            "blockedBy": {"nodes": [{"number": b, "state": s} for b, s in blockers]}}
+            "blockedBy": {"nodes": [{"number": b, "state": s} for b, s in blockers]},
+            "milestone": {"title": milestone} if milestone else None}
 
 
 class Board(unittest.TestCase):
@@ -97,6 +98,38 @@ class Board(unittest.TestCase):
                   issue(239, "lane:tooling")]
         rd = board.ready(issues, [row("239-fix", ["tools/sources.py"])])
         self.assertEqual({k: [i["number"] for i in v] for k, v in rd.items()}, {"world": [210, 237]})
+
+    def test_ready_follows_the_milestones_world_first_backlog_last(self):
+        # #297: by number alone, M3's #30 and M4's #16 came before W1's #237, which the cut at 6 dropped
+        issues = [issue(16, "lane:world", milestone="M4 Track graph, several lines"),
+                  issue(30, "lane:world", milestone="M3 Tiles and streaming"), issue(26, "lane:world", milestone="Backlog"),
+                  issue(40, "lane:world"), issue(276, "lane:world", milestone="W3 Ground"),
+                  issue(237, "lane:world", milestone="W1 Track network"), issue(22, "lane:world", milestone="W2 On the track"),
+                  issue(10, "lane:world", milestone="M1 Hygiene"), issue(258, "lane:world", milestone="W10 Later")]
+        rd = board.ready(issues, [])
+        self.assertEqual([i["number"] for i in rd["world"]], [237, 22, 276, 258, 10, 30, 16, 40, 26])
+
+    def test_an_agent_label_without_a_branch_is_listed_apart(self):
+        issues = [issue(210, "lane:world", "agent:claude"), issue(223, "lane:tooling", "agent:claude"),
+                  issue(237, "lane:world")]
+        cl = board.claimed(issues, [row("223-terrain-offline", ["tools/build_line.py"])])
+        self.assertEqual([i["number"] for i in cl], [210])
+        self.assertNotIn(210, [i["number"] for v in board.ready(issues, []).values() for i in v])
+
+    def test_a_paused_lane_shows_its_count_not_its_issues(self):
+        issues = [issue(n, "lane:sim", milestone="Backlog") for n in (26, 27, 32)]
+        issues += [issue(n, "lane:world", milestone="W1 Track network") for n in range(300, 308)]
+        out = io.StringIO()
+        with mock.patch.object(board, "PAUSED", {"sim": "until checkpoint W2"}), \
+                mock.patch.object(board, "git", return_value="abc main"), mock.patch("sys.stdout", out):
+            board.show([], issues, [], NOW)
+        text = out.getvalue()
+        self.assertIn("sim 0/1 paused", text)
+        self.assertIn("sim      paused until checkpoint W2: 3 issues wait", text)
+        self.assertNotIn("#26", text)
+        self.assertIn("W1      #305", text)
+        self.assertNotIn("#306", text)
+        self.assertIn("… and 2 more", text)
 
 
 class RebuildLabel(unittest.TestCase):
