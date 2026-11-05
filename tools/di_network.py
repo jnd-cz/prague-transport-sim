@@ -51,6 +51,7 @@ GAP = 2.0                # m: two track ends facing each other this near are one
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
+TWICE = 0.5              # m: two short edges between the same nodes this near each other are one track drawn twice
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
 PHOTO_SHARE = 0.8        # of an edge's length a photo track covers for the edge to take it
@@ -211,6 +212,7 @@ class Network:
         self._stubs()
         self._contract()
         self._sections()
+        self._twice()
         self.index()
 
     def _stubs(self):
@@ -293,6 +295,21 @@ class Network:
             self.nodes[X]['kind'] = 'fork'
             self.nodes[Y]['kind'] = 'gone'
             self.report['sections to their tips'] += 1
+
+    def _twice(self):
+        """Two short edges (SECTION_LEGS or less) between the same two nodes, within TWICE of each other, are one track
+        drawn twice: one goes (Strossmayerovo náměstí: two 8 m records from a fork into the crossing; the user,
+        2026-11-05: the DI forks there are right, the bend came from the double). A gauntlet's tracks are longer."""
+        by = defaultdict(list)
+        for e, ed in self.edges.items():
+            if ed['a'] != ed['b'] and ed['line'].length <= SECTION_LEGS:
+                by[frozenset((ed['a'], ed['b']))].append(e)
+        for es in by.values():
+            keep = es[0]
+            for e in es[1:]:
+                if e in self.edges and self.edges[e]['line'].hausdorff_distance(self.edges[keep]['line']) <= TWICE:
+                    self.remove_edge(e)
+                    self.report['tracks drawn twice'] += 1
 
     def _gaps(self):
         """Two track ends facing each other within GAP join with a straight edge: a record the provider ended short
@@ -378,13 +395,23 @@ class Network:
                 self.report['switch tips at their fork already'] += 1
                 continue
             _, x, s = best
+            fx, fy = self.nodes[F]['xy']
             Q = self.split(x[0], s, 'tip')
+            # (a tip behind the fork: the branch runs along the through track from the tip to the fork first, a long
+            # thin switch, Ohrada; ahead of it, the branch starts at the tip)
+            lead = [self.nodes[Q]['xy']]
+            if x == toe:
+                toe_e = next(e for e, end in self.at[Q] if e != div[0] and
+                             {self.edges[e]['a'], self.edges[e]['b']} == {Q, F})
+                c = list(self.edges[toe_e]['line'].coords)
+                lead = c if self.edges[toe_e]['a'] == Q else c[::-1]
+                lead = lead[:-1]
             ed = self.remove_edge(div[0])
             coords = list(ed['line'].coords)
             if div[1] == 0:
-                self.add_edge(Q, ed['b'], [self.nodes[Q]['xy']] + coords[1:], ed['src'], ed['records'])
+                self.add_edge(Q, ed['b'], lead + ([(fx, fy)] if x == toe else []) + coords[1:], ed['src'], ed['records'])
             else:
-                self.add_edge(ed['a'], Q, coords[:-1] + [self.nodes[Q]['xy']], ed['src'], ed['records'])
+                self.add_edge(ed['a'], Q, coords[:-1] + ([(fx, fy)] if x == toe else []) + lead[::-1], ed['src'], ed['records'])
             self.nodes[F]['kind'] = 'joint'
             self.report['switch tips placed'] += 1
 

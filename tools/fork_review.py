@@ -94,7 +94,8 @@ def problems(line):
 
 def review(line, net, switches, frame):
     """A card per problem place: the pin on DI's nearest fork (else the place), DI's forks and OSM's switches near."""
-    forks = [(v['xy'], n) for n, v in net.nodes.items() if len(net.at[n]) >= 3]
+    # (switches only: a node where two tracks cross is no fork, the user 2026-11-05: "looks misjudged crossings")
+    forks = [(v['xy'], n) for n, v in net.nodes.items() if net.through(n)]
     cards = []
     for x, y, what, size in problems(line):
         near_f = sorted((f for f in forks if math.dist(f[0], (x, y)) <= di_tracks.FORK), key=lambda f: math.dist(f[0], (x, y)))
