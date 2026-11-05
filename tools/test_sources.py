@@ -1,4 +1,5 @@
 """Source registry and provenance stamps: python -I tools/test_sources.py."""
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -30,8 +31,29 @@ class Registry(unittest.TestCase):
 
     @unittest.skipUnless((RAW / 'dtm-di/provenance.json').exists(), 'fetch the snapshot: raw/dtm-di/')
     def test_snapshot_dates_resolve(self):
-        for sid in S.SOURCES:
-            self.assertTrue(S.dated(sid) or sid.startswith("rule:"), sid)
+        for sid, s in S.SOURCES.items():
+            self.assertTrue(S.dated(sid) or sid.startswith("rule:") or s.date_kind == "records", sid)
+
+    def test_a_source_dated_per_record_dates_every_record(self):
+        # the user's facts have no snapshot date: each record names when and where it was said (#239)
+        per_record = [sid for sid, s in S.SOURCES.items() if s.date_kind == "records"]
+        self.assertEqual(per_record, ["truth"])
+        self.assertEqual((S.SOURCES["truth"].group, S.SOURCES["truth"].date), (None, ""))
+        truth = json.loads((RAW.parent / 'data/truth.json').read_text(encoding='utf-8'))
+        undated = []
+
+        def walk(v, path):
+            if isinstance(v, list):
+                for i, x in enumerate(v):
+                    walk(x, f"{path}[{i}]")
+            elif isinstance(v, dict):
+                # a record: a fact's text, an answer or a value; it must carry its source
+                if any(k in v for k in ("text", "answer", "value")) and not v.get("source"):
+                    undated.append(path)
+                for k, x in v.items():
+                    walk(x, f"{path}.{k}")
+        walk(truth, "")
+        self.assertEqual(undated, [])
 
 
 class Stamp(unittest.TestCase):
