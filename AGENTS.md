@@ -71,7 +71,8 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   `data/MANIFEST.json` on it, then merge. `main`'s manifest always names data that is in the store.
 - New issues: what is now (with numbers), where in the code, what done means, which checks prove it.
   A fresh session should need nothing but the issue.
-- Where docs go: DATA.md is snapshots, the store and how to refresh sources; facts learned about data
+- Where docs go: DATA.md is how snapshots and the store work and how to refresh sources, and
+  `snapshots/README.md` lists the snapshots (a row with each new one); facts learned about data
   and code go to `docs/knowledge.md`, decisions to `docs/decisions/`. One place per fact: point to a
   table in code instead of copying it.
 - Commits: what changed and why, with numbers where something was measured. Author email in this repo:
