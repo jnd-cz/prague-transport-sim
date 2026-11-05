@@ -30,7 +30,8 @@ class Source:
     group: str | None  # snapshot group (snapshots/<id>.json) with the files; None: a rule, or not pinned yet
     attribution: str  # for the game's credits line, "what: holder" (grouped by holder); "" for rules
     date: str  # the data's date as far as it is known; "@…" is read from the snapshot (dated())
-    date_kind: str  # state (the whole dataset as of), capture (observation years), fetched (no stated date)
+    date_kind: str  # state (the whole dataset as of), capture (observation years), fetched (no stated date),
+    # records (no date of its own: each record says when and where it was said, data/truth.json's `source`)
     datum: str = ""  # height sources: what their heights are
 
 
@@ -70,7 +71,7 @@ SOURCES = {
     "rule:assumed": Source("a default value (no data)", None, "", "", ""),
     "rule:placement": Source("placement rules (spacing, offsets from tracks and kerbs)", None, "", "", ""),
     "rule:curvature": Source("limits from track curvature and switches", None, "", "", ""),
-    "truth": Source("the user's answers and facts (data/truth.json, each with its quote)", None, "", "", ""),
+    "truth": Source("the user's answers and facts (data/truth.json, each with its quote)", None, "", "", "records"),
     "rule:curve": Source("the vertical profile's curve across a held stretch up to 60 m (tools/line_heights.py)", None,
                          "", "", ""),
     "rule:surface": Source("the surveyed surface or terrain under the track plus its style's offset (in the game)",
