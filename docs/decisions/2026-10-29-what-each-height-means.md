@@ -1,7 +1,7 @@
 # What each height means
 
 **Date:** 2026-10-29
-**Status:** proposed (issue #9). The four per-style offsets were approved for the guarded height
+**Status:** agreed and implemented (issue #9, PR #84, 2026-10-29). The four per-style offsets were approved for the guarded height
 staging tool on 2026-10-30; their values and provenance are in `data/truth.json` `trackHeights.railAboveDeck`.
 The user's approval, “Use the proposed offsets for all four styles”, is recorded at
 `trackHeights.offsetApproval`. Both the game and the staging tool read these facts.

@@ -37,6 +37,15 @@ const OPTIONS = {
   trackheight: ['archive profile ok', 'follows survey surface', 'other level (deck / under)', 'unsure'],
 };
 const LEVEL_COLORS = { '-1': '#3ee0ff', 0: '#ffffff', 1: '#ff9a3e' }; // the source's levels: under, at, over ground
+// the IPR orthophoto (#201): leaf-off flight 2026, 0.05 m, CC BY 4.0. The browser loads it straight from
+// IPR (the service answers CORS for any origin): nothing goes through or stays on our server. One image
+// of ORTHO_M around the target at 0.1 m (~280 kB), taken again when the target leaves its middle ORTHO_STEP;
+// close up (the camera within ORTHO_NEAR) half of it at the native 0.05 m: a rail head (~6 cm) is lost at 0.1 m.
+const ORTHO = 'https://gs-pub.praha.eu/imgs/rest/services/ort/mimovegetacni_letecke_snimkovani/ImageServer';
+const ORTHO_M = 150, ORTHO_PX = 1500, ORTHO_STEP = 50, ORTHO_GRID = 2, ORTHO_NEAR = 40; // m, px, m, m between draped vertices, m
+const ORTHO_CREDIT = 'Ortofoto: IPR Praha (CC BY 4.0)';
+// the line's track centrelines by source (data/lineN.json tracks[].src, tools/build_line.py)
+const TRACK_COLORS = { di: '#ff8c1a', osm: '#e040fb', dtmp: '#ffe14a', ortho: '#7cff6b' };
 const options = (f) => f.options || (f.kind === 'trackheight' ? OPTIONS.trackheight : f.src === 'kerbs' || f.kind.startsWith('kerb') ? OPTIONS.kerb : f.src === 'seams' ? OPTIONS.seam : OPTIONS.file);
 // (a finding's place and kind: the same after a rebuild that leaves it where it was)
 const fid = (f) => f.kind === 'trackheight' ? `${f.src}|trackheight|${f.id}` : `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
@@ -117,7 +126,11 @@ function fileFindings(json, label) {
         return;
       }
       const k = [kind, o.kind].filter(Boolean).join(': ') || label;
-      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts });
+      // (marks: other points to show with it, {x, y, label, color}; pick: the answer may be a point placed
+      // on the map, #258)
+      const marks = Array.isArray(o.marks) ? o.marks.filter((m) => typeof m?.x === 'number' && typeof m?.y === 'number') : undefined;
+      out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '', options: opts,
+        ...(marks?.length ? { marks } : {}), ...(o.pick ? { pick: true } : {}), ...(o.id ? { id: String(o.id) } : {}) });
       return;
     }
     for (const [k, v] of Object.entries(o)) walk(v, skip.has(k) ? kind : k);
@@ -161,7 +174,8 @@ export class Review {
     this.cur = -1;
     this.T = { x: 0, y: 0, z: 0 };
     this.yaw = 0; this.pitch = 0.75; this.dist = 90;
-    this.layers = { classes: true, wire: false, source: false, kerbs: true, seams: true, findings: true, track: true, buildings: true, trees: true };
+    this.layers = { classes: true, wire: false, source: false, kerbs: true, seams: true, findings: true, track: true, buildings: true, trees: true, ortho: false, sources: false };
+    this.look = { contrast: false, lines: false }; // the orthophoto's (orthoLook)
     this.held = new Set();
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -285,6 +299,11 @@ body.review #gl { touch-action: none }
 #review textarea { width: 100%; font: inherit; color: #eee; background: #1d2026; border: 1px solid #444; border-radius: 6px; padding: 6px 8px; resize: vertical }
 #review .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 10px 6px; font-size: 11px }
 #review:not(.lay) #rvLayers, #review:not(.lay) .legend { display: none }
+#rvCredit { position: fixed; top: 6px; left: 6px; z-index: 60; max-width: calc(100% - 12px); background: rgba(18,20,24,.8); color: #eee;
+  font: 12px/1.3 system-ui, sans-serif; padding: 3px 8px; border-radius: 6px; display: none }
+#rvCredit.err { color: #ffb0b0 }
+#review label.chk { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px 0 2px; cursor: pointer }
+#review label.chk input { width: 18px; height: 18px; margin: 0 }
 #review.min .rvList, #review.min .rvRow.more, #review.min .legend { display: none }
 @media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
   #review { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 52vh; border-radius: 12px 12px 0 0; font-size: 14px;
@@ -302,23 +321,44 @@ body.review #gl { touch-action: none }
 <div class="rvHead"><b>Review · line ${this.data.line}</b><span class="dim" id="rvCount"></span><button id="rvLay">Layers</button><button id="rvMin" title="fold the panel">▾</button></div>
 <div class="rvRow more" id="rvLayers"></div>
 <div class="legend" id="rvLegend">${Object.entries(CLASS_COLORS).map(([c, col]) => `<span><span class="sw" style="background:${col}"></span>${c}</span>`).join('')}</div>
+<div class="legend" id="rvTrackLegend">tracks: ${Object.entries(TRACK_COLORS).map(([c, col]) => `<span><span class="sw" style="background:${col}"></span>${c}</span>`).join('')}</div>
 <div class="rvRow more"><select id="rvFilter"></select><button id="rvTodo" title="hide the findings with an answer">to do</button></div>
 <div class="rvCard" id="rvCard"><span class="dim">loading findings…</span></div>
 <div class="rvList" id="rvList"></div>`;
     document.body.appendChild(box);
+    // (over the map, where the panel is not: the orthophoto's credit and whether it loaded)
+    this.credit = document.createElement('div');
+    this.credit.id = 'rvCredit';
+    document.body.appendChild(this.credit);
     const $ = (id) => box.querySelector(`#${id}`);
-    const names = { classes: 'Classes', wire: 'Wireframe', source: 'Source', kerbs: 'Kerbs', seams: 'Seams', findings: 'Pins', track: 'Track', buildings: 'Buildings', trees: 'Trees, wires' };
+    const names = { classes: 'Classes', wire: 'Wireframe', source: 'Source', kerbs: 'Kerbs', seams: 'Seams', findings: 'Pins', track: 'Track', buildings: 'Buildings', trees: 'Trees, wires', ortho: 'Orthophoto', sources: 'Track sources' };
     for (const [k, label] of Object.entries(names)) {
       const b = document.createElement('button');
       b.textContent = label;
+      b.dataset.layer = k;
       b.classList.toggle('on', this.layers[k]);
       b.onclick = () => {
         this.layers[k] = !this.layers[k];
         b.classList.toggle('on', this.layers[k]);
         if (k === 'source' && this.layers.source) this._loadSource();
+        if (k === 'ortho') {
+          this.orthoAt = null; this._ortho(); // (switched on again: a failed load is tried again)
+          // (the classes are drawn after any opaque mesh, over the photo: off with it, one click brings them back)
+          if (this.layers.ortho && this.layers.classes) $('rvLayers').querySelector('[data-layer="classes"]').click();
+        }
+        if (k === 'sources' && this.layers.sources) this._trackSources();
         this._applyLayers();
       };
       $('rvLayers').appendChild(b);
+      // the orthophoto's look, beside its button (orthoLook)
+      if (k === 'ortho') for (const [key, text, tip] of [['contrast', 'contrast', 'each spot against its 1 m surround'], ['lines', 'lines', 'thin dark lines (rails, joints) in cyan']]) {
+        const l = document.createElement('label');
+        l.className = 'chk';
+        l.title = tip;
+        l.innerHTML = `<input type="checkbox" data-look="${key}"> ${text}`;
+        l.firstChild.onchange = (e) => { this.look[key] = e.target.checked; this._orthoMap(); };
+        $('rvLayers').appendChild(l);
+      }
     }
     $('rvLay').onclick = () => { box.classList.toggle('lay'); $('rvLay').classList.toggle('on', box.classList.contains('lay')); this._render(); };
     $('rvMin').onclick = () => { box.classList.toggle('min'); $('rvMin').textContent = box.classList.contains('min') ? '▴' : '▾'; this._render(); };
@@ -329,6 +369,7 @@ body.review #gl { touch-action: none }
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.go) this.select(Math.max(0, Math.min(this.list.length - 1, this.cur + +b.dataset.go)));
+      if (b.dataset.place) { this.placing = this.list[this.cur]; b.classList.add('on'); b.textContent = 'Now click the map where it is'; }
       if (b.dataset.copy) navigator.clipboard?.writeText(location.href).then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Copy failed'; });
       if (b.dataset.v !== undefined) this.verdict(b.dataset.v === '' ? null : options(this.list[this.cur])[+b.dataset.v]);
     });
@@ -416,6 +457,8 @@ body.review #gl { touch-action: none }
     this.$('rvCard').innerHTML = `
 <div><span class="kind">${f.kind}</span> <span class="dim">(${f.src}, ${this.cur + 1} / ${this.list.length})</span></div>
 <div>${f.info}</div>
+${f.marks ? `<div class="dim">${f.marks.map((m) => `<span style="color:${esc(m.color || '#fff')}">●</span> ${esc(m.label || '')}`).join(' · ')}</div>` : ''}
+${f.pick ? `<div class="rvRow" style="padding:6px 0 0"><button data-place="1">Place it on the map</button><span class="dim" id="rvPlaced">${this._placedText(f)}</span></div>` : ''}
 <div id="rvHeight"></div>
 <div class="dim">${place || '—'}<br>s ${w.s ?? '?'} m, ${w.d ?? '?'} m from the track · x ${f.x.toFixed(1)}, y ${f.y.toFixed(1)} · ${L.lat.toFixed(6)}, ${L.lon.toFixed(6)}</div>
 <div class="rvRow" style="padding:6px 0 0">${['Mapillary', 'Panoramax', 'Mapy.com', 'Street View'].map((k) => `<a class="btn" target="_blank" rel="noopener" href="${L[k]}">${k}</a>`).join('')}</div>
@@ -555,10 +598,14 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (next && this.list.includes(next)) this.select(this.list.indexOf(next));
   }
 
-  _record(f, v, note) {
-    const w = this.where(f.x, f.y);
+  // extra: a point placed on the map (px, py); kept with any later answer or note until the answer is
+  // removed (✕) or the point placed again. (Kept only while the answer stayed the same, it was lost when
+  // an answer button followed the placing: 10 of 10 on line 22's stop signs, 2026-11-04, #258)
+  _record(f, v, note, extra = null) {
+    const w = this.where(f.x, f.y), old = this.verdicts.get(fid(f));
+    const placed = extra || (v && old?.px !== undefined ? { px: old.px, py: old.py } : {});
     this.verdicts.set(fid(f), { v, note, src: f.src, kind: f.kind, x: +f.x.toFixed(2), y: +f.y.toFixed(2), mag: +f.mag.toFixed(2),
-      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1],
+      info: f.info, street: w.street, stop: w.stop, s: w.s, at: location.search.match(/at=([^&]*)/)?.[1], ...placed, ...(f.id ? { id: f.id } : {}),
       ...(f.kind === 'trackheight' ? { decision_id: f.id, span_ids: f.decision.span_ids, span_sha256: f.span_sha256 } : {}) });
   }
 
@@ -609,10 +656,43 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
   }
 
   // the selected finding: a ring on the ground and, for an area finding, the area's outline
+  _placedText(f) {
+    const r = this._answer(f);
+    return r?.px !== undefined ? `placed at x ${r.px}, y ${r.py} (${Math.hypot(r.px - f.x, r.py - f.y).toFixed(1)} m from the pin)` : '';
+  }
+
+  // a click on the map while placing: the point on the ground under it, saved as the answer (#258)
+  _place(cx, cy) {
+    const f = this.placing, r = this.canvas.getBoundingClientRect();
+    this.placing = null;
+    const ray = new THREE.Raycaster();
+    this.camera.updateMatrixWorld();
+    ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.camera);
+    const hit = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(f.z ?? 0)), hit)) { this._redraw(); return; }
+    this._record(f, 'placed on the map', this.$('rvNote')?.value.trim() || '', { px: +hit.x.toFixed(2), py: +(-hit.z).toFixed(2) });
+    this._redraw();
+    this._highlight(f);
+    this._render();
+  }
+
   _highlight(f) {
     if (this.hl) { this.group.remove(this.hl); this.hl.traverse((o) => o.geometry?.dispose()); }
     if (this.heightMarker) this.heightMarker.visible = false;
     this.hl = new THREE.Group();
+    // the finding's other points, and a point placed as its answer: a thin pin and a ring each
+    const r0 = this._answer(f);
+    const marks = [...(f.marks || []), ...(r0?.px !== undefined ? [{ x: r0.px, y: r0.py, color: '#c070ff' }] : [])];
+    for (const m of marks) {
+      const z = this.ground.at(m.x, m.y), mat = new THREE.MeshBasicMaterial({ color: m.color || '#ffffff', depthTest: false, side: THREE.DoubleSide });
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 6).translate(0, 2, 0), mat);
+      pin.position.set(m.x, z, -m.y);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.95, 32), mat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(m.x, z + 0.3, -m.y);
+      pin.renderOrder = ring.renderOrder = 8;
+      this.hl.add(pin, ring);
+    }
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.25, 2.75, 40), new THREE.MeshBasicMaterial({ color: HL, depthTest: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(f.x, f.z + 0.3, -f.y);
@@ -713,6 +793,10 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (this.seamBars) this.seamBars.visible = L.seams;
     if (this.markers) this.markers.visible = L.findings;
     if (this.trackLine) this.trackLine.visible = L.track;
+    if (this.orthoMesh) this.orthoMesh.visible = L.ortho;
+    this.credit.style.display = L.ortho ? 'block' : 'none';
+    if (this.sourceLines) this.sourceLines.visible = L.sources;
+    this.$('rvTrackLegend').style.display = L.sources ? '' : 'none';
     // (the world's meshes carry their build part, src/world.js buildWorld)
     for (const o of this.world?.children || []) {
       if (o.userData.part === 'buildings') o.visible = L.buildings;
@@ -732,7 +816,109 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     cam.lookAt(T.x, T.z, -T.y);
     this.moved = performance.now();
     if (!this.nearAt || Math.hypot(T.x - this.nearAt.x, T.y - this.nearAt.y) > NEAR / 3) this._near();
+    this._ortho();
     this.dirty = true;
+  }
+
+  // ------------------------------------------------------------------ the orthophoto and the track sources (#201)
+  // the image of the ORTHO_STEP cell around the target, draped over the ground: drawn over the world (the
+  // survey surfaces and the track bed lie up to ~0.3 m over the terrain and would cut it), under the overlays
+  _ortho() {
+    if (!this.layers.ortho) return;
+    const k = this.dist < ORTHO_NEAR ? 0.5 : 1, step = ORTHO_STEP * k, M = ORTHO_M * k;
+    const cx = Math.round(this.T.x / step) * step, cy = Math.round(this.T.y / step) * step;
+    if (this.orthoAt && this.orthoAt[0] === cx && this.orthoAt[1] === cy && this.orthoAt[2] === k) return;
+    const at = (this.orthoAt = [cx, cy, k]), [ox, oy] = this.data.frame.origin, h = M / 2;
+    const bbox = [ox + cx - h, oy + cy - h, ox + cx + h, oy + cy + h].map((v) => v.toFixed(1)).join(',');
+    this.orthoUrl = `${ORTHO}/exportImage?bbox=${bbox}&bboxSR=5514&imageSR=5514&size=${ORTHO_PX},${ORTHO_PX}&format=jpg&f=image`;
+    this._credit('loading…');
+    new THREE.TextureLoader().setCrossOrigin('anonymous').load(this.orthoUrl, (tex) => {
+      if (this.orthoAt !== at) { tex.dispose(); return; } // (the target moved on meanwhile)
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      const n = Math.round(M / ORTHO_GRID), G = M / n, pos = [], uv = [], idx = [], N = n + 1; // (75 m: 38 cells)
+      // the ground smoothed over 10 m (5 × 5 vertices): its kerb steps and the track blend, seen close up
+      // and off the camera's axis, shifted the photo's rows sideways by up to ~20 px
+      const z0 = new Float32Array(N * N), z1 = new Float32Array(N * N), R = 2;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) z0[j * N + i] = this.ground.at(cx - h + i * G, cy - h + j * G);
+      for (const [src, dst, di, dj] of [[z0, z1, 1, 0], [z1, z0, 0, 1]]) for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        let s = 0, c = 0;
+        for (let k = -R; k <= R; k++) { const a = i + k * di, b = j + k * dj; if (a >= 0 && a < N && b >= 0 && b < N) { s += src[b * N + a]; c++; } }
+        dst[j * N + i] = s / c;
+      }
+      for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+        const x = cx - h + i * G, y = cy - h + j * G;
+        pos.push(x, z0[j * N + i] + 0.05, -y);
+        uv.push(i / n, j / n);
+        if (i && j) { const a = (j - 1) * (n + 1) + i - 1, b = a + n + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      this._dropOrtho();
+      // (opaque: three.js draws the opaque pass first, by renderOrder, so the overlay lines, which are opaque,
+      // come after it; a transparent image would be drawn over all of them)
+      this.orthoMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, depthTest: false, side: THREE.DoubleSide }));
+      this.orthoMesh.renderOrder = 2;
+      this.orthoMaps = { '00': tex }; // per look, made once per image
+      this.orthoM = M;
+      this.group.add(this.orthoMesh);
+      this._credit(null);
+      this._orthoMap();
+      this._applyLayers();
+    }, undefined, () => {
+      if (this.orthoAt === at) this._credit('not available: the IPR service did not answer or refused the page. Switch the layer off and on to try again.');
+    });
+  }
+
+  _dropOrtho() {
+    if (!this.orthoMesh) return;
+    this.group.remove(this.orthoMesh);
+    this.orthoMesh.geometry.dispose(); this.orthoMesh.material.dispose();
+    for (const t of Object.values(this.orthoMaps)) t.dispose();
+    this.orthoMesh = null;
+  }
+
+  // the photo in the chosen look (orthoLook: ~0.2–0.5 s for a 1500 px image, once per image and look)
+  _orthoMap() {
+    if (!this.orthoMesh) return;
+    const key = `${+this.look.contrast}${+this.look.lines}`;
+    if (!this.orthoMaps[key]) {
+      const t = new THREE.CanvasTexture(orthoLook(this.orthoMaps['00'].image, this.orthoM, this.look));
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      this.orthoMaps[key] = t;
+    }
+    this.orthoMesh.material.map = this.orthoMaps[key];
+    this.orthoMesh.material.needsUpdate = true;
+    this.moved = performance.now();
+  }
+
+  _credit(state) {
+    this.credit.textContent = state ? `${ORTHO_CREDIT}: ${state}` : ORTHO_CREDIT;
+    this.credit.classList.toggle('err', !!state && state.startsWith('not'));
+  }
+
+  // the line's track centrelines as the build took them, coloured by source: 1 px lines (as thin as can
+  // be seen at any zoom), to lay over the rails on the orthophoto
+  _trackSources() {
+    if (this.sourceLines) return;
+    const pos = [], col = [], c = new THREE.Color();
+    for (const t of this.data.tracks || []) {
+      c.set(TRACK_COLORS[t.src] || '#ffffff');
+      for (let i = 1; i < t.p.length; i++) {
+        const [x0, y0] = t.p[i - 1], [x1, y1] = t.p[i];
+        pos.push(x0, this.ground.at(x0, y0) + 0.3, -y0, x1, this.ground.at(x1, y1) + 0.3, -y1);
+        col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    this.sourceLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+    this.sourceLines.renderOrder = 6;
+    this.group.add(this.sourceLines);
   }
 
   _pan(dx, dy) {
@@ -832,6 +1018,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
 
   // a tap or click: the pin there (a finger is wider than a mouse)
   _pick(cx, cy, touch) {
+    if (this.placing) { this._place(cx, cy); return; }
     const i = this._hit(cx, cy, touch ? 34 : 18);
     if (i >= 0) this.select(i);
   }
@@ -912,6 +1099,85 @@ function band(pts, w, dz) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   return g;
+}
+
+// The orthophoto made easier to read (#201), as a canvas from the loaded image (metres: the image's width):
+// - contrast: each pixel's brightness against its 1 m surround (mean and spread), the colour kept, after
+//   a 3.5 cm smoothing of the JPEG's grain: the faint rails in the pavement and the kerbs stand out over a
+//   box of sun and shade alike;
+// - lines: a pixel darker than its 0.2 m surround (rails, joints, gaps) drawn cyan, scaled by the 99.5th
+//   percentile of the image.
+// Picked on line 17 (Křižovnická, a 12-way junction, Výstaviště, Belárie) against a global stretch,
+// unsharp masking, a high-pass and Sobel edges: edges outlined the paving's texture and gave each rail two
+// lines; a rail is a thin dark line, not a step.
+export function orthoLook(img, metres, { contrast = false, lines = false } = {}) {
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, n = w * h, pm = w / metres;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const id = ctx.getImageData(0, 0, w, h), px = id.data;
+  const ch = [0, 1, 2].map((c) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = px[4 * i + c] / 255; return a; });
+  const [R, G, B] = ch.map((a) => gauss(a, w, h, 0.035 * pm));
+  const L = new Float32Array(n);
+  for (let i = 0; i < n; i++) L[i] = 0.299 * R[i] + 0.587 * G[i] + 0.114 * B[i];
+  // the 1 m surround's mean and spread
+  const k = new Float32Array(n).fill(1), sq = new Float32Array(n);
+  for (let i = 0; i < n; i++) sq[i] = L[i] * L[i];
+  const m = gauss(L, w, h, pm), sd = gauss(sq, w, h, pm);
+  for (let i = 0; i < n; i++) sd[i] = Math.sqrt(Math.max(sd[i] - m[i] * m[i], 1e-4));
+  if (contrast) for (let i = 0; i < n; i++) k[i] = 1 / (1 + Math.exp(-0.9 * (L[i] - m[i]) / (sd[i] + 0.02))) / Math.max(L[i], 1e-3);
+  let r = null;
+  if (lines) {
+    // how much darker than the 0.2 m around, in the 1 m surround's spread: a faint rail in even paving
+    // counts as much as a dark joint in busy paving (the image's own top values, set by shadows and car
+    // edges over 75 m, left the rails under the threshold, in pieces); under half a spread is the grain
+    // (more smoothing first, 5 cm, faded the rails and kept the dots: those are real dark specks)
+    const s = gauss(L, w, h, 0.2 * pm);
+    r = new Float32Array(n);
+    for (let i = 0; i < n; i++) r[i] = Math.max(0, Math.min(1, ((s[i] - L[i]) / (sd[i] + 0.01) - 0.5) / 1.5)) ** 0.6;
+  }
+  const cyan = [0.1, 0.9, 1.0];
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) {
+    let v = Math.min(1, [R, G, B][c][i] * k[i]);
+    if (r) v = v * 0.8 * (1 - r[i]) + cyan[c] * r[i]; // (the photo a little darker under the lines)
+    px[4 * i + c] = v * 255;
+  }
+  ctx.putImageData(id, 0, 0);
+  return cv;
+}
+
+// a gaussian of sigma s px, as three box blurs (each a running sum along rows, then columns)
+function gauss(a, w, h, s) {
+  const r = Math.floor((Math.sqrt(4 * s * s + 1) - 1) / 2 + 0.5); // (3 boxes of 2r+1: variance 3·((2r+1)²−1)/12 ≈ s²)
+  if (r < 1) return s < 0.3 ? a : tap3(a, w, h, Math.min(1 / 3, (s * s) / 2)); // (under ~1.2 px: [q, 1−2q, q], variance 2q = s²)
+  let x = Float32Array.from(a), y = new Float32Array(a.length);
+  for (let pass = 0; pass < 3; pass++) {
+    box(x, y, w, h, r, 1, w); // rows
+    box(y, x, h, w, r, w, 1); // columns
+  }
+  return x;
+}
+
+function tap3(a, w, h, q) {
+  const x = new Float32Array(a.length), y = new Float32Array(a.length), p = 1 - 2 * q;
+  for (let j = 0; j < h; j++) for (let i = 0, o = j * w; i < w; i++) x[o + i] = p * a[o + i] + q * (a[o + Math.max(0, i - 1)] + a[o + Math.min(w - 1, i + 1)]);
+  for (let j = 0; j < h; j++) for (let i = 0, o = j * w; i < w; i++) y[o + i] = p * x[o + i] + q * (x[Math.max(0, j - 1) * w + i] + x[Math.min(h - 1, j + 1) * w + i]);
+  return y;
+}
+
+// a box of 2r+1 along lines of len samples (stride step), lines `count` apart by `next`; edges clamped
+function box(src, dst, len, count, r, step, next) {
+  const d = 2 * r + 1;
+  for (let l = 0; l < count; l++) {
+    const o = l * next;
+    let sum = src[o] * (r + 1);
+    for (let i = 1; i <= r; i++) sum += src[o + Math.min(i, len - 1) * step];
+    for (let i = 0; i < len; i++) {
+      dst[o + i * step] = sum / d;
+      sum += src[o + Math.min(i + r + 1, len - 1) * step] - src[o + Math.max(i - r, 0) * step];
+    }
+  }
 }
 
 function bboxFlat(p) {

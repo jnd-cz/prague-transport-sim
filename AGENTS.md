@@ -115,6 +115,11 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - Python: `python -I` for stdlib-only tools; `python -P -E` for tools needing the user site packages
   (pyosmium, pyproj, shapely, numpy, Pillow). Write multi-line scripts to a file and run it: shell
   heredocs with quotes can break in the Windows shells.
+- Tests: `python -I tools/test_all.py` runs every `tools/test_*.py` the way it must run (`-I` or `-P -E`
+  from its imports; `--browser` adds the page tests, `-k name` picks some). A tool's test is
+  `tools/test_<tool>.py`: a change to a tool runs it, a new tool gets one. CI
+  (`.github/workflows/tests.yml`) runs the tests that need no `data/` or `raw/` and `ruff check tools` on
+  every PR; a test that needs them skips without them, saying what to fetch.
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
   --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
   once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
@@ -129,14 +134,13 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   `tools/test_review.py`): Playwright's `page.evaluate` has none, and a promise that never resolves
   hangs the run without output.
 - Checks in a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`, `lint({ traffic: true })` averages
-  seeds 22, 7, 1234), `python tools/lint_report.py` against `reports/baseline/lineN.json` (an in-page
-  baseline of 2026-10-23, before #7 and #84, not maintained: regressions use `headless.py --compare`); benches in `tools/bench/`
+  seeds 22, 7, 1234), regressions through `headless.py --compare`; benches in `tools/bench/`
   (u3, redruns, walkers; `batch.html`). Run long browser jobs unawaited and poll (script calls time out
   at 45 s); a background window throttles frames, so no fps readings then.
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
-- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
   default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
   of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside

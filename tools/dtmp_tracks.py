@@ -212,7 +212,8 @@ class Segments:
 
     def match(self, x, y, ux, uy, radius=RADIUS, details=False):
         candidates = []
-        for index in self.tree.query(Point(x, y).buffer(radius)):
+        # (the box the buffered point's envelope was: the same candidates without building a circle, #205)
+        for index in self.tree.query(shapely.box(x - radius, y - radius, x + radius, y + radius)):
             row = self.rows[index]
             a, b, length = row['a'], row['b'], row['length']
             vx, vy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
@@ -251,10 +252,15 @@ class Segments:
 
 def samples(segments, area):
     """Clip first, then equal midpoint bins <= 5 m; each observation represents its exact bin length."""
-    for row, geom in zip(segments.rows, segments.geoms):
-        if area is not None and not area.intersects(geom):
+    if area is not None:
+        # (all segments against the prepared area at once; only those crossing its edge are clipped, #205)
+        shapely.prepare(area)
+        hit = shapely.intersects(area, segments.geoms)
+        inside = shapely.contains_properly(area, segments.geoms)
+    for k, (row, geom) in enumerate(zip(segments.rows, segments.geoms)):
+        if area is not None and not hit[k]:
             continue
-        clipped = geom if area is None else geom.intersection(area)
+        clipped = geom if area is None or inside[k] else geom.intersection(area)
         parts = list(clipped.geoms) if hasattr(clipped, 'geoms') else [clipped]
         a, b, length = row['a'], row['b'], row['length']
         ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length

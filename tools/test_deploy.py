@@ -1,6 +1,7 @@
 """tools/deploy.py against a fake FTP server in a temp folder: python -I tools/test_deploy.py"""
 import base64
 import ftplib
+import io
 import json
 import os
 import shutil
@@ -125,6 +126,17 @@ class DeployTest(unittest.TestCase):
         v = json.load(open(os.path.join(self.server, "version.json"), encoding="utf-8"))
         self.assertEqual(len(v["commit"]), 40)
         self.assertIn("snapshot", v["data"])
+
+    def test_version_stays_after_a_second_deploy(self):
+        # the server's manifest lists version.json from the first deploy on (#207)
+        self.run_deploy()
+        self.assertIn("version.json", json.load(open(os.path.join(self.server, deploy.MANIFEST))))
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            self.run_deploy("--dry-run")
+        self.assertNotIn("del version.json", out.getvalue())
+        self.run_deploy()
+        self.assertTrue(os.path.exists(os.path.join(self.server, "version.json")))
+        self.assertIn("version.json", json.load(open(os.path.join(self.server, deploy.MANIFEST))))
 
     def test_review_php_and_pull(self):
         self.run_deploy()

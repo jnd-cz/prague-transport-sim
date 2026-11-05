@@ -18,6 +18,8 @@ import math
 from pathlib import Path
 import sys
 
+import numpy as np
+
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 ROOT = Path(__file__).resolve().parent.parent
 ITERATIONS, ROBUST, TOL = 3000, 6, 1.02  # ADMM steps, robust reweighting rounds, radius tolerance
@@ -91,29 +93,55 @@ def _solve(s, z, w, lam):
     return _back(_factor(len(s),w,rows,lam[1:-1]),[a*b for a,b in zip(w,z)])
 
 
+class _D:
+    """The second-difference operator of an uneven s as its three diagonals (numpy), and the inverse of
+    diag(w) + D^T diag(lam) D: the same system for every ADMM step, solved by one product (#205: the list loops of
+    _back and the row sums were 52 % of line_heights.py)."""
+
+    def __init__(self, s):
+        s = np.asarray(s, dtype=float)
+        h0, h1 = s[1:-1]-s[:-2], s[2:]-s[1:-1]
+        c = 2/(h0+h1)
+        self.n, self.l, self.c, self.r = len(s), c/h0, -c*(1/h0+1/h1), c/h1
+
+    def __call__(self, f):
+        return self.l*f[:-2]+self.c*f[1:-1]+self.r*f[2:]
+
+    def T(self, q):
+        b = np.zeros(self.n)
+        b[:-2] += self.l*q
+        b[1:-1] += self.c*q
+        b[2:] += self.r*q
+        return b
+
+    def inverse(self, w, lam):
+        m = self.n-2
+        D = np.zeros((m, self.n))
+        i = np.arange(m)
+        D[i, i], D[i, i+1], D[i, i+2] = self.l, self.c, self.r
+        return np.linalg.inv(np.diag(np.asarray(w, dtype=float))+(D.T*np.asarray(lam, dtype=float))@D)
+
+
 def _capped(s, z, w, cap, rows, f=None, u=None, y=None):
     """argmin sum w (z-f)^2 subject to |f''_i| <= cap_i, by ADMM on u = D f (one factorisation)."""
     n, m = len(s), len(rows)
     h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
     rho = max(h,.5)**4  # (D's entries ~ 1/h^2: rho D^T D ~ the data weights)
-    L = _factor(n,w,rows,[rho]*m)
-    f = f or list(z)
-    Df = lambda f: [sum(c*f[j] for j,c in r.items()) for r in rows]
-    u = u or [max(-c,min(c,v)) for v,c in zip(Df(f),cap)]
-    y = y or [0.0]*m
+    D = _D(s)
+    Ai = D.inverse(w,[rho]*m)
+    z, w, cap = (np.asarray(a, dtype=float) for a in (z, w, cap))
+    f = np.array(f if f is not None else z, dtype=float)
+    u = np.array(u, dtype=float) if u is not None else np.clip(D(f),-cap,cap)
+    y = np.array(y, dtype=float) if y is not None else np.zeros(m)
+    wz = w*z
     for it in range(ITERATIONS):
-        q = [ui-yi for ui,yi in zip(u,y)]
-        b = [wi*zi for wi,zi in zip(w,z)]
-        for r,qi in zip(rows,q):
-            for j,c in r.items():
-                b[j] += rho*c*qi
-        f = _back(L,b)
-        d = Df(f)
-        u = [max(-c,min(c,v+yi)) for v,yi,c in zip(d,y,cap)]
-        y = [yi+v-ui for yi,v,ui in zip(y,d,u)]
-        if it % 25 == 24 and all(abs(v) <= c*TOL for v,c in zip(d,cap)):
+        f = Ai@(wz+rho*D.T(u-y))
+        d = D(f)
+        u = np.clip(d+y,-cap,cap)
+        y = y+d-u
+        if it % 25 == 24 and np.all(np.abs(d) <= cap*TOL):
             break
-    return f,u,y
+    return f.tolist(),u.tolist(),y.tolist()
 
 
 def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05, pin_weight=1e6):
@@ -169,34 +197,35 @@ def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
     if n < 3:
         return {'z':list(z),'fits':True,'excess':[0.0]*n,'min_radius':math.inf}
     w = [1.0]*n if weight is None else [float(x) for x in weight]
-    rows, cap = _second(s), [1/r for r in rmin[1:-1]]
+    cap = np.array([1/r for r in rmin[1:-1]])
     h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
     rho1, rho2 = max(h,.5)**4, 1.0
-    L = _factor(n,[wi+rho2 for wi in w],rows,[(smooth+1)*rho1]*len(rows))
-    Df = lambda f: [sum(c*f[j] for j,c in r.items()) for r in rows]
-    box = lambda f, y: [fi+yi if t is None else max(zi-t,min(zi+t,fi+yi)) for fi,yi,zi,t in zip(f,y,z,tol)]
-    f = list(z)
-    u, v = [max(-c,min(c,d)) for d,c in zip(Df(f),cap)], box(f,[0.0]*n)
-    y1, y2 = [0.0]*len(rows), [0.0]*n
+    D = _D(s)
+    Ai = D.inverse([wi+rho2 for wi in w],[(smooth+1)*rho1]*(n-2))
+    z = np.asarray(z, dtype=float)
+    free = np.array([t is None for t in tol])
+    t = np.array([0.0 if t is None else t for t in tol])
+    lo, hi = np.where(free,-np.inf,z-t), np.where(free,np.inf,z+t)
+    wz = np.asarray(w, dtype=float)*z
+    f = z.copy()
+    u, v = np.clip(D(f),-cap,cap), np.clip(f,lo,hi)
+    y1, y2 = np.zeros(n-2), np.zeros(n)
     for it in range(ITERATIONS):
         last = f
-        b = [wi*zi+rho2*(vi-yi) for wi,zi,vi,yi in zip(w,z,v,y2)]
-        for r,ui,yi in zip(rows,u,y1):
-            for j,c in r.items():
-                b[j] += rho1*c*(ui-yi)
-        f = _back(L,b)
-        d = Df(f)
-        u = [max(-c,min(c,di+yi)) for di,yi,c in zip(d,y1,cap)]
-        v = box(f,y2)
-        y1 = [yi+di-ui for yi,di,ui in zip(y1,d,u)]
-        y2 = [yi+fi-vi for yi,fi,vi in zip(y2,f,v)]
+        f = Ai@(wz+rho2*(v-y2)+rho1*D.T(u-y1))
+        d = D(f)
+        u = np.clip(d+y1,-cap,cap)
+        v = np.clip(f+y2,lo,hi)
+        y1 = y1+d-u
+        y2 = y2+f-v
         # (feasible is not yet optimal: the curvature penalty acts only as the curve settles, so it must stop moving)
-        if (it % 25 == 24 and all(abs(di) <= c*TOL for di,c in zip(d,cap)) and max(abs(fi-vi) for fi,vi in zip(f,v)) < 1e-3
-                and max(abs(fi-li) for fi,li in zip(f,last)) < 1e-6):
+        if (it % 25 == 24 and np.all(np.abs(d) <= cap*TOL) and np.max(np.abs(f-v)) < 1e-3
+                and np.max(np.abs(f-last)) < 1e-6):
             break
-    excess = [0.0 if t is None else max(0.0,abs(fi-zi)-t) for fi,zi,t in zip(f,z,tol)]
-    fits = max(excess) <= .005 and all(abs(di) <= c*TOL for di,c in zip(Df(f),cap))
-    return {'z':f,'fits':fits,'excess':excess,'min_radius':min(implied_radii(s,f),default=math.inf)}
+    excess = np.where(free,0.0,np.maximum(0.0,np.abs(f-z)-t))
+    fits = bool(excess.max() <= .005 and np.all(np.abs(D(f)) <= cap*TOL))
+    f = f.tolist()
+    return {'z':f,'fits':fits,'excess':excess.tolist(),'min_radius':min(implied_radii(s,f),default=math.inf)}
 
 
 def implied_radii(s, z):

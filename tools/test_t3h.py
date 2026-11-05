@@ -1,0 +1,203 @@
+"""The hybrid T3 model (src/t3h.js, #248) in headless Chromium.
+
+Usage: python -P -E tools/test_t3h.py [--line 17] [--synthetic]
+
+Part 1 (no world data needed; the asset is in git): the model loads; the saloon, the lighter level and the
+draw calls; a set on a straight and on a 20 m curve: the second car hangs on the stiff coupling link (cars
+15.04 m apart), the couplers turn about their pins, the bogies (6.4 m apart) turn to the track; the
+track-brake shoes hang 12 mm over the rail and drop by bogie; the doors, the collector at the wire, the
+cards. Part 2 (with data/line<N>.json): the game draws our tram with it, credits it, and its doors follow
+the game's; with the classic model picked in the menu it loads that one.
+"""
+import argparse
+import faulthandler
+import functools
+import http.server
+import json
+import math
+import os
+import re
+import sys
+import threading
+
+from playwright.sync_api import sync_playwright
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+SYNTHETIC = r"""async () => {
+  const THREE = await import('three');
+  const t3h = await import('/src/t3h.js');
+  const models = await import('/src/models.js');
+  const files = await Promise.all(t3h.T3H_FILES.map(async (f) => {
+    const r = await fetch('/' + f);
+    return { ok: r.ok, json: () => r.json(), arrayBuffer: () => r.arrayBuffer() };
+  }));
+  const proto = await t3h.loadHybridT3(files, 5.34);
+  const tris = (root, pred = () => true) => { let n = 0; root.traverse((o) => { if (o.isMesh && pred(o)) { const g = o.geometry; n += (g.index ? g.index.count : g.attributes.position.count) / 3; } }); return n; };
+  const shown = (o) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; };
+  const drawn = (car) => { let n = 0; car.traverse((o) => { if (o.isMesh && shown(o)) n++; }); return n; };
+  const out = { stats: proto.stats, fullTris: tris(proto.template), insideTris: tris(proto.template, (o) => o.name === 'T3H_in'),
+    lightTris: tris(proto.light), lightInside: tris(proto.light, (o) => o.name === 'T3H_in') };
+  const m = models.makeT3({ line: '17', cars: 2, dest: 'Vozovna Kobylisy', run: '801' });
+  new THREE.Scene().add(m);
+  const [a, b] = m.userData.cars;
+  out.hybrid = !!m.userData.hybrid;
+  out.drawnFull = drawn(a);
+  const pin = (car, z) => car.localToWorld(new THREE.Vector3(0, 0, z));
+  const link = (k) => pin(m.userData.cars[k], -6.25).distanceTo(pin(m.userData.cars[k + 1], 6.25));
+  const deg = (r) => r * 180 / Math.PI;
+  // a straight along map x
+  models.placeConsist(m, 100, (s) => [s, 0, 0, 0]);
+  m.updateMatrixWorld(true);
+  out.straight = { c1: a.position.x, c2: b.position.x, link: link(0), rear: deg(a.userData.rig.couplers[1].rotation.y), front: deg(b.userData.rig.couplers[0].rotation.y) };
+  // the shoes released: their lowest point over the rail (the car on the rail plane at height 0)
+  const shoeLow = () => { let y = Infinity; a.traverse((o) => { if (o.name === 'T3H_shoe') y = Math.min(y, new THREE.Box3().setFromObject(o).min.y); }); return y; };
+  m.updateMatrixWorld(true);
+  out.shoeGap = shoeLow();
+  const shoes = (car) => car.userData.rig.bogies.map((g) => g.shoes.map((s) => +s.position.y.toFixed(4)));
+  t3h.poseHybrid(m, { track: 1 }); out.track1 = shoes(a);
+  t3h.poseHybrid(m, { track: 2 }); out.track2 = shoes(a);
+  m.updateMatrixWorld(true); out.shoeGapOn = shoeLow();
+  t3h.poseHybrid(m, { track: 0 }); out.track0 = shoes(a);
+  // a 20 m curve to the left
+  const R = 20, along = (car) => R * Math.atan2(car.position.x, R + car.position.z);
+  models.placeConsist(m, 60, (s) => [R * Math.sin(s / R), R * (1 - Math.cos(s / R)), 0, 0]);
+  m.updateMatrixWorld(true);
+  out.curve = { pitch: along(a) - along(b), link: link(0), rear: deg(a.userData.rig.couplers[1].rotation.y), front: deg(b.userData.rig.couplers[0].rotation.y),
+    bogies: a.userData.rig.bogies.map((g) => deg(g.node.rotation.y)) };
+  // the doors and the collector
+  const leaf = a.userData.rig.full.getObjectByName('Door_Front_Left_Outer');
+  const q0 = leaf.quaternion.clone();
+  t3h.poseHybrid(m, { doors: 1 }); out.doorTurn = deg(q0.angleTo(leaf.quaternion));
+  t3h.poseHybrid(m, { doors: 0 }); out.doorBack = deg(q0.angleTo(leaf.quaternion));
+  models.placeConsist(m, 100, (s) => [s, 0, 0, 0]);
+  m.updateMatrixWorld(true);
+  const head = a.userData.rig.full.getObjectByName(proto.rig.pantograph.head);
+  out.contact = head.getWorldPosition(new THREE.Vector3()).y + proto.rig.pantograph.contactHeadOffset;
+  // the cards
+  models.setConsistLine(m, '9', 'Sídliště Řepy', '816');
+  out.dest = [a, b].map((c) => c.userData.rig.plates.destAll.map((o) => o.visible));
+  out.destCanvas = a.userData.rig.plates.dest.material.map?.image?.width ?? null;
+  out.fleetOwn = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material !== b.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
+  // the lighter level
+  t3h.setHybridLevel(m, 'light');
+  out.drawnLight = drawn(a);
+  out.levels = [a.userData.rig.full.visible, a.userData.rig.light.visible];
+  out.glass = proto.template.getObjectByName('T3H_glass').material.userData.opacity;
+  return out;
+}"""
+
+GAME = """() => {
+  const u = window.tramModel.userData, r = u.cars[0].userData.rig;
+  return { hybrid: !!u.hybrid, cars: u.cars.length, doors: r.doors, open: window.game.doorOpenness,
+    credit: /SimonStrikesBack/.test(document.body.innerHTML + (window.game.data?.attribution || '')) };
+}"""
+
+
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+
+def importmap():
+    html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
+    return re.search(r'<script type="importmap">.*?</script>', html, re.S).group(0)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--line", default="17")
+    ap.add_argument("--synthetic", action="store_true", help="part 1 only (no world data needed)")
+    args = ap.parse_args()
+    faulthandler.dump_traceback_later(900, exit=True)  # the whole test: page.evaluate has no time limit
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    data = os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json"))
+    fails, r = [], {}
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 960, "height": 540})
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.route(base + "/__t3h.html", lambda route: route.fulfill(
+                content_type="text/html", body=f"<!doctype html><html><head>{importmap()}</head><body></body></html>"))
+            page.goto(base + "/__t3h.html")
+            r["synthetic"] = s = page.evaluate(SYNTHETIC)
+            st, cv = s["straight"], s["curve"]
+            # On R 20, both cars on the circle: the bogie pivots stand 3.2 m along the arc from the car's centre,
+            # so a bogie turns 3.2 / 20 rad to the body and the body's chord is rc from the circle's centre; its
+            # pins (6.25 m from the car's centre) are rp from it; the 2.54 m link (15.04 - 2 x 6.25) spans dt at
+            # rp; the car centres are R (2 a + dt) apart along the track, and each coupler stands at a + dt / 2
+            # to its car.
+            bogie = math.degrees(3.2 / 20)
+            rc = 20 * math.cos(3.2 / 20)
+            rp, a = math.hypot(rc, 6.25), math.atan2(6.25, rc)
+            dt = 2 * math.asin(1.27 / rp)
+            pitch, angle = 20 * (2 * a + dt), math.degrees(a + dt / 2)
+            want = {
+                "the model loads, 43,668 triangles (the asset's 43,792 less a hidden helper)": s["fullTris"] == 43668,
+                "the saloon is its own part (>= 25,000 triangles)": s["insideTris"] >= 25000,
+                "the lighter level: no saloon": s["lightInside"] == 0 and s["lightTris"] < s["fullTris"] - s["insideTris"] + 200,
+                "a hybrid set": s["hybrid"],
+                "draw calls per car: full <= 70, lighter <= 16": s["drawnFull"] <= 70 and s["drawnLight"] <= 16,
+                "the levels swap": s["levels"] == [False, True],
+                "straight: the first car's centre 7.6 m behind the front": abs(st["c1"] - 92.4) < 1e-3,
+                "straight: the second car 15.04 m behind": abs(st["c1"] - st["c2"] - 15.04) < 1e-3,
+                "straight: the link 2.54 m, the couplers straight": abs(st["link"] - 2.54) < 1e-3 and abs(st["rear"]) < 0.01 and abs(st["front"]) < 0.01,
+                "R 20: the link keeps its length (1 mm)": abs(cv["link"] - 2.54) < 1e-3,
+                f"R 20: the second car {pitch:.3f} m along the track (1 mm)": abs(cv["pitch"] - pitch) < 1e-3,
+                f"R 20: each coupler {angle:.1f} degrees to its car, the two alike": abs(abs(cv["rear"]) - angle) < 0.05 and abs(abs(cv["front"]) - angle) < 0.05,
+                "R 20: the bogies turn to the track": all(abs(abs(x) - bogie) < 0.01 for x in cv["bogies"]) and cv["bogies"][0] * cv["bogies"][1] < 0,
+                "the shoes hang 12 mm over the rail": abs(s["shoeGap"] - 0.012) < 0.002,
+                "the shoes on the rail with the magnets on": abs(s["shoeGapOn"]) < 0.002,
+                "the rear bogie's shoes first": s["track1"] == [[-0.012, -0.012], [0, 0]] or s["track1"] == [[0, 0], [-0.012, -0.012]],
+                "both bogies' at the stop, none when off": s["track2"] == [[-0.012, -0.012], [-0.012, -0.012]] and s["track0"] == [[0, 0], [0, 0]],
+                "the doors open and shut": s["doorTurn"] > 30 and s["doorBack"] < 0.01,
+                "the collector at the 5.34 m wire (3 cm)": abs(s["contact"] - 5.34) < 0.03,
+                "the destination card in the leading car only": s["dest"][0] and all(s["dest"][0]) and not any(s["dest"][1]),
+                "the cards drawn (canvas)": s["destCanvas"] == 1024,
+                "each car its own fleet number": s["fleetOwn"],
+                "the glass see-through (0.18)": s["glass"] == 0.18,
+            }
+            fails += [f"synthetic: {k}" for k, ok in want.items() if not ok]
+            if data and not args.synthetic:
+                page.goto(f"{base}/?line={args.line}", timeout=300000)
+                page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                page.evaluate("document.getElementById('optAuto').checked = false")
+                page.evaluate("document.getElementById('btnStart').click()")
+                page.wait_for_function("window.game && window.tramModel && window.camera", timeout=60000)
+                page.wait_for_timeout(2000)
+                r["game"] = g = page.evaluate(GAME)
+                if not g["hybrid"]:
+                    fails.append("game: our tram is not the hybrid model")
+                if abs(g["doors"] - g["open"]) > 1e-3:
+                    fails.append(f"game: the drawn doors {g['doors']} do not follow the game's {g['open']}")
+                if not g["credit"]:
+                    fails.append("game: the hybrid's credit is missing")
+                # the classic model, downloaded when picked
+                page.goto(f"{base}/?line={args.line}", timeout=300000)
+                page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                page.evaluate("document.getElementById('optAuto').checked = false; const o = document.getElementById('optModel'); o.value = 'classic'; o.dispatchEvent(new Event('change'))")
+                page.evaluate("document.getElementById('btnStart').click()")
+                page.wait_for_function("window.game && window.tramModel && window.camera", timeout=120000)
+                r["classic"] = c = page.evaluate("({ kind: window.tramModel.userData.kind, cars: window.tramModel.userData.cars.length, credit: /conflig/.test(document.getElementById('attrib').textContent) })")
+                if c["kind"] != "classic" or not c["credit"]:
+                    fails.append(f"game: the classic model picked, got {c}")
+            elif not args.synthetic:
+                print(f"(part 2 skipped: no data/line{args.line}.json; python -I tools/snapshot.py data-fetch)")
+            if errors:
+                fails.append(f"page errors: {errors[:3]}")
+            browser.close()
+    finally:
+        server.shutdown()
+        faulthandler.cancel_dump_traceback_later()
+    print(json.dumps(r))
+    if fails:
+        sys.exit("; ".join(fails))
+    print("hybrid T3: levels, coupling, bogies, track-brake shoes, doors, collector, cards: pass")
+
+
+if __name__ == "__main__":
+    main()

@@ -18,8 +18,9 @@ What sessions learned and later work needs. Kept current and short; the full log
   IPR's hosted feature layers are stored in Web Mercator, and each was loaded from S-JTSK with its own
   datum shift: the **tree register's lat/lon is ~10 m off** (ask its service for S-JTSK, `outSR=5514`,
   which `geoportal.py` does), while the tree rows and the archived DTM street points are right as
-  lat/lon (asking those for S-JTSK puts them 6–10 m off). A new Geoportál layer gets measured both ways
-  before use.
+  lat/lon (asking those for S-JTSK puts them 6–10 m off: −6.24, −7.67 m at Trojanova; naming a
+  `datumTransformation` makes it 170–300 m, 2026-11-05, #258). A new Geoportál layer gets measured both ways
+  before use. The current DTM's JVF packages (DI, TI, ZPS) are S-JTSK natively.
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
 - Archived track Z is guarded separately from DI geometry by `tools/track_heights.py`; the staging
@@ -304,7 +305,32 @@ Review these when realism matters; most move into the build in M2.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
-- Line 17's full lint after the merge is the pre-rebuild reference (`reports/line17.json`).
+- Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
+  report, not in git); regressions compare with `reports/baseline/headless.json`.
+- **Where a check's time goes** (#205, `tools/profile_check.py`, line 17 seed 1, 2026-11-04, 3 pages at once):
+  the page load to the hidden loading screen takes 56-67 s, 78 % of it in `world.js` and `terrain.js`
+  (`finesAt` 11 %, `_hitTri` 9 %, `dist` 7 %, garbage collection 7 %, `route.nearest` 6 %). The seeded runs
+  take 85 s each (u3, traffic) with the main thread busy 99 % of it, so drawing is not what costs (headless
+  draws once a second): traffic.js 40 %, terrain.js 29 % (all of it `_hitTri`, the ground triangle under a car
+  or walker: 23 % of the run), route.js 11 % (`nearest` 7 %), three.js 4 %, game.js 3 %. The JS heap is
+  1.1 GB after load and 1.3 GB after a run.
+  The lint run is 95 % three.js ray casting (`intersectTriangle`, `getVertexPosition`, `fromBufferAttribute`):
+  `railSupport`, `cantedRailVisibility` and `deckClip` cast `THREE.Raycaster` rays at whole meshes without a
+  spatial index, so every ray tests every triangle of the merged street meshes (537 s with 7 other jobs running;
+  #205 measured 254 s mean per lint run).
+- **The ground under cars and walkers** (#245, line 17 u3 seed 1): `_hitTri` is called from `carPose` (4 points per
+  car per step, ~9 s of a 66 s run), the walkers (~3 s) and `_fitRoad` at traffic set-up (~2 s). Reading the
+  triangles from typed arrays once the load is done (`DtmSurface.seal`) took its share from 22 to 13 %, with the
+  same counts on all 75 seeded runs. What did not help, measured:
+  - reading the lidar height only when two triangles hold the point: most points have two (kerbs, overlapping
+    areas), so the reads stayed;
+  - `inLane` in 2 m instead of 4 m cells: the same 6.6 s, the cost is the map lookups, not the points;
+  - the triangle found last tried first, when it overlaps no other: a triangle spans several 3 m cells holding
+    dozens of others, so proving that cost more (14 s) than the lookups it saved, and the four pose points rarely
+    share a triangle.
+
+  What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
+  only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
 
 ## Environment (Windows dev machines)
 

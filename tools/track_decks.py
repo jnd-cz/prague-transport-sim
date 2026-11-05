@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 
+import shapely
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points, substring, triangulate
 from shapely.strtree import STRtree
@@ -72,7 +73,7 @@ class Decks:
 
     def candidates(self, x, y, di_id, structure_hint=False, di_z=None):
         point, out = Point(x, y), []
-        nearby = [(int(i), self.polygons[i].distance(point)) for i in self.tree.query(point.buffer(1.5))]
+        nearby = [(int(i), self.polygons[i].distance(point)) for i in self.tree.query(shapely.box(x - 1.5, y - 1.5, x + 1.5, y + 1.5))]
         nearby = [(i, d) for i, d in nearby if d <= 1.5]
         heights = {i: self._height(i, point if self.polygons[i].covers(point)
                                   else nearest_points(self.polygons[i], point)[0]) for i, _ in nearby}

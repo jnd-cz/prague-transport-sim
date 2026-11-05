@@ -4,8 +4,9 @@
 // instead of popping.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
-import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights } from './models.js';
-import { T3, COUPLING_GAP } from './tram.js';
+import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights, disposeModel } from './models.js';
+import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
+import { poseHybrid, setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
@@ -69,10 +70,14 @@ function limitSpeed(lim, s, len) {
 function setOpacity(obj, a) {
   obj.visible = a > 0.01;
   obj.traverse((o) => {
-    if (!o.material) return;
-    o.material.transparent = a < 0.999;
-    o.material.opacity = a;
-    o.material.depthWrite = a > 0.5;
+    const m = o.material;
+    if (!m) return;
+    // (glass keeps its own opacity: userData.opacity, src/t3h.js)
+    const base = m.userData.opacity ?? 1;
+    m.userData.fade = a;
+    m.transparent = a < 0.999 || base < 1;
+    m.opacity = a * base;
+    m.depthWrite = a > 0.5 && base === 1;
   });
 }
 
@@ -589,13 +594,14 @@ export class Traffic {
     return hit;
   }
 
-  dispose() { this.scene.remove(this.group); }
+  dispose() { this.scene.remove(this.group); disposeModel(this.group); }
 
   // draw: false for a step whose result is not shown (inspect mode runs several steps per frame):
   // cars and walkers move but are not posed (their height and matrices wait for the drawn step)
   update(dt, camera, draw = true) {
     const tram = this.game.tram;
     const cx = camera.position.x, cy = -camera.position.z;
+    this.cam = [cx, cy];
     this._carsOnTracks();
     this._updateRoadCars(dt, cx, cy, draw);
     this._updateWalkers(dt, cx, cy, draw);
@@ -665,7 +671,7 @@ export class Traffic {
           // line 17 s 19919)
           const sp = lane.path.at(s), close = Math.hypot(sp.x - cx, sp.y - cy) < 50;
           const c = redNear || close || cars.some((o) => o.active && o.path === lane.path && Math.abs(o.s - s) < 12) ? null : this._carSlot();
-          if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, next2: undefined, next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null });
+          if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, next2: undefined, next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null, hitTram: false, cycleT: 0, z: undefined, seen: null, why: null });
         }
       }
     }
@@ -815,7 +821,9 @@ export class Traffic {
           // behind its tail, which waited for it, line 9 s 18390, #152; not a car before the junction: let
           // through, cars drove in behind one waiting for the tram and blocked the track, line 22 s 11969;
           // and a car only enters when its exit lane has room: it never stops inside the junction)
-          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7);
+          // (nor does one in the exit's mouth that waits for this one: car 1299 stood on the track there
+          // waiting for 1290, which waited for the exit to clear, line 9 s 18394 seed 1, #259)
+          const exitFull = live.some((o) => o !== c && o.path === c.next.path && o.s < 7 && o.seen?.car !== c && o.lead !== c);
           const blocker = live.find((o) => o !== c && (
             (o.conn && o.conn.at === J && this._conflict(o.conn, c.plan) && o.seen?.car !== c)
             || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, c.plan)
@@ -895,10 +903,13 @@ export class Traffic {
     // back off in this model. After 30 s it leaves (fades out, as at the edge of the traffic area).
     // Rules that kept the tram short of such crossings, or cars off the track, moved the cycle elsewhere
     // (line 22 s 12619 seed 3; 10 new stuck runs over 5 lines x 5 seeds; #154)
+    // The same with an AI tram ahead of ours in the tram's place: it stopped for the car on the track,
+    // which waited for that tram (line 9 seed 4 s 7581, line 23 seed 5 s 7693: 7200 s jams, #259).
+    const fronts = [tram, ...this.ahead].filter((t) => t.v < 0.3).map((t) => t.s);
     for (const x of crossing) {
       const a = x.car;
       let ends = false;
-      if (x.onTrack && tram.v < 0.3 && x.s > tram.s && x.s - tram.s < 15 && (a.vNow ?? 0) < 0.3) {
+      if (x.onTrack && fronts.some((f) => x.s > f && x.s - f < 15) && (a.vNow ?? 0) < 0.3) {
         for (let o = a, n = 0; o && n < 6; n++) {
           const sn = o.seen;
           if (!sn || (o.vNow ?? 0) > 0.3) break;
@@ -988,7 +999,7 @@ export class Traffic {
   _pathObstacles() {
     const out = [], g = this.game, tram = g.tram;
     for (let k = 0; k < (tram.cars || 1); k++) {
-      const s = tram.s - 0.6 - 7.6 - k * 15.2, p = this.route.at(s), h = this.route.heading(s, 3);
+      const s = tram.s - 0.6 - 7.6 - k * CAR_PITCH, p = this.route.at(s), h = this.route.heading(s, 3);
       out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v, what: 'our tram' });
     }
     for (const t of [...this.ahead, ...this.oncoming]) {
@@ -1193,7 +1204,7 @@ export class Traffic {
           const { back, src } = this._stopLine(lane, kind, P, osmStops);
           // (the head 4 m past the stop line, never past the lane's end: the surveyed signal poles of the
           // technical map stand a median 4.2 m past the OSM stop line, 10-90 % −0.7 to +7.1 m, line 17,
-          // .claude/bench/heads.js; on the line they were 5.5 m off)
+          // tools/bench/heads.js; on the line they were 5.5 m off)
           const e = lane.path.at(Math.min(lane.path.length, lane.path.length - back + 4));
           const x = e.x + e.hy * 2.2, y = e.y - e.hx * 2.2, face = Math.atan2(-e.hx, e.hy);
           // lanes side by side share a head (within 4 m, facing the same way)
@@ -1520,8 +1531,18 @@ export class Traffic {
   }
 
   // --------------------------------------------------------------------- other trams
-  _placeTram(t, route, s, profileZ) {
+  _placeTram(t, route, s, profileZ, dt = 0) {
     placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p), route.rollAt(q)]; });
+    const u = t.mesh.userData;
+    if (!u.hybrid) return;
+    // the detailed model: its full level near the camera; the doors open while it dwells at a stop (shut
+    // 2 s before it leaves, 2 s to move); the brake lamps while it slows or stands
+    const c = u.cars[0].position, d = this.cam ? Math.hypot(c.x - this.cam[0], -c.z - this.cam[1]) : 0;
+    setHybridLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
+    t.doorU = Math.max(0, Math.min(1, (t.doorU ?? 0) + ((t.dwell ?? 0) > 2 ? dt : -dt) / 2));
+    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
+    t.vWas = t.v;
+    if (u.level === 'full') poseHybrid(t.mesh, { doors: t.doorU, braking });
   }
 
   // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it
@@ -1597,7 +1618,10 @@ export class Traffic {
         else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
       }
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
-      if (other && other.s - other.length - 6 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 6;
+      // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 6 m kept two 2-car sets off long platforms, #258)
+      if (other && other.s - other.length - 2 < (stopAt ?? Infinity)) stopAt = other.s - other.length - 2;
+      const clear = other && g.keepClear(t.s, other.s - other.length);
+      if (clear !== null && clear !== undefined && clear < (stopAt ?? Infinity)) stopAt = clear;
       // a car on the track ahead (along it, or crossing it: it gives way to our tram only)
       for (const c of g.carsOnTrack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       for (const c of g.carsCrossing || []) if (c.s > t.s && c.s - 6 < (stopAt ?? Infinity)) stopAt = c.s - 6;
@@ -1619,10 +1643,10 @@ export class Traffic {
       t.s += t.v * dt;
       t.leaving = t.s - tram.s > 1000 || t.s > this.route.length - 20 || (t.endS !== null && t.s > t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, this.route, t.s, (s) => profile.height(s));
+      this._placeTram(t, this.route, t.s, (s) => profile.height(s), dt);
     }
     this.ahead = this.ahead.filter((t) => {
-      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); return false; }
+      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
       return true;
     });
     g.aiTrams = this.ahead;
@@ -1656,7 +1680,7 @@ export class Traffic {
       const isStop = stopAt !== null;
       for (const c of this.carsOnBack || []) if (c.s > t.s && c.s - 2.5 - 4 < (stopAt ?? Infinity)) stopAt = c.s - 2.5 - 4;
       // keep a distance to the oncoming tram in front
-      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 6 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 6;
+      for (const o of this.oncoming) if (o !== t && o.s > t.s && o.s - o.length - 2 < (stopAt ?? Infinity)) stopAt = o.s - o.length - 2;
       // junction signals: the opposite direction has GO together with our straight phase; a tram
       // that can still stop comfortably when its GO starts blinking (or is red) waits at its stop
       // line, and keeps waiting for that signal until it shows GO again. One that cannot is in the
@@ -1700,10 +1724,10 @@ export class Traffic {
       const ourS = t.endS !== null ? this.route.nearestOnHeading(p.x, p.y, -p.hx, -p.hy)?.s : null;
       t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y));
+      this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y), dt);
     }
     this.oncoming = this.oncoming.filter((t) => {
-      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); return false; }
+      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
       return true;
     });
   }

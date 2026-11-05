@@ -170,6 +170,7 @@ export function leafTexture(crushed = false) {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
+  t.userData.shared = true; // (the world's leaves and the game's crushed ones: models.js disposeModel)
   leafTex[key] = t;
   return t;
 }

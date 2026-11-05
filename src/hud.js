@@ -1,6 +1,7 @@
 // Cab instruments and overlays (DOM/SVG), plus the minimap.
 import { fmtTime, fmtDev, demandAt } from './game.js';
 import { t, onLangChange } from './i18n.js';
+import { TR37_SPEC } from './tr37.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
@@ -58,31 +59,56 @@ function makeGauge(el, { size, min, max, major, minor, label, unit, redFrom = nu
   };
 }
 
-const NOTCHES = [
-  [4, 'drive'], [3, 'drive'], [2, 'drive'], [1, 'drive'], [0, 'neutral'],
-  [-1, 'brake'], [-2, 'brake'], [-3, 'brake'], [-4, 'brake'], [-5, 'emerg'],
-];
-const notchLabel = (v) => (v > 0 ? t('notch.drive', { n: v }) : v < 0 && v > -5 ? t('notch.brake', { n: -v }) : v === -5 ? t('notch.emerg') : '0');
+// The pedal bar (#221): one axis from the brake pedal's stop (bottom) to the drive pedal's (top), each
+// pedal's steps as coloured zones, a marker where the pedal is, P when parked; beside it the
+// accelerator's position (1–99: resistors to 75, field stages from 80)
+function drawPedals(cv, eq, S) {
+  const c = cv.getContext('2d'), W = cv.width, H = cv.height, mid = H / 2, k = (mid - 4) / S.pedalMax;
+  const y = (a) => mid - a * k; // drive +, brake −
+  c.clearRect(0, 0, W, H);
+  c.fillStyle = '#1e2420'; c.fillRect(0, 0, W - 16, H);
+  const band = (a0, a1, col) => { c.fillStyle = col; c.fillRect(2, Math.min(y(a0), y(a1)), W - 20, Math.abs(y(a1) - y(a0)) - 1); };
+  const d = S.driveAngles, b = S.brakeAngles;
+  for (let i = 0; i < 5; i++) band(d[i], d[i + 1] ?? S.pedalMax, ['#24502c', '#2c6b37', '#358343', '#3f9b4f', '#4ab35b'][i]);
+  for (let i = 0; i < 5; i++) band(-b[i], -(b[i + 1] ?? S.parkAngle), ['#5a4a22', '#6f5420', '#8a5a1c', '#a35a1a', '#bb5418'][i]);
+  band(-S.parkAngle, -S.trackAngles[0], '#7a1d18');
+  band(-S.trackAngles[0], -S.pedalMax, '#6a2a8a');
+  c.font = '600 9px ui-monospace, monospace'; c.textAlign = 'center'; c.fillStyle = '#d9e6da';
+  for (let i = 0; i < 5; i++) { c.fillText(String(i + 1), (W - 16) / 2, y((d[i] + (d[i + 1] ?? S.pedalMax)) / 2) + 3); c.fillText(String(i + 1), (W - 16) / 2, y(-(b[i] + (b[i + 1] ?? S.parkAngle)) / 2) + 3); }
+  c.fillText(eq.parked ? 'P' : 'p', (W - 16) / 2, y(-(S.parkAngle + S.trackAngles[0]) / 2) + 3);
+  c.fillStyle = '#59645b'; c.fillRect(2, mid - 0.5, W - 20, 1);
+  // the pedal: drive above, brake below (the parked ratchet holds the brake at its station)
+  const a = eq.pedal.drive > 0 ? eq.pedal.drive : -eq.brakeAngle;
+  c.fillStyle = eq.parked ? '#ffb0a0' : '#ffffff';
+  c.fillRect(0, y(a) - 2, W - 16, 4);
+  // the accelerator
+  const ax = W - 12, top = 4, h = H - 8;
+  c.fillStyle = '#151a17'; c.fillRect(ax, top, 10, h);
+  c.fillStyle = eq.p < 75 ? '#d0a030' : '#e0d070';
+  const hp = (h * (eq.p - 1)) / 98;
+  c.fillRect(ax, top + h - hp, 10, hp);
+  c.fillStyle = '#0b0e0c';
+  for (const q of [75, 80, 85, 90, 95]) c.fillRect(ax, top + h - (h * (q - 1)) / 98, 10, 1);
+}
 
 const LAMPS = [
   ['doors', 'red'], ['request', 'amber'], ['speed', 'red'],
   ['track', 'amber'], ['sand', 'blue'], ['deadman', 'red'],
   ['current', 'green'], ['ready', 'green'], ['slip', 'red'],
+  ['acc', 'amber'], ['shoe', 'amber'],
 ];
 
 export class Hud {
   constructor() {
     this.speed = makeGauge($('g-speed'), { size: 160, min: 0, max: 80, major: 10, minor: 5, label: 'km/h', unit: 'TATRA', redFrom: 65 });
-    this.amp = makeGauge($('g-amp'), { size: 76, min: -400, max: 600, major: 200, minor: 100, label: 'A', unit: '', fmt: (v) => (v === 0 ? '0' : v / 100) });
+    // the T3's ammeter reads 0–600 A for drive and brake alike (the user saw only a positive scale in the cab, #221)
+    this.amp = makeGauge($('g-amp'), { size: 76, min: 0, max: 600, major: 200, minor: 100, label: 'A', unit: '', fmt: (v) => (v === 0 ? '0' : v / 100) });
     this.volt = makeGauge($('g-volt'), { size: 76, min: 0, max: 800, major: 200, minor: 100, label: 'V', unit: '', fmt: (v) => v / 100 });
     const notch = $('notch');
-    this.notchEls = new Map();
-    for (const [v, cls] of NOTCHES) {
-      const d = document.createElement('div');
-      d.dataset.cls = cls;
-      notch.appendChild(d);
-      this.notchEls.set(v, d);
-    }
+    this.pedals = document.createElement('canvas');
+    this.pedals.width = 56; this.pedals.height = 148; // (the .notch box's inside)
+    this.pedals.id = 'pedals';
+    notch.appendChild(this.pedals);
     const lamps = $('lamps');
     this.lampEls = {};
     for (const [k, col] of LAMPS) {
@@ -98,7 +124,6 @@ export class Hud {
   }
 
   relabel() {
-    for (const [v, el] of this.notchEls) el.textContent = notchLabel(v);
     for (const [k, el] of Object.entries(this.lampEls)) el.innerText = t(`lamp.${k}`);
   }
 
@@ -112,9 +137,10 @@ export class Hud {
     const tram = game.tram;
     this.speed.set(tram.kmh);
     this.speed.marker(game.currentLimit);
-    this.amp.set(tram.current);
+    this.amp.set(Math.abs(tram.current));
     this.volt.set(tram.voltage);
-    for (const [v, el] of this.notchEls) el.className = v === tram.notch ? `on ${el.dataset.cls}` : '';
+    if (tram.eq.kind === 'pedals') drawPedals(this.pedals, tram.eq, TR37_SPEC);
+    const lamps = tram.eq.lamps;
 
     const st = game.stops[game.nextStop];
     const sw = game.nextSwitch();
@@ -124,7 +150,9 @@ export class Hud {
     this.lamp('track', tram.trackBrake);
     this.lamp('sand', tram.sanding);
     this.lamp('deadman', game.deadmanWarn && Math.floor(performance.now() / 250) % 2);
-    this.lamp('current', tram.force > 500);
+    this.lamp('current', tram.drawing);
+    this.lamp('acc', lamps.acc);
+    this.lamp('shoe', lamps.shoe);
     const ready = st && st.served && st.waiting === 0 && st.alight === 0 && game.clock >= st.sched - 5;
     this.lamp('ready', ready);
     this.lamp('slip', (tram.slip || tram.slide) && Math.floor(performance.now() / 150) % 2);

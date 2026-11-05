@@ -10,10 +10,12 @@ import json
 import math
 import os
 import shutil
+import struct
 import sys
 import tempfile
 import threading
 import time
+import zlib
 
 from playwright.sync_api import sync_playwright
 
@@ -22,7 +24,10 @@ import serve  # noqa: E402
 
 FILE = {"options": ["right", "wrong"],
         "checks": {"demo": {"places": [{"x": 0.0, "y": 0.0, "kind": "here", "mag": 5, "info": "the city origin"},
-                                       {"x": 30.0, "y": 0.0, "kind": "here", "mag": 4, "info": "30 m east"}]}}}
+                                       {"x": 30.0, "y": 0.0, "kind": "here", "mag": 4, "info": "30 m east"},
+                                       # (#258: other points drawn with it, and an answer placed on the map)
+                                       {"x": 60.0, "y": 0.0, "kind": "here", "mag": 3, "info": "60 m east", "pick": True,
+                                        "marks": [{"x": 62.0, "y": 2.0, "label": "the other source", "color": "#ff9e31"}]}]}}}
 HEIGHT = {'findings':[{'kind':'trackheight','id':'bridge-test','x':0,'y':0,'mag':10,'status':'review',
     'info':'test bridge','decision':{'span_ids':['span-test'],'structure':{'kind':'bridge'}},
     'options':['archive profile ok','follows survey surface','other level (deck / under)','unsure'],
@@ -42,6 +47,17 @@ HEIGHT_BYTES = json.dumps(HEIGHT_QUEUE).encode('utf-8')
 HEIGHT_COMPACT = {'snapshot':'test','span_file':'test-spans.json',
                   'span_sha256':hashlib.sha256(HEIGHT_BYTES).hexdigest(),
                   'findings':[{k:v for k,v in f.items() if k!='spans'} for f in HEIGHT['findings']]}
+
+
+def png(w, h, rgb, stripe=None):
+    """A w×h PNG of one colour, with dark 3 px columns every `stripe` px (the orthophoto as the mocked
+    service sends it: the columns stand for rails)."""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+    dark = bytes(c // 3 for c in rgb)
+    row = b"".join(dark if stripe and x % stripe < 3 else bytes(rgb) for x in range(w))
+    raw = b"".join(b"\0" + row for _ in range(h))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 
 
 class Quiet(serve.NoCache):
@@ -101,6 +117,54 @@ def main():
                        heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null };
             }""")
             r["loadS"] = round(time.time() - t0)
+            # the orthophoto (#201), with IPR's service mocked: a 64 px image with the CORS header it sends,
+            # then a service that refuses; and the track sources over it
+            errors, ortho = [], []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.route("https://gs-pub.praha.eu/**", lambda q: (ortho.append(q.request.url), q.fulfill(
+                status=200, content_type="image/png", headers={"Access-Control-Allow-Origin": "*"}, body=png(1500, 1500, (150, 150, 140), 100))))
+            r["ortho"] = page.evaluate("""async () => {
+              const R = window.review, wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((ok) => setTimeout(ok, 100)); return f(); };
+              R.T.x = 12; R.T.y = -40; R._render();
+              document.querySelector('#rvLayers [data-layer="ortho"]').click();
+              const loaded = await wait(() => R.orthoMesh);
+              const credit = R.credit.textContent, shown = getComputedStyle(R.credit).display !== 'none';
+              const c = R.credit.getBoundingClientRect(), panel = R.box.getBoundingClientRect();
+              document.querySelector('#rvLayers [data-layer="sources"]').click();
+              const url = R.orthoUrl, first = R.orthoMesh, dist = R.dist;
+              // close up: half the box at the native 0.05 m, a whole number of draped cells
+              R.dist = 20; R._render();
+              await wait(() => R.orthoMesh !== first);
+              const p = R.orthoMesh.geometry.attributes.position.array, b = R.orthoUrl.match(/bbox=([^&]+)/)[1].split(',').map(Number);
+              let nan = 0; for (let i = 1; i < p.length; i += 3) if (!Number.isFinite(p[i])) nan++;
+              const near = { box: b[2] - b[0], nan, classes: R.layers.classes };
+              // the look: contrast, then lines (a stripe at x 100–102 of the 1500 px image, plain paving at x 150)
+              const px = (x) => [...R.orthoMesh.material.map.image.getContext('2d').getImageData(x, 750, 1, 1).data].slice(0, 3);
+              document.querySelector('[data-look="contrast"]').click();
+              const contrast = { canvas: R.orthoMesh.material.map.isCanvasTexture === true, line: px(101), plain: px(150) };
+              document.querySelector('[data-look="lines"]').click();
+              const lines = { line: px(101), plain: px(150), maps: Object.keys(R.orthoMaps).sort().join() };
+              document.querySelector('[data-look="contrast"]').click(); document.querySelector('[data-look="lines"]').click();
+              const back = R.orthoMesh.material.map === R.orthoMaps['00'];
+              R.dist = dist; R._render();
+              return { loaded: !!loaded, w: first?.material.map.image.width, url, near, contrast, lines, back, credit, shown,
+                       overPanel: c.bottom > panel.top && c.right > panel.left,
+                       sources: R.sourceLines?.geometry.attributes.position.count || 0, tracks: (R.data.tracks || []).length };
+            }""")
+            page.unroute("https://gs-pub.praha.eu/**")
+            page.route("https://gs-pub.praha.eu/**", lambda q: q.abort("connectionrefused"))
+            r["orthoDown"] = page.evaluate("""async () => {
+              const R = window.review, b = document.querySelector('#rvLayers [data-layer="ortho"]');
+              // (off, another cell, on: a new request, now refused; the same box again comes from the image cache)
+              b.click(); R.T.x = 312; R._render(); b.click();
+              for (let i = 0; i < 100 && !R.credit.classList.contains('err'); i++) await new Promise((ok) => setTimeout(ok, 100));
+              const err = R.credit.classList.contains('err'), text = R.credit.textContent;
+              R.select(0); // (the page goes on without it)
+              b.click();
+              return { err, text, cur: R.cur, hidden: getComputedStyle(R.credit).display === 'none' };
+            }""")
+            r["orthoErrors"] = errors[:3]
+            page.unroute("https://gs-pub.praha.eu/**")
             # a click on the head of a neighbouring pin, close up (a pin is then ~100 px tall), selects it
             pin = page.evaluate("""() => {
               const R = window.review, r = R.canvas.getBoundingClientRect(), V = R.camera.position.constructor;
@@ -131,6 +195,28 @@ def main():
               R._fill();
               return { rec, count: R.$('rvCount').textContent };
             }""")
+            # a finding with a mark and a placed answer (#258): the legend, the mark drawn, a click on the map 5 m east
+            # of its pin saved as px, py
+            place = page.evaluate("""() => {
+              const R = window.review, i = R.list.findIndex((f) => f.info === '60 m east'), f = R.list[i];
+              R.select(i);
+              R.T.x = f.x; R.T.y = f.y; R.yaw = 0; R.pitch = 1.4; R.dist = 40; R._render(); R.camera.updateMatrixWorld();
+              const r = R.canvas.getBoundingClientRect(), v = R.camera.position.clone().set(f.x + 5, f.z, -f.y).project(R.camera);
+              return { legend: R.$('rvCard').textContent.includes('the other source'), button: !!R.$('rvCard').querySelector('button[data-place]'),
+                       marks: R.hl.children.length, x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+            }""")
+            page.click("#rvCard button[data-place]")
+            page.mouse.click(place["x"], place["y"])
+            page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length", timeout=20000)
+            got = json.load(open(saved, encoding="utf-8"))
+            rec = next((v for v in got.get("items", {}).values() if v.get("info") == "60 m east"), {})
+            r["place"] = {**{k: place[k] for k in ("legend", "button", "marks")}, "v": rec.get("v"), "px": rec.get("px"), "py": rec.get("py")}
+            # then an answer button: the placed point stays with it (it was dropped, line 22's stop signs, #258)
+            page.click("#rvCard button[data-v='0']")
+            page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length", timeout=20000)
+            got = json.load(open(saved, encoding="utf-8"))
+            rec = next((v for v in got.get("items", {}).values() if v.get("info") == "60 m east"), {})
+            r["place"]["after"] = {"v": rec.get("v"), "px": rec.get("px")}
             page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT_COMPACT)))
             page.route('**/test-spans.json',lambda q:q.fulfill(status=200,content_type='application/json',body=HEIGHT_BYTES))
             with open(os.path.join(tmp, 'line22.json'), 'w', encoding='utf-8') as out:
@@ -213,6 +299,28 @@ def main():
         fails.append(f"desktop panel: the list or the card is cut off: {d}")
     if not d['preview']:
         fails.append('answer preview is missing on desktop')
+    o, od = r["ortho"], r["orthoDown"]
+    origin = (-742806.0, -1043024.0)  # (data/line17.json frame; the request's box is centred on the 50 m cell of x 12, y -40)
+    want = f"bbox={origin[0] + 0 - 75:.1f},{origin[1] - 50 - 75:.1f},{origin[0] + 0 + 75:.1f},{origin[1] - 50 + 75:.1f}&bboxSR=5514"
+    c, ln = o["contrast"], o["lines"]
+    if not c["canvas"] or c["line"][0] >= 60:
+        fails.append(f"orthophoto contrast: no processed image, or the dark stripe not kept dark: {c}")
+    if not (ln["line"][2] > ln["line"][0] + 80 and abs(ln["plain"][2] - ln["plain"][0]) < 40) or ln["maps"] != "00,10,11" or not o["back"]:
+        fails.append(f"orthophoto lines: the stripe not cyan, the paving tinted, or the looks not kept per image: {ln}, back {o['back']}")
+    if not o["loaded"] or o["w"] != 1500:
+        fails.append(f"orthophoto layer: no image draped from the service: {o}")
+    if args.line == "17" and want not in (o["url"] or ""):
+        fails.append(f"orthophoto request is not the 150 m box around the target's cell: {o['url']} (wanted {want})")
+    if o["near"]["box"] != 75 or o["near"]["nan"] or o["near"]["classes"]:
+        fails.append(f"orthophoto close up: not a 75 m box at 0.05 m, heights missing, or the classes left over it: {o['near']}")
+    if not o["shown"] or "IPR Praha (CC BY 4.0)" not in o["credit"] or o["overPanel"]:
+        fails.append(f"orthophoto credit missing or under the panel: {o}")
+    if not o["sources"] or not o["tracks"]:
+        fails.append(f"track sources layer drew nothing: {o}")
+    if not od["err"] or "not available" not in od["text"] or od["cur"] != 0 or not od["hidden"]:
+        fails.append(f"orthophoto with the service refusing: {od}")
+    if r["orthoErrors"]:
+        fails.append(f"page errors with the orthophoto layer: {r['orthoErrors']}")
     if not r["by"].get("seams"):
         fails.append("no seam findings from the survey")
     if r["look"] > 30:
@@ -231,7 +339,13 @@ def main():
         fails.append(f"the answer did not reach the server: {r['saved']}")
     if r["next"] != "30 m east":
         fails.append(f"after the answer the card shows {r['next']!r}, not the next finding without one")
-    if (r["back"]["rec"] or {}).get("v") != "wrong" or not r["back"]["count"].startswith("1 / 2"):
+    p = r["place"]
+    if not (p["legend"] and p["button"] and p["marks"] >= 2 and p["v"] == "placed on the map"
+            and p["px"] is not None and abs(p["px"] - 65) < 1.5 and abs(p["py"]) < 1.5):
+        fails.append(f"a mark or the answer placed on the map (want px ≈ 65, py ≈ 0): {p}")
+    if p["after"]["px"] != p["px"] or p["after"]["v"] in (None, "placed on the map"):
+        fails.append(f"an answer after placing keeps the placed point: {p}")
+    if (r["back"]["rec"] or {}).get("v") != "wrong" or not r["back"]["count"].startswith("1 / 3"):
         fails.append(f"after a reload without local storage: {r['back']}")
     if r['height']['count'] != 2 or not all(r['height'][k] for k in ('svg','marker','reverse','conflict')):
         fails.append(f"track height finding/profile/hover missing: {r['height']}")

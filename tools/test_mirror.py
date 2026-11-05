@@ -3,7 +3,6 @@
 Uses the real Three.js camera/target/geometry and a recording renderer, on its own free-port server.
 No whole city is needed to test timestamps or exception-safe visibility restoration.
 """
-import json
 from pathlib import Path
 import sys
 import unittest

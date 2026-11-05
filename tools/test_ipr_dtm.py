@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ipr_dtm import IprDtm, lzw  # noqa: E402
+from ipr_dtm import IprDtm, lzw, tile_tiff  # noqa: E402
 
 
 class Lzw(unittest.TestCase):
@@ -22,6 +22,19 @@ class Lzw(unittest.TestCase):
         im = Image.open(io.BytesIO(buf.getvalue()))
         off, n = im.tag_v2[273][0], im.tag_v2[279][0]
         self.assertEqual(lzw(buf.getvalue()[off:off + n]), z.tobytes())
+
+
+    def test_a_tile_wrapped_as_its_own_tiff_decodes_the_same(self):
+        # (#205: the reader hands each tile to Pillow's libtiff this way)
+        rng = np.random.default_rng(3)
+        z = (200 + np.cumsum(rng.normal(0, 0.01, 128 * 128))).astype("<f4").reshape(128, 128)
+        buf = io.BytesIO()
+        Image.fromarray(z, "F").save(buf, "TIFF", compression="tiff_lzw", tiffinfo={278: 128})
+        im = Image.open(io.BytesIO(buf.getvalue()))
+        off, n = im.tag_v2[273][0], im.tag_v2[279][0]
+        data = buf.getvalue()[off:off + n]
+        with Image.open(io.BytesIO(tile_tiff(data, 128, 128))) as t:
+            self.assertEqual(np.array(t, dtype="<f4").tobytes(), lzw(data))
 
 
 class Sample(unittest.TestCase):
