@@ -396,11 +396,33 @@ class Network:
         # (an end left without a continuation at a node where tracks meet: none of the node's other ends lies within
         # TURN of opposite it, Ohrada; it leaves the node for its own, to be joined across the gap)
         cos_t = math.cos(math.radians(180 - TURN))
+        lone = [n for n, v in self.nodes.items() if len(self.at[n]) == 1]
+        ltree = shapely.STRtree(shapely.points([self.nodes[n]['xy'] for n in lone])) if lone else None
+        dot = lambda u, v: u[0] * v[0] + u[1] * v[1]
+
+        def faced(n0, d):
+            """A lone track end across a gap from node n0, in line with direction d (into this track) and facing it."""
+            p = self.nodes[n0]['xy']
+            for j in (ltree.query(Point(p).buffer(CROSS_GAP)) if ltree is not None else ()):
+                m = lone[int(j)]
+                q = self.nodes[m]['xy']
+                g = math.dist(p, q)
+                if GAP < g <= CROSS_GAP:
+                    w = _unit((q[0] - p[0], q[1] - p[1]))
+                    if dot(d, self.out_dir(*self.at[m][0])) <= math.cos(math.radians(180 - CROSS_TURN)) and                             -dot(d, w) >= math.cos(math.radians(CROSS_TURN)):
+                        return True
+            return False
         for n0 in [n for n in list(self.at) if len(self.at[n]) >= 3]:
             for x in list(self.at[n0]):
                 d = self.out_dir(*x)
-                if any(d[0] * self.out_dir(*y)[0] + d[1] * self.out_dir(*y)[1] <= cos_t for y in self.at[n0] if y != x):
-                    continue
+                devs = {y: dot(d, self.out_dir(*y)) for y in self.at[n0] if y != x}
+                if any(v <= cos_t for v in devs.values()):
+                    # (it continues an end here: still a dead end where a lone end faces it across a gap and the end it
+                    # continues continues another more straightly: Ohrada, 16° against a 9° through pair)
+                    y = min(devs, key=devs.get)
+                    others = [dot(self.out_dir(*y), self.out_dir(*z)) for z in self.at[n0] if z not in (x, y)]
+                    if not (faced(n0, d) and others and min(others) < devs[y]):
+                        continue
                 e, end = x
                 n1 = self._node(self.nodes[n0]['xy'], 'end')
                 self.at[n0].remove(x)
@@ -609,7 +631,15 @@ class Network:
         # straight track with vertices tens of metres apart; moved alone, the end point turned the whole first
         # segment: Strossmayerovo náměstí, 12 m of straight 0.1-0.4 m off its record)
         coords = dense(list(coords), END_STEP) if len(coords) > 1 else list(coords)
-        coords[0], coords[-1] = self.nodes[a]['xy'], self.nodes[b]['xy']
+        # (cut where the nodes project onto it: a node a little ahead along the track of the record's first point made
+        # the line step forward to it and back, 1 m at Kobylisy, line 17)
+        pa, pb = self.nodes[a]['xy'], self.nodes[b]['xy']
+        line = LineString(coords) if len(coords) > 1 else None
+        if line is not None and line.length > 0 and a != b:
+            s0, s1 = line.project(Point(pa)), line.project(Point(pb))
+            if s1 - s0 > 0.05:
+                coords = list(substring(line, s0, s1).coords)
+        coords[0], coords[-1] = pa, pb
         e = max(self.edges, default=-1) + 1
         self.edges[e] = {'a': a, 'b': b, 'line': LineString(coords), 'src': src, 'records': records, 'chain': chain}
         self.at[a].append((e, 0))
