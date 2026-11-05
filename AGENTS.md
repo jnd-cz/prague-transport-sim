@@ -9,11 +9,16 @@ target design) and [docs/decisions/](docs/decisions/).
 
 ## Starting a session (one issue per session)
 
-1. `git checkout main && git pull`, then `python -I tools/snapshot.py status`; if `data/` differs from
-   the manifest, `python -I tools/snapshot.py data-fetch` (builds also need `fetch` for `raw/`).
+1. **The main checkout stays on `main`** (`git pull` there); every session works in its issue's own
+   worktree: `git worktree add ../<repo>-N -b N-short-name origin/main`, then in it
+   `python -I tools/snapshot.py data-fetch` (from the machine cache in seconds; builds also need `fetch`
+   for `raw/`). Removed when its PR merges, after a look at its untracked files.
 2. `python --version` is 3.12 or newer (an older one first on PATH breaks `-P`).
-3. `gh issue view N --comments`; branch `N-short-name` from `main`.
-4. The issue says what is now, where, and when it is done; the known failures below are not yours.
+3. `python -I tools/board.py`: who works where, the heavy-job queue, the holder of the `rebuild` label,
+   clashes between branches, what is ready to start. A clash with files the issue will touch is settled
+   before the work starts: wait for that branch, branch from it, or take another issue.
+4. `gh issue view N --comments`. The issue says what is now, where, and when it is done; the known
+   failures below are not yours.
 
 In Claude Code, `/issue N` runs these steps and `/regress` the regression check before a PR
 (`.claude/skills/`).
@@ -23,9 +28,27 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - **Tasks live in GitHub issues** (`jnd-cz/prague-transport-sim`), grouped by milestone. Docs link to
   issues instead of listing tasks. New findings that are not fixed now become an issue.
 - **Who works on what:** an issue in progress carries its agent's label (`agent:claude`, `agent:codex`),
-  set when the work starts and removed when its PR merges; `gh issue list --label agent:codex` shows the
-  other agent's work, its branch and draft PR the rest. Before starting, check the open PRs for files
-  the issue will touch too (`gh pr list`, `gh pr diff N --name-only`).
+  set when the work starts and removed when its PR merges; `tools/board.py` shows every branch with its
+  agent, worktree, last edit and the files it shares with other branches.
+- **Lanes** (the issues' `lane:*` labels; the board counts the live sessions of each against `LIMITS`):
+
+  | lane | covers | sessions | checks (below) |
+  |---|---|---|---|
+  | `lane:world` | build tools, `data/`, `truth.json`, the ground and track drawing, review queues | 2: one holds the `rebuild` label, one writes tools and tests without publishing | static |
+  | `lane:sim` | traffic, autopilot, tram physics, walkers' behaviour, the game's rules | 1 | seeded |
+  | `lane:assets` | models, materials, frame time | 1 | drawing |
+  | `lane:tooling` | checks, board, queue, deploy, CI, docs | 1 | its tests |
+
+  The world comes first, one layer at a time with a checkpoint after each (ROADMAP.md). The simulation
+  lane waits for checkpoint W2, apart from the PRs in flight on 2026-11-05 (the user, 2026-11-05: "pause
+  simulation work after finishing the current PRs").
+- **One rebuild at a time:** only the branch whose issue holds the `rebuild` label rebuilds every line
+  and publishes (`snapshot.py data-publish` refuses on another branch). It is taken with `gh issue edit N
+  --add-label rebuild` while nobody holds it (the board shows the holder) and removed when that data's PR
+  merges. Other branches change build tools, test them on a local rebuild and wait to publish.
+- **Order:** GitHub's blocked-by links (an issue's "Blocked by") say what comes first; the board lists the
+  issues ready to start. A step that reads another step's output waits for it: heights, stops and speeds
+  read the track; the ground reads the track and its profile; structures and furniture stand on the ground.
 - One branch per issue (`<number>-<short-name>`), PR into `main`, the PR says which checks were run and
   their numbers. Small doc or data-fact changes may go straight to `main`.
 - PR description: `Closes #N.` (or `Part of #N.`, below), what changes and why, a check table (line × check, before → after),
@@ -33,12 +56,18 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
   ends with `(#issue)`), branch deleted.
 - **`Closes #N` only when this PR meets every point of the issue's "Done when".** Anything still
   open (the user's answers in a review queue, an import of those answers, a rebuild, a data-publish,
-  another line) makes it `Part of #N`; the PR and a comment on the issue list what remains. Only the PR
-  that finishes it says `Closes #N`. A reviewer who finds an open point changes the keyword before the
+  another line) makes it `Part of #N`; the PR and a comment on the issue list what remains. What remains
+  that belongs to another issue moves there (a comment, a blocked-by link), so an open issue holds only
+  its own open points. Only the PR that finishes it says `Closes #N`. A reviewer who finds an open point changes the keyword before the
   merge (#146 was nearly closed with six places still awaiting the user's answers).
 - Review findings: a reviewer posts them as a PR comment ("To fix before merge", "Smaller"); the author
   answers point by point in a comment and pushes. A PR is marked ready and merged on the user's word only.
-- Rebuilt data: `python -I tools/snapshot.py data-publish --note "…"` from the branch, commit
+- **Merge windows:** the user merges ready PRs in batches. A session whose checks are done says so and
+  waits; a draft idle for 48 h is closed or labelled `parked`, with a comment on what is left and what to
+  redo. Questions for the user go under a "Questions for the user" heading in the PR (the board collects
+  them: `board.py --questions`); an issue waiting for answers carries `needs-user`.
+- Rebuilt data: `python -I tools/snapshot.py data-publish --note "…"` from the branch holding the
+  `rebuild` label, commit
   `data/MANIFEST.json` on it, then merge. `main`'s manifest always names data that is in the store.
 - New issues: what is now (with numbers), where in the code, what done means, which checks prove it.
   A fresh session should need nothing but the issue.
@@ -122,13 +151,28 @@ In Claude Code, `/issue N` runs these steps and `/regress` the regression check 
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
   --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
   once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
-  (`--parallel` for several lines). Keep memory in check: long jobs size themselves by free memory
-  (`tools/sysinfo.py`); don't start a second heavy job while one runs.
-- Which checks a change needs (`/regress` picks them from the diff): the game, traffic or the tram:
-  `u3,redruns,traffic,lint` on all lines; drawn geometry (surfaces, track beds, crossings, kerbs): also
-  `surfaces,crossing,canted`, and every seedless move needs a reason; track heights (`tools/line_heights.py`, the
-  profile): also `heights`; the review page: `tools/test_review.py`
-  (phone and desktop sizes); docs or harness only: none, and the PR says so.
+  (`--parallel` for several lines).
+- **Heavy jobs take turns:** `headless.py`, `rebuild.py` and `frametime.py` queue for the machine
+  (`baseline_store.HeavyJob`, first come first served, #280), print whom they wait for, and size their
+  pages and builds by the memory free when their turn comes (`tools/sysinfo.py`). Start one in the
+  background and let it wait; `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- **Which checks a change needs** (`/regress` picks them from the diff; a change of two kinds runs both):
+
+  | change | runs | leaves out |
+  |---|---|---|
+  | docs, research, harness | nothing; the PR says so | all |
+  | the review page, review cards | `tools/test_review.py` (phone and desktop sizes) | headless |
+  | a build tool, its data rebuilt (world) | the tool's test; `--checks lint,surfaces,canted,crossing,spacing,heights` on the rebuilt lines; `tools/datadiff.py` or `tools/track_moves.py` per line; a smoke drive per line (`--checks u3 --seeds 1`: it reaches the last stop, not stuck) | redruns, traffic, seeds 2–5 |
+  | drawn geometry in the game (surfaces, track beds, crossings, kerbs) | `lint,surfaces,crossing,canted`; every seedless move needs a reason | seeded checks |
+  | drawing or load that keeps the world (models, materials, load cuts) | screenshots main vs branch, `tools/frametime.py`; for a load cut, the world after load compared with main's | seeded checks |
+  | the simulation (`traffic.js`, `autopilot.js`, `tram.js`, the game's rules) | `u3,redruns,traffic,lint` on all lines, seeds 1–5, `--compare` | the geometry checks |
+  | track heights (`tools/line_heights.py`, the profile) | also `heights` | |
+  | a world checkpoint (W1, W2 …, ROADMAP.md) | every check on every line once; its moves explained in its PR | |
+
+  Seeded traffic checks on a world change measure traffic reshuffled by the new data (#156) and say
+  little about the change, so they run at the checkpoints (the user, 2026-11-05: "build up the static
+  world … without regression checks at every step where they don't make sense yet (like traffic behavior
+  because of shifting terrain)").
 - Tests that drive a page set a time limit for the whole test (`faulthandler.dump_traceback_later`, as
   `tools/test_review.py`): Playwright's `page.evaluate` has none, and a promise that never resolves
   hangs the run without output.
