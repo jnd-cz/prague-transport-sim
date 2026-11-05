@@ -211,6 +211,12 @@ def main():
             got = json.load(open(saved, encoding="utf-8"))
             rec = next((v for v in got.get("items", {}).values() if v.get("info") == "60 m east"), {})
             r["place"] = {**{k: place[k] for k in ("legend", "button", "marks")}, "v": rec.get("v"), "px": rec.get("px"), "py": rec.get("py")}
+            # then an answer button: the placed point stays with it (it was dropped, line 22's stop signs, #258)
+            page.click("#rvCard button[data-v='0']")
+            page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length", timeout=20000)
+            got = json.load(open(saved, encoding="utf-8"))
+            rec = next((v for v in got.get("items", {}).values() if v.get("info") == "60 m east"), {})
+            r["place"]["after"] = {"v": rec.get("v"), "px": rec.get("px")}
             page.route('**/height-findings.json',lambda q:q.fulfill(status=200,content_type='application/json',body=json.dumps(HEIGHT_COMPACT)))
             page.route('**/test-spans.json',lambda q:q.fulfill(status=200,content_type='application/json',body=HEIGHT_BYTES))
             with open(os.path.join(tmp, 'line22.json'), 'w', encoding='utf-8') as out:
@@ -337,6 +343,8 @@ def main():
     if not (p["legend"] and p["button"] and p["marks"] >= 2 and p["v"] == "placed on the map"
             and p["px"] is not None and abs(p["px"] - 65) < 1.5 and abs(p["py"]) < 1.5):
         fails.append(f"a mark or the answer placed on the map (want px ≈ 65, py ≈ 0): {p}")
+    if p["after"]["px"] != p["px"] or p["after"]["v"] in (None, "placed on the map"):
+        fails.append(f"an answer after placing keeps the placed point: {p}")
     if (r["back"]["rec"] or {}).get("v") != "wrong" or not r["back"]["count"].startswith("1 / 3"):
         fails.append(f"after a reload without local storage: {r['back']}")
     if r['height']['count'] != 2 or not all(r['height'][k] for k in ('svg','marker','reverse','conflict')):
