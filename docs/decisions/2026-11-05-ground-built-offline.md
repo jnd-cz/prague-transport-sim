@@ -17,66 +17,81 @@ raster on its own cell centres, the error against every 1 m cell). The tolerance
 `tol(d) = TOL` within `D0 = 120 m` of a track, `TOL · d / D0` beyond (the same angle seen from the track: 0.42 m at
 500 m), at most 3 m.
 
-## 1. The terrain mesher: greedy insertion
+## 1. The terrain mesher: greedy insertion, the line's whole box at once
 
-Line 17's whole terrain box (7.1 × 15.4 km, 112 tiles of 1,024 m meshed on their own; every cell had IPR lidar),
-TOL 0.10 m. Errors in cm: the mean over all cells / the median tile's p99 / the worst tile's p99:
+Line 17's whole terrain box (7.1 × 15.4 km; every cell had IPR lidar), TOL 0.10 m, in 112 tiles of 1,024 m meshed
+on their own. Errors in cm: the mean over all cells / the median tile's p99 / the worst tile's p99:
 
 | method | triangles | time | 0-10 m | 10-120 m | 120-500 m | beyond 500 m |
 |---|---|---|---|---|---|---|
-| now (as the bench models it: 2 m to 128 m, 10 m beyond) | 5,028,597 | - | 2.7 / 23 / 170 | 2.6 / 27 / 69 | 17.2 / 129 / 289 | 18.0 / 139 / 251 |
-| RTIN | 7,081,625 | 39 s | 1.8 / 9.4 / 12 | 1.8 / 9.4 / 12 | 4.7 / 26 / 51 | 30.2 / 125 / 284 |
-| **greedy insertion** | **3,655,633** | 10 s | 2.3 / 9.0 / 9.3 | 2.2 / 9.0 / 9.5 | 5.7 / 26 / 50 | 35.1 / 114 / 239 |
-| quadric collapse, greedy's count | 3,772,612 | 327 s | 2.1 / 12 / 31 | 2.2 / 14 / 18 | 3.2 / 14 / 149 | 26.3 / 139 / 314 |
+| now (as the bench models it: 2 m to 128 m, 10 m beyond) | 5,145,063 | - | 4.3 / 33 / 335 | 2.8 / 28 / 71 | 18.1 / 137 / 345 | 17.8 / 136 / 260 |
+| RTIN | 7,236,156 | 39 s | 1.9 / 9.4 / 10 | 1.8 / 9.4 / 9.6 | 5.0 / 28 / 39 | 30.6 / 134 / 282 |
+| **greedy insertion** | **3,803,712** | 10 s | 2.4 / 8.8 / 9.2 | 2.2 / 8.9 / 9.5 | 5.9 / 27 / 46 | 35.3 / 123 / 244 |
+| quadric collapse, greedy's count | 3,921,312 | 335 s | 2.5 / 14 / 171 | 2.6 / 15 / 34 | 3.6 / 19 / 138 | 26.0 / 135 / 314 |
 
-Greedy insertion: **27 % fewer triangles than today**, and the error within 120 m of the tracks falls from a p99 of
-23-170 cm to 9-10 cm. Beyond 500 m it is looser than today on average (35 vs 18 cm) by design: there the tolerance
-grows with distance (1 m at 1.2 km), where the 10 m grid spends its triangles evenly.
+**The whole box as one greedy mesh** (one call on 109 M cells: 18 s, after 224 s reading the raster):
+3,746,981 triangles; mean / p99 / max 2.4 / 8.8 / 10.0 cm within 10 m, 2.2 / 9.0 / 55 cm at 10-120 m, 5.9 / 28 /
+82 cm at 120-500 m, 36 / 175 / 376 cm beyond; 0.15 % of the cells over their tolerance.
 
-One tile of 1,024 × 1,024 m beside the track at line 17's middle ((-749, -2299), 16 % of it covered by the
-survey's ground areas), TOL 0.10 m. Errors in cm, mean / p99 / max per distance band:
+- **Greedy insertion** (Garland-Heckbert: insert the worst cell until every cell is within tolerance): **27 % fewer
+  triangles than today**, and the error within 120 m of the tracks falls from a p99 of 28-33 cm (335 cm in the
+  worst tile: walls, cutting edges) to 9 cm. Beyond 500 m it is looser than today on average (35 vs 18 cm) by
+  design: the tolerance grows with distance (1 m at 1.2 km), where the 10 m grid spends its triangles evenly. It
+  needs half RTIN's triangles for the same error.
+- **The per-point tolerance** is had by meshing heights divided by `tol(d)` with one max error of 1: exact where
+  `tol` is constant; 0.15 % of the cells end over theirs where a triangle reaches across `D0` (the 55 cm maximum at
+  10-120 m). The build closes that with a second pass: the cells over tolerance get a smaller `tol`, meshed again.
+- **RTIN** is the one without a dependency (numpy, written for the bench), but its triangles are halves of
+  squares: 1.9 × the triangles, and its error is not a bound (14.5 cm max at a 10 cm tolerance on the tile below).
+- **Quadric edge collapse** reaches a count, not an error: at greedy's count it spreads the triangles evenly
+  (better at 120-500 m) but leaves walls and cutting edges off by up to 1.7 m in the corridor; it starts from the
+  full 1 m mesh.
+
+One tile of 1,024 × 1,024 m beside the track at line 17's middle ((-749, -2299)), errors in cm, mean / p99 / max:
 
 | method | triangles | time | 0-10 m | 10-120 m | 120-500 m | beyond 500 m | cells over tol |
 |---|---|---|---|---|---|---|---|
-| now: 2 m blocks to 128 m, the 10 m grid beyond | 168,768 | - | 3.8 / 49 / 356 | 4.5 / 69 / 898 | 19.1 / 257 / 1388 | 14.7 / 137 / 301 | 15.5 % |
-| RTIN (numpy, per-point tolerance) | 272,732 | 0.4 s | 1.9 / 9.3 / 14 | 1.8 / 9.4 / 18 | 3.3 / 24 / 68 | 10.1 / 40 / 62 | 0.29 % |
-| greedy insertion (pydelatin, heights ÷ tol) | 149,628 | 0.3 s | 2.5 / 9.0 / 10 | 2.3 / 9.1 / 38 | 4.3 / 26 / 61 | 11.3 / 41 / 64 | 0.31 % |
-| quadric collapse (pyfqmr) to the same count | 149,628 | 3.4 s | 2.3 / 14 / 99 | 2.5 / 18 / 236 | 1.5 / 12 / 126 | 1.7 / 10 / 108 | 1.1 % |
+| now | 155,573 | - | 5.4 / 117 / 711 | 3.1 / 57 / 663 | 22.2 / 279 / 1388 | 13.4 / 117 / 301 | 16.7 % |
+| RTIN | 234,944 | 0.5 s | 1.9 / 9.5 / 14.5 | 1.0 / 8.8 / 16 | 4.5 / 27 / 62 | 9.3 / 41 / 58 | 0.31 % |
+| greedy insertion | 129,380 | 0.2 s | 2.2 / 8.7 / 10.0 | 1.5 / 8.7 / 16 | 5.5 / 28 / 61 | 10.4 / 34 / 44 | 0.39 % |
+| quadric collapse | 129,380 | 2.9 s | 2.6 / 34 / 188 | 1.7 / 16 / 159 | 2.1 / 15 / 247 | 1.8 / 11 / 52 | 1.1 % |
 
-The corridor tolerance sets the count (greedy, the same tile): 5 cm 275,191 triangles, 10 cm 149,628, 20 cm 77,317.
+The corridor tolerance sets the count (greedy, the same tile): 5 cm 239,709 triangles, **10 cm 129,380 (the
+user's pick, 2026-11-06: "10cm sounds good enough now")**, 20 cm 65,983.
 
-- **Greedy insertion** (Garland-Heckbert: insert the worst cell until every cell is within tolerance) holds the
-  tolerance within 10 m exactly and needs **half RTIN's triangles** for the same error. A per-point tolerance
-  is had by meshing heights divided by `tol(d)` with one max error of 1: exact where `tol` is constant, and
-  0.3 % of the cells end over their tolerance where a triangle reaches across `D0` (the 10-120 m band's 38 cm
-  maximum). The build closes that with a second pass: the cells over tolerance get a smaller `tol` and the tile
-  is meshed again.
-- **RTIN** is the one without a dependency (numpy, written for the bench), but its triangles are halves of
-  squares: it needs 1.8 × the triangles, and its error is not a bound (14 cm max at a 10 cm tolerance).
-- **Quadric edge collapse** reaches a count, not an error: at greedy's count it spreads the triangles evenly
-  (better far out, 1.5 cm mean beyond 120 m) but leaves walls and cutting edges off by up to 2.4 m in the corridor
-  (1.1 % of the cells over tolerance); it starts from the full 1 m mesh (1 M vertices a tile).
-- **The decision:** greedy insertion. As a library, `pydelatin` (MIT; wheels for Windows / Python 3.12; numpy
-  only), a new build dependency, or the same algorithm in our own tool (a priority queue of triangles by their
-  worst cell; plain Python runs per inserted point, ~75 k a tile, so it needs compiled code). Question 1.
+**Tiles from one mesh.** Tiles meshed on their own pick their own vertices along a shared edge, so neighbours
+crack. Meshing the line's box once and cutting it along the tile lines avoids that: both tiles cut the same
+triangle along the same line, so they share the border's vertices exactly. On line 17's box cut into 1,024 m
+tiles, 28,435 triangles cross a tile line and become 81,764 (+53,329, **+1.4 % of the mesh, 1.6 s**). No fixed
+vertices are needed, so no mesher of our own.
 
-**Tiles must meet.** Each tile meshed on its own picks its own vertices along the shared edge, so neighbours open
-cracks. The build fixes the border: the tile edge's cells are meshed as a 1-D greedy polyline first (shared by
-both tiles), then each tile's interior with those vertices fixed (the greedy start set). pydelatin takes no
-fixed vertices; our own implementation would, which weighs for question 1.
+**Beyond one line's box** (the city's raster is 35 × 26 km, 8 × line 17's box): meshed in large blocks, each
+block's shared border gets a tolerance of ~0 on its one-cell strip, so both blocks insert every border cell that
+is not on a straight line in height and the edges coincide. An estimate, not measured: ~2 triangles per metre of
+block border, ~0.4 M for 8 km blocks over the city.
+
+**The decision: greedy insertion with `pydelatin`** (MIT; a wheel for Windows / Python 3.12; numpy only), a new
+build dependency (question 1), on each line's whole box, cut into tiles afterwards.
+
+**Our own compiled mesher, weighed and not taken:** its gain would be fixed border vertices and an exact per-point
+tolerance (no division trick, no second pass). The cut above makes the first unnecessary, the second pass costs
+one more call. Its costs: a build step on every machine that rebuilds (a C extension needs the MSVC build tools;
+numba is a ~50 MB dependency with llvmlite that follows new Python releases late), and a port of the algorithm
+for us to test and keep.
 
 ## 2. The survey and the terrain together
 
-`ground_cut.py`, the same tile: the greedy mesh cut by the survey's 354 level-0 ground areas.
+`ground_cut.py`, the same tile: the greedy mesh cut by the survey's 354 level-0 ground areas (16 % of the tile).
 
-- 149,628 terrain triangles: 38,219 lie under the survey (dropped), 17,164 cross its edges, 94,245 untouched.
-- The crossing ones' remains, 17,546 pieces, each part of one planar triangle, are triangulated by shapely's
-  constrained Delaunay without interior points: 32,778 triangles. The terrain after: 127,023 (-15 %), no area
+- 129,380 terrain triangles: 37,142 lie under the survey (dropped), 16,003 cross its edges, 76,235 untouched.
+- The crossing ones' remains, 16,369 pieces, each part of one planar triangle, are triangulated by shapely's
+  constrained Delaunay without interior points: 30,899 triangles. The terrain after: 107,134 (-17 %), no area
   left over the survey.
-- 7.7 s for the cut on this tile (+0.6 s the cover): offline, the corridor tiles of a line in minutes.
+- 5.9 s for the cut on this tile (+0.5 s the cover): offline, the corridor tiles of a line in minutes.
 
 This replaces T3's lattice cut (whole 1-2 m cells, cut cells triangulated): the cut runs on the simplified mesh,
-so the terrain keeps its triangle count instead of every lidar sample becoming a vertex.
+so the terrain keeps its triangle count instead of every lidar sample becoming a vertex. The tile cut above is
+the same operation with the tile lines.
 
 ## 3. The track profile and cant: moved to Python
 
@@ -106,28 +121,34 @@ The two paths:
 - **The decision:** the rules move to Python, one at a time, each with a parity check against the page's result
   on every line (a headless export used by that check only, removed with the page's code). The page then loads
   `z`, `grades`, the cant and the bed from the line's data and keeps no profile rule.
-- The cant depends on the smoothed route, so the route smoothing moves with it (question 2).
+- **The route geometry moves too, and the page reads it as it is** (the user, 2026-11-06: "I want to prebuilt as
+  accurate and smooth as possible, so no further smoothing should be needed. Ideally the server prepared data
+  should closely match the browser running version"). The page already draws surveyed track and the build's
+  curves (`trackCurve`, #204) unsmoothed, resampled only (`src/route.js:94-110`); what it still smooths is OSM
+  fill without the build's curves. After #237 (the track from DI) the build draws all of it, the cant is
+  computed from the built geometry, and the page smooths nothing. A check holds it: the page's resampling of the
+  built route moves no point by more than 1 cm, and the page's own cant and profile from the built data match the
+  built ones (the parity check above).
 
 ## 4. The format
 
-The greedy mesh of the tile above (149,628 triangles, 75,004 vertices):
+The greedy mesh of the tile above (129,380 triangles, 64,882 vertices):
 
 | encoding | bytes |
 |---|---|
-| float32 vertices + uint32 indices, as three.js takes them | 2,632 kB, gzip 1,647 kB |
-| integers: vertices row by row as differences (cm heights), indices as differences, varints | 921 kB, gzip 478 kB, xz 409 kB |
+| float32 vertices + uint32 indices, as three.js takes them | 2,276 kB, gzip 1,411 kB |
+| integers: vertices row by row as differences (cm heights), indices as differences, varints | 796 kB, gzip 424 kB, xz 364 kB |
 
-3.2 bytes a triangle after gzip. The difference encoding is decoded into the same typed arrays at load. #307's
-GLB with quantisation is compared on this mesh there; the format is decided after it (question 3).
+3.4 bytes a triangle after gzip. The difference encoding is decoded into the same typed arrays at load. #307's
+GLB with quantisation is compared on this mesh there; the format is decided after it.
 
 ## Questions for the user
 
-1. **The greedy mesher:** pydelatin as a new build dependency (MIT, a wheel, numpy only; no fixed border vertices,
-   so tiles are stitched afterwards), or our own implementation in the build (fixed border vertices; compiled
-   code or numba, also a new dependency, since plain Python is too slow)?
-2. **The profile in Python:** move the route smoothing and the cant with it (the page then computes no route
-   geometry), or the cant only, over a route the build exports?
-3. **The corridor tolerance:** 10 cm (150 k terrain triangles per km² beside the track) or 5 cm (275 k)?
+1. **`pydelatin` as a new build dependency** (MIT, a wheel, numpy only), on each line's whole box cut into tiles,
+   instead of a compiled mesher of our own (section 1)?
+
+Answered (2026-11-06): the route geometry, cant and profile are all built offline and read by the page as they are
+(section 3); the corridor tolerance is 10 cm.
 
 ## What it changes
 

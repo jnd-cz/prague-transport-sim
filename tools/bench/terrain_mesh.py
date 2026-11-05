@@ -75,20 +75,24 @@ def distance(X, Y, step=4):
     _, d = tree.query_nearest(shapely.points(gx.ravel(), gy.ravel()), return_distance=True, all_matches=False)
     d = d.reshape(gx.shape)
     fi = np.interp(X[0], xs, np.arange(len(xs)))
-    fj = np.interp(Y[:, 0], ys, np.arange(len(ys)))
+    fj = np.interp(-Y[:, 0], -ys, np.arange(len(ys)))  # (rows go south: np.interp wants rising points)
     i0, j0 = np.minimum(fi.astype(int), len(xs) - 2), np.minimum(fj.astype(int), len(ys) - 2)
     tx, ty = (fi - i0)[None, :], (fj - j0)[:, None]
     I0, J0 = i0[None, :], j0[:, None]
     return ((d[J0, I0] * (1 - tx) + d[J0, I0 + 1] * tx) * (1 - ty) + (d[J0 + 1, I0] * (1 - tx) + d[J0 + 1, I0 + 1] * tx) * ty)
 
 
-def tile(cx, cy, n):
+def tile(cx, cy, n, m=None):
     """(Z, X, Y) of n+1 x n+1 IPR cells around (cx, cy) in the city frame, rows north to south; NaN filled."""
     e, nn = F.to_jtsk(cx, cy)
+    m = n if m is None else m  # (n columns, m rows)
     i0 = int(round(e - dtm.e0)) - n // 2
-    j0 = int(round(dtm.n0 - nn)) - n // 2
-    I, J = np.meshgrid(np.arange(i0, i0 + n + 1), np.arange(j0, j0 + n + 1))
-    Z = dtm.cells(I, J).astype(np.float64)
+    j0 = int(round(dtm.n0 - nn)) - m // 2
+    I, J = np.meshgrid(np.arange(i0, i0 + n + 1), np.arange(j0, j0 + m + 1))
+    Z = np.empty(I.shape)
+    for r in range(0, I.shape[0], 512):  # in strips: cells() scans its whole input once per raster tile
+        for q in range(0, I.shape[1], 512):
+            Z[r:r + 512, q:q + 512] = dtm.cells(I[r:r + 512, q:q + 512], J[r:r + 512, q:q + 512])
     X, Y = F.from_jtsk(dtm.e0 + I, dtm.n0 - J)
     miss = np.isnan(Z)
     if miss.any():
@@ -107,9 +111,13 @@ def rasterize(V, Tr, shape):
     y1 = np.ceil(np.maximum(np.maximum(a[:, 1], b[:, 1]), c[:, 1])).astype(np.int64)
     w, h = x1 - x0 + 1, y1 - y0 + 1
     cnt = w * h
-    for lo in range(0, len(Tr), 200000):  # in chunks: a big triangle's box is many cells
-        sl = slice(lo, lo + 200000)
-        k = np.repeat(np.arange(lo, min(lo + 200000, len(Tr))), cnt[sl])
+    cum = np.cumsum(cnt)
+    cuts = np.searchsorted(cum, np.arange(0, cum[-1], 20_000_000), side="right")  # chunks of ~20 M cells
+    for lo, hi in zip(cuts, list(cuts[1:]) + [len(Tr)]):
+        if hi <= lo:
+            continue
+        sl = slice(lo, hi)
+        k = np.repeat(np.arange(lo, hi), cnt[sl])
         st = np.repeat(np.cumsum(cnt[sl]) - cnt[sl], cnt[sl])
         o = np.arange(len(k)) - st
         px, py = x0[k] + o % w[k], y0[k] + o // w[k]
@@ -306,6 +314,44 @@ def show(res):
 
 if __name__ == "__main__":
     out = {"line": LINE, "size": SIZE, "tol": TOL, "d0": D0, "tol_max": TOL_MAX, "tiles": []}
+    if "--whole" in sys.argv:  # the whole box as one greedy mesh, then cut into tiles of --size along their lines
+        x1, y1 = T["x0"] + (T["nx"] - 1) * T["dx"], T["y0"] + (T["ny"] - 1) * T["dy"]
+        n, m = int(x1 - T["x0"]) // 2 * 2, int(T["y0"] - y1) // 2 * 2
+        t0 = time.perf_counter()
+        Z, X, Y, miss = tile((T["x0"] + x1) / 2, (T["y0"] + y1) / 2, n, m)
+        D = distance(X, Y)
+        del X, Y
+        t_in = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        V, Tr = m_delatin(Z, D)
+        t_mesh = time.perf_counter() - t0
+        r = report("delatin whole", Z, D, rasterize(V, Tr, Z.shape), len(Tr), len(V), t_mesh)
+        # the triangles a tile line crosses, cut by the tiles they overlap (each piece by the constrained Delaunay):
+        # both tiles cut the same triangle along the same line, so they share the border's vertices exactly
+        a, b, c = V[Tr[:, 0], :2], V[Tr[:, 1], :2], V[Tr[:, 2], :2]
+        lo, hi = np.minimum(np.minimum(a, b), c), np.maximum(np.maximum(a, b), c)
+        cross = np.any(np.floor(lo / SIZE) != np.floor(np.nextafter(hi, -np.inf) / SIZE), axis=1)
+        t0 = time.perf_counter()
+        polys = shapely.polygons(np.stack([a[cross], b[cross], c[cross], a[cross]], 1))
+        boxes = np.array([shapely.box(x, y, x + SIZE, y + SIZE) for y in range(0, m, SIZE) for x in range(0, n, SIZE)])
+        pi, bi = shapely.STRtree(boxes).query(polys, predicate="intersects")
+        pieces = shapely.intersection(polys[pi], boxes[bi])
+        pieces = shapely.get_parts(pieces)
+        pieces = pieces[(shapely.get_type_id(pieces) == 3) & (shapely.area(pieces) > 1e-6)]
+        after = len(shapely.get_parts(shapely.constrained_delaunay_triangles(pieces)))
+        t_cut = time.perf_counter() - t0
+        k = int(cross.sum())
+        print(f"whole box {n} x {m} cells (read {t_in:.0f} s), no lidar {100 * miss:.2f} %")
+        print(f"  {r['triangles']:,} triangles, {r['vertices']:,} vertices in {t_mesh:.0f} s, over tol {r['over_tol_%']} %")
+        for key, v in r["bands"].items():
+            print(f"  {key} m: mean {v['mean_cm']} cm, p99 {v['p99_cm']} cm, max {v['max_cm']} cm")
+        print(f"  cut into {SIZE} m tiles: {k:,} triangles cross a tile line -> {after:,} "
+              f"({after - k:+,}, {100 * (after - k) / len(Tr):+.2f} % of the mesh) in {t_cut:.1f} s")
+        out["whole"] = {**r, "cross": k, "after_cut": after}
+        dst = arg("--out", "")
+        if dst:
+            json.dump(out, open(os.path.join(ROOT, dst), "w"), indent=1)
+        sys.exit(0)
     if "--box" in sys.argv:
         x1, y1 = T["x0"] + (T["nx"] - 1) * T["dx"], T["y0"] + (T["ny"] - 1) * T["dy"]
         centres = [(x + SIZE / 2, y - SIZE / 2) for y in np.arange(T["y0"], y1, -SIZE) for x in np.arange(T["x0"], x1, SIZE)]
