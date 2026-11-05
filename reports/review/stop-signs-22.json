@@ -216,18 +216,18 @@
    "kind": "stop sign",
    "id": "stop-sign-22-Vršovické náměstí-1",
    "line": "22",
-   "x": 2071.3,
-   "y": -2332.8,
-   "s": 13891.8,
-   "mag": 32.9,
+   "x": 2155.2,
+   "y": -2356.2,
+   "s": 13978.9,
+   "mag": 54.2,
    "status": "review",
-   "osm_node": 4721776301,
+   "osm_node": 4721776300,
    "gtfs_s": 13924.7,
    "pick": true,
    "marks": [
     {
-     "x": 2071.3,
-     "y": -2332.8,
+     "x": 2155.2,
+     "y": -2356.2,
      "label": "OSM stop position (the pin)",
      "color": "#3e9dff"
     },
@@ -244,7 +244,7 @@
      "color": "#ffffff"
     }
    ],
-   "info": "Vršovické náměstí (towards Čechovo náměstí): OSM's stop position (the pin, node 4721776301) is 33 m before the timetable (GTFS) point. The platform's front end is 88 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "info": "Vršovické náměstí (towards Čechovo náměstí): OSM's stop position (the pin, node 4721776300) is 54 m after the timetable (GTFS) point. The platform's front end is 1 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
   },
   {
    "kind": "stop sign",

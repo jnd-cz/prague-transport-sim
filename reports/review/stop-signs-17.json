@@ -318,18 +318,18 @@
    "kind": "stop sign",
    "id": "stop-sign-17-Hercovka-1",
    "line": "17",
-   "x": 2655.2,
-   "y": 3528.8,
-   "s": 20169.1,
-   "mag": 34.5,
+   "x": 2772.7,
+   "y": 3501.3,
+   "s": 20289.8,
+   "mag": 86.2,
    "status": "review",
-   "osm_node": 4097081444,
+   "osm_node": 4097081445,
    "gtfs_s": 20203.6,
    "pick": true,
    "marks": [
     {
-     "x": 2655.2,
-     "y": 3528.8,
+     "x": 2772.7,
+     "y": 3501.3,
      "label": "OSM stop position (the pin)",
      "color": "#3e9dff"
     },
@@ -346,7 +346,7 @@
      "color": "#ffffff"
     }
    ],
-   "info": "Hercovka (towards Ke Stírce): OSM's stop position (the pin, node 4097081444) is 35 m before the timetable (GTFS) point. The platform's front end is 27 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "info": "Hercovka (towards Ke Stírce): OSM's stop position (the pin, node 4097081445) is 86 m after the timetable (GTFS) point. The platform's front end is -94 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
   }
  ]
 }

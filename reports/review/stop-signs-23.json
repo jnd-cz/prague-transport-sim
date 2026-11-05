@@ -12,18 +12,18 @@
    "kind": "stop sign",
    "id": "stop-sign-23-Královka-1",
    "line": "23",
-   "x": -2923.9,
-   "y": 115.3,
-   "s": 2.6,
-   "mag": 15.7,
+   "x": -2922.5,
+   "y": 109.4,
+   "s": 0.0,
+   "mag": 18.3,
    "status": "review",
-   "osm_node": 338859782,
+   "osm_node": 338859814,
    "gtfs_s": 18.3,
    "pick": true,
    "marks": [
     {
-     "x": -2923.9,
-     "y": 115.3,
+     "x": -2922.5,
+     "y": 109.4,
      "label": "OSM stop position (the pin)",
      "color": "#3e9dff"
     },
@@ -40,7 +40,7 @@
      "color": "#ffffff"
     }
    ],
-   "info": "Královka (towards Malovanka): OSM's stop position (the pin, node 338859782) is 16 m before the timetable (GTFS) point. The platform's front end is 18 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
+   "info": "Královka (towards Malovanka): OSM's stop position (the pin, node 338859814) is 18 m before the timetable (GTFS) point. The platform's front end is 20 m past the pin. Where is the stop sign? (Not at either: place it on the map.)"
   },
   {
    "kind": "stop sign",

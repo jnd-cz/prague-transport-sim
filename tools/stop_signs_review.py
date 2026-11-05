@@ -2,7 +2,7 @@
 review page (#258): python -P -E tools/stop_signs_review.py [--lines 9,17,22,23,37] [--over 5]
 
 For each line's stops (data/lineN.json stops[].s: the GTFS point projected onto the route), the OSM stop
-position with the same name within 6 m of the route and 80 m along it (public_transport=stop_position +
+position with the same name on the route's track (within ON_TRACK m) and 100 m along it (public_transport=stop_position +
 tram=yes, or railway=tram_stop; the local extract raw/osm/praha.osm.pbf). Stops where the two differ by
 more than --over metres along the track are written to reports/review/stop-signs-N.json, a pin at OSM's
 point, for the user to say where the sign really stands (?line=N&review=reports/review/stop-signs-N.json).
@@ -24,6 +24,10 @@ from geo import Frame  # noqa: E402
 # (elsewhere: "Place it on the map", the point saved with the answer as px, py)
 OPTIONS = ["sign at the pin (OSM)", "sign at the timetable point (GTFS)", "unsure"]
 OSM, GTFS, END = "#3e9dff", "#ff9e31", "#ffffff"
+# The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
+# at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the user, review 2026-11-05), while our direction's
+# node lies on our track (under 1.5 m) at all 174 stops of the 5 lines. Hercovka's own is 86 m past the GTFS point.
+ON_TRACK, ALONG = 1.5, 100
 
 
 class StopPositions(osmium.SimpleHandler):
@@ -83,7 +87,7 @@ def main():
                 if name != st["name"]:
                     continue
                 d, s = project(path, x, y)
-                if d < 6 and abs(s - st["s"]) < 80:
+                if d < ON_TRACK and abs(s - st["s"]) < ALONG:
                     cands.append((abs(s - st["s"]), s, x, y, nid))
             nxt = stops[k + 1]["name"] if k + 1 < len(stops) else "end"
             seen[st["name"]] = seen.get(st["name"], 0) + 1
