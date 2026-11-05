@@ -119,9 +119,12 @@ and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any
 
 ## Regional DTM monthly downloads and JVF transition (#63)
 
-**Status checked 2026-10-30:** the two live ZPS indexes each list all **57 Prague districts** and only
-state **2026-09-30**. No October (`2026-10-31`) package is listed yet. Existing source and built-data
-manifests remain unchanged. Snapshotting a newer month is a separate decision after inspection.
+**Status checked 2026-11-05:** the two live ZPS indexes each list all **57 Prague districts** at state
+**2026-10-31** only, in all four formats (GPKG, JVF, SHP, DGN); the 2026-09-30 packages are no longer
+listed (ours are in the store, snapshot `2026-11-01`). October is the last state published before the
+JVF 1.5.0.2 freeze (2026-11-10 22:00). The pinned sources and built data are unchanged: snapshotting
+October is the user's call (it would rebuild every line's streets, so it belongs before a world
+rebuild, AGENTS.md "One rebuild at a time"). On 2026-10-30 only state 2026-09-30 was listed.
 
 The [regional distribution page](https://portal.dtm-praha-sck.cz/poskytovani-dat) links to Geoportál's
 monthly public ZPS packages. [Provider guidance](https://portal.dtm-praha-sck.cz/poskytovani-dat/zpusoby-poskytovani-prazskych-dat-dtm)
