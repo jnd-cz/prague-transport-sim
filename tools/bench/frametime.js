@@ -17,6 +17,7 @@ const until = async (ok, ms = 120000) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
+const count = (o) => { let n = 0; o.traverse(() => n++); return n; };
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
 export async function run({ model = 'detailed', frames = 600, warm = 120, ai = AI } = {}) {
@@ -50,12 +51,17 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
   });
   // the CPU time of each render (the GPU's work shows in the frame interval)
   const r = window.renderer, orig = r.render;
-  const cpu = [];
+  // (split: the scene's matrix update, which render does first, and the rest of render)
+  const cpu = [], umw = [];
   let info = null;
   r.render = function (scene, cam) {
     const t = performance.now();
+    scene.updateMatrixWorld();
+    const t1 = performance.now(), auto = scene.matrixWorldAutoUpdate;
+    scene.matrixWorldAutoUpdate = false;
     orig.call(this, scene, cam);
-    cpu.push(performance.now() - t);
+    scene.matrixWorldAutoUpdate = auto;
+    cpu.push(performance.now() - t); umw.push(t1 - t);
     if (!info && cpu.length > warm) info = { calls: r.info.render.calls, triangles: r.info.render.triangles };
   };
   const gaps = [];
@@ -69,14 +75,15 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
     }
   } finally {
     r.render = orig;
-    for (const { m } of sets) { window.scene.remove(m); }
   }
-  const c2 = cpu.slice(warm);
+  const c2 = cpu.slice(warm), setNodes = sets.length ? count(sets[0].m) : 0, nodes = count(window.scene);
+  for (const { m } of sets) window.scene.remove(m);
   const ms = (x) => +x.toFixed(2);
   return {
     model, kind: window.tramModel.userData.kind, frames: gaps.length,
     frameMedian: ms(median(gaps)), frameP95: ms(pct(gaps, 0.95)), fps: +(1000 / median(gaps)).toFixed(1),
-    renderMedian: ms(median(c2)), renderP95: ms(pct(c2, 0.95)), ...info,
+    renderMedian: ms(median(c2)), renderP95: ms(pct(c2, 0.95)), matrixMedian: ms(median(umw.slice(warm))), ...info,
+    nodes, tramNodes: count(window.tramModel), setNodes,
     sets: sets.map(({ m, far }) => ({ far, level: m.userData.level ?? m.userData.kind })),
     viewport: [innerWidth, innerHeight, devicePixelRatio],
   };

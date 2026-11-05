@@ -58,12 +58,12 @@ def measure(line, models, frames, headless, warm=120):
 
 
 def table(rows):
-    lines = ["| model | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | draw calls | triangles | AI sets (m: level) |",
-             "|---|---|---|---|---|---|---|"]
+    lines = ["| model | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) |",
+             "|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         sets = ", ".join(f"{s['far']}: {s['level']}" for s in r["sets"])
         lines.append(f"| {r['model']} ({r['kind']}) | {r['frameMedian']} / {r['frameP95']} | {r['fps']} | {r['renderMedian']} / {r['renderP95']} | "
-                     f"{r.get('calls')} | {r.get('triangles'):,} | {sets} |")
+                     f"{r.get('matrixMedian')} | {r.get('calls')} | {r.get('triangles'):,} | {r.get('nodes'):,} / {r.get('tramNodes')} | {sets} |")
     return "\n".join(lines)
 
 
