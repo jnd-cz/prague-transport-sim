@@ -94,7 +94,10 @@ export async function loadHybridT3(responses, contact) {
   };
   const shell = (b) => b.min.y > 0.84 && b.max.y < 3.1 && Math.max(-b.min.z, b.max.z) < 1.25 && Math.max(-b.min.x, b.max.x) < 6.95;
   const paint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0, side: THREE.DoubleSide });
-  const glass = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.18, depthWrite: false });
+  // (one pass for both faces: three draws a double-sided transparent material twice, back then front, and
+  // the 13 glass meshes of a car cost 0.9 ms a frame in tools/frametime.py's scene; dark glass at 18 % shows
+  // no sorting between its faces)
+  const glass = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.18, depthWrite: false, forceSinglePass: true });
   glass.userData = { opacity: 0.18, glass: true }; // (traffic's fade multiplies it)
   const buckets = new Map(); // frame -> { out, in, glass, dest, run: [geometries] }
   const put = (f, kind, g) => {
