@@ -7,273 +7,56 @@
   "tip at OSM's switch",
   "unsure"
  ],
- "over_m": 2.0,
  "findings": [
   {
    "kind": "switch tip",
-   "id": "fork-50.00856-14.45582",
+   "id": "track-50.09900-14.43325",
    "line": "17",
-   "route": "path",
-   "x": 1254.31,
-   "y": -9019.73,
-   "s": 11.7,
-   "mag": 2.6,
+   "x": 1021.55,
+   "y": 1165.04,
+   "mag": 1.39,
    "status": "review",
    "pick": true,
    "marks": [
     {
-     "x": 1254.31,
-     "y": -9019.73,
-     "label": "DI's fork",
-     "color": "#ff3b30"
+     "x": 1021.6,
+     "y": 1167.3,
+     "label": "curve held to 18 m: points moved 0.387 m off DI",
+     "color": "#ffd60a"
     },
     {
-     "x": 1254.49,
-     "y": -9022.36,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    1254.31,
-    -9019.73
-   ],
-   "osm_node": 10728586626,
-   "info": "DI's fork lies 2.6 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.07277-14.41405",
-   "line": "17",
-   "route": "path",
-   "x": -737.17,
-   "y": -1537.52,
-   "s": 12451.7,
-   "mag": 3.0,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -737.17,
-     "y": -1537.52,
-     "label": "DI's fork",
+     "x": 1021.55,
+     "y": 1165.04,
+     "label": "DI's fork (drawn twice)",
      "color": "#ff3b30"
     },
-    {
-     "x": -736.88,
-     "y": -1534.53,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    -737.17,
-    -1537.52
-   ],
-   "osm_node": 2972887874,
-   "info": "DI's fork lies 3.0 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.07295-14.41403",
-   "line": "17",
-   "route": "path",
-   "x": -735.62,
-   "y": -1517.77,
-   "s": 12471.5,
-   "mag": 4.4,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -735.62,
-     "y": -1517.77,
-     "label": "DI's fork",
-     "color": "#ff3b30"
-    },
-    {
-     "x": -735.55,
-     "y": -1513.34,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    -735.62,
-    -1517.77
-   ],
-   "osm_node": 3395971977,
-   "info": "DI's fork lies 4.4 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.07714-14.41437",
-   "line": "17",
-   "route": "path",
-   "x": -648.39,
-   "y": -1059.54,
-   "s": 12940.6,
-   "mag": 5.8,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -648.39,
-     "y": -1059.54,
-     "label": "DI's fork",
-     "color": "#ff3b30"
-    },
-    {
-     "x": -646.7,
-     "y": -1053.97,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    -648.39,
-    -1059.54
-   ],
-   "osm_node": 4696978840,
-   "info": "DI's fork lies 5.8 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.08850-14.41553",
-   "line": "17",
-   "route": "path",
-   "x": -393.82,
-   "y": 181.28,
-   "s": 14245.1,
-   "mag": 3.9,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -393.82,
-     "y": 181.28,
-     "label": "DI's fork",
-     "color": "#ff3b30"
-    },
-    {
-     "x": -396.98,
-     "y": 183.55,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    -393.82,
-    181.28
-   ],
-   "osm_node": 4691199514,
-   "info": "DI's fork lies 3.9 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.12616-14.45712",
-   "line": "17",
-   "route": "pathBack",
-   "x": 3123.42,
-   "y": 3925.69,
-   "s": 795.0,
-   "mag": 16.3,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": 3123.42,
-     "y": 3925.69,
-     "label": "DI's fork",
-     "color": "#ff3b30"
-    }
-   ],
-   "di_fork": [
-    3123.42,
-    3925.69
-   ],
-   "osm_node": null,
-   "info": "OSM has no switch within 15 m of DI's fork. DI draws two tracks from this fork to the next node (Strossmayerovo náměstí): the switch drawn twice? The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.12222-14.45565",
-   "line": "17",
-   "route": "pathBack",
-   "x": 2959.91,
-   "y": 3505.23,
-   "s": 1268.0,
-   "mag": 6.8,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": 2959.91,
-     "y": 3505.23,
-     "label": "DI's fork",
-     "color": "#ff3b30"
-    },
-    {
-     "x": 2963.51,
-     "y": 3511.04,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    2959.91,
-    3505.23
-   ],
-   "osm_node": 4096977723,
-   "info": "DI's fork lies 6.8 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.10822-14.43698",
-   "line": "17",
-   "route": "pathBack",
-   "x": 1425.25,
-   "y": 2144.34,
-   "s": 4208.2,
-   "mag": 3.2,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": 1425.25,
-     "y": 2144.34,
-     "label": "DI's fork",
-     "color": "#ff3b30"
-    },
-    {
-     "x": 1423.54,
-     "y": 2141.63,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    1425.25,
-    2144.34
-   ],
-   "osm_node": 4680424875,
-   "info": "DI's fork lies 3.2 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.09907-14.43325",
-   "line": "17",
-   "route": "pathBack",
-   "x": 1022.52,
-   "y": 1173.16,
-   "s": 5398.1,
-   "mag": 1.9,
-   "status": "review",
-   "pick": true,
-   "marks": [
     {
      "x": 1022.52,
      "y": 1173.16,
+     "label": "DI's fork (drawn twice)",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 1023.83,
+     "y": 1157.83,
+     "label": "DI's fork",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 1026.75,
+     "y": 1176.29,
+     "label": "DI's fork",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 1019.33,
+     "y": 1153.11,
+     "label": "DI's fork",
+     "color": "#ff3b30"
+    },
+    {
+     "x": 1027.48,
+     "y": 1180.87,
      "label": "DI's fork",
      "color": "#ff3b30"
     },
@@ -282,118 +65,22 @@
      "y": 1171.3,
      "label": "OSM's switch (railway=switch)",
      "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    1022.52,
-    1173.16
-   ],
-   "osm_node": 13158758404,
-   "info": "DI's fork lies 1.9 m from OSM's switch. DI draws two tracks from this fork to the next node (Strossmayerovo náměstí): the switch drawn twice? The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.08897-14.41567",
-   "line": "17",
-   "route": "pathBack",
-   "x": -376.43,
-   "y": 231.86,
-   "s": 7486.3,
-   "mag": 5.3,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -376.43,
-     "y": 231.86,
-     "label": "DI's fork",
-     "color": "#ff3b30"
     },
     {
-     "x": -378.7,
-     "y": 227.06,
+     "x": 1026.6,
+     "y": 1173.69,
      "label": "OSM's switch (railway=switch)",
      "color": "#3e9dff"
-    }
-   ],
-   "di_fork": [
-    -376.43,
-    231.86
-   ],
-   "osm_node": 4691199508,
-   "info": "DI's fork lies 5.3 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "fork-50.07329-14.41395",
-   "line": "17",
-   "route": "pathBack",
-   "x": -736.28,
-   "y": -1479.4,
-   "s": 9275.7,
-   "mag": 4.3,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -736.28,
-     "y": -1479.4,
-     "label": "DI's fork",
-     "color": "#ff3b30"
     },
     {
-     "x": -736.77,
-     "y": -1483.63,
+     "x": 1027.7,
+     "y": 1179.9,
      "label": "OSM's switch (railway=switch)",
      "color": "#3e9dff"
     }
    ],
-   "di_fork": [
-    -736.28,
-    -1479.4
-   ],
-   "osm_node": 4696978830,
-   "info": "DI's fork lies 4.3 m from OSM's switch. The pin is DI's fork. Where does the switch begin (the tip of its blades)? Not at the pin: place it on the map."
-  },
-  {
-   "kind": "switch tip",
-   "id": "osm-switch-3234296639",
-   "line": "17",
-   "x": -1231.38,
-   "y": -4551.88,
-   "mag": 20.0,
-   "status": "review",
-   "pick": true,
-   "osm_node": 3234296639,
-   "marks": [
-    {
-     "x": -1231.38,
-     "y": -4551.88,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "info": "OSM has a switch on the route here; DI has no fork within 15 m. Is there a switch? Place the pin on its tip, or answer at the pin if OSM's place is right."
-  },
-  {
-   "kind": "switch tip",
-   "id": "osm-switch-12688577079",
-   "line": "17",
-   "x": 3045.04,
-   "y": 3765.62,
-   "mag": 20.0,
-   "status": "review",
-   "pick": true,
-   "osm_node": 12688577079,
-   "marks": [
-    {
-     "x": 3045.04,
-     "y": 3765.62,
-     "label": "OSM's switch (railway=switch)",
-     "color": "#3e9dff"
-    }
-   ],
-   "info": "OSM has a switch on the route here; DI has no fork within 15 m. Is there a switch? Place the pin on its tip, or answer at the pin if OSM's place is right."
+   "problem": "curve held to 18 m: points moved 0.387 m off DI",
+   "info": "Here curve held to 18 m: points moved 0.387 m off DI. The pin is DI's nearest fork. Where does the switch begin (the tip of its blades)? Place the pin there; if DI's track is right and no switch is involved, answer unsure with a note."
   }
  ]
 }

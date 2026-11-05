@@ -802,6 +802,15 @@ def main():
             print(f"  held to 18 m: points {h['m']} m off (class {h['class_m']} m), {h['radius_m']} m over 2 m, "
                   f"{float(lat):.5f} N {float(lon):.5f} E")
 
+    # where the drawn track has trouble (tools/fork_review.py makes review cards of them, #237): curves held to 18 m,
+    # surveyed points the fitted curve misses, curves left tighter than the minimum, stretches off DI's network
+    problems = {"held": geo.report.get("held_to_network_radius", []), "misses": geo.report.get("misses", []),
+                "tight": geo.report.get("tighter_than_min_radius", []),
+                "off": [{"xy": [round(v, 2) for v in xy], "m": round(length, 1)} for m in [route_m] + ([back_m] if back_m else [])
+                        for xy, length in m.off]}
+    os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
+    with replacing(os.path.join(ROOT, "reports", f"track-problems-{LINE}.json"), "w", encoding="utf-8") as f:
+        json.dump(problems, f)
     pts, route_ends = geo.route(route_m)
     for i in range(1, len(pts)):
         if dist(pts[i - 1], pts[i]) > 400:
