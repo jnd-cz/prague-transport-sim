@@ -1035,6 +1035,7 @@ class Match:
         return out
 
 
+DENSE = 2.0         # m: at most this between a surveyed line's points given to the curve fit
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
 EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
@@ -1047,6 +1048,18 @@ def load_network():
     """DI's network with the user's switch tips and orthophoto tracks (data/truth.json trackSources)."""
     di, archive = di_tracks.load_sources()
     return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive)
+
+
+def dense(coords, step=DENSE):
+    """A surveyed line with points at most `step` m apart along its own segments: DI draws a straight track with
+    vertices tens of metres apart, and the fit, with no data between them, sagged 0.41 m in a 462 m straight leaning
+    into curves at both ends (line 37 east of Ohrada). The user, 2026-11-06: "Straight tracks should ... be stiffer"."""
+    out = [coords[0]]
+    for a, b in zip(coords, coords[1:]):
+        n = int(math.dist(a, b) / step)
+        out += [(a[0] + (b[0] - a[0]) * i / (n + 1), a[1] + (b[1] - a[1]) * i / (n + 1)) for i in range(1, n + 1)]
+        out.append(b)
+    return out
 
 
 class Drawn:
@@ -1064,6 +1077,8 @@ class Drawn:
             a, b = ed['a'], ed['b']
             pos[a], pos[b] = net.nodes[a]['xy'], net.nodes[b]['xy']
             c = list(ed['line'].coords)
+            if ed['src'] in ('di', 'dtmp', 'ortho'):
+                c = dense(c)
             key = k(a, b)
             pts[key] = c if key == (a, b) else c[::-1]
             kind[key] = ed['src']
