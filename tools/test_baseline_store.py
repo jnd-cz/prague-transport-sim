@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -25,7 +26,7 @@ class Store(unittest.TestCase):
     def test_a_heavy_job_is_busy_while_its_process_lives(self):
         child = subprocess.Popen([sys.executable, "-I", "-c",
                                   "import sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"
-                                  "with b.HeavyJob('rebuild test'): print('in', flush=True); time.sleep(30)",
+                                  "with b.HeavyJob('rebuild test', wait=False): print('in', flush=True); time.sleep(30)",
                                   os.path.dirname(os.path.abspath(__file__))], stdout=subprocess.PIPE, text=True)
         try:
             child.stdout.readline()
@@ -38,8 +39,93 @@ class Store(unittest.TestCase):
         self.assertFalse(any(b.startswith("rebuild test") for b in baseline_store.busy()))  # (its stale lock is dropped)
 
     def test_own_lock_is_not_busy(self):
-        with baseline_store.HeavyJob("headless"):
+        with baseline_store.HeavyJob("headless", wait=False):  # (wait=False: not behind this machine's real jobs)
             self.assertFalse(any(str(os.getpid()) in b for b in baseline_store.busy()))
+
+
+TOOLS = os.path.dirname(os.path.abspath(__file__))
+JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"
+       "b.HeavyJob.POLL = 0.1\n"
+       "with b.HeavyJob(sys.argv[2]):\n"
+       "    print('in', flush=True)\n"
+       "    while not os.path.exists(sys.argv[3]): time.sleep(0.05)\n")
+
+
+class Queue(unittest.TestCase):
+    """Heavy jobs take turns, first come first served (#280), in a lock folder of the test's own."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        locks = os.path.join(self.tmp.name, "tram-heavy")
+        patch = mock.patch.object(baseline_store, "LOCKS", locks)
+        patch.start()
+        self.addCleanup(patch.stop)
+        # (the children's tempfile.gettempdir() is the test's folder, so their LOCKS is the same)
+        self.env = {**os.environ, "TMP": self.tmp.name, "TEMP": self.tmp.name, "TMPDIR": self.tmp.name}
+        self.env.pop(baseline_store.HELD, None)
+        self.env.pop("TRAM_HEAVY_NOWAIT", None)
+        self.kids = []
+
+    def job(self, name):
+        release = os.path.join(self.tmp.name, f"release-{name}")
+        p = subprocess.Popen([sys.executable, "-I", "-c", JOB, TOOLS, name, release], env=self.env,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.kids.append(p)
+        self.addCleanup(lambda: (p.kill(), p.wait(), p.stdout.close(), p.stderr.close()))
+        return p, release
+
+    def wait_for(self, cond, secs=20):
+        t = datetime.datetime.now()
+        while not cond():
+            if (datetime.datetime.now() - t).total_seconds() > secs:
+                self.fail("timed out")
+            time.sleep(0.05)
+
+    def states(self):
+        return [(j["what"], j["state"]) for j in baseline_store.queue()]
+
+    def test_the_second_job_waits_for_the_first_then_runs(self):
+        a, release_a = self.job("a")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        b, release_b = self.job("b")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("b", "waiting")])
+        open(release_a, "w").close()
+        self.assertEqual(b.stdout.readline().strip(), "in")  # (b runs once a has ended)
+        self.assertEqual(a.wait(10), 0)
+        self.assertEqual(self.states(), [("b", "running")])
+        open(release_b, "w").close()
+        self.assertEqual(b.wait(10), 0)
+        err = b.stderr.read()
+        self.assertIn("b waits for a in ", err)
+        self.assertIn("b starts after", err)
+
+    def test_a_dead_jobs_ticket_is_dropped(self):
+        a, _ = self.job("a")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        a.kill()
+        a.wait()
+        self.assertEqual(self.states(), [])
+
+    def test_nowait_runs_beside_and_a_step_runs_in_its_parents_turn(self):
+        a, release_a = self.job("a")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        with baseline_store.HeavyJob("now", wait=False):
+            self.assertEqual(sorted(self.states()), [("a", "running"), ("now", "running")])
+            step = subprocess.run([sys.executable, "-I", "-c", "import sys; sys.path.insert(0, sys.argv[1]); "
+                                   "import baseline_store as b; print(b.HeavyJob('step').wait)", TOOLS],
+                                  env={**self.env, baseline_store.HELD: os.environ[baseline_store.HELD]},
+                                  capture_output=True, text=True)
+            self.assertEqual(step.stdout.strip(), "False")
+        self.assertNotIn(baseline_store.HELD, os.environ)
+        open(release_a, "w").close()
+
+    def test_an_older_tools_lock_counts_as_running(self):
+        os.makedirs(baseline_store.LOCKS)
+        with open(os.path.join(baseline_store.LOCKS, f"{os.getpid()}.lock"), "w", encoding="utf-8") as f:
+            f.write("headless C:/x/transport-game-268\n")
+        j, = baseline_store.queue()
+        self.assertEqual((j["what"], j["state"], j["root"]), ("headless", "running", "C:/x/transport-game-268"))
+        self.assertEqual(baseline_store.describe(j, j["since"] + 600), "headless in transport-game-268, running 10 min")
 
 
 class Inputs(unittest.TestCase):
