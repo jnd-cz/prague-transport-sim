@@ -11,7 +11,8 @@
   "trackStyleKinds": "src/heights.js",
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py",
-  "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)"
+  "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
+  "operation": "reference: #211 (switch, crossing and stop speeds) and #221 (the T3SUCS traction) are to read it; nothing reads it yet"
  },
  "stops": [
   {
@@ -222,6 +223,42 @@
    "id": "right-hand-track",
    "text": "regular service always runs on the right-hand track; a double-track line has two tracks the whole way (line 37 Spojovací - Kněžská luka included)",
    "source": "user 2026-10-29"
+  },
+  {
+   "id": "user-switch-control",
+   "text": "Switches keep both control kinds: the historic overhead contacts and the new radio control; the player chooses which to use.",
+   "source": "user 2026-11-03 (#215)",
+   "quote": "For game purposes I'm keeping both historic current switch and new radios at the same time. It costs nothing and player can choose which ones to use."
+  },
+  {
+   "id": "user-speed-signs",
+   "text": "The game shows speed signs up to 60 km/h; higher speeds are taken from the OSM (OpenRailwayMap) track data.",
+   "source": "user 2026-11-03 (#215)",
+   "quote": "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm (openrailwaymap) track info."
+  },
+  {
+   "id": "user-t3-controls",
+   "text": "The T3 controls are placeholders without pedals; the pedals and the accelerator (zrychlovač) are to be researched and simulated.",
+   "source": "user 2026-11-03 (#215)",
+   "quote": "currently there are only placeholder simplified controls without pedals, you can research that and how to simulate zrychlovač behavior."
+  },
+  {
+   "id": "user-request-stops",
+   "text": "The game's T3 has no door- or stop-request buttons. The driver stops for any passengers waiting at a stop: the game cannot know whether they want this tram.",
+   "source": "user 2026-11-03 (#215)",
+   "quote": "No it doesn't although the game tries to simulate request stops, another issue is passing stop where nobody waits for player's tram but you can't know if the waiting passenger want to take your tram (and their behavior is too simple, they could take any tram which gets them closer to their destination). In short driver should stop for any passengers waiting on the stop."
+  },
+  {
+   "id": "user-doors-power",
+   "text": "Open doors block traction in the game; whether the T3 also applies a brake is open.",
+   "source": "user 2026-11-03 (#215)",
+   "quote": "open door currently block adding power, not sure if brake is auto applied as well."
+  },
+  {
+   "id": "user-pantographs",
+   "text": "A two-car T3 set runs with both cars' pantographs up, as in real operation.",
+   "source": "user 2026-11-03 (#215)",
+   "quote": "for t3 we use both cars pantographs as it is in real operation"
   }
  ],
  "places": [
@@ -669,6 +706,1527 @@
     "scope": "OpenStreetMap tram ways",
     "stated": null,
     "note": "no accuracy; against DI p50 0.13 m, p90 0.45 m at line 17's nodes (#20, docs/knowledge.md)"
+   }
+  ]
+ },
+ "operation": {
+  "note": "Operating rules, signals, switches and the T3 from DP Praha's own documents (D 1/2, the T3 textbook, exam sets), ČKD drawings and prazsketramvaje.cz, paraphrased; each with the year it was written or read. Picked by the user from docs/research/prazsketramvaje/ (#215, picker 2026-11-04; the open items 2026-11-05, #293). facts: rules and values; lists: facts keyed by place. `user`: the user's correction, quoted.",
+  "facts": [
+   {
+    "id": "max-speed",
+    "value": 50,
+    "unit": "km/h",
+    "scope": "highest speed on the tram network, also off the road, unless a Rychlostník sign allows more",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 22,
+     "section": "§ 25.1"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q83"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "restriction-start-end",
+    "value": "front in, rear out",
+    "unit": null,
+    "scope": "a speed restriction applies from the front's entry until the rear passes the end sign (\"Ukončení omezené rychlosti\", \"Konec zóny\")",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 22,
+     "section": "§ 25.1, § 49.14, § 49.22"
+    }
+   },
+   {
+    "id": "point-restriction",
+    "value": "front only",
+    "unit": null,
+    "scope": "\"Místo s omezenou rychlostí\": the front passes the point at the speed; speed up once the front has passed",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 54,
+     "section": "§ 49.16"
+    }
+   },
+   {
+    "id": "higher-speed-start-end",
+    "value": "rear in, front out",
+    "unit": null,
+    "scope": "a Rychlostník allowing more than 50 km/h: higher speed from the rear passing it; reduced when the front passes its end",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 22,
+     "section": "§ 25.1"
+    }
+   },
+   {
+    "id": "switch-facing-speed",
+    "value": 15,
+    "unit": "km/h",
+    "scope": "facing a switch (against its points), set straight or diverging, unless a sign sets another speed",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 22,
+     "section": "§ 25.4 a"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q64"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "switch-trailing-diverging-speed",
+    "value": 15,
+    "unit": "km/h",
+    "scope": "trailing a switch (from the frog side) out of its diverging branch, unless signed",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 22,
+     "section": "§ 25.4 b"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q68",
+       "Q80"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "switch-trailing-straight-speed",
+    "value": 30,
+    "unit": "km/h",
+    "scope": "trailing a switch out of its straight branch, unless signed",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 23,
+     "section": "§ 25.5 a"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q69",
+       "Q81"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "crossing-speed",
+    "value": 15,
+    "unit": "km/h",
+    "scope": "over track crossings (diamonds) and trolley-wire crossings, unless signed",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 22,
+     "section": "§ 25.4 c"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q65"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "loop-speed",
+    "value": 15,
+    "unit": "km/h",
+    "scope": "in the curves of a turning loop, from the first facing switch (or the switch into the loop) to the last trailing switch (or the switch out of it)",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 23,
+     "section": "§ 25.4 e"
+    }
+   },
+   {
+    "id": "switch-v-sign-speed",
+    "value": 10,
+    "unit": "km/h",
+    "scope": "facing into the diverging branch of a switch outside depots marked with the \"Rychlost přes výhybku\" sign",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 55,
+     "section": "§ 49.20"
+    }
+   },
+   {
+    "id": "small-radius-speed",
+    "value": 15,
+    "unit": "km/h",
+    "scope": "the whole of a curve of radius under 25 m, marked \"Oblouk o malém poloměru\"; not marked where another rule already slows",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 55,
+     "section": "§ 49.19"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q79"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "stop-pass-speed",
+    "value": 30,
+    "unit": "km/h",
+    "scope": "the front passing the stop sign of a regular or request stop where the train does not stop",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 23,
+     "section": "§ 25.5 b"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q86",
+       "Q87"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "slow-sign-speed",
+    "value": 10,
+    "unit": "km/h",
+    "scope": "\"Pomalu\" sign, hand signal, track works",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 53,
+     "section": "§ 49.13, § 51.5, § 25.3 e"
+    }
+   },
+   {
+    "id": "gradient-no-speed",
+    "value": null,
+    "unit": null,
+    "scope": "the \"dangerous gradient\" rules are about entering an occupied section and starting, not speed; PPS Q53 marks \"25 km/h\" wrong",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 52,
+     "section": "§ 49.9–12"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q53"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "trojska-descent",
+    "value": [
+     20,
+     25
+    ],
+    "unit": "km/h",
+    "scope": "Trojská street, Hercovka → Nad Trojou, 470 m at 80.15 ‰: stop at the signal (safety stopping place), test the parking brake, roll without power; two blocks with signals, one train per block; uphill one train in the section at full power",
+    "basis": "local rule",
+    "source": {
+     "document": "prazsketramvaje.cz: Trojská (line 17 gradient)",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"
+    },
+    "cites": [
+     {
+      "document": "prazsketramvaje.cz: Bezpečnostní zastavovací místa",
+      "year": 2026,
+      "read": "2026-11-03",
+      "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"
+     }
+    ]
+   },
+   {
+    "id": "stop-front-position",
+    "value": "at the sign",
+    "unit": null,
+    "scope": "the first train in a stop stands with its front next to the stop sign or as close before it as possible",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 24,
+     "section": "§ 27.6"
+    }
+   },
+   {
+    "id": "stop-second-train-gap",
+    "value": 1,
+    "unit": "m",
+    "scope": "a second or later train in a stop: at least 1 m behind the train ahead, its rear inside the stop area",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 24,
+     "section": "§ 27.6"
+    }
+   },
+   {
+    "id": "standing-gap",
+    "value": 1,
+    "unit": "m",
+    "scope": "between two standing trains, from the coupler head",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 31,
+     "section": "§ 33.9"
+    }
+   },
+   {
+    "id": "stop-area-default",
+    "value": 30,
+    "unit": "m",
+    "scope": "the stop area: sign to end marker; else the platform edge's length; else 30 m from the sign",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 9,
+     "section": "§ 2.22"
+    }
+   },
+   {
+    "id": "stop-roadway-two-trains",
+    "value": 2,
+    "unit": "trains",
+    "scope": "at stops boarded from the roadway, only the first two trains; at islands as many as fit, the third and later stop again at the sign",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 24,
+     "section": "§ 27.4–5"
+    }
+   },
+   {
+    "id": "on-time-window",
+    "value": [
+     0,
+     179
+    ],
+    "unit": "s late",
+    "scope": "departure from an intermediate stop (nácestná)",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 17,
+     "section": "§ 16.2 a"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: exam set D1 Provozně předpisová soustava (valid from 2025-09-01)",
+      "year": 2025,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_1_pps_20260201.pdf",
+      "questions": [
+       "Q51"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "on-time-window-first-stop",
+    "value": [
+     0,
+     59
+    ],
+    "unit": "s late",
+    "scope": "departure from a boarding stop (nástupní)",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 17,
+     "section": "§ 16.2 b"
+    }
+   },
+   {
+    "id": "start-gap-bunched",
+    "value": 50,
+    "unit": "m",
+    "scope": "gap to the train ahead when starting with trains bunched; more than 100 m during supply failures; or start after the train ahead has passed the nearest section insulator",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 31,
+     "section": "§ 33.7"
+    }
+   },
+   {
+    "id": "following-distance",
+    "value": "braking distance",
+    "unit": null,
+    "scope": "the following train keeps a distance in which it can stop safely",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 31,
+     "section": "§ 33.8"
+    }
+   },
+   {
+    "id": "request-stop-must-stop",
+    "value": "list",
+    "unit": null,
+    "scope": "approach so as to see the stop and stop smoothly when: someone is in the stop area; a passenger signalled; information cannot be given by the system; the train has no door-request buttons; a button is broken; last stop of a pull-in route. Otherwise pass at the set speed with care",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 25,
+     "section": "§ 27.14"
+    },
+    "supports": "rules user-request-stops"
+   },
+   {
+    "id": "doors-warning",
+    "value": 3,
+    "unit": "s",
+    "scope": "the \"Nevystupujte – nenastupujte\" warning before the doors close, heard and seen inside and outside",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 60,
+     "section": "§ 51.12"
+    }
+   },
+   {
+    "id": "bell-warning",
+    "value": 2,
+    "unit": "s",
+    "scope": "signal \"Pozor\" given by the driver; compulsory before driving over a pit and into a depot hall, optional at stops (the user)",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 60,
+     "section": "§ 51.6"
+    },
+    "user": {
+     "source": "user 2026-11-04 (#215, picker note)",
+     "quote": "Řidič je povinen dát tuto návěst před vjezdem nad pracovní jámu a do haly depa. U zastávek nepovinné"
+    }
+   },
+   {
+    "id": "parked-while-standing",
+    "value": null,
+    "unit": null,
+    "scope": "while standing the brake pedal is in the parked position (or a hand controller at full service brake); on a slope the second step of the mechanical brake",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 32,
+     "section": "§ 34.3, § 34.13"
+    }
+   },
+   {
+    "id": "section-insulator-coast",
+    "value": "no current",
+    "unit": null,
+    "scope": "section insulator (green diamond, white dots in a row): all pantographs up, no traction current; a diode insulator (white bar) may be passed drawing current",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 56,
+     "section": "§ 49.23, § 49.27"
+    }
+   },
+   {
+    "id": "trolley-crossing-coast",
+    "value": "no current",
+    "unit": null,
+    "scope": "trolley-wire crossings: no traction current, all pantographs up, where safely possible",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 32,
+     "section": "§ 33.14"
+    }
+   },
+   {
+    "id": "insulator-roll-off",
+    "value": null,
+    "unit": null,
+    "scope": "T3SUCS stopped under a section insulator: unpark the brake pedal, press \"Mycí stroj\" with the drive pedal, roll off by gravity",
+    "basis": "vehicle manual",
+    "source": {
+     "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+     "year": 2009,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+     "page": 7
+    }
+   },
+   {
+    "id": "power-cut-accelerator-stop",
+    "value": null,
+    "unit": null,
+    "scope": "power failure on a dangerous descent: other trains roll on to the next stop, a train with an accelerator (T3) stops at once",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 52,
+     "section": "§ 49.11"
+    }
+   },
+   {
+    "id": "switch-signal-steady",
+    "value": null,
+    "unit": null,
+    "scope": "light signal of a remote-controlled or hand-set lockable switch: a steady red arrow means the route is set and the switch locked; blinking adds blocked against remote throwing; a centre dot means the route may not be set, assume unlocked",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 44,
+     "section": "§ 45.3–5"
+    }
+   },
+   {
+    "id": "radio-switch-distances",
+    "value": {
+     "selectorBefore": 40,
+     "receiverBefore": [
+      25,
+      35
+     ]
+    },
+    "unit": "m",
+    "scope": "radio-controlled switch: the driver sets left / straight / right at least 40 m before; the receiver lies right of the track 25–35 m before the switch; the switch is thrown and blocked when the car's front passes it; once blocked, a contact cannot throw it",
+    "basis": "practice",
+    "source": {
+     "document": "prazsketramvaje.cz: Radiově ovládané výhybky",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041278"
+    }
+   },
+   {
+    "id": "radio-circuit-entry",
+    "value": null,
+    "unit": null,
+    "scope": "a train passes the \"Přijímač rádiového signálu\" sign only when no train is in the switch circuit (which ends at the unblocking device)",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 28,
+     "section": "§ 29.14–16"
+    }
+   },
+   {
+    "id": "trailing-locked-forbidden",
+    "value": null,
+    "unit": null,
+    "scope": "trailing over a lockable, speed or strut-secured switch is forbidden where the wheels would throw its blades",
+    "basis": "operating rule",
+    "source": {
+     "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
+     "year": 2025,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
+     "page": 27,
+     "section": "§ 29.7"
+    }
+   },
+   {
+    "id": "osm-switch-tags",
+    "value": {
+     "switches": 1017,
+     "withRef": 257,
+     "electric": 525
+    },
+    "unit": "nodes",
+    "scope": "railway=switch nodes on railway=tram ways in the local extract praha.osm.pbf (2026-10-22); ref = DP switch number (e.g. 616 Výtoň), railway:switch:electric=yes = remote-controlled; mostly surveyed September 2025",
+    "basis": "data",
+    "source": {
+     "document": "OpenStreetMap, local extract raw/osm/praha.osm.pbf",
+     "year": 2026,
+     "url": "https://www.openstreetmap.org/node/775323"
+    }
+   },
+   {
+    "id": "contact-blocking",
+    "value": {
+     "auxiliaryPast": 15,
+     "unblockPast": 30
+    },
+    "unit": "m",
+    "scope": "introduced because a 2×T3's second pantograph sometimes threw the switch under the set; the switch unblocks when a pantograph closes the unblocking contact while the auxiliary contact is open",
+    "basis": "practice",
+    "source": {
+     "document": "Technika pražských tramvají (student club slides, undated)",
+     "year": null,
+     "url": "https://k5.sh.cvut.cz/~oskar/stah/technika_tramvaji_darkblue.pdf"
+    }
+   },
+   {
+    "id": "t3sucs-switch-button",
+    "value": {
+     "acceleratorMax": 30,
+     "speedKmh": 12,
+     "ohm": 3.5,
+     "fuse": 63,
+     "maxSeconds": 10
+    },
+    "unit": "km/h, Ω, A, s",
+    "scope": "TV → M1 rest contact → ZR9 (1–30) → contactor SV; the speed is an estimate (8–15 km/h)",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Základní schema tramvaje T3SU/ČSSR, drawing 1-38-370 444, issue F",
+     "year": 1987,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-schema.pdf",
+     "page": 1,
+     "part": "1-38-370 444"
+    },
+    "cites": [
+     {
+      "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+      "page": 18,
+      "part": "T-50413"
+     }
+    ]
+   },
+   {
+    "id": "deviation-display",
+    "value": {
+     "onTime": [
+      0,
+      179
+     ],
+     "earlyRed": 1,
+     "earlyFlash": 60,
+     "lateYellow": [
+      180,
+      419
+     ],
+     "lateFlash": 420
+    },
+    "unit": "s",
+    "scope": "the dispatcher's display, not the driver's cab (for a dispatcher mode): deviation shown by the dispatch system: on time 0–179 s late; early by more than 1 s red, more than 60 s flashing red; 180–419 s late yellow; 420 s and more flashing yellow",
+    "basis": "practice",
+    "source": {
+     "document": "prazsketramvaje.cz: DORIS",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2013010201"
+    },
+    "user": {
+     "source": "user 2026-11-05 (#293)",
+     "quote": "dispatcher's panel is not related to driver's cabin but we could include it for potential future addition of dispatcher mode"
+    }
+   },
+   {
+    "id": "depot-run-marking",
+    "value": null,
+    "unit": null,
+    "scope": "pull-in runs show the destination in reversed colours; a T3 with a paper roll sign shows green letters on white instead of blue (the user); reserve trains \"X\" instead of the line number",
+    "basis": "practice",
+    "source": {
+     "document": "prazsketramvaje.cz: Označování vlaků",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041446"
+    },
+    "user": {
+     "source": "user 2026-11-04 (#215, picker note)",
+     "quote": "Generally it has inverse destination colors, T3 with paper display has green letters on white  instead of blue"
+    }
+   },
+   {
+    "id": "t3sucs-drive-steps",
+    "value": {
+     "angles": [
+      5,
+      12,
+      20,
+      27,
+      35
+     ],
+     "maxAngle": 40,
+     "currents": [
+      220,
+      290,
+      360,
+      420,
+      480
+     ],
+     "accelEmpty": [
+      0.6,
+      0.95,
+      1.2,
+      1.5,
+      1.8
+     ]
+    },
+    "unit": "°, A, m/s²",
+    "scope": "the step sets the starting current the limiting relay holds; every step ends at the balancing speed (65 km/h empty, level); no shunting step; any brake pedal travel cuts drive",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Funkce a obsluha elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-03-Funkce.a.obsluha.El.vyzbroje.TR.37.pdf",
+     "page": 4,
+     "part": "T-50172"
+    },
+    "cites": [
+     {
+      "document": "ČKD: Šlapkový řadič HG 14 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-16-Slapkovy.radic.HG.14.pdf",
+      "page": 6,
+      "part": "T-50407"
+     },
+     {
+      "document": "Электрическая схема вагона Т-3 (Soviet textbook chapter, web copy)",
+      "year": null,
+      "url": "https://poezdvl.com/electrooborudovanie-tramvaev-i-troleybusov/elektricheskaya-skhema-vagona-t-3.html"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-brake-steps",
+    "value": {
+     "angles": [
+      3,
+      7,
+      12,
+      18,
+      23
+     ],
+     "park": 27,
+     "trackRear": 37,
+     "trackBoth": 40,
+     "currents": [
+      160,
+      211,
+      262,
+      306,
+      350
+     ],
+     "step5Current": [
+      340,
+      360
+     ]
+    },
+    "unit": "°, A",
+    "scope": "electric (rheostatic) brake through the accelerator; step 5 measured by ČKD, steps 1–4 inferred: the brake pedal uses the drive pedal's current settings and the preparation coil scales them by 350/480; electric brake from 30–50 km/h parked ≈1.2 m/s², emergency (pedal to the end) ≈2.3 m/s²",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Šlapkový řadič HG 14 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-16-Slapkovy.radic.HG.14.pdf",
+     "page": 6,
+     "part": "T-50407"
+    },
+    "cites": [
+     {
+      "document": "ČKD: TR 37 – Zkoušení ve voze (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-26-Zkouseni.ve.voze.pdf",
+      "page": 4,
+      "part": "T-50361"
+     },
+     {
+      "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+      "page": 14,
+      "part": "T-50413"
+     },
+     {
+      "document": "ČKD: Základní schema tramvaje T3SU/ČSSR, drawing 1-38-370 444, issue F",
+      "year": 1987,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-schema.pdf",
+      "page": 1,
+      "part": "1-38-370 444"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-accelerator",
+    "value": {
+     "positions": 99,
+     "ohm": 3.614,
+     "driveOhm": 2.835,
+     "dampingOhm": [
+      0.35,
+      0.7
+     ],
+     "sweepSeconds": 5,
+     "bridgedAt": 75,
+     "fieldStages": [
+      80,
+      85,
+      90,
+      95
+     ],
+     "fieldMin": 0.55,
+     "pilotStop": 97
+    },
+    "unit": "mixed",
+    "scope": "a pilot motor turns a contact cross over 99 fingers; the limiting relay advances it while the current is below the setting, stops it at the setting, reverses it on a large overshoot; the accelerator lamp is lit until position 75 (≈30–35 km/h)",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Zrychlovač TR 37/040 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-17-Zrychlovac.pdf",
+     "page": 1,
+     "part": "T-50408"
+    },
+    "cites": [
+     {
+      "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+      "page": 8,
+      "part": "T-50413"
+     },
+     {
+      "document": "ČKD: Zrychlovač TR 37/040 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-17-Zrychlovac.pdf",
+      "page": 5,
+      "part": "T-50408"
+     },
+     {
+      "document": "ČKD: Základní schema tramvaje T3SU/ČSSR, drawing 1-38-370 444, issue F",
+      "year": 1987,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-schema.pdf",
+      "page": 1,
+      "part": "1-38-370 444"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-parking",
+    "value": 27,
+    "unit": "°",
+    "scope": "tip the pedal plate forward into the ratchet, back with the heel to release; pedal to 0 after parking = shoe brake stage 1; full release by the drive pedal",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Šlapkový řadič HG 14 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-16-Slapkovy.radic.HG.14.pdf",
+     "page": 1,
+     "part": "T-50407"
+    },
+    "cites": [
+     {
+      "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+      "page": 16,
+      "part": "T-50413"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-coasting-current",
+    "value": [
+     40,
+     90
+    ],
+    "unit": "A",
+    "scope": "ammeter reading while coasting per the DP exam; ČKD calls it negligible; Soviet book: relay 25 ± 5 A, at most 0.14 m/s² of drag",
+    "basis": "vehicle",
+    "source": {
+     "document": "DP Praha: exam T3 – zrychlovač",
+     "year": 2023,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/testy_d1_4_technicka_priprava_t3zr_20260201.pdf",
+     "questions": [
+      "Q2853"
+     ]
+    },
+    "cites": [
+     {
+      "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+      "page": 13,
+      "part": "T-50413"
+     },
+     {
+      "document": "Электрическая схема вагона Т-3 (Soviet textbook chapter, web copy)",
+      "year": null,
+      "url": "https://poezdvl.com/electrooborudovanie-tramvaev-i-troleybusov/elektricheskaya-skhema-vagona-t-3.html"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-mech-brake-cut-in",
+    "value": 120,
+    "unit": "A",
+    "scope": "relay LO is then held only by its series coil; below 120 A ±5 % it drops and the shoe brakes apply fully; on lower steps the electric brake simply fades",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+     "page": 16,
+     "part": "T-50413"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+      "year": 2009,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+      "page": 5
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-track-brake-stages",
+    "value": 2,
+    "unit": "stages",
+    "scope": "brake pedal past the parked position: rear bogie (≈37°); on the floor: both bogies (40°)",
+    "basis": "vehicle",
+    "source": {
+     "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+     "year": 2009,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+     "page": 5
+    },
+    "cites": [
+     {
+      "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+      "year": 1982,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+      "page": 16,
+      "part": "T-50413"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-drive-to-brake",
+    "value": [
+     2,
+     3
+    ],
+    "unit": "s",
+    "scope": "ČKD advises 2–3 s of coasting between service braking and driving; DP: a fast change from drive to brake makes the electrodynamic brake drop out and the mechanical brake come in early",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Funkce a obsluha elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-03-Funkce.a.obsluha.El.vyzbroje.TR.37.pdf",
+     "page": 11,
+     "part": "T-50172"
+    },
+    "cites": [
+     {
+      "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+      "year": 2009,
+      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+      "page": 4
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-door-interlock",
+    "value": null,
+    "unit": null,
+    "scope": "door relay DBR (relé blokování rozjezdu), fed through the door contacts of all three doors, in the coil circuit of line contactor LS; no speed condition, no brake contact (wiring diagram, revision b of 1983)",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+     "page": 7,
+     "part": "T-50413"
+    },
+    "cites": [
+     {
+      "document": "ČKD: Základní schema tramvaje T3SU/ČSSR, drawing 1-38-370 444, issue F",
+      "year": 1987,
+      "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-schema.pdf",
+      "page": 1,
+      "part": "1-38-370 444"
+     }
+    ]
+   },
+   {
+    "id": "t3-no-deadman",
+    "value": null,
+    "unit": null,
+    "scope": "the T2's vigilance pedal was dropped; the safety button (and passengers' rescue-brake buttons) drop the safety relay: no traction, shoe and track brakes, bell",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Funkce a obsluha elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-03-Funkce.a.obsluha.El.vyzbroje.TR.37.pdf",
+     "page": 7,
+     "part": "T-50172"
+    }
+   },
+   {
+    "id": "t3sucs-max-relay",
+    "value": 750,
+    "unit": "A",
+    "scope": "opens the line contactor; a fault event when steps are slammed",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Popis funkcí elektrické výzbroje TR 37 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-24-Popis.funkci.elektricke.vyzbroje.TR.37.pdf",
+     "page": 9,
+     "part": "T-50413"
+    }
+   },
+   {
+    "id": "te022-motor",
+    "value": {
+     "power": 40000,
+     "voltage": 300,
+     "current": 150,
+     "rpm": 1750,
+     "rpmMax": 4200,
+     "gear": 7.43,
+     "wheel": 0.7,
+     "vmax": 65
+    },
+    "unit": "W, V, A, rpm, m, km/h",
+    "scope": "two motors in series per bogie, bogies in parallel; field weakened to 55 %; gear ratio and wheel diameter from Russian sources",
+    "basis": "vehicle",
+    "source": {
+     "document": "ČKD: Trakční motor TE 022 (TR 37 equipment documentation for the T3SU)",
+     "year": 1982,
+     "url": "https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-04-Trakcni.motor.TE.022.pdf",
+     "page": 2,
+     "part": "T-50272"
+    },
+    "cites": [
+     {
+      "document": "ru.wikipedia: Tatra T3 (citing Вагоны Т-3, 1977)",
+      "year": 2026,
+      "url": "https://ru.wikipedia.org/wiki/Tatra_T3"
+     }
+    ]
+   },
+   {
+    "id": "t3sucs-sand-axle",
+    "value": "first axle",
+    "unit": null,
+    "scope": "lever, spring and Bowden cable; heated sand boxes under the first seats",
+    "basis": "vehicle",
+    "source": {
+     "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+     "year": 2009,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+     "page": 6
+    }
+   },
+   {
+    "id": "t3-dimensions",
+    "value": {
+     "length": 15.2,
+     "width": 2.5,
+     "mass": 16000,
+     "seats": 24,
+     "standing": 86
+    },
+    "unit": "m, kg",
+    "scope": "T3SUCS and T3R.P",
+    "basis": "vehicle",
+    "source": {
+     "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+     "year": 2009,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+     "page": 4
+    }
+   },
+   {
+    "id": "t3rplf-profile",
+    "value": {
+     "length": 16.3,
+     "mass": 20500,
+     "profile": "KT"
+    },
+    "unit": "m, kg",
+    "scope": "T3R.PLF",
+    "basis": "vehicle",
+    "source": {
+     "document": "DP Praha: Tramvaje T3.SUCS, T3M, T3R.P, T3R.PLF, učební pomůcka (03/09)",
+     "year": 2009,
+     "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
+     "page": 20
+    }
+   }
+  ],
+  "lists": [
+   {
+    "id": "small-radius-curves",
+    "text": "Small-radius curves (R < 25 m, 15 km/h, \"r\" sign) on our lines.",
+    "source": {
+     "document": "prazsketramvaje.cz: Návěsti upravující rychlost tramvaje",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"
+    },
+    "entries": [
+     {"kind": "small-radius-curve", "place": "Na Moráni, from Karlovo náměstí", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["9", "10"], "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Národní – Spálená", "curve": "inner and outer", "value": 15, "unit": "km/h", "lines": ["9", "22", "23"], "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Malostranské náměstí, by Beseda", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["22", "23"], "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Malostranské náměstí, from Karmelitská by Mostecká", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["22", "23"], "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Letenská interlaced track, entry and exit at Klárov", "curve": "inner and outer", "value": 15, "unit": "km/h", "lines": ["22", "23"], "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Chotkova, by Jelení příkop", "curve": "inner and outer", "value": 15, "unit": "km/h", "lines": ["22", "23"], "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Havlíčkova, before Hybernská", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["23"], "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Náměstí Míru, under the stop towards the centre", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["22", "10"], "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Náměstí Míru x Jugoslávská, by the Praha 2 office", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["22", "10"], "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Blanická – Korunní", "curve": "inner and outer", "value": 15, "unit": "km/h", "lines": ["10"], "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "small-radius-curve", "place": "Na Žertvách x U Balabenky", "curve": "inner", "value": 15, "unit": "km/h", "lines": ["37"], "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"}
+    ]
+   },
+   {
+    "id": "night-zones",
+    "text": "Night speed zones, 40 km/h 22–6 h, start and end places.",
+    "source": {
+     "document": "prazsketramvaje.cz: Návěsti upravující rychlost tramvaje",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"
+    },
+    "entries": [
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["17"], "start": "Rašínovo nábřeží, before Vnislavova (DC)", "end": "Rašínovo nábřeží, after Vnislavova (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["17"], "start": "Masarykovo nábřeží, before Myslíkova (DC)", "end": "Masarykovo nábřeží, after Myslíkova (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["17"], "start": "Dukelských hrdinů, before Strossmayerovo náměstí", "end": "Dukelských hrdinů, after Strossmayerovo náměstí", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["17"], "start": "Klapkova, before Veltěžská (DC)", "end": "Klapkova, at Veltěžská (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["17"], "start": "Klapkova, after Ke Stírce", "end": "Klapkova, before Ke Stírce", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9", "22", "23"], "start": "Národní, after Masarykovo nábřeží (DC)", "end": "Národní, before Smetanovo nábřeží (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9", "22", "23"], "start": "Vítězná, after Most Legií (ZC)", "end": "Vítězná, before Most Legií (DC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9", "23"], "start": "Lazarská, after Spálená towards Václavské náměstí", "end": "Lazarská, before Spálená from Václavské náměstí", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9", "23"], "start": "Senovážné náměstí, before the junction from Václavské náměstí", "end": "Senovážné náměstí, after the junction towards Václavské náměstí", "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9"], "start": "Štefánikova, before Anděl from Újezd", "end": "Štefánikova, after Anděl towards Újezd", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9"], "start": "Štefánikova, after Holečkova (DC)", "end": "Štefánikova, before Holečkova (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["9"], "start": "Plzeňská, after U Trojice (DC)", "end": "Plzeňská, before U Trojice (ZC)", "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["10"], "start": "Olšanská, before Jičínská", "end": "Olšanská, after Jičínská (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["10"], "start": "Jana Želivského, before Nákladové nádraží Žižkov stop (ZC)", "end": "Jana Želivského, after the stop (DC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["10"], "start": "Vinohradská, after Želivského stop (DC)", "end": "Vinohradská, before Želivského stop (ZC)", "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22"], "start": "Bělohorská, after Myslbekova", "end": "Bělohorská, before Myslbekova", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22"], "start": "Bělohorská, before Pod Královkou", "end": "Bělohorská, after Pod Královkou", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22"], "start": "Bělohorská, after Malý Břevnov stop (ZC)", "end": "Bělohorská, before Malý Břevnov stop (DC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22", "23"], "start": "Karmelitská, before Mostecká (DC)", "end": "Karmelitská, before Mostecká (ZC)", "check": false, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22", "23"], "start": "Keplerova, before Hládkov (ZC)", "end": null, "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22"], "start": "Francouzská, before Blanická (DC)", "end": "Francouzská, after Blanická (ZC)", "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22"], "start": "V Olšinách, before Průběžná from Starostrašnická", "end": "V Olšinách, after Průběžná", "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"},
+     {"kind": "night-zone", "value": 40, "unit": "km/h", "hours": "22-6", "lines": ["22"], "start": "Starostrašnická, before Krátká (DC)", "end": "Starostrašnická, after Krátká (ZC)", "check": true, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041265"}
+    ]
+   },
+   {
+    "id": "speed-switches",
+    "text": "Speed switches R01–R09 with their straight / diverging speeds.",
+    "source": {
+     "document": "prazsketramvaje.cz: Radiově ovládané výhybky – evidenční čísla",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"
+    },
+    "entries": [
+     {"kind": "speed-switch", "number": "R01", "place": "Prašný most od Hradčanské", "straight": 50, "diverging": 40, "unit": "km/h", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R02", "place": "Vozovna Střešovice, into the depot", "straight": 30, "diverging": 15, "unit": "km/h", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R03", "place": "Letenský tunel od Strossmayerova náměstí", "straight": 50, "diverging": 40, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R04", "place": "Nádraží Braník, into the loop", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R05", "place": "Průběžná od Strašnické", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["22"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R06", "place": "Depo Hostivař od Ústředních dílen", "straight": 30, "diverging": 15, "unit": "km/h", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R07", "place": "Kotlářka, into the loop", "straight": 50, "diverging": 15, "unit": "km/h", "lines": ["9"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R08", "place": "Lihovar od Hlubočep", "straight": 30, "diverging": 30, "unit": "km/h", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R09", "place": "Podolské nábřeží od Dvorců", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"}
+    ]
+   },
+   {
+    "id": "safety-stopping-places",
+    "text": "Safety stopping places (stop, test the parking brake), and how the train starts.",
+    "source": {
+     "document": "prazsketramvaje.cz: Bezpečnostní zastavovací místa",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"
+    },
+    "entries": [
+     {"kind": "safety-stop", "place": "Trojská street, Hercovka → Nad Trojou", "start": "gravity", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Vozovna Kobylisy loop, both boarding stops", "start": "power", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Kobylisy depot exit gate", "start": "power", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Jičínská, Flora → Olšanské náměstí", "start": "gravity", "lines": ["10"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Blatiny towards Vozovna Motol", "start": "power", "lines": ["9"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Malovanka towards Hládkov / Pohořelec", "start": "power", "lines": ["22", "23"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Pohořelec towards Hládkov / Malovanka", "start": "power", "lines": ["22", "23"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Jana Masaryka towards Krymská", "start": "power", "lines": ["22"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"},
+     {"kind": "safety-stop", "place": "Krejcárek → Palmovka, ~120 m before Sokolovská", "start": "gravity", "lines": ["37"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041282"}
+    ]
+   },
+   {
+    "id": "dangerous-gradients",
+    "text": "Dangerous gradients on line 17.",
+    "source": {
+     "document": "prazsketramvaje.cz: Trojská",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"
+    },
+    "entries": [
+     {"kind": "dangerous-gradient", "place": "Trojská street, Hercovka – Nad Trojou", "length": 470, "gradient": 80.15, "unit": "‰", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"},
+     {"kind": "gradient", "place": "below Sídliště Modřany", "gradient": 69.9, "unit": "‰", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"},
+     {"kind": "curve-speed", "place": "embankment curve before Nádraží Modřany", "value": 40, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"}
+    ]
+   },
+   {
+    "id": "meeting-ban-narodni",
+    "text": "Meeting ban at Národní divadlo (\"T - KT\": T3s may not meet KT8D5).",
+    "source": {
+     "document": "prazsketramvaje.cz: Návěsti pro míjení tramvají",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041267"
+    },
+    "entries": [
+     {"kind": "meeting-ban", "place": "Národní divadlo", "types": "T - KT", "lines": ["9", "17", "22", "23"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041267"}
+    ]
+   },
+   {
+    "id": "hand-set-switches",
+    "text": "Hand-set lockable switches U02–U18 (U07 and U17 on line 17, straight in service).",
+    "source": {
+     "document": "prazsketramvaje.cz: Uzamykatelné výhybky s pomocným světelným návěstidlem",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"
+    },
+    "entries": [
+     {"kind": "hand-set-switch", "number": "U02", "place": "Myslíkova from Karlovo náměstí", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U03", "place": "Motol depot exit", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U04", "place": "Pankrác depot to the stub", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U05", "place": "Plzeňská × Radlická from Bertramka", "control": "hand, lockable, auxiliary light signal", "lines": ["9"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U06", "place": "Sídliště Řepy loop to the stub", "control": "hand, lockable, auxiliary light signal", "lines": ["9"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U07", "place": "Podolská vodárna from Kublov (into the loop)", "control": "hand, lockable, auxiliary light signal", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U08", "place": "Zámecká from Nádraží Vršovice", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U09", "place": "Ke Stírce from Bulovka", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U10", "place": "Čechovo náměstí from Koh-i-noor", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U12", "place": "Octárna from Hládkov", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U13", "place": "Čechovo náměstí from Vršovické náměstí", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U14", "place": "U Balabenky from Palmovka (upper)", "control": "hand, lockable, auxiliary light signal", "lines": ["37"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U16", "place": "Vokovice depot", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U17", "place": "Ke Stírce from Trojská", "control": "hand, lockable, auxiliary light signal", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"},
+     {"kind": "hand-set-switch", "number": "U18", "place": "Octárna from Petřiny", "control": "hand, lockable, auxiliary light signal", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2010083001"}
+    ]
+   },
+   {
+    "id": "radio-switches",
+    "text": "Radio-controlled switches on our lines (200 by place name), with number and contact state.",
+    "source": {
+     "document": "prazsketramvaje.cz: Radiově ovládané výhybky – evidenční čísla",
+     "year": 2026,
+     "read": "2026-11-03",
+     "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"
+    },
+    "entries": [
+     {"number": "501", "place": "Anděl od Újezda", "control": "radio", "blades": "spring, lockable", "contact": "removed 17.6.2007", "lines": ["9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "503L", "place": "Anděl od Smíchovského nádraží 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 17.6.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "503P", "place": "Anděl od Smíchovského nádraží 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 17.6.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "504", "place": "Smíchovské nádraží od Anděla", "control": "radio", "blades": "spring, lockable", "contact": "removed ?", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "511", "place": "Malostranská od Mánesova mostu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "512", "place": "Staroměstská od Právnické fakulty", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "514", "place": "Olšanské náměstí", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "520P", "place": "Flora od Želivského 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 14.8.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "520L", "place": "Flora od Želivského 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 14.8.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "521", "place": "Tylovo náměstí od Muzea", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "522", "place": "Staroměstská od Mánesova mostu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "523", "place": "Brusnice od Pohořelce", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "527", "place": "Čechův most od Klárova", "control": "radio", "blades": "spring, lockable", "contact": "removed 12.8.2007", "lines": ["17", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "529L", "place": "Strossmayerovo náměstí od Sparty 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "529P", "place": "Strossmayerovo náměstí od Sparty 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "530P", "place": "Strossmayerovo náměstí od Vltavské 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "530L", "place": "Strossmayerovo náměstí od Vltavské 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "531P", "place": "Strossmayerovo náměstí od Veletržní 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "531L", "place": "Strossmayerovo náměstí od Veletržní 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "532P", "place": "Strossmayerovo náměstí od Letenského tunelu 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "532L", "place": "Strossmayerovo náměstí od Letenského tunelu 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 9.4.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "535", "place": "Újezd od Malé Strany", "control": "radio", "blades": "spring, lockable", "contact": "removed 24.6.2007", "lines": ["9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "536", "place": "Újezd od Anděla", "control": "radio", "blades": "spring, lockable", "contact": "removed 24.6.2007", "lines": ["9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "538", "place": "Koh-i-noor od Čechova náměstí", "control": "radio", "blades": "spring, lockable", "contact": "removed 15.8.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "544P", "place": "Palmovka (dolní) od Libeňského mostu 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "544L", "place": "Palmovka (dolní) od Libeňského mostu 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "545L", "place": "Starý Hloubětín od Harfy 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 11.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "545P", "place": "Starý Hloubětín od Harfy 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 11.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "546P", "place": "Starý Hloubětín od vozovny 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 11.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "546L", "place": "Starý Hloubětín od vozovny 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 11.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "547", "place": "Starý Hloubětín z obratiště", "control": "radio", "blades": "spring, lockable", "contact": "removed 11.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "551", "place": "Obratiště Těšnov od Palmovky", "control": "radio", "blades": "spring, lockable", "contact": "removed ?", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "555", "place": "Na Poříčí od Bílé labutě", "control": "radio", "blades": "spring, lockable", "contact": "removed 28.6.2007", "lines": ["23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "557", "place": "Vltavská od Strossmayerova náměstí", "control": "radio", "blades": "spring, lockable", "contact": "removed 24.6.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "563", "place": "Harfa od Balabenky", "control": "radio", "blades": "spring, lockable", "contact": "removed ?", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "564", "place": "Harfa od Starého Hloubětína", "control": "radio", "blades": "spring, lockable", "contact": "removed ?", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "565", "place": "Harfa z obratiště", "control": "radio", "blades": "spring, lockable", "contact": "removed ?", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "566", "place": "Čechův most od Právnické fakulty", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "568", "place": "Vozovna Motol od Kotlářky", "control": "radio", "blades": "spring, lockable", "contact": "removed 20.6.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "569", "place": "Vozovna Motol od Sídliště Řepy", "control": "radio", "blades": "spring, lockable", "contact": "removed 20.6.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "572", "place": "Kubánské náměstí od obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "574P", "place": "Palmovka (dolní) od Sokolovské 1", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "574L", "place": "Palmovka (dolní) od Sokolovské 2", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "575", "place": "Balabenka od Harfy", "control": "radio", "blades": "spring, lockable", "contact": "removed 22.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "576", "place": "Vozovna Strašnice od Strašnické", "control": "radio", "blades": "spring, lockable", "contact": "removed 15.8.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "578", "place": "Kubánské náměstí od Průběžné", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "599P", "place": "Sídliště Modřany do obratiště 1", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "599L", "place": "Sídliště Modřany do obratiště 2", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "600", "place": "Harfa v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "removed ?", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "605", "place": "Průběžná od Strašnické", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.4.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "606", "place": "Průběžná od Kubánského námětí", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.4.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "607", "place": "Průběžná od Radošovické", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.4.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "608", "place": "Nákladové nádraží Žižkov od Želivského", "control": "radio", "blades": "spring, lockable", "contact": "removed 20.8.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "609", "place": "Nákladové nádraží Žižkov od Olšanské", "control": "radio", "blades": "spring, lockable", "contact": "removed 20.8.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "610", "place": "Nákladové nádraží Žižkov od Biskupcovy", "control": "radio", "blades": "spring, lockable", "contact": "removed 20.8.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "611", "place": "Na Knížecí od Anděla", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.8.2007", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "614", "place": "Výtoň od Palackého náměstí", "control": "radio", "blades": "spring, lockable", "contact": "removed 28.6.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "615", "place": "Výtoň od Albertova", "control": "radio", "blades": "spring, lockable", "contact": "removed 10.6.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "616", "place": "Výtoň od Podolí", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.6.2007", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "617P", "place": "Palmovka (dolní) od ulice Na Žertvách", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "617L", "place": "Palmovka (dolní) od ulice Na Žertvách", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "618P", "place": "Palmovka (dolní) od Bulovky", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "618L", "place": "Palmovka (dolní) od Bulovky", "control": "radio", "blades": "spring, lockable", "contact": "removed 7.4.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "619L", "place": "Palmovka (horní) od Zenklovy", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "619P", "place": "Palmovka (horní) od Zenklovy", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "620P", "place": "Palmovka (horní) od Balabenky", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "620L", "place": "Palmovka (horní) od Balabenky", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "621", "place": "Palmovka (horní) od Ohrady", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "622", "place": "Palmovka (horní) od Invalidovny", "control": "radio", "blades": "spring, lockable", "contact": "removed 16.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "623", "place": "Balabenka od Vysočanské", "control": "radio", "blades": "spring, lockable", "contact": "removed 22.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "624", "place": "Vypich do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "removed 20.8.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "625", "place": "Malostranká od Klárova", "control": "radio", "blades": "spring, lockable", "contact": "removed 12.8.2007", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "626", "place": "Ohrada od Biskupcovy", "control": "radio", "blades": "spring, lockable", "contact": "removed 22.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "627", "place": "Ohrada od Palmovky", "control": "radio", "blades": "spring, lockable", "contact": "removed 22.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "628", "place": "Ohrada od Vápenky", "control": "radio", "blades": "spring, lockable", "contact": "removed 21.6.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "629", "place": "Vápenka od Ohrady", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "630", "place": "Vápenka od Spojovací", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "631", "place": "Vápenka od vozovny Žižkov", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "632", "place": "Vápenka do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "removed 8.8.2007", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "634P", "place": "Tylovo náměstí od Náměstí Míru 1", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "634L", "place": "Tylovo náměstí od Náměstí Míru 2", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "638", "place": "Malostranská od Letenské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "639", "place": "Vinice od Strašnické", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "640", "place": "Klárov od Čechova mostu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "641", "place": "Klárov od Malostranské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "642P", "place": "Anděl od Plzeňské 1", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "642L", "place": "Anděl od Plzeňské 2", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "643", "place": "Lazarská od Myslíkovy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "644", "place": "Letenský tunel od náměstí Republiky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "645", "place": "Letenský tunel od Čechova mostu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "646P", "place": "Palackého náměstí od Moráně", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "646L", "place": "Palackého náměstí od Moráně", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "647L", "place": "Palackého náměstí od Výtoně", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "647P", "place": "Palackého náměstí od Výtoně", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "648P", "place": "Palackého náměstí od Anděla", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "648L", "place": "Palackého náměstí od Anděla", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "649L", "place": "Palackého náměstí od Mánesa", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "649P", "place": "Palackého náměstí od Mánesa", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "650", "place": "Vápenka v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "651", "place": "Francouzská od Korunní", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "652", "place": "Francouzská od Náměstí Míru", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "654", "place": "Vozovna Hloubětín od Kolbenovy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "656", "place": "Ke Stírce od Kobylis", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "658", "place": "Kobylisy od Zenklovy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "659", "place": "Kobylisy od Vozovny Kobylisy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "660", "place": "Kobylisy od Ďáblic", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "663", "place": "Vozovna Kobylisy do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "664", "place": "Vozovna Kobylisy v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "665", "place": "Bílá Hora do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "671", "place": "Vozovna Hloubětín od Poděbradské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "672", "place": "Malovanka od Královky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "673", "place": "Královka od Malovanky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "674L1", "place": "Lehovec v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "674L2", "place": "Lehovec v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "678", "place": "Kotlářka v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "680", "place": "Myslíkova od Lazarské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "681", "place": "Myslíkova od Mánesa", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "682", "place": "Tylovo náměstí od Štěpánské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "683", "place": "Sídliště Řepy v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "685P", "place": "Národní divadlo od Národní třídy 1", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "685L", "place": "Národní divadlo od Národní třídy 2", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "689", "place": "Staroměstská od Národního divadla", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "690", "place": "Podolská vodárna od Výtoně", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "691", "place": "Dvorce od Kublova", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "692", "place": "Dvorce od Nádraží Braník", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "693", "place": "Flora od Olšanského náměstí", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "694", "place": "Flora od Orionky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "695", "place": "Želivského od Vinice", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "696", "place": "Vinice od Želivského", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "697", "place": "Kubánské náměstí do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "701", "place": "Francouzská od Jana Masaryka", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "705", "place": "Starý Hloubětín od Lehovce", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "711", "place": "Elektrárna Holešovice od Výstaviště Holešovice", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "712", "place": "Karlovo náměstí od Moráně", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "713", "place": "Karlovo náměstí od Lazarské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "714", "place": "Karlovo náměstí od Štěpánské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "715", "place": "Moráň", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "716", "place": "Královka od Vypichu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "717", "place": "Radošovická od Průběžné", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "718", "place": "Vypich v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "719", "place": "Senovážné náměstí od Hlavního nádraží", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "723P", "place": "Tylovo náměstí od Bruselské 1", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "723L", "place": "Tylovo náměstí od Bruselské 2", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "724", "place": "Koh-i-noor od Bohemians", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "725", "place": "Minská od Koh-i-nooru", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "726", "place": "Minská od Bohemians", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "728", "place": "Koh-i-noor od Slavie", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "732", "place": "Kubánské náměstí od Slavie", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "733", "place": "Čechův most od Letenského tunelu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "735", "place": "U Balabenky od Palmovky (dolní)", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "736", "place": "U Balabenky od Balabenky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "737", "place": "Balabenka od Palmovky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "739", "place": "Olšanské hřbitovy od Flory", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "740", "place": "Olšanské hřbitovy od Želivského", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "741", "place": "Olšanské hřbitovy v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "742", "place": "Olšanské hřbitovy z obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "743", "place": "Želivského od Flory", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "744", "place": "Brusnice od Milady Horákové", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "745", "place": "Sirotčinec od Brusnice", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "746", "place": "Myslbekova do ulice Hládkov", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "747", "place": "Plzeňská x Radlická od Anděla", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "748", "place": "Chotkovy sady od Malostranské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "750", "place": "Chotkovy sady od Pražského hradu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "751L", "place": "Dlabačov a Malovanka od Pohořelce", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "751P", "place": "Dlabačov a Malovanka od Pohořelce", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "752", "place": "Vozovna Strašnice od Strašnické", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "753", "place": "Vozovna Strašnice od Vinice", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "759", "place": "Zahradní Město do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "760", "place": "Zahradní Město v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "761", "place": "Hlavní nádraží od Senovážného náměstí", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "762", "place": "Hlavní nádraží v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "771", "place": "Národní divadlo od Staroměstské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "773", "place": "Levského do Libuše", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "774", "place": "Chotkovy sady od Badeniho", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "779", "place": "Na Poříčí od Masarykova nádraží", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "780", "place": "Senovážné náměstí od Masarykova nádraží", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "781", "place": "Lazarská od Vodičkovy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "782", "place": "Senovážné náměstí od Jindřišské", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "783", "place": "Výstaviště Holešovice z obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "784", "place": "Výstaviště Holešovice v obratišti 1 (kolejová spojka)", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "785", "place": "Výstaviště Holešovice v obratišti 2 (předjízdné koleje)", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "786", "place": "Výstaviště Holešovice od Nádraží Holešovice", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "787", "place": "Výstaviště Holešovice od Veletržní", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "788", "place": "Národní divadlo od Mánesa", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "789", "place": "Vozovna Hloubětín z vozovny", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "790", "place": "Klárov od Chotkovy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "795", "place": "Na Poříčí od náměstí Republiky", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "796", "place": "U Balabenky od Palmovky (horní)", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "797", "place": "Želivského od Nákladového nádraží Žižkov", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "798", "place": "Anděl od Palackého náměstí", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17", "9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "800", "place": "Lihovar od Podolského nábřeží", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "801", "place": "Podolské nábřeží od Lihovaru", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "802", "place": "Podolské nábřeží od Podolské vodárny", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["17"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "803", "place": "Sídliště Řepy do obratiště", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "804", "place": "Brusnice od Pražského hradu", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "805", "place": "Malovanka od Hládkova", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "806", "place": "Újezd od Národního divadla", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "22", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "807", "place": "Lazarská od Národní třídy", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["9", "23"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "813L1", "place": "Spojovací v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"number": "813L2", "place": "Spojovací v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"}
+    ]
    }
   ]
  },
