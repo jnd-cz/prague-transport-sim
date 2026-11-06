@@ -6,6 +6,7 @@ How to publish, fetch and verify one: [DATA.md](../DATA.md).
 
 | id | note |
 |---|---|
+| `2026-11-06` | `2026-11-05b` + OSM Geofabrik 2026-11-04 (was 2026-10-22); 9 more Geoportál answers for lines 9 and 22 (#237). |
 | `2026-11-05b` | `2026-11-05` with the ZPS street survey at state 2026-10-31 instead of 2026-09-30 for the 17 districts of lines 9, 17, 22, 23 and 37 (34 packages, 263 MB, `python -I tools/dtm_packages.py --fetch --refresh`): the last state before the JVF 1.5.0.2 switch, schema as September's (#63). |
 | `2026-11-05` | `2026-11-03b` + the archive DTM's stop signs along lines 9, 17, 22, 23 and 37, both point layers (`raw/dtmpoints/lineN.signs.json`, `python -P -E tools/dtm_points.py N --signs`, fetched 2026-11-05): the stop sign's second source after the user's (#258). |
 | `2026-11-03b` | `2026-11-03` + DI set 7 at state 2026-10-31 for the same 16 districts (#209): Dvorecký most's tracks (2.9 km new, entered 2026-10-07 and 10-22) and records re-entered with heights. |

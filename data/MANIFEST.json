@@ -1,16 +1,16 @@
 {
- "snapshot": "2026-11-03b",
- "built_at_commit": "9a18a49",
- "published": "2026-11-04 06:24",
- "note": "line 17: facing switches behind merged nodes, 17 -> 19 (#219)",
+ "snapshot": "2026-11-06",
+ "built_at_commit": "6da86b1",
+ "published": "2026-11-06 10:03",
+ "note": "All five lines on DI's own graph (#237), OSM 2026-11-04",
  "files": {
   "line17.bld.bin": {
-   "size": 6348546,
-   "sha256": "a1029f73d31ab3e1823de3726ff55c42ae7caff1c09525cd47ab7b8fbfc7b8e4"
+   "size": 6348762,
+   "sha256": "a70b36e50626abc36a36fe2caf89ccbec85918556c89fa2264639f23986dcf5e"
   },
   "line17.dtm.json": {
-   "size": 9799447,
-   "sha256": "03450390bfe9504965844e01cb294873f81cc71154ef69cde50374b565eb6ff6"
+   "size": 9843793,
+   "sha256": "7fe05b1a5842a4fcba90b9f1560e0c6c69e5c52ea337f1272c19ef078e84a55a"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -25,96 +25,96 @@
    "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
-   "size": 228495,
-   "sha256": "905c2d71ff2117168727db63b42efcbb95c635edd509fdb130118d4b8017ae76"
+   "size": 228481,
+   "sha256": "73812ea95325d2e8a3c66cb66c02623be1172ceb4870d23669729f82e4784c31"
   },
   "line17.json": {
-   "size": 6752566,
-   "sha256": "5ec55cef1a20b744e04450cb33402ee8a6ed2ac8683adbdb0732163d4d368d56"
+   "size": 5562767,
+   "sha256": "1fed2b2b147f5d4ca2d9b6be2cf68294098be518450d005a60a84c63a58a4d1f"
   },
   "line17.signals.json": {
-   "size": 36904,
-   "sha256": "67b6936dcdf3d5314e034be59c26ad54c41475c29fc5b79d7ac3394d5230c542"
+   "size": 36581,
+   "sha256": "6c1f717142a60fce3d485da55829a862f044492b6578db31eb127edf0c68a263"
   },
   "line17.validate.json": {
-   "size": 4441,
-   "sha256": "54bb35413d9571e60d96a64bf14ae8e792342d1444b17a2068c95fe984575928"
+   "size": 4618,
+   "sha256": "9b324d130e82d0db9dd53a88ca8f5db948913d7ffbbe33126c4c089213a9a5a6"
   },
   "line17.zps.json": {
-   "size": 6548335,
-   "sha256": "d42ef0144017f9a515cdf6b844d4cb2ce57b0b6c43c5966ae2ac7db6f539f541"
+   "size": 6581522,
+   "sha256": "a8286b1263260489f5fb63fd74029358b4f79df3fcb4950b2a5975b9578451b5"
   },
   "line22.bld.bin": {
-   "size": 8575524,
-   "sha256": "a9d5d6b57c9d28649402ffa10d0193f6903caf3dac2fd2807d6006373ced0bfe"
+   "size": 8586288,
+   "sha256": "8e1defdacedabff69fc70db01d0e9bbc5e1305510d607d910c3d828a2bd067da"
   },
   "line22.dtm.json": {
-   "size": 9978041,
-   "sha256": "7953178fd6e469afeec3eef58732027f7975560d8bf89beb13370a30f2d1b1a8"
+   "size": 10146530,
+   "sha256": "e42104b171289991a44c21f1cba6a2a33868a63a3330f147a0abcaf92ce09c64"
   },
   "line22.fine.bin": {
    "size": 3734900,
-   "sha256": "78a1601dcf2480669e7cf6ca619c90809c5880d30a63528815eb7f9426c3408c"
+   "sha256": "c8d76ff740d13e3860f6e91d05d0ff2fbdd1299068b4e239b66997f1f9d4b038"
   },
   "line22.fine.json": {
    "size": 5438,
-   "sha256": "24b33986df34317f9625d3e7fe8e72c4e34eb904438a97e5e5d4850dba20998a"
+   "sha256": "a124987e2741c8f9808bd98a6042ccb7010ad9352aa793e5367573209ed155b1"
   },
   "line22.geo.json": {
-   "size": 205858,
-   "sha256": "eb7378012683c1bdaf1374980a6802ce84ab46f231d8f1daf6c6b667ec9ebba7"
+   "size": 206220,
+   "sha256": "2103b15d9c2bf8b551bca70d1f2ca49f34b4b9a8101c906ce0d84501458f636d"
   },
   "line22.json": {
-   "size": 5200220,
-   "sha256": "59cd515314740aac0e01f4e939156babdaa7562be3d587e5afb9ee1dfad2fe40"
+   "size": 5699084,
+   "sha256": "2f461e44b6a5c7ef67e5557c49b6d3471100c48bc05cb851dc7a3bf37db6a3fb"
   },
   "line22.zps.json": {
-   "size": 6851852,
-   "sha256": "a6865dbacaaf70591fdfe8a804acaf2cc1b668da800727b4cec622faab569ab9"
+   "size": 7101578,
+   "sha256": "280103d67c9611c97d59fb66005632aa992b7d8449ce3d3173bb131816133012"
   },
   "line23.bld.bin": {
-   "size": 4805172,
-   "sha256": "ea3b2b859bc240c08fc63db168ef15f64f0a4f282fee9f91935f67923f4a6479"
+   "size": 4806216,
+   "sha256": "255734fd6550040eb0ae9c6a73da27836dd739934b2beed985f072f705a26553"
   },
   "line23.fine.bin": {
    "size": 1732250,
-   "sha256": "33bc20b39bf89054d3f8916f9fea59cdbb83ff8dba63f40e0afb8f4e1a11c3b6"
+   "sha256": "2c72df07464c182717f6fa5010a69c478bbd7daf8ad4734a6ca9236f72ec7ba0"
   },
   "line23.fine.json": {
    "size": 3013,
-   "sha256": "6731638bfb94078b766b27aa747e0d7d3d4da54c9006c57e15e9cade81ad6759"
+   "sha256": "de51f0fef733519aed5ac6877172a6ce3eb3241fe0637ff674c44556795ddade"
   },
   "line23.geo.json": {
-   "size": 80440,
-   "sha256": "fa7d6cea3987ee488cefa925e03cf6ed889e44b41ca90daa93dd34d3667ac17e"
+   "size": 80464,
+   "sha256": "de35e9299c0c715db9d328794c431ca5860a4a8ad1633255e60d186e2d090c13"
   },
   "line23.json": {
-   "size": 1741650,
-   "sha256": "cf1d4c11b1fe685ecc5ba44056267a72ce5f44be137169ed6d526cad62337ea9"
+   "size": 2045776,
+   "sha256": "0a5b60ba9c00c0cf30fdc858c20385abbeee8336fee861d38a3c8a66939b0200"
   },
   "line37.bld.bin": {
-   "size": 3160548,
-   "sha256": "df5c165a365d5ab539395b427878e4800def56e0aefa0b2c4984ee9598253501"
+   "size": 3170628,
+   "sha256": "7e78b231bef0f7814653fe5ccb6a7bd5d3d32d6e8cae51d622e9fce02d6768a4"
   },
   "line37.fine.bin": {
    "size": 1943500,
-   "sha256": "88d27bfdabf7a26febb6eb6341267dea05185c5b8f15ca3c9997355f71a0163d"
+   "sha256": "db635c71140e7681b60dce3019dabec599d0339c0e074be63995db5c78e3938d"
   },
   "line37.fine.json": {
    "size": 3201,
-   "sha256": "741187d7f7f486c1faa015846e99737b41be57b0751b1589f0522b1dd18bbfd7"
+   "sha256": "0795fddd52ccce8e0fceaf48e01ce8aaab2fab97fb7de157b947b233ccee89bf"
   },
   "line37.geo.json": {
-   "size": 174946,
-   "sha256": "9763cf5ef863a092106c27c54d86533ff1daeac3acd61f254ea93da888a2ae03"
+   "size": 175521,
+   "sha256": "3d6bfbad5ac8f38237605547fa3ebfec7f8efdbce03234c40dc8a81a009de16b"
   },
   "line37.json": {
-   "size": 1533310,
-   "sha256": "4b14913e528db74ebeea7ae259b0f5008ea564ac0aa312167d69f7b8da6539c6"
+   "size": 1790733,
+   "sha256": "87719f0b89314932428c1d511bb4dcf67c5950f5033ee44c677e43cd2a70e686"
   },
   "line9.bld.bin": {
-   "size": 10024992,
-   "sha256": "2a89cc1839854cd4e4de6821a3561f4a96e6e20d5c2335453bf6bdc29ce86d9c"
+   "size": 10029834,
+   "sha256": "b35aad115d84a87bdb6a52c545aa85897284e44886d45b3d03d255246f82c76a"
   },
   "line9.fine.bin": {
    "size": 4140500,
@@ -125,12 +125,12 @@
    "sha256": "30ce3adf71e94e40410cb99f5454f7e3f77deae95a9ab73a4194d0797bd810c4"
   },
   "line9.geo.json": {
-   "size": 264397,
-   "sha256": "7b8f964a41239abb9b2c7a2960b4c46042f87adc6f5d31985cdf392cec463f26"
+   "size": 264993,
+   "sha256": "4319f91372cc27bc19d347085d97b9f24a58d0f614b7949811688a4f03824098"
   },
   "line9.json": {
-   "size": 3874257,
-   "sha256": "61ebe1e4353de1a29484f037dd20ce73e3feda19a48fb2399a36ba55c4397c39"
+   "size": 4467924,
+   "sha256": "89c4c507709c918bbb067926a3ca42437c6d4be385461a0749114f9fec4f0e5e"
   },
   "lines.json": {
    "size": 607,
