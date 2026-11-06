@@ -9,7 +9,7 @@ Sources (CC BY 4.0, "data base © IPR Praha"):
 
 Usage:  python -P -E tools/geoportal.py --line 22 [--fetch] [--refresh]
 Needs data/lineN.json (from build_line.py). Writes data/lineN.geo.json + data/lineN.bld.bin.
-Reads the services' answers from the snapshot (raw/geoportal/lineN/); an answer that is not there is an
+Reads the services' answers from the snapshot (raw/geoportal/lineN/, the feature services' raw/geoportal/cells/); an answer that is not there is an
 error unless --fetch downloads it (then publish a new snapshot with it before data-publish, #223).
 --refresh downloads every answer again.
 """
@@ -32,7 +32,9 @@ REFRESH = "--refresh" in sys.argv
 FETCH = "--fetch" in sys.argv or REFRESH
 FETCHED = []  # (answers downloaded in this run: new snapshot files)
 CACHE = os.path.join(ROOT, "raw", "geoportal", f"line{LINE}")
+CELLS = os.path.join(ROOT, "raw", "geoportal", "cells")   # (the feature services' answers, per cell: query())
 os.makedirs(os.path.join(CACHE, "i3s"), exist_ok=True)
+os.makedirs(CELLS, exist_ok=True)
 
 BLD = "https://services5.arcgis.com/SBTXIEUGWbqzUecw/arcgis/rest/services/Budovy_3D_WSL1/SceneServer/layers/0"
 BRIDGES = "https://services5.arcgis.com/SBTXIEUGWbqzUecw/arcgis/rest/services/Mosty_3D_WSL1/SceneServer/layers/0"
@@ -81,6 +83,7 @@ with open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8") as f
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
+import geo_cells  # noqa: E402
 import sources  # noqa: E402
 F = Frame()  # the city frame: the one conversion (tools/geo.py)
 
@@ -224,31 +227,21 @@ def write_buildings(buildings, kinds=None):
 
 
 # ------------------------------------------------------------------ feature services
-def corridor_boxes(step=600.0):
-    """lat/lon envelopes covering the route corridor in ~600 m pieces."""
-    boxes, acc, start = [], 0.0, 0
-    for i in range(1, len(path)):
-        acc += math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1])
-        if acc >= step or i == len(path) - 1:
-            seg = path[start:i + 1]
-            xs, ys = [p[0] for p in seg], [p[1] for p in seg]
-            la0, lo0, la1, lo1 = (float(v) for v in F.bbox(seg, CORRIDOR))
-            boxes.append((lo0, la0, lo1, la1))
-            acc, start = 0.0, i
-    return boxes
-
-
 def query(service, name, fields, out_sr=4326):
-    """Features in the corridor; geometry as lat/lon, or as S-JTSK with out_sr=5514 (see trees())."""
+    """Features in the corridor's cells (tools/geo_cells.py); geometry as lat/lon, or as S-JTSK with out_sr=5514 (see
+    trees()). An answer is named by its cell, shared by the lines: answers named by a box's number along the route stood
+    for another place after a route change, up to 1.7 km off, with no error (#326)."""
     feats = {}
-    for k, (lo0, la0, lo1, la1) in enumerate(corridor_boxes()):
+    for ix, iy in geo_cells.cells(path, CORRIDOR):
+        x0, y0, x1, y1 = geo_cells.bounds(ix, iy)
+        la0, lo0, la1, lo1 = (float(v) for v in F.bbox([(x0, y0), (x1, y1)], 0.0))
         offset = 0
         while True:
             q = urllib.parse.urlencode({
                 "where": "1=1", "geometry": f"{lo0},{la0},{lo1},{la1}", "geometryType": "esriGeometryEnvelope",
                 "inSR": 4326, "outSR": out_sr, "spatialRel": "esriSpatialRelIntersects", "outFields": fields,
                 "returnGeometry": "true", "resultOffset": offset, "resultRecordCount": 2000, "f": "json"})
-            d = fetch(f"{service}/query?{q}", f"{name}{'' if out_sr == 4326 else out_sr}_{k}_{offset}.json")
+            d = fetch(f"{service}/query?{q}", os.path.join(CELLS, f"{name}{'' if out_sr == 4326 else out_sr}_{ix}_{iy}_{offset}.json"))
             for ft in d.get("features", []):
                 at = ft["attributes"]
                 feats[at.get("objectid", at.get("OBJECTID", id(ft)))] = ft

@@ -158,8 +158,8 @@ both post on the pinned #291 and only propose.
   (`.github/workflows/tests.yml`) runs the tests that need no `data/` or `raw/` and `ruff check tools` on
   every PR; a test that needs them skips without them, saying what to fetch.
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
-  --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
-  once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
+  --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold, the thresholds being
+  `judge` in that tool; `--jobs N` pages at once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
   (`--parallel` for several lines).
 - **Heavy jobs take turns:** `headless.py`, `rebuild.py` and `frametime.py` queue for the machine
   (`baseline_store.HeavyJob`, first come first served, #280), print whom they wait for, and size their
@@ -202,13 +202,18 @@ both post on the pinned #291 and only propose.
   merge that changes the game, the checks, the data or `data/truth.json` (`tools/autodeploy.py`, 2 pages at
   once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base
   when the committed `reports/baseline/headless.json` is older. A PR does not refresh the baseline.
+- **Which baseline each tier compares with** (#282): a checkpoint's run stores itself under its name
+  (`--baseline --publish --checkpoint W1`: every check, seeds 1-5). Seedless checks (the world and drawn-geometry tiers)
+  compare with main at the merge base: its baseline, else measured there once in a pinned worktree through the
+  queue and kept on this machine by its key. Seeded checks (the simulation tier) compare with main's at the merge
+  base when the night has measured it, else with the latest checkpoint; `--against W1` names one.
 
 ## Known failures (not caused by your change; remove a row when its issue closes)
 
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
-| crossing | 17 | 1 unexplained pedestrian obstruction (main at 14b71c4 and 9a7b1a0 alike) | #146 |
+| crossing | 17 | 1 unexplained pedestrian obstruction | #146 |
 
 ## Code style
 

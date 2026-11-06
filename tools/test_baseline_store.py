@@ -43,6 +43,84 @@ class Store(unittest.TestCase):
             self.assertFalse(any(str(os.getpid()) in b for b in baseline_store.busy()))
 
 
+class Ticket(unittest.TestCase):
+    def test_a_ticket_being_read_elsewhere_is_replaced_on_a_later_try(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            real, tries = os.replace, []
+
+            def busy(a, b):
+                tries.append(a)
+                if len(tries) < 3:
+                    raise PermissionError(5, "Access is denied")
+                real(a, b)
+            job = baseline_store.HeavyJob("test", wait=False)
+            job.path = os.path.join(d, "1.lock")
+            with mock.patch.object(baseline_store.os, "replace", busy), mock.patch.object(baseline_store.time, "sleep"):
+                job._write("running")
+            self.assertEqual(len(tries), 3)
+            self.assertTrue(os.path.exists(job.path))
+
+    def test_it_gives_up_in_the_end(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            job = baseline_store.HeavyJob("test", wait=False)
+            job.path = os.path.join(d, "1.lock")
+            with mock.patch.object(baseline_store.os, "replace", side_effect=PermissionError(5, "x")), \
+                    mock.patch.object(baseline_store.time, "sleep"), self.assertRaises(PermissionError):
+                job._write("running")
+
+
+class Checkpoints(unittest.TestCase):
+    """Names, the index and what this machine keeps by key (#282); the store's files in a dict."""
+    def test_latest_is_the_highest_world_checkpoint_never_a_test(self):
+        self.assertEqual(baseline_store.latest_checkpoint({"W2": {}, "W10": {}, "TEST-282": {}, "W1": {}}), "W10")
+        self.assertIsNone(baseline_store.latest_checkpoint({"TEST-282": {}}))
+        self.assertIsNone(baseline_store.latest_checkpoint({}))
+
+    def test_publish_lists_it_and_keeps_the_others(self):
+        files = {"checkpoints.json": {"W1": {"key": "a", "commit": "1", "time": "t"}}}
+        with mock.patch.object(baseline_store, "_put", files.update), \
+                mock.patch.object(baseline_store, "fetch", lambda n: (files.get(f"{n}.json"), files.get(f"{n}.places.json"))):
+            baseline_store.publish_checkpoint("W2", "b", {"r": 1}, {"r": 2}, "abc")
+            self.assertEqual(sorted(baseline_store.checkpoints()), ["W1", "W2"])
+            self.assertEqual(baseline_store.checkpoints()["W2"]["key"], "b")
+            self.assertEqual(baseline_store.fetch_checkpoint("W2"), ({"r": 1}, {"r": 2}))
+
+    def test_a_bad_name_is_refused(self):
+        with self.assertRaises(ValueError):
+            baseline_store.publish_checkpoint("../W1", "k", {}, {}, "c")
+
+    def test_kept_accumulates_by_key_on_this_machine(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"TRAMDATA_CACHE": d}):
+            self.assertEqual(baseline_store.kept("k"), ({}, {}))
+            baseline_store.keep("k", {"a": 1}, {"a": 2})
+            baseline_store.keep("k", {"b": 3}, {})
+            self.assertEqual(baseline_store.kept("k"), ({"a": 1, "b": 3}, {"a": 2}))
+            self.assertEqual(baseline_store.kept("other"), ({}, {}))
+
+    def test_measure_at_reads_the_pinned_worktree_and_removes_it(self):
+        want = {"src": "s"}
+        seen = []
+
+        def run(cmd, cwd=None, **kw):
+            seen.append(cmd)
+            if cmd[:3] == ["git", "worktree", "add"]:
+                self.wt = cmd[5]
+                os.makedirs(os.path.join(self.wt, "reports", "baseline"))
+            if "tools/headless.py" in cmd:
+                with open(os.path.join(cwd, "reports", "baseline", "headless.json"), "w", encoding="utf-8") as f:
+                    json.dump({"line9-lint": {"counts": {"n": 1}, "measured_on": want},
+                               "line9-surfaces": {"counts": {"n": 2}, "measured_on": {"src": "older"}},
+                               "line17-lint": {"counts": {"n": 3}, "measured_on": want}}, f)
+                with open(os.path.join(cwd, "reports", "baseline", "headless-places.json"), "w", encoding="utf-8") as f:
+                    json.dump({"line9-lint": {"x": []}, "line17-lint": {"y": []}}, f)
+            return mock.Mock(returncode=0)
+        counts, places = baseline_store.measure_at("abcdef0123", ["9"], ["lint", "surfaces"], want, run=run, out=io.StringIO())
+        self.assertEqual(list(counts), ["line9-lint"])  # (not another line's, nor one measured on older trees)
+        self.assertEqual(places, {"line9-lint": {"x": []}})
+        self.assertIn(["git", "worktree", "remove", "--force", self.wt], seen)
+        self.assertFalse(os.path.exists(self.wt))
+
+
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"
        "b.HeavyJob.POLL = 0.1\n"

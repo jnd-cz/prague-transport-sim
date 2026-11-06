@@ -1,4 +1,4 @@
-"""Where a line's track did not come from DI, and where DI and OSM disagree on switches (#20).
+"""Where a line's track did not come from DI (#20, #237).
 
     python -P -E tools/track_sources.py --line 17            # print the findings
     python -P -E tools/track_sources.py --line 17 --write    # also reports/review/track-sources-17.json (?review)
@@ -6,16 +6,12 @@
 
 Open the file with ?line=17&review=reports/review/track-sources-17.json. An answer "matches reality" recorded in
 data/truth.json trackSources.reviewAnswers (kind and place, with the user's quote) takes the finding off the list;
-anything else goes in a note and stays held: the build does not change switches or tracks from answers (#35, M4).
+anything else goes in a note and stays held: the build does not change tracks from answers (#35, M4).
 
-Reads data/lineN.json (its trackSource ranges, track chains with `src`, switches) and the DI forks
-(tools/di_tracks.py). Findings:
-  - fill: a stretch of the route or of a drawn track within CORRIDOR of it longer than FILL metres taken from
-    the archived DTMP axes or OSM instead of DI;
-  - switch without a DI fork: a facing switch of the route the build did not pair with a DI fork (tools/di_tracks.py
-    moves a switch onto the fork on its tracks within di_tracks.FORK: then it lies within PAIRED of it);
-  - DI fork without an OSM switch: a DI fork within NEAR of the route (either direction) with no OSM junction
-    (three or more track chain ends) within PAIRED.
+Reads data/lineN.json (its trackSource ranges, track chains with `src`). Finding: a stretch of the route or of a drawn
+track within CORRIDOR of it longer than FILL metres taken from the archived DTMP axes or OSM instead of DI. (The
+user's orthophoto tracks are facts, not questions. A switch needs no finding since #237: the line's switches are
+DI's forks, tools/di_network.py; tools/fork_review.py lists where the drawn track has trouble.)
 """
 import json
 import math
@@ -24,30 +20,18 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import di_tracks as dt
 from track_moves import Route
 
 ROOT = Path(__file__).resolve().parent.parent
+OWN = ('di', 'ortho')   # DI, and the tracks the user measured on the orthophoto (data/truth.json photoTracks)
 FILL = 10.0       # m: a fill stretch worth a finding (#20)
 CORRIDOR = 60.0   # m: drawn tracks the build takes (tools/build_line.py Q_TRACKS: around.w:60)
-NEAR = 3.0        # m from the route for a DI fork to be on it
 GROUP = 30.0      # m: drawn fill tracks this near each other are one place
-PAIRED = 1.0      # m: a switch paired with a fork lies on it (the fitted curve moves it by centimetres, #204)
 
 
-def nearest_d(p, pts):
-    best = math.inf
-    for a, b in zip(pts, pts[1:]):
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        l2 = dx * dx + dy * dy or 1e-9
-        t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2))
-        best = min(best, math.dist(p, (a[0] + dx * t, a[1] + dy * t)))
-    return best
-
-
-def findings(data, di):
+def findings(data):
     import shapely
-    from shapely.geometry import LineString, Point
+    from shapely.geometry import LineString
     out = []
     routes = {k: Route(data[k]) for k in ('path', 'pathBack') if len(data.get(k) or []) > 1}
     lines = {k: LineString(r.pts) for k, r in routes.items()}
@@ -56,7 +40,7 @@ def findings(data, di):
         if key not in routes:
             continue
         for a, b, src in ranges:
-            if src != 'di' and b - a > FILL:
+            if src not in OWN and b - a > FILL:
                 x, y = routes[key].at((a + b) / 2)
                 out.append({'kind': 'track fill', 'src_track': src, 'where': key, 's': round(a, 1),
                             'length_m': round(b - a, 1), 'x': round(x, 1), 'y': round(y, 1)})
@@ -65,7 +49,7 @@ def findings(data, di):
     on_route = shapely.unary_union([l.buffer(1.0) for l in lines.values()])
     pieces = []
     for t in data.get('tracks', []):
-        if t.get('src', 'di') == 'di' or len(t['p']) < 2:
+        if t.get('src', 'di') in OWN or len(t['p']) < 2:
             continue
         g = LineString(t['p']).intersection(near).difference(on_route)
         if g.length > 0.5:
@@ -84,27 +68,6 @@ def findings(data, di):
             c = longest.interpolate(0.5, normalized=True)
             out.append({'kind': 'track fill', 'src_track': src, 'where': 'drawn track', 'length_m': round(length, 1),
                         'x': round(c.x, 1), 'y': round(c.y, 1)})
-    # switches
-    path = routes['path']
-    for w in data.get('switches', []):
-        p = path.at(w['s'])
-        f = di.fork_near(*p, reach=PAIRED)
-        if f is None:
-            out.append({'kind': 'switch without DI fork', 's': w['s'], 'x': round(p[0], 1), 'y': round(p[1], 1)})
-    ends = Counter()
-    for t in data.get('tracks', []):
-        for q in (t['p'][0], t['p'][-1]):
-            ends[(round(q[0], 1), round(q[1], 1))] += 1
-    junctions = [q for q, n in ends.items() if n >= 3]
-    jtree = shapely.STRtree(shapely.points(junctions)) if junctions else None
-    for f in di.forks:
-        if min((l.distance(Point(f)) for l in lines.values()), default=math.inf) > NEAR:
-            continue
-        hit = jtree is not None and any(math.dist(junctions[i], f) <= PAIRED for i in jtree.query(Point(f).buffer(PAIRED)))
-        if not hit:
-            s = path.project(f)
-            out.append({'kind': 'DI fork without OSM switch', 's': round(s, 1) if s is not None else None,
-                        'x': round(f[0], 1), 'y': round(f[1], 1)})
     return out
 
 
@@ -113,12 +76,6 @@ INFO = {
     'track fill': 'This track is drawn from {src} here: DI (the current DTM, 2026-09-30) has no track within 2 m of it '
                   'over {length} m. Does the track run like this in the imagery? If not, say how in a note: the build '
                   'does not move tracks from answers yet.',
-    'switch without DI fork': 'OSM has a facing switch here that no DI fork was paired with (none on its tracks, leaving '
-                              'the same way, within 15 m). Is there a switch in the imagery? If not, say so in a note: '
-                              'switches are not removed from answers yet.',
-    'DI fork without OSM switch': 'DI forks here and no OSM switch was paired with it (none on its tracks, leaving the same '
-                                  'way, within 15 m). Is there a switch in the imagery? If so, say where in a note: '
-                                  'switches are not added from answers yet (#35).',
 }
 CONFIRM = 3.0   # m: a recorded answer covers the finding of its kind this near
 
@@ -145,9 +102,7 @@ def confirmed_answers(root=ROOT):
 def main():
     line = sys.argv[sys.argv.index('--line') + 1] if '--line' in sys.argv else '17'
     data = json.loads((ROOT / f'data/line{line}.json').read_text(encoding='utf-8'))
-    from dtmp_tracks import di_data
-    di = dt.Source('di', di_data()[1])
-    found = findings(data, di)
+    found = findings(data)
     from geo import Frame
     frame = Frame()
     for f in found:
@@ -167,8 +122,12 @@ def main():
     if '--write' in sys.argv:
         out = ROOT / f'reports/review/track-sources-{line}.json'
         items = review_items(found, line, confirmed_answers())
+        if not items:   # (nothing to ask: no set)
+            out.unlink(missing_ok=True)
+            print(f'line {line}: no findings')
+            return
         with open(out, 'w', encoding='utf-8', newline='') as f:
-            json.dump({'schema': 1, 'issue': 20, 'line': line, 'options': OPTIONS, 'findings': items}, f,
+            json.dump({'schema': 1, 'issue': 237, 'line': line, 'options': OPTIONS, 'findings': items}, f,
                       ensure_ascii=False, indent=1)
         print(f'wrote {out}: {len(items)} findings')
 

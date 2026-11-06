@@ -1,13 +1,15 @@
 # Tatra T3 — Prague trams (browser prototype)
 
-Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (line 17
-is rebuilt from the survey first): OpenStreetMap (track network, roads, greenery), the Prague Digital
+Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
+and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
 Technical Map (surveyed streets, the transport layer DI for the track), IPR Praha 3D buildings and
 bridges, lidar terrain, and the PID GTFS timetable.
 
 Project docs: [ROADMAP.md](ROADMAP.md) (milestones; tasks are GitHub issues), [AGENTS.md](AGENTS.md)
 (working rules for agents and contributors), [docs/knowledge.md](docs/knowledge.md),
 [docs/architecture.md](docs/architecture.md), [docs/decisions/](docs/decisions/).
+
+**To play:** Run, Gameplay, Autopilot, Language. **To work on it:** everything from [Set up](#set-up) on.
 
 ## Run
 
@@ -17,111 +19,7 @@ python tools/serve.py 8742
 
 Open http://localhost:8742. There's no build step: plain ES modules, with Three.js loaded from a CDN.
 
-The game data (`data/`) and the raw sources (`raw/`) are not in git: a fresh clone gets them from the
-data store, see **[DATA.md](DATA.md)** (one-time SSH setup, then):
-
-```bash
-python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~85 MB)
-python -I tools/snapshot.py fetch          # raw/ to build the world (~2 GB, the pinned source snapshot)
-```
-
-## Rebuild the line data
-
-Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
-(`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
-All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
-
-The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
-side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
-The OSM extract is read once per build (~1 min), and a line takes ~2-4 min:
-
-```bash
-python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
-```
-
-The single steps:
-
-```bash
-python -P -E tools/build_line.py --line 37         # no OSM route relation: from its GTFS shapes
-python -P -E tools/build_line.py --line 22 --headsign "Zahradní Město"
-python -P -E tools/build_line.py --line 23         # any Prague tram line
-python -P -E tools/build_line.py --line 17 --refresh  # recompute the OSM answers cached in raw/line17/
-python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
-python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
-```
-
-`rebuild.py` ends with `line_heights.py` for all the lines it built (~6 min: it stages the network's heights
-with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
-`reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
-the steps. `headless.py --checks heights` compares the game's track with the staged heights.
-`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
-data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
-(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
-outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
-place leaves the list; `reports/line-heights.json` lists the dropped points.
-
-After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
-
-With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
-diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
-network; trips are paired only when the next trip in the GTFS vehicle block starts at the same terminus
-on the selected pattern. Unmatched or ambiguous trips are reported by the build. The current line 9 is
-such a run: Sídliště Řepy → Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10
-(track repairs, autumn 2026).
-Stop platforms come from OSM (`public_transport=platform`) for all lines.
-
-The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
-with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
-lie on the chosen OSM route, and writes `data/lineN.json` plus the menu index `data/lines.json`.
-The OSM answers are cached in `raw/` (line 22), `raw/runN-M/` (a run such as 9 → 10) and `raw/lineN/`
-(other lines), each marked with a key of the extract, the query and the code that answers it
-(`tools/osm_local.py`, `tools/geo.py`): a new snapshot's extract or an edit to either file recomputes
-them. A line without an OSM route
-relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
-it). Built lines: 9, 17, 22, 23, 37.
-
-The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
-list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
-as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy and Pillow live in the user site packages):
-
-| step | writes | what |
-|---|---|---|
-| `platforms` | `lineN.json` | tram platforms of both directions: PID GTFS positions, names and lines, OSM shapes where mapped (`--fetch` re-reads them from the snapshot's extract) |
-| `osm_speeds` | `lineN.json` | posted speeds and dedicated track: the speed limits and banked curves |
-| `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them) |
-| `osm_signals`, `dtm_points` | `lineN.signals.json`, `.dtmpoints.json` | line 17 only: OSM traffic signals, street furniture from the survey |
-| `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
-| `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
-| `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
-| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
-
-Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
-profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
-packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
-
-## Deploy
-
-The game is static files: `index.html`, `src/`, `assets/`, `data/`. Three.js comes from jsDelivr and
-the outdoor temperature from Open-Meteo, both fetched by the browser. `python tools/make_dist.py`
-packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directory. Enable gzip or
-brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
-CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
-
-To a web host over FTPS (#131): `python -I tools/deploy.py` uploads the same files from a clean commit
-whose data matches the manifest:
-- only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
-- it adds `version.json`, shown in the menu's credits, and an `.htaccess` with compression;
-- `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
-
-The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
-
-Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
-`deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
-checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
-it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
-`~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
-hour. Log: `reports/autodeploy.log`.
+A fresh clone first needs the game data: [Set up](#set-up).
 
 ## Gameplay
 
@@ -253,6 +151,116 @@ same driver lives in `src/autopilot.js` and is used by `tools/autopilot.js`.
 
 The interface is in Czech or English (Settings → Language in the menu; remembered in the browser).
 Strings live in `src/i18n.js`.
+
+---
+
+## Set up
+
+The game data (`data/`) and the raw sources (`raw/`) are not in git: a fresh clone gets them from the
+data store, see **[DATA.md](DATA.md)** (one-time SSH setup, then):
+
+```bash
+python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~110 MB)
+python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, the pinned source snapshot)
+```
+
+## Rebuild the line data
+
+Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
+(`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
+All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
+
+The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
+side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
+The OSM extract is read once per build (~1 min), and a line takes ~2-4 min:
+
+```bash
+python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
+```
+
+The single steps:
+
+```bash
+python -P -E tools/build_line.py --line 37         # no OSM route relation: from its GTFS shapes
+python -P -E tools/build_line.py --line 22 --headsign "Zahradní Město"
+python -P -E tools/build_line.py --line 23         # any Prague tram line
+python -P -E tools/build_line.py --line 17 --refresh  # recompute the OSM answers cached in raw/line17/
+python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
+python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
+```
+
+`rebuild.py` ends with `line_heights.py` for all the lines it built (~6 min: it stages the network's heights
+with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
+`reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
+the steps. `headless.py --checks heights` compares the game's track with the staged heights.
+`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
+data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
+(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
+outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
+place leaves the list; `reports/line-heights.json` lists the dropped points.
+
+After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
+
+With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
+diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
+network; trips are paired only when the next trip in the GTFS vehicle block starts at the same terminus
+on the selected pattern. Unmatched or ambiguous trips are reported by the build. The current line 9 is
+such a run: Sídliště Řepy → Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10
+(track repairs, autumn 2026).
+Stop platforms come from OSM (`public_transport=platform`) for all lines.
+
+The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
+with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
+lie on the chosen OSM route, and writes `data/lineN.json` plus the menu index `data/lines.json`.
+The OSM answers are cached in `raw/` (line 22), `raw/runN-M/` (a run such as 9 → 10) and `raw/lineN/`
+(other lines), each marked with a key of the extract, the query and the code that answers it
+(`tools/osm_local.py`, `tools/geo.py`): a new snapshot's extract or an edit to either file recomputes
+them. A line without an OSM route
+relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
+it). Built lines: 9, 17, 22, 23, 37.
+
+The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
+list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
+as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
+pyosmium, pyproj, shapely, numpy and Pillow live in the user site packages):
+
+| step | writes | what |
+|---|---|---|
+| `platforms` | `lineN.json` | tram platforms of both directions: PID GTFS positions, names and lines, OSM shapes where mapped (`--fetch` re-reads them from the snapshot's extract) |
+| `osm_speeds` | `lineN.json` | posted speeds and dedicated track: the speed limits and banked curves |
+| `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them) |
+| `osm_signals`, `dtm_points` | `lineN.signals.json`, `.dtmpoints.json` | line 17 only: OSM traffic signals, street furniture from the survey |
+| `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
+| `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
+| `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
+| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+
+Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
+profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
+packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
+
+## Deploy
+
+The game is static files: `index.html`, `src/`, `assets/`, `data/`. Three.js comes from jsDelivr and
+the outdoor temperature from Open-Meteo, both fetched by the browser. `python tools/make_dist.py`
+packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directory. Enable gzip or
+brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
+CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
+
+To a web host over FTPS (#131): `python -I tools/deploy.py` uploads the same files from a clean commit
+whose data matches the manifest:
+- only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
+- it adds `version.json`, shown in the menu's credits, and an `.htaccess` with compression;
+- `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
+
+The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
+
+Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
+`deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
+checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
+it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
+`~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
+hour. Log: `reports/autodeploy.log`.
 
 ## Dev
 

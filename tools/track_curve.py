@@ -1,9 +1,9 @@
 """The drawn track in plan as smooth curves through the surveyed points, continuous in direction at every node (#204).
 
-    python -P -E tools/track_curve.py --line 17     # fit line 17's track graph, print what moved and what was left
+    python -P -E tools/track_curve.py --line 17     # fit the DI edges line 17's routes run on, print what moved and what was left
 
-The track graph's edges (tools/di_tracks.py `TrackGeometry`) are polylines through DI's or the archive's points,
-or OSM's nodes where neither has the track (fill). They are joined into through tracks: at every node the
+The track graph's edges (tools/di_network.py `Drawn`) are polylines through DI's points, or the orthophoto's
+(data/truth.json photoTracks), or OSM's where DI has no track (fill). They are joined into through tracks: at every node the
 straightest pair of edges continues (a switch's diverging edge, a track's end and a crossing track end or pass
 there). Each through track, longest first, is fitted with a curve that bends as little as it can (a penalised
 spline in plan, bending energy on 1 m samples) while it stays within TOL of every surveyed point (FILL_TOL of fill):
@@ -11,13 +11,12 @@ the points' weights grow only where the curve misses (Lawson's reweighting). A n
 keeps its position (a track through a node is fitted before one ending there), and its direction where this track
 continues that one (a diverging track leaves tangent to
 the through track: data/truth.json trackGeometry `switch-start`, most switches are tangential). Where the curve
-would bend tighter than MIN_RADIUS (data/truth.json `min-radius-passenger`), the tolerance of the points around it
-grows by GROW, at most to the mean coordinate error of their records' accuracy class (data/truth.json
-`sourceAccuracy`: 0.14 m for DI's class 3), and the curve is fitted again. Where it still bends tighter than
-NETWORK_RADIUS (`min-radius-network`: the user, "under 18m there shouldn't be anything like that"), the points around
-it keep growing past their class, at most to HOLD_LIMIT, and each such place is listed with how far its points moved
-(the cost). A point the curve still misses by more than TOL + REPORT is listed, and so is a curve left tighter than
-MIN_RADIUS.
+bends too tight, read at two scales (`tight_at`: 18 m over 5 m as tools/lint.js reads it, data/truth.json
+`min-radius-network`; KINK_RADIUS over 2 m for a bend squeezed into a metre), the tolerance of the points around it
+grows by GROW up to the mean coordinate error of their records' accuracy class (data/truth.json `sourceAccuracy`: 0.14 m
+for DI's class 3). Where it still bends too tight the curve stiffens there and its points may move past their
+class, at most to HOLD_LIMIT, and each such place is listed with how far its points moved (the cost). A point the
+curve still misses by more than TOL + REPORT is listed, and so is a curve left tight.
 
 A Gaussian (the client's old smoothing, src/route.js) cuts inside a curve: 0.2 m on an 18 m curve with the 6 m
 window (#20); a curve held to the points does not.
@@ -40,14 +39,20 @@ FILL_LIMIT = 0.5   # m: a fill point's tolerance grows at most to this (OSM agai
 SIGMAS = 1.0       # a point moves at most this many mean errors of its class (the decree states the mean error, no
                    # limit; 2 on line 17: 6 bends over 10° inside tracks instead of 11, 32 joins over 1° instead of 39)
 GROW = 1.5         # the factor the tolerance grows by per round
-MIN_RADIUS = 20.0  # m: data/truth.json trackGeometry `min-radius-passenger`
-NETWORK_RADIUS = 18.0  # m: data/truth.json trackGeometry `min-radius-network`
+MIN_RADIUS = 18.0  # m: the radius a curve is held to over BEND_LONG (data/truth.json trackGeometry `min-radius-network`:
+                   # the user, "under 18m there shouldn't be anything like that"; `min-radius-passenger` says 20, but at
+                   # 20 the fit moved DI's points up to 14 cm in curves DI draws at 18-20 m, all over the city)
+KINK_RADIUS = 15.0 # m: the radius over BEND: a shorter window sees a bend squeezed into a metre, a longer one averages it
+                   # out; a sagitta of 3.3 cm, so that most of the scatter within TOL stays below it
+NETWORK_RADIUS = 18.0  # m: under this the curve stiffens and its points may move past their class (HOLD_LIMIT)
 HOLD_LIMIT = 0.5   # m: past its class's error a point moves at most this far to hold NETWORK_RADIUS
 STIFFEN, STIFF_MAX = 1.5, 1.5 ** 12  # the bending weight's factor per round where the curve bends under it, and its
                                      # most (x4 at once took a 15° corner to 49 m, its points 0.49 m off; x1.5: 18.2 m, 9 cm)
 SLACK = 0.995      # a curve held at MIN_RADIUS reads a few millimetres under it
-BEND = 1.0         # m either side of a sample for the fit's radius (a 5 m window reads a 10° bend squeezed into a
-                   # metre as 29 m; the fitted curve has no noise to average out)
+BEND = 1.0         # m either side of a sample for the short radius (a 5 m window reads a 10° bend squeezed into a
+                   # metre as 29 m)
+BEND_LONG = 2.5    # m either side for the long radius (as tools/lint.js trackRadius; over 2 m a scatter of 2 cm alone
+                   # reads as 25 m)
 NEAR = 10.0        # m around a place bending too tight whose points' tolerance grows
 REPORT = 0.01      # m: a surveyed point the final curve misses by more than TOL + this is listed
 STEP = 1.0         # m between the curve's samples
@@ -147,6 +152,14 @@ def radii(px, py, half=2.5):
     return out
 
 
+def tight_at(px, py):
+    """The equivalent radius per sample for the limits: the long window's, or the short window's scaled so that
+    KINK_RADIUS over BEND reads as NETWORK_RADIUS over BEND_LONG."""
+    short, long_ = radii(px, py, BEND), radii(px, py, BEND_LONG)
+    f = NETWORK_RADIUS / KINK_RADIUS
+    return [min(l, s * f) for s, l in zip(short, long_)]
+
+
 def class_errors(truth=None):
     """{accuracy class: mean coordinate error in metres} (data/truth.json `sourceAccuracy`, the decree's table)."""
     import json
@@ -226,7 +239,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     data = [i for i, t in enumerate(tol) if t is not None and at[i] not in held]
     px, py = solve()
     if n < 3 or not data:
-        return list(zip(px, py)), at, tol, radii(px, py, BEND)
+        return list(zip(px, py)), at, tol, tight_at(px, py)
     for _ in range(WIDEN):
         for _ in range(ROUNDS):
             worst = 1.0
@@ -239,7 +252,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
             if worst < 1.02:
                 break
             px, py = solve()
-        r = radii(px, py, BEND)
+        r = tight_at(px, py)
         tight = [u[i] for i in range(n) if r[i] < MIN_RADIUS * SLACK]
         grow = [i for i in data if tol[i] < limit[i] - 1e-9 and any(abs(u[at[i]] - t) <= NEAR for t in tight)]
         if not grow:
@@ -263,7 +276,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
             tol[i] = min(limit[i], tol[i] * GROW)
             weight[at[i]] = 1.0
         px, py = solve()
-    return list(zip(px, py)), at, tol, radii(px, py, BEND)
+    return list(zip(px, py)), at, tol, tight_at(px, py)
 
 
 def crossing_point(px, py, s, qx, qy, r, reach=12):
@@ -311,14 +324,14 @@ def thin(pts):
 
 
 class Network:
-    """The fitted track graph. pos {node: (x, y)}, pts {(a, b): points from a to b} keyed as tools/di_tracks.py
-    keys its edges (a before b as strings), kind {(a, b): 'di' | 'dtmp' | 'osm'}, `loose` {(node, edge)}: a node off
+    """The fitted track graph. pos {node: (x, y)}, pts {(a, b): points from a to b} keyed by their nodes
+    (a before b as strings), kind {(a, b): 'di' | 'dtmp' | 'osm'}, `loose` {(node, edge)}: a node off
     the surveyed track its edge runs on (no data point for it: the point nearest all of a node's tracks), `limit`
     {(a, b): metres} how far a surveyed edge's points may move where a curve would bend too tight (the mean coordinate
     error of its records' accuracy class; default the class UNCLASSED). After construction: `pos` and
     `pts` fitted, `report` (counts, the largest misses and the curves left tighter than MIN_RADIUS, with places)."""
 
-    def __init__(self, pos, pts, kind, loose=(), limit=None):
+    def __init__(self, pos, pts, kind, loose=(), limit=None, continues=None, solid=()):
         k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
         # nodes joined by an edge under MERGE are one (a switch's node and a neighbour moved onto one fork; two nodes
         # 4 cm apart at Národní divadlo, each fitted onto another track, would join with a 0.2 m radius)
@@ -336,13 +349,18 @@ class Network:
             degree[a] += 1
             degree[b] += 1
         for (a, b), p in pts.items():
-            if sum(math.dist(x, y) for x, y in zip(p, p[1:])) < MERGE:
+            # (never two nodes of `solid`, each exactly on its tracks: three chains crossing within 0.4 m at Palackého
+            # náměstí, merged, passed one point 13 cm off)
+            if sum(math.dist(x, y) for x, y in zip(p, p[1:])) < MERGE and not (a in solid and b in solid):
                 ra, rb = find(a), find(b)
                 if ra != rb:
                     keep, gone = (ra, rb) if degree[ra] >= degree[rb] else (rb, ra)
                     root[gone] = keep
                     degree[keep] += degree[gone]
         errors = class_errors()
+        members = defaultdict(list)
+        for n in pos:
+            members[find(n)].append(n)
         adj, edges = defaultdict(set), {}
         for (a, b), p in pts.items():
             ra, rb = find(a), find(b)
@@ -398,10 +416,15 @@ class Network:
             dirs = {m: reach(n, m) if len(ms) > 2 else direction(n, m) for m in ms}
             limit = PAIR_TWO if len(ms) == 2 else PAIR
             cands = []
+            # (`continues` {node: {frozenset((a, b))}}: the edges to a and b continue each other through the node, as the
+            # network lets a train pass, tools/di_network.py; other edges meet there at their own angle, #237)
+            ok = None
+            if continues is not None:
+                ok = {frozenset(find(x) for x in pr) for m0 in members[n] for pr in continues.get(m0, ())}
             for i, a in enumerate(ms):
                 for b in ms[:i]:
                     dev = math.degrees(math.acos(max(-1.0, min(1.0, -(dirs[a][0] * dirs[b][0] + dirs[a][1] * dirs[b][1])))))
-                    if dev < limit:
+                    if (dev < limit) if ok is None else frozenset((a, b)) in ok:
                         cands.append((dev, a, b))
             for _, a, b in sorted(cands, key=lambda c: c[0]):
                 if (n, a) not in pair and (n, b) not in pair:
@@ -664,26 +687,24 @@ class Network:
 
 
 def main():
-    import glob
     import json
     import time
-    import di_tracks as dt
+    import di_network
     from geo import Frame
     line = sys.argv[sys.argv.index('--line') + 1] if '--line' in sys.argv else '17'
     root = Path(__file__).resolve().parent.parent
-    raw = root / 'raw' / f'line{line}'
-    answers = [json.loads(Path(f).read_text(encoding='utf-8')) for f in [raw / 'tracks.json', *glob.glob(str(raw / 'route_*.json'))]]
-    nodes, edges = dt.osm_graph(*answers)
+    data = json.loads((root / 'data' / f'line{line}.json').read_text(encoding='utf-8'))
     frame = Frame()
-    ids = list(nodes)
-    x, y = frame.xy([nodes[i][0] for i in ids], [nodes[i][1] for i in ids])
-    pos = {i: (float(a), float(b)) for i, a, b in zip(ids, x, y)}
     t0 = time.time()
-    geo = dt.TrackGeometry(pos, edges, dt.load_sources())
+    net = di_network.load_network()
+    edges = set()
+    for key in ('path', 'pathBack'):
+        if data.get(key):
+            edges |= di_network.Match(net, [tuple(p[:2]) for p in data[key]]).edges
     t1 = time.time()
-    geo.fit_curves()
-    print(f'track geometry: {t1 - t0:.0f} s, curves {time.time() - t1:.0f} s')
-    r = geo.report['curve']
+    drawn = di_network.Drawn(net, edges)
+    print(f"network and the line's routes: {t1 - t0:.0f} s, curves {time.time() - t1:.0f} s")
+    r = drawn.report
     print({k: v for k, v in r.items() if not isinstance(v, list)})
     for key in ('misses', 'held_to_network_radius', 'tighter_than_min_radius'):
         print(f'{key}:')

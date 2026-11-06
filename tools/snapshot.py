@@ -12,7 +12,7 @@ The **built game data** (`data/`, except the hand-made `truth.json`) travels the
 `store/builds/<sha256>` holds them.
 
 Usage (python -I is enough; the store is reached with the system's `sftp`, ssh config host `tramdata`):
-    python -I tools/snapshot.py fetch              # raw/ for snapshots/CURRENT (checks every hash)
+    python -I tools/snapshot.py fetch              # raw/ for snapshots/CURRENT (checks every hash; removes what it replaced)
     python -I tools/snapshot.py data-fetch         # data/ for data/MANIFEST.json
     python -I tools/snapshot.py status             # what differs locally
     python -I tools/snapshot.py publish 2026-11-05 --note "new OSM and GTFS"   # raw/ -> new snapshot
@@ -33,6 +33,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -72,7 +73,7 @@ SOURCES = [
     {"name": "geoportal", "globs": ["raw/geoportal/**/*"],
      "source": "Geoportál Praha services: Budovy 3D, Mosty 3D (I3S), opěrné zdi, stromy (tools/geoportal.py caches)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha",
-     "refresh": "delete raw/geoportal/lineN and run python -I tools/geoportal.py --line N; "
+     "refresh": "delete raw/geoportal/lineN and raw/geoportal/cells and run python -P -E tools/geoportal.py --line N --fetch; "
                 "the whole Mosty 3D layer: python -I tools/mosty3d.py fetch"},
     {"name": "dem", "globs": ["raw/dem/*.tif", "raw/terrain*.tif", "raw/terrain*.json", "raw/line*/terrain*.tif",
                               "raw/line*/terrain*.json", "raw/run*/terrain*.tif", "raw/run*/terrain*.json"],
@@ -356,12 +357,15 @@ class Cache:
 
 
 # ---------------------------------------------------------------- sources
+def source_paths(g):
+    return sorted({p for pat in g["globs"] for p in glob.glob(os.path.join(ROOT, pat), recursive=True) if os.path.isfile(p)})
+
+
 def scan_sources():
     groups = []
     for g in SOURCES:
-        paths = sorted({p for pat in g["globs"] for p in glob.glob(os.path.join(ROOT, pat), recursive=True) if os.path.isfile(p)})
         files = []
-        for p in paths:
+        for p in source_paths(g):
             st = os.stat(p)
             files.append({"path": rel(p), "size": st.st_size, "sha256": sha256(p),
                           "modified": time.strftime("%Y-%m-%d", time.localtime(st.st_mtime))})
@@ -380,7 +384,8 @@ def load_snapshot(sid):
     p = os.path.join(SNAPDIR, f"{sid}.json")
     if not os.path.exists(p):
         raise SystemExit(f"no snapshot manifest {rel(p)}")
-    return json.load(open(p, encoding="utf-8"))
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def publish(store, sid, note):
@@ -416,6 +421,31 @@ def is_current(cache, kind, h, size, p):
     return ok
 
 
+def drop_replaced(sid):
+    """Remove what snapshot sid replaced from raw/: files it does not list, at a path and with bytes an older snapshot
+    holds (here a link to the machine cache; the store keeps the file). Left by an earlier fetch, they stop data_publish:
+    599 after 2026-11-06b moved the Geoportál answers (#332). A file in no snapshot, or with other bytes, may be a new
+    input being staged: it stays, and data_publish still refuses on it."""
+    listed = {f["path"] for g in load_snapshot(sid)["groups"] for f in g["files"]}
+    held = {}
+    for name in os.listdir(SNAPDIR):
+        if name.endswith(".json") and name[:-5] < sid:
+            for g in load_snapshot(name[:-5])["groups"]:
+                for f in g["files"]:
+                    held.setdefault(f["path"], set()).add(f["sha256"])
+    n = 0
+    for g in SOURCES:
+        for p in source_paths(g):
+            r = rel(p)
+            if r not in listed and r in held and sha256(p) in held[r]:
+                os.remove(p)
+                n += 1
+                if g.get("unzip") and p.endswith(".zip") and os.path.isdir(p[:-4]):
+                    shutil.rmtree(p[:-4])  # (what fetch unzipped from it)
+    if n:
+        print(f"removed from raw/: {n} files of older snapshots that {sid} does not list")
+
+
 def fetch(store, sid, cache=None):
     snap = load_snapshot(sid)
     need, unzip = [], []
@@ -447,6 +477,7 @@ def fetch(store, sid, cache=None):
                     print("  unzip", rel(out))
                     with zf.open(n) as src, replacing(out, "wb") as dst:
                         shutil.copyfileobj(src, dst)
+    drop_replaced(sid)
 
 
 def raw_drift(sid):
@@ -478,12 +509,35 @@ def status(sid):
 
 
 # ---------------------------------------------------------------- built data
+LINE_STEPS = ("heights", "platforms", "speed", "clearances")   # keys the steps after build_line.py write (tools/rebuild.py)
+
+
 def data_files():
     d = os.path.join(ROOT, "data")
     return sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)) and f not in DATA_KEEP)
 
 
+def incomplete_lines(folder=None):
+    """{file: [keys]}: line files without what the steps after build_line.py write. build_line.py alone writes a line
+    file with no heights, platforms, speeds or clearances: #237 published all five so, and every check still passed."""
+    folder = folder or os.path.join(ROOT, "data")
+    out = {}
+    for f in sorted(os.listdir(folder)):
+        if re.fullmatch(r"line\d+\.json", f):
+            with open(os.path.join(folder, f), encoding="utf-8") as fh:
+                d = json.load(fh)
+            lacking = [k for k in LINE_STEPS if not d.get(k)]
+            if lacking:
+                out[f] = lacking
+    return out
+
+
 def data_publish(store, note, sid=None, cache=None, allow_drift=False):
+    lacking = incomplete_lines()
+    if lacking:
+        f = next(iter(lacking))
+        raise SystemExit(f"{len(lacking)} line files are not a full build ({f} has no {', '.join(lacking[f])}): "
+                         "rebuild with tools/rebuild.py, not build_line.py alone.")
     # the build must come from the snapshot it names (#223): a changed or new input file means it did not
     sid = sid or (current_id() if os.path.exists(os.path.join(SNAPDIR, "CURRENT")) else None)
     if sid:
@@ -494,8 +548,9 @@ def data_publish(store, note, sid=None, cache=None, allow_drift=False):
             print(f"note: {missing} files of snapshot {sid} are not in raw/ (lines not rebuilt here?)")
         if drift and not allow_drift:
             raise SystemExit(f"raw/ differs from snapshot {sid}: {len(drift)} changed or new input files ({drift[0]}"
-                             f"{', …' if len(drift) > 1 else ''}; tools/snapshot.py status lists them). Publish a"
-                             " snapshot with them first, or pass --allow-drift with a --note saying why.")
+                             f"{', …' if len(drift) > 1 else ''}; tools/snapshot.py status lists them). fetch removes"
+                             " what older snapshots left; publish a snapshot with the rest first, or pass --allow-drift"
+                             " with a --note saying why.")
         if drift:
             note = f"{note} [raw/ differs from snapshot {sid}: {len(drift)} files]".strip()
     files = {}
