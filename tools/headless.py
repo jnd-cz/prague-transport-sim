@@ -98,7 +98,7 @@ SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights"}
 
 
 def judge(check, r):
-    """(ok, one-line summary): the thresholds of tools/bench/batch.html."""
+    """(ok, one-line summary): the checks' thresholds are here; tools/bench/batch.html shows them in a page."""
     if "error" in r:
         return False, r["error"][:300]
     bad = []

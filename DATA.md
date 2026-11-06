@@ -70,7 +70,7 @@ queries.
 
 ```bash
 python -I tools/snapshot.py data-fetch     # data/ for this commit (data/MANIFEST.json)
-python -I tools/snapshot.py fetch          # raw/ for snapshots/CURRENT (~2 GB; unpacks the DTM packages)
+python -I tools/snapshot.py fetch          # raw/ for snapshots/CURRENT (~4.3 GB; unpacks the DTM packages)
 python -I tools/snapshot.py status         # local raw/ and data/ against the manifests
 ```
 

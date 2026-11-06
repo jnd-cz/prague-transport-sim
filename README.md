@@ -1,7 +1,7 @@
 # Tatra T3 — Prague trams (browser prototype)
 
-Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (line 17
-is rebuilt from the survey first): OpenStreetMap (track network, roads, greenery), the Prague Digital
+Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
+and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
 Technical Map (surveyed streets, the transport layer DI for the track), IPR Praha 3D buildings and
 bridges, lidar terrain, and the PID GTFS timetable.
 
@@ -160,8 +160,8 @@ The game data (`data/`) and the raw sources (`raw/`) are not in git: a fresh clo
 data store, see **[DATA.md](DATA.md)** (one-time SSH setup, then):
 
 ```bash
-python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~85 MB)
-python -I tools/snapshot.py fetch          # raw/ to build the world (~2 GB, the pinned source snapshot)
+python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~110 MB)
+python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, the pinned source snapshot)
 ```
 
 ## Rebuild the line data
