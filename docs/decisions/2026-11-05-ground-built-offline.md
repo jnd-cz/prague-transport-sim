@@ -1,6 +1,6 @@
 # The ground built offline: the terrain mesher, the profile in Python, the format (#276)
 
-Status: accepted by the user, 2026-11-06 ("Pydelatin it is"; the mesher, the profile in Python, 10 cm); the format waits for #307.
+Status: accepted by the user, 2026-11-06 ("Pydelatin it is"; the mesher, the profile in Python, 10 cm); the format: [integer differences](2026-11-06-tile-container.md), #307.
 
 ## Why
 
@@ -160,7 +160,7 @@ The greedy mesh of the tile above (129,380 triangles, 64,882 vertices):
 | integers: vertices row by row as differences (cm heights), indices as differences, varints | 796 kB, gzip 424 kB, xz 364 kB |
 
 3.4 bytes a triangle after gzip. The difference encoding is decoded into the same typed arrays at load. #307's
-GLB with quantisation is compared on this mesh there; the format is decided after it.
+GLB with quantisation was compared on this mesh and lost by 17 % after brotli: [the tile container](2026-11-06-tile-container.md).
 
 ## What it changes
 
