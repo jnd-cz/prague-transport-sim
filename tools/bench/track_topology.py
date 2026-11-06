@@ -1,5 +1,5 @@
 """DI's network graph against OSM's track graph, junction by junction (#237):
-    python -P -E tools/bench/track_topology.py [--lines 9,17,22,23,37] [--json out.json]
+    python -P -E tools/bench/track_topology.py [--lines 9,17,22,23,37] [--json out.json] [--latest]
 
 Distance to DI cannot see a wrong connection or a missing one, so this reads which movements each graph allows. A
 movement is a way through a junction: from a point LEG m before it to a point LEG m after it, turning at most TURN
@@ -12,12 +12,16 @@ build's cached network_tracks.json, else the line's corridor, where a track the 
 OSM's movements are looked for on the whole network, so a track a line leaves out is no difference.
 A point stands on any track within NEAR (OSM lies up to metres off, and a fork up to 48 m from DI's, Ohrada): a wrong
 connection between tracks closer than that goes unseen, and nothing here says which graph is right. Differences are a
-list to review, one per place, so the exit code stays 0.
+list to review, one per place, so the exit code stays 0. A di-only place can be OSM out of date (rebuilt track, 50.07847 N
+14.43178 E, the user 2026-11-06): each run says the extract's date, --latest asks Geofabrik whether a newer one exists.
 """
 import heapq
 import json
 import math
+import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -35,6 +39,7 @@ TURN = 60.0     # degrees at one node of a path; a tram does not turn more withi
 THROUGH = 30.0  # degrees at a junction's own node: more is two tracks crossing at a node OSM has not tagged
 SLACK = 1.25    # a path may be this much longer than the movement, plus SLACK_M: a graph's detour is another movement
 SLACK_M = 5.0
+LATEST = 'https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf'
 GROUP = 10.0    # m: differences this near are one place
 CROSSINGS = ('railway_crossing', 'crossing', 'tram_crossing')
 
@@ -249,6 +254,27 @@ def compare(osm, di, whole, near_drawn):
     return found, counts
 
 
+def extract_date(root):
+    """YYMMDD of the snapshot's OSM extract (raw/osm/czech-republic-YYMMDD.osm.pbf), or None."""
+    return next((m.group(1) for m in (re.search(r'-(\d{6})\.osm\.pbf$', f.name) for f in (root / 'raw' / 'osm').glob('*.osm.pbf')) if m), None)
+
+
+def latest_date():
+    """YYMMDD of Geofabrik's latest extract, from where its -latest link redirects, or None."""
+    class Stop(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args):
+            return None
+    req = urllib.request.Request(LATEST, method='HEAD')
+    try:
+        urllib.request.build_opener(Stop).open(req, timeout=20)
+    except urllib.error.HTTPError as e:
+        m = re.search(r'-(\d{6})\.osm\.pbf$', e.headers.get('Location') or '')
+        return m.group(1) if m else None
+    except OSError:
+        return None
+    return None
+
+
 def osm_answer(root, name):
     """OSM's whole tram network from any line's build, else this line's corridor ways."""
     found = sorted((root / 'raw').glob('*/network_tracks.json'))
@@ -271,6 +297,8 @@ def main():
     root = Path(__file__).resolve().parent.parent.parent
     net, frame, report = di_network.load_network(), Frame(), {}
     whole = DiGraph(net, set(net.edges))
+    ours = extract_date(root)
+    print(f'OSM extract {ours}' + (f', Geofabrik has {latest_date()}' if '--latest' in args else ''))
     for name in names:
         data = json.loads((root / 'data' / f'line{name}.json').read_text(encoding='utf-8'))
         lines = [LineString(t['p']) for t in data['tracks'] if len(t['p']) > 1]

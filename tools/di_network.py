@@ -53,6 +53,8 @@ CROSS_TURN = 30.0        # degrees: such ends face each other, and the gap runs 
 ARCHIVE_NEAR = 1.0       # m: the archive's axis this near both ends of a gap fills it
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
+TOUCH_LOOK = 15.0        # m along both tracks either way from where they touch
+TOUCH_APART = 2.5        # m apart by then, all four ways: the two tracks only share this place (2 places in the network)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
 SECTION_TURN = 60.0      # degrees: the most a section's branch may leave its legs' line at the node they end at
 WALK_RADIUS = 50.0       # m: a track ending a step h beside its node gives up its points within sqrt(h * this) of the
@@ -190,6 +192,7 @@ class Network:
             cuts[c] = [(s0, n if (s0 == (0.0 if e == 0 else chains[c].length) and nd == end_node[i]) else nd, f)
                        for s0, nd, f in cuts[c]]
         # 3. crossings inside both chains
+        touched = []
         for a in range(len(chains)):
             for b in ctree.query(chains[a]):
                 b = int(b)
@@ -207,6 +210,15 @@ class Network:
                     ang = math.degrees(math.acos(min(1.0, abs(da[0] * db[0] + da[1] * db[1]))))
                     if ang < 2 * TURN / 3:
                         self.report['shallow touches'] += 1
+                        # (two tracks that run together only here share their rails: two switches back to back, the
+                        # loop at Dvorce; a fork drawn through has one side that stays together)
+                        if self._touch_switch(chains[a], sa, chains[b], sb) and not any(
+                                x == (a, b) and abs(s0 - sa) < TOUCH_LOOK for x, s0 in touched):
+                            touched.append(((a, b), sa))
+                            n = self._node((g.x, g.y), 'touch')
+                            cuts[a].append((sa, n, None))
+                            cuts[b].append((sb, n, None))
+                            self.report['tracks touching: switches back to back'] += 1
                         continue
                     n = self._node((g.x, g.y), 'crossing')
                     cuts[a].append((sa, n, None))
@@ -544,6 +556,14 @@ class Network:
         line = ed['line']
         self.add_edge(ed['a'], n, substring(line, 0, s).coords, ed['src'], ed['records'], ed.get('chain'))
         self.add_edge(n, ed['b'], substring(line, s, line.length).coords, ed['src'], ed['records'], ed.get('chain'))
+
+    @staticmethod
+    def _touch_switch(la, sa, lb, sb):
+        """Two chains meeting at sa, sb that lie TOUCH_APART or more apart TOUCH_LOOK m on, all four ways."""
+        if min(sa, la.length - sa, sb, lb.length - sb) < TOUCH_LOOK:
+            return False
+        return all(lb.distance(la.interpolate(sa + d)) >= TOUCH_APART and la.distance(lb.interpolate(sb + d)) >= TOUCH_APART
+                   for d in (-TOUCH_LOOK, TOUCH_LOOK))
 
     def _end_faced(self, xy, out, c, tips, txy):
         """Another chain's end lies ahead of the end at xy (`out`: its direction out of its chain c), across a gap of up

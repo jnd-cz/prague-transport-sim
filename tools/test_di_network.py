@@ -278,6 +278,21 @@ class Drawing(unittest.TestCase):
         self.assertIn(branch, [f for f, _ in net.passes[(east, 0)]], n)
         self.assertEqual(len(net.at[n]), 3)
 
+    def test_tracks_touching_at_a_shallow_angle_are_switches_back_to_back(self):
+        # Dvorce: a loop's curve touches the main track, 2.8 m apart 15 m on both ways, no record end near
+        curve = [(0, 30), (30, 8), (42, 2), (48, 0.02), (50, 0), (52, 0.02), (58, 2), (70, 8), (100, 30)]
+        net = net_of([(-50, 0), (150, 0)], curve)
+        self.assertEqual(net.report['tracks touching: switches back to back'], 1)
+        n = next(k for k, v in net.nodes.items() if v['kind'] == 'touch')
+        self.assertEqual(len(net.at[n]), 4)
+        west = next(x for x in net.at[n] if net.out_dir(*x)[0] < 0 and abs(net.out_dir(*x)[1]) < 0.02)
+        self.assertEqual(len(net.passes[west]), 2)
+
+    def test_a_fork_drawn_through_is_no_touch(self):
+        # one side stays together: not two tracks that only touch
+        net = net_of([(0, 0), (200, 0)], [(50, 0.2), (80, -0.05), (100, 0.05), (200, 0.1)])
+        self.assertEqual(net.report['tracks touching: switches back to back'], 0)
+
     def test_a_drawn_track_does_not_end_in_the_air(self):
         # Ohrada: the ways run on the through track and past the gap, not on the branch between them: it is drawn too
         net = net_of([(0, 0), (300, 0)], [(100, 0), (110, 1), (130, 10)], [(133, 13), (150, 30), (170, 50)])
