@@ -28,7 +28,7 @@ import reviews  # noqa: E402
 
 
 # what --lan serves: the game and its data, not the sources in raw/, .git or the tools' caches
-LAN_TOP = {"", "index.html", "src", "assets", "data", "tools", "reports", "favicon.ico"}
+LAN_TOP = {"", "index.html", "README.md", "README.en.md", "src", "assets", "data", "tools", "reports", "favicon.ico"}
 
 
 class NoCache(http.server.SimpleHTTPRequestHandler):

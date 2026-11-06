@@ -1,467 +1,207 @@
-# Tatra T3 — Prague trams (browser prototype)
+# Tatra T3 — pražské tramvaje
 
-Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
-and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
-Technical Map (surveyed streets, the transport layer DI for the track), IPR Praha 3D buildings and
-bridges, lidar terrain, and the PID GTFS timetable.
+**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md)
 
-Project docs: [ROADMAP.md](ROADMAP.md) (milestones; tasks are GitHub issues), [AGENTS.md](AGENTS.md)
-(working rules for agents and contributors), [docs/knowledge.md](docs/knowledge.md),
-[docs/architecture.md](docs/architecture.md), [docs/decisions/](docs/decisions/).
+Řízení tramvaje Tatra T3 v 3D Praze postavené ze skutečných dat, na linkách 9, 17, 22, 23 a 37 (linky 17
+a 22 se zaměřenými ulicemi): OpenStreetMap (kolejová síť, silnice, zeleň), Digitální technická mapa Prahy
+(zaměřené ulice, dopravní vrstva DI pro koleje), 3D budovy a mosty IPR Praha, lidarový terén a jízdní řád
+PID GTFS.
 
-**To play:** Run, Gameplay, Autopilot, Language. **To work on it:** everything from [Set up](#set-up) on.
-
-## Run
+## Spuštění
 
 ```bash
 python tools/serve.py 8742
 ```
 
-Open http://localhost:8742. There's no build step: plain ES modules, with Three.js loaded from a CDN.
+Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, knihovna Three.js se načítá z CDN.
 
-A fresh clone first needs the game data: [Set up](#set-up).
+Čerstvý klon nejdřív potřebuje herní data: [Set up](DEVELOPING.md#set-up).
 
-## Gameplay
+<!-- help -->
 
-- **On a phone or tablet** (#79): on-screen buttons, shown on a touch screen by default and switched by
-  🎮 in the menu (remembered per device). They send the keyboard's keys:
-  - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held), and
-    the dead-man button when that option is on;
-  - the left column: doors, bell, sand (held), look left / right (held), view, mirror, pause;
-  - ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating, autopilot, sound, ⚑ report.
+## Hra
 
-  On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
-- **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
-  zoom; a double click brings it back behind the tram.
-- **The right mirror** grows with the window (a quarter of its height, 110–420 px) and keeps its
-  aspect, so its field of view stays the same; its picture is drawn at the frame's size in device
-  pixels. The texture updates at most 30 times a second, with a 300 m horizon. Flat covers/grates are
-  omitted; people, vehicles, poles, overhead wires and the tram remain. Its cached picture is
-  composited after every main redraw, including while paused.
-- **The T3's TR 37 equipment** (#221, `src/tr37.js`; sources and derivation in
-  `docs/research/prazsketramvaje/t3-accelerator.md`): two pedals without detents. A drive step (J1–J5)
-  sets a current, which the accelerator holds by stepping through its 99 positions (resistors to 75, field
-  weakening at 80–95); a brake step (B1–B5) sets a brake current; the electric brake fades below ≈6 km/h,
-  where the shoe brakes come in (partly on steps 3–4, fully from step 5 or parked); the end of the brake
-  stroke adds the track brakes. An open door or a brake pedal off zero cuts traction. Right after driving
-  the brake builds slowly, and step 5 then brings the shoes in at speed: coast 2–3 s between them.
-  The dashboard's pedal bar shows the pedal (drive up, brake down, P parked) and the accelerator.
-- **Controls** (menu): *Simple* moves a lever by steps (W/S, 1–5, Shift+1–5) and works the pedals as a
-  driver would, parking whenever the car stands; *Advanced* moves the pedals themselves (a tap to the next
-  step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
-  parking the shoes release fully only with the drive pedal. Space is the emergency stop in both.
-  An empty car accelerates at 0.6–1.8 m/s² by step (tools/test_traction.py), a full car more slowly; gravity on gradients (Chotkova ~7 %), curve resistance, rolling back
-  when the brake is released on a hill, lateral comfort in curves.
-- Weather: dry / rain / autumn leaves sets wheel–rail adhesion. Too much power spins the wheels,
-  too much brake locks them (flats). Hold A to sand; the emergency brake sands automatically and its
-  magnetic track brakes don't depend on adhesion.
-- Line selection in the menu (each line loads its own world). Stop posts list the day lines serving
-  each stop (GTFS `route_stops`); trams of those lines run ahead of you.
-- Line changes: a run can change its number at a terminus (line 9 continues as 10 at Nákladové
-  nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
-- Speeds: each curve allows √(a·R) with 0.8 m/s² unbalanced lateral acceleration, never above the
-  posted speed of the OSM tram way (`tools/osm_speeds.py`, the data OpenRailwayMap shows) and 50 km/h
-  in streets / 60 on dedicated track. Curves on dedicated track are banked (up to 100 mm cant, level
-  at stops and near the termini); the tram and the view lean into them.
-- Junctions: each signal belongs to a junction controller with a fixed cycle (trams straight in both
-  directions, a turning phase, the cross street) and tram priority; oncoming trams obey it.
-- Traffic: cars drive a lane graph (smooth lanes, turning curves through junctions), give way at
-  junctions, queue behind trams on shared track, stop for walkers; trams stop behind cars on their track.
-- Menu options: automatic switches (onboard computer sets every switch by radio instead of the
-  overhead contacts), performance overlay (FPS, frame time, draw calls, triangles, JS heap).
-- Idle pages draw 4 frames a second (#149): the menu, a pause, the results, review mode with its
-  camera at rest. Driving and inspect mode draw every frame; a hidden tab draws nothing.
-- Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered,
-  six doors); line 23
-  runs a single heritage car. "Set" in the menu overrides it. Each car follows the track on its own
-  bogies.
-- Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day
-  — morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a packed car
-  boards slowly and a full one leaves people for the next tram.
-- Stops from GTFS with real departure times. Where OSM maps the platform, the whole set must stand
-  alongside it (so a second tram can stop behind one already at a long platform); otherwise stop at
-  the sign. Open the doors, wait for boarding and depart on time; early departures cost the most.
-  Request stops (✋) can be passed when nobody waits.
-- Switches: every facing switch has an overhead contact (yellow plate, white sign with a black
-  triangle), worked by the pantograph: pass under it drawing current to set the turn, or coasting to go
-  straight — also right after a stop, at a signal or on a hill (judging that is part of the driver's
-  skill). Current also flows with the **Výhybka** button (Y, as on T3SUCS) and — in winter — through
-  the heating, unless you hold the heating cut-out (C) while coasting under the contact. Contacts are ~22 m before the switch but never where a tram stands with its pantograph at a
-  stop or signal. Trailing switches (where tracks join) need nothing; diamond crossings are not
-  switches. The red LED arrow before each switch shows the blade position and blinks while the switch
-  is locked. If you got it wrong, stop and use the crowbar (X). (Radio/IRC switching remains in the
-  code for switches the data marks as such; none are marked now.)
-- Stops: the tram counts as at the platform when its front is between 20 m before and 12 m past the
-  stop sign; within 3 m of the sign earns a precision bonus.
-- Prague tram signals (four lamps: three on top, one below): the two outer top lamps = stop; top middle +
-  bottom = go straight; top left/right + bottom = go left/right; a blinking GO aspect means it is ending.
-  The call signal below shows three LED bars (\ | /): the bar of the coming direction lights orange
-  once the tram is detected and blinks just before GO. Distant signals with a
-  yellow "P" plate stand before signals hidden behind curves. Tram priority; cross traffic drives
-  along the real crossing street and stops at its line while the tram has GO.
-- Interlaced track in Letenská (under the building near Malostranské náměstí): both directions share
-  ~65 m of track, detected automatically from the two OSM route relations. Signals at both ends grant
-  the section to one direction at a time, return to STOP behind the entering tram, and hold the other
-  side until the section is clear plus 6 s clearance. Oncoming trams obey it.
-- Signs: classic red Prague stop signs, speed limit boards (rychlostník), contact signs, dangerous
-  gradient boards. Zebra crossings painted where OSM marks them (not across the tracks).
-- Traffic: other trams ahead on the same track (they stop at stops and red signals: keep your distance)
-  and oncoming on the opposite track — each carries a line that really serves that stop (GTFS) and
-  turns off (fades out) after the last stop it shares with your line. Cars in the lanes beside the
-  tracks (following the real road geometry and one-way streets) and on the surrounding road network
-  (continuing across junctions); they keep their distance, queue, and pitch/roll with the road
-  surface. Pedestrians on footways and sidewalks who keep off the tracks. Everything fades in and out. Obstacles: parked cars fouling the track (ring the bell) and
-  pedestrians crossing.
-- Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut
-  into a hillside (Chotkova), Most Legií on a deck with piers. OSM track geometry is smoothed into curves,
-  and the terrain is lowered under every track bed so it never pokes through.
-- Heating (DPP T3SUCS manual): saloon seat heaters 0/1/2 (H: three seats each side / all seats),
-  cab heater (kalorifer) 0–3 (K: off / fan / half / full) and the flap that lets the accelerator
-  resistors' waste heat into the saloon (F). The info panel shows the outside, saloon and cab
-  temperatures. Outside temperature: Prague now (Open-Meteo, hourly) or a fixed winter / autumn /
-  summer day (menu). Cold passengers (< 12 °C) and heat you caused cost points; open doors let the
-  heat out; in summer passengers open the windows.
-- Looking around: hold Q / E (or ← / →) to look out of the left / right window; the right
-  rear-view mirror (Z toggles) shows the side of the set and the doors.
-- Signals and signs stand off the road: on catenary poles, hung from span wires beside the contact
-  wire, or at the kerb — not on platforms.
-- Buildings are textured by type (old tenement, panel block, church, industrial hall, glass office)
-  from the OSM tag under each LOD2 building, its roof shape and size. Real 3D bridges (Mosty 3D) set
-  the deck height on tagged bridges and the clearance under structures (station canopies included).
-- Tram model (menu): detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and
-  "Tatra T3" by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0, see `assets/t3h/LICENSE.txt`):
-  its doors, collector, brake lamps and track-brake shoes follow the game, the second car of a set hangs on
-  the coupling (#248); detailed classic (conflig's model alone, CC BY-NC 4.0, `assets/t3/LICENSE.txt`, downloaded
-  when picked); or the built-in simple one. `ASSETS.md` lists them.
-- Overhead line: span wires anchored on poles at the kerb (between carriageway and sidewalk), on wall
-  rosettes where a building stands close, or a bracket arm where one side has no room; closer spacing
-  on curves. Street trees are kept (pruned) clear of all tracks.
+### Vaše směna
+
+- Linku vyberete v menu (každá linka načítá vlastní svět). Označníky uvádějí denní linky, které na
+  zastávce staví; tramvaje těchto linek jedou před vámi.
+- Zastávky mají skutečné časy odjezdů. Otevřete dveře, počkejte na nástup a odjeďte včas; předčasný odjezd
+  stojí nejvíc bodů. Zastávky na znamení (✋) můžete projet, když nikdo nečeká.
+- Zastávku obsloužíte, když tramvaj stojí v místě určeném podle čela vozu:
+  - **U nástupiště dlouhého aspoň 15 m,** je-li v datech: celá souprava stojí podél něj, konec soupravy nejvýše
+    3 m před začátkem nástupiště a čelo nejvýše 4 m za jeho koncem. Za první soupravou tak může obsloužit
+    zastávku druhá, na delším nástupišti i dvě soupravy 2×T3 za sebou (asi tři čtvrtiny zastávek). U nástupiště
+    kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním.
+  - **Jinde:** čelo od 20 m před označníkem do 12 m za ním.
+  - **Návěstidlo těsně za zastávkou:** čelo nejvýše 0,5 m před ním.
+- Bod zastavení je označník: do 3 m od něj získáte bonus 15 bodů za přesnost. Zastavit o kousek dál se stává
+  i ve skutečnosti a cestující přesto nastoupí a vystoupí, proto do 4 m za označníkem hra nic nestrhne; přejetí
+  o více než 4 m stojí 20 bodů, i když zastávku obsloužíte. Zastavení dál vzadu v povoleném místě se netrestá.
+- Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
+  ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; v přeplněném voze trvá nástup
+  déle a při plném vozu zůstanou cestující čekat na další spoj.
+- Změna linky: spoj může na trase linky a na konečné změnit číslo (linka 9 pokračuje na Nákladovém nádraží Žižkov jako 10):
+  všichni vystoupí, přepnou se směrové tabule i údaje na obrazovce a tramvaj odjíždí jako 10.
+
+### Klávesy
+
+| klávesa | co dělá |
+|---|---|
+| `W` / `↑` | k jízdě (stupně J1–J5; pokročilé: ťuknutí o stupeň, držením dál) |
+| `S` / `↓` | k brzdě (B1–B5) |
+| `Mezerník` | nouzová a kolejnicové brzdy (držet) |
+| `N` nebo `0` | obě šlapky volné (výběh) |
+| `1`–`5` | jízdní stupeň; se `Shift` brzdný |
+| `R` | zabrzdit a odbrzdit zajišťovací brzdu (pokročilé ovládání) |
+| `A` | pískování (držet) |
+| `D` | dveře |
+| `B` | zvonec |
+| `Y` | tlačítko **Výhybka**: proud přes kontakt (držet) |
+| `C` | odpojení topení (držet pod kontaktem, pro průjezd bez proudu) |
+| `X` | přestavit výhybku stavěcím klíčem (stojící vůz) |
+| `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
+| `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
+| `Z` | pravé zrcátko zapnout a vypnout |
+| `V` | pohled ze stanoviště řidiče nebo zvenku |
+| `O` | autopilot zapnout a vypnout |
+| `M` | zvuk zapnout a vypnout |
+| `P` / `Esc` | pauza |
+| `F9` | nahlásit problém |
+
+Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
+
+### Jízda
+
+- **Výzbroj TR 37 vozu T3:** dvě šlapky bez aretace. Jízdní stupeň (J1–J5) nastaví proud, který zrychlovač
+  drží postupem přes svých 99 poloh (odporníky do 75, šuntování při 80–95); brzdný stupeň (B1–B5) nastaví
+  brzdný proud; elektrodynamická brzda slábne pod ≈6 km/h, kde nastupují čelisťové brzdy (částečně na
+  stupních 3–4, plně od stupně 5 nebo se zajišťovací brzdou); konec zdvihu brzdové šlapky přidá kolejnicové brzdy.
+  Otevřené dveře nebo brzdová šlapka mimo nulu vypínají trakci. Hned po jízdě se brzda buduje pomalu a stupeň
+  5 pak přivede čelisti za jízdy: mezi jízdou a brzdou vyčkejte 2–3 s kvůli vrácení zrychlovače do základní
+  polohy. Sloupec šlapek na panelu řidiče ukazuje šlapku (jízda nahoru, brzda dolů, P zabrzděno) a zrychlovač.
+- **Ovládání** (menu): *Jednoduché* posouvá páku po stupních (W/S, 1–5, Shift+1–5) a šlapky ovládá jako
+  řidič, stojící vůz samo zabrzdí; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
+  20°/s; držené klávesy se zastaví na brzdném stupni 5) a R zabrzdí a odbrzdí zajišťovací brzdu; po
+  zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda.
+- Prázdný vůz zrychluje podle stupně 0,6–1,8 m/s², plný pomaleji; gravitace na sklonech (Chotkova ~7 %),
+  odpor v obloucích, couvání po uvolnění brzdy v kopci, boční pohodlí v obloucích.
+- Počasí: sucho / déšť / podzimní listí určuje adhezi kola a kolejnice. Příliš velký proud protočí kola,
+  příliš silná brzda je zablokuje (ploché body). Pískujte držením A; nouzová brzda pískuje sama a její
+  magnetické kolejnicové brzdy na adhezi nezávisí.
+- Rychlosti: každý oblouk dovolí √(a·R) s nevyrovnaným bočním zrychlením 0,8 m/s², nikdy více než traťová
+  rychlost a 50 km/h v ulicích / 60 na vlastním tělese. Oblouky na vlastním tělese jsou převýšené (do 100 mm,
+  u zastávek a konečných bez převýšení); tramvaj i pohled se do nich naklánějí.
+- Soupravy: většina linek jezdí dvouvozovými soupravami T3 (2 × 15,2 m přes spřáhla, oba vozy poháněné, šest
+  dveří); na lince 23 jezdí sólo historický vůz. „Souprava“ v menu to změní. Každý vůz sleduje kolej na
+  vlastních podvozcích.
+
+### Výhybky
+
+- Každá rozjezdová výhybka (pojížděná proti hrotům) má pracovní trolejový kontakt (žlutý štítek, bílá tabulka s černým trojúhelníkem),
+  který ovládá sběrač: projeďte pod ním s proudem pro odbočení, nebo bez proudu pro jízdu rovně — i hned za
+  zastávkou, u návěstidla nebo do kopce (odhadnout to patří k umění řidiče).
+- Proud teče i při tlačítku **Výhybka** (Y, jako na T3SUCS) a — v zimě — topením, pokud při průjezdu pod
+  kontaktem bez proudu nedržíte odpojení topení (C).
+- Kontakty jsou ~22 m před výhybkou, nikdy však tam, kde tramvaj stojí se sběračem u zastávky nebo návěstidla.
+  Sjezdové výhybky (pojížděné po hrotech, kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
+- Červená LED šipka před každou výhybkou ukazuje postavení jazyků a bliká, když je výhybka uzamčená. Když to
+  nevyjde, zastavte a použijte stavěcí klíč (X).
+
+### Návěstidla
+
+- Pražská tramvajová návěstidla (čtyři světla: tři nahoře, jedno dole): dvě krajní horní = stůj; horní
+  prostřední + dolní = volno rovně; horní levé nebo pravé + dolní = volno vlevo nebo vpravo; blikající volno
+  znamená, že končí.
+- Výzvové návěstidlo pod ním má tři LED pruhy (\ | /): pruh směru, kterým pojedete, se rozsvítí oranžově, jakmile
+  je tramvaj zjištěna, a těsně před volnem bliká. Předvěsti se žlutým štítkem „P“ stojí před návěstidly
+  skrytými za obloukem.
+- Křižovatky: každé návěstidlo patří k řadiči křižovatky s pevným cyklem (tramvaje rovně v obou směrech, fáze
+  pro odbočení, příčná ulice) a preferencí tramvají; řídí se jím i protijedoucí tramvaje. Příčná doprava jede
+  skutečnou příčnou ulicí a stojí u své čáry, dokud má tramvaj volno.
+- Splítka v Letenské (pod budovou u Malostranského náměstí): oba směry sdílejí ~65 m koleje. Návěstidla na obou
+  koncích pouštějí do úseku vždy jeden směr, za vjíždějící tramvají se vrátí na stůj a druhou stranu drží, dokud
+  se úsek neuvolní, a ještě 6 s poté. Řídí se jimi i protijedoucí tramvaje.
+
+### Topení
+
+Topení je podle příručky DPP k T3SUCS: sedačky v salónu 0/1/2 (H: tři sedačky vpravo i vlevo / všechny),
+kalorifer na stanovišti řidiče 0–3 (K: vypnuto / neohřátý vzduch / polovina topnic / plný výkon) a klapka, která pouští odpadní
+teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje teplotu venku, v salónu a na stanovišti.
+Venkovní teplota: Praha teď nebo pevný zimní / podzimní / letní den (menu). Prochladlí cestující (< 12 °C)
+a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká; v létě si cestující otevírají okna.
+
+### Rozhlížení
+
+- Držením Q / E (nebo ← / →) se díváte levým / pravým oknem; pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje
+  bok soupravy a dveře. Roste s oknem prohlížeče a zorné pole se nemění.
+- **Pohled zvenku** (V): kamera obíhá kolem tramvaje. Tažením ji otáčíte a nakláníte, kolečkem nebo dvěma prsty
+  přibližujete, dvojklik ji vrátí za tramvaj.
+
+### Provoz
+
+- Na stejné koleji jedou před vámi další tramvaje (staví na zastávkách a před červenou: držte odstup) a po
+  protější koleji tramvaje v protisměru; každá nese linku, která na té zastávce opravdu staví, a za poslední
+  zastávkou společnou s vaší linkou odbočí (zmizí).
+- Auta jezdí v pruzích podél kolejí po skutečném tvaru silnic a v jednosměrkách i po okolní silniční síti, přes
+  křižovatky pokračují dál. Na křižovatkách dávají přednost, drží odstup, řadí se za tramvají na společné koleji
+  a staví chodcům; tramvaje staví za auty na své koleji.
+- Chodci chodí po chodnících a mimo koleje. Vše se plynule objevuje a mizí.
+- Překážky: zaparkovaná auta zasahující do průjezdného průřezu (zazvoňte) a přecházející chodci.
+
+### Město
+
+- Terén: koridor trati je zaříznutý do lidarového terénu; opěrné zdi tam, kde trať vede v zářezu ve svahu
+  (Chotkova), Most Legií na mostovce s pilíři.
+- Značky: klasické červené pražské označníky, rychlostníky, tabulky kontaktů, tabulky nebezpečného spádu. Přechody
+  jsou namalované tam, kde jsou zmapované (ne přes koleje). Návěstidla a značky stojí mimo vozovku: na trakčních
+  stožárech, zavěšené na příčných lanech vedle troleje nebo u obrubníku — ne na nástupištích.
+- Trolejové vedení: příčná lana kotvená na stožárech u obrubníku (mezi vozovkou a chodníkem), na růžicích ve zdi,
+  kde stojí blízko budova, nebo výložník, kde na jedné straně není místo; v obloucích hustěji. Stromy v ulicích
+  jsou prořezané tak, aby nezasahovaly do žádné koleje.
+- Budovy mají textury podle typu (starý činžák, panelák, kostel, průmyslová hala, prosklená kancelář). Skutečné 3D
+  mosty určují výšku mostovky a podjezdnou výšku pod konstrukcemi (i pod zastřešením stanic).
+
+### Volby v menu
+
+- Automatické výhybky (palubní počítač staví každou výhybku rádiem místo trolejových kontaktů); přehled výkonu
+  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS).
+- Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
+  Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
+  a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
+  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý.
+
+### Na telefonu nebo tabletu
+
+Tlačítka na obrazovce, na dotykové obrazovce zobrazená automaticky, přepínaná 🎮 v menu (pamatuje si je
+zařízení). Posílají klávesy klávesnice:
+
+- řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
+  bdělosti, je-li ta volba zapnutá;
+- levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), pohled, zrcátko, pauza;
+- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
+  zvuk, ⚑ hlášení.
+
+Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
 
 ## Autopilot
 
-Tick "Autopilot — just watch the ride" in the menu, or press **O** during a shift. It drives like the
-headless test bot: plans speed from limits, stops, signals, obstacles and the tram ahead, picks the
-force needed on the gradient and lets the equipment work the pedals as a careful driver (the advanced
-model: brakes on step 3+ into stops, parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands
-on slippery rail, and gives a short pulse of power (turn) or coasts (straight) under contacts. Press **V** for the outside
-view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the menu; O hands back to the autopilot. The
-same driver lives in `src/autopilot.js` and is used by `tools/autopilot.js`.
+Zaškrtněte v menu „Autopilot — jen se dívat na jízdu“ nebo během směny stiskněte **O**. Plánuje rychlost podle
+omezení, zastávek, návěstidel, překážek a tramvaje před sebou, volí sílu potřebnou na sklonu a nechává výzbroj
+ovládat šlapky jako pečlivý řidič (pokročilý model: do zastávek brzdí od stupně 3, ve stání zabrzdí zajišťovací brzdou, stupně 1–4
+jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty dá krátký
+impuls proudu (odbočení) nebo jede bez proudu (rovně). Klávesou **V** přepnete na pohled zvenku. Řízení převezme
+kterákoli klávesa kontroléru nebo dveří (W/S/mezerník/N/D/R, 0–5), v ovládání zvoleném v menu; O je předá zpět
+autopilotu.
 
-## Language
+## Jazyk
 
-The interface is in Czech or English (Settings → Language in the menu; remembered in the browser).
-Strings live in `src/i18n.js`.
+Rozhraní i tato nápověda jsou česky nebo anglicky (Nastavení → Jazyk v menu; prohlížeč si volbu pamatuje).
 
----
+<!-- /help -->
 
-## Set up
+## Licence
 
-The game data (`data/`) and the raw sources (`raw/`) are not in git: a fresh clone gets them from the
-data store, see **[DATA.md](DATA.md)** (one-time SSH setup, then):
+Kód: GNU GPL v3 ([LICENSE](LICENSE)). Modely a textury: [ASSETS.md](ASSETS.md) (podrobný model T3 je CC BY-NC 4.0). Zdroje dat a jejich uvedení: [NOTICE.md](NOTICE.md).
 
-```bash
-python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~110 MB)
-python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, the pinned source snapshot)
-```
-
-## Rebuild the line data
-
-Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
-(`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
-All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
-
-The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
-side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
-The OSM extract is read once per build (~1 min), and a line takes ~2-4 min:
-
-```bash
-python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
-```
-
-The single steps:
-
-```bash
-python -P -E tools/build_line.py --line 37         # no OSM route relation: from its GTFS shapes
-python -P -E tools/build_line.py --line 22 --headsign "Zahradní Město"
-python -P -E tools/build_line.py --line 23         # any Prague tram line
-python -P -E tools/build_line.py --line 17 --refresh  # recompute the OSM answers cached in raw/line17/
-python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, continuing as 10 at the terminus
-python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
-```
-
-`rebuild.py` ends with `line_heights.py` for all the lines it built (~6 min: it stages the network's heights
-with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
-`reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
-the steps. `headless.py --checks heights` compares the game's track with the staged heights.
-`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
-data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
-(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
-outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
-place leaves the list; `reports/line-heights.json` lists the dropped points.
-
-After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
-
-With `--then`, the route is not taken from the OSM relations (they describe the regular route, not
-diversions) but from the PID GTFS shapes of the two trips, matched onto the whole Prague OSM tram
-network; trips are paired only when the next trip in the GTFS vehicle block starts at the same terminus
-on the selected pattern. Unmatched or ambiguous trips are reported by the build. The current line 9 is
-such a run: Sídliště Řepy → Nákladové nádraží Žižkov as 9, back to Řepy via Vinohradská as 10
-(track repairs, autumn 2026).
-Stop platforms come from OSM (`public_transport=platform`) for all lines.
-
-The script finds the line's OSM route relations by `ref`, takes the GTFS direction-0 headsign
-with the most trips on the service date (override with `--headsign`), checks that the GTFS stops
-lie on the chosen OSM route, and writes `data/lineN.json` plus the menu index `data/lines.json`.
-The OSM answers are cached in `raw/` (line 22), `raw/runN-M/` (a run such as 9 → 10) and `raw/lineN/`
-(other lines), each marked with a key of the extract, the query and the code that answers it
-(`tools/osm_local.py`, `tools/geo.py`): a new snapshot's extract or an edit to either file recomputes
-them. A line without an OSM route
-relation (a substitute line such as 37) is built like a run, from its GTFS shapes (`--gtfs` forces
-it). Built lines: 9, 17, 22, 23, 37.
-
-The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
-list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
-as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy and Pillow live in the user site packages):
-
-| step | writes | what |
-|---|---|---|
-| `platforms` | `lineN.json` | tram platforms of both directions: PID GTFS positions, names and lines, OSM shapes where mapped (`--fetch` re-reads them from the snapshot's extract) |
-| `osm_speeds` | `lineN.json` | posted speeds and dedicated track: the speed limits and banked curves |
-| `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them) |
-| `osm_signals`, `dtm_points` | `lineN.signals.json`, `.dtmpoints.json` | line 17 only: OSM traffic signals, street furniture from the survey |
-| `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
-| `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
-| `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
-| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
-
-Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
-profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
-packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
-
-## Deploy
-
-The game is static files: `index.html`, `src/`, `assets/`, `data/`. Three.js comes from jsDelivr and
-the outdoor temperature from Open-Meteo, both fetched by the browser. `python tools/make_dist.py`
-packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directory. Enable gzip or
-brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
-CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
-
-To a web host over FTPS (#131): `python -I tools/deploy.py` uploads the same files from a clean commit
-whose data matches the manifest:
-- only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
-- it adds `version.json`, shown in the menu's credits, and an `.htaccess` with compression;
-- `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
-
-The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
-
-Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
-`deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
-checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
-it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
-`~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
-hour. Log: `reports/autodeploy.log`.
-
-## Dev
-
-**Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
-each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
-`reports/headless/`:
-
-```bash
-python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
-python -P -E tools/headless.py --lines 23 --checks traffic,lint --seeds 22,7,1234
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,lint --jobs 3
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks canted
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing
-```
-
-`crossing` counts 20 m route sections where a drawn pedestrian surface is above a sampled rail head;
-it also reports missing rail samples and the independently mapped evidence for survey adjustments.
-
-`--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
-up to ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
-
-The harness verifies its own server before launching a job. An occupied `--port` fails without using
-or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
-uses an already-running server.
-
-Regression checks compare with main's baseline in `reports/baseline/headless.json`: the key counts of
-each run, with the code and data they were measured on.
-
-```bash
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --baseline
-```
-
-`--compare` prints baseline → now per run (also in `reports/headless/compare.md`, for the PR) and marks
-problem counts that rose (traffic counts beyond a 15 % + 5 noise band). It warns when the baseline was not
-measured on main's code and data. `--baseline` stores the run as the new baseline; it needs the game,
-the in-page checks and `data/MANIFEST.json` committed and `data/` matching the manifest.
-
-For a combined GTFS run, independently check every logged pair and the built timetable against the
-pinned GTFS, including eligible pairs omitted from both the log and timetable:
-
-```bash
-python -I tools/audit_run_timetable.py --line 9 --log reports/rebuild/line9.build_line.log
-```
-
-The audit takes the service date from the build log (`service date …`, `SERVICE_DATE` in
-`tools/build_line.py`).
-
-`tools/autopilot.js` drives the game headlessly to check the rules. In the browser console:
-
-```js
-const { autopilot } = await import('/tools/autopilot.js');
-autopilot(0, 99, { obstacles: 'normal', weather: 'rain' });
-```
-
-**Lints** ([docs/knowledge.md](docs/knowledge.md)): each check counts one kind of problem over the whole line. With the dev server
-(`tools/serve.py`, which saves the reports), the page loaded with **`?keepgeo`** (the game otherwise frees
-the meshes' CPU copies after loading) and a shift started on the line:
-
-```js
-const { lint } = await import('/tools/lint.js?v=' + Date.now());
-await lint();               // consist at every stop, signals in platforms, trees in buildings, bridges
-await lint({ bot: true });  // + the street bot where DTM streets exist (about a minute)
-await lint({ traffic: true }); // + the whole line driven headless with the real traffic (1–2 minutes)
-```
-
-The traffic run (`tools/traffic_lint.js`) starts a shift at the first stop and lets the autopilot drive
-to the end with a fixed time step; the page's frame loop only draws meanwhile (`window.headless`).
-Every 0.2 s it records every visible car, walker and tram and counts: cars or walkers moving sideways
-(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode) and walkers inside
-a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …). It is
-seeded and uses the first trip, autumn and dry weather, so a run on a **freshly loaded page** gives
-the same counts every time (a second run in the same page differs slightly).
-
-Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
-(above), whose baseline follows main.
-
-Mirror rendering cost (#79): `python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed`.
-Keep its game window in front until it closes: the report records the graphics backend, focus,
-frame times and mirror geometry/update counts, alternating mirror off/on. Unfocused frame rates are
-rejected. `tools/test_mirror.py` checks cadence and renderer state; `tools/test_mirror_game.py` captures
-the real mirror at 1280×720, 3840×2160 and 390×844 in `reports/shots/mirror79/`.
-
-**Compare a view or rebuilt data** (#158):
-
-```bash
-python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main
-python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
-python -I tools/datadiff.py --line 17 dtm
-python -I tools/datadiff.py --line 17 zps --at=-2489,-8331 --radius 5
-python -I tools/datadiff.py --line 17 dtm --ref '5d6c427^'
-```
-
-`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`.
-Views: `cab` (default), `chase`, `review`. The tram is paused at `s`, traffic and HUD are hidden;
-review uses `&at=` at that route point. Both sides use the current view's exact camera, so a changed
-profile cannot move the comparison camera. It starts its own free-port servers, one view at a time.
-The reference defaults to `origin/main`: a git revision is exported temporarily with its published
-data from `TRAMDATA_CACHE`; a directory uses its working files. Neither checkout is modified.
-
-`datadiff.py` compares working `dtm`, `zps` or `line` JSON with the SHA-256-verified published version
-named by `data/MANIFEST.json`, read from the machine cache. `--ref DIR|REV` selects another published
-manifest. Reports in `reports/diffs/` give counts per area class/source kind, the absolute-height-change
-histogram in metres, and the largest changed vertices with their record IDs and XY. Shapes match by
-class, level and exact XY; reordered rings/records are unchanged, XY edits count as added/removed,
-and closed outline endpoints count once. Missing heights count separately. `line` also lists changed
-fields and array counts. `--at X,Y` lists nearby working survey areas and source segments (including
-their levels and height-accuracy classes); the JSON report retains their vertices.
-Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
-in a separate checkout of that reference; comparisons never restore over the working data.
-
-**Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
-**I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
-overlay is hidden and the mouse moves the camera: **orbit** around the tram (drag to turn, wheel to zoom)
-or **fly** (C; drag to look, W/A/S/D, R/F up/down, Shift faster, wheel = flying speed). PgDn / PgUp
-(or . / ,) put the camera at the next / previous stop, T back to the tram, I leaves (the autopilot keeps
-driving: O hands back the controls). The camera's route position is on the panel, handy with the lints.
-
-**The review directory** (`reviews.html`, linked from the menu; #288) lists every review set in
-`reports/review/` under the issue that waits for it, with answered, unsure and waiting counted live from
-the answer store, a link per line that opens the set with only its unanswered findings (`&todo`), and
-the open PRs' questions for the user. Its index (`reports/review/index.json`: the sets, their issues and
-lines, the issues' titles and states, the PRs' questions) is built at each deploy by
-`tools/review_sets.py`; locally, `python -I tools/review_sets.py` writes it. A set names its issue and
-lines in the file (`issue`, `line`, or per finding `line` / `lines_near`); `KNOWN` there covers the
-tools that do not write them yet.
-
-**Review mode** (the checks' findings on the map, desktop or phone; #129): open
-`index.html?line=17&review`, no shift needed. The panel lists findings worst first:
-- the kerb review list from the survey's provenance (`tools/kerbs.py`);
-- seams and flat or sunk kerbs between neighbouring survey areas, grouped per 30 m;
-- with `&review=reports/x.json`, every `{x, y}` in that file (a lint or headless result, a hand-made list).
-
-Choosing one (a row, a tapped pin, N / B) moves the camera there. The card says:
-- the street (OSM name) and the nearest stop;
-- `s`, `x, y` and lat/lon;
-- links to Mapillary, Panoramax, the Mapy.com aerial and Google Street View at that place (facing the camera's heading).
-
-**Layers** toggles the survey classes as colours, the wireframe of the survey triangles, the survey's own lines (**Source**), kerb edges, seam posts, pins, our track, the buildings and the trees.
-**Orthophoto** drapes IPR's leaf-off orthophoto (2026, CC BY 4.0) over the ground around the target: 150 m at 0.1 m, or 75 m at the native 0.05 m with the camera within 40 m (rails show only then). The browser loads it straight from IPR's ImageServer; nothing is stored on our server. It is drawn over the world and the classes (switched off with it), under the other overlays; the credit and a failed load show at the top left. Beside it, **contrast** sets each spot's brightness against its 1 m surround (rails in pavement and kerbs show over sun and shade alike) and **lines** draws thin dark lines (rails, joints, also shadow and people outlines) in cyan: `orthoLook` in `src/review.js`, which says what else was tried.
-**Track sources** draws the line's track centrelines as the build took them (`tracks[].src`): orange DI, violet OSM, yellow DTM points, green orthophoto. Over the orthophoto they show where a source lies against the rails, e.g. for `reports/review/track-sources-N.json`.
-The classes and the wireframe are the game's build of the survey (`tools/dtm.py`: merged areas,
-fitted heights). **Source** draws the survey's 3D lines as they come (`data/lineN.zps.json`,
-`tools/zps_source.py`, lines with surveyed streets) at their own heights: white at ground level, cyan
-below, orange above, red dots where a vertex has no height. The card then lists the source lines
-within 5 m with their kind, level, height there and height accuracy class.
-- **Mouse:** drag pans, right-drag (or Shift-drag) turns and tilts, the wheel zooms.
-- **Touch:** one finger pans; two fingers pinch, twist and tilt.
-- **Keys:** W/A/S/D, Q/E, R/F.
-
-The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (only the game's files; read-only apart from review answers) prints the address to open; Windows asks once to allow it through the firewall.
-
-**Answers** (#136): the card has a button per answer (1–4 on the keyboard) and a note. The answers compare
-the game with reality (the imagery): kerbs wrong in game / matches reality / other level or wall / unsure;
-which of the source and the build is wrong is for the agent to find. An answer is saved
-and the card moves to the next finding without one; **to do** hides the answered ones, and their pins turn
-grey. The answers are kept per line in the browser and sent to the server, which merges them per finding
-(the newer wins), so a phone and a computer share one review:
-- on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
-  `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
-  on every run, and `python -I tools/deploy.py --pull-reviews` does it at once;
-- with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
-
-Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
-A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
-`reports/review/` and deployed with the site (the review directory lists them). A set whose issue is
-closed while findings wait is out of date and is deleted (the user, 2026-11-05): #106's track-height
-disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
-`?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
-OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
-(`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.
-The grouped structure-height queue uses `?line=17&review=reports/review/track-heights.json`: select a
-decision to inspect its linked spans, height profile and sources. Answers with notes, uncertain choices
-and unspecified levels remain held. The card explains any held archive answer (a dip under a bridge, a
-steep step) and offers `archive, bridged over a dip` and `follows survey surface` only where they import;
-`python -P -E tools/track_structure_review.py` rewrites those offers from the committed queue after the
-import rules change. Answers talked over with the user are recorded in `data/truth.json`
-(`trackHeights.reviewAnswers`, one per decision with its quote): `python -P -E tools/track_span_evidence.py`
-converts those; `--from-reviews reports/reviews/line17.json` converts a page's unambiguous answers instead.
-Proposals stay separate from approved height evidence;
-the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
-reproduction commands and `--evidence` format.
-
-**Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
-pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
-screenshot of the 3D view. The state covers the line, trip, clock, weather, seed, tram position, speed
-and notch, the camera, lat/lon, a review-mode link to the place and the deployed version. The record is
-stored as `report-<date>-<time>-<code>`; the id is shown so it can be quoted in chat. It goes into the
-same store as the review answers: on the test host it comes back through `autodeploy.py` as
-`reports/reviews/report-….json` and `.jpg` in the deploy checkout; locally `serve.py` writes it there
-directly. Without a server the record is downloaded as a file instead.
-
-**Street bot** (where DTM streets are imported): open `index.html?line=22&bot` and start a shift. The
-bot drives every car lane and walks every footway the traffic uses (1 m steps), compares the car and
-walker heights with the triangles actually drawn and the DTM area class under the wheels, and lists
-the places that look wrong, worst first: kerb steps, wheels on a sidewalk, height jumps, tilted cars,
-floating or sunken cars and walkers, gaps in the surveyed streets, bumpy footways. Click a row (or
-`n` / `b`) to fly there; arrows orbit, `+` / `−` zoom; coloured posts mark every place.
-`window.streetBot` holds the result (`stats`, `findings`, `raw` samples). One run takes about a minute.
-
-Code: GNU GPL v3 ([LICENSE](LICENSE)). Assets: [ASSETS.md](ASSETS.md) (the detailed T3 model is CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](NOTICE.md).
-
-Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
-terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).
+Data © přispěvatelé OpenStreetMap (ODbL); jízdní řád PID GTFS, data.pid.cz (CC BY 4.0);
+terén ČÚZK DMR 5G (CC BY 4.0); 3D budovy, opěrné zdi a stromy: datový podklad © IPR Praha (CC BY 4.0).

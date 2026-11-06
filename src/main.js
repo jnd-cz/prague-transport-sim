@@ -22,6 +22,7 @@ import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
 import { trackStyles, loadHeightFacts } from './heights.js';
 import { credits, logProvenance, fallbacks } from './provenance.js';
+import { initHelp } from './help.js';
 import { Mirror } from './mirror.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
@@ -365,6 +366,7 @@ applyStatic();
 menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
+initHelp();
 onLangChange(() => { menuTexts(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
