@@ -363,7 +363,8 @@ def snap_to_neighbour(chs):
 
 def smooth_heights(chs):
     """The smoother in front of the band rule (#358): each run of heights, moved at most SMOOTH_CLAMP, nearly not at all near a
-    junction, where the tracks must meet."""
+    junction, where the tracks must meet. A run shorter than two of its wavelengths stays: it has no waves to tell from its
+    shape (a 91 m side track on line 17 fell 14 cm)."""
     diverge, clusters, crossings = junctions(chs)
     near = defaultdict(list)
     for d in diverge:
@@ -375,6 +376,8 @@ def smooth_heights(chs):
     reach, small = SMOOTH_JUNCTION
     for k, c in enumerate(chs):
         for run in height_runs(c):
+            if c.bins[run[-1]]['s'] - c.bins[run[0]]['s'] < 2 * SMOOTH_WAVELENGTH:
+                continue
             for i, v in zip(run, smooth_line(c, run)):
                 x = c.bins[i]
                 most = small if any(abs(x['s'] - t) <= reach for t in near[k]) else SMOOTH_CLAMP

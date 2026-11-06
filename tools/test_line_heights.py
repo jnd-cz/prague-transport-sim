@@ -311,6 +311,12 @@ class Smoothed(unittest.TestCase):
         self.assertTrue(at)
         self.assertLessEqual(max(abs(x['z'] - z0[round(x['s'])]) for x in at), small + 1e-9)
 
+    def test_a_short_run_stays(self):
+        c = chain([(0, 0), (90, 0)], lambda s: 100 + .1 * math.sin(s / 6))
+        z0 = [x['z'] for x in c.bins]
+        lh.smooth_heights([c])
+        self.assertEqual([x['z'] for x in c.bins], z0)
+
     def test_it_moves_a_height_at_most_the_clamp(self):
         c = chain([(0, 0), (300, 0)], lambda s: 100 + .15 * math.sin(s / 6))
         z0 = [x['z'] for x in c.bins]
