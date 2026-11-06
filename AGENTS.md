@@ -213,7 +213,7 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
-| crossing | 17 | 1 unexplained pedestrian obstruction (main at 14b71c4 and 9a7b1a0 alike) | #146 |
+| crossing | 17 | 2 unexplained pedestrian obstructions (one of 1-2.6 cm since #237's rebuild, the track within 3 mm of main's) | #146, #202 |
 
 ## Code style
 
