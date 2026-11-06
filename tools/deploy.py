@@ -1,4 +1,4 @@
-"""Upload the game to the web host over FTPS (#131): python -I tools/deploy.py [--dry-run] [--reports]
+"""Upload the game to the web host over FTPS (#131): python -P -E tools/deploy.py [--dry-run] [--reports]
 
 Config (git-ignored, in the checkout's root): deploy.local.json
     {"host": "<FTP host>", "user": "<FTP user>", "dir": "/httpdocs", "url": "https://testing.pipethebytes.com/"}
@@ -7,7 +7,9 @@ Access protection is the web host's (Plesk: Password-Protected Directories); aft
 checked to answer 401 without a login.
 
 What goes up: tools/make_dist.py's files, plus version.json (commit, data snapshot, date) and an
-.htaccess (compression, revalidation). The server keeps .deploy-manifest.json (path -> sha256): only
+.htaccess (brotli, revalidation). The data heavy packs go up only compressed, as <name>.brotli (#275): the
+.htaccess hands that file to every request for <name>, and the rest stays plain, for the host to compress on the
+fly. The server keeps .deploy-manifest.json (path -> sha256, of what is on the server): only
 changed files are uploaded (each to a .part name, then renamed), files no longer in the site are
 deleted, the manifest is written last. A rollback is a deploy from the older commit.
 --reports also uploads reports/headless/*.json (for ?review=reports/headless/line17-lint.json).
@@ -16,6 +18,7 @@ access); --pull-reviews only fetches reviews/*.json into reports/reviews/, merge
 """
 import argparse
 import base64
+import concurrent.futures
 import datetime
 import ftplib
 import getpass
@@ -29,6 +32,8 @@ import sys
 import urllib.error
 import urllib.request
 
+import brotli
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import reviews  # noqa: E402
 import review_sets  # noqa: E402
@@ -36,16 +41,23 @@ from make_dist import ROOT, files  # noqa: E402
 
 CONFIG = os.path.join(ROOT, "deploy.local.json")
 MANIFEST = ".deploy-manifest.json"
-HTACCESS = """# tools/deploy.py: compressed transfers; the files keep their names between deploys, so revalidate
+# the data heavy packs, kept on the host only compressed (the user, 2026-11-06, #275: "just the data heavy packs
+# should be compressed to smallest size"; docs/knowledge.md, The test host)
+PACKED_DIRS, PACKED_TYPES = ("data/", "assets/"), (".json", ".bin", ".glb", ".gltf")
+PACKED_SUFFIX = ".brotli"  # (not .br: the host's Apache takes that for the Breton language)
+HTACCESS = """# tools/deploy.py: the data and models exist here only as <name>.brotli, and every request for <name> gets that file;
+# the files keep their names between deploys, so revalidate
 <IfModule mod_mime.c>
   AddType text/javascript .js
   AddType application/json .json
   AddType model/gltf+json .gltf
+  AddType model/gltf-binary .glb
   AddType application/octet-stream .bin
+  AddEncoding br .brotli
 </IfModule>
-<IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/json model/gltf+json application/octet-stream
-</IfModule>
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME}.brotli -f
+RewriteRule ^(.*)$ $1.brotli [L]
 <IfModule mod_headers.c>
   Header set Cache-Control "no-cache"
 </IfModule>
@@ -70,10 +82,26 @@ def checks(allow_dirty):
     return git("rev-parse", "HEAD")
 
 
+def packed(rel):
+    return rel.startswith(PACKED_DIRS) and rel.endswith(PACKED_TYPES)
+
+
+def pack(rels):
+    """{name on the server: its bytes} at brotli's best quality, on every core (the compressor lets go of the GIL;
+    the whole site takes 17 s on 24 threads, so nothing keeps the result between deploys)."""
+    def one(rel):
+        with open(os.path.join(ROOT, rel), "rb") as fh:
+            return rel + PACKED_SUFFIX, brotli.compress(fh.read(), quality=11)
+    with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as ex:
+        return dict(ex.map(one, rels))
+
+
 def site(commit, reports=False, github=True):
     """{path: bytes or a local file path} of everything that goes up (github: the review index asks it for the
     issues' titles and the PRs' questions)."""
-    out = {rel: os.path.join(ROOT, rel) for rel in files()}
+    rels = list(files())
+    out = {rel: os.path.join(ROOT, rel) for rel in rels if not packed(rel)}
+    out.update(pack([rel for rel in rels if packed(rel)]))
     if reports:
         d = os.path.join(ROOT, "reports", "headless")
         for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
