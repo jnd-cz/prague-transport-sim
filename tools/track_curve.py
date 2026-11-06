@@ -332,7 +332,7 @@ class Network:
     error of its records' accuracy class; default the class UNCLASSED). After construction: `pos` and
     `pts` fitted, `report` (counts, the largest misses and the curves left tighter than MIN_RADIUS, with places)."""
 
-    def __init__(self, pos, pts, kind, loose=(), limit=None, continues=None):
+    def __init__(self, pos, pts, kind, loose=(), limit=None, continues=None, solid=()):
         k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
         # nodes joined by an edge under MERGE are one (a switch's node and a neighbour moved onto one fork; two nodes
         # 4 cm apart at Národní divadlo, each fitted onto another track, would join with a 0.2 m radius)
@@ -350,7 +350,9 @@ class Network:
             degree[a] += 1
             degree[b] += 1
         for (a, b), p in pts.items():
-            if sum(math.dist(x, y) for x, y in zip(p, p[1:])) < MERGE:
+            # (never two nodes of `solid`, each exactly on its tracks: three chains crossing within 0.4 m at Palackého
+            # náměstí, merged, passed one point 13 cm off)
+            if sum(math.dist(x, y) for x, y in zip(p, p[1:])) < MERGE and not (a in solid and b in solid):
                 ra, rb = find(a), find(b)
                 if ra != rb:
                     keep, gone = (ra, rb) if degree[ra] >= degree[rb] else (rb, ra)

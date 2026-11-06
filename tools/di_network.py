@@ -170,7 +170,7 @@ class Network:
                     p = line.interpolate(run)
                     s = chains[j].project(p)
                     # (the copy part is dropped: the branch starts where it leaves)
-                    cuts[c].append((run if e == 0 else chains[c].length - run, None, 'trim'))
+                    cuts[c].append((run if e == 0 else chains[c].length - run, None, f'trim{e}'))
                     self.report['copies trimmed'] += 1
                 kind = 'branch'
             if not END_CLEAR < s < chains[j].length - END_CLEAR:
@@ -208,14 +208,19 @@ class Network:
         # 4. edges between consecutive cuts
         for c, cs in cuts.items():
             cs = sorted(cs, key=lambda t: t[0])
-            trim = [s for s, _, f in cs if f == 'trim']
-            pts = [(s, n) for s, n, f in cs if f != 'trim']
-            if trim:   # (a copy dropped: the end node moves to where the branch leaves)
-                t = trim[0]
-                if t < chains[c].length / 2:
-                    pts = [(t, pts[0][1])] + [p for p in pts[1:] if p[0] > t]
-                else:
-                    pts = [p for p in pts[:-1] if p[0] < t] + [(t, pts[-1][1])]
+            pts = [(s, n) for s, n, f in cs if f is None]
+            # (a copy dropped: the end node moves to where the branch leaves; read per end, a copy starting 0.5 m from
+            # the far end was taken for the near end's and the track ran 12 m out and back, line 17 at Kobylisy and
+            # Ďáblice. Nothing left between the two: the whole chain is a copy of the track it lies on)
+            t0 = next((s for s, _, f in cs if f == 'trim0'), None)
+            t1 = next((s for s, _, f in cs if f == 'trim1'), None)
+            if t0 is not None:
+                pts = [(t0, pts[0][1])] + [p for p in pts[1:] if p[0] > t0]
+            if t1 is not None:
+                pts = [p for p in pts[:-1] if p[0] < t1] + [(t1, pts[-1][1])]
+            if (t0 is not None or t1 is not None) and pts[-1][0] - pts[0][0] < SHORT:
+                self.report['chains wholly copies'] += 1
+                continue
             for (s0, a), (s1, b) in zip(pts, pts[1:]):
                 if s1 - s0 < 1e-3 or a == b:
                     continue
@@ -497,7 +502,7 @@ class Network:
                 m = lone[int(j)]
                 q = self.nodes[m]['xy']
                 g = math.dist(p, q)
-                if GAP < g <= CROSS_GAP:
+                if g <= CROSS_GAP:
                     w = _unit((q[0] - p[0], q[1] - p[1]))
                     if dot(d, self.out_dir(*self.at[m][0])) <= math.cos(math.radians(180 - CROSS_TURN)) and                             -dot(d, w) >= math.cos(math.radians(CROSS_TURN)):
                         return True
@@ -514,7 +519,12 @@ class Network:
                     if not (faced(n0, d) and others and min(others) < devs[y]):
                         continue
                 e, end = x
-                n1 = self._node(self.nodes[n0]['xy'], 'end')
+                # (at its own last point: the junction's node stands on the tracks going through)
+                c = list(self.edges[e]['line'].coords)
+                if len(c) > 2:
+                    c = c[1:] if end == 0 else c[:-1]
+                    self.edges[e]['line'] = LineString(c)
+                n1 = self._node(c[0] if end == 0 else c[-1], 'end')
                 self.at[n0].remove(x)
                 self.at[n1].append(x)
                 self.edges[e]['a' if end == 0 else 'b'] = n1
@@ -541,7 +551,7 @@ class Network:
                 v = self.out_dir(*self.at[m][0])
                 g = math.dist(p, q)
                 w = _unit((q[0] - p[0], q[1] - p[1]))
-                if GAP < g <= CROSS_GAP and u[0] * v[0] + u[1] * v[1] <= cos_face \
+                if g <= CROSS_GAP and u[0] * v[0] + u[1] * v[1] <= cos_face \
                         and -(u[0] * w[0] + u[1] * w[1]) >= math.cos(math.radians(CROSS_TURN)) and (best is None or g < best[0]):
                     best = (g, m)
             if best is None:
@@ -1240,7 +1250,8 @@ class Drawn:
                         continues[n].add(frozenset((other(e, end), other(f, fend))))
         self.pos = dict(pos)
         if fit:
-            tc = track_curve.Network(pos, pts, kind, {}, limit, continues)
+            tc = track_curve.Network(pos, pts, kind, {}, limit, continues,
+                                     solid={n for n in pos if net.nodes[n]['kind'] == 'crossing'})
             fitted, self.report = tc.pts, tc.report
             self.pos = dict(tc.pos)
         else:

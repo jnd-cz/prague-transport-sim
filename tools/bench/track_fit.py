@@ -96,7 +96,8 @@ def main():
         drawn = di_network.Drawn(net, edges)
         dev = []
         for e, p in drawn.pts.items():
-            if len(p) < 2:
+            # (a gap's fill has no record: the middle of a joint 1 m long is 0.5 m along the track from either end)
+            if len(p) < 2 or not net.edges[e]['records']:
                 continue
             l = LineString(p)
             n = max(1, int(l.length / 0.5))
