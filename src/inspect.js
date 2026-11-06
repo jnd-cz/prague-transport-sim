@@ -2,7 +2,9 @@
 // simulation runs faster or slower than real time (several game steps per frame); pause it any time
 // and look around with the mouse. Two cameras:
 //   orbit - around the tram: drag to turn, wheel to zoom
-//   fly   - free: drag to look, W/A/S/D to move, R/F up and down, Shift faster, wheel = flying speed
+//   fly   - free: drag to look, right-drag (or Shift-drag) to move, W/A/S/D to move, R/F up and down, Shift faster,
+//           wheel = flying speed
+// Both: Q/E or ← / → turn, ↑ / ↓ tilt. The same mouse and keys as review mode (#342).
 // Keys (only while inspecting): Space pause, + / - speed, C orbit/fly, T back to the tram,
 // PageDown / PageUp (or . / ,) camera to the next / previous stop, I leave.
 import * as THREE from 'three';
@@ -38,14 +40,19 @@ export class Inspect {
 
     canvas.addEventListener('pointerdown', (e) => {
       if (!this.active) return;
-      this.drag = { x: e.clientX, y: e.clientY };
+      this.drag = { x: e.clientX, y: e.clientY, slide: this.mode === 'fly' && (e.button !== 0 || e.shiftKey) };
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!this.active || !this.drag) return;
       const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
-      this.drag = { x: e.clientX, y: e.clientY };
-      if (this.mode === 'orbit') {
+      this.drag = { ...this.drag, x: e.clientX, y: e.clientY };
+      if (this.drag.slide) {
+        // the ground follows the mouse, as in review mode; the wheel's flying speed sets how far
+        const k = this.flySpeed * 0.002, s = Math.sin(this.flyYaw), c = Math.cos(this.flyYaw);
+        this.camera.position.x += -c * dx * k - s * dy * k;
+        this.camera.position.z += s * dx * k - c * dy * k;
+      } else if (this.mode === 'orbit') {
         this.yaw -= dx * 0.006;
         this.pitch = Math.max(-1.45, Math.min(0.3, this.pitch - dy * 0.006));
       } else {
@@ -54,6 +61,7 @@ export class Inspect {
       }
     });
     canvas.addEventListener('pointerup', () => { this.drag = null; });
+    canvas.addEventListener('contextmenu', (e) => { if (this.active) e.preventDefault(); });
     canvas.addEventListener('wheel', (e) => {
       if (!this.active) return;
       e.preventDefault();
@@ -93,7 +101,7 @@ export class Inspect {
     if (k === 't') { this._setMode('orbit'); return true; }
     if (k === 'pagedown' || k === '.') { this._toStop(1); e.preventDefault(); return true; }
     if (k === 'pageup' || k === ',') { this._toStop(-1); e.preventDefault(); return true; }
-    if (['w', 'a', 's', 'd', 'r', 'f', 'shift'].includes(k)) { this.held.add(k); return true; }
+    if (['w', 'a', 's', 'd', 'r', 'f', 'q', 'e', 'shift', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k)) { this.held.add(k); return true; }
     return ['o', 'p', 'escape', 'v', 'z', 'm'].includes(k) ? false : true; // the rest of the cab controls stay off
   }
 
@@ -135,13 +143,20 @@ export class Inspect {
 
   // camera and panel, every frame after the game moved
   update(dt) {
-    const g = this.getGame(), cam = this.camera;
+    const g = this.getGame(), cam = this.camera, h = this.held;
+    // the keys that turn and tilt, the same way as a drag: a positive turn looks right, a positive tilt up
+    const turn = ((h.has('e') || h.has('arrowright') ? 1 : 0) - (h.has('q') || h.has('arrowleft') ? 1 : 0)) * 1.2 * dt;
+    const tilt = ((h.has('arrowup') ? 1 : 0) - (h.has('arrowdown') ? 1 : 0)) * 0.8 * dt;
     if (this.mode === 'orbit') {
+      this.yaw -= turn;
+      this.pitch = Math.max(-1.45, Math.min(0.3, this.pitch + tilt));
       const lead = this.getTramModel().userData.cars[0], c = lead.position;
       const h = Math.cos(this.pitch) * this.dist;
       cam.position.set(c.x + Math.sin(this.yaw) * h, c.y + 2 - Math.sin(this.pitch) * this.dist, c.z + Math.cos(this.yaw) * h);
       cam.lookAt(c.x, c.y + 2, c.z);
     } else {
+      this.flyYaw -= turn;
+      this.flyPitch = Math.max(-1.5, Math.min(1.5, this.flyPitch + tilt));
       const fast = this.held.has('shift') ? 4 : 1, v = this.flySpeed * fast * dt;
       const fx = -Math.sin(this.flyYaw) * Math.cos(this.flyPitch), fz = -Math.cos(this.flyYaw) * Math.cos(this.flyPitch), fy = Math.sin(this.flyPitch);
       const rx = Math.cos(this.flyYaw), rz = -Math.sin(this.flyYaw);
@@ -162,7 +177,8 @@ export class Inspect {
       `tram s ${Math.round(g.tram.s)} m · ${(g.tram.v * 3.6).toFixed(0)} km/h · next: ${st ? st.name : '—'}`,
       `camera at s ${n ? Math.round(n.s) : '?'} m, ${n ? Math.round(n.d) : '?'} m from the track`,
       'Space pause · + − speed · C orbit/fly · T tram · PgDn/PgUp next/prev stop · I leave',
-      this.mode === 'orbit' ? 'drag: turn around the tram · wheel: zoom' : 'drag: look · WASD move · R/F up/down · Shift fast · wheel: flying speed',
+      this.mode === 'orbit' ? 'drag: turn around the tram · Q/E, arrows: turn, tilt · wheel: zoom'
+        : 'drag: look · right-drag, WASD: move · R/F up/down · Q/E, arrows: turn, tilt · Shift fast · wheel: flying speed',
     ].join('\n');
   }
 }

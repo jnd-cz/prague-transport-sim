@@ -227,10 +227,16 @@ in a separate checkout of that reference; comparisons never restore over the wor
 
 **Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
 **I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
-overlay is hidden and the mouse moves the camera: **orbit** around the tram (drag to turn, wheel to zoom)
-or **fly** (C; drag to look, W/A/S/D, R/F up/down, Shift faster, wheel = flying speed). PgDn / PgUp
+overlay is hidden and the mouse moves the camera: **orbit** around the tram or **fly** (C; Shift faster, wheel = flying speed). PgDn / PgUp
 (or . / ,) put the camera at the next / previous stop, T back to the tram, I leaves (the autopilot keeps
 driving: O hands back the controls). The camera's route position is on the panel, handy with the lints.
+
+**The free cameras** (the outside view, inspect mode and review mode) take the same controls (#342), the scheme of 3D viewers such as Three.js's `OrbitControls`:
+- **Left drag** turns and tilts: a drag to the right looks to the right, a drag down looks further down.
+- **Right drag or Shift-drag** moves the camera where it is free (fly, review mode). Tied to the tram (the outside view, orbit), it turns.
+- **The wheel** zooms (in fly: flying speed).
+- **Keys** (inspect and review mode): W/A/S/D move, R/F up and down, Q/E or ← / → turn, ↑ / ↓ tilt. The outside view has none: the keys drive the tram.
+- **Touch:** in review mode one finger moves and two pinch, twist and tilt; in the outside view one finger turns and two zoom.
 
 **The review directory** (`reviews.html`, linked from the menu; #288) lists every review set in
 `reports/review/` under the issue that waits for it, with answered, unsure and waiting counted live from
@@ -261,11 +267,8 @@ fitted heights). **Source** draws the survey's 3D lines as they come (`data/line
 `tools/zps_source.py`, lines with surveyed streets) at their own heights: white at ground level, cyan
 below, orange above, red dots where a vertex has no height. The card then lists the source lines
 within 5 m with their kind, level, height there and height accuracy class.
-- **Mouse:** drag pans, right-drag (or Shift-drag) turns and tilts, the wheel zooms.
-- **Touch:** one finger pans; two fingers pinch, twist and tilt.
-- **Keys:** W/A/S/D, Q/E, R/F.
 
-The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (only the game's files; read-only apart from review answers) prints the address to open; Windows asks once to allow it through the firewall.
+The camera takes the free cameras' controls (above). The address follows the camera (`&at=x,y,yaw,pitch,dist`), so a place can be bookmarked or sent. From a phone at home: `python tools/serve.py 8742 --lan` (only the game's files; read-only apart from review answers) prints the address to open; Windows asks once to allow it through the firewall.
 
 **Answers** (#136): the card has a button per answer (1–4 on the keyboard) and a note. The answers compare
 the game with reality (the imagery): kerbs wrong in game / matches reality / other level or wall / unsure;

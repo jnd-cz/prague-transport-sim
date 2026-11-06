@@ -632,7 +632,7 @@ window.addEventListener('blur', () => {
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = null;
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
-// click or tap brings it back behind the tram (#79)
+// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342)
 const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
 {
   const ptr = new Map();
@@ -660,6 +660,7 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
   canvas.addEventListener('pointercancel', up);
   canvas.addEventListener('wheel', (e) => { if (!on()) return; e.preventDefault(); orbit.k = Math.max(0.3, Math.min(4, orbit.k * Math.exp(e.deltaY * 0.001))); orbit.drag = 0.3; }, { passive: false });
   canvas.addEventListener('dblclick', () => { if (on()) Object.assign(orbit, { yaw: 0, pitch: 0, k: 1 }); });
+  canvas.addEventListener('contextmenu', (e) => { if (on()) e.preventDefault(); });
 }
 
 function previewAt(s) {
@@ -757,6 +758,7 @@ const inspect = new Inspect({
     hud.show(!on);
   },
 });
+window.inspect = inspect; // (the console and tools/test_free_camera.py, as window.game)
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
 // An idle page draws 4 frames a second (#149): the menu, a pause, the results, and review mode with its

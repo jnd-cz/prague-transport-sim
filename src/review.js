@@ -5,9 +5,10 @@
 //   ?review=reports/x.json      plus every {x, y} in that file (lint, headless results, a hand-made list)
 //   &at=x,y,yaw,pitch,dist      the camera (the address follows it, so a place can be bookmarked or sent)
 //   &todo                       only the findings without an answer (the review directory, reviews.html)
-// Mouse: drag pans, right-drag (or Shift-drag) turns and tilts, wheel zooms, click a marker selects it.
+// Mouse, as in the game's free cameras (#342): drag turns and tilts, right-drag (or Shift-drag) moves, wheel zooms,
+// click a marker selects it.
 // Touch: one finger pans, two fingers pinch, twist and tilt (move up / down together), tap a marker.
-// Keys: W/A/S/D pan, Q/E turn, R/F tilt, + / − zoom, N / B next / previous finding, 1–4 an answer.
+// Keys: W/A/S/D move, R/F up / down, Q/E or ← / → turn, ↑ / ↓ tilt, + / − zoom, N / B next / previous finding, 1–4 an answer.
 // Verdicts (#136): a button per answer and a note on the card, saved per line (src/verdicts.js) on the
 // server; tools/deploy.py --pull-reviews (or reports/reviews/ locally) hands them to the agent.
 import * as THREE from 'three';
@@ -911,7 +912,8 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     cv.addEventListener('pointerdown', (e) => {
       ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
       try { cv.setPointerCapture(e.pointerId); } catch { /* (a pointer the browser no longer tracks) */ }
-      if (ptr.size === 1) { mode = e.button === 2 || e.shiftKey ? 'turn' : 'pan'; tap = { x: e.clientX, y: e.clientY, t: performance.now() }; }
+      // (a finger has no second button, and the map must move: one finger pans, two turn)
+      if (ptr.size === 1) { mode = e.pointerType === 'mouse' && e.button === 0 && !e.shiftKey ? 'turn' : 'pan'; tap = { x: e.clientX, y: e.clientY, t: performance.now() }; }
       else { tap = null; two = pair(); }
     });
     cv.addEventListener('pointermove', (e) => {
@@ -927,7 +929,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
         // (the map turns with the fingers: a clockwise twist turns the view, i.e. the heading, anticlockwise)
         this._turn(two.ang - q.ang, (q.my - two.my) * 0.004);
         two = q;
-      } else if (mode === 'turn') this._turn(-dx * 0.006, dy * 0.005);
+      } else if (mode === 'turn') this._turn(dx * 0.006, dy * 0.005); // (a drag to the right looks to the right, as src/inspect.js)
       else this._pan(dx, dy);
       this._render();
     });
@@ -952,7 +954,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
       else if (k === 'b') this.select(Math.max(0, this.cur - 1));
       else if (k === '+' || k === '=') { this._zoom(0.8); this._render(); }
       else if (k === '-') { this._zoom(1.25); this._render(); }
-      else if ('wasdqerf'.includes(k) && k.length === 1) this.held.add(k);
+      else if (('wasdqerf'.includes(k) && k.length === 1) || k.startsWith('arrow')) this.held.add(k);
     });
     window.addEventListener('keyup', (e) => this.held.delete(e.key.toLowerCase()));
     window.addEventListener('blur', () => this.held.clear());
@@ -1024,10 +1026,12 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
       if (h.has('s')) this._pan(0, -v);
       if (h.has('a')) this._pan(v, 0);
       if (h.has('d')) this._pan(-v, 0);
-      if (h.has('q')) this._turn(1.2 * dt, 0);
-      if (h.has('e')) this._turn(-1.2 * dt, 0);
-      if (h.has('r')) this._turn(0, 0.8 * dt);
-      if (h.has('f')) this._turn(0, -0.8 * dt);
+      if (h.has('q') || h.has('arrowleft')) this._turn(-1.2 * dt, 0);
+      if (h.has('e') || h.has('arrowright')) this._turn(1.2 * dt, 0);
+      if (h.has('arrowup')) this._turn(0, -0.8 * dt);
+      if (h.has('arrowdown')) this._turn(0, 0.8 * dt);
+      if (h.has('r')) this._zoom(Math.exp(1.5 * dt)); // (up and down: this camera hangs from its target)
+      if (h.has('f')) this._zoom(Math.exp(-1.5 * dt));
       this._render();
     }
     this.retry = (this.retry ?? 30) - dt;
