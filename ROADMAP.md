@@ -30,6 +30,8 @@ the issues.
 | **W4 Structures and scenery** | passages, bridge decks, railway tracks; the feature layer, buildings, street furniture, power data | [milestone W4](https://github.com/jnd-cz/prague-transport-sim/milestone/11) |
 | then **M3** | tiles and streaming | [milestone M3](https://github.com/jnd-cz/prague-transport-sim/milestone/3) |
 
+**W1 is done** (2026-11-06, #341): every check on every line is stored as checkpoint W1, measured on commit a3b4652, the tag `W1`. It is what the seeded checks compare with until W2.
+
 Deferred on purpose: walker "slides" and the line 17 regression checks wait for the rebuilt world; red
 runs of oncoming trams wait for the junction controllers (M4).
 
