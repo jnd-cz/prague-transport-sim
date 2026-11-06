@@ -15,6 +15,9 @@ from atomic import replacing  # noqa: E402
 import snapshot  # noqa: E402
 
 
+LINE = json.dumps({k: [1] for k in snapshot.LINE_STEPS})   # (a full build: data_publish refuses less)
+
+
 class Store:
     def listing(self, kind):
         return set()
@@ -30,7 +33,7 @@ class Publish(unittest.TestCase):
             data = root / 'data'
             data.mkdir()
             with replacing(data / 'line9.json', 'w', encoding='utf-8') as f:
-                f.write('new data')
+                f.write(LINE)
             original = root / 'original.json'
             original.write_text('old manifest', encoding='utf-8')
             manifest = data / 'MANIFEST.json'
@@ -45,7 +48,7 @@ class Publish(unittest.TestCase):
             result = json.loads(manifest.read_text(encoding='utf-8'))
             self.assertEqual(result['snapshot'], 'snapshot')
             self.assertEqual(result['built_at_commit'], 'abc123')
-            self.assertEqual(result['files']['line9.json']['size'], len('new data'))
+            self.assertEqual(result['files']['line9.json']['size'], len(LINE))
             self.assertEqual(len(store.files), 1)
 
 
@@ -54,7 +57,7 @@ class Publish(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / 'data').mkdir()
-            (root / 'data' / 'line9.json').write_text('new data', encoding='utf-8')
+            (root / 'data' / 'line9.json').write_text(LINE, encoding='utf-8')
             manifest = root / 'data' / 'MANIFEST.json'
             store = Store()
             with patch.object(snapshot, 'ROOT', str(root)), patch.object(snapshot, 'DATA_MANIFEST', str(manifest)), \
