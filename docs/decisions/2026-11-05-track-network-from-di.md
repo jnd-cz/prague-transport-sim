@@ -49,14 +49,16 @@ each now a rule, none a place:
   where two such pairs cross, at their crossing. The mean of the ends lay up to 12 cm off the straight track.
 - **A track ending beside its node gives up its points** within sqrt(h x 50 m) of it (h the step, at most 6 m back, none
   under 3 cm), and nothing is put on the chord they leave: the fit takes it to the node in an S bend of about 50 m. The
-  straight pair keeps its points. The user, 2026-11-06: "when you encounter end of di walk back".
+  user, 2026-11-06: "when you encounter end of di walk back".
 - **Surveyed lines reach the fit with points every 2 m** (DI draws straights with vertices tens of metres apart: the
   fit sagged 0.41 m between them), and edges every 1 m before their ends move to their nodes.
 - **A section's tracks start at its tip without Y's point**, each with the leg on its own side (Y is the middle of two
   ends 0.2 m apart: each track stepped 10 cm).
 - **Crossing nodes stay apart in the fit**, exactly on both chains, however close (three chains crossing within
   0.4 m, merged, passed one point 13 cm off).
-- **Copies and folds go**: two records leaving one point the same way do not merge into a chain, a branch's copy
+- **A gauntlet's tracks never touch**: parallel tracks meeting at one node, still within 0.2 m of each other 10 m out,
+  get a node per track (at one node each was pinched 5 cm towards the other, 5.6° in 2 m).
+- **Copies and folds go**: a record turning back on itself splits, two records leaving one point the same way do not merge, a branch's copy
   running on the track is trimmed per end, and a chain with nothing left is a whole copy (these made the only folds,
   176-180°, at Kobylisy, Ďáblice and Hloubětín).
 - **Gaps**: ends facing each other across a crossing track, up to 8 m, join along the archive's axis (Ohrada, the

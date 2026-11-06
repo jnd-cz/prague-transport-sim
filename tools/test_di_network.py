@@ -103,6 +103,16 @@ class Network(unittest.TestCase):
         m = dn.Match(net, [(0, 3.5), (30, 0.09), (70, 0.09), (100, 3.5)])
         self.assertGreater(line_y(net, m, 90), 2)
 
+    def test_a_gauntlets_tracks_never_touch(self):
+        net = net_of([(0, 0), (50, 0)], [(0, 3.5), (30, 0.09), (50, 0.09)],
+                     [(50, 0), (100, 0)], [(50, 0.09), (70, 0.09), (100, 3.5)])
+        self.assertEqual(net.report['gauntlets kept apart'], 1)
+        self.assertFalse([n for n in net.nodes if len(net.at[n]) > 2])
+        for ed in net.edges.values():
+            ys = [c[1] for c in ed['line'].coords if 40 < c[0] < 60]
+            if ys and max(ys) < 0.05:
+                self.assertLess(max(abs(y) for y in ys), 0.01)
+
     def test_every_edge_has_its_own_pair_of_nodes(self):
         # (the curve fit keys edges by their nodes: the gauntlet's two tracks between one pair are split)
         net = net_of([(0, 0), (50, 0)], [(0, 0.09), (50, 0.09)], [(50, 0), (100, 0)], [(50, 0.09), (100, 0.09)])

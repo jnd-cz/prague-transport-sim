@@ -238,6 +238,8 @@ class Network:
         self._sections_into_junctions()
         self._twice()
         self.index()
+        self._gauntlets()
+        self.index()
 
     @staticmethod
     def _meet_point(ms, chains, tips, txy):
@@ -423,22 +425,17 @@ class Network:
     def _walk_back(self):
         """A track ending beside its node (DI's record end a step h off: a branch ending on a track, a provider's joint,
         a fork whose ends lie apart) gives up its points within sqrt(h * WALK_RADIUS) of the node: the curve fit takes it
-        to the node in a smooth bend instead of following DI's ragged end. At a node where tracks meet the straight pair
-        keeps its points. The user, 2026-11-06: "when you encounter end of di walk back ... so that connecting with
+        to the node in a smooth bend instead of following DI's ragged end. A straight track with no step keeps all its
+        points (`_meet_point` put the node on it). The user, 2026-11-06: "when you encounter end of di walk back ... so that connecting with
         existing di or change to its alternative ... will be smoother and without kinks"."""
-        dot = lambda u, v: u[0] * v[0] + u[1] * v[1]
         for n, v in self.nodes.items():
             ends = self.at.get(n, [])
             if v['kind'] in ('crossing', 'mid') or len(ends) < 2:
                 continue
-            through = set()
-            if len(ends) >= 3:
-                _, a, b = min((dot(self.out_dir(*a), self.out_dir(*b)), a, b) for i, a in enumerate(ends) for b in ends[:i])
-                through = {a, b}
             xy = v['xy']
             for e, end in ends:
                 ed = self.edges[e]
-                if (e, end) in through or ed['src'] == 'ortho':
+                if ed['src'] == 'ortho':
                     continue
                 c = list(ed['line'].coords)
                 if end == 1:
@@ -459,6 +456,30 @@ class Network:
                     ed['line'] = LineString(keep if end == 0 else keep[::-1])
                     ed.setdefault('walk', set()).add(end)
                     self.report['joins walked back'] += 1
+
+    def _gauntlets(self):
+        """Parallel tracks meeting at one node (a gauntlet, Malostranské náměstí: two tracks 9 cm apart, their records
+        ending together) never touch: each pair of ends gets a node of its own, on its own track. At one node each was
+        pinched 5 cm towards the other, a break of 5.6° in 2 m."""
+        for n, pairs in self._paired.items():
+            for i, (a, b) in enumerate(pairs):
+                own = []
+                for e, end in (a, b):
+                    c = list(self.edges[e]['line'].coords)
+                    own.append(c[1] if end == 0 else c[-2])
+                xy = ((own[0][0] + own[1][0]) / 2, (own[0][1] + own[1][1]) / 2)
+                m = n if i == 0 else self._node(xy, 'joint')
+                self.nodes[m]['xy'], self.nodes[m]['kind'] = xy, 'joint'
+                for e, end in (a, b):
+                    ed = self.edges[e]
+                    c = list(ed['line'].coords)
+                    c[0 if end == 0 else -1] = xy
+                    ed['line'] = LineString(c)
+                    if m != n:
+                        self.at[n].remove((e, end))
+                        self.at[m].append((e, end))
+                        ed['a' if end == 0 else 'b'] = m
+            self.report['gauntlets kept apart'] += 1
 
     def _twice(self):
         """Two short edges (SECTION_LEGS or less) between the same two nodes, within TWICE of each other, are one track
@@ -836,6 +857,7 @@ class Network:
         par = math.cos(math.radians(PARALLEL))
         self.passes = {}
         paired = 0
+        self._paired = {}
         for n, ends in self.at.items():
             if not ends:
                 continue
@@ -863,6 +885,7 @@ class Network:
                 two.sort(key=side)
                 for a, b in zip(one, two):
                     self.passes[a], self.passes[b] = [b], [a]
+                self._paired[n] = list(zip(one, two))
                 paired += 1
         # two DI chains crossing through each other (a node of kind 'crossing'): each goes on only as itself, however
         # shallow (Vozovna Kobylisy: 14-15°, within TURN)
