@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-11-06b",
- "built_at_commit": "71db9fc",
- "published": "2026-11-06 15:58",
- "note": "Validation reports of all five lines (#23): osm_validate on the data of #321",
+ "snapshot": "2026-11-06c",
+ "built_at_commit": "f81bb11",
+ "published": "2026-11-06 19:27",
+ "note": "Street furniture on lines 9, 22, 23 and 37 from snapshot 2026-11-06c (#349)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -52,6 +52,10 @@
    "size": 9508497,
    "sha256": "144df39942895ebdec7923e25fc675c557170b18971ce09bf34033bb34be7a2e"
   },
+  "line22.dtmpoints.json": {
+   "size": 917174,
+   "sha256": "f1e302990e1705c56d0960a42b2edd8f6ed004c620dc14ac1ae4285c87709a29"
+  },
   "line22.fine.bin": {
    "size": 3734900,
    "sha256": "c8d76ff740d13e3860f6e91d05d0ff2fbdd1299068b4e239b66997f1f9d4b038"
@@ -80,6 +84,10 @@
    "size": 4806216,
    "sha256": "255734fd6550040eb0ae9c6a73da27836dd739934b2beed985f072f705a26553"
   },
+  "line23.dtmpoints.json": {
+   "size": 468871,
+   "sha256": "b6e4f3ff48d6a593ee7f85ad979fb50daea5fc1937dc08a9a1364e36776b6221"
+  },
   "line23.fine.bin": {
    "size": 1732250,
    "sha256": "2c72df07464c182717f6fa5010a69c478bbd7daf8ad4734a6ca9236f72ec7ba0"
@@ -104,6 +112,10 @@
    "size": 3170628,
    "sha256": "7e78b231bef0f7814653fe5ccb6a7bd5d3d32d6e8cae51d622e9fce02d6768a4"
   },
+  "line37.dtmpoints.json": {
+   "size": 487070,
+   "sha256": "522f19e5828c379bc304875b6705ff6a701f78ddc7b98ec8f38fd925dd96b023"
+  },
   "line37.fine.bin": {
    "size": 1943500,
    "sha256": "db635c71140e7681b60dce3019dabec599d0339c0e074be63995db5c78e3938d"
@@ -127,6 +139,10 @@
   "line9.bld.bin": {
    "size": 10029834,
    "sha256": "b35aad115d84a87bdb6a52c545aa85897284e44886d45b3d03d255246f82c76a"
+  },
+  "line9.dtmpoints.json": {
+   "size": 1243452,
+   "sha256": "085a71ba503563709fbddfe9ea59d7d55401705faad444b5e2f2179b21d63321"
   },
   "line9.fine.bin": {
    "size": 4140500,

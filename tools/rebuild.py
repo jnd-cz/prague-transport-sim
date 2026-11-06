@@ -5,7 +5,7 @@
 
 build_line first; then, side by side (each step reads only build_line's output, and only the first
 group writes data/lineN.json, each writer whole and renamed):
-  platforms → osm_speeds → clearances (→ for line 17: OSM signals, survey points) → the OSM validation
+  platforms → osm_speeds → clearances → survey points (→ for line 17: OSM signals) → the OSM validation
   geoportal
   fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
@@ -31,9 +31,11 @@ BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsig
 
 def writers(line):
     """The steps that read build_line's output and write beside it, in order."""
-    out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["clearances.py", "--line", line]]
+    out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["clearances.py", "--line", line],
+           ["dtm_points.py", line]]
+    # (the user, 2026-11-06, #348: "should solve their placement before we populate them elsewhere", #22)
     if line == "17":
-        out += [["osm_signals.py", line], ["dtm_points.py", line]]
+        out.append(["osm_signals.py", line])
     return out + [["osm_validate.py", line]]
 
 

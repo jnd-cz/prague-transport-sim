@@ -6,6 +6,7 @@ How to publish, fetch and verify one: [DATA.md](../DATA.md).
 
 | id | note |
 |---|---|
+| `2026-11-06c` | `2026-11-06b` + the archive DTM's street furniture points of lines 9, 22, 23 and 37 (`raw/dtmpoints/lineN.json`, `python -P -E tools/dtm_points.py N`), 72,070 points, downloaded 2026-11-06 (#349). |
 | `2026-11-06b` | `2026-11-06` with the Geoportál feature answers (walls, trees, tree rows) named per 500 m cell, shared by the lines (`raw/geoportal/cells/`, #326), downloaded 2026-11-06. |
 | `2026-11-06` | `2026-11-05b` + OSM Geofabrik 2026-11-04 (was 2026-10-22); 9 more Geoportál answers for lines 9 and 22 (#237). |
 | `2026-11-05b` | `2026-11-05` with the ZPS street survey at state 2026-10-31 instead of 2026-09-30 for the 17 districts of lines 9, 17, 22, 23 and 37 (34 packages, 263 MB, `python -I tools/dtm_packages.py --fetch --refresh`): the last state before the JVF 1.5.0.2 switch, schema as September's (#63). |
