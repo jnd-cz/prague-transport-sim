@@ -41,8 +41,8 @@ checkpoint's. `--against W1` names a checkpoint.
 4. **Read the result:**
    - A stale-baseline warning: main moved since its baseline. Say so, and read the differences as main's
      changes plus the branch's.
-   - A note that seeded runs compare with a checkpoint: the differences are the world's changes since it plus
-     the branch's. Say so in the PR.
+   - A note when a seeded run took a checkpoint (its merge base has no baseline): the differences are the world's
+     changes since it plus the branch's. Say so in the PR.
    - Known failures in AGENTS.md (its table) are not regressions.
    - The table lists, per line and check: counts whose mean left main's seed spread (**worse** /
      better), counts that moved inside it (noise: no reason needed), and per-seed hard failures
