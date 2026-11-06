@@ -7,7 +7,9 @@
 
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
-const STOP_SHORT = 3; // m: the planned stop curve ends this far before the stop point
+const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
+const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
+const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
 
 export class Autopilot {
   constructor() {
@@ -32,11 +34,13 @@ export class Autopilot {
     let vt = g.currentLimit / 3.6 - 0.6;
     const nl = g.nextLimitChange();
     if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12)) - 0.3);
-    let stopAt = null;
-    const consider = (s) => { if (stopAt === null || s < stopAt) stopAt = s; };
+    const vLimit = vt;
+    let stopAt = null, fixed = false;
+    // (fixed: a stop or a signal, which stays where it is; else something that can move off)
+    const consider = (s, still = false) => { if (stopAt === null || s < stopAt) { stopAt = s; fixed = still; } };
     if (st) {
       const needStop = !st.request || st.waiting > 0 || st.alightFrac > 0;
-      if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target);
+      if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target, true);
     }
     // a signal: when its GO starts blinking, stop if that is comfortable (~0.9 m/s2), else clear the
     // junction on it and keep going (the controller holds the phase for a committed tram); braking
@@ -52,7 +56,7 @@ export class Autopilot {
       // (a tram that stopped anyway, for the passengers at a stop whose stop point is the signal's, has
       // nothing to clear: it drove off on red after the doors closed, Čechův most s 14907, seed 4)
       if (this.goThrough === sig && tr.v < 0.3) this.goThrough = null;
-      if (this.goThrough !== sig) consider(sig.s - 3);
+      if (this.goThrough !== sig) consider(sig.s - 3, true);
     }
     // past a signal, its crossing still ahead (stopped in the junction behind something): the driver no
     // longer sees the signal, and the cross street gives way to a tram in the junction; cars already on
@@ -84,15 +88,36 @@ export class Autopilot {
       consider(c.s - 6);
       if (c.s - tr.s < 60 && tr.v > 1) hazard = true;
     }
+    // Towards a stop or a signal the plan is one curve to the point, without a crawl at its end: the pedal changes then
+    // come only from the deceleration still needed (aNeed), and once braking for it the drive pedal stays off (the
+    // user, #351: "smooth braking towards stop sign without any jums to jízda unless you're following tram in front of
+    // you"; on main the crawl's 3 km/h was held by drive pulses 1–2 m short). Behind something that moves it keeps
+    // the curve ending 3 m short and the crawl up to it, so it closes up as a driver does.
+    const dLeft = stopAt === null ? null : stopAt - tr.s - (fixed ? STOP_MARGIN : 0);
+    let vStop = Infinity, stood = false;
     if (stopAt !== null) {
       const d = stopAt - tr.s;
-      // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
-      // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
-      // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
-      // (and from there it creeps at ≤ 3 km/h to 1 m short: a stop zone may start only 2.5 m before the point)
-      vt = Math.min(vt, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0));
-      if (d < 1) vt = 0;
+      if (fixed) {
+        vStop = Math.sqrt(2 * DECEL * Math.max(0, dLeft));
+        stood = tr.v < 0.1 && d < STAND_SHORT;
+        if (stood || dLeft <= 0) vStop = 0;
+      } else {
+        // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
+        // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
+        // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
+        vStop = Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0);
+        if (d < 1) vStop = 0;
+      }
+      vt = Math.min(vt, vStop);
     }
+    // how hard it slows by itself, rolling on the gradient with the preparation current (m/s²)
+    const gradeHere = g.profile.grade(tr.s - 7);
+    const resist = 650 * tr.cars + 28 * tr.cars * tr.v + 4.2 * tr.v * tr.v;
+    const aCoast = (resist + 700 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
+    // the approach: from the first brake pedal for this point until the tram stands (or the point goes away)
+    if (fixed && tr.notch < 0 && tr.v > 0.3 && tr.v >= vStop - 0.5) { if (this.approach === undefined || this.approach === null) this.approach = stopAt; }
+    if (this.approach !== null && this.approach !== undefined && (!fixed || Math.abs(this.approach - stopAt) > 3 || tr.v < 0.05)) this.approach = null;
+    const inApproach = this.approach !== null && this.approach !== undefined;
     // drive only if still under the plan 2.5 s on: a careful driver coasts into a braking curve (on the T3
     // the brake builds slowly within ≈2.5 s of driving; it drove up to 16.5 km/h 11 m before Ruská and
     // overran, line 22 seed 4, #241's check)
@@ -101,7 +126,13 @@ export class Autopilot {
     if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12 - look)) - 0.3);
     if (stopAt !== null) {
       const d = stopAt - tr.s;
-      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
+      if (fixed) {
+        vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, dLeft - look))));
+        // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops")
+        if (stood || (dLeft < 40 && aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft)) vtDrive = 0;
+        // (stopped short of the point: on, slowly)
+        else if (tr.v < 0.1) vtDrive = Math.max(vtDrive, Math.min(vLimit, 1.2));
+      } else vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
     }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
@@ -143,21 +174,26 @@ export class Autopilot {
 
     // the force wanted: acceleration plus gravity on the gradient and the running resistance; the vehicle's
     // equipment works its own controls for it (the T3's pedals: src/tr37.js autoDrive)
-    const grade = g.profile.grade(tr.s - 7);
+    const grade = gradeHere;
     // (between the drive plan and the brake plan: coast)
     const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
-    const aWant = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
-    const need = tr.inertia * aWant + tr.mass * 9.81 * grade + 650 * tr.cars + 4.2 * tr.v * tr.v;
+    const aPlan = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    // on the curve to a fixed point: the deceleration that still ends there, whatever the brake's steps gave so far; too
+    // fast for a speed limit as well, the harder of the two
+    const onCurve = fixed && dLeft !== null && (inApproach || tr.v >= vStop - 0.02) && tr.v > 0.05;
+    const aNeed = onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft)) : 0;
+    const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, tr.v > vLimit ? (vLimit - tr.v) * 0.9 : 0)) : aPlan;
+    const need = tr.inertia * aWant + tr.mass * 9.81 * grade + resist;
     const stand = g.doorState !== 'closed' || vt <= 0.05;
-    const coast = between || (Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
+    const coast = (!onCurve && between) || (onCurve && need > -300) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
     // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
     const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
-    // a turn under a contact while braking: the switch button draws the current, the drive pedal stays off
-    const button = wantPower === true && need < 0;
+    // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off
+    const button = wantPower === true && (need < 0 || inApproach || coast);
     this.input.switchBtn = button;
     this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s });
-    return { vt, stopAt, notch: tr.notch };
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: inApproach || (onCurve && tr.v > 0.1), fixed, aNeed, aCoast, inertia: tr.inertia, grade });
+    return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }
 }
