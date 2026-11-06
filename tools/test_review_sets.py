@@ -61,6 +61,42 @@ class Index(unittest.TestCase):
         self.assertEqual((index["lines"], index["questions"]), (LINES, []))
 
 
+class KerbLists(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        os.makedirs(os.path.join(self.tmp.name, "data"))
+
+    def survey(self, line, review):
+        doc = {"areas": [], "provenance": {"areas": {"checks": {"kerbs": {"platformSteps": [], "review": review, "notKerb": {}}}}}}
+        with open(os.path.join(self.tmp.name, "data", f"line{line}.dtm.json"), "w", encoding="utf-8") as f:
+            json.dump(doc, f)
+
+    def build(self, state=None):
+        info = {review_sets.KERB_ISSUE: {"title": "Kerbs", "state": state}} if state else {}
+        with mock.patch.object(review_sets, "lines_of", return_value=LINES), mock.patch.object(review_sets, "issues", return_value=info), \
+                mock.patch.object(review_sets, "questions", return_value=[]):
+            return review_sets.build(self.tmp.name, github=bool(state))["sets"]
+
+    ROW = {"c": "sidewalk", "line": "foot", "x": -2319.8, "y": 7.0, "kerb": 40, "terrainOff": 0.2, "basis": "terrain"}
+
+    def test_a_line_with_a_list_is_a_set_under_the_issue_keyed_as_review_mode_keys_it(self):
+        self.survey("17", [self.ROW, {**self.ROW, "c": "island", "line": "top", "x": 5.0}])
+        s = self.build()
+        self.assertEqual([(x["file"], x["lines"], x["issue"], x["findings"], x["unknown"]) for x in s],
+                         [("data/line17.dtm.json", ["17"], review_sets.KERB_ISSUE, 2, [])])
+        self.assertEqual(s[0]["ids"], ["kerbs|sidewalk foot|-2319.8,7.0", "kerbs|island top|5.0,7.0"])
+
+    def test_no_survey_file_or_an_empty_list_is_no_set(self):
+        self.survey("17", [])
+        self.assertEqual(self.build(), [])
+
+    def test_it_leaves_the_directory_when_the_issue_closes(self):
+        self.survey("17", [self.ROW])
+        self.assertEqual(len(self.build("OPEN")), 1)
+        self.assertEqual(self.build("CLOSED"), [])
+
+
 class Committed(unittest.TestCase):
     def test_every_committed_set_names_its_issue_and_lines(self):
         unknown = [s["file"] for s in review_sets.sets() if s["unknown"]]
