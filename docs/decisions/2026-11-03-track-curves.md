@@ -113,5 +113,7 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 
 - 64 places on line 17 read 18-20 m over 5 m (58 on DI's tracks, 2 each on both paths and the photo curve),
   listed as exceptions: connecting curves held at both switches keep DI's radius, and 20 m needs the switches
-  about 0.5 m off. Real curves under 20 m, or switches DI places wrong (#210 measures DI's forks)?
+  about 0.5 m off. Real curves under 20 m, or switches DI places wrong? #210 closed without measuring DI's forks: the user's
+  checks on the orthophoto found them right (2026-11-06: "DI fork position looks good as it is"). Not re-counted
+  on the network of #237.
 - Dvorecký most: resolved by DI's state of 2026-10-31 (#209, PR #213), which has the new tracks.
