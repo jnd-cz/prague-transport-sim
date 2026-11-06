@@ -5,14 +5,14 @@
 
 build_line first; then, side by side (each step reads only build_line's output, and only the first
 group writes data/lineN.json, each writer whole and renamed):
-  platforms → osm_speeds → clearances (→ for line 17: OSM signals, survey points, OSM validation)
+  platforms → osm_speeds → clearances (→ for line 17: OSM signals, survey points) → the OSM validation
   geoportal
   fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
     the source lines for review mode)
 then line_heights once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's
-survey sidecar, so it runs after them all).
-Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log, reports/rebuild/heights.log. After it:
+survey sidecar, so it runs after them all), then the validation report (tools/validation.py, #23).
+Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log, reports/rebuild/heights.log, validation.md. After it:
 python -I tools/snapshot.py data-publish.
 """
 import os
@@ -29,13 +29,18 @@ PY = [sys.executable, "-P", "-E"]
 BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsign", "Zahradní Město"]}
 
 
+def writers(line):
+    """The steps that read build_line's output and write beside it, in order."""
+    out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["clearances.py", "--line", line]]
+    if line == "17":
+        out += [["osm_signals.py", line], ["dtm_points.py", line]]
+    return out + [["osm_validate.py", line]]
+
+
 def steps(line):
     """build_line, then the groups that run side by side (each group's steps in order)."""
     first = ["build_line.py", *BUILD.get(line, ["--line", line])]
-    writers = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["clearances.py", "--line", line]]
-    if line == "17":
-        writers += [["osm_signals.py", line], ["dtm_points.py", line], ["osm_validate.py", line]]
-    groups = [writers, [["geoportal.py", "--line", line]], [["fine_terrain.py", "--line", line]]]
+    groups = [writers(line), [["geoportal.py", "--line", line]], [["fine_terrain.py", "--line", line]]]
     if line in HOLD:
         print(f"line {line}: survey held, not built ({HOLD[line]}; tools/dtm_packages.py HOLD)", flush=True)
     elif line in DTM:
@@ -110,6 +115,15 @@ def main():
     if built:
         results.append(heights(built))
     print("\n".join(results))
+    if built:  # (the report does not fail a build: most of what it counts waits for #22)
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import validation
+        rows, bad, missing = validation.report(built)
+        with open(os.path.join(ROOT, "reports", "rebuild", "validation.md"), "w", encoding="utf-8") as f:
+            f.write("\n".join(rows) + "\n")
+        print("\n".join(rows))
+        over = {line: b for line, b in bad.items() if b}
+        print(f"validation over a limit: {over or 'none'}; no report: {missing or 'none'}")
     sys.exit(1 if any("FAILED" in r for r in results) else 0)
 
 

@@ -2,8 +2,8 @@
 #   python -P -E tools/osm_validate.py 17
 # Reads the snapshot's OSM extract (tools/osm_local.py). Prints: the coordinate fit (OSM tram ways vs our
 # tracks), stops vs OSM stop positions, the line's crossings without an OSM tram crossing, tram signals
-# standing along platforms, and crossings inside platforms. Writes the same as JSON to
-# data/lineN.validate.json.
+# standing along platforms, crossings inside platforms, and platforms overlapping on the route. Writes the same
+# as JSON to data/lineN.validate.json; tools/validation.py holds them against the limits.
 import json
 import math
 import os
@@ -111,8 +111,14 @@ plats = [(st['name'], st.get('p0'), st.get('p1')) for st in data['stops'] if st.
 on = [{'signal': round(g['s']), 'stop': n} for g in data.get('signals', []) for n, a, b in plats if a - 1 < g['s'] < b + 2]
 inside = [{'crossing': round(c), 'stop': n, 'beforeEnd': round(b - c, 1)} for c in data.get('crossings', []) for n, a, b in plats if a + 2 < c < b - 0.5]
 out['signalsOnPlatforms'], out['crossingsInPlatforms'] = on, inside
+out['crossings'] = len(data.get('crossings', []))
+# (the stops as the route passes them: only the line's own direction is on the route)
+ordered = sorted(plats, key=lambda p: p[1])
+out['platformOverlaps'] = [{'stops': [a[0], b[0]], 'overlap': round(a[2] - b[1], 1)} for a, b in zip(ordered, ordered[1:]) if b[1] < a[2]]
 print(f"4. tram signals standing along a platform: {len(on)}" + (' (' + ', '.join(f"{o['signal']} {o['stop']}" for o in on) + ')' if on else ''))
 print(f"5. crossings inside a platform: {len(inside)}" + (' (' + ', '.join(f"{o['crossing']} {o['stop']} {o['beforeEnd']} m before its end" for o in inside) + ')' if inside else ''))
+
+print(f"6. platforms overlapping on the route: {len(out['platformOverlaps'])}" + (' (' + ', '.join(f"{o['stops'][0]} / {o['stops'][1]} {o['overlap']} m" for o in out['platformOverlaps']) + ')' if out['platformOverlaps'] else ''))
 
 with replacing(os.path.join(ROOT, 'data', f'line{line}.validate.json'), 'w', encoding='utf-8') as fh:
     json.dump(out, fh, ensure_ascii=False, indent=1)
