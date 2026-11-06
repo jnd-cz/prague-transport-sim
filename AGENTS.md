@@ -202,6 +202,11 @@ both post on the pinned #291 and only propose.
   merge that changes the game, the checks, the data or `data/truth.json` (`tools/autodeploy.py`, 2 pages at
   once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base
   when the committed `reports/baseline/headless.json` is older. A PR does not refresh the baseline.
+- **Which baseline each tier compares with** (#282): a checkpoint's run stores itself under its name
+  (`--baseline --publish --checkpoint W1`: every check, seeds 1-5). Seedless checks (the world and drawn-geometry tiers)
+  compare with main at the merge base: its baseline, else measured there once in a pinned worktree through the
+  queue and kept on this machine by its key. Seeded checks (the simulation tier) compare with main's at the merge
+  base when the night has measured it, else with the latest checkpoint; `--against W1` names one.
 
 ## Known failures (not caused by your change; remove a row when its issue closes)
 

@@ -71,6 +71,86 @@ class Spread(unittest.TestCase):
         self.assertEqual((cells[2], cells[3], cells[4]), ("1 (main: 5)", "–", "walkerHit"))
 
 
+class FakeStore:
+    """What choose_baseline asks of tools/baseline_store.py (#282)."""
+    latest_checkpoint = staticmethod(lambda index: max(index, default=None))
+
+    def __init__(self, nightly=None, here=None, measured=None, checkpoint=None):
+        self.nightly, self.here, self.measured, self.checkpoint = nightly, here or {}, measured, checkpoint
+        self.asked, self.kept_now = [], None
+
+    def key(self, want):
+        return "k"
+
+    def fetch(self, k):
+        return (self.nightly, {}) if self.nightly else (None, None)
+
+    def kept(self, k):
+        return self.here, {}
+
+    def keep(self, k, counts, places):
+        self.kept_now = counts
+
+    def measure_at(self, rev, lines, checks, want):
+        self.asked.append((lines, checks))
+        return self.measured or {}, {}
+
+    def checkpoints(self):
+        return {"W1": {}} if self.checkpoint else {}
+
+    def fetch_checkpoint(self, name):
+        return self.checkpoint, {}
+
+
+class ChooseBaseline(unittest.TestCase):
+    NOW, OLD = {"src": "now"}, {"src": "old"}
+
+    def entry(self, on, n=1):
+        return {"counts": {"n": n}, "measured_on": on, "commit": "c"}
+
+    def choose(self, stored, results, store, measure=True):
+        return headless.choose_baseline(stored, {}, results, "abcdef0", self.NOW, measure, store)
+
+    def test_an_exact_committed_baseline_asks_nothing_else(self):
+        s = FakeStore()
+        base, _, stale = self.choose({"line9-lint": self.entry(self.NOW)}, {("9", "lint", 0): {}}, s)
+        self.assertEqual((s.asked, stale), ([], []))
+        self.assertEqual(base["line9-lint"]["measured_on"], self.NOW)
+
+    def test_the_nightly_of_the_merge_base_comes_first(self):
+        s = FakeStore(nightly={"line9-lint": self.entry(self.NOW, 7)})
+        base, _, stale = self.choose({"line9-lint": self.entry(self.OLD)}, {("9", "lint", 0): {}}, s)
+        self.assertEqual((base["line9-lint"]["counts"], s.asked, stale), ({"n": 7}, [], []))
+
+    def test_a_seedless_run_without_one_is_measured_once_and_kept(self):
+        s = FakeStore(measured={"line9-lint": self.entry(self.NOW, 5)})
+        base, _, stale = self.choose({"line9-lint": self.entry(self.OLD)}, {("9", "lint", 0): {}, ("9", "u3", 1): {}}, s)
+        self.assertEqual(s.asked, [(["9"], ["lint"])])  # (the seeded run is not measured)
+        self.assertEqual(base["line9-lint"]["counts"], {"n": 5})
+        self.assertEqual(s.kept_now, {"line9-lint": self.entry(self.NOW, 5)})
+        self.assertEqual(stale, [])
+
+    def test_what_this_machine_kept_is_reused(self):
+        s = FakeStore(here={"line9-lint": self.entry(self.NOW, 5)})
+        base, _, _ = self.choose({}, {("9", "lint", 0): {}}, s)
+        self.assertEqual((base["line9-lint"]["counts"], s.asked), ({"n": 5}, []))
+
+    def test_no_measuring_when_told_not_to(self):
+        s = FakeStore()
+        _, _, stale = self.choose({"line9-lint": self.entry(self.OLD)}, {("9", "lint", 0): {}}, s, measure=False)
+        self.assertEqual((s.asked, stale), ([], ["line9-lint"]))
+
+    def test_a_seeded_run_takes_the_latest_checkpoint(self):
+        s = FakeStore(checkpoint={"line9-u3-seed1": self.entry(self.OLD, 3)})
+        base, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD, 9)}, {("9", "u3", 1): {}}, s)
+        self.assertEqual(base["line9-u3-seed1"]["counts"], {"n": 3})
+        self.assertEqual(stale, [])  # (said by the note, not as a stale baseline)
+
+    def test_no_checkpoint_leaves_a_seeded_run_stale(self):
+        _, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD)}, {("9", "u3", 1): {}}, FakeStore())
+        self.assertEqual(stale, ["line9-u3-seed1"])
+
+
 class Places(unittest.TestCase):
     def test_new_and_gone_places_across_seeds(self):
         stored = {"line22-traffic-seed1": {"walkerHit": [[0, 0, 10], [100, 100, 50]]},
