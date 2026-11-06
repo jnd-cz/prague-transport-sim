@@ -40,14 +40,20 @@ FILL_LIMIT = 0.5   # m: a fill point's tolerance grows at most to this (OSM agai
 SIGMAS = 1.0       # a point moves at most this many mean errors of its class (the decree states the mean error, no
                    # limit; 2 on line 17: 6 bends over 10° inside tracks instead of 11, 32 joins over 1° instead of 39)
 GROW = 1.5         # the factor the tolerance grows by per round
-MIN_RADIUS = 20.0  # m: data/truth.json trackGeometry `min-radius-passenger`
-NETWORK_RADIUS = 18.0  # m: data/truth.json trackGeometry `min-radius-network`
+MIN_RADIUS = 18.0  # m: the radius a curve is held to over BEND_LONG (data/truth.json trackGeometry `min-radius-network`:
+                   # the user, "under 18m there shouldn't be anything like that"; `min-radius-passenger` says 20, but at
+                   # 20 the fit moved DI's points up to 14 cm in curves DI draws at 18-20 m, all over the city)
+KINK_RADIUS = 12.0 # m: the radius over BEND: a shorter window sees a bend squeezed into a metre, a longer one averages it
+                   # out; a sagitta of 4 cm, twice TOL, so that DI's own scatter stays below it
+NETWORK_RADIUS = 18.0  # m: under this the curve stiffens and its points may move past their class (HOLD_LIMIT)
 HOLD_LIMIT = 0.5   # m: past its class's error a point moves at most this far to hold NETWORK_RADIUS
 STIFFEN, STIFF_MAX = 1.5, 1.5 ** 12  # the bending weight's factor per round where the curve bends under it, and its
                                      # most (x4 at once took a 15° corner to 49 m, its points 0.49 m off; x1.5: 18.2 m, 9 cm)
 SLACK = 0.995      # a curve held at MIN_RADIUS reads a few millimetres under it
-BEND = 1.0         # m either side of a sample for the fit's radius (a 5 m window reads a 10° bend squeezed into a
-                   # metre as 29 m; the fitted curve has no noise to average out)
+BEND = 1.0         # m either side of a sample for the short radius (a 5 m window reads a 10° bend squeezed into a
+                   # metre as 29 m)
+BEND_LONG = 2.5    # m either side for the long radius (as tools/lint.js trackRadius; over 2 m a scatter of 2 cm alone
+                   # reads as 25 m)
 NEAR = 10.0        # m around a place bending too tight whose points' tolerance grows
 REPORT = 0.01      # m: a surveyed point the final curve misses by more than TOL + this is listed
 STEP = 1.0         # m between the curve's samples
@@ -147,6 +153,14 @@ def radii(px, py, half=2.5):
     return out
 
 
+def tight_at(px, py):
+    """The equivalent radius per sample for the limits: the long window's, or the short window's scaled so that
+    KINK_RADIUS over BEND reads as NETWORK_RADIUS over BEND_LONG."""
+    short, long_ = radii(px, py, BEND), radii(px, py, BEND_LONG)
+    f = NETWORK_RADIUS / KINK_RADIUS
+    return [min(l, s * f) for s, l in zip(short, long_)]
+
+
 def class_errors(truth=None):
     """{accuracy class: mean coordinate error in metres} (data/truth.json `sourceAccuracy`, the decree's table)."""
     import json
@@ -226,7 +240,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     data = [i for i, t in enumerate(tol) if t is not None and at[i] not in held]
     px, py = solve()
     if n < 3 or not data:
-        return list(zip(px, py)), at, tol, radii(px, py, BEND)
+        return list(zip(px, py)), at, tol, tight_at(px, py)
     for _ in range(WIDEN):
         for _ in range(ROUNDS):
             worst = 1.0
@@ -239,7 +253,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
             if worst < 1.02:
                 break
             px, py = solve()
-        r = radii(px, py, BEND)
+        r = tight_at(px, py)
         tight = [u[i] for i in range(n) if r[i] < MIN_RADIUS * SLACK]
         grow = [i for i in data if tol[i] < limit[i] - 1e-9 and any(abs(u[at[i]] - t) <= NEAR for t in tight)]
         if not grow:
@@ -263,7 +277,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
             tol[i] = min(limit[i], tol[i] * GROW)
             weight[at[i]] = 1.0
         px, py = solve()
-    return list(zip(px, py)), at, tol, radii(px, py, BEND)
+    return list(zip(px, py)), at, tol, tight_at(px, py)
 
 
 def crossing_point(px, py, s, qx, qy, r, reach=12):

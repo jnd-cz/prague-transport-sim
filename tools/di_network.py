@@ -55,7 +55,11 @@ SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge,
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
 SECTION_TURN = 60.0      # degrees: the most a section's branch may leave its legs' line at the node they end at
-WALK_BACK = 3.0          # m: a track joining where DI drew no clean joint gives up its points this near the node
+WALK_RADIUS = 50.0       # m: a track ending a step h beside its node gives up its points within sqrt(h * this) of the
+                         # node: an S bend of about this radius takes it to the node (h 2 cm: 1 m, 10 cm: 2.2 m, 40 cm: 4.5 m)
+WALK_MIN = 0.03          # m: a smaller step is DI's scatter, the fit's tolerance takes it
+WALK_MAX = 6.0           # m: at most this far back
+THROUGH_LOOK = 6.0       # m out along record ends for which of them continue each other at a node
 TWICE = 0.5              # m: two short edges between the same nodes this near each other are one track drawn twice
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
@@ -85,6 +89,7 @@ class Network:
             self.take_photo(photo)
             self.index()
         self.unique_pairs()
+        self._walk_back()
         self.index()
 
     # ------------------------------------------------------------------ construction
@@ -117,8 +122,7 @@ class Network:
             members[root(i)].append(i)
         end_node = {}
         for g, ms in members.items():
-            xs = [txy[m] for m in ms]
-            n = self._node((sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs)),
+            n = self._node(self._meet_point(ms, chains, tips, txy),
                            'end' if len(ms) == 1 else 'joint' if len(ms) == 2 else 'meet')
             for m in ms:
                 end_node[m] = n
@@ -228,8 +232,44 @@ class Network:
         self._sections()
         self._sections_into_junctions()
         self._twice()
-        self._walk_back()
         self.index()
+
+    @staticmethod
+    def _meet_point(ms, chains, tips, txy):
+        """Where record ends meeting at one place (within JOIN) have their node: on the straight track through them,
+        which a branch must not pull aside (the mean of a fork's three ends lay up to 12 cm off it; the user, 2026-11-06:
+        "Straight tracks should have priority"). Two straight pairs crossing: where they cross. Else the mean."""
+        xs = [txy[m] for m in ms]
+        mean = (sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs))
+        real = [m for m in ms if chains[tips[m][0]].length >= 1.0]
+        if len(real) < 3:
+            return mean
+        dirs = {}
+        for m in real:
+            c, e = tips[m]
+            l = chains[c]
+            t = min(THROUGH_LOOK, l.length)
+            q = l.interpolate(t if e == 0 else l.length - t)
+            dirs[m] = _unit((q.x - txy[m][0], q.y - txy[m][1]))
+        dot = lambda u, v: u[0] * v[0] + u[1] * v[1]
+        pairs = sorted((dot(dirs[a], dirs[b]), a, b) for i, a in enumerate(real) for b in real[:i])
+        straight = [p for p in pairs if p[0] <= math.cos(math.radians(180 - TURN))]
+        if not straight:
+            return mean
+        mid = lambda a, b: ((txy[a][0] + txy[b][0]) / 2, (txy[a][1] + txy[b][1]) / 2)
+        _, a, b = straight[0]
+        pa = mid(a, b)
+        rest = [p for p in straight if not {p[1], p[2]} & {a, b}]
+        if not rest:
+            return pa
+        _, c, d = rest[0]
+        pc, u, v = mid(c, d), dirs[a], dirs[c]
+        cross = u[0] * v[1] - u[1] * v[0]
+        if abs(cross) < math.sin(math.radians(PARALLEL)):
+            return mean        # (parallel: a gauntlet's tracks meeting)
+        t = ((pc[0] - pa[0]) * v[1] - (pc[1] - pa[1]) * v[0]) / cross
+        x = (pa[0] + t * u[0], pa[1] + t * u[1])
+        return x if math.dist(x, mean) <= JOIN else mean
 
     def _stubs(self):
         """A dead-end edge under STUB from a node where tracks meet is a scrap of a record, not a track (Kobylisy:
@@ -299,18 +339,26 @@ class Network:
             onward = [x for x in self.at[Y] if x[0] not in leg_ids]
             if len(onward) != 2:
                 continue
+            # (each track with the leg on its own side, and without Y's point: Y is the middle of the two legs' ends,
+            # about 0.2 m apart; on it, each track stepped 10 cm towards the other)
+            xx, xy = self.nodes[X]['xy']
+            yx, yy = self.nodes[Y]['xy']
+            u = _unit((yx - xx, yy - xy))
+            side = lambda q, u=u, xx=xx, xy=xy: u[0] * (q[1] - xy) - u[1] * (q[0] - xx)
             pieces = []
             for e, end in legs:
                 ed = self.remove_edge(e)
                 c = list(ed['line'].coords)
                 pieces.append(c if end == 0 else c[::-1])   # from X to Y
+            pieces.sort(key=lambda c, side=side: side(c[max(0, len(c) - 2)]))
+            onward.sort(key=lambda x, side=side: side(self._ahead(x, 3.0).coords[0]))
             for (e, end), piece in zip(onward, pieces):
                 ed = self.remove_edge(e)
                 c = list(ed['line'].coords)
                 if end == 0:
-                    self.add_edge(X, ed['b'], piece[:-1] + c, ed['src'], ed['records'])
+                    self.add_edge(X, ed['b'], piece[:-1] + c[1:], ed['src'], ed['records'], ed.get('chain'))
                 else:
-                    self.add_edge(ed['a'], X, c + piece[::-1][1:], ed['src'], ed['records'])
+                    self.add_edge(ed['a'], X, c[:-1] + piece[::-1][1:], ed['src'], ed['records'], ed.get('chain'))
             self.nodes[X]['kind'] = 'fork'
             self.nodes[Y]['kind'] = 'gone'
             self.report['sections to their tips'] += 1
@@ -368,33 +416,43 @@ class Network:
             self.report['sections into junctions'] += 1
 
     def _walk_back(self):
-        """Where a track joins at a place DI did not draw cleanly (a branch ending on a track, a gap joint, a tip placed
-        or found), the joining track gives up its points within WALK_BACK of the node: the curve fit joins it there
-        smoothly and tangent instead of following DI's ragged end (Kobylisy: a branch running on as a copy turned
-        back 179° in its first metres). The through track keeps its points. The user, 2026-11-06: "when you
-        encounter end of di walk back ... so that connecting with existing di or change to its alternative ... will
-        be smoother and without kinks"."""
+        """A track ending beside its node (DI's record end a step h off: a branch ending on a track, a provider's joint,
+        a fork whose ends lie apart) gives up its points within sqrt(h * WALK_RADIUS) of the node: the curve fit takes it
+        to the node in a smooth bend instead of following DI's ragged end. At a node where tracks meet the straight pair
+        keeps its points. The user, 2026-11-06: "when you encounter end of di walk back ... so that connecting with
+        existing di or change to its alternative ... will be smoother and without kinks"."""
         dot = lambda u, v: u[0] * v[0] + u[1] * v[1]
         for n, v in self.nodes.items():
             ends = self.at.get(n, [])
-            if v['kind'] not in ('branch', 'gap', 'tip', 'interlaced') or len(ends) < 2:
+            if v['kind'] in ('crossing', 'mid') or len(ends) < 2:
                 continue
             through = set()
             if len(ends) >= 3:
-                pairs = [(dot(self.out_dir(*a), self.out_dir(*b)), a, b) for i, a in enumerate(ends) for b in ends[:i]]
-                _, a, b = min(pairs)
+                _, a, b = min((dot(self.out_dir(*a), self.out_dir(*b)), a, b) for i, a in enumerate(ends) for b in ends[:i])
                 through = {a, b}
             xy = v['xy']
             for e, end in ends:
-                if (e, end) in through:
-                    continue
                 ed = self.edges[e]
+                if (e, end) in through or ed['src'] == 'ortho':
+                    continue
                 c = list(ed['line'].coords)
                 if end == 1:
                     c = c[::-1]
-                keep = [c[0]] + [q for q in c[1:-1] if math.dist(q, xy) >= WALK_BACK] + [c[-1]]
+                if len(c) < 4:
+                    continue
+                # the step: the node's distance from the line through the edge's own first points
+                p0 = c[1]
+                q = next((q for q in c[2:-1] if math.dist(q, p0) >= 2.5), None)
+                if q is None:
+                    continue
+                h = abs((q[0] - p0[0]) * (xy[1] - p0[1]) - (q[1] - p0[1]) * (xy[0] - p0[0])) / math.dist(p0, q)
+                if h < WALK_MIN:
+                    continue
+                w = min(WALK_MAX, math.sqrt(h * WALK_RADIUS))
+                keep = [c[0]] + [q for q in c[1:-1] if math.dist(q, xy) >= w] + [c[-1]]
                 if len(keep) < len(c):
                     ed['line'] = LineString(keep if end == 0 else keep[::-1])
+                    ed.setdefault('walk', set()).add(end)
                     self.report['joins walked back'] += 1
 
     def _twice(self):
@@ -1159,7 +1217,10 @@ class Drawn:
             pos[a], pos[b] = net.nodes[a]['xy'], net.nodes[b]['xy']
             c = list(ed['line'].coords)
             if ed['src'] in ('di', 'dtmp', 'ortho'):
-                c = dense(c)
+                # (no points on the chord an end walked back leaves: nothing is known there, _walk_back)
+                walk = ed.get('walk', ())
+                head, tail = c[:1] if 0 in walk else [], c[-1:] if 1 in walk else []
+                c = head + dense(c[len(head):len(c) - len(tail)]) + tail
             key = k(a, b)
             pts[key] = c if key == (a, b) else c[::-1]
             kind[key] = ed['src']
