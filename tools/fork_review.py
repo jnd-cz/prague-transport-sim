@@ -150,11 +150,13 @@ def main():
     lines = args[args.index('--lines') + 1].split(',') if '--lines' in args else ['9', '17', '22', '23', '37']
     frame = Frame()
     net = di_network.load_network()
+    photo = json.loads((ROOT / 'data' / 'truth.json').read_text(encoding='utf-8'))['trackSources'].get('photoTracks', [])
     for line in lines:
         switches = osm_switches(tracks_answer(line), frame)
         tracks = json.loads((ROOT / 'data' / f'line{line}.json').read_text(encoding='utf-8'))['tracks']
         cards = review(line, net, switches, frame)
-        cards += [c for c in photo_ends(line, tracks, net, switches, frame) if c['id'] not in {o['id'] for o in cards}]
+        if not all('forksConfirmed' in t for t in photo):   # (answered: data/truth.json photoTracks)
+            cards += [c for c in photo_ends(line, tracks, net, switches, frame) if c['id'] not in {o['id'] for o in cards}]
         out = {"schema": 1, "issue": 237, "line": line, "options": OPTIONS, "findings": cards}
         dst = os.path.join(ROOT, 'reports', 'review', f'track-forks-{line}.json')
         if not cards:   # (no set for a line without trouble: an empty one would wait in the review directory)
