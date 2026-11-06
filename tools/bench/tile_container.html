@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Tile container bench</title>
-<!-- tools/bench/tile_container.py (#307): decode both formats and build a geometry, timed in the page. -->
+<!-- tools/bench/tile_container.py (#307): decode both formats and build a geometry, timed in the page; the differences also in a worker. -->
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
 </script>
@@ -62,6 +62,63 @@ window.run = async (runs) => {
     out.boxes = [b.min.toArray().concat(b.max.toArray()).map((v) => +v.toFixed(2)), c.min.toArray().concat(c.max.toArray()).map((v) => +v.toFixed(2))];
   }
   for (const k in timings) out[k] = +median(timings[k]).toFixed(1);
+  return out;
+};
+
+// The same decoder in a worker, normals too; the arrays come back without a copy. No Three.js in there: it needs none.
+const workerSource = `const decodeDelta = ${decodeDelta};
+function normals(pos, idx) {
+  const n = new Float32Array(pos.length);
+  for (let i = 0; i < idx.length; i += 3) {
+    const a = idx[i] * 3, b = idx[i + 1] * 3, c = idx[i + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx;
+    for (const k of [a, b, c]) { n[k] += x; n[k + 1] += y; n[k + 2] += z; }
+  }
+  for (let i = 0; i < n.length; i += 3) {
+    const l = Math.hypot(n[i], n[i + 1], n[i + 2]) || 1;
+    n[i] /= l; n[i + 1] /= l; n[i + 2] /= l;
+  }
+  return n;
+}
+onmessage = ({ data }) => {
+  const t = performance.now();
+  const { pos, idx } = decodeDelta(data);
+  const t1 = performance.now();
+  const nor = normals(pos, idx);
+  postMessage({ pos, idx, nor, decode: t1 - t, normals: performance.now() - t1 }, [pos.buffer, idx.buffer, nor.buffer]);
+};`;
+
+window.runWorker = async (runs) => {
+  const buf = await fetch('/reports/tile_container/tile.delta').then((r) => r.arrayBuffer());
+  const w = new Worker(URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' })));
+  const timings = { decode: [], normals: [], page: [] };
+  // the page's thread kept busy with messages: the longest gap between two is its longest stall during the loads
+  const ch = new MessageChannel();
+  let last = performance.now(), gap = 0, on = true;
+  ch.port1.onmessage = () => { const n = performance.now(); gap = Math.max(gap, n - last); last = n; if (on) ch.port2.postMessage(0); };
+  ch.port2.postMessage(0);
+  for (let r = 0; r < runs; r++) {
+    await new Promise((done) => {
+      w.onmessage = ({ data }) => {
+        const t = performance.now(), g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(data.pos, 3));
+        g.setAttribute('normal', new THREE.BufferAttribute(data.nor, 3));
+        g.setIndex(new THREE.BufferAttribute(data.idx, 1));
+        timings.page.push(performance.now() - t);
+        timings.decode.push(data.decode);
+        timings.normals.push(data.normals);
+        done();
+      };
+      const copy = buf.slice(0);
+      w.postMessage(copy, [copy]);
+    });
+  }
+  on = false;
+  w.terminate();
+  const out = { longestStall: +gap.toFixed(1) };
+  for (const k in timings) out[k] = +median(timings[k]).toFixed(2);
   return out;
 };
 window.ready = true;

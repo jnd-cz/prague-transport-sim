@@ -2,7 +2,8 @@
 
 Encodes one tile's mesh both ways and measures the bytes (raw, gzip, brotli), the error of the quantized positions
 against the source, and the load and decode time in a page (headless Chromium, its own server on a free port):
-fetch, decode, typed arrays in a BufferGeometry, normals computed. Three.js from the same CDN as the game.
+fetch, decode, typed arrays in a BufferGeometry, normals computed; the integer differences also in a worker, with
+the longest stall of the page's thread during the loads. Three.js from the same CDN as the game.
 
     python -P -E tools/bench/tile_container.py --line 17 [--at X,Y] [--size 1024] [--runs 15]
 (needs pydelatin and brotli, bench-only; writes reports/tile_container/)
@@ -113,6 +114,7 @@ def browser():
                 page = b.new_page()
                 page.goto(f"http://localhost:{port}/tools/bench/tile_container.html")
                 r = page.evaluate(f"run({RUNS})")
+                r["worker"] = page.evaluate(f"runWorker({RUNS})")
                 b.close()
             return r
         finally:
