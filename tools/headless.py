@@ -134,7 +134,7 @@ def judge(check, r):
             bad.append(f"{r['over']} stops overrun by more than 3 m")
         if r.get("short"):
             bad.append(f"{r['short']} stops more than 3 m short")
-        more = (f"{r.get('stops')} stops, flips ahead/signal/car {r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}, restarts {r.get('restarts')}, pulses {r.get('pulses')}, "
+        more = (f"{r.get('stops')} stops, flips short/ahead/signal/car {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}, pulses {r.get('pulses')}, "
                 f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}")
     elif check == "canted":
         c = (r.get("checks") or {}).get("cantedRailVisibility", {})
@@ -214,7 +214,7 @@ def counts(check, r):
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check == "stops":
-        return {k: r.get(k) for k in ("stuck", "flipsFree", "flipsAhead", "flipsSignal", "flipsCar", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "pedalChangesPerKm")}
+        return {k: r.get(k) for k in ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "pedalChangesPerKm")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":

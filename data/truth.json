@@ -12,7 +12,8 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py",
   "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
-  "operation": "reference: #211 (switch, crossing and stop speeds) and #221 (the T3SUCS traction) are to read it; nothing reads it yet"
+  "operation": "reference: #211 (switch, crossing and stop speeds) and #221 (the T3SUCS traction) are to read it; nothing reads it yet",
+  "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it"
  },
  "stops": [
   {
@@ -2528,6 +2529,41 @@
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    }
+  ]
+ },
+ "substations": {
+  "source": "OSM extract raw/osm/praha.osm.pbf (Geofabrik 2026-11-04): power=substation, substation=traction, voltage 22000;600, operator DPP; python -P -E tools/substations.py --write. e, n: S-JTSK (EPSG:5514) of the centroid, whole metres",
+  "list": [
+   {"osm": "node/6363367962", "ref": null, "e": -742945, "n": -1043615},
+   {"osm": "way/111797199", "ref": "TS8850", "e": -745487, "n": -1048419},
+   {"osm": "way/111797204", "ref": "TS8840", "e": -747478, "n": -1048619},
+   {"osm": "way/124340591", "ref": "TS7041", "e": -735127, "n": -1042181},
+   {"osm": "way/142262628", "ref": "RS9080", "e": -736685, "n": -1047312},
+   {"osm": "way/142322280", "ref": "TS8520", "e": -742256, "n": -1045020},
+   {"osm": "way/179555314", "ref": "TS7540", "e": -745092, "n": -1049997},
+   {"osm": "way/217791414", "ref": "TS7550", "e": -745327, "n": -1052256},
+   {"osm": "way/27042763", "ref": "TS8960", "e": -747694, "n": -1041302},
+   {"osm": "way/27172424", "ref": "TS7910", "e": -747383, "n": -1041946},
+   {"osm": "way/30360157", "ref": "RS3550", "e": -740976, "n": -1043448},
+   {"osm": "way/306454606", "ref": "TS8050", "e": -741557, "n": -1039987},
+   {"osm": "way/31009234", "ref": "TS7149;MR32", "e": -738727, "n": -1042592},
+   {"osm": "way/32877631", "ref": "TS7720", "e": -741919, "n": -1041436},
+   {"osm": "way/32941339", "ref": "TS8740", "e": -746421, "n": -1041265},
+   {"osm": "way/35389329", "ref": "RS9280", "e": -738572, "n": -1041971},
+   {"osm": "way/380929329", "ref": "TS8020", "e": -745078, "n": -1045763},
+   {"osm": "way/41955483", "ref": "TS4400", "e": -748059, "n": -1043081},
+   {"osm": "way/49511268", "ref": "TS8490", "e": -740826, "n": -1044849},
+   {"osm": "way/49784211", "ref": "TS8750", "e": -745162, "n": -1044282},
+   {"osm": "way/49810450", "ref": "TS3090", "e": -743153, "n": -1045389},
+   {"osm": "way/49864242", "ref": "TS9410", "e": -742775, "n": -1046344},
+   {"osm": "way/50136022", "ref": "TS3340", "e": -739391, "n": -1039284},
+   {"osm": "way/50921854", "ref": "TS9270", "e": -747721, "n": -1044391},
+   {"osm": "way/59244743", "ref": "TS8110", "e": -739165, "n": -1040071},
+   {"osm": "way/59584973", "ref": "TS7770", "e": -744182, "n": -1047048},
+   {"osm": "way/61404223", "ref": "TS2393", "e": -744141, "n": -1047846},
+   {"osm": "way/679597859", "ref": "TS8170", "e": -742281, "n": -1043819},
+   {"osm": "way/88598700", "ref": "TS7760", "e": -751045, "n": -1044498},
+   {"osm": "way/90662133", "ref": "TS3110", "e": -738391, "n": -1045720}
   ]
  }
 }

@@ -283,7 +283,8 @@ export class TR37 {
   // the autopilot's wish on the pedals, as a careful driver: want = { force (N, + drive / − brake), stand (stop and
   // stay), coast, power (true: current through the pantograph, false: none), urgent, v, dt, slip, slide, stopDist (m to
   // the stop point, or null), noDrive (braking for a stop: the drive pedal stays off), fixed (that point stays where it
-  // is), aNeed (m/s² still needed to end there), aCoast (m/s² it slows by itself), inertia (kg), grade }.
+  // is), aNeed (m/s² still needed to end there), aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over
+  // the speed to hold, null when not holding one) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -307,6 +308,13 @@ export class TR37 {
       else if (on > 1 && f < F(on - 1) * 0.92) s = -(on - 1);
       else if (on === 1 && f < 0.4 * F(1)) s = 0;
       else s = now;
+    }
+    // holding a speed a step stays until the speed has moved: the relay holds the force, and between two steps' forces
+    // (a gradient) it let go and pressed every second on main, 130–200 pedal changes a km
+    if (w.speedErr != null && !w.urgent && s !== now) {
+      if (now < 0 && s > now && w.speedErr > -0.7) s = now;
+      else if (now < 0 && s < now && w.speedErr < 0.35) s = now;
+      else if (now > 0 && s > 0 && s !== now && w.speedErr < 0 && w.speedErr > -0.7) s = now;
     }
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);

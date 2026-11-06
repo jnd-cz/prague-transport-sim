@@ -12,12 +12,17 @@ export const WIRE = {
   u0: 650,        // V: a substation at no load [assumed; nominal 600 V, the T3 is built for 720 V, T3SU-15 p. 1]
   rSource: 0.03,  // Ω: the rectifier and its transformer [assumed, ≈6 % drop at 1,200 A]
   rWire: 0.10,    // Ω per km of track: contact wire 100 mm² Cu (0.18) with its neighbour track's and the rails [assumed]
-  rFeeder: 0.06,  // Ω per km between the substation and the track: an underground feeder cable [assumed]
-  reach: 2.5,     // km: a substation further from this line's track does not feed it [assumed]
+  rFeeder: 0.06,  // Ω per km of underground feeder cable, from the substation to a section's feed point [assumed]
+  wireKm: 0.8,    // km of wire at most from a feed point: sections of 1–2 km are fed about their middle [assumed]
+  reach: 4,       // km: a substation further from this line's track does not feed it [assumed]
 };
 
 // Where each substation meets this line, and which feed a point of the track hangs on: the one with the least
-// resistance to it (the real section ends are not known yet, #277: a tram crossing one sees the voltage step).
+// resistance to it (the real section ends are not known yet, #277: a tram crossing one sees the voltage step). The
+// path is wire near the place and feeder cable beyond it: a section's feed point is not known either, only that the
+// cable runs out to it.
+const along = (m) => { const km = m / 1000; return WIRE.rWire * Math.min(km, WIRE.wireKm) + WIRE.rFeeder * Math.max(0, km - WIRE.wireKm); };
+
 export class Feeding {
   constructor(route, substations, frameOrigin) {
     this.feeds = [];
@@ -35,7 +40,7 @@ export class Feeding {
   at(s) {
     let best = -1, r = Infinity;
     for (let i = 0; i < this.feeds.length; i++) {
-      const f = this.feeds[i], q = f.r0 + (WIRE.rWire * Math.abs(s - f.s)) / 1000;
+      const f = this.feeds[i], q = f.r0 + along(Math.abs(s - f.s));
       if (q < r) { r = q; best = i; }
     }
     return best < 0 ? null : { i: best, r };
@@ -54,7 +59,7 @@ export class Feeding {
       load += o.i;
       // (the wire is shared only on the same side of the feed, as far as the nearer of the two)
       const same = (s - f.s) * (o.s - f.s) > 0;
-      drop += o.i * (f.r0 + (same ? (WIRE.rWire * Math.min(Math.abs(s - f.s), Math.abs(o.s - f.s))) / 1000 : 0));
+      drop += o.i * (f.r0 + (same ? along(Math.min(Math.abs(s - f.s), Math.abs(o.s - f.s))) : 0));
     }
     return { u0: WIRE.u0 - drop, r: me.r, ref: f.ref, km: Math.abs(s - f.s) / 1000, others: load };
   }

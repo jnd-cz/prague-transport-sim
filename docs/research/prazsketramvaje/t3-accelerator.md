@@ -562,8 +562,7 @@ accelerator overheating on long resistor running (lamp), MR trip from slamming s
    measurement in a car would confirm them.
 2. ~~Accelerator resistance profile and wiring~~: drive 2.835 Ω up to finger ≈77, brake 3.614 Ω, uniform
    per position (8.1). How the two halves share the current inside the device is still not drawn.
-3. **Pilot motor rate in the car**: 5 s per sweep is the shop setting at 24 V; the car feeds 10.5 V
-   through RPM.
+3. ~~Pilot motor rate in the car~~: read as the same 5 s (9.1) [inferred]; no measurement.
 4. ~~LO from brake step 3 or 5~~: step 5 (8.3).
 5. **Coasting current**: 25 ± 5 A (relay, maybe per group) vs 30–60 vs 40–90 A (ammeter) vs ≈50 A.
 6. **Ammeter in braking**: same direction, centre zero, or not shown?
@@ -709,6 +708,57 @@ p. 9 (3.4) was a misreading of a poor scan (answers open question 8).
 - I_brake(1–5) = 160 / 211 / 262 / 306 / 350 A [inferred, was assumed].
 - Switch button: only with drive off and the accelerator at 1–30 (below ≈12 km/h).
 - Doors: traction cut at any speed, no brake.
+
+## 9. The electric system as simulated (#351, #355, read 2026-11-06/07)
+
+Read from the scans in `raw/reference/ckd-t3su/` again. What this section adds to 3–8, and how `src/tr37.js` and `src/electric.js` model it.
+
+### 9.1 The accelerator outside drive
+
+- **The sources.** T3SU-24 § 4.2: coasting reverses the pilot motor's armature current, and the rollers return slowly towards the start; the relay
+  (coil CP strong, so only a negligible brake current through OR) lets them go on while that current is too small. Speed rising downhill: more current,
+  contact 100, rollers up, more resistance, until it is small again; speed falling: slowly back. § 4.3: the brake circuit is the same, with RCP in CP's
+  circuit and RC set to one of five currents. § 1.4: loops cross-connected, the accelerator "returning from B to A", so its resistance falls with
+  the position in the brake, the opposite of drive. T3SU-03 B5: this keeps the resistance matched to the speed, so drive or brake takes up at once.
+- **The model: no lookup.** The current in the loops at position p and speed v comes from the motor chart: E(Im, n) = Im·(Rm + Rloop + R(p)), R(p) = 3.614 Ω ·
+  (p − 1)/98, flux from the chart (§ 5.2), below 60 A falling linearly to a remanence of 3 %. The relay then turns the accelerator towards its setting
+  (preparation 50 A, or the step's current), at the pilot motor's rate, in pulses near it.
+- **Field in the loops.** F1 and F3 hang on ZR6 and ZR5 alone (T3SU-24 p. 8), so they shunt 4M+3M from 85 and 90 in the brake too; F4 and the drive's F2
+  need M2. F2 is in while coasting (R2's rest contact, "so that the given resistance is enough at higher speeds", p. 9) and out on the brake pedal.
+  In a crossed loop two groups' fields count as their harmonic mean [calc]: 2ab/(a + b). F2 alone: 65 %, from the first-stage and both-stage shunts in parallel [calc].
+- **Calibrated:** Rloop = 0.17 Ω, so 120 A at the bottom of the accelerator falls at ≈4 km/h ([ckd24] p. 16). It also makes step 5's current start falling at ≈6 km/h
+  and step 1's at ≈4.3 km/h, as the old fade table had them; below ≈4 km/h the loops no longer excite.
+- **Follows without being set:** the coasting position at a speed comes out near where drive step 1 holds its current, so drive takes up at once
+  (170–190 A against 220 A at 20–40 km/h [calc]), which T3SU-03 B5 asks for; the 2–3 s between drive and brake are the way back from the drive position; and a fast change
+  drops LO because the loops are not excited yet.
+- **Assumed:** remanence 3 %, a 0.2 s lag of the loop current, 0.25 s from LS out to B1 and B2 in (the pilot motor's way back goes through B2), the relay's band.
+- **ZR8, ZR10:** T3SU-17 p. 7 has ZR8 closed at 3–99, the end of the way back: position ≈2.5 with the cross coasting on. It has ZR10 at 33–99, against 3–99 in T3SU-24 p. 14 and on
+  the wiring diagram (§ 8.3): the game takes 3.
+- **The rate.** T3SU-17 p. 5: 5 ± 0.5 s a sweep each way at 24 V, set by the armature's added resistor. T3SU-18 p. 1: 300 rpm at 10.5 V; the armature is always fed from the battery's
+  mid-point through RPM (T3SU-24 p. 10–12), so "24 V" reads as the control voltage, and the rate is the same both ways and in the car [inferred]; it scales with the 24 V side here.
+  This closes open question 3 unless a measurement says otherwise. "Slowly" in § 4.2 reads as following the falling speed.
+
+### 9.2 The motor-generator and the 24 V side
+
+- **One machine.** T3SU-15: series motor TMN 16 Ab (600 V, 720 V at most, 13 A, 5 kW, 1,750 rpm, 2,500 at most), shunt dynamo TDN 16 Ab (1.6 kW, 50 A; 70 A at 30 V at 1,500 rpm for 30 min), two
+  fans on the one shaft, which cool the traction motors and the accelerator. T3SU-24 § 2.1: the current coil SN in its circuit drops LS when it stops, so no fans, no traction.
+- **Series motor.** U = I·R + K·I/(I + I0)·ω, R ≈ 12 Ω with RMG ≈ 4 Ω (§ 8.1). Fans as ω² take the rest of the rated 5 kW [assumed]. So its speed follows the wire between √U and U, and any load on the dynamo slows it.
+- **What slows it on a start** [inferred, no measurement]: the wire's voltage (a two-car set at 700–900 A), and BR1 closing: four release magnets of 2.7 Ω (T3SU-05 p. 3), ≈38 A at 26 V more on the dynamo.
+- **Regulator** GC 11 (T3SU-23): switches the dynamo's field to hold 26 ± 0.5 V, field 12 A at most; a diode keeps the battery from feeding back; fuse 100 A. T3SU-26 p. 3: in all modes, checked at 550–600 V on the wire.
+- **Battery** NKS 100 (T3SU-13): 17 NiCd cells of 1.2 V, 100 Ah, 30 A charging, so ≈22 V at rest when charged: below the regulator's speed margin the side falls to that.
+- **On traction.** T3SU-26 p. 4: step 1's setting rises 10 A per volt below 26 (RC's current falling); other steps by their RC current. The pilot motor's rate scales with it.
+- **Track brakes** run on the battery too (T3SU-13 p. 1): 0.632 Ω a magnet, ≈150 A a car with all four, beyond the dynamo: the side sags while they are on.
+
+### 9.3 The wire
+
+- **Substations:** `data/truth.json` `substations`, the 30 DPP traction substations in the OSM extract (`tools/substations.py`). Their feeding maps are in `raw/reference/web/prazsketramvaje/img/*-napajeni.gif`, schematic, c. 2009 (web-notes § 3.2); not used yet.
+- **The model** (`src/electric.js`): a tram hangs on the feed with the least resistance: source 0.03 Ω, feeder cable 0.06 Ω/km, wire and rails 0.10 Ω/km for the first 0.8 km. No-load 650 V. All [assumed]: nothing found measures them. Section ends and feed points wait for #277.
+- **What depends on it:** force on the resistors no (the relay holds the current; the position stands higher for the same speed); the motor curve and top speed yes; the electric brake no (no line current, only the fans slow down); 26 V hardly; the fans' tone yes; heaters as U².
+
+### 9.4 How a careful driver works it (T3SU-03)
+
+p. 4: wrong to choose a high step at once, let go and press again; on the level steps 1–3 are enough (≈300 A, 360 A at most), more only at speed or uphill; from a high step, a lower one before letting go. p. 5–6: coast as much as possible, above all into stops.
+`src/tr37.js` `autoDrive` and `src/autopilot.js` follow it.
 
 [ckd-dir]: https://k5.sh.cvut.cz/~oskar/T3SU/
 [ckd-schema]: https://k5.sh.cvut.cz/~oskar/T3SU/T3SU-schema.pdf

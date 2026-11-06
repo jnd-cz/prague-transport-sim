@@ -193,7 +193,8 @@ export class Autopilot {
     this.input.switchBtn = button;
     this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: inApproach || (onCurve && tr.v > 0.1), fixed, aNeed, aCoast, inertia: tr.inertia, grade });
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: inApproach || (onCurve && tr.v > 0.1), fixed, aNeed, aCoast, inertia: tr.inertia, grade,
+      speedErr: onCurve ? null : tr.v - vt });
     return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }
 }
