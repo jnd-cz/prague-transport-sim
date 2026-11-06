@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-06b",
- "built_at_commit": "5e847aa",
- "published": "2026-11-06 14:13",
- "note": "lines 17, 22 survey: an area in two districts' packages is one area; 124 and 132 exact copies gone, no height moved (#316)",
+ "built_at_commit": "71db9fc",
+ "published": "2026-11-06 15:58",
+ "note": "Validation reports of all five lines (#23): osm_validate on the data of #321",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -37,8 +37,8 @@
    "sha256": "8698ef0e19017bcdd84848c74c82e24cd7635419e107f36365ec6858bf64dc59"
   },
   "line17.validate.json": {
-   "size": 4618,
-   "sha256": "0029fa3c722d202cd79046854195f9102e047ad521deb71b58e41ad8e1da980e"
+   "size": 4664,
+   "sha256": "3168a1f3d43c7e905a7453bba3584dbc6de5a507d01a4c468c37c5e97b2e73ca"
   },
   "line17.zps.json": {
    "size": 6581522,
@@ -68,6 +68,10 @@
    "size": 6305914,
    "sha256": "6705a89cdf1da00a2daa5d7c5f2830c4875bb908a9915219c6eb2dc7b691d31e"
   },
+  "line22.validate.json": {
+   "size": 4751,
+   "sha256": "18c8b59bb1e8202882616ae4caecd61da2965b3470e912f76bee076c35f33f07"
+  },
   "line22.zps.json": {
    "size": 7101578,
    "sha256": "280103d67c9611c97d59fb66005632aa992b7d8449ce3d3173bb131816133012"
@@ -92,6 +96,10 @@
    "size": 2353037,
    "sha256": "a37d92b1aec48eef3ac453db6ce8c4400caa3c1c10971bee033e66572ab40fa3"
   },
+  "line23.validate.json": {
+   "size": 2171,
+   "sha256": "9533d40da1fce50919ebb1b7e23ab659b73cc6f5ccae633eef0830657a313ab1"
+  },
   "line37.bld.bin": {
    "size": 3170628,
    "sha256": "7e78b231bef0f7814653fe5ccb6a7bd5d3d32d6e8cae51d622e9fce02d6768a4"
@@ -112,6 +120,10 @@
    "size": 2149354,
    "sha256": "59698c2c0c1cb151d94dfaaecc1a5ab9eeaf635924c65729ecff4e14c4f777f6"
   },
+  "line37.validate.json": {
+   "size": 2514,
+   "sha256": "581063851048a03062750224843865de09fd0fda6ee19c28e56f035d54ad9655"
+  },
   "line9.bld.bin": {
    "size": 10029834,
    "sha256": "b35aad115d84a87bdb6a52c545aa85897284e44886d45b3d03d255246f82c76a"
@@ -131,6 +143,10 @@
   "line9.json": {
    "size": 5355859,
    "sha256": "d7f47d9542b270384a2d55a34b38f7068aef6f98834206c472a7dbb15057c038"
+  },
+  "line9.validate.json": {
+   "size": 6596,
+   "sha256": "e6aaa8595138d61425f83c117d86641823e509dd10b42b44a21f1e4ec0d2a261"
   },
   "lines.json": {
    "size": 607,
