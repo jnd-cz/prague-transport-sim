@@ -1005,7 +1005,7 @@ export class Game {
     }
   }
 
-  // The driver gets out with the switch iron (stavěcí tyč; C14; the code keeps the name crowbar): walks
+  // The driver gets out with the switch iron (stavěcí klíč; C14; the code keeps the name crowbar): walks
   // from the cab door along the tram's right side to
   // the switch (1.6 m/s), throws it (2 s crouched over the points) and walks back; at least 9 s.
   crowbar() {

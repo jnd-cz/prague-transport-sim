@@ -34,8 +34,10 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
     At a platform shorter than the set, the front between 8 m before its end and 4 m past it is enough.
   - **Elsewhere:** the front between 20 m before and 12 m past the stop sign.
   - **A signal right after the stop:** the front at most 0.5 m before it.
-- The stopping point is the stop sign: within 3 m of it earns a precision bonus, more than 4 m past it costs
-  points for overshooting. Stopping further back in the allowed place costs nothing.
+- The stopping point is the stop sign: within 3 m of it earns a precision bonus of 15 points. Stopping a little
+  past it happens in reality too and people still get on and off, so up to 4 m past the sign costs nothing;
+  more than 4 m costs 20 points, even though the stop is served. Stopping further back in the allowed place costs
+  nothing.
 - Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
   morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a packed car boards
   slowly and a full one leaves people for the next tram.

@@ -376,13 +376,13 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 | *rozjezdová výhybka*, pojížděná **proti hrotům** | a facing switch | the user; D 1/2 § 2.17 |
 | *sjezdová výhybka*, pojížděná **po hrotech** | a trailing switch | D 1/2 § 2.18 |
 | *kolejová splítka* | interlaced track | the user; D 1/2 § 2.19 |
-| *stavěcí tyč* | the switch iron, "for now" (the user: "there are more options"); D 1/2 has *stavěcí klíč* for hand-set switches | the user |
+| *stavěcí klíč* | the switch iron | the user, to match D 1/2 |
 | *zajišťovací brzda*, *zabrzdit / odbrzdit* | the shoe brake holding a standing car; the pedal's position is *zaparkováno* in D 1/2 and the manual; ČKD's *stanicování* is in neither | the user; exam sets |
 | *výběh* | coasting; the manual also *setrvačnost* | the user; manual p. 4 |
 | *spoj* | a trip, which can change its number along the route and at a terminus | the user |
 | *trolej*; *trolejové vedení* | the contact wire; the wire with its span wires, rosettes, bracket arms and poles | the user |
 | *průjezdný průřez* | the clearance profile | the user; D 1/2 |
-| *kabina řidiče*, *salón*, *kalorifer* | cab, saloon, cab heater; D 1/2 calls the driving position *stanoviště řidiče* | the user; manual p. 8 |
+| *stanoviště řidiče*, *salón*, *kalorifer* | cab, saloon, cab heater | the user, to match D 1/2; manual p. 8 |
 | *sběrač*, *zvonec*, *panel řidiče* | pantograph, bell, driver's panel; the 2009 manual alone says *pantograf* and *zvonek* | D 1/2, exam sets |
 
 ## Environment (Windows dev machines)

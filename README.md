@@ -34,8 +34,9 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
     kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním.
   - **Jinde:** čelo od 20 m před označníkem do 12 m za ním.
   - **Návěstidlo těsně za zastávkou:** čelo nejvýše 0,5 m před ním.
-- Bod zastavení je označník: do 3 m od něj získáte bonus za přesnost, více než 4 m za ním ztratíte body za
-  přejetí. Zastavení dál vzadu v povoleném místě se netrestá.
+- Bod zastavení je označník: do 3 m od něj získáte bonus 15 bodů za přesnost. Zastavit o kousek dál se stává
+  i ve skutečnosti a cestující přesto nastoupí a vystoupí, proto do 4 m za označníkem hra nic nestrhne; přejetí
+  o více než 4 m stojí 20 bodů, i když zastávku obsloužíte. Zastavení dál vzadu v povoleném místě se netrestá.
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
   ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; v přeplněném voze trvá nástup
   déle a při plném vozu zůstanou cestující čekat na další spoj.
@@ -57,11 +58,11 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `B` | zvonec |
 | `Y` | tlačítko **Výhybka**: proud přes kontakt (držet) |
 | `C` | odpojení topení (držet pod kontaktem, pro průjezd bez proudu) |
-| `X` | přestavit výhybku stavěcí tyčí (stojící vůz) |
+| `X` | přestavit výhybku stavěcím klíčem (stojící vůz) |
 | `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `Z` | pravé zrcátko zapnout a vypnout |
-| `V` | pohled z kabiny řidiče nebo zvenku |
+| `V` | pohled ze stanoviště řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
 | `P` / `Esc` | pauza |
@@ -104,7 +105,7 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 - Kontakty jsou ~22 m před výhybkou, nikdy však tam, kde tramvaj stojí se sběračem u zastávky nebo návěstidla.
   Sjezdové výhybky (pojížděné po hrotech, kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
 - Červená LED šipka před každou výhybkou ukazuje postavení jazyků a bliká, když je výhybka uzamčená. Když to
-  nevyjde, zastavte a použijte stavěcí tyč (X).
+  nevyjde, zastavte a použijte stavěcí klíč (X).
 
 ### Návěstidla
 
@@ -124,8 +125,8 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 ### Topení
 
 Topení je podle příručky DPP k T3SUCS: sedačky v salónu 0/1/2 (H: tři sedačky vpravo i vlevo / všechny),
-kalorifer v kabině řidiče 0–3 (K: vypnuto / neohřátý vzduch / polovina topnic / plný výkon) a klapka, která pouští odpadní
-teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje teplotu venku, v salónu a v kabině.
+kalorifer na stanovišti řidiče 0–3 (K: vypnuto / neohřátý vzduch / polovina topnic / plný výkon) a klapka, která pouští odpadní
+teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje teplotu venku, v salónu a na stanovišti.
 Venkovní teplota: Praha teď nebo pevný zimní / podzimní / letní den (menu). Prochladlí cestující (< 12 °C)
 a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká; v létě si cestující otevírají okna.
 
@@ -177,7 +178,7 @@ zařízení). Posílají klávesy klávesnice:
 - řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí tyč, odpojení topení, topení, autopilot,
+- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 
 Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
