@@ -301,6 +301,16 @@ class Neighbour(unittest.TestCase):
 
 
 class Smoothed(unittest.TestCase):
+    def test_it_hardly_moves_a_height_near_a_junction(self):
+        through = chain([(0, 0), (400, 0)], lambda s: 100 + .15 * math.sin(s / 6))
+        branch = chain([(200, 0), (200, 100)], lambda s: 100.0)
+        z0 = {round(x['s']): x['z'] for x in through.bins}
+        lh.smooth_heights([through, branch])
+        reach, small = lh.SMOOTH_JUNCTION
+        at = [x for x in through.bins if abs(x['s'] - 200) <= reach]
+        self.assertTrue(at)
+        self.assertLessEqual(max(abs(x['z'] - z0[round(x['s'])]) for x in at), small + 1e-9)
+
     def test_it_moves_a_height_at_most_the_clamp(self):
         c = chain([(0, 0), (300, 0)], lambda s: 100 + .15 * math.sin(s / 6))
         z0 = [x['z'] for x in c.bins]

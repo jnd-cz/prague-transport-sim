@@ -67,6 +67,9 @@ SMOOTH_WAVELENGTH = 70.0  # m: the waves the smoother halves. What the two track
                          # (#358: at 32-64 m they share 0.67 cm rms and differ by 0.84; at 128-256 m they agree). 100 m
                          # gains 0.7 grade swings per km, and costs distance from the data and coupler travel
 SMOOTH_CLAMP = 0.10   # m: the most it may move a height; the band rule then applies around the smoothed height
+SMOOTH_JUNCTION = (20.0, 0.01)  # m, m: this near a junction it may move a height only this far. Moved 10 cm, a through track left the
+                                # track crossing it to meet that in a bend (19.4 cm of coupling step at Malostranské náměstí; 11.5 cm
+                                # with this, for 0.6 degrees per km more coupler travel)
 NEIGHBOUR_GAP = (2.0, 7.0)  # m: another track this far off, running parallel, is this track's neighbour
 NEIGHBOUR_STEP = 0.20  # m: a height this far from its own smooth line is a step or a dip ...
 NEIGHBOUR_CALM = 0.05  # m: ... if the neighbour's height there lies this near its own line
@@ -359,12 +362,23 @@ def snap_to_neighbour(chs):
 
 
 def smooth_heights(chs):
-    """The smoother in front of the band rule (#358): each run of heights, moved at most SMOOTH_CLAMP."""
-    for c in chs:
+    """The smoother in front of the band rule (#358): each run of heights, moved at most SMOOTH_CLAMP, nearly not at all near a
+    junction, where the tracks must meet."""
+    diverge, clusters, crossings = junctions(chs)
+    near = defaultdict(list)
+    for d in diverge:
+        for i, t in (d['end'], d['through']):
+            near[i].append(t)
+    for g in clusters + crossings:
+        for i, t in g['members']:
+            near[i].append(t)
+    reach, small = SMOOTH_JUNCTION
+    for k, c in enumerate(chs):
         for run in height_runs(c):
             for i, v in zip(run, smooth_line(c, run)):
-                z = c.bins[i]['z']
-                c.bins[i]['z'] = max(z - SMOOTH_CLAMP, min(z + SMOOTH_CLAMP, float(v)))
+                x = c.bins[i]
+                most = small if any(abs(x['s'] - t) <= reach for t in near[k]) else SMOOTH_CLAMP
+                x['z'] = max(x['z'] - most, min(x['z'] + most, float(v)))
 
 
 def build_chains(staged):
