@@ -184,6 +184,44 @@ def main():
             }""")
             page.mouse.click(pin["x"], pin["y"])
             r["pinClick"] = page.evaluate("window.review.list[window.review.cur].info")
+            # the same mouse and keys as the game's free cameras (#342; their side: tools/test_free_camera.py)
+            spot = page.evaluate("""() => {
+              const R = window.review, r = R.canvas.getBoundingClientRect();
+              for (let y = r.top + 40; y < r.bottom - 120; y += 40) for (let x = r.left + 40; x < r.right - 120; x += 40)
+                if (document.elementFromPoint(x, y) === R.canvas && document.elementFromPoint(x + 60, y + 20) === R.canvas) return { x, y };
+            }""")
+            cam = "(() => { const R = window.review; return { yaw: R.yaw, pitch: R.pitch, x: R.T.x, y: R.T.y, dist: R.dist }; })()"
+
+            def moved(a, b):
+                return {"yaw": b["yaw"] - a["yaw"], "pitch": b["pitch"] - a["pitch"], "move": abs(b["x"] - a["x"]) + abs(b["y"] - a["y"]), "dist": b["dist"] - a["dist"]}
+
+            def drag(button="left", shift=False):
+                a = page.evaluate(cam)
+                if shift:
+                    page.keyboard.down("Shift")
+                page.mouse.move(spot["x"], spot["y"])
+                page.mouse.down(button=button)
+                page.mouse.move(spot["x"] + 60, spot["y"] + 20, steps=4)
+                page.mouse.up(button=button)
+                if shift:
+                    page.keyboard.up("Shift")
+                return moved(a, page.evaluate(cam))
+
+            def hold(key):
+                a = page.evaluate(cam)
+                page.keyboard.down(key)
+                page.wait_for_timeout(250)
+                page.keyboard.up(key)
+                return moved(a, page.evaluate(cam))
+
+            r["cam"] = {"left": drag(), "right": drag("right"), "shift": drag(shift=True),
+                        **{k: hold(k) for k in ("q", "e", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "r", "f", "w")}}
+            r["cam"]["finger"] = page.evaluate("""() => {
+              const R = window.review, a = { yaw: R.yaw, x: R.T.x, y: R.T.y };
+              const send = (type, x, y) => R.canvas.dispatchEvent(new PointerEvent(type, { pointerId: 7, pointerType: 'touch', clientX: x, clientY: y, button: 0, bubbles: true }));
+              send('pointerdown', 300, 300); send('pointermove', 360, 320); send('pointerup', 360, 320);
+              return { yaw: R.yaw - a.yaw, move: Math.abs(R.T.x - a.x) + Math.abs(R.T.y - a.y) };
+            }""")
             page.evaluate("window.review.select(window.review.list.findIndex((f) => f.info === 'the city origin'))")
             # the answer as a reviewer gives it: a note, then the button
             page.fill("#rvNote", "kerb about 12 cm")
@@ -416,6 +454,18 @@ def main():
                and v.get('span_sha256')==HEIGHT_COMPACT['span_sha256']
                for v in r['heightSaved'].get('items',{}).values()):
         fails.append('track-height answer was not saved with its decision scope')
+    c = r["cam"]
+    if not (c["left"]["yaw"] > 0 and c["left"]["pitch"] > 0 and c["left"]["move"] == 0):
+        fails.append(f"a left drag does not turn and tilt, to the right and down, without moving: {c['left']}")
+    for how in ("right", "shift"):
+        if not (c[how]["move"] > 0 and c[how]["yaw"] == 0 and c[how]["pitch"] == 0):
+            fails.append(f"a {how} drag does not move the camera alone: {c[how]}")
+    if not (c["q"]["yaw"] < 0 < c["e"]["yaw"] and c["ArrowLeft"]["yaw"] < 0 < c["ArrowRight"]["yaw"] and c["ArrowUp"]["pitch"] < 0 < c["ArrowDown"]["pitch"]):
+        fails.append(f"Q/E or the arrows do not turn left and right, or tilt up and down: {c}")
+    if not (c["r"]["dist"] > 0 > c["f"]["dist"] and c["w"]["move"] > 0):
+        fails.append(f"R/F do not go up and down, or W does not move: {c}")
+    if not (c["finger"]["move"] > 0 and c["finger"]["yaw"] == 0):
+        fails.append(f"one finger does not move the map: {c['finger']}")
     if fails:
         sys.exit("; ".join(fails))
     print("review mode: findings, camera, links, bottom sheet, a click on a pin; an answer saved, the next finding, read back: pass")

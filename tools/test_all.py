@@ -25,6 +25,7 @@ TOOLS = os.path.join(ROOT, "tools")
 NEEDS = {
     "test_audio_pause.py": "data/line23.json",
     "test_deploy.py": "data/line17.json",  # (deploy refuses unless data/ matches the manifest)
+    "test_free_camera.py": "data/line37.json",
     "test_geo_js.py": "raw/proj/cz_cuzk_table_-y-x_3_v1710.tif",
     "test_height_styles.py": "data/line37.json",
     "test_idle.py": "data/line23.json",
