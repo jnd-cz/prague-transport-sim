@@ -148,6 +148,15 @@ class Network(unittest.TestCase):
         for ed in net.edges.values():
             self.assertLessEqual(ed['line'].length, 100.01)
 
+    def test_a_track_beside_another_is_no_copy_where_an_end_faces_it(self):
+        # Ohrada: 20 cm beside the through track for 30 m, its curve starts 5 m on: the track goes on across the gap
+        curve = [(65, 0.8), (75, 3), (90, 10)]
+        net = net_of([(0, 0), (30, 0)], [(30, 0), (100, 0)], [(30, 0), (60, 0.2)], curve)
+        self.assertEqual(net.report['chains wholly copies'], 0)
+        self.assertEqual(net.report['copies kept: an end faces them across a gap'], 1)
+        self.assertEqual(net.report['crossing gaps filled'], 1)
+        self.assertEqual(sum(ed['src'] == 'di' for ed in net.edges.values() if abs(ed['line'].interpolate(ed['line'].project(dn.Point(50, 0.15))).y - 0.15) < 0.1), 1)
+
     def test_a_branch_ending_beside_the_track_walks_back(self):
         # 40 cm beside the track, with its own points on from there: no point near the node, none put on the chord
         branch = [(50 + k, 0.4 + 0.02 * k * k) for k in range(30)]
@@ -248,6 +257,27 @@ class Drawing(unittest.TestCase):
                 or ed['line'].coords[-1][0] >= 49.9 and ed['line'].coords[0][0] > 60}
         g = dn.Drawn(net, legs, fit=False)
         self.assertEqual(len(g.chains({})), 2)
+
+    def test_an_edge_between_two_close_crossings_is_drawn(self):
+        # Strossmayerovo náměstí: 1.3 m between two crossings, under MIN_SPAN: the rail must not break there
+        net = net_of([(0, 0), (100, 0)], [(50, -30), (50, 30)], [(51.3, -30), (51.3, 30)])
+        short = [e for e, ed in net.edges.items() if ed['line'].length < dn.MIN_SPAN]
+        self.assertEqual(len(short), 1)
+        spans, flags = dn.corridor(net, [{'id': 1, 'nodes': [1, 2]}], {1: (10, 0), 2: (90, 0)})
+        self.assertIn(short[0], spans)
+        self.assertEqual(spans[short[0]], (0.0, net.edges[short[0]]['line'].length))
+        self.assertIn(short[0], flags)
+
+    def test_a_drawn_track_does_not_end_in_the_air(self):
+        # Ohrada: the ways run on the through track and past the gap, not on the branch between them: it is drawn too
+        net = net_of([(0, 0), (300, 0)], [(100, 0), (110, 1), (130, 10)], [(133, 13), (150, 30), (170, 50)])
+        self.assertEqual(net.report['gaps joined'] + net.report['crossing gaps filled'], 1)
+        branch = next(e for e, ed in net.edges.items() if ed['line'].distance(dn.Point(110, 1)) < 0.01 and ed['line'].length < 40)
+        ways = [{'id': 1, 'nodes': [1, 2]}, {'id': 2, 'nodes': [3, 4]}]
+        pos = {1: (10, 0), 2: (290, 0), 3: (131, 11), 4: (165, 45)}
+        spans, flags = dn.corridor(net, ways, pos)
+        self.assertEqual(spans[branch], (0.0, net.edges[branch]['line'].length))
+        self.assertIn(branch, flags)
 
     def test_a_corridor_way_draws_the_stretch_it_runs_on(self):
         # a DI edge running far past the corridor: only the stretch OSM's way covers is drawn

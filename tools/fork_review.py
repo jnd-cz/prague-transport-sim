@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from shapely.geometry import LineString  # noqa: E402
 import di_network  # noqa: E402
 import di_tracks  # noqa: E402
 from atomic import replacing  # noqa: E402
@@ -115,13 +116,45 @@ def review(line, net, switches, frame):
     return cards
 
 
+def photo_ends(line, tracks, net, switches, frame):
+    """A card per switch a track measured on the orthophoto ends at (data/truth.json photoTracks), on a line that draws
+    it: such a track starts at a fork no measured point stands on, so the fork's place is the curve's. The user,
+    2026-11-06: "You can send the fork's positions for review"."""
+    lines = [LineString(t['p']) for t in tracks if len(t['p']) > 1]
+    cards = []
+    for ed in net.edges.values():
+        if ed['src'] != 'ortho':
+            continue
+        mid = ed['line'].interpolate(0.5, normalized=True)
+        if not any(l.distance(mid) <= 1.0 for l in lines):
+            continue
+        coords = list(ed['line'].coords)
+        for n, first in ((ed['a'], coords[1]), (ed['b'], coords[-2])):
+            x, y = net.nodes[n]['xy']
+            lat, lon = frame.ll(x, y)
+            marks = [{"x": round(x, 2), "y": round(y, 2), "label": "DI's fork, as built", "color": DI},
+                     {"x": round(first[0], 2), "y": round(first[1], 2), "label": "the nearest point measured on the orthophoto", "color": PROBLEM}]
+            marks += [{"x": round(o[0], 2), "y": round(o[1], 2), "label": f"OSM's switch ({o[3]})", "color": OSM}
+                      for o in switches if math.dist(o[:2], (x, y)) <= di_tracks.FORK]
+            what = f"the orthophoto's curve ends at this fork, {math.dist((x, y), first):.1f} m from its nearest measured point"
+            cards.append({"kind": "switch tip", "id": f"track-{float(lat):.5f}-{float(lon):.5f}", "line": line,
+                          "x": round(x, 2), "y": round(y, 2), "mag": round(math.dist((x, y), first), 2), "status": "review",
+                          "pick": True, "marks": marks, "problem": what,
+                          "info": f"Here {what}. Where does the switch begin (the tip of its blades)? If not at the pin, "
+                                  "place the pin there."})
+    return cards
+
+
 def main():
     args = sys.argv[1:]
     lines = args[args.index('--lines') + 1].split(',') if '--lines' in args else ['9', '17', '22', '23', '37']
     frame = Frame()
     net = di_network.load_network()
     for line in lines:
-        cards = review(line, net, osm_switches(tracks_answer(line), frame), frame)
+        switches = osm_switches(tracks_answer(line), frame)
+        tracks = json.loads((ROOT / 'data' / f'line{line}.json').read_text(encoding='utf-8'))['tracks']
+        cards = review(line, net, switches, frame)
+        cards += [c for c in photo_ends(line, tracks, net, switches, frame) if c['id'] not in {o['id'] for o in cards}]
         out = {"schema": 1, "issue": 237, "line": line, "options": OPTIONS, "findings": cards}
         dst = os.path.join(ROOT, 'reports', 'review', f'track-forks-{line}.json')
         if not cards:   # (no set for a line without trouble: an empty one would wait in the review directory)

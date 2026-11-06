@@ -58,6 +58,14 @@ each now a rule, none a place:
   0.4 m, merged, passed one point 13 cm off).
 - **A gauntlet's tracks never touch**: parallel tracks meeting at one node, still within 0.2 m of each other 10 m out,
   get a node per track (at one node each was pinched 5 cm towards the other, 5.6° in 2 m).
+- **What is kept in spite of those rules**: a track beside another is no copy where another track's end faces its end
+  across a gap (Ohrada: 35 m, 20 cm beside the through track, its curve starts 5 m on), and an edge under `MIN_SPAN` is
+  drawn where drawn tracks go on from both its ends (Strossmayerovo náměstí: 1.3 and 1.2 m between crossings).
+  `tools/bench/track_holes.py` lists holes of the second kind.
+- **An orthophoto track's chords stay empty**: only its measured centres are data. Filled, the 11.7 m chord from the
+  switch at Podolská vodárna put a corner in the curve and moved it 0.48 m off them; empty, it reads 17.9-40.7 m over 5 m
+  and lies within 0.114 m (mean 0.033 m). Moving either fork to where the circle through the points touches its through
+  track (2 and 3 m along it) makes it worse: 13.8-14.3 m.
 - **Copies and folds go**: a record turning back on itself splits, two records leaving one point the same way do not merge, a branch's copy
   running on the track is trimmed per end, and a chain with nothing left is a whole copy (these made the only folds,
   176-180°, at Kobylisy, Ďáblice and Hloubětín).

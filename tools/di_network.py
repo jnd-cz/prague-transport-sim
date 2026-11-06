@@ -167,6 +167,13 @@ class Network:
                 while run + 0.5 <= line.length and chains[j].distance(line.interpolate(run + 0.5)) <= d0 + di_tracks.OVERLAP:
                     run += 0.5
                 if run >= di_tracks.OVERLAP_MIN:
+                    # (no copy where another track's end faces this end across a gap: the track goes on over the piece DI
+                    # lacks, _crossing_gaps. Ohrada: a branch 20 cm beside the through track for 35 m, its curve starts 5 m on)
+                    q = line.interpolate(1.0)
+                    out = _unit((xy[0] - q.x, xy[1] - q.y))
+                    if self._end_faced(xy, out, c, tips, txy):
+                        self.report['copies kept: an end faces them across a gap'] += 1
+                        continue
                     p = line.interpolate(run)
                     s = chains[j].project(p)
                     # (the copy part is dropped: the branch starts where it leaves)
@@ -503,6 +510,23 @@ class Network:
         self.add_edge(ed['a'], n, substring(line, 0, s).coords, ed['src'], ed['records'], ed.get('chain'))
         self.add_edge(n, ed['b'], substring(line, s, line.length).coords, ed['src'], ed['records'], ed.get('chain'))
 
+    def _end_faced(self, xy, out, c, tips, txy):
+        """Another chain's end lies ahead of the end at xy (`out`: its direction out of its chain c), across a gap of up
+        to CROSS_GAP, in line and facing it."""
+        cos = math.cos(math.radians(CROSS_TURN))
+        chains = [ch['line'] for ch in self.source.chains]
+        for (c2, e2), p in zip(tips, txy):
+            g = math.dist(xy, p)
+            if c2 == c or not JOIN < g <= CROSS_GAP:
+                continue
+            w = _unit((p[0] - xy[0], p[1] - xy[1]))
+            l2 = chains[c2] if e2 == 0 else LineString(chains[c2].coords[::-1])
+            q = l2.interpolate(1.0)
+            o2 = _unit((p[0] - q.x, p[1] - q.y))
+            if out[0] * w[0] + out[1] * w[1] >= cos and out[0] * o2[0] + out[1] * o2[1] <= -cos:
+                return True
+        return False
+
     def _crossing_gaps(self, archive):
         """Two track ends facing each other across a gap of up to CROSS_GAP are one track the provider broke where
         it crosses another (Ohrada: the track from the east ends on the through track, its continuation starts 5 m on;
@@ -611,7 +635,7 @@ class Network:
 
     def _gaps(self):
         """Two track ends facing each other within GAP join with a straight edge: a record the provider ended short
-        (Kobyliské náměstí, line 17: 1.1 m between two ends of one track)."""
+        (Kobyliské náměstí, line 17: 1.3 m between two ends of one track)."""
         ends = [n for n, v in self.nodes.items() if len(self.at[n]) == 1]
         tree = shapely.STRtree(shapely.points([self.nodes[n]['xy'] for n in ends]))
         cos = math.cos(math.radians(180 - TURN))
@@ -1249,7 +1273,9 @@ class Drawn:
             a, b = ed['a'], ed['b']
             pos[a], pos[b] = net.nodes[a]['xy'], net.nodes[b]['xy']
             c = list(ed['line'].coords)
-            if ed['src'] in ('di', 'dtmp', 'ortho'):
+            # (not on the orthophoto's tracks: only its measured centres are data, and the 11.7 m chord from the switch to
+            # the first of them at Podolská vodárna, filled, put a corner in the curve and moved it 0.48 m off them)
+            if ed['src'] in ('di', 'dtmp'):
                 # (no points on the chord an end walked back leaves: nothing is known there, _walk_back)
                 walk = ed.get('walk', ())
                 head, tail = c[:1] if 0 in walk else [], c[-1:] if 1 in walk else []
@@ -1458,10 +1484,11 @@ def extend(ids, adj, pos, length=EXTEND):
     return head + ids + tail, len(head)
 
 
-def corridor(net, ways, pos, bridges=()):
+def corridor(net, ways, pos, bridges=(), route=()):
     """Where OSM's track ways of the corridor run on the network: each way lengthened along OSM's track (`extend`) and
     matched as a route; per edge the stretch the way itself covers ({edge: (t0, t1)}, m along it, from the first to
-    the last metre covered), and whether it is on a bridge (`bridges`: the ids of the ways on one, by length)."""
+    the last metre covered), and whether it is on a bridge (`bridges`: the ids of the ways on one, by length). `route`: the
+    edges the line itself draws whole, drawn tracks too for what must not break."""
     adj = defaultdict(set)
     for w in ways:
         ns = [n for n in w['nodes'] if n in pos]
@@ -1502,6 +1529,23 @@ def corridor(net, ways, pos, bridges=()):
         spans[e] = (0.0 if net.in_zone(e, a) else a, length if net.in_zone(e, b) else b)
     spans = {e: sp for e, sp in spans.items() if sp[1] - sp[0] >= MIN_SPAN}
     flags = {e: on_bridge[e] >= 0.5 * run_on[e] for e in spans}
+    # (an edge under MIN_SPAN with drawn tracks going on from both its ends is a piece of them: left out, the rail broke
+    # between two crossings 1.3 m apart, Strossmayerovo náměstí. The user, 2026-11-06: "two spots at Strossmayerovo")
+    # (nor may a drawn track end in the air where its only continuation reaches another drawn track: the way runs on the
+    # track beside it, Ohrada's long interlaced switch, a branch 13 cm beside the through track to its tip 92 m on. The
+    # user, 2026-11-06: "shouldn't there run two lines for the interlaced switch up to the fork point")
+    for e, ed in net.edges.items():
+        # (also an edge drawn only partly: a stretch that stops short of a drawn track, line 22's 54 m at Vypich)
+        if e in route or (e in spans and spans[e][0] <= 0.0 and spans[e][1] >= ed['line'].length):
+            continue
+        ends = [[f for f, _ in net.passes.get((e, end), ()) if f in flags or f in route] for end in (0, 1)]
+        nodes = (ed['a'], ed['b'])
+        # (at the far end any drawn track will do: a switch's other leg, its toe may lie outside the corridor)
+        lone = [i for i, n in enumerate(nodes) if len(net.at[n]) == 2 and ends[i]
+                and any(f in flags or f in route for f, _ in net.at[nodes[1 - i]] if f != e)]
+        if lone or (all(ends) and ed['line'].length < MIN_SPAN):
+            spans[e] = (0.0, ed['line'].length)
+            flags[e] = flags.get(e, flags.get(ends[lone[0] if lone else 0][0], False))
     return spans, flags
 
 def _acc(line):

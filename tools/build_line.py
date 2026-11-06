@@ -783,7 +783,6 @@ def main():
             lat, lon = P.ll(*xy)
             print(f"  off DI's network: {length:.1f} m from {float(lat):.5f} N {float(lon):.5f} E")
     bridge_ways = {w["id"] for w in tways if w.get("tags", {}).get("bridge") not in (None, "no")}
-    stretches, flags = di_network.corridor(net, tways, allpos, bridge_ways)
     whole = route_m.edges | (back_m.edges if back_m else set())
     # (the other legs of the route's facing switches are drawn too: the game shows the switch by them)
     for m in [route_m] + ([back_m] if back_m else []):
@@ -791,6 +790,7 @@ def main():
             if p[0] != "off" and q[0] != "off":
                 x, y = (p[0], 1 if p[1] > 0 else 0), (q[0], 0 if q[1] > 0 else 1)
                 whole |= {z[0] for z in net.passes.get(x, ()) if z != y}
+    stretches, flags = di_network.corridor(net, tways, allpos, bridge_ways, whole)
     stretches = {e: sp for e, sp in stretches.items() if e not in whole}
     drawn_edges = whole | set(stretches)
     geo = di_network.Drawn(net, drawn_edges)
