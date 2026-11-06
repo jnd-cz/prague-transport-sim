@@ -74,6 +74,18 @@ the switch → the **light switch signal** at the end of the circuit.
 | SW-R5 | *Ovládání rychlostní výhybky mimo provoz* | "R 01" crossed by an orange X | no radio control; other rules stay |
 | SW-R6 | *Rychlostní výhybka mimo provoz* | white crosses over the call signal and the switch signal | counts as a lockable switch |
 
+**Which way they lie on our routes (`tools/speed_survey.py`, the game's facing switches; 2026-11-06).** R03 and R04 are
+tagged in OSM by `ref` and lie on line 17's `pathBack`, 0.1 m off it and 3–4 m off `path`, so the direction the game
+drives never faces them. R05 ("od Strašnické") is the same on line 22, by name. R07 and R09 have no `ref`; by name they
+would be line 9's s 23460 (straight; no OSM switch within 5 m) and line 17's s 9773 (straight). Both to check.
+
+**R07, a later source:** the press of October 2023 (Pražská strojírna, in [Technický týdeník](https://technickytydenik.cz/rubriky/denni-zpravodajstvi/v-praze-pribyla-dalsi-vysokorychlostni-vyhybka-prazska-strojirna-zrychlila-tramvaje-na-kotlarce_58880.html)
+and Ekonomický deník) gives the Kotlářka switch **50 straight and 35 diverging**, in service since August 2023. The register
+says 50 / 15. Conditions it names: its own track bed, deep flangeways and a raised frog, heating, SIL 3.
+
+**The signal (photo on the speed-sign page, 2016):** two black boxes one above the other on a bracket of a traction pole,
+the chevron box of white LEDs above, the number box below with outlined white segments.
+
 Speed switches in the register (speeds straight / diverging, km/h):
 
 | No. | Place | Straight | Diverging | Our lines |
