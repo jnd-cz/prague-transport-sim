@@ -2,7 +2,7 @@
 
 Status:
 - **The ground:** accepted by the user (2026-11-06, PR #313, on the slower decode: "it can be loaded and decoded by separate thread to not slow down the playthrough when we do dynamic tile loading ... If yes then then go with it").
-- **A tile's objects:** picked on the measurements below (the user, 2026-11-06, asking for this comparison: "can you reopen and run their comparison before we move on?"), open to the user's veto in its PR.
+- **A tile's objects:** accepted by the user (2026-11-06, PR #324: "yes integer differences for objects look really good as well, go for it and merge").
 
 ## The ground, measured
 
