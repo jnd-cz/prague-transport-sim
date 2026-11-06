@@ -210,5 +210,103 @@ class TruePlaces(unittest.TestCase):
         self.assertEqual([x['z'] for x in series], [100.0, 100.0, 100.0])
 
 
+class Answers(unittest.TestCase):
+    def setUp(self):
+        self.old = lh.STEP_ANSWERS
+        self.addCleanup(lambda: setattr(lh, 'STEP_ANSWERS', self.old))
+
+    def test_an_archive_answer_takes_the_archive_and_holds_where_it_has_none(self):
+        lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
+        series = [{'xy': (10.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}, {'xy': (20.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': None},
+                  {'xy': (90.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}]
+        lh.answered_source(series)
+        self.assertEqual([(x['z'], x['w'], x['src']) for x in series], [(191.5, 1.0, 'dtmp'), (None, 0.0, None), (190.0, 1.0, 'di')])
+
+    def test_a_di_answer_leaves_the_height(self):
+        lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'di', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
+        series = [{'xy': (10.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}]
+        lh.answered_source(series)
+        self.assertEqual(series[0]['z'], 190.0)
+
+    def test_outliers_go_only_within_the_reach(self):
+        c = chain([(0, 0), (300, 0)], lambda s: 100 + .01 * s)
+        for x in c.bins:
+            x['survey'] = None
+        c.bins[10]['z'] += .3
+        c.bins[50]['z'] += .3
+        lh.STEP_ANSWERS = [{'xy': (52.5, 0.0), 'use': 'di', 'drop': True, 'blend': False, 'radius': None, 'reach': 70.0}]
+        self.assertEqual(lh.answered_noise([c])[0], 1)
+        self.assertIsNone(c.bins[10]['z'])
+        self.assertIsNotNone(c.bins[50]['z'])
+
+    def test_a_noisy_height_takes_the_mean_with_the_survey(self):
+        c = chain([(0, 0), (300, 0)], lambda s: 100 + .01 * s)
+        for x in c.bins:
+            x['survey'] = 100.0 + .01 * x['s']
+        c.bins[10]['z'] += .1
+        lh.STEP_ANSWERS = [{'xy': (52.5, 0.0), 'use': 'di', 'drop': False, 'blend': True, 'radius': None, 'reach': 70.0}]
+        before = c.bins[10]['z']
+        self.assertGreaterEqual(lh.answered_noise([c])[1], 1)
+        self.assertLess(c.bins[10]['z'], before)
+
+    def test_the_surveys_pull_makes_no_step_between_bins(self):
+        # the survey 20 cm under a noisy stretch: the heights fade towards it, no two neighbours over 5 cm further apart than the grade
+        c = chain([(0, 0), (300, 0)], lambda s: 100 + .01 * s)
+        for k, x in enumerate(c.bins):
+            x['survey'] = 99.8 + .01 * x['s']
+            if k % 2:
+                x['z'] += .06
+        lh.STEP_ANSWERS = [{'xy': (150.0, 0.0), 'use': 'di', 'drop': False, 'blend': True, 'radius': None, 'reach': 70.0}]
+        lh.answered_noise([c])
+        steps = [abs(b['z'] - a['z'] - .05) for a, b in zip(c.bins, c.bins[1:])]
+        self.assertLess(max(steps), .09)
+        self.assertLess(c.bins[30]['z'], 100 + .01 * c.bins[30]['s'] - .02)
+
+    def test_a_step_answer_replaces_the_radius_answers_in_its_reach(self):
+        truth = {'trackHeights': {'radiusAnswers': [{'place': [50.08862, 14.40603], 'answer': lh.HOLD}, {'place': [50.05, 14.4], 'answer': lh.HOLD}],
+                                  'stepAnswers': [{'place': [50.08862, 14.40603], 'use': 'archive', 'radius': 'follow'}]}}
+        out = lh.load_radius_answers(truth)
+        self.assertEqual(sorted(a['answer'] for a in out), [lh.FOLLOW, lh.HOLD])
+        self.assertEqual(lh.answer_at([out[-1]['xy']]), None)
+
+
+class Neighbour(unittest.TestCase):
+    def tracks(self, f=lambda s: 100 + .02 * s, g=lambda s: 100.3 + .02 * s):
+        return chain([(0, 0), (400, 0)], f), chain([(0, 3.5), (400, 3.5)], g)
+
+    def test_a_dip_on_one_track_takes_the_other_tracks_height_and_their_offset(self):
+        a, b = self.tracks()
+        for k in (40, 41, 42):
+            a.bins[k]['z'] -= 1.0
+        self.assertEqual(lh.snap_to_neighbour([a, b]), 3)
+        for k in (40, 41, 42):
+            self.assertAlmostEqual(a.bins[k]['z'], 100 + .02 * a.bins[k]['s'], delta=.01)
+
+    def test_tracks_that_really_differ_stay_apart(self):
+        a, b = self.tracks()
+        self.assertEqual(lh.snap_to_neighbour([a, b]), 0)
+        self.assertAlmostEqual(b.bins[40]['z'] - a.bins[40]['z'], .3, delta=1e-6)
+
+    def test_a_dip_on_both_stays(self):
+        a, b = self.tracks()
+        for k in (40, 41, 42):
+            a.bins[k]['z'] -= 1.0
+            b.bins[k]['z'] -= 1.0
+        self.assertEqual(lh.snap_to_neighbour([a, b]), 0)
+
+    def test_a_lone_track_stays(self):
+        a, _ = self.tracks()
+        a.bins[40]['z'] -= 1.0
+        self.assertEqual(lh.snap_to_neighbour([a]), 0)
+
+
+class Smoothed(unittest.TestCase):
+    def test_it_moves_a_height_at_most_the_clamp(self):
+        c = chain([(0, 0), (300, 0)], lambda s: 100 + .15 * math.sin(s / 6))
+        z0 = [x['z'] for x in c.bins]
+        lh.smooth_heights([c])
+        self.assertLessEqual(max(abs(x['z'] - z) for x, z in zip(c.bins, z0)), lh.SMOOTH_CLAMP + 1e-9)
+
+
 if __name__ == '__main__':
     unittest.main()

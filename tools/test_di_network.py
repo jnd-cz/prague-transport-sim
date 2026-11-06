@@ -318,5 +318,55 @@ class Drawing(unittest.TestCase):
         self.assertAlmostEqual(t['p'][-1][0], 180, delta=1)
 
 
+def sampled(corners, step=1.0):
+    """A polyline with points every `step` m along its segments, as an edge's line has them."""
+    out = [corners[0]]
+    for a, b in zip(corners, corners[1:]):
+        n = max(1, round(math.dist(a, b) / step))
+        out += [(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n) for i in range(1, n + 1)]
+    return out
+
+
+def arc(n, chord, turn_deg, start=(0.0, 0.0), heading=0.0):
+    pts = [start]
+    h = math.radians(heading)
+    for _ in range(n):
+        pts.append((pts[-1][0] + chord * math.cos(h), pts[-1][1] + chord * math.sin(h)))
+        h += math.radians(turn_deg)
+    return pts
+
+
+class Chords(unittest.TestCase):
+    def test_the_chords_of_a_curve_lose_their_inner_points(self):
+        c = sampled(arc(8, 22.0, 5.0))
+        self.assertEqual(len(dn.chords(c)), 6)  # (the first and the last have a corner at one end only)
+        kept = dn.without_chords(c)
+        self.assertLess(len(kept), 60)
+        for q in arc(8, 22.0, 5.0)[1:-1]:
+            self.assertLess(min(math.dist(q, p) for p in kept), 1e-6)
+
+    def test_a_straight_meeting_a_curve_keeps_its_points(self):
+        straight = [(-300.0, 0.0), (0.0, 0.0)]
+        c = sampled(straight + arc(4, 20.0, 5.0)[1:])
+        kept = dn.without_chords(c)
+        self.assertGreater(sum(1 for p in kept if p[0] < 0), 290)
+
+    def test_a_straight_between_opposite_curves_keeps_its_points(self):
+        c = sampled([(0, 0), (20, 0), (40, 2), (60, 2), (80, 4)])  # (up, level, up again: its corners turn opposite ways)
+        kept = dn.without_chords(c)
+        self.assertGreater(sum(1 for p in kept if 41 < p[0] < 59), 15)
+
+    def test_a_long_straight_between_small_corners_keeps_its_points(self):
+        c = sampled(arc(1, 20, 0) + [(120.0, -0.5), (140.0, -1.5)])
+        self.assertTrue(all(d - b <= 2 for b, d in [(i, j) for i, j in dn.chords(c)]) or not dn.chords(c))
+
+    def test_a_chord_that_sags_under_the_tolerance_stays(self):
+        self.assertEqual(dn.chords(sampled(arc(6, 10.0, 0.5))), [])  # (1.1 cm: the fit bends through it anyway)
+        self.assertEqual(len(dn.chords(sampled(arc(6, 10.0, 2.0)))), 4)  # (4.4 cm)
+
+    def test_a_real_straight_has_no_chords(self):
+        self.assertEqual(dn.chords(sampled([(0, 0), (100, 0), (300, 0)])), [])
+
+
 if __name__ == '__main__':
     unittest.main()

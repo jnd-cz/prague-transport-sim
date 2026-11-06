@@ -1287,6 +1287,10 @@ class Match:
 
 END_STEP = 1.0      # m: an edge's line has points this far apart before its ends go to its nodes' places
 DENSE = 2.0         # m: at most this between a surveyed line's points given to the curve fit
+CHORD_CORNER = 0.3  # degrees: a smaller turn at a point of DI's line is no corner
+CHORD_LENGTH = (3.0, 40.0)  # m: a stretch between two corners turning the same way, this long, is a chord of a curve
+CHORD_END = 1.5     # m from a line's ends, where its end points were moved to their nodes: no corners read there
+CHORD_SAG = 0.02    # m: under this the arc lies within the curve fit's tolerance of its chord (track_curve.TOL): it can bend anyway
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
 EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
@@ -1313,6 +1317,41 @@ def dense(coords, step=DENSE):
     return out
 
 
+def chords(coords):
+    """The stretches of a line that are chords of a curve, as (first index, last index): straight between two corners that turn
+    the same way, with the arc through them over CHORD_SAG from the chord. A corner at only one end is a real straight meeting a
+    curve; over CHORD_LENGTH it is a straight."""
+    if len(coords) < 3:
+        return []
+    cum = [0.0]
+    for a, b in zip(coords, coords[1:]):
+        cum.append(cum[-1] + math.dist(a, b))
+    corners = []
+    for i in range(1, len(coords) - 1):
+        if cum[i] < CHORD_END or cum[-1] - cum[i] < CHORD_END:
+            continue
+        a, b, c = coords[i - 1], coords[i], coords[i + 1]
+        u, v = math.atan2(b[1] - a[1], b[0] - a[0]), math.atan2(c[1] - b[1], c[0] - b[0])
+        d = math.degrees(math.atan2(math.sin(v - u), math.cos(v - u)))
+        if abs(d) >= CHORD_CORNER:
+            corners.append((i, d))
+    sag = lambda l, s, t: l * math.radians((abs(s) + abs(t)) / 2) / 8  # (l^2 / 8R, the radius l over the corners' mean)
+    return [(i, j) for (i, s), (j, t) in zip(corners, corners[1:])
+            if s * t > 0 and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1] and sag(cum[j] - cum[i], s, t) >= CHORD_SAG]
+
+
+def without_chords(coords):
+    """A surveyed line for the curve fit without the points inside the chords of a curve. DI draws some curves with vertices 22-28 m
+    apart and 4-5 degrees at each (line 37, Ohrada - Palmovka: "stepped curve instead of continuous radius", the user,
+    2026-11-06). The vertices lie on the curve and the chords inside it, 22 cm at their middles: the opposite track, at
+    vertices every 1.25 m, runs parallel to the curve through the vertices alone, and the archive's vertices lie within
+    3.2 cm of it."""
+    drop = set()
+    for i, j in chords(coords):
+        drop.update(range(i + 1, j))
+    return [p for i, p in enumerate(coords) if i not in drop]
+
+
 class Drawn:
     """The edges a line draws, fitted as smooth curves (tools/track_curve.py `Network`, #204).
     pts[e]: the fitted points of edge e from its node a to b."""
@@ -1334,7 +1373,7 @@ class Drawn:
                 # (no points on the chord an end walked back leaves: nothing is known there, _walk_back)
                 walk = ed.get('walk', ())
                 head, tail = c[:1] if 0 in walk else [], c[-1:] if 1 in walk else []
-                c = head + dense(c[len(head):len(c) - len(tail)]) + tail
+                c = head + without_chords(dense(c[len(head):len(c) - len(tail)])) + tail
             key = k(a, b)
             pts[key] = c if key == (a, b) else c[::-1]
             kind[key] = ed['src']

@@ -29,7 +29,7 @@ import shapely
 from shapely.geometry import LineString, Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, banded_profile, cause, chains, implied_radii, radii, vertical_profile  # noqa: E402
+from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, banded_profile, cause, chains, implied_radii, radii, vertical_profile, whittaker  # noqa: E402
 
 OUT_STEP = 2.0  # m between heights along a line's path and tracks (the game's profile step, src/terrain.js)
 MATCH = 1.0     # m from a line's point to the chain it lies on (both are DI where the line is, #20)
@@ -63,6 +63,19 @@ CODE = {'di': 'di', 'archive': 'dtmp', 'reviewed': 'review', 'deck': 'zps', 'sur
 LEVELS = ('di', 'dtmp', 'review', 'zps', 'curve', 'surface')  # codes in the order of sources.LAYERS['heights']
 
 
+SMOOTH_WAVELENGTH = 70.0  # m: the waves the smoother halves. What the two tracks of a street do not share ends about here
+                         # (#358: at 32-64 m they share 0.67 cm rms and differ by 0.84; at 128-256 m they agree). 100 m
+                         # gains 0.7 grade swings per km, and costs distance from the data and coupler travel
+SMOOTH_CLAMP = 0.10   # m: the most it may move a height; the band rule then applies around the smoothed height
+NEIGHBOUR_GAP = (2.0, 7.0)  # m: another track this far off, running parallel, is this track's neighbour
+NEIGHBOUR_STEP = 0.20  # m: a height this far from its own smooth line is a step or a dip ...
+NEIGHBOUR_CALM = 0.05  # m: ... if the neighbour's height there lies this near its own line
+DROP_NOISE = 0.05     # m: where an answer discards outliers, a height this far from its smooth line goes
+BLEND_NOISE = 0.02    # m: where an answer weights towards the survey, a height this far from its line, or tighter than 500 m
+BLEND_REACH = 20.0    # m: the survey's pull fades in and out over this (per point it stepped: 7 -> 19 cm of coupling step)
+NEIGHBOUR_LOG = []    # (xy, height) of the heights the last snap_to_neighbour moved: reports/line-heights.json
+STEP_ANSWERS = []     # the user's answers on the step review: data/truth.json trackHeights.stepAnswers
+STEP_REACH = 70.0     # m: the stretch a step card showed either side of its place
 RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
 HOLD, FOLLOW = 'hold the radius', 'follow the data'
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
@@ -73,15 +86,38 @@ def load_radius_answers(truth):
     """data/truth.json trackHeights.radiusAnswers: a place (lat, lon) and the user's choice there."""
     from geo import Frame
     F = Frame()
-    return [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer'], 'outliers': a.get('outliers')}
-            for a in (truth.get('trackHeights') or {}).get('radiusAnswers', [])]
+    out = [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer'], 'outliers': a.get('outliers')}
+           for a in (truth.get('trackHeights') or {}).get('radiusAnswers', [])]
+    # (a step answer is the later word at its place: the radius answers within its reach give way to it)
+    for a in load_step_answers(truth):
+        if a['radius']:
+            out = [o for o in out if math.dist(o['xy'], a['xy']) > a['reach']]
+            out.append({'xy': a['xy'], 'answer': a['radius'], 'outliers': 'drop' if a['drop'] else None, 'reach': a['reach']})
+    return out
+
+
+def load_step_answers(truth):
+    """data/truth.json trackHeights.stepAnswers: at a place, whose heights (`use`: the archive, or DI as it is), and whether
+    outliers go (`drop`), the survey is weighed in where the heights are noisy or the curve exceeded (`blend`), and how
+    the radius answers there change (`radius`)."""
+    from geo import Frame
+    F = Frame()
+    return [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'use': a['use'], 'drop': bool(a.get('drop')), 'blend': bool(a.get('blend')),
+             'radius': {'follow': FOLLOW, 'hold': HOLD}.get(a.get('radius')), 'reach': a.get('reach', STEP_REACH)}
+            for a in (truth.get('trackHeights') or {}).get('stepAnswers', [])]
+
+
+def step_answer_at(xy):
+    """The nearest step answer whose reach holds this point, or None."""
+    near = [(math.dist(a['xy'], xy), k) for k, a in enumerate(STEP_ANSWERS) if math.dist(a['xy'], xy) <= a['reach']]
+    return STEP_ANSWERS[min(near)[1]] if near else None
 
 
 def answer_at(xys, kinds=(HOLD,)):
     """The user's answer (of `kinds`) at a place: the nearest within ANSWER_REACH of any of its points, else None."""
     near = [(math.dist(a['xy'], xy), k, a) for k, a in enumerate(RADIUS_ANSWERS) if a['answer'] in kinds
             for xy in xys if xy is not None]
-    near = [x for x in near if x[0] <= ANSWER_REACH]
+    near = [x for x in near if x[0] <= x[2].get('reach', ANSWER_REACH)]
     return min(near)[2] if near else None
 
 
@@ -169,6 +205,168 @@ def at_true_places(series, line):
         x['z'] = zs[a] + (zs[b] - zs[a]) * (x['s'] - ts[a]) / (ts[b] - ts[a])
 
 
+def other_heights(samples):
+    """A bin's archive and survey heights, each the median of what its samples offer (None: none): what an answer can
+    choose instead of the height staged (tools/import_track_heights.py keeps them as candidates)."""
+    good = lambda v: isinstance(v, (int, float)) and v > 100
+    arch, surv = [], []
+    for h in samples:
+        paved = (h.get('construction') or {}).get('kind') == 'paved'
+        for c in h.get('candidates', ()):
+            if c.get('excluded') or not good(c.get('z')):
+                continue
+            if c['dataset'] == 'archive':
+                arch.append(c['z'])
+            elif c['dataset'] in ('deck', 'survey') and c.get('inside') and paved and c.get('class') in ('deck', 'tram', 'road', 'paved', 'parking'):
+                surv.append(c['z'])
+    pick = lambda v: sorted(v)[len(v) // 2] if v else None
+    return pick(arch), pick(surv)
+
+
+def answered_source(series):
+    """Where the user's step answer takes the archive: its height in each bin, and where it has none the bin is held, so the
+    curve bridges it (the user, Malostranské náměstí, 2026-11-06: "archive, bridge the gap")."""
+    for x in series:
+        a = step_answer_at(x['xy']) if x['xy'] and STEP_ANSWERS else None
+        if not a or a['use'] != 'archive':
+            continue
+        if x['archive'] is None:
+            x['z'], x['w'], x['src'] = None, 0.0, None
+        else:
+            x['z'], x['w'], x['src'] = x['archive'], 1.0, 'dtmp'
+
+
+def height_runs(c):
+    """The chain's stretches of bins with a height, no more than 2 BIN apart, as index lists."""
+    out, run = [], []
+    for i, x in enumerate(c.bins):
+        if x['z'] is None:
+            continue
+        if run and x['s'] - c.bins[run[-1]]['s'] > 2 * BIN + .01:
+            out.append(run)
+            run = []
+        run.append(i)
+    if run:
+        out.append(run)
+    return [r for r in out if len(r) >= 5]
+
+
+def smooth_line(c, run):
+    """A run's own smooth line, for what lies off it."""
+    return whittaker([c.bins[i]['s'] for i in run], [c.bins[i]['z'] for i in run], SMOOTH_WAVELENGTH)
+
+
+def answered_noise(chs):
+    """Where a step answer discards outliers, the heights far from their smooth line go. Where it weighs in the survey, the
+    stretch where heights are noisy or the curve exceeded moves half way to the survey's slow difference from them, the
+    weight and the difference both spread over BLEND_REACH, so the survey's own steps and the stretch's ends make no kink."""
+    if not any(a['drop'] or a['blend'] for a in STEP_ANSWERS):
+        return 0, 0
+    dropped = blended = 0
+    for c in chs:
+        for run in height_runs(c):
+            answers = [step_answer_at(c.bins[i]['xy']) if c.bins[i]['xy'] else None for i in run]
+            if not any(a and (a['drop'] or a['blend']) for a in answers):
+                continue
+            line = smooth_line(c, run)
+            s = [c.bins[i]['s'] for i in run]
+            z = [c.bins[i]['z'] for i in run]
+            want = [0.0] * len(run)
+            for k, a in enumerate(answers):
+                if a and a['blend']:
+                    tight = False
+                    if 2 <= k < len(run) - 2:
+                        tight = abs(2 * ((z[k + 2] - z[k]) / (s[k + 2] - s[k]) - (z[k] - z[k - 2]) / (s[k] - s[k - 2])) / (s[k + 2] - s[k - 2])) > 1 / 500
+                    want[k] = 1.0 if tight or abs(z[k] - line[k]) > BLEND_NOISE else 0.0
+            near = lambda k: [j for j in range(len(run)) if abs(s[j] - s[k]) <= BLEND_REACH]
+            for k, a in enumerate(answers):
+                x = c.bins[run[k]]
+                if a and a['drop'] and abs(z[k] - line[k]) > DROP_NOISE:
+                    x['z'], x['w'], x['src'] = None, 0.0, None
+                    dropped += 1
+                else:
+                    # (past the answer's reach too: at its edge the pull stood at half and made a 5 cm step)
+                    around = near(k)
+                    gaps = [c.bins[run[j]]['survey'] - z[j] for j in around if c.bins[run[j]]['survey'] is not None]
+                    weight = sum(want[j] for j in around) / len(around)
+                    if gaps and weight:
+                        x['z'] = z[k] + .5 * weight * sum(gaps) / len(around)  # (fades out where the survey ends)
+                        blended += 1
+    return dropped, blended
+
+
+def snap_to_neighbour(chs):
+    """A sudden step or dip on one track that the track beside it does not have takes the neighbour's height, their slow offset
+    kept (the user, 2026-11-06: "snap to the other track on sudden jumps", "again use neighbor track when there are steps
+    and dips"). The tracks' real differences are kept: the offset is the median over 50 m either side, and a height only
+    moves if it left its own line by NEIGHBOUR_STEP while the neighbour stays near its line."""
+    offs = {}
+    for ci, c in enumerate(chs):
+        offs[ci] = {}
+        for run in height_runs(c):
+            for i, v in zip(run, smooth_line(c, run)):
+                offs[ci][i] = c.bins[i]['z'] - float(v)
+    tree = shapely.STRtree([c.line for c in chs])
+    moved = []
+    for ci, c in enumerate(chs):
+        steps = [i for i, r in offs[ci].items() if abs(r) > NEIGHBOUR_STEP and c.bins[i]['xy']]
+        if not steps:
+            continue
+        pairs = {}
+        for i in offs[ci]:
+            x = c.bins[i]
+            if not x['xy']:
+                continue
+            p, best = Point(x['xy']), None
+            ux, uy = c.direction(x['s'])
+            for j in tree.query(p.buffer(NEIGHBOUR_GAP[1])):
+                j = int(j)
+                if j == ci:
+                    continue
+                o = chs[j]
+                d = o.line.distance(p)
+                if not NEIGHBOUR_GAP[0] <= d <= NEIGHBOUR_GAP[1]:
+                    continue
+                t = o.line.project(p)
+                vx, vy = o.direction(t)
+                if abs(ux * vx + uy * vy) >= math.cos(math.radians(15)) and (best is None or d < best[0]):
+                    best = (d, j, t)
+            if best is None:
+                continue
+            o, t = chs[best[1]], best[2]
+            near = [k for k in offs[best[1]] if abs(o.bins[k]['s'] - t) <= BIN]
+            if len(near) < 2:
+                continue
+            near.sort(key=lambda k: o.bins[k]['s'])
+            if max(abs(offs[best[1]][k]) for k in near) > NEIGHBOUR_CALM:
+                continue
+            ss, zz = [o.bins[k]['s'] for k in near], [o.bins[k]['z'] for k in near]
+            a = max(0, bisect.bisect_right(ss, t) - 1)
+            b = min(a + 1, len(ss) - 1)
+            pairs[i] = zz[a] if a == b else zz[a] + (zz[b] - zz[a]) * (t - ss[a]) / (ss[b] - ss[a])
+        for i in steps:
+            if i not in pairs:
+                continue
+            x = c.bins[i]
+            calm = sorted(pairs[k] - c.bins[k]['z'] for k in pairs if abs(c.bins[k]['s'] - x['s']) <= 50 and abs(offs[ci][k]) <= NEIGHBOUR_CALM)
+            if len(calm) < 5:
+                continue
+            moved.append((i, c, pairs[i] - calm[len(calm) // 2]))
+    for i, c, z in moved:
+        c.bins[i]['z'] = z
+    NEIGHBOUR_LOG[:] = [(c.bins[i]['xy'], round(z, 3)) for i, c, z in moved]
+    return len(moved)
+
+
+def smooth_heights(chs):
+    """The smoother in front of the band rule (#358): each run of heights, moved at most SMOOTH_CLAMP."""
+    for c in chs:
+        for run in height_runs(c):
+            for i, v in zip(run, smooth_line(c, run)):
+                z = c.bins[i]['z']
+                c.bins[i]['z'] = max(z - SMOOTH_CLAMP, min(z + SMOOTH_CLAMP, float(v)))
+
+
 def build_chains(staged):
     """Chains of DI paths (copies dropped), each with its staged heights binned every BIN m."""
     import di_tracks
@@ -207,10 +405,12 @@ def build_chains(staged):
                          key=lambda h: h['z'])
             h = (sel or v)[len(sel or v) // 2]
             kinds = Counter((x.get('construction') or {}).get('kind') or 'unknown' for x in v)
-            series.append({'s': min((b + .5) * BIN, cum), 'z': h['z'] if sel else None, 'w': 1.0 if sel else 0.0,
+            archive, survey = other_heights(v)
+            series.append({'archive': archive, 'survey': survey, 's': min((b + .5) * BIN, cum), 'z': h['z'] if sel else None, 'w': 1.0 if sel else 0.0,
                            'src': CODE.get((h.get('height_source') or {}).get('dataset')) if sel else None,
                            'kind': kinds.most_common(1)[0][0], 'terrain': h.get('terrain_z'), 'xy': h['xy'],
                            'flags': sorted({f for x in v for f in x.get('review_flags', [])})})
+        answered_source(series)
         track = Chain(xy, series)
         at_true_places(series, track.line)
         out.append(track)
@@ -382,7 +582,7 @@ def solve(c, pins, r, relax=None):
                 near = lambda si: any(abs(si - s[i]) <= RELAX_REACH for i in apart)
                 rmin = [max(v * RELAX_STEP, MIN_RADIUS) if near(si) else v for si, v in zip(s, rmin)]
                 res = banded_profile(s, zf, rmin, tol, weight)
-        raw = [None if x.get('pin') else x['z'] for x in run]
+        raw = [None if x.get('pin') else x.get('staged', x['z']) for x in run]  # (before the smoother)
         # (for review: the band missed by over FIT at the design radius, or rails over FIT apart; a few mm at a pin
         # only bend the radius, they are no question)
         review = [i for i, e in enumerate(first['excess']) if e > FIT]
@@ -845,20 +1045,33 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('lines', nargs='+')
     ap.add_argument('--staged', help='an import of this checkout (tools/import_track_heights.py --evidence ...)')
+    ap.add_argument('--smooth', choices=('wh3', 'none'), default='wh3', help='the smoother in front of the band rule (#358)')
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')
-    global RADIUS_ANSWERS
-    RADIUS_ANSWERS = load_radius_answers(json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8')))
+    global RADIUS_ANSWERS, STEP_ANSWERS
+    truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
+    RADIUS_ANSWERS, STEP_ANSWERS = load_radius_answers(truth), load_step_answers(truth)
     staged = staged_heights(args.staged)
     chs = build_chains(staged)
     del staged
+    dropped, blended = answered_noise(chs)
+    print(f'step answers: {len(STEP_ANSWERS)}; {dropped} heights dropped, {blended} weighed with the survey', flush=True)
+    print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
+    for c in chs:
+        for x in c.bins:
+            x['staged'] = x['z']
+    if args.smooth == 'wh3':
+        smooth_heights(chs)
     summary = assemble(chs)
     from geo import Frame
     F = Frame()
     steps = [dict(s, lat=round(float(F.ll(*s['xy'])[0]), 5), lon=round(float(F.ll(*s['xy'])[1]), 5))
              for c in chs for s in c.steps if s['xy']]
     by = Counter(s['cause'] for s in steps)
-    bad = [s for s in steps if abs(s['largest_m']) > BIG and s['cause'] not in ('di', 'dip', 'structure')]
+    # (an archive the terrain check already distrusts is explained: 50.1130 N 14.3937 E, off the game's lines, swings
+    # over 1 m beside a 60 m hold, and true places took its bins out of the dips)
+    bad = [s for s in steps if abs(s['largest_m']) > BIG and s['cause'] not in ('di', 'dip', 'structure')
+           and 'archive_terrain_height_disagreement' not in s['flags']]
     held = [dict(h, m=round(h['s1'] - h['s0'], 1), lat=round(float(F.ll(*h['xy'])[0]), 5),
                  lon=round(float(F.ll(*h['xy'])[1]), 5)) for c in chs for h in c.held if h['xy']]
     moved = sorted(abs(z - raw) for c in chs for run in c.runs if not any(run['step'])
@@ -881,6 +1094,7 @@ def main():
     lookup, report = Lookup(chs), {'network': {**summary, 'steps_by_cause': dict(by), 'unexplained_steps': bad,
                                                'moved_m': {'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
                                                'held_over_60m': held,
+                                               'neighbour_snaps': [[round(float(v), 5) for v in F.ll(*xy)] + [z] for xy, z in NEIGHBOUR_LOG],
                                                'dropped_by_answers': [[round(float(v), 5) for v in F.ll(*xy)]
                                                                       for c in chs for xy in c.dropped]}, 'lines': {}}
     for line in args.lines:

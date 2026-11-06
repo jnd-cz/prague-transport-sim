@@ -228,6 +228,32 @@ def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
     return {'z':f,'fits':fits,'excess':excess.tolist(),'min_radius':min(implied_radii(s,f),default=math.inf)}
 
 
+def whittaker(s, z, wavelength, order=3, robust=.2):
+    """Heights smoothed by a penalty on their `order`-th difference: a wave of `wavelength` m is halved, shorter ones go,
+    longer ones stay. With order 3 a straight grade and a constant vertical curve are left as they are: grades and
+    curves are what a track is built of (#358). A point further than `robust` m from the curve stops pulling it (Tukey)."""
+    n = len(z)
+    z = np.asarray(z, dtype=float)
+    if n <= order + 1:
+        return z.copy()
+    pos, D = np.asarray(s, dtype=float), np.eye(n)
+    for k in range(order):
+        h = (pos[k + 1:] - pos[:-k - 1]) / (k + 1)
+        D = (D[1:] - D[:-1]) / h[:, None]
+    P = (wavelength / (2 * math.pi)) ** (2 * order) * D.T @ D
+    w, f, i = np.ones(n), z, np.arange(n)
+    for _ in range(5):
+        A = P.copy()
+        A[i, i] += w
+        f = np.linalg.solve(A, w * z)
+        r = z - f
+        nw = np.where(np.abs(r) < robust, (1 - (r / robust) ** 2) ** 2, 1e-3)
+        if np.max(np.abs(nw - w)) < .02:
+            break
+        w = nw
+    return f
+
+
 def implied_radii(s, z):
     """The radius each inner point's change of grade implies (inf on a straight grade)."""
     return [1/abs(c) if c else math.inf for c in curvature(s,z)]

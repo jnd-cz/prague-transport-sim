@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 
-from track_profile import banded_profile, vertical_profile, implied_radii, radii, _solve
+from track_profile import banded_profile, vertical_profile, implied_radii, radii, _solve, whittaker
 
 S = [float(x) for x in range(0,201,5)]
 
@@ -88,6 +88,26 @@ class BandRule(unittest.TestCase):
         out = banded_profile(self.s,z,500,tol,weight=[0.0 if k == 30 else 1.0 for k in range(len(z))])
         self.assertTrue(out['fits'])
         self.assertLess(abs(out['z'][30]-100),.05)
+
+
+class Whittaker(unittest.TestCase):
+    def s(self):
+        return [i * 5.0 for i in range(200)]
+
+    def test_a_grade_and_a_vertical_curve_stay(self):
+        for z in ([100 + .03 * v for v in self.s()], [100 + v * v / 1000 for v in self.s()]):
+            self.assertLess(max(abs(a - b) for a, b in zip(whittaker(self.s(), z, 70), z)), .001)
+
+    def test_a_short_wave_goes_and_a_long_one_stays(self):
+        amp = lambda L: max(abs(v) for v in whittaker(self.s(), [math.sin(2 * math.pi * v / L) for v in self.s()], 70)[40:160])
+        self.assertLess(amp(30), .05)
+        self.assertGreater(amp(256), .95)
+
+    def test_a_bad_point_does_not_pull_its_neighbours(self):
+        z = [100 + .01 * v for v in self.s()]
+        z[100] += 1.0
+        f = whittaker(self.s(), z, 70)
+        self.assertLess(abs(f[100] - (100 + .01 * self.s()[100])), .02)
 
 
 if __name__=='__main__':
