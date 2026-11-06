@@ -59,12 +59,15 @@ function findKerbs(o) {
   return null;
 }
 
-function kerbFindings(raw) {
+export function kerbFindings(raw) {
   const k = findKerbs(raw?.provenance);
-  return (k?.review || []).map((r) => ({
-    src: 'kerbs', kind: `${r.c} ${r.line}`, x: r.x, y: r.y, mag: Math.abs(r.terrainOff) * 100, c: r.c,
-    info: `terrain ${fmt(r.terrainOff * 100)} cm off the ${r.c} along ${r.kerb} m of kerb (the survey line taken as the kerb's ${r.line}, decided by the ${r.basis})`,
-  }));
+  return (k?.review || []).map((r) => {
+    const osm = Object.entries(r.osmKerb || {}).map(([v, n]) => `kerb=${v} ×${n}`).join(', ');
+    return {
+      src: 'kerbs', kind: `${r.c} ${r.line}`, x: r.x, y: r.y, mag: Math.abs(r.terrainOff) * 100, c: r.c,
+      info: `terrain ${fmt(r.terrainOff * 100)} cm off the ${r.c} along ${r.kerb} m of kerb (the survey line taken as the kerb's ${r.line}, decided by the ${r.basis})${osm ? ` · OSM: ${osm} along this kerb` : ''}`,
+    };
+  });
 }
 
 // Neighbouring survey areas at the same outline point: the same class (or road beside road) at another

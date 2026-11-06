@@ -91,12 +91,15 @@ areas, n_z, n_near, n_none, dropped = [], 0, 0, 0, 0
 # take heights from the neighbour's lines too), keyed by its S-JTSK position (1 cm)
 zkey = defaultdict(set)  # several heights where lines of two levels share a 2D position (wall top/foot)
 zgrid = defaultdict(list)
+wall_lines = []  # the survey's walls and terrain edges (tools/kerbs.py: an edge along one is not a kerb)
+WALLS = ("Hranice_zdi", "Zeď", "Terénní_hrana")
 packages = select_packages(ROOT, sources=SOURCES) if SOURCES else select_packages(ROOT, districts=DTM[LINE])
 for package in packages:
     kr = package.kr
     print(f"district: {package.district}, month {package.date}")
     for t, info in gpkg.layers(kr).items():
-        if info["type"] not in ("LINESTRING", "MULTILINESTRING") or "Hranice" not in t:
+        wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
+        if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
             continue
         for f in gpkg.features(kr, t):
             g = f["geom"]
@@ -104,6 +107,10 @@ for package in packages:
                 continue
             parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
             lvl = f.get("UrovenUmisteniObjektuZPS") or 0
+            if wall:
+                wall_lines += [[local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1]
+            if "Hranice" not in t:
+                continue
             for pts in parts:
                 for x, y, z in pts:
                     if z:
@@ -295,9 +302,40 @@ for package in packages:
 
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
-kerb_report = kerbs.apply(areas, lambda x, y: _ipr.sample(x + F.E0, y + F.N0))
+kerb_structures, kerb_low = [], []
+try:  # (OSM's tunnels, bridges and other layers, and its lowered kerbs, from the snapshot's extract)
+    import osm_local
+    import numpy as np
+    from shapely.geometry import LineString
+
+    def _structure(t):
+        if "highway" not in t and "railway" not in t:
+            return False
+        try:
+            other = float(t.get("layer", 0)) != 0
+        except ValueError:
+            other = False
+        return other or t.get("tunnel", "no") != "no" or t.get("bridge", "no") != "no" or t.get("covered", "no") != "no"
+
+    if osm_local.available():
+        pts = line["path"] + line.get("pathBack", [])
+        for w in osm_local.ways(_structure, bbox=F.bbox(pts, 100)):
+            if len(w["geometry"]) > 1:
+                kerb_structures.append(LineString(np.column_stack(F.xy([g["lat"] for g in w["geometry"]], [g["lon"] for g in w["geometry"]]))))
+        low = osm_local.nodes(lambda t: t.get("kerb") in kerbs.LOW_KERB)
+        kerb_low = [(float(x), float(y), n["tags"]["kerb"]) for n, x, y in zip(low, *F.xy([n["lat"] for n in low], [n["lon"] for n in low]))]
+except ImportError:
+    pass
+if not kerb_structures:
+    print("kerbs: no OSM structures read (no extract, or no pyosmium): only the survey says what is on another level")
+_truth = os.path.join(ROOT, "data", "truth.json")
+kerb_facts = json.load(open(_truth, encoding="utf-8")).get("kerbFacts", {}).get("places", []) if os.path.exists(_truth) else []
+kerb_report = kerbs.apply(areas, lambda x, y: _ipr.sample(x + F.E0, y + F.N0),
+                          kerbs.surroundings(areas, kerbs.lines(wall_lines), kerb_structures), kerb_facts, kerb_low)
 print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSteps']}",
-      f"{len(kerb_report['review'])} areas where the terrain disagrees")
+      f"{len(kerb_report['review'])} areas where the terrain disagrees",
+      f"({sum('osmKerb' in e for e in kerb_report['review'])} with an OSM lowered or flush kerb);",
+      "not kerbs:", {k: len(v) for k, v in kerb_report["notKerb"].items()})
 
 counts = defaultdict(int)
 for a in areas:

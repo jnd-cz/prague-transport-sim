@@ -199,6 +199,12 @@ def main():
               R._fill();
               return { rec, count: R.$('rvCount').textContent };
             }""")
+            # a kerb on the list with an OSM lowered kerb along it: the card names it, one without does not (#142)
+            r["kerbNote"] = page.evaluate("""async () => {
+              const { kerbFindings } = await import('./src/review.js');
+              const row = { c: 'sidewalk', x: 1, y: 2, kerb: 40, terrainOff: 0.2, line: 'foot', basis: 'terrain' };
+              return kerbFindings({ provenance: { a: { platformSteps: [], review: [{ ...row, osmKerb: { flush: 1, lowered: 2 } }, row] } } }).map((f) => f.info);
+            }""")
             # a finding with a mark and a placed answer (#258): the legend, the mark drawn, a click on the map 5 m east
             # of its pin saved as px, py
             place = page.evaluate("""() => {
@@ -367,6 +373,8 @@ def main():
         fails.append(f"the answer did not reach the server: {r['saved']}")
     if r["next"] != "30 m east":
         fails.append(f"after the answer the card shows {r['next']!r}, not the next finding without one")
+    if not (r["kerbNote"][0].endswith("· OSM: kerb=flush ×1, kerb=lowered ×2 along this kerb") and "OSM" not in r["kerbNote"][1]):
+        fails.append(f"the kerb card's OSM note: {r['kerbNote']}")
     t = r["todo"]
     if t["place"] or not (t["placed"]["listed"] and t["placed"]["card"] and t["placed"]["v"] == "my own mark: place it on the map"
                           and abs((t["placed"]["px"] or 0) - 95) < 1.5 and t["answered"]["listed"]):

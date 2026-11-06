@@ -70,7 +70,7 @@ queries.
 
 ```bash
 python -I tools/snapshot.py data-fetch     # data/ for this commit (data/MANIFEST.json)
-python -I tools/snapshot.py fetch          # raw/ for snapshots/CURRENT (~2 GB; unpacks the DTM packages)
+python -I tools/snapshot.py fetch          # raw/ for snapshots/CURRENT (~4.3 GB; unpacks the DTM packages)
 python -I tools/snapshot.py status         # local raw/ and data/ against the manifests
 ```
 
@@ -103,7 +103,8 @@ and download it only with `--fetch` (#223).
    files; GTFS: `https://data.pid.cz/PID_GTFS.zip`, and adjust `SERVICE_DATE` in `tools/build_line.py`).
    For a DTM refresh, remove the superseded month's ZIPs and extracted package folders for the replaced
    districts from `raw/dtm/` before rebuilding; an available snapshot pair keeps priority over a newer one.
-2. Rebuild and check the lines (lints, benches).
+2. Rebuild with `tools/rebuild.py` and check the lines (lints, benches). `build_line.py` alone leaves a line without
+   heights, platforms, speeds and clearances; `data-publish` refuses such a file.
 3. `python -I tools/snapshot.py publish <YYYY-MM-DD> --note "what changed"`: uploads the new files,
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`. Add its row at the top of
    [snapshots/README.md](snapshots/README.md).
@@ -169,10 +170,11 @@ and `snapshot.py fetch` (it unzips the new packages). The download server closes
 a few dozen packages (2026-11-05: at 27 and 29 of 34): a rerun 5 minutes later fetches the rest and
 records what the stopped run had fetched.
 
-**Other checkouts after such a snapshot:** `snapshot.py fetch` adds the new month but leaves the older
-one in `raw/dtm/`, which `status` then lists as new input files (`data-publish` refuses on them). Remove
-the older month's entries, e.g. `raw/dtm/*_20260930_ZPS_*` after `2026-11-05b`: they are links to the
-machine cache, and the store and the older snapshots keep the files.
+**Other checkouts after such a snapshot:** `snapshot.py fetch` adds what the snapshot lists and removes what it
+replaced: a file in `raw/` the snapshot does not list, at a path and with bytes an older snapshot holds, with the
+folder unzipped from it (#332). These are links to the machine cache, and the store and the older snapshots keep
+the files. A file in no snapshot, or with other bytes, stays: `status` lists it as a new input file and
+`data-publish` refuses on it.
 
 For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
 GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned
