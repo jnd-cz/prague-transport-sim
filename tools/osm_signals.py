@@ -1,4 +1,4 @@
-# Traffic-signal data along a line from OpenStreetMap, for the game's traffic lights (docs/history/REMOTE-CHANGES.md §17).
+# Traffic-signal data along a line from OpenStreetMap, for the game's traffic lights.
 # Belongs into the build with the other placement rules (#22).
 #   python -P -E tools/osm_signals.py 17      -> data/line17.signals.json
 # Reads the snapshot's OSM extract (tools/osm_local.py; pyosmium, hence -P -E). Writes, in the line's

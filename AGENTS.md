@@ -158,8 +158,8 @@ both post on the pinned #291 and only propose.
   (`.github/workflows/tests.yml`) runs the tests that need no `data/` or `raw/` and `ruff check tools` on
   every PR; a test that needs them skips without them, saying what to fetch.
 - Checks from the command line: `python -P -E tools/headless.py --lines 17 --checks u3,redruns,traffic,lint
-  --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold; `--jobs N` pages at
-  once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
+  --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold, the thresholds being
+  `judge` in that tool; `--jobs N` pages at once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
   (`--parallel` for several lines).
 - **Heavy jobs take turns:** `headless.py`, `rebuild.py` and `frametime.py` queue for the machine
   (`baseline_store.HeavyJob`, first come first served, #280), print whom they wait for, and size their
