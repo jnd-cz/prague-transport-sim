@@ -81,7 +81,8 @@ pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packag
 | `platforms` | `lineN.json` | tram platforms of both directions: PID GTFS positions, names and lines, OSM shapes where mapped (`--fetch` re-reads them from the snapshot's extract) |
 | `osm_speeds` | `lineN.json` | posted speeds and dedicated track: the speed limits and banked curves |
 | `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them) |
-| `osm_signals`, `dtm_points` | `lineN.signals.json`, `.dtmpoints.json` | line 17 only: OSM traffic signals, street furniture from the survey |
+| `dtm_points` | `lineN.dtmpoints.json` | street furniture from the archived technical map |
+| `osm_signals` | `lineN.signals.json` | line 17 only, until the placement rules (#22): OSM traffic signals |
 | `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |

@@ -216,7 +216,7 @@ both post on the pinned #291 and only propose.
 
 | check | line | symptom | issue |
 |---|---|---|---|
-| page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`, `.dtmpoints`) | (expected) |
+| page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
 | crossing | 17 | 1 unexplained pedestrian obstruction | #146 |
 
 ## Code style

@@ -52,12 +52,13 @@ class Report(unittest.TestCase):
 
 
 class Build(unittest.TestCase):
-    def test_every_line_is_validated_and_the_signals_stay_line_17s(self):
+    def test_every_line_is_validated_and_has_its_furniture_and_the_signals_stay_line_17s(self):
         for line in ("9", "17", "22", "23", "37"):
             names = [w[0] for w in rebuild.writers(line)]
             self.assertIn("osm_validate.py", names)
             self.assertEqual(names[-1], "osm_validate.py")  # (after the steps that write what it reads)
             self.assertEqual("osm_signals.py" in names, line == "17")
+            self.assertIn("dtm_points.py", names)
 
 
 if __name__ == "__main__":
