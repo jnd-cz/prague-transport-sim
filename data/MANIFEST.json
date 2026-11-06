@@ -1,16 +1,16 @@
 {
  "snapshot": "2026-11-06b",
- "built_at_commit": "ddb2d32",
- "published": "2026-11-06 13:26",
- "note": "lines 17, 22 survey: the kerb review list drops what is not a kerb, cards name OSM's lowered kerbs; 40 areas' kerb side moved by 0.10 m (#142)",
+ "built_at_commit": "5e847aa",
+ "published": "2026-11-06 14:13",
+ "note": "lines 17, 22 survey: an area in two districts' packages is one area; 124 and 132 exact copies gone, no height moved (#316)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
    "sha256": "b33500c7df2e7c109eb57100bdd4f2f3e98bc596e279da35bd62984346924428"
   },
   "line17.dtm.json": {
-   "size": 9844051,
-   "sha256": "7073af16bbc95dc55c0bd23ad65e8d6f3b3497e8cacfddfe24640a7a7b65763f"
+   "size": 9335366,
+   "sha256": "732c380fab374caab5041954dc8a23c3ede4dfbb16eed6c0e3cc2efe46553399"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -49,8 +49,8 @@
    "sha256": "8e1defdacedabff69fc70db01d0e9bbc5e1305510d607d910c3d828a2bd067da"
   },
   "line22.dtm.json": {
-   "size": 10148085,
-   "sha256": "fa9976722cc5fc52f786df3173e3f9fefa2a0c124e19fb0acf72953fe4bda9c5"
+   "size": 9508497,
+   "sha256": "144df39942895ebdec7923e25fc675c557170b18971ce09bf34033bb34be7a2e"
   },
   "line22.fine.bin": {
    "size": 3734900,
