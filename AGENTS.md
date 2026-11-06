@@ -2,7 +2,8 @@
 
 A Tatra T3 tram driving game in a 3D Prague built from real data. Plain ES modules + Three.js, no build
 step; Python tools build the world from pinned source snapshots. Read before working:
-[README.md](README.md) (run, build, play), [DATA.md](DATA.md) (snapshots, data store),
+[DEVELOPING.md](DEVELOPING.md) (build, deploy, dev tools), [DATA.md](DATA.md) (snapshots, data store),
+[README.md](README.md) (the player's guide in Czech; [README.en.md](README.en.md) in English),
 [ROADMAP.md](ROADMAP.md) (milestones), [docs/knowledge.md](docs/knowledge.md) (what we learned: data
 quirks, conventions, why the main heuristics exist), [docs/architecture.md](docs/architecture.md) (the
 target design) and [docs/decisions/](docs/decisions/).
@@ -74,6 +75,9 @@ both post on the pinned #291 and only propose.
   `data/MANIFEST.json` on it, then merge. `main`'s manifest always names data that is in the store.
 - New issues: what is now (with numbers), where in the code, what done means, which checks prove it.
   A fresh session should need nothing but the issue.
+- **The player's guide comes in two languages:** a change to `README.md` (Czech, first) changes
+  `README.en.md` too; both are Help in the game's menu (`src/help.js`). `tools/test_readme.py` checks their
+  headings, not their sentences. Developer docs stay in English, in `DEVELOPING.md`.
 - Where docs go: DATA.md is how snapshots and the store work and how to refresh sources, and
   `snapshots/README.md` lists the snapshots (a row with each new one); facts learned about data
   and code go to `docs/knowledge.md`, decisions to `docs/decisions/`. One place per fact: point to a
@@ -92,7 +96,7 @@ both post on the pinned #291 and only propose.
   of line 17's open track: calibrated on street track only.
 - Heuristics standing in for missing data log what they decided (debug overlay F8, `window.game`) so they
   can be reviewed.
-- **Questions for the user go to a `?review` findings file** (`reports/review/`, README): the place,
+- **Questions for the user go to a `?review` findings file** (`reports/review/`, DEVELOPING.md): the place,
   imagery links, a picture where it helps, answer choices. Offer only answers that an importer turns into
   evidence, and say on the card why another answer stays held (#162, #176). An answer is keyed by a
   stable identity (a decision ID, a place), never by a generated array index. The file names its `issue`
@@ -192,7 +196,7 @@ both post on the pinned #291 and only propose.
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
-- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, README), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, DEVELOPING.md), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
   default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
   of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside
