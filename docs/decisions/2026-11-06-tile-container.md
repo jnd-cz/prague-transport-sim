@@ -100,7 +100,7 @@ Decoding the densest tile's 2,918 takes under 0.5 ms in all three. GLB's are flo
 
 **The ground is stored in 1 cm on every axis, not 1 mm.** Once the survey is cut into it, x and y need the survey's lattice too, not the 1 m of the bench above. Buildings keep the 5 cm they have.
 
-- **The sources hold nothing finer:** the survey's coordinates are whole centimetres (all of 2.2 M plan values and 323 k heights in three districts' packages), with stated accuracy of 0.14 m in plan and 0.12-0.35 m in height ([knowledge](../knowledge.md)). IPR's raster has more digits, but it is resampled and states no accuracy.
+- **The sources hold nothing finer:** the survey's coordinates are whole centimetres (all of 3.0 M plan values and 323 k heights in three districts' packages, up to 3,000 features per table), with stated accuracy of 0.14 m in plan and 0.12-0.35 m in height ([knowledge](../knowledge.md)). IPR's raster has more digits, but it is resampled and states no accuracy.
 - **What 1 mm costs:** +5.5 % after brotli, 347 to 366 kB on one ground tile of 85,596 triangles.
 - **Rounding moves a vertex by at most 5 mm, and every copy of it the same way,** so surfaces that share a vertex still meet exactly.
 
