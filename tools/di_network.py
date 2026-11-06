@@ -55,6 +55,7 @@ SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge,
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
 SECTION_TURN = 60.0      # degrees: the most a section's branch may leave its legs' line at the node they end at
+WALK_BACK = 3.0          # m: a track joining where DI drew no clean joint gives up its points this near the node
 TWICE = 0.5              # m: two short edges between the same nodes this near each other are one track drawn twice
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
@@ -227,6 +228,7 @@ class Network:
         self._sections()
         self._sections_into_junctions()
         self._twice()
+        self._walk_back()
         self.index()
 
     def _stubs(self):
@@ -364,6 +366,36 @@ class Network:
             else:
                 self.add_edge(ed['a'], X, c[:-1] + [xy], ed['src'], ed['records'], ed.get('chain'))
             self.report['sections into junctions'] += 1
+
+    def _walk_back(self):
+        """Where a track joins at a place DI did not draw cleanly (a branch ending on a track, a gap joint, a tip placed
+        or found), the joining track gives up its points within WALK_BACK of the node: the curve fit joins it there
+        smoothly and tangent instead of following DI's ragged end (Kobylisy: a branch running on as a copy turned
+        back 179° in its first metres). The through track keeps its points. The user, 2026-11-06: "when you
+        encounter end of di walk back ... so that connecting with existing di or change to its alternative ... will
+        be smoother and without kinks"."""
+        dot = lambda u, v: u[0] * v[0] + u[1] * v[1]
+        for n, v in self.nodes.items():
+            ends = self.at.get(n, [])
+            if v['kind'] not in ('branch', 'gap', 'tip', 'interlaced') or len(ends) < 2:
+                continue
+            through = set()
+            if len(ends) >= 3:
+                pairs = [(dot(self.out_dir(*a), self.out_dir(*b)), a, b) for i, a in enumerate(ends) for b in ends[:i]]
+                _, a, b = min(pairs)
+                through = {a, b}
+            xy = v['xy']
+            for e, end in ends:
+                if (e, end) in through:
+                    continue
+                ed = self.edges[e]
+                c = list(ed['line'].coords)
+                if end == 1:
+                    c = c[::-1]
+                keep = [c[0]] + [q for q in c[1:-1] if math.dist(q, xy) >= WALK_BACK] + [c[-1]]
+                if len(keep) < len(c):
+                    ed['line'] = LineString(keep if end == 0 else keep[::-1])
+                    self.report['joins walked back'] += 1
 
     def _twice(self):
         """Two short edges (SECTION_LEGS or less) between the same two nodes, within TWICE of each other, are one track
@@ -640,6 +672,12 @@ class Network:
             if s1 - s0 > 0.05:
                 coords = list(substring(line, s0, s1).coords)
         coords[0], coords[-1] = pa, pb
+        # (no point within END_CLEAR of a node: a node a few centimetres beside the line, joined to a point centimetres
+        # from it, turned the line 125-179° in a step the fit read as a 5 m radius, Kobylisy)
+        while len(coords) > 2 and math.dist(coords[0], coords[1]) < END_CLEAR:
+            del coords[1]
+        while len(coords) > 2 and math.dist(coords[-1], coords[-2]) < END_CLEAR:
+            del coords[-2]
         e = max(self.edges, default=-1) + 1
         self.edges[e] = {'a': a, 'b': b, 'line': LineString(coords), 'src': src, 'records': records, 'chain': chain}
         self.at[a].append((e, 0))
