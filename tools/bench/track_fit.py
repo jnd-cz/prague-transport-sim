@@ -106,7 +106,7 @@ def main():
                 if len(near):
                     dev.append((min(records[int(j)].distance(q) for j in near), q.x, q.y, e))
         ds = sorted(d[0] for d in dev)
-        share = lambda lim: sum(d <= lim for d in ds) / (len(ds) or 1)
+        share = lambda lim, ds=ds: sum(d <= lim for d in ds) / (len(ds) or 1)
         kk = worst_places(kinks(drawn.pts.values()))
         r = drawn.report
         rep = {'edges': len(edges), 'points': len(ds), 'within_2cm': round(share(0.02), 4), 'within_5cm': round(share(0.05), 4),

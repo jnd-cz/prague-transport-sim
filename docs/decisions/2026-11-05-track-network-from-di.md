@@ -32,7 +32,42 @@ should reconsider and start over with the rules?", answered "Rewrite matching on
 - **Facing switches**: where a route leaves a node by one of two or more passes from the end it arrived by.
 - **The user's facts**: a switch tip (`trackSources.switchTips`) moves its fork along the through track; an
   orthophoto track (`photoTracks`) replaces the edges it covers along 80 % of their length.
-- **Kept**: the curve fit (`tools/track_curve.py`) and the heights.
+- **In the junction OSM has little say**: inside a zone (another track within 2.7 m; plain double track lies
+  2.75-3.5 m apart) a route sample's position and heading weigh 5 %, and the network's connections between the anchors
+  outside decide (the user, 2026-11-05: "ignore the exact place of osm track inside the junction").
+
+## Staying on DI
+
+The drawn curve (`tools/track_curve.py`, as since #204) passes within 2 cm of DI's points unless a rule below lets
+it go. What pulled it off DI, measured on five lines (`tools/bench/track_deviation.py`, `tools/bench/track_fit.py`),
+each now a rule, none a place:
+
+- **Tightness is read at two scales**: 18 m over 5 m (as `tools/lint.js`), 15 m over 2 m (a bend squeezed into a
+  metre). A single 20 m limit over 2 m read DI's own scatter of 2 cm as a 25 m curve and moved points up to 14 cm
+  in curves all over the city; most of what lay over 2 cm from DI came from this.
+- **A node stands on the straight track**: where record ends meet (within 0.5 m), on the pair continuing each other;
+  where two such pairs cross, at their crossing. The mean of the ends lay up to 12 cm off the straight track.
+- **A track ending beside its node gives up its points** within sqrt(h x 50 m) of it (h the step, at most 6 m back, none
+  under 3 cm), and nothing is put on the chord they leave: the fit takes it to the node in an S bend of about 50 m. The
+  straight pair keeps its points. The user, 2026-11-06: "when you encounter end of di walk back".
+- **Surveyed lines reach the fit with points every 2 m** (DI draws straights with vertices tens of metres apart: the
+  fit sagged 0.41 m between them), and edges every 1 m before their ends move to their nodes.
+- **A section's tracks start at its tip without Y's point**, each with the leg on its own side (Y is the middle of two
+  ends 0.2 m apart: each track stepped 10 cm).
+- **Crossing nodes stay apart in the fit**, exactly on both chains, however close (three chains crossing within
+  0.4 m, merged, passed one point 13 cm off).
+- **Copies and folds go**: two records leaving one point the same way do not merge into a chain, a branch's copy
+  running on the track is trimmed per end, and a chain with nothing left is a whole copy (these made the only folds,
+  176-180°, at Kobylisy, Ďáblice and Hloubětín).
+- **Gaps**: ends facing each other across a crossing track, up to 8 m, join along the archive's axis (Ohrada, the
+  user: "sadly missing piece of data"), each going on as itself across the crossing.
+
+What is left over 10 cm on the five lines is DI's own: record joints with a sideways step of up to 26 cm (the curve
+passes in the middle), and the middle of a 1.1 m gap, which reads 0.42 m along the track from both ends. Under 18 m
+stays held anywhere (`min-radius-network`): in the depots' yards, which no line draws yet, the whole network's fit moves
+points up to 0.38 m for it.
+
+- **Kept**: the curve fit's method and the heights.
 
 ## What it changed
 
