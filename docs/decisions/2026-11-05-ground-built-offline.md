@@ -1,6 +1,6 @@
 # The ground built offline: the terrain mesher, the profile in Python, the format (#276)
 
-Status: draft (PR "Part of #276"), the user's answers to its questions pending.
+Status: accepted by the user, 2026-11-06 ("Pydelatin it is"; the mesher, the profile in Python, 10 cm); the format waits for #307.
 
 ## Why
 
@@ -65,13 +65,33 @@ triangle along the same line, so they share the border's vertices exactly. On li
 tiles, 28,435 triangles cross a tile line and become 81,764 (+53,329, **+1.4 % of the mesh, 1.6 s**). No fixed
 vertices are needed, so no mesher of our own.
 
-**Beyond one line's box** (the city's raster is 35 × 26 km, 8 × line 17's box): meshed in large blocks, each
-block's shared border gets a tolerance of ~0 on its one-cell strip, so both blocks insert every border cell that
-is not on a straight line in height and the edges coincide. An estimate, not measured: ~2 triangles per metre of
-block border, ~0.4 M for 8 km blocks over the city.
+**The whole city, measured** (`tools/bench/terrain_city.py`; IPR's raster, 35,001 × 26,001 cells, 660 km² with data;
+the tolerance from the 355 km of tram track in OSM; the user, 2026-11-06: "My only concern is hardware resources"):
+
+| | |
+|---|---|
+| triangles | 18,321,030 (9,160,703 vertices); line 17's densities per distance band scaled by the city's areas gave 18.3 M beforehand (`tools/bench/city_area.py`) |
+| time | 7 min on this PC: the distances 173 s, reading the raster 39 s, the mesh 197 s |
+| peak memory | 13.9 GB (the raster as float32 3.4 GB, the rest pydelatin's) |
+| download, at the 3.4 bytes a triangle of section 4 | ~62 MB gzip for the whole city's terrain, before the survey's cut |
+
+| from the tracks | triangles |
+|---|---|
+| 0-10 m | 523,650 |
+| 10-120 m | 6,715,291 |
+| 120-500 m | 8,345,645 |
+| 500-1000 m | 1,383,954 |
+| 1-2 km | 481,649 |
+| over 2 km | 283,054 |
+| tiles with no lidar at all | 587,787 |
+
+So the build does not need blocks or stitching: the city is one mesh, cut into tiles. A rebuild needs it only when the
+raster or the tolerance's tracks change, so it is a step with its own cached output, not part of every line's build. The
+tolerance follows the tracks: when buses and trains get their corridors, the same run covers them, and at the corridor's density
+(~200 k triangles per km²) all 660 km² would be 130 M triangles at most, which needs a coarser tolerance off the routes.
 
 **The decision: greedy insertion with `pydelatin`** (MIT; a wheel for Windows / Python 3.12; numpy only), a new
-build dependency (question 1), on each line's whole box, cut into tiles afterwards.
+build dependency (the user's pick), over the whole city once, cut into tiles afterwards.
 
 **Our own compiled mesher, weighed and not taken:** its gain would be fixed border vertices and an exact per-point
 tolerance (no division trick, no second pass). The cut above makes the first unnecessary, the second pass costs
@@ -142,15 +162,7 @@ The greedy mesh of the tile above (129,380 triangles, 64,882 vertices):
 3.4 bytes a triangle after gzip. The difference encoding is decoded into the same typed arrays at load. #307's
 GLB with quantisation is compared on this mesh there; the format is decided after it.
 
-## Questions for the user
-
-1. **`pydelatin` as a new build dependency** (MIT, a wheel, numpy only), on each line's whole box cut into tiles,
-   instead of a compiled mesher of our own (section 1)?
-
-Answered (2026-11-06): the route geometry, cant and profile are all built offline and read by the page as they are
-(section 3); the corridor tolerance is 10 cm.
-
 ## What it changes
 
-Nothing yet: two benches in `tools/bench/`. The build tool and the page's loading follow in #276 once the answers
-are in.
+Nothing yet: the benches in `tools/bench/` (they need `pydelatin` and `pyfqmr`). The build tool and the page's loading
+follow in #276, after #237 (the ground is built on the track it corrects).
