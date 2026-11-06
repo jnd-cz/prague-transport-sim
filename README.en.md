@@ -1,0 +1,203 @@
+# Tatra T3 — Prague trams
+
+**English** · [Česky](README.md) · [For developers](DEVELOPING.md)
+
+Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
+and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
+Technical Map (surveyed streets, the transport layer DI for the track), IPR Praha 3D buildings and
+bridges, lidar terrain, and the PID GTFS timetable.
+
+## Run
+
+```bash
+python tools/serve.py 8742
+```
+
+Open http://localhost:8742. There's no build step: plain ES modules, with Three.js loaded from a CDN.
+
+A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
+
+<!-- help -->
+
+## Gameplay
+
+### Your shift
+
+- Line selection in the menu (each line loads its own world). Stop posts list the day lines serving
+  each stop; trams of those lines run ahead of you.
+- Stops come with real departure times. Where the platform is mapped, the whole set must stand alongside
+  it (so a second tram can stop behind one already at a long platform); otherwise stop at the sign. Open
+  the doors, wait for boarding and depart on time; early departures cost the most. Request stops (✋) can
+  be passed when nobody waits.
+- The tram counts as at the platform when its front is between 20 m before and 12 m past the stop sign;
+  within 3 m of the sign earns a precision bonus.
+- Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
+  morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a packed car boards
+  slowly and a full one leaves people for the next tram.
+- Line changes: a run can change its number at a terminus (line 9 continues as 10 at Nákladové
+  nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
+
+### Keys
+
+| key | what it does |
+|---|---|
+| `W` / `↑` | towards drive (steps J1–J5; advanced: a tap to the next step, held on) |
+| `S` / `↓` | towards brake (B1–B5) |
+| `Space` | emergency and track brakes (held) |
+| `N` or `0` | both pedals released (coast) |
+| `1`–`5` | a drive step; with `Shift` a brake step |
+| `R` | park and unpark the brake pedal (advanced controls) |
+| `A` | sand (held) |
+| `D` | doors |
+| `B` | bell |
+| `Y` | the **Výhybka** button: current through the contact (held) |
+| `C` | heating cut-out (held under a contact, to coast through) |
+| `X` | set a switch with the switch iron (tram stopped) |
+| `H` / `K` / `F` | saloon seat heaters / cab heater / waste-heat flap |
+| `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
+| `Z` | right mirror on and off |
+| `V` | cab or outside view |
+| `O` | autopilot on and off |
+| `M` | sound on and off |
+| `P` / `Esc` | pause |
+| `F9` | report a problem |
+
+The dead-man pedal, when it is on in the menu, is `Shift` held.
+
+### Driving
+
+- **The T3's TR 37 equipment:** two pedals without detents. A drive step (J1–J5) sets a current, which the
+  accelerator holds by stepping through its 99 positions (resistors to 75, field weakening at 80–95); a
+  brake step (B1–B5) sets a brake current; the electric brake fades below ≈6 km/h, where the shoe brakes
+  come in (partly on steps 3–4, fully from step 5 or parked); the end of the brake stroke adds the track
+  brakes. An open door or a brake pedal off zero cuts traction. Right after driving the brake builds
+  slowly, and step 5 then brings the shoes in at speed: coast 2–3 s between them. The dashboard's pedal
+  bar shows the pedal (drive up, brake down, P parked) and the accelerator.
+- **Controls** (menu): *Simple* moves a lever by steps (W/S, 1–5, Shift+1–5) and works the pedals as a
+  driver would, parking whenever the car stands; *Advanced* moves the pedals themselves (a tap to the next
+  step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
+  parking the shoes release fully only with the drive pedal. Space is the emergency stop in both.
+- An empty car accelerates at 0.6–1.8 m/s² by step, a full car more slowly; gravity on gradients (Chotkova
+  ~7 %), curve resistance, rolling back when the brake is released on a hill, lateral comfort in curves.
+- Weather: dry / rain / autumn leaves sets wheel–rail adhesion. Too much power spins the wheels, too much
+  brake locks them (flats). Hold A to sand; the emergency brake sands automatically and its magnetic track
+  brakes don't depend on adhesion.
+- Speeds: each curve allows √(a·R) with 0.8 m/s² unbalanced lateral acceleration, never above the posted
+  speed of the track and 50 km/h in streets / 60 on dedicated track. Curves on dedicated track are banked
+  (up to 100 mm cant, level at stops and near the termini); the tram and the view lean into them.
+- Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered, six
+  doors); line 23 runs a single heritage car. "Set" in the menu overrides it. Each car follows the track
+  on its own bogies.
+
+### Switches
+
+- Every facing switch has an overhead contact (yellow plate, white sign with a black triangle), worked by
+  the pantograph: pass under it drawing current to set the turn, or coasting to go straight — also right
+  after a stop, at a signal or on a hill (judging that is part of the driver's skill).
+- Current also flows with the **Výhybka** button (Y, as on T3SUCS) and — in winter — through the heating,
+  unless you hold the heating cut-out (C) while coasting under the contact.
+- Contacts are ~22 m before the switch but never where a tram stands with its pantograph at a stop or
+  signal. Trailing switches (where tracks join) need nothing; diamond crossings are not switches.
+- The red LED arrow before each switch shows the blade position and blinks while the switch is locked. If
+  you got it wrong, stop and use the switch iron (X).
+
+### Signals
+
+- Prague tram signals (four lamps: three on top, one below): the two outer top lamps = stop; top middle +
+  bottom = go straight; top left/right + bottom = go left/right; a blinking GO aspect means it is ending.
+- The call signal below shows three LED bars (\ | /): the bar of the coming direction lights orange once
+  the tram is detected and blinks just before GO. Distant signals with a yellow "P" plate stand before
+  signals hidden behind curves.
+- Junctions: each signal belongs to a junction controller with a fixed cycle (trams straight in both
+  directions, a turning phase, the cross street) and tram priority; oncoming trams obey it. Cross traffic
+  drives along the real crossing street and stops at its line while the tram has GO.
+- Interlaced track in Letenská (under the building near Malostranské náměstí): both directions share ~65 m
+  of track. Signals at both ends grant the section to one direction at a time, return to STOP behind the
+  entering tram, and hold the other side until the section is clear plus 6 s clearance. Oncoming trams
+  obey it.
+
+### Heating
+
+Heating follows the DPP T3SUCS manual: saloon seat heaters 0/1/2 (H: three seats each side / all seats),
+cab heater (kalorifer) 0–3 (K: off / fan / half / full) and the flap that lets the accelerator resistors'
+waste heat into the saloon (F). The info panel shows the outside, saloon and cab temperatures. Outside
+temperature: Prague now or a fixed winter / autumn / summer day (menu). Cold passengers (< 12 °C) and heat
+you caused cost points; open doors let the heat out; in summer passengers open the windows.
+
+### Looking around
+
+- Hold Q / E (or ← / →) to look out of the left / right window; the right rear-view mirror (Z toggles)
+  shows the side of the set and the doors. It grows with the window and keeps its field of view.
+- **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
+  zoom; a double click brings it back behind the tram.
+
+### Traffic
+
+- Other trams run ahead on the same track (they stop at stops and red signals: keep your distance) and
+  oncoming on the opposite track; each carries a line that really serves that stop and turns off (fades
+  out) after the last stop it shares with your line.
+- Cars drive in the lanes beside the tracks, following the real road geometry and one-way streets, and on
+  the surrounding road network, continuing across junctions. They give way at junctions, keep their
+  distance, queue behind trams on shared track and stop for walkers; trams stop behind cars on their track.
+- Pedestrians walk footways and sidewalks and keep off the tracks. Everything fades in and out.
+- Obstacles: parked cars fouling the track (ring the bell) and pedestrians crossing.
+
+### The city
+
+- Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut into
+  a hillside (Chotkova), Most Legií on a deck with piers.
+- Signs: classic red Prague stop signs, speed limit boards (rychlostník), contact signs, dangerous gradient
+  boards. Zebra crossings are painted where they are mapped (not across the tracks). Signals and signs
+  stand off the road: on catenary poles, hung from span wires beside the contact wire, or at the kerb — not
+  on platforms.
+- Overhead line: span wires anchored on poles at the kerb (between carriageway and sidewalk), on wall
+  rosettes where a building stands close, or a bracket arm where one side has no room; closer spacing on
+  curves. Street trees are kept (pruned) clear of all tracks.
+- Buildings are textured by type (old tenement, panel block, church, industrial hall, glass office). Real
+  3D bridges set the deck height and the clearance under structures (station canopies included).
+
+### Menu options
+
+- Automatic switches (the onboard computer sets every switch by radio instead of the overhead contacts);
+  performance overlay (FPS, frame time, draw calls, triangles, JS heap).
+- Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
+  by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
+  and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
+  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one.
+
+### On a phone or tablet
+
+On-screen buttons, shown on a touch screen by default and switched by 🎮 in the menu (remembered per
+device). They send the keyboard's keys:
+
+- the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
+  and the dead-man button when that option is on;
+- the left column: doors, bell, sand (held), look left / right (held), view, mirror, pause;
+- ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating,
+  autopilot, sound, ⚑ report.
+
+On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
+
+## Autopilot
+
+Tick "Autopilot — just watch the ride" in the menu, or press **O** during a shift. It plans speed from
+limits, stops, signals, obstacles and the tram ahead, picks the force needed on the gradient and lets the
+equipment work the pedals as a careful driver (the advanced model: brakes on step 3+ into stops, parks while
+standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
+slippery rail, and gives a short pulse of power (turn) or coasts (straight) under contacts. Press **V** for
+the outside view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the
+menu; O hands back to the autopilot.
+
+## Language
+
+The interface and this help are in Czech or English (Settings → Language in the menu; remembered in the
+browser).
+
+<!-- /help -->
+
+## Licences
+
+Code: GNU GPL v3 ([LICENSE](LICENSE)). Assets: [ASSETS.md](ASSETS.md) (the detailed T3 model is CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](NOTICE.md).
+
+Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
+terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).
