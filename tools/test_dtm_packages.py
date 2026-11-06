@@ -169,6 +169,33 @@ def gpkg(path, kind, count, z):
 
 
 class Readers(unittest.TestCase):
+    def test_an_area_listed_twice_is_one_area(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tools = root / 'tools'
+            tools.mkdir()
+            for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py','kerbs.py'):
+                shutil.copyfile(Path(__file__).parent / name, tools / name)
+            (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
+                                              '    def sample(self, E, N):\n        return np.full(np.shape(E), 200.0)\n',
+                                              encoding='utf-8')
+            (root / 'data').mkdir()
+            line = {'path': [[0,0],[20,0]], 'terrain': {'data': base64.b64encode(array.array('h',[0]*4)).decode(),
+                    'base':200,'scale':1,'x0':-10,'y0':-10,'dx':40,'dy':40,'nx':2,'ny':2}}
+            (root / 'data/line17.json').write_text(json.dumps(line), encoding='utf-8')
+            for kind in ('OPL','KR'):
+                gpkg(package(root,OLD,kind), kind, 1, 200)
+            pin(root, [(DISTRICT,OLD)])
+            with closing(sqlite3.connect(package(root,OLD,'OPL'))) as db:  # (the same outline again, as a border area is)
+                db.execute('insert into "Dopravni#010000000503_Test" select id+1, shape, UrovenUmisteniObjektuZPS from "Dopravni#010000000503_Test"')
+                db.commit()
+            sources = [str(p) for p in (root / 'raw/dtm').iterdir()]
+            r = subprocess.run([sys.executable,'-P','-E','tools/dtm.py','--line','17',*sources],
+                               cwd=root,capture_output=True,text=True,encoding='utf-8')
+            self.assertEqual(r.returncode,0,r.stderr)
+            self.assertEqual(len(json.loads((root / 'data/line17.dtm.json').read_text(encoding='utf-8'))['areas']),1)
+            self.assertIn('1 copies of an area',r.stdout)
+
     def test_two_months_both_readers_take_only_snapshot_features(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
