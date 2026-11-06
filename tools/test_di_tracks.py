@@ -65,6 +65,10 @@ class Records(unittest.TestCase):
         di = dt.Source('di', [rec(1, [(0, 0), (60, 0.5)]), rec(2, [(0, 0), (60, -0.5)])])
         self.assertEqual(len(di.chains), 2)
 
+    def test_one_record_turning_back_on_itself_is_two(self):
+        di = dt.Source('di', [rec(1, [(0, 60), (0.5, 30), (1, 0), (2, 30), (3, 60)])])
+        self.assertEqual(len(di.chains), 2)
+
     def test_an_older_record_lying_on_newer_ones_is_dropped_but_interlaced_track_stays(self):
         def dated(i, pts, day):
             return rec(i, pts) | {'attrs': {'DatumVkladu': day}}

@@ -34,7 +34,7 @@ TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the tra
                 # lies this far back (the tongues DI draws: Ohrada, Dejvice 8.4-8.5 m, Chotkova 9 m; OSM's switches
                 # at Čechův most lie 8.0 and 8.8 m behind DI's record joints)
 MIN_RECORD = 0.05  # m: shorter source records are dropped
-FOLD_MIN = 0.1     # m: record ends' last segments this long say which way they go (DI joins records with 1 cm scraps)
+FOLD_LOOK = 1.0    # m out of a joint for the way a record leaves it (DI joins records with 1 cm scraps)
 DUPLICATE = 0.2    # m: a record joining the same two places as another, never farther from it, is a copy
 SUPERSEDED = 0.95, 0.09  # share of an older record's length within DUPLICATE of newer records, and their median
                          # distance at most (m), for the older one to be an earlier copy: DI 2026-10-31's re-entries
@@ -47,6 +47,22 @@ FORK_MIN, FORK_OUT, FORK_APART = 3.0, 8.0, 0.3  # m: a fork's branches (records 
 def _unit(v):
     l = math.hypot(*v) or 1.0
     return (v[0] / l, v[1] / l)
+
+
+def _unfolded(xy):
+    """A record's points in pieces, split where it turns back on itself (over FOLD_LOOK either side, more than 90°): one
+    record drawn along both legs of a switch and through its toe (Hloubětín: 66 m out and 66 m back, 176°)."""
+    out, start = [], 0
+    for i in range(1, len(xy) - 1):
+        q0 = next((q for q in xy[i - 1::-1] if math.dist(q, xy[i]) >= FOLD_LOOK), None)
+        q1 = next((q for q in xy[i + 1:] if math.dist(q, xy[i]) >= FOLD_LOOK), None)
+        if q0 is None or q1 is None or i - start < 1:
+            continue
+        if (q0[0] - xy[i][0]) * (q1[0] - xy[i][0]) + (q0[1] - xy[i][1]) * (q1[1] - xy[i][1]) > 0:
+            out.append(xy[start:i + 1])
+            start = i
+    out.append(xy[start:])
+    return out
 
 
 def _latest(recs):
@@ -79,6 +95,7 @@ class Source:
         # (DI has zero-length records and the same piece twice under two IDs, Čechův most: either would make a
         # straight track look like a fork)
         recs = [(p, [tuple(c[:2]) for c in p['coords']]) for p in paths if len(p['coords']) > 1]
+        recs = [(q, piece) for q, xy in recs for piece in _unfolded(xy)]
         recs = [r for r in recs if LineString(r[1]).length >= MIN_RECORD]
         n = len(recs)
         recs = _latest(recs)
@@ -177,10 +194,11 @@ class Source:
                     nxt = recs[nr][1] if nk == 0 else recs[nr][1][::-1]
                     # (two records leaving the same way from one point do not continue each other: a fork whose toe ends
                     # a little apart, Hloubětín: merged, the track went out along one and back along the other)
-                    here = recs[cur][1] if cur_end == 1 else recs[cur][1][::-1]
-                    u = (here[-1][0] - here[-2][0], here[-1][1] - here[-2][1])
-                    v = (nxt[1][0] - nxt[0][0], nxt[1][1] - nxt[0][1])
-                    if u[0] * v[0] + u[1] * v[1] < 0 and min(math.hypot(*u), math.hypot(*v)) > FOLD_MIN:
+                    def out(line):
+                        q = next((q for q in line[1:] if math.dist(q, line[0]) >= FOLD_LOOK), line[-1])
+                        return (q[0] - line[0][0], q[1] - line[0][1])
+                    u, v = out(recs[cur][1][::-1] if cur_end == 1 else recs[cur][1]), out(nxt)
+                    if u[0] * v[0] + u[1] * v[1] > 0:
                         break
                     used.add(nr)
                     if forward:
