@@ -12,7 +12,7 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py",
   "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
-  "operation": "reference: #211 (switch, crossing and stop speeds) and #221 (the T3SUCS traction) are to read it; nothing reads it yet"
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed and small-radius-speed; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it"
  },
  "stops": [
   {

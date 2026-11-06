@@ -1,7 +1,8 @@
 // Gameplay: timetable, stops & passengers, doors, signals, switches, obstacles, scoring.
 import * as THREE from 'three';
-import { ADHESION, PANTO_FROM_FRONT, tramClearance } from './tram.js';
+import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
+import { trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
@@ -114,8 +115,12 @@ export class Game {
     this._initSwitches();
     this._initObstacles();
     this._initAdhesion();
-    // restrictions: switches, and steep descents (Prague limits trams on long steep gradients)
-    const extra = this.switches.map((w) => ({ from: w.s - 4, to: w.s + 14, v: w.routeDiverging ? 15 : 30 }));
+    // restrictions: switches and crossings (D 1/2 § 25.4-5), and steep descents (no source: `gradient-no-speed`, #211)
+    const facts = opts.speedFacts, trackwork = data.trackwork || null;
+    route.speedTop = T3.vMax * 3.6;
+    route.curveFloor = facts.smallRadius;
+    if (data.speed) route.speedInfo = { ...data.speed, osm: withoutOwnPieces(data.speed.osm, data.speed.step, this.switches, trackwork, facts) };
+    const extra = trackworkStretches(this.switches, trackwork, facts);
     for (let s = 0; s < route.length; s += 10) {
       const g = this.profile.grade(s);
       if (g < -0.06) extra.push({ from: s - 10, to: s + 10, v: 25 });

@@ -6,6 +6,8 @@
 // `max-speed` allows without a sign (untagged dedicated track), the km the 60 cap holds back, the curves under 25 m
 // (`small-radius-speed`), and where a facing switch's slow stretch ends: the front's distance past the switch when
 // the whole tram has left the limit.
+import { FROG, trackworkStretches } from '/src/speedRules.js';
+
 const STEP = 5;
 const SMALL_RADIUS = 25;   // m (data/truth.json `small-radius-speed`)
 
@@ -23,17 +25,16 @@ function causes(game) {
   const route = game.route, n = game.limits.values.length, grades = [], curve = [], posted = [];
   for (let i = 0; i < n; i++) {
     const s = i * STEP, info = route._speedInfo(s);
-    posted.push(Math.min(60, info.osm || (info.dedicated ? 60 : 50)));
+    posted.push(info.osm ? Math.min(info.osm, route.speedTop) : 50);
     curve.push(route.curveSpeed(s));
     const g = game.profile.grade(s);
     grades.push(g < -0.06 ? 25 : g < -0.045 ? 35 : 99);
   }
   const switches = new Float32Array(n).fill(99);
-  for (const w of game.switches) {
-    const v = w.routeDiverging ? 15 : 30;
-    for (let s = w.s - 4; s <= w.s + 14; s += STEP) {
+  for (const e of trackworkStretches(game.switches, game.data.trackwork, game.opts.speedFacts)) {
+    for (let s = e.from; s <= e.to; s += STEP) {
       const i = Math.round(s / STEP);
-      if (i >= 0 && i < n) switches[i] = Math.min(switches[i], v);
+      if (i >= 0 && i < n) switches[i] = Math.min(switches[i], e.v);
     }
   }
   return { curve, posted, grades, switches };
@@ -83,14 +84,13 @@ function curvesUnder(game, radius) {
 // when the limit in force first rises above the switch's speed, whatever else holds it (`any`, up to 200 m): the
 // lowest bin under the whole tram, as Game.currentLimit.
 function liftPast(game, w, length, switches) {
-  const lim = game.limits, v = w.routeDiverging ? 15 : 30;
+  const lim = game.limits, v = game.opts.speedFacts.facing;
   let own = null, any = null;
   for (let d = 0; d < 200 && (own === null || any === null); d += 1) {
     let low = 99, ownBin = false;
-    for (let s = w.s + d - length; s <= w.s + d + 0.1; s += STEP) {
+    for (let s = w.s + d - length; s <= w.s + d + 0.1; s += 1) {
       low = Math.min(low, lim.at(s));
-      const i = Math.floor(s / STEP);
-      if (Math.abs(i * STEP - w.s) <= 20 && switches[i] <= v && s >= w.s - 4) ownBin = true;
+      if (s <= w.s + 20 && s >= w.s - 4 && lim.restriction(s) <= v) ownBin = true;
     }
     if (own === null && !ownBin) own = d;
     if (any === null && low > v) any = d;
@@ -132,6 +132,8 @@ export function run(game = window.game) {
         liftPast: { oneCar: median(lifts.map((l) => l.one.own)), twoCars: median(lifts.map((l) => l.two.own)),
                     twoCarsAny: median(lifts.map((l) => l.two.any)) },
         lifts,
+        pastFrog: median(game.switches.map((w, i) => lifts[i].two.own - (w.frog ?? FROG))),
+        trackwork: game.data.trackwork ? { trailing: game.data.trackwork.trailing.length, crossings: game.data.trackwork.crossings.length } : null,
       },
     },
   };

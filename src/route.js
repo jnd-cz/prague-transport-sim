@@ -321,21 +321,26 @@ export class Route {
   // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
   rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
 
-  // speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral
-  // acceleration A_LAT plus what the cant takes, never above the posted OSM speed or the cap
-  // (50 in streets, 60 on dedicated track; the 65-70 km/h pilot stretches are capped for now)
+  // Speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral acceleration A_LAT plus what
+  // the cant takes. With full cant, the speed the track was laid out for (prepareCant): 50 in streets, 60 on dedicated
+  // track, however it is signed. Otherwise the limit: never above the posted speed, which stands for the sign, nor
+  // the car's top speed (`speedTop`), and 50 without a posted speed (`max-speed`: more needs a Rychlostník, also off the
+  // road). No curve alone asks for less than `curveFloor`: 15 km/h over the whole of a curve under 25 m
+  // (`small-radius-speed`), while the formula gave 10 at R 20.
   _designSpeed(s, r, fullCant, cant = 0) {
     const { osm, dedicated } = this._speedInfo(s);
     const a = A_LAT + (fullCant ? (dedicated ? CANT_MAX : 0) : cant) * 9.81 / 1.5;
     const v = Math.floor((Math.sqrt(a * r) * 3.6) / 5) * 5;
-    const cap = Math.min(60, osm || (dedicated ? 60 : 50));
-    return Math.max(10, Math.min(cap, v));
+    if (fullCant) return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), v));
+    const cap = osm ? Math.min(osm, this.speedTop ?? osm) : 50;
+    return Math.min(cap, Math.max(this.curveFloor ?? 10, v));
   }
 
   // speed the curve at s allows (km/h), with the cant actually built there
   curveSpeed(s) { return this._designSpeed(s, this.radiusAt(s), false, this.cantAt(s)); }
 
-  // Speed limits (km/h) sampled every 5 m: curves (curveSpeed) plus extra restrictions.
+  // Speed limits (km/h): curves (curveSpeed) every 5 m, plus extra restrictions to the metre, so that a switch's limit
+  // ends at its frog and not at the next 5 m (#211). `values` is the 5 m table with the restrictions in it (the signs).
   speedLimits(extra = []) {
     const step = 5;
     const n = Math.ceil(this.length / step) + 1;
@@ -348,12 +353,18 @@ export class Route {
       for (let j = Math.max(0, i - 3); j <= Math.min(n - 1, i + 1); j++) v = Math.min(v, lim[j]);
       out[i] = v;
     }
+    const base = out.slice(), metres = Math.ceil(this.length) + 1;
+    const fine = new Float32Array(metres).fill(99);
     for (const e of extra) {
       for (let s = e.from; s <= e.to; s += step) {
         const i = Math.round(s / step);
         if (i >= 0 && i < n) out[i] = Math.min(out[i], e.v);
       }
+      const last = Math.min(metres - 1, Math.floor(e.to));
+      for (let m = Math.max(0, Math.floor(e.from)); m <= last; m++) fine[m] = Math.min(fine[m], e.v);
     }
-    return { step, values: out, at: (s) => out[Math.max(0, Math.min(n - 1, Math.floor(s / step)))] };
+    const restriction = (s) => fine[Math.max(0, Math.min(metres - 1, Math.floor(s)))];
+    return { step, values: out, restriction,
+             at: (s) => Math.min(base[Math.max(0, Math.min(n - 1, Math.floor(s / step)))], restriction(s)) };
   }
 }

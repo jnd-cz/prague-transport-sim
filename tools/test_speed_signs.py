@@ -1,4 +1,4 @@
-"""The speed signs' placement rule and faces (src/speedSigns.js, #211), in headless Chromium:
+"""The speed signs' placement rule and faces (src/speedSigns.js) and the speeds over trackwork (src/speedRules.js, #211), in headless Chromium:
 
     python -P -E tools/test_speed_signs.py
     python -P -E tools/test_speed_signs.py --sheet reports/speed_signs.png   # also a sheet of every face, to compare with D 1/2 p. 45-47, 52-56
@@ -47,6 +47,27 @@ async () => {
     plateSize: signSize({ kind: 'restriction', v: 30 }),
     arrowSize: signSize({ kind: 'restriction', v: 10, arrow: 'left' }),
     backed: signSize({ kind: 'restriction', v: 30, backing: true }),
+  };
+}
+"""
+
+SPEED_RULES = r"""
+async () => {
+  const { speedFacts, trackworkStretches, withoutOwnPieces, FROG } = await import('/src/speedRules.js');
+  const truth = await (await fetch('/data/truth.json')).json();
+  const facts = speedFacts(truth);
+  let missing = null;
+  try { speedFacts({ operation: { facts: [] } }); } catch (e) { missing = String(e.message); }
+  const work = { trailing: [{ s: 200, fromDiverging: true }, { s: 300, fromDiverging: false, frog: 12 }], crossings: [400] };
+  const own = (posted, trackwork) => withoutOwnPieces(posted, 5, [{ s: 100 }], trackwork, facts);
+  const fill = (...parts) => parts.flatMap(([v, n]) => Array(n).fill(v));
+  return {
+    facts, missing, FROG,
+    stretches: trackworkStretches([{ s: 100 }, { s: 150, frog: 13 }], work, facts),
+    noData: trackworkStretches([{ s: 100 }], undefined, facts),
+    ownDropped: own(fill([50, 19], [15, 4], [50, 5]), work),
+    farKept: own(fill([50, 40], [15, 2], [50, 5]), { trailing: [], crossings: [] }),
+    withoutWork: own(fill([50, 19], [15, 4], [50, 5]), null),
   };
 }
 """
@@ -164,6 +185,24 @@ def check(r, p):
     return f
 
 
+def check_rules(r):
+    f = []
+    def want(name, got, expected):
+        if got != expected:
+            f.append(f"{name}: {got} != {expected}")
+    want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15})
+    if "no value" not in (r["missing"] or ""):
+        f.append(f"a missing fact must stop the game: {r['missing']}")
+    want("switches from the blades to the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"], "v": 15}])
+    want("every kind of trackwork", r["stretches"], [
+        {"from": 96, "to": 100 + r["FROG"], "v": 15}, {"from": 146, "to": 163, "v": 15},
+        {"from": 200 - r["FROG"], "to": 204, "v": 15}, {"from": 288, "to": 304, "v": 30}, {"from": 397, "to": 403, "v": 15}])
+    want("OSM's 15 at a switch is the switch's own", r["ownDropped"], [50] * 19 + [0] * 4 + [50] * 5)
+    want("a 15 elsewhere stays", r["farKept"], [50] * 40 + [15] * 2 + [50] * 5)
+    want("without the line's trackwork OSM's 15 stays", r["withoutWork"], [50] * 19 + [15] * 4 + [50] * 5)
+    return f
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sheet")
@@ -181,12 +220,13 @@ def main():
         page.goto(base + "/__signs.html")
         rules = page.evaluate(RULES)
         pixels = page.evaluate(PIXELS)
+        speed_rules = page.evaluate(SPEED_RULES) if os.path.exists(os.path.join(ROOT, "data", "truth.json")) else None
         if a.sheet:
             page.evaluate(SHEET)
             page.screenshot(path=a.sheet, full_page=True)
         browser.close()
     server.shutdown()
-    fails = check(rules, pixels) + [f"page error: {e}" for e in errors]
+    fails = check(rules, pixels) + (check_rules(speed_rules) if speed_rules else []) + [f"page error: {e}" for e in errors]
     if fails:
         print(json.dumps(rules, ensure_ascii=False, indent=0))
         print("FAILED\n  " + "\n  ".join(fails))
