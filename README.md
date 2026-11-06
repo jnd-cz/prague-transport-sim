@@ -25,16 +25,21 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 
 - Linku vyberete v menu (každá linka načítá vlastní svět). Označníky uvádějí denní linky, které na
   zastávce staví; tramvaje těchto linek jedou před vámi.
-- Zastávky mají skutečné časy odjezdů. Kde je nástupiště zmapované, musí celá souprava stát podél něj
-  (aby u dlouhého nástupiště mohla za první tramvají zastavit druhá); jinde zastavte u označníku. Otevřete
-  dveře, počkejte na nástup a odjeďte včas; předčasný odjezd stojí nejvíc bodů. Zastávky na znamení (✋)
-  můžete projet, když nikdo nečeká.
-- Tramvaj je u nástupiště, když je její čelo od 20 m před označníkem do 12 m za ním; do 3 m od označníku
-  získáte bonus za přesnost.
+- Zastávky mají skutečné časy odjezdů. Otevřete dveře, počkejte na nástup a odjeďte včas; předčasný odjezd
+  stojí nejvíc bodů. Zastávky na znamení (✋) můžete projet, když nikdo nečeká.
+- Zastávku obsloužíte, když tramvaj stojí v místě určeném podle čela vozu:
+  - **U nástupiště dlouhého aspoň 15 m,** je-li v datech: celá souprava stojí podél něj, konec soupravy nejvýše
+    3 m před začátkem nástupiště a čelo nejvýše 4 m za jeho koncem. Za první soupravou tak může obsloužit
+    zastávku druhá, na delším nástupišti i dvě soupravy 2×T3 za sebou (asi tři čtvrtiny zastávek). U nástupiště
+    kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním.
+  - **Jinde:** čelo od 20 m před označníkem do 12 m za ním.
+  - **Návěstidlo těsně za zastávkou:** čelo nejvýše 0,5 m před ním.
+- Bod zastavení je označník: do 3 m od něj získáte bonus za přesnost, více než 4 m za ním ztratíte body za
+  přejetí. Zastavení dál vzadu v povoleném místě se netrestá.
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
-  ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; v plném voze trvá nástup
-  déle a z plného vozu lidé zůstanou čekat na další spoj.
-- Změna linky: pořadí může na konečné změnit číslo (linka 9 pokračuje na Nákladovém nádraží Žižkov jako 10):
+  ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; v přeplněném voze trvá nástup
+  déle a při plném vozu zůstanou cestující čekat na další spoj.
+- Změna linky: spoj může na trase linky a na konečné změnit číslo (linka 9 pokračuje na Nákladovém nádraží Žižkov jako 10):
   všichni vystoupí, přepnou se směrové tabule i údaje na obrazovce a tramvaj odjíždí jako 10.
 
 ### Klávesy
@@ -46,17 +51,17 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `Mezerník` | nouzová a kolejnicové brzdy (držet) |
 | `N` nebo `0` | obě šlapky volné (výběh) |
 | `1`–`5` | jízdní stupeň; se `Shift` brzdný |
-| `R` | stanicovat a odstanicovat brzdovou šlapku (pokročilé ovládání) |
+| `R` | zabrzdit a odbrzdit zajišťovací brzdu (pokročilé ovládání) |
 | `A` | pískování (držet) |
 | `D` | dveře |
 | `B` | zvonec |
 | `Y` | tlačítko **Výhybka**: proud přes kontakt (držet) |
 | `C` | odpojení topení (držet pod kontaktem, pro průjezd bez proudu) |
-| `X` | přestavit výhybku stavědlem (stojící vůz) |
+| `X` | přestavit výhybku stavěcí tyčí (stojící vůz) |
 | `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `Z` | pravé zrcátko zapnout a vypnout |
-| `V` | pohled ze stanoviště nebo zvenku |
+| `V` | pohled z kabiny řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
 | `P` / `Esc` | pauza |
@@ -69,14 +74,14 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 - **Výzbroj TR 37 vozu T3:** dvě šlapky bez aretace. Jízdní stupeň (J1–J5) nastaví proud, který zrychlovač
   drží postupem přes svých 99 poloh (odporníky do 75, šuntování při 80–95); brzdný stupeň (B1–B5) nastaví
   brzdný proud; elektrodynamická brzda slábne pod ≈6 km/h, kde nastupují čelisťové brzdy (částečně na
-  stupních 3–4, plně od stupně 5 nebo při stanicování); konec zdvihu brzdové šlapky přidá kolejnicové brzdy.
+  stupních 3–4, plně od stupně 5 nebo se zajišťovací brzdou); konec zdvihu brzdové šlapky přidá kolejnicové brzdy.
   Otevřené dveře nebo brzdová šlapka mimo nulu vypínají trakci. Hned po jízdě se brzda buduje pomalu a stupeň
-  5 pak přivede čelisti za jízdy: mezi jízdou a brzdou 2–3 s vybíhejte. Sloupec šlapek na přístrojové desce
-  ukazuje šlapku (jízda nahoru, brzda dolů, P stanicováno) a zrychlovač.
+  5 pak přivede čelisti za jízdy: mezi jízdou a brzdou vyčkejte 2–3 s kvůli vrácení zrychlovače do základní
+  polohy. Sloupec šlapek na panelu řidiče ukazuje šlapku (jízda nahoru, brzda dolů, P zabrzděno) a zrychlovač.
 - **Ovládání** (menu): *Jednoduché* posouvá páku po stupních (W/S, 1–5, Shift+1–5) a šlapky ovládá jako
-  řidič, stojící vůz samo stanicuje; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
-  20°/s; držené klávesy se zastaví na brzdném stupni 5) a R stanicuje a odstanicuje brzdovou šlapku; po
-  stanicování se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda.
+  řidič, stojící vůz samo zabrzdí; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
+  20°/s; držené klávesy se zastaví na brzdném stupni 5) a R zabrzdí a odbrzdí zajišťovací brzdu; po
+  zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda.
 - Prázdný vůz zrychluje podle stupně 0,6–1,8 m/s², plný pomaleji; gravitace na sklonech (Chotkova ~7 %),
   odpor v obloucích, couvání po uvolnění brzdy v kopci, boční pohodlí v obloucích.
 - Počasí: sucho / déšť / podzimní listí určuje adhezi kola a kolejnice. Příliš velký proud protočí kola,
@@ -91,15 +96,15 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 
 ### Výhybky
 
-- Každá výhybka pojížděná po hrotu má trolejový kontakt (žlutý štítek, bílá tabulka s černým trojúhelníkem),
+- Každá rozjezdová výhybka (pojížděná proti hrotům) má pracovní trolejový kontakt (žlutý štítek, bílá tabulka s černým trojúhelníkem),
   který ovládá sběrač: projeďte pod ním s proudem pro odbočení, nebo bez proudu pro jízdu rovně — i hned za
   zastávkou, u návěstidla nebo do kopce (odhadnout to patří k umění řidiče).
 - Proud teče i při tlačítku **Výhybka** (Y, jako na T3SUCS) a — v zimě — topením, pokud při průjezdu pod
   kontaktem bez proudu nedržíte odpojení topení (C).
 - Kontakty jsou ~22 m před výhybkou, nikdy však tam, kde tramvaj stojí se sběračem u zastávky nebo návěstidla.
-  Výhybky pojížděné proti hrotu (kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
+  Sjezdové výhybky (pojížděné po hrotech, kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
 - Červená LED šipka před každou výhybkou ukazuje postavení jazyků a bliká, když je výhybka uzamčená. Když to
-  nevyjde, zastavte a použijte stavědlo (X).
+  nevyjde, zastavte a použijte stavěcí tyč (X).
 
 ### Návěstidla
 
@@ -118,9 +123,9 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 
 ### Topení
 
-Topení je podle příručky DPP k T3SUCS: sedačky v salónu 0/1/2 (H: tři sedačky na každé straně / všechny),
-kalorifer na stanovišti 0–3 (K: vypnuto / ventilátor / polovina / plný výkon) a klapka, která pouští odpadní
-teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje teplotu venku, v salónu a na stanovišti.
+Topení je podle příručky DPP k T3SUCS: sedačky v salónu 0/1/2 (H: tři sedačky vpravo i vlevo / všechny),
+kalorifer v kabině řidiče 0–3 (K: vypnuto / neohřátý vzduch / polovina topnic / plný výkon) a klapka, která pouští odpadní
+teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje teplotu venku, v salónu a v kabině.
 Venkovní teplota: Praha teď nebo pevný zimní / podzimní / letní den (menu). Prochladlí cestující (< 12 °C)
 a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká; v létě si cestující otevírají okna.
 
@@ -169,19 +174,19 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 Tlačítka na obrazovce, na dotykové obrazovce zobrazená automaticky, přepínaná 🎮 v menu (pamatuje si je
 zařízení). Posílají klávesy klávesnice:
 
-- řada nad přístrojovou deskou: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
+- řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: stanicování (pokročilé ovládání), kontakt výhybky, stavědlo, odpojení topení, topení, autopilot,
+- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí tyč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 
-Na malé obrazovce jsou přístrojová deska a horní lišta menší a mapka je skrytá.
+Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
 
 ## Autopilot
 
 Zaškrtněte v menu „Autopilot — jen se dívat na jízdu“ nebo během směny stiskněte **O**. Plánuje rychlost podle
 omezení, zastávek, návěstidel, překážek a tramvaje před sebou, volí sílu potřebnou na sklonu a nechává výzbroj
-ovládat šlapky jako pečlivý řidič (pokročilý model: do zastávek brzdí od stupně 3, ve stání stanicuje, stupně 1–4
+ovládat šlapky jako pečlivý řidič (pokročilý model: do zastávek brzdí od stupně 3, ve stání zabrzdí zajišťovací brzdou, stupně 1–4
 jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty dá krátký
 impuls proudu (odbočení) nebo jede bez proudu (rovně). Klávesou **V** přepnete na pohled zvenku. Řízení převezme
 kterákoli klávesa kontroléru nebo dveří (W/S/mezerník/N/D/R, 0–5), v ovládání zvoleném v menu; O je předá zpět

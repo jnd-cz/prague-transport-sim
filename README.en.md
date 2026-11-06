@@ -25,16 +25,21 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 
 - Line selection in the menu (each line loads its own world). Stop posts list the day lines serving
   each stop; trams of those lines run ahead of you.
-- Stops come with real departure times. Where the platform is mapped, the whole set must stand alongside
-  it (so a second tram can stop behind one already at a long platform); otherwise stop at the sign. Open
-  the doors, wait for boarding and depart on time; early departures cost the most. Request stops (✋) can
-  be passed when nobody waits.
-- The tram counts as at the platform when its front is between 20 m before and 12 m past the stop sign;
-  within 3 m of the sign earns a precision bonus.
+- Stops come with real departure times. Open the doors, wait for boarding and depart on time; early
+  departures cost the most. Request stops (✋) can be passed when nobody waits.
+- You serve a stop when the tram stands in the place set by its front:
+  - **At a platform at least 15 m long,** where the data has one: the whole set stands alongside it, its rear
+    at most 3 m short of the platform's start and its front at most 4 m past its end. A second set can serve
+    the stop behind the first, on a longer platform even two 2×T3 sets in a row (about three stops in four).
+    At a platform shorter than the set, the front between 8 m before its end and 4 m past it is enough.
+  - **Elsewhere:** the front between 20 m before and 12 m past the stop sign.
+  - **A signal right after the stop:** the front at most 0.5 m before it.
+- The stopping point is the stop sign: within 3 m of it earns a precision bonus, more than 4 m past it costs
+  points for overshooting. Stopping further back in the allowed place costs nothing.
 - Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
   morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a packed car boards
   slowly and a full one leaves people for the next tram.
-- Line changes: a run can change its number at a terminus (line 9 continues as 10 at Nákladové
+- Line changes: a trip can change its number along the line's route and at a terminus (line 9 continues as 10 at Nákladové
   nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
 
 ### Keys
@@ -71,7 +76,8 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   brake step (B1–B5) sets a brake current; the electric brake fades below ≈6 km/h, where the shoe brakes
   come in (partly on steps 3–4, fully from step 5 or parked); the end of the brake stroke adds the track
   brakes. An open door or a brake pedal off zero cuts traction. Right after driving the brake builds
-  slowly, and step 5 then brings the shoes in at speed: coast 2–3 s between them. The dashboard's pedal
+  slowly, and step 5 then brings the shoes in at speed: wait 2–3 s between them, for the accelerator to return
+  to its base position. The dashboard's pedal
   bar shows the pedal (drive up, brake down, P parked) and the accelerator.
 - **Controls** (menu): *Simple* moves a lever by steps (W/S, 1–5, Shift+1–5) and works the pedals as a
   driver would, parking whenever the car stands; *Advanced* moves the pedals themselves (a tap to the next
@@ -119,7 +125,7 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
 ### Heating
 
 Heating follows the DPP T3SUCS manual: saloon seat heaters 0/1/2 (H: three seats each side / all seats),
-cab heater (kalorifer) 0–3 (K: off / fan / half / full) and the flap that lets the accelerator resistors'
+cab heater (kalorifer) 0–3 (K: off / unheated air / half / full) and the flap that lets the accelerator resistors'
 waste heat into the saloon (F). The info panel shows the outside, saloon and cab temperatures. Outside
 temperature: Prague now or a fixed winter / autumn / summer day (menu). Cold passengers (< 12 °C) and heat
 you caused cost points; open doors let the heat out; in summer passengers open the windows.

@@ -44,11 +44,15 @@ export function renderMarkdown(md) {
     if (/^- /.test(l)) {
       const items = [];
       while (i < lines.length && (/^- /.test(lines[i]) || /^\s+\S/.test(lines[i]))) {
-        if (/^- /.test(lines[i])) items.push(lines[i].slice(2));
-        else items[items.length - 1] += ' ' + lines[i].trim();
+        const last = items[items.length - 1], text = lines[i].trim();
+        if (/^- /.test(lines[i])) items.push({ text: text.slice(2), subs: [] });
+        else if (text.startsWith('- ')) last.subs.push(text.slice(2));
+        else if (last.subs.length && /^\s{4}/.test(lines[i])) last.subs[last.subs.length - 1] += ' ' + text;
+        else last.text += ' ' + text;
         i++;
       }
-      out.push(`<ul>${items.map((x) => `<li>${inline(x)}</li>`).join('')}</ul>`);
+      const li = (x) => `<li>${inline(x.text)}${x.subs.length ? `<ul>${x.subs.map((s) => `<li>${inline(s)}</li>`).join('')}</ul>` : ''}</li>`;
+      out.push(`<ul>${items.map(li).join('')}</ul>`);
       continue;
     }
     const para = [];

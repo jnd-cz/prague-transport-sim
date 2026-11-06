@@ -48,7 +48,7 @@ class Help(unittest.TestCase):
         html = page.evaluate("""async () => {
           const { renderMarkdown, helpPart } = await import('/src/help.js');
           return { part: helpPart('out <!-' + '- help -' + '-> in <!-' + '- /help -' + '-> out'), none: helpPart('nothing'),
-            md: renderMarkdown('## A *b*\\n\\ntext **bold** `k*e*y` <script>\\nmore [x](https://e.cz/a) [y](DEV.md#z)\\n\\n- one\\n  two\\n- three\\n\\n| a | b |\\n|---|---|\\n| `c` | d |\\n') };
+            md: renderMarkdown('## A *b*\\n\\ntext **bold** `k*e*y` <script>\\nmore [x](https://e.cz/a) [y](DEV.md#z)\\n\\n- one\\n  two\\n- three\\n\\n- four\\n  - sub\\n    more\\n  - **sub2**\\n\\n| a | b |\\n|---|---|\\n| `c` | d |\\n') };
         }""")
         self.assertEqual((html["part"], html["none"]), ("in", ""))
         md = html["md"]
@@ -56,6 +56,7 @@ class Help(unittest.TestCase):
         self.assertIn("<b>bold</b> <kbd>k*e*y</kbd> &lt;script&gt; more", md)
         self.assertIn('<a href="https://e.cz/a" target="_blank" rel="noopener">x</a> y</p>', md)
         self.assertIn("<ul><li>one two</li><li>three</li></ul>", md)
+        self.assertIn("<li>four<ul><li>sub more</li><li><b>sub2</b></li></ul></li>", md)
         self.assertIn("<th>a</th>", md)
         self.assertIn("<td><kbd>c</kbd></td><td>d</td>", md)
         self.assertNotIn("---", md)
@@ -81,11 +82,12 @@ class Help(unittest.TestCase):
                     page.wait_for_function("w => document.querySelector('#helpBody').textContent.includes(w)", arg=word, timeout=15000)
                     self.assertEqual(page.inner_text("#btnHelpClose"), close)
                     r = page.evaluate("""() => { const b = document.querySelector('#helpPanel .card'), t = document.querySelector('#helpBody');
-                      return { over: b.scrollWidth - b.clientWidth, scrolls: b.scrollHeight > b.clientHeight, rows: t.querySelectorAll('tbody tr').length,
+                      return { over: b.scrollWidth - b.clientWidth, scrolls: b.scrollHeight > b.clientHeight, rows: t.querySelectorAll('tbody tr').length, nested: t.querySelectorAll('li li').length,
                         heads: t.querySelectorAll('h3').length, raw: /<!--|\\*\\*|^##/m.test(t.textContent), run: t.textContent.includes('serve.py') }; }""")
                     self.assertLessEqual(r["over"], 0, f"{name} {lang}: wider than its card")
                     self.assertTrue(r["scrolls"])
                     self.assertEqual(r["rows"], 20)
+                    self.assertEqual(r["nested"], 3)
                     self.assertGreater(r["heads"], 8)
                     self.assertFalse(r["raw"], "Markdown left in the text")
                     self.assertFalse(r["run"], "the developer's part in the help")

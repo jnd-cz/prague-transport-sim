@@ -11,7 +11,7 @@ import {
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
 const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
-// The platform is 30 m long: any front position that puts the 14 m car alongside it counts.
+// Without a platform (_stopZone): any front position this far either side of the sign counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 
@@ -1005,7 +1005,7 @@ export class Game {
     }
   }
 
-  // The driver gets out with the switch iron (stavědlo; C14; the code keeps the name crowbar): walks
+  // The driver gets out with the switch iron (stavěcí tyč; C14; the code keeps the name crowbar): walks
   // from the cab door along the tram's right side to
   // the switch (1.6 m/s), throws it (2 s crouched over the points) and walks back; at least 9 s.
   crowbar() {
