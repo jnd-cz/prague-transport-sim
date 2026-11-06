@@ -262,6 +262,7 @@ def ring(r, level, cls=None):
     return out, missing
 
 
+seen_areas, n_copies = set(), 0  # (an area on a district border is in both districts' packages, #316)
 for package in packages:
     opl = package.opl
     for t in gpkg.layers(opl):
@@ -277,6 +278,11 @@ for package in packages:
                 if not any(in_corridor(q) for q in loc[:: max(1, len(loc) // 50)]) and not any(in_corridor(q) for q in loc):
                     continue
                 level = f.get("UrovenUmisteniObjektuZPS") or 0
+                same = (cls, level, tuple((p[0], p[1]) for p in outer))
+                if same in seen_areas:
+                    n_copies += 1
+                    continue
+                seen_areas.add(same)
                 r0, miss = ring(outer, level, cls)
                 if miss / max(1, len(r0)) > 0.3:
                     dropped += 1
@@ -297,7 +303,7 @@ counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
 print("areas:", dict(sorted(counts.items())))
-print(f"dropped {dropped} areas with >30 % unknown heights")
+print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of an area")
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing")
 print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
 out = {"areas": areas}
