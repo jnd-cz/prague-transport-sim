@@ -1,6 +1,6 @@
 # Street furniture points from Prague's technical map (archived DTMP, state as of 30 June 2024, CC BY,
 # "datový podklad © IPR Praha") along a line: traffic signals, public transport stop signs, poles and
-# masts, street lights, traffic sign carriers, ground covers (docs/history/REMOTE-CHANGES.md §20, §22).
+# masts, street lights, traffic sign carriers, ground covers.
 #   python -P -E tools/dtm_points.py 17             -> data/lineN.dtmpoints.json (from the snapshot's raw answer)
 #   python -P -E tools/dtm_points.py 17 --refresh   (asks the service again: a new raw answer for a new snapshot)
 #   python -P -E tools/dtm_points.py 17 --signs     -> raw/dtmpoints/lineN.signs.json: the stop signs of both
