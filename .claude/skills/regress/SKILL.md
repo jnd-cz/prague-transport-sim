@@ -6,8 +6,11 @@ argument-hint: "[lines, e.g. 9,23] (default: chosen from the diff)"
 
 # Regression check
 
-Compares this branch with main's baseline (`reports/baseline/headless.json`, issue #89) instead of
-rerunning the published data.
+Compares this branch with main's baseline instead of rerunning the published data. Which one, by what
+each run has (`tools/headless.py`, #282): main's at the merge base (committed or published at night); else a
+seedless run is measured at the merge base once, in a pinned worktree in the heavy-job queue, and kept on
+this machine for the next branch on that base (a few minutes a line); a seeded run takes the latest world
+checkpoint's. `--against W1` names a checkpoint.
 
 1. **What changed:** `git diff --name-only origin/main...HEAD` plus uncommitted changes, and
    `git diff origin/main -- data/MANIFEST.json` if data was rebuilt.
@@ -38,6 +41,8 @@ rerunning the published data.
 4. **Read the result:**
    - A stale-baseline warning: main moved since its baseline. Say so, and read the differences as main's
      changes plus the branch's.
+   - A note when a seeded run took a checkpoint (its merge base has no baseline): the differences are the world's
+     changes since it plus the branch's. Say so in the PR.
    - Known failures in AGENTS.md (its table) are not regressions.
    - The table lists, per line and check: counts whose mean left main's seed spread (**worse** /
      better), counts that moved inside it (noise: no reason needed), and per-seed hard failures

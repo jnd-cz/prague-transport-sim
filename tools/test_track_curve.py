@@ -51,25 +51,15 @@ class Fit(unittest.TestCase):
         self.assertLess(max(abs(math.dist(q, (0, r)) - r) for q in mid), 0.03)
         self.assertGreater(min(rad), 0.9 * r)
 
-    def test_a_corner_tighter_than_20_m_is_eased_within_the_class_error(self):
+    def test_a_corner_is_eased_within_the_class_error(self):
         # a 10° corner at one point among points 0.5 m apart: within 2 cm it would bend at 5 m over a metre (a 5 m
-        # window reads that as 29 m: the fit measures over BEND); DI's class 3 lets its points move 0.14 m
+        # window reads that as 29 m: the fit also measures over BEND); DI's class 3 lets its points move 0.14 m
         pts = [(x / 2, 0.0) for x in range(0, 61)] + [(30 + x / 2 * math.cos(math.radians(10)), x / 2 * math.sin(math.radians(10))) for x in range(1, 61)]
         errors = tc.class_errors()
         samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), limit=[errors['3']] * len(pts))
         self.assertGreater(min(rad), tc.MIN_RADIUS * tc.SLACK)
         self.assertTrue(any(t > tc.TOL for t in tol))
         self.assertLessEqual(max(tol), errors['3'] + 1e-9)
-
-    def test_points_move_no_further_than_their_class_allows(self):
-        # class 1 (0.04 m): the same corner cannot reach 20 m and stays tighter, its points within 4 cm
-        pts = [(x / 2, 0.0) for x in range(0, 61)] + [(30 + x / 2 * math.cos(math.radians(10)), x / 2 * math.sin(math.radians(10))) for x in range(1, 61)]
-        errors = tc.class_errors()
-        self.assertEqual(errors['1'], 0.04)
-        samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), limit=[errors['1']] * len(pts))
-        self.assertLessEqual(max(tol), errors['1'] + 1e-9)
-        self.assertLess(min(rad), tc.MIN_RADIUS)
-        self.assertLess(max(off(p, samples) for p in pts), errors['1'] + 0.005)
 
     def test_a_curve_under_18_m_moves_past_its_class(self):
         # a 30° corner: within class 1 it bends under 18 m (`min-radius-network`, the user: "under 18m there

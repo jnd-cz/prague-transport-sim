@@ -61,8 +61,8 @@ SOURCES = {
     "lod2": Source("IPR Praha 3D buildings (LOD2)", "geoportal", f"3D buildings: {IPR}", "fetched 2026-10-21..23", "fetched", "Bpv"),
     "mosty3d": Source("IPR Praha 3D bridges (Mosty 3D)", "geoportal", f"3D bridges: {IPR}",
                       "photogrammetry 2001-2008", "capture", "Bpv"),
-    "walls": Source("IPR Praha retaining walls", "geoportal", f"Retaining walls: {IPR}", "fetched 2026-10-21..23", "fetched"),
-    "trees": Source("IPR Praha tree register and tree rows", "geoportal", f"Trees: {IPR}", "fetched 2026-10-21..23", "fetched"),
+    "walls": Source("IPR Praha retaining walls", "geoportal", f"Retaining walls: {IPR}", "fetched 2026-11-06", "fetched"),
+    "trees": Source("IPR Praha tree register and tree rows", "geoportal", f"Trees: {IPR}", "fetched 2026-11-06", "fetched"),
     "ortho": Source("IPR Praha orthophoto, leaf-off", "ortho", f"Orthophoto: {IPR}", "flight 2026", "capture"),
     # open data
     "osm": Source("OpenStreetMap, Geofabrik extract", "osm", "Map data: © OpenStreetMap contributors (ODbL)", "@osm", "state"),

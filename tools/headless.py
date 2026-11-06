@@ -34,6 +34,13 @@ measured at night (tools/autodeploy.py), not by PRs:
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
 
+What --compare reads (#282): --against NAME that checkpoint's run. Otherwise, per run, main's baseline of the merge
+base, committed or published; where there is none, a seeded run takes the latest world checkpoint's, and a seedless
+run is measured on demand at the merge base in a pinned worktree (--no-measure-base leaves it out) and kept on this
+machine by its key for the next branch on the same base. A checkpoint is stored by
+`--baseline --publish --checkpoint W1`; a name other than W<n> is a test's: stored under that name only, since a
+partial run under the key would stop the nightly measurement of main.
+
 The full run (all lines, all checks, seeds 1-5) takes ~27 min at 4 pages (2026-11-04, #205; ~2 h before).
 
 Seed spread (#156): a change to the tram's timing reshuffles traffic like a new seed (#151 moved walkerHit
@@ -147,8 +154,11 @@ def judge(check, r):
                 bad.append(f"{k} p90 {c[k]['p90']} m from the staged heights")
         if c.get("apartCount"):
             bad.append(f"{c['apartCount']} junctions with two heights")
+        # (a line without them is not a full build: #237 published five so, this check passing)
+        if not c.get("assembled"):
+            bad.append("no assembled heights on this line")
         more = (f"path {c.get('path')}, pathBack {c.get('pathBack')}, junctions {c.get('junctions')}"
-                if c.get("assembled") else "no assembled heights on this line")
+                if c.get("assembled") else "")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):
@@ -536,6 +546,50 @@ def run_one(page, errors, check, seed, timeout, load=0):
     return r, round(time.monotonic() - t0) + load
 
 
+def choose_baseline(base, stored_places, results, main_rev, want, measure=True, store=baseline_store):
+    """What each run compares with, when no checkpoint is named (#282): main's own at the merge base, committed or
+    published; for a seedless run without one, what this machine measured there, or a measurement now; for a seeded
+    run without one, the latest world checkpoint's. Returns (base, places, the runs left on an older baseline)."""
+    jobs = {key_of(*job): job for job in results}
+    missing = lambda b: {j for j in jobs if (b.get(j) or {}).get("measured_on") != want}  # noqa: E731
+    if missing(base):
+        # (main's nightly baseline, measured on exactly the merge base's code and data)
+        nightly, nightly_places = store.fetch(store.key(want))
+        if nightly is not None:
+            print(f"note: comparing with main's published baseline of {main_rev[:7]} (the local one is older)")
+            base, stored_places = nightly, nightly_places or {}
+    base, stored_places = dict(base), dict(stored_places)
+
+    def take(counts, places, only):
+        for j in only & set(counts):
+            base[j] = counts[j]
+            if j in places:
+                stored_places[j] = places[j]
+            else:
+                stored_places.pop(j, None)
+
+    def seedless():
+        return {j for j in missing(base) if jobs[j][1] in SEEDLESS}
+
+    if seedless():
+        take(*store.kept(store.key(want)), seedless())
+    if seedless() and measure:
+        lines, checks = sorted({jobs[j][0] for j in seedless()}), sorted({jobs[j][1] for j in seedless()})
+        counts, places = store.measure_at(main_rev, lines, checks, want)
+        store.keep(store.key(want), counts, places)
+        take(counts, places, seedless())
+    seeded = {j for j in missing(base) if jobs[j][1] not in SEEDLESS}
+    named = store.latest_checkpoint(store.checkpoints()) if seeded else None
+    if named:
+        counts, places = store.fetch_checkpoint(named)
+        seeded &= set(counts or {})
+        take(counts or {}, places or {}, seeded)
+        print(f"note: {len(seeded)} seeded runs compare with checkpoint {named}: main has no baseline at {main_rev[:7]}")
+    else:
+        seeded = set()
+    return base, stored_places, sorted(j for j in missing(base) - seeded if j in base)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="17")
@@ -556,8 +610,22 @@ def main():
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
     ap.add_argument("--compare", action="store_true", help="compare these runs with the baseline (main's published one when the local one is older)")
     ap.add_argument("--publish", action="store_true", help="with --baseline: also publish it to the data store (the nightly run, #157)")
+    ap.add_argument("--checkpoint", help="with --baseline --publish: also store it under this checkpoint's name (W1, #282)")
+    ap.add_argument("--against", help="with --compare: compare with this checkpoint's run instead of main's")
+    ap.add_argument("--no-measure-base", action="store_true",
+                    help="with --compare: do not measure seedless runs at the merge base when it has no baseline")
     a = ap.parse_args()
     a.seeds = a.seeds or (SPREAD_SEEDS if a.baseline or a.compare else "1-3")
+    if a.checkpoint and not (a.baseline and a.publish):
+        ap.error("--checkpoint needs --baseline --publish")
+    if a.against and not a.compare:
+        ap.error("--against needs --compare")
+    if a.checkpoint and not baseline_store.NAME.match(a.checkpoint):
+        ap.error(f"not a checkpoint name: {a.checkpoint}")
+    if a.checkpoint and a.checkpoint in baseline_store.checkpoints():
+        raise SystemExit(f"checkpoint {a.checkpoint} is in the store: python -I tools/baseline_store.py rm-checkpoint {a.checkpoint} first")
+    if a.against and baseline_store.fetch_checkpoint(a.against)[0] is None:  # (before the run, not after it)
+        raise SystemExit(f"no checkpoint {a.against} in the store: python -I tools/baseline_store.py checkpoints")
     if a.timeout <= 0:
         ap.error("--timeout must be positive")
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
@@ -653,14 +721,13 @@ def main():
     if a.compare:
         main_rev = git("merge-base", "HEAD", "origin/main") or git("rev-parse", "main")
         want = trees(main_rev)
-        older = lambda b: {key_of(*job) for job in results if (b.get(key_of(*job)) or {}).get("measured_on") not in (None, want)}
-        if older(base):
-            # (main's nightly baseline, measured on exactly the merge base's code and data)
-            nightly, nightly_places = baseline_store.fetch(baseline_store.key(want))
-            if nightly is not None:
-                print(f"note: comparing with main's published baseline of {main_rev[:7]} (the local one is older)")
-                base, stored_places = nightly, nightly_places or {}
-        stale = sorted(older(base))
+        if a.against:
+            base, stored_places = baseline_store.fetch_checkpoint(a.against)
+            stored_places = stored_places or {}
+            print(f"note: comparing with checkpoint {a.against} (measured at {sorted({v.get('commit') for v in base.values()})})")
+            stale = []
+        else:
+            base, stored_places, stale = choose_baseline(base, stored_places, results, main_rev, want, not a.no_measure_base)
         if stale:
             print(f"\nWARNING: the baseline of {', '.join(stale)} was not measured on main ({main_rev[:7]}): "
                   "run --baseline on main first, or read the differences as main's changes plus yours")
@@ -691,8 +758,13 @@ def main():
         if a.publish:
             t = trees(rev)
             mine = {k: v for k, v in base.items() if v.get("measured_on") == t}
-            baseline_store.publish(baseline_store.key(t), mine, {k: v for k, v in stored.items() if k in mine})
-            print(f"published as baselines/{baseline_store.key(t)}.json ({len(mine)} runs of {rev[:7]})")
+            where = {k: v for k, v in stored.items() if k in mine}
+            if not a.checkpoint or baseline_store.WORLD.match(a.checkpoint):
+                baseline_store.publish(baseline_store.key(t), mine, where)
+                print(f"published as baselines/{baseline_store.key(t)}.json ({len(mine)} runs of {rev[:7]})")
+            if a.checkpoint:
+                baseline_store.publish_checkpoint(a.checkpoint, baseline_store.key(t), mine, where, rev[:7])
+                print(f"published as checkpoint {a.checkpoint} ({len(mine)} runs of {rev[:7]})")
     sys.exit(1 if failed else 0)
 
 

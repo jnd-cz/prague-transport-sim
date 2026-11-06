@@ -7,6 +7,14 @@ checks, the data manifest and the user's facts in data/truth.json, which the gam
 hashed: `baselines/<key>.json` and `<key>.places.json` in the store. A
 branch looks up the key of its merge base, so it gets main's numbers for exactly that code and data.
 
+A world checkpoint's run is also stored under its name (`baselines/checkpoint-W1.json`, listed in
+`baselines/checkpoints.json`, #282). What a seedless compare measures on demand at a merge base stays in this
+machine's folder by the key (`measure_at`, `kept`, `keep`), not in the store: the key's name there means main's
+full nightly run, and autodeploy would skip measuring it.
+
+    python -I tools/baseline_store.py checkpoints        # the checkpoints in the store
+    python -I tools/baseline_store.py rm-checkpoint NAME # remove one (a test's, or one to measure again)
+
 Heavy jobs (headless.py, rebuild.py, frametime.py) queue for the machine with a ticket in the system temp
 folder and run one at a time (`HeavyJob`, #280); the nightly measurement does not start while any job
 waits or runs.
@@ -15,6 +23,8 @@ import ctypes
 import hashlib
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -59,12 +69,12 @@ def _tmp():
     return tempfile.mkdtemp(prefix=".baseline-", dir=ROOT)
 
 
-def publish(k, base, places):
-    """Upload one baseline (counts and places) under its key; a temporary name, then rename."""
+def _put(files):
+    """Upload {name: object} to baselines/; a temporary name, then rename."""
     st, d = _store(), _tmp()
     try:
         cmds = [f'-mkdir "{st.dir}/baselines"']
-        for name, obj in ((f"{k}.json", base), (f"{k}.places.json", places)):
+        for name, obj in files.items():
             p = os.path.join(d, name)
             with open(p, "w", encoding="utf-8") as f:
                 json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
@@ -78,8 +88,13 @@ def publish(k, base, places):
         os.rmdir(d)
 
 
+def publish(k, base, places):
+    """Upload one baseline (counts and places) under its key."""
+    _put({f"{k}.json": base, f"{k}.places.json": places})
+
+
 def fetch(k):
-    """(counts, places) of the published baseline with this key, or (None, None)."""
+    """(counts, places) of the published baseline with this key or name, or (None, None)."""
     st, d = _store(), _tmp()
     try:
         names = (f"{k}.json", f"{k}.places.json")
@@ -98,6 +113,99 @@ def fetch(k):
 
 def published(k):
     return fetch(k)[0] is not None
+
+
+WORLD = re.compile(r"W(\d+)$")  # (a world checkpoint; any other name is a test's and is never the latest)
+NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def checkpoints():
+    """{name: {key, commit, time}} of the checkpoints in the store."""
+    return fetch("checkpoints")[0] or {}
+
+
+def latest_checkpoint(index):
+    """The highest world checkpoint's name in an index, or None."""
+    return max((n for n in index if WORLD.match(n)), key=lambda n: int(WORLD.match(n)[1]), default=None)
+
+
+def publish_checkpoint(name, k, base, places, commit):
+    """Store a run under the checkpoint's name and list it; `k` is the run's key."""
+    if not NAME.match(name):
+        raise ValueError(f"not a checkpoint name: {name!r}")
+    index = checkpoints()
+    index[name] = {"key": k, "commit": commit, "time": time.strftime("%Y-%m-%d %H:%M")}
+    _put({f"checkpoint-{name}.json": base, f"checkpoint-{name}.places.json": places, "checkpoints.json": index})
+
+
+def fetch_checkpoint(name):
+    return fetch(f"checkpoint-{name}")
+
+
+def remove_checkpoint(name):
+    index = checkpoints()
+    index.pop(name, None)
+    st = _store()
+    st.run([f'-rm "{st.dir}/baselines/checkpoint-{name}.json"', f'-rm "{st.dir}/baselines/checkpoint-{name}.places.json"'], check=False)
+    _put({"checkpoints.json": index})
+
+
+def _kept_dir():
+    cache = os.environ.get("TRAMDATA_CACHE")
+    return os.path.join(cache, "baselines") if cache else os.path.join(tempfile.gettempdir(), "tram-baselines")
+
+
+def kept(k):
+    """(counts, places) this machine measured on demand under this key ({}, {} when none)."""
+    try:
+        with open(os.path.join(_kept_dir(), f"{k}.json"), encoding="utf-8") as f:
+            o = json.load(f)
+        return o["counts"], o["places"]
+    except (OSError, ValueError, KeyError):
+        return {}, {}
+
+
+def keep(k, counts, places):
+    """Add runs measured on demand to this machine's folder, for the next branch on the same base."""
+    have, where = kept(k)
+    have, where = {**have, **counts}, {**where, **places}
+    d = _kept_dir()
+    os.makedirs(d, exist_ok=True)
+    tmp = os.path.join(d, f"{k}.{os.getpid()}.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"counts": have, "places": where}, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(tmp, os.path.join(d, f"{k}.json"))
+
+
+def measure_at(rev, lines, checks, want, run=subprocess.run, out=None):
+    """Main's seedless runs at a commit: a pinned worktree with that commit's code and data, its own
+    headless.py (which takes its turn in the heavy-job queue), removed afterwards. Returns (counts, places)
+    of the runs measured on exactly `want`, the commit's trees."""
+    out = out or sys.stderr
+    wt = tempfile.mkdtemp(prefix=f"{os.path.basename(ROOT)}-base-{rev[:7]}-", dir=os.path.dirname(ROOT))
+    os.rmdir(wt)  # (git worktree add wants to create it)
+    py = sys.executable
+    try:
+        print(f"measuring {','.join(checks)} of lines {','.join(lines)} at {rev[:7]} in {wt}", file=out, flush=True)
+        run(["git", "worktree", "add", "-q", "--detach", wt, rev], cwd=ROOT, check=True)
+        run([py, "-I", "tools/snapshot.py", "data-fetch"], cwd=wt, check=True)
+        # (exit 1 only says a check is over its threshold: the counts are stored all the same)
+        run([py, "-P", "-E", "tools/headless.py", "--lines", ",".join(lines), "--checks", ",".join(checks),
+             "--baseline", "--port", "0"], cwd=wt)
+        counts, places = {}, {}
+        for name, to in (("headless.json", counts), ("headless-places.json", places)):
+            p = os.path.join(wt, "reports", "baseline", name)
+            if os.path.exists(p):
+                with open(p, encoding="utf-8") as f:
+                    to.update(json.load(f))
+        wanted = {f"line{line}-{c}" for line in lines for c in checks}
+        counts = {j: v for j, v in counts.items() if j in wanted and v.get("measured_on") == want}
+        return counts, {j: v for j, v in places.items() if j in counts}
+    finally:
+        if run(["git", "worktree", "remove", "--force", wt], cwd=ROOT, capture_output=True).returncode:
+            print(f"note: {wt} was not removed", file=out)
+        shutil.rmtree(wt, ignore_errors=True)
+        run(["git", "worktree", "prune"], cwd=ROOT, capture_output=True)
 
 
 def alive(pid):
@@ -143,7 +251,14 @@ class HeavyJob:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
                        "since": time.time()}, f)
-        os.replace(tmp, self.path)
+        for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the ticket;
+            try:                                # measured 2026-11-06: a check run died at its turn, #282)
+                os.replace(tmp, self.path)
+                return
+            except PermissionError:
+                if not wait:
+                    raise
+                time.sleep(wait)
 
     def ahead(self):
         """The jobs this one waits for: every ticket before it, and any job running now."""
@@ -224,3 +339,16 @@ def busy():
     """The other heavy jobs on this machine now, waiting or running, as 'what root' (the nightly
     measurement does not start while there are any)."""
     return [f"{j['what']} {j['root']}" for j in queue() if j["pid"] != os.getpid()]
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1:] or ["checkpoints"]
+    if cmd[0] == "checkpoints":
+        idx = checkpoints()
+        for n, v in sorted(idx.items()):
+            print(f"{n}: {v['commit']} {v['time']} {v['key'][:12]}")
+        print(f"latest: {latest_checkpoint(idx)}")
+    elif cmd[0] == "rm-checkpoint" and len(cmd) == 2:
+        remove_checkpoint(cmd[1])
+    else:
+        raise SystemExit(__doc__)

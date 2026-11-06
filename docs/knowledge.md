@@ -142,6 +142,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   the old where both had them (median 0, p90 2 cm): DI heights now reach 63-71 % of each line's path (were
   25-47 %). The old records at Podolské nábřeží run on through the new Dvorecký most junction, where the re-entries
   end at its switches. `di_tracks._latest` drops an older record lying on newer ones (1,057 city-wide).
+- **DI's scatter and joints** (#237): a curve through DI's points within 2 cm reads a 25 m radius over 2 m from scatter
+  alone, so a radius is read over 5 m and only a kink over 2 m. Record ends meeting at a fork lie up to 0.5 m apart
+  (their mean up to 12 cm off the straight track), some record joints step sideways by up to 26 cm (Čechův most's
+  approach, 50.0934 N 14.4168 E), and two records may leave one point the same way, or a whole record copy the track
+  it lies on (Kobylisy, Ďáblice, Hloubětín). The rules: [the decision](decisions/2026-11-05-track-network-from-di.md).
 - **Interlaced track after a switch** (#204; `data/truth.json` `trackGeometry` `interlaced-switch`): at Čechův
   most, Ke Stírce, Ohrada–Krejcárek, Biskupcova–Ohrada and 15 more places DI draws the branch 9-17 cm (mostly
   12-13 cm) beside the track for 11-87 m from the switch's tip before the tracks part, either from a tongue it
