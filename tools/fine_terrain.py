@@ -1,4 +1,4 @@
-"""Fine terrain along a line (PLAN B3): bare-earth lidar on a 2 m lattice near the tracks.
+"""Fine terrain along a line: bare-earth lidar on a 2 m lattice near the tracks.
 
 The game's terrain is a 10 m grid over the whole line (build_line.py), too coarse for the ground
 beside the tracks (jagged slopes, walls, tunnel mouths). This samples the terrain chain (tools/sources.py,
