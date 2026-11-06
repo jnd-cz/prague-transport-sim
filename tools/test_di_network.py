@@ -364,6 +364,9 @@ class Chords(unittest.TestCase):
         self.assertEqual(dn.chords(sampled(arc(6, 10.0, 0.5))), [])  # (1.1 cm: the fit bends through it anyway)
         self.assertEqual(len(dn.chords(sampled(arc(6, 10.0, 2.0)))), 4)  # (4.4 cm)
 
+    def test_a_chord_of_a_very_wide_curve_stays(self):
+        self.assertEqual(dn.chords(sampled(arc(5, 36.0, 0.5))), [])  # (3.9 cm, but 4100 m: a straight with small corners)
+
     def test_a_real_straight_has_no_chords(self):
         self.assertEqual(dn.chords(sampled([(0, 0), (100, 0), (300, 0)])), [])
 

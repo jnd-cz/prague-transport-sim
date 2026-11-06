@@ -1291,6 +1291,8 @@ CHORD_CORNER = 0.3  # degrees: a smaller turn at a point of DI's line is no corn
 CHORD_LENGTH = (3.0, 40.0)  # m: a stretch between two corners turning the same way, this long, is a chord of a curve
 CHORD_END = 1.5     # m from a line's ends, where its end points were moved to their nodes: no corners read there
 CHORD_SAG = 0.02    # m: under this the arc lies within the curve fit's tolerance of its chord (track_curve.TOL): it can bend anyway
+CHORD_RADIUS = 1500.0  # m: wider is a straight with small corners, no curve: freed, one on line 17 (s 17624, 2372 m) took the
+                       # tracks from an even 3.0 m to 2.86 m apart; the curves drawn in chords are 250-500 m
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
 EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
@@ -1319,8 +1321,8 @@ def dense(coords, step=DENSE):
 
 def chords(coords):
     """The stretches of a line that are chords of a curve, as (first index, last index): straight between two corners that turn
-    the same way, with the arc through them over CHORD_SAG from the chord. A corner at only one end is a real straight meeting a
-    curve; over CHORD_LENGTH it is a straight."""
+    the same way, with the arc through them over CHORD_SAG from the chord and its radius under CHORD_RADIUS. A corner at only one
+    end is a real straight meeting a curve; over CHORD_LENGTH it is a straight."""
     if len(coords) < 3:
         return []
     cum = [0.0]
@@ -1335,9 +1337,10 @@ def chords(coords):
         d = math.degrees(math.atan2(math.sin(v - u), math.cos(v - u)))
         if abs(d) >= CHORD_CORNER:
             corners.append((i, d))
-    sag = lambda l, s, t: l * math.radians((abs(s) + abs(t)) / 2) / 8  # (l^2 / 8R, the radius l over the corners' mean)
+    bend = lambda s, t: math.radians((abs(s) + abs(t)) / 2)  # (the radius is the chord over the corners' mean; the sag l^2 / 8R)
     return [(i, j) for (i, s), (j, t) in zip(corners, corners[1:])
-            if s * t > 0 and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1] and sag(cum[j] - cum[i], s, t) >= CHORD_SAG]
+            if s * t > 0 and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1]
+            and (cum[j] - cum[i]) * bend(s, t) / 8 >= CHORD_SAG and cum[j] - cum[i] <= CHORD_RADIUS * bend(s, t)]
 
 
 def without_chords(coords):
