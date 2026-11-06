@@ -65,5 +65,14 @@ class Markdown(unittest.TestCase):
         self.assertEqual(__import__("json").loads(block)["sizes"]["src"], {"src/a.js": 35})
 
 
+class Branches(unittest.TestCase):
+    def test_only_branches_on_the_remote_whose_pr_is_finished(self):
+        ls = "aaa\trefs/heads/main\nbbb\trefs/heads/20-di-lines\nccc\trefs/heads/202-open\n"
+        self.assertEqual(H.finished_on_remote(ls, {"20-di-lines", "gone-from-the-remote"}), ["20-di-lines"])
+
+    def test_no_answer_from_the_remote_is_none(self):
+        self.assertEqual(H.finished_on_remote(None, {"x"}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

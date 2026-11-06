@@ -139,8 +139,7 @@ The harness verifies its own server before launching a job. An occupied `--port`
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
 uses an already-running server.
 
-Regression checks compare with main's baseline in `reports/baseline/headless.json`: the key counts of
-each run, with the code and data they were measured on.
+Regression checks compare with main's baseline in the data store: the key counts of each run, with the code and data they were measured on. `--baseline` also keeps a local copy in `reports/baseline/`, ignored by git.
 
 ```bash
 python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare

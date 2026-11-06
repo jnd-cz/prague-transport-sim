@@ -25,8 +25,8 @@ at once, each in a worker process with its own browser (default: half the cores,
 memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded, so the counts are the same as
 one after another.
 
-Baseline (#89): `--baseline` stores each run's key counts in reports/baseline/headless.json (committed),
-with what they were measured on (the git trees of the game, the in-page checks, the data manifest and
+Baseline (#89): `--baseline` stores each run's key counts in reports/baseline/headless.json (this machine's,
+ignored by git; --publish puts them in the data store), with what they were measured on (the git trees of the game, the in-page checks, the data manifest and
 data/truth.json: MEASURED; the data files must match the manifest and those paths be committed). `--compare`
 prints baseline -> now per run as a table for the PR (reports/headless/compare.md) and warns when the
 baseline was not measured on the code, data and facts of main (the merge base). Main's baseline is
@@ -547,7 +547,7 @@ def run_one(page, errors, check, seed, timeout, load=0):
 
 
 def choose_baseline(base, stored_places, results, main_rev, want, measure=True, store=baseline_store):
-    """What each run compares with, when no checkpoint is named (#282): main's own at the merge base, committed or
+    """What each run compares with, when no checkpoint is named (#282): main's own at the merge base, this machine's or
     published; for a seedless run without one, what this machine measured there, or a measurement now; for a seeded
     run without one, the latest world checkpoint's. Returns (base, places, the runs left on an older baseline)."""
     jobs = {key_of(*job): job for job in results}
@@ -753,8 +753,7 @@ def main():
         with open(PLACES, "w", encoding="utf-8") as f:  # (one run per line: diffs stay readable)
             rows = (f"{json.dumps(k)}: {json.dumps(v, separators=(',', ':'))}" for k, v in sorted(stored.items()))
             f.write("{\n" + ",\n".join(rows) + "\n}\n")
-        print(f"baseline: {len(results)} runs stored in {os.path.relpath(BASELINE, ROOT)}"
-              + ("" if a.publish else " (commit it)"))
+        print(f"baseline: {len(results)} runs stored in {os.path.relpath(BASELINE, ROOT)}")
         if a.publish:
             t = trees(rev)
             mine = {k: v for k, v in base.items() if v.get("measured_on") == t}

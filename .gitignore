@@ -12,8 +12,10 @@ Thumbs.db
 # deploy package (tools/make_dist.py)
 dist/
 
-# lint reports (tools/lint.js); the baseline in reports/baseline/ is committed
+# lint reports (tools/lint.js)
 reports/*.json
+# (--baseline's local copy: main's baselines and the checkpoints live in the data store, #346)
+reports/baseline/
 
 # tools/snapshot.py download scratch
 .snap-*/

@@ -122,8 +122,6 @@ def nightly(log, st, now=None):
     print(f"{stamp} nightly baseline of {git('rev-parse', '--short', 'HEAD')} ({k[:12]})", file=log)
     code = run(log, python(), "-P", "-E", "tools/headless.py", "--lines", LINES, "--checks", CHECKS,
                "--baseline", "--publish", "--jobs", "2", "--port", "0")
-    # (the deploy checkout stays as checked out: the files --baseline wrote are only published)
-    run(log, "git", "checkout", "-q", "--", "reports/baseline")
     if baseline_store.published(k):
         st["baseline"] = k
         return 0
