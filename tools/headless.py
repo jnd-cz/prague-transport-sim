@@ -154,8 +154,11 @@ def judge(check, r):
                 bad.append(f"{k} p90 {c[k]['p90']} m from the staged heights")
         if c.get("apartCount"):
             bad.append(f"{c['apartCount']} junctions with two heights")
+        # (a line without them is not a full build: #237 published five so, this check passing)
+        if not c.get("assembled"):
+            bad.append("no assembled heights on this line")
         more = (f"path {c.get('path')}, pathBack {c.get('pathBack')}, junctions {c.get('junctions')}"
-                if c.get("assembled") else "no assembled heights on this line")
+                if c.get("assembled") else "")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):
