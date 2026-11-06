@@ -5,7 +5,7 @@ Usage: python -P -E tools/test_t3h.py [--line 17] [--synthetic]
 Part 1 (no world data needed; the asset is in git): the model loads; the saloon, the lighter level and the
 draw calls; a set on a straight and on a 20 m curve: the second car hangs on the stiff coupling link (cars
 15.04 m apart), the couplers turn about their pins, the bogies (6.4 m apart) turn to the track; the
-track-brake shoes hang 12 mm over the rail and drop by bogie; the doors, the collector at the wire, the
+track-brake shoes hang 12 mm over the rail and drop by bogie; the couplers' heads meet on a wave in the track; the doors, the collector at the wire, the
 cards. Part 2 (with data/line<N>.json): the game draws our tram with it, credits it, and its doors follow
 the game's; with the classic model picked in the menu it loads that one.
 """
@@ -65,6 +65,22 @@ SYNTHETIC = r"""async () => {
   m.updateMatrixWorld(true);
   out.curve = { pitch: along(a) - along(b), link: link(0), rear: deg(a.userData.rig.couplers[1].rotation.y), front: deg(b.userData.rig.couplers[0].rotation.y),
     bogies: a.userData.rig.bogies.map((g) => deg(g.node.rotation.y)) };
+  // a grade, then a wave of 30 m (the cars on opposite curves): the two bars' tips, the coupling plane on the link
+  const tips = () => {
+    m.updateMatrixWorld(true);
+    const [r, f] = [a.userData.rig.couplers[1], b.userData.rig.couplers[0]];
+    return { gap: r.localToWorld(new THREE.Vector3(-1.27, 0, 0)).distanceTo(f.localToWorld(new THREE.Vector3(1.27, 0, 0))), rear: deg(r.rotation.z), front: deg(f.rotation.z) };
+  };
+  models.placeConsist(m, 100, (s) => [s, 0, 0.06 * s, 0]);
+  out.grade = tips();
+  out.wave = { gap: 0, tilt: 0 };
+  for (let s = 100; s < 130; s += 1.5) {
+    models.placeConsist(m, s, (q) => [q, 0, 0.05 * Math.sin(2 * Math.PI * q / 30), 0]);
+    const t = tips();
+    out.wave.gap = Math.max(out.wave.gap, t.gap);
+    out.wave.tilt = Math.max(out.wave.tilt, Math.abs(t.rear));
+  }
+  models.placeConsist(m, 60, (s) => [R * Math.sin(s / R), R * (1 - Math.cos(s / R)), 0, 0]);
   // the doors and the collector
   const leaf = a.userData.rig.full.getObjectByName('Door_Front_Left_Outer');
   const q0 = leaf.quaternion.clone();
@@ -150,6 +166,9 @@ def main():
                 f"R 20: the second car {pitch:.3f} m along the track (1 mm)": abs(cv["pitch"] - pitch) < 1e-3,
                 f"R 20: each coupler {angle:.1f} degrees to its car, the two alike": abs(abs(cv["rear"]) - angle) < 0.05 and abs(abs(cv["front"]) - angle) < 0.05,
                 "R 20: the bogies turn to the track": all(abs(abs(x) - bogie) < 0.01 for x in cv["bogies"]) and cv["bogies"][0] * cv["bogies"][1] < 0,
+                "a grade: the couplers in line with their cars": abs(s["grade"]["rear"]) < 0.01 and abs(s["grade"]["front"]) < 0.01,
+                f"a wave: the heads meet (gap {s['wave']['gap'] * 1000:.1f} mm)": s["wave"]["gap"] < 0.005,
+                f"a wave: the couplers tilt ({s['wave']['tilt']:.2f} degrees)": s["wave"]["tilt"] > 0.2,
                 "the shoes hang 12 mm over the rail": abs(s["shoeGap"] - 0.012) < 0.002,
                 "the shoes on the rail with the magnets on": abs(s["shoeGapOn"]) < 0.002,
                 "the rear bogie's shoes first": s["track1"] == [[-0.012, -0.012], [0, 0]] or s["track1"] == [[0, 0], [-0.012, -0.012]],
