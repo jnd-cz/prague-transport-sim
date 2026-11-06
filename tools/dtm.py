@@ -296,8 +296,8 @@ for package in packages:
 
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
-kerb_structures = []
-try:  # (OSM's tunnels, bridges and other layers from the snapshot's extract)
+kerb_structures, kerb_low = [], []
+try:  # (OSM's tunnels, bridges and other layers, and its lowered kerbs, from the snapshot's extract)
     import osm_local
     import numpy as np
     from shapely.geometry import LineString
@@ -316,6 +316,8 @@ try:  # (OSM's tunnels, bridges and other layers from the snapshot's extract)
         for w in osm_local.ways(_structure, bbox=F.bbox(pts, 100)):
             if len(w["geometry"]) > 1:
                 kerb_structures.append(LineString(np.column_stack(F.xy([g["lat"] for g in w["geometry"]], [g["lon"] for g in w["geometry"]]))))
+        low = osm_local.nodes(lambda t: t.get("kerb") in kerbs.LOW_KERB)
+        kerb_low = [(float(x), float(y), n["tags"]["kerb"]) for n, x, y in zip(low, *F.xy([n["lat"] for n in low], [n["lon"] for n in low]))]
 except ImportError:
     pass
 if not kerb_structures:
@@ -323,9 +325,10 @@ if not kerb_structures:
 _truth = os.path.join(ROOT, "data", "truth.json")
 kerb_facts = json.load(open(_truth, encoding="utf-8")).get("kerbFacts", {}).get("places", []) if os.path.exists(_truth) else []
 kerb_report = kerbs.apply(areas, lambda x, y: _ipr.sample(x + F.E0, y + F.N0),
-                          kerbs.surroundings(areas, kerbs.lines(wall_lines), kerb_structures), kerb_facts)
+                          kerbs.surroundings(areas, kerbs.lines(wall_lines), kerb_structures), kerb_facts, kerb_low)
 print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSteps']}",
-      f"{len(kerb_report['review'])} areas where the terrain disagrees;",
+      f"{len(kerb_report['review'])} areas where the terrain disagrees",
+      f"({sum('osmKerb' in e for e in kerb_report['review'])} with an OSM lowered or flush kerb);",
       "not kerbs:", {k: len(v) for k, v in kerb_report["notKerb"].items()})
 
 counts = defaultdict(int)

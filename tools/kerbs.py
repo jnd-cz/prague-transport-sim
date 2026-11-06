@@ -24,9 +24,13 @@ what it disagrees with leaves the list, counted by why (`notKerb`):
   wall: a survey wall or terrain edge along the kerb;
   terrain: off by more than AGREE with neither (greenery, terrain older than the street).
 A place the user said is a real ramp stays on the list (data/truth.json kerbFacts).
+
+OSM's lowered and flush kerbs are only named on a listed area's card (`osmKerb`): they change no height and no list.
+Listed areas have such a node no more often than kerbs in general (docs/knowledge.md); heights from them are #303.
 """
 import math
 import statistics
+from collections import Counter
 
 import shapely
 from shapely.geometry import LineString, Point, Polygon
@@ -46,6 +50,8 @@ AGREE = 0.40
 # off-level area, or a wall or terrain edge. Measured on the 19 answers (#142): the 10 other-level cases have 0.57-1.00
 # of their points within them, the terrain-only cases none
 NEAR_OSM, NEAR_AREA, NEAR_WALL, SHARE = 8.0, 5.0, 3.0, 0.3
+LOW_KERB = ("lowered", "flush")  # OSM's kerb=* values a review card names
+NEAR_LOW = 3.0  # m: such a node this near the area's kerb edges
 
 
 def _rings(a):
@@ -105,10 +111,12 @@ def surroundings(areas, walls=(), structures=()):
     return why
 
 
-def apply(areas, terrain, why=None, facts=()):
+def apply(areas, terrain, why=None, facts=(), low_kerbs=()):
     """Kerbs into the ground-level areas, in place. terrain(x, y): IPR height in the city frame (NaN
     outside). why: surroundings(...). facts: the user's places (x, y, kind) that stay on the review list.
+    low_kerbs: OSM's lowered and flush kerb nodes (x, y, value), named on the list's items.
     Returns the report for the provenance checks."""
+    low_tree = shapely.STRtree(shapely.points([k[:2] for k in low_kerbs])) if len(low_kerbs) else None
     carr = {}
     for a in areas:
         if a["l"] == 0 and a["c"] in CARR:
@@ -194,6 +202,13 @@ def apply(areas, terrain, why=None, facts=()):
                 if key in seen:  # (the same area from two districts' packages)
                     continue
                 seen.add(key)
+                if low_tree is not None:
+                    edges = lines([[r[i][:2], r[(i + 1) % len(r)][:2]] for r, s in zip(rings, shared)
+                                   for i in range(len(r)) if s[i] and s[(i + 1) % len(r)]])
+                    hits = low_tree.query(edges, predicate="dwithin", distance=NEAR_LOW)[1]
+                    tagged = Counter(low_kerbs[i][2] for i in set(hits.tolist()))
+                    if tagged:
+                        item["osmKerb"] = dict(sorted(tagged.items()))
                 fact = next((f for f in facts if poly.buffer(0.5).contains(Point(f["x"], f["y"]))), None)
                 pts = [p[:2] for r, s in zip(rings, shared) for i, p in enumerate(r) if s[i]]
                 reason = None if fact else (why(pts) if why else None) or ("terrain" if abs(res) > AGREE else None)

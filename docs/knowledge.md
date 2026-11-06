@@ -199,6 +199,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   (road −0.005 / +0.006 m, sidewalk +0.095 / +0.109 m on lines 17 / 22); along line 17's platforms the
   **top** (+0.17 m over the road). The sidewalks' far edges lie +0.100 m over the foot: sidewalks are
   nearly flat across (a 2 % crossfall would leave 2–3 cm kerbs).
+- **OSM's lowered kerbs show in the terrain at about half a kerb** (IPR 1 m into the raised area minus 1 m into the
+  road, medians on lines 17 / 22): `kerb=lowered` +5.9 / +6.3 cm, `flush` +6.1 / +5.8 cm, `raised` +11.1 / +11.8 cm,
+  no lowered or flush node within 10 m +11.4 / +11.0 cm. A `kerb=*` node lies within 1.5 m of only 33 % / 48 % of the
+  crossing ends on a survey kerb, so a rule that lowers only tagged kerbs leaves most raised (#303). The kerb review
+  list is not enriched in them (16 % / 33 % of listed areas, 18 % / 36 % of all kerbed areas), so its cards name them
+  and they change no list (#142).
 - **Street surfaces from the survey**: smoothing fits through the outline vertices (on straight kerbs only
   the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
   is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street

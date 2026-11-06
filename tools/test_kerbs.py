@@ -57,6 +57,26 @@ class Lists(unittest.TestCase):
         self.assertEqual(len(r["review"]), 1)
 
 
+class OsmNote(unittest.TestCase):
+    def report(self, nodes):
+        return kerbs.apply(list(street()), terrain(0.30, 0.0), low_kerbs=nodes)
+
+    def test_nodes_along_the_kerb_are_named(self):
+        r = self.report([(20.0, 1.0, "lowered"), (10.0, -2.9, "lowered"), (30.0, 0.0, "flush")])
+        self.assertEqual(r["review"][0]["osmKerb"], {"flush": 1, "lowered": 2})
+
+    def test_a_node_further_off_is_not(self):
+        self.assertNotIn("osmKerb", self.report([(20.0, 3.5, "lowered")])["review"][0])
+
+    def test_it_changes_no_height_and_no_list(self):
+        plain, tagged = list(street()), list(street())
+        a = kerbs.apply(plain, terrain(0.30, 0.0))
+        b = kerbs.apply(tagged, terrain(0.30, 0.0), low_kerbs=[(20.0, 0.0, "lowered")])
+        self.assertEqual(plain, tagged)
+        del b["review"][0]["osmKerb"]
+        self.assertEqual(a, b)
+
+
 class Decision(unittest.TestCase):
     def side(self, inside, road):
         road_a, walk = street()
