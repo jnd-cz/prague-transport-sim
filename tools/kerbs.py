@@ -15,10 +15,20 @@ island, platform) that shares vertices with a carriageway:
     from a top line. Kerb faces are drawn only on the edges shared with the carriageway ("k").
 The terrain is only a decision and a check, never a surface point: areas where it disagrees with the
 result by more than CHECK over a kerb of CHECK_LEN or more are listed for review.
+
+The terrain is the wrong reference in most of what that finds: in the user's review of line 17's 19 largest (#136,
+#142) 18 were not the kerb's fault. So it decides a side only where it lies within AGREE of the line on one side, and
+what it disagrees with leaves the list, counted by why (`notKerb`):
+  level: an OSM tunnel, bridge or other layer, or a survey area off level 0, along the kerb (the terrain is an
+    underpass floor or an embankment under a bridge);
+  wall: a survey wall or terrain edge along the kerb;
+  terrain: off by more than AGREE with neither (greenery, terrain older than the street).
+A place the user said is a real ramp stays on the list (data/truth.json kerbFacts).
 """
 import math
 import statistics
 
+import shapely
 from shapely.geometry import LineString, Point, Polygon
 from shapely.strtree import STRtree
 
@@ -28,6 +38,14 @@ CHECK, CHECK_LEN = 0.05, 10.0  # m: terrain disagreeing by more than this, along
 CARR = {"road", "tram", "parking"}
 RAISED = {"sidewalk", "island", "platform"}
 SIDE = 1.0  # m: where the terrain is read on either side of the kerb line
+# m: the terrain agrees with a kerb line within this (a platform's largest step, PLATFORM). On the user's
+# 19 answers (#142) the five cases where the terrain was the wrong reference and nothing stands near are off by
+# 0.61-1.42 m
+AGREE = 0.40
+# along a kerb: at least SHARE of its points within these of a structure (OSM's lines are centre lines) or an
+# off-level area, or a wall or terrain edge. Measured on the 19 answers (#142): the 10 other-level cases have 0.57-1.00
+# of their points within them, the terrain-only cases none
+NEAR_OSM, NEAR_AREA, NEAR_WALL, SHARE = 8.0, 5.0, 3.0, 0.3
 
 
 def _rings(a):
@@ -60,9 +78,37 @@ def _sides(a, poly, ring, i, terrain):
     return zi - p[2], zo - p[2]
 
 
-def apply(areas, terrain):
+def _share_near(tree, points, reach):
+    if tree is None:
+        return 0.0
+    near = tree.query(points, predicate="dwithin", distance=reach)[0]
+    return len(set(near.tolist())) / len(points)
+
+
+def lines(coords):
+    """shapely lines of point lists, without the degenerate ones."""
+    out = [LineString(c) for c in coords if len({(p[0], p[1]) for p in c}) > 1]
+    return out
+
+
+def surroundings(areas, walls=(), structures=()):
+    """why(points): 'level', 'wall' or None for a kerb's points (x, y). walls and structures: shapely lines."""
+    off = [Polygon([p[:2] for p in a["r"]]) for a in areas if a["l"] != 0 and len(a["r"]) > 2]
+    off = [g if g.is_valid else g.buffer(0) for g in off]
+    trees = [shapely.STRtree(list(g)) if len(g) else None for g in (structures, off, walls)]
+
+    def why(points):
+        pts = shapely.points(points)
+        if _share_near(trees[0], pts, NEAR_OSM) >= SHARE or _share_near(trees[1], pts, NEAR_AREA) >= SHARE:
+            return "level"
+        return "wall" if _share_near(trees[2], pts, NEAR_WALL) >= SHARE else None
+    return why
+
+
+def apply(areas, terrain, why=None, facts=()):
     """Kerbs into the ground-level areas, in place. terrain(x, y): IPR height in the city frame (NaN
-    outside). Returns the report for the provenance checks."""
+    outside). why: surroundings(...). facts: the user's places (x, y, kind) that stay on the review list.
+    Returns the report for the provenance checks."""
     carr = {}
     for a in areas:
         if a["l"] == 0 and a["c"] in CARR:
@@ -71,7 +117,8 @@ def apply(areas, terrain):
                     if p[2] is not None:
                         carr.setdefault((p[0], p[1]), []).append(p)
     lowered = set()  # carriageway vertices already moved down to a kerb's foot
-    count, steps, review = {}, [], []
+    count, steps, review, seen = {}, [], [], set()
+    notkerb = {"level": [], "wall": [], "terrain": []}
     info = []  # per raised area along a carriageway: rings, shared flags, polygon, rises, sides
     for a in areas:
         if a["l"] != 0 or a["c"] not in RAISED:
@@ -109,8 +156,10 @@ def apply(areas, terrain):
         # which side the line belongs to (the terrain first: it reads both sides of the same line. The
         # far edge decided 109 of line 22's 380 sidewalks the other way, 78 of them with the terrain
         # +0.11 m over the line: a far edge often meets a lawn, a parking area or a wall's foot)
-        if len(sides) >= 3:
-            foot, basis = abs(statistics.median(b for _, b in sides)) <= abs(statistics.median(i for i, _ in sides)), "terrain"
+        inside = statistics.median(i for i, _ in sides) if sides else None
+        road = statistics.median(b for _, b in sides) if sides else None
+        if len(sides) >= 3 and min(abs(inside), abs(road)) <= AGREE:
+            foot, basis = abs(road) <= abs(inside), "terrain"
         elif a["c"] != "platform" and len(rises) >= 3:
             foot, basis = statistics.median(rises) >= KERB / 2, "survey"
         else:
@@ -139,7 +188,17 @@ def apply(areas, terrain):
                          for i in range(len(r)) if s[i] and s[(i + 1) % len(r)])
             if abs(res) > CHECK and length >= CHECK_LEN:
                 c = poly.representative_point()
-                review.append({"c": a["c"], "x": round(c.x, 1), "y": round(c.y, 1), "kerb": round(length),
-                               "terrainOff": round(res, 2), "line": "foot" if foot else "top", "basis": basis})
+                item = {"c": a["c"], "x": round(c.x, 1), "y": round(c.y, 1), "kerb": round(length),
+                        "terrainOff": round(res, 2), "line": "foot" if foot else "top", "basis": basis}
+                key = (a["c"], item["x"], item["y"])
+                if key in seen:  # (the same area from two districts' packages)
+                    continue
+                seen.add(key)
+                fact = next((f for f in facts if poly.buffer(0.5).contains(Point(f["x"], f["y"]))), None)
+                pts = [p[:2] for r, s in zip(rings, shared) for i, p in enumerate(r) if s[i]]
+                reason = None if fact else (why(pts) if why else None) or ("terrain" if abs(res) > AGREE else None)
+                if fact:
+                    item["fact"] = fact["kind"]
+                (notkerb[reason] if reason else review).append(item)
     return {"kerb": KERB, "areas": {"/".join(k): v for k, v in sorted(count.items())},
-            "platformSteps": sorted(steps), "review": review}
+            "platformSteps": sorted(steps), "review": review, "notKerb": notkerb}
