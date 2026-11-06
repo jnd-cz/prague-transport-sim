@@ -173,7 +173,9 @@ records what the stopped run had fetched.
 **Other checkouts after such a snapshot:** `snapshot.py fetch` adds the new month but leaves the older
 one in `raw/dtm/`, which `status` then lists as new input files (`data-publish` refuses on them). Remove
 the older month's entries, e.g. `raw/dtm/*_20260930_ZPS_*` after `2026-11-05b`: they are links to the
-machine cache, and the store and the older snapshots keep the files.
+machine cache, and the store and the older snapshots keep the files. Any other source a snapshot replaced stays
+the same way: after `2026-11-06b`, `raw/geoportal/line*/` (the answers now lie in `raw/geoportal/cells/`) and the
+previous country extract in `raw/osm/` (599 files in a worktree from before it, all in older snapshots byte for byte).
 
 For example (PowerShell; the same two requests work with `curl`), stage the latest advertised Praha 2
 GPKG and matching JVF header reference **outside raw/** before deciding whether to replace pinned

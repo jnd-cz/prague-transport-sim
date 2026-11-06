@@ -8,7 +8,7 @@
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py",
   "trackGeometry": "tools/track_profile.py; the radii are still copied in tools/track_curve.py and tools/lint.js (#224)",
-  "trackStyleKinds": "src/heights.js",
+  "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py",
   "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
@@ -2228,6 +2228,18 @@
      {"number": "813L1", "place": "Spojovací v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
      {"number": "813L2", "place": "Spojovací v obratišti", "control": "radio", "blades": "spring, lockable", "contact": "never fitted", "lines": ["37"], "linesBy": "place name (check against the track)", "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"}
     ]
+   }
+  ]
+ },
+ "kerbFacts": {
+  "note": "Places on the kerb review list the user judged a real ramp or incline: they stay on the list whatever stands near them (tools/kerbs.py). The other answers of that review are rules in the tool (#142).",
+  "places": [
+   {
+    "x": -1015.1,
+    "y": -3871.4,
+    "kind": "ramp",
+    "said": "looks like normal ramp or incline on terrain",
+    "where": "the user's kerb review of line 17 (#136), quoted in #142"
    }
   ]
  },
