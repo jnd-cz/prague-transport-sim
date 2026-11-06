@@ -241,6 +241,7 @@ class Network:
         self._stubs()
         self._crossing_gaps(self.archive)
         self._contract()
+        self._folded_stubs()
         self._sections()
         self._sections_into_junctions()
         self._twice()
@@ -299,6 +300,40 @@ class Network:
                 if not self.at[n]:
                     self.nodes[n]['kind'] = 'gone'
             self.report['stubs dropped'] += 1
+
+    def _folded_stubs(self):
+        """Two ends at a node, both leaving the same way, one of them under STUB and on to a node where tracks meet: the
+        short one is the through track running on past the fork, the other a branch that ended there. The fork is at the
+        far node; left apart nobody passes the branch's node and the track it joins is lost to it (50.1324 N 14.4526 E,
+        line 17: 2.5 m, found by tools/bench/track_topology.py)."""
+        cos = math.cos(math.radians(TURN))
+        for n in list(self.at):
+            ends = self.at[n]
+            if len(ends) != 2:
+                continue
+            u, v = self.out_dir(*ends[0]), self.out_dir(*ends[1])
+            if u[0] * v[0] + u[1] * v[1] < cos:
+                continue
+            (s, send), (o, oend) = sorted(ends, key=lambda x: self.edges[x[0]]['line'].length)
+            short = self.edges[s]['line'].length
+            far = self.edges[s]['b'] if send == 0 else self.edges[s]['a']
+            if s == o or short >= STUB or far == n or len(self.at[far]) < 3:
+                continue
+            ed = self.edges[o]
+            if ed['line'].length <= short:
+                continue
+            c = list(ed['line'].coords)
+            c = c if oend == 0 else c[::-1]
+            l = LineString(c)
+            kept = [q for q in c if l.project(Point(q)) > short]
+            c = [self.nodes[far]['xy']] + kept
+            ed['line'] = LineString(c if oend == 0 else c[::-1])
+            ed['a' if oend == 0 else 'b'] = far
+            self.remove_edge(s)
+            self.at[n].remove((o, oend))
+            self.at[far].append((o, oend))
+            self.nodes[n]['kind'] = 'gone'
+            self.report['folded stubs'] += 1
 
     def _contract(self):
         """Nodes where tracks meet, joined by an edge under SHORT, are one node: a junction DI draws in pieces

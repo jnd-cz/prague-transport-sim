@@ -268,6 +268,16 @@ class Drawing(unittest.TestCase):
         self.assertEqual(spans[short[0]], (0.0, net.edges[short[0]]['line'].length))
         self.assertIn(short[0], flags)
 
+    def test_a_branch_ending_past_the_fork_reaches_the_track_it_joins(self):
+        # 50.1324 N 14.4526 E: the through track runs 2.5 m past where the track from the east joins it, a branch ends there
+        net = net_of([(-100, 0), (0, 0)], [(-2.5, 0.05), (100, 1)], [(0, 0.1), (-20, 0.3), (-60, 5)])
+        self.assertEqual(net.report['folded stubs'], 1)
+        east = next(e for e, ed in net.edges.items() if max(c[0] for c in ed['line'].coords) > 50)
+        branch = next(e for e, ed in net.edges.items() if max(c[1] for c in ed['line'].coords) > 4)
+        n = net.edges[east]['a']
+        self.assertIn(branch, [f for f, _ in net.passes[(east, 0)]], n)
+        self.assertEqual(len(net.at[n]), 3)
+
     def test_a_drawn_track_does_not_end_in_the_air(self):
         # Ohrada: the ways run on the through track and past the gap, not on the branch between them: it is drawn too
         net = net_of([(0, 0), (300, 0)], [(100, 0), (110, 1), (130, 10)], [(133, 13), (150, 30), (170, 50)])
