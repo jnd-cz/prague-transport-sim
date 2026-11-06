@@ -251,7 +251,14 @@ class HeavyJob:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
                        "since": time.time()}, f)
-        os.replace(tmp, self.path)
+        for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the ticket;
+            try:                                # measured 2026-11-06: a check run died at its turn, #282)
+                os.replace(tmp, self.path)
+                return
+            except PermissionError:
+                if not wait:
+                    raise
+                time.sleep(wait)
 
     def ahead(self):
         """The jobs this one waits for: every ticket before it, and any job running now."""
