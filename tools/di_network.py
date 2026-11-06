@@ -1293,6 +1293,9 @@ CHORD_END = 1.5     # m from a line's ends, where its end points were moved to t
 CHORD_SAG = 0.02    # m: under this the arc lies within the curve fit's tolerance of its chord (track_curve.TOL): it can bend anyway
 CHORD_RADIUS = 1500.0  # m: wider is a straight with small corners, no curve: freed, one on line 17 (s 17624, 2372 m) took the
                        # tracks from an even 3.0 m to 2.86 m apart; the curves drawn in chords are 250-500 m
+CHORD_ALIKE = 3.0   # the larger corner over the smaller: a curve drawn in chords turns about alike at each vertex (4.0 and 4.0, 5.0
+                    # and 5.0 degrees at Ohrada - Palmovka); a large corner beside a small one is a straight meeting a bend
+                    # (lines 22 and 23 at Malostranské náměstí: freed, the tracks went from an even 3.75 m to 3.52 m apart)
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
 EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
@@ -1321,8 +1324,8 @@ def dense(coords, step=DENSE):
 
 def chords(coords):
     """The stretches of a line that are chords of a curve, as (first index, last index): straight between two corners that turn
-    the same way, with the arc through them over CHORD_SAG from the chord and its radius under CHORD_RADIUS. A corner at only one
-    end is a real straight meeting a curve; over CHORD_LENGTH it is a straight."""
+    about alike and the same way, with the arc through them over CHORD_SAG from the chord and its radius under CHORD_RADIUS. A
+    corner at only one end is a real straight meeting a curve; over CHORD_LENGTH it is a straight."""
     if len(coords) < 3:
         return []
     cum = [0.0]
@@ -1339,7 +1342,7 @@ def chords(coords):
             corners.append((i, d))
     bend = lambda s, t: math.radians((abs(s) + abs(t)) / 2)  # (the radius is the chord over the corners' mean; the sag l^2 / 8R)
     return [(i, j) for (i, s), (j, t) in zip(corners, corners[1:])
-            if s * t > 0 and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1]
+            if s * t > 0 and max(abs(s), abs(t)) <= CHORD_ALIKE * min(abs(s), abs(t)) and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1]
             and (cum[j] - cum[i]) * bend(s, t) / 8 >= CHORD_SAG and cum[j] - cum[i] <= CHORD_RADIUS * bend(s, t)]
 
 

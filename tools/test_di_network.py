@@ -367,6 +367,14 @@ class Chords(unittest.TestCase):
     def test_a_chord_of_a_very_wide_curve_stays(self):
         self.assertEqual(dn.chords(sampled(arc(5, 36.0, 0.5))), [])  # (3.9 cm, but 4100 m: a straight with small corners)
 
+    def test_a_large_corner_beside_a_small_one_is_no_chord(self):
+        pts = arc(1, 20.0, 6.0)
+        h = math.radians(6.0)
+        pts.append((pts[-1][0] + 20 * math.cos(h), pts[-1][1] + 20 * math.sin(h)))
+        h += math.radians(0.5)
+        pts.append((pts[-1][0] + 20 * math.cos(h), pts[-1][1] + 20 * math.sin(h)))
+        self.assertEqual(dn.chords(sampled(pts)), [])
+
     def test_a_real_straight_has_no_chords(self):
         self.assertEqual(dn.chords(sampled([(0, 0), (100, 0), (300, 0)])), [])
 
