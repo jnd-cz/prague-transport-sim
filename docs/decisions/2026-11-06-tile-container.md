@@ -93,3 +93,17 @@ Decoding the densest tile's 2,918 takes under 0.5 ms in all three. GLB's are flo
 - What the page works out per building on load: the class, wall uv and colour, lifting, sinking. Baked into the tile, they will add to the sizes, in either format; how much is for #30 to measure.
 - Walls (9 on line 17, kept as outlines) and the furniture drawn from the line's data, whose placements have the same shape as the trees'.
 - Sizes are per line, so a building on two lines counts twice.
+
+## The frame and the lattice
+
+**The frame stays [one city frame and its tile grid](2026-10-29-city-frame-and-tiles.md):** a fixed origin at the Marian column, vertices relative to their tile, the simulation in city coordinates (the user, 2026-11-06: "I agree that fixed origin and tile local geometry is fine for our purpose"). The 1,024 m tiles above are a size to measure on, not that record's 500 m grid; #30 decides the tile size.
+
+**The ground is stored in 1 cm on every axis, not 1 mm.** Once the survey is cut into it, x and y need the survey's lattice too, not the 1 m of the bench above. Buildings keep the 5 cm they have.
+
+- **The sources hold nothing finer:** the survey's coordinates are whole centimetres (all of 2.2 M plan values and 323 k heights in three districts' packages), with stated accuracy of 0.14 m in plan and 0.12-0.35 m in height ([knowledge](../knowledge.md)). IPR's raster has more digits, but it is resampled and states no accuracy.
+- **What 1 mm costs:** +5.5 % after brotli, 347 to 366 kB on one ground tile of 85,596 triangles.
+- **Rounding moves a vertex by at most 5 mm, and every copy of it the same way,** so surfaces that share a vertex still meet exactly.
+
+**Rails may be the exception, not measured:** independent rounding of ±5 mm could show as a wiggle a few metres from the cab, where a pixel is about 3 mm, and could change the gauge by up to 1 cm. If rail meshes go into tiles, they need their own lattice or section; the header holds the lattice, so the format allows it. The simulation's track stays in doubles either way.
+
+i32 has room for either: at 1 mm the tile origin reaches ±2,147 km.
