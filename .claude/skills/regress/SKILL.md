@@ -7,7 +7,7 @@ argument-hint: "[lines, e.g. 9,23] (default: chosen from the diff)"
 # Regression check
 
 Compares this branch with main's baseline instead of rerunning the published data. Which one, by what
-each run has (`tools/headless.py`, #282): main's at the merge base (committed or published at night); else a
+each run has (`tools/headless.py`, #282): main's at the merge base (published at night, or this machine's own); else a
 seedless run is measured at the merge base once, in a pinned worktree in the heavy-job queue, and kept on
 this machine for the next branch on that base (a few minutes a line); a seeded run takes the latest world
 checkpoint's. `--against W1` names a checkpoint.

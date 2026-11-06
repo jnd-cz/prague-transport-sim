@@ -204,8 +204,8 @@ both post on the pinned #291 and only propose.
   as does every move of the seedless checks (lint, surfaces) and every mean outside the spread. The table
   also lists places new and gone (#157). Main's baseline is measured at night by the deploy PC after a
   merge that changes the game, the checks, the data or `data/truth.json` (`tools/autodeploy.py`, 2 pages at
-  once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base
-  when the committed `reports/baseline/headless.json` is older. A PR does not refresh the baseline.
+  once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base. A PR does not
+  refresh the baseline.
 - **Which baseline each tier compares with** (#282): a checkpoint's run stores itself under its name
   (`--baseline --publish --checkpoint W1`: every check, seeds 1-5). Seedless checks (the world and drawn-geometry tiers)
   compare with main at the merge base: its baseline, else measured there once in a pinned worktree through the

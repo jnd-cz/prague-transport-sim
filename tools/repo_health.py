@@ -128,6 +128,13 @@ def ci_times():
     return {"runs": len(secs), "median_s": round(secs[len(secs) // 2]) if secs else None, "max_s": round(max(secs)) if secs else None, "failed": fails}
 
 
+def finished_on_remote(ls_remote, finished):
+    """The branches `git ls-remote --heads` lists whose PR is finished. Asked of the remote: a tracking ref outlives its
+    branch until a fetch prunes it (58 such were reported on 2026-11-06, with one branch really there, #346)."""
+    heads = [w[len("refs/heads/"):] for w in (ls_remote or "").split() if w.startswith("refs/heads/")]
+    return sorted(b for b in heads if b in finished)
+
+
 def collect(root=ROOT, now=None):
     now = now or time.time()
     today = datetime.date.fromtimestamp(now)
@@ -157,9 +164,8 @@ def collect(root=ROOT, now=None):
     # leftovers: worktrees of finished work, remote branches whose PR is merged or closed
     gone_wt = [os.path.basename(r["worktree"]) for r in rs if r["worktree"] and {"gone", "missing"} & set(r["flags"])]
     stale_wt = [os.path.basename(r["worktree"]) for r in rs if r["worktree"] and "stale" in r["flags"] and not {"gone", "missing"} & set(r["flags"])]
-    remote = (board.git("branch", "-r", "--format=%(refname:short)", cwd=root) or "").split()
     finished = {p["headRefName"] for p in prs_all or [] if p.get("state") in ("MERGED", "CLOSED")} - {p["headRefName"] for p in prs_open or []}
-    leftover_branches = sorted(b[len("origin/"):] for b in remote if b.startswith("origin/") and b[len("origin/"):] in finished)
+    leftover_branches = finished_on_remote(board.git("ls-remote", "--heads", "origin", cwd=root), finished)
     with open(os.path.join(root, "AGENTS.md"), encoding="utf-8") as f:
         kf = known_failures(f.read())
     kf_closed = [(row, n) for row, n in kf if n not in by_n]
