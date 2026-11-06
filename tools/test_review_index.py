@@ -29,11 +29,16 @@ INDEX = {"built": "2026-11-05 15:00", "commit": "abc1234", "repo": "jnd-cz/pragu
                    "issueInfo": {"title": "Done long ago", "state": "CLOSED"}, "waitsForInfo": {"title": "Done long ago", "state": "CLOSED"},
                    "lines": ["9"], "findings": 1, "unknown": []},
                   {"file": "reports/review/test-gone.json", "title": "Gone", "issue": None, "waitsFor": None, "issueInfo": None,
-                   "waitsForInfo": None, "lines": [], "findings": 2, "unknown": ["issue", "lines"]}],
+                   "waitsForInfo": None, "lines": [], "findings": 2, "unknown": ["issue", "lines"]},
+                  # (#334: no file of its own, counted from the ids)
+                  {"file": "data/line17.dtm.json", "title": "Kerb review list", "issue": 142, "waitsFor": 142,
+                   "issueInfo": {"title": "Kerbs", "state": "OPEN"}, "waitsForInfo": {"title": "Kerbs", "state": "OPEN"},
+                   "lines": ["17"], "findings": 2, "unknown": [], "ids": ["kerbs|sidewalk foot|1.0,2.0", "kerbs|island top|3.0,4.0"]}],
          "questions": [{"pr": 270, "title": "Wheel spin and sand", "url": "https://github.com/jnd-cz/prague-transport-sim/pull/270",
                         "draft": True, "sections": [{"title": "Questions for the user", "items": ["**Autumn costs time:** `3-5 min`"]}]}]}
 # answers as review mode stores them (src/reviewFindings.js fid: file|kind|x,y), in the line each set was opened with
-STORES = {"line17": {"items": {"file|stop|1.0,2.0": {"v": "right", "t": 1}, "file|stop|3.0,4.0": {"v": "unsure", "note": "hm", "t": 2}}},
+STORES = {"line17": {"items": {"file|stop|1.0,2.0": {"v": "right", "t": 1}, "file|stop|3.0,4.0": {"v": "unsure", "note": "hm", "t": 2},
+                               "kerbs|sidewalk foot|1.0,2.0": {"v": "matches reality", "t": 1}}},
           "line9": {"items": {"file|z|7.0,8.0": {"v": "ok", "t": 1}}}}
 
 
@@ -78,7 +83,7 @@ def main():
             errors = []
             page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
             fulfil(page, {"reports/review/index.json": INDEX, "reports/review/test-a.json": A, "reports/review/test-b.json": B,
-                          "reports/review/test-old.json": OLD, "_only": True}, STORES)
+                          "reports/review/test-old.json": OLD, "data/line17.dtm.json": {"findings": []}, "_only": True}, STORES)
             page.goto(url)
             page.wait_for_function("() => window.reviewIndex", timeout=30000)
             sets = page.evaluate("() => window.reviewIndex.sets.map((s) => [s.file.split('/').pop(), s.c || null, s.error || null])")
@@ -90,13 +95,16 @@ def main():
             check(f"{w}: a missing set shows its error", c["test-gone.json"][1] == "HTTP 404")
             waiting = page.inner_html("#waiting")
             check(f"{w}: A's link opens line 17 with only the unanswered", 'href="index.html?line=17&amp;review=reports%2Freview%2Ftest-a.json&amp;todo"' in waiting)
+            check(f"{w}: the kerb list counted from its ids, not its survey file",
+                  c["line17.dtm.json"][0] == {"total": 2, "answered": 1, "unsure": 0, "noted": 0, "waiting": 1})
+            check(f"{w}: its link opens line 17's review mode with only the unanswered", 'href="index.html?line=17&amp;review&amp;todo"' in waiting)
             check(f"{w}: A under its issue, with its title and state", "#258</a> Stop point at the stop sign" in waiting and ">open<" in waiting)
             check(f"{w}: an unknown issue and lines are said", "No issue known" in waiting and "unknown: issue, lines" in waiting)
             answered = page.inner_html("#answered")
             check(f"{w}: B among the answered, its closed issue marked", "test-b.json" in answered and "CLOSED" in answered and "test-b.json" not in waiting)
             q = page.inner_html("#questions")
             check(f"{w}: the PR's question without its Markdown", "PR #270" in q and "Autumn costs time: 3-5 min" in q and "**" not in q)
-            check(f"{w}: the status sums the waiting, not the out of date", "1 finding waiting in 2 of 4 sets" in page.inner_text("#status"))
+            check(f"{w}: the status sums the waiting, not the out of date", "2 findings waiting in 3 of 5 sets" in page.inner_text("#status"))
             old = page.evaluate("() => window.reviewIndex.old")
             check(f"{w}: a set with a closed issue and findings waiting is out of date",
                   old == ["reports/review/test-old.json"] and "Out of date" in waiting and waiting.index("test-old.json") > waiting.index("Out of date"))

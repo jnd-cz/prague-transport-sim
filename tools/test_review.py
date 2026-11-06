@@ -20,6 +20,7 @@ import zlib
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import review_sets  # noqa: E402
 import serve  # noqa: E402
 
 FILE = {"options": ["right", "wrong"],
@@ -104,6 +105,9 @@ def main():
               await R.ready;
               const by = {};
               for (const f of R.findings) by[f.src] = (by[f.src] || 0) + 1;
+              // (#334: the directory's link to a kerb list relies on these two)
+              const { fid } = await import('./src/reviewFindings.js');
+              const firstFilter = R.$('rvFilter').value, kerbIds = R.findings.filter((f) => f.src === 'kerbs').map(fid);
               R.$('rvFilter').value = 'file|';
               R._fill();
               const i = R.list.findIndex((f) => f.info === 'the city origin');
@@ -116,11 +120,12 @@ def main():
               const links = [...document.querySelectorAll('#rvCard a')].map((a) => a.href);
               const panel = document.querySelector('#review').getBoundingClientRect();
               const buttons = [...document.querySelectorAll('#rvCard button[data-v]')].map((b) => b.textContent);
-              return { by, look: Math.hypot(gx - f.x, gy - f.y), lat: L.lat, lon: L.lon, links, buttons,
+              return { by, firstFilter, kerbIds, look: Math.hypot(gx - f.x, gy - f.y), lat: L.lat, lon: L.lon, links, buttons,
                        panel: { top: panel.top, height: panel.height, width: panel.width },
                        heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null };
             }""")
             r["loadS"] = round(time.time() - t0)
+            r["kerbIdsIndex"] = next((s["ids"] for s in review_sets.kerb_sets(serve.ROOT, [args.line])), [])
             # the orthophoto (#201), with IPR's service mocked: a 64 px image with the CORS header it sends,
             # then a service that refuses; and the track sources over it
             errors, ortho = [], []
@@ -373,6 +378,10 @@ def main():
         fails.append(f"the answer did not reach the server: {r['saved']}")
     if r["next"] != "30 m east":
         fails.append(f"after the answer the card shows {r['next']!r}, not the next finding without one")
+    if sorted(r["kerbIds"]) != sorted(r["kerbIdsIndex"]):
+        fails.append(f"the directory's kerb ids are not review mode's: {len(r['kerbIds'])} on the page, {len(r['kerbIdsIndex'])} in the index")
+    if r["kerbIds"] and r["firstFilter"] != "kerbs|":
+        fails.append(f"review mode starts on {r['firstFilter']!r}, not on the kerbs the directory's link promises")
     if not (r["kerbNote"][0].endswith("· OSM: kerb=flush ×1, kerb=lowered ×2 along this kerb") and "OSM" not in r["kerbNote"][1]):
         fails.append(f"the kerb card's OSM note: {r['kerbNote']}")
     t = r["todo"]

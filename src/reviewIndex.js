@@ -2,7 +2,8 @@
 // tools/review_sets.py at each deploy), the issue that waits for it, and how many of its findings are
 // answered, counted live from the answer store (src/verdicts.js) with the findings read and keyed as review
 // mode reads them (src/reviewFindings.js). A set's answers are stored under the line it was opened with,
-// so every line's store is read.
+// so every line's store is read. A kerb list lies in the line's survey data, read by review mode (src/review.js):
+// its entry carries the findings' ids and its link opens the line's review mode, which starts on the kerbs.
 import { fileFindings, fid } from './reviewFindings.js';
 import { readLineAnswers } from './verdicts.js';
 
@@ -21,16 +22,19 @@ export async function answers(lines) {
 
 // a set's findings and how many are answered (an answer with "unsure" counts, and is shown apart)
 export async function count(set, items) {
-  const r = await fetch(set.file, { cache: 'no-store' });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const fs = fileFindings(await r.json(), set.file.split('/').pop());
+  let ids = set.ids;
+  if (!ids) {
+    const r = await fetch(set.file, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    ids = fileFindings(await r.json(), set.file.split('/').pop()).map(fid);
+  }
   let answered = 0, unsure = 0, noted = 0;
-  for (const f of fs) {
-    const a = items[fid(f)];
+  for (const id of ids) {
+    const a = items[id];
     if (a?.v) { answered++; if (a.v === 'unsure') unsure++; }
     if (a?.note) noted++;
   }
-  return { total: fs.length, answered, unsure, noted, waiting: fs.length - answered };
+  return { total: ids.length, answered, unsure, noted, waiting: ids.length - answered };
 }
 
 const issueUrl = (repo, n) => `https://github.com/${repo}/issues/${n}`;
@@ -39,7 +43,7 @@ const name = (set) => set.title || set.file.split('/').pop().replace(/\.json$/, 
 function setRow(set) {
   const c = set.c;
   const links = set.lines.length
-    ? set.lines.map((l) => `<a href="index.html?line=${encodeURIComponent(l)}&review=${encodeURIComponent(set.file)}${c && c.waiting ? '&todo' : ''}">line ${esc(l)}</a>`).join('')
+    ? set.lines.map((l) => `<a href="index.html?line=${encodeURIComponent(l)}&review${set.ids ? '' : `=${encodeURIComponent(set.file)}`}${c && c.waiting ? '&todo' : ''}">line ${esc(l)}</a>`).join('')
     : '<span class="bad">no line known: open it from its issue</span>';
   const counts = set.error ? `<span class="bad">${esc(set.error)}</span>`
     : `<span class="wait">${c.waiting} waiting</span> · <span class="done">${c.answered} answered</span>${c.unsure ? ` (<span class="unsure">${c.unsure} unsure</span>)` : ''}`;

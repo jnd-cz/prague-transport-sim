@@ -386,7 +386,8 @@ the open PRs' questions for the user. Its index (`reports/review/index.json`: th
 lines, the issues' titles and states, the PRs' questions) is built at each deploy by
 `tools/review_sets.py`; locally, `python -I tools/review_sets.py` writes it. A set names its issue and
 lines in the file (`issue`, `line`, or per finding `line` / `lines_near`); `KNOWN` there covers the
-tools that do not write them yet.
+tools that do not write them yet. The kerb review lists are listed there too, under #142, though they lie in each
+line's survey data, not in a file.
 
 **Review mode** (the checks' findings on the map, desktop or phone; #129): open
 `index.html?line=17&review`, no shift needed. The panel lists findings worst first:

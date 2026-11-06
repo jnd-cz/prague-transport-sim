@@ -12,6 +12,10 @@ A set is a JSON file in reports/review/ with findings (a span queue another file
 a file without findings, is not). Its title, issue and lines come from the file itself (`title` or
 `about`, `issue`, `line` or `lines`), else from its findings (`line`, `lines_near`), else from its name
 (`stop-signs-17.json`: line 17), else from KNOWN; what is still unknown is listed with the set.
+
+The kerb review lists are sets too (#334), though no file holds them: they lie in each line's survey data
+(tools/kerbs.py), where review mode reads them, so they always match the published build. Their entries carry the
+findings' ids, for the page to count answers without loading a 10 MB survey file for each line.
 """
 import json
 import os
@@ -34,6 +38,7 @@ KNOWN = {
 }
 # issues closed into another, whose sets wait for that one now (the issue's closing comment says so)
 MOVED = {20: 237}
+KERB_ISSUE = 142  # (the kerb review lists wait for it)
 
 
 def lines_of(root=ROOT):
@@ -97,6 +102,36 @@ def sets(folder=FOLDER, known_lines=None):
             if isinstance(d, dict) and n not in queues and findings(d)]
 
 
+def kerb_report(o):
+    """The kerb report in a survey file's provenance, wherever the stamp put it (src/review.js findKerbs)."""
+    if isinstance(o, dict):
+        if isinstance(o.get("review"), list) and "platformSteps" in o:
+            return o
+        o = list(o.values())
+    for v in o if isinstance(o, list) else []:
+        r = kerb_report(v)
+        if r:
+            return r
+    return None
+
+
+def kerb_sets(root, known_lines):
+    """One set per line with a kerb list; ids as review mode keys its findings (src/review.js kerbFindings,
+    src/reviewFindings.js fid)."""
+    out = []
+    for line in known_lines:
+        try:
+            with open(os.path.join(root, "data", f"line{line}.dtm.json"), encoding="utf-8") as f:
+                report = kerb_report(json.load(f).get("provenance"))
+        except (OSError, ValueError):
+            continue
+        ids = [f"kerbs|{e['c']} {e['line']}|{e['x']:.1f},{e['y']:.1f}" for e in (report or {}).get("review", [])]
+        if ids:
+            out.append({"file": f"data/line{line}.dtm.json", "title": "Kerb review list", "issue": KERB_ISSUE,
+                        "waitsFor": MOVED.get(KERB_ISSUE, KERB_ISSUE), "lines": [line], "findings": len(ids), "unknown": [], "ids": ids})
+    return out
+
+
 def issues(numbers):
     """{number: {title, state}} from GitHub; {} where it cannot be asked (the page then shows the number)."""
     def one(n):
@@ -119,11 +154,13 @@ def questions():
 
 def build(root=ROOT, github=True):
     known_lines = lines_of(root)
-    ss = sets(os.path.join(root, "reports", "review"), known_lines)
+    ss = sets(os.path.join(root, "reports", "review"), known_lines) + kerb_sets(root, known_lines)
     info = issues({s["issue"] for s in ss if s["issue"]} | {s["waitsFor"] for s in ss if s["waitsFor"]}) if github else {}
     for s in ss:
         s["issueInfo"] = info.get(s["issue"])
         s["waitsForInfo"] = info.get(s["waitsFor"])
+    # (no file to delete once its issue is closed: it only leaves the directory, and review mode still shows it)
+    ss = [s for s in ss if not ("ids" in s and (s["waitsForInfo"] or {}).get("state") == "CLOSED")]
     commit = board.git("rev-parse", "--short", "HEAD", cwd=root)
     return {"built": time.strftime("%Y-%m-%d %H:%M"), "commit": commit, "repo": "jnd-cz/prague-transport-sim",
             "lines": known_lines, "sets": ss, "questions": questions() if github else []}
