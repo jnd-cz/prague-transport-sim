@@ -33,6 +33,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -72,7 +73,7 @@ SOURCES = [
     {"name": "geoportal", "globs": ["raw/geoportal/**/*"],
      "source": "Geoportál Praha services: Budovy 3D, Mosty 3D (I3S), opěrné zdi, stromy (tools/geoportal.py caches)",
      "licence": "CC BY 4.0, datový podklad © IPR Praha",
-     "refresh": "delete raw/geoportal/lineN and run python -I tools/geoportal.py --line N; "
+     "refresh": "delete raw/geoportal/lineN and raw/geoportal/cells and run python -P -E tools/geoportal.py --line N --fetch; "
                 "the whole Mosty 3D layer: python -I tools/mosty3d.py fetch"},
     {"name": "dem", "globs": ["raw/dem/*.tif", "raw/terrain*.tif", "raw/terrain*.json", "raw/line*/terrain*.tif",
                               "raw/line*/terrain*.json", "raw/run*/terrain*.tif", "raw/run*/terrain*.json"],
@@ -478,12 +479,35 @@ def status(sid):
 
 
 # ---------------------------------------------------------------- built data
+LINE_STEPS = ("heights", "platforms", "speed", "clearances")   # keys the steps after build_line.py write (tools/rebuild.py)
+
+
 def data_files():
     d = os.path.join(ROOT, "data")
     return sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)) and f not in DATA_KEEP)
 
 
+def incomplete_lines(folder=None):
+    """{file: [keys]}: line files without what the steps after build_line.py write. build_line.py alone writes a line
+    file with no heights, platforms, speeds or clearances: #237 published all five so, and every check still passed."""
+    folder = folder or os.path.join(ROOT, "data")
+    out = {}
+    for f in sorted(os.listdir(folder)):
+        if re.fullmatch(r"line\d+\.json", f):
+            with open(os.path.join(folder, f), encoding="utf-8") as fh:
+                d = json.load(fh)
+            lacking = [k for k in LINE_STEPS if not d.get(k)]
+            if lacking:
+                out[f] = lacking
+    return out
+
+
 def data_publish(store, note, sid=None, cache=None, allow_drift=False):
+    lacking = incomplete_lines()
+    if lacking:
+        f = next(iter(lacking))
+        raise SystemExit(f"{len(lacking)} line files are not a full build ({f} has no {', '.join(lacking[f])}): "
+                         "rebuild with tools/rebuild.py, not build_line.py alone.")
     # the build must come from the snapshot it names (#223): a changed or new input file means it did not
     sid = sid or (current_id() if os.path.exists(os.path.join(SNAPDIR, "CURRENT")) else None)
     if sid:
