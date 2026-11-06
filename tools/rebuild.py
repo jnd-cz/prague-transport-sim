@@ -118,12 +118,7 @@ def main():
     if built:  # (the report does not fail a build: most of what it counts waits for #22)
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import validation
-        rows, bad, missing = validation.report(built)
-        with open(os.path.join(ROOT, "reports", "rebuild", "validation.md"), "w", encoding="utf-8") as f:
-            f.write("\n".join(rows) + "\n")
-        print("\n".join(rows))
-        over = {line: b for line, b in bad.items() if b}
-        print(f"validation over a limit: {over or 'none'}; no report: {missing or 'none'}")
+        validation.write_report(built)
     sys.exit(1 if any("FAILED" in r for r in results) else 0)
 
 

@@ -112,7 +112,7 @@ on = [{'signal': round(g['s']), 'stop': n} for g in data.get('signals', []) for 
 inside = [{'crossing': round(c), 'stop': n, 'beforeEnd': round(b - c, 1)} for c in data.get('crossings', []) for n, a, b in plats if a + 2 < c < b - 0.5]
 out['signalsOnPlatforms'], out['crossingsInPlatforms'] = on, inside
 out['crossings'] = len(data.get('crossings', []))
-# (the stops as the route passes them: only the line's own direction is on the route)
+# (the stops as the route passes them, neighbours only: only the line's own direction is on the route)
 ordered = sorted(plats, key=lambda p: p[1])
 out['platformOverlaps'] = [{'stops': [a[0], b[0]], 'overlap': round(a[2] - b[1], 1)} for a, b in zip(ordered, ordered[1:]) if b[1] < a[2]]
 print(f"4. tram signals standing along a platform: {len(on)}" + (' (' + ', '.join(f"{o['signal']} {o['stop']}" for o in on) + ')' if on else ''))
