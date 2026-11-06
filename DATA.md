@@ -280,4 +280,5 @@ An SFTP-only account `tramdata` on the storage server, chrooted to its folder (`
 `--store HOST:DIR` or set `TRAMDATA_STORE`.
 
 Licences of the stored sources are listed per group in each snapshot manifest; the game's attribution
-line repeats them. The store is private: the DPP textbook in `reference/` is for private reference only.
+line repeats them. The store is private: `reference/` (the DPP textbook, the ČKD manuals and the other research downloads, per file in
+its `SOURCES.md`) is for private reference only, with no licence cleared, and is not served with the game.

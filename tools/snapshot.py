@@ -100,9 +100,10 @@ SOURCES = [
      "source": "ČÚZK correction grid ETRS89 -> S-JTSK (cdn.proj.org/cz_cuzk_table_-y-x_3_v1710.tif), used by tools/geo.py",
      "licence": "CC BY 4.0, ČÚZK (PROJ-data)",
      "refresh": "only if PROJ-data publishes a new version: download it and update tools/geo.py's GRID"},
-    {"name": "reference", "globs": ["raw/reference/*"],
-     "source": "reference documents (DPP T3 driver's textbook, the user's stop research)",
-     "licence": "for private reference only", "refresh": "by hand"},
+    {"name": "reference", "globs": ["raw/reference/**/*"],
+     "source": "reference documents: DPP T3 driver's textbook, the user's stop research, the research sessions' downloads "
+               "(ČKD TR 37 manuals, DP Praha tests, theses, papers, saved web pages); per file: raw/reference/SOURCES.md",
+     "licence": "for private reference only, no licence cleared", "refresh": "by hand"},
 ]
 
 
