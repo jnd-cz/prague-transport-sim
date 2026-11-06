@@ -23,6 +23,7 @@ Markov model, Viterbi): every STEP m of the route a state is an edge, a directio
 route; the next state follows the previous along the graph, through the passes above, about as far as the route
 went. A state off the network (OSM's own line) is allowed at a cost where DI has no track.
 """
+import bisect
 import heapq
 import math
 import sys
@@ -1295,7 +1296,11 @@ CHORD_RADIUS = 1500.0  # m: wider is a straight with small corners, no curve: fr
                        # tracks from an even 3.0 m to 2.86 m apart; the curves drawn in chords are 250-500 m
 CHORD_ALIKE = 3.0   # the larger corner over the smaller: a curve drawn in chords turns about alike at each vertex (4.0 and 4.0, 5.0
                     # and 5.0 degrees at Ohrada - Palmovka); a large corner beside a small one is a straight meeting a bend
-                    # (lines 22 and 23 at Malostranské náměstí: freed, the tracks went from an even 3.75 m to 3.52 m apart)
+CHORD_BESIDE = 5.0  # a chord's radius over the curve's just outside it, past which the chord is that curve's lead-in: a curve drawn in
+                    # chords keeps about its radius past the chord. Lines 22 and 23 at Malostranské náměstí have a 31 m straight
+                    # between curves of 25 and 33 m, on both tracks; its corners of 0.5-1.4 degrees read as chords of 590 m, and
+                    # freed, the tracks went from an even 3.75 m to 3.54 m apart
+CHORD_LOOK = 15.0   # m beyond a chord's ends where that curve is looked for
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
 EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
@@ -1324,8 +1329,9 @@ def dense(coords, step=DENSE):
 
 def chords(coords):
     """The stretches of a line that are chords of a curve, as (first index, last index): straight between two corners that turn
-    about alike and the same way, with the arc through them over CHORD_SAG from the chord and its radius under CHORD_RADIUS. A
-    corner at only one end is a real straight meeting a curve; over CHORD_LENGTH it is a straight."""
+    about alike and the same way, with the arc through them over CHORD_SAG from the chord and its radius under CHORD_RADIUS and
+    within CHORD_BESIDE of the curve just outside it. A corner at only one end is a real straight meeting a curve; over
+    CHORD_LENGTH it is a straight."""
     if len(coords) < 3:
         return []
     cum = [0.0]
@@ -1343,7 +1349,28 @@ def chords(coords):
     bend = lambda s, t: math.radians((abs(s) + abs(t)) / 2)  # (the radius is the chord over the corners' mean; the sag l^2 / 8R)
     return [(i, j) for (i, s), (j, t) in zip(corners, corners[1:])
             if s * t > 0 and max(abs(s), abs(t)) <= CHORD_ALIKE * min(abs(s), abs(t)) and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1]
-            and (cum[j] - cum[i]) * bend(s, t) / 8 >= CHORD_SAG and cum[j] - cum[i] <= CHORD_RADIUS * bend(s, t)]
+            and (cum[j] - cum[i]) * bend(s, t) / 8 >= CHORD_SAG and cum[j] - cum[i] <= CHORD_RADIUS * bend(s, t)
+            and (cum[j] - cum[i]) / bend(s, t) <= CHORD_BESIDE * min(_radius_over(coords, cum, cum[i] - CHORD_LOOK, cum[i]),
+                                                                     _radius_over(coords, cum, cum[j], cum[j] + CHORD_LOOK))]
+
+
+def _radius_over(coords, cum, lo, hi, tip=3.0):
+    """A line's radius between lo and hi m along it, from its direction over the first and last `tip` m; none past its ends."""
+    if lo < 0 or hi > cum[-1]:
+        return math.inf
+
+    def at(s):
+        k = max(0, min(bisect.bisect_right(cum, s) - 1, len(cum) - 2))
+        f = (s - cum[k]) / max(cum[k + 1] - cum[k], 1e-9)
+        return coords[k][0] + f * (coords[k + 1][0] - coords[k][0]), coords[k][1] + f * (coords[k + 1][1] - coords[k][1])
+
+    def heading(s, t):
+        a, b = at(s), at(t)
+        return math.atan2(b[1] - a[1], b[0] - a[0])
+
+    d = heading(hi - tip, hi) - heading(lo, lo + tip)
+    d = abs(math.atan2(math.sin(d), math.cos(d)))
+    return (hi - lo - tip) / d if d > 1e-9 else math.inf
 
 
 def without_chords(coords):

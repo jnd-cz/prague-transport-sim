@@ -375,6 +375,15 @@ class Chords(unittest.TestCase):
         pts.append((pts[-1][0] + 20 * math.cos(h), pts[-1][1] + 20 * math.sin(h)))
         self.assertEqual(dn.chords(sampled(pts)), [])
 
+    def test_a_straight_between_tight_curves_is_no_chord(self):
+        pts = arc(25, 1.0, 2.2)  # (26 m of a curve of 26 m)
+        h = math.degrees(math.atan2(pts[-1][1] - pts[-2][1], pts[-1][0] - pts[-2][0])) + 1.0
+        lead = arc(2, 15.0, 1.0, pts[-1], h)  # (two chords with corners of 1 degree: 860 m, on their own they would count)
+        h += 2.0
+        rest = arc(25, 1.0, 2.2, lead[-1], h)
+        self.assertEqual(dn.chords(sampled(pts + lead[1:] + rest[1:])), [])
+        self.assertEqual(len(dn.chords(sampled(lead + [(lead[-1][0] + 15 * math.cos(math.radians(h)), lead[-1][1] + 15 * math.sin(math.radians(h)))]))), 1)
+
     def test_a_real_straight_has_no_chords(self):
         self.assertEqual(dn.chords(sampled([(0, 0), (100, 0), (300, 0)])), [])
 
