@@ -40,6 +40,29 @@ BANDS = [(0, 10), (10, 120), (120, 500), (500, 1e9)]
 F = Frame()
 
 
+def peak_gb():
+    """The process's peak memory so far (Windows: the peak working set; elsewhere ru_maxrss)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD)] +                        [(k, ctypes.c_size_t) for k in ("PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage",
+                                                       "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage",
+                                                       "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage")]
+        c = PMC()
+        c.cb = ctypes.sizeof(c)
+        k32, psapi = ctypes.WinDLL("kernel32"), ctypes.WinDLL("psapi")
+        k32.GetCurrentProcess.restype = wintypes.HANDLE  # (the default int would cut the 64-bit pseudo handle)
+        psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+        if not psapi.GetProcessMemoryInfo(k32.GetCurrentProcess(), ctypes.byref(c), c.cb):
+            raise OSError("GetProcessMemoryInfo failed")
+        return c.PeakWorkingSetSize / 2**30
+    except (AttributeError, OSError):
+        import resource
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+
+
 def tol(d):
     return np.minimum(TOL * np.maximum(d, D0) / D0, TOL_MAX)
 
@@ -321,10 +344,10 @@ if __name__ == "__main__":
         Z, X, Y, miss = tile((T["x0"] + x1) / 2, (T["y0"] + y1) / 2, n, m)
         D = distance(X, Y)
         del X, Y
-        t_in = time.perf_counter() - t0
+        t_in, gb_in = time.perf_counter() - t0, peak_gb()
         t0 = time.perf_counter()
         V, Tr = m_delatin(Z, D)
-        t_mesh = time.perf_counter() - t0
+        t_mesh, gb_mesh = time.perf_counter() - t0, peak_gb()
         r = report("delatin whole", Z, D, rasterize(V, Tr, Z.shape), len(Tr), len(V), t_mesh)
         # the triangles a tile line crosses, cut by the tiles they overlap (each piece by the constrained Delaunay):
         # both tiles cut the same triangle along the same line, so they share the border's vertices exactly
@@ -341,13 +364,23 @@ if __name__ == "__main__":
         after = len(shapely.get_parts(shapely.constrained_delaunay_triangles(pieces)))
         t_cut = time.perf_counter() - t0
         k = int(cross.sum())
-        print(f"whole box {n} x {m} cells (read {t_in:.0f} s), no lidar {100 * miss:.2f} %")
+        print(f"whole box {n} x {m} cells (read {t_in:.0f} s), no lidar {100 * miss:.2f} %; peak memory "
+              f"{gb_in:.1f} GB after the read, {gb_mesh:.1f} GB after the mesh")
         print(f"  {r['triangles']:,} triangles, {r['vertices']:,} vertices in {t_mesh:.0f} s, over tol {r['over_tol_%']} %")
         for key, v in r["bands"].items():
             print(f"  {key} m: mean {v['mean_cm']} cm, p99 {v['p99_cm']} cm, max {v['max_cm']} cm")
         print(f"  cut into {SIZE} m tiles: {k:,} triangles cross a tile line -> {after:,} "
               f"({after - k:+,}, {100 * (after - k) / len(Tr):+.2f} % of the mesh) in {t_cut:.1f} s")
-        out["whole"] = {**r, "cross": k, "after_cut": after}
+        # triangles per km² by the distance of their centroid from the tracks (to scale to other areas)
+        g = (a + b + c) / 3
+        dc = D[np.clip(np.round(g[:, 1]).astype(int), 0, m), np.clip(np.round(g[:, 0]).astype(int), 0, n)]
+        dens = {}
+        for lo, hi in BANDS + [(500, 1000), (1000, 2000), (2000, 1e9)]:
+            km2 = float(((D >= lo) & (D < hi)).sum()) / 1e6
+            nt = int(((dc >= lo) & (dc < hi)).sum())
+            dens[f"{lo}-{int(hi) if hi < 1e9 else ''}"] = {"km2": round(km2, 2), "triangles": nt, "per_km2": round(nt / km2) if km2 else None}
+            print(f"  {lo}-{int(hi) if hi < 1e9 else ''} m: {km2:.2f} km², {nt:,} triangles, {nt / km2 if km2 else 0:,.0f} per km²")
+        out["whole"] = {**r, "cross": k, "after_cut": after, "density": dens, "peak_gb": [gb_in, gb_mesh], "s": [t_in, t_mesh]}
         dst = arg("--out", "")
         if dst:
             json.dump(out, open(os.path.join(ROOT, dst), "w"), indent=1)
