@@ -103,7 +103,8 @@ and download it only with `--fetch` (#223).
    files; GTFS: `https://data.pid.cz/PID_GTFS.zip`, and adjust `SERVICE_DATE` in `tools/build_line.py`).
    For a DTM refresh, remove the superseded month's ZIPs and extracted package folders for the replaced
    districts from `raw/dtm/` before rebuilding; an available snapshot pair keeps priority over a newer one.
-2. Rebuild and check the lines (lints, benches).
+2. Rebuild with `tools/rebuild.py` and check the lines (lints, benches). `build_line.py` alone leaves a line without
+   heights, platforms, speeds and clearances; `data-publish` refuses such a file.
 3. `python -I tools/snapshot.py publish <YYYY-MM-DD> --note "what changed"`: uploads the new files,
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`. Add its row at the top of
    [snapshots/README.md](snapshots/README.md).
