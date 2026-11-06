@@ -1,12 +1,12 @@
 {
  "snapshot": "2026-11-06",
- "built_at_commit": "6da86b1",
- "published": "2026-11-06 10:03",
- "note": "All five lines on DI's own graph (#237), OSM 2026-11-04",
+ "built_at_commit": "f2b94a3",
+ "published": "2026-11-06 10:48",
+ "note": "Full rebuild of all five lines: the steps after build_line.py that #312's data lacked (#320)",
  "files": {
   "line17.bld.bin": {
-   "size": 6348762,
-   "sha256": "a70b36e50626abc36a36fe2caf89ccbec85918556c89fa2264639f23986dcf5e"
+   "size": 6348366,
+   "sha256": "b33500c7df2e7c109eb57100bdd4f2f3e98bc596e279da35bd62984346924428"
   },
   "line17.dtm.json": {
    "size": 9843793,
@@ -25,20 +25,20 @@
    "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
-   "size": 228481,
-   "sha256": "73812ea95325d2e8a3c66cb66c02623be1172ceb4870d23669729f82e4784c31"
+   "size": 228364,
+   "sha256": "710c7669d83f639996fc3b81edb02776d2edbccd3c868b462e409df599274359"
   },
   "line17.json": {
-   "size": 5562767,
-   "sha256": "1fed2b2b147f5d4ca2d9b6be2cf68294098be518450d005a60a84c63a58a4d1f"
+   "size": 6267267,
+   "sha256": "48f4c0af9d1825d6d845f4ac705910025dbb6547b5f6f5bd23f16b1ae3414120"
   },
   "line17.signals.json": {
-   "size": 36581,
-   "sha256": "6c1f717142a60fce3d485da55829a862f044492b6578db31eb127edf0c68a263"
+   "size": 36582,
+   "sha256": "8698ef0e19017bcdd84848c74c82e24cd7635419e107f36365ec6858bf64dc59"
   },
   "line17.validate.json": {
    "size": 4618,
-   "sha256": "9b324d130e82d0db9dd53a88ca8f5db948913d7ffbbe33126c4c089213a9a5a6"
+   "sha256": "0029fa3c722d202cd79046854195f9102e047ad521deb71b58e41ad8e1da980e"
   },
   "line17.zps.json": {
    "size": 6581522,
@@ -65,8 +65,8 @@
    "sha256": "2103b15d9c2bf8b551bca70d1f2ca49f34b4b9a8101c906ce0d84501458f636d"
   },
   "line22.json": {
-   "size": 5699084,
-   "sha256": "2f461e44b6a5c7ef67e5557c49b6d3471100c48bc05cb851dc7a3bf37db6a3fb"
+   "size": 6305914,
+   "sha256": "6705a89cdf1da00a2daa5d7c5f2830c4875bb908a9915219c6eb2dc7b691d31e"
   },
   "line22.zps.json": {
    "size": 7101578,
@@ -89,8 +89,8 @@
    "sha256": "de35e9299c0c715db9d328794c431ca5860a4a8ad1633255e60d186e2d090c13"
   },
   "line23.json": {
-   "size": 2045776,
-   "sha256": "0a5b60ba9c00c0cf30fdc858c20385abbeee8336fee861d38a3c8a66939b0200"
+   "size": 2353037,
+   "sha256": "a37d92b1aec48eef3ac453db6ce8c4400caa3c1c10971bee033e66572ab40fa3"
   },
   "line37.bld.bin": {
    "size": 3170628,
@@ -109,8 +109,8 @@
    "sha256": "3d6bfbad5ac8f38237605547fa3ebfec7f8efdbce03234c40dc8a81a009de16b"
   },
   "line37.json": {
-   "size": 1790733,
-   "sha256": "87719f0b89314932428c1d511bb4dcf67c5950f5033ee44c677e43cd2a70e686"
+   "size": 2149354,
+   "sha256": "59698c2c0c1cb151d94dfaaecc1a5ab9eeaf635924c65729ecff4e14c4f777f6"
   },
   "line9.bld.bin": {
    "size": 10029834,
@@ -129,8 +129,8 @@
    "sha256": "4319f91372cc27bc19d347085d97b9f24a58d0f614b7949811688a4f03824098"
   },
   "line9.json": {
-   "size": 4467924,
-   "sha256": "89c4c507709c918bbb067926a3ca42437c6d4be385461a0749114f9fec4f0e5e"
+   "size": 5355859,
+   "sha256": "d7f47d9542b270384a2d55a34b38f7068aef6f98834206c472a7dbb15057c038"
   },
   "lines.json": {
    "size": 607,
