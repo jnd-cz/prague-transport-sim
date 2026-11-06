@@ -66,6 +66,10 @@ each now a rule, none a place:
   switch at Podolská vodárna put a corner in the curve and moved it 0.48 m off them; empty, it reads 17.9-40.7 m over 5 m
   and lies within 0.114 m (mean 0.033 m). Moving either fork to where the circle through the points touches its through
   track (2 and 3 m along it) makes it worse: 13.8-14.3 m.
+- **Connections are read against OSM**: distance to DI cannot see a wrong or missing connection, so
+  `tools/bench/track_topology.py` compares the movements through each junction with OSM's graph, both ways round, and
+  lists the differences for review. It found one lost connection at once (50.1324 N 14.4526 E). A branch ending past its
+  fork now reaches the track it joins (`_folded_stubs`).
 - **Copies and folds go**: a record turning back on itself splits, two records leaving one point the same way do not merge, a branch's copy
   running on the track is trimmed per end, and a chain with nothing left is a whole copy (these made the only folds,
   176-180°, at Kobylisy, Ďáblice and Hloubětín).
