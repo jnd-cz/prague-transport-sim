@@ -67,8 +67,9 @@ def glb(V, T):
     scale = np.maximum((hi - lo) / 65535, 1e-6)
     scale[2] = max(scale[2], 0.01)  # (no finer than the source's cm)
     q = np.round((V - lo) / scale).astype("<u2")
-    pos = q.tobytes()
-    pos += b"\0" * (-len(pos) % 4)
+    padded = np.zeros((len(q), 4), "<u2")  # (a vertex attribute starts on 4 bytes: ushort x, y, z and 2 B of padding)
+    padded[:, :3] = q
+    pos = padded.tobytes()
     idx = T.astype("<u2" if len(V) < 65536 else "<u4").tobytes()
     idx += b"\0" * (-len(idx) % 4)
     j = {"asset": {"version": "2.0"}, "extensionsUsed": ["KHR_mesh_quantization"], "extensionsRequired": ["KHR_mesh_quantization"],
@@ -76,7 +77,7 @@ def glb(V, T):
          "nodes": [{"mesh": 0, "translation": lo.tolist(), "scale": scale.tolist()}],
          "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}],
          "buffers": [{"byteLength": len(pos) + len(idx)}],
-         "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": q.size * 2, "target": 34962},
+         "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(pos), "byteStride": 8, "target": 34962},
                          {"buffer": 0, "byteOffset": len(pos), "byteLength": T.size * (2 if len(V) < 65536 else 4), "target": 34963}],
          "accessors": [{"bufferView": 0, "componentType": 5123, "count": len(V), "type": "VEC3",
                         "min": [int(v) for v in q.min(0)], "max": [int(v) for v in q.max(0)]},
