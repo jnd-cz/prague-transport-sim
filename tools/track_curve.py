@@ -11,13 +11,12 @@ the points' weights grow only where the curve misses (Lawson's reweighting). A n
 keeps its position (a track through a node is fitted before one ending there), and its direction where this track
 continues that one (a diverging track leaves tangent to
 the through track: data/truth.json trackGeometry `switch-start`, most switches are tangential). Where the curve
-would bend tighter than MIN_RADIUS (data/truth.json `min-radius-passenger`), the tolerance of the points around it
-grows by GROW, at most to the mean coordinate error of their records' accuracy class (data/truth.json
-`sourceAccuracy`: 0.14 m for DI's class 3), and the curve is fitted again. Where it still bends tighter than
-NETWORK_RADIUS (`min-radius-network`: the user, "under 18m there shouldn't be anything like that"), the points around
-it keep growing past their class, at most to HOLD_LIMIT, and each such place is listed with how far its points moved
-(the cost). A point the curve still misses by more than TOL + REPORT is listed, and so is a curve left tighter than
-MIN_RADIUS.
+bends too tight, read at two scales (`tight_at`: 18 m over 5 m as tools/lint.js reads it, data/truth.json
+`min-radius-network`; KINK_RADIUS over 2 m for a bend squeezed into a metre), the tolerance of the points around it
+grows by GROW up to the mean coordinate error of their records' accuracy class (data/truth.json `sourceAccuracy`: 0.14 m
+for DI's class 3). Where it still bends too tight the curve stiffens there and its points may move past their
+class, at most to HOLD_LIMIT, and each such place is listed with how far its points moved (the cost). A point the
+curve still misses by more than TOL + REPORT is listed, and so is a curve left tight.
 
 A Gaussian (the client's old smoothing, src/route.js) cuts inside a curve: 0.2 m on an 18 m curve with the 6 m
 window (#20); a curve held to the points does not.
@@ -43,8 +42,8 @@ GROW = 1.5         # the factor the tolerance grows by per round
 MIN_RADIUS = 18.0  # m: the radius a curve is held to over BEND_LONG (data/truth.json trackGeometry `min-radius-network`:
                    # the user, "under 18m there shouldn't be anything like that"; `min-radius-passenger` says 20, but at
                    # 20 the fit moved DI's points up to 14 cm in curves DI draws at 18-20 m, all over the city)
-KINK_RADIUS = 12.0 # m: the radius over BEND: a shorter window sees a bend squeezed into a metre, a longer one averages it
-                   # out; a sagitta of 4 cm, twice TOL, so that DI's own scatter stays below it
+KINK_RADIUS = 15.0 # m: the radius over BEND: a shorter window sees a bend squeezed into a metre, a longer one averages it
+                   # out; a sagitta of 3.3 cm, so that most of the scatter within TOL stays below it
 NETWORK_RADIUS = 18.0  # m: under this the curve stiffens and its points may move past their class (HOLD_LIMIT)
 HOLD_LIMIT = 0.5   # m: past its class's error a point moves at most this far to hold NETWORK_RADIUS
 STIFFEN, STIFF_MAX = 1.5, 1.5 ** 12  # the bending weight's factor per round where the curve bends under it, and its

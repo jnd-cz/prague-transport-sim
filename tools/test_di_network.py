@@ -110,6 +110,46 @@ class Network(unittest.TestCase):
         self.assertEqual(len(pairs), len(set(pairs)))
         self.assertTrue(all(ed['a'] != ed['b'] for ed in net.edges.values()))
 
+    def test_a_forks_node_lies_on_the_straight_track(self):
+        # the mean of three ends lay up to 12 cm off the straight track, which the fit then had to pass through
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], [(50.1, 0.4)] + turnout(50, r=60)[1:])
+        n = next(n for n in net.nodes if len(net.at[n]) == 3)
+        self.assertAlmostEqual(net.nodes[n]['xy'][1], 0, delta=0.001)
+
+    def test_four_ends_crossing_meet_where_their_pairs_cross(self):
+        net = net_of([(0, 0.1), (50, 0.1)], [(50, 0.1), (100, 0.1)], [(50, -50), (50.2, 0)], [(50.2, 0), (50.4, 50)])
+        n = next(n for n in net.nodes if len(net.at[n]) == 4)
+        self.assertAlmostEqual(net.nodes[n]['xy'][1], 0.1, delta=0.001)
+        self.assertAlmostEqual(net.nodes[n]['xy'][0], 50.2, delta=0.01)
+
+    def test_a_section_pairs_each_leg_with_the_track_on_its_side_and_leaves_out_their_meeting_point(self):
+        # the legs end 0.37 m apart at Y; a track through Y's middle stepped 18 cm towards the other
+        leg = turnout(50, r=30, length=4.7, n=3)
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (54.7, 0)], leg, [(54.7, 0), (120, 0)],
+                     turnout(50, r=30, length=40, n=400)[47:])
+        self.assertEqual(net.report['sections to their tips'], 1)
+        straight = next(ed for ed in net.edges.values() if max(c[0] for c in ed['line'].coords) > 100)
+        self.assertLess(max(abs(c[1]) for c in straight['line'].coords), 0.01)
+
+    def test_a_chain_all_copy_of_the_track_goes(self):
+        # Kobylisy, Ďáblice: both ends on the track, within centimetres of it all along: it ran out and back
+        net = net_of([(0, 0), (100, 0)], [(40, 0.01), (60, 0.01)])
+        self.assertEqual(net.report['chains wholly copies'] + net.report['stubs dropped'], 1)
+        for ed in net.edges.values():
+            self.assertLessEqual(ed['line'].length, 100.01)
+
+    def test_a_branch_ending_beside_the_track_walks_back(self):
+        # 40 cm beside the track, with its own points on from there: no point near the node, none put on the chord
+        branch = [(50 + k, 0.4 + 0.02 * k * k) for k in range(30)]
+        net = net_of([(0, 0), (120, 0)], branch)
+        n = next(n for n in net.nodes if len(net.at[n]) == 3)
+        e, end = next(x for x in net.at[n] if net.edges[x[0]].get('walk'))
+        c = list(net.edges[e]['line'].coords)
+        c = c if end == 0 else c[::-1]
+        self.assertGreaterEqual(math.dist(c[0], c[1]), 3.0)
+        drawn = dn.Drawn(net, set(net.edges), fit=False)
+        self.assertEqual(drawn.net.edges[e].get('walk'), {end})
+
     def test_a_switch_whose_tip_the_user_placed_forks_there(self):
         net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((50.5, 0.2), (46.7, -1.65))])
         self.assertEqual(net.report['switch tips placed'], 1)

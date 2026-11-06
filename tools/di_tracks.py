@@ -34,6 +34,7 @@ TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the tra
                 # lies this far back (the tongues DI draws: Ohrada, Dejvice 8.4-8.5 m, Chotkova 9 m; OSM's switches
                 # at Čechův most lie 8.0 and 8.8 m behind DI's record joints)
 MIN_RECORD = 0.05  # m: shorter source records are dropped
+FOLD_MIN = 0.1     # m: record ends' last segments this long say which way they go (DI joins records with 1 cm scraps)
 DUPLICATE = 0.2    # m: a record joining the same two places as another, never farther from it, is a copy
 SUPERSEDED = 0.95, 0.09  # share of an older record's length within DUPLICATE of newer records, and their median
                          # distance at most (m), for the older one to be an earlier copy: DI 2026-10-31's re-entries
@@ -173,8 +174,15 @@ class Source:
                     nr, nk = divmod(other, 2)
                     if nr in used:
                         break
-                    used.add(nr)
                     nxt = recs[nr][1] if nk == 0 else recs[nr][1][::-1]
+                    # (two records leaving the same way from one point do not continue each other: a fork whose toe ends
+                    # a little apart, Hloubětín: merged, the track went out along one and back along the other)
+                    here = recs[cur][1] if cur_end == 1 else recs[cur][1][::-1]
+                    u = (here[-1][0] - here[-2][0], here[-1][1] - here[-2][1])
+                    v = (nxt[1][0] - nxt[0][0], nxt[1][1] - nxt[0][1])
+                    if u[0] * v[0] + u[1] * v[1] < 0 and min(math.hypot(*u), math.hypot(*v)) > FOLD_MIN:
+                        break
+                    used.add(nr)
                     if forward:
                         pts += nxt[1:]
                         ids.append(recs[nr][0])
@@ -283,7 +291,7 @@ class Source:
                             back = max((onward(j, tt, sg, TONGUE + 1.0) for sg in (1, -1)),
                                        key=lambda q: -((q[min(2, len(q) - 1)].x - q[0].x) * u[0] + (q[min(2, len(q) - 1)].y - q[0].y) * u[1]))
                             f = geom(back).interpolate(TONGUE)
-                        elif not lone and math.dist(e, (behind[1].x, behind[1].y)) < 0.01 and da[min(2, len(da) - 1)] >= INTERLACE[0]:
+                        elif not lone and len(behind) > 1 and math.dist(e, (behind[1].x, behind[1].y)) < 0.01 and da[min(2, len(da) - 1)] >= INTERLACE[0]:
                             # (a record continuing another's end with the branch beside it from the joint: the same
                             # switch seen from the track, a tongue back along it)
                             f, mine = geom(behind).interpolate(TONGUE), True

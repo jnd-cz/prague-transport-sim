@@ -60,6 +60,11 @@ class Records(unittest.TestCase):
         self.assertEqual(len(di.chains), 1)
         self.assertEqual(di.chains[0]['line'].length > 99, True)
 
+    def test_two_records_leaving_one_point_the_same_way_are_not_one_chain(self):
+        # Hloubětín: merged, the track went 130 m out along one and back along the other, a 176° fold
+        di = dt.Source('di', [rec(1, [(0, 0), (60, 0.5)]), rec(2, [(0, 0), (60, -0.5)])])
+        self.assertEqual(len(di.chains), 2)
+
     def test_an_older_record_lying_on_newer_ones_is_dropped_but_interlaced_track_stays(self):
         def dated(i, pts, day):
             return rec(i, pts) | {'attrs': {'DatumVkladu': day}}
