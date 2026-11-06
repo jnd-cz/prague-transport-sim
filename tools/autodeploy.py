@@ -85,7 +85,7 @@ def once(log):
     st = load_state()
     code = deploy(log, st)
     if time.time() - st.get("pull_failed_at", 0) >= RETRY:
-        if run(log, python(), "-I", "tools/deploy.py", "--pull-reviews"):
+        if run(log, python(), "-P", "-E", "tools/deploy.py", "--pull-reviews"):
             st["pull_failed_at"] = time.time()
             print(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} pulling the reviews failed; next try in {RETRY // 60} min", file=log)
             code = code or 1
@@ -142,7 +142,7 @@ def deploy(log, st):
     print(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} {new[:7]} {git('log', '-1', '--format=%s', new)}", file=log)
     ok = (run(log, "git", "checkout", "-q", "--detach", new) == 0
           and run(log, python(), "-I", "tools/snapshot.py", "data-fetch") == 0
-          and run(log, python(), "-I", "tools/deploy.py") == 0)
+          and run(log, python(), "-P", "-E", "tools/deploy.py") == 0)
     if ok:
         st.update(deployed=new, at=time.time())
         st.pop("failed", None)

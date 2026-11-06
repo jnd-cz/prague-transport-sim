@@ -398,3 +398,11 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   simulation in JS (`window.headless`) rather than waiting in real time.
 - Memory: the whole line is built at load (no streaming); fine terrain adds ~0.15–0.2 GB.
 - The `gh` CLI lives in `C:\Program Files\GitHub CLI` (not always on the Bash PATH).
+
+## The test host
+
+Measured 2026-11-06 with Firefox 159 on the host itself (#275): nginx in front of Apache, PHP as FastCGI.
+
+- **What it compresses by itself.** A request that accepts brotli gets JSON, scripts and HTML as brotli at about quality 6 (`main.js` 16,347 B against 16,352 B locally at 6), and `.bin` not at all. A request without brotli gets scripts and HTML as gzip at level 1 (`main.js` 19,350 B, the size of local `gzip -1`), and JSON and `.bin` not at all. The `mod_deflate` lines our `.htaccess` used to have changed nothing, and line 17's two `.bin` files went out whole: 10.8 MB of the 15.9 MB a game load transferred.
+- **`.br` means Breton there.** A file named `x.json.br` comes with `Content-Language: br`, and neither `RemoveLanguage .br` nor `Header unset Content-Language` takes it off. `x.json.brotli` with `AddEncoding br .brotli` comes clean, also with no plain file beside it and from subfolders.
+- **A mangled page after changing Firefox's encodings.** With `network.http.accept-encoding.secure` set to leave out `br`, Firefox revalidates a page it cached as brotli, gets a 304 and shows the raw bytes, since it no longer decodes what it no longer accepts. Ctrl+Shift+R shows the page. The host's answer is right, and a visitor does not change this setting between visits.

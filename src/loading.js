@@ -13,13 +13,17 @@ const nextFrame = () => new Promise((r) => {
   requestAnimationFrame(() => requestAnimationFrame(r));
   setTimeout(r, 100);
 });
+// the data files' real sizes, { 'data/line17.json': bytes }, from the manifest that goes up with them
+const dataSizes = () => fetch('data/MANIFEST.json').then((r) => (r.ok ? r.json() : {}))
+  .then((m) => Object.fromEntries(Object.entries(m.files || {}).map(([f, e]) => [`data/${f}`, e.size]))).catch(() => ({}));
 
 class Download {
-  constructor(url, label, onChange) {
+  constructor(url, label, onChange, sizes) {
     this.url = url;
     this.label = label;
     this.loaded = 0;
-    this.total = 0;      // Content-Length, 0 when unknown (a compressed response, no header)
+    this.total = 0;      // the real size, 0 when unknown (a compressed response and not in the manifest)
+    this.sizes = sizes;
     this.state = 'wait'; // wait, load, done, missing, error
     this.onChange = onChange;
     this.promise = this.run();
@@ -30,8 +34,10 @@ class Download {
       const res = await fetch(this.url);
       if (!res.ok) { this.state = 'missing'; this.onChange(); return null; }
       const len = +res.headers.get('Content-Length') || 0;
-      // a compressed body counts decompressed bytes, so its length is no use as the total
+      // a compressed body counts decompressed bytes, so its length is no use as the total: on the test host
+      // that is every data file (#275), and the manifest has their real sizes
       this.total = res.headers.get('Content-Encoding') ? 0 : len;
+      if (!this.total) this.sizes.then((s) => { if (this.state === 'load' && s[this.url]) { this.total = s[this.url]; this.onChange(); } });
       this.state = 'load';
       this.onChange();
       if (!res.body) { const buf = new Uint8Array(await res.arrayBuffer()); this.loaded = buf.length; return this.finish(buf); }
@@ -85,6 +91,7 @@ export class Loader {
     this.t0 = performance.now();
     this.pending = false;
     this.el = $('loading');
+    this.sizes = dataSizes();
   }
 
   fail(error) {
@@ -96,7 +103,7 @@ export class Loader {
 
   // start downloading now; get(url) later waits for it
   prefetch(url, label = url.split('/').pop()) {
-    if (!this.files.has(url)) this.files.set(url, new Download(url, label, () => this.render()));
+    if (!this.files.has(url)) this.files.set(url, new Download(url, label, () => this.render(), this.sizes));
     return this;
   }
 

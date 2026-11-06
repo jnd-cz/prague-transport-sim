@@ -74,7 +74,7 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy and Pillow live in the user site packages):
+pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packages):
 
 | step | writes | what |
 |---|---|---|
@@ -99,10 +99,11 @@ packs them into `dist/tatra-t3-prague.zip`; unzip it into any web server directo
 brotli for `.json` and `.bin` on the server (~3x smaller downloads). The detailed tram model is
 CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown in the menu.
 
-To a web host over FTPS (#131): `python -I tools/deploy.py` uploads the same files from a clean commit
+To a web host over FTPS (#131): `python -P -E tools/deploy.py` uploads the same files from a clean commit
 whose data matches the manifest:
 - only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
-- it adds `version.json`, shown in the menu's credits, and an `.htaccess` with compression;
+- the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 28.6 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS);
+- it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
 
 The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
@@ -274,7 +275,7 @@ grey. The answers are kept per line in the browser and sent to the server, which
 (the newer wins), so a phone and a computer share one review:
 - on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
   `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
-  on every run, and `python -I tools/deploy.py --pull-reviews` does it at once;
+  on every run, and `python -P -E tools/deploy.py --pull-reviews` does it at once;
 - with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
 
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.

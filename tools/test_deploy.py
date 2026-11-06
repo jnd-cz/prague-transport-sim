@@ -1,4 +1,4 @@
-"""tools/deploy.py against a fake FTP server in a temp folder: python -I tools/test_deploy.py"""
+"""tools/deploy.py against a fake FTP server in a temp folder: python -P -E tools/test_deploy.py"""
 import base64
 import ftplib
 import io
@@ -9,6 +9,8 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+
+import brotli
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import deploy  # noqa: E402
@@ -93,12 +95,13 @@ class DeployTest(unittest.TestCase):
     def test_first_then_unchanged_then_changed(self):
         up, _ = self.run_deploy()
         for rel in SOME:
-            with open(os.path.join(self.server, *rel.split("/")), "rb") as a, open(os.path.join(deploy.ROOT, *rel.split("/")), "rb") as b:
-                self.assertEqual(a.read(), b.read(), rel)
+            name = rel + deploy.PACKED_SUFFIX if deploy.packed(rel) else rel
+            with open(os.path.join(self.server, *name.split("/")), "rb") as a, open(os.path.join(deploy.ROOT, *rel.split("/")), "rb") as b:
+                self.assertEqual(brotli.decompress(a.read()) if deploy.packed(rel) else a.read(), b.read(), rel)
         self.assertTrue(os.path.exists(os.path.join(self.server, ".htaccess")))
         self.assertFalse([f for _, _, fs in os.walk(self.server) for f in fs if f.endswith(".part")], "no .part left")
         self.assertEqual(up[-1], deploy.MANIFEST + ".part", "the manifest is written last")
-        self.assertLess(up.index("data/MANIFEST.json.part"), up.index("index.html.part"), "data before the page")
+        self.assertLess(up.index("data/MANIFEST.json.brotli.part"), up.index("index.html.part"), "data before the page")
         # nothing changed: only the version and the manifest go up
         up, gone = self.run_deploy()
         self.assertEqual(sorted(up), sorted(["version.json.part", deploy.MANIFEST + ".part"]))
@@ -115,6 +118,31 @@ class DeployTest(unittest.TestCase):
         self.assertNotIn("src/main.js.part", up)
         self.assertEqual(gone, ["src/old.js"])
         self.assertNotIn("src/old.js", json.load(open(man)))
+
+    def test_the_data_heavy_packs_go_up_only_compressed(self):
+        for rel in ("data/line17.bld.bin", "data/line17.json", "data/MANIFEST.json", "assets/t3/t3.bin", "assets/t3/t3.gltf", "assets/t3h/t3h.glb"):
+            self.assertTrue(deploy.packed(rel), rel)
+        for rel in ("index.html", "reviews.html", "src/main.js", "README.md", "assets/t3/t3_color.jpg", "assets/t3/LICENCE.txt", "reports/review/a.json", "version.json"):
+            self.assertFalse(deploy.packed(rel), rel)
+        self.run_deploy()
+        self.assertTrue(os.path.exists(os.path.join(self.server, "data", "MANIFEST.json.brotli")))
+        self.assertFalse(os.path.exists(os.path.join(self.server, "data", "MANIFEST.json")), "no plain copy beside it")
+        # the server's rule hands that file to a request for the plain name
+        h = open(os.path.join(self.server, ".htaccess")).read()
+        self.assertIn(f"AddEncoding br {deploy.PACKED_SUFFIX}", h)
+        self.assertIn(f"RewriteRule ^(.*)$ $1{deploy.PACKED_SUFFIX} [L]", h)
+
+    def test_a_site_with_plain_data_loses_it_after_the_compressed_copy_is_up(self):
+        self.run_deploy()
+        man = os.path.join(self.server, deploy.MANIFEST)
+        m = json.load(open(man))
+        m["data/MANIFEST.json"] = "0" * 64  # (as the deploys before #275 left it)
+        json.dump(m, open(man, "w"))
+        open(os.path.join(self.server, "data", "MANIFEST.json"), "w").write("{}")
+        _, gone = self.run_deploy()
+        self.assertEqual(gone, ["data/MANIFEST.json"])
+        self.assertFalse(os.path.exists(os.path.join(self.server, "data", "MANIFEST.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.server, "data", "MANIFEST.json.brotli")))
 
     def test_dry_run_writes_nothing(self):
         self.run_deploy("--dry-run")
