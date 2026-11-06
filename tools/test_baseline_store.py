@@ -43,6 +43,32 @@ class Store(unittest.TestCase):
             self.assertFalse(any(str(os.getpid()) in b for b in baseline_store.busy()))
 
 
+class Ticket(unittest.TestCase):
+    def test_a_ticket_being_read_elsewhere_is_replaced_on_a_later_try(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            real, tries = os.replace, []
+
+            def busy(a, b):
+                tries.append(a)
+                if len(tries) < 3:
+                    raise PermissionError(5, "Access is denied")
+                real(a, b)
+            job = baseline_store.HeavyJob("test", wait=False)
+            job.path = os.path.join(d, "1.lock")
+            with mock.patch.object(baseline_store.os, "replace", busy), mock.patch.object(baseline_store.time, "sleep"):
+                job._write("running")
+            self.assertEqual(len(tries), 3)
+            self.assertTrue(os.path.exists(job.path))
+
+    def test_it_gives_up_in_the_end(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            job = baseline_store.HeavyJob("test", wait=False)
+            job.path = os.path.join(d, "1.lock")
+            with mock.patch.object(baseline_store.os, "replace", side_effect=PermissionError(5, "x")), \
+                    mock.patch.object(baseline_store.time, "sleep"), self.assertRaises(PermissionError):
+                job._write("running")
+
+
 class Checkpoints(unittest.TestCase):
     """Names, the index and what this machine keeps by key (#282); the store's files in a dict."""
     def test_latest_is_the_highest_world_checkpoint_never_a_test(self):
