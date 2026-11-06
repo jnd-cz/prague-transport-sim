@@ -141,6 +141,34 @@ class Chain:
         return (b.x - a.x) / d, (b.y - a.y) / d
 
 
+def at_true_places(series, line):
+    """Each bin's height read at the bin's centre from the samples at their true places along the chain: a sample lies up
+    to 2.4 m from its bin's centre (rms 1.2 m), which on a 4 % grade was a height error of up to 10 cm, and half of
+    what the rails waved by (#358). A sample further from its centre than the bin is the chain passing it twice: it
+    stays. A bin with no sample within 2 BIN either side keeps its own height."""
+    pts = []
+    for x in series:
+        if x['z'] is not None and x['xy'] is not None:
+            t = line.project(Point(x['xy']))
+            pts.append((t if abs(t - x['s']) <= BIN else x['s'], x['z']))
+    pts.sort()
+    ts, zs = [], []
+    for t, z in pts:
+        if not ts or t - ts[-1] > 1e-6:
+            ts.append(t)
+            zs.append(z)
+    if len(ts) < 2:
+        return
+    for x in series:
+        if x['z'] is None:
+            continue
+        k = bisect.bisect_left(ts, x['s'])
+        a, b = max(0, k - 1), min(len(ts) - 1, k)
+        if a == b or x['s'] - ts[a] > 2 * BIN or ts[b] - x['s'] > 2 * BIN:
+            continue
+        x['z'] = zs[a] + (zs[b] - zs[a]) * (x['s'] - ts[a]) / (ts[b] - ts[a])
+
+
 def build_chains(staged):
     """Chains of DI paths (copies dropped), each with its staged heights binned every BIN m."""
     import di_tracks
@@ -183,7 +211,9 @@ def build_chains(staged):
                            'src': CODE.get((h.get('height_source') or {}).get('dataset')) if sel else None,
                            'kind': kinds.most_common(1)[0][0], 'terrain': h.get('terrain_z'), 'xy': h['xy'],
                            'flags': sorted({f for x in v for f in x.get('review_flags', [])})})
-        out.append(Chain(xy, series))
+        track = Chain(xy, series)
+        at_true_places(series, track.line)
+        out.append(track)
     print(f'{len(out)} chains of {len(paths)} DI paths ({source.duplicates} copies dropped), '
           f'{sum(len(c.bins) for c in out)} bins', flush=True)
     return out

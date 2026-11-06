@@ -170,5 +170,45 @@ class Lines(unittest.TestCase):
                          [[0, 3.0, 'di'], [3.0, 7.0, 'dtmp'], [7.0, 8, 'surface']])
 
 
+class TruePlaces(unittest.TestCase):
+    def bins(self, grade=0.05):
+        # a straight 5 % grade, each bin's sample up to 2.4 m off its centre and its height true to where it lies
+        line = lh.LineString([(0, 0), (200, 0)])
+        out = []
+        for b in range(40):
+            s = (b + .5) * lh.BIN
+            t = s + 2.4 * math.sin(b * 1.7)
+            out.append({'s': s, 'z': 100 + grade * t, 'xy': (t, 0.0)})
+        return line, out
+
+    def test_a_grade_stays_a_grade(self):
+        line, series = self.bins()
+        before = max(abs(x['z'] - (100 + .05 * x['s'])) for x in series)
+        lh.at_true_places(series, line)
+        after = max(abs(x['z'] - (100 + .05 * x['s'])) for x in series[1:-1])
+        self.assertGreater(before, .1)
+        self.assertLess(after, .001)
+
+    def test_a_held_bin_stays_held(self):
+        line, series = self.bins()
+        series[7]['z'] = None
+        series[7]['xy'] = None
+        lh.at_true_places(series, line)
+        self.assertIsNone(series[7]['z'])
+
+    def test_a_bin_with_no_sample_near_keeps_its_height(self):
+        line = lh.LineString([(0, 0), (200, 0)])
+        series = [{'s': 2.5, 'z': 100.0, 'xy': (2.5, 0.0)}, {'s': 102.5, 'z': 104.0, 'xy': (102.5, 0.0)}]
+        lh.at_true_places(series, line)
+        self.assertEqual([x['z'] for x in series], [100.0, 104.0])
+
+    def test_a_chain_passing_a_sample_twice_leaves_it_in_its_bin(self):
+        # (project finds the chain's other pass, far from this bin's centre)
+        line = lh.LineString([(0, 0), (200, 0)])
+        series = [{'s': 2.5, 'z': 100.0, 'xy': (2.5, 0.0)}, {'s': 7.5, 'z': 100.0, 'xy': (150.0, 0.0)}, {'s': 12.5, 'z': 100.0, 'xy': (12.5, 0.0)}]
+        lh.at_true_places(series, line)
+        self.assertEqual([x['z'] for x in series], [100.0, 100.0, 100.0])
+
+
 if __name__ == '__main__':
     unittest.main()
