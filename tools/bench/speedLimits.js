@@ -39,6 +39,28 @@ function causes(game) {
   return { curve, posted, grades, switches };
 }
 
+// the name of the street nearest a route position, for reading a place (data.roads[].n, tools/build_line.py)
+function streetAt(game, s) {
+  const p = game.route.at(s);
+  let best = null, bd = 25;
+  for (const r of game.data.roads) {
+    if (!r.n) continue;
+    for (let i = 1; i < r.p.length; i++) {
+      const a = r.p[i - 1], b = r.p[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((p.x - a[0]) * dx + (p.y - a[1]) * dy) / l2));
+      const d = Math.hypot(p.x - a[0] - dx * t, p.y - a[1] - dy * t);
+      if (d < bd) { bd = d; best = r.n; }
+    }
+  }
+  return best;
+}
+
+function stopsAround(game, s) {
+  const st = game.data.stops;
+  const k = st.filter((x) => x.s <= s).length;
+  return `${st[Math.max(0, k - 1)]?.name} .. ${st[Math.min(st.length - 1, k)]?.name}`;
+}
+
 function curvesUnder(game, radius) {
   const route = game.route, out = [];
   let from = null, rMin = 1e9;
@@ -49,7 +71,8 @@ function curvesUnder(game, radius) {
       rMin = Math.min(rMin, r);
     } else if (from !== null) {
       const onSwitch = game.switches.some((w) => w.s > from - 15 && w.s < s + 15);
-      out.push({ from, to: s, r: round(rMin, 1), v: route.curveSpeed((from + s) / 2), onSwitch });
+      out.push({ from, to: s, r: round(rMin, 1), v: route.curveSpeed((from + s) / 2), onSwitch,
+                 street: streetAt(game, (from + s) / 2), between: stopsAround(game, (from + s) / 2) });
       from = null; rMin = 1e9;
     }
   }
