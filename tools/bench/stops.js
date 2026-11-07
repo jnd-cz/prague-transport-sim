@@ -5,7 +5,7 @@
 // (and 10 m) until the tram stands there; a brake for a curve further out is not one, and driving on after it is fine.
 // flips: the drive pedal after the brake pedal inside an approach, by what allowed it: ahead (a tram ahead short of the stop
 // point: the user, #351, "unless you're following tram in front of you"), signal (a signal short of the stop point
-// showed stop), car (a car on or crossing our track short of it), free (nothing: the plan changed its mind, which
+// showed stop), car (a car on or crossing our track that it would stop for short of it), free (nothing: the plan changed its mind, which
 // is what must stay at 0). shoesAtSpeed: approaches where the shoe brakes came fully in above 8 km/h (LO dropped).
 // pulses: the brake pedal let off to zero and pressed again inside an approach. restarts: the tram stood short of
 // the stop point and drove on. err: the stop point less the front at the stand (+ short, − over).
@@ -39,8 +39,9 @@ export function stopsWatch(game) {
         const gap = game.tramAheadGap?.();
         if (gap !== null && gap !== undefined && gap < d + 2) a.why.ahead = true;
         if (game.signals.some((x) => x.s > tr.s && x.s < st.target + 1 && x.state !== 'go')) a.why.signal = true;
-        if ((game.carsOnTrack || []).some((c) => c.s > tr.s && c.s < st.target) || (game.carsCrossing || []).some((c) => c.s > tr.s && c.s < st.target)) a.why.car = true;
-        if (game.obstacles.some((o) => o.state !== 'gone' && Math.abs(o.lat) < 2.5 && o.s > tr.s && o.s < st.target)) a.why.car = true;
+        // (its stopping point, which the autopilot takes 6–8 m short of it, as src/autopilot.js)
+        if ((game.carsOnTrack || []).some((c) => c.s > tr.s && c.s - 7.5 < st.target) || (game.carsCrossing || []).some((c) => c.s > tr.s && c.s - 6 < st.target)) a.why.car = true;
+        if (game.obstacles.some((o) => o.state !== 'gone' && Math.abs(o.lat) < 2.5 && o.s > tr.s && o.s - 8 < st.target)) a.why.car = true;
         if (n !== a.was) {
           a.changes++;
           if (a.braked && n > 0) {

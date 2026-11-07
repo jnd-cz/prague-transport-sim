@@ -21,7 +21,7 @@ RUN = """async (only) => {
   const { Tram } = await import('/src/tram.js');
   const { Autopilot } = await import('/src/autopilot.js');
   const h = 1 / 30;
-  // a line: stops [s], limit (km/h) or limits [[s, km/h]], grade(s), signals [{ s, states: [[t, state]] }], ahead { s, length, moves: [[t, v]] }
+  // a line: stops [s], limit (km/h) or limits [[s, km/h]], grade(s), signals [{ s, states: [[t, state]] }], ahead { s, length, moves: [[t, v]] }, crossing { s, from, to } (a car crossing the track there, from t to t)
   const drive = (o) => {
     const tr = new Tram(o.cars ?? 2);
     tr.eq.mode = 'advanced';
@@ -55,6 +55,7 @@ RUN = """async (only) => {
       T += h; g.clock = T; step++;
       for (const x of g.signals) for (const [t, state] of x.states) if (T >= t) x.state = state;
       if (ahead) { for (const [t, v] of ahead.moves) if (T >= t) ahead.v = v; ahead.s += ahead.v * h; }
+      if (o.crossing) g.carsCrossing = T >= (o.crossing.from ?? 0) && T <= (o.crossing.to ?? Infinity) ? [o.crossing] : [];
       pilot.step(g, h);
       tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed' });
       const n = tr.notch, st = stops[g.nextStop], d = st ? st.target - tr.s : null;
@@ -100,6 +101,11 @@ RUN = """async (only) => {
     { name: 'green turns red close by', stops: [20, 900], limit: 50, pax: 60, signals: [{ s: 500, states: [[0, 'go'], [36, 'warn'], [39, 'stop'], [80, 'go']] }] },
     { name: 'tram ahead stands at the stop, then leaves', stops: [20, 700], limit: 50, pax: 60, ahead: { s: 700, length: 30.24, moves: [[0, 0], [62, 6]] } },
     { name: 'tram ahead creeps on', stops: [20, 900], limit: 50, pax: 60, ahead: { s: 400, length: 30.24, moves: [[0, 2]] } },
+    // (the bell rings for it, and the stop does not change: it took the last-metres rule away and stood 3.6 m short, line 17 seed 5, Nádraží Modřany)
+    { name: 'car crossing past the stop', stops: [20, 600], limit: 50, pax: 60, crossing: { s: 640 } },
+    { name: 'car crossing past the stop, downhill', stops: [20, 600], limit: 50, pax: 60, grade: uphill(-0.022), crossing: { s: 640 } },
+    // (its point, 6 m short of it, comes before the stop for a moment: the plan forgot the stop and drove, line 22 seed 5 at Radošovická, line 37 seed 4 at U Elektry)
+    ...[62, 64, 66, 68, 70, 72].map((t) => ({ name: `car crossing just past the stop, uphill, at ${t} s`, stops: [20, 600], limit: 50, pax: 60, grade: uphill(0.02), crossing: { s: 603, from: t, to: t + 2 } })),
   ].filter((x) => !only || x.name.includes(only));
   return S.map(drive);
 }"""

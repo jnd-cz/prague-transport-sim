@@ -40,9 +40,11 @@ export class Autopilot {
     const limitDecel = planAt(gradeHere);
     if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12)) - 0.3);
     const vLimit = vt;
-    let stopAt = null, fixed = false;
-    // (fixed: a stop or a signal, which stays where it is; else something that can move off)
-    const consider = (s, still = false) => { if (stopAt === null || s < stopAt) { stopAt = s; fixed = still; } };
+    let stopAt = null, fixed = false, fixedAt = null;
+    // (fixed: a stop or a signal, which stays where it is; else something that can move off. Something nearer does not take
+    // the fixed point away: a car crossing just past a stop, its point 6 m short of it, had the plan forget the stop for
+    // a second and drive on the way in, line 22 seed 5 at Radošovická, line 37 seed 4 at U Elektry)
+    const consider = (s, still = false) => { if (still && (fixedAt === null || s < fixedAt)) fixedAt = s; if (stopAt === null || s < stopAt) { stopAt = s; fixed = still; } };
     if (st) {
       const needStop = !st.request || st.waiting > 0 || st.alightFrac > 0;
       if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target, true);
@@ -98,47 +100,49 @@ export class Autopilot {
     // user, #351: "smooth braking towards stop sign without any jums to jízda unless you're following tram in front of
     // you"; on main the crawl's 3 km/h was held by drive pulses 1–2 m short). Behind something that moves it keeps
     // the curve ending 3 m short and the crawl up to it, so it closes up as a driver does.
-    const dLeft = stopAt === null ? null : stopAt - tr.s - (fixed ? STOP_MARGIN : 0);
+    const dLeft = fixedAt === null ? null : fixedAt - tr.s - STOP_MARGIN;
     // (the steepest downhill between here and the point counts: a crest just before it took the brake's margin away)
-    const stopDecel = !fixed || dLeft > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + dLeft / 2 - 7), g.profile.grade(tr.s + dLeft - 7)));
-    let vStop = Infinity, stood = false;
-    if (stopAt !== null) {
+    const stopDecel = dLeft === null || dLeft > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + dLeft / 2 - 7), g.profile.grade(tr.s + dLeft - 7)));
+    let vFixed = Infinity, vMoving = Infinity, stood = false;
+    if (fixedAt !== null) {
+      vFixed = Math.sqrt(2 * stopDecel * Math.max(0, dLeft));
+      stood = tr.v < 0.1 && fixedAt - tr.s < STAND_SHORT;
+      if (stood || dLeft <= 0) vFixed = 0;
+      vt = Math.min(vt, vFixed);
+    }
+    if (stopAt !== null && !fixed) {
       const d = stopAt - tr.s;
-      if (fixed) {
-        vStop = Math.sqrt(2 * stopDecel * Math.max(0, dLeft));
-        stood = tr.v < 0.1 && d < STAND_SHORT;
-        if (stood || dLeft <= 0) vStop = 0;
-      } else {
-        // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
-        // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
-        // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
-        vStop = Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0);
-        if (d < 1) vStop = 0;
-      }
-      vt = Math.min(vt, vStop);
+      // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
+      // come in, so a crawl up to the last 1.5 m overran stops and signals by 1–3 m, #241's checks; a driver
+      // comes in slowly and lets the shoes stop it. The precise-stop bonus allows ±3 m.)
+      vMoving = Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - STOP_SHORT))), d > 1 ? 0.8 : 0);
+      if (d < 1) vMoving = 0;
+      vt = Math.min(vt, vMoving);
     }
     // how hard it slows by itself, rolling on the gradient with the preparation current (m/s²)
     const resist = 650 * tr.cars + 28 * tr.cars * tr.v + 4.2 * tr.v * tr.v;
     const aCoast = (resist + 700 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
-    // the approach: from the first brake pedal for this point until the tram stands (or the point goes away)
-    if (fixed && tr.notch < 0 && tr.v > 0.3 && tr.v >= vStop - 0.5) { if (this.approach === undefined || this.approach === null) this.approach = stopAt; }
-    if (this.approach !== null && this.approach !== undefined && (!fixed || Math.abs(this.approach - stopAt) > 3 || tr.v < 0.05)) this.approach = null;
-    const inApproach = this.approach !== null && this.approach !== undefined;
+    // the approach: from the first brake pedal for this point until the tram stands, the point goes away, or something nearer
+    // has taken it well under the curve (that may move off again, and the tram with it)
+    if (fixedAt !== null && tr.notch < 0 && tr.v > 0.3 && tr.v >= vFixed - 0.5) this.approach = this.approach ?? fixedAt;
+    if (this.approach != null && (fixedAt === null || Math.abs(this.approach - fixedAt) > 3 || tr.v < 0.05 || (!fixed && tr.v < vFixed - 1.5))) this.approach = null;
+    const inApproach = this.approach != null;
     // drive only if still under the plan 2.5 s on: a careful driver coasts into a braking curve (on the T3
     // the brake builds slowly within ≈2.5 s of driving; it drove up to 16.5 km/h 11 m before Ruská and
     // overran, line 22 seed 4, #241's check)
     const look = Math.max(0, tr.v) * 2.5;
     let vtDrive = vt;
     if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12 - look)) - 0.3);
-    if (stopAt !== null) {
+    if (fixedAt !== null) {
+      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - look))));
+      // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops")
+      if (stood || (dLeft < 40 && aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft)) vtDrive = 0;
+      // (stopped short of the point: on, slowly)
+      else if (tr.v < 0.1) vtDrive = Math.max(vtDrive, Math.min(vLimit, 1.2));
+    }
+    if (stopAt !== null && !fixed) {
       const d = stopAt - tr.s;
-      if (fixed) {
-        vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - look))));
-        // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops")
-        if (stood || (dLeft < 40 && aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft)) vtDrive = 0;
-        // (stopped short of the point: on, slowly)
-        else if (tr.v < 0.1) vtDrive = Math.max(vtDrive, Math.min(vLimit, 1.2));
-      } else vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
+      vtDrive = Math.min(vtDrive, Math.max(Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, d - look - STOP_SHORT))), d > 1 ? 0.8 : 0));
     }
     if (hazard && this.bellCooldown <= 0) { g.ringBell(); this.bellCooldown = 6; }
 
@@ -193,11 +197,12 @@ export class Autopilot {
       if (nl && nl.v / 3.6 < tr.v) aPlan = Math.max(-1.1, Math.min(aPlan, -(tr.v * tr.v - (nl.v / 3.6 - 0.3) ** 2) / (2 * Math.max(3, nl.d - 12))));
     }
     // on the curve to a fixed point: the deceleration that still ends there, whatever the brake's steps gave so far; too
-    // fast for a speed limit as well, the harder of the two
+    // fast for a speed limit or for something nearer as well, the harder of the two
     // (the brake takes ≈1 s to come in: from the point where that second still leaves the curve's deceleration)
-    const onCurve = fixed && dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * stopDecel * Math.max(0, dLeft - tr.v)) - 0.02) && tr.v > 0.05;
+    const onCurve = dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * stopDecel * Math.max(0, dLeft - tr.v)) - 0.02) && tr.v > 0.05;
     const aNeed = onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft)) : 0;
-    const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, tr.v > vLimit ? (vLimit - tr.v) * 0.9 : 0)) : aPlan;
+    const vOver = Math.min(vLimit, vMoving);
+    const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, tr.v > vOver ? (vOver - tr.v) * 0.9 : 0)) : aPlan;
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + resist;
     const stand = g.doorState !== 'closed' || vt <= 0.05;
     const coast = (!onCurve && between) || (onCurve && need > -300) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
@@ -207,7 +212,9 @@ export class Autopilot {
     const button = wantPower === true && (need < 0 || inApproach || coast);
     this.input.switchBtn = button;
     this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
-    tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || hazard, v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+    // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
+    // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
+    tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: inApproach || (onCurve && tr.v > 0.1), fixed, aNeed, aCoast, inertia: tr.inertia, grade,
       speedErr: onCurve ? null : tr.v - vt });
     return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };

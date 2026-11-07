@@ -333,7 +333,7 @@ export class TR37 {
       if (s < -4 && (this.ls || this.coastT < C.coastSettle)) s = -4;
       if (s > 0 && this.brakeT < C.coastSettle) s = 0;
     }
-    if (w.fixed && w.aNeed != null && s < 0 && v < 1.6 && !w.stand && !w.urgent) {
+    if (w.fixed && w.aNeed != null && s < 0 && v < 1.6 && !w.stand) {
       // the last metres to a stop or a signal. The electric brake is out below ≈6 km/h; from step 3 on it hands over to the
       // shoes, partly (BR1 at position 3) or fully on step 5 (LO), and partly is as far as they let go again without the
       // drive pedal: so not before that alone is what it takes, until then rolling.
