@@ -1,6 +1,6 @@
 # Speed limits from D 1/2's facts, OSM's posted speeds and the signs (#211)
 
-Status: **proposed**, waiting for the user's answers (PR #362). The code in that PR follows the proposal; each rule is its own part of the diff.
+Status: **limits decided, signs proposed** (PR #362). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). Questions 4–8, on the signs and the speed switches, are open.
 
 ## The facts against the code
 
@@ -11,6 +11,7 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | `max-speed` | 50 km/h, also off the road, unless a Rychlostník allows more | D 1/2 § 25.1 | **differs:** untagged dedicated track 60, 5.97 km over 50 with no tag | 50 |
 | `user-speed-signs` | signs up to 60 for now, "higher speeds to be picked up from osm" | the user, 2026-11-03 | **differs:** every speed capped at 60, 1.77 km of line 17 held back (0.89 km of it before the first stop) | the limit follows OSM up to the T3's 65; signs not changed yet |
 | `restriction-start-end` | front in, rear out | § 25.1, 49.14, 49.22 | holds (`currentLimit`, lowest under the whole tram) | holds |
+| `restriction-past` | a restriction ends 2 m past a curve's end, a switch's frog or a crossing | the user, 2026-11-07 | **differs:** a curve's limit ran 15 m past its last low 5 m bin; a switch's ended at the frog's bin | 2 m, to the metre |
 | `higher-speed-start-end` | rear in, front out | § 25.1 | holds (falls out of the same minimum) | holds |
 | `point-restriction` | front only | § 49.16 | missing; no place known | missing |
 | `switch-facing-speed` | 15 km/h facing, straight or diverging | § 25.4a | **differs:** 30 straight, 15 diverging; 18 m stretch | 15; blades to frog |
@@ -22,8 +23,8 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | `switch-v-sign-speed` | 10 km/h facing diverging at a "V" | § 49.20 | missing; no list of places | missing |
 | `stop-pass-speed` | 30 km/h, the front passing a stop's sign without stopping | § 25.5b | missing | missing: a rule of the game, for after W2 |
 | `slow-sign-speed` | 10 km/h at *Pomalu* | § 49.13 | missing; no places | missing |
-| `gradient-no-speed` | the dangerous-gradient rules set no speed; PPS Q53 marks "25 km/h" wrong | § 49.9–12 | **differs:** 25 under −6 %, 35 under −4.5 %: 4.64 km of limits with no source | unchanged: question 3 |
-| `trojska-descent` | 20–25 km/h, rolling, Hercovka → Nad Trojou | website, local rule | covered by chance by the rule above | unchanged |
+| `gradient-no-speed` | the dangerous-gradient rules set no speed; PPS Q53 marks "25 km/h" wrong | § 49.9–12, the user | **differs:** 25 under −6 %, 35 under −4.5 %: 4.64 km of limits with no source | holds: no limit from a slope |
+| `trojska-descent` | 20–25 km/h, rolling, Hercovka → Nad Trojou | website, local rule | covered by chance by the rule above | 25 by its `place`, only where OSM tags no speed (the user: a backup after OSM) |
 | `speed-switches` | R01–R09 with their speeds | register | not read | not read: [design](2026-11-07-speed-switch-signals.md) |
 | `night-zones` | 40 km/h, 22–6 h | website | not read | not read: below |
 | `dangerous-gradients` | Trojská 80.15 ‰, below Sídliště Modřany 69.9 ‰, the embankment curve 40 km/h | website | a board from the profile at −5.5 % | unchanged |
@@ -31,18 +32,18 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 
 **What sets the limit, km of the five lines** (86.6 km):
 
-| cause | before | now | with W2's rebuild (local) |
-|---|---|---|---|
-| posted or general | 65.72 | 66.48 | 64.96 |
-| curve | 15.25 | 14.00 | 13.40 |
-| gradient (no source) | 4.64 | 4.62 | 4.63 |
-| switch, and with the rebuild the diamonds | 1.01 | 1.53 | 3.65 |
+| cause | before | proposed (84640ad) | decided (78fd584) | decided, with W2's rebuild (local) |
+|---|---|---|---|---|
+| posted or general | 65.72 | 66.48 | 73.75 | 71.36 |
+| curve | 15.25 | 14.00 | 11.14 | 10.93 |
+| gradient (no source) | 4.64 | 4.62 | – | – |
+| switch, and with the rebuild the diamonds | 1.01 | 1.53 | 1.74 | 4.35 |
 
 **Where a slow stretch ended** (two-car set, 30.24 m). #211 read three extensions. The window of `speedLimits` applies only to curves, not to switches, so two remained: the stretch ran to 14 m past the fork, and 5 m bins rounded it up. Measured: the limit lifted **46–48 m** past the fork.
 
-The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself:
+The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself and the user's 2 m:
 - **The frog** lies a median **11.5 m** past the fork (10.5–13.5 m p10–p90), measured on the 82 facing switches: where the other leg is one gauge off the route.
-- **Now 42–43 m** at a switch with no other trackwork after it, which is the frog plus the tram. D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1).
+- **Now 44–45 m** at a switch with no other trackwork after it: the frog, 2 m, the tram. D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1). A one-car tram: 29–30 m.
 
 On today's data, what the driver still feels as too far is mostly OSM. 65 stretches on the five lines are tagged 15 km/h, up to 110 m long, and 38 of them touch a facing switch. The first rise of the limit past a switch is a median **73–105 m**. Those pieces stand for the trailing switches and diamonds the game did not know. Once the data has them (W2's rebuild) they are dropped (`withoutOwnPieces`).
 
@@ -56,7 +57,7 @@ On today's data, what the driver still feels as too far is mostly OSM. 65 stretc
 | 23 | 14 (5) | 12 | 1.11 → 1.00 | 85 → 75 |
 | 37 | 9 (3) | 11 | 0.69 → 0.45 | 105 → 64 |
 
-OSM's pieces go, but the first rise stays at a median 64–75 m. `--checks limits` says what holds a two-car set last, at the 82 facing switches:
+OSM's pieces go, but the first rise stays at a median 64–75 m. `--checks limits` says what holds a two-car set last, at the 82 facing switches (before the 2 m rule):
 
 | holds it last | forks |
 |---|---|
@@ -65,22 +66,67 @@ OSM's pieces go, but the first rise stays at a median 64–75 m. `--checks limit
 | the switch itself: frog plus tram | 18 |
 | the window below, carrying a posted piece on | 2 |
 
-So at most forks the limit is what the rules ask: 39 of the 82 have a trailing switch or a diamond within 15 m past the frog, and each holds the limit until the rear has passed. `liftPast.twoCars` (a median 43–51 m on the rebuild) counts the pieces that start in the first 20 m past the fork, so 51 m is its ceiling.
+So at most forks the limit is what the rules ask: 39 of the 82 have a trailing switch or a diamond within 15 m past the frog, and each holds the limit until the rear has passed. `liftPast.twoCars` counts the pieces that start in the first 20 m past the fork, so 51 m is its ceiling: on the rebuild with the 2 m rule its median is 45–46 m on lines 22, 23 and 37 and that ceiling on 9 and 17.
 
-**The window has no source.** Since the initial commit `speedLimits` takes each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), and `currentLimit` also holds a limit until the rear has passed. So a curve's or a posted piece's limit lifts 15 m plus the tram after its last low bin; 0.96 of the 5.22 km at 15 km/h or less is only that spill.
+**2 m past the end** (`restriction-past`, the user, 2026-11-07). Since the initial commit `speedLimits` had taken each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), with no source. Now:
+- **The table is per metre.** A curve's limit follows the radius at each metre (`Route._radius`), from 5 m before it asks for less (`CURVE_AHEAD`, unchanged) to 2 m after. A switch's stretch ends 2 m past the frog, a trailing switch's 2 m past its blades, a diamond's 2 m past its rails. `Game.currentLimit` reads the metres under the tram; the 5 m `values` (the signs, the overlay) keep each bin's lowest.
+- **The curve's end** is where the game's radius estimate (16 m of heading) last asks for less than the posted speed. Against a short estimate (6 m), the limit is back at the posted speed a median **2–3 m** past the curve's end on lines 9, 17, 22 and 23 and −1 m on line 37, p90 at most 5 m (published data, 222 curves). The 16 m estimate is close to the true radius because most curves here have transitions: the limit climbs step by step along the transition and leaves its lowest speed a median 7–8 m before that end. The p10 of −15 m on lines 23 and 37 is the measure's search reach.
+- **The radius estimate smears a sharp end** by about 12 m each way, so on a curve without a transition the limit would run that far past its end. Most curves here have one.
+- **Km at 15 km/h or less** on the rebuild: 5.22 → 5.09. The window's spill goes; each of the 272 pieces of trackwork gains 2 m.
 
-Tried on the rebuilt lines with 5 m behind, in a scratch copy:
-- **Km at 15 km/h or less:** 5.22 → 4.71.
-- **Forks the window holds last:** 22 → 11.
-- **First rise past a fork (lines 9, 17, 22, 23, 37):** 73, 73, 73, 75, 64 → 73, 69, 64, 67, 64 m.
-- **Time at the limit over the 86.6 km:** 131.3 → 128.7 min, −2 %.
+**What it does to a run.** `u3,redruns,traffic,lint` on all lines, seeds 1–5, on 78fd584 with the published data, against checkpoint W1: **80 of 80 runs pass**, lint does not move, no run is stuck or unfinished. Line 23's seed 1, which had not finished on 84640ad (the tram behind car 112, which waited for a walker pacing 1.4 m in front of it: #269's scene), now finishes. Outside main's seed spread:
 
-Not changed: it moves every curve limit, so it waits for the user's word and then needs the simulation checks (PR 362, question 9).
+| line | count | W1 mean [min–max] → branch |
+|---|---|---|
+| 17 | `heatingKnobs` | 14 [13–14] → 13, better |
+| 22 | `cyclesBroken` | 0 → 0.6 (seed 3: 1, seed 4: 2) |
+| 23 | u3 `green` | 106 [99–113] → 97 |
+| 37 | `cyclesBroken` | 0 → 0.2 (seed 5: 1) |
+| 37 | `warnPasses` | 0.8 [0–2] → 2.4 |
 
-**What it does to a run.** `u3,redruns,traffic,lint` on all lines, seeds 1–5, against checkpoint W1: 79 of 80 runs pass, lint does not move.
-- **Trip time** (traffic seeds 2 and 3, main pinned at 38024b5): line 9 −1.4 %, 17 +2.1 %, 22 +2.2 %, 23 −2.3 %, 37 +1.2 %. The 15 km/h over straight switches costs little against the stops and traffic of a run.
-- **Line 23, traffic seed 1, did not finish** (stop 2, 7200 s). The tram stands at s 682 behind car 112, which stands on the track and waits for a walker pacing 1.4 m in front of it. This is #269's scene, in another place: #265's change of tram timing ran into it on the same line and seed.
-- **Outside main's seed spread, not traced:** `cyclesBroken` on line 9 (0 → 0.4) and line 37 (0 → 0.2), `jump` on line 22 (373 → 394, spread 344–391). New timing reshuffles traffic like a new seed (#156); these are the counts to read first if W2's checkpoint keeps them.
+The earlier moves of 84640ad (`cyclesBroken` on line 9, `jump` on line 22) are inside the spread now. New timing reshuffles traffic like a new seed (#156).
+
+**The broken cycles**, traced in a scratch copy of `traffic.js`, are the scene the breaker was made for (#154, #168): our tram stands short of a car on its track, and the car waits for a tram, until the car leaves after 30 s. Line 22, seeds 3 and 4, at s 5018, 28 m past Pohořelec (the car waits for our tram, limit 50); line 22, seed 4, at s 8407, 73 m before Malostranské náměstí (another tram, 15); line 37, seed 5, at s 4723, 32 m past Balabenka beyond its diverging switch, #168's place (another tram, 15). The redruns check records no places for line 37's warn passes.
+
+**Trip time**, the traffic check's run to the last stop, seeds 1–5, against main's own run at 38024b5 (mean [min–max]):
+
+| line | main, s | branch, s | change |
+|---|---|---|---|
+| 9 | 5173 [5059–5293] | 5119 [5038–5160] | −1.0 % |
+| 17 | 3414 [3394–3439] | 3341 [3251–3424] | −2.2 % |
+| 22 | 3630 [3575–3703] | 3575 [3522–3617] | −1.5 % |
+| 23 | 2019 [1913–2103] | 1912 [1878–1976] | −5.3 % |
+| 37 | 1696 [1644–1745] | 1672 [1621–1703] | −1.4 % |
+
+Dropping the slope limits (4.6 km at 25 or 35) and the 15 m window gains more than 50 on untagged track and 15 over a straight switch cost. On 84640ad, with the slope limits and the window, two seeds had read −2.3 % to +2.2 %.
+
+## Steep descents
+
+The user (2026-11-07): drop the limits from the slope. Both steep descents the user knows are tagged in OSM: 25 km/h on the Trojská way (1256351697, 440 m) and 35 on Hlubočepy – Geologická (465270521, 465270522, 1246102955, 1246102956). `trojska-descent` stays as the backup, 25 km/h between Hercovka and Nad Trojou in that order of stops, where OSM tags no speed (`placeStretches`). Line 17's route climbs Trojská, so it fires on no built line today.
+
+`--checks limits` lists every stretch of at least 20 m steeper than −4.5 % on our track profile, with what is posted on it: 48 on the five lines, 14 of them untagged. The steepest:
+
+| line | between | grade, length | posted | limit now |
+|---|---|---|---|---|
+| 22 | Jana Masaryka – Krymská | −8.8 %, 415 m | untagged | 50 |
+| 23 | Královka – Malovanka | −8.6 %, 70 m | untagged | 15 (a curve) |
+| 23 | Malovanka – Hládkov | −8.6 %, 155 m | untagged | 50 |
+| 37 | Ohrada – Krejcárek | −8.2 %, 300 m | 50, 60 | 45 |
+| 17 | Sídliště Modřany – Modřanská rokle | −8.1 %, 205 m | 60 | 60 |
+| 9 | Blatiny – Slánská | −7.7 %, 285 m | 50 | 30 |
+
+The grades are our profile's, before #358's denoising; they are read again on its data before anything is built on them.
+
+## Anticipating the end of a restriction
+
+The user asked whether the autopilot rises toward the limit as a restriction ends. **It does not, on main or on #351's branch:** its target is the limit in force less 0.6 m/s, so it reaches the end of a 15 km/h stretch at 11.8–13.9 km/h. Test drives with the real `Tram` and `Autopilot` on 11 made-up lines, seconds saved per restriction left, median (range):
+
+| autopilot | rising to the limit as it lifts (1.5 s early) | margin 0.45 m/s | margin 0.3 m/s |
+|---|---|---|---|
+| main's | 0.03 (−1.63 to 0.4) | 1.03 (−0.23 to 2.67), never over | 2.13, over by up to 0.53 km/h for up to 3.3 s |
+| #351's | 0.43 (0 to 0.87) | 1.06 (0.33 to 2.0); over only on the 40 ‰ climb | 1.36 |
+
+The margin is the larger lever. Neither is on this branch: #351 rewrites those lines, and the same change behaves differently there. [#370](https://github.com/jnd-cz/prague-transport-sim/issues/370) holds the numbers and the code, blocked by #351.
 
 **Line 17's curve limits since #204.** Before #204 (019c86b, its own data) against main (38024b5, which also has #210, #218 and #237), by place: 34 of 4360 bins moved by 5 km/h or more, in 31 stretches, 17 up and 14 down. Nearly all are one 5 m bin at a 5 km/h step, with the radius changed by under 17 %: `curveSpeed` rounds down to 5 km/h, so a small change crosses a step. The five large moves are not curves: there the sample fell on another OSM way, whose posted speed is the one shown.
 
@@ -145,7 +191,7 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 | yellow backing board (§ 49.32) | any sign may have it; no rule says where | an option of the face |
 | SIG-V2 *Pomalu*, V5 point, V9 "V" | faces only: no source lists their places | |
 
-**A change from today:** a limit that comes only from a curve (14.0 km, R over 25 m) has no real sign, so it gets none. The gauge marker and the hint still show it. Today's boards stand at every change, drawn black on white, and call themselves rychlostník.
+**A change from today:** a limit that comes only from a curve (11.1 km since the 2 m rule; R over 25 m) has no real sign, so it gets none. The gauge marker and the hint still show it. Today's boards stand at every change, drawn black on white, and call themselves rychlostník.
 
 **Curves under 25 m found by the rule, against the list:** Spálená (9, 22, 23), Chotkova (22, 23), Blanická (9), Na Moráni (9), Na Žertvách (37), Klárov (22, 23, at a switch). Not found by radius: Malostranské náměstí (both), Náměstí Míru (both), Havlíčkova. These may be other directions or a radius read over 16 m; the implementation issue checks them.
 
