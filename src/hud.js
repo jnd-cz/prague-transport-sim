@@ -206,6 +206,7 @@ export class Hud {
       `${K('info.accel')} ${tram.a.toFixed(2)} · ${t('info.lateral')} ${(game.latAcc || 0).toFixed(1)} m/s²`,
       `${K('info.grade')} ${(tram.grade * 1000 >= 0 ? '+' : '') + Math.round(tram.grade * 1000)} ‰ · ${Math.round(game.profile.height(tram.s))} ${t('info.altitude')}`,
       `${K('info.adhesion')} ${t(`adh.${game.weather}`)} μ ${tram.mu.toFixed(2)} · ${K('info.sand')} ${Math.round(tram.sand * 100)} %`,
+      `${K('info.power')} ${Math.round(tram.voltage)} V${tram.supply.ref ? ` (${tram.supply.ref} ${tram.supply.km.toFixed(1)} km)` : ''} · ${tram.eq.aux.U.toFixed(1)} V · ${Math.round(tram.eq.mg.rpm)} ${t('info.rpm')}`,
       `${K('info.switch')} ${sw && sw.s - tram.s < 300 ? `${Math.round(sw.s - tram.s)} m · ${t(`dirShort.${sw.pos === 'straight' ? 'straight' : sw.divSide}`)}` : '—'}`,
     ].join('<br>');
 

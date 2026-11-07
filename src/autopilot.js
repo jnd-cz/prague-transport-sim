@@ -177,10 +177,19 @@ export class Autopilot {
     const grade = gradeHere;
     // (between the drive plan and the brake plan: coast)
     const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
-    const aPlan = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    let aPlan = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    // near a speed it holds, gently: a hard gain took it from one brake step's force to the next and from 14 to 10 km/h and
+    // back down a gradient, and it asked for drive there; into a lower limit ahead, the deceleration that ends there, not
+    // a lag behind it
+    if (vt === vLimit) {
+      const off = (tr.v > vt ? vt : vtDrive) - tr.v, gentle = Math.sign(off) * (0.35 * Math.min(Math.abs(off), 1) + 0.9 * Math.max(0, Math.abs(off) - 1));
+      aPlan = Math.max(-1.1, Math.min(1.0, gentle));
+      if (nl && nl.v / 3.6 < tr.v) aPlan = Math.max(-1.1, Math.min(aPlan, -(tr.v * tr.v - (nl.v / 3.6 - 0.3) ** 2) / (2 * Math.max(3, nl.d - 12))));
+    }
     // on the curve to a fixed point: the deceleration that still ends there, whatever the brake's steps gave so far; too
     // fast for a speed limit as well, the harder of the two
-    const onCurve = fixed && dLeft !== null && (inApproach || tr.v >= vStop - 0.02) && tr.v > 0.05;
+    // (the brake takes ≈1 s to come in: from the point where that second still leaves the curve's deceleration)
+    const onCurve = fixed && dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * DECEL * Math.max(0, dLeft - tr.v)) - 0.02) && tr.v > 0.05;
     const aNeed = onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft)) : 0;
     const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, tr.v > vLimit ? (vLimit - tr.v) * 0.9 : 0)) : aPlan;
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + resist;

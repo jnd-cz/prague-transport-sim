@@ -57,6 +57,43 @@ export class TramAudio {
     src.connect(this.rollFilter).connect(this.rollGain).connect(this.master);
     src.start();
 
+    // the motor-generator and its two fans (src/electric.js): always running, its speed following the wire, so its
+    // tone falls when the tram draws current. A hum at twice the shaft speed, the blades' tone, the air.
+    this.mgGain = ctx.createGain();
+    this.mgGain.gain.value = 0.05;
+    this.mgGain.connect(this.master);
+    this.mgOsc = [['triangle', 0.5], ['sawtooth', 0.12]].map(([type, level]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type;
+      o.frequency.value = 60;
+      g.gain.value = level;
+      o.connect(g).connect(this.mgGain);
+      o.start();
+      return o;
+    });
+    const air = ctx.createBufferSource();
+    air.buffer = this.noise;
+    air.loop = true;
+    this.mgAir = ctx.createBiquadFilter();
+    this.mgAir.type = 'bandpass';
+    this.mgAir.frequency.value = 700;
+    this.mgAir.Q.value = 1.2;
+    const airGain = ctx.createGain();
+    airGain.gain.value = 0.7;
+    air.connect(this.mgAir).connect(airGain).connect(this.mgGain);
+    air.start();
+    // the accelerator's pilot motor and worm gear, whenever the cross turns
+    this.pilotGain = ctx.createGain();
+    this.pilotGain.gain.value = 0;
+    this.pilotOsc = ctx.createOscillator();
+    this.pilotOsc.type = 'sawtooth';
+    this.pilotOsc.frequency.value = 300;
+    const pilotLp = ctx.createBiquadFilter();
+    pilotLp.type = 'lowpass';
+    pilotLp.frequency.value = 1100;
+    this.pilotOsc.connect(pilotLp).connect(this.pilotGain).connect(this.master);
+    this.pilotOsc.start();
+
     // flange squeal in tight curves
     this.squealGain = ctx.createGain();
     this.squealGain.gain.value = 0;
@@ -118,6 +155,24 @@ export class TramAudio {
     this.squealGain.gain.setTargetAtTime(squeal, t, tram.slide ? 0.03 : 0.2);
     this.squeal.frequency.setTargetAtTime(tram.slide ? 1900 : 2900, t, 0.05);
     if (tram.trackBrake) this.rollGain.gain.setTargetAtTime(0.4, t, 0.05);
+
+    const eq = tram.eq;
+    if (eq.mg) {
+      const f0 = eq.mg.rpm / 60; // (≈30 Hz)
+      this.mgOsc[0].frequency.setTargetAtTime(Math.max(1, f0 * 2), t, 0.05);
+      this.mgOsc[1].frequency.setTargetAtTime(Math.max(1, f0 * 12), t, 0.05); // (the impellers' blades)
+      this.mgAir.frequency.setTargetAtTime(Math.max(50, f0 * 24), t, 0.05);
+      this.mgGain.gain.setTargetAtTime(0.05 * Math.min(1, f0 / 25), t, 0.2);
+      // the contactors: the line contactor's clunk, M2 and the four field stages as the cross passes them
+      const moved = eq.p - (this.lastP ?? eq.p);
+      this.lastP = eq.p;
+      const rate = dt > 0 ? Math.abs(moved) / dt : 0;
+      this.pilotGain.gain.setTargetAtTime(Math.min(0.012, rate * 0.0007), t, 0.04);
+      this.pilotOsc.frequency.setTargetAtTime(150 + rate * 12, t, 0.05);
+      if (eq.ls !== this.lastLs) { if (this.lastLs !== undefined) this.click(0.12, 420); this.lastLs = eq.ls; }
+      if (eq.ls) for (const q of [75, 80, 85, 90, 95]) if ((eq.p - q) * (eq.p - moved - q) < 0) this.click(0.05, 650);
+      if (eq.shoe !== this.lastShoe) { if (this.lastShoe !== undefined) this.click(0.1, 260); this.lastShoe = eq.shoe; }
+    }
 
     // rail joints every 18 m: a bogie "ta-dum"
     const joint = Math.floor(tram.s / 18);

@@ -109,7 +109,7 @@ export class Tram {
     // the wire: everything this set draws, through the resistance to its substation (a fast filter for the needle
     // and the step's order: the equipment read the last step's voltage)
     this.lineA = out.line + out.auxLine + this.buttonA + this.loadW / Math.max(100, this.voltage);
-    const u = Math.max(0, this.supply.u0 - this.supply.r * this.lineA);
+    const u = Math.max(this.supply.floor ?? 0, this.supply.u0 - this.supply.r * this.lineA);
     this.voltage += (u - this.voltage) * Math.min(1, dt / 0.05);
     // wheelspin: motor current collapses and flickers
     this.current = this.forcedStop ? 0 : out.current * (this.slip ? 0.55 + 0.2 * Math.sin((this.time * 1000) / 40) : 1);

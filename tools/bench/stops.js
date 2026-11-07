@@ -1,8 +1,8 @@
 // Dev check (not part of the game): how the autopilot brings the tram to its stops (#351). A watcher on the
 // u3 drive (tools/bench/u3.js, opts.also); in the page after loading:
 //   const { run } = await import('/tools/bench/stops.js'); await run(seed)
-// An approach runs from the first brake pedal with the stop within its braking distance at 0.4 m/s² (and 20 m) until
-// the tram stands there.
+// An approach runs from the first brake pedal with the stop within its braking distance at the autopilot's 0.65 m/s²
+// (and 10 m) until the tram stands there; a brake for a curve further out is not one, and driving on after it is fine.
 // flips: the drive pedal after the brake pedal inside an approach, by what allowed it: ahead (a tram ahead short of the stop
 // point: the user, #351, "unless you're following tram in front of you"), signal (a signal short of the stop point
 // showed stop), car (a car on or crossing our track short of it), free (nothing: the plan changed its mind, which
@@ -29,7 +29,7 @@ export function stopsWatch(game) {
       if (st !== cur) { cur = st; if (a) a = null; }
       if (st && !st.served && !a && !st._seen) {
         const d = st.target - tr.s, needs = !st.request || st.waiting > 0 || st.alightFrac > 0;
-        if (needs && n < 0 && d > 0 && d < (tr.v * tr.v) / 0.8 + 20 && tr.v > 1) {
+        if (needs && n < 0 && d > 0 && d < (tr.v * tr.v) / 1.3 + 10 && tr.v > 1) {
           a = { v0: tr.v, d0: d, t0: game.clock, flips: [], pulses: 0, changes: 0, decel: 0, jerk: 0, shoes: 0, restarts: 0, was: n, braked: true, stood: false, why: {} };
         }
       }

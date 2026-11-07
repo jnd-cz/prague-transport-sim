@@ -15,6 +15,9 @@ export const WIRE = {
   rFeeder: 0.06,  // Ω per km of underground feeder cable, from the substation to a section's feed point [assumed]
   wireKm: 0.8,    // km of wire at most from a feed point: sections of 1–2 km are fed about their middle [assumed]
   reach: 4,       // km: a substation further from this line's track does not feed it [assumed]
+  floor: 400,     // V: the lowest a network like this is built to hold (EN 50163's 400 V, from memory): with these
+                  // guessed resistances the sum can go lower (two starts on one far feed: 134 V at line 37's terminus), and
+                  // then it is the guess that is wrong [assumed]
 };
 
 // Where each substation meets this line, and which feed a point of the track hangs on: the one with the least
@@ -61,7 +64,7 @@ export class Feeding {
       const same = (s - f.s) * (o.s - f.s) > 0;
       drop += o.i * (f.r0 + (same ? along(Math.min(Math.abs(s - f.s), Math.abs(o.s - f.s))) : 0));
     }
-    return { u0: WIRE.u0 - drop, r: me.r, ref: f.ref, km: Math.abs(s - f.s) / 1000, others: load };
+    return { u0: WIRE.u0 - drop, r: me.r, floor: WIRE.floor, ref: f.ref, km: Math.abs(s - f.s) / 1000, others: load };
   }
 }
 

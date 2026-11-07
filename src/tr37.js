@@ -198,7 +198,8 @@ export class TR37 {
   get brakeStep() { return stepOf(this.brakeAngle, C.brakeAngles); }
   // for logs and tests: the drive step, minus the brake step, −6 with the track brakes
   get notch() { const b = this.brakeAngle; return b >= C.trackAngles[0] ? -6 : this.brakeStep ? -this.brakeStep : this.driveStep; }
-  get lamps() { return { acc: this.p < 80, shoe: this.shoe > 0 }; } // ZR1: the accelerator's positions 1–80 (§ 8.2)
+  // ZR1: the accelerator's positions 1–80, fed through BK9 (brake pedal 0–2) or ZR10 (positions 3–99) (§ 8.2)
+  get lamps() { return { acc: this.p < 80 && (this.brakeAngle < C.br1Angle || this.p >= 3), shoe: this.shoe > 0 }; }
   get drawing() { return this.ls; } // traction current through the pantograph
   // the switch button: drive off and the accelerator at 1–30 (M1's rest contact and ZR9, § 8.2)
   get buttonLive() { return !this.ls && this.p <= 30; }
@@ -277,7 +278,7 @@ export class TR37 {
       if (this.pedal.drive === 0 && !this.goal) this.setStep(L);
     } else if (L <= 0) {
       if (Math.abs(v) < 0.1) this.parked = true;
-    } else { this.pedal.drive = 0; if (this.goal?.drive) this.goal = null; }
+    } else { this.pedal.drive = 0; if (this.goal?.drive) this.goal = null; if (Math.abs(v) < 0.1) this.parked = true; }
   }
 
   // the autopilot's wish on the pedals, as a careful driver: want = { force (N, + drive / − brake), stand (stop and
@@ -309,12 +310,16 @@ export class TR37 {
       else if (on === 1 && f < 0.4 * F(1)) s = 0;
       else s = now;
     }
-    // holding a speed a step stays until the speed has moved: the relay holds the force, and between two steps' forces
-    // (a gradient) it let go and pressed every second on main, 130–200 pedal changes a km
+    // holding a speed a step stays until the speed has moved, and so does nothing: the relay holds the force, and between
+    // two steps' forces (a gradient) it let go and pressed every 2 s (main: 130–200 pedal changes a km). The plan's speed is
+    // 0.6 m/s under the limit, so these bands stay under it.
     if (w.speedErr != null && !w.urgent && s !== now) {
-      if (now < 0 && s > now && w.speedErr > -0.7) s = now;
-      else if (now < 0 && s < now && w.speedErr < 0.35) s = now;
-      else if (now > 0 && s > 0 && s !== now && w.speedErr < 0 && w.speedErr > -0.7) s = now;
+      const e = w.speedErr;
+      if (now < 0 && s > now && e > -0.7) s = now;
+      else if (now < 0 && s < now && e < 0.3) s = now;
+      else if (now > 0 && s >= 0 && e < 0.2 && e > -0.7) s = now;
+      else if (now === 0 && s > 0 && e > -0.6 && v > 1) s = 0;
+      else if (now === 0 && s < 0 && e < 0.25) s = 0;
     }
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
