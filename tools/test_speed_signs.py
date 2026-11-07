@@ -53,7 +53,8 @@ async () => {
 
 SPEED_RULES = r"""
 async () => {
-  const { speedFacts, trackworkStretches, withoutOwnPieces, FROG } = await import('/src/speedRules.js');
+  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, FROG } = await import('/src/speedRules.js');
+  const { Route } = await import('/src/route.js');
   const truth = await (await fetch('/data/truth.json')).json();
   const facts = speedFacts(truth);
   let missing = null;
@@ -61,7 +62,34 @@ async () => {
   const work = { trailing: [{ s: 200, fromDiverging: true }, { s: 300, fromDiverging: false, frog: 12 }], crossings: [400] };
   const own = (posted, trackwork) => withoutOwnPieces(posted, 5, [{ s: 100 }], trackwork, facts);
   const fill = (...parts) => parts.flatMap(([v, n]) => Array(n).fill(v));
+  const stops = [{ name: 'A', s: 0 }, { name: 'Hercovka', s: 100 }, { name: 'Nad Trojou', s: 200 }];
+  // a straight, an arc of radius 30 m with no transition from x = 200, a quarter turn, and a straight
+  const arc = [];
+  for (let x = 0; x <= 200; x += 1) arc.push([x, 0]);
+  const R = 30, turn = Math.PI / 2, curveLen = R * turn;
+  for (let t = 1 / R; t < turn; t += 1 / R) arc.push([200 + R * Math.sin(t), R - R * Math.cos(t)]);
+  for (let y = 0; y <= 200; y += 1) arc.push([200 + R, R + y]);
+  const route = new Route(arc);
+  const end = 200 + curveLen;
+  const window = (past) => {
+    const lim = route.speedLimits([], past);
+    let lowest = 99, last = 0, top = 0;
+    for (let m = 150; m < 330; m++) lowest = Math.min(lowest, lim.at(m));
+    for (let m = 150; m < 330; m++) { if (lim.at(m) === lowest) last = m; if (lim.at(m) < 50) top = m; }
+    return { lowest, last, top };
+  };
+  const ladder = route.speedLimits([{ from: 100, to: 110, v: 15 }], 2);
   return {
+    limits: { end, none: window(0), two: window(2), fifteen: window(15) },
+    extra: { at105: ladder.at(105), at110: ladder.at(110.5), at111: ladder.at(111), bin: ladder.values[21], bin2: ladder.values[23], restriction: ladder.restriction(105), free: ladder.restriction(120) },
+    places: {
+      read: facts.places,
+      untagged: placeStretches(facts.places, stops, Array(60).fill(0), 5),
+      tagged: placeStretches(facts.places, stops, Array(60).fill(25), 5),
+      noData: placeStretches(facts.places, stops, undefined, 5),
+      partly: placeStretches(facts.places, stops, fill([0, 30], [25, 10], [0, 20]), 5),
+      uphill: placeStretches(facts.places, [{ name: 'Nad Trojou', s: 100 }, { name: 'Hercovka', s: 200 }], Array(60).fill(0), 5),
+    },
     facts, missing, FROG,
     stretches: trackworkStretches([{ s: 100 }, { s: 150, frog: 13 }], work, facts),
     noData: trackworkStretches([{ s: 100 }], undefined, facts),
@@ -190,13 +218,32 @@ def check_rules(r):
     def want(name, got, expected):
         if got != expected:
             f.append(f"{name}: {got} != {expected}")
-    want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15})
+    want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
+                                         "past": 2, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
     if "no value" not in (r["missing"] or ""):
         f.append(f"a missing fact must stop the game: {r['missing']}")
-    want("switches from the blades to the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"], "v": 15}])
-    want("every kind of trackwork", r["stretches"], [
-        {"from": 96, "to": 100 + r["FROG"], "v": 15}, {"from": 146, "to": 163, "v": 15},
-        {"from": 200 - r["FROG"], "to": 204, "v": 15}, {"from": 288, "to": 304, "v": 30}, {"from": 397, "to": 403, "v": 15}])
+    want("switches from the blades to 2 m past the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"] + 2, "v": 15}])
+    want("every kind of trackwork, each 2 m past its end", r["stretches"], [
+        {"from": 96, "to": 100 + r["FROG"] + 2, "v": 15}, {"from": 146, "to": 165, "v": 15},
+        {"from": 200 - r["FROG"], "to": 206, "v": 15}, {"from": 288, "to": 306, "v": 30}, {"from": 397, "to": 405, "v": 15}])
+    p = r["places"]
+    want("Trojská's fact where OSM tags nothing", p["untagged"], [{"from": 100, "to": 200, "v": 25}])
+    want("OSM comes first", p["tagged"], [])
+    want("without speeds in the data the fact holds", p["noData"], [{"from": 100, "to": 200, "v": 25}])
+    want("only the untagged part", p["partly"], [{"from": 100, "to": 150, "v": 25}])
+    want("not uphill", p["uphill"], [])
+    # the curve's end, 2 m past, against the 16 m estimate's own smear of it (R 30, no transition: the worst case)
+    lim = r["limits"]
+    if lim["two"]["last"] >= lim["fifteen"]["last"]:
+        f.append(f"a narrower margin must lift the lowest speed sooner: {lim}")
+    if lim["two"]["last"] != lim["none"]["last"] + 2:
+        f.append(f"the margin moves the limit's end by itself: {lim}")
+    if not lim["end"] - 10 <= lim["two"]["last"] <= lim["end"] + 2:
+        f.append(f"the lowest speed must end by 2 m past the curve: {lim}")
+    x = r["extra"]
+    want("a restriction is exact to the metre", [x["at105"], x["at110"], x["at111"]], [15, 15, 50])
+    want("the 5 m table holds each bin's lowest", [x["bin"], x["bin2"]], [15, 50])
+    want("restriction() reads the restrictions alone", [x["restriction"], x["free"]], [15, 99])
     want("OSM's 15 at a switch is the switch's own", r["ownDropped"], [50] * 19 + [0] * 4 + [50] * 5)
     want("a 15 elsewhere stays", r["farKept"], [50] * 40 + [15] * 2 + [50] * 5)
     want("without the line's trackwork OSM's 15 stays", r["withoutWork"], [50] * 19 + [15] * 4 + [50] * 5)

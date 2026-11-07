@@ -166,7 +166,8 @@ def judge(check, r):
         c = (r.get("checks") or {}).get("speedLimits", {})
         more = (f"by cause {c.get('byCause')}, over 50 untagged {c.get('over50WithoutTag')} km, held at 60 {c.get('heldAt60')} km, "
                 f"curves under 25 m {len(c.get('smallRadius') or [])}, limit lifts past a switch {c.get('liftPast')}, "
-                f"held there by {c.get('heldBy')}, km at the switch's speed {c.get('km15')}")
+                f"held there by {c.get('heldBy')}, km at the switch's speed {c.get('km15')}, past a curve's end {c.get('curveEnd')}, "
+                f"steep stretches {len(c.get('descents') or [])}")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):

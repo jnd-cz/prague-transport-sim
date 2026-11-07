@@ -12,7 +12,7 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py",
   "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed and small-radius-speed; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it"
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past and trojska-descent; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it"
  },
  "stops": [
   {
@@ -752,6 +752,16 @@
     }
    },
    {
+    "id": "restriction-past",
+    "value": 2,
+    "unit": "m",
+    "scope": "a curve's, a switch's or a crossing's speed restriction runs this far past its end (a switch's: its frog); the rear still has to leave it (restriction-start-end)",
+    "basis": "the user",
+    "quote": "Q4 definitely lower, I would keep just 2m past the end of curve, switch fork or crossing.",
+    "source": "Claude Code session 2026-11-07 (#211, PR 362, the question on the curve window)",
+    "date": "2026-11-07"
+   },
+   {
     "id": "point-restriction",
     "value": "front only",
     "unit": null,
@@ -973,7 +983,7 @@
     "value": null,
     "unit": null,
     "scope": "the \"dangerous gradient\" rules are about entering an occupied section and starting, not speed; PPS Q53 marks \"25 km/h\" wrong",
-    "basis": "operating rule",
+    "basis": "operating rule; the user dropped the game's limits on steep descents (\"Q3 drop them altogether. I found two steep descends at trojská and Barrandovský most (Hlubočepy - Geologická) and both are marked in osm with limited speed\", Claude Code session 2026-11-07, #211)",
     "source": {
      "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
      "year": 2025,
@@ -999,8 +1009,12 @@
      25
     ],
     "unit": "km/h",
-    "scope": "Trojská street, Hercovka → Nad Trojou, 470 m at 80.15 ‰: stop at the signal (safety stopping place), test the parking brake, roll without power; two blocks with signals, one train per block; uphill one train in the section at full power",
-    "basis": "local rule",
+    "scope": "Trojská street, Hercovka → Nad Trojou, 470 m at 80.15 ‰: stop at the signal (safety stopping place), test the parking brake, roll without power; two blocks with signals, one train per block; uphill one train in the section at full power. In the game only where OSM tags no speed, at the highest speed named (OSM's way there says 25)",
+    "place": {
+     "from": "Hercovka",
+     "to": "Nad Trojou"
+    },
+    "basis": "local rule; the user: \"I would keep the trojská descend fact only as a backup after osm rule\" (Claude Code session 2026-11-07, #211)",
     "source": {
      "document": "prazsketramvaje.cz: Trojská (line 17 gradient)",
      "year": 2026,
