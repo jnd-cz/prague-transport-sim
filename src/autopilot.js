@@ -166,7 +166,11 @@ export class Autopilot {
     let vtDrive = vt;
     if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12 - look)) - 0.3);
     if (fixedAt !== null) {
-      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - look))));
+      // (and what it still gains while the accelerator comes off, ≈1 s: up 37 ‰ on step 4 at 1.1 m/s² it drove from 14 to 20 km/h
+      // 19 m before Hlušičkova, then needed more than the brake builds after driving and stood 3.5–4.6 m short on the emergency
+      // brake, line 9 seeds 1 and 3)
+      const gain = Math.max(0, tr.a);
+      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - look - gain * 3.5))) - gain);
       // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops")
       if (stood || (dLeft < 40 && aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft)) vtDrive = 0;
       // (stopped short of the point: on, slowly)
