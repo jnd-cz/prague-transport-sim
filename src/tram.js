@@ -23,6 +23,9 @@ export const T3 = {
   capacity: 110,             // 24 seated + 86 standing (crush load 160)
   crushCapacity: 160,
   vMax: 65 / 3.6,            // empty, on the level ([ckd03] p. 4)
+  // s of sanding in the box, not refilled during a shift: "on the level of minutes if not more" (the user, 2026-11-07, PR #363; the
+  // real figure: #266). 90 s ran dry on every line 9 run in autumn
+  sandSecs: 600,
   lineVoltage: 600,
 };
 
@@ -88,7 +91,7 @@ export class Tram {
 
     // sand: driver key, or automatically with the track brakes
     this.sanding = (sandKey || (out.trackOn && speed > 0.3)) && this.sand > 0;
-    if (this.sanding) this.sand = Math.max(0, this.sand - dt / 90);
+    if (this.sanding) this.sand = Math.max(0, this.sand - dt / T3.sandSecs);
     this.mu = Math.min(0.33, mu + (this.sanding ? 0.1 : 0));
     const adhesion = this.mu * m * G; // all axles are motored and braked
 

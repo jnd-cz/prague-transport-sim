@@ -291,11 +291,12 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the
   test drives' presses by 10 % and the waste by 1 %, cost 0.7 % in time and 13 % more pedal steps, and slipped on leaves up a climb:
   not kept. Steps 4–5 from a stand on the level (T3SU-03 p. 4 says 1–3) waste 4–10 % less with a full load, nothing empty.
-- **Wet leaves and sand** (#351): the box holds 90 s of sanding a shift and is not refilled (`src/tram.js`, no source: #266); the
+- **Wet leaves and sand** (#351): the box holds 10 minutes of sanding a shift and is not refilled (`src/tram.js` `sandSecs`; the user, 2026-11-07: "on the level of
+  minutes if not more", the real figure #266; 90 s ran dry on every line 9 run); the
   track brakes sand too. On a leaf patch (0.06) every step slips from a stand (step 1 pulls 0.60 m/s², the grip is 0.59), and
   slipping wheels pull 0.7 of the grip, 0.41 m/s²: with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
-  at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). Sanding at every slip and slide ran the box dry half way
-  along lines 9, 17 and 22; sanding only where it decides something, it still runs dry there, while 23 and 37 keep a third to two
+  at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). With 90 s, sanding at every slip and slide ran the box dry half way
+  along lines 9, 17 and 22; sanding only where it decides something, it still ran dry there, while 23 and 37 kept a third to two
   thirds. Pulling away the autopilot sands only where slipping wheels would not climb with 0.15 m/s² to spare, then up to 3 m/s;
   braking, on a slide with a stop point within a patch slide's distance. With the box empty the track brakes take a slide toward a
   point and let go once the rail under the tram gives what is still needed: held past a patch's end they stood the tram 13 m short

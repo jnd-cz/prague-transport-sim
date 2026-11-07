@@ -283,7 +283,7 @@ export class Autopilot {
     const coastingIn = fixedAt !== null && tr.v > vtDrive + 0.3;
     this.input.switchBtn = button;
     // slippery rail: sand where it decides something, pulling away or braking for a point (the equipment eases off a step): on every slip
-    // and slide the box, 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
+    // and slide the box, then 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
     // (a moment longer than the slip it stops: sand flickering on and off is no use). Pulling away, only where slipping wheels
     // (0.7 of the grip) do not climb with 0.15 m/s² to spare: a leaf patch over 26 ‰; on the level they still pull away, and the
     // box was still dry on lines 9, 17 and 22, with patches up 35–40 ‰ ahead (0.41 m/s² slipping: 38 ‰ at most). There, once it

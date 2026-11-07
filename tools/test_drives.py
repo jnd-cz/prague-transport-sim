@@ -128,7 +128,7 @@ RUN = """async (only) => {
     // (still at speed there, already braking: nothing but the drive pedal can draw the current)
     ...[[600, 70], [600, 100]].map(([s, d]) => ({ name: `turn under a contact ${d} m before the stop, at speed`, stops: [20, s], limit: 50, pax: 60, contact: s - d })),
     { name: 'turn under a contact 70 m before the stop, downhill', stops: [20, 600], limit: 50, pax: 60, grade: uphill(-0.03), contact: 530 },
-    // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box holds 90 s of a whole shift, and the autopilot ran it dry
+    // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box held 90 s of a whole shift then, and the autopilot ran it dry
     // on every slip; with it empty a patch on 50 per mille can never be left (three runs stuck for good on lines 9 and 17)
     { name: 'leaves, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.15, leaves: true },
     { name: 'leaves, up 50 per mille', stops: [20, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), leaves: true },
