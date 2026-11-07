@@ -21,6 +21,7 @@ import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
 import { trackStyles, loadHeightFacts } from './heights.js';
+import { speedFacts } from './speedRules.js';
 import { credits, logProvenance, fallbacks } from './provenance.js';
 import { initHelp } from './help.js';
 import { Mirror } from './mirror.js';
@@ -422,6 +423,7 @@ async function start() {
     toutAt: outdoorTemperature($('optTemp').value),
     detailed: modelKind(),
     seed: Math.floor(random() * 1e9),
+    speedFacts: speedFacts(truth),
   });
   game.runSeed = seed; // (replay: ?seed=N)
   // the line number shown on the tram, the top bar and in messages follows the run
