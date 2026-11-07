@@ -264,8 +264,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py --checks stops`,
   `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make.
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
-  below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way;
-  the crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
+  below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way.
+  A light brake step lifts the accelerator (29 → 34 at 19 km/h, step 1), so holding a limit it coasts through a diverging contact rather than
+  brake for less than 0.6 m/s over it: at Anděl that brake step had the drive pedal make the turn 22 m before the stop, 7.8 m short on the track brakes.
+  The crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
 - **Real rides, and how far to follow them** (#351, PR #363): GPS of four rides on line 23 from the user, read from the speed with the
