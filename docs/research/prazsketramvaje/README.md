@@ -27,6 +27,9 @@ set against what the game does now (main at 7cac287). The user picks from
 | prazsketramvaje.cz articles (speed signals, switch registers, signals, operation) | undated pages, read 2026-11-03 | listed in each note |
 | Index of DP's regulations, exams and textbooks on the site | | [2012112501](https://www.prazsketramvaje.cz/view.php?cisloclanku=2012112501) |
 
+Copies of everything cited here, the ČKD manuals included, are in the store's `raw/reference/`, with `SOURCES.md` saying where
+each came from (#353; `python -I tools/snapshot.py fetch`). For private reference only.
+
 D 1/2 is marked "for work use only"; the notes paraphrase it and cite paragraph and page, and copy no
 text. If the PDFs should be kept, they belong in the store's private `reference/` group like the T3
 textbook (a snapshot publish, not part of this issue). Other documents on the index page not read

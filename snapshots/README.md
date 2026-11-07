@@ -6,6 +6,7 @@ How to publish, fetch and verify one: [DATA.md](../DATA.md).
 
 | id | note |
 |---|---|
+| `2026-11-06r` | `2026-11-06c` + the research sessions' documents in `raw/reference/`, private reference only: ČKD's TR 37 manuals and wiring diagram (their site returned 404 on 2026-11-06), DP Praha's tests and D 1/2, theses, adhesion papers, saved web pages, photos; each file's origin in `raw/reference/SOURCES.md` (#353). No build reads them. |
 | `2026-11-06c` | `2026-11-06b` + the archive DTM's street furniture points of lines 9, 22, 23 and 37 (`raw/dtmpoints/lineN.json`, `python -P -E tools/dtm_points.py N`), 72,070 points, downloaded 2026-11-06 (#349). |
 | `2026-11-06b` | `2026-11-06` with the Geoportál feature answers (walls, trees, tree rows) named per 500 m cell, shared by the lines (`raw/geoportal/cells/`, #326), downloaded 2026-11-06. |
 | `2026-11-06` | `2026-11-05b` + OSM Geofabrik 2026-11-04 (was 2026-10-22); 9 more Geoportál answers for lines 9 and 22 (#237). |
