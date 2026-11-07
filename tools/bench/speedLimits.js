@@ -4,8 +4,9 @@
 // For every 5 m bin of the route: the limit in force and the rule that lowers it most (the first of the causes
 // equal to it). Reported: km per limit and per cause, the km the game drives faster than data/truth.json's
 // `max-speed` allows without a sign (untagged dedicated track), the km the 60 cap holds back, the curves under 25 m
-// (`small-radius-speed`), and where a facing switch's slow stretch ends: the front's distance past the switch when
-// the whole tram has left the limit.
+// (`small-radius-speed`), where a facing switch's slow stretch ends: the front's distance past the switch when
+// the whole tram has left the limit, and what holds the limit last there (`heldBy`), with the km at that speed by
+// cause (`km15`).
 import { FROG, trackworkStretches } from '/src/speedRules.js';
 
 const STEP = 5;
@@ -80,7 +81,8 @@ function curvesUnder(game, radius) {
   return out;
 }
 
-// The front's distance past the switch when the tram of this length leaves the switch's own stretch (`own`), and
+// The front's distance past the switch when the tram of this length leaves the restrictions of the first 20 m past the
+// fork (`own`: the switch's stretch, and any trailing switch or diamond starting there, so at most 20 m + the tram), and
 // when the limit in force first rises above the switch's speed, whatever else holds it (`any`, up to 200 m): the
 // lowest bin under the whole tram, as Game.currentLimit.
 function liftPast(game, w, length, switches) {
@@ -96,6 +98,41 @@ function liftPast(game, w, length, switches) {
     if (any === null && low > v) any = d;
   }
   return { own, any };
+}
+
+// Why a bin stands at v or lower. `spilled`: only because speedLimits' window (15 m behind, 5 m ahead) carried a
+// neighbour's limit here.
+function whyLow(c, i, v) {
+  if (c.switches[i] <= v) return 'trackwork';
+  if (c.posted[i] <= v) return 'posted';
+  if (c.curve[i] <= v) return 'curve';
+  for (let j = i - 3; j <= i + 1; j++) if (c.posted[j] <= v) return 'posted, spilled';
+  return 'curve, spilled';
+}
+
+// The metre that holds a tram longest past a fork: the one the rear leaves when the limit first rises (`any`).
+function holder(game, w, any, length, c) {
+  const lim = game.limits, v = game.opts.speedFacts.facing;
+  if (any === null) return null;
+  for (let s = w.s + any - 1 - length; s <= w.s + any; s += 1) {
+    if (lim.at(s) > v) continue;
+    const past = Math.round(s - w.s), frog = w.frog ?? FROG;
+    if (lim.restriction(s) <= v) return { past, cause: past <= frog ? 'own switch' : 'trackwork' };
+    return { past, cause: whyLow(c, Math.floor(s / STEP), v) };
+  }
+  return null;
+}
+
+function countBy(list) {
+  const out = {};
+  for (const k of list) if (k) out[k] = (out[k] || 0) + 1;
+  return out;
+}
+
+function kmOf(bins) {
+  const out = countBy(bins);
+  for (const k of Object.keys(out)) out[k] = round(out[k] * STEP / 1000);
+  return out;
 }
 
 export function run(game = window.game) {
@@ -132,6 +169,9 @@ export function run(game = window.game) {
         liftPast: { oneCar: median(lifts.map((l) => l.one.own)), twoCars: median(lifts.map((l) => l.two.own)),
                     twoCarsAny: median(lifts.map((l) => l.two.any)) },
         lifts,
+        heldBy: countBy(game.switches.map((w, i) => holder(game, w, lifts[i].two.any, 30, c)?.cause)),
+        lastSlowPast: median(game.switches.map((w, i) => holder(game, w, lifts[i].two.any, 30, c)?.past ?? null)),
+        km15: kmOf(values.flatMap((v, i) => (v <= game.opts.speedFacts.facing ? [whyLow(c, i, v)] : []))),
         pastFrog: median(game.switches.map((w, i) => lifts[i].two.own - (w.frog ?? FROG))),
         trackwork: game.data.trackwork ? { trailing: game.data.trackwork.trailing.length, crossings: game.data.trackwork.crossings.length } : null,
       },
