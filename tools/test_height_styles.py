@@ -80,7 +80,7 @@ class HeightStyles(unittest.TestCase):
         result = self.page.evaluate('''async () => {
           const {loadHeightFacts} = await import('/src/heights.js');
           const {Loader} = await import('/src/loading.js');
-          for (const id of ['loading','loadPct','loadStep']) {
+          for (const id of ['loading','loadPct','loadStep','loadBytes','loadFiles']) {
             if (!document.getElementById(id)) { const e=document.createElement('div'); e.id=id; document.body.append(e); }
           }
           document.getElementById('loading').classList.add('hidden');
