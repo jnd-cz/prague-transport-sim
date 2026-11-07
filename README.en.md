@@ -81,6 +81,19 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   slowly, and step 5 then brings the shoes in at speed: wait 2–3 s between them, for the accelerator to return
   to its base position. The dashboard's pedal
   bar shows the pedal (drive up, brake down, P parked) and the accelerator.
+- **The accelerator** (*zrychlovač*, the yellow bar beside the pedals, position 1 at the bottom, 99 at the top) is
+  turned only by its pilot motor, about 20 positions a second at most, and steered by the limiting relay from the
+  current: driving it cuts out resistance, the faster the higher the step. Pedal off it holds a small preparation
+  current, so it comes back as the speed falls (about 31 at 20 km/h, 50 at 30 km/h) and rises again going
+  downhill; braking it holds the step's current: the higher the step, the lower it stands. High means little
+  resistance when driving and much when braking.
+- **Power:** the voltage on the wire falls with your current, your distance from the substation and the current of
+  other trams on the same feed (the line's resistances are an estimate, the substations from OSM). On the resistors
+  that does not change the force, the accelerator only stands higher; above them a weak wire means less pull and a
+  lower top speed. The electric brake does not care. The motor-generator and both fans share one shaft and its
+  series motor runs with the voltage: so the tone falls as you pull away, and falls too when the shoes' release
+  magnets load the dynamo; the regulator holds the on-board 26 V. The info panel shows the voltage, the
+  substation, the on-board voltage and the rpm.
 - **Controls** (menu): *Simple* moves a lever by steps (W/S, 1–5, Shift+1–5) and works the pedals as a
   driver would, parking whenever the car stands; *Advanced* moves the pedals themselves (a tap to the next
   step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
@@ -102,7 +115,8 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
 - Every facing switch has an overhead contact (yellow plate, white sign with a black triangle), worked by
   the pantograph: pass under it drawing current to set the turn, or coasting to go straight — also right
   after a stop, at a signal or on a hill (judging that is part of the driver's skill).
-- Current also flows with the **Výhybka** button (Y, as on T3SUCS) and — in winter — through the heating,
+- Current also flows with the **Výhybka** button (Y, as on T3SUCS: only with drive off and the accelerator up to
+  position 30, about 20 km/h) and — in winter — through the heating,
   unless you hold the heating cut-out (C) while coasting under the contact.
 - Contacts are ~22 m before the switch but never where a tram stands with its pantograph at a stop or
   signal. Trailing switches (where tracks join) need nothing; diamond crossings are not switches.
@@ -190,9 +204,11 @@ On a small screen the dashboard and the top bar are smaller and the minimap is h
 
 Tick "Autopilot — just watch the ride" in the menu, or press **O** during a shift. It plans speed from
 limits, stops, signals, obstacles and the tram ahead, picks the force needed on the gradient and lets the
-equipment work the pedals as a careful driver (the advanced model: brakes on step 3+ into stops, parks while
-standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
-slippery rail, and gives a short pulse of power (turn) or coasts (straight) under contacts. Press **V** for
+equipment work the pedals as a careful driver (the advanced model: pulls away on steps 1–3 on the level, brakes
+step by step, into a stop on one curve and without going back to the drive pedal unless a tram stands ahead,
+parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
+slippery rail, and under contacts draws current for a turn (the switch button when slow enough, otherwise a short pulse of
+the drive pedal) or coasts (straight). Press **V** for
 the outside view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the
 menu; O hands back to the autopilot.
 

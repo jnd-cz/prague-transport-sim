@@ -422,6 +422,7 @@ async function start() {
     toutAt: outdoorTemperature($('optTemp').value),
     detailed: modelKind(),
     seed: Math.floor(random() * 1e9),
+    substations: truth.substations?.list,
   });
   game.runSeed = seed; // (replay: ?seed=N)
   // the line number shown on the tram, the top bar and in messages follows the run

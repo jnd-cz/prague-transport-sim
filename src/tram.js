@@ -52,6 +52,9 @@ export class Tram {
     this.current = 0;      // A, the ammeter (a car's; negative braking)
     this.electric = 0;     // W drawn from the line (+) or burnt in the brake resistors (−)
     this.voltage = T3.lineVoltage;
+    this.supply = { u0: T3.lineVoltage, r: 0 }; // what the wire gives here (src/electric.js Feeding, from the game)
+    this.loadW = 0;        // W of heating on the line; button: A through the switch button's resistor, both from the game
+    this.buttonA = 0;
     this.trackBrake = false;
     this.trackMagnets = 0;
     this.sanding = false;
@@ -103,7 +106,11 @@ export class Tram {
 
     this.time = (this.time || 0) + dt; // (simulation time: the same drive gives the same result)
     this.electric = out.line > 0 ? this.voltage * out.line : -out.dissipated;
-    this.voltage = T3.lineVoltage + 18 * Math.sin((this.time * 1000) / 2300) - out.line * 0.045;
+    // the wire: everything this set draws, through the resistance to its substation (a fast filter for the needle
+    // and the step's order: the equipment read the last step's voltage)
+    this.lineA = out.line + out.auxLine + this.buttonA + this.loadW / Math.max(100, this.voltage);
+    const u = Math.max(this.supply.floor ?? 0, this.supply.u0 - this.supply.r * this.lineA);
+    this.voltage += (u - this.voltage) * Math.min(1, dt / 0.05);
     // wheelspin: motor current collapses and flickers
     this.current = this.forcedStop ? 0 : out.current * (this.slip ? 0.55 + 0.2 * Math.sin((this.time * 1000) / 40) : 1);
 
