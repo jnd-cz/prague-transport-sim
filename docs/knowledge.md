@@ -297,7 +297,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). Sanding at every slip and slide ran the box dry half way
   along lines 9, 17 and 22; sanding only where it decides something, it still runs dry there, while 23 and 37 keep a third to two
   thirds. Pulling away the autopilot sands only where slipping wheels would not climb with 0.15 m/s² to spare, then up to 3 m/s;
-  braking, on a slide with a stop point within a patch slide's distance. A slip takes a step less for 6 s, lower only if it still
+  braking, on a slide with a stop point within a patch slide's distance. With the box empty the track brakes take a slide toward a
+  point and let go once the rail under the tram gives what is still needed: held past a patch's end they stood the tram 13 m short
+  of Mezi Hřbitovy up 25 ‰. A slip takes a step less for 6 s, lower only if it still
   slips 0.8 s on (the equipment lags the pedal). A slide over 1.2 s above 3 m/s costs the flats penalty (`src/game.js`).
 - T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
   overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
