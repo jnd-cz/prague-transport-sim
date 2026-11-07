@@ -178,7 +178,7 @@ both post on the pinned #291 and only propose.
   | a build tool, its data rebuilt (world) | the tool's test; `--checks lint,surfaces,canted,crossing,spacing,heights` on the rebuilt lines; `tools/datadiff.py` or `tools/track_moves.py` per line; a smoke drive per line (`--checks u3 --seeds 1`: it reaches the last stop, not stuck) | redruns, traffic, seeds 2–5 |
   | drawn geometry in the game (surfaces, track beds, crossings, kerbs) | `lint,surfaces,crossing,canted`; every seedless move needs a reason | seeded checks |
   | drawing or load that keeps the world (models, materials, load cuts) | screenshots main vs branch, `tools/frametime.py`; for a load cut, the world after load compared with main's | seeded checks |
-  | the simulation (`traffic.js`, `autopilot.js`, `tram.js`, the game's rules) | `u3,redruns,traffic,lint` on all lines, seeds 1–5, `--compare` | the geometry checks |
+  | the simulation (`traffic.js`, `autopilot.js`, `tram.js`, `tr37.js`, `electric.js`, the game's rules) | `u3,redruns,traffic,lint` on all lines, seeds 1–5, `--compare`; the tram or the autopilot: also `stops`, `tools/test_traction.py`, `tools/test_electric.py`, `tools/test_drives.py` | the geometry checks |
   | track heights (`tools/line_heights.py`, the profile) | also `heights` | |
   | a world checkpoint (W1, W2 …, ROADMAP.md) | every check on every line once; its moves explained in its PR | |
 

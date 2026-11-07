@@ -291,7 +291,7 @@ holds BR1 (3–99); ZR9 (1–30) enables the switch button (8.3).
   loops** (armatures of one pair feed the fields of the other pair, through the accelerator) — the T3
   "has no pure coasting" ([rubook]) [B]; [ckd24] p. 4, 13 [A].
 - The preparation coil CP (RCP bridged by F2) makes the limiting relay hold a **small brake current**;
-  B2 reverses the pilot motor so the accelerator moves back from 99 toward 1 as speed falls, keeping a
+  B2 reverses the pilot motor so the accelerator moves slowly back from 99 toward 1 as speed falls, keeping a
   position that matches the speed ([ckd24] p. 12–13) [A].
 - If speed rises when coasting downhill, the coasting current rises, the relay touches its other
   contact and the accelerator moves up (more brake resistance) until the current is small again
@@ -535,7 +535,7 @@ Variables: v (m/s), p (accelerator position 1–99, continuous), I (car current)
 - **Coasting**: a drag force equivalent to the preparation current: F_prep ≈ 4·T(I_prep/2)·21.2 with
   I_prep ≈ 50 A car current, i.e. ≈0.05–0.1 m/s² above ≈5 km/h, fading to 0 below [assumed within the
   sourced 0–0.14 m/s²]. p tracks p_match(v) at ≤ 20 /s, where p_match is the drive equilibrium position
-  for step 1 at speed v [assumed]; after drive it runs back from 99.
+  for step 1 at speed v [assumed]; after drive it runs back from 99. (Replaced by the relay in the loops, 9.1.)
 - **Braking**: I_brake(step) = 160, 211, 262, 306, 350 A for steps 1–5 [step 5 sourced; 1–4 inferred
   from the wiring diagram, 8.2]. Brake force = 4·T(I_brake/2)·7.43/0.97/0.35. Available current is
   limited by speed: the accelerator must first reach the needed position (≤ 20 /s, starting from

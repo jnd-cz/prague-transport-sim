@@ -175,7 +175,7 @@ export class TR37 {
     this.p = C.pMin;       // accelerator position 1…99
     this.mg = new MotorGenerator();
     this.aux = new AuxBus();
-    this.mg.settle(C.lineVoltage, 26 * 25);
+    this.mg.settle(C.lineVoltage, 26 * 12);
     this.sn = true;        // SN: the motor-generator's current holds it (T3SU-24 § 2.1): no fans, no traction
     this.Iset = 0;         // A: what the relay holds now
     this.ls = false;       // line contactor in (traction)
@@ -448,11 +448,12 @@ export class TR37 {
     this.drive += (fDrive - this.drive) * Math.min(1, dt / 0.15);
     const track = rescue || b >= C.trackAngles[1] ? 2 : b >= C.trackAngles[0] ? 1 : 0;
 
-    // the 24 V side: control 20 A with the lamps, 8 A more with the power contactors in [assumed]; the shoe brakes' four
-    // release magnets, 2.7 Ω each, in full through BR1 and through RČ partly (T3SU-05 p. 3); the track brakes' magnets, 0.632 Ω
+    // the 24 V side: the shoe brakes' four release magnets, 2.7 Ω each, in full through BR1 and through RČ partly (T3SU-05 p. 3),
+    // are ≈38 A of a running car; control and lamps 8 A, the power contactors 3 A more [assumed: with the charge that
+    // comes to the dynamo's 50 A, T3SU-15 p. 3]; the track brakes' magnets, 0.632 Ω
     const U = this.aux.U;
     const magnets = this.shoe === 0 ? (4 * U) / 2.7 : this.shoe === 1 ? (4 * U) / (2.7 * 3.3) : 0;
-    const demand = 20 + (this.ls ? 8 : 0) + magnets + (track * 2 * U) / 0.632;
+    const demand = 8 + (this.ls ? 3 : 0) + magnets + (track * 2 * U) / 0.632;
     this.aux.update(dt, this.mg.rpm, demand);
     this.mg.update(dt, voltage, this.aux.U * this.aux.dynamoA);
 
