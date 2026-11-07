@@ -284,8 +284,8 @@ export class TR37 {
   // the autopilot's wish on the pedals, as a careful driver: want = { force (N, + drive / − brake), stand (stop and
   // stay), coast, power (true: current through the pantograph, false: none), urgent, v, dt, slip, slide, stopDist (m to
   // the stop point, or null), noDrive (braking for a stop: the drive pedal stays off), fixed (that point stays where it
-  // is), aNeed (m/s² still needed to end there), aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over
-  // the speed to hold, null when not holding one) }.
+  // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
+  // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -317,10 +317,10 @@ export class TR37 {
     // 0.6 m/s under the limit, so these bands stay under it.
     if (w.speedErr != null && !w.urgent && s !== now) {
       const e = w.speedErr;
-      if (now < 0 && s > now && e > -0.7) s = now;
+      if (now < 0 && s > now && e > -0.4) s = now;
       else if (now < 0 && s < now && e < 0.3) s = now;
       else if (now > 0 && s >= 0 && e < 0.2 && e > -0.7) s = now;
-      else if (now === 0 && s > 0 && e > -0.6 && v > 1) s = 0;
+      else if (now === 0 && s > 0 && e > -0.35 && v > 1) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
     }
     if (w.power === true) s = Math.max(1, s);
@@ -333,7 +333,7 @@ export class TR37 {
     // before driving again ([ckd03] p. 11). (From a stand the loops are not the question.)
     if (!w.urgent && v > 2) {
       if (s < -4 && (this.ls || this.coastT < C.coastSettle)) s = -4;
-      if (s > 0 && this.brakeT < C.coastSettle) s = 0;
+      if (s > 0 && this.brakeT < C.coastSettle && w.power !== true) s = 0;
     }
     if (w.fixed && w.aNeed != null && s < 0 && v < 1.6 && !w.stand) {
       // the last metres to a stop or a signal. The electric brake is out below ≈6 km/h; from step 3 on it hands over to the
@@ -343,7 +343,7 @@ export class TR37 {
       // (step 5 only when partly is well short of it: the full shoes come in at 1.4 m/s², and the point has a margin)
       const a1 = (C.shoeForce[1] * this.cars) / w.inertia + Math.max(0, w.aCoast);
       if (w.aNeed > a1 * 1.8) s = -5;
-      else if (w.aNeed >= a1 * 0.9 || this.shoe > 0) s = -3;
+      else if (w.aSoon >= a1 * 0.9 || this.shoe > 0) s = -3;
       else s = now < 0 ? Math.max(now, -2) : 0;
     } else if (s < 0 && v < 2.5 && !w.fixed) {
       // behind something that moves: at a crawl (below ≈9 km/h) steps 1–2 fade out to nothing and steps 3–4 leave only the

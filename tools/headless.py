@@ -134,8 +134,9 @@ def judge(check, r):
             bad.append(f"{r['over']} stops overrun by more than 3 m")
         if r.get("short"):
             bad.append(f"{r['short']} stops more than 3 m short")
-        more = (f"{r.get('stops')} stops, flips short/ahead/signal/car {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}, pulses {r.get('pulses')}, "
-                f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}")
+        more = (f"{r.get('stops')} stops, flips short/ahead/signal/car/contact {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}/{r.get('flipsContact')}, pulses {r.get('pulses')}, "
+                f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}, "
+                f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}")
     elif check == "canted":
         c = (r.get("checks") or {}).get("cantedRailVisibility", {})
         if c.get("count"):
@@ -192,7 +193,7 @@ def load_places():
     return json.load(open(PLACES, encoding="utf-8")) if os.path.exists(PLACES) else {}
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-       "stops": {"stuck", "flipsFree", "short", "over"},
+       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
 HARD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
@@ -214,7 +215,7 @@ def counts(check, r):
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check == "stops":
-        return {k: r.get(k) for k in ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "pedalChangesPerKm")}
+        return {k: r.get(k) for k in ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "late", "devMean", "lateStops", "pedalChangesPerKm")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":

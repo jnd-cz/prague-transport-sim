@@ -6,10 +6,12 @@
 // headless rule tests (tools/autopilot.js).
 
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
-const DECEL = 0.65; // planned braking (m/s2), below B2 so there is margin
+const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
+const PLAN_DECEL = 0.8; // … to a stop, a signal or a lower limit: on step 3 of the level, as the drive's steps 1–3 (0.65 lost 2–3 s a stop against main, which ran 0.7 m/s over its curve)
 const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
+const V_BUTTON = 4.2; // m/s: slow enough for the switch button: the accelerator stands at 30 or less coasting (ZR9, T3SU-24 § 8.2; tools/test_electric.py: 31 at 20 km/h), with the 1–2 km/h it comes in over the plan
 
 export class Autopilot {
   constructor() {
@@ -32,14 +34,16 @@ export class Autopilot {
 
     // target speed: line speed, upcoming restrictions, then everything we must stop for
     let vt = g.currentLimit / 3.6 - 0.6;
-    const nl = g.nextLimitChange();
-    // the deceleration to plan on: 0.65 m/s² where the electric brake has it to spare, less on a steep downhill, where step 4
-    // has to hold the tram's weight too (70 ‰ takes ≈0.7 of its ≈1 m/s²: braking at 0.65 there ended on the track brakes)
+    let nl = g.nextLimitChange();
+    // the deceleration to plan on: less on a steep downhill, where the electric brake has to hold the tram's weight too (70 ‰ takes
+    // ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes)
     const gradeHere = g.profile.grade(tr.s - 7);
-    const planAt = (grade) => Math.max(0.2, Math.min(DECEL, 0.85 * ((tr.eq.brakeForce(4, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
+    const planAt = (grade) => Math.max(0.2, Math.min(PLAN_DECEL, 0.7 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
-    if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12)) - 0.3);
-    const vLimit = vt;
+    const vLine = vt;
+    const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, limit.d - 12)) - 0.3;
+    if (nl) vt = Math.min(vt, curveTo(nl));
+    let vLimit = vt;
     let stopAt = null, fixed = false, fixedAt = null;
     // (fixed: a stop or a signal, which stays where it is; else something that can move off. Something nearer does not take
     // the fixed point away: a car crossing just past a stop, its point 6 m short of it, had the plan forget the stop for
@@ -110,6 +114,21 @@ export class Autopilot {
       if (stood || dLeft <= 0) vFixed = 0;
       vt = Math.min(vt, vFixed);
     }
+    // a turn under a contact where it will be braking anyway, for a stop just past it or for the switch's own limit: slow enough
+    // there for the switch button, as a limit of its own, or it would take the drive pedal between the brake. (Where it
+    // is still at speed there, the drive pedal is the way: nothing else draws the current.)
+    const ct = g.nextContact();
+    if (ct && ct.required === 'diverging' && tr.v > V_BUTTON) {
+      const dc = ct.contact - tr.panto;
+      const toLimit = nl && nl.d - 12 > dc ? curveTo({ v: nl.v, d: nl.d - dc }) : Infinity;
+      const toPoint = fixedAt !== null && ct.contact + 4.5 < fixedAt ? Math.sqrt(2 * stopDecel * Math.max(0, fixedAt - STOP_MARGIN - ct.contact - 4.5)) : Infinity;
+      const there = Math.min(toLimit, toPoint);
+      if (dc > 0 && there > V_BUTTON && there < 0.75 * vLine) {
+        nl = { v: V_BUTTON * 3.6, d: dc + 12 };
+        vLimit = Math.min(vLimit, curveTo(nl));
+        vt = Math.min(vt, vLimit);
+      }
+    }
     if (stopAt !== null && !fixed) {
       const d = stopAt - tr.s;
       // (the curve ends 3 m short: below ≈6 km/h the T3's electric brake fades and the shoes take ≈0.5 s to
@@ -156,7 +175,6 @@ export class Autopilot {
     // for straight. Decide only for the last second or so, allowing for the controller's
     // ramp, so the tram can still start from a stop shortly before a contact.
     let wantPower = null;
-    const ct = g.nextContact();
     if (ct) {
       const d = ct.contact - tr.panto, v = Math.max(0, tr.v);
       // a short pulse of J1 is enough for the turn (also while braking into a stop); for
@@ -188,34 +206,40 @@ export class Autopilot {
     // (between the drive plan and the brake plan: coast)
     const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
     let aPlan = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    // (once on the curve to it, not from the moment a lower limit is in sight: that had it stop accelerating 300 m before every curve)
+    const aToLimit = nl && nl.v / 3.6 < tr.v && tr.v >= curveTo(nl) - 0.3 ? (tr.v * tr.v - (nl.v / 3.6 - 0.3) ** 2) / (2 * Math.max(3, nl.d - 12)) : 0;
     // near a speed it holds, gently: a hard gain took it from one brake step's force to the next and from 14 to 10 km/h and
     // back down a gradient, and it asked for drive there; into a lower limit ahead, the deceleration that ends there, not
     // a lag behind it
     if (vt === vLimit) {
       const off = (tr.v > vt ? vt : vtDrive) - tr.v, gentle = Math.sign(off) * (0.35 * Math.min(Math.abs(off), 1) + 0.9 * Math.max(0, Math.abs(off) - 1));
       aPlan = Math.max(-1.1, Math.min(1.0, gentle));
-      if (nl && nl.v / 3.6 < tr.v) aPlan = Math.max(-1.1, Math.min(aPlan, -(tr.v * tr.v - (nl.v / 3.6 - 0.3) ** 2) / (2 * Math.max(3, nl.d - 12))));
+      if (aToLimit > 0) aPlan = Math.max(-1.1, Math.min(aPlan, -aToLimit));
     }
     // on the curve to a fixed point: the deceleration that still ends there, whatever the brake's steps gave so far; too
     // fast for a speed limit or for something nearer as well, the harder of the two
-    // (the brake takes ≈1 s to come in: from the point where that second still leaves the curve's deceleration)
-    const onCurve = dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * stopDecel * Math.max(0, dLeft - tr.v)) - 0.02) && tr.v > 0.05;
+    // (half a second ahead, the brake's own lag: a whole second left the deceleration below step 3 and 12 m of rolling at the end)
+    const onCurve = dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * stopDecel * Math.max(0, dLeft - tr.v * 0.5)) - 0.02) && tr.v > 0.05;
     const aNeed = onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft)) : 0;
     const vOver = Math.min(vLimit, vMoving);
-    const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, tr.v > vOver ? (vOver - tr.v) * 0.9 : 0)) : aPlan;
+    const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, -aToLimit, tr.v > vOver ? (vOver - tr.v) * 0.9 : 0)) : aPlan;
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + resist;
     const stand = g.doorState !== 'closed' || vt <= 0.05;
     const coast = (!onCurve && between) || (onCurve && need > -300) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
     // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
     const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
-    // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off
-    const button = wantPower === true && (need < 0 || inApproach || coast);
+    // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
+    // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
+    // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
+    const needPedal = wantPower === true && !tr.eq.buttonLive && (tr.eq.ls || tr.eq.p > 36 || ct.contact - tr.panto < tr.v * 0.3 + 1);
+    const button = wantPower === true && !needPedal && (need < 0 || inApproach || coast);
     this.input.switchBtn = button;
     this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: inApproach || (onCurve && tr.v > 0.1), fixed, aNeed, aCoast, inertia: tr.inertia, grade,
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1)) && !needPedal, fixed, aNeed,
+      aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade,
       speedErr: onCurve ? null : tr.v - vt });
     return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }

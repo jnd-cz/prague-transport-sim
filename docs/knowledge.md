@@ -259,8 +259,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's electric system** (#351): `src/tr37.js`, `src/electric.js`, read from ČKD's manuals in
   `docs/research/prazsketramvaje/t3-accelerator.md` § 9. Nothing but the pilot motor moves the accelerator, the relay in
   every mode. The wire's resistances and no-load voltage are assumed; nothing found measures them.
-- **How the autopilot drives it** (#351): to a stop or signal one curve to the point, with what the brake can spare on
-  the steepest downhill to it, no crawl and no drive pedal once braking (`tools/headless.py --checks stops`, `tools/test_drives.py`);
+- **How the autopilot drives it** (#351): to a stop or signal one curve to the point at up to 0.8 m/s², with what the brake can spare on
+  the steepest downhill to it, no crawl and no drive pedal once braking (`tools/headless.py --checks stops`, `tools/test_drives.py`).
+  Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
+  below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way;
   the crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
