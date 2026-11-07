@@ -255,9 +255,17 @@ export class Autopilot {
     const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, -aToLimit, tr.v > vOver ? (vOver - tr.v) * 0.9 : 0)) : aPlan;
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + resist;
     const stand = g.doorState !== 'closed' || vt <= 0.05;
-    const coast = (!onCurve && between) || (onCurve && need > -300) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000);
     // urgent: harder braking than planned is needed now (a stop closer than the plan's distance)
     const urgent = stopAt !== null && tr.v > 1 && (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s - 1.5)) > DECEL * 1.3;
+    // (the switch button works with the accelerator at 30 or under, and a light brake step lifts it: one for 0.3 m/s over the limit
+    // 5 m before a contact took it from 29 to 34, the drive pedal made the turn 22 m before Anděl and the brake after it needed the
+    // track brakes, 7.8 m short, line 9 seeds 2 and 5 downhill. Holding the line's limit and less than 0.6 m/s over it, it coasts
+    // through on the button and brakes after; not on the way down to a lower limit or a point, where coasting ran 3 km/h over the
+    // switch's limit and the pedal made the turn after all, and braking on step 5 had the position at 21)
+    // (a diverging contact, not only the next one: at Anděl one for a switch passed straight came 4 m before it)
+    const btnSoon = tr.eq.buttonLive && g.switches.some((w) => !w.auto && !w.passedContact && w.required === 'diverging' && w.contact > tr.panto && w.contact - tr.panto < tr.v * 2.5 + 2);
+    const coast = (!onCurve && between) || (onCurve && need > -300) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
+      (btnSoon && vt === vLine && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6);
     // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
     // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
