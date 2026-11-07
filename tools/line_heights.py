@@ -60,6 +60,7 @@ NEAR_MEET = 2.0  # m: two tracks meeting a third this near each other along it m
 MAX_GRADE = 0.09  # the steepest tram track (the game's grade limiter, src/terrain.js; Hercovka - Kobylisy 8-8.8 %)
 HOLD_WEIGHT = 1e-3  # a held bin's pull towards the straight line across its hold
 PIN_MERGE = 0.5  # m: pinned points this near each other along a track are one (their mean)
+MEET_GIVE = 0.03  # m a pin may give where an answer holds the floor and the tracks' meeting points need a tighter curve
 MEET_ROUNDS = 8  # where an answer holds the floor at a junction, the rounds in which its tracks meet half way (assemble)
 PIN_WEIGHT = 1e3  # a pinned point's weight against a staged height's 1 (1e6 left the solver short of the radius
                   # after 3000 steps on 30 chains, up to 55 s each)
@@ -296,17 +297,19 @@ def answered_toward(chs):
     """Where a step answer moves the archive part way to survey + lidar (`toward`): each archive height within the answer's
     reach goes that share of the way to the mean of survey and lidar where they agree within TOWARD_AGREE, else to the
     lidar, fading out over the reach's last BLEND_REACH m so the edge makes no step; a height whose lidar lies on another
-    level (over TOWARD_OTHER away) stays (the user, Malovanka, 2026-11-07: "Let's pick the half option for malovanka now")."""
+    level (over TOWARD_OTHER away) stays (the user, Malovanka, 2026-11-07: "Let's pick the half option for malovanka now").
+    `from` names the sources it moves, the archive by default, and `other` how far the lidar may lie off for it to (Královka's
+    loop: DI too, up to 1 m off, no structure there and the user's photos showing the whole loop flush with the grass)."""
     moved = 0
     # (by its own reach, not the nearest answer's: the next card 85 m on would cut it off half way, in a step)
     for a in [a for a in STEP_ANSWERS if a['toward']]:
         for c in chs:
             for x in c.bins:
                 d = math.dist(x['xy'], a['xy']) if x['xy'] else math.inf
-                if d > a['reach'] or x.get('z') is None or x.get('src') != 'dtmp' or x.get('pin'):
+                if d > a['reach'] or x.get('z') is None or x.get('src') not in a['toward'].get('from', ['dtmp']) or x.get('pin'):
                     continue
-                arch, surv, lid = x.get('archive'), x.get('survey'), x.get('terrain')
-                if arch is None or lid is None or abs(lid - arch) > TOWARD_OTHER:
+                arch, surv, lid = (x.get('archive') if x.get('src') == 'dtmp' else x['z']), x.get('survey'), x.get('terrain')
+                if arch is None or lid is None or abs(lid - arch) > a['toward'].get('other', TOWARD_OTHER):
                     continue
                 ref = (surv + lid) / 2 if surv is not None and abs(surv - lid) <= TOWARD_AGREE else lid
                 w = min(1.0, (a['reach'] - d) / BLEND_REACH)
@@ -696,7 +699,20 @@ def solve(c, pins, r, relax=None):
         # every curve under the floor where no answer allows it is a place for review too: 4 of the 5 places under 500 m on the
         # lines were such, at Malostranské náměstí, Trojská and Královka)
         tight = implied_radii(s, res['z'])
-        below |= {i + 1 for i, v in enumerate(tight) if v < floor * TIGHT and lowest[i + 1] >= floor}
+        tight_at = {i + 1 for i, v in enumerate(tight) if v < floor * TIGHT and lowest[i + 1] >= floor}
+        pins_near = [j for j in range(len(s)) if run[j].get('pin') and tight_at and min(abs(s[j] - s[i]) for i in tight_at) <= RELAX_REACH]
+        if pins_near and answer_at([xy_of(i) for i in tight_at], (HOLD,)):
+            # (an answer holds the floor here too: solved at it with the pins near weighed like data, and the tracks they come
+            # from meet that half way, assemble: Královka, Malovanka, Strossmayerovo náměstí, where several tracks' meeting
+            # points metres apart needed 351-472 m)
+            held = banded_profile(s, zf, [max(v, floor) for v in rmin], [MEET_GIVE if j in pins_near else t for j, t in enumerate(tol)],
+                                  weight)
+            # (only where the pins giving MEET_GIVE let the floor hold: weighed like data, the pins went 26 cm and the tracks
+            # pulled after them made 10 % grades at Malovanka)
+            if min(implied_radii(s, held['z']), default=math.inf) >= floor * TIGHT:
+                c.apart += [(s[j], held['z'][j]) for j in pins_near]
+                tight_at = set()
+        below |= tight_at
         raw = [None if x.get('pin') else x.get('staged', x['z']) for x in run]  # (before the smoother)
         # (for review: where the floor cannot meet the band, or the rails meet only below it; a place the band missed at
         # the design radius that an answer settled is kept too, so that the answers met can be counted)
@@ -1172,6 +1188,10 @@ def radius_review(chs, snapshot):
         lat, lon = (float(v) for v in F.ll(*at))
         near = {n: min(g.distance(Point(at)) for g in gs) for n, gs in routes.items()}
         lines = sorted((n for n, dd in near.items() if dd < 10), key=int)
+        if not lines:
+            # (off the lines' routes: the floor holds there as built and nobody drives it; the user, 2026-11-07:
+            # "Generally tracks far from the main line aren't important")
+            continue
         spans, previews = [], {HOLD: {}, FOLLOW: {}}
         for k, p in enumerate(sorted(places, key=lambda p: -len(p['data']))):
             sid = f'{ident}:track{k + 1}'
