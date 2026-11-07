@@ -11,11 +11,12 @@ const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on
 // rides on line 23 (2026-10-31) braked late and firmly: from 23–25 km/h at 0.69 and 0.86 m/s² on average, 1.05–1.09 at p90, after ≈45 m of
 // coasting; the user, 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense", "Later braking to match real
 // driver". At 0.7 of step 5 a full set planned 0.63 and braked on step 3 from 140 m out
-// m of coasting into the braking curve before a stop or a signal: two real rides on line 23 (2026-10-31) took the drive pedal off 80–100 m
-// out at ≈28–30 km/h and braked the last 25–30 m from ≈24 km/h. Read from GPS they coasted 41–45 m, but the same reading takes a
-// 32–37 m coast of the autopilot's for 7 m; 60 m puts the drive-off ≈90 m out. ČKD, T3SU-03 p. 5: "fully use coasting, above all when
-// coming into stops"; the user, 2026-11-07: "Later braking to match real driver"
-const COAST_IN = 60;
+// s of coasting into the braking curve before a stop or a signal, at the speed the drive comes off: two real rides on line 23 (2026-10-31)
+// took the drive pedal off 80–100 m out at ≈28–30 km/h and braked the last 25–30 m from ≈24 km/h. 8 s takes it off ≈90 m out at
+// ≈28 km/h (as metres, 45 or 60, or half the way to a closer point, it drove up to 35 km/h 90 m out). Read from GPS the rides
+// coasted 41–45 m, but the same reading takes a 32–37 m coast of the autopilot's for 7 m. ČKD, T3SU-03 p. 5: "fully use coasting,
+// above all when coming into stops"; the user, 2026-11-07: "Later braking to match real driver"
+const COAST_T = 8;
 const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
@@ -175,15 +176,15 @@ export class Autopilot {
     if (fixedAt !== null) {
       // (and what it still gains while the accelerator comes off, ≈1 s: up 37 ‰ on step 4 at 1.1 m/s² it drove from 14 to 20 km/h
       // 19 m before Hlušičkova, then needed more than the brake builds after driving and stood 3.5–4.6 m short on the emergency
-      // brake, line 9 seeds 1 and 3). It coasts COAST_IN into the curve, or half the way to a closer point, with the gradient's own
-      // slowing: up a climb the drive stays on longer, down one it comes off sooner
+      // brake, line 9 seeds 1 and 3). It coasts COAST_T into the curve, with the gradient's own slowing: up a
+      // climb the drive stays on longer, down one it comes off sooner
       const gain = Math.max(0, tr.a);
-      const coastIn = Math.max(look, Math.min(COAST_IN, 0.5 * dLeft));
+      const coastIn = Math.min(dLeft, Math.max(look, COAST_T * tr.v));
       vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - coastIn - gain * 3.5) + 2 * aCoast * coastIn)) - gain);
       // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops"; just after braking up to
-      // 2 × COAST_IN out when it is there within 15 s: after a switch's 15 km/h 53 m before the stop it drove up to 17 km/h between two
+      // 90 m out when it is there within 15 s: after a switch's 15 km/h 53 m before the stop it drove up to 17 km/h between two
       // brakings. Not pulling away from the stop before: with stops 60 m apart that took 9 % longer)
-      const rolls = aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft && (dLeft < 40 || (tr.eq.brakeT < 5 && dLeft < 2 * COAST_IN && dLeft < 15 * tr.v));
+      const rolls = aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft && (dLeft < 40 || (tr.eq.brakeT < 5 && dLeft < 90 && dLeft < 15 * tr.v));
       if (stood || rolls) vtDrive = 0;
       // (stopped short of the point: on, slowly)
       else if (tr.v < 0.1) vtDrive = Math.max(vtDrive, Math.min(vLimit, 1.2));
@@ -286,6 +287,6 @@ export class Autopilot {
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       speedErr: onCurve ? null : tr.v - vt });
-    return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
+    return { vt, vtDrive, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }
 }
