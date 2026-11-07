@@ -259,13 +259,16 @@ export class Autopilot {
     // slipped, until 3 m/s: sand for 1.5 s at a time slipped again after each
     const slipClimbs = 0.7 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.15;
     this.startSand = tr.v < 3 && !slipClimbs && need > 0 && (tr.slip || !!this.startSand);
-    this.sandT = this.startSand || (tr.slide && (onCurve || urgent || hazard)) ? 1.5 : (this.sandT || 0) - dt;
+    // (braking: once the point lies within what a tram sliding on a patch needs, 0.44 m/s², and 20 m; on the curve only, it braked
+    // on a step less after the slide at 0.3 m/s², under the slide's own, and stood 7.4 m short on the emergency brake, line 37 seed 4)
+    const slideNear = dLeft !== null && dLeft < (tr.v * tr.v) / (2 * 0.44) + 20;
+    this.sandT = this.startSand || (tr.slide && (onCurve || urgent || hazard || slideNear)) ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1)) && !needPedal, fixed, aNeed,
-      aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0,
+      aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       speedErr: onCurve ? null : tr.v - vt });
     return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }
