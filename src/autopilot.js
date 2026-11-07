@@ -7,8 +7,14 @@
 
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
-const PLAN_DECEL = 0.9; // … to a stop, a signal or a lower limit: step 3 on the level, as the drive's steps 1–3. A real ride on line 23 braked at about 0.9 at the end, on a heritage line whose drivers
-// go milder (the user, 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense"); 0.65 lost 2–3 s a stop against main, which ran 0.7 m/s over its curve
+const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on the level and empty (planAt: 0.85 of step 5 below that). Two real
+// rides on line 23 (2026-10-31) braked late and firmly: from 23–25 km/h at 0.69 and 0.86 m/s² on average, 1.05–1.09 at p90, after ≈45 m of
+// coasting; the user, 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense", "Later braking to match real
+// driver". At 0.7 of step 5 a full set planned 0.63 and braked on step 3 from 140 m out
+// m of coasting into the braking curve before a stop or a signal: two real rides on line 23 (2026-10-31) took the drive pedal off ≈100 m
+// out at ≈30 km/h, coasted ≈45 m and braked from ≈23 km/h at ≈0.86 m/s²; ČKD, T3SU-03 p. 5: "fully use coasting, above all when coming
+// into stops"; the user, 2026-11-07: "Later braking to match real driver"
+const COAST_IN = 45;
 const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
@@ -38,12 +44,12 @@ export class Autopilot {
     // "our autopilot can lean a bit on the faster side where it makes sense")
     let vt = g.currentLimit / 3.6 - 0.4;
     let nl = g.nextLimitChange();
-    // the deceleration to plan on: less on a steep downhill, where the electric brake has to hold the tram's weight too (70 ‰ takes
-    // ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes)
+    // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
+    // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
     const gradeHere = g.profile.grade(tr.s - 7);
     // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold)
     const planMax = Math.min(PLAN_DECEL, 0.5 * 9.81 * (g.muBase ?? 0.3));
-    const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.7 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
+    const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.8 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
     const vLine = vt;
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, limit.d - 12)) - 0.3;
@@ -168,11 +174,16 @@ export class Autopilot {
     if (fixedAt !== null) {
       // (and what it still gains while the accelerator comes off, ≈1 s: up 37 ‰ on step 4 at 1.1 m/s² it drove from 14 to 20 km/h
       // 19 m before Hlušičkova, then needed more than the brake builds after driving and stood 3.5–4.6 m short on the emergency
-      // brake, line 9 seeds 1 and 3)
+      // brake, line 9 seeds 1 and 3). It coasts COAST_IN into the curve, or half the way to a closer point, with the gradient's own
+      // slowing: up a climb the drive stays on longer, down one it comes off sooner
       const gain = Math.max(0, tr.a);
-      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - look - gain * 3.5))) - gain);
-      // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops")
-      if (stood || (dLeft < 40 && aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft)) vtDrive = 0;
+      const coastIn = Math.max(look, Math.min(COAST_IN, 0.5 * dLeft));
+      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - coastIn - gain * 3.5) + 2 * aCoast * coastIn)) - gain);
+      // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops"; just after braking up to
+      // 2 × COAST_IN out when it is there within 15 s: after a switch's 15 km/h 53 m before the stop it drove up to 17 km/h between two
+      // brakings. Not pulling away from the stop before: with stops 60 m apart that took 9 % longer)
+      const rolls = aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft && (dLeft < 40 || (tr.eq.brakeT < 5 && dLeft < 2 * COAST_IN && dLeft < 15 * tr.v));
+      if (stood || rolls) vtDrive = 0;
       // (stopped short of the point: on, slowly)
       else if (tr.v < 0.1) vtDrive = Math.max(vtDrive, Math.min(vLimit, 1.2));
     }
@@ -250,6 +261,9 @@ export class Autopilot {
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
     const needPedal = wantPower === true && !tr.eq.buttonLive && (tr.eq.ls || tr.eq.p > 36 || ct.contact - tr.panto < tr.v * 0.3 + 1);
     const button = wantPower === true && !needPedal && (need < 0 || inApproach || coast);
+    // (up a climb the approach drives again where coasting would stand it more than 3 m short: with the drive pedal held off it
+    // stood 15.7 m short of Mezi Hřbitovy up 25 ‰, line 9 seed 2 in autumn; on the level it does not, where main crawled on pulses)
+    const shortUphill = inApproach && fixed && aCoast > 0.15 && (tr.v * tr.v) / (2 * aCoast) < dLeft - 3;
     this.input.switchBtn = button;
     // slippery rail: sand where it decides something, pulling away or braking for a point (the equipment eases off a step): on every slip
     // and slide the box, 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
@@ -267,8 +281,9 @@ export class Autopilot {
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1)) && !needPedal, fixed, aNeed,
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1)) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
+      aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       speedErr: onCurve ? null : tr.v - vt });
     return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }

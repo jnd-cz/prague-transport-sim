@@ -286,7 +286,7 @@ export class TR37 {
   // the stop point, or null), noDrive (braking for a stop: the drive pedal stays off), fixed (that point stays where it
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
-  // still gets here) }.
+  // still gets here), aService (m/s² step 5 gives here, the gradient with it) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -371,7 +371,9 @@ export class TR37 {
     }
     // a stop the service brake (≈1.3 m/s² on step 5) cannot make: the pedal to the floor, the track brakes
     // with it, as a driver does for a signal turning red too close (line 17 seed 3: red 36 m ahead at
-    // 38 km/h, 1.6 m/s² needed; the old force model braked 1.8 m/s²); let go once it is in hand
+    // 38 km/h, 1.6 m/s² needed; the old force model braked 1.8 m/s²); let go once it is in hand. Up a climb
+    // step 5 has the gradient with it (w.aService): at 1.15 flat a car stopping just past a stop up 40 ‰
+    // brought the track brakes in at 2.3 m/s² where step 5 and the climb made 1.5
     // … and one the wheels cannot make, sliding on a leaf patch at 0.3 m/s² with the signal close and no sand left: the track brakes do
     // not depend on the rail (with sand, the sand first: the track brakes are a jolt of 2.3 m/s²)
     // (only past what a sliding tram still gets, w.slideA: over 0.35 they came in on ordinary approaches at 0.7 and stood it 7–13 m
@@ -380,7 +382,7 @@ export class TR37 {
       const need = (w.v * w.v) / (2 * Math.max(0.5, w.stopDist));
       // (once on for a slide, until the stop is in hand: between the two it went on and off 4 times on one patch)
       A.slideTrack = w.fixed && !w.sandLeft && ((w.slide && need > Math.max(0.35, w.slideA ?? 0)) || (A.slideTrack && now === -6 && need > 0.3));
-      if ((v > 2 && (need > 1.15 || (now === -6 && need > 0.6))) || A.slideTrack) s = -6;
+      if ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack) s = -6;
     }
     const contact = w.power != null;
     if (!w.urgent && !contact && s !== -6) {
