@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "snapshot": "2026-11-03b",
+ "snapshot": "2026-11-06c",
  "findings": [
   {
    "kind": "trackheight",
    "id": "radius-50.0781-14.4676",
    "x": 3138.3554586676,
    "y": -1466.489424485535,
-   "mag": 0.165,
+   "mag": 0.158,
    "status": "review",
    "place": [
     50.07815,
@@ -16,7 +16,7 @@
    "lines_near": [
     "9"
    ],
-   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 17 cm (tightest 224 m). Within the band the radius is 124 m.",
+   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 16 cm (tightest 228 m). Within the band the radius is 129 m.",
    "decision": {
     "span_ids": [
      "radius-50.0781-14.4676:track1"
@@ -56,7 +56,7 @@
         -1487.22
        ],
        "archive": [],
-       "di_z": 269.775,
+       "di_z": 269.769,
        "surfaces": [],
        "ipr_terrain_z": 269.915
       },
@@ -67,7 +67,7 @@
         -1482.26
        ],
        "archive": [],
-       "di_z": 269.625,
+       "di_z": 269.624,
        "surfaces": [],
        "ipr_terrain_z": 270.0
       },
@@ -78,7 +78,7 @@
         -1477.32
        ],
        "archive": [],
-       "di_z": 269.56,
+       "di_z": 269.562,
        "surfaces": [],
        "ipr_terrain_z": 270.051
       },
@@ -100,7 +100,7 @@
         -1468.74
        ],
        "archive": [],
-       "di_z": 269.675,
+       "di_z": 269.671,
        "surfaces": [],
        "ipr_terrain_z": 270.166
       },
@@ -122,7 +122,7 @@
         -1465.62
        ],
        "archive": [],
-       "di_z": 269.855,
+       "di_z": 269.853,
        "surfaces": [],
        "ipr_terrain_z": 270.195
       },
@@ -133,7 +133,7 @@
         -1463.56
        ],
        "archive": [],
-       "di_z": 270.09,
+       "di_z": 270.092,
        "surfaces": [],
        "ipr_terrain_z": 270.214
       },
@@ -144,7 +144,7 @@
         -1462.59
        ],
        "archive": [],
-       "di_z": 270.24,
+       "di_z": 270.235,
        "surfaces": [],
        "ipr_terrain_z": 270.257
       },
@@ -173,47 +173,47 @@
      "radius-50.0781-14.4676:track1": [
       [
        0.0,
-       269.866
+       269.862
       ],
       [
        2.5,
-       269.812
+       269.809
       ],
       [
        7.5,
-       269.729
+       269.727
       ],
       [
        12.5,
-       269.697
+       269.695
       ],
       [
        17.5,
-       269.734
+       269.731
       ],
       [
        22.5,
-       269.882
+       269.877
       ],
       [
        25.9,
-       270.006
+       270.0
       ],
       [
        27.5,
-       270.054
+       270.047
       ],
       [
        32.5,
-       270.176
+       270.168
       ],
       [
        37.5,
-       270.25
+       270.24
       ],
       [
        41.0,
-       270.282
+       270.272
       ]
      ]
     },
@@ -221,47 +221,836 @@
      "radius-50.0781-14.4676:track1": [
       [
        0.0,
-       269.887
+       269.883
       ],
       [
        2.5,
-       269.803
+       269.8
       ],
       [
        7.5,
-       269.655
+       269.654
       ],
       [
        12.5,
-       269.62
+       269.618
       ],
       [
        17.5,
-       269.743
+       269.738
       ],
       [
        22.5,
-       270.011
+       270.0
       ],
       [
        25.9,
-       270.175
+       270.162
       ],
       [
        27.5,
-       270.218
+       270.205
       ],
       [
        32.5,
-       270.257
+       270.248
       ],
       [
        37.5,
-       270.262
+       270.253
       ],
       [
        41.0,
-       270.264
+       270.253
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0931-14.3924",
+   "x": -1966.5129399979962,
+   "y": 914.5854292296889,
+   "mag": 0.048,
+   "status": "review",
+   "place": [
+    50.0931,
+    14.39235
+   ],
+   "lines_near": [
+    "22",
+    "23"
+   ],
+   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 5 cm (tightest 472 m). Within the band the radius is 134 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0931-14.3924:track1"
+    ],
+    "structure": {
+     "kind": "junction"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0931-14.3924:track1",
+     "line": 22,
+     "direction": "path",
+     "structure": {
+      "kind": "junction"
+     },
+     "status": "review",
+     "start_s": 1132.5,
+     "length_m": 130.0,
+     "profile": [
+      {
+       "s": 1132.5,
+       "xy": [
+        -1901.67,
+        913.35
+       ],
+       "archive": [
+        {
+         "z": 264.177
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.214
+      },
+      {
+       "s": 1137.5,
+       "xy": [
+        -1906.66,
+        913.15
+       ],
+       "archive": [
+        {
+         "z": 264.331
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.194
+      },
+      {
+       "s": 1142.5,
+       "xy": [
+        -1911.66,
+        912.98
+       ],
+       "archive": [
+        {
+         "z": 264.462
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.547
+      },
+      {
+       "s": 1147.5,
+       "xy": [
+        -1916.66,
+        912.8
+       ],
+       "archive": [
+        {
+         "z": 264.594
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.659
+      },
+      {
+       "s": 1152.5,
+       "xy": [
+        -1921.66,
+        912.62
+       ],
+       "archive": [
+        {
+         "z": 264.731
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.782
+      },
+      {
+       "s": 1157.5,
+       "xy": [
+        -1926.65,
+        912.45
+       ],
+       "archive": [
+        {
+         "z": 264.877
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.907
+      },
+      {
+       "s": 1162.5,
+       "xy": [
+        -1931.65,
+        912.28
+       ],
+       "archive": [
+        {
+         "z": 265.024
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.128
+      },
+      {
+       "s": 1167.5,
+       "xy": [
+        -1936.65,
+        912.1
+       ],
+       "archive": [
+        {
+         "z": 265.179
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.238
+      },
+      {
+       "s": 1172.5,
+       "xy": [
+        -1941.64,
+        911.93
+       ],
+       "archive": [
+        {
+         "z": 265.349
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.36
+      },
+      {
+       "s": 1177.5,
+       "xy": [
+        -1946.64,
+        911.76
+       ],
+       "archive": [
+        {
+         "z": 265.521
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.497
+      },
+      {
+       "s": 1182.5,
+       "xy": [
+        -1951.64,
+        911.59
+       ],
+       "archive": [
+        {
+         "z": 265.68
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.638
+      },
+      {
+       "s": 1187.5,
+       "xy": [
+        -1956.63,
+        911.7
+       ],
+       "archive": [
+        {
+         "z": 265.683
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.776
+      },
+      {
+       "s": 1192.5,
+       "xy": [
+        -1961.55,
+        912.57
+       ],
+       "archive": [
+        {
+         "z": 265.73
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.87
+      },
+      {
+       "s": 1197.9,
+       "xy": [
+        -1966.51,
+        914.59
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 1202.5,
+       "xy": [
+        -1970.37,
+        917.13
+       ],
+       "archive": [
+        {
+         "z": 265.815
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.008
+      },
+      {
+       "s": 1207.5,
+       "xy": [
+        -1973.93,
+        920.64
+       ],
+       "archive": [
+        {
+         "z": 265.859
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.963
+      },
+      {
+       "s": 1212.5,
+       "xy": [
+        -1976.78,
+        924.74
+       ],
+       "archive": [
+        {
+         "z": 265.793
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.912
+      },
+      {
+       "s": 1217.5,
+       "xy": [
+        -1978.73,
+        929.33
+       ],
+       "archive": [
+        {
+         "z": 265.631
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.757
+      },
+      {
+       "s": 1222.5,
+       "xy": [
+        -1979.7,
+        934.23
+       ],
+       "archive": [
+        {
+         "z": 265.507
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.574
+      },
+      {
+       "s": 1227.5,
+       "xy": [
+        -1979.66,
+        939.22
+       ],
+       "archive": [
+        {
+         "z": 265.41
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.424
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0931-14.3924:track1": [
+      [
+       1132.5,
+       264.153
+      ],
+      [
+       1137.5,
+       264.3
+      ],
+      [
+       1142.5,
+       264.449
+      ],
+      [
+       1147.5,
+       264.598
+      ],
+      [
+       1152.5,
+       264.748
+      ],
+      [
+       1157.5,
+       264.902
+      ],
+      [
+       1162.5,
+       265.065
+      ],
+      [
+       1167.5,
+       265.249
+      ],
+      [
+       1172.5,
+       265.432
+      ],
+      [
+       1177.5,
+       265.591
+      ],
+      [
+       1182.5,
+       265.724
+      ],
+      [
+       1187.5,
+       265.833
+      ],
+      [
+       1192.5,
+       265.916
+      ],
+      [
+       1197.9,
+       265.978
+      ],
+      [
+       1202.5,
+       265.982
+      ],
+      [
+       1207.5,
+       265.956
+      ],
+      [
+       1212.5,
+       265.88
+      ],
+      [
+       1217.5,
+       265.779
+      ],
+      [
+       1222.5,
+       265.652
+      ],
+      [
+       1227.5,
+       265.501
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0931-14.3924:track1": [
+      [
+       1132.5,
+       264.153
+      ],
+      [
+       1137.5,
+       264.301
+      ],
+      [
+       1142.5,
+       264.45
+      ],
+      [
+       1147.5,
+       264.6
+      ],
+      [
+       1152.5,
+       264.75
+      ],
+      [
+       1157.5,
+       264.898
+      ],
+      [
+       1162.5,
+       265.044
+      ],
+      [
+       1167.5,
+       265.196
+      ],
+      [
+       1172.5,
+       265.351
+      ],
+      [
+       1177.5,
+       265.501
+      ],
+      [
+       1182.5,
+       265.635
+      ],
+      [
+       1187.5,
+       265.753
+      ],
+      [
+       1192.5,
+       265.891
+      ],
+      [
+       1197.9,
+       266.025
+      ],
+      [
+       1202.5,
+       265.968
+      ],
+      [
+       1207.5,
+       265.874
+      ],
+      [
+       1212.5,
+       265.768
+      ],
+      [
+       1217.5,
+       265.648
+      ],
+      [
+       1222.5,
+       265.523
+      ],
+      [
+       1227.5,
+       265.399
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0933-14.3922",
+   "x": -1975.655000000028,
+   "y": 935.054999999993,
+   "mag": 0.04,
+   "status": "review",
+   "place": [
+    50.09327,
+    14.39219
+   ],
+   "lines_near": [],
+   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 4 cm (tightest 364 m). Within the band the radius is 232 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0933-14.3922:track1"
+    ],
+    "structure": {
+     "kind": "junction"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0933-14.3922:track1",
+     "line": 22,
+     "direction": "path",
+     "structure": {
+      "kind": "junction"
+     },
+     "status": "review",
+     "start_s": -22.5,
+     "length_m": 126.3,
+     "profile": [
+      {
+       "s": 0.0,
+       "xy": [
+        -1948.5,
+        915.21
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 2.5,
+       "xy": [
+        -1951.0,
+        915.18
+       ],
+       "archive": [
+        {
+         "z": 265.596
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.572
+      },
+      {
+       "s": 7.5,
+       "xy": [
+        -1955.99,
+        915.49
+       ],
+       "archive": [
+        {
+         "z": 265.653
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.7
+      },
+      {
+       "s": 12.5,
+       "xy": [
+        -1960.84,
+        916.64
+       ],
+       "archive": [
+        {
+         "z": 265.712
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.801
+      },
+      {
+       "s": 17.5,
+       "xy": [
+        -1965.33,
+        918.83
+       ],
+       "archive": [
+        {
+         "z": 265.761
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.903
+      },
+      {
+       "s": 22.5,
+       "xy": [
+        -1969.22,
+        921.94
+       ],
+       "archive": [
+        {
+         "z": 265.756
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.924
+      },
+      {
+       "s": 27.5,
+       "xy": [
+        -1972.34,
+        925.84
+       ],
+       "archive": [
+        {
+         "z": 265.741
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.842
+      },
+      {
+       "s": 32.5,
+       "xy": [
+        -1974.52,
+        930.33
+       ],
+       "archive": [
+        {
+         "z": 265.735
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.657
+      },
+      {
+       "s": 37.5,
+       "xy": [
+        -1975.67,
+        935.18
+       ],
+       "archive": [
+        {
+         "z": 265.722
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.452
+      },
+      {
+       "s": 43.8,
+       "xy": [
+        -1975.8,
+        941.51
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0933-14.3922:track1": [
+      [
+       0.0,
+       265.485
+      ],
+      [
+       2.5,
+       265.558
+      ],
+      [
+       7.5,
+       265.685
+      ],
+      [
+       12.5,
+       265.783
+      ],
+      [
+       17.5,
+       265.852
+      ],
+      [
+       22.5,
+       265.864
+      ],
+      [
+       27.5,
+       265.817
+      ],
+      [
+       32.5,
+       265.701
+      ],
+      [
+       37.5,
+       265.532
+      ],
+      [
+       43.8,
+       265.22
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0933-14.3922:track1": [
+      [
+       0.0,
+       265.479
+      ],
+      [
+       2.5,
+       265.539
+      ],
+      [
+       7.5,
+       265.643
+      ],
+      [
+       12.5,
+       265.719
+      ],
+      [
+       17.5,
+       265.778
+      ],
+      [
+       22.5,
+       265.824
+      ],
+      [
+       27.5,
+       265.843
+      ],
+      [
+       32.5,
+       265.754
+      ],
+      [
+       37.5,
+       265.569
+      ],
+      [
+       43.8,
+       265.192
       ]
      ]
     }
@@ -272,14 +1061,14 @@
    "id": "radius-50.0727-14.5310",
    "x": 7557.666972281479,
    "y": -2683.5895522388473,
-   "mag": 0.026,
+   "mag": 0.029,
    "status": "review",
    "place": [
     50.07268,
     14.53103
    ],
    "lines_near": [],
-   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 3 cm (tightest 485 m). Within the band the radius is 87 m.",
+   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 3 cm (tightest 477 m). Within the band the radius is 86 m.",
    "decision": {
     "span_ids": [
      "radius-50.0727-14.5310:track1"
@@ -453,11 +1242,11 @@
      "radius-50.0727-14.5310:track1": [
       [
        0.0,
-       263.375
+       263.371
       ],
       [
        1.6,
-       263.4
+       263.397
       ],
       [
        7.5,
@@ -465,7 +1254,7 @@
       ],
       [
        12.5,
-       263.461
+       263.462
       ],
       [
        17.5,
@@ -473,7 +1262,7 @@
       ],
       [
        22.5,
-       263.376
+       263.377
       ],
       [
        27.5,
@@ -481,7 +1270,7 @@
       ],
       [
        32.5,
-       263.355
+       263.356
       ],
       [
        37.5,
@@ -489,7 +1278,7 @@
       ],
       [
        42.3,
-       263.347
+       263.349
       ]
      ]
     },
@@ -497,11 +1286,11 @@
      "radius-50.0727-14.5310:track1": [
       [
        0.0,
-       263.35
+       263.345
       ],
       [
        1.6,
-       263.429
+       263.426
       ],
       [
        7.5,
@@ -533,7 +1322,2464 @@
       ],
       [
        42.3,
-       263.347
+       263.349
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0932-14.3922",
+   "x": -1977.6018367346776,
+   "y": 926.3789795919305,
+   "mag": 0.026,
+   "status": "review",
+   "place": [
+    50.09319,
+    14.39218
+   ],
+   "lines_near": [],
+   "info": "junction: at a junction (the rails meet there within 5 mm), no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 3 cm (tightest 415 m). Within the band the radius is 375 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0932-14.3922:track1"
+    ],
+    "structure": {
+     "kind": "junction"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0932-14.3922:track1",
+     "line": 22,
+     "direction": "path",
+     "structure": {
+      "kind": "junction"
+     },
+     "status": "review",
+     "start_s": -44.2,
+     "length_m": 146.7,
+     "profile": [
+      {
+       "s": 0.0,
+       "xy": [
+        -2002.8,
+        909.79
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 2.5,
+       "xy": [
+        -2000.31,
+        909.95
+       ],
+       "archive": [
+        {
+         "z": 266.851
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.96
+      },
+      {
+       "s": 7.5,
+       "xy": [
+        -1995.36,
+        910.66
+       ],
+       "archive": [
+        {
+         "z": 266.733
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.792
+      },
+      {
+       "s": 12.5,
+       "xy": [
+        -1990.64,
+        912.28
+       ],
+       "archive": [
+        {
+         "z": 266.59
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.633
+      },
+      {
+       "s": 15.8,
+       "xy": [
+        -1987.78,
+        913.83
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 17.5,
+       "xy": [
+        -1986.34,
+        914.81
+       ],
+       "archive": [
+        {
+         "z": 266.458
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.497
+      },
+      {
+       "s": 22.5,
+       "xy": [
+        -1982.61,
+        918.13
+       ],
+       "archive": [
+        {
+         "z": 266.326
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.258
+      },
+      {
+       "s": 27.5,
+       "xy": [
+        -1979.62,
+        922.13
+       ],
+       "archive": [
+        {
+         "z": 266.118
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 266.038
+      },
+      {
+       "s": 32.2,
+       "xy": [
+        -1977.6,
+        926.38
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 37.5,
+       "xy": [
+        -1976.35,
+        931.5
+       ],
+       "archive": [
+        {
+         "z": 265.658
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.643
+      },
+      {
+       "s": 42.5,
+       "xy": [
+        -1976.03,
+        936.49
+       ],
+       "archive": [
+        {
+         "z": 265.532
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.431
+      },
+      {
+       "s": 47.5,
+       "xy": [
+        -1975.8,
+        941.49
+       ],
+       "archive": [
+        {
+         "z": 265.198
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 265.154
+      },
+      {
+       "s": 52.5,
+       "xy": [
+        -1975.57,
+        946.48
+       ],
+       "archive": [
+        {
+         "z": 264.916
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.924
+      },
+      {
+       "s": 57.5,
+       "xy": [
+        -1975.35,
+        951.48
+       ],
+       "archive": [
+        {
+         "z": 264.671
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.732
+      },
+      {
+       "s": 62.5,
+       "xy": [
+        -1975.13,
+        956.47
+       ],
+       "archive": [
+        {
+         "z": 264.43
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.518
+      },
+      {
+       "s": 67.5,
+       "xy": [
+        -1974.91,
+        961.47
+       ],
+       "archive": [
+        {
+         "z": 264.188
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.315
+      },
+      {
+       "s": 72.5,
+       "xy": [
+        -1974.69,
+        966.46
+       ],
+       "archive": [
+        {
+         "z": 263.946
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 264.107
+      },
+      {
+       "s": 77.5,
+       "xy": [
+        -1974.47,
+        971.46
+       ],
+       "archive": [
+        {
+         "z": 263.702
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 263.894
+      },
+      {
+       "s": 82.5,
+       "xy": [
+        -1974.25,
+        976.45
+       ],
+       "archive": [
+        {
+         "z": 263.456
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 263.479
+      },
+      {
+       "s": 87.5,
+       "xy": [
+        -1974.04,
+        981.45
+       ],
+       "archive": [
+        {
+         "z": 263.209
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 263.268
+      },
+      {
+       "s": 92.5,
+       "xy": [
+        -1973.82,
+        986.44
+       ],
+       "archive": [
+        {
+         "z": 262.961
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 263.049
+      },
+      {
+       "s": 97.5,
+       "xy": [
+        -1973.6,
+        991.44
+       ],
+       "archive": [
+        {
+         "z": 262.713
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 262.836
+      },
+      {
+       "s": 102.5,
+       "xy": [
+        -1973.38,
+        996.43
+       ],
+       "archive": [
+        {
+         "z": 262.46
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 262.623
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0932-14.3922:track1": [
+      [
+       0.0,
+       266.961
+      ],
+      [
+       2.5,
+       266.923
+      ],
+      [
+       7.5,
+       266.826
+      ],
+      [
+       12.5,
+       266.688
+      ],
+      [
+       15.8,
+       266.574
+      ],
+      [
+       17.5,
+       266.505
+      ],
+      [
+       22.5,
+       266.281
+      ],
+      [
+       27.5,
+       265.996
+      ],
+      [
+       32.2,
+       265.755
+      ],
+      [
+       37.5,
+       265.534
+      ],
+      [
+       42.5,
+       265.362
+      ],
+      [
+       47.5,
+       265.164
+      ],
+      [
+       52.5,
+       264.941
+      ],
+      [
+       57.5,
+       264.695
+      ],
+      [
+       62.5,
+       264.445
+      ],
+      [
+       67.5,
+       264.196
+      ],
+      [
+       72.5,
+       263.947
+      ],
+      [
+       77.5,
+       263.699
+      ],
+      [
+       82.5,
+       263.451
+      ],
+      [
+       87.5,
+       263.204
+      ],
+      [
+       92.5,
+       262.957
+      ],
+      [
+       97.5,
+       262.708
+      ],
+      [
+       102.5,
+       262.459
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0932-14.3922:track1": [
+      [
+       0.0,
+       266.946
+      ],
+      [
+       2.5,
+       266.913
+      ],
+      [
+       7.5,
+       266.846
+      ],
+      [
+       12.5,
+       266.719
+      ],
+      [
+       15.8,
+       266.604
+      ],
+      [
+       17.5,
+       266.531
+      ],
+      [
+       22.5,
+       266.282
+      ],
+      [
+       27.5,
+       265.967
+      ],
+      [
+       32.2,
+       265.725
+      ],
+      [
+       37.5,
+       265.518
+      ],
+      [
+       42.5,
+       265.383
+      ],
+      [
+       47.5,
+       265.187
+      ],
+      [
+       52.5,
+       264.946
+      ],
+      [
+       57.5,
+       264.694
+      ],
+      [
+       62.5,
+       264.443
+      ],
+      [
+       67.5,
+       264.195
+      ],
+      [
+       72.5,
+       263.947
+      ],
+      [
+       77.5,
+       263.699
+      ],
+      [
+       82.5,
+       263.451
+      ],
+      [
+       87.5,
+       263.204
+      ],
+      [
+       92.5,
+       262.957
+      ],
+      [
+       97.5,
+       262.708
+      ],
+      [
+       102.5,
+       262.459
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0854-14.3839",
+   "x": -2686.3099999999977,
+   "y": 148.64500000001863,
+   "mag": 0.021,
+   "status": "review",
+   "place": [
+    50.0854,
+    14.38385
+   ],
+   "lines_near": [],
+   "info": "band: on plain track, no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 2 cm (tightest 328 m). Within the band the radius is 328 m, and the band is still missed.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0854-14.3839:track1"
+    ],
+    "structure": {
+     "kind": "band"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0854-14.3839:track1",
+     "line": 22,
+     "direction": "path",
+     "structure": {
+      "kind": "band"
+     },
+     "status": "review",
+     "start_s": 117.5,
+     "length_m": 130.0,
+     "profile": [
+      {
+       "s": 117.5,
+       "xy": [
+        -2689.89,
+        191.6
+       ],
+       "archive": [
+        {
+         "z": 297.757
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.655
+      },
+      {
+       "s": 122.5,
+       "xy": [
+        -2694.45,
+        189.55
+       ],
+       "archive": [
+        {
+         "z": 297.999
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.942
+      },
+      {
+       "s": 127.5,
+       "xy": [
+        -2698.46,
+        186.59
+       ],
+       "archive": [
+        {
+         "z": 298.263
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.258
+      },
+      {
+       "s": 132.5,
+       "xy": [
+        -2701.72,
+        182.8
+       ],
+       "archive": [
+        {
+         "z": 298.528
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.51
+      },
+      {
+       "s": 137.5,
+       "xy": [
+        -2704.06,
+        178.4
+       ],
+       "archive": [
+        {
+         "z": 298.75
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.76
+      },
+      {
+       "s": 142.5,
+       "xy": [
+        -2705.35,
+        173.58
+       ],
+       "archive": [
+        {
+         "z": 298.949
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.026
+      },
+      {
+       "s": 147.5,
+       "xy": [
+        -2705.51,
+        168.6
+       ],
+       "archive": [
+        {
+         "z": 299.141
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.248
+      },
+      {
+       "s": 152.5,
+       "xy": [
+        -2704.52,
+        163.71
+       ],
+       "archive": [
+        {
+         "z": 299.345
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.465
+      },
+      {
+       "s": 157.5,
+       "xy": [
+        -2702.44,
+        159.17
+       ],
+       "archive": [
+        {
+         "z": 299.452
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.611
+      },
+      {
+       "s": 162.5,
+       "xy": [
+        -2699.41,
+        155.2
+       ],
+       "archive": [
+        {
+         "z": 299.554
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.669
+      },
+      {
+       "s": 167.5,
+       "xy": [
+        -2695.58,
+        152.02
+       ],
+       "archive": [
+        {
+         "z": 299.655
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.67
+      },
+      {
+       "s": 172.5,
+       "xy": [
+        -2691.12,
+        149.78
+       ],
+       "archive": [
+        {
+         "z": 299.692
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.636
+      },
+      {
+       "s": 177.5,
+       "xy": [
+        -2686.26,
+        148.64
+       ],
+       "archive": [
+        {
+         "z": 299.641
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.561
+      },
+      {
+       "s": 182.5,
+       "xy": [
+        -2681.27,
+        148.43
+       ],
+       "archive": [
+        {
+         "z": 299.383
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.435
+      },
+      {
+       "s": 187.5,
+       "xy": [
+        -2676.27,
+        148.39
+       ],
+       "archive": [
+        {
+         "z": 298.982
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.234
+      },
+      {
+       "s": 192.5,
+       "xy": [
+        -2671.27,
+        148.4
+       ],
+       "archive": [
+        {
+         "z": 298.815
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 299.066
+      },
+      {
+       "s": 197.5,
+       "xy": [
+        -2666.27,
+        148.41
+       ],
+       "archive": [
+        {
+         "z": 298.667
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.898
+      },
+      {
+       "s": 202.5,
+       "xy": [
+        -2661.27,
+        148.42
+       ],
+       "archive": [
+        {
+         "z": 298.508
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.747
+      },
+      {
+       "s": 207.5,
+       "xy": [
+        -2656.27,
+        148.43
+       ],
+       "archive": [
+        {
+         "z": 298.344
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.404
+      },
+      {
+       "s": 212.5,
+       "xy": [
+        -2651.27,
+        148.52
+       ],
+       "archive": [
+        {
+         "z": 298.175
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.257
+      },
+      {
+       "s": 217.5,
+       "xy": [
+        -2646.37,
+        149.45
+       ],
+       "archive": [
+        {
+         "z": 297.999
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 298.09
+      },
+      {
+       "s": 222.5,
+       "xy": [
+        -2641.78,
+        151.4
+       ],
+       "archive": [
+        {
+         "z": 297.821
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.9
+      },
+      {
+       "s": 227.5,
+       "xy": [
+        -2637.71,
+        154.3
+       ],
+       "archive": [
+        {
+         "z": 297.681
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.712
+      },
+      {
+       "s": 232.5,
+       "xy": [
+        -2634.18,
+        157.83
+       ],
+       "archive": [
+        {
+         "z": 297.593
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.534
+      },
+      {
+       "s": 237.5,
+       "xy": [
+        -2631.05,
+        161.73
+       ],
+       "archive": [
+        {
+         "z": 297.468
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.436
+      },
+      {
+       "s": 242.5,
+       "xy": [
+        -2628.02,
+        165.7
+       ],
+       "archive": [
+        {
+         "z": 297.317
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.185
+      },
+      {
+       "s": 247.5,
+       "xy": [
+        -2625.0,
+        169.69
+       ],
+       "archive": [
+        {
+         "z": 297.138
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 297.012
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0854-14.3839:track1": [
+      [
+       117.5,
+       297.862
+      ],
+      [
+       122.5,
+       298.083
+      ],
+      [
+       127.5,
+       298.309
+      ],
+      [
+       132.5,
+       298.534
+      ],
+      [
+       137.5,
+       298.75
+      ],
+      [
+       142.5,
+       298.953
+      ],
+      [
+       147.5,
+       299.14
+      ],
+      [
+       152.5,
+       299.313
+      ],
+      [
+       157.5,
+       299.461
+      ],
+      [
+       162.5,
+       299.56
+      ],
+      [
+       167.5,
+       299.606
+      ],
+      [
+       172.5,
+       299.592
+      ],
+      [
+       177.5,
+       299.51
+      ],
+      [
+       182.5,
+       299.351
+      ],
+      [
+       187.5,
+       299.155
+      ],
+      [
+       192.5,
+       298.934
+      ],
+      [
+       197.5,
+       298.712
+      ],
+      [
+       202.5,
+       298.515
+      ],
+      [
+       207.5,
+       298.339
+      ],
+      [
+       212.5,
+       298.173
+      ],
+      [
+       217.5,
+       298.016
+      ],
+      [
+       222.5,
+       297.869
+      ],
+      [
+       227.5,
+       297.727
+      ],
+      [
+       232.5,
+       297.585
+      ],
+      [
+       237.5,
+       297.44
+      ],
+      [
+       242.5,
+       297.287
+      ],
+      [
+       247.5,
+       297.121
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0854-14.3839:track1": [
+      [
+       117.5,
+       297.862
+      ],
+      [
+       122.5,
+       298.083
+      ],
+      [
+       127.5,
+       298.309
+      ],
+      [
+       132.5,
+       298.534
+      ],
+      [
+       137.5,
+       298.75
+      ],
+      [
+       142.5,
+       298.953
+      ],
+      [
+       147.5,
+       299.14
+      ],
+      [
+       152.5,
+       299.313
+      ],
+      [
+       157.5,
+       299.461
+      ],
+      [
+       162.5,
+       299.56
+      ],
+      [
+       167.5,
+       299.606
+      ],
+      [
+       172.5,
+       299.592
+      ],
+      [
+       177.5,
+       299.51
+      ],
+      [
+       182.5,
+       299.351
+      ],
+      [
+       187.5,
+       299.155
+      ],
+      [
+       192.5,
+       298.934
+      ],
+      [
+       197.5,
+       298.712
+      ],
+      [
+       202.5,
+       298.515
+      ],
+      [
+       207.5,
+       298.339
+      ],
+      [
+       212.5,
+       298.173
+      ],
+      [
+       217.5,
+       298.016
+      ],
+      [
+       222.5,
+       297.869
+      ],
+      [
+       227.5,
+       297.727
+      ],
+      [
+       232.5,
+       297.585
+      ],
+      [
+       237.5,
+       297.44
+      ],
+      [
+       242.5,
+       297.287
+      ],
+      [
+       247.5,
+       297.121
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0990-14.4330",
+   "x": 1000.5999999999767,
+   "y": 1163.0849999999627,
+   "mag": 0.014,
+   "status": "review",
+   "place": [
+    50.09896,
+    14.43296
+   ],
+   "lines_near": [],
+   "info": "band: on plain track, no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 1 cm (tightest 419 m). Within the band the radius is 374 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0990-14.4330:track1"
+    ],
+    "structure": {
+     "kind": "band"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0990-14.4330:track1",
+     "line": 17,
+     "direction": "path",
+     "structure": {
+      "kind": "band"
+     },
+     "status": "review",
+     "start_s": -47.5,
+     "length_m": 130.0,
+     "profile": [
+      {
+       "s": 0.0,
+       "xy": [
+        988.48,
+        1166.77
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 2.5,
+       "xy": [
+        990.78,
+        1165.79
+       ],
+       "archive": [],
+       "di_z": 201.915,
+       "surfaces": [],
+       "ipr_terrain_z": 201.763
+      },
+      {
+       "s": 7.5,
+       "xy": [
+        995.52,
+        1164.2
+       ],
+       "archive": [],
+       "di_z": 201.778,
+       "surfaces": [],
+       "ipr_terrain_z": 201.515
+      },
+      {
+       "s": 12.5,
+       "xy": [
+        1000.39,
+        1163.11
+       ],
+       "archive": [],
+       "di_z": 201.583,
+       "surfaces": [],
+       "ipr_terrain_z": 201.287
+      },
+      {
+       "s": 17.5,
+       "xy": [
+        1005.38,
+        1163.06
+       ],
+       "archive": [],
+       "di_z": 201.14,
+       "surfaces": [],
+       "ipr_terrain_z": 201.11
+      },
+      {
+       "s": 22.5,
+       "xy": [
+        1010.22,
+        1164.24
+       ],
+       "archive": [],
+       "di_z": 200.786,
+       "surfaces": [],
+       "ipr_terrain_z": 200.887
+      },
+      {
+       "s": 27.5,
+       "xy": [
+        1014.62,
+        1166.59
+       ],
+       "archive": [],
+       "di_z": 200.577,
+       "surfaces": [],
+       "ipr_terrain_z": 200.703
+      },
+      {
+       "s": 32.5,
+       "xy": [
+        1018.31,
+        1169.94
+       ],
+       "archive": [],
+       "di_z": 200.519,
+       "surfaces": [],
+       "ipr_terrain_z": 200.539
+      },
+      {
+       "s": 37.5,
+       "xy": [
+        1021.06,
+        1174.1
+       ],
+       "archive": [],
+       "di_z": 200.569,
+       "surfaces": [],
+       "ipr_terrain_z": 200.463
+      },
+      {
+       "s": 42.5,
+       "xy": [
+        1022.83,
+        1178.77
+       ],
+       "archive": [],
+       "di_z": 200.392,
+       "surfaces": [],
+       "ipr_terrain_z": 200.387
+      },
+      {
+       "s": 47.5,
+       "xy": [
+        1024.08,
+        1183.61
+       ],
+       "archive": [],
+       "di_z": 200.333,
+       "surfaces": [],
+       "ipr_terrain_z": 200.305
+      },
+      {
+       "s": 50.2,
+       "xy": [
+        1024.55,
+        1186.27
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0990-14.4330:track1": [
+      [
+       0.0,
+       201.889
+      ],
+      [
+       2.5,
+       201.809
+      ],
+      [
+       7.5,
+       201.63
+      ],
+      [
+       12.5,
+       201.419
+      ],
+      [
+       17.5,
+       201.174
+      ],
+      [
+       22.5,
+       200.897
+      ],
+      [
+       27.5,
+       200.679
+      ],
+      [
+       32.5,
+       200.52
+      ],
+      [
+       37.5,
+       200.418
+      ],
+      [
+       42.5,
+       200.346
+      ],
+      [
+       47.5,
+       200.302
+      ],
+      [
+       50.2,
+       200.289
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0990-14.4330:track1": [
+      [
+       0.0,
+       201.887
+      ],
+      [
+       2.5,
+       201.811
+      ],
+      [
+       7.5,
+       201.636
+      ],
+      [
+       12.5,
+       201.427
+      ],
+      [
+       17.5,
+       201.182
+      ],
+      [
+       22.5,
+       200.892
+      ],
+      [
+       27.5,
+       200.669
+      ],
+      [
+       32.5,
+       200.511
+      ],
+      [
+       37.5,
+       200.417
+      ],
+      [
+       42.5,
+       200.354
+      ],
+      [
+       47.5,
+       200.316
+      ],
+      [
+       50.2,
+       200.295
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0943-14.3920",
+   "x": -1972.039999999979,
+   "y": 1051.335000000021,
+   "mag": 0.011,
+   "status": "review",
+   "place": [
+    50.09431,
+    14.39202
+   ],
+   "lines_near": [],
+   "info": "band: on plain track, no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 1 cm (tightest 404 m). Within the band the radius is 320 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0943-14.3920:track1"
+    ],
+    "structure": {
+     "kind": "band"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0943-14.3920:track1",
+     "line": 22,
+     "direction": "path",
+     "structure": {
+      "kind": "band"
+     },
+     "status": "review",
+     "start_s": 97.5,
+     "length_m": 120.0,
+     "profile": [
+      {
+       "s": 97.5,
+       "xy": [
+        -1973.6,
+        991.44
+       ],
+       "archive": [
+        {
+         "z": 262.713
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 262.836
+      },
+      {
+       "s": 102.5,
+       "xy": [
+        -1973.38,
+        996.43
+       ],
+       "archive": [
+        {
+         "z": 262.46
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 262.623
+      },
+      {
+       "s": 107.5,
+       "xy": [
+        -1973.16,
+        1001.43
+       ],
+       "archive": [
+        {
+         "z": 262.203
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 262.394
+      },
+      {
+       "s": 112.5,
+       "xy": [
+        -1972.94,
+        1006.42
+       ],
+       "archive": [
+        {
+         "z": 261.947
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 262.131
+      },
+      {
+       "s": 117.5,
+       "xy": [
+        -1972.72,
+        1011.42
+       ],
+       "archive": [
+        {
+         "z": 261.701
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 261.919
+      },
+      {
+       "s": 122.5,
+       "xy": [
+        -1972.5,
+        1016.41
+       ],
+       "archive": [
+        {
+         "z": 261.461
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 261.519
+      },
+      {
+       "s": 127.5,
+       "xy": [
+        -1972.29,
+        1021.41
+       ],
+       "archive": [
+        {
+         "z": 261.223
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 261.34
+      },
+      {
+       "s": 132.5,
+       "xy": [
+        -1972.07,
+        1026.4
+       ],
+       "archive": [
+        {
+         "z": 261.0
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 261.134
+      },
+      {
+       "s": 137.5,
+       "xy": [
+        -1971.86,
+        1031.4
+       ],
+       "archive": [
+        {
+         "z": 260.786
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.919
+      },
+      {
+       "s": 142.5,
+       "xy": [
+        -1971.65,
+        1036.39
+       ],
+       "archive": [
+        {
+         "z": 260.572
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.526
+      },
+      {
+       "s": 145.6,
+       "xy": [
+        -1971.52,
+        1039.5
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 147.5,
+       "xy": [
+        -1971.43,
+        1041.39
+       ],
+       "archive": [
+        {
+         "z": 260.363
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.376
+      },
+      {
+       "s": 152.5,
+       "xy": [
+        -1971.31,
+        1046.39
+       ],
+       "archive": [
+        {
+         "z": 260.162
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.222
+      },
+      {
+       "s": 157.5,
+       "xy": [
+        -1972.04,
+        1051.32
+       ],
+       "archive": [
+        {
+         "z": 259.96
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.096
+      },
+      {
+       "s": 162.5,
+       "xy": [
+        -1973.72,
+        1056.02
+       ],
+       "archive": [
+        {
+         "z": 259.933
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.022
+      },
+      {
+       "s": 167.5,
+       "xy": [
+        -1976.28,
+        1060.31
+       ],
+       "archive": [
+        {
+         "z": 259.938
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 259.968
+      },
+      {
+       "s": 172.5,
+       "xy": [
+        -1979.67,
+        1063.97
+       ],
+       "archive": [
+        {
+         "z": 259.981
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.001
+      },
+      {
+       "s": 177.5,
+       "xy": [
+        -1983.74,
+        1066.86
+       ],
+       "archive": [
+        {
+         "z": 260.089
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.101
+      },
+      {
+       "s": 182.5,
+       "xy": [
+        -1988.29,
+        1068.91
+       ],
+       "archive": [
+        {
+         "z": 260.273
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.267
+      },
+      {
+       "s": 187.5,
+       "xy": [
+        -1993.15,
+        1070.02
+       ],
+       "archive": [
+        {
+         "z": 260.487
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.467
+      },
+      {
+       "s": 192.5,
+       "xy": [
+        -1998.14,
+        1070.18
+       ],
+       "archive": [
+        {
+         "z": 260.697
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.668
+      },
+      {
+       "s": 196.0,
+       "xy": [
+        -2001.62,
+        1069.92
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 260.776
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0943-14.3920:track1": [
+      [
+       97.5,
+       262.708
+      ],
+      [
+       102.5,
+       262.459
+      ],
+      [
+       107.5,
+       262.208
+      ],
+      [
+       112.5,
+       261.957
+      ],
+      [
+       117.5,
+       261.706
+      ],
+      [
+       122.5,
+       261.457
+      ],
+      [
+       127.5,
+       261.211
+      ],
+      [
+       132.5,
+       260.968
+      ],
+      [
+       137.5,
+       260.732
+      ],
+      [
+       142.5,
+       260.525
+      ],
+      [
+       145.6,
+       260.422
+      ],
+      [
+       147.5,
+       260.364
+      ],
+      [
+       152.5,
+       260.229
+      ],
+      [
+       157.5,
+       260.13
+      ],
+      [
+       162.5,
+       260.076
+      ],
+      [
+       167.5,
+       260.064
+      ],
+      [
+       172.5,
+       260.091
+      ],
+      [
+       177.5,
+       260.179
+      ],
+      [
+       182.5,
+       260.302
+      ],
+      [
+       187.5,
+       260.457
+      ],
+      [
+       192.5,
+       260.641
+      ],
+      [
+       196.0,
+       260.785
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0943-14.3920:track1": [
+      [
+       97.5,
+       262.708
+      ],
+      [
+       102.5,
+       262.459
+      ],
+      [
+       107.5,
+       262.208
+      ],
+      [
+       112.5,
+       261.956
+      ],
+      [
+       117.5,
+       261.705
+      ],
+      [
+       122.5,
+       261.457
+      ],
+      [
+       127.5,
+       261.216
+      ],
+      [
+       132.5,
+       260.984
+      ],
+      [
+       137.5,
+       260.76
+      ],
+      [
+       142.5,
+       260.55
+      ],
+      [
+       145.6,
+       260.434
+      ],
+      [
+       147.5,
+       260.369
+      ],
+      [
+       152.5,
+       260.224
+      ],
+      [
+       157.5,
+       260.119
+      ],
+      [
+       162.5,
+       260.052
+      ],
+      [
+       167.5,
+       260.024
+      ],
+      [
+       172.5,
+       260.035
+      ],
+      [
+       177.5,
+       260.125
+      ],
+      [
+       182.5,
+       260.254
+      ],
+      [
+       187.5,
+       260.421
+      ],
+      [
+       192.5,
+       260.628
+      ],
+      [
+       196.0,
+       260.792
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "kind": "trackheight",
+   "id": "radius-50.0943-14.3895",
+   "x": -2147.7449999999953,
+   "y": 1068.9300000000512,
+   "mag": 0.01,
+   "status": "review",
+   "place": [
+    50.09426,
+    14.38955
+   ],
+   "lines_near": [],
+   "info": "band: on plain track, no curve at the design radius stays within 10 cm of the staged heights: held to it, the curve leaves that band by up to 1 cm (tightest 359 m). Within the band the radius is 351 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.0943-14.3895:track1"
+    ],
+    "structure": {
+     "kind": "band"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.0943-14.3895:track1",
+     "line": 22,
+     "direction": "path",
+     "structure": {
+      "kind": "band"
+     },
+     "status": "review",
+     "start_s": -42.5,
+     "length_m": 120.0,
+     "profile": [
+      {
+       "s": 0.0,
+       "xy": [
+        -2132.55,
+        1076.9
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 2.5,
+       "xy": [
+        -2135.04,
+        1076.64
+       ],
+       "archive": [],
+       "di_z": 266.681,
+       "surfaces": [],
+       "ipr_terrain_z": 266.601
+      },
+      {
+       "s": 7.5,
+       "xy": [
+        -2139.81,
+        1075.22
+       ],
+       "archive": [],
+       "di_z": 267.003,
+       "surfaces": [],
+       "ipr_terrain_z": 266.838
+      },
+      {
+       "s": 12.5,
+       "xy": [
+        -2144.09,
+        1072.66
+       ],
+       "archive": [],
+       "di_z": 267.29,
+       "surfaces": [],
+       "ipr_terrain_z": 267.103
+      },
+      {
+       "s": 17.5,
+       "xy": [
+        -2147.6,
+        1069.12
+       ],
+       "archive": [],
+       "di_z": 267.505,
+       "surfaces": [],
+       "ipr_terrain_z": 267.326
+      },
+      {
+       "s": 22.5,
+       "xy": [
+        -2150.14,
+        1064.82
+       ],
+       "archive": [],
+       "di_z": 267.619,
+       "surfaces": [],
+       "ipr_terrain_z": 267.448
+      },
+      {
+       "s": 27.5,
+       "xy": [
+        -2151.56,
+        1060.04
+       ],
+       "archive": [],
+       "di_z": 267.648,
+       "surfaces": [],
+       "ipr_terrain_z": 267.61
+      },
+      {
+       "s": 32.5,
+       "xy": [
+        -2151.74,
+        1055.06
+       ],
+       "archive": [],
+       "di_z": 267.63,
+       "surfaces": [],
+       "ipr_terrain_z": 267.643
+      },
+      {
+       "s": 37.1,
+       "xy": [
+        -2150.8,
+        1050.57
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 37.8,
+       "xy": [
+        -2150.57,
+        1049.92
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 42.5,
+       "xy": [
+        -2148.45,
+        1045.73
+       ],
+       "archive": [],
+       "di_z": 267.608,
+       "surfaces": [],
+       "ipr_terrain_z": 267.594
+      },
+      {
+       "s": 46.0,
+       "xy": [
+        -2146.29,
+        1043.02
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 46.6,
+       "xy": [
+        -2145.81,
+        1042.54
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 52.5,
+       "xy": [
+        -2141.41,
+        1038.68
+       ],
+       "archive": [],
+       "di_z": 267.515,
+       "surfaces": [],
+       "ipr_terrain_z": 267.497
+      },
+      {
+       "s": 57.5,
+       "xy": [
+        -2137.12,
+        1036.15
+       ],
+       "archive": [],
+       "di_z": 267.434,
+       "surfaces": [],
+       "ipr_terrain_z": 267.446
+      },
+      {
+       "s": 62.5,
+       "xy": [
+        -2132.34,
+        1034.73
+       ],
+       "archive": [],
+       "di_z": 267.288,
+       "surfaces": [],
+       "ipr_terrain_z": 267.298
+      },
+      {
+       "s": 65.8,
+       "xy": [
+        -2129.04,
+        1034.48
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 267.197
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {},
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.0943-14.3895:track1": [
+      [
+       0.0,
+       266.56
+      ],
+      [
+       2.5,
+       266.703
+      ],
+      [
+       7.5,
+       266.969
+      ],
+      [
+       12.5,
+       267.202
+      ],
+      [
+       17.5,
+       267.395
+      ],
+      [
+       22.5,
+       267.518
+      ],
+      [
+       27.5,
+       267.577
+      ],
+      [
+       32.5,
+       267.6
+      ],
+      [
+       37.1,
+       267.595
+      ],
+      [
+       37.8,
+       267.593
+      ],
+      [
+       42.5,
+       267.581
+      ],
+      [
+       46.0,
+       267.557
+      ],
+      [
+       46.6,
+       267.551
+      ],
+      [
+       52.5,
+       267.476
+      ],
+      [
+       57.5,
+       267.381
+      ],
+      [
+       62.5,
+       267.259
+      ],
+      [
+       65.8,
+       267.165
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.0943-14.3895:track1": [
+      [
+       0.0,
+       266.557
+      ],
+      [
+       2.5,
+       266.703
+      ],
+      [
+       7.5,
+       266.971
+      ],
+      [
+       12.5,
+       267.205
+      ],
+      [
+       17.5,
+       267.4
+      ],
+      [
+       22.5,
+       267.525
+      ],
+      [
+       27.5,
+       267.581
+      ],
+      [
+       32.5,
+       267.601
+      ],
+      [
+       37.1,
+       267.591
+      ],
+      [
+       37.8,
+       267.588
+      ],
+      [
+       42.5,
+       267.583
+      ],
+      [
+       46.0,
+       267.563
+      ],
+      [
+       46.6,
+       267.557
+      ],
+      [
+       52.5,
+       267.485
+      ],
+      [
+       57.5,
+       267.388
+      ],
+      [
+       62.5,
+       267.261
+      ],
+      [
+       65.8,
+       267.159
       ]
      ]
     }
