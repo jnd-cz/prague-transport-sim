@@ -11,10 +11,11 @@ const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on
 // rides on line 23 (2026-10-31) braked late and firmly: from 23–25 km/h at 0.69 and 0.86 m/s² on average, 1.05–1.09 at p90, after ≈45 m of
 // coasting; the user, 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense", "Later braking to match real
 // driver". At 0.7 of step 5 a full set planned 0.63 and braked on step 3 from 140 m out
-// m of coasting into the braking curve before a stop or a signal: two real rides on line 23 (2026-10-31) took the drive pedal off ≈100 m
-// out at ≈30 km/h, coasted ≈45 m and braked from ≈23 km/h at ≈0.86 m/s²; ČKD, T3SU-03 p. 5: "fully use coasting, above all when coming
-// into stops"; the user, 2026-11-07: "Later braking to match real driver"
-const COAST_IN = 45;
+// m of coasting into the braking curve before a stop or a signal: two real rides on line 23 (2026-10-31) took the drive pedal off 80–100 m
+// out at ≈28–30 km/h and braked the last 25–30 m from ≈24 km/h. Read from GPS they coasted 41–45 m, but the same reading takes a
+// 32–37 m coast of the autopilot's for 7 m; 60 m puts the drive-off ≈90 m out. ČKD, T3SU-03 p. 5: "fully use coasting, above all when
+// coming into stops"; the user, 2026-11-07: "Later braking to match real driver"
+const COAST_IN = 60;
 const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
