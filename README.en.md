@@ -207,7 +207,8 @@ limits, stops, signals, obstacles and the tram ahead, picks the force needed on 
 equipment work the pedals as a careful driver (the advanced model: pulls away on steps 1–3 on the level, brakes
 step by step, into a stop on one curve and without going back to the drive pedal unless a tram stands ahead,
 parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
-slippery rail, and gives a short pulse of power (turn) or coasts (straight) under contacts. Press **V** for
+slippery rail, and under contacts draws current for a turn (the switch button when slow enough, otherwise a short pulse of
+the drive pedal) or coasts (straight). Press **V** for
 the outside view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the
 menu; O hands back to the autopilot.
 
