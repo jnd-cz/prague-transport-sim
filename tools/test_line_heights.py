@@ -76,13 +76,58 @@ class Assembly(unittest.TestCase):
             return 100 - .06 * s + (s - 94) ** 2 / 200
         return 100 - .06 * 106 + 144 / 200 + .06 * (s - 106)
 
-    def test_a_sag_tighter_than_the_radius_stays_in_the_band_and_goes_to_review(self):
+    @staticmethod
+    def tightest(c):
+        return min(min(lh.implied_radii(run['s'], run['z']), default=math.inf) for run in c.runs)
+
+    def test_a_sag_tighter_than_the_floor_holds_the_floor_and_goes_to_review(self):
+        # (the user, 2026-11-07: "hold minimum radius at 500m everywhere and get back with review cases which can't fit")
         c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
         quiet(lh.assemble, [c])
+        self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
+        self.assertGreater(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + .005)  # (the band gave way)
+        self.assertEqual([(p['kind'], p['factor'], p['fits']) for p in c.review], [('band', 1.0, False)])
+        self.assertGreater(c.review[0]['excess'], .005)
+        follow = c.review[0]['final']  # (the card's 'follow the data': within the band, below the floor)
+        self.assertLess(min(lh.implied_radii([a for a, _ in follow], [b for _, b in follow]), default=math.inf), lh.radii()['min'])
+
+    def test_a_follow_answer_given_before_the_floor_gives_way_only_to_it(self):
+        c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
+        lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [{'xy': (100.0, 0.0), 'answer': lh.FOLLOW, 'date': '2026-11-03'}], '2026-11-07'
+        try:
+            quiet(lh.assemble, [c])
+        finally:
+            lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [], None
+        self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
+        self.assertFalse(c.review[0]['fits'])
+
+    def test_a_follow_answer_given_since_the_floor_follows_the_data_below_it(self):
+        c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
+        lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [{'xy': (100.0, 0.0), 'answer': lh.FOLLOW, 'date': '2026-11-08'}], '2026-11-07'
+        try:
+            quiet(lh.assemble, [c])
+        finally:
+            lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [], None
         self.assertLess(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + lh.FIT)
-        self.assertEqual([p['kind'] for p in c.review], ['band'])
-        self.assertLess(c.review[0]['factor'], 1)
-        self.assertTrue(c.review[0]['fits'])
+        self.assertLess(self.tightest(c), lh.radii()['min'])
+
+    def test_pins_that_need_a_tighter_curve_get_it_and_go_to_review(self):
+        # (two meeting points 4 m apart, 20 cm apart in height, on a level track: the rails join, below the floor)
+        c = chain([(0, 0), (200, 0)], lambda s: 100.0)
+        quiet(lh.solve, c, {100.0: 100.0, 104.0: 100.2}, lh.radii())
+        self.assertLess(abs(c.z_at(104.0)[0] - 100.2), .01)
+        tight = [p for p in c.review if p['below']]
+        self.assertEqual(len(tight), 1)
+        self.assertLess(tight[0]['radius'], lh.radii()['min'])
+
+    def test_on_open_track_the_radius_gives_way_to_the_floor_and_no_review(self):
+        # (a 700 m sag: under the open track's 1000 m, over the floor, within the band at it)
+        c = chain([(0, 0), (300, 0)], lambda s: 100 + (s - 150) ** 2 / 1400 * (1 if abs(s - 150) < 60 else 0)
+                  + (0 if abs(s - 150) < 60 else (60 ** 2 / 1400 + 120 / 1400 * (abs(s - 150) - 60))), kind='open')
+        quiet(lh.assemble, [c])
+        self.assertEqual(c.review, [])
+        self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
+        self.assertLess(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + lh.FIT)
 
     def test_a_curve_at_the_radius_within_the_band_is_solved(self):
         # (a 600 m sag with +-4 cm of noise: within 10 cm at 500 m, nothing for review, the noise not followed)
@@ -261,6 +306,21 @@ class Answers(unittest.TestCase):
         steps = [abs(b['z'] - a['z'] - .05) for a, b in zip(c.bins, c.bins[1:])]
         self.assertLess(max(steps), .09)
         self.assertLess(c.bins[30]['z'], 100 + .01 * c.bins[30]['s'] - .02)
+
+    def test_a_toward_answer_moves_the_archive_half_way_and_fades_at_its_edge(self):
+        # (Malovanka, 2026-11-07: "Let's pick the half option"; the survey and lidar 20 cm over the archive)
+        c = chain([(0, 0), (300, 0)], lambda s: 100.0)
+        for x in c.bins:
+            x['archive'], x['survey'], x['terrain'] = 100.0, 100.2, 100.2
+        c.bins[0]['terrain'] = 101.0  # (another level: stays)
+        lh.STEP_ANSWERS = [{'xy': (60.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0,
+                            'toward': {'heights': 'survey+lidar', 'share': 0.5}}]
+        lh.answered_toward([c])
+        # (s 2.5 on another level, s 62.5 at the answer, s 7.5 and 112.5 in the fade 52.5 m off, s 132.5 past the reach)
+        for k, want in ((0, 100.0), (12, 100.1), (1, 100.0875), (22, 100.0875), (26, 100.0)):
+            self.assertAlmostEqual(c.bins[k]['z'], want, places=6)
+        steps = [abs(b['z'] - a['z']) for a, b in zip(c.bins[1:], c.bins[2:])]
+        self.assertLess(max(steps), .03)
 
     def test_a_step_answer_replaces_the_radius_answers_in_its_reach(self):
         truth = {'trackHeights': {'radiusAnswers': [{'place': [50.08862, 14.40603], 'answer': lh.HOLD}, {'place': [50.05, 14.4], 'answer': lh.HOLD}],

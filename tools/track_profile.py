@@ -27,11 +27,12 @@ STEP = .3  # m: a point the curve misses by more is a step (#184's departure thr
 
 
 def radii(truth=None):
-    """The design minimum radii (street, open track, switch) from data/truth.json."""
+    """The design minimum radii (street, open track, switch) from data/truth.json, and the floor under them (`min`: the
+    radius gives way to the data no further, the user's rule; the street's radius where there is none)."""
     truth = truth or json.loads((ROOT/'data/truth.json').read_text(encoding='utf-8'))
     facts = {f['id']:f['value'] for f in truth['trackGeometry']['facts']}
     return {'street':facts['vertical-radius-street'],'open':facts['vertical-radius-open-track'],
-            'switch':facts['vertical-radius-switch']}
+            'switch':facts['vertical-radius-switch'],'min':facts.get('vertical-radius-min',facts['vertical-radius-street'])}
 
 
 def curvature(s, z):
@@ -304,7 +305,11 @@ BIN, JOIN, TURN = 5.0, .3, 15  # m per calibration bin; DI path ends this close 
 
 def chains(paths):
     """DI paths joined end to end into tracks: at a shared end, the pair that continues straightest (within
-    15 degrees) is joined; a switch's diverging path starts a chain of its own. [[(path id, reversed), ...]]"""
+    15 degrees) is joined; a switch's diverging path starts a chain of its own. [[(path id, reversed), ...]]
+    Ends are grouped by a rounded JOIN grid; two ends the grid left unpaired that lie within JOIN across a cell boundary
+    and go on straight are joined too. (With the grid alone 614 such joints, 1 cm apart, were two chains, each solved with
+    its own grade up to the joint: +2.5 % into -0.85 % at Malostranské náměstí, -4.2 into -1.2 % at Trojská, #358. Grouping
+    every end by distance instead re-paired the three ends of the Malovanka switch, 13 cm apart, and moved its through track.)"""
     ends = {}
     def key(p):
         return (round(p[0]/JOIN),round(p[1]/JOIN))
@@ -314,12 +319,12 @@ def chains(paths):
     for pid,xy in paths.items():
         if len(xy) < 2:
             continue
-        ends.setdefault(key(xy[0]),[]).append((pid,0,heading(xy,True)))
-        ends.setdefault(key(xy[-1]),[]).append((pid,1,heading(xy,False)))
+        ends.setdefault(key(xy[0]),[]).append((pid,0,heading(xy,True),xy[0]))
+        ends.setdefault(key(xy[-1]),[]).append((pid,1,heading(xy,False),xy[-1]))
+    turn = lambda a, b: abs(abs((a[2]-b[2]+math.pi)%(2*math.pi)-math.pi)-math.pi)
     link = {}
-    for group in ends.values():
-        pairs = sorted(((abs(abs((a[2]-b[2]+math.pi)%(2*math.pi)-math.pi)-math.pi),i,j)
-                        for i,a in enumerate(group) for j,b in enumerate(group) if i < j and a[0] != b[0]))
+    def pair(group):
+        pairs = sorted((turn(a,b),i,j) for i,a in enumerate(group) for j,b in enumerate(group) if i < j and a[0] != b[0])
         used = set()
         for dev,i,j in pairs:
             if dev > math.radians(TURN) or i in used or j in used:
@@ -328,6 +333,18 @@ def chains(paths):
             a, b = group[i], group[j]
             link[(a[0],a[1])] = (b[0],b[1])
             link[(b[0],b[1])] = (a[0],a[1])
+    for group in ends.values():
+        pair(group)
+    # (the ends left over, against the left-over ends of the neighbouring cells)
+    left = {k: [e for e in g if (e[0],e[1]) not in link] for k, g in ends.items()}
+    for (cx,cy), g in left.items():
+        for e in g:
+            if (e[0],e[1]) in link:
+                continue
+            near = [o for dx in (-1,0,1) for dy in (-1,0,1) if (dx,dy) != (0,0) for o in left.get((cx+dx,cy+dy),())
+                    if (o[0],o[1]) not in link and o[0] != e[0] and math.dist(e[3][:2],o[3][:2]) <= JOIN]
+            if near:
+                pair([e, min(near, key=lambda o: turn(e,o))])
     seen, out = set(), []
     for pid in paths:
         if pid in seen or len(paths[pid]) < 2:
