@@ -35,7 +35,7 @@ RUN = """async (only) => {
     const stops = (o.stops || []).map((s, i) => ({ name: 'S' + i, target: s, served: false, waiting: 0, alight: 0, alightFrac: 0, request: false, sched: 0, zone: [s - 2.5, s + 3] }));
     const ahead = o.ahead ? { ...o.ahead, v: 0 } : null;
     const g = {
-      tram: tr, clock: 0, stops, nextStop: 0, doorState: 'closed', muBase: o.mu ?? 0.3, obstacles: [], carsOnTrack: [], carsCrossing: [], switches: [], opts: { autoIrc: true },
+      tram: tr, clock: 0, stops, nextStop: 0, doorState: 'closed', muBase: o.mu ?? 0.3, muAt, obstacles: [], carsOnTrack: [], carsCrossing: [], switches: [], opts: { autoIrc: true },
       climate: { tout: 15, tin: 20, tcab: 20, saloon: 0, cab: 0, flap: false },
       profile: { grade: (s) => (o.grade ? o.grade(s) : 0) },
       signals: (o.signals || []).map((x) => ({ s: x.s, cross: x.s + 15, state: 'go', states: x.states })),
@@ -79,7 +79,7 @@ RUN = """async (only) => {
       lastA = tr.a;
       if (tr.v > 0.2) R.maxJerk = Math.max(R.maxJerk, Math.abs(jf));
       for (const x of g.signals) if (x.state !== 'go' && x.s < tr.s && x.s > tr.s - 1 && tr.v > 0) R.overrun++;
-      if (step % 8 === 0) R.series.push([+T.toFixed(2), +tr.s.toFixed(1), +tr.kmh.toFixed(1), n, +tr.eq.p.toFixed(1), Math.round(tr.current), Math.round(tr.voltage), Math.round(tr.eq.mg.rpm), tr.eq.shoe, +tr.a.toFixed(2), d === null ? null : +d.toFixed(1), g.tramAheadGap() === null ? null : +g.tramAheadGap().toFixed(1)]);
+      if (step % 8 === 0) R.series.push([+T.toFixed(2), +tr.s.toFixed(1), +tr.kmh.toFixed(1), n, +tr.eq.p.toFixed(1), Math.round(tr.current), Math.round(tr.voltage), Math.round(tr.eq.mg.rpm), tr.eq.shoe, +tr.a.toFixed(2), d === null ? null : +d.toFixed(1), g.tramAheadGap() === null ? null : +g.tramAheadGap().toFixed(1), tr.slip ? 1 : 0, tr.sanding ? 1 : 0, tr.slide ? 1 : 0]);
       if (tr.s >= lastS || (g.nextStop >= stops.length && o.endAtLastStop !== false)) break;
     }
     R.secs = +T.toFixed(1); R.lastKmh = +tr.kmh.toFixed(1); R.lastS = +tr.s.toFixed(1); R.maxDecel = +R.maxDecel.toFixed(2); R.maxJerk = +R.maxJerk.toFixed(2);

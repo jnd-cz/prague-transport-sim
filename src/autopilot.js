@@ -62,10 +62,18 @@ export class Autopilot {
     // junction on it and keep going (the controller holds the phase for a committed tram); braking
     // for a blinking GO it could not stop for took it over the line on red (line 17 s 3158)
     const sig = g.signals.find((x) => x.s > tr.s + 0.2);
+    if (this.stopFor && (this.stopFor !== sig || sig.state === 'go')) this.stopFor = null;
     if (sig && sig.state !== 'go') {
       const d = sig.s - 3 - tr.s;
-      // (only a moving tram: one standing at the stop point stays; it went on red from there, s 14178)
-      if (sig.state === 'warn' && this.goThrough !== sig && tr.v > 1 && d < (tr.v * tr.v) / 1.8 + tr.v) this.goThrough = sig;
+      // (only a moving tram: one standing at the stop point stays; it went on red from there, s 14178.) Decided once, at the
+      // first sight of the blinking, and a stop stays a stop while service braking (1.15 m/s²) still makes it: the test, met
+      // again on the way down, turned a tram braking for it into one going through 82 m out at 41 km/h, which then slowed for
+      // the junction's 15 km/h, spent the controller's 10 s and met red 7 m before the signal (line 23 towards Královka, seed 5)
+      if (sig.state === 'warn' && this.goThrough !== sig && tr.v > 1) {
+        if (this.stopFor !== sig && d < (tr.v * tr.v) / 1.8 + tr.v) this.goThrough = sig;
+        else if (this.stopFor === sig && d < (tr.v * tr.v) / 2.3 + 0.3 * tr.v) { this.goThrough = sig; this.stopFor = null; }
+        else this.stopFor = sig;
+      }
       // (red after all, the hold having run out while it crawled up behind something: stop if service
       // braking still can, line 17 s 10251)
       if (sig.state === 'stop' && this.goThrough === sig && d > (tr.v * tr.v) / 2.2 + 0.5) this.goThrough = null;
@@ -241,8 +249,13 @@ export class Autopilot {
     this.input.switchBtn = button;
     // slippery rail: sand where it decides something, pulling away or braking for a point (the equipment eases off a step): on every slip
     // and slide the box, 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
-    // (a moment longer than the slip it stops: sand flickering on and off is no use)
-    this.sandT = (tr.slip && tr.v < 3) || (tr.slide && (onCurve || urgent || hazard)) ? 1.5 : (this.sandT || 0) - dt;
+    // (a moment longer than the slip it stops: sand flickering on and off is no use). Pulling away, only where slipping wheels
+    // (0.7 of the grip) do not climb with 0.15 m/s² to spare: a leaf patch over 26 ‰; on the level they still pull away, and the
+    // box was still dry on lines 9, 17 and 22, with patches up 35–40 ‰ ahead (0.41 m/s² slipping: 38 ‰ at most). There, once it
+    // slipped, until 3 m/s: sand for 1.5 s at a time slipped again after each
+    const slipClimbs = 0.7 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.15;
+    this.startSand = tr.v < 3 && !slipClimbs && need > 0 && (tr.slip || !!this.startSand);
+    this.sandT = this.startSand || (tr.slide && (onCurve || urgent || hazard)) ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)

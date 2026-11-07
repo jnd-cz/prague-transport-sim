@@ -330,12 +330,14 @@ export class TR37 {
     if (w.power === false) s = Math.min(0, s);
     if (w.noDrive) s = Math.min(0, s);
     // a wheel that goes takes a step less, and the step stays less for a while: back on the same step at once it slipped through
-    // most of every start on autumn's leaves (6 s and 3 s [assumed]). Not pulling away: the sand does that while the box holds any,
-    // and the slipping wheels still pull with 0.7 of the grip, more than step 1, which alone does not climb 50 ‰ (with the box
-    // empty it stood up a climb where it had slipped up before: lines 9, 17 and 22 in autumn)
+    // most of every start on autumn's leaves (6 s and 3 s [assumed]). On sand too: sand gives 0.1 of grip back, and step 5 pulls
+    // with more (up 50 ‰ it slipped 4.5 s on step 5 while sanding). The sand stays on through the start (the autopilot's).
+    // Lower again only if it still slips 0.8 s on: the wheels go on slipping while a step comes off (0.6 s), and a slip on step 4
+    // ended on step 1 for 6 s (up 50 ‰ on leaves, 17 s lost)
     A.slipT = (A.slipT || 0) - w.dt;
     A.slideT = (A.slideT || 0) - w.dt;
-    if (w.slip && now > 1 && v >= 3) { A.slipCap = now - 1; A.slipT = 6; }
+    A.slipWait = (A.slipWait || 0) - w.dt;
+    if (w.slip && now > 1) { if (!(A.slipT > 0) || (now <= A.slipCap && A.slipWait <= 0)) { A.slipCap = now - 1; A.slipWait = 0.8; } A.slipT = 6; }
     if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
     if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
