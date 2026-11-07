@@ -693,6 +693,8 @@ class Network:
         """Two track ends facing each other within GAP join with a straight edge: a record the provider ended short
         (Kobyliské náměstí, line 17: 1.3 m between two ends of one track)."""
         ends = [n for n, v in self.nodes.items() if len(self.at[n]) == 1]
+        if not ends:
+            return
         tree = shapely.STRtree(shapely.points([self.nodes[n]['xy'] for n in ends]))
         cos = math.cos(math.radians(180 - TURN))
         done = set()

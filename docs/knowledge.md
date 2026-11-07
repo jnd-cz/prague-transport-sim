@@ -160,6 +160,13 @@ What sessions learned and later work needs. Kept current and short; the full log
   draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
   the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
   is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
+- **Interlaced tracks' record ends lie within JOIN of each other** (#368): 10-15 cm apart, where DI splits both tracks
+  at the same places (Nádraží Libeň: every 6-27 m over 39 m) or starts or ends the branch beside a record joint of the
+  through track (Ke Stírce 11.7 cm, Čechův most 12 cm with the through track's joint 0.6 m apart). Grouped as one place,
+  the node lay on the branch and the line stepped 10-12 cm through it, or the through track's records were dropped as
+  copies of the branch's (two records between the same two places, within 20 cm) and line 37 ran the branch for 35 m:
+  the user's "sideways jolts" (2026-11-07). 14 such places in the network, 6 on the lines. `di_tracks._meetings`: an end
+  whose track goes on in line does not meet an end beside that track, nor two joints side by side.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0

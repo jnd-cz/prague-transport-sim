@@ -120,6 +120,23 @@ class Assembly(unittest.TestCase):
         self.assertEqual(len(tight), 1)
         self.assertLess(tight[0]['radius'], lh.radii()['min'])
 
+    def test_a_hold_answer_at_a_junction_holds_the_floor_and_the_tracks_meet_half_way(self):
+        # (a track crossing two others 4 m apart whose heights differ by 20 cm: alone it meets them on a 320 m curve; held,
+        # the two give way towards it. The user, 2026-11-07: "best fit to 500m limit even at the price of larger height
+        # difference from source")
+        a = chain([(100, -150), (100, 150)], lambda s: 100.0)
+        b = chain([(104, -150), (104, 150)], lambda s: 100.2)
+        c = chain([(0, 0), (200, 0)], lambda s: 100.1)
+        lh.RADIUS_ANSWERS = [{'xy': (102.0, 0.0), 'answer': lh.HOLD, 'date': '2026-11-07'}]
+        try:
+            quiet(lh.assemble, [a, b, c])
+        finally:
+            lh.RADIUS_ANSWERS = []
+        self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
+        self.assertLess(abs(c.z_at(100)[0] - a.z_at(150)[0]), .01)
+        self.assertLess(abs(c.z_at(104)[0] - b.z_at(150)[0]), .01)
+        self.assertFalse([p for p in c.review if p['below']])
+
     def test_on_open_track_the_radius_gives_way_to_the_floor_and_no_review(self):
         # (a 700 m sag: under the open track's 1000 m, over the floor, within the band at it)
         c = chain([(0, 0), (300, 0)], lambda s: 100 + (s - 150) ** 2 / 1400 * (1 if abs(s - 150) < 60 else 0)

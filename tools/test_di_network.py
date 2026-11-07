@@ -104,9 +104,10 @@ class Network(unittest.TestCase):
         self.assertGreater(line_y(net, m, 90), 2)
 
     def test_a_gauntlets_tracks_never_touch(self):
+        # (each track's joint lies in line and the other's 9 cm beside it: the records join along their own tracks,
+        # di_tracks._meetings, #368, and the gauntlet never becomes one node to pull apart)
         net = net_of([(0, 0), (50, 0)], [(0, 3.5), (30, 0.09), (50, 0.09)],
                      [(50, 0), (100, 0)], [(50, 0.09), (70, 0.09), (100, 3.5)])
-        self.assertEqual(net.report['gauntlets kept apart'], 1)
         self.assertFalse([n for n in net.nodes if len(net.at[n]) > 2])
         for ed in net.edges.values():
             ys = [c[1] for c in ed['line'].coords if 40 < c[0] < 60]

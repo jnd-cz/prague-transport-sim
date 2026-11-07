@@ -60,6 +60,7 @@ NEAR_MEET = 2.0  # m: two tracks meeting a third this near each other along it m
 MAX_GRADE = 0.09  # the steepest tram track (the game's grade limiter, src/terrain.js; Hercovka - Kobylisy 8-8.8 %)
 HOLD_WEIGHT = 1e-3  # a held bin's pull towards the straight line across its hold
 PIN_MERGE = 0.5  # m: pinned points this near each other along a track are one (their mean)
+MEET_ROUNDS = 8  # where an answer holds the floor at a junction, the rounds in which its tracks meet half way (assemble)
 PIN_WEIGHT = 1e3  # a pinned point's weight against a staged height's 1 (1e6 left the solver short of the radius
                   # after 3000 steps on 30 chains, up to 55 s each)
 CROSS = 1.0     # m: tracks crossing within this height of each other cross at grade (else one passes over)
@@ -570,7 +571,7 @@ def solve(c, pins, r, relax=None):
     runs, cut = held_runs(series)
     c.held = [{'s0': h[0]['s'], 's1': h[-1]['s'], 'flags': sorted({f for x in h for f in x['flags']}),
                'xy': h[len(h) // 2]['xy']} for h in cut]
-    c.runs, c.steps, c.review, c.dropped = [], [], [], []
+    c.runs, c.steps, c.review, c.dropped, c.apart = [], [], [], [], []
     for run in runs:
         # (a held bin starts on the straight line between its neighbours, at HOLD_WEIGHT: at weight 0 the curve was
         # free to sag anywhere the radius allows, 5 cm under a straight grade across 40 m)
@@ -672,6 +673,11 @@ def solve(c, pins, r, relax=None):
             # (an answer holds the radius against the band, not against the rails joining: where they still miss, the
             # radius gives way near the pin as it would without the answer; 24 junctions 1-2.5 cm apart, 2026-11-04)
             for to_floor in (True, False):
+                if not to_floor and apart and answer_at([xy_of(i) for i in apart], (HOLD,)):
+                    # (an answer holds the floor here: the radius stays, and the tracks meet half way, assemble; the user,
+                    # 2026-11-07: "best fit to 500m limit even at the price of larger height difference from source")
+                    c.apart += [(s[i], res['z'][i]) for i in apart]
+                    break
                 for _ in range(RELAX_STEPS):
                     apart = [i for i in over(res) if run[i].get('pin')]
                     if not apart:
@@ -794,7 +800,9 @@ def assemble(chs):
                     meets[j1].append((u1, j2, u2, 'near'))
                     meets[j2].append((u2, j1, u1, 'near'))
     solved, pinned, used, apart, t0 = set(), 0, [], {}, time.time()
-    for n, i in enumerate(sorted(range(len(chs)), key=lambda i: -chs[i].length)):
+    order = sorted(range(len(chs)), key=lambda i: -chs[i].length)
+    last = {}
+    for n, i in enumerate(order):
         c = chs[i]
         solve(c, {}, r)
         cands = []
@@ -819,9 +827,37 @@ def assemble(chs):
         if pins:
             solve(c, pins, r)
             pinned += 1
+        last[i] = pins
         solved.add(i)
         if n % 200 == 199:
             print(f'  {n + 1} of {len(chs)} chains solved ({pinned} pinned), {time.time() - t0:.0f} s', flush=True)
+    # where an answer holds the floor at a junction whose rails meet only below it (solve: c.apart), the tracks meet half
+    # way: the track the chain is pinned to there takes the middle of their heights as a pin of its own, and every chain
+    # whose pins moved is solved again in the order above, until they meet (each round halves what is left)
+    by_chain, extra, met = defaultdict(list), defaultdict(dict), 0
+    for u in used:
+        by_chain[u[0]].append(u)
+    gaps = []
+    for _ in range(MEET_ROUNDS):
+        gap = 0.0
+        for i in order:
+            for t, z in chs[i].apart:
+                for _, ti, j, tj in by_chain[i]:
+                    zj = chs[j].z_at(tj)[0]
+                    if abs(ti - t) <= PIN_MERGE and zj is not None and abs(zj - z) > PIN_TOL:
+                        extra[j][tj], gap = (zj + z) / 2, max(gap, abs(zj - z))
+        gaps.append(round(gap, 4))
+        if not gap:
+            break
+        for i in order:
+            p = {ti: chs[j].z_at(tj)[0] for _, ti, j, tj in by_chain[i]}
+            p = {t: z for t, z in p.items() if z is not None} | extra[i]
+            if p.keys() != last[i].keys() or any(abs(p[t] - last[i][t]) > 0.001 for t in p):
+                solve(chs[i], p, r)
+                last[i], met = p, met + 1
+    if met:
+        print(f'junctions held at the floor: the tracks met half way, {met} chains solved again; the widest gap by round, m: '
+              f'{gaps}', flush=True)
     # what is left where tracks were pinned to each other: the heights of both there
     worst = []
     for i, ti, j, tj in used:
