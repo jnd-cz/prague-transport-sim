@@ -371,8 +371,9 @@ export class TR37 {
     }
     if (s !== now && (A.hold <= 0 || w.urgent || contact)) {
       A.step = s;
-      // (a brake step comes on after 0.3 s, comes off after 0.8 s; drive 0.6 s)
-      A.hold = s < now && s < 0 ? 0.3 : s < 0 ? 0.8 : 0.6;
+      // (a brake step comes on after 0.3 s, comes off after 0.8 s, sooner when far more than it takes: a car gone from the way left
+      // it on step 5 and overbraking, and uphill it then rolled out 5 m short at Palackého náměstí; drive 0.6 s)
+      A.hold = s < now && s < 0 ? 0.3 : s < 0 ? (-w.force < F(-s) * 0.7 ? 0.3 : 0.8) : 0.6;
       this.setStep(s);
     }
   }

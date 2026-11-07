@@ -108,6 +108,8 @@ RUN = """async (only) => {
     { name: 'car crossing past the stop, downhill', stops: [20, 600], limit: 50, pax: 60, grade: uphill(-0.022), crossing: { s: 640 } },
     // (its point, 6 m short of it, comes before the stop for a moment: the plan forgot the stop and drove, line 22 seed 5 at Radošovická, line 37 seed 4 at U Elektry)
     ...[62, 64, 66, 68, 70, 72].map((t) => ({ name: `car crossing just past the stop, uphill, at ${t} s`, stops: [20, 600], limit: 50, pax: 60, grade: uphill(0.02), crossing: { s: 603, from: t, to: t + 2 } })),
+    // (the car gone, the brake it took comes off soon enough to reach the point: it rolled out 5 m short up 40 per mille, line 17 at Palackého náměstí)
+    ...[58, 60, 62, 64, 66].map((t) => ({ name: `car crossing just past the stop, up 40 per mille, at ${t} s`, stops: [20, 600], limit: 50, pax: 60, grade: uphill(0.04), crossing: { s: 603, from: t, to: t + 1.5 } })),
     // (a turn: current through the pantograph under the contact, without the drive pedal once braking for the stop)
     ...[[600, 25], [600, 40], [600, 55], [600, 150], [600, 400]].map(([s, d]) => ({ name: `turn under a contact ${d} m before the stop`, stops: [20, s], limit: 50, pax: 60, contact: s - d })),
     // (still at speed there, already braking: nothing but the drive pedal can draw the current)
