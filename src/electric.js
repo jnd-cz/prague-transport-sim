@@ -11,8 +11,8 @@
 export const WIRE = {
   u0: 650,        // V: a substation at no load [assumed; nominal 600 V, the T3 is built for 720 V, T3SU-15 p. 1]
   rSource: 0.03,  // Ω: the rectifier and its transformer [assumed, ≈6 % drop at 1,200 A]
-  rWire: 0.10,    // Ω per km of track: contact wire 100 mm² Cu (0.18) with its neighbour track's and the rails [assumed]
-  rFeeder: 0.06,  // Ω per km of underground feeder cable, from the substation to a section's feed point [assumed]
+  rWire: 0.08,    // Ω per km of track: contact wire 100 mm² Cu (0.18) with its neighbour track's and the rails [assumed]
+  rFeeder: 0.04,  // Ω per km of underground feeder cables, from the substation to a section's feed point [assumed]
   wireKm: 0.8,    // km of wire at most from a feed point: sections of 1–2 km are fed about their middle [assumed]
   reach: 4,       // km: a substation further from this line's track does not feed it [assumed]
   floor: 400,     // V: the lowest a network like this is built to hold (EN 50163's 400 V, from memory): with these
@@ -31,10 +31,17 @@ export class Feeding {
     this.feeds = [];
     if (!substations?.length || !frameOrigin) return;
     const [e0, n0] = frameOrigin;
+    // (route.nearest looks only ≈40 m around; these stand further off, so every 40 m of the line is tried)
     for (const sub of substations) {
-      const n = route.nearest(sub.e - e0, sub.n - n0);
-      if (!n || n.d > WIRE.reach * 1000) continue;
-      this.feeds.push({ s: n.s, ref: sub.ref, r0: WIRE.rSource + (WIRE.rFeeder * n.d) / 1000 });
+      const x = sub.e - e0, y = sub.n - n0;
+      let d2 = Infinity, s = 0;
+      for (let k = 0; k < route.samples.length; k += 10) {
+        const q = route.samples[k], t = (q[0] - x) ** 2 + (q[1] - y) ** 2;
+        if (t < d2) { d2 = t; s = q[2]; }
+      }
+      const d = Math.sqrt(d2);
+      if (d > WIRE.reach * 1000) continue;
+      this.feeds.push({ s, ref: sub.ref, r0: WIRE.rSource + (WIRE.rFeeder * d) / 1000 });
     }
     this.feeds.sort((a, b) => a.s - b.s);
   }

@@ -752,7 +752,7 @@ Read from the scans in `raw/reference/ckd-t3su/` again. What this section adds t
 ### 9.3 The wire
 
 - **Substations:** `data/truth.json` `substations`, the 30 DPP traction substations in the OSM extract (`tools/substations.py`). Their feeding maps are in `raw/reference/web/prazsketramvaje/img/*-napajeni.gif`, schematic, c. 2009 (web-notes § 3.2); not used yet.
-- **The model** (`src/electric.js`): a tram hangs on the feed with the least resistance: source 0.03 Ω, feeder cable 0.06 Ω/km, wire and rails 0.10 Ω/km for the first 0.8 km. No-load 650 V. All [assumed]: nothing found measures them. Section ends and feed points wait for #277.
+- **The model** (`src/electric.js`): a tram hangs on the feed with the least resistance: source 0.03 Ω, feeder cables 0.04 Ω/km, wire and rails 0.08 Ω/km for the first 0.8 km. No-load 650 V, 400 V at the least (the low limit of EN 50163, from memory). All [assumed]: nothing found measures them. Section ends and feed points wait for #277.
 - **What depends on it:** force on the resistors no (the relay holds the current; the position stands higher for the same speed); the motor curve and top speed yes; the electric brake no (no line current, only the fans slow down); 26 V hardly; the fans' tone yes; heaters as U².
 
 ### 9.4 How a careful driver works it (T3SU-03)

@@ -151,10 +151,24 @@ RUN = """async () => {
     const t = fresh(); t.eq.park(true); run(t, 2); t.eq.park(false); const a0 = t.eq.aux.U;
     t.eq.pedal.brake = S.pedalMax; t.eq.goal = null; run(t, 1); out.track = { before: +a0.toFixed(1), during: +t.eq.aux.U.toFixed(1), battery: Math.round(t.eq.aux.batteryA) };
   }
+  // the lever of the Simple controls: parked at a stand, away on a drive step, brake steps, parked again
+  {
+    const t = new Tram(1), e = t.eq, seen = {};
+    run(t, 1); seen.stand = { parked: e.parked, notch: t.notch };
+    e.lever = 2; run(t, 6); seen.drive = { parked: e.parked, notch: t.notch, kmh: +t.kmh.toFixed(1), ls: e.ls };
+    e.lever = 0; run(t, 2); seen.coast = { notch: t.notch, ls: e.ls };
+    e.lever = -3; run(t, 3); seen.brake = { notch: t.notch, decel: +(-t.a).toFixed(2) };
+    run(t, 30, {}, (x) => x.v > 0); run(t, 1); e.lever = 0; run(t, 1); seen.stopped = { kmh: +t.kmh.toFixed(1), parked: e.parked };
+    e.lever = 3; run(t, 3, { doorsOpen: true }); seen.doors = { kmh: +t.kmh.toFixed(1), ls: e.ls };
+    run(t, 3); seen.after = { notch: t.notch, kmh: +t.kmh.toFixed(1), parked: e.parked };
+    e.lever = -6; run(t, 0.1); seen.emergency = { notch: t.notch, track: e.brakeAngle };
+    out.lever = seen;
+  }
   // the wire, on a made-up straight line: substations at km 1 and km 5
   {
-    const route = { nearest: (x, y) => ({ s: x, d: Math.abs(y) }) };
+    const route = { samples: Array.from({ length: 800 }, (_, i) => [i * 10, 0, i * 10, i]) };
     const f = new Feeding(route, [{ ref: 'a', e: 1000, n: 0 }, { ref: 'b', e: 5000, n: 200 }, { ref: 'far', e: 2000, n: 9000 }], [0, 0]);
+    out.feed2 = f.feeds.map((x) => [x.ref, Math.round(x.s)]);
     const at = (s, o) => { const q = f.supply(s, o); return { ref: q.ref, r: +q.r.toFixed(3), u0: Math.round(q.u0) }; };
     out.feed = { n: f.feeds.length, at1000: at(1000), at1500: at(1500), at2500: at(2500), at4800: at(4800),
       sameSide: at(1500, [{ s: 1400, i: 500 }]), otherSide: at(1500, [{ s: 600, i: 500 }]), otherFeed: at(1500, [{ s: 4900, i: 500 }]) };
@@ -220,6 +234,10 @@ def checks(o):
     want(o["rc"] == [0, 10, 20, 30], f"step 1's setting on the 24 V side: {o['rc']}, want +0, 10, 20, 30 A (T3SU-26 p. 4)")
     want(17 <= o["pilot"] <= 23, f"the pilot motor at 26 V: {o['pilot']} positions/s")
     want(o["track"]["during"] < o["track"]["before"] and o["track"]["during"] > 15 and o["track"]["battery"] < 0, f"track brakes on the 24 V side: {o['track']}")
+    v = o["lever"]
+    want(v["stand"]["parked"] and v["drive"]["notch"] == 2 and v["drive"]["kmh"] > 5 and not v["drive"]["parked"], f"the lever, away: {v}")
+    want(v["coast"]["notch"] == 0 and v["brake"]["notch"] == -3 and v["brake"]["decel"] > 0.4, f"the lever, coasting and braking: {v}")
+    want(v["stopped"]["parked"] and v["doors"]["kmh"] == 0 and v["after"]["notch"] == 3 and v["after"]["kmh"] > 2 and v["emergency"]["notch"] == -6, f"the lever, parked, doors, on, emergency: {v}")
     f = o["feed"]
     want(f["n"] == 2, f"the far substation should not feed this line: {f['n']} feeds")
     want(f["at1000"]["ref"] == "a" and f["at4800"]["ref"] == "b" and f["at1000"]["r"] < f["at1500"]["r"] < f["at2500"]["r"], f"the feeds and their resistance: {f}")
