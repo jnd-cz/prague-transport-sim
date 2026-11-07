@@ -266,6 +266,9 @@ export class Autopilot {
     // (up a climb the approach drives again where coasting would stand it more than 3 m short: with the drive pedal held off it
     // stood 15.7 m short of Mezi Hřbitovy up 25 ‰, line 9 seed 2 in autumn; on the level it does not, where main crawled on pulses)
     const shortUphill = inApproach && fixed && aCoast > 0.15 && (tr.v * tr.v) / (2 * aCoast) < dLeft - 3;
+    // (coasting in to a point, over what the drive may reach: holding a limit it pressed step 1 against a slight climb 105 m before
+    // Kubánské náměstí, between braking for the limit and braking for the stop, line 22 seeds 2 and 3)
+    const coastingIn = fixedAt !== null && tr.v > vtDrive + 0.3;
     this.input.switchBtn = button;
     // slippery rail: sand where it decides something, pulling away or braking for a point (the equipment eases off a step): on every slip
     // and slide the box, 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
@@ -283,7 +286,7 @@ export class Autopilot {
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1)) && !needPedal && !shortUphill, fixed, aNeed,
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       speedErr: onCurve ? null : tr.v - vt });
