@@ -264,16 +264,20 @@ export class Autopilot {
     // switch's limit and the pedal made the turn after all, and braking on step 5 had the position at 21)
     // (a diverging contact, not only the next one: at Anděl one for a switch passed straight came 4 m before it)
     const btnSoon = tr.eq.buttonLive && g.switches.some((w) => !w.auto && !w.passedContact && w.required === 'diverging' && w.contact > tr.panto && w.contact - tr.panto < tr.v * 2.5 + 2);
-    const coast = (!onCurve && between) || (onCurve && need > -300) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
+    // (up a climb the approach drives again where coasting would stand it more than 3 m short, until it rolls to within 1 m: with the
+    // drive pedal held off it stood 15.7 m short of Mezi Hřbitovy up 25 ‰, line 9 seed 2 in autumn; on the level it does not, where
+    // main crawled on pulses. On the curve it asked to coast as well: after the track brakes for a slide let go 53 m out at 20 km/h it
+    // coasted up 25 ‰ and stood 13 m short there, seed 3)
+    const reach = aCoast > 0 ? (tr.v * tr.v) / (2 * aCoast) : Infinity;
+    this.upDrive = inApproach && fixed && aCoast > 0.15 && (reach < dLeft - 3 || (!!this.upDrive && reach < dLeft - 1));
+    const shortUphill = this.upDrive;
+    const coast = (!onCurve && between) || (onCurve && need > -300 && !shortUphill) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
       (btnSoon && vt === vLine && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6);
     // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
     // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
     const needPedal = wantPower === true && !tr.eq.buttonLive && (tr.eq.ls || tr.eq.p > 36 || ct.contact - tr.panto < tr.v * 0.3 + 1);
     const button = wantPower === true && !needPedal && (need < 0 || inApproach || coast);
-    // (up a climb the approach drives again where coasting would stand it more than 3 m short: with the drive pedal held off it
-    // stood 15.7 m short of Mezi Hřbitovy up 25 ‰, line 9 seed 2 in autumn; on the level it does not, where main crawled on pulses)
-    const shortUphill = inApproach && fixed && aCoast > 0.15 && (tr.v * tr.v) / (2 * aCoast) < dLeft - 3;
     // (coasting in to a point, over what the drive may reach: holding a limit it pressed step 1 against a slight climb 105 m before
     // Kubánské náměstí, between braking for the limit and braking for the stop, line 22 seeds 2 and 3)
     const coastingIn = fixedAt !== null && tr.v > vtDrive + 0.3;

@@ -380,8 +380,10 @@ export class TR37 {
     // short of Balabenka, Na Hroudě and Hlušičkova in autumn)
     if (w.stopDist != null && v > 0.8) {
       const need = (w.v * w.v) / (2 * Math.max(0.5, w.stopDist));
-      // (once on for a slide, until the stop is in hand: between the two it went on and off 4 times on one patch)
-      A.slideTrack = w.fixed && !w.sandLeft && ((w.slide && need > Math.max(0.35, w.slideA ?? 0)) || (A.slideTrack && now === -6 && need > 0.3));
+      // (once on for a slide, until the stop is in hand: between the two it went on and off 4 times on one patch. In hand is also where
+      // the rail under it gives what is still needed: held to 0.3 m/s² past the patch's end, they let go at 20 km/h 53 m before Mezi
+      // Hřbitovy, up 25 ‰, and it had to drive again to get there, line 9 seed 3 in autumn)
+      A.slideTrack = w.fixed && !w.sandLeft && ((w.slide && need > Math.max(0.35, w.slideA ?? 0)) || (A.slideTrack && now === -6 && need > 0.3 && need > 0.8 * (w.slideA ?? 0)));
       if ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack) s = -6;
     }
     const contact = w.power != null;
