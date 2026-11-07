@@ -70,6 +70,9 @@ class Download {
   }
 }
 
+// a file the page could not get or read; packed: the host's compression may be why (#275)
+const fileError = (key, url, packed, cause) => Object.assign(new Error(t(key, { file: url }), { cause }), { packed });
+
 // the body of a finished download read as fetch's Response would, or null when it is not there
 function body(buf, url) {
   if (!buf) return null;
@@ -78,7 +81,10 @@ function body(buf, url) {
     url,
     bytes: buf,
     arrayBuffer: () => Promise.resolve(buf.buffer),
-    json: () => Promise.resolve(JSON.parse(new TextDecoder().decode(buf))),
+    json: async () => {
+      try { return JSON.parse(new TextDecoder().decode(buf)); }
+      catch (e) { throw fileError('load.unreadable', url, true, e); } // (the parser's own message quotes the bytes)
+    },
     blobUrl: (type) => URL.createObjectURL(new Blob([buf], { type })),
   };
 }
@@ -92,13 +98,29 @@ export class Loader {
     this.pending = false;
     this.el = $('loading');
     this.sizes = dataSizes();
+    // anything thrown while the page loads stops the build, and the bar alone would just stand still (#371)
+    // (no e.error: the browser's own notices, like a ResizeObserver loop, stop nothing)
+    this.onError = (e) => { if (e.error) this.fail(e.error); };
+    addEventListener('error', this.onError);
   }
 
+  // what stopped the page, on the loading screen; the first cause stays (what comes after follows from it)
   fail(error) {
+    if (this.failed) return;
     this.failed = true;
     this.el?.classList.remove('hidden');
-    $('loadPct').textContent = 'Cannot start';
-    $('loadStep').textContent = `${error.message || error}. Reload the page; if it persists, report this message.`;
+    $('loadPct').textContent = t('load.cannot');
+    $('loadBytes').textContent = '';
+    const step = $('loadStep'), what = `${error.message || error}. `;
+    // on plain http browsers refuse the host's packed files or hand over their raw bytes (#275); not on this machine,
+    // where http counts as secure
+    if (error.packed && !isSecureContext) {
+      const a = document.createElement('a');
+      a.href = `https://${location.host}${location.pathname}${location.search}`;
+      a.textContent = t('load.https');
+      step.replaceChildren(`${what}${t('load.http')} `, a);
+    } else step.textContent = what + t('load.reload');
+    this.render(true);
   }
 
   // start downloading now; get(url) later waits for it
@@ -107,11 +129,11 @@ export class Loader {
     return this;
   }
 
-  // a fetch-like body ({ ok, json(), arrayBuffer() }) or { ok: false } when the file is missing
+  // a fetch-like body ({ ok, json(), arrayBuffer() }) or { ok: false } when the file is missing (its json() says which)
   async get(url) {
     this.prefetch(url);
     const d = this.files.get(url);
-    return body(await d.promise, url) || { ok: false, url };
+    return body(await d.promise, url) || { ok: false, url, json: () => Promise.reject(fileError('load.notLoaded', url, d.state === 'error')) };
   }
 
   // the build steps that follow the downloads, with their share of the build part of the bar
@@ -162,6 +184,7 @@ export class Loader {
   }
 
   finish() {
+    removeEventListener('error', this.onError);
     this.close();
     for (const s of this.steps) s.done = true;
     this.step = null;
@@ -198,8 +221,8 @@ export class Loader {
       // steps' usual time (the weights are milliseconds); fixed once the downloads are done
       const downloading = files.some((d) => d.state === 'wait' || d.state === 'load');
       if (downloading || this.dlShare === undefined) {
-        const ms = performance.now() - this.t0, dlMs = dl > 0.02 ? ms / dl : Infinity;
-        this.dlShare = Math.max(DL_SHARE_MIN, Math.min(1, dlMs / (dlMs + sw)));
+        const dlMs = (performance.now() - this.t0) / dl; // (no telling from the first 2 %)
+        this.dlShare = dl > 0.02 ? Math.max(DL_SHARE_MIN, Math.min(1, dlMs / (dlMs + sw))) : DL_SHARE_MIN;
       }
       f = downloading ? this.dlShare * dl : this.dlShare + (1 - this.dlShare) * built / sw;
     }
@@ -210,7 +233,6 @@ export class Loader {
 
   // redraw at most once a frame while bytes stream in; now = immediately (before a blocking step)
   render(now = false) {
-    if (this.failed) return;
     if (!now) {
       if (this.pending) return;
       this.pending = true;
@@ -220,10 +242,17 @@ export class Loader {
       return;
     }
     if (!this.el) return;
+    const files = [...this.files.values()];
+    $('loadFiles').innerHTML = files.map((d) => {
+      const pct = d.state === 'done' ? '✓' : d.state === 'missing' ? t('load.missing') : d.state === 'error' ? t('load.error')
+        : d.total ? `${Math.floor((d.loaded / d.total) * 100)} %` : d.loaded ? `${mb(d.loaded)} MB` : '…';
+      const size = d.total ? `${mb(d.total)} MB` : '';
+      return `<tr class="${d.state}"><td>${d.label}</td><td>${size}</td><td>${pct}</td></tr>`;
+    }).join('');
+    if (this.failed) return; // (the message stays; the files go on arriving)
     const f = this.fraction();
     $('loadBar').style.width = `${(f * 100).toFixed(1)}%`;
     $('loadPct').textContent = `${Math.floor(f * 100)} %`;
-    const files = [...this.files.values()];
     const loaded = files.reduce((a, d) => a + d.loaded, 0);
     const total = files.reduce((a, d) => a + (d.state === 'missing' || d.state === 'error' ? 0 : d.total), 0);
     const secs = (performance.now() - this.t0) / 1000;
@@ -233,11 +262,5 @@ export class Loader {
     $('loadBytes').textContent = info;
     const part = this.step?.parts?.label;
     $('loadStep').textContent = this.step ? t(`load.${this.step.key}`) + (part ? ` · ${t(`load.w.${part}`)}` : '') : downloading ? t('load.download') : '';
-    $('loadFiles').innerHTML = files.map((d) => {
-      const pct = d.state === 'done' ? '✓' : d.state === 'missing' ? t('load.missing') : d.state === 'error' ? t('load.error')
-        : d.total ? `${Math.floor((d.loaded / d.total) * 100)} %` : d.loaded ? `${mb(d.loaded)} MB` : '…';
-      const size = d.total ? `${mb(d.total)} MB` : '';
-      return `<tr class="${d.state}"><td>${d.label}</td><td>${size}</td><td>${pct}</td></tr>`;
-    }).join('');
   }
 }

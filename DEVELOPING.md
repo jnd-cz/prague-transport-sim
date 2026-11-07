@@ -103,7 +103,7 @@ CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown 
 To a web host over FTPS (#131): `python -P -E tools/deploy.py` uploads the same files from a clean commit
 whose data matches the manifest:
 - only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
-- the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 31.5 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS);
+- the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 31.5 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS). Without it Chromium refuses the files (`ERR_CONTENT_DECODING_FAILED`), a browser that hands the page the raw bytes shows the bar at 5 % with every file ticked, and the loading screen says to open the page over https (#371);
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
 
