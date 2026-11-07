@@ -259,22 +259,36 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's electric system** (#351): `src/tr37.js`, `src/electric.js`, read from ČKD's manuals in
   `docs/research/prazsketramvaje/t3-accelerator.md` § 9. Nothing but the pilot motor moves the accelerator, the relay in
   every mode. The wire's resistances and no-load voltage are assumed; nothing found measures them.
-- **How the autopilot drives it** (#351): to a stop or signal one curve to the point at up to 0.9 m/s² (on wet leaves half the grip, 0.74), with what the brake can spare on
-  the steepest downhill to it, no crawl and no drive pedal once braking (`tools/headless.py --checks stops`, `tools/test_drives.py`).
+- **How the autopilot drives it** (#351): to a stop or signal it drives until coasting 8 s meets the braking curve, then one curve to the
+  point at 0.8 of what step 5 gives, at most 1.0 m/s² (on wet leaves half the grip, 0.74), with the steepest downhill to it counted; no
+  crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py --checks stops`,
+  `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make.
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way;
   the crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
-- **A real ride, and how far to follow it** (#351, PR #363): GPS of car 6921 on line 23, Lazarská to Královka, 2026-10-31, read
-  from the speed with the gradient and the running resistance taken out. The driver coasted 48 % of the distance and braked 11 %;
-  before a stop the drive came off ≈ 100 m out, then ≈ 45 m of coasting and the brake from ≈ 23 km/h at ≈ 0.86 m/s² (p90 1.09).
-  GPS sees traction of 3 s or more, so its 6.9 presses of the drive pedal a km is a lower limit. Moving, it was 10 % quicker than the
-  autopilot from Národní třída on, a third of that on the climb to Královský letohrádek, where our limits end later after each
-  slow spot (#211). The user, 2026-11-07: "I did notice the drivers went a bit milder on the tram, probably because it's Heritage
-  ride and on that route they err on the side of bigger delay than aggressively following the timetable. Other difference is our
+- **Real rides, and how far to follow them** (#351, PR #363): GPS of four rides on line 23 from the user, read from the speed with the
+  gradient and the running resistance taken out: car 6921 Lazarská to Královka and car 6312 Královka to Bílá labuť on 2026-10-31,
+  T2R 6004 and T3SUCS 7290 on the diverted route on 2026-11-07, the last with a phone's accelerometer for 11 minutes. The drivers
+  coasted 38–48 % of the distance; before a stop the drive came off 81–124 m out at 28–35 km/h and they braked the last 22–43 m from
+  21–25 km/h at 0.67–0.86 m/s² (p90 0.9–1.1). The accelerometer counts ≈ 6 presses of the drive pedal a km, each ≈ 6 s at ≈ 1 m/s²
+  (peaks 1.3, p90 1.7), braking at 0.7 (peaks 1.0, p90 1.6); the GPS reading of the same 3.3 km counts 7.3 a km. The phone's Y axis
+  reads the tram's acceleration 1:1 once its zero is taken at each stand (it sat 0.15–0.34 g from the tilt and the stop's
+  gradient); its file is named when it was saved, not started. Pulling away on the level the autopilot is about as quick (0.91 m/s² net
+  to 30 km/h against 0.51–0.80 on the October rides, the T2R 1.05); where it reached 25 km/h later it was holding a limit on the way. Moving, the rides were up to 10 %
+  quicker than the autopilot, a third of that on the climb to Královský letohrádek, where our limits end later after each slow
+  spot (#211). The user, 2026-11-07: "I did notice the drivers went a bit milder on the tram, probably because it's Heritage ride
+  and on that route they err on the side of bigger delay than aggressively following the timetable. Other difference is our
   inaccurate speed limits and holding them longer after each curve. So the comparison is just rough to get in the ballpark and our
-  autopilot can lean a bit on the faster side where it makes sense."
+  autopilot can lean a bit on the faster side where it makes sense."; "Later braking to match real driver"; "the general point of
+  driving with zrychlovač still seems to be minimizing power waste, so drivers keep the našlápnutí amount low, use it hard to not
+  spent burning much power in resistors as well as conserve momentum, save time by coasting at speeds under limit."
+- **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
+  starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
+  of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the
+  test drives' presses by 10 % and the waste by 1 %, cost 0.7 % in time and 13 % more pedal steps, and slipped on leaves up a climb:
+  not kept. Steps 4–5 from a stand on the level (T3SU-03 p. 4 says 1–3) waste 4–10 % less with a full load, nothing empty.
 - **Wet leaves and sand** (#351): the box holds 90 s of sanding a shift and is not refilled (`src/tram.js`, no source: #266); the
   track brakes sand too. On a leaf patch (0.06) every step slips from a stand (step 1 pulls 0.60 m/s², the grip is 0.59), and
   slipping wheels pull 0.7 of the grip, 0.41 m/s²: with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
