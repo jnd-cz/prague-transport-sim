@@ -297,7 +297,9 @@ export class TR37 {
     const pick = (f, force) => { for (let k = 1; k <= 5; k++) if (force(k) >= f) return k; return 5; };
     const F = (k) => this.brakeForce(k, v);
     let s;
-    if (w.stand) s = Math.min(-3, -pick(-w.force, F));
+    // (the last 1 km/h on the partly applied shoes it is already on, where they hold it: the full shoes for that moment were a
+    // jolt of 1.5 m/s² just before the stand)
+    if (w.stand) s = v < 0.3 && now <= -3 && (w.aCoast ?? 0) > -0.3 ? now : Math.min(-3, -pick(-w.force, F));
     else if (w.coast) s = 0;
     else if (w.force > 0) s = pick(w.force, (k) => this.driveForce(k));
     else {
@@ -336,12 +338,13 @@ export class TR37 {
     if (w.fixed && w.aNeed != null && s < 0 && v < 1.6 && !w.stand) {
       // the last metres to a stop or a signal. The electric brake is out below ≈6 km/h; from step 3 on it hands over to the
       // shoes, partly (BR1 at position 3) or fully on step 5 (LO), and partly is as far as they let go again without the
-      // drive pedal: so not before that alone is what it takes, until then rolling.
+      // drive pedal: so not before that alone is what it takes, until then the step it is on, which fades by itself. (Off the
+      // pedal for those 2 s it was one more release and press per stop.)
       // (step 5 only when partly is well short of it: the full shoes come in at 1.4 m/s², and the point has a margin)
       const a1 = (C.shoeForce[1] * this.cars) / w.inertia + Math.max(0, w.aCoast);
       if (w.aNeed > a1 * 1.8) s = -5;
       else if (w.aNeed >= a1 * 0.9 || this.shoe > 0) s = -3;
-      else s = 0;
+      else s = now < 0 ? Math.max(now, -2) : 0;
     } else if (s < 0 && v < 2.5 && !w.fixed) {
       // behind something that moves: at a crawl (below ≈9 km/h) steps 1–2 fade out to nothing and steps 3–4 leave only the
       // shoes partly applied (≈0.5 m/s², less than a downhill grade takes): a stop point within 8 m or needing more than

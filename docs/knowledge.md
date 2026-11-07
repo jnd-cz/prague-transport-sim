@@ -261,7 +261,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   every mode. The wire's resistances and no-load voltage are assumed; nothing found measures them.
 - **How the autopilot drives it** (#351): to a stop or signal one curve to the point, with what the brake can spare on
   the steepest downhill to it, no crawl and no drive pedal once braking (`tools/headless.py --checks stops`, `tools/test_drives.py`);
-  the crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl.
+  the crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
+  all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
+  second brought the drive pedal back uphill.
 - T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
   overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
