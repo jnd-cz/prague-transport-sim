@@ -31,22 +31,51 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 
 **What sets the limit, km of the five lines** (86.6 km):
 
-| cause | before | now |
-|---|---|---|
-| posted or general | 65.72 | 66.48 |
-| curve | 15.25 | 14.00 |
-| gradient (no source) | 4.64 | 4.62 |
-| facing switch | 1.01 | 1.53 |
+| cause | before | now | with W2's rebuild (local) |
+|---|---|---|---|
+| posted or general | 65.72 | 66.48 | 64.96 |
+| curve | 15.25 | 14.00 | 13.40 |
+| gradient (no source) | 4.64 | 4.62 | 4.63 |
+| switch, and with the rebuild the diamonds | 1.01 | 1.53 | 3.65 |
 
 **Where a slow stretch ended** (two-car set, 30.24 m). #211 read three extensions. The window of `speedLimits` applies only to curves, not to switches, so two remained: the stretch ran to 14 m past the fork, and 5 m bins rounded it up. Measured: the limit lifted **46–48 m** past the fork.
 
 The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself:
 - **The frog** lies a median **11.5 m** past the fork (10.5–13.5 m p10–p90), measured on the 82 facing switches: where the other leg is one gauge off the route.
-- **Now 42–43 m**, which is the frog plus the tram. D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1).
+- **Now 42–43 m** at a switch with no other trackwork after it, which is the frog plus the tram. D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1).
 
-What the driver still feels as too far is mostly OSM. 65 stretches on the five lines are tagged 15 km/h, up to 110 m long, and 38 of them touch a facing switch. The first rise of the limit past a switch is a median **73–105 m**. Those pieces stand for the trailing switches and diamonds the game did not know. Once the data has them (W2's rebuild) they are dropped (`withoutOwnPieces`).
+On today's data, what the driver still feels as too far is mostly OSM. 65 stretches on the five lines are tagged 15 km/h, up to 110 m long, and 38 of them touch a facing switch. The first rise of the limit past a switch is a median **73–105 m**. Those pieces stand for the trailing switches and diamonds the game did not know. Once the data has them (W2's rebuild) they are dropped (`withoutOwnPieces`).
 
-**With the trackwork in the data (line 17 rebuilt locally, not published):** 19 trailing switches, 4 of them from the diverging branch, and 26 diamonds; `path` and the facing switches are unchanged. The km held at 15 km/h go from 1.11 to 0.81, and the first rise past a fork from a median 89 m to 73 m. A smoke drive (`u3` seed 1) and lint pass, with the same lint counts.
+**With the trackwork in the data (all five lines rebuilt locally, not published).** Only `trackwork` and each switch's `frog` are new; `path`, `pathBack`, the rest of `switches` and every sidecar are unchanged. `lint,surfaces,canted,crossing,spacing,heights` read the same as main at the merge base on all 30 runs (line 17's `crossing` is the known #146), and the smoke drive (`u3` seed 1) passes on every line. A frog was found at 80 of 82 facing switches and 88 of 89 trailing ones; the others take the median.
+
+| line | trailing switches (from diverging) | diamonds | km at 15 km/h | first rise past a fork, median m |
+|---|---|---|---|---|
+| 9 | 23 (7) | 29 | 1.67 → 1.34 | 85 → 73 |
+| 17 | 19 (4) | 26 | 1.11 → 0.81 | 89 → 73 |
+| 22 | 24 (4) | 23 | 1.53 → 1.44 | 73 → 73 |
+| 23 | 14 (5) | 12 | 1.11 → 1.00 | 85 → 75 |
+| 37 | 9 (3) | 11 | 0.69 → 0.45 | 105 → 64 |
+
+OSM's pieces go, but the first rise stays at a median 64–75 m. `--checks limits` says what holds a two-car set last, at the 82 facing switches:
+
+| holds it last | forks |
+|---|---|
+| another trailing switch or diamond of the junction | 42 |
+| the window below, carrying a curve's limit on | 20 |
+| the switch itself: frog plus tram | 18 |
+| the window below, carrying a posted piece on | 2 |
+
+So at most forks the limit is what the rules ask: 39 of the 82 have a trailing switch or a diamond within 15 m past the frog, and each holds the limit until the rear has passed. `liftPast.twoCars` (a median 43–51 m on the rebuild) counts the pieces that start in the first 20 m past the fork, so 51 m is its ceiling.
+
+**The window has no source.** Since the initial commit `speedLimits` takes each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), and `currentLimit` also holds a limit until the rear has passed. So a curve's or a posted piece's limit lifts 15 m plus the tram after its last low bin; 0.96 of the 5.22 km at 15 km/h or less is only that spill.
+
+Tried on the rebuilt lines with 5 m behind, in a scratch copy:
+- **Km at 15 km/h or less:** 5.22 → 4.71.
+- **Forks the window holds last:** 22 → 11.
+- **First rise past a fork (lines 9, 17, 22, 23, 37):** 73, 73, 73, 75, 64 → 73, 69, 64, 67, 64 m.
+- **Time at the limit over the 86.6 km:** 131.3 → 128.7 min, −2 %.
+
+Not changed: it moves every curve limit, so it waits for the user's word and then needs the simulation checks (PR 362, question 9).
 
 **What it does to a run.** `u3,redruns,traffic,lint` on all lines, seeds 1–5, against checkpoint W1: 79 of 80 runs pass, lint does not move.
 - **Trip time** (traffic seeds 2 and 3, main pinned at 38024b5): line 9 −1.4 %, 17 +2.1 %, 22 +2.2 %, 23 −2.3 %, 37 +1.2 %. The 15 km/h over straight switches costs little against the stops and traffic of a run.
