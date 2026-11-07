@@ -46,6 +46,26 @@ The rule leaves one extension. `restriction-start-end` holds the limit until the
 
 What the driver still feels as too far is mostly OSM. 65 stretches on the five lines are tagged 15 km/h, up to 110 m long, and 38 of them touch a facing switch. The first rise of the limit past a switch is a median **73–105 m**. Those pieces stand for the trailing switches and diamonds the game did not know. Once the data has them (W2's rebuild) they are dropped (`withoutOwnPieces`).
 
+**With the trackwork in the data (line 17 rebuilt locally, not published):** 19 trailing switches, 4 of them from the diverging branch, and 26 diamonds; `path` and the facing switches are unchanged. The km held at 15 km/h go from 1.11 to 0.81, and the first rise past a fork from a median 89 m to 73 m. A smoke drive (`u3` seed 1) and lint pass, with the same lint counts.
+
+**What it does to a run.** `u3,redruns,traffic,lint` on all lines, seeds 1–5, against checkpoint W1: 79 of 80 runs pass, lint does not move.
+- **Trip time** (traffic seeds 2 and 3, main pinned at 38024b5): line 9 −1.4 %, 17 +2.1 %, 22 +2.2 %, 23 −2.3 %, 37 +1.2 %. The 15 km/h over straight switches costs little against the stops and traffic of a run.
+- **Line 23, traffic seed 1, did not finish** (stop 2, 7200 s). The tram stands at s 682 behind car 112, which stands on the track and waits for a walker pacing 1.4 m in front of it. This is #269's scene, in another place: #265's change of tram timing ran into it on the same line and seed.
+- **Outside main's seed spread, not traced:** `cyclesBroken` on line 9 (0 → 0.4) and line 37 (0 → 0.2), `jump` on line 22 (373 → 394, spread 344–391). New timing reshuffles traffic like a new seed (#156); these are the counts to read first if W2's checkpoint keeps them.
+
+**Line 17's curve limits since #204.** Before #204 (019c86b, its own data) against main (38024b5, which also has #210, #218 and #237), by place: 34 of 4360 bins moved by 5 km/h or more, in 31 stretches, 17 up and 14 down. Nearly all are one 5 m bin at a 5 km/h step, with the radius changed by under 17 %: `curveSpeed` rounds down to 5 km/h, so a small change crosses a step. The five large moves are not curves: there the sample fell on another OSM way, whose posted speed is the one shown.
+
+| s | between | km/h before → after | tightest R before → after, m |
+|---|---|---|---|
+| 1640 | Levského (before the first stop) | 50 → 30 | straight: OSM's way |
+| 11880 | Podolská vodárna – Výtoň | 30 → 50 | straight: OSM's way |
+| 14055 | Karlovy lázně – Staroměstská | 50 → 30 | 511 → 516: OSM's way |
+| 20845 | Kobylisy – Březiněveská | 60 → 15 | straight: OSM's way |
+| 20425 | Hercovka – Ke Stírce | 30 → 10 | 99 → 91: OSM's 10 km/h way (`maxspeed` 10) |
+| 14920 | Právnická fakulta – Čechův most | 10 → 15 | 22 → 22 |
+| 8700, 13750, 16075, 17710, 18535, 18755, 20640, 20685, 20910, 11275 | ten places | 5 down | 2–13 % tighter |
+| 325, 2325, 4140, 11185, 11220, 12970, 13400, 13980, 17450, 17740, 18590, 20615, 20665, 20705, 20765 | fifteen places | 5 up | 0–16 % wider |
+
 ## OSM's speeds
 
 `tools/speed_survey.py`, extract of 2026-11-04. The build reads `maxspeed` only, and the game had it.
