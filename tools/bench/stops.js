@@ -12,10 +12,13 @@
 // the stop point and drove on. err: the stop point less the front at the stand (+ short, − over). The timetable: late (the game's
 // penalty for it), devMean (s after the schedule at the departures), lateStops (departures over 3 min after it); smooth driving must not
 // cost it: 4 % slower on the same line took line 22's penalty from 17 to 509.
+// The drive pedal's use, on the whole run: presses (from 0 to a drive step, "našlápnutí"), pressesRolling (of them while already moving
+// faster than 1 m/s, the rest are the starts), brakeApplies (from coasting or drive to a brake step), the shares of the distance on drive,
+// coasting and brake, coastStretches (coasting 20 m or more). In the wet: slipSecs, slideSecs, sandSecs, emergencies (the pedal to the floor).
 
 export function stopsWatch(game) {
-  const R = { stops: [], flips: [], changes: 0, driveSteps: 0, steps: 0 };
-  let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0;
+  const R = { stops: [], flips: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0 };
+  let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null;
   const finish = (st, tr) => {
     a.err = +(st.target - tr.s).toFixed(2);
     R.stops.push({ stop: st.name, s: Math.round(st.target), v0: +(a.v0 * 3.6).toFixed(0), d0: Math.round(a.d0), secs: +(game.clock - a.t0).toFixed(1), flips: a.flips.length,
@@ -27,6 +30,17 @@ export function stopsWatch(game) {
     after: () => {
       const tr = game.tram, n = tr.notch, st = game.stops[game.nextStop];
       R.steps++;
+      // (the pedal's use over the whole run, read before lastStep moves on)
+      if (n > 0 && lastStep <= 0) { R.presses++; if (tr.v > 1) R.pressesRolling++; }
+      if (n < 0 && lastStep >= 0 && tr.v > 0.3) R.brakeApplies++;
+      if (n === -6 && lastStep !== -6) R.emergencies++;
+      const ds = lastS === null ? 0 : Math.max(0, tr.s - lastS), dt = lastClock === null ? 0 : game.clock - lastClock;
+      lastS = tr.s; lastClock = game.clock;
+      if (n > 0) R.driveM += ds; else if (n < 0) R.brakeM += ds; else R.coastM += ds;
+      if (n === 0) coastRun += ds; else { if (coastRun >= 20) R.coastStretches++; coastRun = 0; }
+      if (tr.slip) R.slip += dt;
+      if (tr.slide) R.slide += dt;
+      if (game.input?.sand || tr.sanding) R.sand += dt;
       if (n !== lastStep) { R.changes++; lastStep = n; }
       if (n > 0) R.driveSteps++;
       if (st !== cur) { cur = st; if (a) a = null; }
@@ -81,6 +95,9 @@ export function stopsWatch(game) {
         restarts: sum('restarts'), pulses: sum('pulses'), shoesAtSpeed: sum('shoesAtSpeed'), maxDecel: +max('decel').toFixed(2), maxJerk: +max('jerk').toFixed(2),
         errP90: errs.length ? errs[Math.floor(errs.length * 0.9)] : null, errMax: errs.length ? errs[errs.length - 1] : null, short: S.filter((x) => x.err > 3).length, over: S.filter((x) => x.err < -3).length,
         pedalChangesPerKm: +(R.changes / Math.max(1, game.tram.s / 1000)).toFixed(1), driveShare: +(R.driveSteps / Math.max(1, R.steps)).toFixed(3), simSeconds: Math.round(game.clock - (R.clock0 ?? 0)),
+        presses: R.presses, pressesPerKm: +(R.presses / Math.max(1, game.tram.s / 1000)).toFixed(2), pressesPerStop: +(R.presses / Math.max(1, S.length)).toFixed(2), pressesRolling: R.pressesRolling,
+        brakeApplies: R.brakeApplies, driveM: Math.round(R.driveM), coastM: Math.round(R.coastM), brakeM: Math.round(R.brakeM), coastStretches: R.coastStretches,
+        slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), emergencies: R.emergencies,
         comfort: Math.round(game.penalties.comfort || 0), late: Math.round(game.penalties.late || 0),
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5) };
     },
@@ -90,5 +107,6 @@ export function stopsWatch(game) {
 export async function run(seed = 1, opts = {}) {
   const { run: drive } = await import('./u3.js');
   const r = await drive(seed, { ...opts, also: [stopsWatch] });
-  return r.also[0];
+  // (opts.full: with what the drive itself found, for the weather's stress test)
+  return opts.full ? { ...r.also[0], hits: r.hits, collisions: r.collisions, signalPenalty: r.signalPenalty, signalEvents: r.signalEvents, collisionPenalty: r.collisionPenalty, stuckScene: r.stuckScene } : r.also[0];
 }
