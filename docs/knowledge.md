@@ -259,13 +259,30 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's electric system** (#351): `src/tr37.js`, `src/electric.js`, read from ČKD's manuals in
   `docs/research/prazsketramvaje/t3-accelerator.md` § 9. Nothing but the pilot motor moves the accelerator, the relay in
   every mode. The wire's resistances and no-load voltage are assumed; nothing found measures them.
-- **How the autopilot drives it** (#351): to a stop or signal one curve to the point at up to 0.8 m/s², with what the brake can spare on
+- **How the autopilot drives it** (#351): to a stop or signal one curve to the point at up to 0.9 m/s² (on wet leaves half the grip, 0.74), with what the brake can spare on
   the steepest downhill to it, no crawl and no drive pedal once braking (`tools/headless.py --checks stops`, `tools/test_drives.py`).
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way;
   the crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
+- **A real ride, and how far to follow it** (#351, PR #363): GPS of car 6921 on line 23, Lazarská to Královka, 2026-10-31, read
+  from the speed with the gradient and the running resistance taken out. The driver coasted 48 % of the distance and braked 11 %;
+  before a stop the drive came off ≈ 100 m out, then ≈ 45 m of coasting and the brake from ≈ 23 km/h at ≈ 0.86 m/s² (p90 1.09).
+  GPS sees traction of 3 s or more, so its 6.9 presses of the drive pedal a km is a lower limit. Moving, it was 10 % quicker than the
+  autopilot from Národní třída on, a third of that on the climb to Královský letohrádek, where our limits end later after each
+  slow spot (#211). The user, 2026-11-07: "I did notice the drivers went a bit milder on the tram, probably because it's Heritage
+  ride and on that route they err on the side of bigger delay than aggressively following the timetable. Other difference is our
+  inaccurate speed limits and holding them longer after each curve. So the comparison is just rough to get in the ballpark and our
+  autopilot can lean a bit on the faster side where it makes sense."
+- **Wet leaves and sand** (#351): the box holds 90 s of sanding a shift and is not refilled (`src/tram.js`, no source: #266); the
+  track brakes sand too. On a leaf patch (0.06) every step slips from a stand (step 1 pulls 0.60 m/s², the grip is 0.59), and
+  slipping wheels pull 0.7 of the grip, 0.41 m/s²: with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
+  at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). Sanding at every slip and slide ran the box dry half way
+  along lines 9, 17 and 22; sanding only where it decides something, it still runs dry there, while 23 and 37 keep a third to two
+  thirds. Pulling away the autopilot sands only where slipping wheels would not climb with 0.15 m/s² to spare, then up to 3 m/s;
+  braking, on a slide with a stop point within a patch slide's distance. A slip takes a step less for 6 s, lower only if it still
+  slips 0.8 s on (the equipment lags the pedal). A slide over 1.2 s above 3 m/s costs the flats penalty (`src/game.js`).
 - T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
   overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
@@ -337,6 +354,10 @@ Review these when realism matters; most move into the build in M2.
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
+- `--checks stops` counts the drive pedal's presses from 0 (*našlápnutí*), those made rolling (over 1 m/s), the brake's applies
+  and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide, sand and
+  the emergency brake. A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
+  coasting. Dry, main pressed 19–24 times a km (70 % rolling), the #351 autopilot 8.4–13 (lines 37 and 23).
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with main's baseline in the data store.
 - **Where a check's time goes** (#205, `tools/profile_check.py`, line 17 seed 1, 2026-11-04, 3 pages at once):
@@ -389,6 +410,7 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 | *stavěcí klíč* | the switch iron | the user, to match D 1/2 |
 | *zajišťovací brzda*, *zabrzdit / odbrzdit* | the shoe brake holding a standing car; the pedal's position is *zaparkováno* in D 1/2 and the manual; ČKD's *stanicování* is in neither | the user; exam sets |
 | *výběh* | coasting; the manual also *setrvačnost* | the user; manual p. 4 |
+| *našlápnutí* | pressing the drive pedal from 0 | the user, 2026-11-07 ("in the real world I think that's what called našlápnutí") |
 | *spoj* | a trip, which can change its number along the route and at a terminus | the user |
 | *trolej*; *trolejové vedení* | the contact wire; the wire with its span wires, rosettes, bracket arms and poles | the user |
 | *průjezdný průřez* | the clearance profile | the user; D 1/2 |
