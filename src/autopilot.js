@@ -7,7 +7,8 @@
 
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
-const PLAN_DECEL = 0.8; // … to a stop, a signal or a lower limit: on step 3 of the level, as the drive's steps 1–3 (0.65 lost 2–3 s a stop against main, which ran 0.7 m/s over its curve)
+const PLAN_DECEL = 0.9; // … to a stop, a signal or a lower limit: step 3 on the level, as the drive's steps 1–3. A real ride on line 23 braked at about 0.9 at the end, on a heritage line whose drivers
+// go milder (the user, 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense"); 0.65 lost 2–3 s a stop against main, which ran 0.7 m/s over its curve
 const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
@@ -33,7 +34,9 @@ export class Autopilot {
     }
 
     // target speed: line speed, upcoming restrictions, then everything we must stop for
-    let vt = g.currentLimit / 3.6 - 0.6;
+    // (1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed, the user, 2026-11-07:
+    // "our autopilot can lean a bit on the faster side where it makes sense")
+    let vt = g.currentLimit / 3.6 - 0.4;
     let nl = g.nextLimitChange();
     // the deceleration to plan on: less on a steep downhill, where the electric brake has to hold the tram's weight too (70 ‰ takes
     // ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes)

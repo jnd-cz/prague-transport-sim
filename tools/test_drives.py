@@ -31,7 +31,7 @@ RUN = """async (only) => {
     if (o.sand !== undefined) tr.sand = o.sand;
     const muAt = (s) => (o.patches || []).some(([a, b]) => s > a && s < b) ? 0.06 : o.mu ?? 0.3;
     const limitAt = (s) => { if (!o.limits) return o.limit ?? 50; let k = o.limits[0][1]; for (const [a, v] of o.limits) if (s >= a) k = v; return k; };
-    const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0, slipSecs: 0, slideSecs: 0, emergencies: 0 };
+    const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0, slipSecs: 0, slideSecs: 0, emergencies: 0, overLimit: -99 };
     const stops = (o.stops || []).map((s, i) => ({ name: 'S' + i, target: s, served: false, waiting: 0, alight: 0, alightFrac: 0, request: false, sched: 0, zone: [s - 2.5, s + 3] }));
     const ahead = o.ahead ? { ...o.ahead, v: 0 } : null;
     const g = {
@@ -74,6 +74,7 @@ RUN = """async (only) => {
       if (n > 0 && braked) { R.flips.push({ T: +T.toFixed(1), s: +tr.s.toFixed(1), kmh: +tr.kmh.toFixed(1), step: n, gap: g.tramAheadGap() === null ? null : +g.tramAheadGap().toFixed(1), car: !!o.crossing && T >= (o.crossing.from ?? 0) && T <= (o.crossing.to ?? Infinity) + 2 }); braked = false; }
       if (tr.v < 0.02) braked = false;
       R.maxDecel = Math.max(R.maxDecel, -tr.a);
+      R.overLimit = Math.max(R.overLimit, tr.kmh - limitAt(tr.s));
       jf += ((tr.a - lastA) * 30 - jf) * 0.17;
       lastA = tr.a;
       if (tr.v > 0.2) R.maxJerk = Math.max(R.maxJerk, Math.abs(jf));
@@ -83,6 +84,7 @@ RUN = """async (only) => {
     }
     R.secs = +T.toFixed(1); R.lastKmh = +tr.kmh.toFixed(1); R.lastS = +tr.s.toFixed(1); R.maxDecel = +R.maxDecel.toFixed(2); R.maxJerk = +R.maxJerk.toFixed(2);
     R.minU = Math.min(...R.series.map((x) => x[6]));
+    R.overLimit = +R.overLimit.toFixed(1);
     R.sandLeft = +tr.sand.toFixed(2); R.slipSecs = +R.slipSecs.toFixed(1); R.slideSecs = +R.slideSecs.toFixed(1); R.finished = g.nextStop >= stops.length;
     return R;
   };
@@ -130,6 +132,8 @@ RUN = """async (only) => {
     { name: 'leaves, standing on a patch up 50 per mille', stops: [20, 60, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), patches: [[40, 90]], leaves: true },
     // (with the box empty, this last one could not be left at all: slipping wheels give 0.41 m/s², and 50 per mille takes 0.49: physics, not driving)
     { name: 'leaves, a patch at a red signal, no sand', stops: [20, 900], limit: 50, pax: 60, mu: 0.15, patches: [[440, 500]], signals: [{ s: 500, states: [[0, 'stop'], [100, 'go']] }], sand: 0, leaves: true },
+    // (slipping, the wheels pull with 0.7 of 0.15, enough for 50 ‰; a step less after the slip, step 1, is not)
+    { name: 'leaves, pulling away up 50 per mille, no sand', stops: [20, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), sand: 0, leaves: true },
   ].filter((x) => !only || x.name.includes(only));
   return S.map((o) => ({ ...drive(o), leaves: !!o.leaves }));
 }"""
@@ -155,6 +159,8 @@ def checks(r):
         want(not free, f"drive pedal after the brake with nothing ahead: {free[:3]}")
     want(r["shoes"] == 0 or "green turns red" in name, f"shoes fully in at speed {r['shoes']} steps")
     want(r["overrun"] == 0, f"over a signal at stop {r['overrun']} times")
+    # (the game's penalty starts 3 km/h over, src/game.js; the plan may lean on the limit, not past that. Into a lower limit it counts from the point itself, and the whole tram's length does not apply here: 1 km/h more)
+    want(r["overLimit"] <= (2.5 if "limit" not in name else 3.5), f"{r['overLimit']} km/h over the limit")
     for st in r["stands"]:
         want(abs(st["err"]) <= 2.5, f"stood {st['err']} m from the point at {st['stop']}")
     if r["leaves"]:
@@ -164,7 +170,8 @@ def checks(r):
         want(r["emergencies"] <= (1 if "no sand" in name else 0), f"{r['emergencies']} uses of the emergency brake")
     elif "stands at the stop" not in name:
         # (a car that comes into the way close by is a hard stop, as it should be)
-        want(r["maxDecel"] <= (2.5 if "green turns red" in name else 1.8 if "just past" in name else 1.45), f"decelerated at {r['maxDecel']} m/s²")
+        # (the comfort penalty starts at 1.5 m/s², src/game.js)
+        want(r["maxDecel"] <= (2.5 if "green turns red" in name else 1.8 if "just past" in name else 1.5), f"decelerated at {r['maxDecel']} m/s²")
     if "contact" in r:
         want(r["contact"]["drawn"], f"no current under the contact: {r['contact']}")
     if name in TIMES:

@@ -1,12 +1,14 @@
 // Dev check helpers (not part of the game) for the benches that drive a whole line (u3, redruns): when
 // our tram counts as stuck, and what stood in front of it then.
 
-// A function to call once per chunk: our tram's position once it has not moved for 10 minutes, else
-// null. A scheduled wait at a stop is not a deadlock: the clock starts at departure.
+// A function to call once per chunk: our tram's position once it has not got on for 10 minutes, else
+// null. A scheduled wait at a stop is not a deadlock: the clock starts at departure. Getting on is
+// forward: rocking a metre back and forth on a leaf patch up a climb ran three autumn runs into the
+// page's 30 min timeout instead (a jump back of 100 m is a new run, not a roll).
 export function stuckWatch(game) {
   let lastS, lastMove = 0;
   return () => {
-    if (lastS === undefined || Math.abs(game.tram.s - lastS) > 1) { lastS = game.tram.s; lastMove = game.clock; }
+    if (lastS === undefined || game.tram.s - lastS > 1 || game.tram.s < lastS - 100) { lastS = game.tram.s; lastMove = game.clock; }
     const st = game.stops[game.nextStop];
     if (st?.arrived && game._atStop(st) && Math.abs(game.tram.v) < 0.05) lastMove = Math.max(lastMove, Math.min(game.clock, st.sched));
     return game.clock - lastMove > 600 ? Math.round(game.tram.s) : null;

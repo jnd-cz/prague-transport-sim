@@ -314,12 +314,15 @@ export class TR37 {
     }
     // holding a speed a step stays until the speed has moved, and so does nothing: the relay holds the force, and between
     // two steps' forces (a gradient) it let go and pressed every 2 s (main: 130–200 pedal changes a km). The plan's speed is
-    // 0.6 m/s under the limit, so these bands stay under it.
+    // 0.4 m/s under the limit, so these bands stay under it.
+    // (over the speed the drive pedal comes off, whatever force a climb still seems to ask: at position 99 step 1 passes 300 A, and it let go only 2.8 km/h over the limit)
+    if (w.speedErr != null && !w.urgent && s > 0 && w.speedErr > 0.3) s = 0;
     if (w.speedErr != null && !w.urgent && s !== now) {
       const e = w.speedErr;
       if (now < 0 && s > now && e > -0.4) s = now;
       else if (now < 0 && s < now && e < 0.3) s = now;
-      else if (now > 0 && s >= 0 && e < 0.2 && e > -0.7) s = now;
+      // (a high step comes off sooner: each takes 0.6 s on the way down, and up 50 ‰ on step 4 it went 2.8 km/h over the limit)
+      else if (now > 0 && s >= 0 && e < 0.2 - 0.25 * (now - 1) && e > -0.7) s = now;
       else if (now === 0 && s > 0 && e > -0.35 && v > 1) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
     }
@@ -327,11 +330,12 @@ export class TR37 {
     if (w.power === false) s = Math.min(0, s);
     if (w.noDrive) s = Math.min(0, s);
     // a wheel that goes takes a step less, and the step stays less for a while: back on the same step at once it slipped through
-    // most of every start on autumn's leaves (6 s and 3 s [assumed]). Pulling away with sand in the box the sand does it instead: step 1
-    // alone does not climb 50 ‰, and without a slip it would not even ask for sand
+    // most of every start on autumn's leaves (6 s and 3 s [assumed]). Not pulling away: the sand does that while the box holds any,
+    // and the slipping wheels still pull with 0.7 of the grip, more than step 1, which alone does not climb 50 ‰ (with the box
+    // empty it stood up a climb where it had slipped up before: lines 9, 17 and 22 in autumn)
     A.slipT = (A.slipT || 0) - w.dt;
     A.slideT = (A.slideT || 0) - w.dt;
-    if (w.slip && now > 1 && !(v < 3 && w.sandLeft)) { A.slipCap = now - 1; A.slipT = 6; }
+    if (w.slip && now > 1 && v >= 3) { A.slipCap = now - 1; A.slipT = 6; }
     if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
     if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;

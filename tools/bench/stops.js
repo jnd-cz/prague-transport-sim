@@ -98,7 +98,7 @@ export function stopsWatch(game) {
         presses: R.presses, pressesPerKm: +(R.presses / Math.max(1, game.tram.s / 1000)).toFixed(2), pressesPerStop: +(R.presses / Math.max(1, S.length)).toFixed(2), pressesRolling: R.pressesRolling,
         brakeApplies: R.brakeApplies, driveM: Math.round(R.driveM), coastM: Math.round(R.coastM), brakeM: Math.round(R.brakeM), coastStretches: R.coastStretches,
         slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies,
-        comfort: Math.round(game.penalties.comfort || 0), late: Math.round(game.penalties.late || 0),
+        comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5) };
     },
   };

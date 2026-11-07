@@ -199,7 +199,7 @@ def load_places():
     return json.load(open(PLACES, encoding="utf-8")) if os.path.exists(PLACES) else {}
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops"},
+       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
        "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
@@ -224,7 +224,7 @@ def counts(check, r):
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in ("stops", "autumn"):
         keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "sandSecs", "sandLeft", "emergencies") if check == "autumn" else ()
-        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "late", "devMean", "lateStops", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm")}
+        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":
