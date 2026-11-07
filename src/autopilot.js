@@ -33,7 +33,12 @@ export class Autopilot {
     // target speed: line speed, upcoming restrictions, then everything we must stop for
     let vt = g.currentLimit / 3.6 - 0.6;
     const nl = g.nextLimitChange();
-    if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12)) - 0.3);
+    // the deceleration to plan on: 0.65 m/s² where the electric brake has it to spare, less on a steep downhill, where step 4
+    // has to hold the tram's weight too (70 ‰ takes ≈0.7 of its ≈1 m/s²: braking at 0.65 there ended on the track brakes)
+    const gradeHere = g.profile.grade(tr.s - 7);
+    const planAt = (grade) => Math.max(0.2, Math.min(DECEL, 0.85 * ((tr.eq.brakeForce(4, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
+    const limitDecel = planAt(gradeHere);
+    if (nl) vt = Math.min(vt, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12)) - 0.3);
     const vLimit = vt;
     let stopAt = null, fixed = false;
     // (fixed: a stop or a signal, which stays where it is; else something that can move off)
@@ -94,11 +99,13 @@ export class Autopilot {
     // you"; on main the crawl's 3 km/h was held by drive pulses 1–2 m short). Behind something that moves it keeps
     // the curve ending 3 m short and the crawl up to it, so it closes up as a driver does.
     const dLeft = stopAt === null ? null : stopAt - tr.s - (fixed ? STOP_MARGIN : 0);
+    // (the steepest downhill between here and the point counts: a crest just before it took the brake's margin away)
+    const stopDecel = !fixed || dLeft > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + dLeft / 2 - 7), g.profile.grade(tr.s + dLeft - 7)));
     let vStop = Infinity, stood = false;
     if (stopAt !== null) {
       const d = stopAt - tr.s;
       if (fixed) {
-        vStop = Math.sqrt(2 * DECEL * Math.max(0, dLeft));
+        vStop = Math.sqrt(2 * stopDecel * Math.max(0, dLeft));
         stood = tr.v < 0.1 && d < STAND_SHORT;
         if (stood || dLeft <= 0) vStop = 0;
       } else {
@@ -111,7 +118,6 @@ export class Autopilot {
       vt = Math.min(vt, vStop);
     }
     // how hard it slows by itself, rolling on the gradient with the preparation current (m/s²)
-    const gradeHere = g.profile.grade(tr.s - 7);
     const resist = 650 * tr.cars + 28 * tr.cars * tr.v + 4.2 * tr.v * tr.v;
     const aCoast = (resist + 700 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
     // the approach: from the first brake pedal for this point until the tram stands (or the point goes away)
@@ -123,11 +129,11 @@ export class Autopilot {
     // overran, line 22 seed 4, #241's check)
     const look = Math.max(0, tr.v) * 2.5;
     let vtDrive = vt;
-    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * DECEL * Math.max(0, nl.d - 12 - look)) - 0.3);
+    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12 - look)) - 0.3);
     if (stopAt !== null) {
       const d = stopAt - tr.s;
       if (fixed) {
-        vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * DECEL * Math.max(0, dLeft - look))));
+        vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - look))));
         // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops")
         if (stood || (dLeft < 40 && aCoast > 0 && (tr.v * tr.v) / (2 * aCoast) >= dLeft)) vtDrive = 0;
         // (stopped short of the point: on, slowly)
@@ -189,7 +195,7 @@ export class Autopilot {
     // on the curve to a fixed point: the deceleration that still ends there, whatever the brake's steps gave so far; too
     // fast for a speed limit as well, the harder of the two
     // (the brake takes ≈1 s to come in: from the point where that second still leaves the curve's deceleration)
-    const onCurve = fixed && dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * DECEL * Math.max(0, dLeft - tr.v)) - 0.02) && tr.v > 0.05;
+    const onCurve = fixed && dLeft !== null && (inApproach || tr.v >= Math.sqrt(2 * stopDecel * Math.max(0, dLeft - tr.v)) - 0.02) && tr.v > 0.05;
     const aNeed = onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft)) : 0;
     const aWant = onCurve ? Math.max(-1.3, Math.min(-aNeed, tr.v > vLimit ? (vLimit - tr.v) * 0.9 : 0)) : aPlan;
     const need = tr.inertia * aWant + tr.mass * 9.81 * grade + resist;
