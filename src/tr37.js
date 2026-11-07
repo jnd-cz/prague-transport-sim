@@ -285,7 +285,7 @@ export class TR37 {
   // stay), coast, power (true: current through the pantograph, false: none), urgent, v, dt, slip, slide, stopDist (m to
   // the stop point, or null), noDrive (braking for a stop: the drive pedal stays off), fixed (that point stays where it
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
-  // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one) }.
+  // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -326,8 +326,15 @@ export class TR37 {
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
     if (w.noDrive) s = Math.min(0, s);
-    if (w.slip && s > 1) s--;
-    if (w.slide && s < -1) s++;
+    // a wheel that goes takes a step less, and the step stays less for a while: back on the same step at once it slipped through
+    // most of every start on autumn's leaves (6 s and 3 s [assumed]). Pulling away with sand in the box the sand does it instead: step 1
+    // alone does not climb 50 ‰, and without a slip it would not even ask for sand
+    A.slipT = (A.slipT || 0) - w.dt;
+    A.slideT = (A.slideT || 0) - w.dt;
+    if (w.slip && now > 1 && !(v < 3 && w.sandLeft)) { A.slipCap = now - 1; A.slipT = 6; }
+    if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
+    if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
+    if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast
     // before driving again ([ckd03] p. 11). (From a stand the loops are not the question.)
@@ -356,9 +363,11 @@ export class TR37 {
     // a stop the service brake (≈1.3 m/s² on step 5) cannot make: the pedal to the floor, the track brakes
     // with it, as a driver does for a signal turning red too close (line 17 seed 3: red 36 m ahead at
     // 38 km/h, 1.6 m/s² needed; the old force model braked 1.8 m/s²); let go once it is in hand
-    if (w.stopDist != null && v > 2) {
+    // … and one the wheels cannot make, sliding on a leaf patch at 0.3 m/s² with the signal close and no sand left: the track brakes do
+    // not depend on the rail (with sand, the sand first: the track brakes are a jolt of 2.3 m/s²)
+    if (w.stopDist != null && v > 0.8) {
       const need = (w.v * w.v) / (2 * Math.max(0.5, w.stopDist));
-      if (need > 1.15 || (now === -6 && need > 0.6)) s = -6;
+      if ((v > 2 && (need > 1.15 || (now === -6 && need > 0.6))) || (w.slide && w.fixed && need > 0.35 && !w.sandLeft)) s = -6;
     }
     const contact = w.power != null;
     if (!w.urgent && !contact && s !== -6) {
@@ -369,7 +378,7 @@ export class TR37 {
       if (s > 3 && v < 25 / 3.6 && Math.abs(w.grade || 0) < 0.02) s = 3;
       if (now >= 3 && s <= 0) s = 1;
     }
-    if (s !== now && (A.hold <= 0 || w.urgent || contact)) {
+    if (s !== now && (A.hold <= 0 || w.urgent || contact || w.slip || w.slide)) {
       A.step = s;
       // (a brake step comes on after 0.3 s, comes off after 0.8 s, sooner when far more than it takes: a car gone from the way left
       // it on step 5 and overbraking, and uphill it then rolled out 5 m short at Palackého náměstí; drive 0.6 s)

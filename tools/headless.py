@@ -223,7 +223,7 @@ def counts(check, r):
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in ("stops", "autumn"):
-        keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "sandSecs", "emergencies") if check == "autumn" else ()
+        keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "sandSecs", "sandLeft", "emergencies") if check == "autumn" else ()
         return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "late", "devMean", "lateStops", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}

@@ -38,7 +38,9 @@ export class Autopilot {
     // the deceleration to plan on: less on a steep downhill, where the electric brake has to hold the tram's weight too (70 ‰ takes
     // ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes)
     const gradeHere = g.profile.grade(tr.s - 7);
-    const planAt = (grade) => Math.max(0.2, Math.min(PLAN_DECEL, 0.7 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
+    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold)
+    const planMax = Math.min(PLAN_DECEL, 0.5 * 9.81 * (g.muBase ?? 0.3));
+    const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.7 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
     const vLine = vt;
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, limit.d - 12)) - 0.3;
@@ -234,12 +236,16 @@ export class Autopilot {
     const needPedal = wantPower === true && !tr.eq.buttonLive && (tr.eq.ls || tr.eq.p > 36 || ct.contact - tr.panto < tr.v * 0.3 + 1);
     const button = wantPower === true && !needPedal && (need < 0 || inApproach || coast);
     this.input.switchBtn = button;
-    this.input.sand = tr.slip || tr.slide; // slippery rail: sand (the equipment eases off a step)
+    // slippery rail: sand where it decides something, pulling away or braking for a point (the equipment eases off a step): on every slip
+    // and slide the box, 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
+    // (a moment longer than the slip it stops: sand flickering on and off is no use)
+    this.sandT = (tr.slip && tr.v < 3) || (tr.slide && (onCurve || urgent || hazard)) ? 1.5 : (this.sandT || 0) - dt;
+    this.input.sand = this.sandT > 0;
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1)) && !needPedal, fixed, aNeed,
-      aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade,
+      aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0,
       speedErr: onCurve ? null : tr.v - vt });
     return { vt, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }

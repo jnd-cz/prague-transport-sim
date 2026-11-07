@@ -21,19 +21,21 @@ RUN = """async (only) => {
   const { Tram } = await import('/src/tram.js');
   const { Autopilot } = await import('/src/autopilot.js');
   const h = 1 / 30;
-  // a line: stops [s], limit (km/h) or limits [[s, km/h]], grade(s), signals [{ s, states: [[t, state]] }], ahead { s, length, moves: [[t, v]] }, crossing { s, from, to } (a car crossing the track there, from t to t), contact (s of an overhead contact for a turn)
+  // a line: stops [s], limit (km/h) or limits [[s, km/h]], grade(s), signals [{ s, states: [[t, state]] }], ahead { s, length, moves: [[t, v]] }, crossing { s, from, to } (a car crossing the track there, from t to t), contact (s of an overhead contact for a turn), mu (the rail's adhesion, 0.15 on autumn's wet leaves), patches [[s, s]] (leaf patches, 0.06), sand (what is left in the box, 0-1)
   const drive = (o) => {
     const tr = new Tram(o.cars ?? 2);
     tr.eq.mode = 'advanced';
     tr.passengers = o.pax ?? 0;
     tr.s = o.from ?? 0;
     if (o.supply) tr.supply = o.supply;
+    if (o.sand !== undefined) tr.sand = o.sand;
+    const muAt = (s) => (o.patches || []).some(([a, b]) => s > a && s < b) ? 0.06 : o.mu ?? 0.3;
     const limitAt = (s) => { if (!o.limits) return o.limit ?? 50; let k = o.limits[0][1]; for (const [a, v] of o.limits) if (s >= a) k = v; return k; };
-    const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0 };
+    const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0, slipSecs: 0, slideSecs: 0, emergencies: 0 };
     const stops = (o.stops || []).map((s, i) => ({ name: 'S' + i, target: s, served: false, waiting: 0, alight: 0, alightFrac: 0, request: false, sched: 0, zone: [s - 2.5, s + 3] }));
     const ahead = o.ahead ? { ...o.ahead, v: 0 } : null;
     const g = {
-      tram: tr, clock: 0, stops, nextStop: 0, doorState: 'closed', obstacles: [], carsOnTrack: [], carsCrossing: [], switches: [], opts: { autoIrc: true },
+      tram: tr, clock: 0, stops, nextStop: 0, doorState: 'closed', muBase: o.mu ?? 0.3, obstacles: [], carsOnTrack: [], carsCrossing: [], switches: [], opts: { autoIrc: true },
       climate: { tout: 15, tin: 20, tcab: 20, saloon: 0, cab: 0, flap: false },
       profile: { grade: (s) => (o.grade ? o.grade(s) : 0) },
       signals: (o.signals || []).map((x) => ({ s: x.s, cross: x.s + 15, state: 'go', states: x.states })),
@@ -58,7 +60,10 @@ RUN = """async (only) => {
       if (ahead) { for (const [t, v] of ahead.moves) if (T >= t) ahead.v = v; ahead.s += ahead.v * h; }
       if (o.crossing) g.carsCrossing = T >= (o.crossing.from ?? 0) && T <= (o.crossing.to ?? Infinity) ? [o.crossing] : [];
       pilot.step(g, h);
-      tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed' });
+      tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed', mu: muAt(tr.s), sandKey: !!pilot.input.sand });
+      if (tr.slip) R.slipSecs += h;
+      if (tr.slide) R.slideSecs += h;
+      if (tr.notch === -6 && last !== -6) R.emergencies++;
       if (o.contact && !R.contact && tr.panto >= o.contact) R.contact = { kmh: +tr.kmh.toFixed(1), step: tr.notch, p: +tr.eq.p.toFixed(1), drawn: tr.drawing || (!!pilot.input.switchBtn && tr.eq.buttonLive) };
       const n = tr.notch, st = stops[g.nextStop], d = st ? st.target - tr.s : null;
       if (n !== last) { R.changes++; last = n; }
@@ -78,6 +83,7 @@ RUN = """async (only) => {
     }
     R.secs = +T.toFixed(1); R.lastKmh = +tr.kmh.toFixed(1); R.lastS = +tr.s.toFixed(1); R.maxDecel = +R.maxDecel.toFixed(2); R.maxJerk = +R.maxJerk.toFixed(2);
     R.minU = Math.min(...R.series.map((x) => x[6]));
+    R.sandLeft = +tr.sand.toFixed(2); R.slipSecs = +R.slipSecs.toFixed(1); R.slideSecs = +R.slideSecs.toFixed(1); R.finished = g.nextStop >= stops.length;
     return R;
   };
   const uphill = (g) => () => g;
@@ -115,8 +121,17 @@ RUN = """async (only) => {
     // (still at speed there, already braking: nothing but the drive pedal can draw the current)
     ...[[600, 70], [600, 100]].map(([s, d]) => ({ name: `turn under a contact ${d} m before the stop, at speed`, stops: [20, s], limit: 50, pax: 60, contact: s - d })),
     { name: 'turn under a contact 70 m before the stop, downhill', stops: [20, 600], limit: 50, pax: 60, grade: uphill(-0.03), contact: 530 },
+    // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box holds 90 s of a whole shift, and the autopilot ran it dry
+    // on every slip; with it empty a patch on 50 per mille can never be left (three runs stuck for good on lines 9 and 17)
+    { name: 'leaves, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.15, leaves: true },
+    { name: 'leaves, up 50 per mille', stops: [20, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), leaves: true },
+    { name: 'leaves, a patch before the stop', stops: [20, 600], limit: 50, pax: 60, mu: 0.15, patches: [[520, 590]], leaves: true },
+    { name: 'leaves, a patch at a red signal', stops: [20, 900], limit: 50, pax: 60, mu: 0.15, patches: [[440, 500]], signals: [{ s: 500, states: [[0, 'stop'], [100, 'go']] }], leaves: true },
+    { name: 'leaves, standing on a patch up 50 per mille', stops: [20, 60, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), patches: [[40, 90]], leaves: true },
+    // (with the box empty, this last one could not be left at all: slipping wheels give 0.41 m/s², and 50 per mille takes 0.49: physics, not driving)
+    { name: 'leaves, a patch at a red signal, no sand', stops: [20, 900], limit: 50, pax: 60, mu: 0.15, patches: [[440, 500]], signals: [{ s: 500, states: [[0, 'stop'], [100, 'go']] }], sand: 0, leaves: true },
   ].filter((x) => !only || x.name.includes(only));
-  return S.map(drive);
+  return S.map((o) => ({ ...drive(o), leaves: !!o.leaves }));
 }"""
 
 
@@ -142,7 +157,12 @@ def checks(r):
     want(r["overrun"] == 0, f"over a signal at stop {r['overrun']} times")
     for st in r["stands"]:
         want(abs(st["err"]) <= 2.5, f"stood {st['err']} m from the point at {st['stop']}")
-    if "stands at the stop" not in name:
+    if r["leaves"]:
+        # (on leaves the wheels may go, as they do; it still has to get there, and stop there)
+        want(r["finished"], f"did not get through: at {r['lastS']} m after {r['secs']} s, slip {r['slipSecs']} s, sand left {r['sandLeft']}")
+        want(r["slipSecs"] <= 12, f"wheels slipping {r['slipSecs']} s")
+        want(r["emergencies"] <= (1 if "no sand" in name else 0), f"{r['emergencies']} uses of the emergency brake")
+    elif "stands at the stop" not in name:
         # (a car that comes into the way close by is a hard stop, as it should be)
         want(r["maxDecel"] <= (2.5 if "green turns red" in name else 1.8 if "just past" in name else 1.45), f"decelerated at {r['maxDecel']} m/s²")
     if "contact" in r:
@@ -175,7 +195,7 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     for r in drives:
         err = ", ".join(str(s["err"]) for s in r["stands"])
-        print(f"{r['name']:44} {r['secs']:6.1f} s, stops off by {err or '-':16} decel {r['maxDecel']:.2f}, jerk {r['maxJerk']:.1f}, pedal {r['changes']:3}, flips {len(r['flips'])}, shoes {r['shoes']}, U min {r['minU']}" + (f", contact {r['contact']}" if "contact" in r else ""))
+        print(f"{r['name']:44} {r['secs']:6.1f} s, stops off by {err or '-':16} decel {r['maxDecel']:.2f}, jerk {r['maxJerk']:.1f}, pedal {r['changes']:3}, flips {len(r['flips'])}, shoes {r['shoes']}, U min {r['minU']}" + (f", contact {r['contact']}" if "contact" in r else "") + (f", slip {r['slipSecs']} s, slide {r['slideSecs']} s, sand left {r['sandLeft']}, emergencies {r['emergencies']}" if r["leaves"] else ""))
     if "--report" in sys.argv:
         with open(sys.argv[sys.argv.index("--report") + 1], "w", encoding="utf-8") as fh:
             json.dump(drives, fh, ensure_ascii=False)
