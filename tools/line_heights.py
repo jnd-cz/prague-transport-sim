@@ -90,6 +90,8 @@ TOWARD_AGREE, TOWARD_OTHER = 0.08, 0.5  # m: survey and lidar this near agree (e
 NEIGHBOUR_LOG = []    # (xy, height) of the heights the last snap_to_neighbour moved: reports/line-heights.json
 STEP_ANSWERS = []     # the user's answers on the step review: data/truth.json trackHeights.stepAnswers
 STEP_REACH = 70.0     # m: the stretch a step card showed either side of its place
+IGNORE_ANSWERS = []  # the user's answers that drop heights: data/truth.json radiusAnswers with `ignore` (load_ignore_answers)
+STRETCH_NEAR = 1.0   # m: a height this near an `ignore` answer's stretch is on it
 RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
 HOLD, FOLLOW = 'hold the radius', 'follow the data'
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
@@ -110,6 +112,36 @@ def load_radius_answers(truth):
     return out
 
 
+def load_ignore_answers(truth):
+    """data/truth.json radiusAnswers with `ignore`: 'switches' drops the heights between a junction's switches within `reach`
+    (solve), 'stretch' those of `sources` along `stretch` (answered_ignore). Read apart from the radius answers, which a step
+    answer's radius overrides within its reach."""
+    from geo import Frame
+    F = Frame()
+    xy = lambda p: tuple(float(v) for v in F.xy(*p))
+    return [{'xy': xy(a['place']), 'ignore': a['ignore'], 'reach': a.get('reach', ANSWER_REACH),
+             'stretch': [xy(p) for p in a.get('stretch', [])], 'sources': a.get('sources', ['di', 'dtmp'])}
+            for a in (truth.get('trackHeights') or {}).get('radiusAnswers', []) if a.get('ignore')]
+
+
+def answered_ignore(chs):
+    """Where an answer drops a source's heights along a stretch, they go and the curve bridges them (the user, line 9 at
+    Olšanské hřbitovy, 2026-11-07: "if you discard di on the left half, left of the white marker")."""
+    n = 0
+    for a in IGNORE_ANSWERS:
+        if a['ignore'] != 'stretch' or len(a['stretch']) < 2:
+            continue
+        line = LineString(a['stretch'])
+        for c in chs:
+            if c.line.distance(line) > STRETCH_NEAR:
+                continue
+            for x in c.bins:
+                if x['xy'] and x.get('z') is not None and x.get('src') in a['sources'] and line.distance(Point(x['xy'])) <= STRETCH_NEAR:
+                    x['z'], x['w'] = None, 0.0
+                    n += 1
+    return n
+
+
 def load_step_answers(truth):
     """data/truth.json trackHeights.stepAnswers: at a place, whose heights (`use`: the archive, or DI as it is), and whether
     outliers go (`drop`), the survey is weighed in where the heights are noisy or the curve exceeded (`blend`), and how
@@ -118,7 +150,7 @@ def load_step_answers(truth):
     F = Frame()
     return [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'use': a['use'], 'drop': bool(a.get('drop')), 'blend': bool(a.get('blend')),
              'radius': {'follow': FOLLOW, 'hold': HOLD}.get(a.get('radius')), 'reach': a.get('reach', STEP_REACH),
-             'toward': a.get('toward'), 'date': a.get('date')}
+             'toward': a.get('toward'), 'date': a.get('radius_date', a.get('date'))}
             for a in (truth.get('trackHeights') or {}).get('stepAnswers', [])]
 
 
@@ -611,6 +643,16 @@ def solve(c, pins, r, relax=None):
         tol = [PIN_TOL if x.get('pin') else None if (not x['w'] or i in dropped) else JUNCTION_BAND if zone(x['s'])
                else BAND for i, x in enumerate(run)]
         weight = [0.0 if i in dropped else w for i, w in enumerate(weight)]
+        # (where an answer drops the heights between a junction's switches, they go: the tracks meet on the curve around them;
+        # the user, Malovanka, 2026-11-07: "if you ignore any height between the switches and fit the best vertical radius")
+        for a in IGNORE_ANSWERS:
+            near = [(lo, hi) for lo, hi in c.switch if a['ignore'] == 'switches'
+                    and math.dist(c.line.interpolate((lo + hi) / 2).coords[0], a['xy']) <= a['reach']]
+            if near:
+                lo, hi = min(z[0] for z in near), max(z[1] for z in near)
+                for i, x in enumerate(run):
+                    if lo <= x['s'] <= hi and not x.get('pin') and tol[i] is not None:
+                        tol[i], weight[i] = None, HOLD_WEIGHT
         # the band rule: within BAND of the staged heights at the design radius, else the radius gives way where the
         # band is missed, down to the floor (an answer to hold the radius keeps the design radius), and where the floor
         # cannot meet the band either, the band gives way and the place goes to the user's review
@@ -1242,13 +1284,15 @@ def main():
     ap.add_argument('--smooth', choices=('wh3', 'none'), default='wh3', help='the smoother in front of the band rule (#358)')
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')
-    global RADIUS_ANSWERS, STEP_ANSWERS, FLOOR_SINCE
+    global RADIUS_ANSWERS, STEP_ANSWERS, FLOOR_SINCE, IGNORE_ANSWERS
     truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
     RADIUS_ANSWERS, STEP_ANSWERS = load_radius_answers(truth), load_step_answers(truth)
+    IGNORE_ANSWERS = load_ignore_answers(truth)
     FLOOR_SINCE = next((f.get('date') for f in truth['trackGeometry']['facts'] if f['id'] == 'vertical-radius-min'), None)
     staged = staged_heights(args.staged)
     chs = build_chains(staged)
     del staged
+    print(f'{answered_ignore(chs)} heights dropped along a stretch by an answer ({len(IGNORE_ANSWERS)} answers that drop heights)', flush=True)
     print(f'{answered_toward(chs)} heights moved part way to survey + lidar by a step answer', flush=True)
     dropped, blended = answered_noise(chs)
     print(f'step answers: {len(STEP_ANSWERS)}; {dropped} heights dropped, {blended} weighed with the survey', flush=True)

@@ -277,6 +277,31 @@ class Answers(unittest.TestCase):
         self.old = lh.STEP_ANSWERS
         self.addCleanup(lambda: setattr(lh, 'STEP_ANSWERS', self.old))
 
+    def test_an_answer_drops_a_sources_heights_along_a_stretch(self):
+        # (line 9 at Olšanské hřbitovy: DI's 65 cm dip left of the card's marker goes, the curve bridges it)
+        dip = lambda s: 100.0 - (0.6 if 30 <= s <= 60 else 0.0)
+        c = chain([(0, 0), (200, 0)], dip)
+        for x in c.bins:
+            x['src'] = 'di'
+        lh.IGNORE_ANSWERS = [{'ignore': 'stretch', 'stretch': [(25.0, 0.0), (65.0, 0.0)], 'sources': ['di'], 'xy': (45.0, 0.0), 'reach': 15}]
+        try:
+            self.assertEqual(lh.answered_ignore([c]), sum(1 for x in c.bins if 25 <= x['s'] <= 65))
+            quiet(lh.assemble, [c])
+        finally:
+            lh.IGNORE_ANSWERS = []
+        self.assertAlmostEqual(c.z_at(45)[0], 100.0, delta=.02)
+
+    def test_an_answer_drops_the_heights_between_a_junctions_switches(self):
+        # (Malovanka: a 30 cm hump between the switches; within the junction's 15 cm band the curve rose half of it)
+        c = chain([(0, 0), (200, 0)], lambda s: 100.0 + (0.3 if 90 <= s <= 110 else 0.0))
+        c.switch = [(85.0, 95.0), (105.0, 115.0)]
+        lh.IGNORE_ANSWERS = [{'ignore': 'switches', 'xy': (100.0, 0.0), 'reach': 40, 'stretch': [], 'sources': []}]
+        try:
+            quiet(lh.solve, c, {}, lh.radii())
+        finally:
+            lh.IGNORE_ANSWERS = []
+        self.assertAlmostEqual(c.z_at(100)[0], 100.0, delta=.03)
+
     def test_an_archive_answer_takes_the_archive_and_holds_where_it_has_none(self):
         lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
         series = [{'xy': (10.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}, {'xy': (20.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': None},
