@@ -456,6 +456,27 @@ function trackRadius(g) {
   return c;
 }
 
+// Curves drawn in steps (#358): trackRadius flags under 18 m and trackJoins looks only where chains end, so a curve of 250 m
+// made of 17 m straights and 5 degree bends over 5 m passed both. Along our route and the opposite one: a place whose
+// radius over 5 m is under a third of the radius over 25 m around it, on a curve under 1500 m. Per 10 m of route.
+const STEP_SHORT = 2.5, STEP_LONG = 12.5, STEP_RATIO = 3, STEP_CURVE = 1500;
+function steppedCurves(g) {
+  const d = g.data, bad = new Map();
+  let n = 0;
+  [['our', d.path], ['opposite', d.pathBack]].forEach(([kind, p]) => {
+    if (!p || p.length < 3) return;
+    const { L, at } = along(p);
+    for (let s = STEP_LONG; s < L - STEP_LONG; s += 2) {
+      const R5 = circleRadius(at(s - STEP_SHORT), at(s), at(s + STEP_SHORT)), R25 = circleRadius(at(s - STEP_LONG), at(s), at(s + STEP_LONG));
+      n++;
+      if (R25 >= STEP_CURVE || R5 * STEP_RATIO >= R25) continue;
+      const k = `${kind}:${Math.round(s / 10)}`, [x, y] = at(s), mag = R25 / R5;
+      if (!(bad.get(k)?.mag >= mag)) bad.set(k, { kind, x, y, s: Math.round(s), mag, info: `${kind} track ${R5.toFixed(0)} m over 5 m in a ${R25.toFixed(0)} m curve` });
+    }
+  });
+  return check('stepped-curves', n, [...bad.values()]);
+}
+
 // Where drawn tracks meet (#204): at every node where track chains end (a record or source joint, a switch, a
 // crossing), the chains that continue each other (directions within 30°) are paired straightest first; a pair
 // whose directions break by more than 1° is flagged, per class (joint: two ends, switch: three, crossing: four
@@ -855,6 +876,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     railSupport: railSupport(g, world),
     cantedRailVisibility: cantedRailVisibility(g, world),
     verticalCurves: verticalCurves(g),
+    steppedCurves: steppedCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
     trackRadius: trackRadius(g),
