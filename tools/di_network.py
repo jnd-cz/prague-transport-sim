@@ -1373,6 +1373,21 @@ def _radius_over(coords, cum, lo, hi, tip=3.0):
     return (hi - lo - tip) / d if d > 1e-9 else math.inf
 
 
+SMOOTHED = None  # the 'smooth' answers of the stepped-curve review, [(xy, reach)], read once (di_tracks.stepped_answers)
+
+
+def without_steps(coords):
+    """A surveyed line for the curve fit without its points within reach of a place the user answered 'smooth' on the
+    stepped-curve review (#368): the fit draws one curve through there. The line's own ends stay (its nodes)."""
+    global SMOOTHED
+    if SMOOTHED is None:
+        SMOOTHED = [(xy, r) for xy, a, r in di_tracks.stepped_answers() if a == 'smooth']
+    if not SMOOTHED or len(coords) < 3:
+        return coords
+    free = lambda p: all(math.dist(p, xy) > r for xy, r in SMOOTHED)
+    return [coords[0]] + [p for p in coords[1:-1] if free(p)] + [coords[-1]]
+
+
 def without_chords(coords):
     """A surveyed line for the curve fit without the points inside the chords of a curve. DI draws some curves with vertices 22-28 m
     apart and 4-5 degrees at each (line 37, Ohrada - Palmovka: "stepped curve instead of continuous radius", the user,
@@ -1406,7 +1421,7 @@ class Drawn:
                 # (no points on the chord an end walked back leaves: nothing is known there, _walk_back)
                 walk = ed.get('walk', ())
                 head, tail = c[:1] if 0 in walk else [], c[-1:] if 1 in walk else []
-                c = head + without_chords(dense(c[len(head):len(c) - len(tail)])) + tail
+                c = head + without_steps(without_chords(dense(c[len(head):len(c) - len(tail)]))) + tail
             key = k(a, b)
             pts[key] = c if key == (a, b) else c[::-1]
             kind[key] = ed['src']

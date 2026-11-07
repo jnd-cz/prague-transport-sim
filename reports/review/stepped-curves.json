@@ -1,0 +1,612 @@
+{
+ "schema": 1,
+ "snapshot": "2026-11-06c",
+ "issue": 368,
+ "title": "Curves drawn in steps",
+ "lines": [
+  "17",
+  "22",
+  "23",
+  "37"
+ ],
+ "findings": [
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.1222-14.4556",
+   "x": 2959.9,
+   "y": 3505.18,
+   "mag": 11.7,
+   "status": "review",
+   "place": [
+    50.12222,
+    14.45565
+   ],
+   "line": 17,
+   "lines_near": [
+    "17"
+   ],
+   "stop": "Ke Stírce",
+   "info": "A curve drawn in steps 92 m from the stop Ke Stírce: the step is 12 cm off one smooth curve, a 7.2° corner. line 17 opposite track, s 1269: 38 m over 5 m in a 816 m curve, a corner of 7.2° that leaves one smooth curve by 12 cm, 0 m from where drawn tracks meet (a switch, a crossing or a joint).",
+   "step": {
+    "offset_cm": 11.7,
+    "corner_deg": 7.19,
+    "r5_m": 38,
+    "r25_m": 816
+   },
+   "places": [
+    {
+     "line": 17,
+     "track": "opposite",
+     "s": 1269,
+     "offset_cm": 11.7,
+     "corner_deg": 7.19,
+     "r5_m": 38,
+     "r25_m": 816,
+     "meet_m": 0.0
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.1019-14.5033",
+   "x": 6032.07,
+   "y": 802.72,
+   "mag": 11.5,
+   "status": "review",
+   "place": [
+    50.10189,
+    14.50333
+   ],
+   "line": 37,
+   "lines_near": [
+    "37"
+   ],
+   "stop": "Nádraží Libeň",
+   "info": "A curve drawn in steps 48 m from the stop Nádraží Libeň: the step is 11 cm off one smooth curve, a 6.4° corner. line 37 our track, s 6263: 33 m over 5 m in a 127 m curve, a corner of 6.4° that leaves one smooth curve by 11 cm, 8 m from where drawn tracks meet (a switch, a crossing or a joint); line 37 our track, s 6267: 85 m over 5 m in a 322 m curve, a corner of 2.5° that leaves one smooth curve by 11 cm, 2 m from where drawn tracks meet (a switch, a crossing or a joint).",
+   "step": {
+    "offset_cm": 11.5,
+    "corner_deg": 6.43,
+    "r5_m": 33,
+    "r25_m": 127
+   },
+   "places": [
+    {
+     "line": 37,
+     "track": "our",
+     "s": 6263,
+     "offset_cm": 11.5,
+     "corner_deg": 6.43,
+     "r5_m": 33,
+     "r25_m": 127,
+     "meet_m": 8.3
+    },
+    {
+     "line": 37,
+     "track": "our",
+     "s": 6267,
+     "offset_cm": 11.4,
+     "corner_deg": 2.48,
+     "r5_m": 85,
+     "r25_m": 322,
+     "meet_m": 2.3
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0935-14.4167",
+   "x": -233.77,
+   "y": 722.07,
+   "mag": 11.0,
+   "status": "review",
+   "place": [
+    50.09352,
+    14.41671
+   ],
+   "line": 17,
+   "lines_near": [
+    "17"
+   ],
+   "stop": "Čechův most",
+   "info": "A curve drawn in steps 94 m from the stop Čechův most: the step is 11 cm off one smooth curve, a 6.1° corner. line 17 opposite track, s 6911: 45 m over 5 m in a 1053 m curve, a corner of 6.1° that leaves one smooth curve by 11 cm, 6 m from where drawn tracks meet (a switch, a crossing or a joint); line 17 our track, s 14861: 90 m over 5 m in a 1487 m curve, a corner of 3.0° that leaves one smooth curve by 6 cm, 4 m from where drawn tracks meet (a switch, a crossing or a joint); line 17 our track, s 14867: 255 m over 5 m in a 1147 m curve, a corner of 0.9° that leaves one smooth curve by 5 cm, 3 m from where drawn tracks meet (a switch, a crossing or a joint).",
+   "step": {
+    "offset_cm": 11.0,
+    "corner_deg": 6.09,
+    "r5_m": 45,
+    "r25_m": 1053
+   },
+   "places": [
+    {
+     "line": 17,
+     "track": "opposite",
+     "s": 6911,
+     "offset_cm": 11.0,
+     "corner_deg": 6.09,
+     "r5_m": 45,
+     "r25_m": 1053,
+     "meet_m": 6.3
+    },
+    {
+     "line": 17,
+     "track": "our",
+     "s": 14861,
+     "offset_cm": 6.0,
+     "corner_deg": 2.99,
+     "r5_m": 90,
+     "r25_m": 1487,
+     "meet_m": 3.7
+    },
+    {
+     "line": 17,
+     "track": "our",
+     "s": 14867,
+     "offset_cm": 4.8,
+     "corner_deg": 0.87,
+     "r5_m": 255,
+     "r25_m": 1147,
+     "meet_m": 2.8
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0931-14.4066",
+   "x": -959.67,
+   "y": 777.32,
+   "mag": 9.9,
+   "status": "review",
+   "place": [
+    50.09312,
+    14.40656
+   ],
+   "line": 22,
+   "lines_near": [
+    "22",
+    "23"
+   ],
+   "stop": "Královský letohrádek",
+   "info": "A curve drawn in steps 168 m from the stop Královský letohrádek: the step is 10 cm off one smooth curve, a 1.8° corner. line 22 opposite track, s 10985: 132 m over 5 m in a 731 m curve, a corner of 1.8° that leaves one smooth curve by 10 cm; line 23 opposite track, s 5147: 128 m over 5 m in a 618 m curve, a corner of 1.8° that leaves one smooth curve by 10 cm; line 23 our track, s 3057: 162 m over 5 m in a 1500 m curve, a corner of 1.6° that leaves one smooth curve by 9 cm.",
+   "step": {
+    "offset_cm": 9.9,
+    "corner_deg": 1.78,
+    "r5_m": 132,
+    "r25_m": 731
+   },
+   "places": [
+    {
+     "line": 22,
+     "track": "opposite",
+     "s": 10985,
+     "offset_cm": 9.9,
+     "corner_deg": 1.78,
+     "r5_m": 132,
+     "r25_m": 731,
+     "meet_m": 243.5
+    },
+    {
+     "line": 23,
+     "track": "our",
+     "s": 3057,
+     "offset_cm": 9.1,
+     "corner_deg": 1.58,
+     "r5_m": 162,
+     "r25_m": 1500,
+     "meet_m": 240.5
+    },
+    {
+     "line": 23,
+     "track": "opposite",
+     "s": 5147,
+     "offset_cm": 9.8,
+     "corner_deg": 1.77,
+     "r5_m": 128,
+     "r25_m": 618,
+     "meet_m": 243.4
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.1019-14.5029",
+   "x": 5999.39,
+   "y": 809.36,
+   "mag": 9.9,
+   "status": "review",
+   "place": [
+    50.10191,
+    14.50286
+   ],
+   "line": 37,
+   "lines_near": [
+    "37"
+   ],
+   "stop": "Nádraží Libeň",
+   "info": "A curve drawn in steps 15 m from the stop Nádraží Libeň: the step is 10 cm off one smooth curve, a 4.6° corner. line 37 our track, s 6229: 58 m over 5 m in a 774 m curve, a corner of 4.6° that leaves one smooth curve by 10 cm.",
+   "step": {
+    "offset_cm": 9.9,
+    "corner_deg": 4.57,
+    "r5_m": 58,
+    "r25_m": 774
+   },
+   "places": [
+    {
+     "line": 37,
+     "track": "our",
+     "s": 6229,
+     "offset_cm": 9.9,
+     "corner_deg": 4.57,
+     "r5_m": 58,
+     "r25_m": 774,
+     "meet_m": 41.5
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0928-14.4066",
+   "x": -960.23,
+   "y": 738.09,
+   "mag": 9.4,
+   "status": "review",
+   "place": [
+    50.09277,
+    14.40662
+   ],
+   "line": 23,
+   "lines_near": [
+    "23"
+   ],
+   "stop": "Královský letohrádek",
+   "info": "A curve drawn in steps 202 m from the stop Královský letohrádek: the step is 9 cm off one smooth curve, a 1.2° corner. line 23 opposite track, s 5065: 204 m over 5 m in a 1308 m curve, a corner of 1.2° that leaves one smooth curve by 9 cm.",
+   "step": {
+    "offset_cm": 9.4,
+    "corner_deg": 1.19,
+    "r5_m": 204,
+    "r25_m": 1308
+   },
+   "places": [
+    {
+     "line": 23,
+     "track": "opposite",
+     "s": 5065,
+     "offset_cm": 9.4,
+     "corner_deg": 1.19,
+     "r5_m": 204,
+     "r25_m": 1308,
+     "meet_m": 256.4
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0681-14.4589",
+   "x": 2369.74,
+   "y": -2487.42,
+   "mag": 7.4,
+   "status": "review",
+   "place": [
+    50.06811,
+    14.45885
+   ],
+   "line": 22,
+   "lines_near": [
+    "22"
+   ],
+   "stop": "Čechovo náměstí",
+   "info": "A curve drawn in steps 44 m from the stop Čechovo náměstí: the step is 7 cm off one smooth curve, a 4.5° corner. line 22 our track, s 14233: 48 m over 5 m in a 201 m curve, a corner of 4.5° that leaves one smooth curve by 7 cm, 1 m from where drawn tracks meet (a switch, a crossing or a joint); line 22 our track, s 14239: 410 m over 5 m in a 1449 m curve, a corner of 0.5° that leaves one smooth curve by 5 cm, 5 m from where drawn tracks meet (a switch, a crossing or a joint).",
+   "step": {
+    "offset_cm": 7.4,
+    "corner_deg": 4.54,
+    "r5_m": 48,
+    "r25_m": 201
+   },
+   "places": [
+    {
+     "line": 22,
+     "track": "our",
+     "s": 14233,
+     "offset_cm": 7.4,
+     "corner_deg": 4.54,
+     "r5_m": 48,
+     "r25_m": 201,
+     "meet_m": 0.8
+    },
+    {
+     "line": 22,
+     "track": "our",
+     "s": 14239,
+     "offset_cm": 5.1,
+     "corner_deg": 0.5,
+     "r5_m": 410,
+     "r25_m": 1449,
+     "meet_m": 5.2
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0886-14.4053",
+   "x": -1118.01,
+   "y": 286.94,
+   "mag": 6.0,
+   "status": "review",
+   "place": [
+    50.08856,
+    14.4053
+   ],
+   "line": 22,
+   "lines_near": [
+    "22",
+    "23"
+   ],
+   "stop": "Malostranské náměstí",
+   "info": "A curve drawn in steps 93 m from the stop Malostranské náměstí: the step is 6 cm off one smooth curve, a 1.3° corner. line 22 opposite track, s 9981: 203 m over 5 m in a 1379 m curve, a corner of 1.2° that leaves one smooth curve by 6 cm; line 23 opposite track, s 4143: 185 m over 5 m in a 1035 m curve, a corner of 1.3° that leaves one smooth curve by 6 cm.",
+   "step": {
+    "offset_cm": 6.0,
+    "corner_deg": 1.27,
+    "r5_m": 185,
+    "r25_m": 1035
+   },
+   "places": [
+    {
+     "line": 22,
+     "track": "opposite",
+     "s": 9981,
+     "offset_cm": 6.0,
+     "corner_deg": 1.2,
+     "r5_m": 203,
+     "r25_m": 1379,
+     "meet_m": 361.5
+    },
+    {
+     "line": 23,
+     "track": "opposite",
+     "s": 4143,
+     "offset_cm": 6.0,
+     "corner_deg": 1.27,
+     "r5_m": 185,
+     "r25_m": 1035,
+     "meet_m": 361.4
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.1194-14.4355",
+   "x": 1493.16,
+   "y": 3394.54,
+   "mag": 4.4,
+   "status": "review",
+   "place": [
+    50.11944,
+    14.43554
+   ],
+   "line": 17,
+   "lines_near": [
+    "17"
+   ],
+   "stop": "Trojská",
+   "info": "A curve drawn in steps 322 m from the stop Trojská: the step is 4 cm off one smooth curve, a 1.1° corner. line 17 opposite track, s 2789: 218 m over 5 m in a 1343 m curve, a corner of 1.1° that leaves one smooth curve by 4 cm.",
+   "step": {
+    "offset_cm": 4.4,
+    "corner_deg": 1.1,
+    "r5_m": 218,
+    "r25_m": 1343
+   },
+   "places": [
+    {
+     "line": 17,
+     "track": "opposite",
+     "s": 2789,
+     "offset_cm": 4.4,
+     "corner_deg": 1.1,
+     "r5_m": 218,
+     "r25_m": 1343,
+     "meet_m": 1250.3
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0056-14.4029",
+   "x": -2548.17,
+   "y": -8827.62,
+   "mag": 3.1,
+   "status": "review",
+   "place": [
+    50.00562,
+    14.4029
+   ],
+   "line": 17,
+   "lines_near": [
+    "17"
+   ],
+   "stop": "Nádraží Modřany",
+   "info": "A curve drawn in steps 119 m from the stop Nádraží Modřany: the step is 3 cm off one smooth curve, a 0.7° corner. line 17 our track, s 4555: 309 m over 5 m in a 1396 m curve, a corner of 0.7° that leaves one smooth curve by 3 cm; line 17 our track, s 4559: 379 m over 5 m in a 1278 m curve, a corner of 0.5° that leaves one smooth curve by 2 cm.",
+   "step": {
+    "offset_cm": 3.1,
+    "corner_deg": 0.72,
+    "r5_m": 309,
+    "r25_m": 1396
+   },
+   "places": [
+    {
+     "line": 17,
+     "track": "our",
+     "s": 4555,
+     "offset_cm": 3.1,
+     "corner_deg": 0.72,
+     "r5_m": 309,
+     "r25_m": 1396,
+     "meet_m": 2322.6
+    },
+    {
+     "line": 17,
+     "track": "our",
+     "s": 4559,
+     "offset_cm": 2.2,
+     "corner_deg": 0.53,
+     "r5_m": 379,
+     "r25_m": 1278,
+     "meet_m": 2324.7
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  },
+  {
+   "kind": "stepped curve",
+   "id": "stepped-50.0925-14.4864",
+   "x": 4693.22,
+   "y": -63.31,
+   "mag": 3.1,
+   "status": "review",
+   "place": [
+    50.09254,
+    14.48643
+   ],
+   "line": 37,
+   "lines_near": [
+    "37"
+   ],
+   "stop": "Chmelnice",
+   "info": "A curve drawn in steps 38 m from the stop Chmelnice: the step is 3 cm off one smooth curve, a 0.9° corner. line 37 our track, s 875: 236 m over 5 m in a 875 m curve, a corner of 0.9° that leaves one smooth curve by 3 cm; line 37 our track, s 877: 200 m over 5 m in a 728 m curve, a corner of 1.0° that leaves one smooth curve by 3 cm.",
+   "step": {
+    "offset_cm": 3.1,
+    "corner_deg": 0.89,
+    "r5_m": 236,
+    "r25_m": 875
+   },
+   "places": [
+    {
+     "line": 37,
+     "track": "our",
+     "s": 875,
+     "offset_cm": 3.1,
+     "corner_deg": 0.89,
+     "r5_m": 236,
+     "r25_m": 875,
+     "meet_m": 732.3
+    },
+    {
+     "line": 37,
+     "track": "our",
+     "s": 877,
+     "offset_cm": 3.1,
+     "corner_deg": 1.04,
+     "r5_m": 200,
+     "r25_m": 728,
+     "meet_m": 732.3
+    }
+   ],
+   "options": [
+    "smooth into one curve",
+    "keep as drawn",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
+    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
+    "unsure": "This answer stays held for review."
+   }
+  }
+ ]
+}

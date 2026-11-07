@@ -387,6 +387,21 @@ class Chords(unittest.TestCase):
     def test_a_real_straight_has_no_chords(self):
         self.assertEqual(dn.chords(sampled([(0, 0), (100, 0), (300, 0)])), [])
 
+    def test_a_place_answered_smooth_loses_its_points_and_keeps_the_lines_ends(self):
+        # (the stepped-curve review, #368: 'smooth' frees DI's vertices within its reach, the fit draws one curve through)
+        c = sampled([(0, 0), (50, 0), (100, 4)])
+        old = dn.SMOOTHED
+        dn.SMOOTHED = [((50.0, 0.0), 10.0)]
+        try:
+            kept = dn.without_steps(c)
+            self.assertEqual((kept[0], kept[-1]), (c[0], c[-1]))
+            self.assertFalse(any(math.dist(p, (50, 0)) <= 10 for p in kept))
+            self.assertEqual(len(kept), sum(1 for p in c if math.dist(p, (50, 0)) > 10))
+            dn.SMOOTHED = []
+            self.assertEqual(dn.without_steps(c), c)
+        finally:
+            dn.SMOOTHED = old
+
 
 if __name__ == '__main__':
     unittest.main()

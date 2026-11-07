@@ -381,6 +381,24 @@ def photo_tracks(truth=None):
     return out
 
 
+def stepped_answers(truth=None):
+    """[(xy, answer, reach)] in city metres: the user's answers on the stepped-curve review (data/truth.json
+    trackSources.steppedAnswers, reports/review/stepped-curves.json, #368): 'smooth' draws one curve through the place,
+    'keep' leaves it as drawn."""
+    import json
+    from geo import Frame
+    path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    facts = json.loads(Path(path).read_text(encoding='utf-8'))['trackSources'].get('steppedAnswers', [])
+    frame, out = Frame(), []
+    for f in facts:
+        x, y = frame.xy(*f['place'])
+        out.append(((float(x), float(y)), f['answer'], float(f.get('reach', STEPPED_REACH))))
+    return out
+
+
+STEPPED_REACH = 10.0  # m: a 'smooth' answer frees DI's vertices this near its place (the cards' steps lie within 5 m of it)
+
+
 def photo_source():
     """The orthophoto's tracks the user took over DI's as a source (TrackGeometry `photo`), or None."""
     photo = photo_tracks()
