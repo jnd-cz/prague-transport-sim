@@ -315,8 +315,10 @@ export class TR37 {
     // holding a speed a step stays until the speed has moved, and so does nothing: the relay holds the force, and between
     // two steps' forces (a gradient) it let go and pressed every 2 s (main: 130–200 pedal changes a km). The plan's speed is
     // 0.4 m/s under the limit, so these bands stay under it.
-    // (over the speed the drive pedal comes off, whatever force a climb still seems to ask: at position 99 step 1 passes 300 A, and it let go only 2.8 km/h over the limit)
-    if (w.speedErr != null && !w.urgent && s > 0 && w.speedErr > 0.3) s = 0;
+    // (over the limit the drive pedal comes off, whatever force a climb still seems to ask: at position 99 step 1 passes 300 A, and it let
+    // go only 2.8 km/h over the limit. 0.6 m/s over the plan's speed, 0.8 km/h over the limit: at 0.3 step 1 came off in every slow
+    // spot up 40-50 per mille and the tram sagged 2-4 km/h under the plan, 5-12 s lost on line 23's climb to Kralovsky letohradek)
+    if (w.speedErr != null && !w.urgent && s > 0 && w.speedErr > 0.6) s = 0;
     if (w.speedErr != null && !w.urgent && s !== now) {
       const e = w.speedErr;
       if (now < 0 && s > now && e > -0.4) s = now;
