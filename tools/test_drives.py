@@ -31,7 +31,7 @@ RUN = """async (only) => {
     if (o.sand !== undefined) tr.sand = o.sand;
     const muAt = (s) => (o.patches || []).some(([a, b]) => s > a && s < b) ? 0.06 : o.mu ?? 0.3;
     const limitAt = (s) => { if (!o.limits) return o.limit ?? 50; let k = o.limits[0][1]; for (const [a, v] of o.limits) if (s >= a) k = v; return k; };
-    const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0, slipSecs: 0, slideSecs: 0, emergencies: 0, overLimit: -99 };
+    const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0, slipSecs: 0, slideSecs: 0, emergencies: 0, overLimit: -99, lineJ: 0, mechJ: 0, brakeJ: 0 };
     const stops = (o.stops || []).map((s, i) => ({ name: 'S' + i, target: s, served: false, waiting: 0, alight: 0, alightFrac: 0, request: false, sched: 0, zone: [s - 2.5, s + 3] }));
     const ahead = o.ahead ? { ...o.ahead, v: 0 } : null;
     const g = {
@@ -62,6 +62,7 @@ RUN = """async (only) => {
       const plan = pilot.step(g, h) || {};
       tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed', mu: muAt(tr.s), sandKey: !!pilot.input.sand });
       if (tr.slip) R.slipSecs += h;
+      if (tr.electric > 0) { R.lineJ += tr.electric * h; R.mechJ += Math.max(0, tr.drive * tr.v) * h; } else R.brakeJ -= tr.electric * h;
       if (tr.slide) R.slideSecs += h;
       if (tr.notch === -6 && last !== -6) R.emergencies++;
       if (o.contact && !R.contact && tr.panto >= o.contact) R.contact = { kmh: +tr.kmh.toFixed(1), step: tr.notch, p: +tr.eq.p.toFixed(1), drawn: tr.drawing || (!!pilot.input.switchBtn && tr.eq.buttonLive) };
@@ -85,6 +86,8 @@ RUN = """async (only) => {
     R.secs = +T.toFixed(1); R.lastKmh = +tr.kmh.toFixed(1); R.lastS = +tr.s.toFixed(1); R.maxDecel = +R.maxDecel.toFixed(2); R.maxJerk = +R.maxJerk.toFixed(2);
     R.minU = Math.min(...R.series.map((x) => x[6]));
     R.overLimit = +R.overLimit.toFixed(1);
+    // (Wh a drive: from the wire, of it not the motors' work (the starting resistors above all), burnt braking)
+    R.lineWh = Math.round(R.lineJ / 3600); R.wasteWh = Math.round((R.lineJ - R.mechJ) / 3600); R.brakeWh = Math.round(R.brakeJ / 3600);
     R.sandLeft = +tr.sand.toFixed(2); R.slipSecs = +R.slipSecs.toFixed(1); R.slideSecs = +R.slideSecs.toFixed(1); R.finished = g.nextStop >= stops.length;
     return R;
   };
@@ -206,7 +209,7 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     for r in drives:
         err = ", ".join(str(s["err"]) for s in r["stands"])
-        print(f"{r['name']:44} {r['secs']:6.1f} s, stops off by {err or '-':16} decel {r['maxDecel']:.2f}, jerk {r['maxJerk']:.1f}, pedal {r['changes']:3}, flips {len(r['flips'])}, shoes {r['shoes']}, U min {r['minU']}" + (f", contact {r['contact']}" if "contact" in r else "") + (f", slip {r['slipSecs']} s, slide {r['slideSecs']} s, sand left {r['sandLeft']}, emergencies {r['emergencies']}" if r["leaves"] else ""))
+        print(f"{r['name']:44} {r['secs']:6.1f} s, stops off by {err or '-':16} decel {r['maxDecel']:.2f}, jerk {r['maxJerk']:.1f}, pedal {r['changes']:3}, flips {len(r['flips'])}, shoes {r['shoes']}, U min {r['minU']}" + f", wire {r['lineWh']} Wh, waste {r['wasteWh']}" + (f", contact {r['contact']}" if "contact" in r else "") + (f", slip {r['slipSecs']} s, slide {r['slideSecs']} s, sand left {r['sandLeft']}, emergencies {r['emergencies']}" if r["leaves"] else ""))
     if "--report" in sys.argv:
         with open(sys.argv[sys.argv.index("--report") + 1], "w", encoding="utf-8") as fh:
             json.dump(drives, fh, ensure_ascii=False)
