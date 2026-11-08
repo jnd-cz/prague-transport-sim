@@ -107,7 +107,10 @@ def main():
               for (const f of R.findings) by[f.src] = (by[f.src] || 0) + 1;
               // (#334: the directory's link to a kerb list relies on these two)
               const { fid } = await import('./src/reviewFindings.js');
+              const fileFilter = R.$('rvFilter').value, opened = R.file;
+              R.file = null; R._filters(); // (the directory's link to a kerb list names no file)
               const firstFilter = R.$('rvFilter').value, kerbIds = R.findings.filter((f) => f.src === 'kerbs').map(fid);
+              R.file = opened;
               R.$('rvFilter').value = 'file|';
               R._fill();
               const i = R.list.findIndex((f) => f.info === 'the city origin');
@@ -120,7 +123,7 @@ def main():
               const links = [...document.querySelectorAll('#rvCard a')].map((a) => a.href);
               const panel = document.querySelector('#review').getBoundingClientRect();
               const buttons = [...document.querySelectorAll('#rvCard button[data-v]')].map((b) => b.textContent);
-              return { by, firstFilter, kerbIds, look: Math.hypot(gx - f.x, gy - f.y), lat: L.lat, lon: L.lon, links, buttons,
+              return { by, fileFilter, firstFilter, kerbIds, look: Math.hypot(gx - f.x, gy - f.y), lat: L.lat, lon: L.lon, links, buttons,
                        panel: { top: panel.top, height: panel.height, width: panel.width },
                        heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null };
             }""")
@@ -418,6 +421,8 @@ def main():
         fails.append(f"after the answer the card shows {r['next']!r}, not the next finding without one")
     if sorted(r["kerbIds"]) != sorted(r["kerbIdsIndex"]):
         fails.append(f"the directory's kerb ids are not review mode's: {len(r['kerbIds'])} on the page, {len(r['kerbIdsIndex'])} in the index")
+    if r["fileFilter"] != "file|":
+        fails.append(f"review mode opened with a findings file starts on {r['fileFilter']!r}, not on that file")
     if r["kerbIds"] and r["firstFilter"] != "kerbs|":
         fails.append(f"review mode starts on {r['firstFilter']!r}, not on the kerbs the directory's link promises")
     if not (r["kerbNote"][0].endswith("· OSM: kerb=flush ×1, kerb=lowered ×2 along this kerb") and "OSM" not in r["kerbNote"][1]):

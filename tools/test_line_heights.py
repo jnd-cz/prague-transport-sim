@@ -214,6 +214,14 @@ class Lines(unittest.TestCase):
         self.assertTrue(all(abs(o - 3.5) < 1e-6 for o in off))
         self.assertAlmostEqual(zs[0], 200.5, places=3)  # (our s 0 is the opposite track's s 100)
 
+    def test_past_the_opposite_routes_end_there_is_no_opposite_track(self):
+        # (#344, line 23 near Těšnov: 52 m past the opposite route's end, its end 3 m to the side was taken as beside ours)
+        path = [(0, 0), (100, 0)]
+        back = [(60, 3.0), (0, 3.0)]
+        off, zs = lh.across(path, back, [200.0 + .01 * k for k in range(31)])
+        self.assertTrue(all(o is not None for o in off[:30]))
+        self.assertTrue(all(o is None and z is None for o, z in zip(off[33:], zs[33:])))
+
     def test_a_track_ending_on_another_takes_its_height(self):
         through = {'p': [[0, 0], [40, 0]], 'zs': [100 + .02 * 2 * k for k in range(21)]}
         branch = {'p': [[20, .3], [40, 10]], 'zs': [100.43 + .01 * k for k in range(13)]}
@@ -426,6 +434,35 @@ class Neighbour(unittest.TestCase):
         a, _ = self.tracks()
         a.bins[40]['z'] -= 1.0
         self.assertEqual(lh.snap_to_neighbour([a]), 0)
+
+
+class Sources(unittest.TestCase):
+    def hump(self, both=False, flags=()):
+        # (#344, line 9 at Sídliště Řepy: one track's DI humped up to 0.97 m over the lidar for 90 m, the archive and the
+        # track beside it on the lidar)
+        ground = lambda s: 100 + .02 * s
+        bump = lambda s: max(0.0, 0.9 * (1 - abs(s - 200) / 50))
+        a = chain([(0, 0), (400, 0)], lambda s: ground(s) + 0.15 + bump(s), terrain=ground)
+        b = chain([(0, 3), (400, 3)], lambda s: ground(s) + 0.15 + (bump(s) if both else 0.0), terrain=ground)
+        for c in (a, b):
+            for x in c.bins:
+                x['src'], x['archive'], x['flags'] = 'di', ground(x['s']) + 0.15, list(flags)
+        return a, b, ground
+
+    def test_dis_hump_on_one_track_takes_the_archive(self):
+        a, b, ground = self.hump()
+        self.assertGreater(lh.archive_over_di([a, b]), 0)
+        self.assertLess(max(abs(x['z'] - ground(x['s']) - 0.15) for x in a.bins), lh.SOURCES_EDGE + 1e-9)
+        self.assertTrue(all(x['src'] == 'di' for x in b.bins))
+
+    def test_a_hump_on_both_tracks_stays(self):
+        # (a rebuild may have raised both tracks since the archive)
+        a, b, _ = self.hump(both=True)
+        self.assertEqual(lh.archive_over_di([a, b]), 0)
+
+    def test_on_a_structure_dis_height_stays(self):
+        a, b, _ = self.hump(flags=['structure_hint'])
+        self.assertEqual(lh.archive_over_di([a, b]), 0)
 
 
 class Smoothed(unittest.TestCase):

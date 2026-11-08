@@ -443,6 +443,84 @@ def answered_noise(chs):
     return dropped, blended
 
 
+def beside(chs, tree, ci, x):
+    """The track beside chain ci's bin x: NEIGHBOUR_GAP m off, parallel within 15 degrees, the nearest; (distance, its chain,
+    the distance along it) or None."""
+    if not x['xy']:
+        return None
+    p, best = Point(x['xy']), None
+    ux, uy = chs[ci].direction(x['s'])
+    for j in tree.query(p.buffer(NEIGHBOUR_GAP[1])):
+        j = int(j)
+        if j == ci:
+            continue
+        o = chs[j]
+        d = o.line.distance(p)
+        if not NEIGHBOUR_GAP[0] <= d <= NEIGHBOUR_GAP[1]:
+            continue
+        t = o.line.project(p)
+        vx, vy = o.direction(t)
+        if abs(ux * vx + uy * vy) >= math.cos(math.radians(15)) and (best is None or d < best[0]):
+            best = (d, j, t)
+    return best
+
+
+SOURCES_OFF, SOURCES_ON, SOURCES_EDGE, SOURCES_RUN = 0.5, 0.3, 0.1, 3  # m, m, m, bins (archive_over_di)
+STRUCTURE_FLAGS = {'structure_hint', 'structure_unverified', 'tunnel_unverified', 'known_archive_disagreement'}
+
+
+def archive_over_di(chs):
+    """Where one track's DI lies over SOURCES_OFF m off the lidar for SOURCES_RUN bins and more, while the archive lies within
+    SOURCES_ON m of it and the track beside it within SOURCES_ON m of its own lidar, three sources stand against one: the
+    archive's heights replace DI's along the whole stretch where the two differ by over SOURCES_EDGE (#344: line 9 at
+    Sídliště Řepy, DI's outbound track humped 0.97 m over the lidar for 90 m, 0.7-0.9 m over the return track 3 m beside it,
+    the archive within 0.2 m of the lidar; the support drawn under it stood 0.9 m over the other track's bed). Not on a
+    structure (the bare-earth lidar and the archive both lie under a bridge, DI on it: up to 14 m apart), nor where both
+    tracks lie off the lidar (a rebuild may have raised them since the archive), nor where the user answered a step card."""
+    tree = shapely.STRtree([c.line for c in chs])
+    moved = 0
+    for ci, c in enumerate(chs):
+        bins = sorted((x for x in c.bins if x['xy']), key=lambda x: x['s'])
+
+        def core(x):
+            if (x.get('src') != 'di' or x.get('z') is None or x.get('archive') is None or x.get('terrain') is None
+                    or STRUCTURE_FLAGS & set(x.get('flags') or ()) or (STEP_ANSWERS and step_answer_at(x['xy']))):
+                return False
+            if abs(x['z'] - x['terrain']) <= SOURCES_OFF or abs(x['archive'] - x['terrain']) > SOURCES_ON:
+                return False
+            best = beside(chs, tree, ci, x)
+            if best is None:
+                return False
+            near = [b for b in chs[best[1]].bins if b.get('z') is not None and b.get('terrain') is not None and abs(b['s'] - best[2]) <= BIN]
+            if not near:
+                return False
+            n = min(near, key=lambda b: abs(b['s'] - best[2]))
+            return abs(n['z'] - n['terrain']) <= SOURCES_ON
+        flags = [core(x) for x in bins]
+        k = 0
+        while k < len(bins):
+            if not flags[k]:
+                k += 1
+                continue
+            e = k
+            while e + 1 < len(bins) and flags[e + 1] and bins[e + 1]['s'] - bins[e]['s'] <= 2 * BIN + .01:
+                e += 1
+            if e - k + 1 >= SOURCES_RUN:
+                apart = lambda x: (x.get('src') == 'di' and x.get('z') is not None and x.get('archive') is not None
+                                   and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and abs(x['z'] - x['archive']) > SOURCES_EDGE)
+                a, b = k, e
+                while a > 0 and apart(bins[a - 1]) and bins[a]['s'] - bins[a - 1]['s'] <= 2 * BIN + .01:
+                    a -= 1
+                while b + 1 < len(bins) and apart(bins[b + 1]) and bins[b + 1]['s'] - bins[b]['s'] <= 2 * BIN + .01:
+                    b += 1
+                for x in bins[a:b + 1]:
+                    if x.get('archive') is not None:
+                        x['z'], x['src'] = x['archive'], 'dtmp'
+                        moved += 1
+            k = e + 1
+    return moved
+
+
 def snap_to_neighbour(chs):
     """A sudden step or dip on one track that the track beside it does not have takes the neighbour's height, their slow offset
     kept (the user, 2026-11-06: "snap to the other track on sudden jumps", "again use neighbor track when there are steps
@@ -463,22 +541,7 @@ def snap_to_neighbour(chs):
         pairs = {}
         for i in offs[ci]:
             x = c.bins[i]
-            if not x['xy']:
-                continue
-            p, best = Point(x['xy']), None
-            ux, uy = c.direction(x['s'])
-            for j in tree.query(p.buffer(NEIGHBOUR_GAP[1])):
-                j = int(j)
-                if j == ci:
-                    continue
-                o = chs[j]
-                d = o.line.distance(p)
-                if not NEIGHBOUR_GAP[0] <= d <= NEIGHBOUR_GAP[1]:
-                    continue
-                t = o.line.project(p)
-                vx, vy = o.direction(t)
-                if abs(ux * vx + uy * vy) >= math.cos(math.radians(15)) and (best is None or d < best[0]):
-                    best = (d, j, t)
+            best = beside(chs, tree, ci, x)
             if best is None:
                 continue
             o, t = chs[best[1]], best[2]
@@ -1053,7 +1116,10 @@ def ranges(srcs, step=OUT_STEP):
 
 def across(path, back, back_z, step=OUT_STEP):
     """At every path height: the opposite track's offset (left > 0) and height where it runs beside ours, parallel
-    within ANGLE, ACROSS_MIN-ACROSS_MAX m off; the game's cross-section of the street between them (heightAt)."""
+    within ANGLE, ACROSS_MIN-ACROSS_MAX m off; the game's cross-section of the street between them (heightAt). Beside
+    means its nearest point lies within ACROSS_MAX: past the opposite route's end the nearest point is its end, metres
+    behind but 3 m to the side (#344: line 23 near Těšnov kept the end's height 52 m on, 0.45 m over the track beside
+    ours, and trackLevels flagged that track)."""
     a, b = LineString(path), LineString(back)
     n = max(1, math.ceil(a.length / step - 1e-9))
     off, zs = [], []
@@ -1068,7 +1134,7 @@ def across(path, back, back_z, step=OUT_STEP):
         lat = (q.y - p.y) * ux - (q.x - p.x) * uy
         i = min(int(t / step), len(back_z) - 2)
         z0, z1 = back_z[i], back_z[i + 1]
-        if (not ACROSS_MIN <= abs(lat) <= ACROSS_MAX or z0 is None or z1 is None
+        if (not ACROSS_MIN <= abs(lat) <= ACROSS_MAX or p.distance(q) > ACROSS_MAX or z0 is None or z1 is None
                 or abs(ux * (v1.x - v0.x) + uy * (v1.y - v0.y)) / e < math.cos(math.radians(ANGLE))):
             off.append(None)
             zs.append(None)
@@ -1355,6 +1421,7 @@ def main():
     print(f'{answered_toward(chs)} heights moved part way to survey + lidar by a step answer', flush=True)
     dropped, blended = answered_noise(chs)
     print(f'step answers: {len(STEP_ANSWERS)}; {dropped} heights dropped, {blended} weighed with the survey', flush=True)
+    print(f'{archive_over_di(chs)} heights took the archive where DI alone stood off the lidar and the track beside it', flush=True)
     print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
     print(f'{answered_ground(chs)} heights took the ground, or part way to it, in {len(GROUND_ANSWERS)} areas an answer has '
           f'follow the ground', flush=True)
