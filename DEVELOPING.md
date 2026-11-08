@@ -45,11 +45,18 @@ python -P -E tools/line_heights.py 17 22           # top of rail (#197), after t
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights.
-`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
-data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
-(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
-outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
-place leaves the list; `reports/line-heights.json` lists the dropped points.
+Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
+of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
+curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.
+`?line=23&review=reports/review/track-radius.json` shows those places: each answer's preview is its curve;
+`hold the radius` recorded in `data/truth.json` (`trackHeights.radiusAnswers`) keeps the radius at that place, with
+`"outliers": "drop"` (the note "Discard the outliers") the points it misses the band at are dropped, worst first, and
+it is fitted to the rest; `follow the data` given since the floor's date lets it go below 500 m there (one given before
+gives way only to the floor). An answered place leaves the list; `reports/line-heights.json` lists the dropped points.
+`python -P -E tools/stepped_review.py reports/headless` (after `headless.py --checks lint`) writes
+`reports/review/stepped-curves.json`: every curve the `steppedCurves` check flags, with its step's size (the corner over
+5 m beyond the curve's own, and how far the track leaves the smooth curve of its flanks); `smooth into one curve`
+(`trackSources.steppedAnswers`, read by `tools/di_network.py`) frees DI's vertices within 10 m of the place.
 
 After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
 

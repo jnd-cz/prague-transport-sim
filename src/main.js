@@ -49,6 +49,20 @@ load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a,
 const data = await (await load.get(`data/line${lineId}.json`)).json();
 data.line = String(data.line);
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
+// ?profile=<name>: a trial height profile over the line's own, to drive and compare (reports/review/profiles/, #358)
+if (params.has('profile')) {
+  const name = params.get('profile'), res = await fetch(`reports/review/profiles/line${lineId}-${encodeURIComponent(name)}.json`);
+  if (res.ok) {
+    const p = await res.json();
+    data.heights = p.heights;
+    data.heightSource = p.heightSource;
+    data.tracks.forEach((t, i) => { if (p.zs[i]) t.zs = p.zs[i]; else delete t.zs; });
+    const tag = document.createElement('div');
+    tag.textContent = `height profile: ${name}`;
+    tag.style.cssText = 'position:fixed;left:50%;top:2px;transform:translateX(-50%);z-index:50;padding:1px 8px;font:12px monospace;color:#fff;background:#0009;pointer-events:none';
+    document.body.appendChild(tag);
+  } else console.warn(`no height profile ${name} for line ${lineId}: ${res.status}`);
+}
 setLine(data.line);
 // optional Geoportál Praha import (tools/geoportal.py): LOD2 buildings, retaining walls, trees
 try {
