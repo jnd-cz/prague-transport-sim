@@ -50,18 +50,20 @@ export class Autopilot {
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
     const gradeHere = g.profile.grade(tr.s - 7);
-    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold, less the whole of a downhill's pull, which is
-    // sure where the grip is not; on dry rail step 5 binds first: down Chotkova's 55 ‰ the half of 0.15's grip planned 0.74 m/s² where
-    // the grip held 0.56 after the slope's pull, and it came into the 20 km/h at 35, line 23 seed 2 in autumn)
+    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold, less a downhill's pull; on dry rail step 5 binds
+    // first. To a lower limit the whole pull, which is sure where the grip is not, to a point half of it: there the track brakes take a
+    // slide, and nothing does for a limit. Down Chotkova's 55 ‰ half of 0.15's grip planned 0.74 m/s² where the grip held 0.56 after the
+    // pull, and it came into the 20 km/h at 35, line 23 seed 2 in autumn; with the whole pull to the points too, the autumn runs' mean
+    // delay rose by 100 s on lines 17 and 22)
     const mu = g.muBase ?? 0.3;
     // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
-    const planAt = (grade) => Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + Math.min(0, grade)),
+    const planAt = (grade, pull = 0.5) => Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + pull * Math.min(0, grade)),
       0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
-    const limitDecel = planAt(gradeHere);
+    const limitDecel = planAt(gradeHere, 1);
     // (to a lower limit as to a point, the steepest downhill on the way counts: planned on the 23 ‰ where it began braking, it met 59 ‰,
     // where step 5 makes 0.67 m/s², and came into line 17's 15 km/h at s 17422 4.5 km/h over, seed 3)
-    const limitPlan = (d) => (d > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + d / 2 - 7), g.profile.grade(tr.s + d - 7))));
+    const limitPlan = (d) => (d > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + d / 2 - 7), g.profile.grade(tr.s + d - 7)), 1));
     const vLine = vt;
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitPlan(limit.d) * Math.max(0, limit.d - 12)) - 0.3;
     if (nl) vt = Math.min(vt, curveTo(nl));
@@ -137,7 +139,7 @@ export class Autopilot {
     // the curve ending 3 m short and the crawl up to it, so it closes up as a driver does.
     const dLeft = fixedAt === null ? null : fixedAt - tr.s - STOP_MARGIN;
     // (the steepest downhill between here and the point counts: a crest just before it took the brake's margin away)
-    const stopDecel = dLeft === null || dLeft > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + dLeft / 2 - 7), g.profile.grade(tr.s + dLeft - 7)));
+    const stopDecel = dLeft === null || dLeft > 400 ? planAt(gradeHere) : planAt(Math.min(gradeHere, g.profile.grade(tr.s + dLeft / 2 - 7), g.profile.grade(tr.s + dLeft - 7)));
     let vFixed = Infinity, vMoving = Infinity, stood = false;
     if (fixedAt !== null) {
       vFixed = Math.sqrt(2 * stopDecel * Math.max(0, dLeft));
