@@ -20,7 +20,9 @@ A = {"issue": 258, "findings": [{"x": 1.0, "y": 2.0, "kind": "stop"}, {"x": 3.0,
 B = {"issue": 106, "findings": [{"x": 7.0, "y": 8.0, "kind": "z"},
                                 {"x": 7.5, "y": 8.5, "kind": "z", "recorded": {"v": "archive profile ok", "t": 5, "source": "data/truth.json"}}]}
 OLD = {"issue": 107, "findings": [{"x": 9.0, "y": 9.0, "kind": "old"}]}  # (its issue closed, nothing answered: out of date)
-INDEX = {"built": "2026-11-05 15:00", "commit": "abc1234", "repo": "jnd-cz/prague-transport-sim", "lines": ["9", "17"],
+# (the deploy's time from version.json, #386: the index carries none)
+VERSION = {"commit": "abc1234", "deployed": "2026-11-05T15:00:42+01:00"}
+INDEX = {"commit": "abc1234", "repo": "jnd-cz/prague-transport-sim", "lines": ["9", "17"],
          "sets": [{"file": "reports/review/test-a.json", "title": "Stop signs, line 17", "issue": 258, "waitsFor": 258,
                    "issueInfo": {"title": "Stop point at the stop sign", "state": "OPEN"}, "waitsForInfo": {"title": "Stop point at the stop sign", "state": "OPEN"},
                    "lines": ["17"], "findings": 3, "unknown": []},
@@ -85,7 +87,8 @@ def main():
             errors = []
             page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
             fulfil(page, {"reports/review/index.json": INDEX, "reports/review/test-a.json": A, "reports/review/test-b.json": B,
-                          "reports/review/test-old.json": OLD, "data/line17.dtm.json": {"findings": []}, "_only": True}, STORES)
+                          "reports/review/test-old.json": OLD, "data/line17.dtm.json": {"findings": []}, "version.json": VERSION,
+                          "_only": True}, STORES)
             page.goto(url)
             page.wait_for_function("() => window.reviewIndex", timeout=30000)
             sets = page.evaluate("() => window.reviewIndex.sets.map((s) => [s.file.split('/').pop(), s.c || null, s.error || null])")
@@ -108,6 +111,8 @@ def main():
             q = page.inner_html("#questions")
             check(f"{w}: the PR's question without its Markdown", "PR #270" in q and "Autumn costs time: 3-5 min" in q and "**" not in q)
             check(f"{w}: the status sums the waiting, not the out of date", "2 findings waiting in 3 of 5 sets" in page.inner_text("#status"))
+            check(f"{w}: the deploy's time from version.json", "index of the deploy of 2026-11-05 15:00 (abc1234)" in page.inner_text("#status")
+                  and "at the deploy of 2026-11-05 15:00" in q)
             old = page.evaluate("() => window.reviewIndex.old")
             check(f"{w}: a set with a closed issue and findings waiting is out of date",
                   old == ["reports/review/test-old.json"] and "Out of date" in waiting and waiting.index("test-old.json") > waiting.index("Out of date"))
@@ -128,6 +133,9 @@ def main():
         heights = page.evaluate("() => window.reviewIndex.sets.find((s) => s.file.endsWith('/track-heights.json'))?.c")
         check(f"the real track-height decisions are answered in data/truth.json: {heights}", heights and heights["waiting"] == 0)
         check("the real sets: no page errors", not errors)
+        status = page.inner_text("#status")
+        check(f"the real sets without version.json (tools/serve.py): the commit alone: {status!r}",
+              f"index ({index['commit']})" in status and "deploy of" not in status)
         b.close()
     server.shutdown()
     print(f"{len(fails)} failed" if fails else "all passed")

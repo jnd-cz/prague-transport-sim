@@ -60,6 +60,15 @@ class Index(unittest.TestCase):
         self.assertEqual([(s["file"], s["findings"], s["lines"]) for s in index["sets"]], [("reports/review/a-9.json", 2, ["9"])])
         self.assertEqual((index["lines"], index["questions"]), (LINES, []))
 
+    def test_the_same_tree_builds_the_same_index_a_minute_later(self):
+        # (#386: the index carried its build time, so every deploy uploaded it again)
+        import time
+        self.write("a-9.json", {"issue": 1, "findings": [{"x": 1, "y": 2}]})
+        with mock.patch.object(review_sets, "lines_of", return_value=LINES):
+            first = json.dumps(review_sets.build(self.tmp.name, github=False))
+            with mock.patch.object(time, "strftime", return_value="a minute later"):
+                self.assertEqual(json.dumps(review_sets.build(self.tmp.name, github=False)), first)
+
 
 class KerbLists(unittest.TestCase):
     def setUp(self):

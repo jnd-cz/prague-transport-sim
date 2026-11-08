@@ -76,13 +76,16 @@ function grouped(repo, sets) {
 
 function questions(index) {
   if (!index.questions?.length) return '';
-  return `<h2>Questions in pull requests</h2><div class="dim">From the open PRs' descriptions at the deploy of ${esc(index.built)}; answer them on the PR or in a session.</div>`
+  return `<h2>Questions in pull requests</h2><div class="dim">From the open PRs' descriptions${index.built ? ` at the deploy of ${esc(index.built)}` : ''}; answer them on the PR or in a session.</div>`
     + index.questions.map((q) => `<div class="issue q"><h3><a href="${esc(q.url)}" target="_blank" rel="noopener">PR #${q.pr}</a> ${esc(q.title)}${q.draft ? ' <span class="state">draft</span>' : ''}</h3>`
       + q.sections.map((s) => `<div class="dim">${esc(s.title)}</div><ul>${s.items.map((i) => `<li>${plain(i)}</li>`).join('')}</ul>`).join('') + '</div>').join('');
 }
 
 export async function main() {
   let index;
+  // (the deploy's time comes from version.json, which every deploy uploads: the index carries none, so an unchanged
+  // tree deploys it unchanged, #386; tools/serve.py has no version.json)
+  const version = fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   try {
     const r = await fetch('reports/review/index.json', { cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -91,6 +94,8 @@ export async function main() {
     $('status').innerHTML = `No index of the review sets (${esc(e.message)}): <code>python -I tools/review_sets.py</code> builds it; <code>tools/deploy.py</code> does at each deploy.`;
     return;
   }
+  const deployed = (await version)?.deployed;
+  index.built = typeof deployed === 'string' ? deployed.slice(0, 16).replace('T', ' ') : null;
   const { items, online } = await answers(index.lines);
   const sets = await Promise.all(index.sets.map(async (s) => {
     try { return { ...s, c: await count(s, items) }; } catch (e) { return { ...s, error: e.message }; }
@@ -100,7 +105,7 @@ export async function main() {
   const old = sets.filter(stale);
   const waiting = sets.filter((s) => !stale(s) && (s.error || s.c.waiting > 0)), answered = sets.filter((s) => !s.error && s.c.waiting === 0);
   const total = waiting.reduce((a, s) => a + (s.c?.waiting || 0), 0);
-  $('status').innerHTML = `${total} finding${total === 1 ? '' : 's'} waiting in ${waiting.length} of ${sets.length} sets · index of ${esc(index.built)} (${esc(index.commit || '')})`
+  $('status').innerHTML = `${total} finding${total === 1 ? '' : 's'} waiting in ${waiting.length} of ${sets.length} sets · index ${index.built ? `of the deploy of ${esc(index.built)} ` : ''}(${esc(index.commit || '')})`
     + (online ? '' : ' · <span class="bad">the answer store did not answer: counts from this device only</span>');
   $('waiting').innerHTML = (waiting.length ? `<h2>Waiting for answers</h2>${grouped(index.repo, waiting)}` : '<h2>Nothing waiting</h2>')
     + (old.length ? `<h2>Out of date</h2><div class="dim">Their issue is closed while findings wait: these sets are out of date, and their files in <code>reports/review/</code> are to be deleted.</div>${grouped(index.repo, old)}` : '');
