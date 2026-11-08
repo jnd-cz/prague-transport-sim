@@ -45,10 +45,35 @@ export function shownSize(sign, scale = SIGN_SCALE) {
 // as high, the photos' 0.86-1.01. Narrowed to 0.8 of its width ("stretch it so it looks close to the real signs", the
 // user), it matches the photos side by side, the vertical strokes as heavy as theirs; at its own width it looked too
 // wide. The figures are the photos' size, 0.47 of the panel's height.
-const FIGURES = '"Bahnschrift Condensed", "Bahnschrift SemiCondensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
+// Where Bahnschrift is missing (macOS, Linux, phones), D-DIN Condensed Bold: a DIN 1451 recreation by Datto under the SIL
+// Open Font License, loaded from its repository through jsDelivr, pinned to a commit (the user, 2026-11-08: "load the font
+// externally anyway and use the din one as fallback"). `loadFigureFont` must have settled before faces are drawn.
+const FIGURES = '"Bahnschrift Condensed", "D-DIN Condensed", "Bahnschrift SemiCondensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
+export const DDIN_URL = 'https://cdn.jsdelivr.net/gh/amcchord/datto-d-din@e199c8441e758d6e492cd01ef52c3c67ba4bae26/D-DINCondensed-Bold.woff2';
 const FIGURE_H = 0.113;        // m: the speed signs' figures, the same on every plate
 const FIGURE_W = 0.86;         // the most of a panel's width the figures take
-const SQUEEZE = 0.8;           // the figures' width over the font's own
+const TWO_FIGURES = 0.94;      // two figures' width over their height on the photos (0.86-1.01): each font is narrowed to it
+                               // (Bahnschrift to 0.79 of its width, D-DIN to 0.88)
+
+let fontLoad = null;
+// Resolves true once D-DIN is there, false if it could not load (then the next face in FIGURES draws).
+export function loadFigureFont() {
+  if (typeof FontFace === 'undefined' || typeof document === 'undefined' || !document.fonts) return Promise.resolve(false);
+  if (!fontLoad) {
+    const face = new FontFace('D-DIN Condensed', `url(${DDIN_URL}) format('woff2')`, { weight: '700' });
+    document.fonts.add(face);
+    fontLoad = face.load().then(() => true, () => false);
+  }
+  return fontLoad;
+}
+
+// how much to narrow the face the canvas resolves for FIGURES, so two figures are as wide as on the photos
+function squeezeFor(g) {
+  g.save(); g.font = `700 100px ${FIGURES}`;
+  const m = g.measureText('60'); g.restore();
+  const w = (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width), h = m.actualBoundingBoxAscent || 72;
+  return Math.min(1, TWO_FIGURES / (w / h));
+}
 
 // Text in a box: as large as the box allows, centred in it, `squeeze` times as wide as the font draws it. `bold`: an
 // outline of that width (of the height) in the same colour, heavier than the font's own bold.
@@ -73,7 +98,7 @@ function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '7
 // figures of height h (or narrower than maxW) centred on cx, cy
 function figures(g, text, cx, cy, h, color, { maxW = Infinity, bold = 0 } = {}) {
   const w = Math.min(maxW, h * 4);
-  fit(g, text, cx - w / 2, cy - h / 2, w, h, { color, bold, squeeze: SQUEEZE });
+  fit(g, text, cx - w / 2, cy - h / 2, w, h, { color, bold, squeeze: squeezeFor(g) });
 }
 
 function diagonal(g, x0, y0, x1, y1, width, color) {

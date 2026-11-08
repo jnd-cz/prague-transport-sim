@@ -81,7 +81,9 @@ would be line 9's s 23460 (straight; no OSM switch within 5 m) and line 17's s 9
 
 **R07, a later source:** the press of October 2023 (Pražská strojírna, in [Technický týdeník](https://technickytydenik.cz/rubriky/denni-zpravodajstvi/v-praze-pribyla-dalsi-vysokorychlostni-vyhybka-prazska-strojirna-zrychlila-tramvaje-na-kotlarce_58880.html)
 and Ekonomický deník) gives the Kotlářka switch **50 straight and 35 diverging**, in service since August 2023. The register
-says 50 / 15. Conditions it names: its own track bed, deep flangeways and a raised frog, heating, SIL 3.
+says 50 / 15. Conditions it names: its own track bed, deep flangeways and a raised frog, heating, SIL 3. **The game takes
+the press release's 35** (the user, 2026-11-08: "I will go with the press release"); `data/truth.json` `speed-switches` keeps
+the register's 15 beside it under `register`, with a `check` to confirm later.
 
 **The signal (photo on the speed-sign page, 2016):** two black boxes one above the other on a bracket of a traction pole,
 the chevron box of white LEDs above, the number box below with outlined white segments.

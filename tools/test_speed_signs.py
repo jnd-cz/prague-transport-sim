@@ -124,7 +124,22 @@ async () => {
     drawSign(c.getContext('2d'), { kind, v: 30, digit: 3, permille: 80 }, 100, 200);
     all.push(kind);
   }
+  // the drawn figures' ink, width over height, inside a restriction's panel: the photos' two figures are 0.86-1.01
+  const inkAspect = (() => {
+    const spec = { kind: 'restriction', v: 60 }, s = signSize(spec), W = 400, H = Math.round(W * s.h / s.w), c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    drawSign(g, spec, W, H);
+    const d = g.getImageData(0, 0, W, H).data;
+    let x0 = W, x1 = 0, y0 = H, y1 = 0;
+    for (let y = Math.round(H * 0.15); y < H * 0.85; y++) for (let x = Math.round(W * 0.2); x < W * 0.8; x++) {
+      const i = (y * W + x) * 4;
+      if (d[i] < 60 && d[i + 1] < 60 && d[i + 2] < 60) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    }
+    return Math.round((x1 - x0 + 1) / (y1 - y0 + 1) * 100) / 100;
+  })();
   return {
+    inkAspect,
     drawn: all.length,
     restrictionFrame: colour({ kind: 'restriction', v: 30 }, 0.05, 0.5),
     restrictionPanel: colour({ kind: 'restriction', v: 30 }, 0.25, 0.14),
@@ -205,6 +220,8 @@ def check(r, p):
     want("the backing board", r["backed"], {"w": 0.28, "h": 0.38})
     white, yellow, black = lambda c: min(c) > 200, lambda c: c[0] > 220 and c[1] > 170 and c[2] < 60, lambda c: max(c) < 40
     want("15 kinds drawn", p["drawn"], 15)
+    if not 0.86 <= p["inkAspect"] <= 1.01:
+        f.append(f"two figures must be as wide over high as on the photos (0.86-1.01), whatever font is found: {p['inkAspect']}")
     for name, test, c in (("the white frame", white, p["restrictionFrame"]), ("the yellow panel", yellow, p["restrictionPanel"]),
                           ("the Rychlostník's black panel", black, p["higherPanel"]), ("Pomalu's bare panel", yellow, p["slowPanel"]),
                           ("the yellow backing", yellow, p["backingEdge"]), ("the triangle's yellow", yellow, p["triangleMiddle"]),
