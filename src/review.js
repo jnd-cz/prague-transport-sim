@@ -143,6 +143,7 @@ export class Review {
     this.kept = new Set();
     this._names();
     this._ui();
+    this.file = url || null; // (the findings file it was opened with: the list starts on it)
     this.verdicts = new Verdicts(`line${data.line}`, { line: data.line, file: url || null }, () => this._sync());
     this._input();
     this._track();
@@ -355,8 +356,9 @@ body.review #gl { touch-action: none }
     sel.innerHTML = `<option value="">all (${this.findings.length})</option>`
       + Object.entries(srcs).map(([s, n]) => `<option value="${s}|">${s}: all (${n})</option>`).join('')
       + Object.entries(by).sort().map(([k, n]) => `<option value="${k}">${k.replace('|', ': ')} (${n})</option>`).join('');
-    // the first source with findings that are not grouped seams: the review lists come first
-    const first = Object.keys(srcs).find((s) => s !== 'seams') || Object.keys(srcs)[0];
+    // the file it was opened with, else the first source with findings that are not grouped seams: the review lists
+    // come first (a line's kerbs would hide the 27 track-height cards of a named file under 168 of their own)
+    const first = this.file && srcs.file ? 'file' : Object.keys(srcs).find((s) => s !== 'seams') || Object.keys(srcs)[0];
     sel.value = first ? `${first}|` : '';
     this._fill();
   }

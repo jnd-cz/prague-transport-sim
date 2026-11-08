@@ -39,7 +39,7 @@ All radio switches in the register are "spring blades, lockable" (*pružné jazy
 
 | ID | Aspect | Look (p. 44, 48) | Meaning |
 |---|---|---|---|
-| SW-S1 | *Postavení vlakové cesty vpravo / přímo / vlevo* | black panel with a dot matrix of **red LEDs**; the lit LEDs form a broad **arrow** pointing right, up or left; the unlit LEDs of the other symbols show dark grey | route set that way **and the switch locked**. **Blinking** = in addition **blocked** against being thrown by remote control (a train is in the circuit) |
+| SW-S1 | *Postavení vlakové cesty vpravo / přímo / vlevo* | black panel with a dot matrix of **red LEDs**; the lit LEDs form a broad **dart** with a swallow-tail notch pointing right or left, or a **vertical bar** 4 LEDs wide with a pointed top for straight; the unlit LEDs of the other symbols show dark grey, the rest of the panel is black (p. 44) | route set that way **and the switch locked**. **Blinking** = in addition **blocked** against being thrown by remote control (a train is in the circuit) |
 | SW-S2 | *Neurčitá vlaková cesta* (undetermined) | a small red **cluster in the middle** | the route may not be set properly: **assume the switch is not locked**. Blinking = blocked. |
 | SW-S3 | two switches close together | signals side by side or stacked; the **lower signal belongs to the first switch** in the direction of travel, the upper to the second; plates "L", "P", "1", "2" (white on black) say which | |
 | SW-S4 | second (auxiliary) signal | where one signal cannot be seen both from where the switch is set remotely and where it is set by hand | |
@@ -52,7 +52,7 @@ All radio switches in the register are "spring blades, lockable" (*pružné jazy
 | SW-S11 | *Zajišťovací výhybka* | yellow panel with a **red "Z"** | spring-return switch, or one secured against throwing |
 | SW-S12 | working contact of a remote-controlled switch | white square, **black triangle** with an **orange square** inside (PPS Q102) | marks the place of the trolley contact |
 
-Game now: SW-S1 as a red LED chevron hung 8 m before the switch, blinking "while the switch is
+Game now: SW-S1 as D 1/2 draws it (`src/ledPanels.js`, #376; a chevron before) hung 8 m before the switch, blinking "while the switch is
 locked" (`src/models.js:778-819`, `src/game.js:729, 1250-1254`); SW-S6 exists as
 `makeRadioSwitchSign` but no switch uses it; SW-S12 is the game's contact sign
 (`src/models.js:861-871`), with a yellow plate on the wire. SW-S2, SW-S3, SW-S5, SW-S8 to SW-S11
@@ -73,6 +73,20 @@ the switch → the **light switch signal** at the end of the circuit.
 | SW-R4 | light switch signal | black panel with a white **chevron** (pointing up for straight, sideways for a branch), blinking = blocked; under it a white **seven-segment number** (e.g. "50", "40") | route set and locked; the number is the **speed allowed over the switch** that way. No number: pass as a lockable switch (15 km/h; PPS Q104). Dark although the train is in the circuits: pass as a lockable switch (§ 30.4). |
 | SW-R5 | *Ovládání rychlostní výhybky mimo provoz* | "R 01" crossed by an orange X | no radio control; other rules stay |
 | SW-R6 | *Rychlostní výhybka mimo provoz* | white crosses over the call signal and the switch signal | counts as a lockable switch |
+
+**Which way they lie on our routes (`tools/speed_survey.py`, the game's facing switches; 2026-11-06).** R03 and R04 are
+tagged in OSM by `ref` and lie on line 17's `pathBack`, 0.1 m off it and 3–4 m off `path`, so the direction the game
+drives never faces them. R05 ("od Strašnické") is the same on line 22, by name. R07 and R09 have no `ref`; by name they
+would be line 9's s 23460 (straight; no OSM switch within 5 m) and line 17's s 9773 (straight). Both to check.
+
+**R07, a later source:** the press of October 2023 (Pražská strojírna, in [Technický týdeník](https://technickytydenik.cz/rubriky/denni-zpravodajstvi/v-praze-pribyla-dalsi-vysokorychlostni-vyhybka-prazska-strojirna-zrychlila-tramvaje-na-kotlarce_58880.html)
+and Ekonomický deník) gives the Kotlářka switch **50 straight and 35 diverging**, in service since August 2023. The register
+says 50 / 15. Conditions it names: its own track bed, deep flangeways and a raised frog, heating, SIL 3. **The game takes
+the press release's 35** (the user, 2026-11-08: "I will go with the press release"); `data/truth.json` `speed-switches` keeps
+the register's 15 beside it under `register`, with a `check` to confirm later.
+
+**The signal (photo on the speed-sign page, 2016):** two black boxes one above the other on a bracket of a traction pole,
+the chevron box of white LEDs above, the number box below with outlined white segments.
 
 Speed switches in the register (speeds straight / diverging, km/h):
 

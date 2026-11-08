@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
 import { CAR_PITCH } from './tram.js';
+import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -716,9 +717,9 @@ function mergeBoxes(geos, shade) {
 //   stop           = the two outer top lamps
 //   go straight    = top middle + bottom
 //   go left/right  = top left/right + bottom
-// Below it hangs the call signal (výzvové návěstidlo): three LED bars \ | / — the bar for the
-// direction about to get GO lights orange once the tram's request is registered and blinks
-// just before GO. A distant signal (předvěst) has a yellow "P" plate instead.
+// Below it hangs the call signal (výzvové návěstidlo): three LED strips \ | / (src/ledPanels.js) —
+// the strip for the direction about to get GO lights once the tram's request is registered and
+// blinks just before GO. A distant signal (předvěst) has a yellow "P" plate instead.
 const ASPECT = {
   stop: ['L', 'R'],
   straight: ['M', 'B'],
@@ -729,24 +730,7 @@ let pPlateTex = null, backplateTex = null;
 const callTex = {};
 function callTexture(dir) {
   if (callTex[dir]) return callTex[dir];
-  callTex[dir] = keptTexture(128, 128, (c, w, h) => {
-    c.fillStyle = '#0a0a0a';
-    c.fillRect(0, 0, w, h);
-    const bars = { left: [[28, 30], [58, 98]], straight: [[64, 26], [64, 102]], right: [[100, 30], [70, 98]] };
-    for (const [k, [[x0, y0], [x1, y1]]] of Object.entries(bars)) {
-      // LED dots along the bar
-      const n = 9;
-      for (let i = 0; i < n; i++) {
-        const x = x0 + ((x1 - x0) * i) / (n - 1), y = y0 + ((y1 - y0) * i) / (n - 1);
-        for (const off of [-4, 4]) {
-          c.fillStyle = k === dir ? '#ffa21a' : '#1d2a1d';
-          c.beginPath();
-          c.arc(x + off, y, 3.2, 0, Math.PI * 2);
-          c.fill();
-        }
-      }
-    }
-  });
+  callTex[dir] = keptTexture(160, 160, (c, w, h) => drawCallSignal(c, dir === 'none' ? [] : [dir], w, h));
   return callTex[dir];
 }
 
@@ -815,27 +799,12 @@ export function makeTramSignal({ distant = false } = {}) {
 }
 
 // Switch position indicator (přestavníkové návěstidlo), newest DPP type: a black box hung from
-// the span wire above the track, a matrix of red LEDs forming a chevron: < left, > right,
-// ^ straight. The symbol blinks while the switch is locked.
+// the span wire above the track, a matrix of red LEDs (src/ledPanels.js): a dart pointing left
+// or right, a bar for straight. The symbol blinks while the switch is locked.
 const arrowTextures = {};
 function arrowTexture(dir) {
   if (arrowTextures[dir]) return arrowTextures[dir];
-  arrowTextures[dir] = keptTexture(160, 128, (g, w, h) => {
-    g.fillStyle = '#0b0b0b';
-    g.fillRect(0, 0, w, h);
-    // chevron as two thick strokes meeting at a tip
-    const tip = dir === 'left' ? [44, 64] : dir === 'right' ? [116, 64] : [80, 26];
-    const ends = dir === 'left' ? [[96, 22], [96, 106]] : dir === 'right' ? [[64, 22], [64, 106]] : [[40, 88], [120, 88]];
-    const dist = (px, py, [ax, ay], [bx, by]) => {
-      const vx = bx - ax, vy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy)));
-      return Math.hypot(px - ax - vx * t, py - ay - vy * t);
-    };
-    for (let y = 5; y < h; y += 7) for (let x = 5; x < w; x += 7) {
-      const lit = dir !== 'off' && (dist(x, y, tip, ends[0]) < 9 || dist(x, y, tip, ends[1]) < 9);
-      g.fillStyle = lit ? '#ff2a12' : '#1a0b09';
-      g.beginPath(); g.arc(x, y, 2.6, 0, Math.PI * 2); g.fill();
-    }
-  });
+  arrowTextures[dir] = keptTexture(200, 160, (g, w, h) => drawSwitchSignal(g, dir, w, h));
   return arrowTextures[dir];
 }
 

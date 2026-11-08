@@ -160,6 +160,39 @@ What sessions learned and later work needs. Kept current and short; the full log
   draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
   the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
   is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
+- **Interlaced tracks' record ends lie within JOIN of each other** (#368): 10-15 cm apart, where DI splits both tracks
+  at the same places (Nádraží Libeň: every 6-27 m over 39 m) or starts or ends the branch beside a record joint of the
+  through track (Ke Stírce 11.7 cm, Čechův most 12 cm with the through track's joint 0.6 m apart). Grouped as one place,
+  the node lay on the branch and the line stepped 10-12 cm through it, or the through track's records were dropped as
+  copies of the branch's (two records between the same two places, within 20 cm) and line 37 ran the branch for 35 m:
+  the user's "sideways jolts" (2026-11-07). 14 such places in the network, 6 on the lines. `di_tracks._meetings`: an end
+  whose track goes on in line does not meet an end beside that track, nor two joints side by side.
+- **An interlaced switch splays both tracks** (#368, 2026-11-08): unlike a classic switch's straight track, neither
+  leaving track continues the approach (the user, on a street-view photo of Čechův most). DI agrees: 7 m past the tip
+  the two tracks lie +4.7 and -8.7 cm off the approach's axis (rms 0.3 cm along it), and DI draws those first 4.6-10 m
+  as one straight from the tip (the 18 tips of the network). Fitted as a straight track and a branch, the branch left
+  along the through track's tilt and bent 1.2 degrees over 2 m. `track_curve` `approach`: the approach is fitted first,
+  both tracks leave along it, the tongue chord's interpolated points are no data.
+- **A track end walked back to its node keeps DI's record end** 1.8-2.3 m from the node (`Drawn`, `walk`): it is no
+  node and an answer that frees the points around it frees it too (Čechovo náměstí: held, it hooked line 22's track
+  3.5 cm in the last 0.76 m before the fork, 3.4 degrees).
+- **DI can hump on one track alone** (#344): line 9 at Sídliště Řepy, DI's outbound track rose 0.97 m over the lidar for
+  90 m while the return track 3 m beside it, the archive and the lidar under both agreed within 0.2 m. Where DI is the
+  source, the archive sided with the lidar at every such stretch of the network; on a bridge it does not (the bare-earth
+  lidar and the archive both lie under the deck, DI 6-14 m over them: the `structure_hint` flag). `archive_over_di`.
+- **OSM roads drawn over the rails** (#344, the `railSupport` places left after the heights): where the street way runs
+  onto a bridge, `ground.at` gives it the ground under the bridge, at the abutment level with the deck (Most Legií, 8-18 cm
+  over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across
+  the rails (50.0755 N 14.4303 E, 28 cm; 50.0884 N 14.4325 E, 15 cm); a road crossing the track between two of its nodes
+  is linear between them (50.0707 N 14.3802 E, 7 cm). W3's ground surface (#276, #301) replaces this drawing.
+- **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
+  user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
+  and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
+  ground: its 12 % ground step had been dropped as steeper than any track. The tracks follow the lidar in the
+  user's areas, no tighter than 250 m: unlimited, Malovanka read 131 m, a 2.4 cm lidar bump over 5 m
+  (`data/truth.json` radiusAnswers with `area`).
+- **The heights read IPR's 1 m raster, the game draws a 2 m grid of it** (`tools/fine_terrain.py` STEP; the 1 m mesh
+  is #276): at Královka and Malovanka the 2 m grid lies within mean 0.6-0.9 cm, max 6.4 cm of the raster at the tracks.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
@@ -347,8 +380,13 @@ Review these when realism matters; most move into the build in M2.
   from the approach road, the terrain re-covered over it.
 - **Trees** ≥ 3.2 m from a track, crowns ≥ 1.9 m; **LOD2 buildings** within 2.5 m of the route lifted to
   track + 6.3 m (passages like Letenská).
-- **Speed limits** from curvature, posted OSM speeds and switches; stop zone −20…+12 m; adhesion dry
-  0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
+- **Speed limits** (#211, [the decision](decisions/2026-11-07-speed-limits-and-signs.md)): 50 unless OSM
+  posts another (up to the T3's 65), 15 from a facing switch's blades to its frog, and a curve's from
+  the radius at each metre, from 5 m before it to its end (`restriction-past`: 0 m, the user: the bogie leaves the
+  switch before the car's end, so no margin). The rear still has to leave each restriction. The radius is read over
+  16 m of heading, which smears a sharp curve's end by about 12 m each way; most curves here have transitions, so the
+  limit climbs along them.
+- Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
   arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.

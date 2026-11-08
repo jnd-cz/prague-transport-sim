@@ -100,9 +100,32 @@ in [switches.md](switches.md) SW-R.
 
 ## Higher speeds (Rychlostník) on line 17
 
-OSM tags line 17's track with 60, 65 and 70 km/h in places (191 samples at 70, 178 at 65, 1233 at
-60; `tools/osm_speeds.py`). D 1/2 allows more than 50 km/h only past a Rychlostník sign. The exam set
-offers "60 km/h, more on Nádraží Braník – Modřany" as a wrong answer to the general limit off the road
-(PPS Q83), which hints that the Modřany line has such signs. Their places are not on
-prazsketramvaje.cz pages read so far; a source for them (or the user) is needed before the game's 60
-on dedicated track is changed.
+OSM tags line 17's track with 60, 65 and 70 km/h in places (`tools/speed_survey.py`, extract 2026-11-04):
+
+| km/h | line 17, s | between | OSM's note |
+|---|---|---|---|
+| 65 | 515–1405 | towards Libuš, before the first stop Levského (opened 2023-05-27); the game does not drive it | |
+| 60 | 2040–2910, 4190–5490 | Modřanská rokle – U Libušského potoka; Nádraží Modřany – Belárie | |
+| **70** | 5490–6440 | Belárie – Hodkovičky – Černý kůň, 950 m | "max. 70 km/h pouze vozy 14T, ostatní max. 65 km/h" on all 8 ways |
+| 60 | 6440–7505, 7560–8680, 9980–10730, 18705–19770 | Černý kůň – Nádraží Braník; Pobřežní cesta – Přístaviště; Kublov – Podolská vodárna; Trojská – Nad Trojou | |
+
+Off our lines the extract has 65 at Geologická – Hlubočepy, Smíchovské nádraží – Lihovar, Sídliště Barrandov –
+Poliklinika Barrandov (with a 30 km/h night zone, the list's Zone 30) and Krejcárek – Ohrada (one way, the opposite track
+60). In total: 65 km/h on 4.6 km and 70 km/h on 1.9 km of track, each way counted.
+
+**What the signs look like there** (searched 2026-11-06; nothing found that shows one):
+- **The rule:** more than 50 km/h needs a Rychlostník, white number on black (§ 25.1, § 49.17). A road sign does not do
+  it: PSP Q28 marks "50 km/h unless the section is marked by speed signals" as the right answer where a road sign allows
+  70, and gives "70 km/h with 14T and 52T, 65 with T3 and KT8D5R.N2P, 60 with 15T" as a wrong one (so that line is no fact,
+  though it agrees with OSM's note for the T3).
+- **By type:** § 49.17 is the only text on it: a section may carry several Rychlostník signs, the driver follows the one
+  for his car type and the others the one without a type. So OSM's note reads as a 65 for everyone and a 70 for the 14T.
+  D 1/2 draws the sign only with "60" and no type; how the type is written (a strip under the panel, as the arrow; on the
+  plate; a plate of its own) is not in any source read. Inferred, not seen: no separate sign kind for 65 or 70.
+- **Seen since:** the user's photo of a Rychlostník for **60** (2026-11-08): white condensed DIN figures on black, a white
+  frame, hung by a clamp from the span wire over the track.
+- **Sources read for this:** the speed-sign page (no places, no type); the Modřany line's Wikipedia page (no speeds; R04);
+  the e15 article of 2019-10-31 (DPP planning up to 10 km/h more on separate track, naming Koněvova and Švehlova; "some
+  signs allow 70"); Tram-fórum, 2022-08-15 (drivers: 65 is driven legally and routinely; no sign described).
+- **Speeds by car:** T3 65 km/h by design (ČKD, `src/tram.js`), so a T3's limit on the 70 stretch is its own 65 either way.
+  DPP's page gives the 14T 60 km/h, which disagrees with OSM's note; not settled here.

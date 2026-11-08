@@ -99,9 +99,10 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 - Počasí: sucho / déšť / podzimní listí určuje adhezi kola a kolejnice. Příliš velký proud protočí kola,
   příliš silná brzda je zablokuje (ploché body). Pískujte držením A; nouzová brzda pískuje sama a její
   magnetické kolejnicové brzdy na adhezi nezávisí.
-- Rychlosti: každý oblouk dovolí √(a·R) s nevyrovnaným bočním zrychlením 0,8 m/s², nikdy více než traťová
-  rychlost a 50 km/h v ulicích / 60 na vlastním tělese. Oblouky na vlastním tělese jsou převýšené (do 100 mm,
-  u zastávek a konečných bez převýšení); tramvaj i pohled se do nich naklánějí.
+- Rychlosti: 50 km/h, pokud traťová rychlost neříká jinak, nejvýše 65 km/h tramvaje T3. Každý oblouk dovolí √(a·R)
+  s nevyrovnaným bočním zrychlením 0,8 m/s², nejméně 15 km/h, není-li trať značena níž. Výhybka proti hrotu je 15 km/h
+  od jazyků po srdcovku, ať je postavená kamkoli, dokud ji nemine zadní čelo vlaku. Oblouky na vlastním tělese jsou
+  převýšené (do 100 mm, u zastávek a konečných bez převýšení); tramvaj i pohled se do nich naklánějí.
 - Soupravy: většina linek jezdí dvouvozovými soupravami T3 (2 × 15,2 m přes spřáhla, oba vozy poháněné, šest
   dveří); na lince 23 jezdí sólo historický vůz. „Souprava“ v menu to změní. Každý vůz sleduje kolej na
   vlastních podvozcích.

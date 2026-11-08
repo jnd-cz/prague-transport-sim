@@ -1723,7 +1723,7 @@ export class Traffic {
         this.oncoming.push({ ...this._newTram(other.line), endS: other.endS, s: n.s, v: 7, dwell: 0, served: new Set() });
       }
     }
-    if (!this.backLimits) this.backLimits = br.speedLimits();
+    if (!this.backLimits) this.backLimits = br.speedLimits([], this.game.opts.speedFacts.past);
     const ground = this.ground;
     const gauntlets = this.game.gauntlets || [];
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };

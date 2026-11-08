@@ -45,11 +45,18 @@ python -P -E tools/line_heights.py 17 22           # top of rail (#197), after t
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights.
-`?line=23&review=reports/review/track-radius.json` shows where no curve at the design radius stays within 10 cm of the
-data (15 cm in a junction): each answer's preview is its curve; `hold the radius` recorded in `data/truth.json`
-(`trackHeights.radiusAnswers`) keeps the radius at that place, with `"outliers": "drop"` (the note "Discard the
-outliers") the points it misses the band at are dropped, worst first, and it is fitted to the rest. An answered
-place leaves the list; `reports/line-heights.json` lists the dropped points.
+Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
+of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
+curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.
+`?line=23&review=reports/review/track-radius.json` shows those places: each answer's preview is its curve;
+`hold the radius` recorded in `data/truth.json` (`trackHeights.radiusAnswers`) keeps the radius at that place, with
+`"outliers": "drop"` (the note "Discard the outliers") the points it misses the band at are dropped, worst first, and
+it is fitted to the rest; `follow the data` given since the floor's date lets it go below 500 m there (one given before
+gives way only to the floor). An answered place leaves the list; `reports/line-heights.json` lists the dropped points.
+`python -P -E tools/stepped_review.py reports/headless` (after `headless.py --checks lint`) writes
+`reports/review/stepped-curves.json`: every curve the `steppedCurves` check flags, with its step's size (the corner over
+5 m beyond the curve's own, and how far the track leaves the smooth curve of its flanks); `smooth into one curve`
+(`trackSources.steppedAnswers`, read by `tools/di_network.py`) frees DI's vertices within 10 m of the place.
 
 After a rebuild: `python -I tools/snapshot.py data-publish --note "…"` and commit `data/MANIFEST.json`.
 
@@ -103,7 +110,7 @@ CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown 
 To a web host over FTPS (#131): `python -P -E tools/deploy.py` uploads the same files from a clean commit
 whose data matches the manifest:
 - only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
-- the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 31.5 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS);
+- the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 31.5 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS). Without it Chromium refuses the files (`ERR_CONTENT_DECODING_FAILED`), a browser that hands the page the raw bytes shows the bar at 5 % with every file ticked, and the loading screen says to open the page over https (#371);
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
 

@@ -103,9 +103,11 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
 - Weather: dry / rain / autumn leaves sets wheel–rail adhesion. Too much power spins the wheels, too much
   brake locks them (flats). Hold A to sand; the emergency brake sands automatically and its magnetic track
   brakes don't depend on adhesion.
-- Speeds: each curve allows √(a·R) with 0.8 m/s² unbalanced lateral acceleration, never above the posted
-  speed of the track and 50 km/h in streets / 60 on dedicated track. Curves on dedicated track are banked
-  (up to 100 mm cant, level at stops and near the termini); the tram and the view lean into them.
+- Speeds: 50 km/h unless the track's posted speed says otherwise, up to the T3's 65 km/h. Each curve allows
+  √(a·R) with 0.8 m/s² unbalanced lateral acceleration, at least 15 km/h unless the track is posted lower. A facing
+  switch is 15 km/h from its blades to its frog, whichever way it is set, until the rear of the tram has passed.
+  Curves on dedicated track are banked (up to 100 mm cant, level at stops and near the termini); the tram and the
+  view lean into them.
 - Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered, six
   doors); line 23 runs a single heritage car. "Set" in the menu overrides it. Each car follows the track
   on its own bogies.
