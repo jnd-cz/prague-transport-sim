@@ -197,6 +197,60 @@ class SpanReviews(unittest.TestCase):
             p['xy'] = [p['xy'][0],9]
         self.assertIn('steps up',get()['held'][0]['reason'])
 
+    def test_pieces_numeric_di_cut_apart_are_judged_on_the_archive_as_one_stretch(self):
+        # (#390: DI splits held stretches into pieces of 0.6-7 m and lies 0.1-0.5 m off the archive beside them)
+        rail = lambda s: 200+.01*s
+        def track(direction, y, ss, archive, di=lambda s: None):
+            pt = lambda s: {'s':s,'xy':[s,y],'archive':[{'id':7,'z':archive(s)}],'surfaces':[],'di_z':di(s)}
+            def span(i, piece):
+                a, b = piece[0]-.5, piece[-1]+.5
+                return {'id':f'{direction}:{i}','line':9,'direction':direction,'start_s':a,'end_s':b,'length_m':b-a,
+                        'profile':[pt(s) for s in piece],'approach':[pt(s) for s in ss if a-30 <= s <= b+30 and s not in piece],
+                        'approval_profile':{'xy':[[a,y],[b,y]],'di_ids':['di-'+direction],'rule':{'type':'needs_explicit_review'}}}
+            return span
+        def get(spans):
+            finding = {'kind':'trackheight','id':'t','decision':{'span_ids':[s['id'] for s in spans],'structure':{'kind':'tunnel'}},'spans':spans}
+            return from_reviews({'items':{'pin':{'decision_id':'t','span_ids':[s['id'] for s in spans],'v':'archive profile ok',
+                                                 'note':'','t':1761955200000}}},{'findings':[finding]},'reviews/line9.json')
+        # DI every 4 m, 0.4 m under a smooth archive: no step of the archive's own
+        ss = list(range(0,61))
+        span = track('path',0,ss,rail,lambda s: rail(s)-.4 if s%4==0 else None)
+        entry = get([span(1,[21,22,23]),span(2,[25,26,27])])['span_reviews'][0]
+        self.assertEqual([p['rule'] for p in entry['profiles']],[{'type':'archive'}]*2)
+        # the road over the tunnel, +6 m for 80 m, in the archive of pieces between DI on the rail every 10 m: the
+        # stretch sees the departure close, which no piece's own 30 m reach, and the smooth other direction mends it
+        ss = list(range(0,202,2))
+        hump = lambda s: rail(s)+(6 if 50 <= s <= 130 else 0)
+        out = track('path',0,ss,hump,lambda s: rail(s) if s%10==0 else None)
+        pieces = [out(i,[s for s in range(a,a+10,2) if s%10]) for i,a in enumerate(range(50,130,10))]
+        back = track('pathBack',3.5,ss,rail)(0,list(range(30,152,2)))
+        entry = get([*pieces,back])['span_reviews'][0]
+        z = SpanEvidence([{**entry,'profiles':[entry['profiles'][4]]}]).at('di-path',94,0,[{'z':hump(94)}])[0]['z']
+        self.assertAlmostEqual(z,rail(94),places=2)
+        # (alone, its 30 m reach neither edge of the hump: nothing tells the road from the rail)
+        alone = get([pieces[4],back])['span_reviews'][0]['profiles'][0]['rule']
+        self.assertEqual(alone,{'type':'archive'})
+
+    def test_a_few_metres_without_archive_are_interpolated_and_one_record_met_twice_is_one_height(self):
+        rail = lambda s: 200+.01*s
+        def get(missing, at12=None):
+            points = [{'s':s,'xy':[s,0],'archive':[] if s in missing else (at12 if s==12 and at12 else [{'id':7,'z':rail(s)}]),
+                       'surfaces':[]} for s in range(0,31)]
+            span = {'id':'s','start_s':0,'length_m':30,'profile':points,
+                    'approval_profile':{'xy':[[0,0],[30,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+            finding = {'kind':'trackheight','id':'u','decision':{'span_ids':['s'],'structure':{'kind':'unmapped'}},'spans':[span]}
+            return from_reviews({'items':{'pin':{'decision_id':'u','span_ids':['s'],'v':'archive profile ok','note':'','t':1761955200000}}},
+                                {'findings':[finding]},'reviews/line22.json')
+        # (Malostranské náměstí: the archive leaves out 2-5 m among the tunnel's points)
+        entry = get({8,9,10})['span_reviews'][0]
+        self.assertEqual(entry['profiles'][0]['rule']['type'],'samples')
+        self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',9,0,[])[0]['z'],rail(9))
+        self.assertEqual(get(set(range(5,17)))['held'][0]['reason'],'archive rail height missing on part of the span')
+        # (Hlavní nádraží: one record met twice on the road ramp's flank, 0.35 m apart; two records apart stay held)
+        self.assertTrue(get(set(),[{'id':7,'z':rail(12)+.17},{'id':7,'z':rail(12)-.18}])['span_reviews'])
+        self.assertEqual(get(set(),[{'id':7,'z':rail(12)+.17},{'id':8,'z':rail(12)-.18}])['held'][0]['reason'],
+                         'archive rail heights conflict on part of the span')
+
     def test_survey_track_areas_count_on_a_bridge_only_where_they_meet_the_archive(self):
         # (#184, Černý kůň: the tram areas and the deck carry on across the dip, within 0.2 m of the archive)
         zs = [197+.01*s for s in range(0,105,5)]
@@ -309,7 +363,8 @@ class SpanReviews(unittest.TestCase):
             self.assertEqual(SpanEvidence([entry]).at('di-1',5,0,[{'z':250}])[0]['z'],250)
 
     def test_the_reviewed_decisions_offer_what_the_user_asked_for(self):
-        # (the committed queue: Modřany's bridge over the street, Palackého most over the river; 2026-11-02 session)
+        # (the committed queue: Modřany's bridge over the street, Palackého most over the river; 2026-11-02 session.
+        # The deck stays at the bridge's level, 6 m over the street: its ends 201.19 and 201.60 m in the queue of 2026-11-08)
         path = Path(__file__).resolve().parent.parent/'reports/review/track-height-spans.json'
         items = {f['id']:f for f in findings(json.loads(path.read_text(encoding='utf-8')),inline=True)['findings']}
         self.assertIn('archive, bridged over a dip',items['osm-4722520']['options'])
@@ -317,7 +372,7 @@ class SpanReviews(unittest.TestCase):
         self.assertIn('follows survey surface',items['osm-476017592']['options'])
         self.assertNotIn('archive, bridged over a dip',items['osm-476017592']['options'])
         for spans in items['osm-4722520']['bridged'].values():
-            self.assertTrue(all(200.5 < z < 201.6 for b in spans for z in b[1::2]), spans)
+            self.assertTrue(all(200.5 < z < 201.7 for b in spans for z in b[1::2]), spans)
 
     def test_findings_keep_all_spans_and_pin_the_longest(self):
         spans = [{'id':'a','length_m':10,'profile':[{'xy':[0,0]}], 'from_stop':'A','to_stop':'B'},

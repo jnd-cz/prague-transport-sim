@@ -291,6 +291,18 @@ in the walkthrough: DI, then the archive where it is smooth, then:
    over the descent and climb above 4 % around its steep part (Černý kůň's archive falls 4–5 % for 14 m
    before the drop, while the deck rises).
 
+**Pieces between numeric DI (#390).** The queue regenerated on the data of 2026-11-06 finds numeric DI
+inside held stretches, which cuts them into pieces of 0.6–7 m: Hlavní nádraží's 75 m spans became 17 and 9
+pieces. Beside them DI lies 0.1–0.5 m off the archive (Hlavní nádraží) and its rejected raw heights up to
+1.5 m under it (Malostranské náměstí), so a series of both read as steps and dips neither source has, and
+4 of the 19 answers still asked for were refused. The checks now judge the archive's own heights (DI only
+where the archive has none, or where two archive records differ by over 0.3 m beside it); a decision's pieces
+in one direction whose 30 m approaches meet are judged as one stretch, where a departure from the other
+direction is seen whole and mended at each piece's own points; a point without a height between heights at most
+10 m apart is interpolated; one record met twice on a slope is one height (its mean), two records apart
+stay held. On the committed queue of 2026-11-02 every import and every card's explanation stays the same;
+on the regenerated one all 20 decisions import their answers.
+
 The game does not take these profiles yet: profile assembly is #20.
 
 **The terrain checks an archive height nothing else confirms (#190).** Where there is no numeric DI and no

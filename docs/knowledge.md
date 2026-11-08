@@ -69,6 +69,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
   1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
   ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
+- **In the tunnels and structures DI added by 2026-11-06, it does not share the archive's heights** (#390):
+  numeric DI lies 0.1–0.2 m under the archive along Hlavní nádraží's Seifertova tunnel, 0.45–0.55 m under it
+  in Wilsonova's outbound track, and the raw DI the import rejects runs up to 1.5 m under it through
+  Malostranské náměstí. A series mixing the two at 1 m spacing steps 12–46 %, so the review answers
+  judge the archive's own heights.
 - **Where only the archive has a height, the 2023 terrain checks it** (#190): where a ZPS survey confirms
   the archive, the two differ by more than 1 m on 13 of 45,577 samples (0.03 %); without a survey 848 samples
   do (Malovanka 83 m, the Libeň bridge's dips to the streets, Troja's old alignment). Numeric DI agreeing with
