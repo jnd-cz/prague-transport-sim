@@ -3,65 +3,6 @@
  "snapshot": "2026-11-06c",
  "issue": 368,
  "title": "Curves drawn in steps",
- "lines": [
-  "17"
- ],
- "findings": [
-  {
-   "kind": "stepped curve",
-   "id": "stepped-50.0934-14.4169",
-   "x": -225.84,
-   "y": 704.66,
-   "mag": 4.0,
-   "status": "review",
-   "place": [
-    50.09337,
-    14.41686
-   ],
-   "line": 17,
-   "lines_near": [
-    "17"
-   ],
-   "stop": "Čechův most",
-   "info": "A curve drawn in steps 100 m from the stop Čechův most: the step is 4 cm off one smooth curve, a 2.0° corner. line 17 opposite track, s 6917: 125 m over 5 m in a 1380 m curve, a corner of 2.1° that leaves one smooth curve by 4 cm, 0 m from where drawn tracks meet (a switch, a crossing or a joint); line 17 our track, s 14857: 130 m over 5 m in a 1253 m curve, a corner of 2.0° that leaves one smooth curve by 4 cm, 1 m from where drawn tracks meet (a switch, a crossing or a joint).",
-   "step": {
-    "offset_cm": 4.0,
-    "corner_deg": 1.98,
-    "r5_m": 130,
-    "r25_m": 1253
-   },
-   "places": [
-    {
-     "line": 17,
-     "track": "opposite",
-     "s": 6917,
-     "offset_cm": 3.8,
-     "corner_deg": 2.08,
-     "r5_m": 125,
-     "r25_m": 1380,
-     "meet_m": 0.4
-    },
-    {
-     "line": 17,
-     "track": "our",
-     "s": 14857,
-     "offset_cm": 4.0,
-     "corner_deg": 1.98,
-     "r5_m": 130,
-     "r25_m": 1253,
-     "meet_m": 0.9
-    }
-   ],
-   "options": [
-    "smooth into one curve",
-    "keep as drawn",
-    "unsure"
-   ],
-   "answer_explanations": {
-    "smooth into one curve": "DI's vertices within 10 m of the place leave the curve fit, which draws one curve through: the track moves by about the step's size.",
-    "keep as drawn": "A real corner (a switch, a joint, a short straight between curves): the track stays as it is.",
-    "unsure": "This answer stays held for review."
-   }
-  }
- ]
+ "lines": [],
+ "findings": []
 }

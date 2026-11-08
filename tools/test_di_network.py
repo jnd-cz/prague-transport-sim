@@ -400,6 +400,10 @@ class Chords(unittest.TestCase):
             self.assertEqual((kept[0], kept[-1]), (c[0], c[-1]))
             self.assertFalse(any(math.dist(p, (50, 0)) <= 10 for p in kept))
             self.assertEqual(len(kept), sum(1 for p in c if math.dist(p, (50, 0)) > 10))
+            # (an end walked back to its node is DI's record end, no node: inside the reach it goes too)
+            walked = dn.without_steps(c[:52], (True, False))
+            self.assertEqual(walked[0], c[0])
+            self.assertTrue(all(math.dist(p, (50, 0)) > 10 for p in walked[1:]))
             dn.SMOOTHED = []
             self.assertEqual(dn.without_steps(c), c)
         finally:

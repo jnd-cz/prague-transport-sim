@@ -99,6 +99,23 @@ class Network(unittest.TestCase):
         h_out = heading(net.pts[(2, 3)])
         self.assertLess(abs(math.degrees(h_out - h_in)), 0.5)
 
+    def test_an_interlaced_tip_is_a_y_both_tracks_leaving_the_approach(self):
+        # (Čechův most, #368: the approach on the axis to the tip, the two tracks +4.7 and -8.7 cm off it from 7 m on; no
+        # points between, DI's tongue chord. A Y: neither continues the approach, both leave along it)
+        appr = [(x, 0.0) for x in range(-50, 1, 2)]
+        up = [(0.0, 0.0)] + [(x, 0.047) for x in range(7, 51, 2)]
+        down = [(0.0, 0.0)] + [(x, -0.087) for x in range(7, 51, 2)]
+        pos = {1: appr[0], 2: (0.0, 0.0), 3: up[-1], 4: down[-1]}
+        net = tc.Network(pos, {(1, 2): appr, (2, 3): up, (2, 4): down}, {(1, 2): 'di', (2, 3): 'di', (2, 4): 'di'},
+                         approach={2: 1})
+        self.assertLess(max(abs(y) for x, y in net.pts[(1, 2)]), 0.005)   # (the approach stays on its axis)
+        for key, side in (((2, 3), 1), ((2, 4), -1)):
+            out = net.pts[key]
+            self.assertLess(abs(math.degrees(heading(out))), 0.3)          # (leaves along the approach)
+            self.assertGreater(side * out[len(out) // 2][1], 0.03)        # (and off to its own side)
+            turn = [abs(math.degrees(heading(out[i:], d=1.0) - heading(out[i + 1:], d=1.0))) for i in range(len(out) - 3)]
+            self.assertLess(max(turn), 0.5)                                # (smoothly: no bend over 0.5 degree a metre)
+
     def test_a_branch_starting_at_its_own_angle_keeps_it(self):
         # beyond START the branch leaves at its own angle (data/truth.json `switch-start`: some designs start abruptly)
         through = [(x, 0.0) for x in range(0, 101, 2)]
