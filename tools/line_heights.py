@@ -26,7 +26,7 @@ from pathlib import Path
 import sys
 
 import shapely
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, banded_profile, cause, chains, implied_radii, radii, vertical_profile, whittaker  # noqa: E402
@@ -93,7 +93,10 @@ STEP_REACH = 70.0     # m: the stretch a step card showed either side of its pla
 IGNORE_ANSWERS = []  # the user's answers that drop heights: data/truth.json radiusAnswers with `ignore` (load_ignore_answers)
 STRETCH_NEAR = 1.0   # m: a height this near an `ignore` answer's stretch is on it
 RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
-HOLD, FOLLOW = 'hold the radius', 'follow the data'
+HOLD, FOLLOW, GROUND = 'hold the radius', 'follow the data', 'follow the ground'
+GROUND_ANSWERS = []  # the user's areas where the tracks take the lidar ground: radiusAnswers with `area` (load_ground_answers)
+GROUND_BAND = 0.05   # m: the curve stays within this of the ground in such an area
+GROUND_OTHER = 1.5   # m: a lidar this far from the track's height there is another level (a wall, a roof), no evidence
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
 DROP_MAX = 12     # rounds: where an answer holds the radius and discards the outliers, one point dropped per round
 
@@ -103,7 +106,7 @@ def load_radius_answers(truth):
     from geo import Frame
     F = Frame()
     out = [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer'], 'outliers': a.get('outliers'), 'date': a.get('date')}
-           for a in (truth.get('trackHeights') or {}).get('radiusAnswers', [])]
+           for a in (truth.get('trackHeights') or {}).get('radiusAnswers', []) if not a.get('area')]
     # (a step answer is the later word at its place: the radius answers within its reach give way to it)
     for a in load_step_answers(truth):
         if a['radius']:
@@ -142,6 +145,51 @@ def answered_ignore(chs):
     return n
 
 
+def load_ground_answers(truth):
+    """data/truth.json radiusAnswers with an `area` (lat, lon corners): 'follow the ground' there."""
+    from geo import Frame
+    F = Frame()
+    return [{'area': Polygon([tuple(float(v) for v in F.xy(*p)) for p in a['area']]), 'answer': FOLLOW, 'date': a.get('date')}
+            for a in (truth.get('trackHeights') or {}).get('radiusAnswers', []) if a.get('area')]
+
+
+def ground_at(xy, reach=0.0):
+    """The ground answer whose area holds this point (or lies within `reach` of it), or None."""
+    return next((g for g in GROUND_ANSWERS if xy is not None and g['area'].distance(Point(xy)) <= reach), None)
+
+
+def answered_ground(chs):
+    """Where an answer has the tracks follow the ground in an area, each height there takes the lidar ground and is marked,
+    so that no rule drops it as a step steeper than any track; around the area the heights move part way, fading out over
+    BLEND_REACH, so the edge makes no step, and are marked too (Královka: the ground climbs 61 cm in 5 m just past where
+    the arms meet, at the area's edge; dropped there, the track lay 49 cm under it) (the user, Královka and Malovanka, 2026-11-08: "Can you try fitting the tracks to
+    ground in the highlighted areas ... With smooth transition to the rest of tracks"). A lidar over GROUND_OTHER off is
+    another level and stays out."""
+    n = 0
+    for g in GROUND_ANSWERS:
+        near = g['area'].buffer(BLEND_REACH)
+        for c in chs:
+            if not c.line.intersects(near):
+                continue
+            for x in c.bins:
+                lid = x.get('terrain')
+                if not x['xy'] or lid is None or x.get('pin') or not near.covers(Point(x['xy'])):
+                    continue
+                if x.get('z') is not None and abs(lid - x['z']) > GROUND_OTHER:
+                    continue
+                d = g['area'].distance(Point(x['xy']))
+                if d == 0:
+                    x['z'], x['w'], x['ground'] = lid, 1.0, True
+                    x['src'] = x.get('src') or 'dtmp'
+                elif x.get('z') is not None:
+                    x['z'] += (1 - d / BLEND_REACH) * (lid - x['z'])
+                    x['ground'] = x.get('ground') or 'near'
+                else:
+                    continue
+                n += 1
+    return n
+
+
 def load_step_answers(truth):
     """data/truth.json trackHeights.stepAnswers: at a place, whose heights (`use`: the archive, or DI as it is), and whether
     outliers go (`drop`), the survey is weighed in where the heights are noisy or the curve exceeded (`blend`), and how
@@ -161,7 +209,11 @@ def step_answer_at(xy):
 
 
 def answer_at(xys, kinds=(HOLD,)):
-    """The user's answer (of `kinds`) at a place: the nearest within ANSWER_REACH of any of its points, else None."""
+    """The user's answer (of `kinds`) at a place: the nearest within ANSWER_REACH of any of its points, else None. In an area
+    where the tracks follow the ground, and the BLEND_REACH around it, that answer is the later word: it follows the data there."""
+    g = next((g for xy in xys if (g := ground_at(xy, BLEND_REACH))), None)
+    if g:
+        return g if FOLLOW in kinds else None
     near = [(math.dist(a['xy'], xy), k, a) for k, a in enumerate(RADIUS_ANSWERS) if a['answer'] in kinds
             for xy in xys if xy is not None]
     near = [x for x in near if x[0] <= x[2].get('reach', ANSWER_REACH)]
@@ -637,11 +689,12 @@ def solve(c, pins, r, relax=None):
         def steep(g):
             idx = [i for i in range(max(0, g[0] - 1), min(len(run), g[-1] + 2)) if run[i]['z'] is not None]
             return any(abs(run[b]['z'] - run[a]['z']) > MAX_GRADE * (run[b]['s'] - run[a]['s']) for a, b in zip(idx, idx[1:]))
-        out = [g for g in groups if len(g) <= LONE or steep(g)]
+        # (where an answer has the tracks follow the ground, its heights are the ground: none of them goes)
+        out = [g for g in groups if not any(run[i].get('ground') for i in g) and (len(g) <= LONE or steep(g))]
         dropped = {i for g in out for i in g}
         zone = lambda si: any(a <= si <= b for a, b in c.switch)
-        tol = [PIN_TOL if x.get('pin') else None if (not x['w'] or i in dropped) else JUNCTION_BAND if zone(x['s'])
-               else BAND for i, x in enumerate(run)]
+        tol = [PIN_TOL if x.get('pin') else None if (not x['w'] or i in dropped) else GROUND_BAND if x.get('ground') is True
+               else JUNCTION_BAND if zone(x['s']) else BAND for i, x in enumerate(run)]
         weight = [0.0 if i in dropped else w for i, w in enumerate(weight)]
         # (where an answer drops the heights between a junction's switches, they go: the tracks meet on the curve around them;
         # the user, Malovanka, 2026-11-07: "if you ignore any height between the switches and fit the best vertical radius")
@@ -661,7 +714,8 @@ def solve(c, pins, r, relax=None):
         over = lambda r_: [i for i, e in enumerate(r_['excess']) if e > fit[i]]
         xy_of = lambda j: run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0])
         floor = r.get('min', MIN_RADIUS)
-        lowest = [floor] * len(s)  # how far the radius may give way at each point
+        # how far the radius may give way at each point (in an area that follows the ground, below the floor: the user's word)
+        lowest = [MIN_RADIUS if ground_at(xy_of(j), BLEND_REACH) else floor for j in range(len(s))]
         res = first = banded_profile(s, zf, rmin, tol, weight)
         relaxed = drops = 0
         while relaxed < RELAX_STEPS and drops < DROP_MAX:
@@ -1284,10 +1338,10 @@ def main():
     ap.add_argument('--smooth', choices=('wh3', 'none'), default='wh3', help='the smoother in front of the band rule (#358)')
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')
-    global RADIUS_ANSWERS, STEP_ANSWERS, FLOOR_SINCE, IGNORE_ANSWERS
+    global RADIUS_ANSWERS, STEP_ANSWERS, FLOOR_SINCE, IGNORE_ANSWERS, GROUND_ANSWERS
     truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
     RADIUS_ANSWERS, STEP_ANSWERS = load_radius_answers(truth), load_step_answers(truth)
-    IGNORE_ANSWERS = load_ignore_answers(truth)
+    IGNORE_ANSWERS, GROUND_ANSWERS = load_ignore_answers(truth), load_ground_answers(truth)
     FLOOR_SINCE = next((f.get('date') for f in truth['trackGeometry']['facts'] if f['id'] == 'vertical-radius-min'), None)
     staged = staged_heights(args.staged)
     chs = build_chains(staged)
@@ -1297,6 +1351,8 @@ def main():
     dropped, blended = answered_noise(chs)
     print(f'step answers: {len(STEP_ANSWERS)}; {dropped} heights dropped, {blended} weighed with the survey', flush=True)
     print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
+    print(f'{answered_ground(chs)} heights took the ground, or part way to it, in {len(GROUND_ANSWERS)} areas an answer has '
+          f'follow the ground', flush=True)
     for c in chs:
         for x in c.bins:
             x['staged'] = x['z']

@@ -302,6 +302,27 @@ class Answers(unittest.TestCase):
             lh.IGNORE_ANSWERS = []
         self.assertAlmostEqual(c.z_at(100)[0], 100.0, delta=.03)
 
+    def test_an_answer_has_the_tracks_follow_the_ground_in_an_area(self):
+        # (Královka's west arm: the data level, the ground stepping 60 cm down at 12 % over 5 m; the step was dropped as
+        # steeper than any track and the arm stayed 15-78 cm above the ground)
+        ground = lambda s: 100.0 if s <= 95 else 99.4 if s >= 100 else 100.0 - .12 * (s - 95)
+        c = chain([(0, 0), (260, 0)], lambda s: 100.0, terrain=ground)
+        lh.GROUND_ANSWERS = [{'area': lh.Polygon([(70, -5), (150, -5), (150, 5), (70, 5)]), 'answer': lh.FOLLOW, 'date': None}]
+        try:
+            self.assertGreater(lh.answered_ground([c]), 0)
+            for x in c.bins:
+                x['staged'] = x['z']
+            quiet(lh.assemble, [c])
+        finally:
+            lh.GROUND_ANSWERS = []
+        self.assertAlmostEqual(c.z_at(125)[0], 99.4, delta=lh.GROUND_BAND + .01)
+        self.assertAlmostEqual(c.z_at(80)[0], 100.0, delta=lh.GROUND_BAND + .01)
+        self.assertAlmostEqual(c.z_at(240)[0], 100.0, delta=lh.BAND)
+        # (the edge makes no step: no grade steeper than any track's beyond the ground's own step)
+        s = [5.0 * k for k in range(52)]
+        z = [c.z_at(t)[0] for t in s]
+        self.assertLess(max(abs(b - a) / 5 for t, a, b in zip(s, z, z[1:]) if not 85 <= t <= 105), lh.MAX_GRADE)
+
     def test_an_archive_answer_takes_the_archive_and_holds_where_it_has_none(self):
         lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
         series = [{'xy': (10.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}, {'xy': (20.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': None},
