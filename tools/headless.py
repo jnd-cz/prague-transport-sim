@@ -214,7 +214,8 @@ BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
        "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
        "load10": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
        "load90": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
-       "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies"},
+       # (overspeed too: down 55 ‰ on leaves the branch of #351 ran 35 km/h into a 20 in 23 of 25 runs, unflagged)
+       "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
 HARD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
