@@ -465,6 +465,60 @@ class Sources(unittest.TestCase):
         self.assertEqual(lh.archive_over_di([a, b]), 0)
 
 
+class Held(unittest.TestCase):
+    def track(self, archive, survey, held=range(20, 40), flags=()):
+        # (#202: a held stretch, the archive and the survey 0.35 m apart, as on line 17 between Čechův most and
+        # Strossmayerovo náměstí; around it DI 5 cm over the lidar)
+        ground = lambda s: 100 + .01 * s
+        c = chain([(0, 0), (300, 0)], lambda s: ground(s) + .05, terrain=ground)
+        for k, x in enumerate(c.bins):
+            x['src'], x['flags'] = 'di', list(flags)
+            x['archive'] = x['survey'] = None
+            if k in held:
+                x['z'], x['w'], x['src'] = None, 0.0, None
+                x['archive'] = None if archive is None else ground(x['s']) + archive
+                x['survey'] = None if survey is None else ground(x['s']) + survey
+        return c, ground
+
+    def test_the_lidar_picks_the_archive(self):
+        c, ground = self.track(.02, -.33)
+        self.assertEqual(lh.held_settled([c]), (20, 0))
+        self.assertTrue(all(x['src'] == 'dtmp' and abs(x['z'] - ground(x['s']) - .02) < 1e-9 for x in c.bins[20:40]))
+
+    def test_the_lidar_picks_the_survey(self):
+        c, _ = self.track(.4, -.03)
+        self.assertEqual(lh.held_settled([c]), (20, 0))
+        self.assertTrue(all(x['src'] == 'zps' for x in c.bins[20:40]))
+
+    def test_neither_near_the_lidar_stays_held(self):
+        c, _ = self.track(.3, -.3)
+        self.assertEqual(lh.held_settled([c]), (0, 0))
+        self.assertTrue(all(x['z'] is None for x in c.bins[20:40]))
+
+    def test_only_the_lidar_gives_it_with_the_rails_offset_around(self):
+        c, ground = self.track(None, None)
+        self.assertEqual(lh.held_settled([c]), (0, 20))
+        self.assertTrue(all(x['src'] == 'lidar' and abs(x['z'] - ground(x['s']) - .05) < 1e-9 for x in c.bins[20:40]))
+
+    def test_a_lidar_steeper_than_any_track_stays_held(self):
+        # (Petřín's funicular: held its whole length, the hill's bare earth stepped 2-6 m)
+        c, ground = self.track(None, None)
+        for x in c.bins:
+            x['terrain'] += .3 * max(0.0, x['s'] - 100)   # (30 % from s 100)
+        self.assertEqual(lh.held_settled([c]), (0, 0))
+
+    def test_a_lidar_that_does_not_meet_the_heights_beside_stays_held(self):
+        c, _ = self.track(None, None)
+        for x in c.bins[20:40]:
+            x['terrain'] += 0.6
+        self.assertEqual(lh.held_settled([c]), (0, 0))
+
+    def test_on_a_structure_it_stays_held(self):
+        # (the bare-earth lidar lies under a deck and over a tunnel)
+        c, _ = self.track(None, None, flags=['structure_hint'])
+        self.assertEqual(lh.held_settled([c]), (0, 0))
+
+
 class Smoothed(unittest.TestCase):
     def test_it_hardly_moves_a_height_near_a_junction(self):
         through = chain([(0, 0), (400, 0)], lambda s: 100 + .15 * math.sin(s / 6))

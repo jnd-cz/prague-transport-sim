@@ -69,7 +69,7 @@ END_FADE = 10.0  # m over which a track's end taking the height of the track it 
 ACROSS_MIN, ACROSS_MAX = 2.0, 6.0  # m: the opposite track beside ours (the game's corridor is 6 m, src/terrain.js)
 EXTEND = BIN    # m: a chain's height reaches this far past its first and last bin (its ends, junctions)
 CODE = {'di': 'di', 'archive': 'dtmp', 'reviewed': 'review', 'deck': 'zps', 'survey': 'zps'}  # staged dataset -> code
-LEVELS = ('di', 'dtmp', 'review', 'zps', 'curve', 'surface')  # codes in the order of sources.LAYERS['heights']
+LEVELS = ('di', 'dtmp', 'review', 'zps', 'lidar', 'curve', 'surface')  # codes in the order of sources.LAYERS['heights']
 
 
 SMOOTH_WAVELENGTH = 70.0  # m: the waves the smoother halves. What the two tracks of a street do not share ends about here
@@ -467,6 +467,77 @@ def beside(chs, tree, ci, x):
 
 SOURCES_OFF, SOURCES_ON, SOURCES_EDGE, SOURCES_RUN = 0.5, 0.3, 0.1, 3  # m, m, m, bins (archive_over_di)
 STRUCTURE_FLAGS = {'structure_hint', 'structure_unverified', 'tunnel_unverified', 'known_archive_disagreement'}
+
+
+HELD_NEAR = 0.10      # m: a held height's source the lidar lies this near, the other source further (held_settled, rule 1)
+LIDAR_AROUND = 100.0  # m: the rail's offset over the lidar where only the lidar has a height: the median of the chain's
+LIDAR_OFFSET = 0.01   # heights this near, else this (the network's median: p10 -0.067, p90 +0.182 m on 61,403 bins)
+LIDAR_LOG = []        # (xy, rule, height) of the heights held_settled gave: reports/line-heights.json
+
+
+def held_settled(chs):
+    """Heights the staging held (no source it could choose), settled by the lidar (#202). Not on a structure (the bare-earth
+    lidar lies under a deck, on a hill over a tunnel), nor under a step answer.
+    1. Where the archive and the survey disagree, the one the lidar lies within HELD_NEAR m of while the other lies
+       further: the lidar breaks the tie, two sources against one. Calibrated where DI has a height too: the lidar's pick
+       matched DI within HELD_NEAR at 148 of 155 bins (the archive 137 of 141, the survey 11 of 14); where it picks
+       neither (14), the height stays held. Line 17 between Čechův most and Strossmayerovo náměstí: the archive within
+       1-3 cm of the lidar for 126 m, the survey 0.3-0.4 m under both.
+    2. Where only the lidar has a height (no DI, archive or survey: `no_usable_height`), the lidar plus the rail's offset
+       over it on the chain's heights within LIDAR_AROUND m, else LIDAR_OFFSET (line 22's west end: 74-80 m). Only a
+       stretch the lidar draws no steeper than any track (MAX_GRADE) and that meets the heights either side of it within
+       SOURCES_ON: Petřín's funicular, held its whole length, took the hill's bare earth, steps of 2.2-6.1 m.
+    Returns the counts per rule; each height goes to LIDAR_LOG and its source code is the one taken ('lidar' for 2)."""
+    n1 = n2 = 0
+    LIDAR_LOG.clear()
+    usable = lambda x: (x.get('z') is not None and x.get('terrain') is not None and x.get('src') in ('di', 'dtmp')
+                        and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and abs(x['z'] - x['terrain']) < 1.0)
+    for c in chs:
+        ref = sorted((x['s'], x['z'] - x['terrain']) for x in c.bins if usable(x))
+        todo = []
+        bins = sorted(c.bins, key=lambda x: x['s'])
+        for x in c.bins:
+            g = x.get('terrain')
+            if (x.get('z') is not None or g is None or not x['xy'] or STRUCTURE_FLAGS & set(x.get('flags') or ())
+                    or (STEP_ANSWERS and step_answer_at(x['xy']))):
+                continue
+            a, s = x.get('archive'), x.get('survey')
+            if a is not None and s is not None:
+                if abs(a - g) <= HELD_NEAR < abs(s - g):
+                    todo.append((x, a, 'dtmp', 1))
+                elif abs(s - g) <= HELD_NEAR < abs(a - g):
+                    todo.append((x, s, 'zps', 1))
+            elif a is None and s is None:
+                near = sorted(o for t, o in ref if abs(t - x['s']) <= LIDAR_AROUND)
+                todo.append((x, g + (near[len(near) // 2] if near else LIDAR_OFFSET), 'lidar', 2))
+        # (rule 2 by stretch: no steeper than any track, meeting the heights either side)
+        lid = [t for t in todo if t[3] == 2]
+        todo = [t for t in todo if t[3] == 1]
+        lid.sort(key=lambda t: t[0]['s'])
+        runs = []
+        for t in lid:
+            if runs and t[0]['s'] - runs[-1][-1][0]['s'] <= 2 * BIN + .01:
+                runs[-1].append(t)
+            else:
+                runs.append([t])
+        for run in runs:
+            if any(abs(b[1] - a[1]) > MAX_GRADE * (b[0]['s'] - a[0]['s']) for a, b in zip(run, run[1:])):
+                continue
+            ok = True
+            for end, side in ((run[0], -1), (run[-1], 1)):
+                nb = [x for x in bins if x.get('z') is not None and 0 < side * (x['s'] - end[0]['s']) <= 2 * BIN + .01]
+                if nb and abs(min(nb, key=lambda x: abs(x['s'] - end[0]['s']))['z'] - end[1]) > SOURCES_ON:
+                    ok = False
+            if ok:
+                todo += run
+        for x, z, src, rule in todo:
+            x['z'], x['w'], x['src'] = z, 1.0, src
+            LIDAR_LOG.append((x['xy'], rule, round(z, 3)))
+            if rule == 1:
+                n1 += 1
+            else:
+                n2 += 1
+    return n1, n2
 
 
 def archive_over_di(chs):
@@ -1422,6 +1493,8 @@ def main():
     dropped, blended = answered_noise(chs)
     print(f'step answers: {len(STEP_ANSWERS)}; {dropped} heights dropped, {blended} weighed with the survey', flush=True)
     print(f'{archive_over_di(chs)} heights took the archive where DI alone stood off the lidar and the track beside it', flush=True)
+    n1, n2 = held_settled(chs)
+    print(f'held heights settled by the lidar: {n1} where it sided with the archive or the survey, {n2} where only it had one', flush=True)
     print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
     print(f'{answered_ground(chs)} heights took the ground, or part way to it, in {len(GROUND_ANSWERS)} areas an answer has '
           f'follow the ground', flush=True)
@@ -1463,6 +1536,7 @@ def main():
                                                'moved_m': {'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
                                                'held_over_60m': held,
                                                'neighbour_snaps': [[round(float(v), 5) for v in F.ll(*xy)] + [z] for xy, z in NEIGHBOUR_LOG],
+                                               'held_settled': [[round(float(v), 5) for v in F.ll(*xy)] + [rule, z] for xy, rule, z in LIDAR_LOG],
                                                'dropped_by_answers': [[round(float(v), 5) for v in F.ll(*xy)]
                                                                       for c in chs for xy in c.dropped]}, 'lines': {}}
     for line in args.lines:
