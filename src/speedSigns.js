@@ -30,17 +30,19 @@ export function signSize(sign) {
 // ------------------------------------------------------------------ the figures and text
 // Every photo shows a heavy condensed DIN (DIN 1451 Engschrift): the user's 60 Rychlostník and 80 gradient board
 // (2026-11-08), the website's 10 and 30 restrictions. D 1/2's drawings use a heavy face for speeds and a serif for
-// gradients; the photos win. Bahnschrift Condensed Bold, Windows' DIN 1451, in its own proportions ("Bahnschrift bold looks
-// good", the user, 2026-11-08); elsewhere the nearest condensed face. Squeezing it to the photos' narrower figures (0.43 as
-// wide as high, Bahnschrift's are 0.59) distorted it, so the figures are a little lower than the photos' 0.45-0.50 of the
-// panel: two of them at 100 mm fill 0.86 of the 140 mm panel's width.
+// gradients; the photos win. Bahnschrift Condensed Bold, Windows' DIN 1451 ("Bahnschrift bold looks good", the user,
+// 2026-11-08); elsewhere the nearest condensed face. Its figures are wider than the signs': two of them are 1.18 as wide
+// as high, the photos' 0.86-1.01. Narrowed to 0.8 of its width ("stretch it so it looks close to the real signs", the
+// user), it matches the photos side by side, the vertical strokes as heavy as theirs; at its own width it looked too
+// wide. The figures are the photos' size, 0.47 of the panel's height.
 const FIGURES = '"Bahnschrift Condensed", "Bahnschrift SemiCondensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
-const FIGURE_H = 0.100;        // m: the speed signs' figures, the same on every plate
+const FIGURE_H = 0.113;        // m: the speed signs' figures, the same on every plate
 const FIGURE_W = 0.86;         // the most of a panel's width the figures take
+const SQUEEZE = 0.8;           // the figures' width over the font's own
 
-// Text in a box, in its own proportions: as large as the box allows, centred in it. `bold`: an outline of that width (of
-// the height) in the same colour, heavier than the font's own bold.
-function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '700', bold = 0 } = {}) {
+// Text in a box: as large as the box allows, centred in it, `squeeze` times as wide as the font draws it. `bold`: an
+// outline of that width (of the height) in the same colour, heavier than the font's own bold.
+function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '700', bold = 0, squeeze = 1 } = {}) {
   text = String(text);
   g.save();
   g.font = `${weight} 100px ${family}`;
@@ -49,9 +51,9 @@ function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '7
   const left = m.actualBoundingBoxLeft || 0, right = m.actualBoundingBoxRight || m.width || 60;
   const up = m.actualBoundingBoxAscent || 72, down = m.actualBoundingBoxDescent || 0;
   const line = bold * h, k0 = (h - line) / (up + down);
-  const k = Math.min(k0, (w - line) / (left + right));
+  const k = Math.min(k0, (w - line) / ((left + right) * squeeze));
   g.translate(x + w / 2, y + h / 2);
-  g.scale(k, k);
+  g.scale(k * squeeze, k);
   g.fillStyle = color;
   g.fillText(text, -(right - left) / 2, (up - down) / 2);
   if (line) { g.strokeStyle = color; g.lineJoin = 'round'; g.lineWidth = line / k; g.strokeText(text, -(right - left) / 2, (up - down) / 2); }
@@ -61,7 +63,7 @@ function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '7
 // figures of height h (or narrower than maxW) centred on cx, cy
 function figures(g, text, cx, cy, h, color, { maxW = Infinity, bold = 0 } = {}) {
   const w = Math.min(maxW, h * 4);
-  fit(g, text, cx - w / 2, cy - h / 2, w, h, { color, bold });
+  fit(g, text, cx - w / 2, cy - h / 2, w, h, { color, bold, squeeze: SQUEEZE });
 }
 
 function diagonal(g, x0, y0, x1, y1, width, color) {

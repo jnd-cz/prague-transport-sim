@@ -1,6 +1,6 @@
 # Speed limits from D 1/2's facts, OSM's posted speeds and the signs (#211)
 
-Status: **limits decided, signs proposed** (PR #362). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). Questions 4–8, on the signs and the speed switches, are open.
+Status: **limits decided, signs proposed** (PR #362). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). On 2026-11-08 the user answered questions 4, 6 and 8, and on 5 that the signs must be larger. Open: the size (5), from the screenshots, and whether R07 and R09 are at the places marked (7).
 
 ## The facts against the code
 
@@ -177,7 +177,10 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 
 **Figures and shapes from photos (the user's of 2026-11-08, the website's):** shapes and colours follow D 1/2; the figures follow the photos.
 - Every sign's figures are a heavy condensed DIN, as on the user's 60 Rychlostník and 80 climb board and the website's 10 and 30. D 1/2 draws a heavy face filling the panel, and a serif on the gradient boards.
-- The faces use Bahnschrift Condensed Bold, Windows' DIN 1451, at its own proportions (the user, 2026-11-08: "Bahnschrift bold looks good"); elsewhere the nearest condensed face. Its figures are wider than the photos' (0.59 as wide as high, against 0.43). Squeezed to the photos' width they looked wrong, so they are 100 mm high on every plate, restriction, point, Rychlostník and zone alike. That is 0.42 of the panel's height; the photos have 0.45–0.50.
+- The faces use Bahnschrift Condensed Bold, Windows' DIN 1451 (the user, 2026-11-08: "Bahnschrift bold looks good"); elsewhere the nearest condensed face.
+- Its figures are wider than the signs': two are 1.18 as wide as high, the photos' 0.86–1.01. They are drawn at 0.8 of their width, which matches the photos side by side, the vertical strokes as heavy as theirs (the user: "stretch it so it looks close to the real signs").
+- They are the photos' size, 113 mm (0.47 of the panel), on every plate: restriction, point, Rychlostník and zone.
+- Text on the plates (ZÓNA, the hours, a car type) keeps the font's own width ("keep the type under number, unsqueezed").
 - The gradient boards' figures are larger and heavier than the photos', to read in the game (the user, 2026-11-08). They are 0.30 of the board high (the photos: 0.23), bold with an outline of 0.035 of their height.
 - The gradient board's pentagon has its shoulders 0.56 of the height from its point's edge, as on both photos and D 1/2 p. 52. They were drawn at 0.42.
 - The speed switch's arrow is measured on the two R01 photos ([speed-switch signals](2026-11-07-speed-switch-signals.md)).
@@ -198,7 +201,17 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 | yellow backing board (§ 49.32) | any sign may have it; no rule says where | an option of the face |
 | SIG-V2 *Pomalu*, V5 point, V9 "V" | faces only: no source lists their places | |
 
-**A change from today:** a limit that comes only from a curve (11.1 km since the 2 m rule; R over 25 m) has no real sign, so it gets none. The gauge marker and the hint still show it. Today's boards stand at every change, drawn black on white, and call themselves rychlostník.
+**Limits that come only from a curve** (11.1 km since the 2 m rule; R over 25 m) have no real sign. The user (2026-11-08): "I would still keep them for now for diagnostic purposes, we can drop them later with more stable release". So they keep a board, today's black on white one, marked as a diagnostic in the code. The gauge marker and the hint show them too. Today's boards stand at every change and call themselves rychlostník; the real signs replace them everywhere else.
+
+**Size in the game:** the user (2026-11-08): "because of monitor's low dpi and resolution we need larger signs". Measured in the game's cab view at 1920×1080 (about 96° across, 15 px per degree), boards hung over the track. The figures need about 8 px to read.
+
+| scale | board | figures 113 mm × scale read up to | at 50 m | at 100 m |
+|---|---|---|---|---|
+| 100 % | 200×300 mm | about 12 m | 2 px: colour and shape only | 1 px, specks |
+| 150 % | 300×450 mm | about 18 m | 3 px | 1.5 px |
+| 200 % | 400×600 mm | about 24 m | 4 px: colour and shape | 2 px |
+
+An eye reads the real 113 mm figures at about 75 m (5′ per character). No board size the scene can hold matches that on a 1080p screen: 100 % would need about 6 times its size. Where the driver must act (a restriction 90–125 m ahead at 50 km/h, a warning board 140–200 m ahead), the board shows its kind by colour and shape, and the number has to come from elsewhere: the gauge marker and the hint, or a zoom key that narrows the view as an eye would. The size is the user's choice from the screenshots ([the review page](https://claude.ai/artifact/Hx86b3fvNzVYjJnGWDfazq)).
 
 **Curves under 25 m found by the rule, against the list:** Spálená (9, 22, 23), Chotkova (22, 23), Blanická (9), Na Moráni (9), Na Žertvách (37), Klárov (22, 23, at a switch). Not found by radius: Malostranské náměstí (both), Náměstí Míru (both), Havlíčkova. These may be other directions or a radius read over 16 m; the implementation issue checks them.
 

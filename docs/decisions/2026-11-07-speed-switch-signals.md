@@ -8,8 +8,8 @@ Sources: D 1/2 § 30, 46; PPS Q103–105, Q109, Q111–112; the website's page o
 
 | no. | place | speeds | on our lines | the driven direction meets it |
 |---|---|---|---|---|
-| R07 | Kotlářka | 50 / 15 in the register, 50 / 35 in the 2023 press | 9 | **yes**, by name: s 23460, straight, on the way back from the centre. To check |
-| R09 | Podolské nábřeží od Dvorců | 30 / 15 | 17 | **yes**, by name: s 9773, straight. To check |
+| R07 | Kotlářka | 50 / 15 in the register, 50 / 35 in the 2023 press | 9 | **yes**, by name: s 23460, straight, on the way back from the centre; Plzeňská between Kavalírka and Kotlářka, 50.06971 N 14.36516 E, heading west. To check |
+| R09 | Podolské nábřeží od Dvorců | 30 / 15 | 17 | **yes**, by name: s 9773, straight; Podolské nábřeží between Dvorce and Kublov, just before the junction westwards, 50.04992 N 14.41556 E, heading north. To check |
 | R03 | Letenský tunel | 50 / 40 | 17 | no: `pathBack` (OSM `ref`, 0.1 m) |
 | R04 | Nádraží Braník, into the loop | 30 / 15 | 17 | no: `pathBack` (OSM `ref`, 0.1 m) |
 | R05 | Průběžná od Strašnické | 30 / 15 | 22 | no: `pathBack`, by name |
