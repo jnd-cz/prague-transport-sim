@@ -162,8 +162,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   a hillside (Chotkova), Most Legií on a deck with piers.
 - Signs: classic red Prague stop signs; the speed signs of the D 1/2 rules (a restriction in black on yellow,
   a Rychlostník in white on black, the warning triangle, the "r" of a small-radius curve, the dangerous climb
-  and descent), twice their real size so they can be read on a screen. A white board with a black number is
-  only a helper: it stands where a curve limits the speed and no real sign does. Contact signs. Zebra crossings are painted where they are mapped (not across the tracks). Signals and signs
+  and descent), twice their real size so they can be read on a screen. Contact
+  signs. Zebra crossings are painted where they are mapped (not across the tracks). Signals and signs
   stand off the road: on catenary poles, hung from span wires beside the contact wire, or at the kerb — not
   on platforms.
 - Overhead line: span wires anchored on poles at the kerb (between carriageway and sidewalk), on wall

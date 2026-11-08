@@ -835,6 +835,12 @@ export class Game {
     // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; the user, 2026-11-08: "keep them for now for
     // diagnostic purposes, we can drop them later with more stable release"). Where the limit lies under both the posted
     // speed and the restrictions for 25 m or more: the lowest at the start, 12 m before it, and the speed after it.
+    // They show only with the debug overlay (F8, src/debugOverlay.js; the user, 2026-11-08, #389: "Only with F8"): in the
+    // old design they read as real signs, three to one against those. None within 20 m of a real sign, which stands there.
+    const diag = (this.diagBoards = new THREE.Group());
+    diag.visible = false;
+    this.objects.add(diag);
+    const real = this.signBoards.map((b) => b.at ?? b.s);
     const lim = this.limits, step = lim.step, vals = lim.values;
     const postedAt = (s) => Math.min(posted[Math.floor(s / pstep)] || 50, top);
     const curveBin = (i) => vals[i] < Math.min(postedAt(i * step), lim.restriction(i * step + step / 2));
@@ -851,8 +857,10 @@ export class Game {
         const board = makeSpeedSign(v);
         board.userData.diagnostic = true;
         this._mount(board, s, { movable: v > low ? 'after' : true });
-        this.objects.add(board);
-        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s), at: Math.round(board.userData.mountedS ?? s) });
+        const at = board.userData.mountedS ?? s;
+        if (real.some((r) => Math.abs(r - at) < 20)) continue;
+        diag.add(board);
+        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s), at: Math.round(at) });
       }
       i = k;
     }
