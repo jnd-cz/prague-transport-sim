@@ -469,16 +469,17 @@ const carPoint = (car, x, y, z, out) => { car.updateMatrix(); return out.set(x, 
 // pin, a few cm closer along the track in a curve than on the straight.
 export function placeHybridConsist(model, sFront, at, pitch = CAR_PITCH) {
   const { cars, bogie } = model.userData, pin = T3.couplerPivot, link = pitch - 2 * pin;
+  const y = cars[0].userData.rig?.couplers[1]?.position.y ?? 0; // (the pins' height in the car: the link runs between them)
   let c = sFront - HALF;
   cars.forEach((car, k) => {
     if (k > 0) {
       const prev = cars[k - 1];
-      carPoint(prev, 0, 0, -pin, A);
+      carPoint(prev, 0, y, -pin, A);
       // the next car's centre along the track: two secant steps from the straight-track pitch
       let c2 = c - pitch;
       for (let i = 0; i < 3; i++) {
         placeCar(car, c2, at, bogie, sFront);
-        carPoint(car, 0, 0, pin, B);
+        carPoint(car, 0, y, pin, B);
         const err = A.distanceTo(B) - link;
         if (Math.abs(err) < 1e-4) break;
         c2 += err;
@@ -488,12 +489,12 @@ export function placeHybridConsist(model, sFront, at, pitch = CAR_PITCH) {
     placeCar(car, c, at, bogie, sFront);
   });
   // the couplers: coupled ones along the link, the free ones at the set's ends straight ahead
-  for (const car of cars) for (const bar of car.userData.rig.couplers) if (bar) bar.rotation.y = 0;
+  for (const car of cars) for (const bar of car.userData.rig.couplers) if (bar) bar.rotation.set(0, 0, 0);
   cars.forEach((car, k) => {
     const rear = car.userData.rig.couplers[1];
     if (k === cars.length - 1 || !rear) return;
     const next = cars[k + 1], nf = next.userData.rig.couplers[0];
-    carPoint(car, 0, 0, -pin, A); carPoint(next, 0, 0, pin, B);
+    carPoint(car, 0, y, -pin, A); carPoint(next, 0, y, pin, B);
     F.subVectors(B, A); // from this car's rear pin to the next one's front pin, in the world
     for (const [cc, bar, sign] of [[car, rear, -1], [next, nf, 1]]) {
       if (!bar) continue;
@@ -501,6 +502,9 @@ export function placeHybridConsist(model, sFront, at, pitch = CAR_PITCH) {
       // (the rig frame: +X = the car's forward (z), +Z = its right (-x)); the bar points along sign*X
       const fx = Q.z, rz = -Q.x;
       bar.rotation.y = sign > 0 ? Math.atan2(-rz, fx) : Math.atan2(rz, -fx);
+      // (up and down too: held along its car, each head rode on that car's pitch and the two stepped against
+      // each other by cm where the track changes its grade between the cars, #356)
+      bar.rotation.z = sign * Math.atan2(Q.y, Math.hypot(fx, rz));
     }
   });
 }

@@ -51,6 +51,9 @@ Conventions
 
 ## 1. Sources
 
+The ČKD links returned 404 on 2026-11-06. The copies are in `raw/reference/ckd-t3su/` (#353), scans without a text
+layer; page numbers here are the PDF's, the printed number being one lower in T3SU-24.
+
 | key | what | date | reliability |
 |---|---|---|---|
 | [ckd03] | ČKD, *Funkce a obsluha elektrické výzbroje TR 37* (operation of TR 37), doc. T-50172, 15 p. | TKS/Vk-05/82, hand corrections later | [A], with crossed-out older text |

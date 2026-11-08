@@ -23,6 +23,7 @@ Markov model, Viterbi): every STEP m of the route a state is an edge, a directio
 route; the next state follows the previous along the graph, through the passes above, about as far as the route
 went. A state off the network (OSM's own line) is allowed at a cost where DI has no track.
 """
+import bisect
 import heapq
 import math
 import sys
@@ -248,6 +249,7 @@ class Network:
             k = self.nodes[n]['kind']
             if k == 'meet':
                 self.nodes[n]['kind'] = 'fork' if len(ends) == 3 else 'meet'
+        self.tips = {}   # interlaced tips: {node: the direction the branch leaves in} (_interlaced_tips)
         self._interlaced_tips(getattr(src, 'interlaced', []))
         self._gaps()
         self._stubs()
@@ -692,6 +694,8 @@ class Network:
         """Two track ends facing each other within GAP join with a straight edge: a record the provider ended short
         (Kobyliské náměstí, line 17: 1.3 m between two ends of one track)."""
         ends = [n for n, v in self.nodes.items() if len(self.at[n]) == 1]
+        if not ends:
+            return
         tree = shapely.STRtree(shapely.points([self.nodes[n]['xy'] for n in ends]))
         cos = math.cos(math.radians(180 - TURN))
         done = set()
@@ -872,11 +876,13 @@ class Network:
         """An interlaced branch DI starts beside the track at a record joint (the fork there) is joined at its tip
         (`Source.interlaced`, a tongue back along the track): the through edge splits at the tip and the branch's
         end moves there, the piece from the tip to where DI starts it drawn straight (Čechův most: 13 cm beside the
-        track for 8.5 m)."""
+        track for 8.5 m). Each tip's node goes to `tips` {node: the direction the branch leaves in} (Drawn: the Y)."""
         for it in interlaced:
             tip, u, side = it['tip'], it['dir'], it['side']
             near = [(math.dist(v['xy'], tip), n) for n, v in self.nodes.items()
                     if math.dist(v['xy'], tip) <= di_tracks.TONGUE + 8.0]
+            if near and min(near)[0] <= 1.0:
+                self.tips[min(near)[1]] = u
             if not near or min(near)[0] <= 1.0:
                 continue
             # the node ahead of the tip where branch and track part (three or more ends)
@@ -909,6 +915,7 @@ class Network:
                 self.report['interlaced tips off the track edge'] += 1
                 continue
             T = self.split(e_in, s, 'interlaced')
+            self.tips[T] = u
             ed = self.remove_edge(branch[0])
             coords = list(ed['line'].coords)
             if branch[1] == 0:
@@ -1287,6 +1294,19 @@ class Match:
 
 END_STEP = 1.0      # m: an edge's line has points this far apart before its ends go to its nodes' places
 DENSE = 2.0         # m: at most this between a surveyed line's points given to the curve fit
+CHORD_CORNER = 0.3  # degrees: a smaller turn at a point of DI's line is no corner
+CHORD_LENGTH = (3.0, 40.0)  # m: a stretch between two corners turning the same way, this long, is a chord of a curve
+CHORD_END = 1.5     # m from a line's ends, where its end points were moved to their nodes: no corners read there
+CHORD_SAG = 0.02    # m: under this the arc lies within the curve fit's tolerance of its chord (track_curve.TOL): it can bend anyway
+CHORD_RADIUS = 1500.0  # m: wider is a straight with small corners, no curve: freed, one on line 17 (s 17624, 2372 m) took the
+                       # tracks from an even 3.0 m to 2.86 m apart; the curves drawn in chords are 250-500 m
+CHORD_ALIKE = 3.0   # the larger corner over the smaller: a curve drawn in chords turns about alike at each vertex (4.0 and 4.0, 5.0
+                    # and 5.0 degrees at Ohrada - Palmovka); a large corner beside a small one is a straight meeting a bend
+CHORD_BESIDE = 5.0  # a chord's radius over the curve's just outside it, past which the chord is that curve's lead-in: a curve drawn in
+                    # chords keeps about its radius past the chord. Lines 22 and 23 at Malostranské náměstí have a 31 m straight
+                    # between curves of 25 and 33 m, on both tracks; its corners of 0.5-1.4 degrees read as chords of 590 m, and
+                    # freed, the tracks went from an even 3.75 m to 3.54 m apart
+CHORD_LOOK = 15.0   # m beyond a chord's ends where that curve is looked for
 MIN_SPAN = 2.0      # m: a shorter stretch of an edge the corridor's track ways run on is not drawn
 FULL = 1.0          # m: a drawn stretch this near both ends of its edge is the whole edge
 EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM's track at both ends
@@ -1327,6 +1347,141 @@ def dense(coords, step=DENSE):
     return out
 
 
+def chords(coords):
+    """The stretches of a line that are chords of a curve, as (first index, last index): straight between two corners that turn
+    about alike and the same way, with the arc through them over CHORD_SAG from the chord and its radius under CHORD_RADIUS and
+    within CHORD_BESIDE of the curve just outside it. A corner at only one end is a real straight meeting a curve; over
+    CHORD_LENGTH it is a straight."""
+    if len(coords) < 3:
+        return []
+    cum = [0.0]
+    for a, b in zip(coords, coords[1:]):
+        cum.append(cum[-1] + math.dist(a, b))
+    corners = []
+    for i in range(1, len(coords) - 1):
+        if cum[i] < CHORD_END or cum[-1] - cum[i] < CHORD_END:
+            continue
+        a, b, c = coords[i - 1], coords[i], coords[i + 1]
+        u, v = math.atan2(b[1] - a[1], b[0] - a[0]), math.atan2(c[1] - b[1], c[0] - b[0])
+        d = math.degrees(math.atan2(math.sin(v - u), math.cos(v - u)))
+        if abs(d) >= CHORD_CORNER:
+            corners.append((i, d))
+    bend = lambda s, t: math.radians((abs(s) + abs(t)) / 2)  # (the radius is the chord over the corners' mean; the sag l^2 / 8R)
+    return [(i, j) for (i, s), (j, t) in zip(corners, corners[1:])
+            if s * t > 0 and max(abs(s), abs(t)) <= CHORD_ALIKE * min(abs(s), abs(t)) and CHORD_LENGTH[0] <= cum[j] - cum[i] <= CHORD_LENGTH[1]
+            and (cum[j] - cum[i]) * bend(s, t) / 8 >= CHORD_SAG and cum[j] - cum[i] <= CHORD_RADIUS * bend(s, t)
+            and (cum[j] - cum[i]) / bend(s, t) <= CHORD_BESIDE * min(_radius_over(coords, cum, cum[i] - CHORD_LOOK, cum[i]),
+                                                                     _radius_over(coords, cum, cum[j], cum[j] + CHORD_LOOK))]
+
+
+def _radius_over(coords, cum, lo, hi, tip=3.0):
+    """A line's radius between lo and hi m along it, from its direction over the first and last `tip` m; none past its ends."""
+    if lo < 0 or hi > cum[-1]:
+        return math.inf
+
+    def at(s):
+        k = max(0, min(bisect.bisect_right(cum, s) - 1, len(cum) - 2))
+        f = (s - cum[k]) / max(cum[k + 1] - cum[k], 1e-9)
+        return coords[k][0] + f * (coords[k + 1][0] - coords[k][0]), coords[k][1] + f * (coords[k + 1][1] - coords[k][1])
+
+    def heading(s, t):
+        a, b = at(s), at(t)
+        return math.atan2(b[1] - a[1], b[0] - a[0])
+
+    d = heading(hi - tip, hi) - heading(lo, lo + tip)
+    d = abs(math.atan2(math.sin(d), math.cos(d)))
+    return (hi - lo - tip) / d if d > 1e-9 else math.inf
+
+
+SMOOTHED = None  # the 'smooth' answers of the stepped-curve review, [(xy, reach)], read once (di_tracks.stepped_answers)
+
+
+def without_steps(coords, nodes=(True, True)):
+    """A surveyed line for the curve fit without its points within reach of a place the user answered 'smooth' on the
+    stepped-curve review (#368): the fit draws one curve through there. The line's own ends stay where they are its nodes
+    (`nodes`); an end walked back to a node is DI's record end 1.8-2.3 m from it, and held, it kept the step (Čechovo
+    náměstí: line 22's track hooked 3.5 cm in the last 0.76 m before the fork, 44 m over 5 m)."""
+    global SMOOTHED
+    if SMOOTHED is None:
+        SMOOTHED = [(xy, r) for xy, a, r in di_tracks.stepped_answers() if a == 'smooth']
+    if not SMOOTHED or len(coords) < 3:
+        return coords
+    free = lambda p: all(math.dist(p, xy) > r for xy, r in SMOOTHED)
+    return ([coords[0]] if nodes[0] or free(coords[0]) else []) + [p for p in coords[1:-1] if free(p)] + \
+        ([coords[-1]] if nodes[1] or free(coords[-1]) else [])
+
+
+def smooth_nodes(pos, pts, net):
+    """The surveyed nodes within reach of a place the user answered 'smooth' on, as track_curve's `loose` {(node, edge): 0}:
+    no data point there, the node lands where the fitted curve passes (#368). Freeing the points between nodes was not
+    enough where the node itself lies on the step: at Čechovo náměstí DI zig-zags -8 to +9 cm in the 10 m before a fork,
+    and the fork lands 8.7 cm from DI's node (with the walked-back record ends freed too, without_steps; line 22, s 14233:
+    44 m over 5 m in a 198 m curve before). A crossing stays where it is."""
+    if SMOOTHED is None:
+        without_steps([])
+    out = {}
+    for key in pts:
+        for n in key:
+            if net.nodes[n]['kind'] != 'crossing' and any(math.dist(pos[n], xy) <= r for xy, r in SMOOTHED or ()):
+                out[(n, key)] = 0.0
+    return out
+
+
+TONGUE_MIN = 2.0  # m: DI's first vertex past an interlaced tip further than this on a leaving track: a tongue chord
+
+
+def splay_ends(net):
+    """At each interlaced tip (`Network.tips`), the end approaching it and the two leaving it: {node: ((e, end) approaching,
+    [(e, end), (e, end)] leaving)}. Unlike a classic switch's straight track, neither leaving track continues the approach:
+    both leave its axis, on either side (the user, 2026-11-08, on a street-view photo of Čechův most: "I think it's the case
+    for interlaced switches that they have splay for both tracks unlike classical switch"; DI there: +4.7 and -8.7 cm off the
+    approach's axis 7 m on, which the fit had drawn as a straight track and a branch, with a 2-degree bend 1 m past each tip)."""
+    out = {}
+    for n, u in getattr(net, 'tips', {}).items():
+        ends = net.at.get(n, [])
+        dot = {x: net.out_dir(*x)[0] * u[0] + net.out_dir(*x)[1] * u[1] for x in ends}
+        back, fwd = [x for x in ends if dot[x] < -0.5], [x for x in ends if dot[x] > 0.5]
+        if len(ends) == 3 and len(back) == 1 and len(fwd) == 2:
+            out[n] = (back[0], fwd)
+    return out
+
+
+def tongue(net, e, end):
+    """How far from this end of edge e the first of DI's own vertices lies, where it is over TONGUE_MIN (else 0): DI draws the
+    first metres past an interlaced tip as one straight (4.6-10 m at the 18 tips), and the points the fit would take along it
+    are interpolated, not measured."""
+    line = net.edges[e]['line']
+    at = [line.project(Point(c[:2])) for r in net.edges[e]['records'] if isinstance(r, dict) for c in r['coords']
+          if line.distance(Point(c[:2])) < 0.05]
+    first = min((t if end == 0 else line.length - t for t in at if (t if end == 0 else line.length - t) > 0.3), default=0.0)
+    return first if first > TONGUE_MIN else 0.0
+
+
+def without_tongue(coords, cut):
+    """The points of a surveyed line within cut (m from its start, from its end) of it dropped: a tongue chord's interior.
+    The line's own ends stay."""
+    if len(coords) < 3 or not any(cut):
+        return coords
+    acc = [0.0]
+    for p, q in zip(coords, coords[1:]):
+        acc.append(acc[-1] + math.dist(p, q))
+    L = acc[-1]
+    keep = [i for i in range(1, len(coords) - 1) if acc[i] >= cut[0] - 0.05 and L - acc[i] >= cut[1] - 0.05]
+    return [coords[0]] + [coords[i] for i in keep] + [coords[-1]]
+
+
+def without_chords(coords):
+    """A surveyed line for the curve fit without the points inside the chords of a curve. DI draws some curves with vertices 22-28 m
+    apart and 4-5 degrees at each (line 37, Ohrada - Palmovka: "stepped curve instead of continuous radius", the user,
+    2026-11-06). The vertices lie on the curve and the chords inside it, 22 cm at their middles: the opposite track, at
+    vertices every 1.25 m, runs parallel to the curve through the vertices alone, and the archive's vertices lie within
+    3.2 cm of it."""
+    drop = set()
+    for i, j in chords(coords):
+        drop.update(range(i + 1, j))
+    return [p for i, p in enumerate(coords) if i not in drop]
+
+
 class Drawn:
     """The edges a line draws, fitted as smooth curves (tools/track_curve.py `Network`, #204).
     pts[e]: the fitted points of edge e from its node a to b."""
@@ -1337,6 +1492,8 @@ class Drawn:
         k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
         pos, pts, kind, limit = {}, {}, {}, {}
         errors = track_curve.class_errors()
+        splay = splay_ends(net)
+        leaving = {x for _, fwd in splay.values() for x in fwd}
         for e in self.edges:
             ed = net.edges[e]
             a, b = ed['a'], ed['b']
@@ -1348,7 +1505,10 @@ class Drawn:
                 # (no points on the chord an end walked back leaves: nothing is known there, _walk_back)
                 walk = ed.get('walk', ())
                 head, tail = c[:1] if 0 in walk else [], c[-1:] if 1 in walk else []
-                c = head + dense(c[len(head):len(c) - len(tail)]) + tail
+                # (a track leaving an interlaced tip: no points on DI's tongue chord, the fit eases it off the approach)
+                cut = [tongue(net, e, end) if not wb and (e, end) in leaving else 0.0 for end, wb in ((0, head), (1, tail))]
+                mid = without_steps(without_chords(dense(c[len(head):len(c) - len(tail)])), (not head, not tail))
+                c = head + without_tongue(mid, cut) + tail
             key = k(a, b)
             pts[key] = c if key == (a, b) else c[::-1]
             kind[key] = ed['src']
@@ -1366,10 +1526,17 @@ class Drawn:
                     if f in self.edges and f != e:
                         other = lambda x, xend: net.edges[x]['b'] if xend == 0 else net.edges[x]['a']
                         continues[n].add(frozenset((other(e, end), other(f, fend))))
+        # an interlaced tip whose three tracks this line draws is a Y: no two of them continue each other, the approach is
+        # fitted first and both leaving tracks start along it (track_curve `approach`)
+        approach = {}
+        for n, ((e, end), fwd) in splay.items():
+            if e in self.edges and all(f in self.edges for f, _ in fwd):
+                continues[n] = set()
+                approach[n] = net.edges[e]['b'] if end == 0 else net.edges[e]['a']
         self.pos = dict(pos)
         if fit:
-            tc = track_curve.Network(pos, pts, kind, {}, limit, continues,
-                                     solid={n for n in pos if net.nodes[n]['kind'] == 'crossing'})
+            tc = track_curve.Network(pos, pts, kind, smooth_nodes(pos, pts, net), limit, continues,
+                                     solid={n for n in pos if net.nodes[n]['kind'] == 'crossing'}, approach=approach)
             fitted, self.report = tc.pts, tc.report
             self.pos = dict(tc.pos)
         else:

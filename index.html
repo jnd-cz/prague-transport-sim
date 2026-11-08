@@ -125,6 +125,7 @@
   .loadBox { width: min(460px, 100%); }
   .loadHead { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0; }
   .loadHead.dim { font-size: 13px; color: var(--dim); min-height: 1.3em; }
+  .loadHead.dim a { color: var(--amber); }
   .loadTrack { height: 10px; border-radius: 5px; background: #2c3631; overflow: hidden; }
   #loadBar { height: 100%; width: 0; background: var(--amber); }
   #loadFiles { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; color: var(--dim); }
@@ -285,6 +286,14 @@
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
 </script>
-<script type="module" src="src/main.js"></script>
+<script>
+// a module that does not arrive stops the page before any of its code runs, the translations included (#371)
+function noCode() {
+  const cs = (navigator.language || '').toLowerCase().startsWith('cs');
+  document.getElementById('loadPct').textContent = cs ? 'Nelze spustit' : 'Cannot start';
+  document.getElementById('loadStep').textContent = cs ? 'Kód hry se nenačetl: zkontrolujte připojení a načtěte stránku znovu.' : "The game's code did not load: check the connection and reload the page.";
+}
+</script>
+<script type="module" src="src/main.js" onerror="noCode()"></script>
 </body>
 </html>

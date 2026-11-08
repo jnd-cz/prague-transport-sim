@@ -38,6 +38,41 @@ class Records(unittest.TestCase):
         self.assertEqual(len(di.forks), 1)
         self.assertLess(math.dist(di.forks[0], (20, 0)), 0.01)
 
+    def test_an_interlaced_branch_beside_a_joint_leaves_the_track_whole(self):
+        # Ke Stírce: the branch starts 11.7 cm beside the through track's record joint; met there, the node lay on the
+        # branch and line 17 stepped 12 cm through it. The user, 2026-11-07: "intarlaced switch here, same case as
+        # Čechův most"
+        branch = [(50, 0.117), (90, 0.117)] + [(x, y + 0.117) for x, y in turnout(90)[1:]]
+        di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (200, 0)]), rec(3, branch)])
+        ids = lambda c: [r['id'] for r in c['records']]
+        through = [c for c in di.chains if '1' in ids(c)]
+        self.assertEqual(len(through), 1)
+        self.assertEqual(ids(through[0]), ['1', '2'])
+        self.assertLess(math.dist(di.forks[0], (50 - dt.TONGUE, 0)), 0.01)
+        # Čechův most: the through track's joint 0.6 m apart, the branch ending 12 cm beside it with a scrap on
+        b_in = [(0, 3.0), (20, 0.12), (49.4, 0.12)]
+        di = dt.Source('di', [rec(1, [(-50, 0), (49.4, 0)]), rec(2, [(50, 0), (150, 0)]), rec(3, b_in),
+                              rec(4, [(49.4, 0.12), (50, 0.11)])])
+        through = next(c for c in di.chains if '1' in ids(c))
+        self.assertEqual(ids(through), ['1', '2'])
+        self.assertAlmostEqual(through['line'].length, 200, delta=0.01)
+
+    def test_two_interlaced_tracks_split_at_the_same_places_stay_two(self):
+        # Nádraží Libeň: both tracks split every 6-27 m, their joints 10.7 cm apart; met there, the through track's
+        # records were dropped as copies of the branch's and line 37 ran the branch. The user, 2026-11-07: "there should
+        # be two tracks running with a small shift that corresponds to the current jolts"
+        cuts = [0, 6, 33, 39]
+        a = [rec(10 + k, [(cuts[k], 0), (cuts[k + 1], 0)]) for k in range(3)]
+        b = [rec(20 + k, [(cuts[k], 0.107), (cuts[k + 1], 0.107)]) for k in range(3)]
+        # (where they part, both joints side by side: the branch goes on from its own, not from the through track's)
+        part = [(39 + x, 0.107 + y) for x, y in turnout(0, n=20)]
+        di = dt.Source('di', [rec(1, [(-60, 0), (0, 0)]), rec(2, [(39, 0), (150, 0)]), *a, *b, rec(4, part),
+                              rec(3, [(-60, 3.4), (150, 3.4)])])
+        self.assertEqual(di.duplicates, 0)
+        ids = lambda c: [r['id'] for r in c['records']]
+        self.assertTrue(any(ids(c) in (['20', '21', '22', '4'], ['4', '22', '21', '20']) for c in di.chains))
+        self.assertTrue(any(ids(c) in (['1', '10', '11', '12', '2'], ['2', '12', '11', '10', '1']) for c in di.chains))
+
     def test_a_switch_drawn_as_a_section_forks_at_its_tip(self):
         # Dvorecký most (DI 2026-10-07): both legs drawn as 4.7 m records from the tip, where OSM's switch and the
         # switch machine cover are, to a joint where the track and the branch go on
