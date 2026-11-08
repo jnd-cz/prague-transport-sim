@@ -856,7 +856,7 @@ const cached = (key, make) => { if (!signTex.has(key)) { const tex = make(); tex
 
 // The old board, black number on white with a black border: now only a diagnostic, where a limit comes from a curve
 // alone and no real sign stands (the user, 2026-11-08: "keep them for now for diagnostic purposes, we can drop them
-// later with more stable release").
+// later with more stable release"), shown with the debug overlay (F8) only (#389).
 export function makeSpeedSign(v) {
   const tex = cached(`v${v}`, () => canvasTexture(128, 160, (g, w, h) => {
     g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
