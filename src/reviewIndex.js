@@ -4,7 +4,7 @@
 // mode reads them (src/reviewFindings.js). A set's answers are stored under the line it was opened with,
 // so every line's store is read. A kerb list lies in the line's survey data, read by review mode (src/review.js):
 // its entry carries the findings' ids and its link opens the line's review mode, which starts on the kerbs.
-import { fileFindings, fid } from './reviewFindings.js';
+import { fileFindings, fid, answerOf } from './reviewFindings.js';
 import { readLineAnswers } from './verdicts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,19 +22,19 @@ export async function answers(lines) {
 
 // a set's findings and how many are answered (an answer with "unsure" counts, and is shown apart)
 export async function count(set, items) {
-  let ids = set.ids;
-  if (!ids) {
+  let found = set.ids?.map((id) => ({ id }));
+  if (!found) {
     const r = await fetch(set.file, { cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    ids = fileFindings(await r.json(), set.file.split('/').pop()).map(fid);
+    found = fileFindings(await r.json(), set.file.split('/').pop()).map((f) => ({ id: fid(f), f }));
   }
   let answered = 0, unsure = 0, noted = 0;
-  for (const id of ids) {
-    const a = items[id];
+  for (const { id, f } of found) {
+    const a = f ? answerOf(f, items[id]) : items[id];
     if (a?.v) { answered++; if (a.v === 'unsure') unsure++; }
     if (a?.note) noted++;
   }
-  return { total: ids.length, answered, unsure, noted, waiting: ids.length - answered };
+  return { total: found.length, answered, unsure, noted, waiting: found.length - answered };
 }
 
 const issueUrl = (repo, n) => `https://github.com/${repo}/issues/${n}`;

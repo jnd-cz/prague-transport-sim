@@ -234,11 +234,44 @@ class SpanReviews(unittest.TestCase):
         entry = from_reviews(truth_answers(truth([22])),{'findings':[finding]},'data/truth.json')['span_reviews'][0]
         self.assertEqual((entry['source']['date'],entry['source']['record']),('2026-11-02','data/truth.json#trackHeights.reviewAnswers/unmapped-1'))
         self.assertIn('changed decision scope',from_reviews(truth_answers(truth([22,23])),{'findings':[finding]},'t')['held'][0]['reason'])
-        # (and the committed answers import on the committed queue)
+        # (and the committed queue's decisions are each answered and import; an answer whose place numeric DI
+        # now covers has no decision, and comes back with it)
         root = Path(__file__).resolve().parent.parent
-        result = from_reviews(truth_answers(json.loads((root/'data/truth.json').read_text(encoding='utf-8'))),
-                              json.loads((root/'reports/review/track-heights.json').read_text(encoding='utf-8')),'data/truth.json')
-        self.assertEqual((len(result['span_reviews']),result['held']),(27,[]))
+        queue = json.loads((root/'reports/review/track-heights.json').read_text(encoding='utf-8'))
+        result = from_reviews(truth_answers(json.loads((root/'data/truth.json').read_text(encoding='utf-8'))),queue,'data/truth.json')
+        decisions = {f['id'] for f in queue['findings']}
+        self.assertEqual({e['id'] for e in result['span_reviews']},{'review-'+i for i in decisions})
+        self.assertEqual([h for h in result['held'] if h['id'] in decisions or h['reason']!='missing or changed decision scope'],[])
+        self.assertTrue(all(f.get('recorded') for f in queue['findings']))
+
+    def test_findings_show_an_answer_recorded_in_truth_where_it_imports(self):
+        span = {'id':'s:line22:path:1','line':22,'direction':'path','start_s':0,'length_m':10,'from_stop':'A','to_stop':'B',
+                'profile':[{'s':s,'xy':[s,0],'archive':[{'z':250}],'surfaces':[]} for s in (0,5,10)],
+                'approval_profile':{'xy':[[0,0],[10,0]],'di_ids':['di-1'],'rule':{'type':'needs_explicit_review'}}}
+        result = {'snapshot':'test','spans':[span],
+                  'decisions':[{'id':'survey-1','status':'review','span_ids':[span['id']],
+                                'structure':{'kind':'survey_level','tags':{'line22.dtm.json#areas/707':{'level':1}}}}]}
+        truth = lambda lines: {'trackHeights':{'reviewAnswers':[{'decision':'survey-1','answer':'archive profile ok','lines':lines,
+                                                                 'quote':'q','source':'s','date':'2026-11-02'}]}}
+        item = findings(result,truth=truth([22]))['findings'][0]
+        self.assertEqual({k:item['recorded'][k] for k in ('v','date','quote','source')},
+                         {'v':'archive profile ok','date':'2026-11-02','quote':'q','source':'data/truth.json'})
+        self.assertNotIn('recorded',findings(result,truth=truth([22,23]))['findings'][0])  # (its scope changed: asked again)
+        self.assertNotIn('recorded',findings(result)['findings'][0])
+
+    def test_a_surveyed_level_keeps_its_id_when_its_records_are_renumbered(self):
+        # (#379: Královský letohrádek's deck was line22.dtm.json#areas/697, then #areas/707 after a rebuild)
+        square = lambda x, z=250: [[x,-5,z],[x+10,-5,z],[x+10,5,z],[x,5,z],[x,-5,z]]
+        area = lambda i, x=0, **k: {'id':i,'ring':square(x),'holes':[],'class':'deck','level':1,**k}
+        first = Structures([],[area('line22.dtm.json#areas/697')])
+        identity = first.at((5,0))
+        self.assertTrue(identity.startswith('survey-'))
+        moved = {**area('line23.dtm.json#areas/12'),'ring':square(0,251)[2:-1]+square(0,251)[:3]}  # (another start, other heights)
+        again = Structures([],[area('line22.dtm.json#areas/707'),moved])
+        self.assertEqual(again.at((5,0)),identity)
+        self.assertEqual(again.catalog[identity]['survey_records'],['line22.dtm.json#areas/707','line23.dtm.json#areas/12'])
+        for other in (area('line22.dtm.json#areas/697',x=20),area('line22.dtm.json#areas/697',level=2)):
+            self.assertNotEqual(Structures([],[other]).at((25 if other['level']==1 else 5,0)),identity)
 
     def test_survey_answer_skips_short_gaps_and_takes_one_height_of_deck_and_road(self):
         # (Palackého most: deck and road at level 1 within 1 cm; an abutment and a point without survey)
