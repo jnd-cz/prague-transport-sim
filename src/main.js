@@ -445,6 +445,7 @@ async function start() {
     toutAt: outdoorTemperature($('optTemp').value),
     detailed: modelKind(),
     seed: Math.floor(random() * 1e9),
+    substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
     signFacts: signFacts(truth),
   });

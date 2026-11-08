@@ -1,19 +1,21 @@
 // Dev check helpers (not part of the game) for the benches that drive a whole line (u3, redruns): when
 // our tram counts as stuck, and what stood in front of it then.
 
-// A function to call once per chunk: our tram's position once it has not moved for 10 minutes, else
-// null. A scheduled wait at a stop is not a deadlock: the clock starts at departure.
+// A function to call once per chunk: our tram's position once it has not got on for 10 minutes, else
+// null. A scheduled wait at a stop is not a deadlock: the clock starts at departure. Getting on is
+// forward: rocking a metre back and forth on a leaf patch up a climb ran three autumn runs into the
+// page's 30 min timeout instead (a jump back of 100 m is a new run, not a roll).
 export function stuckWatch(game) {
   let lastS, lastMove = 0;
   return () => {
-    if (lastS === undefined || Math.abs(game.tram.s - lastS) > 1) { lastS = game.tram.s; lastMove = game.clock; }
+    if (lastS === undefined || game.tram.s - lastS > 1 || game.tram.s < lastS - 100) { lastS = game.tram.s; lastMove = game.clock; }
     const st = game.stops[game.nextStop];
     if (st?.arrived && game._atStop(st) && Math.abs(game.tram.v) < 0.05) lastMove = Math.max(lastMove, Math.min(game.clock, st.sched));
     return game.clock - lastMove > 600 ? Math.round(game.tram.s) : null;
   };
 }
 
-// What holds the tram: the autopilot's plan and what lies ahead of it. Each crossing car carries the
+// What holds the tram: the autopilot's plan and what lies ahead of it. Each car on or across our track carries the
 // chain of what it waits for (a car's id, 'our tram', 'tram', or a walker with what it does): the
 // line 9 s 11221 gridlock ran car -> car -> car -> our tram (#92).
 export function stuckScene(game, traffic, pilot) {
@@ -40,7 +42,8 @@ export function stuckScene(game, traffic, pilot) {
   return { s: Math.round(tr.s), v: tr.v, plan: { vt: plan.vt, stopAt: plan.stopAt && Math.round(plan.stopAt - tr.s) }, doors: game.doorState, action: !!game.action, hold: game.holdTimer,
     nextStop: st && { name: st.name, d: Math.round(st.target - tr.s), served: st.served, waiting: st.waiting, runners: (game.runners || []).length },
     signal: sig && { d: Math.round(sig.s - tr.s), state: sig.state, demand: !!sig.demand, t: sig.t },
-    carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => Math.round(c.s - tr.s)),
+    // (with their chains: line 23 at 10 % load, seed 1, stood for good behind two cars on the track 8 and 9 m ahead, distances only)
+    carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), v: c.car?.vNow ?? c.v, waits: c.car ? waits(c.car) : [] })),
     carsCrossing: (game.carsCrossing || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), onTrack: c.onTrack, v: c.car.vNow, light: c.car.lane?.light ? traffic.lightAspect(c.car.lane.light) : null, waits: waits(c.car) })),
     tramAhead: game.tramAheadGap ? game.tramAheadGap() : null,
     aiTrams: [...traffic.ahead, ...traffic.oncoming].map((t) => ({ id: id(t), waits: waits(t), cycleSeconds: t.cycleT || 0 })),

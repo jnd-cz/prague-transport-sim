@@ -338,8 +338,11 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   pixels. The texture updates at most 30 times a second, with a 300 m horizon. Flat covers/grates are
   omitted; people, vehicles, poles, overhead wires and the tram remain. Its cached picture is
   composited after every main redraw, including while paused.
-- **The T3's TR 37 equipment** (#221): `src/tr37.js`; sources and derivation in
-  `docs/research/prazsketramvaje/t3-accelerator.md`. Acceleration by step: `tools/test_traction.py`.
+- **The T3's TR 37 equipment** (#221, #351): `src/tr37.js`, with the wire and the motor-generator in `src/electric.js`;
+  sources and derivation in `docs/research/prazsketramvaje/t3-accelerator.md` (§ 9 the electric system). Acceleration by step:
+  `tools/test_traction.py`; the situations (coasting, take-up, a weak wire …): `tools/test_electric.py`; how the autopilot
+  drives it on made-up lines (gradients, loads, signals, a tram or a car ahead, contacts, time limits): `tools/test_drives.py`; on the real
+  lines, the stops and the timetable: `tools/headless.py --checks stops`. The substations: `tools/substations.py --write` into `data/truth.json`.
 - **On-screen controls** (#79): `src/touch.js`.
 - **Stops and lines:** stop posts come from GTFS `route_stops`, stops and departures from GTFS, platforms
   from OSM. The tram ahead's line is one that serves that stop in GTFS.

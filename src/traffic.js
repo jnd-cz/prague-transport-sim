@@ -8,6 +8,7 @@ import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLig
 import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
 import { poseHybrid, setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
+import { aiLineCurrent } from './electric.js';
 
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
 const MAX_CARS = 30, MAX_WALKERS = 90, FADE = 1.2;
@@ -607,6 +608,7 @@ export class Traffic {
     this._updateWalkers(dt, cx, cy, draw);
     this._updateAhead(dt, tram);
     this._updateOncoming(dt, tram);
+    this._wireLoads(dt);
     this._clearAiTramCycles(dt);
   }
 
@@ -1675,6 +1677,7 @@ export class Traffic {
         }
       }
       const a = Math.max(-1.3, Math.min(1.0, (vt - t.v) * 0.8, aStop));
+      t.a = a;
       t.v = Math.max(0, t.v + a * dt);
       t.s += t.v * dt;
       t.leaving = t.s - tram.s > 1000 || t.s > this.route.length - 20 || (t.endS !== null && t.s > t.endS);
@@ -1686,6 +1689,21 @@ export class Traffic {
       return true;
     });
     g.aiTrams = this.ahead;
+  }
+
+  // What the other trams draw, for the voltage at our pantograph (src/electric.js), twice a second: a tram on either
+  // track hangs on the same wire feed.
+  _wireLoads(dt) {
+    this._wireT = (this._wireT ?? 0) - dt;
+    if (this._wireT > 0) return;
+    this._wireT = 0.5;
+    const out = [];
+    for (const t of this.ahead) out.push({ s: t.s, i: aiLineCurrent(2, t.v, t.a ?? 0) });
+    for (const t of this.oncoming) {
+      const p = this.back.at(t.s), n = this.route.nearest(p.x, p.y);
+      if (n) out.push({ s: n.s, i: aiLineCurrent(2, t.v, t.a ?? 0) });
+    }
+    this.game.otherTrams = out;
   }
 
   // Oncoming trams on the opposite track; they obey the single-track (gauntlet) signals.
@@ -1756,6 +1774,7 @@ export class Traffic {
         if (d < 0.8 && t.v < 0.3 && isStop && this.backStops.includes(stopAt)) { t.served.add(stopAt); t.dwell = 10 + this.rand() * 10; }
       }
       const a = Math.max(-1.3, Math.min(1.0, (vt - t.v) * 0.8, aStop));
+      t.a = a;
       t.v = Math.max(0, t.v + a * dt);
       t.s += t.v * dt;
       const p = br.at(t.s), me = this.route.at(tram.s);

@@ -80,6 +80,17 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   Otevřené dveře nebo brzdová šlapka mimo nulu vypínají trakci. Hned po jízdě se brzda buduje pomalu a stupeň
   5 pak přivede čelisti za jízdy: mezi jízdou a brzdou vyčkejte 2–3 s kvůli vrácení zrychlovače do základní
   polohy. Sloupec šlapek na panelu řidiče ukazuje šlapku (jízda nahoru, brzda dolů, P zabrzděno) a zrychlovač.
+- **Zrychlovač** (žlutý sloupec vedle šlapek, dole poloha 1, nahoře 99) se točí jen svým řídicím motorkem, nejvýš
+  asi 20 poloh za sekundu, a řídí ho omezovací relé podle proudu: při jízdě vyřazuje odpory, tím rychleji, čím
+  vyšší je stupeň. Po puštění šlapky drží malý proud přípravy, takže se s klesající rychlostí vrací (asi 31 při
+  20 km/h, 50 při 30 km/h) a při jízdě ze svahu zase stoupá; při brzdění drží proud stupně: čím vyšší stupeň,
+  tím níž stojí. Při jízdě znamená vysoko málo odporu, při brzdění naopak hodně.
+- **Napájení:** napětí v troleji klesá s vaším odběrem, se vzdáleností od měnírny a s odběrem jiných tramvají na
+  stejném napájení (odpory vedení jsou odhad, pozice měníren z OSM). Na odporech to sílu nezmění, jen zrychlovač
+  stojí výš; nad nimi slabá trolej znamená menší tah a nižší nejvyšší rychlost. Elektrodynamické brzdě je jedno.
+  Motorgenerátor s oběma ventilátory je na jedné hřídeli a jeho sériový motor se točí podle napětí: proto
+  tón klesne, když se rozjíždíte, a klesne i přidržením čelistí na dynamu; palubních 26 V regulátor drží.
+  Informační panel ukazuje napětí, měnírnu, palubní napětí a otáčky.
 - **Ovládání** (menu): *Jednoduché* posouvá páku po stupních (W/S, 1–5, Shift+1–5) a šlapky ovládá jako
   řidič, stojící vůz samo zabrzdí; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
   20°/s; držené klávesy se zastaví na brzdném stupni 5) a R zabrzdí a odbrzdí zajišťovací brzdu; po
@@ -102,7 +113,8 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 - Každá rozjezdová výhybka (pojížděná proti hrotům) má pracovní trolejový kontakt (žlutý štítek, bílá tabulka s černým trojúhelníkem),
   který ovládá sběrač: projeďte pod ním s proudem pro odbočení, nebo bez proudu pro jízdu rovně — i hned za
   zastávkou, u návěstidla nebo do kopce (odhadnout to patří k umění řidiče).
-- Proud teče i při tlačítku **Výhybka** (Y, jako na T3SUCS) a — v zimě — topením, pokud při průjezdu pod
+- Proud teče i při tlačítku **Výhybka** (Y, jako na T3SUCS: jen bez jízdy a se zrychlovačem do polohy 30, tedy
+  asi do 20 km/h) a — v zimě — topením, pokud při průjezdu pod
   kontaktem bez proudu nedržíte odpojení topení (C).
 - Kontakty jsou ~22 m před výhybkou, nikdy však tam, kde tramvaj stojí se sběračem u zastávky nebo návěstidla.
   Sjezdové výhybky (pojížděné po hrotech, kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
@@ -195,9 +207,11 @@ Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skryt�
 
 Zaškrtněte v menu „Autopilot — jen se dívat na jízdu“ nebo během směny stiskněte **O**. Plánuje rychlost podle
 omezení, zastávek, návěstidel, překážek a tramvaje před sebou, volí sílu potřebnou na sklonu a nechává výzbroj
-ovládat šlapky jako pečlivý řidič (pokročilý model: do zastávek brzdí od stupně 3, ve stání zabrzdí zajišťovací brzdou, stupně 1–4
-jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty dá krátký
-impuls proudu (odbočení) nebo jede bez proudu (rovně). Klávesou **V** přepnete na pohled zvenku. Řízení převezme
+ovládat šlapky jako pečlivý řidič (pokročilý model: na rovině rozjíždí na stupních 1–3, brzdí po stupních, do zastávky
+jednou křivkou a bez návratu na jízdní šlapku, pokud před ním nestojí tramvaj, ve stání zabrzdí zajišťovací brzdou, stupně
+1–4 jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty odebírá proud
+pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně).
+Klávesou **V** přepnete na pohled zvenku. Řízení převezme
 kterákoli klávesa kontroléru nebo dveří (W/S/mezerník/N/D/R, 0–5), v ovládání zvoleném v menu; O je předá zpět
 autopilotu.
 

@@ -20,6 +20,7 @@ const STOP_AHEAD = 6;          // without a stop sign in the data: the front sto
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 
 import { rng } from './random.js';
+import { Feeding } from './electric.js';
 
 // Passenger demand by time of day (weekday): morning and afternoon peaks, quiet nights.
 const DEMAND = [[0, 0.3], [5, 0.35], [6, 1.0], [7, 2.2], [8.5, 2.3], [9.5, 1.3], [11, 1.0], [14, 1.3],
@@ -129,6 +130,8 @@ export class Game {
     this.limits = route.speedLimits(extra, facts.past);
     this._initSigns();
     this.aiTrams = []; // same-direction trams ahead, kept up to date by the traffic module
+    this.otherTrams = []; // { s, i }: the trams on the wire near us, by route position and current (traffic.js)
+    this.feeding = opts.substations ? new Feeding(route, opts.substations, data.frame?.origin) : null;
 
     const st = this.stops[opts.startStop];
     tram.s = st.target;
@@ -1180,6 +1183,12 @@ export class Game {
       tram.forcedStop = true;
     } else tram.forcedStop = false;
 
+    // the wire at the pantograph, with the other trams on our feed (src/electric.js); the heaters on the line, and the
+    // switch button's resistor while its current flows (≈100 A: 600 V over RV ≈3.5 Ω and the dampers, § 8.1)
+    if (this.feeding) tram.supply = this.feeding.supply(tram.panto, this.otherTrams);
+    tram.loadW = ([0, 3000, 10000][this.climate.saloon] * tram.cars + [0, 0, 2000, 4000][this.climate.cab]) * (input.cutout ? 0 : 1);
+    tram.buttonA = input.switchBtn && tram.eq.buttonLive ? tram.voltage / 5.5 : 0;
+
     const mid = tram.s - tram.length / 2;
     tram.update(dt, {
       deadmanTrip,
@@ -1354,7 +1363,8 @@ export class Game {
   heatingDraws() { const c = this.climate; return c.saloon > 0 || c.cab >= 2; }
   contactCurrent() {
     const inp = this.input || {};
-    return this.tram.drawing || !!inp.switchBtn || (this.heatingDraws() && !inp.cutout);
+    // (the button works only with drive off and the accelerator at 1–30: M1's rest contact and ZR9, § 8.2)
+    return this.tram.drawing || (!!inp.switchBtn && this.tram.eq.buttonLive) || (this.heatingDraws() && !inp.cutout);
   }
 
   setHeating(which) {

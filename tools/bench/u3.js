@@ -10,18 +10,19 @@ import { stuckWatch, stuckScene } from './stuck.js';
 const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
 
 export async function run(seed = 1, opts = {}) {
-  const { trip = 40, chunk = 400 } = opts;
+  const { trip = 40, chunk = 400, weather = 'dry' } = opts;
   window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
   const $ = (id) => document.getElementById(id);
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
   // (nothing from the real weather: the menu's default temperature is today's Prague forecast, which sets
   // the autopilot's heaters and flap, #205; autumn as tools/traffic_lint.js)
-  $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
+  $('selTrip').value = String(trip); $('optWeather').value = weather; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
   $('btnStart').click();
   window.headless = true;
   const { Autopilot } = await import('/src/autopilot.js');
   const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
+  game.pilot = pilot; // (for the watchers: what it stops for, tools/bench/stops.js)
   const stuck = stuckWatch(game);
   // (other checks' watchers along on the same drive, opts.also: [(game, traffic) => watcher], #205)
   const also = (opts.also || []).map((make) => make(game, traffic));
