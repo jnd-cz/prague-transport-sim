@@ -39,7 +39,7 @@ All radio switches in the register are "spring blades, lockable" (*pružné jazy
 
 | ID | Aspect | Look (p. 44, 48) | Meaning |
 |---|---|---|---|
-| SW-S1 | *Postavení vlakové cesty vpravo / přímo / vlevo* | black panel with a dot matrix of **red LEDs**; the lit LEDs form a broad **arrow** pointing right, up or left; the unlit LEDs of the other symbols show dark grey | route set that way **and the switch locked**. **Blinking** = in addition **blocked** against being thrown by remote control (a train is in the circuit) |
+| SW-S1 | *Postavení vlakové cesty vpravo / přímo / vlevo* | black panel with a dot matrix of **red LEDs**; the lit LEDs form a broad **dart** with a swallow-tail notch pointing right or left, or a **vertical bar** 4 LEDs wide with a pointed top for straight; the unlit LEDs of the other symbols show dark grey, the rest of the panel is black (p. 44) | route set that way **and the switch locked**. **Blinking** = in addition **blocked** against being thrown by remote control (a train is in the circuit) |
 | SW-S2 | *Neurčitá vlaková cesta* (undetermined) | a small red **cluster in the middle** | the route may not be set properly: **assume the switch is not locked**. Blinking = blocked. |
 | SW-S3 | two switches close together | signals side by side or stacked; the **lower signal belongs to the first switch** in the direction of travel, the upper to the second; plates "L", "P", "1", "2" (white on black) say which | |
 | SW-S4 | second (auxiliary) signal | where one signal cannot be seen both from where the switch is set remotely and where it is set by hand | |
@@ -52,7 +52,7 @@ All radio switches in the register are "spring blades, lockable" (*pružné jazy
 | SW-S11 | *Zajišťovací výhybka* | yellow panel with a **red "Z"** | spring-return switch, or one secured against throwing |
 | SW-S12 | working contact of a remote-controlled switch | white square, **black triangle** with an **orange square** inside (PPS Q102) | marks the place of the trolley contact |
 
-Game now: SW-S1 as a red LED chevron hung 8 m before the switch, blinking "while the switch is
+Game now: SW-S1 as D 1/2 draws it (`src/ledPanels.js`, #376; a chevron before) hung 8 m before the switch, blinking "while the switch is
 locked" (`src/models.js:778-819`, `src/game.js:729, 1250-1254`); SW-S6 exists as
 `makeRadioSwitchSign` but no switch uses it; SW-S12 is the game's contact sign
 (`src/models.js:861-871`), with a yellow plate on the wire. SW-S2, SW-S3, SW-S5, SW-S8 to SW-S11
