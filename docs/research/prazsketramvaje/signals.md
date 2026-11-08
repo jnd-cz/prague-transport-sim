@@ -68,9 +68,9 @@ panel 140×240 mm**: an estimate from the family, not a stated size. The warning
 p. 54) and the zone plate (111 by 171, panel 74 by 109, p. 56) have no size in any source read.
 
 **Numbers.** A heavy condensed black figure filling the panel's width in D 1/2's drawings ("30", "20"), a plain bold
-one on the zone plate ("40"). The photos show otherwise: a condensed DIN (DIN 1451 Engschrift), each figure 0.40–0.45 as
-wide as high, strokes 0.11–0.12 of the height, the pair about half the panel's height and three quarters of its width (the
-website's 10 and 30, the user's 60 of 2026-11-08). The photos also show an orange-yellow reflective panel, white frame with
+one on the zone plate ("40"). The photos show otherwise: a heavy condensed DIN (DIN 1451 Engschrift), each figure
+0.37–0.48 as wide as high, strokes 0.145 of the height, the pair about half the panel's height and three quarters of its
+width (the website's 10 and 30, the user's 60 of 2026-11-08; the 80 gradient board's strokes are 0.17). The photos also show an orange-yellow reflective panel, white frame with
 a grey edge; a sign over a fork has its arrow on a white strip under the panel, inside the plate's outline.
 
 **How they stand (photos on the speed-sign page).** Plates and triangles hang from the span wire by a clamp over the

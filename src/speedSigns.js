@@ -27,27 +27,41 @@ export function signSize(sign) {
   return { w: Math.round(w * 1000) / 1000, h: Math.round(h * 1000) / 1000 };
 }
 
-// The figures of the real signs are a condensed DIN (DIN 1451 Engschrift) on every photo: the user's of a 60 Rychlostník
-// and an 80 gradient board (2026-11-08), the website's 10 and 30 restrictions. D 1/2's drawings use a heavy condensed face
-// for speeds and a serif for gradients; the photos win. Bahnschrift is Windows' DIN 1451, DIN Condensed macOS'; whichever
-// is found, `fit` stretches it to the box measured on the photos.
+// ------------------------------------------------------------------ the figures and text
+// Every photo shows a heavy condensed DIN (DIN 1451 Engschrift): the user's 60 Rychlostník and 80 gradient board
+// (2026-11-08), the website's 10 and 30 restrictions. D 1/2's drawings use a heavy face for speeds and a serif for
+// gradients; the photos win. Bahnschrift Condensed Bold, Windows' DIN 1451, in its own proportions ("Bahnschrift bold looks
+// good", the user, 2026-11-08); elsewhere the nearest condensed face. Squeezing it to the photos' narrower figures (0.43 as
+// wide as high, Bahnschrift's are 0.59) distorted it, so the figures are a little lower than the photos' 0.45-0.50 of the
+// panel: two of them at 100 mm fill 0.86 of the 140 mm panel's width.
 const FIGURES = '"Bahnschrift Condensed", "Bahnschrift SemiCondensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
-const DIGIT = 0.43;            // a figure's width over its height (photos: 0.40-0.45)
-const DIGIT_GAP = 0.08;        // the space between two figures over their height
+const FIGURE_H = 0.100;        // m: the speed signs' figures, the same on every plate
+const FIGURE_W = 0.86;         // the most of a panel's width the figures take
 
-// text filling a box
-function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '600' } = {}) {
+// Text in a box, in its own proportions: as large as the box allows, centred in it. `bold`: an outline of that width (of
+// the height) in the same colour, heavier than the font's own bold.
+function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '700', bold = 0 } = {}) {
+  text = String(text);
   g.save();
-  g.fillStyle = color;
-  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
   g.font = `${weight} 100px ${family}`;
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   const m = g.measureText(text);
-  const top = m.actualBoundingBoxAscent ?? 72, bottom = m.actualBoundingBoxDescent ?? 0, wide = m.width || 60;
-  const sx = w / wide, sy = h / (top + bottom);
-  g.translate(x + w / 2, y + h);
-  g.scale(sx, sy);
-  g.fillText(text, 0, -bottom);
+  const left = m.actualBoundingBoxLeft || 0, right = m.actualBoundingBoxRight || m.width || 60;
+  const up = m.actualBoundingBoxAscent || 72, down = m.actualBoundingBoxDescent || 0;
+  const line = bold * h, k0 = (h - line) / (up + down);
+  const k = Math.min(k0, (w - line) / (left + right));
+  g.translate(x + w / 2, y + h / 2);
+  g.scale(k, k);
+  g.fillStyle = color;
+  g.fillText(text, -(right - left) / 2, (up - down) / 2);
+  if (line) { g.strokeStyle = color; g.lineJoin = 'round'; g.lineWidth = line / k; g.strokeText(text, -(right - left) / 2, (up - down) / 2); }
   g.restore();
+}
+
+// figures of height h (or narrower than maxW) centred on cx, cy
+function figures(g, text, cx, cy, h, color, { maxW = Infinity, bold = 0 } = {}) {
+  const w = Math.min(maxW, h * 4);
+  fit(g, text, cx - w / 2, cy - h / 2, w, h, { color, bold });
 }
 
 function diagonal(g, x0, y0, x1, y1, width, color) {
@@ -76,16 +90,9 @@ function plate(g, x, y, w, h, panel, u) {
   return { x: x + f, y: y + f, w: w - 2 * f, h: h - 2 * f };
 }
 
-// figures of height h centred on cx, cy, as wide as the photos' (DIGIT, DIGIT_GAP)
-function figures(g, text, cx, cy, h, color) {
-  const n = String(text).length, w = (n * DIGIT + (n - 1) * DIGIT_GAP) * h;
-  fit(g, String(text), cx - w / 2, cy - h / 2, w, h, { color });
-}
-
-// a speed on a panel: the figures half the panel's height (photos: 0.45-0.50), narrower if a long number needs it
-function number(g, p, text, color = BLACK) {
-  const n = String(text).length, h = Math.min(p.h * 0.47, p.w * 0.84 / (n * DIGIT + (n - 1) * DIGIT_GAP));
-  figures(g, text, p.x + p.w / 2, p.y + p.h / 2, h, color);
+// a speed on a panel, the same size on every plate (restriction, point, Rychlostník, zone), smaller only if it is too wide
+function number(g, p, text, color, u) {
+  figures(g, text, p.x + p.w / 2, p.y + p.h / 2, FIGURE_H * u, color, { maxW: p.w * FIGURE_W });
 }
 
 function triangle(g, x, y, w, h, digit, u) {
@@ -96,7 +103,7 @@ function triangle(g, x, y, w, h, digit, u) {
   g.fillStyle = WHITE; path(0); g.fill();
   g.strokeStyle = EDGE; g.lineWidth = Math.max(1, 0.004 * u); path(0); g.stroke();
   g.fillStyle = YELLOW; path(0.018 * u); g.fill();
-  if (digit !== undefined && digit !== null) fit(g, String(digit), x + w * 0.38, y + h * 0.1, w * 0.24, h * 0.56);
+  if (digit !== undefined && digit !== null) figures(g, digit, x + w / 2, y + h * 0.38, h * 0.5, BLACK, { maxW: w * 0.3 });
 }
 
 // The gradient board: a grey square, a white pentagon whose point takes the half of the height it points to: its
@@ -130,8 +137,10 @@ export function drawSign(g, sign, W, H) {
   if (k === 'climb' || k === 'climbEnd' || k === 'descent' || k === 'descentEnd') {
     const up = k.startsWith('climb');
     pentagon(g, x, y, w, h, up, u);
-    // red figures 0.23 of the board high, their middle at 0.575 of it climbing and 0.47 descending (the photos)
-    figures(g, sign.permille, x + w / 2, y + h * (up ? 0.575 : 0.47), h * 0.23, '#d81e1e');
+    // red figures, their middle at 0.575 of the board climbing and 0.47 descending (the photos); larger and bolder than
+    // the photos' (0.23 of the board high) to read in the game (the user, 2026-11-08): 0.30 high, Bahnschrift's bold
+    // with an outline of 0.035 of the height on top
+    figures(g, sign.permille, x + w / 2, y + h * (up ? 0.575 : 0.47), h * 0.30, '#d81e1e', { maxW: w * 0.62, bold: 0.035 });
     if (k.endsWith('End')) diagonal(g, x, y, x + w, y + h, 0.016 * u, BLACK);
     return;
   }
@@ -145,7 +154,7 @@ export function drawSign(g, sign, W, H) {
     const p = { x: x + f, y: y + head, w: w - 2 * f, h: h - head - f };
     g.fillStyle = end ? WHITE : YELLOW; g.fillRect(p.x, p.y, p.w, p.h);
     g.strokeStyle = BLACK; g.lineWidth = Math.max(1, 0.003 * u); g.strokeRect(p.x, p.y, p.w, p.h);
-    figures(g, sign.v, p.x + p.w / 2, p.y + p.h / 2, p.h * 0.32, end ? '#aaa' : BLACK);
+    number(g, p, sign.v, end ? '#aaa' : BLACK, u);
     if (end) diagonal(g, x, y, x + w, y + h, 0.014 * u, BLACK);
     return;
   }
@@ -160,8 +169,8 @@ export function drawSign(g, sign, W, H) {
     if (sign.arrow) arrow(g, x + (w - 0.15 * u) / 2, sy, 0.15 * u, 0.025 * u, sign.arrow);
     else fit(g, sign.carType, x + w * 0.25, sy - 0.004 * u, w * 0.5, 0.033 * u);
   }
-  if (k === 'restriction' || k === 'point') number(g, p, String(sign.v));
-  else if (k === 'higher') number(g, p, String(sign.v), '#fff');
+  if (k === 'restriction' || k === 'point') number(g, p, sign.v, BLACK, u);
+  else if (k === 'higher') number(g, p, sign.v, '#fff', u);
   else if (k === 'smallRadius') {
     const nh = p.h * 0.45, nw = p.w * 0.46;
     fit(g, 'r', p.x + (p.w - nw) / 2, p.y + p.h * 0.14, nw, nh, { family: 'Arial, sans-serif' });
@@ -207,22 +216,30 @@ function inDart(d, along, across) {
   return !(along < d.D && Math.abs(across) < d.N / 2 * (d.D - along) / d.D);
 }
 
+// The number box, from the two R01 photos: each figure a single line of LEDs, 0.69 of the box's height, 0.52 as wide as
+// high, the two 0.26 of that height apart (D 1/2 p. 46 draws outlined segments filling the box); about 20 LEDs up a figure;
+// the unlit LEDs of the other segments show faintly.
+const NUMBER = { h: 0.69, w: 0.52, gap: 0.26, leds: 19 };
+
 // `panel`: {kind: 'chevron', dir: 'straight'|'left'|'right'|null, dark} | {kind: 'number', v, dark}
 // | {kind: 'entry', state: 'go'|'stop'|'dark'} | {kind: 'undetermined'} (a dot, § 46.5). W x H px.
 export function drawLedPanel(g, panel, W, H) {
   const k = panel.kind;
   g.fillStyle = '#0a0a0a';
   if (k === 'entry') {
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = '#050505'; g.beginPath(); g.arc(W / 2, H / 2, Math.min(W, H) * 0.48, 0, Math.PI * 2); g.fill();
+    // a round disc with a solid bar, as D 1/2 draws it; nothing outside the disc
+    g.beginPath(); g.arc(W / 2, H / 2, Math.min(W, H) * 0.48, 0, Math.PI * 2); g.fill();
     if (panel.state === 'dark') return;
     const r = Math.min(W, H) * 0.42, t = r * 0.25, go = panel.state === 'go';
     g.fillStyle = '#fff';
     if (go) g.fillRect(W / 2 - t, H / 2 - r, 2 * t, 2 * r); else g.fillRect(W / 2 - r, H / 2 - t, 2 * r, 2 * t);
     return;
   }
-  g.fillRect(0, 0, W, H);
-  if (panel.dark) return;
+  // the box, its corners cut as on the photos
+  const c = H * 0.07;
+  g.beginPath(); g.moveTo(c, 0); g.lineTo(W - c, 0); g.lineTo(W, c); g.lineTo(W, H - c); g.lineTo(W - c, H); g.lineTo(c, H); g.lineTo(0, H - c); g.lineTo(0, c);
+  g.closePath(); g.fill();
+  if (panel.dark && k !== 'number') return;
   const r = W * 0.012, step = W * 0.034, on = '#fffef0';
   if (k === 'chevron') {
     // a dart with a notch at its tail, in LED dots, centred in the box (D 1/2 p. 46; the photos of R01)
@@ -238,11 +255,15 @@ export function drawLedPanel(g, panel, W, H) {
   } else if (k === 'undetermined') {
     for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) if (i * i + j * j <= 5) { g.fillStyle = on; g.beginPath(); g.arc(W / 2 + i * step * 0.8, H / 2 + j * step * 0.8, r, 0, Math.PI * 2); g.fill(); }
   } else if (k === 'number') {
-    const digits = String(panel.v).split(''), dw = W * 0.34, dh = H * 0.72, gap = W * 0.08, x0 = (W - digits.length * dw - (digits.length - 1) * gap) / 2, y0 = (H - dh) / 2;
+    // dark: both places' LEDs unlit
+    const digits = panel.dark ? ['', ''] : String(panel.v).split(''), dh = H * NUMBER.h, dw = dh * NUMBER.w, gap = dh * NUMBER.gap;
+    const pitch = dh / NUMBER.leds, lr = pitch * 0.36, x0 = (W - digits.length * dw - (digits.length - 1) * gap) / 2, y0 = (H - dh) / 2;
     digits.forEach((d, i) => {
       const x = x0 + i * (dw + gap), y = y0, m = y + dh / 2, e = x + dw, b = y + dh;
       const seg = { a: [x, y, e, y], b: [e, y, e, m], c: [e, m, e, b], d: [x, b, e, b], e: [x, m, x, b], f: [x, y, x, m], g: [x, m, e, m] };
-      for (const s of SEGMENTS[d] || '') dots(g, ...seg[s], r, step * 0.7, on);
+      const lit = SEGMENTS[d] || '';
+      for (const s of 'abcdefg') if (!lit.includes(s)) dots(g, ...seg[s], lr, pitch, '#242422');
+      for (const s of lit) dots(g, ...seg[s], lr, pitch, on);
     });
   }
 }

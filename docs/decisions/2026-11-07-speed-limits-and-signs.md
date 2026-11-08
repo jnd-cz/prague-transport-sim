@@ -176,8 +176,9 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 **Size:** 200×300 mm with a 30 mm white frame, panel 140×240 mm. D 1/2 gives none; this is the same sign family on the website, and D 1/2's drawings have that shape. Estimated from the drawings: triangle 400×300 mm, zone plate 200×312 mm.
 
 **Figures and shapes from photos (the user's of 2026-11-08, the website's):** shapes and colours follow D 1/2; the figures follow the photos.
-- Every sign's figures are a condensed DIN, as on the user's 60 Rychlostník and 80 climb board and the website's 10 and 30: each 0.43 as wide as high, the pair about half the panel's height. D 1/2 draws a heavy face filling the panel, and a serif on the gradient boards.
-- The faces use Bahnschrift, Windows' DIN 1451, or the nearest condensed face elsewhere, stretched to the same box.
+- Every sign's figures are a heavy condensed DIN, as on the user's 60 Rychlostník and 80 climb board and the website's 10 and 30. D 1/2 draws a heavy face filling the panel, and a serif on the gradient boards.
+- The faces use Bahnschrift Condensed Bold, Windows' DIN 1451, at its own proportions (the user, 2026-11-08: "Bahnschrift bold looks good"); elsewhere the nearest condensed face. Its figures are wider than the photos' (0.59 as wide as high, against 0.43). Squeezed to the photos' width they looked wrong, so they are 100 mm high on every plate, restriction, point, Rychlostník and zone alike. That is 0.42 of the panel's height; the photos have 0.45–0.50.
+- The gradient boards' figures are larger and heavier than the photos', to read in the game (the user, 2026-11-08). They are 0.30 of the board high (the photos: 0.23), bold with an outline of 0.035 of their height.
 - The gradient board's pentagon has its shoulders 0.56 of the height from its point's edge, as on both photos and D 1/2 p. 52. They were drawn at 0.42.
 - The speed switch's arrow is measured on the two R01 photos ([speed-switch signals](2026-11-07-speed-switch-signals.md)).
 
