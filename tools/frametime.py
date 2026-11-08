@@ -1,10 +1,11 @@
 """The frame time and the draw calls with each tram model (tools/bench/frametime.js), in a headed Chromium.
 
-Usage: python -P -E tools/frametime.py [--line 17] [--models detailed,classic,simple] [--frames 600] [--headless]
+Usage: python -P -E tools/frametime.py [--line 17] [--models detailed,classic,simple] [--fov 62,22.75] [--frames 600] [--headless]
 
 Its own server on a free port; for each model a fresh page at 1280 x 720 loads the line, starts the first
 trip with that model, adds three more sets ahead and measures `--frames` frames with vsync off (so the
-interval is what a frame costs, not the display's 60 Hz). Headed by default: headless Chromium draws in
+interval is what a frame costs, not the display's 60 Hz); `--fov` measures each model at each of these vertical fields
+(the cab's 62°, the zoom key's 22.75°: #382). Headed by default: headless Chromium draws in
 software, so its times say nothing about a GPU (#205); `--headless` only checks that the bench runs. Run it
 on a quiet machine, the window in front: it waits its turn among the heavy jobs (tools/baseline_store.py).
 Prints a table and writes reports/frametime.json.
@@ -32,7 +33,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-def measure(line, models, frames, headless, warm=120):
+def measure(line, models, frames, headless, warm=120, fovs=(None,)):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
@@ -41,14 +42,14 @@ def measure(line, models, frames, headless, warm=120):
         with sync_playwright() as p:
             args = [] if headless else ["--disable-gpu-vsync", "--disable-frame-rate-limit"]
             browser = p.chromium.launch(headless=headless, args=args)
-            for model in models:
+            for model, fov in [(m, f) for m in models for f in fovs]:
                 page = browser.new_page(viewport={"width": 1280, "height": 720}, device_scale_factor=1)
                 errors = []
                 page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
                 page.goto(f"{base}/?line={line}", timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
                 r = page.evaluate("async (o) => { const { run } = await import('/tools/bench/frametime.js'); return await run(o); }",
-                                  {"model": model, "frames": frames, "warm": warm})
+                                  {"model": model, "frames": frames, "warm": warm, "fov": fov})
                 r["errors"] = errors[:3]
                 out.append(r)
                 page.close()
@@ -59,11 +60,11 @@ def measure(line, models, frames, headless, warm=120):
 
 
 def table(rows):
-    lines = ["| model | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) |",
-             "|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| model | field (°) | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         sets = ", ".join(f"{s['far']}: {s['level']}" for s in r["sets"])
-        lines.append(f"| {r['model']} ({r['kind']}) | {r['frameMedian']} / {r['frameP95']} | {r['fps']} | {r['renderMedian']} / {r['renderP95']} | "
+        lines.append(f"| {r['model']} ({r['kind']}) | {r.get('fov')} | {r['frameMedian']} / {r['frameP95']} | {r['fps']} | {r['renderMedian']} / {r['renderP95']} | "
                      f"{r.get('matrixMedian')} | {r.get('calls')} | {r.get('triangles'):,} | {r.get('nodes'):,} / {r.get('tramNodes')} | {sets} |")
     return "\n".join(lines)
 
@@ -72,6 +73,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--line", default="17")
     ap.add_argument("--models", default="detailed,classic,simple")
+    ap.add_argument("--fov", default="", help="vertical fields to measure each model at, e.g. 62,22.75 (default: the camera's)")
     ap.add_argument("--frames", type=int, default=600)
     ap.add_argument("--headless", action="store_true", help="software drawing: checks the bench runs, no timing")
     args = ap.parse_args()
@@ -81,7 +83,8 @@ def main():
     from baseline_store import HeavyJob
     with HeavyJob("frametime"):  # (frame times need the machine to itself: it waits for the heavy jobs, #280)
         faulthandler.dump_traceback_later(1800, exit=True)  # page.evaluate has no time limit
-        rows = measure(args.line, args.models.split(","), args.frames, args.headless)
+        fovs = [float(f) for f in args.fov.split(",") if f] or [None]
+        rows = measure(args.line, args.models.split(","), args.frames, args.headless, fovs=fovs)
         faulthandler.cancel_dump_traceback_later()
     os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
     with open(os.path.join(ROOT, "reports", "frametime.json"), "w", encoding="utf-8", newline="") as f:

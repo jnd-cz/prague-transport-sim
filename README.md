@@ -61,6 +61,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `X` | přestavit výhybku stavěcím klíčem (stojící vůz) |
 | `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
+| `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
 | `V` | pohled ze stanoviště řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
@@ -170,8 +171,8 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
   (Chotkova), Most Legií na mostovce s pilíři.
 - Značky: klasické červené pražské označníky; rychlostní návěsti podle předpisu D 1/2 (omezení rychlosti černým
   číslem na žluté, rychlostník bílým na černé, předzvěstní trojúhelník, „r“ oblouku o malém poloměru, nebezpečné
-  stoupání a klesání), dvakrát větší než skutečné, aby se daly přečíst na obrazovce. Bílá tabule s černým číslem
-  je jen pomocná: stojí, kde rychlost omezuje oblouk a skutečná návěst nestojí. Tabulky kontaktů. Přechody
+  stoupání a klesání), dvakrát větší než skutečné, aby se daly přečíst na obrazovce. Tabulky
+  kontaktů. Přechody
   jsou namalované tam, kde jsou zmapované (ne přes koleje). Návěstidla a značky stojí mimo vozovku: na trakčních
   stožárech, zavěšené na příčných lanech vedle troleje nebo u obrubníku — ne na nástupištích.
 - Trolejové vedení: příčná lana kotvená na stožárech u obrubníku (mezi vozovkou a chodníkem), na růžicích ve zdi,
@@ -196,7 +197,7 @@ zařízení). Posílají klávesy klávesnice:
 
 - řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
-- levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), pohled, zrcátko, pauza;
+- levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
 - ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 

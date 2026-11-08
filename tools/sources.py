@@ -85,9 +85,9 @@ LAYERS = {
     "streets": ("zps", "dtmp", "osm"),  # areas and kerbs; OSM: road centre lines with widths
     "tracks": ("ortho", "dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); the orthophoto only where the user took
                                                           # it (truth.json photoTracks, #204); OSM reviewed gaps only
-    # top of rail (#197): numeric DI, the archive, the user's reviewed spans, survey plus the style fact, the curve
-    # across a short hold; where none, the game's surface profile
-    "heights": ("dtm-di", "dtmp-tracks", "truth", "zps", "rule:curve", "rule:surface"),
+    # top of rail (#197): numeric DI, the archive, the user's reviewed spans, survey plus the style fact, the lidar where
+    # nothing else has a height (#202), the curve across a short hold; where none, the game's surface profile
+    "heights": ("dtm-di", "dtmp-tracks", "truth", "zps", "ipr-dtm", "rule:curve", "rule:surface"),
     "structures": ("zps", "mosty3d", "osm"),  # bridge decks (survey) over the model over OSM tags (#13)
     "furniture": ("dtmpoints", "osm", "rule:placement"),  # survey points over OSM over rules (#14)
     "buildings": ("lod2", "osm"),

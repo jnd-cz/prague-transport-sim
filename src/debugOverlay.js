@@ -7,8 +7,9 @@
 //   white bar            conflict on the route (street, footway or crossing): its near edge
 //   green bars / ball    platform start and end / where the tram front stops for passengers
 //   orange / olive line  track not from the current DTM (DI): OpenStreetMap / the archived DTMP axes (#20)
-//   cyan / blue / red    route height not measured on it (#197): the curve across a short hold / the user's reviewed
-//     line, 0.6 m up      span / the game's surface profile (no assembled height: fill, a hold over 60 m)
+//   cyan / blue / yellow route height not measured on it (#197): the curve across a short hold / the user's reviewed
+//     / red line,         span / the lidar where nothing else had a height (#202) / the game's surface profile (no
+//     0.6 m up            assembled height: fill, a hold over 60 m)
 import * as THREE from 'three';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
@@ -46,7 +47,8 @@ export function builtGeoJSON(game, traffic) {
 }
 
 export function createDebugOverlay(scene) {
-  let group = null;
+  let group = null, shown = null; // shown: the game whose diagnostic speed boards are on with the overlay (#389)
+  const diag = (game, on) => { if (game?.diagBoards) game.diagBoards.visible = on; };
   const mats = {}, lineMats = {};
   const mat = (c) => (mats[c] ||= new THREE.MeshBasicMaterial({ color: c, depthTest: false, transparent: true, opacity: 0.9 }));
   const geo = { ball: new THREE.SphereGeometry(0.9, 10, 8), dot: new THREE.SphereGeometry(0.6, 8, 6), bar: new THREE.BoxGeometry(3, 0.2, 0.6), wide: new THREE.BoxGeometry(5, 0.25, 0.6) };
@@ -73,7 +75,7 @@ export function createDebugOverlay(scene) {
       g.add(line);
     }
     // route heights not measured where they are (the profile's source per sample, tools/line_heights.py)
-    const HEIGHT_SRC = { curve: 0x22e5e5, review: 0x3a6cff, surface: 0xff3030 };
+    const HEIGHT_SRC = { curve: 0x22e5e5, review: 0x3a6cff, lidar: 0xe0c020, surface: 0xff3030 }; // (lidar: #202)
     for (let i = 0; P.source && i < P.n; i++) {
       const c = HEIGHT_SRC[P.source[i]];
       if (!c) continue;
@@ -109,13 +111,14 @@ export function createDebugOverlay(scene) {
   return {
     get on() { return !!group; },
     toggle(game, traffic) {
-      if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; return false; }
+      if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; diag(shown, false); shown = null; return false; }
       if (!game) return false;
       group = build(game, traffic);
       scene.add(group);
+      diag((shown = game), true);
       return true;
     },
     // a new shift (new game / traffic objects): drop the old markers
-    reset() { if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; } },
+    reset() { if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; } diag(shown, false); shown = null; },
   };
 }

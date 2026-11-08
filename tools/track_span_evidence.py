@@ -1,5 +1,6 @@
 """Explicitly reviewed structure profiles; no proposal is applied automatically (#106)."""
 import argparse
+import bisect
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -114,6 +115,7 @@ SURVEY_SPREAD, MAX_GAP = .03, 10  # m: deck and road of one survey agree to 3 cm
 # else there: the road over the tram at Hlavní nádraží (+6.9 m), the street under Modřany's bridge (-6 m).
 PARALLEL_GAP, DEPART, OFFSET = (2.5, 6), .3, .1
 SLOPE_RUN = 15  # m of archive on each side of a dip whose grade the bridging curve continues
+APPROACH = 30  # m of route on each side of a span that the queue carries with it (tools/track_structure_review.py)
 # On a structure the survey's generic track and deck areas are not rail height by themselves: on the queue's
 # bridges level-0 tram areas lie p10 -1.53 / median -0.26 / p90 +0.11 m from the archive (Modřany and
 # Hodkovičky ~2 m below). They count only on a span where they meet the archive within 0.3 m wherever the
@@ -132,7 +134,7 @@ def _valid(z):
 def _structure_level(structure):
     """(evidence kind, physical level) of a decision's structure, or Held."""
     kind = structure['kind']
-    if kind=='unmapped':
+    if kind in ('unmapped','street'):
         return 'surface',0  # (no bridge or tunnel mapped or surveyed here: the track lies on the street)
     key = 'level' if kind=='survey_level' else 'layer'
     try:
@@ -152,13 +154,20 @@ def _structure_level(structure):
 
 
 def _rail_z(point):
-    """Numeric DI where it is (it wins anyway), else the archive; None where neither."""
-    if _valid(point.get('di_z')):
-        return point['di_z']
-    zs = [c['z'] for c in point.get('archive',[]) if _valid(c.get('z')) and not c.get('excluded')]
+    """The archive where it is, else numeric DI; None where neither. The answers judge the archive's profile:
+    where numeric DI splits a held stretch into pieces of 0.6-7 m, DI beside them lies 0.1-0.5 m off the
+    archive (Hlavní nádraží) and its rejected raw heights 1.5 m under it (Malostranské náměstí), and a series
+    of both read as steps and dips that neither has (#390). DI still wins where it is, in the import."""
+    cs = [c for c in point.get('archive',[]) if _valid(c.get('z')) and not c.get('excluded')]
+    zs, di = [c['z'] for c in cs], (point['di_z'] if _valid(point.get('di_z')) else None)
     if zs and max(zs)-min(zs)>.3:
+        if di is not None:
+            return di  # (two archive records apart: DI's height, as before #390)
+        if len(ids := {c.get('id') for c in cs})==1 and None not in ids:
+            # (one record met twice on a steep flank, not two records apart: Hlavní nádraží's road ramp, 0.35 m)
+            return sum(zs)/len(zs)
         raise Held('archive rail heights conflict on part of the span')
-    return zs[0] if zs else None
+    return zs[0] if zs else di
 
 
 def _grade(a, b):
@@ -195,11 +204,32 @@ def dips(series):
     return out, bad
 
 
-def _series(span):
-    """The span's points with its ~30 m of approach, sorted, and the (point, (s, rail z)) of those with a height."""
-    points = sorted([*(dict(p,inside=False) for p in span.get('approach',[])),*(dict(p,inside=True) for p in span['profile'])],
-                    key=lambda p:p['s'])
+def _series(span, stretch=()):
+    """The span's points with its ~30 m of approach, sorted, and the (point, (s, rail z)) of those with a height.
+    With its stretch (_stretches), the points of all its pieces and their approaches, `own` marking the span's."""
+    by = {}
+    for o in stretch or (span,):
+        for p in o.get('approach',[]):
+            by.setdefault(round(p['s'],2),dict(p,inside=False,own=False))
+        for p in o['profile']:
+            by[round(p['s'],2)] = dict(p,inside=True,own=o is span)
+    points = sorted(by.values(),key=lambda p:p['s'])
     return points,[(p,(p['s'],z)) for p in points if (z := _rail_z(p)) is not None]
+
+
+def _stretches(spans):
+    """A decision's spans of one line and direction chained where their approaches meet ({span id: the chain}):
+    numeric DI cuts a held stretch into pieces of 0.6-7 m, and a departure or a dip runs across them (Hlavní
+    nádraží: the road over the tunnel, +6 m for 60 m; #390), so the answer judges the stretch they lie in."""
+    out, chain = {}, []
+    end = lambda o: o.get('end_s',o['start_s']+o['length_m'])
+    for o in sorted(spans,key=lambda o:(str(o.get('line')),str(o.get('direction')),o['start_s'])):
+        if chain and ((o.get('line'),o.get('direction')) != (chain[-1].get('line'),chain[-1].get('direction'))
+                      or o['start_s']-end(chain[-1]) > 2*APPROACH):
+            chain = []
+        chain.append(o)
+        out[o['id']] = chain
+    return out
 
 
 def _parallel_z(known, others):
@@ -291,17 +321,19 @@ def _bridge_curve(known, k, m):
     return z
 
 
-def _archive_profile(span, line, bridge, others=()):
+def _archive_profile(span, line, bridge, others=(), stretch=()):
     """The span's archive rule ({'type':'archive'}), or samples where the archive needed mending: a stretch
     where it leaves the smooth archive of the other direction (others) takes that one's heights, and with
     bridge=True each dip is crossed on a curve. The ~30 m of approach on both sides count for the dips
-    (Hodkovičky's closes 5 m past the span)."""
-    points,known = _series(span)
+    (Hodkovičky's closes 5 m past the span); with `stretch` (_stretches), its pieces' points and approaches
+    too, and the span takes the stretch's heights at its own points."""
+    points,known = _series(span,stretch)
     found, bad = dips([sz for _,sz in known])
     # (a step among the approach points alone is another span's business)
     inside = lambda i: known[i][0]['inside'] or known[i+1][0]['inside']
     parallel = []
-    if others and ([1 for i,_ in bad if inside(i)] or [1 for k,m in found if any(known[j][0]['inside'] for j in range(k,m+1))]):
+    # (any step or dip in reach: numeric DI rows between pieces can carry a departure's edges, #390)
+    if others and (bad or found):
         mended,parallel = _follow_parallel(known,others)
         if parallel:
             known = mended
@@ -312,8 +344,14 @@ def _archive_profile(span, line, bridge, others=()):
     found = [(k,m) for k,m in found if any(known[j][0]['inside'] for j in range(k,m+1))]
     under = {id(known[j][0]) for k,m in found for j in range(k+1,m)}
     zs = {id(p):z for p,(_,z) in known}
-    if any(id(p) not in zs for p in points if p['inside'] and id(p) not in under):
-        raise Held('archive rail height missing on part of the span')
+    # (a point without a height between heights at most MAX_GAP apart is interpolated, as samples are: the
+    # archive leaves out 2-5 m among Malostranské náměstí's tunnel points, #390)
+    at = [s for _,(s,_) in known]
+    missing = [p for p in points if p['inside'] and id(p) not in under and id(p) not in zs]
+    for p in missing:
+        i = bisect.bisect(at,p['s'])
+        if i==0 or i==len(at) or at[i]-at[i-1] > MAX_GAP:
+            raise Held('archive rail height missing on part of the span')
     if found and not bridge:
         k,m = found[0]
         (s0,z0),(s1,_) = known[k][1],known[m][1]
@@ -322,8 +360,10 @@ def _archive_profile(span, line, bridge, others=()):
                    f'(what lies under the track): answer "{BRIDGED}" if the track bridges it')
     if bridge and not found:
         raise Held('the archive has no dip to bridge')
-    if not found and not parallel:
-        return {'type':'archive'},[],[]
+    mended = [(known[k][1][0],known[m][1][0]) for k,m in found]+[tuple(r) for r in parallel]
+    gone = {id(p) for p in missing}
+    if not any(id(p) in gone or any(a < p['s'] < b for a,b in mended) for p in points if p['inside'] and p.get('own',True)):
+        return {'type':'archive'},[],[]  # (nothing of its own mended: the archive as it is)
     bridged = []
     for k,m in found:
         (a,za),(b,zb) = known[k][1],known[m][1]
@@ -333,9 +373,14 @@ def _archive_profile(span, line, bridge, others=()):
                 zs[id(p)] = curve(p['s'])
         bridged.append([a,round(za,3),b,round(zb,3),[[round(s,3),round(curve(s),3)] for s in
                         (a+(b-a)*i/10 for i in range(11))]])
-    samples = [[round(line.project(Point(p['xy'])),3),round(zs[id(p)],3)] for p in points if p['inside'] and id(p) in zs]
+    samples = [[round(line.project(Point(p['xy'])),3),round(zs[id(p)],3)] for p in points
+               if p['inside'] and p.get('own',True) and id(p) in zs]
+    if not samples:
+        raise Held('archive rail height missing on part of the span')
     if any(b[0]-a[0]>MAX_GAP or b[0]<=a[0] for a,b in zip(samples,samples[1:])):
         raise Held('archive points are too far apart to sample')
+    if len(samples)==1:
+        return {'type':'constant','z':samples[0][1]},bridged,parallel  # (a piece of one point)
     return {'type':'samples','samples':samples},bridged,parallel
 
 
@@ -417,7 +462,9 @@ def from_reviews(verdicts, findings, source_name):
             if not isinstance(answer.get('t'),(int,float)):
                 raise Held('missing answer date')
             kind,level = _structure_level(item['decision']['structure'])
-            profiles, uncovered = [], []
+            if answer['v']==BRIDGED and item['decision']['structure']['kind']=='street':
+                raise Held('street track has no deck to carry over a dip')
+            profiles, uncovered, chains = [], [], _stretches(item['spans'])
             for span in item['spans']:
                 p = dict(span['approval_profile'])
                 if not p.get('di_ids'):
@@ -439,7 +486,7 @@ def from_reviews(verdicts, findings, source_name):
                         uncovered.append(span['id']); continue
                 else:
                     others = [o for o in item['spans'] if o.get('line')==span.get('line') and o.get('direction')!=span.get('direction')]
-                    p['rule'],bridged,parallel = _archive_profile(span,line,answer['v']==BRIDGED,others)
+                    p['rule'],bridged,parallel = _archive_profile(span,line,answer['v']==BRIDGED,others,chains[span['id']])
                     if bridged:
                         p['bridged'] = bridged
                     if parallel:

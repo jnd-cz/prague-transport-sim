@@ -69,6 +69,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
   1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
   ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
+- **In the tunnels and structures DI added by 2026-11-06, it does not share the archive's heights** (#390):
+  numeric DI lies 0.1–0.2 m under the archive along Hlavní nádraží's Seifertova tunnel, 0.45–0.55 m under it
+  in Wilsonova's outbound track, and the raw DI the import rejects runs up to 1.5 m under it through
+  Malostranské náměstí. A series mixing the two at 1 m spacing steps 12–46 %, so the review answers
+  judge the archive's own heights.
 - **Where only the archive has a height, the 2023 terrain checks it** (#190): where a ZPS survey confirms
   the archive, the two differ by more than 1 m on 13 of 45,577 samples (0.03 %); without a survey 848 samples
   do (Malovanka 83 m, the Libeň bridge's dips to the streets, Troja's old alignment). Numeric DI agreeing with
@@ -180,6 +185,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   90 m while the return track 3 m beside it, the archive and the lidar under both agreed within 0.2 m. Where DI is the
   source, the archive sided with the lidar at every such stretch of the network; on a bridge it does not (the bare-earth
   lidar and the archive both lie under the deck, DI 6-14 m over them: the `structure_hint` flag). `archive_over_di`.
+- **The lidar settles most held heights** (#202, 2026-11-08): where the archive and the survey disagree by over 0.3 m and
+  DI has a height too, the source the 1 m lidar lies within 10 cm of matched DI at 148 of 155 bins (the archive 137 of
+  141, the survey 11 of 14). On ordinary track the rail lies a median +1 cm over the lidar (p10 -7, p90 +18 cm). The
+  lidar alone is no height for a funicular: Petřín's, held its whole length, took the hill's bare earth in steps of
+  2-6 m. `held_settled`: held stretches over 60 m 81 -> 50 network-wide, 5 -> 0 on the lines' routes.
 - **OSM roads drawn over the rails** (#344, the `railSupport` places left after the heights): where the street way runs
   onto a bridge, `ground.at` gives it the ground under the bridge, at the abutment level with the deck (Most Legií, 8-18 cm
   over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across

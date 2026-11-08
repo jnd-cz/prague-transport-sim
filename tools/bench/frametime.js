@@ -6,7 +6,8 @@
 // two others at the lighter one, as traffic sets them), the camera fixed 14 m off the platform side. The
 // game runs (a paused one draws 4 frames a second, #149) with the run's seeded traffic.
 // Returns the frame interval (median, p95; vsync off in the runner), the CPU time of renderer.render,
-// the draw calls and triangles of a frame, and each set's level.
+// the draw calls and triangles of a frame, and each set's level. `fov`: the camera's vertical field in degrees
+// (the cab's 62 unless given; the zoom key's 22.75, #382).
 const AI = [45, 110, 180];
 
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
@@ -20,7 +21,7 @@ const until = async (ok, ms = 120000) => {
 const count = (o) => { let n = 0; o.traverse(() => n++); return n; };
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
-export async function run({ model = 'detailed', frames = 600, warm = 120, ai = AI } = {}) {
+export async function run({ model = 'detailed', frames = 600, warm = 120, ai = AI, fov = null } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = 1; // (the run's seeded stream: the same traffic for every model)
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
@@ -40,6 +41,7 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
   const c = route.offset(s0 - 15, -14), l = route.at(s0 + 40);
   window.camera.position.set(c.x, g.profile.height(s0 - 15) + 3, -c.y);
   window.camera.lookAt(l.x, g.profile.height(s0 + 40) + 1.5, -l.y);
+  if (fov) { window.camera.fov = fov; window.camera.updateProjectionMatrix(); }
   window.camera.updateMatrixWorld();
   const sets = ai.map((d) => {
     const m = makeT3({ line: g.line, cars: 2, detailed: model === 'simple' ? false : kind, run: '899' });
@@ -80,7 +82,7 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
   for (const { m } of sets) window.scene.remove(m);
   const ms = (x) => +x.toFixed(2);
   return {
-    model, kind: window.tramModel.userData.kind, frames: gaps.length,
+    model, kind: window.tramModel.userData.kind, fov: +window.camera.fov.toFixed(2), frames: gaps.length,
     frameMedian: ms(median(gaps)), frameP95: ms(pct(gaps, 0.95)), fps: +(1000 / median(gaps)).toFixed(1),
     renderMedian: ms(median(c2)), renderP95: ms(pct(c2, 0.95)), matrixMedian: ms(median(umw.slice(warm))), ...info,
     nodes, tramNodes: count(window.tramModel), setNodes,
