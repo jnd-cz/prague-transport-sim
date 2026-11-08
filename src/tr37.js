@@ -72,9 +72,21 @@ export const TR37_SPEC = {
   // braking
   coastSettle: 2.5,          // s the autopilot coasts between drive and brake: the accelerator's way back (ČKD: 2–3 s, [ckd03] p. 11)
   shoeForce: [0, 9200, 27600], // N per car: shoe brakes released / partly / fully [assumed ≈0.5 / 1.5 m/s² empty]
-  trackForce: 12000,         // N per car per magnet pair: 2 × 60 kN attraction × μ 0.1 [μ assumed]
+  // the track brakes: two ČKD FC33 magnets a bogie, 60 kN attraction each (T3SU-22 p. 1, T3SU-02 p. 1), N per car per pair. Their
+  // friction on the rail by speed (km/h, μ): a tram's, TU Dresden's braking lecture 2020/21 slide 97, held below 10 km/h. With it
+  // the pedal on the floor stops an empty car from 42 and 50 km/h at 2.6 m/s², 2.2 at 40 km/h rising to 3 below 15, a T3 measured by
+  // VUT Brno 2.85 and 2.65 (Krychtálek 2010 p. 26; ČKD's informative 2.3, T3SU-26 p. 5); with a flat μ 0.1 it was 2.24 at every speed
+  trackPull: 120000,
+  trackMu: [[10, 0.2], [20, 0.16], [40, 0.12], [50, 0.11], [60, 0.105], [70, 0.1]],
 };
 const C = TR37_SPEC;
+// the track brake's friction at a speed (km/h), between the table's points
+function trackMu(kmh) {
+  const m = C.trackMu;
+  if (kmh <= m[0][0]) return m[0][1];
+  for (let i = 1; i < m.length; i++) if (kmh <= m[i][0]) return m[i - 1][1] + ((m[i][1] - m[i - 1][1]) * (kmh - m[i - 1][0])) / (m[i][0] - m[i - 1][0]);
+  return m[m.length - 1][1];
+}
 
 // The TE 022 motor at 300 V ([ckd04] p. 14, read from the chart, § 5.2): current A → rpm and torque Nm at
 // full field, and at the weakened field (drawn for 50 %; at 60 and 80 A the 100 A ratios)
@@ -495,7 +507,7 @@ export class TR37 {
     this.mg.update(dt, voltage, this.aux.U * this.aux.dynamoA);
 
     return {
-      drive: this.drive, brake: fElec + this.shoeF, track: track * C.trackForce * k, trackOn: track > 0, trackPairs: track,
+      drive: this.drive, brake: fElec + this.shoeF, track: track * C.trackPull * trackMu(speed * 3.6) * k, trackOn: track > 0, trackPairs: track,
       current: I, line: this.ls ? I * k : 0, dissipated: fElec * speed, auxLine: this.mg.i * k,
     };
   }

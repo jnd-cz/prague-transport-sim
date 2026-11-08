@@ -336,6 +336,17 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
   0.089 / 0.090 coasting (p25–p75 0.05–0.15), so the totals agree and the model's rise with speed is not settled by one ride.
+- **The track brakes** (#351, `src/tr37.js` `trackPull`, `trackMu`): four ČKD FC33 magnets a car, two a bogie, 60 kN attraction each, fed
+  from the battery (T3SU-22 p. 1, T3SU-02 p. 1, T3SU-13 p. 1). The rear bogie's come on at the pedal's first stage past parking, both bogies'
+  with the pedal on the floor (the DPP T3 textbook p. 5). Their friction on the rail rises as the speed falls: 0.10 at 70 km/h, 0.12 at 40,
+  0.16 at 20, 0.20 at 10 (a tram's curve, TU Dresden's braking lecture 2020/21, slide 97). The pedal on the floor then stops an empty car
+  from 42 and 50 km/h at 2.6 m/s² and one with 40 passengers at 2.35, from 2.2 m/s² at 40 km/h to 3 below 15 (4.2 at the end, empty).
+  A T3 measured at VUT Brno stopped at 2.85 and 2.65 m/s² from 42 and 50 km/h (Krychtálek 2010 p. 26, the load not given); ČKD's
+  informative figure is 2.3 (T3SU-26 p. 5). With a flat friction of 0.1 it had been 2.24 at every speed. They are for danger only
+  (D 1/2 § 34.4: when service braking cannot avert it; the textbook: "jen v případě nebezpečí"; the user, 2026-11-08: "those should be
+  used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"). The autopilot
+  takes them only for a walker, a car or an obstacle in the way, or where the grip is under 0.25 or the wheels slide. A stop, a
+  signal, a junction or a tram ahead on dry rail gets step 5 at most.
 - **The load** (#351, `tools/headless.py --checks load10,load90`: the stops run with the passengers held at 10 % and 90 % of the
   capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass, and boarding slows over 75 %. Held at step 3
   from every stand, a full car made 0.8 m/s² and lines 17 and 22 took 504 and 396 s longer at 90 % than at 10 % (main 263 and 240 s).
