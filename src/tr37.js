@@ -286,7 +286,7 @@ export class TR37 {
   // the stop point, or null), noDrive (braking for a stop: the drive pedal stays off), fixed (that point stays where it
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
-  // still gets here), aService (m/s² step 5 gives here, the gradient with it) }.
+  // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -326,7 +326,10 @@ export class TR37 {
       else if (now < 0 && s < now && e < 0.3) s = now;
       // (a high step comes off sooner: each takes 0.6 s on the way down, and up 50 ‰ on step 4 it went 2.8 km/h over the limit)
       else if (now > 0 && s >= 0 && e < 0.2 - 0.25 * (now - 1) && e > -0.7) s = now;
-      else if (now === 0 && s > 0 && e > -0.35 && v > 1) s = 0;
+      // (once it let go, it coasts down w.holdSag under the speed before it presses again, 1 m/s at 30 km/h and over: the user, 2026-11-08,
+      // "The hysteresis for speed under limit when another pedal press starts can be higher, which will lead to less presses"; at 0.35
+      // the autopilot pressed 12.5-14.7 times a km on line 23, a driver 5.8 on a phone's count)
+      else if (now === 0 && s > 0 && e > -(w.holdSag ?? 0.35) && v > 1) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
     }
     if (w.power === true) s = Math.max(1, s);
@@ -391,8 +394,8 @@ export class TR37 {
       // from the lever's "nothing" a careful foot: brake and drive one step at a time; off a high drive step through a lower one
       if (s < 0 && now <= 0 && s < now - 1) s = now - 1;
       if (s > 0 && now >= 0 && s > now + 1) s = now + 1;
-      // (T3SU-03 p. 4: on the level steps 1–3, more only at speed or uphill)
-      if (s > 3 && v < 25 / 3.6 && Math.abs(w.grade || 0) < 0.02) s = 3;
+      // (T3SU-03 p. 4: on the level steps 1–3, more only at speed or uphill; at speed from 20 km/h, where a driver on 7290 went to steps 4-5)
+      if (s > 3 && v < 20 / 3.6 && Math.abs(w.grade || 0) < 0.02) s = 3;
       if (now >= 3 && s <= 0) s = 1;
     }
     if (s !== now && (A.hold <= 0 || w.urgent || contact || w.slip || w.slide)) {

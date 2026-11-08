@@ -109,9 +109,16 @@ export function stopsWatch(game) {
   };
 }
 
+// (opts.load: the passengers held at this share of the capacity all the way, before and after each step: how the timetable and the
+// driving follow the load; boarding still slows in a full car, src/game.js)
+const loadWatch = (share) => (game) => {
+  const hold = () => { game.tram.passengers = Math.round(share * game.tram.capacity); };
+  return { before: hold, after: hold, result: () => null };
+};
+
 export async function run(seed = 1, opts = {}) {
   const { run: drive } = await import('./u3.js');
-  const r = await drive(seed, { ...opts, also: [stopsWatch] });
+  const r = await drive(seed, { ...opts, also: opts.load != null ? [stopsWatch, loadWatch(opts.load)] : [stopsWatch] });
   // (opts.full: with what the drive itself found, for the weather's stress test)
   return opts.full ? { ...r.also[0], hits: r.hits, collisions: r.collisions, signalPenalty: r.signalPenalty, signalEvents: r.signalEvents, collisionPenalty: r.collisionPenalty, stuckScene: r.stuckScene } : r.also[0];
 }

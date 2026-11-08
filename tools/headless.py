@@ -82,6 +82,9 @@ CALLS = {
              "const r = await run(SEED, { also: [redrunsWatch] }); const red = r.also[0]; delete r.also; return { u3: r, redruns: red };",
     "stops": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED);",
     "autumn": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED, { weather: 'leaves', full: true });",
+    # (the same drive with the passengers held at 10 % and 90 % of the capacity: how the timetable and the driving follow the load, #351)
+    "load10": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED, { load: 0.1 });",
+    "load90": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED, { load: 0.9 });",
     "traffic": "const { trafficRun } = await import('/tools/traffic_lint.js'); return await trafficRun({ seed: SEED });",
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
@@ -127,7 +130,7 @@ def judge(check, r):
         if r.get("ourSignalPenalty"):
             bad.append(f"our signal penalty {r['ourSignalPenalty']}")
         more = f"warn passes {r.get('warnPasses')}, holds {r.get('holds')}"
-    elif check in ("stops", "autumn"):
+    elif check in STOPS_LIKE:
         # (#351: once braking for a stop the autopilot does not go back to the drive pedal, unless what is in
         # front of it changed; the user, 2026-11-06: "without any jums to jízda unless you're following tram in front of you")
         if r.get("stuck") is not None:
@@ -209,15 +212,20 @@ def load_places():
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
        "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
+       "load10": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
+       "load90": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
        "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
 HARD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
         "stops": {"stuck", "flipsFree"},
+        "load10": {"stuck", "flipsFree"},
+        "load90": {"stuck", "flipsFree"},
         "autumn": {"stuck", "hits", "signalPenalty"},
         "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"},
         "traffic": {"finished"}}
 SPREAD_SEEDS = "1-5"
+STOPS_LIKE = ("stops", "autumn", "load10", "load90")  # the stops bench and its variants
 
 
 def counts(check, r):
@@ -231,8 +239,8 @@ def counts(check, r):
                 "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber")}
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
-    if check in ("stops", "autumn"):
-        keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "sandSecs", "sandLeft", "emergencies") if check == "autumn" else ()
+    if check in STOPS_LIKE:
+        keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "sandSecs", "sandLeft", "emergencies") if check == "autumn" else ("simSeconds",) if check.startswith("load") else ()
         return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
@@ -630,7 +638,7 @@ def choose_baseline(base, stored_places, results, main_rev, want, measure=True, 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="17")
-    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, stops, autumn, traffic, lint, canted, crossing, surfaces, spacing, heights")
+    ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, stops, autumn, load10, load90, traffic, lint, canted, crossing, surfaces, spacing, heights")
     ap.add_argument("--seeds", help=f"default 1-3; {SPREAD_SEEDS} with --baseline or --compare (the seed spread)")
     ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")

@@ -51,7 +51,9 @@ export class Autopilot {
     const gradeHere = g.profile.grade(tr.s - 7);
     // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold)
     const planMax = Math.min(PLAN_DECEL, 0.5 * 9.81 * (g.muBase ?? 0.3));
-    const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.8 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
+    // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
+    // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
+    const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
     const vLine = vt;
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, limit.d - 12)) - 0.3;
@@ -148,6 +150,17 @@ export class Autopilot {
         nl = { v: V_BUTTON * 3.6, d: dc + 12 };
         vLimit = Math.min(vLimit, curveTo(nl));
         vt = Math.min(vt, vLimit);
+      } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity) {
+        // (at speed the drive pedal makes the turn, ≈1.5 s without the brake: slow enough there for the point to stay on its curve after
+        // that. Braking at 0.85 of step 5 it was on the curve at the contact 70 m before the stop, then needed 1.16 m/s² and the track
+        // brakes; test drive "turn under a contact 70 m before the stop, at speed")
+        const dC = Math.max(0, fixedAt - STOP_MARGIN - ct.contact - 4.5);
+        const vC = (-3 * stopDecel + Math.sqrt(9 * stopDecel * stopDecel + 8 * stopDecel * dC)) / 2;
+        if (vC < there && (!nl || curveTo({ v: vC * 3.6, d: dc + 12 }) < curveTo(nl))) {
+          nl = { v: vC * 3.6, d: dc + 12 };
+          vLimit = Math.min(vLimit, curveTo(nl));
+          vt = Math.min(vt, vLimit);
+        }
       }
     }
     if (stopAt !== null && !fixed) {
@@ -160,7 +173,7 @@ export class Autopilot {
       vt = Math.min(vt, vMoving);
     }
     // how hard it slows by itself, rolling on the gradient with the preparation current (m/s²)
-    const resist = 650 * tr.cars + 28 * tr.cars * tr.v + 4.2 * tr.v * tr.v;
+    const resist = 650 * tr.cars + 28 * tr.cars * tr.v + 4.2 * (0.7 + 0.3 * tr.cars) * tr.v * tr.v; // (as src/tram.js, without the curves)
     const aCoast = (resist + 700 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
     // the approach: from the first brake pedal for this point until the tram stands, the point goes away, or something nearer
     // has taken it well under the curve (that may move off again, and the tram with it)
@@ -178,9 +191,13 @@ export class Autopilot {
       // 19 m before Hlušičkova, then needed more than the brake builds after driving and stood 3.5–4.6 m short on the emergency
       // brake, line 9 seeds 1 and 3). It coasts COAST_T into the curve, with the gradient's own slowing: up a
       // climb the drive stays on longer, down one it comes off sooner
+      // (the coast too with the steepest downhill on its way: over a crest from 40 ‰ up into 50 ‰ down it came to the curve at 47 km/h,
+      // where step 5 makes only 0.65 m/s², and stood on the track brakes; test drive "crest into the stop")
       const gain = Math.max(0, tr.a);
       const coastIn = Math.min(dLeft, Math.max(look, COAST_T * tr.v));
-      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - coastIn - gain * 3.5) + 2 * aCoast * coastIn)) - gain);
+      const gIn = Math.min(gradeHere, g.profile.grade(tr.s + coastIn / 2 - 7), g.profile.grade(tr.s + coastIn - 7));
+      const aCoastIn = aCoast + (tr.mass * 9.81 * (gIn - gradeHere)) / tr.inertia;
+      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - coastIn - gain * 3.5) + 2 * aCoastIn * coastIn)) - gain);
       // (it rolls there by itself: ČKD, T3SU-03 p. 5, "fully use coasting, above all when coming into stops"; just after braking up to
       // 90 m out when it is there within 15 s: after a switch's 15 km/h 53 m before the stop it drove up to 17 km/h between two
       // brakings. Not pulling away from the stop before: with stops 60 m apart that took 9 % longer)
@@ -235,7 +252,10 @@ export class Autopilot {
     const grade = gradeHere;
     // (between the drive plan and the brake plan: coast)
     const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
-    let aPlan = Math.max(-1.1, Math.min(1.0, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
+    // (up to 1.0 m/s² from a stand, 1.2 above 20 km/h: a phone on T3SUCS 7290 read 0.95-0.99 pulling away, step 3, and 1.21-1.29 from 20 to
+    // 40 km/h, steps 4-5; the user, 2026-11-08, on pressing step 4 at speed: "I think we can check that now")
+    const aUp = tr.v > 20 / 3.6 ? 1.2 : 1.0;
+    let aPlan = Math.max(-1.1, Math.min(aUp, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
     // (once on the curve to it, not from the moment a lower limit is in sight: that had it stop accelerating 300 m before every curve)
     const aToLimit = nl && nl.v / 3.6 < tr.v && tr.v >= curveTo(nl) - 0.3 ? (tr.v * tr.v - (nl.v / 3.6 - 0.3) ** 2) / (2 * Math.max(3, nl.d - 12)) : 0;
     // near a speed it holds, gently: a hard gain took it from one brake step's force to the next and from 14 to 10 km/h and
@@ -243,7 +263,7 @@ export class Autopilot {
     // a lag behind it
     if (vt === vLimit) {
       const off = (tr.v > vt ? vt : vtDrive) - tr.v, gentle = Math.sign(off) * (0.35 * Math.min(Math.abs(off), 1) + 0.9 * Math.max(0, Math.abs(off) - 1));
-      aPlan = Math.max(-1.1, Math.min(1.0, gentle));
+      aPlan = Math.max(-1.1, Math.min(aUp, gentle));
       if (aToLimit > 0) aPlan = Math.max(-1.1, Math.min(aPlan, -aToLimit));
     }
     // on the curve to a fixed point: the deceleration that still ends there, whatever the brake's steps gave so far; too
@@ -301,7 +321,8 @@ export class Autopilot {
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
-      speedErr: onCurve ? null : tr.v - vt });
+      // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
+      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)) });
     return { vt, vtDrive, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }
 }
