@@ -824,11 +824,13 @@ export class Game {
     const smallRadius = smallRadiusCurves(route.length, (s) => route._radius(s), turnAt);
     const gradients = locateGradients(this.opts.signFacts?.gradients || [], this.data.stops, (s) => this.profile.height(s));
     const plan = withArrows(planSigns({ posted, step: pstep, top, trackwork, smallRadius, gradients }), this.switches);
+    const RELEASE = new Set(['end', 'higher', 'climbEnd', 'descentEnd', 'zoneEnd']);
     for (const sign of plan) {
       const board = makeSpeedBoard(sign);
-      this._mount(board, sign.s, { movable: true });
+      this._mount(board, sign.s, { movable: RELEASE.has(sign.kind) ? 'after' : true });
       this.objects.add(board);
-      this.signBoards.push({ ...sign, s: Math.round(sign.s) });
+      // where the rule wants it, and where it stands (moved off a platform, or to its span)
+      this.signBoards.push({ ...sign, s: Math.round(sign.s), at: Math.round(board.userData.mountedS ?? sign.s) });
     }
     // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; the user, 2026-11-08: "keep them for now for
     // diagnostic purposes, we can drop them later with more stable release"). Where the limit lies under both the posted
@@ -848,9 +850,9 @@ export class Game {
         last = s;
         const board = makeSpeedSign(v);
         board.userData.diagnostic = true;
-        this._mount(board, s, { movable: true });
+        this._mount(board, s, { movable: v > low ? 'after' : true });
         this.objects.add(board);
-        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s) });
+        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s), at: Math.round(board.userData.mountedS ?? s) });
       }
       i = k;
     }
@@ -863,8 +865,12 @@ export class Game {
   _mount(obj, s, { movable = false, hang = false } = {}) {
     const route = this.route, C = route.catenary || [], ud = obj.userData;
     const platformAt = (x) => this.stops.find((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
+    // movable: true moves a sign on a platform to just before it; 'after', for a sign that releases a limit (an end, a
+    // Rychlostník), to just past it, so that no sign tells the driver to speed up before the limit lifts
+    const after = movable === 'after';
     let onPlatform = platformAt(s);
-    if (onPlatform && movable) { s = (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
+    if (onPlatform && movable) { s = after ? (onPlatform.p1 ?? onPlatform.target + 2) + 6 : (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
+    ud.mountedS = s;
     const hidePole = () => { if (ud.pole) ud.pole.visible = false; };
     const kerb = route.kerbAt ? route.kerbAt(s, -1) : null;
     if (kerb && !kerb.wall && kerb.lat <= 6.5 && !onPlatform && !hang) {
@@ -877,8 +883,9 @@ export class Game {
     // after s: the nearest span was often over the junction, the signal hung in its middle (user,
     // 2026-10-24); one that must hang takes such a span only when there is none before s)
     const spans = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
-    const span = spans.find((c) => c.s <= s + 2) || (hang ? spans[0] : null);
+    const span = spans.find((c) => (after ? c.s >= s - 2 : c.s <= s + 2)) || (hang ? spans[0] : null);
     if (span && ud.boardTop !== undefined) {
+      ud.mountedS = span.s;
       // right of the tram: its half width, the overhang of the car ends in a curve, a margin and
       // the board's own half width (it used to hang 1.15 m out, over the tram's roof edge)
       hidePole();
