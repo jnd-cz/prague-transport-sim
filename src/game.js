@@ -3,11 +3,12 @@ import * as THREE from 'three';
 import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
 import { placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
+import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
 import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
   makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
-  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign, disposeModel,
+  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeSpeedBoard, disposeModel,
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
@@ -782,35 +783,50 @@ export class Game {
     this.ircLast = dir;
   }
 
-  // Track signs: speed limits (rychlostník) where a restriction starts or ends, and
-  // dangerous gradient boards at the top of steep descents.
+  // Track signs (#364): D 1/2's speed and gradient signs where src/speedSigns.js's `planSigns` puts them, from the posted
+  // speeds, the trackwork, the curves under 25 m and the listed dangerous gradients; and a diagnostic board where a limit
+  // comes from a curve alone. Each is in `signBoards` for the debug overlay and the checks.
   _initSigns() {
-    const lim = this.limits, step = lim.step, vals = lim.values;
-    let last = -1e9, cur = vals[0];
-    for (let i = 1; i < vals.length; i++) {
-      const v = vals[i];
-      if (v === cur) continue;
-      // only changes that last at least 25 m
-      let k = i;
-      while (k < vals.length && vals[k] === v && (k - i) * step < 25) k++;
-      if ((k - i) * step < 25 && k < vals.length) continue;
-      const s = i * step - (v < cur ? 12 : 0);
-      cur = v;
-      if (s - last < 35 || s < 20) continue;
-      last = s;
-      const sign = makeSpeedSign(v);
-      this._mount(sign, s, { movable: true });
-      this.objects.add(sign);
+    this.signBoards ||= [];
+    const route = this.route, sp = route.speedInfo, top = Math.round(T3.vMax * 3.6);
+    const posted = sp?.osm || [], pstep = sp?.step ?? 5;
+    const tw = this.data.trackwork || {};
+    const trackwork = [...this.switches.map((w) => w.s), ...(tw.trailing || []).map((w) => w.s), ...(tw.crossings || [])];
+    const turnAt = (s) => { const a = route.heading(s - 1, 1), b = route.heading(s + 1, 1); return a.hx * b.hy - a.hy * b.hx; };
+    const smallRadius = smallRadiusCurves(route.length, (s) => route._radius(s), turnAt);
+    const gradients = locateGradients(this.opts.signFacts?.gradients || [], this.data.stops, (s) => this.profile.height(s));
+    const plan = withArrows(planSigns({ posted, step: pstep, top, trackwork, smallRadius, gradients }), this.switches);
+    const RELEASE = new Set(['end', 'higher', 'climbEnd', 'descentEnd', 'zoneEnd']);
+    for (const sign of plan) {
+      const board = makeSpeedBoard(sign);
+      this._mount(board, sign.s, { movable: RELEASE.has(sign.kind) ? 'after' : true });
+      this.objects.add(board);
+      // where the rule wants it, and where it stands (moved off a platform, or to its span)
+      this.signBoards.push({ ...sign, s: Math.round(sign.s), at: Math.round(board.userData.mountedS ?? sign.s) });
     }
-    let inSteep = false;
-    for (let s = 0; s < this.route.length; s += 10) {
-      const g = this.profile.grade(s + 30);
-      if (!inSteep && g < -0.055) {
-        inSteep = true;
-        const sign = makeGradientSign(Math.round(-this.profile.grade(s + 60) * 100) || 6);
-        this._mount(sign, s, { movable: true });
-        this.objects.add(sign);
-      } else if (inSteep && g > -0.03) inSteep = false;
+    // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; the user, 2026-11-08: "keep them for now for
+    // diagnostic purposes, we can drop them later with more stable release"). Where the limit lies under both the posted
+    // speed and the restrictions for 25 m or more: the lowest at the start, 12 m before it, and the speed after it.
+    const lim = this.limits, step = lim.step, vals = lim.values;
+    const postedAt = (s) => Math.min(posted[Math.floor(s / pstep)] || 50, top);
+    const curveBin = (i) => vals[i] < Math.min(postedAt(i * step), lim.restriction(i * step + step / 2));
+    const near = (s) => plan.some((g) => g.kind === 'smallRadius' && Math.abs(g.s - s) < 40);
+    let last = -1e9;
+    for (let i = 1; i < vals.length; i++) {
+      if (!curveBin(i) || curveBin(i - 1)) continue;
+      let k = i, low = vals[i];
+      while (k < vals.length && curveBin(k)) low = Math.min(low, vals[k++]);
+      if ((k - i) * step < 25 || near(i * step)) { i = k; continue; }
+      for (const [s, v] of [[i * step - 12, low], [k * step, vals[Math.min(k, vals.length - 1)]]]) {
+        if (s - last < 35 || s < 20) continue;
+        last = s;
+        const board = makeSpeedSign(v);
+        board.userData.diagnostic = true;
+        this._mount(board, s, { movable: v > low ? 'after' : true });
+        this.objects.add(board);
+        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s), at: Math.round(board.userData.mountedS ?? s) });
+      }
+      i = k;
     }
   }
 
@@ -821,8 +837,12 @@ export class Game {
   _mount(obj, s, { movable = false, hang = false } = {}) {
     const route = this.route, C = route.catenary || [], ud = obj.userData;
     const platformAt = (x) => this.stops.find((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
+    // movable: true moves a sign on a platform to just before it; 'after', for a sign that releases a limit (an end, a
+    // Rychlostník), to just past it, so that no sign tells the driver to speed up before the limit lifts
+    const after = movable === 'after';
     let onPlatform = platformAt(s);
-    if (onPlatform && movable) { s = (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
+    if (onPlatform && movable) { s = after ? (onPlatform.p1 ?? onPlatform.target + 2) + 6 : (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
+    ud.mountedS = s;
     const hidePole = () => { if (ud.pole) ud.pole.visible = false; };
     const kerb = route.kerbAt ? route.kerbAt(s, -1) : null;
     if (kerb && !kerb.wall && kerb.lat <= 6.5 && !onPlatform && !hang) {
@@ -835,8 +855,9 @@ export class Game {
     // after s: the nearest span was often over the junction, the signal hung in its middle (user,
     // 2026-10-24); one that must hang takes such a span only when there is none before s)
     const spans = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
-    const span = spans.find((c) => c.s <= s + 2) || (hang ? spans[0] : null);
+    const span = spans.find((c) => (after ? c.s >= s - 2 : c.s <= s + 2)) || (hang ? spans[0] : null);
     if (span && ud.boardTop !== undefined) {
+      ud.mountedS = span.s;
       // right of the tram: its half width, the overhang of the car ends in a curve, a margin and
       // the board's own half width (it used to hang 1.15 m out, over the tram's roof edge)
       hidePole();

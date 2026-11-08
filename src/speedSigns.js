@@ -56,13 +56,14 @@ const TWO_FIGURES = 0.94;      // two figures' width over their height on the ph
                                // (Bahnschrift to 0.79 of its width, D-DIN to 0.88)
 
 let fontLoad = null;
-// Resolves true once D-DIN is there, false if it could not load (then the next face in FIGURES draws).
-export function loadFigureFont() {
+// Resolves true once D-DIN is there, false if it could not load in `wait` ms (offline, the host down): then the next face
+// in FIGURES draws, and the game starts anyway.
+export function loadFigureFont(wait = 4000) {
   if (typeof FontFace === 'undefined' || typeof document === 'undefined' || !document.fonts) return Promise.resolve(false);
   if (!fontLoad) {
     const face = new FontFace('D-DIN Condensed', `url(${DDIN_URL}) format('woff2')`, { weight: '700' });
     document.fonts.add(face);
-    fontLoad = face.load().then(() => true, () => false);
+    fontLoad = Promise.race([face.load().then(() => true, () => false), new Promise((done) => setTimeout(() => done(false), wait))]);
   }
   return fontLoad;
 }
@@ -377,4 +378,66 @@ export function planSigns({ posted, step = 5, top = 65, trackwork = [], smallRad
     kept.push(g);
   }
   return kept;
+}
+
+// ------------------------------------------------------------------ the facts the signs read (data/truth.json)
+// `dangerous-gradients`: the boards stand only where the list has one (a slope alone is no dangerous gradient, D 1/2
+// § 49.9-12).
+export function signFacts(truth) {
+  const lists = truth?.operation?.lists || [];
+  const list = (id) => lists.find((l) => l.id === id)?.entries || [];
+  return {
+    gradients: list('dangerous-gradients').filter((e) => e.kind === 'dangerous-gradient' && e.from && e.to)
+      .map((e) => ({ place: e.place, from: e.from, to: e.to, descending: !!e.descending, permille: Math.round(e.gradient), length: e.length })),
+  };
+}
+
+// The listed gradients on this route as [{from, to, permille, up}] (route metres), for planSigns. A list entry names the
+// stops either side and which way it falls; the route may pass them either way. The board stands where the listed length
+// falls or rises the most between the two stops, read off `heightAt(s)` in 10 m steps.
+export function locateGradients(gradients, stops, heightAt) {
+  const out = [];
+  for (const gr of gradients) {
+    const a = stops.find((q) => q.name === gr.from), b = stops.find((q) => q.name === gr.to);
+    if (!a || !b) continue;
+    const s0 = Math.min(a.s, b.s), s1 = Math.max(a.s, b.s), len = Math.min(gr.length || s1 - s0, s1 - s0);
+    // the route descends where it meets `from` first and the list says it falls from there
+    const up = (a.s < b.s) !== gr.descending;
+    let best = s0, most = -Infinity;
+    for (let s = s0; s + len <= s1 + 0.1; s += 10) {
+      const d = (heightAt(s + len) - heightAt(s)) * (up ? 1 : -1);
+      if (d > most) { most = d; best = s; }
+    }
+    out.push({ from: Math.round(best), to: Math.round(best + len), permille: gr.permille, up });
+  }
+  return out;
+}
+
+// Curves under 25 m radius (D 1/2 § 49.19), [{from, to, side}] in route metres: `radiusAt(s)` and `turnAt(s)` (the
+// heading's change, + left) read every `step` m. A run shorter than `min` m is the radius estimate's noise.
+export const SMALL_RADIUS = 25;
+export function smallRadiusCurves(length, radiusAt, turnAt, step = 2, min = 6) {
+  const out = [];
+  let run = null;
+  for (let s = 0; s <= length; s += step) {
+    if (radiusAt(s) < SMALL_RADIUS) {
+      if (!run) run = { from: s, to: s, turn: 0 };
+      run.to = s; run.turn += turnAt(s);
+    } else if (run) {
+      if (run.to - run.from >= min) out.push({ from: run.from, to: run.to, side: run.turn > 0 ? 'left' : 'right' });
+      run = null;
+    }
+  }
+  if (run && run.to - run.from >= min) out.push({ from: run.from, to: run.to, side: run.turn > 0 ? 'left' : 'right' });
+  return out;
+}
+
+// A sign standing within `reach` m past a facing switch the route leaves by its diverging branch holds for that branch:
+// it carries the branch's arrow (D 1/2 § 49.13, photo: "10" with an arrow over a fork).
+export function withArrows(signs, switches, reach = 15) {
+  return signs.map((g) => {
+    if (!['restriction', 'point', 'switchV', 'slow'].includes(g.kind)) return g;   // the "r" sign draws its own curve's arrow
+    const w = switches.find((x) => x.routeDiverging && g.s >= x.s - 2 && g.s <= x.s + reach);
+    return w ? { ...g, arrow: w.routeSide === 'right' ? 'right' : 'left' } : g;
+  });
 }

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
+import { drawSign, shownSize } from './speedSigns.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -853,7 +854,9 @@ function signOnPole(tex, w, h, y, poleH = y + h / 2) {
 const signTex = new Map();
 const cached = (key, make) => { if (!signTex.has(key)) { const tex = make(); tex.userData.shared = true; signTex.set(key, tex); } return signTex.get(key); };
 
-// Tram speed sign (rychlostník): black number on a white board with a black border.
+// The old board, black number on white with a black border: now only a diagnostic, where a limit comes from a curve
+// alone and no real sign stands (the user, 2026-11-08: "keep them for now for diagnostic purposes, we can drop them
+// later with more stable release").
 export function makeSpeedSign(v) {
   const tex = cached(`v${v}`, () => canvasTexture(128, 160, (g, w, h) => {
     g.fillStyle = '#111'; g.fillRect(0, 0, w, h);
@@ -893,18 +896,18 @@ export function makeRadioSwitchSign() {
   return signOnPole(tex, 0.4, 0.4, 3.2);
 }
 
-// Dangerous gradient: grey board, white field showing the slope with the red percentage.
-export function makeGradientSign(pct) {
-  const tex = cached(`grad${pct}`, () => canvasTexture(144, 160, (g, w, h) => {
-    g.fillStyle = '#8b8d8f'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#fff'; g.fillRect(12, 12, w - 24, h - 24);
-    g.fillStyle = '#111';
-    g.beginPath(); g.moveTo(20, 60); g.lineTo(w - 20, 120); g.lineTo(20, 120); g.closePath(); g.fill();
-    g.fillStyle = '#d0141b';
-    g.font = 'bold 40px Arial, sans-serif'; g.textAlign = 'center';
-    g.fillText(`${pct} %`, w / 2 + 14, 50);
-  }));
-  return signOnPole(tex, 0.45, 0.5, 2.8);
+// A D 1/2 speed or gradient sign (src/speedSigns.js: restriction, end, warning, Rychlostník, "r", zone, the gradient
+// boards) on a pole, SIGN_SCALE times its real size, its bottom edge 2.6 m up (#364). Textures are kept per face, so
+// they are drawn once: after loadFigureFont has settled (src/main.js), or a face keeps the font it was first drawn in.
+export function makeSpeedBoard(sign) {
+  const { s, ...face } = sign;
+  const size = shownSize(face), H = 256, W = Math.round(H * size.w / size.h);
+  const tex = cached('board' + JSON.stringify(face), () => canvasTexture(W, H, (g, w, h) => drawSign(g, face, w, h)));
+  const g = signOnPole(tex, size.w, size.h, 2.6 + size.h / 2);
+  // the warning triangle's corners are clear
+  if (face.kind === 'warning') g.children[1].material.alphaTest = 0.5;
+  g.userData.sign = face;
+  return g;
 }
 
 // Prague tram stop post (zastávkový označník): a red frame column. From the top: the tram

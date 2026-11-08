@@ -12,7 +12,7 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past and trojska-descent; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it"
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past and trojska-descent; src/speedSigns.js (signFacts) reads dangerous-gradients; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it"
  },
  "stops": [
   {
@@ -2031,7 +2031,7 @@
      "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"
     },
     "entries": [
-     {"kind": "dangerous-gradient", "place": "Trojská street, Hercovka – Nad Trojou", "length": 470, "gradient": 80.15, "unit": "‰", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"},
+     {"kind": "dangerous-gradient", "place": "Trojská street, Hercovka – Nad Trojou", "from": "Hercovka", "to": "Nad Trojou", "descending": true, "length": 470, "gradient": 80.15, "unit": "‰", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"},
      {"kind": "gradient", "place": "below Sídliště Modřany", "gradient": 69.9, "unit": "‰", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"},
      {"kind": "curve-speed", "place": "embankment curve before Nádraží Modřany", "value": 40, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041635"}
     ]

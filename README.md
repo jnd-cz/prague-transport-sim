@@ -105,15 +105,15 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   kontaktem bez proudu nedržíte odpojení topení (C).
 - Kontakty jsou ~22 m před výhybkou, nikdy však tam, kde tramvaj stojí se sběračem u zastávky nebo návěstidla.
   Sjezdové výhybky (pojížděné po hrotech, kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
-- Červená LED šipka před každou výhybkou ukazuje postavení jazyků a bliká, když je výhybka uzamčená. Když to
-  nevyjde, zastavte a použijte stavěcí klíč (X).
+- Červené LED návěstidlo před každou výhybkou ukazuje postavení jazyků (šipka vlevo či vpravo, svislý pruh rovně)
+  a bliká, když je výhybka uzamčená. Když to nevyjde, zastavte a použijte stavěcí klíč (X).
 
 ### Návěstidla
 
 - Pražská tramvajová návěstidla (čtyři světla: tři nahoře, jedno dole): dvě krajní horní = stůj; horní
   prostřední + dolní = volno rovně; horní levé nebo pravé + dolní = volno vlevo nebo vpravo; blikající volno
   znamená, že končí.
-- Výzvové návěstidlo pod ním má tři LED pruhy (\ | /): pruh směru, kterým pojedete, se rozsvítí oranžově, jakmile
+- Výzvové návěstidlo pod ním má tři LED pruhy (\ | /): pruh směru, kterým pojedete, se rozsvítí žlutě, jakmile
   je tramvaj zjištěna, a těsně před volnem bliká. Předvěsti se žlutým štítkem „P“ stojí před návěstidly
   skrytými za obloukem.
 - Křižovatky: každé návěstidlo patří k řadiči křižovatky s pevným cyklem (tramvaje rovně v obou směrech, fáze
@@ -153,7 +153,10 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 
 - Terén: koridor trati je zaříznutý do lidarového terénu; opěrné zdi tam, kde trať vede v zářezu ve svahu
   (Chotkova), Most Legií na mostovce s pilíři.
-- Značky: klasické červené pražské označníky, rychlostníky, tabulky kontaktů, tabulky nebezpečného spádu. Přechody
+- Značky: klasické červené pražské označníky; rychlostní návěsti podle předpisu D 1/2 (omezení rychlosti černým
+  číslem na žluté, rychlostník bílým na černé, předzvěstní trojúhelník, „r“ oblouku o malém poloměru, nebezpečné
+  stoupání a klesání), dvakrát větší než skutečné, aby se daly přečíst na obrazovce. Bílá tabule s černým číslem
+  je jen pomocná: stojí, kde rychlost omezuje oblouk a skutečná návěst nestojí. Tabulky kontaktů. Přechody
   jsou namalované tam, kde jsou zmapované (ne přes koleje). Návěstidla a značky stojí mimo vozovku: na trakčních
   stožárech, zavěšené na příčných lanech vedle troleje nebo u obrubníku — ne na nástupištích.
 - Trolejové vedení: příčná lana kotvená na stožárech u obrubníku (mezi vozovkou a chodníkem), na růžicích ve zdi,

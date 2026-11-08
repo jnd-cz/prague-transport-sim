@@ -1,6 +1,6 @@
 # Speed switches: their LED signals in the game (#211)
 
-Status: **proposed**, waiting for the user's answers (PR #362). Nothing here is in the game yet; the panels are drawn in `src/speedSigns.js` (`drawLedPanel`).
+Status: **proposed** (PR #362, the user's answers of 2026-11-08 in). The elements come into the game with #365; registration, the number and its limit with #380.
 
 Sources: D 1/2 § 30, 46; PPS Q103–105, Q109, Q111–112; the website's page on R01; [switches.md](../research/prazsketramvaje/switches.md) SW-R.
 
