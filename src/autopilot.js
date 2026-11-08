@@ -56,8 +56,11 @@ export class Autopilot {
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
     const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
+    // (to a lower limit as to a point, the steepest downhill on the way counts: planned on the 23 ‰ where it began braking, it met 59 ‰,
+    // where step 5 makes 0.67 m/s², and came into line 17's 15 km/h at s 17422 4.5 km/h over, seed 3)
+    const limitPlan = (d) => (d > 400 ? limitDecel : planAt(Math.min(gradeHere, g.profile.grade(tr.s + d / 2 - 7), g.profile.grade(tr.s + d - 7))));
     const vLine = vt;
-    const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, limit.d - 12)) - 0.3;
+    const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitPlan(limit.d) * Math.max(0, limit.d - 12)) - 0.3;
     if (nl) vt = Math.min(vt, curveTo(nl));
     let vLimit = vt;
     let stopAt = null, fixed = false, fixedAt = null, stopWhy = null;
@@ -193,7 +196,7 @@ export class Autopilot {
     // overran, line 22 seed 4, #241's check)
     const look = Math.max(0, tr.v) * 2.5;
     let vtDrive = vt;
-    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, nl.d - 12 - look)) - 0.3);
+    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitPlan(nl.d) * Math.max(0, nl.d - 12 - look)) - 0.3);
     if (fixedAt !== null) {
       // (and what it still gains while the accelerator comes off, ≈1 s: up 37 ‰ on step 4 at 1.1 m/s² it drove from 14 to 20 km/h
       // 19 m before Hlušičkova, then needed more than the brake builds after driving and stood 3.5–4.6 m short on the emergency

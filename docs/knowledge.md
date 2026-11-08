@@ -348,8 +348,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   takes them only for a walker, a car or an obstacle in the way, or where the grip is under 0.25 or the wheels slide. A stop, a
   signal, a junction or a tram ahead on dry rail gets step 5 at most.
 - **The load** (#351, `tools/headless.py --checks load10,load90`: the stops run with the passengers held at 10 % and 90 % of the
-  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass, and boarding slows over 75 %. Held at step 3
-  from every stand, a full car made 0.8 m/s² and lines 17 and 22 took 504 and 396 s longer at 90 % than at 10 % (main 263 and 240 s).
+  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass, and boarding slows over 75 %. A full car
+  pulls away on step 4 where step 3 cannot make 1.0 m/s² (on step 3 it made 0.8). Seed 1 at 90 % against 10 %, lines 9, 17, 22, 23
+  and 37: +102, +355, +419, +47 and +147 s to the terminus (main +4, +263, +240, +133, +50 s); the departures' mean delay 103, 355,
+  303, 141 and 82 s at 90 %. A run's length also moves 35–223 s from seed to seed, as the traffic reshuffles.
 - **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
   starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the
