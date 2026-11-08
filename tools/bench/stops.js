@@ -20,7 +20,7 @@
 // resistors above all: a press held at a low step keeps them in the circuit), brakeKWh burnt in the brake resistors.
 
 export function stopsWatch(game) {
-  const R = { stops: [], flips: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0, lineJ: 0, mechJ: 0, brakeJ: 0 };
+  const R = { stops: [], flips: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0, emergencyAt: [], lineJ: 0, mechJ: 0, brakeJ: 0 };
   let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null;
   const finish = (st, tr) => {
     a.err = +(st.target - tr.s).toFixed(2);
@@ -40,7 +40,13 @@ export function stopsWatch(game) {
       // (the pedal's use over the whole run, read before lastStep moves on)
       if (n > 0 && lastStep <= 0) { R.presses++; if (tr.v > 1) R.pressesRolling++; }
       if (n < 0 && lastStep >= 0 && tr.v > 0.3) R.brakeApplies++;
-      if (n === -6 && lastStep !== -6) R.emergencies++;
+      if (n === -6 && lastStep !== -6) {
+        R.emergencies++;
+        // (each use of the track brakes: where, how fast, for what, how far it had, on what rail)
+        const p = game.pilot, why = p?.stopWhy ?? null;
+        R.emergencyAt.push({ s: Math.round(tr.s), kmh: +(tr.v * 3.6).toFixed(1), why, d: p?.stopAtS == null ? null : +(p.stopAtS - tr.s).toFixed(1),
+          stop: st?.name ?? null, mu: +(game.muBase ?? 0.3).toFixed(2), slide: !!tr.slide, sandLeft: +(tr.sand ?? 0).toFixed(2) });
+      }
       const ds = lastS === null ? 0 : Math.max(0, tr.s - lastS), dt = lastClock === null ? 0 : game.clock - lastClock;
       lastS = tr.s; lastClock = game.clock;
       if (n > 0) R.driveM += ds; else if (n < 0) R.brakeM += ds; else R.coastM += ds;
@@ -108,7 +114,7 @@ export function stopsWatch(game) {
         presses: R.presses, pressesPerKm: +(R.presses / Math.max(1, game.tram.s / 1000)).toFixed(2), pressesPerStop: +(R.presses / Math.max(1, S.length)).toFixed(2), pressesRolling: R.pressesRolling,
         brakeApplies: R.brakeApplies, driveM: Math.round(R.driveM), coastM: Math.round(R.coastM), brakeM: Math.round(R.brakeM), coastStretches: R.coastStretches,
         lineKWh: +(R.lineJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), wasteKWh: +((R.lineJ - R.mechJ) / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), brakeKWh: +(R.brakeJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3),
-        slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies,
+        slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
         comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5) };
     },

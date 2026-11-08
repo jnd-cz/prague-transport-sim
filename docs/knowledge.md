@@ -344,8 +344,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the
   test drives' presses by 10 % and the waste by 1 %, cost 0.7 % in time and 13 % more pedal steps, and slipped on leaves up a climb:
   not kept. Steps 4–5 from a stand on the level (T3SU-03 p. 4 says 1–3) waste 4–10 % less with a full load, nothing empty.
-- **Wet leaves and sand** (#351): the box holds 10 minutes of sanding a shift and is not refilled (`src/tram.js` `sandSecs`; the user, 2026-11-07: "on the level of
-  minutes if not more", the real figure #266; 90 s ran dry on every line 9 run); the
+- **Wet leaves and sand** (#351): the box holds 25 minutes of sanding a shift and is not refilled (`src/tram.js` `sandSecs`; the user, 2026-11-07: "on the level of
+  minutes if not more"). That is a tram box's least, 17 dm³ by ČSN 28 1300, at a sander's 400–500 g per 30 s (Matečka 2015, VUT Brno,
+  `raw/reference/adhesion/`, #266); the T3's own box is not known. 90 s ran dry on every line 9 run; the
   track brakes sand too. On a leaf patch (0.06) every step slips from a stand (step 1 pulls 0.60 m/s², the grip is 0.59), and
   slipping wheels pull 0.7 of the grip, 0.41 m/s²: with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
   at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). With 90 s, sanding at every slip and slide ran the box dry half way

@@ -22,6 +22,7 @@ export async function run(seed = 1, opts = {}) {
   const { Autopilot } = await import('/src/autopilot.js');
   const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
+  game.pilot = pilot; // (for the watchers: what it stops for, tools/bench/stops.js)
   const stuck = stuckWatch(game);
   // (other checks' watchers along on the same drive, opts.also: [(game, traffic) => watcher], #205)
   const also = (opts.also || []).map((make) => make(game, traffic));

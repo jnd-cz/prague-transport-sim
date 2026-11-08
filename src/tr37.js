@@ -286,7 +286,8 @@ export class TR37 {
   // the stop point, or null), noDrive (braking for a stop: the drive pedal stays off), fixed (that point stays where it
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
-  // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press) }.
+  // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
+  // trackOk (false: no danger, so not the track brakes) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -387,7 +388,8 @@ export class TR37 {
       // the rail under it gives what is still needed: held to 0.3 m/s² past the patch's end, they let go at 20 km/h 53 m before Mezi
       // Hřbitovy, up 25 ‰, and it had to drive again to get there, line 9 seed 3 in autumn)
       A.slideTrack = w.fixed && !w.sandLeft && ((w.slide && need > Math.max(0.35, w.slideA ?? 0)) || (A.slideTrack && now === -6 && need > 0.3 && need > 0.8 * (w.slideA ?? 0)));
-      if ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack) s = -6;
+      // (w.trackOk false: no danger, the service brake at most, src/autopilot.js)
+      if (w.trackOk !== false && ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack)) s = -6;
     }
     const contact = w.power != null;
     if (!w.urgent && !contact && s !== -6) {

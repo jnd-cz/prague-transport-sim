@@ -60,14 +60,15 @@ export class Autopilot {
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitDecel * Math.max(0, limit.d - 12)) - 0.3;
     if (nl) vt = Math.min(vt, curveTo(nl));
     let vLimit = vt;
-    let stopAt = null, fixed = false, fixedAt = null;
+    let stopAt = null, fixed = false, fixedAt = null, stopWhy = null;
     // (fixed: a stop or a signal, which stays where it is; else something that can move off. Something nearer does not take
     // the fixed point away: a car crossing just past a stop, its point 6 m short of it, had the plan forget the stop for
     // a second and drive on the way in, line 22 seed 5 at Radošovická, line 37 seed 4 at U Elektry)
-    const consider = (s, still = false) => { if (still && (fixedAt === null || s < fixedAt)) fixedAt = s; if (stopAt === null || s < stopAt) { stopAt = s; fixed = still; } };
+    // (why: what it stops for, for the track brakes' rule and the logs: stop, signal, junction, walker, tram, car)
+    const consider = (s, still = false, why = null) => { if (still && (fixedAt === null || s < fixedAt)) fixedAt = s; if (stopAt === null || s < stopAt) { stopAt = s; fixed = still; stopWhy = why; } };
     if (st) {
       const needStop = !st.request || st.waiting > 0 || st.alightFrac > 0;
-      if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target, true);
+      if ((!st.served && needStop) || g.doorState !== 'closed') consider(st.target, true, 'stop');
     }
     // a signal: when its GO starts blinking, stop if that is comfortable (~0.9 m/s2), else clear the
     // junction on it and keep going (the controller holds the phase for a committed tram); braking
@@ -91,17 +92,17 @@ export class Autopilot {
       // (a tram that stopped anyway, for the passengers at a stop whose stop point is the signal's, has
       // nothing to clear: it drove off on red after the doors closed, Čechův most s 14907, seed 4)
       if (this.goThrough === sig && tr.v < 0.3) this.goThrough = null;
-      if (this.goThrough !== sig) consider(sig.s - 3, true);
+      if (this.goThrough !== sig) consider(sig.s - 3, true, 'signal');
     }
     // past a signal, its crossing still ahead (stopped in the junction behind something): the driver no
     // longer sees the signal, and the cross street gives way to a tram in the junction; cars already on
     // the crossing drive off it first (the user, #268: "tram driver should wait until the tracks clear")
     const past = g.signals.find((x) => x.xroad && x.s <= tr.s && x.cross > tr.s + 1);
-    if (past && past.cars.some((c) => Math.abs((past.xroad.sX - c.s) * c.dir) < 4 && c.v > 0.1)) consider(past.cross - 3);
+    if (past && past.cars.some((c) => Math.abs((past.xroad.sX - c.s) * c.dir) < 4 && c.v > 0.1)) consider(past.cross - 3, false, 'junction');
     let hazard = false;
     for (const ob of g.obstacles) {
       if (ob.state !== 'gone' && Math.abs(ob.lat) < 2.5 && ob.s > tr.s) {
-        consider(ob.s - 8);
+        consider(ob.s - 8, false, ob.type === 'pedestrian' ? 'walker' : 'obstacle');
         if (ob.s - tr.s < 80) hazard = true;
       }
     }
@@ -109,18 +110,18 @@ export class Autopilot {
     // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 8 m since the prototype kept two 2-car sets off
     // long platforms, the user, #258)
     if (gap !== null) {
-      consider(tr.s + gap - TRAM_GAP);
+      consider(tr.s + gap - TRAM_GAP, false, 'tram');
       const clear = g.keepClear(tr.s, tr.s + gap); // (not into a junction the tram ahead has not cleared)
-      if (clear !== null) consider(clear);
+      if (clear !== null) consider(clear, false, 'junction');
     }
     // a car on our track ahead (shared lane, queuing on the tracks): stop behind it
-    for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5);
+    for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5, false, 'car');
     // a car crossing our track ahead (turning across, U3), or committed to it (too close to stop): stop
     // short of it until it is across, and ring the bell within 60 m (a car that went while we stood at a
     // stop before the junction was hit as we pulled away, line 17 s 16851)
     for (const c of g.carsCrossing || []) {
       if (c.s <= tr.s) continue;
-      consider(c.s - 6);
+      consider(c.s - 6, false, 'car');
       if (c.s - tr.s < 60 && tr.v > 1) hazard = true;
     }
     // Towards a stop or a signal the plan is one curve to the point, without a crawl at its end: the pedal changes then
@@ -325,14 +326,20 @@ export class Autopilot {
     const slideNear = dLeft !== null && dLeft < (tr.v * tr.v) / (2 * 0.44) + 20;
     this.sandT = this.startSand || (tr.slide && (onCurve || urgent || hazard || slideNear)) ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
+    // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
+    // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
+    // or an obstacle in the way, or a rail that does not hold. A stop, a signal, a junction or a tram ahead on dry rail is service, step 5
+    const dryRail = !tr.slide && Math.min(g.muAt(tr.s), g.muAt(stopAt === null ? tr.s : Math.min(stopAt, tr.s + 80))) >= 0.25;
+    const trackOk = !dryRail || stopWhy === 'walker' || stopWhy === 'obstacle' || stopWhy === 'car';
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
-    tr.eq.autoDrive({ force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+    tr.eq.autoDrive({ trackOk, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
       speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)) });
+    this.stopWhy = stopAt === null ? null : stopWhy; this.stopAtS = stopAt;
     return { vt, vtDrive, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }
 }
