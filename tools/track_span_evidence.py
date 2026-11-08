@@ -134,7 +134,7 @@ def _valid(z):
 def _structure_level(structure):
     """(evidence kind, physical level) of a decision's structure, or Held."""
     kind = structure['kind']
-    if kind=='unmapped':
+    if kind in ('unmapped','street'):
         return 'surface',0  # (no bridge or tunnel mapped or surveyed here: the track lies on the street)
     key = 'level' if kind=='survey_level' else 'layer'
     try:
@@ -462,6 +462,8 @@ def from_reviews(verdicts, findings, source_name):
             if not isinstance(answer.get('t'),(int,float)):
                 raise Held('missing answer date')
             kind,level = _structure_level(item['decision']['structure'])
+            if answer['v']==BRIDGED and item['decision']['structure']['kind']=='street':
+                raise Held('street track has no deck to carry over a dip')
             profiles, uncovered, chains = [], [], _stretches(item['spans'])
             for span in item['spans']:
                 p = dict(span['approval_profile'])

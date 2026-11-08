@@ -185,6 +185,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   90 m while the return track 3 m beside it, the archive and the lidar under both agreed within 0.2 m. Where DI is the
   source, the archive sided with the lidar at every such stretch of the network; on a bridge it does not (the bare-earth
   lidar and the archive both lie under the deck, DI 6-14 m over them: the `structure_hint` flag). `archive_over_di`.
+- **The lidar settles most held heights** (#202, 2026-11-08): where the archive and the survey disagree by over 0.3 m and
+  DI has a height too, the source the 1 m lidar lies within 10 cm of matched DI at 148 of 155 bins (the archive 137 of
+  141, the survey 11 of 14). On ordinary track the rail lies a median +1 cm over the lidar (p10 -7, p90 +18 cm). The
+  lidar alone is no height for a funicular: Petřín's, held its whole length, took the hill's bare earth in steps of
+  2-6 m. `held_settled`: held stretches over 60 m 81 -> 50 network-wide, 5 -> 0 on the lines' routes.
 - **OSM roads drawn over the rails** (#344, the `railSupport` places left after the heights): where the street way runs
   onto a bridge, `ground.at` gives it the ground under the bridge, at the abutment level with the deck (Most Legií, 8-18 cm
   over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across

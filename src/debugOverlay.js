@@ -7,8 +7,9 @@
 //   white bar            conflict on the route (street, footway or crossing): its near edge
 //   green bars / ball    platform start and end / where the tram front stops for passengers
 //   orange / olive line  track not from the current DTM (DI): OpenStreetMap / the archived DTMP axes (#20)
-//   cyan / blue / red    route height not measured on it (#197): the curve across a short hold / the user's reviewed
-//     line, 0.6 m up      span / the game's surface profile (no assembled height: fill, a hold over 60 m)
+//   cyan / blue / yellow route height not measured on it (#197): the curve across a short hold / the user's reviewed
+//     / red line,         span / the lidar where nothing else had a height (#202) / the game's surface profile (no
+//     0.6 m up            assembled height: fill, a hold over 60 m)
 import * as THREE from 'three';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
@@ -73,7 +74,7 @@ export function createDebugOverlay(scene) {
       g.add(line);
     }
     // route heights not measured where they are (the profile's source per sample, tools/line_heights.py)
-    const HEIGHT_SRC = { curve: 0x22e5e5, review: 0x3a6cff, surface: 0xff3030 };
+    const HEIGHT_SRC = { curve: 0x22e5e5, review: 0x3a6cff, lidar: 0xe0c020, surface: 0xff3030 }; // (lidar: #202)
     for (let i = 0; P.source && i < P.n; i++) {
       const c = HEIGHT_SRC[P.source[i]];
       if (!c) continue;

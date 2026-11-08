@@ -301,7 +301,9 @@ decision to inspect its linked spans, height profile and sources. Answers with n
 and unspecified levels remain held. The card explains any held archive answer (a dip under a bridge, a
 steep step) and offers `archive, bridged over a dip` and `follows survey surface` only where they import;
 `python -P -E tools/track_structure_review.py` rewrites those offers from the committed queue after the
-import rules change. Answers talked over with the user are recorded in `data/truth.json`
+import rules change. Regenerated with `--input`, the queue also takes street track where the heights build
+(`reports/line-heights.json`, `--heights`) still has no height after its rules, as a `street` decision named
+by its nearest stops, offering the archive, the survey and unsure (#202). Answers talked over with the user are recorded in `data/truth.json`
 (`trackHeights.reviewAnswers`, one per decision with its quote): `python -P -E tools/track_span_evidence.py`
 converts those; `--from-reviews reports/reviews/line17.json` converts a page's unambiguous answers instead.
 A decision whose answer there imports carries it in the findings (`recorded`), and its card and the review

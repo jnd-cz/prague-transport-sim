@@ -6,6 +6,8 @@
 The findings load in ?line=17&review=reports/review/track-heights.json.
 Each structure has contiguous spans with stop names, lengths per direction, dated candidates and
 proposed rules. Copy reviewed profiles to --evidence span_reviews; a proposal is never evidence.
+Ordinary street track joins as a 'street' decision where the heights build still holds it after its rules
+(--heights, tools/line_heights.py's report) or where data/truth.json answers it (#202).
 """
 import argparse
 from collections import defaultdict
@@ -123,8 +125,17 @@ def record_date(source):
     return datetime.fromtimestamp(date/1000,timezone.utc).date().isoformat() if isinstance(date,(int,float)) else date
 
 
-def grouped(rows, structures):
-    """Keep each traversal separate, including repeated path legs and changes of direction."""
+STREET = {'id':'street','kind':'street','osm_ways':[],'names':[]}
+
+
+def corridor_id(kind, a, b):
+    """A decision without a mapped structure, named by the stops nearest its ends (stable across builds)."""
+    return kind+'-'+hashlib.sha256('|'.join(sorted({a or '?',b or '?'})).encode()).hexdigest()[:12]
+
+
+def grouped(rows, structures, street=False):
+    """Keep each traversal separate, including repeated path legs and changes of direction. With street=True
+    the other held rows group too, as 'street': no structure at their place or in their flags (#202)."""
     runs, run, last_key, last_end = [], [], None, None
     for r in rows:
         key = (r['line'],r['direction'],structures.at(r.get('di_xy') or r['xy']))
@@ -134,6 +145,9 @@ def grouped(rows, structures):
         passage = any(t.get('tunnel')=='building_passage' for t in metadata.get('tags',{}).values())
         # A building passage is a structure review item even when numeric DI already resolves it.
         held = held or passage
+        # (the import's structure mask hints at a structure the OSM ways here do not map: not street track)
+        if street and not held and r['status']=='review' and 'structure_hint' not in r['review_flags']:
+            key, held = (key[0],key[1],'street'), True
         start = r['s']-r['weight_m']/2
         if run and (not held or key!=last_key or abs(start-last_end)>.01):
             runs.append((last_key,run))
@@ -155,15 +169,17 @@ def endpoint(rows, s, before):
     return {'di_id':r['di_id'],'xy':r['xy'],'z':r['raw_di_z'],'distance_m':round(abs(r['s']-s),3)}
 
 
-def review(report, structures, terrain, lines):
+def review(report, structures, terrain, lines, held=None, answered=()):
+    """held: {(line, direction): [(s0, s1), ...]} where the heights build still has no height (None: structures
+    only); a street run is queued where it has a row there or its decision is answered (answered: decision ids),
+    so an answer that settles a hold keeps its decision."""
     routes = defaultdict(list)
     di_sources = {str(g['id']):g['sources'] for g in report.get('geometry',[])}
     for r in report['route_samples']:
         routes[r['line'],r['direction']].append(r)
     spans, counters = [], defaultdict(int)
-    for key,rows in grouped(report['route_samples'],structures):
+    for key,rows in grouped(report['route_samples'],structures,street=held is not None):
         line,direction,structure = key
-        counters[key] += 1
         a,b = rows[0]['s']-rows[0]['weight_m']/2,rows[-1]['s']+rows[-1]['weight_m']/2
         data = lines[line]
         stops = data.get('stops',[])
@@ -172,6 +188,13 @@ def review(report, structures, terrain, lines):
             stops = [{'name':st['name'],'s':back.project(forward.interpolate(st['s']))} for st in stops]
         # Names are located on the direction's path, never using outward s on pathBack.
         nearest = lambda s: min(stops,key=lambda t:abs(t['s']-s))['name'] if stops else None
+        # (the build's gaps are over 10 m and the rows 5 m apart: a run the build holds has a row inside one;
+        # a shorter hold is bridged by the profile's curve)
+        if structure=='street' and not (
+                any(s0 <= r['s'] <= s1 for r in rows for s0,s1 in held.get((line,direction),()))
+                or corridor_id('street',nearest(a),nearest(b)) in answered):
+            continue
+        counters[key] += 1
         ends = [endpoint(routes[line,direction],a,True),endpoint(routes[line,direction],b,False)]
         for end in ends:
             if end:
@@ -222,7 +245,7 @@ def review(report, structures, terrain, lines):
                                  'excluded':c.get('excluded')}
                                 for c in r.get('candidates',[]) if c['dataset'] in ('deck','survey') and c.get('inside')],
                     'ipr_terrain_z':float(z) if math.isfinite(z) and 100<z<500 else None})
-        metadata = structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
+        metadata = STREET if structure=='street' else structures.catalog.get(structure,{'id':'unmapped','kind':'unmapped','osm_ways':[],'names':[]})
         route_line = LineString([p[:2] for p in data[direction]])
         osm_positions = []
         corridor = substring(route_line,max(0,a-30),min(route_line.length,b+30)).buffer(8)
@@ -279,15 +302,17 @@ def review(report, structures, terrain, lines):
     for span in spans:
         identity = span['structure_id']
         # Unmapped fragments are one corridor question, without claiming a common physical level.
-        if identity=='unmapped':
-            stops = sorted({span['from_stop'] or '?',span['to_stop'] or '?'})
-            identity = 'unmapped-'+hashlib.sha256('|'.join(stops).encode()).hexdigest()[:12]
+        if identity in ('unmapped','street'):
+            identity = corridor_id(identity,span['from_stop'],span['to_stop'])
         d = decisions.setdefault(identity,{'id':identity,'structure':span['structure'],'span_ids':[],
                                           'length_per_direction_m':{},'status':span['status']})
         if span['status']=='review':
             d['status'] = 'review'
         if span['structure_id']=='unmapped':
             d['scope_note'] = 'Grouped by nearest stops for review; not evidence of one structure or level.'
+        elif span['structure_id']=='street':
+            d['scope_note'] = ('Street track the heights build holds, grouped by nearest stops: the archive and the '
+                               'survey disagree or neither has a height, and the lidar settles neither.')
         d['span_ids'].append(span['id'])
         key = f"line{span['line']}:{span['direction']}"
         d['length_per_direction_m'][key] = round(d['length_per_direction_m'].get(key,0)+span['length_m'],3)
@@ -352,8 +377,10 @@ def findings(result, inline=False, span_file='reports/review/track-height-spans.
                             bridged[span['id']] = profile['bridged']
             else:
                 explanations[choice] = 'span approval data is incomplete'
-        # (the archive is always offered, with why it stays held; the others only where they import)
-        item['options'] = [ARCHIVE,*(c for c in (BRIDGED,SURVEY) if not explanations[c]),'other level (deck / under)','unsure']
+        # (the archive is always offered, with why it stays held; the others only where they import; street track
+        # lies on the street, #202)
+        item['options'] = [ARCHIVE,*(c for c in (BRIDGED,SURVEY) if not explanations[c]),
+                           *(['other level (deck / under)'] if decision['structure']['kind']!='street' else []),'unsure']
         if bridged:
             item['bridged'] = bridged
         item['answer_explanations'] = explanations
@@ -413,6 +440,8 @@ def main():
     ap.add_argument('--output',type=Path,default=ROOT/'reports/review/track-height-spans.json')
     ap.add_argument('--markdown-output',type=Path,default=ROOT/'reports/review/track-height-spans.md')
     ap.add_argument('--findings-output',type=Path,default=ROOT/'reports/review/track-heights.json')
+    ap.add_argument('--heights',type=Path,default=ROOT/'reports/line-heights.json',
+                    help="tools/line_heights.py's report of the same build: street track queues where it still holds a height")
     a = ap.parse_args()
     try:
         span_file = a.output.resolve().relative_to(ROOT.resolve()).as_posix()
@@ -428,12 +457,18 @@ def main():
         print(f"{a.findings_output}: {len(result['decisions'])} decisions rewritten from {span_file}")
         return
     report = json.loads(a.input.read_text(encoding='utf-8'))
+    if not a.heights.exists():
+        ap.error(f'{a.heights} is missing: run tools/line_heights.py first (street track queues where it holds a height)')
+    lines = json.loads(a.heights.read_text(encoding='utf-8'))['lines']
+    held = {(int(n),key):[(g['s0'],g['s1']) for g in lines[n][key].get('gaps',[]) if g['why']=='held']
+            for n in lines for key in ('path','pathBack') if isinstance(lines[n].get(key),dict)}
+    answered = {x['decision'] for x in truth.get('trackHeights',{}).get('reviewAnswers',[])}
     decks = load_decks(ROOT)
     context = load_context(decks)
     terrain = IprDtm()
     try:
         result = review(report,Structures(context.paths,decks.records,report.get('mosty3d_structures',[])),terrain,
-                        {n:load_line(n) for n in (9,17,22,23,37)})
+                        {n:load_line(n) for n in (9,17,22,23,37)},held,answered)
     finally:
         terrain.f.close()
     from atomic import replacing
@@ -444,9 +479,9 @@ def main():
     a.markdown_output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(a.markdown_output,'w',encoding='utf-8') as f:
         f.write(markdown(result))
-    answered = {x['decision'] for x in truth.get('trackHeights',{}).get('reviewAnswers',[])}
     print(f"{len(result['decisions'])} structure decisions ({sum(d['id'] in answered for d in result['decisions'])} "
-          f"answered in data/truth.json), {len(result['spans'])} contiguous direction spans")
+          f"answered in data/truth.json, {sum(d['structure']['kind']=='street' for d in result['decisions'])} on street track), "
+          f"{len(result['spans'])} contiguous direction spans")
     for d in result['decisions']:
         print(json.dumps({k:v for k,v in d.items() if k!='structure'},ensure_ascii=True))
 
