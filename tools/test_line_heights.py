@@ -307,7 +307,8 @@ class Answers(unittest.TestCase):
         # steeper than any track and the arm stayed 15-78 cm above the ground)
         ground = lambda s: 100.0 if s <= 95 else 99.4 if s >= 100 else 100.0 - .12 * (s - 95)
         c = chain([(0, 0), (260, 0)], lambda s: 100.0, terrain=ground)
-        lh.GROUND_ANSWERS = [{'area': lh.Polygon([(70, -5), (150, -5), (150, 5), (70, 5)]), 'answer': lh.FOLLOW, 'date': None}]
+        lh.GROUND_ANSWERS = [{'area': lh.Polygon([(70, -5), (150, -5), (150, 5), (70, 5)]), 'answer': lh.FOLLOW, 'date': None,
+                              'radius_min': 250.0}]
         try:
             self.assertGreater(lh.answered_ground([c]), 0)
             for x in c.bins:
@@ -322,6 +323,8 @@ class Answers(unittest.TestCase):
         s = [5.0 * k for k in range(52)]
         z = [c.z_at(t)[0] for t in s]
         self.assertLess(max(abs(b - a) / 5 for t, a, b in zip(s, z, z[1:]) if not 85 <= t <= 105), lh.MAX_GRADE)
+        # (no tighter than the area's limit, within the solver's tolerance: the step itself needs 42 m)
+        self.assertGreater(min(lh.implied_radii(c.runs[0]['s'], c.runs[0]['z'])), 250.0 * lh.TIGHT)
 
     def test_an_archive_answer_takes_the_archive_and_holds_where_it_has_none(self):
         lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]

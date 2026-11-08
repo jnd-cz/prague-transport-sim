@@ -146,10 +146,12 @@ def answered_ignore(chs):
 
 
 def load_ground_answers(truth):
-    """data/truth.json radiusAnswers with an `area` (lat, lon corners): 'follow the ground' there."""
+    """data/truth.json radiusAnswers with an `area` (lat, lon corners): 'follow the ground' there, the radius no tighter
+    than `radius_min` (the user, 2026-11-08: 250 m; the 131 m curve at Malovanka was a 2.4 cm bump in the lidar over 5 m)."""
     from geo import Frame
     F = Frame()
-    return [{'area': Polygon([tuple(float(v) for v in F.xy(*p)) for p in a['area']]), 'answer': FOLLOW, 'date': a.get('date')}
+    return [{'area': Polygon([tuple(float(v) for v in F.xy(*p)) for p in a['area']]), 'answer': FOLLOW, 'date': a.get('date'),
+             'radius_min': a.get('radius_min', MIN_RADIUS)}
             for a in (truth.get('trackHeights') or {}).get('radiusAnswers', []) if a.get('area')]
 
 
@@ -714,8 +716,11 @@ def solve(c, pins, r, relax=None):
         over = lambda r_: [i for i, e in enumerate(r_['excess']) if e > fit[i]]
         xy_of = lambda j: run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0])
         floor = r.get('min', MIN_RADIUS)
-        # how far the radius may give way at each point (in an area that follows the ground, below the floor: the user's word)
-        lowest = [MIN_RADIUS if ground_at(xy_of(j), BLEND_REACH) else floor for j in range(len(s))]
+        # how far the radius may give way at each point: below the floor in an area that follows the ground, down to the area's
+        # own limit (the user's word), and at most down to `least` anywhere
+        grounds = [ground_at(xy_of(j), BLEND_REACH) for j in range(len(s))]
+        least = [g['radius_min'] if g else MIN_RADIUS for g in grounds]
+        lowest = [g['radius_min'] if g else floor for g in grounds]
         res = first = banded_profile(s, zf, rmin, tol, weight)
         relaxed = drops = 0
         while relaxed < RELAX_STEPS and drops < DROP_MAX:
@@ -732,7 +737,7 @@ def solve(c, pins, r, relax=None):
                     if a is None:
                         bad += group
                         if below_floor([xy_of(j) for j in group]):
-                            lowest = [MIN_RADIUS if any(abs(si - s[j]) <= RELAX_REACH for j in group) else v for si, v in zip(s, lowest)]
+                            lowest = [lt if any(abs(si - s[j]) <= RELAX_REACH for j in group) else v for si, v, lt in zip(s, lowest, least)]
                     elif a.get('outliers') == 'drop' and free:
                         worst.append(max(free, key=lambda j: res['excess'][j]))
                 group = [i] if i is not None else []
@@ -782,7 +787,7 @@ def solve(c, pins, r, relax=None):
                     if not apart:
                         break
                     near = lambda si: any(abs(si - s[i]) <= RELAX_REACH for i in apart)
-                    new = [max(v * RELAX_STEP, lo if to_floor else MIN_RADIUS) if near(si) else v for si, v, lo in zip(s, rmin, lowest)]
+                    new = [max(v * RELAX_STEP, lo if to_floor else lt) if near(si) else v for si, v, lo, lt in zip(s, rmin, lowest, least)]
                     if new == rmin:
                         break
                     if not to_floor:
