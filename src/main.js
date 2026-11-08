@@ -22,6 +22,9 @@ import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
 import { trackStyles, loadHeightFacts } from './heights.js';
 import { speedFacts } from './speedRules.js';
+import { loadFigureFont, signFacts } from './speedSigns.js';
+// the signs' fallback face (D-DIN) loads while the world does; the game waits for it before it draws them (#364)
+const figureFont = loadFigureFont();
 import { credits, logProvenance, fallbacks } from './provenance.js';
 import { initHelp } from './help.js';
 import { Mirror } from './mirror.js';
@@ -407,6 +410,7 @@ $('btnStart').addEventListener('click', start);
 async function start() {
   if ($('optModel').value === 'classic') await loadClassic();
   audio.start();
+  await figureFont;   // after audio.start: the click's activation unlocks the audio
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   tram.eq.mode = controlMode();
@@ -437,6 +441,7 @@ async function start() {
     seed: Math.floor(random() * 1e9),
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
+    signFacts: signFacts(truth),
   });
   game.runSeed = seed; // (replay: ?seed=N)
   // the line number shown on the tram, the top bar and in messages follows the run

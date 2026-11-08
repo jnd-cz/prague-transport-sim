@@ -16,7 +16,9 @@ import review_sets  # noqa: E402
 import serve  # noqa: E402
 
 A = {"issue": 258, "findings": [{"x": 1.0, "y": 2.0, "kind": "stop"}, {"x": 3.0, "y": 4.0, "kind": "stop"}, {"x": 5.0, "y": 6.0, "kind": "stop"}]}
-B = {"issue": 106, "findings": [{"x": 7.0, "y": 8.0, "kind": "z"}]}
+# (the second answered in data/truth.json, not on the page: #379)
+B = {"issue": 106, "findings": [{"x": 7.0, "y": 8.0, "kind": "z"},
+                                {"x": 7.5, "y": 8.5, "kind": "z", "recorded": {"v": "archive profile ok", "t": 5, "source": "data/truth.json"}}]}
 OLD = {"issue": 107, "findings": [{"x": 9.0, "y": 9.0, "kind": "old"}]}  # (its issue closed, nothing answered: out of date)
 INDEX = {"built": "2026-11-05 15:00", "commit": "abc1234", "repo": "jnd-cz/prague-transport-sim", "lines": ["9", "17"],
          "sets": [{"file": "reports/review/test-a.json", "title": "Stop signs, line 17", "issue": 258, "waitsFor": 258,
@@ -24,7 +26,7 @@ INDEX = {"built": "2026-11-05 15:00", "commit": "abc1234", "repo": "jnd-cz/pragu
                    "lines": ["17"], "findings": 3, "unknown": []},
                   {"file": "reports/review/test-b.json", "title": None, "issue": 106, "waitsFor": 106,
                    "issueInfo": {"title": "Track z", "state": "CLOSED"}, "waitsForInfo": {"title": "Track z", "state": "CLOSED"},
-                   "lines": ["9"], "findings": 1, "unknown": []},
+                   "lines": ["9"], "findings": 2, "unknown": []},
                   {"file": "reports/review/test-old.json", "title": "Old", "issue": 107, "waitsFor": 107,
                    "issueInfo": {"title": "Done long ago", "state": "CLOSED"}, "waitsForInfo": {"title": "Done long ago", "state": "CLOSED"},
                    "lines": ["9"], "findings": 1, "unknown": []},
@@ -91,7 +93,8 @@ def main():
             w = size["width"]
             check(f"{w}: set A counted (3 findings, 2 answered, 1 unsure, 1 note)",
                   c["test-a.json"][0] == {"total": 3, "answered": 2, "unsure": 1, "noted": 1, "waiting": 1})
-            check(f"{w}: set B answered in line 9's store", c["test-b.json"][0] == {"total": 1, "answered": 1, "unsure": 0, "noted": 0, "waiting": 0})
+            check(f"{w}: set B answered in line 9's store and in data/truth.json",
+                  c["test-b.json"][0] == {"total": 2, "answered": 2, "unsure": 0, "noted": 0, "waiting": 0})
             check(f"{w}: a missing set shows its error", c["test-gone.json"][1] == "HTTP 404")
             waiting = page.inner_html("#waiting")
             check(f"{w}: A's link opens line 17 with only the unanswered", 'href="index.html?line=17&amp;review=reports%2Freview%2Ftest-a.json&amp;todo"' in waiting)
@@ -122,6 +125,8 @@ def main():
         real = page.evaluate("() => window.reviewIndex.sets.map((s) => [s.file, s.findings, s.c && s.c.total, s.error || null])")
         check(f"the real sets: all {len(index['sets'])} read", len(real) == len(index["sets"]) and not any(r[3] for r in real))
         check("the real sets: the page counts what the index lists", all(r[1] == r[2] for r in real))
+        heights = page.evaluate("() => window.reviewIndex.sets.find((s) => s.file.endsWith('/track-heights.json'))?.c")
+        check(f"the real track-height decisions are answered in data/truth.json: {heights}", heights and heights["waiting"] == 0)
         check("the real sets: no page errors", not errors)
         b.close()
     server.shutdown()

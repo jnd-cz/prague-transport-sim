@@ -1,6 +1,6 @@
 # Speed switches: their LED signals in the game (#211)
 
-Status: **proposed**, waiting for the user's answers (PR #362). Nothing here is in the game yet; the panels are drawn in `src/speedSigns.js` (`drawLedPanel`).
+Status: **the elements in the game** (#365): at R07 and R09 the number plate, the call signal, the entry sleeper signal and the switch signal stand at R01's distances (`Game._initSpeedSwitch`, matched by the OSM node's lat, lon in `data/truth.json`). The call signal stays dark and the number box dark, so the switch is passed at 15 km/h. Registration, the number and its limit wait with the simulation work: #380.
 
 Sources: D 1/2 § 30, 46; PPS Q103–105, Q109, Q111–112; the website's page on R01; [switches.md](../research/prazsketramvaje/switches.md) SW-R.
 

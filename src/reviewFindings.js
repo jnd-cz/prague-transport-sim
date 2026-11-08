@@ -6,6 +6,10 @@
 // stored under it, src/verdicts.js)
 export const fid = (f) => f.kind === 'trackheight' ? `${f.src}|trackheight|${f.id}` : `${f.src}|${f.kind}|${f.x.toFixed(1)},${f.y.toFixed(1)}`;
 
+// a finding's answer: the page's, or the one data/truth.json records for it (`recorded`, what the import
+// reads: a track-height decision renamed by a rebuilt queue keeps its answer, #379), the newer of the two
+export const answerOf = (f, page) => f.recorded?.v && (!page?.v || (f.recorded.t || 0) > (page.t || 0)) ? f.recorded : page;
+
 // every object with numeric x and y in a findings file; its kind from the keys above it
 export function fileFindings(json, label) {
   const out = [], skip = new Set(['places', 'checks', 'result', 'review', 'findings', 'bad']);
@@ -24,7 +28,8 @@ export function fileFindings(json, label) {
       const marks = Array.isArray(o.marks) ? o.marks.filter((m) => typeof m?.x === 'number' && typeof m?.y === 'number') : undefined;
       out.push({ src: 'file', kind: k, x: o.x, y: o.y, mag: typeof o.mag === 'number' ? o.mag : 1, info: o.info || o.msg || '',
         options: Array.isArray(o.options) ? o.options.map(String) : opts, ...(typeof o.place_option === 'string' ? { placeOption: o.place_option } : {}),
-        ...(marks?.length ? { marks } : {}), ...(o.pick ? { pick: true } : {}), ...(o.id ? { id: String(o.id) } : {}) });
+        ...(marks?.length ? { marks } : {}), ...(o.pick ? { pick: true } : {}), ...(o.id ? { id: String(o.id) } : {}),
+        ...(o.recorded?.v ? { recorded: o.recorded } : {}) });
       return;
     }
     for (const [k, v] of Object.entries(o)) walk(v, skip.has(k) ? kind : k);

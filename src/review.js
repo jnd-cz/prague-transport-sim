@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { toLatLon } from './geo.js';
 import { Verdicts, readLineAnswers } from './verdicts.js';
 import { heightProfile } from './trackHeightProfile.js';
-import { fid, loadFindings } from './reviewFindings.js';
+import { fid, loadFindings, answerOf } from './reviewFindings.js';
 
 const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
 const STREETS = new Set([...CARR, ...RAISED, 'paved', 'cycle']);
@@ -383,7 +383,7 @@ body.review #gl { touch-action: none }
 
   _answer(f) {
     const local = this.verdicts.get(fid(f)), other = f.kind === 'trackheight' ? this.otherAnswers?.[fid(f)] : null;
-    return other && (!local || (other.t || 0) > (local.t || 0)) ? other : local;
+    return answerOf(f, other && (!local || (other.t || 0) > (local.t || 0)) ? other : local);
   }
 
   async _loadOtherAnswers() {
@@ -537,8 +537,10 @@ ${this._verdictHtml(f)}`;
       lines.push('Notes, unsure and unspecified other levels stay held for review.');
       explanation = `<div class="dim">${lines.join('<br>')}</div>`;
     }
+    const recorded = r && r === f.recorded;
+    if (recorded) explanation += `<div class="dim">Answered in ${esc(r.source)} (${esc(r.date)}): “${esc(r.quote)}”</div>`;
     return `<div class="rvVerdict">${explanation}<textarea id="rvNote" rows="2" placeholder="note (optional, before or after the answer)">${esc(r?.note || '')}</textarea>
-<div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
+<div class="rvRow" style="padding:6px 0 0">${options(f).map((o, i) => `<button data-v="${i}" class="${r?.v === o ? 'on' : ''}">${i + 1} · ${esc(o)}</button>`).join('')}${r?.v && !recorded ? '<button data-v="" title="remove the answer">✕</button>' : ''}</div>
 ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"></div>' : ''}<div class="dim" id="rvSync">${this._syncText()}</div></div>`;
   }
 
@@ -1010,7 +1012,7 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (!tip) { tip = this.tip = document.createElement('div'); tip.className = 'rvTip'; document.body.appendChild(tip); }
     tip.style.display = f ? 'block' : 'none';
     if (!f) return;
-    const r = this.verdicts.get(fid(f));
+    const r = this._answer(f);
     tip.innerHTML = `<b>${esc(f.kind)}</b> · ${f.mag.toFixed(0)}${r?.v ? ` · ✓ ${esc(r.v)}` : ''}`;
     tip.style.left = `${cx + 14}px`;
     tip.style.top = `${cy + 10}px`;

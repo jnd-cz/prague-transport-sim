@@ -241,7 +241,9 @@ This is a level exclusion, not a claim that every remaining surface measures rai
 decisions. The [review queue](../../reports/review/track-height-spans.json) contains OSM IDs/names,
 both nearest stops, lengths per direction, dated archive records, numeric DI near the ends, same-level
 survey candidates, IPR bare-earth comparisons and one proposed rule per span. Untagged elevated survey
-areas retain their survey IDs instead of acquiring an invented OSM identity. A proposal does not approve
+areas retain their survey IDs instead of acquiring an invented OSM identity; their decision is named by the
+areas' class, level and outline (as `tools/datadiff.py` matches areas), not by their positions in the
+generated survey files, which a rebuild renumbers (#379). A proposal does not approve
 a height. Building underpasses, including the Křížovnické náměstí case identified in the review, need a
 reviewed street-level rule; a covering building surface cannot establish rail height.
 

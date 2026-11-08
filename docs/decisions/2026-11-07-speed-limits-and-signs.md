@@ -1,6 +1,6 @@
 # Speed limits from D 1/2's facts, OSM's posted speeds and the signs (#211)
 
-Status: **limits decided, signs proposed** (PR #362). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). On 2026-11-08 the user answered questions 4–8: 200 % for testing, as a parameter (`SIGN_SCALE`); R07 and R09 at the places marked; and `restriction-past` 0 m. Open: R07's diverging speed (15 or 35 km/h), for #365.
+Status: **decided; the signs in the game** (PR #362 for the limits and faces, #364 for the boards in the game). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). On 2026-11-08 the user answered questions 4–8: 200 % for testing, as a parameter (`SIGN_SCALE`); R07 and R09 at the places marked; `restriction-past` 0 m; and R07's diverging speed 35 km/h, the press release, the register's 15 kept to confirm. Night zones, held with the simulation work, are #380.
 
 ## The facts against the code
 
@@ -183,7 +183,7 @@ Network: 2625 tram ways, 1298 with `maxspeed`; 168 km of 355 km untagged.
 
 ## The signs
 
-Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.py`, not yet in the game. `--sheet` draws them all. Research: [signals.md](../research/prazsketramvaje/signals.md).
+Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.py`; `Game._initSigns` stands them (#364) and lists each in `game.signBoards`. `--sheet` draws them all. Research: [signals.md](../research/prazsketramvaje/signals.md).
 
 **Size:** 200×300 mm with a 30 mm white frame, panel 140×240 mm. D 1/2 gives none; this is the same sign family on the website, and D 1/2's drawings have that shape. Estimated from the drawings: triangle 400×300 mm, zone plate 200×312 mm.
 

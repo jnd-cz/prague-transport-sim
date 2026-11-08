@@ -122,14 +122,17 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   unless you hold the heating cut-out (C) while coasting under the contact.
 - Contacts are ~22 m before the switch but never where a tram stands with its pantograph at a stop or
   signal. Trailing switches (where tracks join) need nothing; diamond crossings are not switches.
-- The red LED arrow before each switch shows the blade position and blinks while the switch is locked. If
-  you got it wrong, stop and use the switch iron (X).
+- The red LED signal before each switch shows the blade position (an arrow left or right, a vertical bar for
+  straight) and blinks while the switch is locked. If you got it wrong, stop and use the switch iron (X).
+- The speed switches R07 (Kotlářka, line 9) and R09 (Podolské nábřeží, line 17) have their own signals: the
+  number plate, the call signal, the entry sleeper signal and the white LED arrow over the number. Without
+  registration the number stays dark and the switch is passed like any other, at 15 km/h.
 
 ### Signals
 
 - Prague tram signals (four lamps: three on top, one below): the two outer top lamps = stop; top middle +
   bottom = go straight; top left/right + bottom = go left/right; a blinking GO aspect means it is ending.
-- The call signal below shows three LED bars (\ | /): the bar of the coming direction lights orange once
+- The call signal below shows three LED bars (\ | /): the bar of the coming direction lights yellow once
   the tram is detected and blinks just before GO. Distant signals with a yellow "P" plate stand before
   signals hidden behind curves.
 - Junctions: each signal belongs to a junction controller with a fixed cycle (trams straight in both
@@ -170,8 +173,10 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 
 - Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut into
   a hillside (Chotkova), Most Legií on a deck with piers.
-- Signs: classic red Prague stop signs, speed limit boards (rychlostník), contact signs, dangerous gradient
-  boards. Zebra crossings are painted where they are mapped (not across the tracks). Signals and signs
+- Signs: classic red Prague stop signs; the speed signs of the D 1/2 rules (a restriction in black on yellow,
+  a Rychlostník in white on black, the warning triangle, the "r" of a small-radius curve, the dangerous climb
+  and descent), twice their real size so they can be read on a screen. A white board with a black number is
+  only a helper: it stands where a curve limits the speed and no real sign does. Contact signs. Zebra crossings are painted where they are mapped (not across the tracks). Signals and signs
   stand off the road: on catenary poles, hung from span wires beside the contact wire, or at the kerb — not
   on platforms.
 - Overhead line: span wires anchored on poles at the kerb (between carriageway and sidewalk), on wall

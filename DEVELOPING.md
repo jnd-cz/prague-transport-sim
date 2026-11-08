@@ -304,6 +304,8 @@ steep step) and offers `archive, bridged over a dip` and `follows survey surface
 import rules change. Answers talked over with the user are recorded in `data/truth.json`
 (`trackHeights.reviewAnswers`, one per decision with its quote): `python -P -E tools/track_span_evidence.py`
 converts those; `--from-reviews reports/reviews/line17.json` converts a page's unambiguous answers instead.
+A decision whose answer there imports carries it in the findings (`recorded`), and its card and the review
+directory show it answered where the page holds no answer under that decision's id (#379).
 Proposals stay separate from approved height evidence;
 the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
 reproduction commands and `--evidence` format.

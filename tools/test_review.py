@@ -355,6 +355,15 @@ def main():
             page.wait_for_function("window.review.verdicts.state === 'saved' && !Object.keys(window.review.verdicts.pending).length",timeout=20000)
             r['heightNext'] = page.evaluate('window.review.list[window.review.cur].id')
             r['heightSaved'] = json.load(open(saved,encoding='utf-8'))
+            # (#379: an answer data/truth.json records shows on its card, without the page's remove button)
+            r['recorded'] = page.evaluate('''() => {
+              const R=window.review, f=R.findings.find(f=>f.id==='other-bridge');
+              f.recorded={v:'follows survey surface',t:1,date:'2026-11-02',quote:'the quote',source:'data/truth.json'};
+              R.otherAnswers={}; R._fill(); R.select(R.list.indexOf(f));
+              const card=R.$('rvCard');
+              return {on:[...card.querySelectorAll('button.on')].map(b=>b.textContent), text:card.textContent,
+                      remove:!!card.querySelector('button[data-v=""]'), across:R.$('rvCount').textContent};
+            }''')
             # a 1080p desktop window: the tall track-height card scrolls, the list keeps its rows (#178)
             page.set_viewport_size({'width': 1920, 'height': 800})
             r['desk'] = page.evaluate('''() => {
@@ -459,6 +468,10 @@ def main():
                and v.get('span_sha256')==HEIGHT_COMPACT['span_sha256']
                for v in r['heightSaved'].get('items',{}).values()):
         fails.append('track-height answer was not saved with its decision scope')
+    rec = r['recorded']
+    if (rec['on'] != ['2 · follows survey surface'] or 'Answered in data/truth.json (2026-11-02): “the quote”' not in rec['text']
+            or rec['remove'] or '2 / 2 answered across lines' not in rec['across']):
+        fails.append(f"an answer recorded in data/truth.json is not shown on its card: {rec}")
     c = r["cam"]
     if not (c["left"]["yaw"] > 0 and c["left"]["pitch"] > 0 and c["left"]["move"] == 0):
         fails.append(f"a left drag does not turn and tilt, to the right and down, without moving: {c['left']}")
