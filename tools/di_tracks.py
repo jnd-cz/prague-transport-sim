@@ -42,6 +42,10 @@ SUPERSEDED = 0.95, 0.09  # share of an older record's length within DUPLICATE of
                          # partner (Malostranské náměstí 9-10 cm, Čechův most 13 cm)
 FORK_MIN, FORK_OUT, FORK_APART = 3.0, 8.0, 0.3  # m: a fork's branches (records this long) are this far apart
                                                 # this far out
+IN_LINE = 0.03, 10.0  # m across, degrees: record ends facing each other this near one line are one track's joint (DI joins
+                      # its records with 1 cm scraps)
+INTERLACE_GAP = 100.0  # m: the longest gap in one track of an interlace, beside the other, joined (Nádraží Libeň: 33 m;
+                       # DI's interlaced runs are 11-87 m)
 
 
 def _unit(v):
@@ -87,6 +91,128 @@ def _latest(recs):
     return keep
 
 
+def _meetings(recs):
+    """Pairs (i, j) of record ends (2 * record + end) that continue each other: ends within JOIN, except an end that a
+    track goes on from in line and an end lying beside that track (INTERLACE: 5-20 cm across and still within 20 cm of
+    it FORK_OUT on) - interlaced track, the branch starting or ending beside a record joint of the through track. Ends
+    in line facing each other across a gap of up to INTERLACE_GAP continue each other where both step sideways onto
+    the other track of an interlace and that track lies beside the whole gap.
+    (Ke Stírce: the branch starting 11.7 cm beside the through track's record joint met it there, and line 17 stepped
+    12 cm through the node; Čechův most: the through track's joint 0.6 m apart, the branch's end and a scrap 12 cm beside
+    it; Nádraží Libeň: no through track for 33 m beside the branch, joined to it by steps of 11 and 13 cm, the branch
+    6 m short of its curve. The user, 2026-11-07: "there is interlaced switch coming all the way from near the
+    crosswalk ... So there should be two tracks running with a small shift that corresponds to the current jolts.")"""
+    lines = [LineString(xy) for _, xy in recs]
+    pts = [xy[0] if k == 0 else xy[-1] for _, xy in recs for k in (0, 1)]
+    if not pts:
+        return set()
+    tree = shapely.STRtree(shapely.points(pts))
+    lo, hi = INTERLACE[0], INTERLACE[1]
+    cos_line = math.cos(math.radians(IN_LINE[1]))
+
+    def out(i):   # the way end i's record leaves it
+        l = lines[i // 2]
+        q = l.interpolate(min(FOLD_LOOK, l.length) if i % 2 == 0 else max(0.0, l.length - FOLD_LOOK))
+        return _unit((q.x - pts[i][0], q.y - pts[i][1]))
+
+    def across(i, j):   # how far end j lies off the line end i's record leaves along
+        u = out(i)
+        return abs((pts[j][0] - pts[i][0]) * u[1] - (pts[j][1] - pts[i][1]) * u[0])
+
+    def opposite(i, j):
+        u, v = out(i), out(j)
+        return u[0] * v[0] + u[1] * v[1] <= -cos_line
+    near = [(i, int(j)) for i in range(len(pts)) for j in tree.query(Point(pts[i]).buffer(JOIN))
+            if int(j) > i and math.dist(pts[i], pts[int(j)]) <= JOIN]
+    joint = {(i, j) for i, j in near if i // 2 != j // 2 and opposite(i, j)
+             and across(i, j) <= IN_LINE[0] and across(j, i) <= IN_LINE[0]}
+    # (ends stepping sideways onto another end: the gaps of an interlace's broken track run between them)
+    step = sorted({e for i, j in near if lo <= max(across(i, j), across(j, i)) <= hi for e in (i, j)})
+    if step:
+        ltree = shapely.STRtree(lines)
+        stree = shapely.STRtree(shapely.points([pts[i] for i in step]))
+        for a, i in enumerate(step):
+            for b in stree.query(Point(pts[i]).buffer(INTERLACE_GAP)):
+                j = step[int(b)]
+                g = math.dist(pts[i], pts[j])
+                if j <= i or i // 2 == j // 2 or g <= JOIN or g > INTERLACE_GAP:
+                    continue
+                w = _unit((pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]))
+                u, v = out(i), out(j)
+                if u[0] * w[0] + u[1] * w[1] > -cos_line or v[0] * w[0] + v[1] * w[1] < cos_line \
+                        or across(i, j) > lo or across(j, i) > lo:
+                    continue
+                gap = LineString([pts[i], pts[j]])
+                other = [lines[int(k)] for k in ltree.query(gap.buffer(hi)) if int(k) not in (i // 2, j // 2)]
+                if not other:
+                    continue
+                n = max(1, int(g))
+                d = shapely.distance(shapely.points([gap.interpolate(g * (k + 0.5) / n).coords[0] for k in range(n)]),
+                                     shapely.MultiLineString(other))
+                if all(lo <= x <= hi for x in d):
+                    joint.add((i, j))
+    partner = defaultdict(list)
+    for i, j in joint:
+        partner[i].append(j)
+        partner[j].append(i)
+
+    def onward(j, d):   # the point d m along from end j, on through the joints in line
+        seen = set()
+        while True:
+            l = lines[j // 2]
+            if l.length >= d:
+                return l.interpolate(d if j % 2 == 0 else l.length - d)
+            d -= l.length
+            seen.add(j // 2)
+            nxt = [p for p in partner.get(j ^ 1, ()) if p // 2 not in seen]
+            if len(nxt) != 1:
+                return Point(pts[j ^ 1])
+            j = nxt[0]
+
+    def run(e, d):   # the records from end e on through the joints in line, d m of them
+        out, seen = [], set()
+        while d > 0 and e // 2 not in seen:
+            out.append(lines[e // 2])
+            seen.add(e // 2)
+            d -= lines[e // 2].length
+            nxt = partner.get(e ^ 1, ())
+            if len(nxt) != 1:
+                break
+            e = nxt[0]
+        return out
+
+    def beside(i, j):   # j lies beside the track that goes on from i in line
+        for p in partner.get(i, ()):
+            if p == j:
+                continue
+            uj = out(j)
+            # (the track the way j's record leaves: i's own record or its partner's, and on)
+            e = i if out(i)[0] * uj[0] + out(i)[1] * uj[1] > 0 else p
+            parts = run(e, FORK_OUT + 2.0) + ([LineString([pts[i], pts[p]])] if math.dist(pts[i], pts[p]) > 0 else [])
+            track = shapely.MultiLineString(parts)
+            if lo <= track.distance(Point(pts[j])) <= hi and track.distance(onward(j, FORK_OUT)) <= hi:
+                return True
+        return False
+    def two_joints(i, j):   # each goes on in line with another end, and their tracks run side by side FORK_OUT on, one way
+        # or the other: two tracks (Nádraží Libeň, where the interlace parts: met as one node of four, the route took the
+        # branch's side for 35 m, nearer OSM's way; a switch drawn as a section has its legs' joint 25 cm apart, but they
+        # meet at its tip 4.7 m back and part ahead)
+        ps, qs = [p for p in partner.get(i, ()) if p != j], [q for q in partner.get(j, ()) if q != i]
+        u, v = out(i), out(j)
+        if not ps or not qs or abs(u[0] * v[0] + u[1] * v[1]) < math.cos(math.radians(ANGLE)) \
+                or max(across(i, j), across(j, i)) < lo:
+            return False
+        for a in (i, ps[0]):
+            for b in (j, qs[0]):
+                ua, ub = out(a), out(b)
+                if ua[0] * ub[0] + ua[1] * ub[1] > 0 and \
+                        lo <= shapely.MultiLineString(run(a, FORK_OUT + 2.0)).distance(onward(b, FORK_OUT)) <= hi:
+                    return True
+        return False
+    return joint | {(i, j) for i, j in near
+                    if (i, j) not in joint and not beside(i, j) and not beside(j, i) and not two_joints(i, j)}
+
+
 class Source:
     """A source's track records merged into chains that end only at forks, crossings and track ends."""
 
@@ -102,17 +228,14 @@ class Source:
         self.superseded = n - len(recs)
         while True:   # clusters, then again without the duplicates found
             ends = [(r, k, xy[0 if k == 0 else -1]) for r, (_, xy) in enumerate(recs) for k in (0, 1)]
-            tree = shapely.STRtree(shapely.points([e[2] for e in ends]))
             cluster = list(range(len(ends)))
             def root(i):
                 while cluster[i] != i:
                     cluster[i] = cluster[cluster[i]]
                     i = cluster[i]
                 return i
-            for i, (_, _, xy) in enumerate(ends):
-                for j in tree.query(Point(xy).buffer(JOIN)):
-                    if math.dist(xy, ends[j][2]) <= JOIN:
-                        cluster[root(int(j))] = root(i)
+            for i, j in _meetings(recs):
+                cluster[root(j)] = root(i)
             between = defaultdict(list)
             for r in range(len(recs)):
                 between[tuple(sorted((root(2 * r), root(2 * r + 1))))].append(r)
@@ -201,11 +324,13 @@ class Source:
                     if u[0] * v[0] + u[1] * v[1] > 0:
                         break
                     used.add(nr)
+                    # (across a gap in line, _meetings, the next record keeps its end: the chain runs straight over it)
+                    cut = 1 if math.dist(nxt[0], pts[-1] if forward else pts[0]) <= JOIN else 0
                     if forward:
-                        pts += nxt[1:]
+                        pts += nxt[cut:]
                         ids.append(recs[nr][0])
                     else:
-                        pts = nxt[::-1][:-1] + pts
+                        pts = nxt[::-1][:len(nxt) - cut] + pts
                         ids.insert(0, recs[nr][0])
                     cur, cur_end = nr, 1 - nk
             line = LineString(pts)
@@ -379,6 +504,24 @@ def photo_tracks(truth=None):
         out.append({'id': f'photo-{i}', 'coords': [(float(x), float(y), None) for x, y in zip(xs, ys)],
                     'attrs': {}, 'sources': [], 'place': f['place']})
     return out
+
+
+def stepped_answers(truth=None):
+    """[(xy, answer, reach)] in city metres: the user's answers on the stepped-curve review (data/truth.json
+    trackSources.steppedAnswers, reports/review/stepped-curves.json, #368): 'smooth' draws one curve through the place,
+    'keep' leaves it as drawn."""
+    import json
+    from geo import Frame
+    path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    facts = json.loads(Path(path).read_text(encoding='utf-8'))['trackSources'].get('steppedAnswers', [])
+    frame, out = Frame(), []
+    for f in facts:
+        x, y = frame.xy(*f['place'])
+        out.append(((float(x), float(y)), f['answer'], float(f.get('reach', STEPPED_REACH))))
+    return out
+
+
+STEPPED_REACH = 10.0  # m: a 'smooth' answer frees DI's vertices this near its place (the cards' steps lie within 5 m of it)
 
 
 def photo_source():
