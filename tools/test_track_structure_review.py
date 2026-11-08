@@ -12,7 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import numpy as np
 
 from track_heights import HeightGuard
-from track_structure_review import Structures, grouped, review, record_date, findings, queue_text
+from track_structure_review import Structures, corridor_id, grouped, review, record_date, findings, queue_text
 from track_span_evidence import SpanEvidence, from_reviews, hydrate_findings, truth_answers, dips
 from track_terrain_fallback import ordinary_fallback
 from test_track_heights import match, path, offset_fact
@@ -361,6 +361,53 @@ class SpanReviews(unittest.TestCase):
                                  {'findings':[finding]},'reviews/line17.json')['span_reviews'][0]
             self.assertEqual((entry['kind'],entry['level']),(kind,level))
             self.assertEqual(SpanEvidence([entry]).at('di-1',5,0,[{'z':250}])[0]['z'],250)
+
+    def test_street_track_the_build_holds_is_a_decision_offering_what_imports(self):
+        # (#202: line 17 between Čechův most and Strossmayerovo náměstí held 126 m before the lidar settled it,
+        # the paved survey 0.3-0.4 m under the archive)
+        rows = [{'line':17,'direction':'path','s':s,'weight_m':5,'xy':[s,0],'status':'review',
+                 'review_flags':['archive_surface_height_disagreement'],'di_id':'di-1','raw_di_z':None,
+                 'construction':{'kind':'paved'},
+                 'candidates':[{'dataset':'archive','id':1,'z':200+.01*s},
+                               {'dataset':'survey','id':'zps-1','class':'paved','level':0,'provenance':{},
+                                'z':199.65+.01*s,'surface_z':199.6+.01*s,'inside':True}]}
+                for s in (2.5+5*k for k in range(20))]
+        rows += [{'line':17,'direction':'path','s':s,'weight_m':5,'xy':[s,0],'status':'selected','review_flags':[],
+                  'di_id':'di-2','raw_di_z':201.1,'candidates':[]} for s in (102.5,107.5)]
+        report = {'route_samples':rows,'archive_sources':{},'snapshot':'test','frame':{}}
+        lines = {17:{'path':[[0,0],[200,0]],'pathBack':[[200,0],[0,0]],'stops':[{'name':'A','s':0},{'name':'B','s':100}]}}
+        class Terrain:
+            def sample(self,e,n):
+                return np.full(len(e),199.5)
+        run = lambda held,answered=(): review(report,Structures([]),Terrain(),lines,held,answered)
+        self.assertFalse(run(None)['decisions'])  # (structures only)
+        self.assertFalse(run({(17,'path'):[(150,190)]})['decisions'])  # (the build settles it)
+        identity = corridor_id('street','A','B')
+        self.assertEqual([d['id'] for d in run({(17,'path'):[],(17,'pathBack'):[(20,80)]},{identity})['decisions']],[identity])
+        result = run({(17,'path'):[(20,80)]})
+        self.assertEqual([(d['id'],d['structure']['kind'],d['length_per_direction_m']) for d in result['decisions']],
+                         [(identity,'street',{'line17:path':100})])
+        self.assertTrue(identity.startswith('street-'))
+        item = findings(result,inline=True)['findings'][0]
+        self.assertEqual(item['options'],['archive profile ok','follows survey surface','unsure'])
+        self.assertIn('no deck',item['answer_explanations']['archive, bridged over a dip'])
+        get = lambda v:from_reviews({'items':{'pin':{'decision_id':identity,'span_ids':item['decision']['span_ids'],
+                                                      'v':v,'note':'','t':1761955200000}}},{'findings':[item]},'test')
+        for v,z in (('archive profile ok',200.5),('follows survey surface',200.15)):
+            entry = get(v)['span_reviews'][0]
+            self.assertEqual((entry['kind'],entry['level']),('surface',0))
+            self.assertAlmostEqual(SpanEvidence([entry]).at('di-1',50,0,[{'z':200.5}])[0]['z'],z)
+        # (a structure the import's mask hints at is no street track)
+        self.assertFalse(grouped([{**rows[0],'review_flags':['structure_hint']}],Structures([]),street=True))
+
+    def test_unmapped_decisions_keep_their_ids(self):
+        path = Path(__file__).resolve().parent.parent/'reports/review/track-height-spans.json'
+        queue = json.loads(path.read_text(encoding='utf-8'))
+        spans = {s['id']:s for s in queue['spans']}
+        unmapped = [d for d in queue['decisions'] if d['structure']['kind']=='unmapped']
+        self.assertTrue(unmapped)
+        for d in unmapped:
+            self.assertEqual({corridor_id('unmapped',spans[i]['from_stop'],spans[i]['to_stop']) for i in d['span_ids']},{d['id']})
 
     def test_the_reviewed_decisions_offer_what_the_user_asked_for(self):
         # (the committed queue: Modřany's bridge over the street, Palackého most over the river; 2026-11-02 session.
