@@ -9,8 +9,8 @@
 // switch button, only the drive pedal can draw it), free (nothing: the plan changed its mind, which
 // is what must stay at 0). shoesAtSpeed: approaches where the shoe brakes came fully in above 8 km/h (LO dropped).
 // pulses: the brake pedal let off to zero and pressed again inside an approach. restarts: the tram stood short of
-// the stop point and drove on. err: the stop point less the front at the stand (+ short, − over; behindTram: stands behind a tram ahead
-// at the stop, not judged by it). The timetable: late (the game's
+// the stop point and drove on. err: the stop point less the front at the stand (+ short, − over; behindTram, behindCar: stands behind a tram
+// or a car ahead at the stop, not judged by it). The timetable: late (the game's
 // penalty for it), devMean (s after the schedule at the departures), lateStops (departures over 3 min after it); smooth driving must not
 // cost it: 4 % slower on the same line took line 22's penalty from 17 to 509.
 // The drive pedal's use, on the whole run: presses (from 0 to a drive step, "našlápnutí"), pressesRolling (of them while already moving
@@ -25,9 +25,11 @@ export function stopsWatch(game) {
   const finish = (st, tr) => {
     a.err = +(st.target - tr.s).toFixed(2);
     // (served behind a tram standing at the front of a long platform, as src/game.js lets a second set stop: not short of the point;
-    // it counted Přístaviště 34.6 m short on line 17's 74 m platform, autumn seed 2)
+    // it counted Přístaviště 34.6 m short on line 17's 74 m platform, autumn seed 2; so behind a car standing on the track inside the
+    // platform's zone: Karlovy lázně 11.8 m short, 8 m behind a car that had turned onto the track in front of the tram, line 17 seed 5)
     const gap = game.tramAheadGap?.();
-    a.behind = gap != null && gap < 12;
+    const car = [...(game.carsOnTrack || []), ...(game.carsCrossing || [])].some((c) => c.s > tr.s && c.s - tr.s < 12);
+    a.behind = gap != null && gap < 12 ? 'tram' : car ? 'car' : false;
     R.stops.push({ stop: st.name, s: Math.round(st.target), v0: +(a.v0 * 3.6).toFixed(0), d0: Math.round(a.d0), secs: +(game.clock - a.t0).toFixed(1), flips: a.flips.length,
       pulses: a.pulses, steps: a.changes, decel: +a.decel.toFixed(2), jerk: +a.jerk.toFixed(2), shoesAtSpeed: a.shoes, restarts: a.restarts, err: a.err, behind: a.behind });
     a = null;
@@ -109,7 +111,7 @@ export function stopsWatch(game) {
       const devs = (game.log || []).map((x) => x.dev).filter((x) => x !== undefined && x !== null);
       return { seed, stuck: stuck ?? null, stops: S.length, flipsFree: by('free'), flipsShort: by('short'), flipsAhead: by('ahead'), flipsSignal: by('signal'), flipsCar: by('car'), flipsContact: by('contact'),
         restarts: sum('restarts'), pulses: sum('pulses'), shoesAtSpeed: sum('shoesAtSpeed'), maxDecel: +max('decel').toFixed(2), maxJerk: +max('jerk').toFixed(2),
-        errP90: errs.length ? errs[Math.floor(errs.length * 0.9)] : null, errMax: errs.length ? errs[errs.length - 1] : null, short: own.filter((x) => x.err > 3).length, over: own.filter((x) => x.err < -3).length, behindTram: S.length - own.length,
+        errP90: errs.length ? errs[Math.floor(errs.length * 0.9)] : null, errMax: errs.length ? errs[errs.length - 1] : null, short: own.filter((x) => x.err > 3).length, over: own.filter((x) => x.err < -3).length, behindTram: S.filter((x) => x.behind === 'tram').length, behindCar: S.filter((x) => x.behind === 'car').length,
         pedalChangesPerKm: +(R.changes / Math.max(1, game.tram.s / 1000)).toFixed(1), driveShare: +(R.driveSteps / Math.max(1, R.steps)).toFixed(3), simSeconds: Math.round(game.clock - (R.clock0 ?? 0)),
         presses: R.presses, pressesPerKm: +(R.presses / Math.max(1, game.tram.s / 1000)).toFixed(2), pressesPerStop: +(R.presses / Math.max(1, S.length)).toFixed(2), pressesRolling: R.pressesRolling,
         brakeApplies: R.brakeApplies, driveM: Math.round(R.driveM), coastM: Math.round(R.coastM), brakeM: Math.round(R.brakeM), coastStretches: R.coastStretches,
