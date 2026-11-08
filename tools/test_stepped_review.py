@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import geo  # noqa: E402
 import stepped_review as sr  # noqa: E402
 
 
@@ -57,6 +58,7 @@ class Measure(unittest.TestCase):
 
 
 class Cards(unittest.TestCase):
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_places_of_one_curve_are_one_card_and_answered_ones_go(self):
         root = Path(tempfile.mkdtemp())
         (root / 'data').mkdir()

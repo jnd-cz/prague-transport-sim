@@ -8,6 +8,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import geo  # noqa: E402
 import line_heights as lh  # noqa: E402
 
 
@@ -388,6 +389,7 @@ class Answers(unittest.TestCase):
         steps = [abs(b['z'] - a['z']) for a, b in zip(c.bins[1:], c.bins[2:])]
         self.assertLess(max(steps), .03)
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_a_step_answer_replaces_the_radius_answers_in_its_reach(self):
         truth = {'trackHeights': {'radiusAnswers': [{'place': [50.08862, 14.40603], 'answer': lh.HOLD}, {'place': [50.05, 14.4], 'answer': lh.HOLD}],
                                   'stepAnswers': [{'place': [50.08862, 14.40603], 'use': 'archive', 'radius': 'follow'}]}}

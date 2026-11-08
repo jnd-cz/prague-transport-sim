@@ -8,6 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import di_network as dn  # noqa: E402
 import di_tracks as dt  # noqa: E402
 
+dn.SMOOTHED = []  # (the networks here are made up: none of the user's answers in data/truth.json applies to them)
+
 
 def rec(i, pts):
     return {'id': str(i), 'coords': [(x, y, None) for x, y in pts], 'attrs': {}, 'sources': []}
