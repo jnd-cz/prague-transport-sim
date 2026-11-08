@@ -2,8 +2,8 @@
 // for Route.speedLimits (#211). Pure: docs/decisions/2026-11-07-speed-limits-and-signs.md measures and explains them.
 //
 // A stretch runs over the trackwork itself, from the blades to the frog, and `restriction-past` metres on (the user's
-// margin). Game.currentLimit holds it until the rear has left it (`restriction-start-end`: front in, rear out), so the
-// stretch does not add the tram's length.
+// margin, 0 since 2026-11-08). Game.currentLimit holds it until the rear has left it (`restriction-start-end`: front in,
+// rear out), so the stretch does not add the tram's length.
 const TIP = 4;       // m before the fork: DI draws 48 of its switches as a section whose fork lies 4-5 m past the tip (docs/knowledge.md)
 export const FROG = 11.5; // m past the fork, where the other leg lies one gauge off: median of the 82 facing switches of the five lines, 10.5-13.5 m p10-p90 (#211); the build's `frog` when it has one
 const DIAMOND = 3;   // m either side of a crossing node: its rails (a diamond's own length, read off DI's chains)

@@ -5,6 +5,10 @@
 // plates' (docs/research/prazsketramvaje/signals.md), which D 1/2's drawings match. Heights over width of the triangle
 // and the zone plate are read off the drawings (p. 54, 56).
 export const PLATE = { w: 0.2, h: 0.3, frame: 0.03 };
+// How much larger than real the game shows the signs: on a 1080p screen the real figures read only up to about 12 m
+// (the size experiment, docs/decisions/2026-11-07-speed-limits-and-signs.md). 2 for testing (the user, 2026-11-08: "pick
+// 200% now for testing ... keep the size of signs a parameter that can be changed later").
+export const SIGN_SCALE = 2;
 const YELLOW = '#f6c500';      // the photos' reflective orange-yellow (D 1/2 draws pure yellow)
 const BLACK = '#111';
 const WHITE = '#f4f4f0';
@@ -25,6 +29,12 @@ export function signSize(sign) {
   if (sign.arrow || sign.carType) h += STRIP;
   if (sign.backing) { w += 2 * BACKING; h += 2 * BACKING; }
   return { w: Math.round(w * 1000) / 1000, h: Math.round(h * 1000) / 1000 };
+}
+
+// the face's size in the game's world, metres: the real size times `scale`
+export function shownSize(sign, scale = SIGN_SCALE) {
+  const s = signSize(sign);
+  return { w: Math.round(s.w * scale * 1000) / 1000, h: Math.round(s.h * scale * 1000) / 1000 };
 }
 
 // ------------------------------------------------------------------ the figures and text

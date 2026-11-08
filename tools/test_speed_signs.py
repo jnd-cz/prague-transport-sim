@@ -25,7 +25,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 RULES = r"""
 async () => {
-  const { planSigns: plan, brakingDistance, signSize } = await import('/src/speedSigns.js');
+  const { planSigns: plan, brakingDistance, signSize, shownSize, SIGN_SCALE } = await import('/src/speedSigns.js');
   const fill = (...parts) => parts.flatMap(([v, m]) => Array(m / 5).fill(v));
   const kinds = (r) => r.map((g) => `${g.kind}${g.v ?? g.digit ?? ''}@${g.s}`);
   return {
@@ -45,6 +45,7 @@ async () => {
     descent: kinds(plan({ posted: fill([0, 900]), gradients: [{ from: 100, to: 570, permille: 80 }] })),
     braking50: brakingDistance(50), braking60: brakingDistance(60),
     plateSize: signSize({ kind: 'restriction', v: 30 }),
+    shown: shownSize({ kind: 'restriction', v: 30 }), shown15: shownSize({ kind: 'restriction', v: 30 }, 1.5), scale: SIGN_SCALE,
     arrowSize: signSize({ kind: 'restriction', v: 10, arrow: 'left' }),
     backed: signSize({ kind: 'restriction', v: 30, backing: true }),
   };
@@ -80,7 +81,7 @@ async () => {
   };
   const ladder = route.speedLimits([{ from: 100, to: 110, v: 15 }], 2);
   return {
-    limits: { end, none: window(0), two: window(2), fifteen: window(15) },
+    limits: { end, none: window(0), two: window(2), fifteen: window(15), fact: window(facts.past) },
     extra: { at105: ladder.at(105), at110: ladder.at(110.5), at111: ladder.at(111), bin: ladder.values[21], bin2: ladder.values[23], restriction: ladder.restriction(105), free: ladder.restriction(120) },
     places: {
       read: facts.places,
@@ -198,6 +199,8 @@ def check(r, p):
     want("braking distance from 50", r["braking50"], 140)
     want("braking distance from 60", r["braking60"], 200)
     want("the plate", r["plateSize"], {"w": 0.2, "h": 0.3})
+    want("shown at the game's scale, 200 % for testing", [r["scale"], r["shown"]], [2, {"w": 0.4, "h": 0.6}])
+    want("another scale", r["shown15"], {"w": 0.3, "h": 0.45})
     want("the plate with an arrow", r["arrowSize"], {"w": 0.2, "h": 0.35})
     want("the backing board", r["backed"], {"w": 0.28, "h": 0.38})
     white, yellow, black = lambda c: min(c) > 200, lambda c: c[0] > 220 and c[1] > 170 and c[2] < 60, lambda c: max(c) < 40
@@ -218,27 +221,27 @@ def check_rules(r):
         if got != expected:
             f.append(f"{name}: {got} != {expected}")
     want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
-                                         "past": 2, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
+                                         "past": 0, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
     if "no value" not in (r["missing"] or ""):
         f.append(f"a missing fact must stop the game: {r['missing']}")
-    want("switches from the blades to 2 m past the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"] + 2, "v": 15}])
-    want("every kind of trackwork, each 2 m past its end", r["stretches"], [
-        {"from": 96, "to": 100 + r["FROG"] + 2, "v": 15}, {"from": 146, "to": 165, "v": 15},
-        {"from": 200 - r["FROG"], "to": 206, "v": 15}, {"from": 288, "to": 306, "v": 30}, {"from": 397, "to": 405, "v": 15}])
+    want("switches from the blades to the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"], "v": 15}])
+    want("every kind of trackwork, each to its end", r["stretches"], [
+        {"from": 96, "to": 100 + r["FROG"], "v": 15}, {"from": 146, "to": 163, "v": 15},
+        {"from": 200 - r["FROG"], "to": 204, "v": 15}, {"from": 288, "to": 304, "v": 30}, {"from": 397, "to": 403, "v": 15}])
     p = r["places"]
     want("Trojská's fact where OSM tags nothing", p["untagged"], [{"from": 100, "to": 200, "v": 25}])
     want("OSM comes first", p["tagged"], [])
     want("without speeds in the data the fact holds", p["noData"], [{"from": 100, "to": 200, "v": 25}])
     want("only the untagged part", p["partly"], [{"from": 100, "to": 150, "v": 25}])
     want("not uphill", p["uphill"], [])
-    # the curve's end, 2 m past, against the 16 m estimate's own smear of it (R 30, no transition: the worst case)
+    # the curve's end, `restriction-past` on, against the 16 m estimate's own smear of it (R 30, no transition: the worst case)
     lim = r["limits"]
     if lim["two"]["last"] >= lim["fifteen"]["last"]:
         f.append(f"a narrower margin must lift the lowest speed sooner: {lim}")
     if lim["two"]["last"] != lim["none"]["last"] + 2:
         f.append(f"the margin moves the limit's end by itself: {lim}")
-    if not lim["end"] - 10 <= lim["two"]["last"] <= lim["end"] + 2:
-        f.append(f"the lowest speed must end by 2 m past the curve: {lim}")
+    if not lim["end"] - 10 <= lim["fact"]["last"] <= lim["end"] + r["facts"]["past"]:
+        f.append(f"the lowest speed must end by `restriction-past` past the curve: {lim}")
     x = r["extra"]
     want("a restriction is exact to the metre", [x["at105"], x["at110"], x["at111"]], [15, 15, 50])
     want("the 5 m table holds each bin's lowest", [x["bin"], x["bin2"]], [15, 50])

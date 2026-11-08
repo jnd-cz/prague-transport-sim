@@ -1,6 +1,6 @@
 # Speed limits from D 1/2's facts, OSM's posted speeds and the signs (#211)
 
-Status: **limits decided, signs proposed** (PR #362). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). On 2026-11-08 the user answered questions 4, 6 and 8, and on 5 that the signs must be larger. Open: the size (5), from the screenshots, and whether R07 and R09 are at the places marked (7).
+Status: **limits decided, signs proposed** (PR #362). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). On 2026-11-08 the user answered questions 4–8: 200 % for testing, as a parameter (`SIGN_SCALE`); R07 and R09 at the places marked; and `restriction-past` 0 m. Open: R07's diverging speed (15 or 35 km/h), for #365.
 
 ## The facts against the code
 
@@ -11,7 +11,7 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | `max-speed` | 50 km/h, also off the road, unless a Rychlostník allows more | D 1/2 § 25.1 | **differs:** untagged dedicated track 60, 5.97 km over 50 with no tag | 50 |
 | `user-speed-signs` | signs up to 60 for now, "higher speeds to be picked up from osm" | the user, 2026-11-03 | **differs:** every speed capped at 60, 1.77 km of line 17 held back (0.89 km of it before the first stop) | the limit follows OSM up to the T3's 65; signs not changed yet |
 | `restriction-start-end` | front in, rear out | § 25.1, 49.14, 49.22 | holds (`currentLimit`, lowest under the whole tram) | holds |
-| `restriction-past` | a restriction ends 2 m past a curve's end, a switch's frog or a crossing | the user, 2026-11-07 | **differs:** a curve's limit ran 15 m past its last low 5 m bin; a switch's ended at the frog's bin | 2 m, to the metre |
+| `restriction-past` | a restriction ends right at a curve's end, a switch's frog or a crossing: "keep it simply right after", since "the tram bogie leaves the switch sooner than the end of car" | the user, 2026-11-08 (2 m on 2026-11-07) | **differs:** a curve's limit ran 15 m past its last low 5 m bin; a switch's ended at the frog's bin | 0 m, to the metre |
 | `higher-speed-start-end` | rear in, front out | § 25.1 | holds (falls out of the same minimum) | holds |
 | `point-restriction` | front only | § 49.16 | missing; no place known | missing |
 | `switch-facing-speed` | 15 km/h facing, straight or diverging | § 25.4a | **differs:** 30 straight, 15 diverging; 18 m stretch | 15; blades to frog |
@@ -41,9 +41,9 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 
 **Where a slow stretch ended** (two-car set, 30.24 m). #211 read three extensions. The window of `speedLimits` applies only to curves, not to switches, so two remained: the stretch ran to 14 m past the fork, and 5 m bins rounded it up. Measured: the limit lifted **46–48 m** past the fork.
 
-The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself and the user's 2 m:
+The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself (with the user's 2 m until 2026-11-08, none since):
 - **The frog** lies a median **11.5 m** past the fork (10.5–13.5 m p10–p90), measured on the 82 facing switches: where the other leg is one gauge off the route.
-- **Now 44–45 m** at a switch with no other trackwork after it: the frog, 2 m, the tram. D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1). A one-car tram: 29–30 m.
+- **Now 42–43 m** at a switch with no other trackwork after it: the frog and the tram (44–45 m with the 2 m). D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1). A one-car tram: 28–29 m.
 
 On today's data, what the driver still feels as too far is mostly OSM. 65 stretches on the five lines are tagged 15 km/h, up to 110 m long, and 38 of them touch a facing switch. The first rise of the limit past a switch is a median **73–105 m**. Those pieces stand for the trailing switches and diamonds the game did not know. Once the data has them (W2's rebuild) they are dropped (`withoutOwnPieces`).
 
@@ -68,7 +68,19 @@ OSM's pieces go, but the first rise stays at a median 64–75 m. `--checks limit
 
 So at most forks the limit is what the rules ask: 39 of the 82 have a trailing switch or a diamond within 15 m past the frog, and each holds the limit until the rear has passed. `liftPast.twoCars` counts the pieces that start in the first 20 m past the fork, so 51 m is its ceiling: on the rebuild with the 2 m rule its median is 45–46 m on lines 22, 23 and 37 and that ceiling on 9 and 17.
 
-**2 m past the end** (`restriction-past`, the user, 2026-11-07). Since the initial commit `speedLimits` had taken each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), with no source. Now:
+**Right at the end, no margin** (`restriction-past` 0 m, the user, 2026-11-08: "Can we discard the 2 metre rule and keep it simply right after? I realize this because the tram bogie leaves the switch sooner than the end of car so we don't need to hold safety tolerance."). The rear still has to leave each restriction (§ 25.1); the 2 m on top of it are gone. Measured on the published W2 data (`--checks limits`):
+
+| line | two-car lift past a fork, median m (2 m → 0 m) | one car, m | curve: back at the posted speed past its end, median / p90 m | km at 15 km/h or less (2 m → 0 m) |
+|---|---|---|---|---|
+| 9 | 51 → 49 | 34 | 0 / 2 | 1.32 → 1.25 |
+| 17 | 51 → 51 | 36 | 0 / 2 | 1.00 → 0.94 |
+| 22 | 45 → 43 | 28 | 1 / 2 | 1.39 → 1.31 |
+| 23 | 45 → 43 | 28 | 1 / 2 | 0.91 → 0.88 |
+| 37 | 46 → 44 | 29 | 0 / 3 | 0.47 → 0.46 |
+
+At a switch with nothing after it the two-car lift is the frog and the tram, 42–43 m. 51 m is the measure's ceiling: on lines 9 and 17 another trailing switch or diamond of the junction holds the limit at most forks. Across the five lines what holds it last is that trackwork at 52 forks, the switch itself at 19, a curve at 9 and a posted piece at 2.
+
+**2 m past the end** (`restriction-past`, the user, 2026-11-07; 0 m since 2026-11-08, above). Since the initial commit `speedLimits` had taken each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), with no source. Now:
 - **The table is per metre.** A curve's limit follows the radius at each metre (`Route._radius`), from 5 m before it asks for less (`CURVE_AHEAD`, unchanged) to 2 m after. A switch's stretch ends 2 m past the frog, a trailing switch's 2 m past its blades, a diamond's 2 m past its rails. `Game.currentLimit` reads the metres under the tram; the 5 m `values` (the signs, the overlay) keep each bin's lowest.
 - **The curve's end** is where the game's radius estimate (16 m of heading) last asks for less than the posted speed. Against a short estimate (6 m), the limit is back at the posted speed a median **2–3 m** past the curve's end on lines 9, 17, 22 and 23 and −1 m on line 37, p90 at most 5 m (published data, 222 curves). The 16 m estimate is close to the true radius because most curves here have transitions: the limit climbs step by step along the transition and leaves its lowest speed a median 7–8 m before that end. The p10 of −15 m on lines 23 and 37 is the measure's search reach.
 - **The radius estimate smears a sharp end** by about 12 m each way, so on a curve without a transition the limit would run that far past its end. Most curves here have one.
@@ -211,7 +223,9 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 | 150 % | 300×450 mm | about 18 m | 3 px | 1.5 px |
 | 200 % | 400×600 mm | about 24 m | 4 px: colour and shape | 2 px |
 
-An eye reads the real 113 mm figures at about 75 m (5′ per character). No board size the scene can hold matches that on a 1080p screen: 100 % would need about 6 times its size. Where the driver must act (a restriction 90–125 m ahead at 50 km/h, a warning board 140–200 m ahead), the board shows its kind by colour and shape, and the number has to come from elsewhere: the gauge marker and the hint, or a zoom key that narrows the view as an eye would. The size is the user's choice from the screenshots ([the review page](https://claude.ai/artifact/Hx86b3fvNzVYjJnGWDfazq)).
+An eye reads the real 113 mm figures at about 75 m (5′ per character). No board size the scene can hold matches that on a 1080p screen: 100 % would need about 6 times its size. Where the driver must act (a restriction 90–125 m ahead at 50 km/h, a warning board 140–200 m ahead), the board shows its kind by colour and shape, and the number has to come from elsewhere: the gauge marker and the hint, or a zoom key that narrows the view as an eye would. The user chose from the screenshots ([the review page](https://claude.ai/artifact/Hx86b3fvNzVYjJnGWDfazq)): "pick 200% now for testing, can you keep the size of signs a parameter that can be changed later?" `SIGN_SCALE` in `src/speedSigns.js` is 2; `shownSize(sign)` gives the size the game shows, `signSize(sign)` the real one.
+
+**Where Bahnschrift is missing** (macOS, Linux, phones, browsers that hide installed fonts), the faces fall back to the next condensed face in `FIGURES`, narrowed the same way. That holds for the game as for any page. The same face everywhere needs a font file shipped with the game, for example D-DIN (SIL Open Font License, a DIN 1451 recreation with a condensed bold). Bahnschrift itself may not be redistributed. A new asset needs its own issue.
 
 **Curves under 25 m found by the rule, against the list:** Spálená (9, 22, 23), Chotkova (22, 23), Blanická (9), Na Moráni (9), Na Žertvách (37), Klárov (22, 23, at a switch). Not found by radius: Malostranské náměstí (both), Náměstí Míru (both), Havlíčkova. These may be other directions or a radius read over 16 m; the implementation issue checks them.
 

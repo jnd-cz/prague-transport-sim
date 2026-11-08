@@ -798,13 +798,13 @@
    },
    {
     "id": "restriction-past",
-    "value": 2,
+    "value": 0,
     "unit": "m",
     "scope": "a curve's, a switch's or a crossing's speed restriction runs this far past its end (a switch's: its frog); the rear still has to leave it (restriction-start-end)",
     "basis": "the user",
-    "quote": "Q4 definitely lower, I would keep just 2m past the end of curve, switch fork or crossing.",
-    "source": "Claude Code session 2026-11-07 (#211, PR 362, the question on the curve window)",
-    "date": "2026-11-07"
+    "quote": "Can we discard the 2 metre rule and keep it simply right after? I realize this because the tram bogie leaves the switch sooner than the end of car so we don't need to hold safety tolerance.",
+    "source": "Claude Code session 2026-11-08 (#211, PR 362); was 2 m from the session of 2026-11-07 (\"I would keep just 2m past the end of curve, switch fork or crossing\")",
+    "date": "2026-11-08"
    },
    {
     "id": "point-restriction",
