@@ -167,6 +167,14 @@ What sessions learned and later work needs. Kept current and short; the full log
   copies of the branch's (two records between the same two places, within 20 cm) and line 37 ran the branch for 35 m:
   the user's "sideways jolts" (2026-11-07). 14 such places in the network, 6 on the lines. `di_tracks._meetings`: an end
   whose track goes on in line does not meet an end beside that track, nor two joints side by side.
+- **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
+  user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
+  and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
+  ground: its 12 % ground step had been dropped as steeper than any track. The tracks follow the lidar in the
+  user's areas, no tighter than 250 m: unlimited, Malovanka read 131 m, a 2.4 cm lidar bump over 5 m
+  (`data/truth.json` radiusAnswers with `area`).
+- **The heights read IPR's 1 m raster, the game draws a 2 m grid of it** (`tools/fine_terrain.py` STEP; the 1 m mesh
+  is #276): at Královka and Malovanka the 2 m grid lies within mean 0.6-0.9 cm, max 6.4 cm of the raster at the tracks.
 - **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
   to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
