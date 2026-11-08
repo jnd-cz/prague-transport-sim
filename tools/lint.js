@@ -459,7 +459,11 @@ function trackRadius(g) {
 // Curves drawn in steps (#358): trackRadius flags under 18 m and trackJoins looks only where chains end, so a curve of 250 m
 // made of 17 m straights and 5 degree bends over 5 m passed both. Along our route and the opposite one: a place whose
 // radius over 5 m is under a third of the radius over 25 m around it, on a curve under 1500 m. Per 10 m of route.
+// Not where the two halves of the 25 m bend opposite ways: a reverse curve reads as a wide one over 25 m, its bends
+// cancelling (#368: Královský letohrádek, line 23, a 65 m bend into a 20 m one the other way read 396 m in a 1221 m
+// curve; the user: "make sure the arrangement of curves in opposite direction is kept").
 const STEP_SHORT = 2.5, STEP_LONG = 12.5, STEP_RATIO = 3, STEP_CURVE = 1500;
+const turn = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]));
 function steppedCurves(g) {
   const d = g.data, bad = new Map();
   let n = 0;
@@ -470,6 +474,8 @@ function steppedCurves(g) {
       const R5 = circleRadius(at(s - STEP_SHORT), at(s), at(s + STEP_SHORT)), R25 = circleRadius(at(s - STEP_LONG), at(s), at(s + STEP_LONG));
       n++;
       if (R25 >= STEP_CURVE || R5 * STEP_RATIO >= R25) continue;
+      const h = STEP_LONG / 2;
+      if (turn(at(s - STEP_LONG), at(s - h), at(s)) * turn(at(s), at(s + h), at(s + STEP_LONG)) < 0) continue;
       const k = `${kind}:${Math.round(s / 10)}`, [x, y] = at(s), mag = R25 / R5;
       if (!(bad.get(k)?.mag >= mag)) bad.set(k, { kind, x, y, s: Math.round(s), mag, info: `${kind} track ${R5.toFixed(0)} m over 5 m in a ${R25.toFixed(0)} m curve` });
     }

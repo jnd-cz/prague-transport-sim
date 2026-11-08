@@ -405,6 +405,22 @@ class Chords(unittest.TestCase):
         finally:
             dn.SMOOTHED = old
 
+    def test_nodes_at_a_smooth_answer_land_on_the_curve(self):
+        # (#368: Čechovo náměstí, a fork on DI's zig-zag inside a 'smooth' answer)
+        class Net:
+            nodes = {1: {'kind': 'fork'}, 2: {'kind': 'crossing'}, 3: {'kind': 'fork'}, 4: {'kind': 'joint'}, 5: {'kind': 'fork'}}
+        pos = {1: (0.0, 0.0), 2: (1.0, 0.0), 3: (200.0, 0.0), 4: (100.0, 0.0), 5: (300.0, 0.0)}
+        pts = {(1, 4): [], (2, 4): [], (3, 4): [], (3, 5): []}
+        old = dn.SMOOTHED
+        dn.SMOOTHED = [((0.0, 0.0), 10.0)]
+        try:
+            loose = dn.smooth_nodes(pos, pts, Net())
+        finally:
+            dn.SMOOTHED = old
+        # (the fork in reach, on the edge it ends; not the crossing in reach, nor nodes elsewhere)
+        self.assertEqual(sorted(loose), [(1, (1, 4))])
+        self.assertEqual(set(loose.values()), {0.0})
+
 
 if __name__ == '__main__':
     unittest.main()

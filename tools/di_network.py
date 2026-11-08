@@ -1390,6 +1390,21 @@ def without_steps(coords):
     return [coords[0]] + [p for p in coords[1:-1] if free(p)] + [coords[-1]]
 
 
+def smooth_nodes(pos, pts, net):
+    """The surveyed nodes within reach of a place the user answered 'smooth' on, as track_curve's `loose` {(node, edge): 0}:
+    no data point there, the node lands where the fitted curve passes (#368). Freeing the points between nodes was not
+    enough where the step lay at the node itself: at Čechovo náměstí DI zig-zags -8 to +9 cm in the 10 m before a fork,
+    and its node sat on that zig-zag (line 22, s 14233: 44 m over 5 m in a 198 m curve). A crossing stays where it is."""
+    if SMOOTHED is None:
+        without_steps([])
+    out = {}
+    for key in pts:
+        for n in key:
+            if net.nodes[n]['kind'] != 'crossing' and any(math.dist(pos[n], xy) <= r for xy, r in SMOOTHED or ()):
+                out[(n, key)] = 0.0
+    return out
+
+
 def without_chords(coords):
     """A surveyed line for the curve fit without the points inside the chords of a curve. DI draws some curves with vertices 22-28 m
     apart and 4-5 degrees at each (line 37, Ohrada - Palmovka: "stepped curve instead of continuous radius", the user,
@@ -1443,7 +1458,7 @@ class Drawn:
                         continues[n].add(frozenset((other(e, end), other(f, fend))))
         self.pos = dict(pos)
         if fit:
-            tc = track_curve.Network(pos, pts, kind, {}, limit, continues,
+            tc = track_curve.Network(pos, pts, kind, smooth_nodes(pos, pts, net), limit, continues,
                                      solid={n for n in pos if net.nodes[n]['kind'] == 'crossing'})
             fitted, self.report = tc.pts, tc.report
             self.pos = dict(tc.pos)
