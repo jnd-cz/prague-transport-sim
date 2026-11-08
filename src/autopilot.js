@@ -50,11 +50,14 @@ export class Autopilot {
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
     const gradeHere = g.profile.grade(tr.s - 7);
-    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold)
-    const planMax = Math.min(PLAN_DECEL, 0.5 * 9.81 * (g.muBase ?? 0.3));
+    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold once a downhill has taken its share, on dry rail
+    // only past 96 ‰: down Chotkova's 55 ‰ the half of 0.15's grip planned 0.74 m/s² where the grip held 0.56 after the slope's pull,
+    // and it came into the 20 km/h at 35, line 23 seed 2 in autumn)
+    const mu = g.muBase ?? 0.3;
     // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
-    const planAt = (grade) => Math.max(0.2, Math.min(planMax, 0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
+    const planAt = (grade) => Math.max(0.2, Math.min(PLAN_DECEL, 0.5 * 9.81 * (mu + Math.min(0, grade)),
+      0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
     // (to a lower limit as to a point, the steepest downhill on the way counts: planned on the 23 ‰ where it began braking, it met 59 ‰,
     // where step 5 makes 0.67 m/s², and came into line 17's 15 km/h at s 17422 4.5 km/h over, seed 3)
@@ -316,7 +319,7 @@ export class Autopilot {
     // Kubánské náměstí, between braking for the limit and braking for the stop, line 22 seeds 2 and 3)
     const coastingIn = fixedAt !== null && tr.v > vtDrive + 0.3;
     this.input.switchBtn = button;
-    // slippery rail: sand where it decides something, pulling away or braking for a point (the equipment eases off a step): on every slip
+    // slippery rail: sand pulling away where it decides something, and braking on a slide (the equipment eases off a step): on every slip
     // and slide the box, then 90 s for a shift, was dry half way along, and then a leaf patch on 50 ‰ could not be left at all
     // (a moment longer than the slip it stops: sand flickering on and off is no use). Pulling away, only where slipping wheels
     // (0.7 of the grip) do not climb with 0.15 m/s² to spare: a leaf patch over 26 ‰; on the level they still pull away, and the
@@ -324,10 +327,10 @@ export class Autopilot {
     // slipped, until 3 m/s: sand for 1.5 s at a time slipped again after each
     const slipClimbs = 0.7 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.15;
     this.startSand = tr.v < 3 && !slipClimbs && need > 0 && (tr.slip || !!this.startSand);
-    // (braking: once the point lies within what a tram sliding on a patch needs, 0.44 m/s², and 20 m; on the curve only, it braked
-    // on a step less after the slide at 0.3 m/s², under the slide's own, and stood 7.4 m short on the emergency brake, line 37 seed 4)
-    const slideNear = dLeft !== null && dLeft < (tr.v * tr.v) / (2 * 0.44) + 20;
-    this.sandT = this.startSand || (tr.slide && (onCurve || urgent || hazard || slideNear)) ? 1.5 : (this.sandT || 0) - dt;
+    // (braking: on every slide. Rationed while the box held 90 s, to a point within what a sliding tram needs, it slid twice without sand
+    // braking for a lower limit down Chotkova's 55 ‰, held step 1 for 3 s after each and came into the 20 km/h at 35, line 23 seed 2 in
+    // autumn; the box holds 25 minutes)
+    this.sandT = this.startSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
     // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
