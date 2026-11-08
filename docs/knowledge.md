@@ -293,7 +293,8 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   `docs/research/prazsketramvaje/t3-accelerator.md` § 9. Nothing but the pilot motor moves the accelerator, the relay in
   every mode. The wire's resistances and no-load voltage are assumed; nothing found measures them.
 - **How the autopilot drives it** (#351): to a stop or signal it drives until coasting 8 s meets the braking curve, then one curve to the
-  point at 0.85 of what step 5 gives, at most 1.0 m/s² (on wet leaves half the grip, 0.74), with the steepest downhill to it counted, for
+  point at 0.85 of what step 5 gives, at most 1.0 m/s² (on wet leaves half the grip, 0.74 on the level, less half a downhill's pull;
+  to a lower limit less the whole pull, as nothing takes a slide there that the track brakes take at a point), with the steepest downhill to it counted, for
   the coast as for the curve; no crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py
   --checks stops`, `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make. It pulls away at up to
   1.0 m/s², on step 3 below 20 km/h on the level unless step 3 cannot make it (a full car), and at up to 1.2 m/s² above 20 km/h (step 4).
@@ -367,7 +368,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). With 90 s, sanding at every slip and slide ran the box dry half way
   along lines 9, 17 and 22; sanding only where it decides something, it still ran dry there, while 23 and 37 kept a third to two
   thirds. Pulling away the autopilot sands only where slipping wheels would not climb with 0.15 m/s² to spare, then up to 3 m/s;
-  braking, on a slide with a stop point within a patch slide's distance. With the box empty the track brakes take a slide toward a
+  braking, on every slide: an autumn run uses 34–203 s of the box. Rationed to a stop point near ahead, it slid braking for Chotkova's
+  20 km/h down 55 ‰ without sand and came in at 35; the autumn runs' speed penalty was 495, main's 53, and 38 with sand on every slide
+  and the plan less the downhill's pull (`--checks autumn`, all lines, seeds 1–5). With the box empty the track brakes take a slide toward a
   point and let go once the rail under the tram gives what is still needed: held past a patch's end they stood the tram 13 m short
   of Mezi Hřbitovy up 25 ‰. A slip takes a step less for 6 s, lower only if it still
   slips 0.8 s on (the equipment lags the pedal). A slide over 1.2 s above 3 m/s costs the flats penalty (`src/game.js`).
