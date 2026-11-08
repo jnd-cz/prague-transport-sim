@@ -40,6 +40,14 @@ R_EARTH = 6378137.0  # Web Mercator (EPSG:3857) sphere
 _T = None
 
 
+def have_grid():
+    """Whether the snapshot's shift grid is here (tests that convert lat, lon skip without it: CI fetches no raw/)."""
+    return os.path.exists(os.path.join(GRID_DIR, GRID))
+
+
+NO_GRID = f"needs raw/proj/{GRID} (python -I tools/snapshot.py fetch)"
+
+
 def _transformer():
     global _T
     if _T is None:

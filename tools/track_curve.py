@@ -331,7 +331,7 @@ class Network:
     error of its records' accuracy class; default the class UNCLASSED). After construction: `pos` and
     `pts` fitted, `report` (counts, the largest misses and the curves left tighter than MIN_RADIUS, with places)."""
 
-    def __init__(self, pos, pts, kind, loose=(), limit=None, continues=None, solid=()):
+    def __init__(self, pos, pts, kind, loose=(), limit=None, continues=None, solid=(), approach=None):
         k = lambda a, b: (a, b) if str(a) < str(b) else (b, a)
         # nodes joined by an edge under MERGE are one (a switch's node and a neighbour moved onto one fork; two nodes
         # 4 cm apart at Národní divadlo, each fitted onto another track, would join with a 0.2 m radius)
@@ -373,6 +373,10 @@ class Network:
                 adj[ra].add(rb)
                 adj[rb].add(ra)
         loose = {(find(n), k(find(a), find(b))): (loose[(n, (a, b))] if isinstance(loose, dict) else 0.5) for n, (a, b) in loose}
+        # `approach` {node: the node its approaching track comes from}: a Y (an interlaced tip, tools/di_network.py
+        # splay_ends): no two tracks continue each other there, the approaching one is fitted first and the others leave
+        # along it, each easing off to its own side
+        appr = {find(n): find(m) for n, m in (approach or {}).items()}
 
         def along(n, m):
             p = edges[k(n, m)][0]
@@ -412,6 +416,8 @@ class Network:
         # at every node the straightest pairs of edges continue each other
         pair = {}
         for n, ms in adj.items():
+            if n in appr:
+                continue
             ms = list(ms)
             dirs = {m: reach(n, m) if len(ms) > 2 else direction(n, m) for m in ms}
             limit = PAIR_TWO if len(ms) == 2 else PAIR
@@ -472,6 +478,9 @@ class Network:
         for c, seq in enumerate(chains):
             for n in seq[1:-1]:
                 through[n].add(c)
+            for n, m in ((seq[0], seq[1]), (seq[-1], seq[-2])):
+                if appr.get(n) == m:   # (the track approaching a Y holds it, as a track through a node does)
+                    through[n].add(c)
         order, done, left = [], set(), list(range(len(chains)))
         while left:
             c = next((c for c in left if all(through[n] <= done | {c} for n in (chains[c][0], chains[c][-1]))), left[0])
