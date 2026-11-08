@@ -92,9 +92,7 @@ try {
 } catch { /* none for this line */ }
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
-let truth;
-try { truth = await loadHeightFacts(); }
-catch (error) { load.fail(error); throw error; }
+const truth = await loadHeightFacts();
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
 const t3Res = await Promise.all(T3H_FILES.map((f) => load.get(f)));
 await load.begin('terrain');
