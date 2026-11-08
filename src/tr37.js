@@ -394,8 +394,10 @@ export class TR37 {
       // from the lever's "nothing" a careful foot: brake and drive one step at a time; off a high drive step through a lower one
       if (s < 0 && now <= 0 && s < now - 1) s = now - 1;
       if (s > 0 && now >= 0 && s > now + 1) s = now + 1;
-      // (T3SU-03 p. 4: on the level steps 1–3, more only at speed or uphill; at speed from 20 km/h, where a driver on 7290 went to steps 4-5)
-      if (s > 3 && v < 20 / 3.6 && Math.abs(w.grade || 0) < 0.02) s = 3;
+      // (T3SU-03 p. 4: on the level steps 1–3, more only at speed or uphill; at speed from 20 km/h, where a driver on 7290 went to steps 4-5.
+      // And where step 3 cannot make what is asked, ≤ 1.0 m/s² pulling away: a full car, where it made 0.8 and lost 400-500 s on lines 17 and
+      // 22 at 90 % of the capacity against 10 %, main 240-260 s)
+      if (s > 3 && v < 20 / 3.6 && Math.abs(w.grade || 0) < 0.02 && this.driveForce(3) >= w.force) s = 3;
       if (now >= 3 && s <= 0) s = 1;
     }
     if (s !== now && (A.hold <= 0 || w.urgent || contact || w.slip || w.slide)) {
