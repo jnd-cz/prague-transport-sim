@@ -293,9 +293,13 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   `docs/research/prazsketramvaje/t3-accelerator.md` § 9. Nothing but the pilot motor moves the accelerator, the relay in
   every mode. The wire's resistances and no-load voltage are assumed; nothing found measures them.
 - **How the autopilot drives it** (#351): to a stop or signal it drives until coasting 8 s meets the braking curve, then one curve to the
-  point at 0.8 of what step 5 gives, at most 1.0 m/s² (on wet leaves half the grip, 0.74), with the steepest downhill to it counted; no
-  crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py --checks stops`,
-  `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make.
+  point at 0.85 of what step 5 gives, at most 1.0 m/s² (on wet leaves half the grip, 0.74), with the steepest downhill to it counted, for
+  the coast as for the curve; no crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py
+  --checks stops`, `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make. It pulls away at up to
+  1.0 m/s², on step 3 below 20 km/h on the level unless step 3 cannot make it (a full car), and at up to 1.2 m/s² above 20 km/h (step 4).
+  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (0.12 of the speed in slow streets, 0.35 m/s on a
+  climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
+  point on its curve.
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way.
   A light brake step lifts the accelerator (29 → 34 at 19 km/h, step 1), so holding a limit it coasts through a diverging contact rather than
@@ -319,6 +323,20 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   autopilot can lean a bit on the faster side where it makes sense."; "Later braking to match real driver"; "the general point of
   driving with zrychlovač still seems to be minimizing power waste, so drivers keep the našlápnutí amount low, use it hard to not
   spent burning much power in resistors as well as conserve momentum, save time by coasting at speeds under limit."
+- **Which steps the drivers use** (#351): the phone on T3SUCS 7290, zeroed at a stand, reads the traction's acceleration whatever the
+  gradient, as the model's on the level. With 40 passengers the model's drive steps 1–5 give 0.51 / 0.75 / 1.01 / 1.29 / 1.59 m/s² up to
+  30 km/h (falling above as the field weakens: 0.89 / 1.12 / 1.30 on steps 3–5 at 35 km/h) and the brake steps 0.33 / 0.59 / 0.77 /
+  0.93 / 1.11. The phone read 0.95–0.99 pulling away to 20 km/h (step 3), 1.21–1.29 from 20 to 40 km/h (steps 4–5), and braking
+  0.81–0.85 below 30 km/h, 1.06 from 30–40 (steps 3–5); whole stops from 20–40 km/h averaged 0.95–1.10 on the phone and the GPS.
+  All the recorded cars have the same TR37 (the user, 2026-11-07: "all of recorded cars should have pretty much the same TR37.
+  Difference can be mostly tuning and wear between depot servicing").
+- **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
+  m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
+  passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
+  0.089 / 0.090 coasting (p25–p75 0.05–0.15), so the totals agree and the model's rise with speed is not settled by one ride.
+- **The load** (#351, `tools/headless.py --checks load10,load90`: the stops run with the passengers held at 10 % and 90 % of the
+  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass, and boarding slows over 75 %. Held at step 3
+  from every stand, a full car made 0.8 m/s² and lines 17 and 22 took 504 and 396 s longer at 90 % than at 10 % (main 263 and 240 s).
 - **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
   starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the

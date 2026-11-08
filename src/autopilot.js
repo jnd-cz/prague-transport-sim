@@ -141,10 +141,13 @@ export class Autopilot {
     // there for the switch button, as a limit of its own, or it would take the drive pedal between the brake. (Where it
     // is still at speed there, the drive pedal is the way: nothing else draws the current.)
     const ct = g.nextContact();
-    if (ct && ct.required === 'diverging' && tr.v > V_BUTTON) {
-      const dc = ct.contact - tr.panto;
+    // (the next diverging contact, not only the next one: at Anděl one for a switch passed straight comes 4 m before it, and the turn
+    // went on the drive pedal at 18 km/h, 7.1 m short on the track brakes, line 9 seed 4 in autumn)
+    const cd = ct && ct.required === 'diverging' ? ct : (g.switches || []).find((w) => !w.auto && !w.passedContact && w.required === 'diverging' && w.contact > tr.panto - 1);
+    if (cd && tr.v > V_BUTTON) {
+      const dc = cd.contact - tr.panto;
       const toLimit = nl && nl.d - 12 > dc ? curveTo({ v: nl.v, d: nl.d - dc }) : Infinity;
-      const toPoint = fixedAt !== null && ct.contact + 4.5 < fixedAt ? Math.sqrt(2 * stopDecel * Math.max(0, fixedAt - STOP_MARGIN - ct.contact - 4.5)) : Infinity;
+      const toPoint = fixedAt !== null && cd.contact + 4.5 < fixedAt ? Math.sqrt(2 * stopDecel * Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5)) : Infinity;
       const there = Math.min(toLimit, toPoint);
       if (dc > 0 && there > V_BUTTON && there < 0.75 * vLine) {
         nl = { v: V_BUTTON * 3.6, d: dc + 12 };
@@ -154,7 +157,7 @@ export class Autopilot {
         // (at speed the drive pedal makes the turn, ≈1.5 s without the brake: slow enough there for the point to stay on its curve after
         // that. Braking at 0.85 of step 5 it was on the curve at the contact 70 m before the stop, then needed 1.16 m/s² and the track
         // brakes; test drive "turn under a contact 70 m before the stop, at speed")
-        const dC = Math.max(0, fixedAt - STOP_MARGIN - ct.contact - 4.5);
+        const dC = Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5);
         const vC = (-3 * stopDecel + Math.sqrt(9 * stopDecel * stopDecel + 8 * stopDecel * dC)) / 2;
         if (vC < there && (!nl || curveTo({ v: vC * 3.6, d: dc + 12 }) < curveTo(nl))) {
           nl = { v: vC * 3.6, d: dc + 12 };
@@ -283,7 +286,7 @@ export class Autopilot {
     // through on the button and brakes after; not on the way down to a lower limit or a point, where coasting ran 3 km/h over the
     // switch's limit and the pedal made the turn after all, and braking on step 5 had the position at 21)
     // (a diverging contact, not only the next one: at Anděl one for a switch passed straight came 4 m before it)
-    const btnSoon = tr.eq.buttonLive && g.switches.some((w) => !w.auto && !w.passedContact && w.required === 'diverging' && w.contact > tr.panto && w.contact - tr.panto < tr.v * 2.5 + 2);
+    const btnSoon = tr.eq.buttonLive && !!cd && cd.contact > tr.panto && cd.contact - tr.panto < tr.v * 2.5 + 2;
     // (up a climb the approach drives again where coasting would stand it more than 3 m short, until it rolls to within 1 m: with the
     // drive pedal held off it stood 15.7 m short of Mezi Hřbitovy up 25 ‰, line 9 seed 2 in autumn; on the level it does not, where
     // main crawled on pulses. On the curve it asked to coast as well: after the track brakes for a slide let go 53 m out at 20 km/h it
