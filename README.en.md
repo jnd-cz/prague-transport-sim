@@ -62,6 +62,7 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `X` | set a switch with the switch iron (tram stopped) |
 | `H` / `K` / `F` | saloon seat heaters / cab heater / waste-heat flap |
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
+| `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |
 | `Z` | right mirror on and off |
 | `V` | cab or outside view |
 | `O` | autopilot on and off |
@@ -187,7 +188,7 @@ device). They send the keyboard's keys:
 
 - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
-- the left column: doors, bell, sand (held), look left / right (held), view, mirror, pause;
+- the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
 - ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating,
   autopilot, sound, ⚑ report.
 

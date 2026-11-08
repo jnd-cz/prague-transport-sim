@@ -61,6 +61,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `X` | přestavit výhybku stavěcím klíčem (stojící vůz) |
 | `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
+| `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
 | `V` | pohled ze stanoviště řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
@@ -184,7 +185,7 @@ zařízení). Posílají klávesy klávesnice:
 
 - řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
-- levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), pohled, zrcátko, pauza;
+- levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
 - ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 
