@@ -68,6 +68,13 @@ export function loadFigureFont(wait = 4000) {
   return fontLoad;
 }
 
+// White text on black filling a W x H plate: the speed switch's number plate ("R 07", D 1/2 § 46.1, p. 45).
+export function drawNumberPlate(g, text, W, H) {
+  g.fillStyle = BLACK; g.fillRect(0, 0, W, H);
+  g.strokeStyle = EDGE; g.lineWidth = Math.max(1, H * 0.012); g.strokeRect(0, 0, W, H);
+  fit(g, text, W * 0.07, H * 0.16, W * 0.86, H * 0.68, { color: WHITE });
+}
+
 // how much to narrow the face the canvas resolves for FIGURES, so two figures are as wide as on the photos
 function squeezeFor(g) {
   g.save(); g.font = `700 100px ${FIGURES}`;
@@ -381,14 +388,16 @@ export function planSigns({ posted, step = 5, top = 65, trackwork = [], smallRad
 }
 
 // ------------------------------------------------------------------ the facts the signs read (data/truth.json)
-// `dangerous-gradients`: the boards stand only where the list has one (a slope alone is no dangerous gradient, D 1/2
-// § 49.9-12).
+// `dangerous-gradients` (the boards stand only where the list has one: a slope alone is no dangerous gradient, D 1/2
+// § 49.9-12) and the `speed-switches` whose OSM node is known (the place by its lat, lon: no route positions in code).
 export function signFacts(truth) {
   const lists = truth?.operation?.lists || [];
   const list = (id) => lists.find((l) => l.id === id)?.entries || [];
   return {
     gradients: list('dangerous-gradients').filter((e) => e.kind === 'dangerous-gradient' && e.from && e.to)
       .map((e) => ({ place: e.place, from: e.from, to: e.to, descending: !!e.descending, permille: Math.round(e.gradient), length: e.length })),
+    speedSwitches: list('speed-switches').filter((e) => e.osm && e.osm.lat != null && e.osm.lon != null)
+      .map((e) => ({ number: e.number, straight: e.straight, diverging: e.diverging, lat: e.osm.lat, lon: e.osm.lon })),
   };
 }
 

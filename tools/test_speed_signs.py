@@ -225,6 +225,7 @@ def check(r, p):
     want("braking distance from 60", r["braking60"], 200)
     want("the plate", r["plateSize"], {"w": 0.2, "h": 0.3})
     want("only the listed dangerous gradients", r["signFacts"]["gradients"], [{"place": "X", "from": "A", "to": "B", "descending": True, "permille": 80, "length": 100}])
+    want("only the speed switches with a node", r["signFacts"]["speedSwitches"], [{"number": "R07", "straight": 50, "diverging": 35, "lat": 50.1, "lon": 14.3}])
     want("a listed gradient the route climbs, where it rises most", r["gradUp"], [{"from": 200, "to": 300, "permille": 80, "up": True}])
     want("and one it descends", r["gradDown"], [{"from": 200, "to": 300, "permille": 80, "up": False}])
     want("a gradient whose stop is not on the route", r["gradMissing"], [])
@@ -254,6 +255,8 @@ def check_rules(r):
     def want(name, got, expected):
         if got != expected:
             f.append(f"{name}: {got} != {expected}")
+    want("truth.json's speed switches with a node", [w["number"] for w in r["signs"]["speedSwitches"]], ["R07", "R09"])
+    want("R07 at the press release's speeds", [(w["straight"], w["diverging"]) for w in r["signs"]["speedSwitches"]][:1], [(50, 35)])
     want("Trojská's dangerous gradient", [(g["from"], g["to"], g["descending"], g["permille"]) for g in r["signs"]["gradients"]], [("Hercovka", "Nad Trojou", True, 80)])
     want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
                                          "past": 0, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})

@@ -2,13 +2,15 @@
 import * as THREE from 'three';
 import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
-import { placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
+import { FROG, placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
+import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
   makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
   makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeSpeedBoard, disposeModel,
+  makeSpeedSwitchSignal, makeSwitchNumberPlate, makeCallSignal, makeEntrySignal,
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
@@ -704,7 +706,31 @@ export class Game {
     }
   }
 
+  // The speed switch (truth.json `speed-switches`, by its OSM node's lat, lon) whose node lies within 15 m of the facing
+  // switch at s, or null. R07 lies 9 m from line 9's switch (DI's and OSM's node differ), R09 on it.
+  _speedSwitchAt(s) {
+    const list = this.opts.signFacts?.speedSwitches || [], origin = this.data.frame?.origin;
+    if (!list.length || !origin) return null;
+    const p = this.route.at(s), [lat, lon] = toLatLon(p.x, p.y, origin);
+    const m = (e) => Math.hypot((e.lat - lat) * 111320, (e.lon - lon) * 111320 * Math.cos(lat * Math.PI / 180));
+    return list.find((e) => m(e) < 15) || null;
+  }
+
+  // A speed switch's elements at R01's distances (D 1/2 § 46; docs/decisions/2026-11-07-speed-switch-signals.md): the
+  // number plate 190 m before it, the call signal 160 m (dark: no registration yet), the entry sleeper signal 27 m (may
+  // enter), and the switch signal at the frog, in place of the red indicator. They and their limit stay as for any
+  // facing switch until registration is built (the later issue).
+  _initSpeedSwitch(sw) {
+    const frog = sw.frog ?? FROG, add = (obj, s, how) => { if (s < 5) return; how(obj, s); this.objects.add(obj); };
+    add(makeSwitchNumberPlate(sw.speedSwitch.number), sw.s - 190, (o, s) => this._mount(o, s, { movable: true }));
+    add(makeCallSignal(), sw.s - 160, (o, s) => this._mount(o, s, { movable: true }));
+    add(makeEntrySignal('go'), sw.s - 27, (o, s) => place(o, this.route, s, -1.1, 0, true));
+    this._mount(sw.indicator, sw.s + frog);
+    this.signBoards.push({ kind: 'speedSwitch', number: sw.speedSwitch.number, s: Math.round(sw.s) });
+  }
+
   _initSwitches() {
+    this.signBoards ||= [];
     // contacts of closely following switches keep their order and at least 4 m between them
     const contacts = [];
     this.data.switches.forEach((d, k) => {
@@ -716,11 +742,12 @@ export class Game {
     this.switches = this.data.switches.map((d, k) => {
       const required = d.routeDiverging ? 'diverging' : 'straight';
       const divSide = d.routeDiverging ? d.routeSide : (d.routeSide === 'left' ? 'right' : 'left');
+      const speedSwitch = this._speedSwitchAt(d.s);
       const sw = {
-        ...d, required, divSide,
+        ...d, required, divSide, speedSwitch,
         pos: this.rand() < 0.5 ? 'straight' : 'diverging',
         contact: contacts[k], passedContact: false, passed: false,
-        indicator: makeSwitchIndicator(), marker: makeContactMarker(),
+        indicator: speedSwitch ? makeSpeedSwitchSignal() : makeSwitchIndicator(), marker: makeContactMarker(),
       };
       // Every facing switch is worked by an overhead contact: the driver passes under it with
       // current (turn) or coasting (straight), also right after a stop, at a signal or on a
@@ -732,7 +759,8 @@ export class Game {
       const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
       this._mount(sign, sw.auto ? d.s - 40 : sw.contact);
       this.objects.add(sign);
-      place(sw.indicator, this.route, d.s - 8, -0.4, -0.26, true); // hangs from the span wire over the track
+      if (speedSwitch) this._initSpeedSwitch(sw);
+      else place(sw.indicator, this.route, d.s - 8, -0.4, -0.26, true); // hangs from the span wire over the track
       const c = this.route.at(sw.contact);
       sw.marker.position.x = c.x;
       sw.marker.position.y += this.profile.height(sw.contact);
