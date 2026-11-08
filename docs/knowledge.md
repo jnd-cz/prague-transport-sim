@@ -299,11 +299,13 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   1.0 m/s², on step 3 below 20 km/h on the level unless step 3 cannot make it (a full car), and at up to 1.2 m/s² above 20 km/h (step 4).
   Once it let go it coasts down 1 m/s under the speed it holds before pressing again (0.12 of the speed in slow streets, 0.35 m/s on a
   climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
-  point on its curve.
+  point on its curve; only where the limits have it pass the contact faster than the button works coasting (≈19 km/h).
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way.
-  A light brake step lifts the accelerator (29 → 34 at 19 km/h, step 1), so holding a limit it coasts through a diverging contact rather than
-  brake for less than 0.6 m/s over it: at Anděl that brake step had the drive pedal make the turn 22 m before the stop, 7.8 m short on the track brakes.
+  A light brake step lifts the accelerator (29 → 34 at 19 km/h, step 1), so holding a limit, or up to 0.6 m/s under it where a lower
+  limit's curve begins, it coasts through a diverging contact rather than brake for less than 0.6 m/s over it: at Anděl that brake step had
+  the drive pedal make the turn 22 m before the stop, 7.8 m short on the track brakes; the switch's 15 km/h just past the stop begins 2 m
+  before the contact.
   The crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.

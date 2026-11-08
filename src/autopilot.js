@@ -21,6 +21,7 @@ const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the pla
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
 const V_BUTTON = 4.2; // m/s: slow enough for the switch button: the accelerator stands at 30 or less coasting (ZR9, T3SU-24 § 8.2; tools/test_electric.py: 31 at 20 km/h), with the 1–2 km/h it comes in over the plan
+const V_BUTTON_COAST = 5.3; // m/s: the fastest the button still works coasting through (28 at 19 km/h coasting into Anděl, line 9 seed 1)
 
 export class Autopilot {
   constructor() {
@@ -153,10 +154,13 @@ export class Autopilot {
         nl = { v: V_BUTTON * 3.6, d: dc + 12 };
         vLimit = Math.min(vLimit, curveTo(nl));
         vt = Math.min(vt, vLimit);
-      } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity) {
+      } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity && Math.min(there, nl && nl.d - 12 <= dc ? nl.v / 3.6 - 0.4 : vLine) > V_BUTTON_COAST) {
         // (at speed the drive pedal makes the turn, ≈1.5 s without the brake: slow enough there for the point to stay on its curve after
         // that. Braking at 0.85 of step 5 it was on the curve at the contact 70 m before the stop, then needed 1.16 m/s² and the track
-        // brakes; test drive "turn under a contact 70 m before the stop, at speed")
+        // brakes; test drive "turn under a contact 70 m before the stop, at speed". Not where the limit has it pass slow enough to coast
+        // through on the button: 5 m before Anděl's contact, the 20 km/h street's limit, this took the target under the line's and so the
+        // coasting for the button away, a brake step lifted the accelerator over 30, and the drive pedal turned at 19 km/h, 8 m short on
+        // the track brakes, line 9 seed 1)
         const dC = Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5);
         const vC = (-3 * stopDecel + Math.sqrt(9 * stopDecel * stopDecel + 8 * stopDecel * dC)) / 2;
         if (vC < there && (!nl || curveTo({ v: vC * 3.6, d: dc + 12 }) < curveTo(nl))) {
@@ -286,6 +290,9 @@ export class Autopilot {
     // through on the button and brakes after; not on the way down to a lower limit or a point, where coasting ran 3 km/h over the
     // switch's limit and the pedal made the turn after all, and braking on step 5 had the position at 21)
     // (a diverging contact, not only the next one: at Anděl one for a switch passed straight came 4 m before it)
+    // (and over the first 0.6 m/s of a dip under the line's limit, whose curve keeps 12 m in hand: the switch's 15 km/h just past Anděl's stop
+    // dipped it 2 m before the contact, a brake step lifted the accelerator over 30 and the drive pedal turned at 19 km/h, then the track
+    // brakes, line 9 seeds 1 and 2)
     const btnSoon = tr.eq.buttonLive && !!cd && cd.contact > tr.panto && cd.contact - tr.panto < tr.v * 2.5 + 2;
     // (up a climb the approach drives again where coasting would stand it more than 3 m short, until it rolls to within 1 m: with the
     // drive pedal held off it stood 15.7 m short of Mezi Hřbitovy up 25 ‰, line 9 seed 2 in autumn; on the level it does not, where
@@ -295,7 +302,7 @@ export class Autopilot {
     this.upDrive = inApproach && fixed && aCoast > 0.15 && (reach < dLeft - 3 || (!!this.upDrive && reach < dLeft - 1));
     const shortUphill = this.upDrive;
     const coast = (!onCurve && between) || (onCurve && need > -300 && !shortUphill) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
-      (btnSoon && vt === vLine && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6);
+      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6);
     // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
     // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
