@@ -176,6 +176,15 @@ What sessions learned and later work needs. Kept current and short; the full log
 - **A track end walked back to its node keeps DI's record end** 1.8-2.3 m from the node (`Drawn`, `walk`): it is no
   node and an answer that frees the points around it frees it too (Čechovo náměstí: held, it hooked line 22's track
   3.5 cm in the last 0.76 m before the fork, 3.4 degrees).
+- **DI can hump on one track alone** (#344): line 9 at Sídliště Řepy, DI's outbound track rose 0.97 m over the lidar for
+  90 m while the return track 3 m beside it, the archive and the lidar under both agreed within 0.2 m. Where DI is the
+  source, the archive sided with the lidar at every such stretch of the network; on a bridge it does not (the bare-earth
+  lidar and the archive both lie under the deck, DI 6-14 m over them: the `structure_hint` flag). `archive_over_di`.
+- **OSM roads drawn over the rails** (#344, the `railSupport` places left after the heights): where the street way runs
+  onto a bridge, `ground.at` gives it the ground under the bridge, at the abutment level with the deck (Most Legií, 8-18 cm
+  over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across
+  the rails (50.0755 N 14.4303 E, 28 cm; 50.0884 N 14.4325 E, 15 cm); a road crossing the track between two of its nodes
+  is linear between them (50.0707 N 14.3802 E, 7 cm). W3's ground surface (#276, #301) replaces this drawing.
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the

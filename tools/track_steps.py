@@ -6,8 +6,10 @@ A place is where one of these holds, and places within REACH m of each other are
 - a coupling step (`coupling_steps`): two rigid cars on their bogies, each carrying its coupler head along its own pitch,
   would meet that far apart in height; over STEP m is a kink in the profile, not a wave;
 - numeric DI jumps (`di_jumps`): a record's segment of at least JUMP_LENGTH m climbing over JUMP_GRADE and JUMP_RISE m,
-  steeper than any track (the rule of #202's comment of 2026-11-06);
-- the lint's places of a checkpoint's run (--checkpoint, `trackLevels`, `railSupport`, `verticalCurves`).
+  steeper than any track (the rule of #202's comment of 2026-11-06), where the rail as built still steps near it;
+- with --checkpoint, the lint's places of that checkpoint's run (`trackLevels`, `railSupport`, `verticalCurves`).
+A place the user answered (`stepAnswers`, or an area where the tracks follow the ground: `radiusAnswers` with `area`;
+within ANSWERED m) is left out; one that still steps is printed.
 
 Each card holds the heights of every line and direction through the place: numeric DI, the archive's records, the
 survey's surfaces, the 2023 terrain and the game's profile (src/trackHeightProfile.js draws them). The answers are read
@@ -29,6 +31,7 @@ REACH = 60.0         # m: findings this near each other are one card
 AROUND = 70.0        # m: the heights shown either side of the place
 CAR_BOGIE, CAR_PITCH = 3.2, 15.04  # m: a car's centre to its bogie pivots, between coupled cars' centres (src/tram.js)
 ROUTE_NEAR = 8.0     # m: a DI jump this near a line's route is on it
+ANSWERED = 15.0      # m: a place this near one the user answered (data/truth.json stepAnswers) is that place
 
 
 def interp(xs, ys, x):
@@ -199,7 +202,8 @@ def card(group, samples, lines_data, frame, terrain):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--checkpoint', default='W1', help="whose lint places to list ('' for none)")
+    ap.add_argument('--checkpoint', default='', help="also list this checkpoint's lint places (e.g. W1; none by default: "
+                    "a checkpoint's places are those of its build, not of today's)")
     ap.add_argument('--output', type=Path, default=ROOT / 'reports/review/track-steps.json')
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')
@@ -216,7 +220,11 @@ def main():
     from shapely.geometry import LineString, Point
     routes = [LineString([p[:2] for p in d[k]]) for d in lines_data.values() for k in ('path', 'pathBack')]
     tree = STRtree(routes)
-    places += [p for p in di_jumps(staged['geometry']) if len(tree.query(Point(p['x'], p['y']).buffer(ROUTE_NEAR), predicate='intersects'))]
+    # (a DI jump is listed where the rail as built still steps near it: the build drops what is steeper than any track,
+    # line_heights MAX_GRADE, and a jump it smoothed away is no question)
+    steps = list(places)
+    places += [p for p in di_jumps(staged['geometry']) if len(tree.query(Point(p['x'], p['y']).buffer(ROUTE_NEAR), predicate='intersects'))
+               and any(math.dist((p['x'], p['y']), (q['x'], q['y'])) <= REACH for q in steps)]
     if a.checkpoint:
         for q in lint_places(a.checkpoint):
             # (verticalCurves has only the route position)
@@ -226,10 +234,28 @@ def main():
     for r in staged['route_samples']:
         samples.setdefault((r['line'], r['direction']), []).append(r)
     frame, terrain = Frame(), IprDtm()
+    # (a place the user answered is not asked again: its answer is in the build; one that still steps is printed)
+    answered = [(tuple(float(v) for v in frame.xy(*s['place'])), s.get('decision'))
+                for s in (truth.get('trackHeights') or {}).get('stepAnswers', [])]
+    # (and an area where the user had the tracks follow the ground, steps of the ground and all: radiusAnswers `area`)
+    from shapely.geometry import Polygon
+    areas = [(Polygon([tuple(float(v) for v in frame.xy(*p)) for p in a['area']]), a.get('decision'))
+             for a in (truth.get('trackHeights') or {}).get('radiusAnswers', []) if a.get('area')]
+    groups, still = [], []
+    for g in merged(places):
+        here = (g[0]['x'], g[0]['y'])
+        hit = next((d for xy, d in answered if math.dist(xy, here) <= ANSWERED), None) or \
+            next((d for poly, d in areas if poly.distance(Point(here)) <= ANSWERED), None)
+        if hit is None:
+            groups.append(g)
+        elif g[0]['cm'] >= STEP * 100:
+            still.append(f"{hit}: {g[0]['what']}")
     try:
-        out = [c for c in (card(g, samples, lines_data, frame, terrain) for g in merged(places)) if c]
+        out = [c for c in (card(g, samples, lines_data, frame, terrain) for g in groups) if c]
     finally:
         terrain.f.close()
+    for s in still:
+        print(f'answered, still stepping: {s}')
     out.sort(key=lambda f: -f['mag'])
     doc = {'schema': 1, 'snapshot': staged['snapshot'], 'title': 'Track heights: where the rail as built steps', 'issue': 344,
            'lines': list(LINES), 'findings': out}
