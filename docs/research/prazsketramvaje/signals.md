@@ -68,8 +68,10 @@ panel 140×240 mm**: an estimate from the family, not a stated size. The warning
 p. 54) and the zone plate (111 by 171, panel 74 by 109, p. 56) have no size in any source read.
 
 **Numbers.** A heavy condensed black figure filling the panel's width in D 1/2's drawings ("30", "20"), a plain bold
-one on the zone plate ("40"). The photos: an orange-yellow reflective panel, white frame with a grey edge; a sign over
-a fork has its arrow on a white strip under the panel, inside the plate's outline.
+one on the zone plate ("40"). The photos show otherwise: a condensed DIN (DIN 1451 Engschrift), each figure 0.40–0.45 as
+wide as high, strokes 0.11–0.12 of the height, the pair about half the panel's height and three quarters of its width (the
+website's 10 and 30, the user's 60 of 2026-11-08). The photos also show an orange-yellow reflective panel, white frame with
+a grey edge; a sign over a fork has its arrow on a white strip under the panel, inside the plate's outline.
 
 **How they stand (photos on the speed-sign page).** Plates and triangles hang from the span wire by a clamp over the
 track, or stand on a traction pole. D 1/2 gives no height or side: "the sign on the right of the tram wire applies"
@@ -82,7 +84,7 @@ only where tram and trolleybus wires run together (§ 41).
 | SIG-V3 | *Ukončení omezené rychlosti* (end) | yellow panel with a **black diagonal** from bottom left to top right | speed up only when the **whole train** has passed | p. 53; `navest-rychlost_konec-001.gif`, photo `-002.jpg` (2016) | – | missing |
 | SIG-V4 | *Předzvěstní štít* (warning board) | **yellow triangle, point down**, white edge, black digit = the coming limit in **tens of km/h** (3 = 30); no digit = *Pomalu* follows | stands at **braking distance** before a restriction, *Pomalu* or point restriction when the speed drops by **30 km/h or more**; also where the view is poor for smaller drops | p. 54; `navest-rychlost_stit_30-001.gif`, photo `navest-rychlost_stit_20-001.jpg` (2016) | – | missing |
 | SIG-V5 | *Místo s omezenou rychlostí* (point restriction) | yellow panel with black number, a **black triangle pointing down** under it | the **front** passes the point at that speed; speed up once the front has passed | p. 54; `navest-rychlost_misto_30-001.gif`, photo `-002.jpg` (2016) | – | missing |
-| SIG-V6 | *Rychlostník* | **black** panel with a **white number** | from here a speed **above** the general one is allowed (rear past the sign first); ends with SIG-V7, another Rychlostník or restrictions. A Rychlostník for one car type applies to that type; one without a type to the rest (§ 49.17; how a type is written on the sign: no drawing, [places.md](places.md)). Inside a time-limited zone (SIG-V10) the lower of the two applies in the zone's hours. | p. 54; `navest-rychlostnik_30-001.gif` | the game's only speed board is called "rychlostník" but drawn as a restriction | differs |
+| SIG-V6 | *Rychlostník* | **black** panel with a **white number** | from here a speed **above** the general one is allowed (rear past the sign first); ends with SIG-V7, another Rychlostník or restrictions. A Rychlostník for one car type applies to that type; one without a type to the rest (§ 49.17; how a type is written on the sign: no drawing, [places.md](places.md)). Inside a time-limited zone (SIG-V10) the lower of the two applies in the zone's hours. | p. 54; `navest-rychlostnik_30-001.gif`; the user's photo of a **60** (2026-11-08): white DIN figures on black, a white frame, hung by a clamp from the span wire over the track | the game's only speed board is called "rychlostník" but drawn as a restriction | differs |
 | SIG-V7 | *Konec rychlostníku* | black panel with a **white diagonal** | end of the higher speed (front at the sign) | p. 55; `navest-rychlostnik_konec-001.gif` | – | missing |
 | SIG-V8 | *Oblouk o malém poloměru* (small radius) | yellow panel with a black lower-case **"r"** and an arrow under it; the arrow picks the curve at a fork | curve of **R < 25 m: 15 km/h** over the whole curve | p. 55; `navest-oblouk_r-001.gif`, photo `-002.jpg` (Moráň, 2004) | – | missing ([places.md](places.md) lists the curves) |
 | SIG-V9 | *Rychlost přes výhybku* (switch speed) | yellow panel with a large black **"V"** | outside depots: **10 km/h** facing this switch into its **diverging** branch | p. 55; `navest-rychlost_pres_vyhybku-001.gif`, photo `-002.jpg` | – | missing |
@@ -95,6 +97,13 @@ facing directions (§ 25.4a) and keeps 10 km/h for switches with the "V" sign; t
 older.
 
 ## Gradient signs (§ 49.9–12, p. 52–53)
+
+The user's photos of 2026-11-08, a climb of 80 ‰ and the end of a descent of 80 ‰, and D 1/2's drawings agree on the
+shape: the pentagon's point takes the half of the board it points to, its shoulders 0.56 of the height from that edge
+(photos 0.56 and 0.56, drawings 0.56 and 0.57), the white field about 5 % in from the board's edges. The figures differ:
+D 1/2 draws a red serif; the climb board has a condensed DIN (0.23 of the board high, its middle at 0.575 of the height),
+the older end board a wide rounded bold one (0.24 high, 0.45 of the board wide). The game takes the DIN, as on the speed
+signs.
 
 | ID | Sign | Look | Meaning | Game now | Status |
 |---|---|---|---|---|---|

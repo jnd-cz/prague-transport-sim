@@ -122,6 +122,8 @@ Poliklinika Barrandov (with a 30 km/h night zone, the list's Zone 30) and Krejc�
   for his car type and the others the one without a type. So OSM's note reads as a 65 for everyone and a 70 for the 14T.
   D 1/2 draws the sign only with "60" and no type; how the type is written (a strip under the panel, as the arrow; on the
   plate; a plate of its own) is not in any source read. Inferred, not seen: no separate sign kind for 65 or 70.
+- **Seen since:** the user's photo of a Rychlostník for **60** (2026-11-08): white condensed DIN figures on black, a white
+  frame, hung by a clamp from the span wire over the track.
 - **Sources read for this:** the speed-sign page (no places, no type); the Modřany line's Wikipedia page (no speeds; R04);
   the e15 article of 2019-10-31 (DPP planning up to 10 km/h more on separate track, naming Koněvova and Švehlova; "some
   signs allow 70"); Tram-fórum, 2022-08-15 (drivers: 65 is driven legally and routinely; no sign described).

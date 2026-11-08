@@ -27,8 +27,16 @@ export function signSize(sign) {
   return { w: Math.round(w * 1000) / 1000, h: Math.round(h * 1000) / 1000 };
 }
 
-// text filling a box: the drawings' heavy figures are condensed to the panel's width
-function fit(g, text, x, y, w, h, { color = BLACK, family = '"Arial Narrow", Arial, sans-serif', weight = 'bold' } = {}) {
+// The figures of the real signs are a condensed DIN (DIN 1451 Engschrift) on every photo: the user's of a 60 Rychlostník
+// and an 80 gradient board (2026-11-08), the website's 10 and 30 restrictions. D 1/2's drawings use a heavy condensed face
+// for speeds and a serif for gradients; the photos win. Bahnschrift is Windows' DIN 1451, DIN Condensed macOS'; whichever
+// is found, `fit` stretches it to the box measured on the photos.
+const FIGURES = '"Bahnschrift Condensed", "Bahnschrift SemiCondensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
+const DIGIT = 0.43;            // a figure's width over its height (photos: 0.40-0.45)
+const DIGIT_GAP = 0.08;        // the space between two figures over their height
+
+// text filling a box
+function fit(g, text, x, y, w, h, { color = BLACK, family = FIGURES, weight = '600' } = {}) {
   g.save();
   g.fillStyle = color;
   g.textAlign = 'center'; g.textBaseline = 'alphabetic';
@@ -68,9 +76,16 @@ function plate(g, x, y, w, h, panel, u) {
   return { x: x + f, y: y + f, w: w - 2 * f, h: h - 2 * f };
 }
 
+// figures of height h centred on cx, cy, as wide as the photos' (DIGIT, DIGIT_GAP)
+function figures(g, text, cx, cy, h, color) {
+  const n = String(text).length, w = (n * DIGIT + (n - 1) * DIGIT_GAP) * h;
+  fit(g, String(text), cx - w / 2, cy - h / 2, w, h, { color });
+}
+
+// a speed on a panel: the figures half the panel's height (photos: 0.45-0.50), narrower if a long number needs it
 function number(g, p, text, color = BLACK) {
-  const w = p.w * 0.84, h = Math.min(p.h * 0.62, w * 1.25);
-  fit(g, text, p.x + (p.w - w) / 2, p.y + (p.h - h) / 2, w, h, { color });
+  const n = String(text).length, h = Math.min(p.h * 0.47, p.w * 0.84 / (n * DIGIT + (n - 1) * DIGIT_GAP));
+  figures(g, text, p.x + p.w / 2, p.y + p.h / 2, h, color);
 }
 
 function triangle(g, x, y, w, h, digit, u) {
@@ -84,10 +99,13 @@ function triangle(g, x, y, w, h, digit, u) {
   if (digit !== undefined && digit !== null) fit(g, String(digit), x + w * 0.38, y + h * 0.1, w * 0.24, h * 0.56);
 }
 
+// The gradient board: a grey square, a white pentagon whose point takes the half of the height it points to: its
+// shoulders at 0.56 of the height from the point's edge (the user's photos 2026-11-08: 0.56 climbing, 0.44 from the top
+// descending; D 1/2 p. 52: 0.56, 0.43).
 function pentagon(g, x, y, w, h, up, u) {
   g.fillStyle = '#bdbdbd'; g.fillRect(x, y, w, h);
   g.strokeStyle = EDGE; g.lineWidth = Math.max(1, 0.004 * u); g.strokeRect(x, y, w, h);
-  const m = 0.016 * u, s = h * 0.42;
+  const m = 0.016 * u, s = h * 0.56;
   g.fillStyle = '#fff';
   g.beginPath();
   if (up) {
@@ -112,7 +130,8 @@ export function drawSign(g, sign, W, H) {
   if (k === 'climb' || k === 'climbEnd' || k === 'descent' || k === 'descentEnd') {
     const up = k.startsWith('climb');
     pentagon(g, x, y, w, h, up, u);
-    fit(g, String(sign.permille), x + w * 0.31, y + h * (up ? 0.42 : 0.36), w * 0.38, h * 0.25, { color: '#e01010', family: '"Times New Roman", Times, serif' });
+    // red figures 0.23 of the board high, their middle at 0.575 of it climbing and 0.47 descending (the photos)
+    figures(g, sign.permille, x + w / 2, y + h * (up ? 0.575 : 0.47), h * 0.23, '#d81e1e');
     if (k.endsWith('End')) diagonal(g, x, y, x + w, y + h, 0.016 * u, BLACK);
     return;
   }
@@ -126,8 +145,7 @@ export function drawSign(g, sign, W, H) {
     const p = { x: x + f, y: y + head, w: w - 2 * f, h: h - head - f };
     g.fillStyle = end ? WHITE : YELLOW; g.fillRect(p.x, p.y, p.w, p.h);
     g.strokeStyle = BLACK; g.lineWidth = Math.max(1, 0.003 * u); g.strokeRect(p.x, p.y, p.w, p.h);
-    const nw = p.w * 0.5, nh = p.h * 0.32;
-    fit(g, String(sign.v), p.x + (p.w - nw) / 2, p.y + (p.h - nh) / 2, nw, nh, { color: end ? '#aaa' : BLACK, family: 'Arial, sans-serif' });
+    figures(g, sign.v, p.x + p.w / 2, p.y + p.h / 2, p.h * 0.32, end ? '#aaa' : BLACK);
     if (end) diagonal(g, x, y, x + w, y + h, 0.014 * u, BLACK);
     return;
   }
@@ -168,7 +186,8 @@ export function drawSign(g, sign, W, H) {
 }
 
 // ------------------------------------------------------------------ the speed switch's LED panels (D 1/2 § 46)
-// Black boxes with white LED dots (the switch signal, the number) or yellow bars (the call signal).
+// Black boxes with white LED dots: the switch signal, the number, the entry signal. The call signal is the junctions'
+// own, drawn by src/ledPanels.js (#376).
 const SEGMENTS = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
 
 function dots(g, x0, y0, x1, y1, r, step, color) {
@@ -179,7 +198,16 @@ function dots(g, x0, y0, x1, y1, r, step, color) {
   }
 }
 
-// `panel`: {kind: 'chevron', dir: 'straight'|'left'|'right'|null, dark} | {kind: 'number', v, dark} | {kind: 'call', dir, dark}
+// The switch signal's dart, from the photos of R01 (the speed-sign page): straight 0.76 of the box's height long and 0.45
+// wide, its notch 0.26 deep and 0.20 wide; sideways 1.0 long and 0.51 wide, the notch 0.36 deep and 0.18 wide, in the
+// box's heights. `along` runs from the tail to the tip, `across` from the axis.
+const DARTS = { straight: { L: 0.76, B: 0.45, D: 0.26, N: 0.20 }, side: { L: 1.0, B: 0.51, D: 0.36, N: 0.18 } };
+function inDart(d, along, across) {
+  if (along < 0 || along > d.L || Math.abs(across) > d.B / 2 * (d.L - along) / d.L) return false;
+  return !(along < d.D && Math.abs(across) < d.N / 2 * (d.D - along) / d.D);
+}
+
+// `panel`: {kind: 'chevron', dir: 'straight'|'left'|'right'|null, dark} | {kind: 'number', v, dark}
 // | {kind: 'entry', state: 'go'|'stop'|'dark'} | {kind: 'undetermined'} (a dot, § 46.5). W x H px.
 export function drawLedPanel(g, panel, W, H) {
   const k = panel.kind;
@@ -197,16 +225,15 @@ export function drawLedPanel(g, panel, W, H) {
   if (panel.dark) return;
   const r = W * 0.012, step = W * 0.034, on = '#fffef0';
   if (k === 'chevron') {
-    // a filled arrow with a notch at its base, in LED dots (D 1/2 p. 46; the photo on the speed-sign page)
-    const shape = (u, v) => {
-      const [a, b] = panel.dir === 'right' ? [v, 1 - u] : panel.dir === 'left' ? [1 - v, u] : [u, v];   // to the "up" arrow
-      if (b < 0.12 || b > 0.88) return false;
-      const half = (b - 0.12) * 0.42, notch = Math.max(0, (b - 0.62) * 0.36);
-      return Math.abs(a - 0.5) <= half && Math.abs(a - 0.5) >= notch;
+    // a dart with a notch at its tail, in LED dots, centred in the box (D 1/2 p. 46; the photos of R01)
+    const shape = (x, y) => {   // in box heights from the middle, y down
+      if (panel.dir === 'straight') return inDart(DARTS.straight, DARTS.straight.L / 2 - y, x);
+      const along = (panel.dir === 'right' ? x : -x) + DARTS.side.L / 2;
+      return inDart(DARTS.side, along, y);
     };
     g.fillStyle = on;
     for (let y = step / 2; y < H; y += step) for (let x = step / 2; x < W; x += step) {
-      if (shape(x / W, y / H)) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+      if (shape((x - W / 2) / H, (y - H / 2) / H)) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
     }
   } else if (k === 'undetermined') {
     for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) if (i * i + j * j <= 5) { g.fillStyle = on; g.beginPath(); g.arc(W / 2 + i * step * 0.8, H / 2 + j * step * 0.8, r, 0, Math.PI * 2); g.fill(); }
@@ -217,12 +244,6 @@ export function drawLedPanel(g, panel, W, H) {
       const seg = { a: [x, y, e, y], b: [e, y, e, m], c: [e, m, e, b], d: [x, b, e, b], e: [x, m, x, b], f: [x, y, x, m], g: [x, m, e, m] };
       for (const s of SEGMENTS[d] || '') dots(g, ...seg[s], r, step * 0.7, on);
     });
-  } else if (k === 'call') {
-    const lean = { left: [[0.28, 0.14], [0.5, 0.86]], straight: [[0.5, 0.14], [0.5, 0.86]], right: [[0.72, 0.14], [0.5, 0.86]] };
-    for (const [dir, [[a, b], [c, d]]] of Object.entries(lean)) {
-      const lit = panel.dir === dir, wide = W * 0.03;
-      for (const o of [-wide, 0, wide]) dots(g, a * W + o, b * H, c * W + o, d * H, r * 1.2, step, lit ? '#ffd21a' : '#2a2a22');
-    }
   }
 }
 

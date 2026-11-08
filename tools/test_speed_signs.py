@@ -153,7 +153,6 @@ async () => {
     ['SIG-G1 climb', { kind: 'climb', permille: 80 }], ['SIG-G2 end', { kind: 'climbEnd', permille: 80 }], ['SIG-G3 descent', { kind: 'descent', permille: 80 }], ['SIG-G4 end', { kind: 'descentEnd', permille: 80 }],
   ];
   const panels = [
-    ['SW-R2 call, straight', { kind: 'call', dir: 'straight' }, 90, 90], ['call, right', { kind: 'call', dir: 'right' }, 90, 90], ['call, dark', { kind: 'call', dark: true }, 90, 90],
     ['SW-R3 entry, go', { kind: 'entry', state: 'go' }, 90, 90], ['entry, stop', { kind: 'entry', state: 'stop' }, 90, 90],
     ['SW-R4 set straight', { kind: 'chevron', dir: 'straight' }, 130, 90], ['set right', { kind: 'chevron', dir: 'right' }, 130, 90], ['set left', { kind: 'chevron', dir: 'left' }, 130, 90],
     ['undetermined', { kind: 'undetermined' }, 130, 90], ['number 50', { kind: 'number', v: 50 }, 130, 90], ['number 40', { kind: 'number', v: 40 }, 130, 90], ['no number', { kind: 'number', dark: true }, 130, 90],

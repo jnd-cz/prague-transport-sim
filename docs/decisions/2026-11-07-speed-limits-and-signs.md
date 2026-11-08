@@ -175,6 +175,12 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 
 **Size:** 200×300 mm with a 30 mm white frame, panel 140×240 mm. D 1/2 gives none; this is the same sign family on the website, and D 1/2's drawings have that shape. Estimated from the drawings: triangle 400×300 mm, zone plate 200×312 mm.
 
+**Figures and shapes from photos (the user's of 2026-11-08, the website's):** shapes and colours follow D 1/2; the figures follow the photos.
+- Every sign's figures are a condensed DIN, as on the user's 60 Rychlostník and 80 climb board and the website's 10 and 30: each 0.43 as wide as high, the pair about half the panel's height. D 1/2 draws a heavy face filling the panel, and a serif on the gradient boards.
+- The faces use Bahnschrift, Windows' DIN 1451, or the nearest condensed face elsewhere, stretched to the same box.
+- The gradient board's pentagon has its shoulders 0.56 of the height from its point's edge, as on both photos and D 1/2 p. 52. They were drawn at 0.42.
+- The speed switch's arrow is measured on the two R01 photos ([speed-switch signals](2026-11-07-speed-switch-signals.md)).
+
 **Where each stands, from data, with no coordinates in code:**
 
 | sign | when | places |
@@ -198,7 +204,7 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 ## The 65 and 70 km/h stretches
 
 See [places.md](../research/prazsketramvaje/places.md). In short:
-- **No source shows these signs.** The rule makes them a Rychlostník, white number on black.
+- **No source shows these signs.** The rule makes them a Rychlostník, white number on black. The user's photo of one for 60 (2026-11-08) shows it: white DIN figures on black, a white frame, hung from the span wire.
 - **By type:** § 49.17 allows several signs for different car types. OSM's note fits that: a 65 for all and a 70 for the 14T.
 - **How the type is written** is not in any source read. The faces draw it on a strip under the panel, as the arrow is, marked unsourced.
 - **The T3's limit** there is 65 either way, its own top speed.
