@@ -22,6 +22,7 @@ from shapely.ops import substring
 from shapely.strtree import STRtree
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
+from datadiff import canonical
 from dtmp_tracks import ROOT, load_line, write_json
 from geo import Frame
 from ipr_dtm import IprDtm
@@ -29,7 +30,7 @@ from track_context import load_context
 from track_decks import load_decks
 from track_heights import usable
 from track_terrain_fallback import ordinary_fallback
-from track_span_evidence import ARCHIVE, BRIDGED, SURVEY, SpanEvidence, from_reviews
+from track_span_evidence import ARCHIVE, BRIDGED, SURVEY, SpanEvidence, from_reviews, truth_answers
 
 
 def structure_kind(tags):
@@ -40,6 +41,14 @@ def structure_kind(tags):
     if tags.get('bridge','no')!='no' or tags.get('layer','0')!='0':
         return 'bridge'
     return None
+
+
+def place(record):
+    """A survey area by what it is and where (its class, level and outline, as tools/datadiff.py matches
+    areas): its record id is a position in a generated sidecar, renumbered by a rebuild, and the same area
+    lies in each line's sidecar it is near (#379)."""
+    ring = lambda points: canonical([[round(v,2) for v in p[:2]] for p in points],ring=True)
+    return repr((record.get('class'),record['level'],ring(record['ring']),sorted(ring(h) for h in record.get('holes',[]))))
 
 
 class Structures:
@@ -54,7 +63,7 @@ class Structures:
             if r['level']!=0 and r.get('class') in ('deck','tram','road','paved','parking'):
                 geom = Polygon([p[:2] for p in r['ring']],r.get('holes',[]))
                 if geom.is_valid and not geom.is_empty:
-                    self.paths.append({'id':r['id'],'attrs':{'review_kind':'survey_level','level':r['level']}})
+                    self.paths.append({'id':r['id'],'place':place(r),'attrs':{'review_kind':'survey_level','level':r['level']}})
                     self.geoms.append(geom)
         self.tree = STRtree(self.geoms)
         parent = list(range(len(self.paths)))
@@ -83,7 +92,8 @@ class Structures:
             osm = [i for i in ids if isinstance(i,int)]
             mosty = sorted({int(i.split(':')[1]) for i in ids if isinstance(i,str) and i.startswith('mosty3d:')})
             survey = [i for i in ids if isinstance(i,str) and not i.startswith('mosty3d:')]
-            identity = ('osm-'+str(min(osm)) if osm else 'survey-'+hashlib.sha256('|'.join(survey).encode()).hexdigest()[:12]
+            places = sorted({p['place'] for p in group if 'place' in p})
+            identity = ('osm-'+str(min(osm)) if osm else 'survey-'+hashlib.sha256('|'.join(places).encode()).hexdigest()[:12]
                         if survey else 'mosty3d-'+str(mosty[0]))
             names = sorted({p['attrs']['name'] for p in group if p['attrs'].get('name')})
             self.catalog[identity] = {'id':identity,'kind':structure_kind(group[0]['attrs']),
@@ -298,8 +308,9 @@ def queue_text(result):
     return json.dumps(result,ensure_ascii=False,separators=(',',':'))+'\n'
 
 
-def findings(result, inline=False, span_file='reports/review/track-height-spans.json'):
-    """One pin per decision; the shared span queue is loaded only once."""
+def findings(result, inline=False, span_file='reports/review/track-height-spans.json', truth=None):
+    """One pin per decision; the shared span queue is loaded only once. A decision that data/truth.json
+    (`truth`) answers carries the answer as `recorded`, where it imports: the page shows it answered (#379)."""
     spans = {s['id']:s for s in result['spans']}
     out = []
     for decision in result['decisions']:
@@ -347,6 +358,12 @@ def findings(result, inline=False, span_file='reports/review/track-height-spans.
             item['bridged'] = bridged
         item['answer_explanations'] = explanations
         item['answer_previews'] = previews
+        for a in (truth or {}).get('trackHeights',{}).get('reviewAnswers',[]):
+            if a['decision']==decision['id']:
+                answer = truth_answers({'trackHeights':{'reviewAnswers':[a]}})
+                if not from_reviews(answer,{'findings':[item]},'data/truth.json')['held']:
+                    item['recorded'] = {'v':a['answer'],'t':int(next(iter(answer['items'].values()))['t']),
+                                        'date':a['date'],'quote':a['quote'],'source':'data/truth.json'}
         if not inline:
             del item['spans']
         out.append(item)
@@ -401,12 +418,13 @@ def main():
         span_file = a.output.resolve().relative_to(ROOT.resolve()).as_posix()
     except ValueError:
         ap.error('--output must be inside the checkout so review mode can load it')
+    truth = json.loads((ROOT/'data/truth.json').read_text(encoding='utf-8'))
     if not a.input:
         # (the answers offered change with the import rules: the queue and its hash stay as they are)
         result = json.loads(a.output.read_text(encoding='utf-8'))
         if queue_text(result).encode('utf-8') != a.output.read_bytes():
             sys.exit(f'{a.output} is not as this tool writes it: rebuild with --input')
-        write_json(a.findings_output,findings(result,span_file=span_file))
+        write_json(a.findings_output,findings(result,span_file=span_file,truth=truth))
         print(f"{a.findings_output}: {len(result['decisions'])} decisions rewritten from {span_file}")
         return
     report = json.loads(a.input.read_text(encoding='utf-8'))
@@ -422,11 +440,13 @@ def main():
     a.output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(a.output,'w',encoding='utf-8',newline='\n') as f:
         f.write(queue_text(result))
-    write_json(a.findings_output,findings(result,span_file=span_file))
+    write_json(a.findings_output,findings(result,span_file=span_file,truth=truth))
     a.markdown_output.parent.mkdir(parents=True,exist_ok=True)
     with replacing(a.markdown_output,'w',encoding='utf-8') as f:
         f.write(markdown(result))
-    print(f"{len(result['decisions'])} structure decisions, {len(result['spans'])} contiguous direction spans")
+    answered = {x['decision'] for x in truth.get('trackHeights',{}).get('reviewAnswers',[])}
+    print(f"{len(result['decisions'])} structure decisions ({sum(d['id'] in answered for d in result['decisions'])} "
+          f"answered in data/truth.json), {len(result['spans'])} contiguous direction spans")
     for d in result['decisions']:
         print(json.dumps({k:v for k,v in d.items() if k!='structure'},ensure_ascii=True))
 

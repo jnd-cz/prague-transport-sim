@@ -114,6 +114,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -347,6 +354,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "I agree with the rule to follow the neighbor rail if it's close and one of them dips",
+        "source": "data/truth.json"
       }
     },
     {
@@ -558,6 +572,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "I agree with the rule to follow the neighbor rail if it's close and one of them dips",
+        "source": "data/truth.json"
       }
     },
     {
@@ -698,6 +719,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -760,6 +788,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -882,6 +917,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -998,6 +1040,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "page answer 'archive profile ok' (reports/reviews/line22.json)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -1598,6 +1647,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "follows survey surface",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "follow survey surface until bridge ends (page note, lines 9 and 17)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -2479,6 +2535,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "I agree with the rule to follow the neighbor rail if it's close and one of them dips",
+        "source": "data/truth.json"
       }
     },
     {
@@ -3823,6 +3886,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive, bridged over a dip",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "page answer 'archive, bridged over a dip' (reports/reviews/line17.json)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -4078,6 +4148,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive, bridged over a dip",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "bridge over dip, approximate the curve from adjacent valid archive track instead of straight line (page note)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -4852,6 +4929,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "follows survey surface",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "maybe I meant the gold points that seem to follow the track height from both sides",
+        "source": "data/truth.json"
       }
     },
     {
@@ -5608,6 +5692,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -5746,6 +5837,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "For the rest you can pick archive",
+        "source": "data/truth.json"
       }
     },
     {
@@ -5907,6 +6005,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "For the rest you can pick archive",
+        "source": "data/truth.json"
       }
     },
     {
@@ -5979,6 +6084,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "For the rest you can pick archive",
+        "source": "data/truth.json"
       }
     },
     {
@@ -6138,6 +6250,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "graph shows DI purple points available, follow them (page note; DI wins where it is)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -6214,6 +6333,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "For the rest you can pick archive",
+        "source": "data/truth.json"
       }
     },
     {
@@ -6539,6 +6665,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "page answer 'archive profile ok' (reports/reviews/line17.json)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -6605,6 +6738,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "page answer 'archive profile ok' (reports/reviews/line22.json)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -6763,6 +6903,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "page answer 'archive profile ok' (reports/reviews/line23.json)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -7297,6 +7444,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "I agree with the rule to follow the neighbor rail if it's close and one of them dips",
+        "source": "data/truth.json"
       }
     },
     {
@@ -7554,6 +7708,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "page answer 'archive profile ok' (reports/reviews/line23.json)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -7632,6 +7793,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -7890,6 +8058,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "For the rest you can pick archive (the dip at the end was the chart piling later points on its edge, #185)",
+        "source": "data/truth.json"
       }
     },
     {
@@ -8151,6 +8326,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     },
     {
@@ -8233,6 +8415,13 @@
             ]
           ]
         }
+      },
+      "recorded": {
+        "v": "archive profile ok",
+        "t": 1793577600000,
+        "date": "2026-11-02",
+        "quote": "if the archive looks smooth there then it should be chosen, Braník included",
+        "source": "data/truth.json"
       }
     }
   ],
