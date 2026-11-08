@@ -25,7 +25,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 RULES = r"""
 async () => {
-  const { planSigns: plan, brakingDistance, signSize, shownSize, SIGN_SCALE } = await import('/src/speedSigns.js');
+  const { planSigns: plan, brakingDistance, signSize, shownSize, SIGN_SCALE, signFacts, locateGradients, smallRadiusCurves, withArrows } = await import('/src/speedSigns.js');
   const fill = (...parts) => parts.flatMap(([v, m]) => Array(m / 5).fill(v));
   const kinds = (r) => r.map((g) => `${g.kind}${g.v ?? g.digit ?? ''}@${g.s}`);
   return {
@@ -45,6 +45,15 @@ async () => {
     descent: kinds(plan({ posted: fill([0, 900]), gradients: [{ from: 100, to: 570, permille: 80 }] })),
     braking50: brakingDistance(50), braking60: brakingDistance(60),
     plateSize: signSize({ kind: 'restriction', v: 30 }),
+    signFacts: signFacts({ operation: { lists: [
+      { id: 'dangerous-gradients', entries: [{ kind: 'dangerous-gradient', place: 'X', from: 'A', to: 'B', descending: true, gradient: 80.15, length: 100 }, { kind: 'gradient', place: 'Y', gradient: 69.9 }] },
+      { id: 'speed-switches', entries: [{ number: 'R07', straight: 50, diverging: 35, osm: { lat: 50.1, lon: 14.3 } }, { number: 'R01', straight: 50, diverging: 40 }] }] } }),
+    gradUp: locateGradients([{ from: 'A', to: 'B', descending: true, permille: 80, length: 100 }], [{ name: 'B', s: 100 }, { name: 'A', s: 400 }], (s) => (s < 200 ? 0 : s > 300 ? 8 : (s - 200) * 0.08)),
+    gradDown: locateGradients([{ from: 'A', to: 'B', descending: true, permille: 80, length: 100 }], [{ name: 'A', s: 100 }, { name: 'B', s: 400 }], (s) => (s < 200 ? 8 : s > 300 ? 0 : 8 - (s - 200) * 0.08)),
+    gradMissing: locateGradients([{ from: 'A', to: 'B', descending: true, permille: 80, length: 100 }], [{ name: 'A', s: 100 }], () => 0),
+    curves: smallRadiusCurves(100, (s) => (s >= 40 && s <= 60 ? 20 : 1e6), () => 0.1),
+    curveShort: smallRadiusCurves(100, (s) => (s >= 40 && s <= 44 ? 20 : 1e6), () => 0.1),
+    arrows: withArrows([{ kind: 'restriction', v: 10, s: 105 }, { kind: 'restriction', v: 10, s: 200 }, { kind: 'smallRadius', s: 106 }], [{ s: 100, routeDiverging: true, routeSide: 'right' }]).map((g) => g.arrow ?? null),
     shown: shownSize({ kind: 'restriction', v: 30 }), shown15: shownSize({ kind: 'restriction', v: 30 }, 1.5), scale: SIGN_SCALE,
     arrowSize: signSize({ kind: 'restriction', v: 10, arrow: 'left' }),
     backed: signSize({ kind: 'restriction', v: 30, backing: true }),
@@ -55,6 +64,7 @@ async () => {
 SPEED_RULES = r"""
 async () => {
   const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, FROG } = await import('/src/speedRules.js');
+  const { signFacts } = await import('/src/speedSigns.js');
   const { Route } = await import('/src/route.js');
   const truth = await (await fetch('/data/truth.json')).json();
   const facts = speedFacts(truth);
@@ -91,7 +101,7 @@ async () => {
       partly: placeStretches(facts.places, stops, fill([0, 30], [25, 10], [0, 20]), 5),
       uphill: placeStretches(facts.places, [{ name: 'Nad Trojou', s: 100 }, { name: 'Hercovka', s: 200 }], Array(60).fill(0), 5),
     },
-    facts, missing, FROG,
+    facts, missing, FROG, signs: signFacts(truth),
     stretches: trackworkStretches([{ s: 100 }, { s: 150, frog: 13 }], work, facts),
     noData: trackworkStretches([{ s: 100 }], undefined, facts),
     ownDropped: own(fill([50, 19], [15, 4], [50, 5]), work),
@@ -214,6 +224,14 @@ def check(r, p):
     want("braking distance from 50", r["braking50"], 140)
     want("braking distance from 60", r["braking60"], 200)
     want("the plate", r["plateSize"], {"w": 0.2, "h": 0.3})
+    want("only the listed dangerous gradients", r["signFacts"]["gradients"], [{"place": "X", "from": "A", "to": "B", "descending": True, "permille": 80, "length": 100}])
+    want("only the speed switches with a node", r["signFacts"]["speedSwitches"], [{"number": "R07", "straight": 50, "diverging": 35, "lat": 50.1, "lon": 14.3}])
+    want("a listed gradient the route climbs, where it rises most", r["gradUp"], [{"from": 200, "to": 300, "permille": 80, "up": True}])
+    want("and one it descends", r["gradDown"], [{"from": 200, "to": 300, "permille": 80, "up": False}])
+    want("a gradient whose stop is not on the route", r["gradMissing"], [])
+    want("a curve under 25 m, turning left", r["curves"], [{"from": 40, "to": 60, "side": "left"}])
+    want("a run shorter than 6 m is the estimate's noise", r["curveShort"], [])
+    want("past a diverging fork a restriction carries the branch's arrow; the r sign draws its own", r["arrows"], ["right", None, None])
     want("shown at the game's scale, 200 % for testing", [r["scale"], r["shown"]], [2, {"w": 0.4, "h": 0.6}])
     want("another scale", r["shown15"], {"w": 0.3, "h": 0.45})
     want("the plate with an arrow", r["arrowSize"], {"w": 0.2, "h": 0.35})
@@ -237,6 +255,9 @@ def check_rules(r):
     def want(name, got, expected):
         if got != expected:
             f.append(f"{name}: {got} != {expected}")
+    want("truth.json's speed switches with a node", [w["number"] for w in r["signs"]["speedSwitches"]], ["R07", "R09"])
+    want("R07 at the press release's speeds", [(w["straight"], w["diverging"]) for w in r["signs"]["speedSwitches"]][:1], [(50, 35)])
+    want("Trojská's dangerous gradient", [(g["from"], g["to"], g["descending"], g["permille"]) for g in r["signs"]["gradients"]], [("Hercovka", "Nad Trojou", True, 80)])
     want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
                                          "past": 0, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
     if "no value" not in (r["missing"] or ""):

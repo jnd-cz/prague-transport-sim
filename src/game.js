@@ -2,12 +2,15 @@
 import * as THREE from 'three';
 import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
-import { placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
+import { FROG, placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
+import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
+import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
   makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
-  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeGradientSign, disposeModel,
+  makeStopSign, makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeSpeedBoard, disposeModel,
+  makeSpeedSwitchSignal, makeSwitchNumberPlate, makeCallSignal, makeEntrySignal,
 } from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
@@ -703,7 +706,31 @@ export class Game {
     }
   }
 
+  // The speed switch (truth.json `speed-switches`, by its OSM node's lat, lon) whose node lies within 15 m of the facing
+  // switch at s, or null. R07 lies 9 m from line 9's switch (DI's and OSM's node differ), R09 on it.
+  _speedSwitchAt(s) {
+    const list = this.opts.signFacts?.speedSwitches || [], origin = this.data.frame?.origin;
+    if (!list.length || !origin) return null;
+    const p = this.route.at(s), [lat, lon] = toLatLon(p.x, p.y, origin);
+    const m = (e) => Math.hypot((e.lat - lat) * 111320, (e.lon - lon) * 111320 * Math.cos(lat * Math.PI / 180));
+    return list.find((e) => m(e) < 15) || null;
+  }
+
+  // A speed switch's elements at R01's distances (D 1/2 § 46; docs/decisions/2026-11-07-speed-switch-signals.md): the
+  // number plate 190 m before it, the call signal 160 m (dark: no registration yet), the entry sleeper signal 27 m (may
+  // enter), and the switch signal at the frog, in place of the red indicator. They and their limit stay as for any
+  // facing switch until registration is built (the later issue).
+  _initSpeedSwitch(sw) {
+    const frog = sw.frog ?? FROG, add = (obj, s, how) => { if (s < 5) return; how(obj, s); this.objects.add(obj); };
+    add(makeSwitchNumberPlate(sw.speedSwitch.number), sw.s - 190, (o, s) => this._mount(o, s, { movable: true }));
+    add(makeCallSignal(), sw.s - 160, (o, s) => this._mount(o, s, { movable: true }));
+    add(makeEntrySignal('go'), sw.s - 27, (o, s) => place(o, this.route, s, -1.1, 0, true));
+    this._mount(sw.indicator, sw.s + frog);
+    this.signBoards.push({ kind: 'speedSwitch', number: sw.speedSwitch.number, s: Math.round(sw.s) });
+  }
+
   _initSwitches() {
+    this.signBoards ||= [];
     // contacts of closely following switches keep their order and at least 4 m between them
     const contacts = [];
     this.data.switches.forEach((d, k) => {
@@ -715,11 +742,12 @@ export class Game {
     this.switches = this.data.switches.map((d, k) => {
       const required = d.routeDiverging ? 'diverging' : 'straight';
       const divSide = d.routeDiverging ? d.routeSide : (d.routeSide === 'left' ? 'right' : 'left');
+      const speedSwitch = this._speedSwitchAt(d.s);
       const sw = {
-        ...d, required, divSide,
+        ...d, required, divSide, speedSwitch,
         pos: this.rand() < 0.5 ? 'straight' : 'diverging',
         contact: contacts[k], passedContact: false, passed: false,
-        indicator: makeSwitchIndicator(), marker: makeContactMarker(),
+        indicator: speedSwitch ? makeSpeedSwitchSignal() : makeSwitchIndicator(), marker: makeContactMarker(),
       };
       // Every facing switch is worked by an overhead contact: the driver passes under it with
       // current (turn) or coasting (straight), also right after a stop, at a signal or on a
@@ -731,7 +759,8 @@ export class Game {
       const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
       this._mount(sign, sw.auto ? d.s - 40 : sw.contact);
       this.objects.add(sign);
-      place(sw.indicator, this.route, d.s - 8, -0.4, -0.26, true); // hangs from the span wire over the track
+      if (speedSwitch) this._initSpeedSwitch(sw);
+      else place(sw.indicator, this.route, d.s - 8, -0.4, -0.26, true); // hangs from the span wire over the track
       const c = this.route.at(sw.contact);
       sw.marker.position.x = c.x;
       sw.marker.position.y += this.profile.height(sw.contact);
@@ -782,35 +811,48 @@ export class Game {
     this.ircLast = dir;
   }
 
-  // Track signs: speed limits (rychlostník) where a restriction starts or ends, and
-  // dangerous gradient boards at the top of steep descents.
+  // Track signs (#364): D 1/2's speed and gradient signs where src/speedSigns.js's `planSigns` puts them, from the posted
+  // speeds, the trackwork, the curves under 25 m and the listed dangerous gradients; and a diagnostic board where a limit
+  // comes from a curve alone. Each is in `signBoards` for the debug overlay and the checks.
   _initSigns() {
-    const lim = this.limits, step = lim.step, vals = lim.values;
-    let last = -1e9, cur = vals[0];
-    for (let i = 1; i < vals.length; i++) {
-      const v = vals[i];
-      if (v === cur) continue;
-      // only changes that last at least 25 m
-      let k = i;
-      while (k < vals.length && vals[k] === v && (k - i) * step < 25) k++;
-      if ((k - i) * step < 25 && k < vals.length) continue;
-      const s = i * step - (v < cur ? 12 : 0);
-      cur = v;
-      if (s - last < 35 || s < 20) continue;
-      last = s;
-      const sign = makeSpeedSign(v);
-      this._mount(sign, s, { movable: true });
-      this.objects.add(sign);
+    this.signBoards ||= [];
+    const route = this.route, sp = route.speedInfo, top = Math.round(T3.vMax * 3.6);
+    const posted = sp?.osm || [], pstep = sp?.step ?? 5;
+    const tw = this.data.trackwork || {};
+    const trackwork = [...this.switches.map((w) => w.s), ...(tw.trailing || []).map((w) => w.s), ...(tw.crossings || [])];
+    const turnAt = (s) => { const a = route.heading(s - 1, 1), b = route.heading(s + 1, 1); return a.hx * b.hy - a.hy * b.hx; };
+    const smallRadius = smallRadiusCurves(route.length, (s) => route._radius(s), turnAt);
+    const gradients = locateGradients(this.opts.signFacts?.gradients || [], this.data.stops, (s) => this.profile.height(s));
+    const plan = withArrows(planSigns({ posted, step: pstep, top, trackwork, smallRadius, gradients }), this.switches);
+    for (const sign of plan) {
+      const board = makeSpeedBoard(sign);
+      this._mount(board, sign.s, { movable: true });
+      this.objects.add(board);
+      this.signBoards.push({ ...sign, s: Math.round(sign.s) });
     }
-    let inSteep = false;
-    for (let s = 0; s < this.route.length; s += 10) {
-      const g = this.profile.grade(s + 30);
-      if (!inSteep && g < -0.055) {
-        inSteep = true;
-        const sign = makeGradientSign(Math.round(-this.profile.grade(s + 60) * 100) || 6);
-        this._mount(sign, s, { movable: true });
-        this.objects.add(sign);
-      } else if (inSteep && g > -0.03) inSteep = false;
+    // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; the user, 2026-11-08: "keep them for now for
+    // diagnostic purposes, we can drop them later with more stable release"). Where the limit lies under both the posted
+    // speed and the restrictions for 25 m or more: the lowest at the start, 12 m before it, and the speed after it.
+    const lim = this.limits, step = lim.step, vals = lim.values;
+    const postedAt = (s) => Math.min(posted[Math.floor(s / pstep)] || 50, top);
+    const curveBin = (i) => vals[i] < Math.min(postedAt(i * step), lim.restriction(i * step + step / 2));
+    const near = (s) => plan.some((g) => g.kind === 'smallRadius' && Math.abs(g.s - s) < 40);
+    let last = -1e9;
+    for (let i = 1; i < vals.length; i++) {
+      if (!curveBin(i) || curveBin(i - 1)) continue;
+      let k = i, low = vals[i];
+      while (k < vals.length && curveBin(k)) low = Math.min(low, vals[k++]);
+      if ((k - i) * step < 25 || near(i * step)) { i = k; continue; }
+      for (const [s, v] of [[i * step - 12, low], [k * step, vals[Math.min(k, vals.length - 1)]]]) {
+        if (s - last < 35 || s < 20) continue;
+        last = s;
+        const board = makeSpeedSign(v);
+        board.userData.diagnostic = true;
+        this._mount(board, s, { movable: true });
+        this.objects.add(board);
+        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s) });
+      }
+      i = k;
     }
   }
 
