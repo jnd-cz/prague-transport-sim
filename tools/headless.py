@@ -7,6 +7,7 @@
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks canted             # rail/bed visibility
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing           # pedestrian surfaces over rails
     python -P -E tools/headless.py --lines 17 --checks heights   # top of rail against the staged heights, junctions (#197)
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks limits   # the speed limits and what sets them (#211)
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
 check and awaits it, exactly like tools/bench/batch.html. Results: one JSON per run in reports/headless/
@@ -93,8 +94,10 @@ CALLS = {
                "const { run } = await import('/tools/bench/spacing.js'); return run();",
     "heights": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
                "const { run } = await import('/tools/bench/heights.js'); return run();",
+    "limits": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
+              "const { run } = await import('/tools/bench/speedLimits.js'); return run();",
 }
-SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights"}
+SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits"}
 
 
 def judge(check, r):
@@ -159,6 +162,12 @@ def judge(check, r):
             bad.append("no assembled heights on this line")
         more = (f"path {c.get('path')}, pathBack {c.get('pathBack')}, junctions {c.get('junctions')}"
                 if c.get("assembled") else "")
+    elif check == "limits":  # (no thresholds: what the limits are, and what sets them, #211)
+        c = (r.get("checks") or {}).get("speedLimits", {})
+        more = (f"by cause {c.get('byCause')}, over 50 untagged {c.get('over50WithoutTag')} km, held at 60 {c.get('heldAt60')} km, "
+                f"curves under 25 m {len(c.get('smallRadius') or [])}, limit lifts past a switch {c.get('liftPast')}, "
+                f"held there by {c.get('heldBy')}, km at the switch's speed {c.get('km15')}, past a curve's end {c.get('curveEnd')}, "
+                f"steep stretches {len(c.get('descents') or [])}")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):

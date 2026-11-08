@@ -836,6 +836,8 @@ def main():
     for sw in switches:
         sw.pop("node", None)
     print(f"facing switches on route: {len(switches)}")
+    trackwork = geo.trackwork(route_m, route_ends, path.at)    # (the speeds of D 1/2 § 25.4-5, src/speedRules.js)
+    print(f"trailing switches on route: {len(trackwork['trailing'])}, crossings: {len(trackwork['crossings'])}")
     track_lines = geo.chains(flags, stretches, XY)
     print(f"track chains: {len(track_lines)} (from {len(drawn_edges)} edges)")
 
@@ -1207,6 +1209,7 @@ def main():
         "stops": stops,
         "timetable": timetable,
         "switches": switches,
+        "trackwork": trackwork,
         "signals": signals,
         "crossings": crossings,
         "tracks": track_lines,

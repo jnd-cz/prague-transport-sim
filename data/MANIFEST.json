@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-06r",
- "built_at_commit": "bdde969",
- "published": "2026-11-08 12:18",
- "note": "#344: the archive over a lone DI hump (line 9 Sídliště Řepy), no opposite track past a route's end (line 23 Těšnov); lines 9 17 22 23 37",
+ "built_at_commit": "d94ca94",
+ "published": "2026-11-08 14:34",
+ "note": "W2 for #211: every line rebuilt on main 9375dc4 + #211's tools; adds each facing switch's frog and the trailing switches and diamonds (trackwork); path, heights and switch positions unchanged",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -29,8 +29,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6269098,
-   "sha256": "008ba1c761862651e30b2921c6c2cd5269270f2644dd129798c3603e9497ff14"
+   "size": 6270452,
+   "sha256": "9fad5a0626afb8dd7c0564930adeefb05d6d4f7373b0712ad121d3ce0378a6f1"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -69,8 +69,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6341707,
-   "sha256": "3d4ed1eb63c765de0db95089fb8b7c49b9c3ac688efe9c447c42e489b924455d"
+   "size": 6343260,
+   "sha256": "ee72b459393d59a783dfa121984143cbf6f5ade547e6911bae9c4d0d05d367a2"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -101,8 +101,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2363794,
-   "sha256": "d6c4585459fda930329a08d4ac2c4eb629c460e7818d634212fdf0e909c23a2d"
+   "size": 2364695,
+   "sha256": "7029f1db3512cade9031f06e6fe6dec503b226673b95527e8ff435b749a6e854"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -129,8 +129,8 @@
    "sha256": "cb0a10ac26f32199caf577e8e729af1d3689a1985766bb4d7c857a7bc35ce461"
   },
   "line37.json": {
-   "size": 2161937,
-   "sha256": "5947f7b8ee34d479073c43e6d7ccd2a15d3271c18a832c4dadd3e6f095e9e403"
+   "size": 2162559,
+   "sha256": "456357b0b9898b12c87521c58094d50d5c6f7c965d74d53038e1affef014d462"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -157,8 +157,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5368313,
-   "sha256": "a862334992527eaefc65253e122858ff59fb3042cb904f7172b0e2b392274973"
+   "size": 5369974,
+   "sha256": "b3874fa5d577d86d39348a744fb6f9ef7cc48bf00841ed836a0d603fe8f7149b"
   },
   "line9.validate.json": {
    "size": 6596,

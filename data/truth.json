@@ -12,7 +12,7 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
-  "operation": "reference: #211 (switch, crossing and stop speeds) and #221 (the T3SUCS traction) are to read it; nothing reads it yet"
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past and trojska-descent; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it"
  },
  "stops": [
   {
@@ -797,6 +797,16 @@
     }
    },
    {
+    "id": "restriction-past",
+    "value": 0,
+    "unit": "m",
+    "scope": "a curve's, a switch's or a crossing's speed restriction runs this far past its end (a switch's: its frog); the rear still has to leave it (restriction-start-end)",
+    "basis": "the user",
+    "quote": "Can we discard the 2 metre rule and keep it simply right after? I realize this because the tram bogie leaves the switch sooner than the end of car so we don't need to hold safety tolerance.",
+    "source": "Claude Code session 2026-11-08 (#211, PR 362); was 2 m from the session of 2026-11-07 (\"I would keep just 2m past the end of curve, switch fork or crossing\")",
+    "date": "2026-11-08"
+   },
+   {
     "id": "point-restriction",
     "value": "front only",
     "unit": null,
@@ -1018,7 +1028,7 @@
     "value": null,
     "unit": null,
     "scope": "the \"dangerous gradient\" rules are about entering an occupied section and starting, not speed; PPS Q53 marks \"25 km/h\" wrong",
-    "basis": "operating rule",
+    "basis": "operating rule; the user dropped the game's limits on steep descents (\"Q3 drop them altogether. I found two steep descends at trojská and Barrandovský most (Hlubočepy - Geologická) and both are marked in osm with limited speed\", Claude Code session 2026-11-07, #211)",
     "source": {
      "document": "DP Praha: D 1/2 Dopravní a návěstní předpis pro tramvaje (in force 2025-09-01)",
      "year": 2025,
@@ -1044,8 +1054,12 @@
      25
     ],
     "unit": "km/h",
-    "scope": "Trojská street, Hercovka → Nad Trojou, 470 m at 80.15 ‰: stop at the signal (safety stopping place), test the parking brake, roll without power; two blocks with signals, one train per block; uphill one train in the section at full power",
-    "basis": "local rule",
+    "scope": "Trojská street, Hercovka → Nad Trojou, 470 m at 80.15 ‰: stop at the signal (safety stopping place), test the parking brake, roll without power; two blocks with signals, one train per block; uphill one train in the section at full power. In the game only where OSM tags no speed, at the highest speed named (OSM's way there says 25)",
+    "place": {
+     "from": "Hercovka",
+     "to": "Nad Trojou"
+    },
+    "basis": "local rule; the user: \"I would keep the trojská descend fact only as a backup after osm rule\" (Claude Code session 2026-11-07, #211)",
     "source": {
      "document": "prazsketramvaje.cz: Trojská (line 17 gradient)",
      "year": 2026,
@@ -1981,9 +1995,9 @@
      {"kind": "speed-switch", "number": "R04", "place": "Nádraží Braník, into the loop", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
      {"kind": "speed-switch", "number": "R05", "place": "Průběžná od Strašnické", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["22"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
      {"kind": "speed-switch", "number": "R06", "place": "Depo Hostivař od Ústředních dílen", "straight": 30, "diverging": 15, "unit": "km/h", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
-     {"kind": "speed-switch", "number": "R07", "place": "Kotlářka, into the loop", "straight": 50, "diverging": 15, "unit": "km/h", "lines": ["9"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
+     {"kind": "speed-switch", "number": "R07", "place": "Kotlářka, into the loop", "straight": 50, "diverging": 35, "unit": "km/h", "lines": ["9"], "source": "Pražská strojírna's press release of October 2023 (Technický týdeník, https://technickytydenik.cz/rubriky/denni-zpravodajstvi/v-praze-pribyla-dalsi-vysokorychlostni-vyhybka-prazska-strojirna-zrychlila-tramvaje-na-kotlarce_58880.html; also Ekonomický deník): 50 straight, 35 diverging, in service since August 2023; the user, Claude Code session 2026-11-08 (#211, PR 362): \"ok I will go with the press release\"", "register": {"straight": 50, "diverging": 15, "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"}, "check": "the diverging speed: the register's 15 against the press release's 35, to confirm (the user, 2026-11-08: \"please note this discrepancy down in our docs so we can trace it, confirm later\")", "osm": {"node": 4533725474, "ref": null, "confirmed": "the user, 2026-11-08: \"Kotlářka looks right\""}},
      {"kind": "speed-switch", "number": "R08", "place": "Lihovar od Hlubočep", "straight": 30, "diverging": 30, "unit": "km/h", "lines": [], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"},
-     {"kind": "speed-switch", "number": "R09", "place": "Podolské nábřeží od Dvorců", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262"}
+     {"kind": "speed-switch", "number": "R09", "place": "Podolské nábřeží od Dvorců", "straight": 30, "diverging": 15, "unit": "km/h", "lines": ["17"], "source": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041262", "osm": {"node": 6660333413, "ref": null, "note": "the Dvorecký most junction's northbound facing switch; OSM tags ref 802, the junction's southbound facing switch, 65 m north (node 9412314524)", "confirmed": "the user, Claude Code session 2026-11-08 (#211, PR 362): \"yes\""}}
     ]
    },
    {

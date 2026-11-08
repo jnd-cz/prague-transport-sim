@@ -111,6 +111,9 @@ export function radiusAlong(ranges, offset = 0, curved = false) {
 
 // curve speeds: comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m)
 const A_LAT = 0.8, CANT_MAX = 0.1;
+// m a curve's limit starts before the radius asks for it: the 16 m estimate reads a curve's start late (its full radius
+// about 12 m in, where the transition is short), and the limit is for the front going in
+const CURVE_AHEAD = 5;
 
 export class Route {
   // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
@@ -248,16 +251,19 @@ export class Route {
     return out;
   }
 
-  // Curve radius (m) at s, from heading change over 16 m.
+  // Curve radius (m) at s itself, from heading change over 16 m.
+  _radius(s) {
+    const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
+    const dTheta = Math.acos(Math.max(-1, Math.min(1, a.hx * b.hx + a.hy * b.hy)));
+    return dTheta > 1e-4 ? 16 / dTheta : 1e6;
+  }
+
+  // The same at the nearest 5 m, for what is read many times a frame.
   radiusAt(s) {
     if (!this.radii) {
       const n = Math.ceil(this.length / 5) + 1;
       this.radii = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const a = this.heading(i * 5 - 8, 4), b = this.heading(i * 5 + 8, 4);
-        const dTheta = Math.acos(Math.max(-1, Math.min(1, a.hx * b.hx + a.hy * b.hy)));
-        this.radii[i] = dTheta > 1e-4 ? 16 / dTheta : 1e6;
-      }
+      for (let i = 0; i < n; i++) this.radii[i] = this._radius(i * 5);
     }
     return this.radii[Math.max(0, Math.min(this.radii.length - 1, Math.round(s / 5)))];
   }
@@ -321,39 +327,50 @@ export class Route {
   // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
   rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
 
-  // speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral
-  // acceleration A_LAT plus what the cant takes, never above the posted OSM speed or the cap
-  // (50 in streets, 60 on dedicated track; the 65-70 km/h pilot stretches are capped for now)
+  // Speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral acceleration A_LAT plus what
+  // the cant takes. With full cant, the speed the track was laid out for (prepareCant): 50 in streets, 60 on dedicated
+  // track, however it is signed. Otherwise the limit: never above the posted speed, which stands for the sign, nor
+  // the car's top speed (`speedTop`), and 50 without a posted speed (`max-speed`: more needs a Rychlostník, also off the
+  // road). No curve alone asks for less than `curveFloor`: 15 km/h over the whole of a curve under 25 m
+  // (`small-radius-speed`), while the formula gave 10 at R 20.
   _designSpeed(s, r, fullCant, cant = 0) {
     const { osm, dedicated } = this._speedInfo(s);
     const a = A_LAT + (fullCant ? (dedicated ? CANT_MAX : 0) : cant) * 9.81 / 1.5;
     const v = Math.floor((Math.sqrt(a * r) * 3.6) / 5) * 5;
-    const cap = Math.min(60, osm || (dedicated ? 60 : 50));
-    return Math.max(10, Math.min(cap, v));
+    if (fullCant) return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), v));
+    const cap = osm ? Math.min(osm, this.speedTop ?? osm) : 50;
+    return Math.min(cap, Math.max(this.curveFloor ?? 10, v));
   }
 
   // speed the curve at s allows (km/h), with the cant actually built there
-  curveSpeed(s) { return this._designSpeed(s, this.radiusAt(s), false, this.cantAt(s)); }
+  curveSpeed(s) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s)); }
 
-  // Speed limits (km/h) sampled every 5 m: curves (curveSpeed) plus extra restrictions.
-  speedLimits(extra = []) {
-    const step = 5;
-    const n = Math.ceil(this.length / step) + 1;
-    const lim = new Float32Array(n).fill(50);
-    for (let i = 0; i < n; i++) lim[i] = this.curveSpeed(i * step);
-    // a curve limit applies to the whole curve: take min over a short window
-    const out = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      let v = lim[i];
-      for (let j = Math.max(0, i - 3); j <= Math.min(n - 1, i + 1); j++) v = Math.min(v, lim[j]);
-      out[i] = v;
+  // Speed limits (km/h) to the metre: the curve and the posted speed (curveSpeed), `past` metres on from where they ask
+  // for it (`restriction-past`: 15 m on until #211, from 5 m bins) and CURVE_AHEAD before, plus the extra restrictions,
+  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs).
+  speedLimits(extra = [], past = 0) {
+    const step = 5, metres = Math.ceil(this.length) + 1;
+    const curve = new Float32Array(metres);
+    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m);
+    const base = new Float32Array(metres);
+    for (let m = 0; m < metres; m++) {
+      let v = 99;
+      for (let j = Math.max(0, m - past); j <= Math.min(metres - 1, m + CURVE_AHEAD); j++) v = Math.min(v, curve[j]);
+      base[m] = v;
     }
+    const fine = new Float32Array(metres).fill(99);
     for (const e of extra) {
-      for (let s = e.from; s <= e.to; s += step) {
-        const i = Math.round(s / step);
-        if (i >= 0 && i < n) out[i] = Math.min(out[i], e.v);
-      }
+      const last = Math.min(metres - 1, Math.floor(e.to));
+      for (let m = Math.max(0, Math.floor(e.from)); m <= last; m++) fine[m] = Math.min(fine[m], e.v);
     }
-    return { step, values: out, at: (s) => out[Math.max(0, Math.min(n - 1, Math.floor(s / step)))] };
+    const values = new Float32Array(Math.ceil(this.length / step) + 1).fill(99);
+    for (let m = 0; m < metres; m++) {
+      const i = Math.floor(m / step);
+      values[i] = Math.min(values[i], base[m], fine[m]);
+    }
+    if (values[values.length - 1] === 99) values[values.length - 1] = values[values.length - 2];
+    const metre = (s) => Math.max(0, Math.min(metres - 1, Math.floor(s)));
+    const restriction = (s) => fine[metre(s)];
+    return { step, values, restriction, at: (s) => { const m = metre(s); return Math.min(base[m], fine[m]); } };
   }
 }

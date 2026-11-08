@@ -253,6 +253,32 @@ class Drawing(unittest.TestCase):
         line = dn.LineString(pts)
         self.assertEqual(g.facing(m, ends, lambda s: (lambda p: (p.x, p.y))(line.interpolate(s))), [])
 
+    def test_a_trailing_switch_from_its_straight_branch(self):
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50))
+        m = dn.Match(net, [(120, 0.4), (0, 0.4)])
+        g = dn.Drawn(net, set(net.edges), fit=False)
+        pts, ends = g.route(m)
+        line = dn.LineString(pts)
+        work = g.trackwork(m, ends, lambda s: (lambda p: (p.x, p.y))(line.interpolate(s)))
+        self.assertEqual(len(work['trailing']), 1)
+        self.assertAlmostEqual(work['trailing'][0]['s'], 70, delta=0.5)
+        self.assertFalse(work['trailing'][0]['fromDiverging'])
+        self.assertEqual(work['crossings'], [])
+
+    def test_a_facing_switch_is_not_a_trailing_one(self):
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50))
+        m = dn.Match(net, [(0, 0.4), (50, 0.4), (120, 0.4)])
+        g = dn.Drawn(net, set(net.edges), fit=False)
+        pts, ends = g.route(m)
+        line = dn.LineString(pts)
+        self.assertEqual(g.trackwork(m, ends, lambda s: (lambda p: (p.x, p.y))(line.interpolate(s)))['trailing'], [])
+
+    def test_the_frog_lies_where_the_other_leg_is_one_gauge_off(self):
+        leg = dn.LineString([(0, 0), (40, 4)])        # parts at 1 in 10: 1.435 m at about 14.4 m along
+        self.assertAlmostEqual(dn._frog(leg, lambda d: (d, 0.0)), 14.5, delta=0.5)
+        self.assertIsNone(dn._frog(dn.LineString([(0, 0), (1, 5)]), lambda d: (d, 0.0)))    # parts at once: under 5 m
+        self.assertIsNone(dn._frog(dn.LineString([(0, 0), (100, 0)]), lambda d: (d, 0.0)))   # never parts within 25 m
+
     def test_two_legs_of_a_switch_drawn_without_its_toe_are_two_chains(self):
         # (joined through the fork they made a V: the track ran back on itself)
         net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50))

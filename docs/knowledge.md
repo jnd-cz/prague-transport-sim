@@ -334,8 +334,13 @@ Review these when realism matters; most move into the build in M2.
   from the approach road, the terrain re-covered over it.
 - **Trees** ≥ 3.2 m from a track, crowns ≥ 1.9 m; **LOD2 buildings** within 2.5 m of the route lifted to
   track + 6.3 m (passages like Letenská).
-- **Speed limits** from curvature, posted OSM speeds and switches; stop zone −20…+12 m; adhesion dry
-  0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
+- **Speed limits** (#211, [the decision](decisions/2026-11-07-speed-limits-and-signs.md)): 50 unless OSM
+  posts another (up to the T3's 65), 15 from a facing switch's blades to its frog, and a curve's from
+  the radius at each metre, from 5 m before it to its end (`restriction-past`: 0 m, the user: the bogie leaves the
+  switch before the car's end, so no margin). The rear still has to leave each restriction. The radius is read over
+  16 m of heading, which smears a sharp curve's end by about 12 m each way; most curves here have transitions, so the
+  limit climbs along them.
+- Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
   arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.

@@ -1,7 +1,8 @@
 // Gameplay: timetable, stops & passengers, doors, signals, switches, obstacles, scoring.
 import * as THREE from 'three';
-import { ADHESION, PANTO_FROM_FRONT, tramClearance } from './tram.js';
+import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
+import { placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
@@ -114,14 +115,15 @@ export class Game {
     this._initSwitches();
     this._initObstacles();
     this._initAdhesion();
-    // restrictions: switches, and steep descents (Prague limits trams on long steep gradients)
-    const extra = this.switches.map((w) => ({ from: w.s - 4, to: w.s + 14, v: w.routeDiverging ? 15 : 30 }));
-    for (let s = 0; s < route.length; s += 10) {
-      const g = this.profile.grade(s);
-      if (g < -0.06) extra.push({ from: s - 10, to: s + 10, v: 25 });
-      else if (g < -0.045) extra.push({ from: s - 10, to: s + 10, v: 35 });
-    }
-    this.limits = route.speedLimits(extra);
+    // restrictions: switches and crossings (D 1/2 § 25.4-5), and a local rule where OSM tags no speed. A slope itself sets
+    // none (`gradient-no-speed`; the user, 2026-11-07: the steep descents are tagged in OSM)
+    const facts = opts.speedFacts, trackwork = data.trackwork || null;
+    route.speedTop = T3.vMax * 3.6;
+    route.curveFloor = facts.smallRadius;
+    if (data.speed) route.speedInfo = { ...data.speed, osm: withoutOwnPieces(data.speed.osm, data.speed.step, this.switches, trackwork, facts) };
+    const extra = [...trackworkStretches(this.switches, trackwork, facts),
+                   ...placeStretches(facts.places, data.stops, data.speed?.osm, data.speed?.step ?? 5)];
+    this.limits = route.speedLimits(extra, facts.past);
     this._initSigns();
     this.aiTrams = []; // same-direction trams ahead, kept up to date by the traffic module
 
@@ -943,9 +945,10 @@ export class Game {
   }
 
   get currentLimit() {
-    // the whole tram length must respect a restriction
+    // the whole tram length must respect a restriction (metre by metre, as the limits are: 5 m steps could step over a
+    // curve's lowest few metres, and did so differently at each position of the tram)
     let v = 99;
-    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 5) v = Math.min(v, this.limits.at(s));
+    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 1) v = Math.min(v, this.limits.at(s));
     return v;
   }
 
@@ -954,7 +957,7 @@ export class Game {
   nextLimitChange() {
     const cur = this.currentLimit;
     let best = null, bestNeed = Infinity;
-    for (let d = 5; d < 300; d += 5) {
+    for (let d = 1; d < 300; d += 1) {
       const v = this.limits.at(this.tram.s + d);
       if (v >= cur) continue;
       const need = Math.sqrt((v / 3.6) ** 2 + 2 * 0.7 * d); // speed allowed now to make it

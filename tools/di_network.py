@@ -1313,6 +1313,20 @@ EXTEND = 40.0       # m: a corridor way is matched lengthened this far along OSM
 CONTINUE = 30.0     # degrees: OSM's track continues a way within this
 ALT_LOOK = 14.0     # m along a switch's other leg for the point the game shows it by (`alt`)
 SWITCH_GAP = 3.0    # m: a facing switch this near the one before is the same place (two forks of one crossover)
+GAUGE = 1.435       # m: the frog lies where the other leg's centre line is this far off: the two inner rails meet there
+FROG_RANGE = (5.0, 25.0)   # m past the fork. Outside it the legs were not read as parting there: a shared stretch, or a
+                           # section drawn with its fork at the joint (0.5 m, 46 m and 56 m among line 17's and 37's), #211
+
+
+def _frog(leg, on_route):
+    """How far along the route from a fork its other leg (a LineString) lies one gauge off, to 0.5 m, or None outside
+    FROG_RANGE: the game takes the measured median then. `on_route(d)` is the route's point d m past the fork."""
+    for k in range(1, int(FROG_RANGE[1] * 2) + 1):
+        d = k * 0.5
+        x, y = on_route(d)
+        if leg.distance(Point(x, y)) >= GAUGE:
+            return d if d >= FROG_RANGE[0] else None
+    return None
 
 
 def load_network():
@@ -1593,10 +1607,54 @@ class Drawn:
                                                                   ((math.hypot(*u) * math.hypot(*v)) or 1)))))
             cr = d_in[0] * v_route[1] - d_in[1] * v_route[0]
             ca = d_in[0] * v_alt[1] - d_in[1] * v_alt[0]
-            out.append({'s': round(s, 1), 'routeDiverging': ang(d_in, v_route) > ang(d_in, v_alt),
-                        'routeSide': 'left' if cr > ca else 'right', 'alt': [round(tgt.x, 1), round(tgt.y, 1)],
-                        'node': net.edges[p[0]]['b'] if p[1] > 0 else net.edges[p[0]]['a']})
+            w = {'s': round(s, 1), 'routeDiverging': ang(d_in, v_route) > ang(d_in, v_alt),
+                 'routeSide': 'left' if cr > ca else 'right', 'alt': [round(tgt.x, 1), round(tgt.y, 1)],
+                 'node': net.edges[p[0]]['b'] if p[1] > 0 else net.edges[p[0]]['a']}
+            frog = _frog(line, lambda d, s=s: at_s(s + d))
+            if frog is not None:
+                w['frog'] = frog
+            out.append(w)
         return out
+
+    def trackwork(self, match, ends, at_s):
+        """What else the route passes that D 1/2 § 25.4-5 slows: {'trailing': [{'s', 'fromDiverging', 'frog'?}], 'crossings':
+        [s]}. A trailing switch: a node where the route could have come by another end; a crossing: DI's crossing node."""
+        net, trailing, crossings = self.net, [], []
+        pieces = match.pieces
+        for i in range(len(pieces) - 1):
+            p, q = pieces[i], pieces[i + 1]
+            if p[0] == 'off' or q[0] == 'off':
+                continue
+            x = (p[0], 1 if p[1] > 0 else 0)
+            y = (q[0], 0 if q[1] > 0 else 1)
+            s = ends[i]
+            node = net.edges[p[0]]['b'] if p[1] > 0 else net.edges[p[0]]['a']
+            if net.nodes[node]['kind'] == 'crossing':
+                if not crossings or s - crossings[-1] >= SWITCH_GAP:
+                    crossings.append(round(s, 1))
+                continue
+            alts = [z for z in net.passes.get(y, ()) if z != x]
+            if not alts or len(net.passes.get(x, ())) > 1:    # (none: no other way in; several: a facing switch too)
+                continue
+            if trailing and s - trailing[-1]['s'] < SWITCH_GAP:
+                continue
+            here = at_s(s)
+            on = _unit((at_s(s + 2.0)[0] - here[0], at_s(s + 2.0)[1] - here[1]))
+            back = at_s(max(0.0, s - ALT_LOOK))
+            v_route = (back[0] - here[0], back[1] - here[1])
+            z = alts[0]
+            line = LineString(self.pts.get(z[0]) or list(net.edges[z[0]]['line'].coords))
+            tgt = line.interpolate(min(ALT_LOOK, line.length) if z[1] == 0 else max(0.0, line.length - ALT_LOOK))
+            v_alt = (tgt.x - here[0], tgt.y - here[1])
+            # (each leg against the way on: 1 = in line, the more in line is the straight branch)
+            in_route = -(on[0] * v_route[0] + on[1] * v_route[1]) / (math.hypot(*v_route) or 1)
+            in_alt = -(on[0] * v_alt[0] + on[1] * v_alt[1]) / (math.hypot(*v_alt) or 1)
+            w = {'s': round(s, 1), 'fromDiverging': in_route < in_alt}
+            frog = _frog(line, lambda d, s=s: at_s(max(0.0, s - d)))
+            if frog is not None:
+                w['frog'] = frog
+            trailing.append(w)
+        return {'trailing': trailing, 'crossings': crossings}
 
     def chains(self, flags, spans=None, xy=3):
         """The drawn edges merged into chains through nodes where exactly two drawn edges meet with the same
