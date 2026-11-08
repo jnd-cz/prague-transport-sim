@@ -21,7 +21,6 @@ import json
 import os
 import re
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -161,7 +160,9 @@ def build(root=ROOT, github=True):
     # (no file to delete once its issue is closed: it only leaves the directory, and review mode still shows it)
     ss = [s for s in ss if not ("ids" in s and (s["waitsForInfo"] or {}).get("state") == "CLOSED")]
     commit = board.git("rev-parse", "--short", "HEAD", cwd=root)
-    return {"built": time.strftime("%Y-%m-%d %H:%M"), "commit": commit, "repo": "jnd-cz/prague-transport-sim",
+    # (no build time: an unchanged tree builds the same index, so a deploy uploads it only when it changed; the
+    # page takes the deploy's time from version.json, #386)
+    return {"commit": commit, "repo": "jnd-cz/prague-transport-sim",
             "lines": known_lines, "sets": ss, "questions": questions() if github else []}
 
 
