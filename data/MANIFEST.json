@@ -1,12 +1,12 @@
 {
  "snapshot": "2026-11-06c",
- "built_at_commit": "2fd10b6",
- "published": "2026-11-08 07:50",
- "note": "#358: heights at their true place, wh3 smoother, 500 m floor with the user's answers, Královka and Malovanka on the ground (250 m), interlaced DI ends (#368); lines 9 17 22 23 37",
+ "built_at_commit": "ffef252",
+ "published": "2026-11-08 10:53",
+ "note": "#368: interlaced switches as a Y, Čechovo náměstí's fork smoothed, reverse curves in steppedCurves; lines 9 17 22 23 37",
  "files": {
   "line17.bld.bin": {
-   "size": 6348546,
-   "sha256": "a1029f73d31ab3e1823de3726ff55c42ae7caff1c09525cd47ab7b8fbfc7b8e4"
+   "size": 6348366,
+   "sha256": "b33500c7df2e7c109eb57100bdd4f2f3e98bc596e279da35bd62984346924428"
   },
   "line17.dtm.json": {
    "size": 9335366,
@@ -25,12 +25,12 @@
    "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
-   "size": 231744,
-   "sha256": "a6f40dd7ee2a0a7c038b6a3ecef1ed00b3f4202930ec0e3dcd21d7ce039194ca"
+   "size": 231588,
+   "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6269086,
-   "sha256": "7b789d8b883b5896ce1ea89649691017b055b89b8c78282d310b3723c25767f8"
+   "size": 6269101,
+   "sha256": "881fe5fcc684bd801789a17abceada007bf8b54cb3fb10d09e6987a8df396aec"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -69,12 +69,12 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6341745,
-   "sha256": "aa4709aba2a3b2bce1df209dade778b05ddcab248ebf3949cabfcee6232af78e"
+   "size": 6341747,
+   "sha256": "58df1117afef73f2525d69473fb97cde8c0bd828f392e195378fec5692a64daa"
   },
   "line22.validate.json": {
    "size": 4761,
-   "sha256": "1ed812adf7ed9be48dd20669573c36abd729ea13f37c8f9e39b846237da83444"
+   "sha256": "fc9bb5a12227d434c780e9d49d3d2262f2830419017ad707bc2c86e997431dc5"
   },
   "line22.zps.json": {
    "size": 7095539,
@@ -101,16 +101,16 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2363870,
-   "sha256": "314aa443aecc5ab99512ad0ef4732853cd8e7abb14b675dbdab7f6e0d30a77dc"
+   "size": 2363850,
+   "sha256": "b3fe5f7eb34a902323fa61f8a39b77f3a6fd57ffb0fd32b6f2a3a9c1f5cabe04"
   },
   "line23.validate.json": {
    "size": 2170,
    "sha256": "f2c55a0abde05a0d187d781a66768181620d83a45caf752bd2afab87362b61ed"
   },
   "line37.bld.bin": {
-   "size": 3172176,
-   "sha256": "fce767cb67e01fa222d28e7bd40dc7be3b213a7b77f4931a39c310b72ccdda97"
+   "size": 3170628,
+   "sha256": "7e78b231bef0f7814653fe5ccb6a7bd5d3d32d6e8cae51d622e9fce02d6768a4"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -125,16 +125,16 @@
    "sha256": "741187d7f7f486c1faa015846e99737b41be57b0751b1589f0522b1dd18bbfd7"
   },
   "line37.geo.json": {
-   "size": 175539,
-   "sha256": "5b382d45402a8fedff3ec653b16095874515faf411ec688e84b03a2f85be98e4"
+   "size": 175567,
+   "sha256": "cb0a10ac26f32199caf577e8e729af1d3689a1985766bb4d7c857a7bc35ce461"
   },
   "line37.json": {
-   "size": 2161951,
-   "sha256": "c86b9ca27fff518a7b9b931978bb7e29ea613cab10ec9e6e1c61162d1fbc9593"
+   "size": 2161943,
+   "sha256": "86b775a44cef6e2e84749c3e4038c1eb3237fe41f8f1a3d8ee261a175965a224"
   },
   "line37.validate.json": {
    "size": 2514,
-   "sha256": "9b87731ab6e371f67078c2d50b60f25c60229507f8e46bf6c1d38c8397464d12"
+   "sha256": "13b9285cd5f16cecc01f2334969687e8ac553021ef2e08bebac146629be5f028"
   },
   "line9.bld.bin": {
    "size": 10029834,
@@ -157,8 +157,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5368207,
-   "sha256": "f363cf719f9e01dd9d108fd0d5a5342df58ce9c475cae89f4deb2984d1b47593"
+   "size": 5368226,
+   "sha256": "9afed74c4572d51484da14e9325aeb71bcc40d89287a1d5ca35a2e26ea96820c"
   },
   "line9.validate.json": {
    "size": 6596,

@@ -167,6 +167,15 @@ What sessions learned and later work needs. Kept current and short; the full log
   copies of the branch's (two records between the same two places, within 20 cm) and line 37 ran the branch for 35 m:
   the user's "sideways jolts" (2026-11-07). 14 such places in the network, 6 on the lines. `di_tracks._meetings`: an end
   whose track goes on in line does not meet an end beside that track, nor two joints side by side.
+- **An interlaced switch splays both tracks** (#368, 2026-11-08): unlike a classic switch's straight track, neither
+  leaving track continues the approach (the user, on a street-view photo of Čechův most). DI agrees: 7 m past the tip
+  the two tracks lie +4.7 and -8.7 cm off the approach's axis (rms 0.3 cm along it), and DI draws those first 4.6-10 m
+  as one straight from the tip (the 18 tips of the network). Fitted as a straight track and a branch, the branch left
+  along the through track's tilt and bent 1.2 degrees over 2 m. `track_curve` `approach`: the approach is fitted first,
+  both tracks leave along it, the tongue chord's interpolated points are no data.
+- **A track end walked back to its node keeps DI's record end** 1.8-2.3 m from the node (`Drawn`, `walk`): it is no
+  node and an answer that frees the points around it frees it too (Čechovo náměstí: held, it hooked line 22's track
+  3.5 cm in the last 0.76 m before the fork, 3.4 degrees).
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
