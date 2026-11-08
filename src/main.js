@@ -159,7 +159,12 @@ const debugOverlay = createDebugOverlay(scene);
 const sky = new THREE.Color('#b9cfe0');
 scene.background = sky;
 scene.fog = new THREE.Fog(sky, 180, 950);
-const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 1600);
+// The cab view's field of view, and the held zoom key's (G, #382): 3x is what brings a sign at SIGN_SCALE 2 to readable
+// figures (8 px at 1080p) 75 m ahead, as an eye reads the real ones (docs/decisions/2026-11-07-speed-limits-and-signs.md,
+// the size experiment).
+const CAB_FOV = 62, ZOOM = 3;
+const zoomFov = (z) => (2 * Math.atan(Math.tan((CAB_FOV / 2) * Math.PI / 180) / z) * 180) / Math.PI;
+const camera = new THREE.PerspectiveCamera(CAB_FOV, 1, 0.3, 1600);
 const hemi = new THREE.HemisphereLight(0xdfe9f5, 0x6b6a5c, 1.6);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1dc, 1.6);
@@ -413,6 +418,7 @@ async function start() {
   await figureFont;   // after audio.start: the click's activation unlocks the audio
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
+  zoom = zoomTarget = 1;
   tram.eq.mode = controlMode();
   const kind = modelKind(), have = kind === 'classic' && !classicReady() ? 'hybrid' : kind || 'simple';
   if (tramModel.userData.cars.length !== cars || tramModel.userData.kind !== have) {
@@ -554,6 +560,7 @@ $('btnToMenu').addEventListener('click', () => {
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
+let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished || !$('menu').classList.contains('hidden') || reporter.isOpen) return;
   const k = e.key.toLowerCase();
@@ -582,6 +589,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'y') input.switchBtn = true;  // "Výhybka" button: current through the contact
   if (['arrowup', 'arrowdown', ' '].includes(k)) e.preventDefault();
   if (k === 'p' || k === 'escape') { game.paused = !game.paused; return; }
+  if (k === 'g') { zoomTarget = ZOOM; return; }   // held: look closer (also while paused, to read a sign)
   if (game.paused) return;
   if (e.repeat && k !== 'w' && k !== 's' && k !== 'arrowup' && k !== 'arrowdown') return;
   const prev = command();
@@ -612,6 +620,8 @@ window.addEventListener('keydown', (e) => {
   }
   if (command() !== prev) audio.click(0.12, 1600);
 });
+// a held key whose keyup never comes (the window lost focus) lets the view go back
+window.addEventListener('blur', () => { zoomTarget = 1; });
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') input.deadman = false;
   const ku = e.key.toLowerCase();
@@ -619,6 +629,7 @@ window.addEventListener('keyup', (e) => {
   if (ku === 'c') input.cutout = false;
   if (ku === 'y') input.switchBtn = false;
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
+  if (ku === 'g') zoomTarget = 1;
   if (e.key === ' ' && command() === -6) setStep(-5); // (the emergency stop let go: brake step 5)
   if ((ku === 'w' || ku === 'arrowup' || ku === 's' || ku === 'arrowdown') && pedalKey) pedalKey = null;
 });
@@ -703,6 +714,11 @@ function updateCamera(dt, t) {
   placeTram(s);
   if (window.freeCam) { tramModel.visible = true; return; } // debugging: camera set from the console
   tramModel.visible = chase;
+  // the zoom is the cab view's: eased over about 0.2 s, and none outside
+  zoom += ((chase ? 1 : zoomTarget) - zoom) * Math.min(1, dt * 12);
+  if (Math.abs(zoom - 1) < 1e-3 && zoomTarget === 1) zoom = 1;
+  const fov = zoomFov(zoom);
+  if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (chase) {
     // behind and above the tram body (works also at the very start of the route)
     // (around the point 10 m ahead of the front: by default behind and above the set, as before)

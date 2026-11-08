@@ -1,4 +1,5 @@
-"""tools/frametime.py: the bench runs for a model and reports what it measured (headless, a few frames).
+"""tools/frametime.py: the bench runs for a model and reports what it measured (headless, a few frames), also at the
+zoom key's narrower field (#382).
 
 Usage: python -P -E tools/test_frametime.py [--line 17]
 
@@ -24,9 +25,14 @@ def main():
         return
     faulthandler.dump_traceback_later(900, exit=True)  # the whole test: page.evaluate has no time limit
     rows = measure(args.line, ["detailed", "simple"], frames=10, headless=True, warm=5)
+    zoomed = measure(args.line, ["simple"], frames=10, headless=True, warm=5, fovs=[22.75])[0]
     faulthandler.cancel_dump_traceback_later()
     fails = []
     hy, simple = rows
+    if simple["fov"] != 62 or zoomed["fov"] != 22.75:
+        fails.append(f"the fields measured: {simple['fov']}, {zoomed['fov']}")
+    if not zoomed.get("calls") or zoomed["calls"] > simple["calls"]:
+        fails.append(f"a narrower field draws no more: {zoomed.get('calls')} calls zoomed, {simple['calls']} not")
     if hy["kind"] != "hybrid" or simple["kind"] != "simple":
         fails.append(f"the models drawn: {hy['kind']}, {simple['kind']}")
     if [s["level"] for s in hy["sets"]] != ["full", "light", "light"]:
@@ -36,7 +42,8 @@ def main():
             fails.append(f"{r['model']}: {r}")
     if fails:
         sys.exit("; ".join(fails))
-    print("frame-time bench: runs per model, the sets' levels, draw calls and triangles reported: pass")
+    print(f"frame-time bench: runs per model, the sets' levels, draw calls and triangles reported; zoomed {zoomed['calls']} calls"
+          f" against {simple['calls']}: pass")
 
 
 if __name__ == "__main__":
