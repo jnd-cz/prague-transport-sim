@@ -50,13 +50,13 @@ export class Autopilot {
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
     const gradeHere = g.profile.grade(tr.s - 7);
-    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold once a downhill has taken its share, on dry rail
-    // only past 96 ‰: down Chotkova's 55 ‰ the half of 0.15's grip planned 0.74 m/s² where the grip held 0.56 after the slope's pull,
-    // and it came into the 20 km/h at 35, line 23 seed 2 in autumn)
+    // (and less on a slippery rail, as a driver knows it: half of what wet leaves hold, less the whole of a downhill's pull, which is
+    // sure where the grip is not; on dry rail step 5 binds first: down Chotkova's 55 ‰ the half of 0.15's grip planned 0.74 m/s² where
+    // the grip held 0.56 after the slope's pull, and it came into the 20 km/h at 35, line 23 seed 2 in autumn)
     const mu = g.muBase ?? 0.3;
     // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
-    const planAt = (grade) => Math.max(0.2, Math.min(PLAN_DECEL, 0.5 * 9.81 * (mu + Math.min(0, grade)),
+    const planAt = (grade) => Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + Math.min(0, grade)),
       0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere);
     // (to a lower limit as to a point, the steepest downhill on the way counts: planned on the 23 ‰ where it began braking, it met 59 ‰,
