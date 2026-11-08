@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
-import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
+import { drawSign, shownSize } from './speedSigns.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -907,80 +907,6 @@ export function makeSpeedBoard(sign) {
   // the warning triangle's corners are clear
   if (face.kind === 'warning') g.children[1].material.alphaTest = 0.5;
   g.userData.sign = face;
-  return g;
-}
-
-// ------------------------------------------------------------------ the speed switch's elements (D 1/2 § 46, #365)
-// Along the track at R01's distances (docs/decisions/2026-11-07-speed-switch-signals.md): the number plate (the radio
-// receiver's place), the call signal, the entry sleeper signal, and at the frog the switch signal over its number box.
-
-// "R 07": white on black, landscape as D 1/2 p. 45 draws it, 400 x 300 mm estimated, SIGN_SCALE times as the speed signs
-export function makeSwitchNumberPlate(number) {
-  const text = String(number).replace(/^R(\d)/, 'R $1');
-  const w = 0.4 * SIGN_SCALE, h = 0.3 * SIGN_SCALE;
-  const tex = cached('rplate' + text, () => canvasTexture(256, 192, (g, W, H) => drawNumberPlate(g, text, W, H)));
-  return signOnPole(tex, w, h, 2.6 + h / 2);
-}
-
-// the call signal on its own pole: the junctions' box, dark until a request is registered (registration: the later issue)
-export function makeCallSignal() {
-  const g = new THREE.Group(), top = 3.6;
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, top + 0.25, 8), lambert(0xa9adb0));
-  pole.position.y = (top + 0.25) / 2;
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.18), lambert(0x0e0e0e));
-  box.position.set(0, top, 0.1);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.38), new THREE.MeshBasicMaterial({ map: callTexture('none') }));
-  face.position.set(0, top, 0.195);
-  g.add(pole, box, face);
-  g.userData.pole = pole;
-  g.userData.boardTop = top + 0.21;
-  return g;
-}
-
-// the entry sleeper signal: a round black disc low beside the rail, a white vertical bar (may enter) or horizontal one
-const entryTex = {};
-export function makeEntrySignal(state = 'go') {
-  entryTex[state] ||= keptTexture(128, 128, (g, w, h) => drawLedPanel(g, { kind: 'entry', state }, w, h));
-  const g = new THREE.Group();
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 6), lambert(0x333333));
-  post.position.y = 0.175;
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.15, 24), new THREE.MeshBasicMaterial({ map: entryTex[state], alphaTest: 0.5 }));
-  disc.position.set(0, 0.5, 0.03);
-  const back = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.05, 24), lambert(0x161616));
-  back.rotation.x = Math.PI / 2; back.position.set(0, 0.5, 0);
-  g.add(post, back, disc);
-  return g;
-}
-
-// The switch signal: two boxes with cut corners on a pole bracket about 5 m up, the white LED dart above (the set way;
-// blinking while locked) and the number box below. The number stays dark here: without registration the switch is
-// passed as a lockable one, 15 km/h (D 1/2 § 30.4; registration and the number are the later issue). Same API as
-// makeSwitchIndicator: userData.set(dir, blinkOff).
-const dartTex = {};
-function dartTexture(dir) {
-  return (dartTex[dir] ||= keptTexture(216, 150, (g, w, h) => drawLedPanel(g, dir === 'off' ? { kind: 'chevron', dark: true } : { kind: 'chevron', dir }, w, h)));
-}
-let numberDarkTex = null;
-export function makeSpeedSwitchSignal() {
-  const g = new THREE.Group(), y = 5.0;
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, y + 0.5, 8), lambert(0xa9adb0));
-  pole.position.y = (y + 0.5) / 2;
-  const mat = new THREE.MeshBasicMaterial({ map: dartTexture('straight'), alphaTest: 0.5 });
-  numberDarkTex ||= keptTexture(216, 150, (c, w, h) => drawLedPanel(c, { kind: 'number', dark: true }, w, h));
-  for (const [dy, m] of [[0.25, mat], [-0.25, new THREE.MeshBasicMaterial({ map: numberDarkTex, alphaTest: 0.5 })]]) {
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.4, 0.16), lambert(0x111111));
-    box.position.set(0, y + dy, 0.12);
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.42), m);
-    face.position.set(0, y + dy, 0.205);
-    g.add(box, face);
-  }
-  g.add(pole);
-  g.userData.pole = pole;
-  g.userData.boardTop = y + 0.46;
-  g.userData.set = (dir, blinkOff = false) => {
-    const tex = dartTexture(blinkOff ? 'off' : dir);
-    if (mat.map !== tex) { mat.map = tex; mat.needsUpdate = true; }
-  };
   return g;
 }
 

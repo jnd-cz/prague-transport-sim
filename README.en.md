@@ -110,9 +110,6 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   signal. Trailing switches (where tracks join) need nothing; diamond crossings are not switches.
 - The red LED signal before each switch shows the blade position (an arrow left or right, a vertical bar for
   straight) and blinks while the switch is locked. If you got it wrong, stop and use the switch iron (X).
-- The speed switches R07 (Kotlářka, line 9) and R09 (Podolské nábřeží, line 17) have their own signals: the
-  number plate, the call signal, the entry sleeper signal and the white LED arrow over the number. Without
-  registration the number stays dark and the switch is passed like any other, at 15 km/h.
 
 ### Signals
 

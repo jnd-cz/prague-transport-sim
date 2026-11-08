@@ -107,9 +107,6 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   Sjezdové výhybky (pojížděné po hrotech, kde se koleje spojují) nic nepotřebují; kolejová křížení nejsou výhybky.
 - Červené LED návěstidlo před každou výhybkou ukazuje postavení jazyků (šipka vlevo či vpravo, svislý pruh rovně)
   a bliká, když je výhybka uzamčená. Když to nevyjde, zastavte a použijte stavěcí klíč (X).
-- Rychlostní výhybky R07 (Kotlářka, linka 9) a R09 (Podolské nábřeží, linka 17) mají svá návěstidla: číselnou
-  tabulku, výzvové návěstidlo, vjezdové pražcové návěstidlo a bílou LED šipku nad číslem. Bez přihlášení číslo
-  nesvítí a výhybka se projíždí jako ostatní, 15 km/h.
 
 ### Návěstidla
 
