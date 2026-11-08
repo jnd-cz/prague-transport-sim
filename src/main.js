@@ -409,8 +409,8 @@ $('btnStart').addEventListener('click', start);
 
 async function start() {
   if ($('optModel').value === 'classic') await loadClassic();
-  await figureFont;
   audio.start();
+  await figureFont;   // after audio.start: the click's activation unlocks the audio
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   tram.eq.mode = controlMode();
