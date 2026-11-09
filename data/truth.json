@@ -12,7 +12,7 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; tools/track_loops.py reads not-loops; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it"
  },
@@ -915,6 +915,23 @@
      "source": "Claude Code session 2026-11-09 (#211): where a loop is, by rule (tools/track_loops.py)",
      "quote": "I would like to make rule instead of declarative list, it's loop at the end of gtfs route, or any loop where two track diverge and come back together with larger than 180 degree turn, that's for double track loop (Sídliště Petřiny). There are side loops like Dvorce or Hlubočepy which are not used by regular service but still need the limit. Not drivable today but should be in the future. Try the rules or adjust to catch all obvious loops."
     }
+   },
+   {
+    "id": "not-loops",
+    "value": [
+     {
+      "place": "Chotkovy sady",
+      "lat": 50.097075,
+      "lon": 14.408949,
+      "radius": 60,
+      "why": "DI draws a teardrop here whose ends meet the junction above it, at one level; it is no loop"
+     }
+    ],
+    "unit": "m",
+    "scope": "places where DI's track passes the loop rule but is no turning loop: tools/track_loops.py leaves out a path that comes within `radius` of one",
+    "basis": "the user",
+    "quote": "all real loops except Chotkovy sady. The curve is about 180 but tracks don't come back to join themselves anywhere.",
+    "source": "Claude Code session 2026-11-09 (#211), on the 47 loops the rule found"
    },
    {
     "id": "switch-v-sign-speed",

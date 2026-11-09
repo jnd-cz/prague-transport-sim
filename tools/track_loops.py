@@ -12,12 +12,14 @@ are side loops like Dvorce or Hlubočepy which are not used by regular service b
 the loop) to a switch left by its toe (the switch out of it; the same one for a balloon) that:
 - turns TURN or more from the heading in to the heading out: the street's tracks run back, 180° give or take their own
   bends. (From the switch's leg instead it falls short by the switch's angle: Divoká Šárka 173°.)
-- ends within NECK of where it starts: a loop's switches lie together (Sídliště Petřiny's 72 m apart, the farthest of
-  the termini); a circuit round city blocks comes back 160-510 m away (Čechovo náměstí, Palmovka, Strossmayerovo
-  náměstí, Masarykovo nádraží, Náměstí Míru);
+- ends within NECK of where it starts: a loop's switches lie together (Lehovec's whole loop 120 m apart, the farthest;
+  Sídliště Petřiny's 72 m); a circuit round city blocks comes back 214-510 m away (Palmovka, Strossmayerovo náměstí,
+  Masarykovo nádraží, Náměstí Míru);
 - runs at most BOUND m;
 - is drivable: its mean radius at least `min-radius-network` (data/truth.json trackGeometry): a 52 m path turning 276°
-  at Radošovická is a junction drawn in pieces, not a track.
+  at Radošovická is a junction drawn in pieces, not a track;
+- is not at a place the user says is no loop (data/truth.json operation `not-loops`: the teardrop at Chotkovy sady,
+  which DI draws with both ends on the junction above it, at one level).
 
 **On a route** (rule 1 as well as 2): a route is in a loop where it follows the loop's whole path, or the part of it
 from its own start or to its own end (a route that starts or ends in its loop). A route that runs over a circuit's
@@ -32,7 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 TURN = 170.0     # degrees, heading in to heading out
-NECK = 120.0     # m between the switch into the loop and the switch out of it
+NECK = 150.0     # m between the switch into the loop and the switch out of it
 BOUND = 600.0    # m: the longest loop path searched
 MIN_TRIPS = 90   # GTFS trips ending at a stop for the calibration to count it a terminus (fewer: pull-in and pull-out runs)
 NEAR = 400.0     # m: a terminus this near a loop's track has it
@@ -45,6 +47,22 @@ def _wrap(a):
 def _min_radius():
     from track_curve import geometry_fact
     return float(geometry_fact('min-radius-network'))
+
+
+def not_loops(truth=None):
+    """[(x, y, radius)] in city metres: data/truth.json operation `not-loops`, the places the user says are no loop."""
+    import json
+    from geo import Frame
+    truth = truth or json.loads((Path(__file__).resolve().parent.parent / 'data' / 'truth.json').read_text(encoding='utf-8'))
+    fact = next((f for f in truth['operation']['facts'] if f['id'] == 'not-loops'), {})
+    frame = Frame()
+    return [(*(float(v) for v in frame.xy(p['lat'], p['lon'])), float(p['radius'])) for p in fact.get('value', [])]
+
+
+def _at(net, c, places):
+    """Whether the candidate's path comes within a not-loop place's radius."""
+    from shapely.geometry import Point
+    return any(net.edges[e]['line'].distance(Point(x, y)) <= r for x, y, r in places for e, _ in c['path'])
 
 
 class _Geometry:
@@ -113,10 +131,12 @@ def why_not(c, turn=TURN, neck=NECK, radius=None):
     return None
 
 
-def find(net, turn=TURN, neck=NECK, bound=BOUND, radius=None):
-    """The loops: the candidates that pass the rule (`radius`: min-radius-network unless given)."""
+def find(net, turn=TURN, neck=NECK, bound=BOUND, radius=None, places=None):
+    """The loops: the candidates that pass the rule (`radius`: min-radius-network unless given; `places`: the not-loops,
+    data/truth.json's unless given)."""
     radius = _min_radius() if radius is None else radius
-    return [c for c in candidates(net, bound) if why_not(c, turn, neck, radius) is None]
+    places = not_loops() if places is None else places
+    return [c for c in candidates(net, bound) if why_not(c, turn, neck, radius) is None and not _at(net, c, places)]
 
 
 def groups(loops):
@@ -215,9 +235,11 @@ def main():
     sys.stdout.reconfigure(encoding='utf-8')
     root = Path(__file__).resolve().parent.parent
     net = di_network.load_network()
-    radius = _min_radius()
+    radius, places = _min_radius(), not_loops()
     cands = candidates(net)
-    loops = [c for c in cands if why_not(c, radius=radius) is None]
+    passed = [c for c in cands if why_not(c, radius=radius) is None]
+    loops = [c for c in passed if not _at(net, c, places)]
+    print(f"left out at the user's not-loops (data/truth.json): {len(passed) - len(loops)} paths")
     termini, stops, frame = _termini(root)
     named = [(float(x), float(y), r['stop_name']) for r in stops.values() if r.get('location_type', '0') in ('', '0')
              for x, y in [frame.xy(float(r['stop_lat']), float(r['stop_lon']))]]
