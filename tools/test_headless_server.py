@@ -118,6 +118,7 @@ class Ownership(unittest.TestCase):
                     '--port',str(port),'--out',str(out)]
             with patch.object(headless,'ROOT',str(root)), patch.object(headless,'BASELINE',str(baseline)), \
                     patch.object(sys,'argv',argv), patch.object(headless,'git',return_value=None), \
+                    patch.object(headless.baseline_store,'dirty',return_value=[]), \
                     patch.object(headless,'data_matches',return_value=[]), patch.object(headless,'worker') as worker:
                 with self.assertRaises(SystemExit) as error:
                     headless.main()
