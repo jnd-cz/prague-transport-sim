@@ -81,7 +81,9 @@ export class Autopilot {
     // a signal: when its GO starts blinking, stop if that is comfortable (~0.9 m/s2), else clear the
     // junction on it and keep going (the controller holds the phase for a committed tram); braking
     // for a blinking GO it could not stop for took it over the line on red (line 17 s 3158)
-    const sig = g.signals.find((x) => x.s > tr.s + 0.2);
+    // (a signal is ahead until the front is past its head: within 0.2 m of it, standing behind a car in the junction, it counted
+    // as passed, and the tram followed the car over the line on red at 0.3 m/s, line 9 seed 4 s 22350, #408's third case)
+    const sig = g.signals.find((x) => x.s > tr.s);
     if (this.stopFor && (this.stopFor !== sig || sig.state === 'go')) this.stopFor = null;
     if (sig && sig.state !== 'go') {
       const d = sig.s - 3 - tr.s;
@@ -107,6 +109,10 @@ export class Autopilot {
       if (this.goThrough === sig && tr.v < 0.3) this.goThrough = null;
       if (this.goThrough !== sig) consider(sig.s - 3, true, 'signal');
     }
+    // (and a red one after it within sight: two signals 53 m apart, the second came into view only past the first, at 12.7 m/s
+    // with 44 m left, and the tram crossed it on red at 6.9 m/s, line 17 seed 4 s 19808; the driver sees both)
+    const sig2 = sig && g.signals.find((x) => x.s > sig.s);
+    if (sig2 && sig2.state === 'stop' && sig2.s - tr.s < 150) consider(sig2.s - 3, true, 'signal');
     // past a signal, its crossing still ahead (stopped in the junction behind something): the driver no
     // longer sees the signal, and the cross street gives way to a tram in the junction; cars already on
     // the crossing drive off it first (the user, #268: "tram driver should wait until the tracks clear")
