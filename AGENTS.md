@@ -43,9 +43,8 @@ both post on the pinned #291 and only propose.
   | `lane:tooling` | checks, board, queue, deploy, CI, docs | 1 | its tests |
 
   The world comes first, one layer at a time with a checkpoint after each (ROADMAP.md). The simulation
-  lane waits for checkpoint W2, apart from the PRs in flight on 2026-11-05 (the user, 2026-11-05: "pause
-  simulation work after finishing the current PRs"); the board shows it paused (`tools/board.py` `PAUSED`, removed at
-  that checkpoint).
+  lane waited for checkpoint W2 (the user, 2026-11-05: "pause simulation work after finishing the current PRs")
+  and resumed there (#414). A lane the user pauses shows as paused on the board (`tools/board.py` `PAUSED`).
 - **One rebuild at a time:** only the branch whose issue holds the `rebuild` label rebuilds every line
   and publishes (`snapshot.py data-publish` refuses on another branch). It is taken with `gh issue edit N
   --add-label rebuild` while nobody holds it (the board shows the holder) and removed when that data's PR
@@ -219,7 +218,6 @@ both post on the pinned #291 and only propose.
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
 | crossing | 17 | 1 unexplained pedestrian obstruction | #146 |
 | crossing | 9 | 2 unexplained pedestrian obstructions: a surveyed sidewalk 0.40 m over the rails at s 3672 (since its survey, #125) | #146 |
-| u3, redruns | 9 | seed 1: signal penalty 200 at s 18791, the autopilot accelerating through as the green held for it ends 11 m ahead | #408 |
 | `tools/test_audio_pause.py` `test_shift_lifecycle` | 23 | the master gain is 0 after the shift starts (wants over 0.01) | #381 |
 | `tools/test_headless_timeout.py` `test_stuck_and_scheduled_wait` | (its own page) | `KeyError: 'stuck'` in both modes | #381 |
 
