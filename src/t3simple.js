@@ -6,7 +6,7 @@
 // windscreen leaning back under the roof cap's visor), painted from one canvas shared by every car. The
 // running gear, pantograph and fittings are one mesh in vertex colours, the lamps another, the car's fleet
 // numbers a third: four draw calls a car, and its plates. Two variants: the T3SUCS, and the T3M with the
-// resistors' box on the roof and its green route display (src/models.js). One car: origin on the rail plane
+// resistors' box on the roof and its green dot-matrix displays (src/models.js). One car: origin on the rail plane
 // midway between the bogie pivots, facing +Z, the right side (the doors) at -X.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -411,6 +411,9 @@ function bogie(zc) {
 // The mirror (the user's photos of 6921 and 7122): its arm rises from the cap's side over the front door, runs out
 // and drops; the route plate hangs on the drop facing forward (src/models.js puts the plate on it), the mirror
 // below it, its back to the front. A small mirror on a bracket at the left corner.
+const SIDE_INDICATOR = { z: 3.05, h: 1.81 };
+// the T3M's side display: in the upper part of the right side's second window from the front (the user's photo of 8015)
+const SIDE_DISPLAY = { z: 2.29, h: 2.31, w: 1.05, hh: 0.33 };
 const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.62, 2.94, 6.28], [-1.62, 2.3, 6.28]];
 const MIRROR_PLATE = [-1.62, 2.52, 6.31];
 
@@ -439,21 +442,21 @@ function partsGeometry(wire, variant) {
     const f = onFace(1, x, 1.03);
     P.push(part(new THREE.CylinderGeometry(0.115, 0.12, 0.05, 18), COL.red, { at: [x + 0.012 * Math.sin(f.yaw), 1.03, f.z + 0.012 * Math.cos(f.yaw)], rot: [Math.PI / 2, f.yaw, 0] }));
   }
-  // the lamp units' housings by the corners
+  // the lamp units' housings by the corners, the side indicators' on the pillar amidships
   for (const [sign, z] of [[-1, 6.42], [1, 6.42], [-1, -6.45], [1, -6.45]]) {
     const s = onSide(sign, z);
     P.push(part(box(0.02, 0.24, 0.095), '#262626', { at: [s.x + s.n[0] * 0.008, 1.235, z + s.n[1] * 0.008], rot: [0, s.yaw, 0] }));
   }
+  for (const sign of [-1, 1]) P.push(part(box(0.016, 0.135, 0.08), '#262626', { at: [sign * (HW + 0.006), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   // the roof (the colour elevation): three hatches, a low cover behind the pantograph, a box amidships, the
   // aerial on the front cap, the pantograph; on a T3M the resistors' box towards the rear (the user's photos
   // of 8080 and 8088: "Box on top with resistors towards back only for t3m")
   for (const z of [-5.2, -0.78, 4.69]) P.push(part(box(0.62, 0.06, 1.05), '#7c8084', { at: [0, ROOF + 0.03, z] }));
   P.push(part(box(0.9, 0.05, 1.45), '#5c6064', { at: [0, ROOF + 0.025, 1.7] }));
   P.push(part(box(0.5, 0.12, 0.5), '#5c6064', { at: [0, ROOF + 0.06, 0.18] }));
-  if (variant === 'T3M') {
-    P.push(part(box(1.25, 0.27, 2.6), '#5b5f62', { at: [0, ROOF + 0.135, -2.65] }));
-    P.push(part(box(1.17, 0.03, 2.5), '#6c7073', { at: [0, ROOF + 0.285, -2.65] }));
-    for (let k = 0; k < 6; k++) P.push(part(box(1.27, 0.012, 0.03), '#3a3d40', { at: [0, ROOF + 0.1 + 0.022 * (k % 3), -3.6 + 0.4 * k] }));
+  if (variant === 'T3M') { // (short but wide, its top a grille: the user, 2026-11-09, and a model of an 8xxx)
+    P.push(part(box(1.4, 0.2, 0.85), '#45484b', { at: [0, ROOF + 0.1, -3.0] }));
+    for (let k = 0; k < 8; k++) P.push(part(box(1.32, 0.02, 0.05), '#5d6164', { at: [0, ROOF + 0.205, -3.35 + 0.1 * k] }));
   }
   P.push(bar([0, ROOF - 0.05, 5.68], [0, ROOF + 0.24, 5.68], 0.015, '#8a8d90'), bar([0, ROOF + 0.24, 5.55], [0, ROOF + 0.24, 5.81], 0.012, '#8a8d90'));
   P.push(...pantograph(wire));
@@ -482,6 +485,9 @@ function lampsGeometry() {
     const f = onFace(-1, x, h);
     L.push(part(box(w, hh, 0.02), color, { at: [x + 0.012 * Math.sin(f.yaw), h, f.z + 0.012 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
   };
+  // the side indicators: on the pillar between the first and second windows on the right, the second and third on
+  // the left (both 3.05 m ahead of the centre), at the window band's foot (the user's photos of 8015 and 8080)
+  for (const sign of [-1, 1]) L.push(part(box(0.012, 0.11, 0.06), '#ff9a22', { at: [sign * (HW + 0.016), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   for (const x of [-0.47, 0.47]) onRear(x, 0.95, 0.2, 0.07, '#d8261a');
   onRear(0, 0.95, 0.16, 0.055, '#f4f4ee');
   for (const x of [-0.66, 0.66]) {
@@ -564,6 +570,7 @@ function shapes(wire, variant) {
     const plates = {
       rb: onBody(probe, 0, 2.74, 1, 0.56, 0.3), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),
       dest: onBody(probe, -0.02, 1.77, 1, 0.46, 0.19), run: onBody(probe, -0.67, 1.725, 1, 0.12, 0.09), rear: onBody(probe, 0, 1.90, -1, 0.34, 0.3),
+      led: onFlank(-1, SIDE_DISPLAY.z, SIDE_DISPLAY.h, SIDE_DISPLAY.w, SIDE_DISPLAY.hh),
     };
     // (the figures fill 0.64 of the texture's width and 0.66 of its height: 0.15 m tall on the front, between the
     // headlights, 0.14 m on the rear, 0.10 m on the sides, as on 6921, 6892 and 8080)
@@ -608,6 +615,7 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
       mesh(P.plates.run, mats.runMat, 'plate');
     }
     if (k === cars - 1) mesh(P.plates.rear, mats.rearMat, 'plate');
+    if (mats.ledMat) mesh(P.plates.led, mats.ledMat, 'display'); // (a T3M's side display, on every car)
     root.add(car);
     root.userData.cars.push(car);
   }

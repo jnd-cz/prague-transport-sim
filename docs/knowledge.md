@@ -445,9 +445,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
   round the cab than along the saloon, under a cream band with a flap; the bumpers black (heritage cars: aluminium); the route
   plate hangs on the mirror's arm, which drops from the cab's roof; rectangular lamp units (indicator over a lamp) by the
-  corners; fleet numbers yellow on the front between the headlights, on the rear and on both sides. A T3M has the resistors'
-  box on the roof towards the rear and a green route display ("Box on top with resistors towards back only for t3m, which has
-  green top number plate").
+  corners; a side indicator on the pillar between the first and second windows on the right, the second and third on the left;
+  fleet numbers yellow on the front between the headlights, on the rear and on both sides. A T3M has the resistors' box on the
+  roof towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
+  plate"), and green dot-matrix displays: the route on the front, and inside the right side's second window the route with the
+  destination and the next stop.
 
 ## Heuristics that stand in for missing data
 

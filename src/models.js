@@ -66,20 +66,42 @@ function numberTexture(line, w, h, fg, bg, fill = 0.85) {
     g.fillText(text, w / 2, h / 2 + h * 0.04);
   });
 }
-// (a T3M's route display: green figures on black; the user's photos of 8080, 2026-11-09: "green top number plate")
-const routeBoxTexture = (line, variant) => (variant === 'T3M' ? ledTexture(line) : numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9));
-function ledTexture(line) {
-  return canvasTexture(160, 128, (g, w, h) => {
-    g.fillStyle = '#121612';
-    g.fillRect(0, 0, w, h);
-    g.fillStyle = '#9be36a';
-    g.font = `bold ${h * 0.78}px "Arial Narrow", Arial, sans-serif`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(line), w / 2, h / 2 + h * 0.04);
-    g.fillStyle = 'rgba(18, 22, 18, 0.6)'; // the diodes' grid
-    for (let x = 0; x < w; x += 5) g.fillRect(x, 0, 1.5, h);
-    for (let y = 0; y < h; y += 5) g.fillRect(0, y, w, 1.5);
+// A T3M's displays are green dot-matrix LEDs (the user's photos of 8015 and 8080, 2026-11-09: "green top number plate",
+// "Green dot led panel with destination and next stop"): the text drawn in white on black, then sampled into round
+// diodes on a pitch, lit where the text covers their centre, dim where not.
+function ledFace(w, h, pitch, draw) {
+  return canvasTexture(w, h, (g) => {
+    const src = document.createElement('canvas');
+    src.width = w; src.height = h;
+    const s = src.getContext('2d');
+    s.fillStyle = '#000'; s.fillRect(0, 0, w, h);
+    s.fillStyle = '#fff'; s.textBaseline = 'middle';
+    draw(s, w, h);
+    const px = s.getImageData(0, 0, w, h).data;
+    g.fillStyle = '#0a0f0a'; g.fillRect(0, 0, w, h);
+    for (let y = pitch / 2; y < h; y += pitch) for (let x = pitch / 2; x < w; x += pitch) {
+      g.fillStyle = px[(Math.floor(y) * w + Math.floor(x)) * 4] > 110 ? '#a8f06e' : '#172414';
+      g.beginPath(); g.arc(x, y, pitch * 0.38, 0, 2 * Math.PI); g.fill();
+    }
+  });
+}
+const routeBoxTexture = (line, variant) => (variant === 'T3M'
+  ? ledFace(160, 128, 5, (s, w, h) => { s.font = `bold ${h * 0.8}px "Arial Narrow", Arial, sans-serif`; s.textAlign = 'center'; s.fillText(String(line), w / 2, h / 2 + 4); })
+  : numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9));
+// the T3M's side panel: the route number large on the left, the destination over the next stop beside it (each only
+// when the set has it)
+function ledPanelTexture(line, dest, next) {
+  return ledFace(512, 160, 4, (s, w, h) => {
+    const fit = (text, x, y, size, max, weight = 'bold') => {
+      let px = size;
+      do { s.font = `${weight} ${px}px "Arial Narrow", Arial, sans-serif`; px -= 2; } while (s.measureText(text).width > max && px > 12);
+      s.fillText(text, x, y);
+    };
+    s.textAlign = 'center';
+    fit(String(line), 76, h / 2 + 6, 134, 140);
+    s.textAlign = 'left';
+    if (dest) fit(dest.toUpperCase(), 168, next ? 48 : h / 2 + 4, 60, w - 180);
+    if (next) fit(next, 168, 118, 44, w - 180, 'normal');
   });
 }
 const mirrorPlateTexture = (line) => numberTexture(line, 104, 128, '#ffffff', DPP_BLUE, 0.85);
@@ -141,6 +163,7 @@ function plateMats(line, dest, run, variant) {
   return {
     rbMat: plate(routeBoxTexture(line, variant)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
     destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)),
+    ...(variant === 'T3M' ? { ledMat: plate(ledPanelTexture(line, dest, null)) } : {}),
   };
 }
 
@@ -364,7 +387,19 @@ export function setConsistLine(model, line, dest = model.userData.dest, run = mo
   }
   if (u.dest !== dest) swap(mats.destMat, destinationTexture(dest));
   if (u.run !== run) swap(mats.runMat, runCardTexture(run));
+  if (u.line !== line || u.dest !== dest) swap(mats.ledMat, ledPanelTexture(line, dest, u.next));
   Object.assign(u, { line, dest, run });
+}
+
+// The next stop on a T3M's side panel (the built-in car; other sets have none to show)
+export function setNextStop(model, next) {
+  const u = model.userData;
+  if (!u.mats?.ledMat || u.next === next) return;
+  const old = u.mats.ledMat.map;
+  u.mats.ledMat.map = ledPanelTexture(u.line, u.dest, next);
+  u.mats.ledMat.needsUpdate = true;
+  old?.dispose();
+  u.next = next;
 }
 
 // Put each car of a set on the track: cars are 15.2 m over couplers, the body starts 0.6 m

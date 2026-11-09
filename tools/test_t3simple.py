@@ -44,6 +44,13 @@ MEASURE = r"""async () => {
   out.variants = { suc: m.userData.variant, m: t3m.userData.variant, sucRoof: roofBox(parts.geometry), mRoof: roofBox(named(t3m.userData.cars[0], 'parts').geometry),
     sucDisplay: px(m.userData.mats.rbMat), mDisplay: px(t3m.userData.mats.rbMat) };
   out.fleet = { suc: m.userData.fleet, m: t3m.userData.fleet, meshes: [a, b].map((c) => c.children.filter((o) => o.name === 'fleet').length) };
+  // the T3M's side display on every car, none on the T3SUCS; the next stop redraws it; the side indicators on both sides
+  const displays = (set) => set.userData.cars.map((c) => c.children.filter((o) => o.name === 'display').length);
+  const led0 = t3m.userData.mats.ledMat.map;
+  models.setNextStop(t3m, 'Palmovka');
+  const L = named(a, 'lamps').geometry.attributes.position;
+  const ind = [-1, 1].map((s) => { for (let i = 0; i < L.count; i++) if (s * L.getX(i) > 1.255 && Math.abs(L.getZ(i) - 3.05) < 0.05 && Math.abs(L.getY(i) - 1.81) < 0.07) return true; return false; });
+  out.displays = { suc: displays(m), m: displays(t3m), next: t3m.userData.mats.ledMat.map !== led0 && t3m.userData.next === 'Palmovka', indicators: ind };
   const auto = new Set();
   for (let r = 801; r < 849; r++) auto.add(models.makeT3({ line: '17', detailed: false, run: String(r) }).userData.variant);
   out.fleet.auto = [...auto].sort();
@@ -118,7 +125,7 @@ SHOTS = r"""async ({ kinds }) => {
   const views = {
     side: persp([-24, 2.2, 0.5], [0, 1.6, 0.5], 36), front34: persp([-7.5, 2.3, 15], [0, 1.5, 5]), rear34: persp([7, 2.4, -15], [0, 1.5, -5]),
     front: persp([0, 1.8, 22], [0, 1.7, 0], 14), set: persp([-14, 4, 24], [0, 1.4, -4], 40), elevation: elev,
-    bogie: persp([-5, 0.9, 3.4], [0, 0.45, 3.2], 32),
+    bogie: persp([-5, 0.9, 3.4], [0, 0.45, 3.2], 32), display: persp([-6.5, 2.0, 1.2], [-1.25, 2.0, 3.2], 34),
   };
   const out = {};
   for (const kind of kinds) {
@@ -127,6 +134,7 @@ SHOTS = r"""async ({ kinds }) => {
       const m = models.makeT3({ line: '17', cars: view === 'set' ? 2 : 1, detailed: simple ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant: kind === 't3m' ? 'T3M' : 'T3SUCS' });
       models.placeConsist(m, 7.6, (s) => [0, -s, 0, 0]);
       if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
+      models.setNextStop(m, 'Palmovka');
       scene.add(m);
       renderer.render(scene, cam);
       out[`${kind}-${view}`] = renderer.domElement.toDataURL('image/png');
@@ -182,7 +190,9 @@ def judge(r):
         "four draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 4 and r["drawn"][1] - r["plates"][1] <= 4,
         # the variants: only a T3M has the resistors' box on the roof (3.02 m) and the green-on-black display
         "variants as asked": r["variants"]["suc"] == "T3SUCS" and r["variants"]["m"] == "T3M",
-        "the T3M's roof box, none on the T3SUCS": r["variants"]["mRoof"] > 3.25 and r["variants"]["sucRoof"] < 3.15,
+        "the T3M's roof box, none on the T3SUCS": r["variants"]["mRoof"] > 3.18 and r["variants"]["sucRoof"] < 3.12,
+        "the T3M's side display on each car, none on the T3SUCS; the next stop shown": r["displays"]["m"] == [1, 1] and r["displays"]["suc"] == [0, 0] and r["displays"]["next"],
+        "the side indicators on both sides": r["displays"]["indicators"] == [True, True],
         "the T3M's display dark, the T3SUCS's plate blue": sum(r["variants"]["mDisplay"]) < 90 and r["variants"]["sucDisplay"][2] > 120,
         "fleet numbers by type, each car its own": all(7001 <= n <= 7292 for n in r["fleet"]["suc"]) and all(8001 <= n <= 8090 for n in r["fleet"]["m"])
         and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
