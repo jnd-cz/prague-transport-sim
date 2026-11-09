@@ -11,8 +11,7 @@ IPR states no height datum: every run compares it with DMR 5G (Bpv) where both h
 the median differs by more than DATUM_TOLERANCE.
 IPR is bare earth without structures: over a passage (an underpass, a culvert) it shows the passage, not
 the surface over it, which DMR 5G kept. Near an OSM passage, a point where IPR is more than PASSAGE_DROP
-below DMR 5G takes DMR 5G (level 1): measured 2026-10-30, the track would otherwise dip 5-6 m into
-Divadelní's underpass at Národní divadlo (lines 9, 22, 23) and the Rokytka culvert (line 37).
+below DMR 5G takes DMR 5G (level 1): the passages rule and the tiles are tools/dmr5g.py's.
 
 Usage:  python -P -E tools/fine_terrain.py --line 17 [--band 120] [--step 2] [--fetch]
 Writes data/lineN.fine.bin (Int16, centimetres over `base`, block after block, rows north to south
@@ -22,16 +21,12 @@ samples a side (shared edges, so neighbouring blocks meet exactly). The export t
 (raw/dem/); a tile that is not there is an error unless --fetch downloads it (then publish a new snapshot
 with it before data-publish, #223).
 """
-import io
 import json
 import os
 import sys
 import time
-import urllib.parse
-import urllib.request
 
 import numpy as np
-from PIL import Image
 import shapely
 from shapely.geometry import LineString, box
 from shapely.ops import unary_union
@@ -40,14 +35,11 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 arg = lambda k, d: type(d)(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d  # noqa: E731
 LINE, BAND, STEP, B = arg("--line", "17"), arg("--band", 120.0), arg("--step", 2.0), 64
-SERVICE = "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer/exportImage"
-TILE, PX = 500.0, 1.0  # export tiles: 500 m at 1 m pixels (S-JTSK)
-CACHE = os.path.join(ROOT, "raw", "dem")
-os.makedirs(CACHE, exist_ok=True)
-
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
 from atomic import replacing  # noqa: E402
+import dmr5g  # noqa: E402
+from dmr5g import PASSAGE_DROP, PASSAGE_R, passage  # noqa: E402
 from geo import Frame  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
 import sources  # noqa: E402
@@ -75,21 +67,8 @@ for bi in range(int((minx - X0) // BS), int((maxx - X0) // BS) + 1):
             blocks.append((bi, bj))
 print(f"line {LINE}: {len(blocks)} blocks of {B}x{B} at {STEP} m ({len(blocks) * B * B / 1e6:.2f} M cells)")
 
-# passages under the surface in the band, from the snapshot's OSM extract (cached per line like
-# platforms.py's answer): tunnels, culverts, covered ways, ways below ground level; not the deep metro
-PASSAGE_R, PASSAGE_DROP = 8.0, 0.5  # m: half a passage's width with its walls; IPR under DMR 5G by more
-
-
-def passage(t):
-    if t.get("location") == "underground" or t.get("railway") == "subway":
-        return False
-    try:
-        below = float(t.get("layer", 0)) < 0
-    except ValueError:
-        below = False
-    return t.get("tunnel", "no") != "no" or t.get("covered") == "yes" or t.get("culvert") == "yes" or below
-
-
+# passages under the surface in the band (dmr5g.passage), from the snapshot's OSM extract (cached per line like
+# platforms.py's answer)
 src = os.path.join(ROOT, "raw", f"line{LINE}", "passages_box.json")
 pbox = tuple(round(float(v), 7) for v in F.bbox(line["path"] + line.get("pathBack", []), BAND + 20))
 osm = json.load(open(src, encoding="utf-8")) if os.path.exists(src) else None
@@ -112,57 +91,8 @@ if covers is not None:
     shapely.prepare(covers)
 print(f"passages: {len(plines)} OSM ways in the box")
 
-tiles = {}
-FETCHED = []  # (tiles downloaded in this run: new snapshot files)
-
-
-def tile(ix, iy):
-    if (ix, iy) in tiles:
-        return tiles[(ix, iy)]
-    f = os.path.join(CACHE, f"{ix}_{iy}.tif")
-    if not os.path.exists(f):
-        # (a cache miss used to download silently: the 2026-11-03 snapshot had to add 8 such tiles, #223)
-        if "--fetch" not in sys.argv:
-            raise SystemExit(f"raw/dem/{ix}_{iy}.tif: not in raw/ (the snapshot, tools/snapshot.py fetch); --fetch downloads it, then publish a new snapshot before data-publish")
-        FETCHED.append(f)
-        x0, y0, n = ix * TILE, iy * TILE, int(TILE / PX)
-        q = urllib.parse.urlencode({"bbox": f"{x0},{y0},{x0 + TILE},{y0 + TILE}", "bboxSR": 5514, "imageSR": 5514,
-                                    "size": f"{n},{n}", "format": "tiff", "pixelType": "F32",
-                                    "interpolation": "RSP_BilinearInterpolation", "f": "image"})
-        for k in range(6):
-            try:
-                with urllib.request.urlopen(urllib.request.Request(SERVICE + "?" + q, headers={"User-Agent": "tram-game-prototype/0.1"}), timeout=180) as r:
-                    data = r.read()
-                Image.open(io.BytesIO(data))  # (an error page is no image)
-                with replacing(f, "wb") as fh:
-                    fh.write(data)
-                break
-            except Exception as e:  # noqa: BLE001
-                print(f"  tile {ix},{iy}: {str(e)[:60]}; retry", flush=True)
-                time.sleep(5 * (k + 1))
-        else:
-            raise SystemExit(f"tile {ix},{iy} failed")
-    tiles[(ix, iy)] = np.asarray(Image.open(f), dtype=np.float32)
-    return tiles[(ix, iy)]
-
-
-def sample(X, Y):
-    """Bilinear DMR 5G at S-JTSK points (arrays); pixel centres at (i + 0.5) m."""
-    out = np.full(X.shape, np.nan, np.float32)
-    ix, iy = np.floor(X / TILE).astype(int), np.floor(Y / TILE).astype(int)
-    for key in set(zip(ix.ravel().tolist(), iy.ravel().tolist())):
-        m = (ix == key[0]) & (iy == key[1])
-        img = tile(*key)
-        n = img.shape[0]
-        fx = (X[m] - key[0] * TILE) / PX - 0.5
-        fy = (key[1] * TILE + TILE - Y[m]) / PX - 0.5  # image rows go south
-        i0 = np.clip(np.floor(fx).astype(int), 0, n - 2)
-        j0 = np.clip(np.floor(fy).astype(int), 0, n - 2)
-        tx, ty = np.clip(fx - i0, 0, 1), np.clip(fy - j0, 0, 1)
-        a, b = img[j0, i0], img[j0, i0 + 1]
-        c, d = img[j0 + 1, i0], img[j0 + 1, i0 + 1]
-        out[m] = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
-    return out
+dem = dmr5g.Tiles(fetch="--fetch" in sys.argv)
+tiles, FETCHED, sample = dem.tiles, dem.fetched, dem.sample  # (tiles downloaded in this run: new snapshot files)
 
 
 _coarse = np.frombuffer(__import__("base64").b64decode(T["data"]), "<i2").reshape(T["ny"], T["nx"]) * T["scale"] + T["base"]
