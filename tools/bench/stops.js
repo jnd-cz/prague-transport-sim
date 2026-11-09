@@ -23,7 +23,7 @@
 
 export function stopsWatch(game) {
   const R = { stops: [], flips: [], stretches: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0, emergencyAt: [], lineJ: 0, mechJ: 0, brakeJ: 0 };
-  let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null, curTo = null;
+  let heldClock = null, a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null, curTo = null;
   const finish = (st, tr) => {
     a.err = +(st.target - tr.s).toFixed(2);
     // (served behind a tram standing at the front of a long platform, as src/game.js lets a second set stop: not short of the point;
@@ -47,9 +47,20 @@ export function stopsWatch(game) {
       // (the stretch to a stop begins once the stop before it is served, so the pull-away counts toward the next one)
       const to = st && st.served ? game.stops[game.nextStop + 1] : st;
       if (to) {
-        if (to !== curTo) { curTo = to; R.stretches.push({ to: to.name, drive: 0, brake: 0, t0: game.clock, tMove: null }); }
+        if (to !== curTo) { curTo = to; R.stretches.push({ to: to.name, drive: 0, brake: 0, t0: game.clock, tMove: null, held: {} }); }
         const q = R.stretches[R.stretches.length - 1];
         if (q.tMove === null && tr.v > 0.3) q.tMove = game.clock;
+        // (the time held on the way, standing or under 1.5 m/s, by what the autopilot stops for: a single track's signal apart
+        // from the others, and not the last metres into the stop itself, #431)
+        const dtc = heldClock === null ? 0 : game.clock - heldClock;
+        heldClock = game.clock;
+        if (q.tMove !== null && tr.v < 1.5 && dtc > 0 && dtc < 1) {
+          const p = game.pilot;
+          let why = p?.stopWhy ?? 'none';
+          if (why === 'stop' && p?.stopAtS != null && Math.abs(p.stopAtS - to.target) < 1 && to.target - tr.s < 30) why = null;
+          else if (why === 'signal') { const nx = game.signals.find((x) => x.s > tr.s); if (nx?.gauntlet) why = 'gauntlet'; }
+          if (why) q.held[why] = (q.held[why] || 0) + dtc;
+        }
         if (n > 0 && lastStep <= 0) q.drive++;
         if (n < 0 && lastStep >= 0 && tr.v > 0.3) q.brake++;
       }
@@ -130,7 +141,7 @@ export function stopsWatch(game) {
         slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
         comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
-        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)) })) };
+        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)), held: Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
     },
   };
 }
