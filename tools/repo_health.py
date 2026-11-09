@@ -157,10 +157,11 @@ def collect(root=ROOT, now=None):
         for n in re.findall(r"Part of #(\d+)", p.get("body") or ""):
             part_of.setdefault(int(n), []).append(p["number"])
     half = sorted(n for n in part_of if n in by_n)
-    # review sets whose issue is closed (out of date if a finding still waits: reviews.html says which)
+    # review sets whose issue is closed (out of date if a finding still waits: reviews.html says which); not a set a
+    # build reads, which stays (review_sets.READ_BY, #416)
     sets = review_sets.sets(os.path.join(root, "reports", "review"))
     info = review_sets.issues({s["waitsFor"] for s in sets if s["waitsFor"]})
-    closed_sets = [s["file"] for s in sets if (info.get(s["waitsFor"]) or {}).get("state") == "CLOSED"]
+    closed_sets = [s["file"] for s in sets if not s.get("readBy") and (info.get(s["waitsFor"]) or {}).get("state") == "CLOSED"]
     # leftovers: worktrees of finished work, remote branches whose PR is merged or closed
     gone_wt = [os.path.basename(r["worktree"]) for r in rs if r["worktree"] and {"gone", "missing"} & set(r["flags"])]
     stale_wt = [os.path.basename(r["worktree"]) for r in rs if r["worktree"] and "stale" in r["flags"] and not {"gone", "missing"} & set(r["flags"])]

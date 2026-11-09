@@ -115,6 +115,16 @@ class Committed(unittest.TestCase):
         names = {os.path.basename(s["file"]) for s in review_sets.sets()}
         self.assertEqual(sorted(set(review_sets.KNOWN) - names), [])
 
+    def test_a_set_a_build_reads_is_named_by_those_tools_and_marked(self):
+        # (#416: track-heights.json was proposed for deletion once #202 closed, though the height build reads it)
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        for name, tools in review_sets.READ_BY.items():
+            for t in tools:
+                with open(os.path.join(root, t), encoding="utf-8") as f:
+                    self.assertIn(f"reports/review/{name}", f.read(), f"{t} no longer reads {name}: drop it from READ_BY")
+        marked = {os.path.basename(s["file"]): s.get("readBy") for s in review_sets.sets()}
+        self.assertEqual({n: marked.get(n) for n in review_sets.READ_BY}, review_sets.READ_BY)
+
 
 if __name__ == "__main__":
     unittest.main()

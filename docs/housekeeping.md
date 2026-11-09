@@ -27,7 +27,8 @@ starts from the new baseline anyway.
    - ready PRs: the list for the merge window;
    - a half-done issue: does it still hold only its own points? Split or close it;
    - issues without a lane; a lane over its session limit (the board);
-   - a review set whose issue is closed while findings wait: delete it (`reviews.html` has the counts; AGENTS.md);
+   - a review set whose issue is closed while findings wait: delete it (`reviews.html` has the counts; AGENTS.md),
+     unless a build reads it (`tools/review_sets.py` `READ_BY`);
    - a worktree of finished work, a remote branch of a merged or closed PR: delete it, after a look at its
      untracked files (they go to `worktree-leftovers/` beside the checkouts);
    - a known-failure row whose issue is closed: remove it, or name its new issue;

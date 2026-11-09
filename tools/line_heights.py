@@ -51,7 +51,8 @@ RELAX_STEP, RELAX_STEPS, RELAX_REACH = 0.8, 12, 50.0  # where the band is missed
 MIN_RADIUS = float(geometry_fact('min-radius-passenger'))  # m, 20: 12 times, never under the tightest horizontal radius
 RELEASE, RELEASE_ROUNDS = 15.0, 3  # m, rounds: where the floor cannot meet the band, the band gives way this far around the
                                    # points it misses (as near a pin, below)
-REVIEW_ISSUE = 358  # the issue the radius review waits for (reports/review/track-radius.json names it)
+REVIEW_ISSUE = 276  # the issue the radius review waits for (reports/review/track-radius.json names it): W3's track
+                    # profile work, since #358 closed at W2 (#416)
 TIGHT = 0.95        # a solved curve under this share of the floor is a place for review: the solver's own tolerance is 2 %
                     # (track_profile.TOL), and 10 junctions read 478-490 m, no question for the user
 FLOOR_SINCE = None  # the date of the floor (data/truth.json trackGeometry vertical-radius-min): a later 'follow the data'

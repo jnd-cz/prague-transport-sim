@@ -102,7 +102,7 @@ both post on the pinned #291 and only propose.
   and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under them. A set whose
   issue is closed while findings wait is out of date: delete its file (the user, 2026-11-05: "If the issue
   is closed and reviews are unasnwered then it's out of date and can be deleted"); the directory lists
-  such sets apart.
+  such sets apart. A set a build reads stays (`tools/review_sets.py` `READ_BY`: deleting it breaks the build, #416).
 
 ## Unattended runs (overnight, Codex /goal, scheduled sessions)
 
