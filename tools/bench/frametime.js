@@ -8,6 +8,8 @@
 // Returns the frame interval (median, p95; vsync off in the runner), the CPU time of renderer.render,
 // the draw calls and triangles of a frame, and each set's level. `fov`: the camera's vertical field in degrees
 // (the cab's 62 unless given; the zoom key's 22.75, #382).
+import { startShift } from './shift.js';
+
 const AI = [45, 110, 180];
 
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
@@ -30,8 +32,8 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
   const sel = $('optModel');
   sel.value = model; sel.dispatchEvent(new Event('change'));
   const kind = model === 'simple' ? 'simple' : model === 'classic' ? 'classic' : 'hybrid';
-  $('btnStart').click();
-  await until(() => window.game && window.tramModel?.userData.kind === kind && window.camera);
+  await startShift({ timeout: 120 });
+  await until(() => window.tramModel?.userData.kind === kind && window.camera);
   const { makeT3, placeConsist } = await import('/src/models.js');
   const { setHybridLevel, FULL_OUT } = await import('/src/t3h.js');
   const g = window.game, route = g.route, s0 = g.tram.s;

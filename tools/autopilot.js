@@ -1,8 +1,9 @@
 // Dev tool: drives a game headlessly (fixed time step) to exercise the gameplay rules.
-// In the browser console:  const { autopilot } = await import('/tools/autopilot.js'); autopilot(0, 10)
+// In the browser console:  const { autopilot } = await import('/tools/autopilot.js'); await autopilot(0, 10)
 import { Autopilot } from '../src/autopilot.js';
+import { startShift } from './bench/shift.js';
 
-export function autopilot(startStop, untilStop, { obstacles = 'off', weather = 'dry', maxT = 3600, dt = 1 / 30, trace = null } = {}) {
+export async function autopilot(startStop, untilStop, { obstacles = 'off', weather = 'dry', maxT = 3600, dt = 1 / 30, trace = null } = {}) {
   const $ = (id) => document.getElementById(id);
   $('menu').classList.remove('hidden');
   $('selStop').value = String(startStop);
@@ -10,8 +11,7 @@ export function autopilot(startStop, untilStop, { obstacles = 'off', weather = '
   $('optObst').value = obstacles;
   $('optWeather').value = weather;
   $('optAuto').checked = false;
-  $('btnStart').click();
-  const g = window.game, tr = g.tram;
+  const g = await startShift(), tr = g.tram;
   g.audio.setMuted(true);
   const ap = new Autopilot();
   let T = 0;

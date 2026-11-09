@@ -18,14 +18,18 @@ HTML = """<!doctype html><title>9</title><div id="loading" class="hidden"></div>
 <button id="btnStart"></button><script>
 const mode = location.pathname.split('/')[1];
 if (mode === 'loading') document.getElementById('loading').className = '';
-window.game = {
-  clock: 0, tram: {s: 11221, v: 0}, route: {length: 20000, at: () => ({x: 0, y: 0})},
-  profile: {height: () => 0}, penalties: {}, signals: [], nextStop: 0,
-  stops: mode === 'scheduled' ? [{arrived: true, sched: 1800}] : [], _atStop: () => true,
-  update(h) { this.clock += h; if (mode === 'finish') this.tram.s += 100; }
+// (as the real page: Start makes a new game, after an await, #400)
+document.getElementById('btnStart').onclick = async () => {
+  await null;
+  window.traffic = {oncoming: [], ahead: [], backStops: [], update() {}};
+  window.camera = {position: {set() {}}};
+  window.game = {
+    clock: 0, tram: {s: 11221, v: 0}, route: {length: 20000, at: () => ({x: 0, y: 0})},
+    profile: {height: () => 0}, penalties: {}, signals: [], nextStop: 0,
+    stops: mode === 'scheduled' ? [{arrived: true, sched: 1800}] : [], _atStop: () => true,
+    update(h) { this.clock += h; if (mode === 'finish') this.tram.s += 100; }
+  };
 };
-window.traffic = {oncoming: [], ahead: [], backStops: [], update() {}};
-window.camera = {position: {set() {}}};
 </script>"""
 
 
@@ -36,7 +40,7 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split('?')[0]
         if path == '/started':
             self.started.set()
-        if path in ('/tools/bench/redruns.js', '/tools/bench/stuck.js'):
+        if path in ('/tools/bench/redruns.js', '/tools/bench/stuck.js', '/tools/bench/shift.js'):
             body = (Path(__file__).parent / 'bench' / path.rsplit('/', 1)[1]).read_bytes()
             mime = 'text/javascript'
         elif path == '/src/autopilot.js':
