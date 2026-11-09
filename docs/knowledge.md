@@ -387,7 +387,7 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   energy −4 to −10 %; the mean delay +18–28 s on lines 17, 22 and 23 (inside main's seed spread), the late penalty outside it on
   lines 17 and 23 (19 → 78, 7 → 25). Holding a drive step to 0.6 m/s over up a climb pressed more and ran later; holding brake step 1
   down every descent to 1 m/s under ran line 23 40 s later. On W2's data (73c2a32): brake applications −6 to −18 %, the wire's energy
-  −4 to −12 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
+  −4 to −11 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
   (2026-11-09), the timetable's part being #242.
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
