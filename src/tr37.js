@@ -344,6 +344,11 @@ export class TR37 {
       // the autopilot pressed 12.5-14.7 times a km on line 23, a driver 5.8 on a phone's count)
       else if (now === 0 && s > 0 && e > -(w.holdSag ?? 0.35) && v > 1) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
+      // (down a descent, where coasting gains the speed back in seconds, the brake comes down to step 1 rather than off, until 1 m/s
+      // under, where step 1 slows it by less than 0.15 m/s²: let go 0.4 under and pressed again 0.25 over, it braked every 4-5 s holding
+      // 15 km/h down Chotkova's 43 ‰, 16-19 brake presses to Malostranská where the driver of 6921 braked 7 times, #396. Held to 1 m/s
+      // under wherever step 1 slows it, the eastbound runs of line 23 ran 40 s later)
+      if (now < 0 && s >= 0 && (w.aCoast ?? 0) < -0.05 && e > -1.0 && F(1) / (w.inertia || 2e4) + (w.aCoast ?? 0) < 0.15) s = -1;
     }
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
