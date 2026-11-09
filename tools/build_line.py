@@ -838,6 +838,10 @@ def main():
     print(f"facing switches on route: {len(switches)}")
     trackwork = geo.trackwork(route_m, route_ends, path.at)    # (the speeds of D 1/2 § 25.4-5, src/speedRules.js)
     print(f"trailing switches on route: {len(trackwork['trailing'])}, crossings: {len(trackwork['crossings'])}")
+    # turning loops on DI's network by the user's rule, where the route follows one (tools/track_loops.py, loop-speed)
+    import track_loops
+    trackwork["loops"] = track_loops.on_route(route_m.pieces, route_ends, track_loops.find(net))
+    print(f"loops on route: {trackwork['loops']}")
     track_lines = geo.chains(flags, stretches, XY)
     print(f"track chains: {len(track_lines)} (from {len(drawn_edges)} edges)")
 

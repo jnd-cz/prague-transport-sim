@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
-import { FROG, placeStretches, trackworkStretches, withoutOwnPieces } from './speedRules.js';
+import { FROG, placeStretches, stopPassPoints, trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
 import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
@@ -128,6 +128,10 @@ export class Game {
     const extra = [...trackworkStretches(this.switches, trackwork, facts),
                    ...placeStretches(facts.places, data.stops, data.speed?.osm, data.speed?.step ?? 5)];
     this.limits = route.speedLimits(extra, facts.past);
+    // (the turning loops the build found on the route, for F8 and window.game: tools/track_loops.py's rule, #211)
+    this.loops = trackwork?.loops || [];
+    this.points = stopPassPoints(this.stops, facts);
+    this._frontWas = null;
     this._initSigns();
     this.aiTrams = []; // same-direction trams ahead, kept up to date by the traffic module
     this.otherTrams = []; // { s, i }: the trams on the wire near us, by route position and current (traffic.js)
@@ -1023,6 +1027,13 @@ export class Game {
       const need = Math.sqrt((v / 3.6) ** 2 + 2 * 0.7 * d); // speed allowed now to make it
       if (need < bestNeed) { bestNeed = need; best = { v, d }; }
     }
+    // the points the front alone keeps (a stop's sign passed without stopping), until the front is at them
+    for (const p of this.points) {
+      const d = p.s - this.tram.s;
+      if (d <= 0 || d >= 300 || p.v >= cur) continue;
+      const need = Math.sqrt((p.v / 3.6) ** 2 + 2 * 0.7 * d);
+      if (need < bestNeed) { bestNeed = need; best = { v: p.v, d, point: true }; }
+    }
     return best;
   }
 
@@ -1677,6 +1688,18 @@ export class Game {
         this._end(true);
       }
     } else if (tram.kmh < lim) this.overspeedWarned = false;
+    // a point limit is kept as the front passes it; over it, the penalty is the overspeed's above as if the limit held over
+    // the set's own length (a point passes in a few frames)
+    const was = this._frontWas ?? tram.s;
+    for (const p of this.points) {
+      if (!(was < p.s && tram.s >= p.s) || tram.kmh <= p.v + 3) continue;
+      const pts = (tram.kmh - p.v) * 0.6 * (tram.length / Math.max(tram.v, 1));
+      this.overspeedAcc += pts;
+      this.score -= pts;
+      this.penalties.speed = (this.penalties.speed || 0) + pts;
+      this.msg(t('msg.speedingStop', { v: p.v, stop: p.stop }), 'bad');
+    }
+    this._frontWas = tram.s;
 
     // passenger comfort: harsh longitudinal acceleration, jerk and sideways (curve) acceleration
     this.latAcc = (tram.v * tram.v) / this.route.radiusAt(tram.s - 4);
