@@ -43,6 +43,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   built as a 9 → 10 run. Line 37 (a substitute line) has no OSM relation: built from its GTFS shapes,
   which run between the two tracks in places; the matcher prefers the right-hand track (regular
   service always uses it, `data/truth.json`).
+- **PID GTFS `route_stops.txt` lists no route at stops only some trips serve** (#407): Pražský hrad and
+  Královský letohrádek (lines 22 and 23), Národní divadlo C/D (17, 1, 11) and Brusnice C/D have trams in
+  `stop_times.txt` but no route there. Which stops are tram stops comes from the trips of the service date
+  (`tools/platform_match.py` `tram_lines`). PID's stop point is where the tram front stops: it can stand past
+  the end of the platform OSM drew (Klamovka A on line 9: 38 m), or on the track itself (Pražský hrad B:
+  0.6 m off the centre line).
 - **PID GTFS `block_id` links through-running trips only** (older notes said it had none): on
   2026-10-21 each of line 9's 427 blocks is one 9 trip and the 10 trip it becomes, and lines 17, 22,
   23 and 37 have no `block_id` at all. It is not a vehicle's day (no run numbers, no depot runs).
