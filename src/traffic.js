@@ -296,7 +296,11 @@ export class Traffic {
     // where oncoming trams stop: the front at the far end of their own platform (game.platforms of the
     // back route: OSM shapes, GTFS positions). Mapped from our stop point they stopped 8 m into theirs:
     // our platform's far end is near the start of theirs (user: "they stop just before the stop instead
-    // of running to its end"). Our stop mapped across stays the fallback where they have no platform.
+    // of running to its end"). Only there: our stop mapped across, the fallback where they had no platform within
+    // 30 m, stopped them opposite our stop sign with doors open, a second stop where theirs is staggered 27-141 m
+    // away (42 of the 49 such points on the five lines) and one where PID has none for them (the user, 2026-11-09:
+    // "ai trams from other direction still seem to stop and open door at our direction's stops but a bit past the
+    // stop sign"). Our stops with no platform of the same name for them: noOppositeStop (lint).
     // (on their right: the T3's doors; not at a platform no tram stops at, `unused`, #407)
     // (overlapping platforms of one stop, OSM and GTFS, are one stretch: two stop points in one platform
     // stopped the tram twice, Kobylisy 951 and 1012)
@@ -304,11 +308,9 @@ export class Traffic {
     const runs = [];
     for (const [a, b] of backPl) if (runs.length && a < runs[runs.length - 1][1] + 10) runs[runs.length - 1][1] = Math.max(runs[runs.length - 1][1], b); else runs.push([a, b]);
     const ends = runs.map(([, b]) => b - 1);
-    this.backStops = this.back ? [...ends, ...game.stops.map((st) => {
-      const o = route.offset(st.target, 3.2);
-      const n = this.back.nearestOnHeading(o.x, o.y, -o.hx, -o.hy);
-      return n && n.d < 30 && !runs.some(([a, b]) => n.s + 8 > a - 30 && n.s + 8 < b + 30) ? n.s + 8 : null;
-    }).filter((s) => s !== null)].sort((a, b) => a - b) : [];
+    this.backStops = this.back ? ends : [];
+    const backNames = new Set((game.platforms || []).filter((p) => p.back && p.rt === this.back && p.side < 0 && !p.unused).map((p) => p.name));
+    this.noOppositeStop = this.back ? game.stops.filter((st) => !backNames.has(st.name)).map((st) => ({ stop: st.name, s: st.target })) : [];
     // a junction's stop line for oncoming trams (backCross − 6, in update) inside a platform: the point lay up to 1.7 m past
     // the line, and a tram pulling in as the signal turned red rolled over it to reach the point (line 37 s 4688, line 9
     // s 5409, #385). A line up to 10 m before the point moves it to 3 m before the line, where a red stops it anyway, if
