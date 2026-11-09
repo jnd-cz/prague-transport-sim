@@ -235,13 +235,23 @@ export class Game {
     const quad = (a, b, c, d, k) => { tri(a, b, c, k); tri(a, c, d, k); };
     this.platforms = [];
     for (const pl of this.data.platforms || []) {
-      let best = null;
+      let best = null, mine = null;
       for (const rt of routes) {
         const proj = pl.p.map(([x, y]) => rt.nearest(x, y));
         if (proj.some((q) => !q)) continue;
         const d = proj.reduce((a, q) => a + q.d, 0) / proj.length;
         if (!best || d < best.d) best = { rt, proj, d };
+        // (the route takes a platform on its doors' side, however near the back path: on a round trip, line 9,
+        // the back path runs over the same tracks the same way and took half the platforms by a hair, each
+        // drawn with a second stop sign beside our stop's. Judged by its points along the route: line 37 starts
+        // at the head of Spojovací's platform, 29 m of it lie behind the start)
+        if (rt !== this.route) continue;
+        const ins = pl.p.map((_, i) => i).filter((i) => proj[i].s > 0.5 && proj[i].s < rt.length - 0.5);
+        const din = ins.reduce((a, i) => a + proj[i].d, 0) / ins.length;
+        const lat = ins.reduce((a, i) => { const [x, y] = pl.p[i], q = rt.at(proj[i].s); return a + q.hx * (y - q.y) - q.hy * (x - q.x); }, 0);
+        if (ins.length && din <= 12 && lat <= 0) mine = { rt, proj, d };
       }
+      if (mine) best = mine;
       if (!best || best.d > 12) continue;
       const { rt, proj } = best;
       // (a platform known only from GTFS: its stop position is where the tram front stops; the
@@ -286,16 +296,21 @@ export class Game {
       this.objects.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
     }
     // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
-    // their driving direction is along the back route), shelter where OSM has one
+    // their driving direction is along the back route), shelter where OSM has one. One sign per platform: where OSM
+    // draws a platform as two ways, the one without PID's stop got a blank sign beside the other's (Flora,
+    // Malostranská)
+    const twin = (p) => !p.stop && this.platforms.some((q) => q !== p && q.back && q.stop && q.rt === p.rt && q.side === p.side && q.s0 < p.s1 && p.s0 < q.s1);
     for (const p of this.platforms) {
       if (!p.back) continue;
-      const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
-      const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
-      const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.18 : ground.trackAt(o.x, o.y);
-      const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
-      sign.position.set(o.x, zt + 0.18, -o.y);
-      sign.rotation.y = Math.atan2(-h.hx, h.hy);
-      this.objects.add(sign);
+      if (!twin(p)) {
+        const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
+        const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
+        const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.18 : ground.trackAt(o.x, o.y);
+        const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
+        sign.position.set(o.x, zt + 0.18, -o.y);
+        sign.rotation.y = Math.atan2(-h.hx, h.hy);
+        this.objects.add(sign);
+      }
       if (p.shelter) {
         const sh = makeShelter(), m = p.rt.offset((p.s0 + p.s1) / 2, p.side * (p.outer - 0.6));
         sh.position.set(m.x, ground.trackAt(m.x, m.y) + 0.18, -m.y);

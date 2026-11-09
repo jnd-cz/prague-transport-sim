@@ -369,7 +369,40 @@ def vienna(R, survey, s0, s1):
         s += 4
     if lane + raised < 3 or lane / (lane + raised) <= 0.5:
         return None
-    return round(kerb / nk, 2) if nk else 6.0
+    return kerb / nk if nk else 6.0
+
+
+def side_of(pl, rt, proj):
+    """-1 where the platform lies right of the route (the doors' side), +1 left (src/game.js _buildPlatforms)."""
+    lat = 0.0
+    for (x, y), (s, _) in zip((q[:2] for q in pl['p']), proj):
+        qx, qy, hx, hy = rt.at(s)
+        lat += hx * (y - qy) - hy * (x - qx)
+    return 1 if lat > 0 else -1
+
+
+def assign(pl, R, RB):
+    """The route a platform belongs to, (route, projections, mean distance) or None (src/game.js _buildPlatforms): the
+    route where it lies on the doors' side within 12 m, however near the back path (on line 9's round trip the back
+    path runs over the same tracks the same way and took half the platforms by a hair, each drawn with a second stop
+    sign beside our stop's), judged by its points along the route (line 37 starts at the head of Spojovací's
+    platform); else the nearer of the two."""
+    best = mine = None
+    for rt in [R] + ([RB] if RB else []):
+        proj = [rt.nearest(x, y) for x, y in (q[:2] for q in pl['p'])]
+        if any(s is None for s, _ in proj):
+            continue
+        d = sum(q[1] for q in proj) / len(proj)
+        if best is None or d < best[2]:
+            best = (rt, proj, d)
+        if rt is not R:
+            continue
+        ins = [i for i, (s, _) in enumerate(proj) if 0.5 < s < rt.length - 0.5]
+        if ins:
+            pts = [pl['p'][i] for i in ins]
+            if sum(proj[i][1] for i in ins) / len(ins) <= 12 and side_of({'p': pts}, rt, [proj[i] for i in ins]) < 0:
+                mine = (rt, proj, d)
+    return mine or best
 
 
 def stop_types(data, survey, targets, R, RB):
@@ -378,14 +411,7 @@ def stop_types(data, survey, targets, R, RB):
     ({platform index: kerb}, {stop index: kerb}), kerb None for an ordinary stop."""
     plats, ours = {}, []
     for k, pl in enumerate(data.get('platforms') or []):
-        best = None
-        for rt in [R] + ([RB] if RB else []):
-            proj = [rt.nearest(x, y) for x, y in (q[:2] for q in pl['p'])]
-            if any(s is None for s, _ in proj):
-                continue
-            d = sum(q[1] for q in proj) / len(proj)
-            if best is None or d < best[2]:
-                best = (rt, proj, d)
+        best = assign(pl, R, RB)
         if best is None or best[2] > 12:
             continue
         rt, proj, _ = best
@@ -395,11 +421,7 @@ def stop_types(data, survey, targets, R, RB):
             s0 = s1 - 32
         if s1 - s0 < 8 or s1 - s0 > 120:
             continue
-        lats = []
-        for (x, y), (s, _) in zip((q[:2] for q in pl['p']), proj):
-            qx, qy, hx, hy = rt.at(s)
-            lats.append(hx * (y - qy) - hy * (x - qx))
-        side = (1 if sum(lats) > 0 else -1) if sum(lats) else -1
+        side = side_of(pl, rt, proj)
         if side < 0:
             plats[k] = vienna(rt, survey, s0, s1)
             if rt is R:
@@ -466,7 +488,9 @@ def main():
     data['signals'] = raw
     placed, targets, moved, C, R = place(data, osm_tram_signals(a.line))
     data['signalsRaw'] = raw
-    data['signals'] = [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in d.items() if k in SIGNAL_KEYS} for d in placed]
+    # (unrounded: the game's own rules keep full precision, and a 5 cm shift of signals and stop points reshuffled every
+    # seeded drive like a new seed)
+    data['signals'] = [{k: v for k, v in d.items() if k in SIGNAL_KEYS} for d in placed]
     # the stop types from the survey (stage 2): `vienna` the kerb's offset or null, on the platforms judged and on the stops
     dtm = ROOT / 'data' / f'line{a.line}.dtm.json'
     for pl_ in data.get('platforms') or []:
