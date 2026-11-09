@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-08r",
- "built_at_commit": "486440f",
- "published": "2026-11-09 10:20",
- "note": "Loops and stop-sign points (#211): lines 9, 17, 22, 23, 37 rebuilt with trackwork.loops",
+ "built_at_commit": "09d85d6",
+ "published": "2026-11-09 11:20",
+ "note": "Survey on lines 9, 23 and 37 (#125): their dtm and zps sidecars, the five lines rebuilt",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -84,6 +84,10 @@
    "size": 4806216,
    "sha256": "255734fd6550040eb0ae9c6a73da27836dd739934b2beed985f072f705a26553"
   },
+  "line23.dtm.json": {
+   "size": 4317511,
+   "sha256": "2b83d46318a6b911438f8962d0522fc3d259db6d07028aa1f7c620c4921b33e5"
+  },
   "line23.dtmpoints.json": {
    "size": 468871,
    "sha256": "b6e4f3ff48d6a593ee7f85ad979fb50daea5fc1937dc08a9a1364e36776b6221"
@@ -108,9 +112,17 @@
    "size": 2170,
    "sha256": "f2c55a0abde05a0d187d781a66768181620d83a45caf752bd2afab87362b61ed"
   },
+  "line23.zps.json": {
+   "size": 3323466,
+   "sha256": "06fb6c13644a4ec0f3534ed96a557784772694a2c8068f96a96a1b621ca4effd"
+  },
   "line37.bld.bin": {
    "size": 3170628,
    "sha256": "7e78b231bef0f7814653fe5ccb6a7bd5d3d32d6e8cae51d622e9fce02d6768a4"
+  },
+  "line37.dtm.json": {
+   "size": 4682047,
+   "sha256": "3799f10bbbc7557b26b7d086cb7152bc545d09221fc446a462a934e8ccfd6aa6"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -129,16 +141,24 @@
    "sha256": "cb0a10ac26f32199caf577e8e729af1d3689a1985766bb4d7c857a7bc35ce461"
   },
   "line37.json": {
-   "size": 2162916,
-   "sha256": "3e5ad772d6c7a9aa6aaad00d8e295b5bd81b4747a6469c904af1be4aa969e7e5"
+   "size": 2161053,
+   "sha256": "2c3f84e96c0e97cf3c34d2e4f1c4dde327432bb3833aea1792670b6b2ce78aae"
   },
   "line37.validate.json": {
    "size": 2514,
    "sha256": "13b9285cd5f16cecc01f2334969687e8ac553021ef2e08bebac146629be5f028"
   },
+  "line37.zps.json": {
+   "size": 3403475,
+   "sha256": "39caeda7d1af3e75453b37ceb2c5aae1a756b4d3ea6fbb27acea468b759d0e57"
+  },
   "line9.bld.bin": {
    "size": 10029834,
    "sha256": "b35aad115d84a87bdb6a52c545aa85897284e44886d45b3d03d255246f82c76a"
+  },
+  "line9.dtm.json": {
+   "size": 9578218,
+   "sha256": "25c2eebfc3229131b2334b8e5d044279175cc435aa7520baa4dae81d22a48663"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
@@ -157,12 +177,16 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5370021,
-   "sha256": "1745a1562b2d70000078bc7e45ae8d14638b37d0bef2c0431b64c668b1b269be"
+   "size": 5370475,
+   "sha256": "3fb07a5f4f4547047466b40f501a4c196ae30bfc6bbb0e6a94911607d934f679"
   },
   "line9.validate.json": {
    "size": 6596,
    "sha256": "cf5b6fc3c321ae39dd068553d8d3612d8c4d9ea22abfd75e3efbe306a3d4af63"
+  },
+  "line9.zps.json": {
+   "size": 7400229,
+   "sha256": "4737abf35276431d45159fc823298823599f80982080053537e4c4f023e2b3f3"
   },
   "lines.json": {
    "size": 607,
