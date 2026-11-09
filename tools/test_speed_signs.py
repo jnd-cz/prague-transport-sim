@@ -63,14 +63,14 @@ async () => {
 
 SPEED_RULES = r"""
 async () => {
-  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, FROG } = await import('/src/speedRules.js');
+  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, stopPassPoints, FROG } = await import('/src/speedRules.js');
   const { signFacts } = await import('/src/speedSigns.js');
   const { Route } = await import('/src/route.js');
   const truth = await (await fetch('/data/truth.json')).json();
   const facts = speedFacts(truth);
   let missing = null;
   try { speedFacts({ operation: { facts: [] } }); } catch (e) { missing = String(e.message); }
-  const work = { trailing: [{ s: 200, fromDiverging: true }, { s: 300, fromDiverging: false, frog: 12 }], crossings: [400] };
+  const work = { trailing: [{ s: 200, fromDiverging: true }, { s: 300, fromDiverging: false, frog: 12 }], crossings: [400], loops: [{ from: 500, to: 640 }] };
   const own = (posted, trackwork) => withoutOwnPieces(posted, 5, [{ s: 100 }], trackwork, facts);
   const fill = (...parts) => parts.flatMap(([v, n]) => Array(n).fill(v));
   const stops = [{ name: 'A', s: 0 }, { name: 'Hercovka', s: 100 }, { name: 'Nad Trojou', s: 200 }];
@@ -104,6 +104,7 @@ async () => {
     facts, missing, FROG, signs: signFacts(truth),
     stretches: trackworkStretches([{ s: 100 }, { s: 150, frog: 13 }], work, facts),
     noData: trackworkStretches([{ s: 100 }], undefined, facts),
+    points: stopPassPoints([{ name: 'A', target: 10 }, { name: 'C', target: 300 }, { name: 'B', target: 150 }], facts),
     ownDropped: own(fill([50, 19], [15, 4], [50, 5]), work),
     farKept: own(fill([50, 40], [15, 2], [50, 5]), { trailing: [], crossings: [] }),
     withoutWork: own(fill([50, 19], [15, 4], [50, 5]), null),
@@ -259,13 +260,16 @@ def check_rules(r):
     want("R07 at the press release's speeds", [(w["straight"], w["diverging"]) for w in r["signs"]["speedSwitches"]][:1], [(50, 35)])
     want("Trojská's dangerous gradient", [(g["from"], g["to"], g["descending"], g["permille"]) for g in r["signs"]["gradients"]], [("Hercovka", "Nad Trojou", True, 80)])
     want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
-                                         "past": 0, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
+                                         "past": 0, "loop": 15, "stopPass": 30, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
     if "no value" not in (r["missing"] or ""):
         f.append(f"a missing fact must stop the game: {r['missing']}")
     want("switches from the blades to the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"], "v": 15}])
     want("every kind of trackwork, each to its end", r["stretches"], [
         {"from": 96, "to": 100 + r["FROG"], "v": 15}, {"from": 146, "to": 163, "v": 15},
-        {"from": 200 - r["FROG"], "to": 204, "v": 15}, {"from": 288, "to": 304, "v": 30}, {"from": 397, "to": 403, "v": 15}])
+        {"from": 200 - r["FROG"], "to": 204, "v": 15}, {"from": 288, "to": 304, "v": 30}, {"from": 397, "to": 403, "v": 15},
+        {"from": 500, "to": 640, "v": 15}])
+    want("a stop sign is a point limit at 30 km/h for the front, every stop's but the first, by place", r["points"],
+         [{"s": 150, "v": 30, "stop": "B"}, {"s": 300, "v": 30, "stop": "C"}])
     p = r["places"]
     want("Trojská's fact where OSM tags nothing", p["untagged"], [{"from": 100, "to": 200, "v": 25}])
     want("OSM comes first", p["tagged"], [])
