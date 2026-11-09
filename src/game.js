@@ -342,32 +342,24 @@ export class Game {
   }
 
   _initSignals() {
+    // where each signal stands: the build's placement (tools/placement.py, #22: the same rules, decided once with
+    // each decision's rule) where the data has it, else the rules here. With the build's, the rules here run too on
+    // the signals as build_line found them, and every place where they disagree is logged (placementDiffs).
+    const built = this.data.signals?.some((d) => d.rule) ? this.data.signals : null;
+    const own = this._placeSignals(built ? (this.data.signalsRaw || []) : this.data.signals);
     // grade separation: where our track is on a bridge, the junctions and their traffic lights
     // belong to the road underneath (e.g. the Modřany estakáda), not to the tram
-    const placed = this._placeSignals(this.data.signals);
-    this.signals = placed.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d, i) => {
-      d = { ...d };
-      // a signal never stands along a platform: it moves to the platform head, just past where the
-      // tram front stops; if the crossing follows too closely for that, it hangs from the wire
-      for (const st of this.stops) {
-        const a = (st.p0 ?? st.target - 30) - 1, b = st.target + 2;
-        if (d.s > a && d.s < b) {
-          // (only while the platform head is still before the junction's near edge)
-          if (b < (d.edge ?? d.cross) - 1) d.s = b;
-          else {
-            // (the crossing right after the platform: its stop point, 3 m before the signal, is where the
-            // front stops for the passengers, or the crossing's edge if that comes first; hung 12-15 m
-            // back over the platform it made trams stop short of the platform end at red, Kublov)
-            d.hang = true; d.head = st;
-            d.s = Math.max(d.s, Math.min(st.target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
-            // (and the front stops for the passengers no further than that: the crossing began 4 m before
-            // the platform's end at Staroměstská, the tram served the stop 3 m past its red stop point)
-            // (served up to 0.5 m before the signal, 2.5 m past the stop point: 0.5 m was too little to stop a T3
-            // in, the user, #255)
-            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
-          }
-        }
-      }
+    const live = (list) => list.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d) => ({ ...d }));
+    let placed;
+    if (built) {
+      placed = live(built).map((d) => ({ ...d, head: d.head !== undefined ? this.stops[d.head] : undefined }));
+      // (the stop point moves back before a hung signal as below, after the zone the set's length gave it)
+      for (const d of placed) if (d.head && d.s - 3 < d.head.target) this._stopBefore(d.head, d);
+      this._dryTargets = new Map();
+      this.placementDiffs = this._placementDiffs(placed, live(own).map((d) => this._platformRule(d, true)));
+      if (this.placementDiffs.length) console.log(`placement: the build and the game differ at ${this.placementDiffs.join('; ')}`);
+    } else placed = live(own).map((d) => this._platformRule(d));
+    this.signals = placed.map((d, i) => {
       const mesh = makeTramSignal();
       // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
       // the track, so the post does not hide it from the driver; the same pole carries the crossing's
@@ -401,6 +393,51 @@ export class Game {
     }).sort((a, b) => a.s - b.s);
     this._initGauntlets();
     this._initDistantSignals();
+  }
+
+  // A signal never stands along a platform: it moves to the platform head, just past where the tram front stops; if the
+  // crossing follows too closely for that, it hangs from the wire and the stop point moves back before it (tools/
+  // placement.py platform_rule, the same). `dry`: decide only, for the comparison with the build's placement, with the
+  // stop points moved so far kept in this._dryTargets.
+  _platformRule(d, dry = false) {
+    for (const st of this.stops) {
+      const target = dry ? this._dryTargets.get(st) ?? st.target : st.target;
+      const a = (st.p0 ?? target - 30) - 1, b = target + 2;
+      if (d.s > a && d.s < b) {
+        // (only while the platform head is still before the junction's near edge)
+        if (b < (d.edge ?? d.cross) - 1) d.s = b;
+        else {
+          // (the crossing right after the platform: its stop point, 3 m before the signal, is where the
+          // front stops for the passengers, or the crossing's edge if that comes first; hung 12-15 m
+          // back over the platform it made trams stop short of the platform end at red, Kublov)
+          d.hang = true; d.head = st;
+          d.s = Math.max(d.s, Math.min(target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
+          if (d.s - 3 < target) { if (dry) this._dryTargets.set(st, d.s - 3); else this._stopBefore(st, d); }
+        }
+      }
+    }
+    return d;
+  }
+
+  // (and the front stops for the passengers no further than that: the crossing began 4 m before the platform's end at
+  // Staroměstská, the tram served the stop 3 m past its red stop point; served up to 0.5 m before the signal, 2.5 m past
+  // the stop point: 0.5 m was too little to stop a T3 in, the user, #255)
+  _stopBefore(st, d) {
+    st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target);
+  }
+
+  // Where the build's placement and the rules here disagree: ["sig@s0: what"], by the signals' input position s0.
+  _placementDiffs(built, own) {
+    const key = (d) => Math.round((d.s0 ?? d.s) * 10), mine = new Map(own.map((d) => [key(d), d])), out = [];
+    for (const b of built) {
+      const o = mine.get(key(b)), at = `sig@${Math.round(b.s0 ?? b.s)}`;
+      mine.delete(key(b));
+      if (!o) { out.push(`${at}: only the build's`); continue; }
+      if (Math.abs(o.s - b.s) > 0.15) out.push(`${at}: at ${b.s.toFixed(1)}, the game's at ${o.s.toFixed(1)}`);
+      if (!!o.hang !== !!b.hang || o.head?.name !== b.head?.name) out.push(`${at}: hung ${!!b.hang} at ${b.head?.name ?? '-'}, the game's ${!!o.hang} at ${o.head?.name ?? '-'}`);
+    }
+    for (const o of mine.values()) out.push(`sig@${Math.round(o.s0 ?? o.s)}: only the game's`);
+    return out;
   }
 
   // Interlaced track (gauntlet), e.g. Letenska under the building near Malostranske namesti:
