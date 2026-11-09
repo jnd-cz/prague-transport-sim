@@ -299,7 +299,7 @@ export class TR37 {
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
   // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
-  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather) }.
+  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather), maxDrive (N: no drive step pulling more) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -315,8 +315,10 @@ export class TR37 {
     // jolt of 1.5 m/s² just before the stand)
     if (w.stand) s = v < 0.3 && now <= -3 && (w.aCoast ?? 0) > -0.3 ? now : Math.min(-3, -pick(-w.force, F));
     else if (w.coast) s = 0;
-    else if (w.force > 0) s = pick(w.force, (k) => this.driveForce(k));
-    else {
+    else if (w.force > 0) {
+      s = pick(w.force, (k) => this.driveForce(k));
+      if (w.maxDrive != null) while (s > 1 && this.driveForce(s) > w.maxDrive) s--; // (the rail's grip, #265)
+    } else {
       // a brake step stays while it is about right: on the way in it would otherwise come and go, the force asked for
       // falling as soon as a step gives more than it (main let go and pressed again ≈5 times per stop)
       const f = -w.force, on = now < 0 ? -now : 0;
