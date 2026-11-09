@@ -74,6 +74,19 @@ class Import(unittest.TestCase):
             self.assertEqual(t["stopSigns"]["signs"], [{"stop": "B"}])
             self.assertTrue(p.read_text(encoding="utf-8").startswith('{\n "note": "x",\n "stops": [\n  {"name": "A"}'))
 
+    def test_a_section_after_stop_signs_stays(self):
+        # (#351 added substations behind stopSigns; the import cut everything after its own section)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "truth.json"
+            p.write_text('{\n "note": "x",\n "stopSigns": {\n  "signs": []\n },\n "substations": {\n  "list": [1]\n }\n}\n',
+                         encoding="utf-8")
+            R.write_truth([{"stop": "B"}], str(p))
+            text = p.read_text(encoding="utf-8")
+            t = json.loads(text)
+            self.assertEqual(list(t), ["note", "stopSigns", "substations"])
+            self.assertEqual((t["stopSigns"]["signs"], t["substations"]), ([{"stop": "B"}], {"list": [1]}))
+            self.assertTrue(text.endswith(',\n "substations": {\n  "list": [1]\n }\n}\n'))
+
 
 if __name__ == "__main__":
     unittest.main()
