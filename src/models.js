@@ -2,7 +2,7 @@
 // in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
 import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
-import { makeSimpleSet } from './t3simple.js';
+import { makeSimpleSet, t3Variant, fleetNumbers } from './t3simple.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
@@ -66,7 +66,22 @@ function numberTexture(line, w, h, fg, bg, fill = 0.85) {
     g.fillText(text, w / 2, h / 2 + h * 0.04);
   });
 }
-const routeBoxTexture = (line) => numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9);
+// (a T3M's route display: green figures on black; the user's photos of 8080, 2026-11-09: "green top number plate")
+const routeBoxTexture = (line, variant) => (variant === 'T3M' ? ledTexture(line) : numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9));
+function ledTexture(line) {
+  return canvasTexture(160, 128, (g, w, h) => {
+    g.fillStyle = '#121612';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#9be36a';
+    g.font = `bold ${h * 0.78}px "Arial Narrow", Arial, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(line), w / 2, h / 2 + h * 0.04);
+    g.fillStyle = 'rgba(18, 22, 18, 0.6)'; // the diodes' grid
+    for (let x = 0; x < w; x += 5) g.fillRect(x, 0, 1.5, h);
+    for (let y = 0; y < h; y += 5) g.fillRect(0, y, w, 1.5);
+  });
+}
 const mirrorPlateTexture = (line) => numberTexture(line, 104, 128, '#ffffff', DPP_BLUE, 0.85);
 const rearPlateTexture = (line) => numberTexture(line, 144, 128, '#1d3f86', '#f4f4f0', 1.0);
 const runCardTexture = (run) => numberTexture(run, 112, 72, '#f4f4f0', '#151515', 0.8);
@@ -105,24 +120,26 @@ function destinationTexture(name) {
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
 // detailed: 'hybrid' (or true: the animated hybrid, src/t3h.js), 'classic' (conflig's model, loaded on the
-// player's choice), false (the built-in car, src/t3simple.js); a model not loaded falls back to the next simpler one
-export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '' } = {}) {
+// player's choice), false (the built-in car, src/t3simple.js); a model not loaded falls back to the next simpler one.
+// variant (the built-in car): 'T3SUCS' or 'T3M'; none: one from the run number (a quarter of the sets T3Ms)
+export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '', variant = null } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
   if (detailed === 'classic' && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
   if (detailed && hybridReady()) { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP); root.userData.kind = 'hybrid'; return root; }
   if (detailed && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
-  makeSimpleSet(root, cars, dest, plateMats(line, dest, run), CONTACT_WIRE - RAIL_TOP);
+  const v = variant ?? t3Variant(run);
+  makeSimpleSet(root, cars, dest, plateMats(line, dest, run, v), CONTACT_WIRE - RAIL_TOP, { variant: v, fleet: fleetNumbers(v, run, cars) });
   Object.assign(root.userData, { kind: 'simple', dest, run });
   return root;
 }
 
 // the plates' and cards' materials of a set: route box and mirror plate glowing, the cards on the glass lit like the body
-function plateMats(line, dest, run) {
+function plateMats(line, dest, run, variant) {
   const plate = (map) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
   const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
   return {
-    rbMat: plate(routeBoxTexture(line)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
+    rbMat: plate(routeBoxTexture(line, variant)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
     destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)),
   };
 }
@@ -341,7 +358,7 @@ export function setConsistLine(model, line, dest = model.userData.dest, run = mo
   const u = model.userData, { mats } = u;
   const swap = (m, tex) => { if (!m) return; const old = m.map; m.map = tex; m.needsUpdate = true; old?.dispose(); };
   if (u.line !== line) {
-    swap(mats.rbMat, routeBoxTexture(line));
+    swap(mats.rbMat, routeBoxTexture(line, u.variant));
     swap(mats.mirMat, mirrorPlateTexture(line));
     swap(mats.rearMat, rearPlateTexture(line));
   }

@@ -197,7 +197,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
   (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one, with the
   dimensions and livery of the T3's general-arrangement drawing, no saloon and no moving parts, the lightest
-  to draw.
+  to draw. With it the other trams run as T3SUCS and T3M sets (the T3M with the resistors' box on its roof and
+  its green route display).
 
 ### On a phone or tablet
 

@@ -191,7 +191,8 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
   od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý, s rozměry a nátěrem podle
-  typového výkresu T3, bez interiéru a nehybný, nejlehčí na výkon.
+  typového výkresu T3, bez interiéru a nehybný, nejlehčí na výkon. S ním jezdí cizí soupravy jako T3SUCS i T3M
+  (T3M s bednou odporníků na střeše a zeleným číslem linky).
 
 ### Na telefonu nebo tabletu
 

@@ -442,6 +442,12 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   the centreline; the front and rear doors stand on the taper. The plan view on p. 10 of Dynybyl's thesis is too narrow (the
   user, 2026-11-09: "looks more narrow, like t1 or early prototype than t3"). Laid over the colour elevation at its scale, the
   built model's windows, doors, bands and ends fall on its lines.
+- **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
+  round the cab than along the saloon, under a cream band with a flap; the bumpers black (heritage cars: aluminium); the route
+  plate hangs on the mirror's arm, which drops from the cab's roof; rectangular lamp units (indicator over a lamp) by the
+  corners; fleet numbers yellow on the front between the headlights, on the rear and on both sides. A T3M has the resistors'
+  box on the roof towards the rear and a green route display ("Box on top with resistors towards back only for t3m, which has
+  green top number plate").
 
 ## Heuristics that stand in for missing data
 

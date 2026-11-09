@@ -6,7 +6,8 @@ Needs no world data. Checks: the body is 14.0 x 2.5 m with its roof at 3.02 m; t
 from the doors and in the side view lean back above the windscreen's foot (the drawing's numbers); the
 bogie pivots 6.4 m apart with wheels of 700 mm at 1.9 m; the couplers' heads meet in a two-car set; the
 pantograph's head at the wire; the plates and cards on the right cars and swapped with the line; at most
-three draw calls a car besides its plates. With --shots: the same views of each model (side, three-quarter
+four draw calls a car besides its plates; the T3M variant with its roof box and green display, fleet numbers by
+type, AI sets of both types. With --shots: the same views of each model (side, three-quarter
 front and rear, the front, a two-car set, an orthographic side elevation at the colour drawing's scale)
 as DIR/<model>-<view>.png and one picture per view with the models side by side (DIR/compare-<view>.png).
 """
@@ -29,12 +30,23 @@ MEASURE = r"""async () => {
   const THREE = await import('three');
   const models = await import('/src/models.js');
   const { CAR_PITCH } = await import('/src/tram.js');
-  const m = models.makeT3({ line: '17', cars: 2, detailed: false, dest: 'Vozovna Kobylisy', run: '801' });
+  const m = models.makeT3({ line: '17', cars: 2, detailed: false, dest: 'Vozovna Kobylisy', run: '801', variant: 'T3SUCS' });
   new THREE.Scene().add(m);
   const [a, b] = m.userData.cars, out = { kind: m.userData.kind, bogie: m.userData.bogie };
   const meshes = (car) => car.children.filter((o) => o.isMesh);
+  const named = (car, name) => car.children.find((o) => o.name === name);
   out.drawn = [meshes(a).length, meshes(b).length];
-  const body = meshes(a)[0], parts = meshes(a)[1];
+  const body = named(a, 'body'), parts = named(a, 'parts');
+  // the variants: the T3M's resistor box towards the rear of the roof, its route display; the fleet numbers
+  const roofBox = (geo) => { const P = geo.attributes.position; let top = 0; for (let i = 0; i < P.count; i++) if (P.getZ(i) < -1.2 && P.getZ(i) > -4.1 && Math.abs(P.getX(i)) < 0.7) top = Math.max(top, P.getY(i)); return top; };
+  const px = (mat) => Array.from(mat.map.image.getContext('2d').getImageData(3, 3, 1, 1).data.slice(0, 3));
+  const t3m = models.makeT3({ line: '17', cars: 2, detailed: false, run: '801', variant: 'T3M' });
+  out.variants = { suc: m.userData.variant, m: t3m.userData.variant, sucRoof: roofBox(parts.geometry), mRoof: roofBox(named(t3m.userData.cars[0], 'parts').geometry),
+    sucDisplay: px(m.userData.mats.rbMat), mDisplay: px(t3m.userData.mats.rbMat) };
+  out.fleet = { suc: m.userData.fleet, m: t3m.userData.fleet, meshes: [a, b].map((c) => c.children.filter((o) => o.name === 'fleet').length) };
+  const auto = new Set();
+  for (let r = 801; r < 849; r++) auto.add(models.makeT3({ line: '17', detailed: false, run: String(r) }).userData.variant);
+  out.fleet.auto = [...auto].sort();
   body.geometry.computeBoundingBox();
   const bb = body.geometry.boundingBox;
   out.body = { x: [bb.min.x, bb.max.x], y: [bb.min.y, bb.max.y], z: [bb.min.z, bb.max.z] };
@@ -64,7 +76,7 @@ MEASURE = r"""async () => {
   m.updateMatrixWorld(true);
   out.couplerGap = a.localToWorld(new THREE.Vector3(0, 0, zMin)).distanceTo(b.localToWorld(new THREE.Vector3(0, 0, zMax)));
   // the plates: route box, mirror, destination and run on the first car, the rear plate on the last
-  out.plates = [meshes(a).length - 3, meshes(b).length - 3];
+  out.plates = [a, b].map((c) => c.children.filter((o) => o.name === 'plate').length);
   const rb = m.userData.mats.rbMat, map0 = rb.map;
   models.setConsistLine(m, '22', 'Bílá Hora', '802');
   out.swapped = rb.map !== map0 && m.userData.dest === 'Bílá Hora';
@@ -106,11 +118,13 @@ SHOTS = r"""async ({ kinds }) => {
   const views = {
     side: persp([-24, 2.2, 0.5], [0, 1.6, 0.5], 36), front34: persp([-7.5, 2.3, 15], [0, 1.5, 5]), rear34: persp([7, 2.4, -15], [0, 1.5, -5]),
     front: persp([0, 1.8, 22], [0, 1.7, 0], 14), set: persp([-14, 4, 24], [0, 1.4, -4], 40), elevation: elev,
+    bogie: persp([-5, 0.9, 3.4], [0, 0.45, 3.2], 32),
   };
   const out = {};
   for (const kind of kinds) {
     for (const [view, cam] of Object.entries(views)) {
-      const m = models.makeT3({ line: '17', cars: view === 'set' ? 2 : 1, detailed: kind === 'simple' ? false : kind, dest: 'Sídliště Ďáblice', run: '801' });
+      const simple = kind === 'simple' || kind === 't3m';
+      const m = models.makeT3({ line: '17', cars: view === 'set' ? 2 : 1, detailed: simple ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant: kind === 't3m' ? 'T3M' : 'T3SUCS' });
       models.placeConsist(m, 7.6, (s) => [0, -s, 0, 0]);
       if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
       scene.add(m);
@@ -165,7 +179,14 @@ def judge(r):
         "the coupled heads meet": r["couplerGap"] < 0.01,
         "plates: 4 on the first car, the rear plate on the last": r["plates"] == [4, 1],
         "the plates follow the line": r["swapped"],
-        "three draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 3 and r["drawn"][1] - r["plates"][1] <= 3,
+        "four draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 4 and r["drawn"][1] - r["plates"][1] <= 4,
+        # the variants: only a T3M has the resistors' box on the roof (3.02 m) and the green-on-black display
+        "variants as asked": r["variants"]["suc"] == "T3SUCS" and r["variants"]["m"] == "T3M",
+        "the T3M's roof box, none on the T3SUCS": r["variants"]["mRoof"] > 3.25 and r["variants"]["sucRoof"] < 3.15,
+        "the T3M's display dark, the T3SUCS's plate blue": sum(r["variants"]["mDisplay"]) < 90 and r["variants"]["sucDisplay"][2] > 120,
+        "fleet numbers by type, each car its own": all(7001 <= n <= 7292 for n in r["fleet"]["suc"]) and all(8001 <= n <= 8090 for n in r["fleet"]["m"])
+        and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
+        "AI sets of both types by run number": r["fleet"]["auto"] == ["T3M", "T3SUCS"],
     }
     fails += [k for k, ok in want.items() if not ok]
     return fails
@@ -186,7 +207,7 @@ def montage(outdir, kinds, views):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--shots", help="also save the views of each model into this directory")
-    ap.add_argument("--models", default="simple,classic,hybrid", help="the models for --shots")
+    ap.add_argument("--models", default="simple,t3m,classic,hybrid", help="the models for --shots (t3m: the built-in car as a T3M)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     faulthandler.dump_traceback_later(600, exit=True)  # the whole test: page.evaluate has no time limit
