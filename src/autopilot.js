@@ -89,9 +89,14 @@ export class Autopilot {
       // first sight of the blinking, and a stop stays a stop while service braking (1.15 m/s²) still makes it: the test, met
       // again on the way down, turned a tram braking for it into one going through 82 m out at 41 km/h, which then slowed for
       // the junction's 15 km/h, spent the controller's 10 s and met red 7 m before the signal (line 23 towards Královka, seed 5)
+      // A stop decided stays a stop as long as step 5 still makes it: D 1/2 § 42.8, "Pozor" obliges the driver to stop unless, when it
+      // lit, the tram was too close to stop safely. Turned to go at service braking's edge with its reaction time (1.15 m/s² after
+      // 0.3 s), 16 m out at 5.2 m/s already on step 5 with 1.04 m/s² still to brake, it let the brake off as the controller's 10 s ran
+      // out and crossed on red (line 9 seed 1 on #22's data, #408)
       if (sig.state === 'warn' && this.goThrough !== sig && tr.v > 1) {
+        const a5 = (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
         if (this.stopFor !== sig && d < (tr.v * tr.v) / 1.8 + tr.v) this.goThrough = sig;
-        else if (this.stopFor === sig && d < (tr.v * tr.v) / 2.3 + 0.3 * tr.v) { this.goThrough = sig; this.stopFor = null; }
+        else if (this.stopFor === sig && d < (tr.v * tr.v) / (2 * 0.95 * Math.max(0.5, a5))) { this.goThrough = sig; this.stopFor = null; }
         else this.stopFor = sig;
       }
       // (red after all, the hold having run out while it crawled up behind something: stop if service
