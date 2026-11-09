@@ -343,6 +343,25 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   0.81–0.85 below 30 km/h, 1.06 from 30–40 (steps 3–5); whole stops from 20–40 km/h averaged 0.95–1.10 on the phone and the GPS.
   All the recorded cars have the same TR37 (the user, 2026-11-07: "all of recorded cars should have pretty much the same TR37.
   Difference can be mostly tuning and wear between depot servicing").
+- **The ride of 2026-11-08, and the presses per stretch** (#396): GPS of T3SUCS 7122 westbound from Jindřišská to Pražský hrad and of
+  T3 6921 eastbound from Pražský hrad to Bílá labuť (then on a diversion), and on 6921 a phone held in the hand for two parts (down
+  Chotkova from Královský letohrádek; Národní třída to Vodičkova). They approach the stops as rides 1–4: coasting 36–45 % of the distance,
+  the drive off 110–124 m out at 29–35 km/h, the last 32–55 m braked from 24–25 km/h at 0.71–0.72 m/s². The user counted 7122's presses
+  from zero, drive + brake: 38 + 19 to Pražský hrad, 2–3 + 1–2 a stretch on the level, 12–13 + 2 up the climb to Královský letohrádek
+  (the user: "Experienced driver seems to know well where exactly to drive to get most of each press between stops, only traffic adds
+  more presses than usual undisturbed ride would"). The GPS estimator reads 44 + 25 there: about a press a stretch too many, and fewer
+  up the climb, where a press that only holds the speed does not show. A hand-held phone's zero drifts by 0.4–0.6 m/s² between stands,
+  so its levels are taken from the GPS and the gradient, and it shows the shape within a second: a drive from 0.8 m/s² or more ends with
+  a drop to coasting within 0.1–0.2 s (5.4–8.3 m/s³), where the model's falls at 1.5–2.4 m/s³ over 0.3–0.7 s, the autopilot stepping
+  back through step 1 (T3SU-03 p. 4; the user: "Some zrychlovač shows larger jerks at the end of drive"). The autopilot on the same
+  stretches (line 23 built westbound for 7122, seeds 1–3) pressed 63 + 45 westbound and 80 + 59 eastbound, where 6921's GPS reads 46 +
+  39; besides traffic, from holding a speed on gradients and driving down descents.
+  With #396 (a switch contact far ahead no longer hides nearer limits from the drive's target; coasting into a lower limit as into a
+  point; no drive pedal down a descent where coasting gets there; brake step 1 held down a descent where it barely slows): down
+  Chotkova 4.7 + 10 (main 8.3 + 17). On the five lines, dry, seeds 1–5: drive presses −4 %, brake applications −13 %, the wire's
+  energy −4 to −10 %; the mean delay +18–28 s on lines 17, 22 and 23 (inside main's seed spread), the late penalty outside it on
+  lines 17 and 23 (19 → 78, 7 → 25). Holding a drive step to 0.6 m/s over up a climb pressed more and ran later; holding brake step 1
+  down every descent to 1 m/s under ran line 23 40 s later.
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
