@@ -299,7 +299,7 @@ export class TR37 {
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
   // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
-  // trackOk (false: no danger, so not the track brakes) }.
+  // trackOk (false: no danger, so not the track brakes), rising (true: a restriction lifts within RISE_LAG s, the limit is the target) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -335,14 +335,17 @@ export class TR37 {
     if (w.speedErr != null && !w.urgent && s > 0 && w.speedErr > 0.6) s = 0;
     if (w.speedErr != null && !w.urgent && s !== now) {
       const e = w.speedErr;
-      if (now < 0 && s > now && e > -0.4) s = now;
+      // (a restriction lifting within RISE_LAG s: the step stays to 0.35 m/s over the limit rather than off and on again, #370)
+      if (now > 0 && s >= 0 && w.rising && e < 0.35) s = now;
+      else if (now < 0 && s > now && e > -0.4) s = now;
       else if (now < 0 && s < now && e < 0.3) s = now;
       // (a high step comes off sooner: each takes 0.6 s on the way down, and up 50 ‰ on step 4 it went 2.8 km/h over the limit)
       else if (now > 0 && s >= 0 && e < 0.2 - 0.25 * (now - 1) && e > -0.7) s = now;
       // (once it let go, it coasts down w.holdSag under the speed before it presses again, 1 m/s at 30 km/h and over: the user, 2026-11-08,
       // "The hysteresis for speed under limit when another pedal press starts can be higher, which will lead to less presses"; at 0.35
       // the autopilot pressed 12.5-14.7 times a km on line 23, a driver 5.8 on a phone's count)
-      else if (now === 0 && s > 0 && e > -(w.holdSag ?? 0.35) && v > 1) s = 0;
+      // (but not in the last RISE_LAG s before a restriction lifts: pressed then, the current is up as the rear leaves it, #370)
+      else if (now === 0 && s > 0 && e > -(w.holdSag ?? 0.35) && v > 1 && !w.rising) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
       // (down a descent, where coasting gains the speed back in seconds, the brake comes down to step 1 rather than off, until 1 m/s
       // under, where step 1 slows it by less than 0.15 m/s²: let go 0.4 under and pressed again 0.25 over, it braked every 4-5 s holding

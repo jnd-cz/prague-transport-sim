@@ -22,6 +22,10 @@ const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far s
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
 const V_BUTTON = 4.2; // m/s: slow enough for the switch button: the accelerator stands at 30 or less coasting (ZR9, T3SU-24 § 8.2; tools/test_electric.py: 31 at 20 km/h), with the 1–2 km/h it comes in over the plan
 const V_BUTTON_COAST = 5.3; // m/s: the fastest the button still works coasting through (28 at 19 km/h coasting into Anděl, line 9 seed 1)
+// s of pedal early at a restriction's end: the target rises from the margin to the limit itself so that, pressed this early, the
+// accelerator's current is up as the limit lifts (#370's test drives: 1.5 s; the user, 2026-11-07: "anticipating end of restriction and
+// starts accelerating as it nears the end of it to stay within limit but use better the next faster segment")
+const RISE_LAG = 1.5;
 
 export class Autopilot {
   constructor() {
@@ -46,6 +50,12 @@ export class Autopilot {
     // (1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed, the user, 2026-11-07:
     // "our autopilot can lean a bit on the faster side where it makes sense")
     let vt = g.currentLimit / 3.6 - 0.4;
+    // (as the restriction ends the target rises to the limit itself, on the curve a 0.7 m/s² start would follow, RISE_LAG s early)
+    const up = g.limitRise?.();
+    if (up) {
+      const v = g.currentLimit / 3.6;
+      vt = Math.max(vt, Math.min(v, Math.sqrt(Math.max(0, v * v - 2 * 0.7 * Math.max(0, up.d - tr.v * RISE_LAG)))));
+    }
     let nl = g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
@@ -362,7 +372,8 @@ export class Autopilot {
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
-      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)) });
+      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)),
+      rising: !!up && vt >= vLimit - 0.05 && up.d - tr.v * RISE_LAG <= 0 });
     this.stopWhy = stopAt === null ? null : stopWhy; this.stopAtS = stopAt;
     return { vt, vtDrive, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }

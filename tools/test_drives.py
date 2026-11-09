@@ -45,7 +45,20 @@ RUN = """async (only) => {
         else { this.doorState = 'closed'; this.nextStop++; }
       },
       _atStop(st) { return tr.s >= st.zone[0] && tr.s <= st.zone[1]; },
-      get currentLimit() { return limitAt(tr.s); },
+      // (as the game: a limit holds over the tram's whole length, and limitRise is where it rises, #370)
+      get currentLimit() { let v = 99; for (let s = tr.s - tr.length; s <= tr.s + 0.1; s += 1) v = Math.min(v, limitAt(s)); return v; },
+      limitRise() {
+        if (!o.limits) return null;
+        const s = tr.s, L = tr.length, cur = this.currentLimit;
+        let last = null;
+        for (let x = s + 0.1; x >= s - L; x -= 1) if (limitAt(x) <= cur) { last = x; break; }
+        if (last === null) return null;
+        for (let x = s + 1; x - L <= last + 1 && x < s + 300; x += 1) if (limitAt(x) <= cur) last = x;
+        const d = Math.floor(last) + 1 + L - s;
+        let v = 99;
+        for (let x = s + d - L; x <= s + d + 0.1; x += 1) v = Math.min(v, limitAt(x));
+        return d < 300 && v > cur ? { d, v } : null;
+      },
       nextLimitChange() { if (!o.limits) return null; const here = limitAt(tr.s); for (const [a, v] of o.limits) if (a > tr.s && v < here && a - tr.s < 300) return { v, d: a - tr.s }; return null; },
       tramAheadGap() { return ahead ? ahead.s - ahead.length - tr.s : null; },
       keepClear() { return null; }, ringBell() {}, irc() {}, heatingDraws() { return false; },
@@ -75,7 +88,11 @@ RUN = """async (only) => {
       if (n > 0 && braked) { R.flips.push({ T: +T.toFixed(1), s: +tr.s.toFixed(1), kmh: +tr.kmh.toFixed(1), step: n, gap: g.tramAheadGap() === null ? null : +g.tramAheadGap().toFixed(1), car: !!o.crossing && T >= (o.crossing.from ?? 0) && T <= (o.crossing.to ?? Infinity) + 2 }); braked = false; }
       if (tr.v < 0.02) braked = false;
       R.maxDecel = Math.max(R.maxDecel, -tr.a);
-      R.overLimit = Math.max(R.overLimit, tr.kmh - limitAt(tr.s));
+      R.overLimit = Math.max(R.overLimit, tr.kmh - g.currentLimit);
+      // (the seconds from the rear leaving a restriction to the line's limit, for the drives that end one, #370)
+      if (o.riseAt !== undefined && R.upT === undefined && tr.s - tr.length >= o.riseAt) R.leftT = R.leftT ?? T;
+      if (R.leftT !== undefined && R.upT === undefined && tr.kmh >= (o.riseTo ?? 50) - 3) R.upT = +(T - R.leftT).toFixed(1);
+      if (o.riseAt !== undefined && tr.s >= o.riseAt + 150 && R.at150 === undefined) R.at150 = +T.toFixed(1);
       jf += ((tr.a - lastA) * 30 - jf) * 0.17;
       lastA = tr.a;
       if (tr.v > 0.2) R.maxJerk = Math.max(R.maxJerk, Math.abs(jf));
@@ -109,6 +126,11 @@ RUN = """async (only) => {
     { name: 'limit just before the stop', stops: [20, 600], limits: [[0, 50], [480, 15]], pax: 60 },
     // (a slow stretch that ends 90 m before a stop: coast on into it, as the real rides did, not drive up between two brakings)
     { name: 'limit ends 90 m before the stop', stops: [20, 700], limits: [[0, 50], [300, 20], [610, 50]], pax: 60 },
+    // (a restriction's end: the target rises to the limit as the rear nears the end, the pedal 1.5 s early, #370; the user, 2026-11-07:
+    // "anticipating end of restriction and starts accelerating as it nears the end of it to stay within limit")
+    ...[['a 15 km/h switch', 15, 0, 60, 2], ['a 15 km/h switch, up 40 per mille', 15, 0.04, 60, 2], ['a 15 km/h switch, down 40 per mille', 15, -0.04, 60, 2],
+      ['a 15 km/h switch, full', 15, 0, 220, 2], ['a 15 km/h switch, one car', 15, 0, 60, 1], ['a 30 km/h switch', 30, 0, 60, 2], ['a 20 km/h curve', 20, 0, 60, 2]]
+      .map(([n, v, gr, pax, cars]) => ({ name: `the end of ${n}`, stops: [20, 900], limits: [[0, 50], [300, v], [340, 50]], grade: uphill(gr), pax, cars, riseAt: 340, riseTo: 50 })),
     { name: 'weak wire', stops: [20, 900], limit: 60, pax: 100, supply: { u0: 650, r: 0.25, floor: 400 } },
     { name: 'stiff wire', stops: [20, 900], limit: 60, pax: 100, supply: { u0: 650, r: 0.03 } },
     { name: 'red at a signal, in good time', stops: [20, 900], limit: 50, pax: 60, signals: [{ s: 500, states: [[0, 'stop'], [75, 'go']] }] },

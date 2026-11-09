@@ -1087,6 +1087,22 @@ export class Game {
     return v;
   }
 
+  // Where the limit in force rises: { d, v }, the metres the front still runs until the rear has left the restriction's last
+  // metre, and the limit in force then (km/h); null when it does not rise within 300 m (#370: the autopilot reaches the limit
+  // as it lifts). A restriction that resumes within a tram's length is the same one: the tram is still in it.
+  limitRise() {
+    const s = this.tram.s, L = this.tram.length, at = (x) => this.limits.at(x), cur = this.currentLimit;
+    let last = null;
+    for (let x = s + 0.1; x >= s - L; x -= 1) if (at(x) <= cur) { last = x; break; }
+    if (last === null) return null;
+    for (let x = s + 1; x - L <= last + 1 && x < s + 300; x += 1) if (at(x) <= cur) last = x;
+    const d = Math.floor(last) + 1 + L - s;
+    if (d >= 300) return null;
+    let v = 99;
+    for (let x = s + d - L; x <= s + d + 0.1; x += 1) v = Math.min(v, at(x));
+    return v > cur ? { d, v } : null;
+  }
+
   // The most restrictive lower limit ahead: the one that needs braking soonest (a 10 km/h
   // curve shortly after a 40 km/h section matters more than the 40).
   nextLimitChange() {
