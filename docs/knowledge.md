@@ -278,11 +278,11 @@ Sections:
   of its 128 m tiles past the image's south and east edges (274 x 204 tiles hold 35,072 x 26,112 cells): a reader
   that decodes whole tiles crops them (`IprDtm.cells` checks the bounds, `tools/bench/terrain_city.py` and
   `tools/city_terrain.py` crop). IPR has ground over the whole of Prague (OSM relation 435514, 496.2 km²) and
-  164 km² beyond, its no-data at least ~50 m outside the limits (the median 1.5 km). DMR 5G has real cells under
-  the floor: line 17's 10 m grid holds 57 cells of 163.1-169.8 m at Troja (50.1139 N,
-  14.4290 E, 334 m from the track), a pit in the 2009-2013 lidar (Trojský most and the Blanka tunnel were built
-  there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills them from their neighbours at
-  line 17's next `build_line.py`.
+  164 km² beyond, its no-data no nearer the limits than 47 m (a 10 m sample; 1.5 km in the median): the city
+  terrain needs no fallback (#428). DMR 5G has real cells under the floor: line 17's 10 m grid holds 57 cells of
+  163.1-169.8 m at Troja (50.1139 N, 14.4290 E, 334 m from the track), a pit in the 2009-2013 lidar (Trojský most
+  and the Blanka tunnel were built there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills
+  them from their neighbours at line 17's next `build_line.py`.
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
