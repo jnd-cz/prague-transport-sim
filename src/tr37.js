@@ -299,7 +299,7 @@ export class TR37 {
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
   // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
-  // trackOk (false: no danger, so not the track brakes) }.
+  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -382,7 +382,8 @@ export class TR37 {
       // pedal for those 2 s it was one more release and press per stop.)
       // (step 5 only when partly is well short of it: the full shoes come in at 1.4 m/s², and the point has a margin)
       const a1 = (C.shoeForce[1] * this.cars) / w.inertia + Math.max(0, w.aCoast);
-      if (w.aNeed > a1 * 1.8) s = -5;
+      // (on slippery rail, lowMu, the full shoes lock the wheels: step 5 only where the partly applied ones are far short, #265)
+      if (w.aNeed > a1 * (w.lowMu ? 2.5 : 1.8)) s = -5;
       else if (w.aSoon >= a1 * 0.9 || this.shoe > 0) s = -3;
       else s = now < 0 ? Math.max(now, -2) : 0;
     } else if (s < 0 && v < 2.5 && !w.fixed) {
