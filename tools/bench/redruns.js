@@ -7,6 +7,7 @@
 // Also counted: passes while the GO blinks (warn: allowed), our own signal penalties, controller holds.
 // It stops when our tram is stuck (tools/bench/stuck.js, as u3).
 import { stuckWatch, stuckScene } from './stuck.js';
+import { startShift } from './shift.js';
 
 export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
   window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
@@ -15,10 +16,9 @@ export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
   // (nothing from the real weather: the menu's default temperature is today's Prague forecast, which sets
   // the autopilot's heaters and flap, #205; autumn as tools/traffic_lint.js)
   $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
-  $('btnStart').click();
   window.headless = true;
+  const game = await startShift(), traffic = window.traffic, camera = window.camera;
   const { Autopilot } = await import('/src/autopilot.js');
-  const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
   const stuck = stuckWatch(game);
   game.autopilot = true; game.paused = false;
