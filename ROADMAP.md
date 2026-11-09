@@ -19,7 +19,7 @@ what each milestone is for; the issues hold the tasks.
 The user's plan of 2026-11-05: the static world is built bottom-up, one layer at a time on all five
 lines, and each layer ends at a **checkpoint**: one run of every check on every line, a PR that explains
 what moved, and a tag on main (`W1` …). Within a layer one branch rebuilds and publishes (the `rebuild`
-label, AGENTS.md). The simulation lane waits for W2. GitHub's blocked-by links hold the order between
+label, AGENTS.md). The simulation lane waited for W2. GitHub's blocked-by links hold the order between
 the issues.
 
 | Checkpoint | The layer | Issues |
@@ -31,6 +31,8 @@ the issues.
 | then **M3** | tiles and streaming | [milestone M3](https://github.com/jnd-cz/prague-transport-sim/milestone/3) |
 
 **W1 is done** (2026-11-06, #341): every check on every line is stored as checkpoint W1, measured on commit a3b4652, the tag `W1`. It is what the seeded checks compare with until W2.
+
+**W2 is done** (2026-11-09, #414): every check on every line is stored as checkpoint W2, measured on commit d2c105c, the tag `W2`. The simulation lane resumes from it.
 
 Deferred on purpose: walker "slides" and the line 17 regression checks wait for the rebuilt world; red
 runs of oncoming trams wait for the junction controllers (M4).

@@ -36,7 +36,8 @@ def writers(line):
     # (the user, 2026-11-06, #348: "should solve their placement before we populate them elsewhere", #22)
     if line == "17":
         out.append(["osm_signals.py", line])
-    return out + [["osm_validate.py", line]]
+    # (placement last: it reads the platforms and OSM's signals, and the validation counts OSM's signals as found, #22)
+    return out + [["osm_validate.py", line], ["placement.py", "--line", line]]
 
 
 def steps(line):

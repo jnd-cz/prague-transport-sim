@@ -9,6 +9,7 @@
 import { Autopilot } from '../src/autopilot.js';
 import { CAR_PITCH } from '../src/tram.js';
 import { stuckScene } from './bench/stuck.js';
+import { startShift } from './bench/shift.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
 const TOP = 12;
@@ -89,10 +90,9 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   $('optCars').value = 'auto';
   $('optObst').value = 'off';
   $('optAuto').checked = false;
-  $('btnStart').click();
-  const g = window.game, tr = window.traffic;
-  g.audio.setMuted(true);
   window.headless = true; // the page's frame loop must not step the game between our chunks
+  const g = await startShift(), tr = window.traffic;
+  g.audio.setMuted(true);
   const ap = new Autopilot();
   const slides = [], jumps = [], overlaps = [], hits = [], knobs = [], redRuns = [];
   const lastS = new Map(); // oncoming tram -> its position at the previous step

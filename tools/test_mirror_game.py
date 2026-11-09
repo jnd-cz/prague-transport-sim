@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from atomic import replacing
 from shot import site
+import gpu
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,7 +28,7 @@ def main():
     a.out.mkdir(parents=True,exist_ok=True)
     results = {'views':[]}
     with site(ROOT) as url, sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
+        browser, _ = gpu.launch(pw)
         try:
             page = browser.new_page(viewport={'width':1280,'height':720},device_scale_factor=1)
             errors = []

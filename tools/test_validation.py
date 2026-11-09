@@ -56,7 +56,8 @@ class Build(unittest.TestCase):
         for line in ("9", "17", "22", "23", "37"):
             names = [w[0] for w in rebuild.writers(line)]
             self.assertIn("osm_validate.py", names)
-            self.assertEqual(names[-1], "osm_validate.py")  # (after the steps that write what it reads)
+            self.assertEqual(names[-2:], ["osm_validate.py", "placement.py"])  # (after the steps that write what they
+            # read; placement after the validation, which counts OSM's signals as build_line found them, #22)
             self.assertEqual("osm_signals.py" in names, line == "17")
             self.assertIn("dtm_points.py", names)
 

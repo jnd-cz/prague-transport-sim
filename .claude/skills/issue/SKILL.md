@@ -16,8 +16,8 @@ runs them in order; read AGENTS.md first if it is not in context yet.
 2. **The board:** `python -I tools/board.py`. Note the heavy-job queue, the holder of the `rebuild` label,
    the lanes over their limit and every branch that touches the files this issue will touch. A clash is
    settled before the work starts: wait for that branch, branch from it, or tell the user and suggest
-   another issue. The issue's lane (`lane:*` label) must have room; the simulation lane waits for
-   checkpoint W2 (AGENTS.md, Lanes) unless the user says otherwise.
+   another issue. The issue's lane (`lane:*` label) must have room and not be paused (the
+   board's `PAUSED`, AGENTS.md Lanes) unless the user says otherwise.
 3. **The issue:** `gh issue view $ARGUMENTS --comments`. Note its Now / Where / Done when / Checks. If it
    lacks one of them, work it out from the code and say what you assumed. Check its blocked-by links
    (an open blocker means it is not ready: say so) and the known failures table in AGENTS.md, so you

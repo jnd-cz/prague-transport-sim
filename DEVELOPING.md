@@ -91,6 +91,7 @@ pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packag
 | `dtm_points` | `lineN.dtmpoints.json` | street furniture from the archived technical map |
 | `osm_signals` | `lineN.signals.json` | line 17 only, until the placement rules (#22): OSM traffic signals |
 | `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
+| `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
 | `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
@@ -140,8 +141,12 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing
 `crossing` counts 20 m route sections where a drawn pedestrian surface is above a sampled rail head;
 it also reports missing rail samples and the independently mapped evidence for survey adjustments.
 
-`--jobs N` runs N pages at once, each in its own browser process (default: by cores and free memory,
-up to ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
+`--jobs N` runs N pages at once, each in its own browser process (default: half the cores, at most 8, and
+~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
+The pages draw nothing (#411): a page takes ~2 cores instead of ~12, with the same counts. `--draw` draws
+once a second in software as before; `--gpu` puts the pages' WebGL on the machine's GPU. Tools that need
+pictures (`tools/shot.py`, the mirror's screenshots, `tools/frametime.py --headless`) draw on the GPU
+through `tools/gpu.py`, and fall back to SwiftShader, saying so, where there is none.
 
 The harness verifies its own server before launching a job. An occupied `--port` fails without using
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly

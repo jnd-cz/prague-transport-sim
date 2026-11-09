@@ -26,11 +26,11 @@ DTM = {
     "23": ["500054", "500089", "500143", "500178", "500186", "500208"],
     "37": ["500097", "500208", "500216", "547361"],
 }
-# Lines whose survey is fetched but not built into the game yet: on lines 9 and 37 the survey's ground
-# lies up to 0.87 m over the rail bed or 2.7 m under it (railSupport 2 -> 29, 1 -> 24) until the track
-# heights are staged (#106 / #119), and line 9 seed 1 deadlocks with the changed timing (#152).
-# tools/rebuild.py skips their dtm step and says so (#125).
-HOLD = {"9": "#119, #152", "23": "#119", "37": "#119"}
+# Lines whose survey is fetched but not built into the game yet, {line: why}: tools/rebuild.py skips their dtm
+# step and says so. Lines 9, 23 and 37 were held until the track heights were staged (#119) and line 9's
+# deadlock was traced (#152); both closed, they take their survey since #125 (the user, 2026-11-09: "22 and
+# (W2 in general I think) needs to download and apply the survey first").
+HOLD = {}
 INDEX = "https://geoportalpraha.cz/api/get-dtm-download-metadata?code={}"  # sets 02 OPL, 03 KR (DATA.md)
 BASE = "https://isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/"
 NAME = re.compile(r"VS_CZ010_MOMC_(\d{6})_(\d{8})_ZPS_(OPL|KR)\.gpkg(?:\.zip)?$")

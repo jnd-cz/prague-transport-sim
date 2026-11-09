@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing
+import gpu
 from shot import site
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,7 +32,7 @@ def main():
     if a.seconds <= 0 or a.rounds < 1:
         ap.error('seconds and rounds must be positive')
     with site(ROOT) as url, sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not a.headed)
+        browser = pw.chromium.launch(headless=False) if a.headed else gpu.launch(pw)[0]
         try:
             page = browser.new_page(viewport={'width':1280,'height':720}, device_scale_factor=1)
             page.add_init_script('window.headless = true')

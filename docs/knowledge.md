@@ -43,6 +43,12 @@ What sessions learned and later work needs. Kept current and short; the full log
   built as a 9 → 10 run. Line 37 (a substitute line) has no OSM relation: built from its GTFS shapes,
   which run between the two tracks in places; the matcher prefers the right-hand track (regular
   service always uses it, `data/truth.json`).
+- **PID GTFS `route_stops.txt` lists no route at stops only some trips serve** (#407): Pražský hrad and
+  Královský letohrádek (lines 22 and 23), Národní divadlo C/D (17, 1, 11) and Brusnice C/D have trams in
+  `stop_times.txt` but no route there. Which stops are tram stops comes from the trips of the service date
+  (`tools/platform_match.py` `tram_lines`). PID's stop point is where the tram front stops: it can stand past
+  the end of the platform OSM drew (Klamovka A on line 9: 38 m), or on the track itself (Pražský hrad B:
+  0.6 m off the centre line).
 - **PID GTFS `block_id` links through-running trips only** (older notes said it had none): on
   2026-10-21 each of line 9's 427 blocks is one 9 trip and the 10 trip it becomes, and lines 17, 22,
   23 and 37 have no `block_id` at all. It is not a vehicle's day (no run numbers, no depot runs).
@@ -53,6 +59,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   leaves Řepy and returns to it over the same tracks: s 0–8 km and 20–28 km): the closest piece of it can be our own track. Matching
   onto another route takes the heading into account (`Route.nearestOnHeading`); plain `nearest` there
   spawned oncoming trams on our track and made two false 8 km gauntlets on line 9 (28 signals lost).
+  A platform there lies as near to the back path as to the route, and goes to the back path by a hair
+  about half the time: 15 stops of line 9 had a second, opposite-direction sign beside ours. The game marks
+  a platform the route passes on its doors' side as `ours` and draws no other sign there, but keeps it on
+  the back path, whose trams stop at it (`src/traffic.js` `backStops`, #22).
 - **The archived track heights (the `archive` candidates, 2008 records) under a structure measure what
   lies below it** (#176): at Modřany → Belárie the archive follows the embankment within 0.2 m of the
   lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
@@ -124,7 +134,13 @@ What sessions learned and later work needs. Kept current and short; the full log
   vyhláška 393/2020 Sb.): DI's tram axes are class 3 (0.14 m in plan, 0.12 m in height) but 7 of 10,371 in
   class 2; ZPS lines are class 3 in plan (3.2 M) or 4 (0.7 M) and **class 5 in height** (3.2 M lines, 0.35 m),
   class 3 for 0.7 M. The archive states none; DMR 5G guarantees 0.18 m (0.30 m under dense vegetation); IPR's
-  1 m terrain and the orthophoto state nothing.
+  1 m terrain and the orthophoto state nothing. Counted 2026-11-03 on the state of 2026-09-30, 16 districts (moved
+  here from `truth.json`, #224), class: records in plan / in height:
+  - DI axes (`tools/dtmp_tracks.py` `di_data()`): 3: 10,364 / 10,364; 2: 7 / 7.
+  - ZPS lines (the `ZPS_KR.gpkg` files): 1: 0 / 1; 2: 1,065 / 1,065; 3: 3,226,053 / 700,785; 4: 701,195 / 21;
+    5: 5 / 3,156,921; 9: 52,246 / 121,771.
+  - ZPS areas (the `ZPS_OPL.gpkg` files): 2: 149 / 149; 3: 266,689 / 50,249; 4: 193,705 / 0; 5: 6 / 378,988;
+    9: 15,863 / 47,026.
 - **A connecting curve held at both switches keeps the radius DI gives it** (#204): its ends and directions
   are fixed by the through tracks, so widening the tolerance cannot change it; 24 places on line 17 read
   18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off
@@ -226,6 +242,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   (`tools/dtm_packages.py` `DTM`, `--check` recomputes it from the OSM district boundaries). The hand-made
   lists before #125 covered under half of line 22 (no Praha 1 or 6) and missed line 17's Troja and Libuš,
   with Trojský most. Its vertices are far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **`lineN.dtm.json` areas keep their holes apart** (`r` the outline, `h` the holes: 958 of line 9's 9,336
+  areas), and **some outlines cross themselves** (22 on line 9, among them the 27,644 m² carriageway of
+  Seifertova). The game triangulates both as they are (`src/terrain.js`); a tool reading them with shapely
+  takes the holes and repairs the ring (`make_valid`), or it loses the area: dropped, Seifertova's carriageway
+  hid the Vienna-type stop Lipanská A (#22, `tools/placement.py` `Survey`).
 - **An outline along a retaining wall takes the wall's top and foot by turns** (#147): the area's
   vertices coincide with the wall's 3D lines (`Hranice stavby`, ground level), whose heights alternate.
   Beside the tram embankment at Belárie (line 17) the tram area's edge read 195.8 / 199.7 / 196.8 /
@@ -412,6 +433,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 ## Heuristics that stand in for missing data
 
 Review these when realism matters; most move into the build in M2.
+- **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
+  turning 170°+ street to street, its switches within 150 m, mean radius 18 m+. It finds 47 loops on DI's network,
+  all real by the user's review (2026-11-09); it names each by its nearest GTFS stop, so Špejchar's loop shows as
+  Chotkovy sady. The loops DI does not draw yet (Libuš, Nádraží Holešovice …) are missing
+  ([decision record](decisions/2026-11-07-speed-limits-and-signs.md)).
 - **Signals**: from OSM `traffic_signals` clusters near the route; never past the crossing they were
   made for (except along platforms, where the platform-head rules decide); two at one stop line are one.
   GO held for a tram in its dilemma zone (15 + v²/1.6 m). Distant signals where R < 110 m within 140 m.
@@ -468,6 +494,13 @@ Review these when realism matters; most move into the build in M2.
   and the nearby junction cars, including their `why`, `seen` and actual wait chains.
 
 ## Checks and what they measure
+
+- **No check reads a drawn pixel** (#411): the 75 runs of every check on every line (seeds 1–2) gave the same
+  results, field by field, drawn once a second or not at all. Playwright's headless Chromium draws WebGL in
+  software (SwiftShader) unless launched on ANGLE D3D11. Once a second it still took 5–12 cores of a page's ~12,
+  against the game's ~1, and slowed the game's own thread (line 23's drive 55 → 41 s without it). The 75 runs took
+  1633 s drawing at 4 pages, 721 s without at 8, 706 s at 12. The same GPU draws 60 heavy frames in 0.28 s where
+  SwiftShader takes 47.5 s (Intel Arc A770, `tools/gpu.py`).
 
 - `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
