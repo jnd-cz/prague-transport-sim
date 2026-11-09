@@ -16,12 +16,14 @@
 // The drive pedal's use, on the whole run: presses (from 0 to a drive step, "našlápnutí"), pressesRolling (of them while already moving
 // faster than 1 m/s, the rest are the starts), brakeApplies (from coasting or drive to a brake step), the shares of the distance on drive,
 // coasting and brake, coastStretches (coasting 20 m or more). In the wet: slipSecs, slideSecs, sandSecs, emergencies (the pedal to the floor).
+// Per stretch, the way to each stop (stretches: drive presses, brake applications, seconds from moving off the stop before it to standing
+// served at this one), as the user counted them on a ride, "drive + braking" (#396).
 // Energy a km (kWh/km, the traction only): lineKWh drawn from the wire, wasteKWh of it not turned into the motors' work (the starting
 // resistors above all: a press held at a low step keeps them in the circuit), brakeKWh burnt in the brake resistors.
 
 export function stopsWatch(game) {
-  const R = { stops: [], flips: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0, emergencyAt: [], lineJ: 0, mechJ: 0, brakeJ: 0 };
-  let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null;
+  const R = { stops: [], flips: [], stretches: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0, emergencyAt: [], lineJ: 0, mechJ: 0, brakeJ: 0 };
+  let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null, curTo = null;
   const finish = (st, tr) => {
     a.err = +(st.target - tr.s).toFixed(2);
     // (served behind a tram standing at the front of a long platform, as src/game.js lets a second set stop: not short of the point;
@@ -42,6 +44,15 @@ export function stopsWatch(game) {
       // (the pedal's use over the whole run, read before lastStep moves on)
       if (n > 0 && lastStep <= 0) { R.presses++; if (tr.v > 1) R.pressesRolling++; }
       if (n < 0 && lastStep >= 0 && tr.v > 0.3) R.brakeApplies++;
+      // (the stretch to a stop begins once the stop before it is served, so the pull-away counts toward the next one)
+      const to = st && st.served ? game.stops[game.nextStop + 1] : st;
+      if (to) {
+        if (to !== curTo) { curTo = to; R.stretches.push({ to: to.name, drive: 0, brake: 0, t0: game.clock, tMove: null }); }
+        const q = R.stretches[R.stretches.length - 1];
+        if (q.tMove === null && tr.v > 0.3) q.tMove = game.clock;
+        if (n > 0 && lastStep <= 0) q.drive++;
+        if (n < 0 && lastStep >= 0 && tr.v > 0.3) q.brake++;
+      }
       if (n === -6 && lastStep !== -6) {
         R.emergencies++;
         // (each use of the track brakes: where, how fast, for what, how far it had, on what rail)
@@ -118,7 +129,8 @@ export function stopsWatch(game) {
         lineKWh: +(R.lineJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), wasteKWh: +((R.lineJ - R.mechJ) / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), brakeKWh: +(R.brakeJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3),
         slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
         comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
-        devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5) };
+        devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
+        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)) })) };
     },
   };
 }
