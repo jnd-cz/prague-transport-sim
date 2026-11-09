@@ -160,8 +160,11 @@ export class Autopilot {
       const toPoint = fixedAt !== null && cd.contact + 4.5 < fixedAt ? Math.sqrt(2 * stopDecel * Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5)) : Infinity;
       const there = Math.min(toLimit, toPoint);
       if (dc > 0 && there > V_BUTTON && there < 0.75 * vLine) {
-        nl = { v: V_BUTTON * 3.6, d: dc + 12 };
-        vLimit = Math.min(vLimit, curveTo(nl));
+        // (the next limit only where it binds more than the next one: taken for it whatever, the contact 660 m ahead at Malostranská hid
+        // Chotkova's hairpins from the drive's target, and it pressed to step 3 down 48 ‰ between them, from 22 to 39 km/h, #396)
+        const cl = { v: V_BUTTON * 3.6, d: dc + 12 };
+        if (!nl || curveTo(cl) < curveTo(nl)) nl = cl;
+        vLimit = Math.min(vLimit, curveTo(cl));
         vt = Math.min(vt, vLimit);
       } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity && Math.min(there, nl && nl.d - 12 <= dc ? nl.v / 3.6 - 0.4 : vLine) > V_BUTTON_COAST) {
         // (at speed the drive pedal makes the turn, ≈1.5 s without the brake: slow enough there for the point to stay on its curve after
