@@ -102,7 +102,9 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   magnetické kolejnicové brzdy na adhezi nezávisí.
 - Rychlosti: 50 km/h, pokud traťová rychlost neříká jinak, nejvýše 65 km/h tramvaje T3. Každý oblouk dovolí √(a·R)
   s nevyrovnaným bočním zrychlením 0,8 m/s², nejméně 15 km/h, není-li trať značena níž. Výhybka proti hrotu je 15 km/h
-  od jazyků po srdcovku, ať je postavená kamkoli, dokud ji nemine zadní čelo vlaku. Oblouky na vlastním tělese jsou
+  od jazyků po srdcovku, ať je postavená kamkoli, dokud ji nemine zadní čelo vlaku. Ve smyčce je 15 km/h od výhybky
+  do smyčky po výhybku ze smyčky. Označník zastávky, kde vlak nestaví, projede čelo nejvýše 30 km/h (místo s omezenou
+  rychlostí: vlak smí zrychlit, jakmile ho čelo mine). Oblouky na vlastním tělese jsou
   převýšené (do 100 mm, u zastávek a konečných bez převýšení); tramvaj i pohled se do nich naklánějí.
 - Soupravy: většina linek jezdí dvouvozovými soupravami T3 (2 × 15,2 m přes spřáhla, oba vozy poháněné, šest
   dveří); na lince 23 jezdí sólo historický vůz. „Souprava“ v menu to změní. Každý vůz sleduje kolej na

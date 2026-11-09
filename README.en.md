@@ -107,6 +107,8 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
 - Speeds: 50 km/h unless the track's posted speed says otherwise, up to the T3's 65 km/h. Each curve allows
   √(a·R) with 0.8 m/s² unbalanced lateral acceleration, at least 15 km/h unless the track is posted lower. A facing
   switch is 15 km/h from its blades to its frog, whichever way it is set, until the rear of the tram has passed.
+  A turning loop is 15 km/h from the switch into it to the switch out of it. The front passes the sign of a stop
+  where the train does not stop at 30 km/h at most (a point limit: the train may speed up once the front is past).
   Curves on dedicated track are banked (up to 100 mm cant, level at stops and near the termini); the tram and the
   view lean into them.
 - Sets: most lines run two-car T3 multiple-unit sets (2 × 15.2 m over couplers, both cars powered, six
