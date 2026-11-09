@@ -30,6 +30,7 @@ from shapely.geometry import LineString, Point, Polygon
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, banded_profile, cause, chains, implied_radii, radii, vertical_profile, whittaker  # noqa: E402
+from track_curve import geometry_fact  # noqa: E402
 
 OUT_STEP = 2.0  # m between heights along a line's path and tracks (the game's profile step, src/terrain.js)
 MATCH = 1.0     # m from a line's point to the chain it lies on (both are DI where the line is, #20)
@@ -47,7 +48,7 @@ FIT, PIN_FIT = 0.01, 0.002  # m outside the band that still fits (the solver's c
 PIN_TOL = 0.005  # m: a junction's pinned height, within this
 LONE = 2        # bins: a group of misses this small is a lone bad point, not held to the band
 RELAX_STEP, RELAX_STEPS, RELAX_REACH = 0.8, 12, 50.0  # where the band is missed: the radius x0.8 within 50 m, at most
-MIN_RADIUS = 20.0  # m: 12 times, never under the tightest horizontal radius (data/truth.json min-radius-passenger)
+MIN_RADIUS = float(geometry_fact('min-radius-passenger'))  # m, 20: 12 times, never under the tightest horizontal radius
 RELEASE, RELEASE_ROUNDS = 15.0, 3  # m, rounds: where the floor cannot meet the band, the band gives way this far around the
                                    # points it misses (as near a pin, below)
 REVIEW_ISSUE = 358  # the issue the radius review waits for (reports/review/track-radius.json names it)

@@ -7,13 +7,14 @@
   "places": "reference: places the user described, for the scenery and structure work",
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, line_heights.py",
-  "trackGeometry": "tools/track_profile.py; the radii are still copied in tools/track_curve.py and tools/lint.js (#224)",
+  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py (min-radius-network), line_heights.py (min-radius-passenger), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
-  "sourceAccuracy": "tools/di_tracks.py, track_curve.py; its counts are tool output (#224)",
+  "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past and trojska-descent; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
-  "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it"
+  "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
+  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it"
  },
  "stops": [
   {
@@ -630,7 +631,7 @@
   ]
  },
  "sourceAccuracy": {
-  "note": "How precise each source is, as its provider states it, and the accuracy classes counted in our snapshot (2026-11-03, #204). The user, 2026-11-03: \"register that data as a fact and the same for vertical accuracy (of each data source ideally) so we can work with it for tuning up the track laying algorithm\". The DTM records carry their class (TridaPresnostiPoloha, TridaPresnostiVyska); `classes` is the decree's table: mean coordinate error mxy and mean height error mH in metres. Class 9: worse than class 5 or unknown. New DTM data is kept at least in class 3 (§ 3 odst. 7).",
+  "note": "How precise each source is, as its provider states it (#204; the classes counted in our snapshot are tool output, in docs/knowledge.md, #224). The user, 2026-11-03: \"register that data as a fact and the same for vertical accuracy (of each data source ideally) so we can work with it for tuning up the track laying algorithm\". The DTM records carry their class (TridaPresnostiPoloha, TridaPresnostiVyska); `classes` is the decree's table: mean coordinate error mxy and mean height error mH in metres. Class 9: worse than class 5 or unknown. New DTM data is kept at least in class 3 (§ 3 odst. 7).",
   "classes": {
    "1": {
     "mxy": 0.04,
@@ -663,53 +664,17 @@
    {
     "id": "dtm-di",
     "scope": "DI tram track axes (OsaKolejeTramvajoveDrahy), 16 districts, state 2026-09-30",
-    "horizontalClasses": {
-     "3": 10364,
-     "2": 7
-    },
-    "heightClasses": {
-     "3": 10364,
-     "2": 7
-    },
-    "counted": "tools/dtmp_tracks.py di_data(), 2026-11-03"
+    "note": "each record carries its class; how many are in each class: docs/knowledge.md (#224)"
    },
    {
     "id": "zps",
     "scope": "ZPS kresba lines (KR), 16 districts, state 2026-09-30",
-    "horizontalClasses": {
-     "2": 1065,
-     "3": 3226053,
-     "4": 701195,
-     "5": 5,
-     "9": 52246
-    },
-    "heightClasses": {
-     "1": 1,
-     "2": 1065,
-     "3": 700785,
-     "4": 21,
-     "5": 3156921,
-     "9": 121771
-    },
-    "counted": "the ZPS_KR.gpkg files of raw/dtm, 2026-11-03"
+    "note": "each record carries its class; how many are in each class: docs/knowledge.md (#224)"
    },
    {
     "id": "zps-areas",
     "scope": "ZPS derived areas (OPL), 16 districts, state 2026-09-30",
-    "horizontalClasses": {
-     "2": 149,
-     "3": 266689,
-     "4": 193705,
-     "5": 6,
-     "9": 15863
-    },
-    "heightClasses": {
-     "2": 149,
-     "3": 50249,
-     "5": 378988,
-     "9": 47026
-    },
-    "counted": "the ZPS_OPL.gpkg files of raw/dtm, 2026-11-03"
+    "note": "each record carries its class; how many are in each class: docs/knowledge.md (#224)"
    },
    {
     "id": "dtmp-tracks",
