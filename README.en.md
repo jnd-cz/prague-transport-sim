@@ -195,7 +195,9 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
-  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one.
+  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one, with the
+  dimensions and livery of the T3's general-arrangement drawing, no saloon and no moving parts, the lightest
+  to draw.
 
 ### On a phone or tablet
 

@@ -435,6 +435,13 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
 - Prague signals: 4 white lamps on a white plate (stop = outer two), call box with three orange LED bars,
   distant signal with a yellow "P"; switch indicator a red LED chevron on the span wire.
+- **The T3's outline** (#427, `src/t3simple.js`): drawingdatabase.com's general arrangement (`Tatra-T3-1.gif`, side and
+  plan, dimensioned at 20 mm a pixel) and its colour elevation (`trams_t3_01.png`, 12.66 mm a pixel) agree with each other
+  and with Dynybyl's table 3, Wikipedia and the 1977 Soviet manual: body 14 000 × 2 500 mm, 3 060 mm high, pivots 3 800 / 6 400
+  / 3 800 mm. In plan the ends taper from the doors (4.5 m ahead of and 4.8 m behind the centre) to corners 0.73–0.78 m off
+  the centreline; the front and rear doors stand on the taper. The plan view on p. 10 of Dynybyl's thesis is too narrow (the
+  user, 2026-11-09: "looks more narrow, like t1 or early prototype than t3"). Laid over the colour elevation at its scale, the
+  built model's windows, doors, bands and ends fall on its lines.
 
 ## Heuristics that stand in for missing data
 

@@ -1,6 +1,8 @@
-// Low-poly models built from primitives: T3 tram, cars, pedestrians, signals and signs.
+// Low-poly models built from primitives: cars, pedestrians, signals and signs; the T3 sets (the built-in car
+// in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
 import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
+import { makeSimpleSet } from './t3simple.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
@@ -41,29 +43,6 @@ function canvasTexture(w, h, draw) {
 
 // a texture cached for the whole page (signs, plates): marked shared, so disposeModel keeps it
 const keptTexture = (w, h, draw) => { const tex = canvasTexture(w, h, draw); tex.userData.shared = true; return tex; };
-
-// Plan outline of the car body: straight sides with elliptical ends.
-function planShape(halfW, halfL, endDepth) {
-  const straight = halfL - endDepth, n = 18, s = new THREE.Shape();
-  for (let i = 0; i <= n; i++) { // front end, from the right side through the nose
-    const a = (Math.PI * i) / n;
-    const x = halfW * Math.cos(a), z = straight + endDepth * Math.sin(a);
-    i === 0 ? s.moveTo(x, z) : s.lineTo(x, z);
-  }
-  for (let i = 0; i <= n; i++) { // rear end
-    const a = Math.PI + (Math.PI * i) / n;
-    s.lineTo(halfW * Math.cos(a), -straight + endDepth * Math.sin(a));
-  }
-  return s;
-}
-
-// One horizontal livery band of the body, from y0 to y1, inset by `inset` metres.
-function band(y0, y1, inset, mat) {
-  const geo = new THREE.ExtrudeGeometry(planShape(1.25 - inset, 7 - inset, 1.05 - inset * 0.6), { depth: y1 - y0, bevelEnabled: false, curveSegments: 1 });
-  geo.rotateX(-Math.PI / 2); // extrusion becomes height
-  geo.translate(0, y0, 0);
-  return new THREE.Mesh(geo, mat);
-}
 
 // The T3's number plates and cards (user photos, 2026-10-23): the route number on the roof box at
 // the front and on the mirror arm (white digits on DPP blue, no border; the mirror one smaller and
@@ -121,185 +100,31 @@ function destinationTexture(name) {
   });
 }
 
-// Tatra T3 in the Prague livery: red lower body, cream window band and upper body, dark grey
-// roof, cream four-leaf folding doors, blue route number boxes, orange diamond pantograph.
-// One car: origin = centre of the body at rail level, facing +Z (local), 14 m x 2.5 m.
-function makeT3Car(line, mats) {
-  const g = new THREE.Group();
-  g.rotation.order = 'YXZ';
-  const { red, cream, glass, dark, roof, chrome, orange, grey, rubber, rbMat } = mats;
-  g.add(band(0.40, 0.52, 0.04, dark));          // underframe skirt
-  g.add(band(0.52, 0.60, -0.006, chrome));      // bumper / rubbing strip
-  g.add(band(0.60, 1.30, 0, red));              // lower body
-  g.add(band(1.30, 1.42, -0.008, cream));       // window sill
-  g.add(band(1.42, 2.34, 0.03, glass));         // window band (recessed glass)
-  g.add(band(2.34, 2.62, 0.004, cream));        // upper body, slight tumblehome
-  g.add(band(2.62, 2.80, 0.02, cream));
-  // rounded roof edge built from narrowing bands
-  [[2.80, 2.86, 0.06], [2.86, 2.92, 0.13], [2.92, 2.98, 0.24], [2.98, 3.03, 0.40], [3.03, 3.07, 0.62]]
-    .forEach(([a, b, i]) => g.add(band(a, b, i, roof)));
-  const box = (w, h, d, mat, x, y, z, parent = g) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, y, z);
-    parent.add(m);
-    return m;
-  };
-  const DOORS = [4.85, -0.25, -5.0]; // door centres on the right side (-X)
-  const inDoor = (z) => DOORS.some((d) => Math.abs(z - d) < 0.7);
-  // window pillars, and the transom between the big panes and the top hopper windows
-  for (let z = -5.4; z <= 5.5; z += 1.36) for (const x of [-1.235, 1.235]) {
-    if (x < 0 && inDoor(z)) continue;
-    box(0.04, 0.93, 0.13, cream, x, 1.88, z);
-  }
-  for (const x of [-1.232, 1.232]) {
-    let z0 = -5.9;
-    const stops = x < 0 ? [...DOORS].sort((a, b) => a - b).flatMap((d) => [d - 0.66, d + 0.66]) : [];
-    const cuts = [z0, ...stops, 5.9];
-    for (let k = 0; k < cuts.length; k += 2) {
-      const a = cuts[k], b = cuts[k + 1];
-      if (b - a > 0.2) box(0.03, 0.045, b - a, cream, x, 2.06, (a + b) / 2);
-    }
-  }
-  // windscreen corner pillars at both ends
-  for (const sz of [1, -1]) for (const sx of [1, -1]) box(0.09, 0.93, 0.09, cream, sx * 0.84, 1.88, sz * 6.5);
-  // four-leaf folding doors: cream leaves, tall glazing, dark seams, step and door lamp
-  for (const z of DOORS) {
-    box(0.03, 2.0, 1.28, cream, -1.262, 1.42, z);
-    for (const dz of [-0.465, -0.155, 0.155, 0.465]) {
-      box(0.035, 0.95, 0.22, glass, -1.268, 1.82, z + dz);
-      box(0.03, 0.36, 0.2, glass, -1.268, 0.98, z + dz);
-    }
-    for (const dz of [-0.31, 0, 0.31]) box(0.04, 2.0, 0.018, rubber, -1.27, 1.42, z + dz);
-    box(0.18, 0.12, 1.2, dark, -1.15, 0.36, z); // step
-    box(0.05, 0.06, 0.16, orange, -1.27, 2.5, z); // door indicator lamp
-  }
-  // front: headlights with chrome rings, indicators, coupler cover, wipers, mirror
-  const lamp = (x, y, z, r, color, facing) => {
-    const l = new THREE.Mesh(new THREE.CircleGeometry(r, 16), new THREE.MeshBasicMaterial({ color }));
-    l.position.set(x, y, z);
-    l.rotation.y = facing;
-    g.add(l);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(r, r * 1.3, 16), chrome);
-    ring.position.set(x, y, z - Math.cos(facing) * 0.002);
-    ring.rotation.y = facing;
-    g.add(ring);
-  };
-  const endZ = (x, sz, inset = 0) => {
-    // surface of the elliptical end at lateral x
-    const hw = 1.25 - inset, straight = 7 - inset - (1.05 - inset * 0.6), d = 1.05 - inset * 0.6;
-    return sz * (straight + d * Math.sqrt(Math.max(0, 1 - (x / hw) ** 2)));
-  };
-  for (const sz of [1, -1]) {
-    for (const x of [-0.72, 0.72]) {
-      const face = sz > 0 ? Math.atan2(x * 0.9, 1) : Math.PI + Math.atan2(-x * 0.9, 1);
-      lamp(x, 0.92, endZ(x, sz) + sz * 0.012, 0.1, sz > 0 ? 0xfff3c0 : 0x9a1010, face);
-      const xi = x * 1.32;
-      const fi = sz > 0 ? Math.atan2(xi * 0.9, 1) : Math.PI + Math.atan2(-xi * 0.9, 1);
-      lamp(xi, 0.92, endZ(xi, sz) + sz * 0.012, 0.055, 0xe08a1a, fi);
-    }
-    box(0.55, 0.16, 0.34, dark, 0, 0.48, sz * 6.95); // coupler under its cover
-  }
-  for (const x of [-0.38, 0.38]) {
-    const w = box(0.025, 0.75, 0.02, rubber, x, 1.78, endZ(x, 1, 0.03) + 0.02);
-    w.rotation.z = x > 0 ? 0.32 : -0.32;
-  }
-  const mirrorArm = box(0.3, 0.03, 0.03, grey, -1.37, 2.2, 6.15);
-  mirrorArm.rotation.y = -0.4;
-  box(0.05, 0.32, 0.14, dark, -1.5, 2.12, 6.22);
-  // route number boxes: front dome, rear, and beside the front door
-  const rb = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), rbMat);
-  rb.position.set(0, 2.58, 7.0);
-  g.add(rb);
-  const rbRear = rb.clone();
-  rbRear.position.set(0, 2.58, -7.0);
-  rbRear.rotation.y = Math.PI;
-  g.add(rbRear);
-  const rbSide = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), rbMat);
-  rbSide.position.set(-1.27, 1.95, 5.65);
-  rbSide.rotation.y = -Math.PI / 2;
-  g.add(rbSide);
-  // bogies: side frames, wheels, springs and the magnetic track brake shoes
-  const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.12, 14), wheelMat = lambert(0x161616);
-  for (const z of [-3.8, 3.8]) {
-    for (const x of [-0.93, 0.93]) {
-      box(0.16, 0.3, 2.5, dark, x, 0.44, z);
-      for (const dz of [-0.45, 0.45]) {
-        const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.22, 8), grey);
-        sp.position.set(x, 0.68, z + dz);
-        g.add(sp);
-      }
-    }
-    box(1.7, 0.18, 0.5, dark, 0, 0.5, z); // bolster
-    for (const dz of [-0.95, 0.95]) for (const x of [-0.72, 0.72]) {
-      const w = new THREE.Mesh(wheelGeo, wheelMat);
-      w.rotation.z = Math.PI / 2;
-      w.position.set(x, 0.35, z + dz);
-      g.add(w);
-    }
-    for (const x of [-0.72, 0.72]) box(0.1, 0.09, 1.0, grey, x, 0.1, z);
-  }
-  // underfloor equipment between the bogies
-  for (const [x, z, l] of [[0.55, 0.6, 2.2], [-0.55, -0.9, 1.6], [0.45, -2.0, 0.9]]) box(0.9, 0.3, l, dark, x, 0.48, z);
-  // roof: resistor box, ventilation hatches and the orange diamond pantograph
-  box(1.3, 0.26, 2.6, lambert(0x48494a), 0, 3.19, -2.4);
-  for (const z of [4.4, -0.2, -5.3]) box(0.7, 0.07, 0.85, grey, 0, 3.1, z);
-  box(1.1, 0.12, 1.4, dark, 0, 3.12, 3.1); // pantograph base frame
-  const pan = new THREE.Group();
-  const bar = (x0, y0, z0, x1, y1, z1, mat = orange) => {
-    const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1);
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, a.distanceTo(b), 5), mat);
-    m.position.copy(a).add(b).multiplyScalar(0.5);
-    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
-    pan.add(m);
-  };
-  // diamond (rhombus) frames on both sides, seen from the side as < >
-  for (const x of [-0.5, 0.5]) {
-    bar(x, 3.2, -0.65, x * 0.6, 4.05, 0); bar(x, 3.2, 0.65, x * 0.6, 4.05, 0);
-    bar(x * 0.6, 4.05, 0, x * 0.25, 4.85, -0.25); bar(x * 0.6, 4.05, 0, x * 0.25, 4.85, 0.25);
-  }
-  bar(-0.3, 4.05, 0, 0.3, 4.05, 0);
-  // collector head with horns
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.05, 0.12), dark);
-  head.position.set(0, 4.88, 0);
-  pan.add(head);
-  bar(-0.62, 4.88, 0, -0.85, 4.74, 0, dark); bar(0.62, 4.88, 0, 0.85, 4.74, 0, dark);
-  // same place as on the detailed model (3.1 m ahead of the car centre), raised to the wire:
-  // the frame is stretched up from its base at 3.2 m so the head (4.88 m) meets the wire
-  const k = (CONTACT_WIRE - RAIL_TOP - 0.01 - 3.2) / (4.88 - 3.2);
-  pan.scale.y = k;
-  pan.position.set(0, 3.2 - 3.2 * k, 3.1);
-  g.add(pan);
-  return g;
-}
-
 // A T3 set of one or two cars (Prague ran most T3s as two-car multiple units). The cars are
 // separate children so each can follow the track on its own bogies: see placeConsist().
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
 // detailed: 'hybrid' (or true: the animated hybrid, src/t3h.js), 'classic' (conflig's model, loaded on the
-// player's choice), false (the procedural car); a model not loaded falls back to the next simpler one
+// player's choice), false (the built-in car, src/t3simple.js); a model not loaded falls back to the next simpler one
 export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '' } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
   if (detailed === 'classic' && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
   if (detailed && hybridReady()) { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP); root.userData.kind = 'hybrid'; return root; }
   if (detailed && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
-  root.userData.kind = 'simple';
-  root.userData.bogie = 3.8;     // bogie pivots of the built-in model
-  root.userData.bodyFront = 7.0;
-  const mats = {
-    red: lambert(0xb81a1f), cream: lambert(0xefe4c4), glass: lambert(0x1c262d), dark: lambert(0x2a2a2a),
-    roof: lambert(0x5d6164), chrome: lambert(0xb9bcbf), orange: lambert(0xd8541c), grey: lambert(0x6a6d70),
-    rubber: lambert(0x111111), rbMat: new THREE.MeshBasicMaterial({ map: routeBoxTexture(line) }),
-  };
-  root.userData.mats = mats;
-  root.userData.cars = [];
-  for (let k = 0; k < cars; k++) {
-    const car = makeT3Car(line, mats);
-    root.add(car);
-    root.userData.cars.push(car);
-  }
+  makeSimpleSet(root, cars, dest, plateMats(line, dest, run), CONTACT_WIRE - RAIL_TOP);
+  Object.assign(root.userData, { kind: 'simple', dest, run });
   return root;
+}
+
+// the plates' and cards' materials of a set: route box and mirror plate glowing, the cards on the glass lit like the body
+function plateMats(line, dest, run) {
+  const plate = (map) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
+  const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
+  return {
+    rbMat: plate(routeBoxTexture(line)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
+    destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)),
+  };
 }
 
 // The classic detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt), the
@@ -480,13 +305,7 @@ function boxQuad(b) {
 function makeDetailedSet(root, line, cars, dest, run) {
   // own material per set (traffic fades sets individually), shared geometry
   const mat = detailedProto.children[0].material.clone();
-  const plate = (map) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
-  // (cards on the glass: lit like the body, not glowing)
-  const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
-  const mats = {
-    rbMat: plate(routeBoxTexture(line)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
-    destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)), body: mat,
-  };
+  const mats = { ...plateMats(line, dest, run), body: mat };
   root.userData.mats = mats;
   root.userData.dest = dest;
   root.userData.run = run;
