@@ -38,4 +38,4 @@ def workers(gb_each, most=4):
 
 
 if __name__ == "__main__":
-    print(f"free {available_gb():.1f} GB, cores {os.cpu_count()}; headless pages {workers(2.0)}, line builds {workers(1.5, 5)}")
+    print(f"free {available_gb():.1f} GB, cores {os.cpu_count()}; headless pages {workers(4.0, 8)}, line builds {workers(2.5, 5)}")

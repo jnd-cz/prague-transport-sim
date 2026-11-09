@@ -26,6 +26,7 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing
+import gpu
 from data_reference import ROOT, checkout, digest, git
 
 
@@ -203,10 +204,11 @@ def main(argv=None, root=ROOT):
         with tempfile.TemporaryDirectory(prefix='.shot-', dir=a.out) as tmp, sync_playwright() as pw:
             work = Path(tmp)
             current = work / f'{stem}-current.png'
-            browser = pw.chromium.launch(headless=True, args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
+            # (both pictures drawn the same way, on the GPU where there is one, #411)
+            browser, renderer = gpu.launch(pw)
             try:
                 now = capture(browser, root, a.line, a.s, a.view, current, a.timeout)
-                report = {'line': a.line, 's': a.s, 'view': a.view, 'current': now,
+                report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
                 if a.ref:

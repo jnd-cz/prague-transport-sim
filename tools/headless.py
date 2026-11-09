@@ -17,12 +17,13 @@ thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
 Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
-any job; an occupied port fails. --url explicitly uses an existing server. WebGL runs on
-SwiftShader (software): slower than a desktop browser, the same results (the checks step the
-simulation themselves). --batch N (default 6) runs up to N checks of one line one after another in one
+any job; an occupied port fails. --url explicitly uses an existing server. The pages draw
+nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
+are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
+software as before; --gpu: on the machine's GPU, tools/gpu.py). --batch N (default 6) runs up to N checks of one line one after another in one
 loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
 counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). --jobs N runs N pages
-at once, each in a worker process with its own browser (default: half the cores, at most 4, and what free
+at once, each in a worker process with its own browser (default: half the cores, at most 8, and what free
 memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded, so the counts are the same as
 one after another.
 
@@ -67,6 +68,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
 from sysinfo import workers  # noqa: E402
+import gpu  # noqa: E402
 import baseline_store  # noqa: E402
 from baseline_store import MEASURED, HeavyJob  # noqa: E402
 
@@ -498,10 +500,9 @@ def serve(port, startup_timeout=10):
 ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
         "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
         "--disable-backgrounding-occluded-windows"]
-GPU_ARGS = ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization",
-            "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
-            "--disable-backgrounding-occluded-windows"]
-PAGE = {"draw": True, "viewport": (960, 540), "gpu": False}  # (how the pages draw: --no-draw, --viewport, --gpu, #411)
+GPU_ARGS = [*gpu.HARDWARE, *ARGS[3:]]  # (WebGL on the machine's GPU, tools/gpu.py)
+PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free memory)
+PAGE = {"draw": False, "viewport": (960, 540), "gpu": False}  # (how the pages draw: --draw, --viewport, --gpu, #411)
 
 
 def worker(jobs, url, headed, timeout, done=None, page_opts=None):
@@ -663,8 +664,8 @@ def main():
                     help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
     ap.add_argument("--batch", type=int, default=6,
                     help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
-    ap.add_argument("--no-draw", action="store_true",
-                    help="headless runs keep a draw's world matrices without its pixels (the software draw: 5-12 cores a page, #411)")
+    ap.add_argument("--draw", action="store_true",
+                    help="draw the pages once a second (default: no drawing, the same counts; the software draw took 5-12 cores a page, #411)")
     ap.add_argument("--viewport", default="960x540", help="the pages' size, WxH (the software draw costs by the pixel)")
     ap.add_argument("--gpu", action="store_true", help="WebGL on the machine's GPU (ANGLE D3D11) instead of SwiftShader")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
@@ -694,7 +695,7 @@ def main():
         vw, vh = (int(v) for v in a.viewport.lower().split("x"))
     except ValueError:
         ap.error(f"--viewport WxH, not {a.viewport!r}")
-    page_opts = {"draw": not a.no_draw, "viewport": (vw, vh), "gpu": a.gpu}
+    page_opts = {"draw": a.draw, "viewport": (vw, vh), "gpu": a.gpu}
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
     for c in checks:
         if c not in CALLS:
@@ -742,7 +743,9 @@ def main():
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
         if a.jobs is None:
-            a.jobs = workers(4.0)  # (sized by the memory free once its turn comes)
+            # (sized by the memory free once its turn comes; at most 8: without drawing a page takes ~2 cores, and 75
+            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411)
+            a.jobs = workers(4.0, most=PAGES)
         os.makedirs(a.out, exist_ok=True)
         # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs)
