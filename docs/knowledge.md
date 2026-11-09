@@ -374,7 +374,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   up the climb, where a press that only holds the speed does not show. A hand-held phone's zero drifts by 0.4–0.6 m/s² between stands,
   so its levels are taken from the GPS and the gradient, and it shows the shape within a second: a drive from 0.8 m/s² or more ends with
   a drop to coasting within 0.1–0.2 s (5.4–8.3 m/s³), where the model's falls at 1.5–2.4 m/s³ over 0.3–0.7 s, the autopilot stepping
-  back through step 1 (T3SU-03 p. 4; the user: "Some zrychlovač shows larger jerks at the end of drive"). The autopilot on the same
+  back through step 1 (T3SU-03 p. 4; the user: "Some zrychlovač shows larger jerks at the end of drive"). The model's car has the sharp
+  end too: let go at once, the damping resistors come back in over 2 × 0.1 s and the line contactor opens (`src/tr37.js` `dampStep`,
+  assumed), and coasting holds the preparation current (40–90 A on a T3SU, DPP's accelerator exam). So the drivers lift off a high step
+  at once, against the manual's step back (the user, 2026-11-09: "I suspect the driver rather than the tram"); the autopilot keeps the
+  manual's way. The DPP textbook and the web say nothing more. The recordings: `raw/reference/rides/` (snapshot 2026-11-09r). The autopilot on the same
   stretches (line 23 built westbound for 7122, seeds 1–3) pressed 63 + 45 westbound and 80 + 59 eastbound, where 6921's GPS reads 46 +
   39; besides traffic, from holding a speed on gradients and driving down descents.
   With #396 (a switch contact far ahead no longer hides nearer limits from the drive's target; coasting into a lower limit as into a
@@ -382,7 +386,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   Chotkova 4.7 + 10 (main 8.3 + 17). On the five lines, dry, seeds 1–5: drive presses −4 %, brake applications −13 %, the wire's
   energy −4 to −10 %; the mean delay +18–28 s on lines 17, 22 and 23 (inside main's seed spread), the late penalty outside it on
   lines 17 and 23 (19 → 78, 7 → 25). Holding a drive step to 0.6 m/s over up a climb pressed more and ran later; holding brake step 1
-  down every descent to 1 m/s under ran line 23 40 s later.
+  down every descent to 1 m/s under ran line 23 40 s later. On W2's data (73c2a32): brake applications −6 to −18 %, the wire's energy
+  −4 to −12 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
+  (2026-11-09), the timetable's part being #242.
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
