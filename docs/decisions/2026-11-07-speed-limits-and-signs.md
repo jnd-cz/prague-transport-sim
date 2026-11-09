@@ -120,10 +120,9 @@ The user, on PR 362's open points: the stop-pass limit is "point limit with over
 - turns 170° or more from the heading arriving at the first switch to the heading leaving the second: the street's two tracks run opposite ways. From the switch's own leg the turn falls short by the switch's angle: Divoká Šárka 173°;
 - has its two switches within 150 m. Lehovec's whole loop runs between switches 120 m apart and Královka's 142 m; Sídliště Petřiny's are 72 m apart. The nearest circuit round city blocks comes back 214 m away (Palmovka), the others up to 510 m (Strossmayerovo náměstí, Masarykovo nádraží, Náměstí Míru);
 - runs at most 600 m;
-- has a mean radius of at least `min-radius-network`, 18 m. A 52 m path turning 276° at Radošovická is a junction drawn in pieces;
-- is not at a place the user says is no loop (`not-loops` in `data/truth.json`): the teardrop at Chotkovy sady. DI draws it with both ends on the junction above it, all at level 0, and OSM tags no bridge or layer there, so the data cannot tell it.
+- has a mean radius of at least `min-radius-network`, 18 m. A 52 m path turning 276° at Radošovická is a junction drawn in pieces.
 
-On DI's network (2026-09-30) the rule finds 46 loops: the termini, the depots, Dvorce, Hlubočepy, both of Petřiny's loop tracks and Lehovec's whole loop. The user reviewed the list on 2026-11-09: "all real loops except Chotkovy sady". Of the 50 GTFS termini with 90 or more trips, eight have no loop:
+On DI's network (2026-09-30) the rule finds 47 loops: the termini, the depots, Dvorce, Hlubočepy, Špejchar (listed by its nearest stop, Chotkovy sady), both of Petřiny's loop tracks and Lehovec's whole loop. The user reviewed the list on 2026-11-09: all of them are real loops. Špejchar was confirmed after a second look: "This one at Chotkovy sady is correct, named by stop špejchar, I misunderstood the street Chotkovy sady". Of the 50 GTFS termini with 90 or more trips, eight have no loop:
 - Karlovo náměstí and Zvonařka are none. The user: "karlovo náměstí isn't a loop and zvonařka technically doesn't loop, it's a triangle and radius plus switch speed limits are enough there".
 - DI does not draw the loops at Libuš, Nádraží Holešovice, Nákladové nádraží Žižkov, Pankrác and Slivenec yet. The user: "leave for now".
 - Nádraží Hostivař, a large loop like Lehovec's, lies outside DI's districts.

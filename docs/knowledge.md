@@ -400,10 +400,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 
 Review these when realism matters; most move into the build in M2.
 - **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
-  turning 170°+ street to street, its switches within 150 m, mean radius 18 m+, not at a place `not-loops` names. It
-  finds 46 loops on DI's network, all real by the user's review (2026-11-09). DI's flat drawing makes a teardrop at
-  Chotkovy sady look like a loop; it is no loop (`not-loops`). The loops DI does not draw yet (Libuš, Nádraží
-  Holešovice …) are missing ([decision record](decisions/2026-11-07-speed-limits-and-signs.md)).
+  turning 170°+ street to street, its switches within 150 m, mean radius 18 m+. It finds 47 loops on DI's network,
+  all real by the user's review (2026-11-09); it names each by its nearest GTFS stop, so Špejchar's loop shows as
+  Chotkovy sady. The loops DI does not draw yet (Libuš, Nádraží Holešovice …) are missing
+  ([decision record](decisions/2026-11-07-speed-limits-and-signs.md)).
 - **Signals**: from OSM `traffic_signals` clusters near the route; never past the crossing they were
   made for (except along platforms, where the platform-head rules decide); two at one stop line are one.
   GO held for a tram in its dilemma zone (15 + v²/1.6 m). Distant signals where R < 110 m within 140 m.

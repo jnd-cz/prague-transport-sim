@@ -61,19 +61,6 @@ class Loops(unittest.TestCase):
         self.assertEqual(tl.find(net, radius=18), [])
         self.assertTrue(all('from its start' in (tl.why_not(c, radius=18) or 'from its start') for c in cands))
 
-    def test_a_place_the_user_says_is_no_loop(self):
-        net = terminus()
-        self.assertTrue(tl.find(net, radius=18, places=[]))
-        self.assertEqual(tl.find(net, radius=18, places=[(20.0, 0.0, 60.0)]), [])
-        self.assertTrue(tl.find(net, radius=18, places=[(500.0, 0.0, 60.0)]))
-
-    def test_the_not_loops_are_read_from_truth(self):
-        truth = {'operation': {'facts': [{'id': 'not-loops', 'value': [{'lat': 50.0875, 'lon': 14.4213, 'radius': 60}]}]}}
-        (x, y, r), = tl.not_loops(truth)
-        self.assertLess(math.hypot(x, y), 50)    # (the city frame's origin: the Marian column)
-        self.assertEqual(r, 60.0)
-        self.assertTrue(tl.not_loops())          # (data/truth.json's own: Chotkovy sady)
-
     def test_a_turn_too_tight_for_a_tram_is_a_drawing(self):
         c = {'turn': 276.0, 'len': 52.0, 'neck': 45.0}
         self.assertIn('mean radius', tl.why_not(c, radius=18))
