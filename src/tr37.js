@@ -338,12 +338,19 @@ export class TR37 {
       if (now < 0 && s > now && e > -0.4) s = now;
       else if (now < 0 && s < now && e < 0.3) s = now;
       // (a high step comes off sooner: each takes 0.6 s on the way down, and up 50 ‰ on step 4 it went 2.8 km/h over the limit)
-      else if (now > 0 && s >= 0 && e < 0.2 - 0.25 * (now - 1) && e > -0.7) s = now;
+      // (up a climb, where coasting loses the speed in seconds, a step stays to 0.6 m/s over: let go at 0.26 over and pressed again
+      // 0.35 under, it pressed step 1 every 3-5 s holding 15 km/h up 20-30 ‰ after Malostranská, 15-18 presses to Malostranské
+      // náměstí where the driver of 6921 pressed 7, #396)
+      else if (now > 0 && s >= 0 && e < ((w.aCoast ?? 0) > 0.2 ? 0.6 : 0.2) - 0.25 * (now - 1) && e > -0.7) s = now;
       // (once it let go, it coasts down w.holdSag under the speed before it presses again, 1 m/s at 30 km/h and over: the user, 2026-11-08,
       // "The hysteresis for speed under limit when another pedal press starts can be higher, which will lead to less presses"; at 0.35
       // the autopilot pressed 12.5-14.7 times a km on line 23, a driver 5.8 on a phone's count)
       else if (now === 0 && s > 0 && e > -(w.holdSag ?? 0.35) && v > 1) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
+      // (down a descent, where coasting gains the speed back in seconds, the brake comes down to step 1 rather than off, until 1 m/s
+      // under: let go 0.4 under and pressed again 0.25 over, it braked every 4-5 s holding 15 km/h down Chotkova's 43 ‰, 16-19 brake
+      // presses to Malostranská where the driver of 6921 braked 7 times, #396)
+      if (now < 0 && s >= 0 && (w.aCoast ?? 0) < -0.05 && e > -1.0) s = -1;
     }
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);

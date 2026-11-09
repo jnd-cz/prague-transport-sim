@@ -204,7 +204,16 @@ export class Autopilot {
     // overran, line 22 seed 4, #241's check)
     const look = Math.max(0, tr.v) * 2.5;
     let vtDrive = vt;
-    if (nl) vtDrive = Math.min(vtDrive, Math.sqrt((nl.v / 3.6) ** 2 + 2 * limitPlan(nl.d) * Math.max(0, nl.d - 12 - look)) - 0.3);
+    // (into a lower limit as into a point: it coasts COAST_T into the limit's curve with the gradient's own pull. Driving up to the
+    // curve itself it pressed to step 3 down Chotkova's 48 ‰ between two hairpins, from 19 to 39 km/h, and braked 30 m on; the
+    // driver of T3 6921 drove twice from Královský letohrádek to Malostranská, the autopilot 7-9 times, #396)
+    if (nl) {
+      const dl = Math.max(0, nl.d - 12);
+      const coastL = Math.min(dl, Math.max(look, COAST_T * tr.v));
+      const gL = Math.min(gradeHere, g.profile.grade(tr.s + coastL / 2 - 7), g.profile.grade(tr.s + coastL - 7));
+      const aCoastL = aCoast + (tr.mass * 9.81 * (gL - gradeHere)) / tr.inertia;
+      vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, (nl.v / 3.6) ** 2 + 2 * limitPlan(nl.d) * Math.max(0, dl - coastL) + 2 * aCoastL * coastL)) - 0.3);
+    }
     if (fixedAt !== null) {
       // (and what it still gains while the accelerator comes off, ≈1 s: up 37 ‰ on step 4 at 1.1 m/s² it drove from 14 to 20 km/h
       // 19 m before Hlušičkova, then needed more than the brake builds after driving and stood 3.5–4.6 m short on the emergency
@@ -313,8 +322,12 @@ export class Autopilot {
     const reach = aCoast > 0 ? (tr.v * tr.v) / (2 * aCoast) : Infinity;
     this.upDrive = inApproach && fixed && aCoast > 0.15 && (reach < dLeft - 3 || (!!this.upDrive && reach < dLeft - 1));
     const shortUphill = this.upDrive;
+    // (down a descent the gradient brings the speed up by itself: no drive pedal where coasting reaches the drive's target within COAST_T.
+    // At 22.6 km/h down Chotkova's 49 ‰, 29 km/h the target, it pressed and was there in 2 s on step 1, where coasting took 5 s; the
+    // driver of 6921 drove twice on the way down to Malostranská, #396)
+    const gravityUp = !onCurve && !urgent && !hazard && aCoast < -0.05 && tr.v > 1 && tr.v < vtDrive && (vtDrive - tr.v) / -aCoast < COAST_T;
     const coast = (!onCurve && between) || (onCurve && need > -300 && !shortUphill) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
-      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6);
+      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6) || gravityUp;
     // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
     // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
