@@ -1749,7 +1749,7 @@ export class Traffic {
     for (const t of this.oncoming) {
       let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
-      const isStop = stopAt !== null;
+      const isStop = stopAt !== null, platformAt = stopAt;
       t.waitFor = null; t.stop = stopAt === null ? null : { s: stopAt, why: 'stop' };
       const stop = (s, why, who = null) => { if (s < (stopAt ?? Infinity)) { stopAt = s; t.stop = { s, why }; t.waitFor = who; } };
       for (const c of this.carsOnBack || []) if (c.s > t.s) stop(c.s - 2.5 - 4, 'car on track', c.car);
@@ -1770,7 +1770,10 @@ export class Traffic {
         // or just starting can always stay)
         if (d > 0 && d < 150 && (d > stopDistance(t.v, sig.backState) || t.v < 0.5)) t.redStops.add(sig);
         if (t.redStops.has(sig)) { if (d > -1) stop(line - 3, 'signal'); } // a little before the line
-        else if (d > 0 && d < 150 && sig.backState === 'warn') sig.backCommitted = true;
+        // (not a tram that stops at its platform before the line anyway: the controller held the green up to 10 s for it, line 37
+        // holds 1.6 → 4.6 a run once #385 put three platform points just before their lines. Behind a car it may still be committed:
+        // the car can move on)
+        else if (d > 0 && d < 150 && sig.backState === 'warn' && !(isStop && platformAt < line)) sig.backCommitted = true;
       }
       for (const G of gauntlets) {
         if (t.s > G.b0 && t.s - t.length < G.b1) G.theirs.occupied = true;
