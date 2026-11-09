@@ -28,7 +28,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-TOL = 0.02         # m: the curve within this of every surveyed point (DI, the archive)
+
+def geometry_fact(fact_id, truth=None):
+    """A value of data/truth.json trackGeometry, read where it is used instead of copied (#224)."""
+    import json
+    truth = truth or json.loads((Path(__file__).resolve().parent.parent / 'data' / 'truth.json').read_text(encoding='utf-8'))
+    return next(f['value'] for f in truth['trackGeometry']['facts'] if f['id'] == fact_id)
+
+
+TOL = 0.02        # m: the curve within this of every surveyed point (DI, the archive)
 FILL_TOL = 0.3     # m: of OSM's nodes where neither has the track
 PHOTO_TOL = 0.05   # m: of track centres measured on the orthophoto (Podolská vodárna: 1.6-2.7 cm rms about a smooth
                    # curve; held within TOL the curve followed that scatter, 10 m over 2 m)
@@ -39,12 +47,12 @@ FILL_LIMIT = 0.5   # m: a fill point's tolerance grows at most to this (OSM agai
 SIGMAS = 1.0       # a point moves at most this many mean errors of its class (the decree states the mean error, no
                    # limit; 2 on line 17: 6 bends over 10° inside tracks instead of 11, 32 joins over 1° instead of 39)
 GROW = 1.5         # the factor the tolerance grows by per round
-MIN_RADIUS = 18.0  # m: the radius a curve is held to over BEND_LONG (data/truth.json trackGeometry `min-radius-network`:
+MIN_RADIUS = float(geometry_fact('min-radius-network'))  # m, 18: the radius a curve is held to over BEND_LONG (`min-radius-network`:
                    # the user, "under 18m there shouldn't be anything like that"; `min-radius-passenger` says 20, but at
                    # 20 the fit moved DI's points up to 14 cm in curves DI draws at 18-20 m, all over the city)
 KINK_RADIUS = 15.0 # m: the radius over BEND: a shorter window sees a bend squeezed into a metre, a longer one averages it
                    # out; a sagitta of 3.3 cm, so that most of the scatter within TOL stays below it
-NETWORK_RADIUS = 18.0  # m: under this the curve stiffens and its points may move past their class (HOLD_LIMIT)
+NETWORK_RADIUS = MIN_RADIUS  # m: under this the curve stiffens and its points may move past their class (HOLD_LIMIT)
 HOLD_LIMIT = 0.5   # m: past its class's error a point moves at most this far to hold NETWORK_RADIUS
 STIFFEN, STIFF_MAX = 1.5, 1.5 ** 12  # the bending weight's factor per round where the curve bends under it, and its
                                      # most (x4 at once took a 15° corner to 49 m, its points 0.49 m off; x1.5: 18.2 m, 9 cm)

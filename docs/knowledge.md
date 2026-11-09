@@ -124,7 +124,13 @@ What sessions learned and later work needs. Kept current and short; the full log
   vyhláška 393/2020 Sb.): DI's tram axes are class 3 (0.14 m in plan, 0.12 m in height) but 7 of 10,371 in
   class 2; ZPS lines are class 3 in plan (3.2 M) or 4 (0.7 M) and **class 5 in height** (3.2 M lines, 0.35 m),
   class 3 for 0.7 M. The archive states none; DMR 5G guarantees 0.18 m (0.30 m under dense vegetation); IPR's
-  1 m terrain and the orthophoto state nothing.
+  1 m terrain and the orthophoto state nothing. Counted 2026-11-03 on the state of 2026-09-30, 16 districts (moved
+  here from `truth.json`, #224), class: records in plan / in height:
+  - DI axes (`tools/dtmp_tracks.py` `di_data()`): 3: 10,364 / 10,364; 2: 7 / 7.
+  - ZPS lines (the `ZPS_KR.gpkg` files): 1: 0 / 1; 2: 1,065 / 1,065; 3: 3,226,053 / 700,785; 4: 701,195 / 21;
+    5: 5 / 3,156,921; 9: 52,246 / 121,771.
+  - ZPS areas (the `ZPS_OPL.gpkg` files): 2: 149 / 149; 3: 266,689 / 50,249; 4: 193,705 / 0; 5: 6 / 378,988;
+    9: 15,863 / 47,026.
 - **A connecting curve held at both switches keeps the radius DI gives it** (#204): its ends and directions
   are fixed by the through tracks, so widening the tolerance cannot change it; 24 places on line 17 read
   18.5-19.9 m over 5 m (Dlouhá, Strossmayerovo náměstí, Podolí, Kobylisy), needing the switches 0.5 m off

@@ -374,9 +374,9 @@ export function cantedRailVisibility(g, world) {
 }
 
 // Vertical curves of the track profile: the radius of every crest and sag over 20 m (change of
-// grade per metre), flagged under 500 m (tram track: 500 m minimum in streets, 1000 m preferred), and
+// grade per metre), flagged under 500 m (R_MIN: data/truth.json `vertical-radius-street`, 1000 m preferred), and
 // grades over 9 %.
-function verticalCurves(g) {
+function verticalCurves(g, R_MIN) {
   const pr = g.route.ground.profile, L = g.route.length, bad = new Map();
   let n = 0, minR = Infinity;
   for (let s = 10; s < L - 10; s += 2) {
@@ -384,7 +384,7 @@ function verticalCurves(g) {
     const dg = pr.grade(s + 10) - pr.grade(s - 10), R = 20 / Math.max(1e-6, Math.abs(dg)), gr = Math.abs(pr.grade(s));
     minR = Math.min(minR, R);
     const k = Math.round(s / 50);
-    if (R < 500 && !(bad.get(k)?.mag >= 500 / R)) bad.set(k, { s: Math.round(s), mag: 500 / R, info: `${dg > 0 ? 'sag' : 'crest'} radius ${Math.round(R)} m` });
+    if (R < R_MIN && !(bad.get(k)?.mag >= R_MIN / R)) bad.set(k, { s: Math.round(s), mag: R_MIN / R, info: `${dg > 0 ? 'sag' : 'crest'} radius ${Math.round(R)} m` });
     else if (gr > 0.09 && !bad.has(k)) bad.set(k, { s: Math.round(s), mag: gr * 10, info: `grade ${(gr * 100).toFixed(1)} %` }); // (Hercovka - Kobylisy really climbs 8-8.8 %)
   }
   const c = check('vertical-curves', n, [...bad.values()]);
@@ -415,13 +415,14 @@ function along(p) {
 // `min-radius-network`, the user: "under 18m there shouldn't be anything like that"); 18-20 m are exceptions
 // (`min-radius-passenger`), listed in `exceptions`. tools/track_curve.py holds 20 m within the points' accuracy
 // class and 18 m past it. Places per 10 m of each line, counted per class (our, opposite, the track's source).
-const MIN_RADIUS = 18, EXCEPTION_RADIUS = 20, SLACK = 0.995, HALF = 2.5;
+// (both radii read from data/truth.json, as tools/track_curve.py reads them: #224)
+const SLACK = 0.995, HALF = 2.5;
 function circleRadius(a, b, c) {
   const ab = Math.hypot(b[0] - a[0], b[1] - a[1]), bc = Math.hypot(c[0] - b[0], c[1] - b[1]), ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
   const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
   return area2 > 1e-9 ? Math.min(1e6, (ab * bc * ca) / (2 * area2)) : 1e6;
 }
-function trackRadius(g) {
+function trackRadius(g, MIN_RADIUS, EXCEPTION_RADIUS) {
   const d = g.data, lines = [['our', d.path], ['opposite', d.pathBack], ...(d.tracks || []).map((t) => [t.src || 'osm', t.p])];
   const bad = new Map(), near = new Map(), kinds = {}, nearKinds = {};
   let n = 0, minR = Infinity;
@@ -837,9 +838,8 @@ function underpassClearance(g) {
 // other lines, unknown directions ("?", "centrum") and multi-platform stops are not counted. vienna-cycle
 // (only the cycle strip raised, a classic kerb for cars) is listed but not counted: the detector's
 // car-lane test does not decide it (#224).
-async function stopFacts(g) {
-  let facts = [];
-  try { facts = (await (await fetch('/data/truth.json', { cache: 'no-store' })).json()).stops || []; } catch { /* no truth file */ }
+function stopFacts(g, truth) {
+  const facts = truth?.stops || [];
   const index = new Map(g.stops.map((st, i) => [st.name, i]));
   const ACROSS = new Set(['vienna', 'street']), KERB = new Set(['island', 'kerb']);
   const bad = [], listed = [];
@@ -860,16 +860,27 @@ async function stopFacts(g) {
   return { ...check('stop-facts', of, bad), listed };
 }
 
+// data/truth.json, read once by the checks that score against its facts or take their limits from it (#224)
+async function loadTruth() {
+  try { return await (await fetch('/data/truth.json', { cache: 'no-store' })).json(); } catch { return null; }
+}
+function geometryFact(truth, id) {
+  const f = truth?.trackGeometry?.facts?.find((x) => x.id === id);
+  if (!f) throw new Error(`data/truth.json trackGeometry ${id} is missing`);
+  return f.value;
+}
+
 export async function lint({ bot = false, traffic = false, save = true, seeds = SEEDS } = {}) {
   const g = window.game, world = window.world;
   if (!g || !world) throw new Error('start a shift first');
   // (the game frees the meshes' CPU copies after the GPU upload; the mesh checks need them: ?keepgeo)
   if (!/[?&](keepgeo|bot)\b/.test(location.search)) throw new Error('load the page with ?keepgeo (e.g. /?line=17&keepgeo)');
   const t0 = performance.now();
+  const truth = await loadTruth();
   const trees = treesInBuildings(world);
   const checks = {
     consist: consistAtStops(g),
-    stopFacts: await stopFacts(g),
+    stopFacts: stopFacts(g, truth),
     signalsInPlatforms: signalsInPlatforms(g),
     treeTrunks: trees.trunk,
     treeCrowns: trees.crown,
@@ -883,11 +894,11 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
     cantedRailVisibility: cantedRailVisibility(g, world),
-    verticalCurves: verticalCurves(g),
+    verticalCurves: verticalCurves(g, geometryFact(truth, 'vertical-radius-street')),
     steppedCurves: steppedCurves(g),
     catenary: catenarySpans(g),
     trackSpacing: trackSpacing(g),
-    trackRadius: trackRadius(g),
+    trackRadius: trackRadius(g, geometryFact(truth, 'min-radius-network'), geometryFact(truth, 'min-radius-passenger')),
     trackJoins: trackJoins(g),
     trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
