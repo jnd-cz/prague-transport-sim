@@ -118,14 +118,15 @@ The user, on PR 362's open points: the stop-pass limit is "point limit with over
 
 **Loops** (`tools/track_loops.py`; `python -P -E tools/track_loops.py` lists them). A loop is a path over DI's passes from a switch entered by its toe to a switch left by its toe (the same switch for a balloon) that:
 - turns 170° or more from the heading arriving at the first switch to the heading leaving the second: the street's two tracks run opposite ways. From the switch's own leg the turn falls short by the switch's angle: Divoká Šárka 173°;
-- has its two switches within 120 m. Sídliště Petřiny's are 72 m apart, the farthest of the termini; circuits round city blocks come back 160–510 m away (Čechovo náměstí's other circuit, Palmovka, Strossmayerovo náměstí, Masarykovo nádraží, Náměstí Míru);
+- has its two switches within 150 m. Lehovec's whole loop runs between switches 120 m apart and Královka's 142 m; Sídliště Petřiny's are 72 m apart. The nearest circuit round city blocks comes back 214 m away (Palmovka), the others up to 510 m (Strossmayerovo náměstí, Masarykovo nádraží, Náměstí Míru);
 - runs at most 600 m;
-- has a mean radius of at least `min-radius-network`, 18 m. A 52 m path turning 276° at Radošovická is a junction drawn in pieces.
+- has a mean radius of at least `min-radius-network`, 18 m. A 52 m path turning 276° at Radošovická is a junction drawn in pieces;
+- is not at a place the user says is no loop (`not-loops` in `data/truth.json`): the teardrop at Chotkovy sady. DI draws it with both ends on the junction above it, all at level 0, and OSM tags no bridge or layer there, so the data cannot tell it.
 
-On DI's network (2026-09-30) the rule finds 47 loops: the termini, the depots, Dvorce, Hlubočepy and both of Petřiny's loop tracks. Of the 50 GTFS termini with 90 or more trips, the rule misses eight:
-- Karlovo náměstí and Zvonařka are short workings round city blocks;
-- DI does not draw the loops at Libuš, Nádraží Holešovice, Nákladové nádraží Žižkov, Pankrác and Slivenec yet;
-- Nádraží Hostivař lies outside DI's districts.
+On DI's network (2026-09-30) the rule finds 46 loops: the termini, the depots, Dvorce, Hlubočepy, both of Petřiny's loop tracks and Lehovec's whole loop. The user reviewed the list on 2026-11-09: "all real loops except Chotkovy sady". Of the 50 GTFS termini with 90 or more trips, eight have no loop:
+- Karlovo náměstí and Zvonařka are none. The user: "karlovo náměstí isn't a loop and zvonařka technically doesn't loop, it's a triangle and radius plus switch speed limits are enough there".
+- DI does not draw the loops at Libuš, Nádraží Holešovice, Nákladové nádraží Žižkov, Pankrác and Slivenec yet. The user: "leave for now".
+- Nádraží Hostivař, a large loop like Lehovec's, lies outside DI's districts.
 
 None of the eight is on the five lines' routes.
 
@@ -136,7 +137,7 @@ A route takes the loop's limit where it follows the loop's whole path, or the pa
 | 9 | its first 44 m and last 79 m | Sídliště Řepy, where the run starts and ends |
 | 17 | its last 74 m | Vozovna Kobylisy |
 | 22 | its first 50 m | Bílá Hora |
-| 23 | its first 27 m | Královka |
+| 23 | its first 109 m, to the street switch out of the loop | Královka |
 
 Line 9's run does not turn at Nákladové nádraží Žižkov: it goes on there as line 10, 89° round the corner.
 
