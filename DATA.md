@@ -253,7 +253,7 @@ ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and
 The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
 altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
 The first acquisition is published in snapshot `2026-10-30` (#61), the state 2026-10-31 in `2026-11-03b` (#209); the
-old records it keeps beside their re-entries: [knowledge](docs/knowledge.md#sources-and-their-quirks).
+old records it keeps beside their re-entries: [knowledge](docs/knowledge.md#di-track-geometry).
 
 ### IPR 1 m terrain
 
