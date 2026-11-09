@@ -6,6 +6,7 @@
 // tram's stopping distance (v²/2 + 10 m at 1 m/s2) while it moved faster than 2 m/s (of them bold);
 // bells = the autopilot's bell; hits = collisions with crossing cars.
 import { stuckWatch, stuckScene } from './stuck.js';
+import { startShift } from './shift.js';
 
 const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
 
@@ -17,10 +18,9 @@ export async function run(seed = 1, opts = {}) {
   // (nothing from the real weather: the menu's default temperature is today's Prague forecast, which sets
   // the autopilot's heaters and flap, #205; autumn as tools/traffic_lint.js)
   $('selTrip').value = String(trip); $('optWeather').value = weather; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
-  $('btnStart').click();
   window.headless = true;
+  const game = await startShift(), traffic = window.traffic, camera = window.camera;
   const { Autopilot } = await import('/src/autopilot.js');
-  const game = window.game, traffic = window.traffic, camera = window.camera;
   const pilot = new Autopilot();
   game.pilot = pilot; // (for the watchers: what it stops for, tools/bench/stops.js)
   const stuck = stuckWatch(game);
