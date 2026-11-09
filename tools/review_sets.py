@@ -34,6 +34,10 @@ OUT = os.path.join(FOLDER, "index.json")
 KNOWN = {
     "track-heights.json": {"title": "Track heights: structure and street decisions", "issue": 202, "lines": ["17"]},
 }
+# sets a build reads, by the tools that read them: the user's answers become evidence through them, so they stay when
+# their issue closes (deleting one breaks the build, #416). track-heights.json maps data/truth.json's
+# trackHeights.reviewAnswers onto its decisions.
+READ_BY = {"track-heights.json": ["tools/line_heights.py", "tools/track_profile.py"]}
 # issues closed into another, whose sets wait for that one now (the issue's closing comment says so)
 MOVED = {20: 237}
 KERB_ISSUE = 142  # (the kerb review lists wait for it)
@@ -81,7 +85,7 @@ def describe(name, d, known_lines):
     title = d.get("title") or k.get("title") or (d.get("about") if isinstance(d.get("about"), str) else None)
     unknown = [what for what, v in (("issue", issue), ("lines", lines)) if not v]
     return {"file": f"reports/review/{name}", "title": title, "issue": issue, "waitsFor": MOVED.get(issue, issue),
-            "lines": lines, "findings": len(fs), "unknown": unknown}
+            "lines": lines, "findings": len(fs), "unknown": unknown, **({"readBy": READ_BY[name]} if name in READ_BY else {})}
 
 
 def sets(folder=FOLDER, known_lines=None):
