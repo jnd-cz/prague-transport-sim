@@ -86,19 +86,19 @@ class Rules(unittest.TestCase):
         self.assertEqual(survey.class_at(300, -4), 'road')
         self.assertEqual(survey.class_at(800, -4), 'road')
 
-    def test_a_platform_on_the_doors_side_is_the_route_s_however_near_the_back_path(self):
-        # line 9's round trip: the back path over the same track the same way, a hair nearer the platform
+    def test_a_platform_on_the_doors_side_is_ours_whichever_path_took_it(self):
+        # line 9's round trip: the back path over the same track the same way, a hair nearer the platform, draws it;
+        # the route passes it on its doors' side, so it is our stop's platform
         RB = pl.Route([[0, -0.01], [1000, -0.01]])
         right = {'p': [[100, -3], [160, -3]]}
-        self.assertIs(pl.assign(right, self.R, RB)[0], self.R)
-        # the opposite track's platform (left of the route, right of the back path) stays the back path's
-        back = pl.Route([[1000, 6], [0, 6]])
-        self.assertIs(pl.assign({'p': [[100, 9], [160, 9]]}, self.R, back)[0], back)
+        self.assertIs(pl.assign(right, self.R, RB)[0], RB)
+        self.assertEqual(pl.ours(right, self.R), (100, 160))
+        # the opposite track's platform (left of the route) is not ours
+        self.assertIsNone(pl.ours({'p': [[100, 9], [160, 9]]}, self.R))
 
-    def test_a_platform_reaching_behind_the_route_s_start_is_still_the_route_s(self):
-        # line 37 starts at the head of Spojovací's platform, 29 m of it behind the start; the back path passes all of it
-        RB = pl.Route([[1000, -6], [-40, -6]])
-        self.assertIs(pl.assign({'p': [[-29, -3], [1.5, -3]]}, self.R, RB)[0], self.R)
+    def test_a_platform_reaching_behind_the_route_s_start_is_judged_by_its_part_along_it(self):
+        # line 37 starts at the head of Spojovací's platform, 29 m of it behind the start
+        self.assertEqual(pl.ours({'p': [[-29, -3], [1.5, -3]]}, self.R), (1.5, 1.5))
 
     def test_the_route_is_the_game_s_metre_by_metre_chords(self):
         R = pl.Route([[0, 0], [10, 0], [10, 10]])

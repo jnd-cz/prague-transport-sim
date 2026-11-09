@@ -235,23 +235,26 @@ export class Game {
     const quad = (a, b, c, d, k) => { tri(a, b, c, k); tri(a, c, d, k); };
     this.platforms = [];
     for (const pl of this.data.platforms || []) {
-      let best = null, mine = null;
+      let best = null, ours = null;
       for (const rt of routes) {
         const proj = pl.p.map(([x, y]) => rt.nearest(x, y));
         if (proj.some((q) => !q)) continue;
         const d = proj.reduce((a, q) => a + q.d, 0) / proj.length;
         if (!best || d < best.d) best = { rt, proj, d };
-        // (the route takes a platform on its doors' side, however near the back path: on a round trip, line 9,
-        // the back path runs over the same tracks the same way and took half the platforms by a hair, each
-        // drawn with a second stop sign beside our stop's. Judged by its points along the route: line 37 starts
-        // at the head of Spojovací's platform, 29 m of it lie behind the start)
+        // (also ours where the route passes it on its doors' side, whichever path it went to: on line 9's round trip
+        // the back path runs over the same tracks the same way and took half our platforms by a hair, each drawn
+        // with a second stop sign beside our stop's and our stop's stand-in box on it. Judged by its points along
+        // the route: line 37 starts at the head of Spojovací's platform, 29 m of it lie behind the start)
         if (rt !== this.route) continue;
         const ins = pl.p.map((_, i) => i).filter((i) => proj[i].s > 0.5 && proj[i].s < rt.length - 0.5);
         const din = ins.reduce((a, i) => a + proj[i].d, 0) / ins.length;
         const lat = ins.reduce((a, i) => { const [x, y] = pl.p[i], q = rt.at(proj[i].s); return a + q.hx * (y - q.y) - q.hy * (x - q.x); }, 0);
-        if (ins.length && din <= 12 && lat <= 0) mine = { rt, proj, d };
+        if (ins.length && din <= 12 && lat <= 0) {
+          let a = Math.min(...ins.map((i) => proj[i].s)), b = Math.max(...ins.map((i) => proj[i].s));
+          if (pl.gtfs) { b = proj[0].s + 1; a = b - 32; }
+          ours = { s0: a, s1: b };
+        }
       }
-      if (mine) best = mine;
       if (!best || best.d > 12) continue;
       const { rt, proj } = best;
       // (a platform known only from GTFS: its stop position is where the tram front stops; the
@@ -264,7 +267,7 @@ export class Game {
       // (an OSM platform line usually runs along its middle, an area gives its outer edge)
       // (an OSM line: 2-3.5 m wide unless tagged; it reached over the car lane at Trojská, 5.1 m)
       const inner = 1.5, outer = pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner)));
-      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter };
+      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours };
       this.platforms.push(plat);
       // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
       plat.kerb = side < 0 ? this._stopType(pl.vienna, () => this._vienna(rt, s0, s1), `platform ${pl.name}`) : null;
@@ -296,12 +299,12 @@ export class Game {
       this.objects.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
     }
     // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
-    // their driving direction is along the back route), shelter where OSM has one. One sign per platform: where OSM
-    // draws a platform as two ways, the one without PID's stop got a blank sign beside the other's (Flora,
-    // Malostranská)
+    // their driving direction is along the back route), shelter where OSM has one. Not on our own platforms (`ours`:
+    // our stop's sign and shelter stand there). One sign per platform: where OSM draws a platform as two ways, the
+    // one without PID's stop got a blank sign beside the other's (Flora, Malostranská)
     const twin = (p) => !p.stop && this.platforms.some((q) => q !== p && q.back && q.stop && q.rt === p.rt && q.side === p.side && q.s0 < p.s1 && p.s0 < q.s1);
     for (const p of this.platforms) {
-      if (!p.back) continue;
+      if (!p.back || p.ours) continue;
       if (!twin(p)) {
         const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
         const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
@@ -323,9 +326,12 @@ export class Game {
   _buildStop(stop) {
     const route = this.route;
     const g = new THREE.Group();
-    // our platform: the OSM one (built with both directions' platforms) where it covers the stop zone,
-    // else a 30 m box on the right (T3 doors are on the right side only)
-    const osm = (this.platforms || []).find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20);
+    // our platform: the OSM one (built with both directions' platforms) where it covers the stop zone, also one the
+    // back path took that the route passes on its doors' side (`ours`), else a 30 m box on the right (T3 doors are on
+    // the right side only)
+    const pls = this.platforms || [];
+    const osm = pls.find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20)
+      || pls.find((p) => p.back && p.ours && p.ours.s0 < stop.target - 8 && p.ours.s1 > stop.target - 20);
     const len = 30, mid = stop.target - len / 2 - 1;
     // (a Vienna-type stop: boarding from the sidewalk; sign and shelter stand at the kerb)
     const kerb = osm ? osm.kerb : this._stopType(this.data.stops[stop.i].vienna, () => this._vienna(route, stop.target - len - 1, stop.target - 1), `stop ${stop.name}`);

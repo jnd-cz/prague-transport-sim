@@ -382,12 +382,9 @@ def side_of(pl, rt, proj):
 
 
 def assign(pl, R, RB):
-    """The route a platform belongs to, (route, projections, mean distance) or None (src/game.js _buildPlatforms): the
-    route where it lies on the doors' side within 12 m, however near the back path (on line 9's round trip the back
-    path runs over the same tracks the same way and took half the platforms by a hair, each drawn with a second stop
-    sign beside our stop's), judged by its points along the route (line 37 starts at the head of Spojovací's
-    platform); else the nearer of the two."""
-    best = mine = None
+    """The path a platform is drawn along, (route, projections, mean distance) or None: the nearer of the two
+    (src/game.js _buildPlatforms)."""
+    best = None
     for rt in [R] + ([RB] if RB else []):
         proj = [rt.nearest(x, y) for x, y in (q[:2] for q in pl['p'])]
         if any(s is None for s, _ in proj):
@@ -395,21 +392,28 @@ def assign(pl, R, RB):
         d = sum(q[1] for q in proj) / len(proj)
         if best is None or d < best[2]:
             best = (rt, proj, d)
-        if rt is not R:
-            continue
-        ins = [i for i, (s, _) in enumerate(proj) if 0.5 < s < rt.length - 0.5]
-        if ins:
-            pts = [pl['p'][i] for i in ins]
-            if sum(proj[i][1] for i in ins) / len(ins) <= 12 and side_of({'p': pts}, rt, [proj[i] for i in ins]) < 0:
-                mine = (rt, proj, d)
-    return mine or best
+    return best
+
+
+def ours(pl, R):
+    """(s0, s1) on the route where it passes the platform on its doors' side within 12 m, whichever path the platform
+    is drawn along, else None (src/game.js _buildPlatforms `ours`): on line 9's round trip the back path runs over the
+    same tracks the same way and took half our platforms by a hair, each drawn with a second stop sign. Judged by the
+    platform's points along the route: line 37 starts at the head of Spojovací's platform, 29 m of it behind the start."""
+    proj = [R.nearest(x, y) for x, y in (q[:2] for q in pl['p'])]
+    ins = [i for i, (s, _) in enumerate(proj) if s is not None and 0.5 < s < R.length - 0.5]
+    if not ins or sum(proj[i][1] for i in ins) / len(ins) > 12 or side_of({'p': [pl['p'][i] for i in ins]}, R, [proj[i] for i in ins]) > 0:
+        return None
+    if pl.get('gtfs'):
+        return proj[0][0] + 1 - 32, proj[0][0] + 1
+    return min(proj[i][0] for i in ins), max(proj[i][0] for i in ins)
 
 
 def stop_types(data, survey, targets, R, RB):
     """The stop type of each OSM platform on the doors' side (`kerb` per data.platforms index, src/game.js
     _buildPlatforms) and of each stop without such a platform over the 30 m before its point (_buildStop):
     ({platform index: kerb}, {stop index: kerb}), kerb None for an ordinary stop."""
-    plats, ours = {}, []
+    plats, mine, theirs = {}, [], []
     for k, pl in enumerate(data.get('platforms') or []):
         best = assign(pl, R, RB)
         if best is None or best[2] > 12:
@@ -425,11 +429,17 @@ def stop_types(data, survey, targets, R, RB):
         if side < 0:
             plats[k] = vienna(rt, survey, s0, s1)
             if rt is R:
-                ours.append((s0, s1, k))
+                mine.append((s0, s1, k))
+        o = ours(pl, R) if rt is not R else None
+        if o:
+            theirs.append((*o, k))
     stops = {}
     for i, t in enumerate(targets):
-        osm = next((k for s0, s1, k in ours if s0 < t - 8 and s1 > t - 20), None)
-        stops[i] = plats[osm] if osm is not None else vienna(R, survey, t - 31, t - 1)
+        # (the route's own platforms first, then those the back path took that the route passes, as the game)
+        osm = next((k for s0, s1, k in mine if s0 < t - 8 and s1 > t - 20), None)
+        if osm is None:
+            osm = next((k for s0, s1, k in theirs if s0 < t - 8 and s1 > t - 20), None)
+        stops[i] = plats.get(osm) if osm is not None else vienna(R, survey, t - 31, t - 1)
     return plats, stops
 
 
