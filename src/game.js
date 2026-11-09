@@ -215,6 +215,17 @@ export class Game {
     return nk ? kerb / nk : 6;
   }
 
+  // The stop type: the build's (tools/placement.py `vienna`: the kerb's offset or null) where the data has it, else the
+  // rule here; with the build's, the rule here runs too and a disagreement is logged with the placement's (#22 stage 2).
+  _stopType(built, own, what) {
+    if (built === undefined) return own();
+    const mine = own();
+    if ((mine === null) !== (built === null) || (mine !== null && Math.abs(mine - built) > 0.05)) {
+      (this.stopTypeDiffs ||= []).push(`${what}: Vienna ${built ?? 'no'}, the game's ${mine === null ? 'no' : mine.toFixed(2)}`);
+    }
+    return built;
+  }
+
   _buildPlatforms() {
     const routes = [this.route, this.backRoute].filter(Boolean), ground = this.route.ground, dtm = ground.dtm;
     const pos = [], col = [];
@@ -224,12 +235,25 @@ export class Game {
     const quad = (a, b, c, d, k) => { tri(a, b, c, k); tri(a, c, d, k); };
     this.platforms = [];
     for (const pl of this.data.platforms || []) {
-      let best = null;
+      let best = null, ours = null;
       for (const rt of routes) {
         const proj = pl.p.map(([x, y]) => rt.nearest(x, y));
         if (proj.some((q) => !q)) continue;
         const d = proj.reduce((a, q) => a + q.d, 0) / proj.length;
         if (!best || d < best.d) best = { rt, proj, d };
+        // (also ours where the route passes it on its doors' side, whichever path it went to: on line 9's round trip
+        // the back path runs over the same tracks the same way and took half our platforms by a hair, each drawn
+        // with a second stop sign beside our stop's and our stop's stand-in box on it. Judged by its points along
+        // the route: line 37 starts at the head of Spojovací's platform, 29 m of it lie behind the start)
+        if (rt !== this.route) continue;
+        const ins = pl.p.map((_, i) => i).filter((i) => proj[i].s > 0.5 && proj[i].s < rt.length - 0.5);
+        const din = ins.reduce((a, i) => a + proj[i].d, 0) / ins.length;
+        const lat = ins.reduce((a, i) => { const [x, y] = pl.p[i], q = rt.at(proj[i].s); return a + q.hx * (y - q.y) - q.hy * (x - q.x); }, 0);
+        if (ins.length && din <= 12 && lat <= 0) {
+          let a = Math.min(...ins.map((i) => proj[i].s)), b = Math.max(...ins.map((i) => proj[i].s));
+          if (pl.gtfs) { b = proj[0].s + 1; a = b - 32; }
+          ours = { s0: a, s1: b };
+        }
       }
       if (!best || best.d > 12) continue;
       const { rt, proj } = best;
@@ -243,10 +267,10 @@ export class Game {
       // (an OSM platform line usually runs along its middle, an area gives its outer edge)
       // (an OSM line: 2-3.5 m wide unless tagged; it reached over the car lane at Trojská, 5.1 m)
       const inner = 1.5, outer = pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner)));
-      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter };
+      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours };
       this.platforms.push(plat);
       // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
-      plat.kerb = side < 0 ? this._vienna(rt, s0, s1) : null;
+      plat.kerb = side < 0 ? this._stopType(pl.vienna, () => this._vienna(rt, s0, s1), `platform ${pl.name}`) : null;
       if (plat.kerb !== null) { plat.inner = plat.kerb; plat.outer = plat.kerb + 2; plat.surveyed = true; continue; }
       const mid = rt.offset((s0 + s1) / 2, side * (inner + outer) / 2), cls = dtm?.classAt(mid.x, mid.y);
       plat.surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
@@ -275,16 +299,21 @@ export class Game {
       this.objects.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
     }
     // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
-    // their driving direction is along the back route), shelter where OSM has one
+    // their driving direction is along the back route), shelter where OSM has one. Not on our own platforms (`ours`:
+    // our stop's sign and shelter stand there). One sign per platform: where OSM draws a platform as two ways, the
+    // one without PID's stop got a blank sign beside the other's (Flora, Malostranská)
+    const twin = (p) => !p.stop && this.platforms.some((q) => q !== p && q.back && q.stop && q.rt === p.rt && q.side === p.side && q.s0 < p.s1 && p.s0 < q.s1);
     for (const p of this.platforms) {
-      if (!p.back) continue;
-      const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
-      const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
-      const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.18 : ground.trackAt(o.x, o.y);
-      const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
-      sign.position.set(o.x, zt + 0.18, -o.y);
-      sign.rotation.y = Math.atan2(-h.hx, h.hy);
-      this.objects.add(sign);
+      if (!p.back || p.ours) continue;
+      if (!twin(p)) {
+        const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
+        const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
+        const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.18 : ground.trackAt(o.x, o.y);
+        const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
+        sign.position.set(o.x, zt + 0.18, -o.y);
+        sign.rotation.y = Math.atan2(-h.hx, h.hy);
+        this.objects.add(sign);
+      }
       if (p.shelter) {
         const sh = makeShelter(), m = p.rt.offset((p.s0 + p.s1) / 2, p.side * (p.outer - 0.6));
         sh.position.set(m.x, ground.trackAt(m.x, m.y) + 0.18, -m.y);
@@ -297,12 +326,15 @@ export class Game {
   _buildStop(stop) {
     const route = this.route;
     const g = new THREE.Group();
-    // our platform: the OSM one (built with both directions' platforms) where it covers the stop zone,
-    // else a 30 m box on the right (T3 doors are on the right side only)
-    const osm = (this.platforms || []).find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20);
+    // our platform: the OSM one (built with both directions' platforms) where it covers the stop zone, also one the
+    // back path took that the route passes on its doors' side (`ours`), else a 30 m box on the right (T3 doors are on
+    // the right side only)
+    const pls = this.platforms || [];
+    const osm = pls.find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20)
+      || pls.find((p) => p.back && p.ours && p.ours.s0 < stop.target - 8 && p.ours.s1 > stop.target - 20);
     const len = 30, mid = stop.target - len / 2 - 1;
     // (a Vienna-type stop: boarding from the sidewalk; sign and shelter stand at the kerb)
-    const kerb = osm ? osm.kerb : this._vienna(route, stop.target - len - 1, stop.target - 1);
+    const kerb = osm ? osm.kerb : this._stopType(this.data.stops[stop.i].vienna, () => this._vienna(route, stop.target - len - 1, stop.target - 1), `stop ${stop.name}`);
     stop.vienna = kerb !== null;
     const plat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), new THREE.MeshLambertMaterial({ color: 0xa7a197 }));
     plat.visible = !osm && !stop.vienna;
@@ -346,32 +378,24 @@ export class Game {
   }
 
   _initSignals() {
+    // where each signal stands: the build's placement (tools/placement.py, #22: the same rules, decided once with
+    // each decision's rule) where the data has it, else the rules here. With the build's, the rules here run too on
+    // the signals as build_line found them, and every place where they disagree is logged (placementDiffs).
+    const built = this.data.signals?.some((d) => d.rule) ? this.data.signals : null;
+    const own = this._placeSignals(built ? (this.data.signalsRaw || []) : this.data.signals);
     // grade separation: where our track is on a bridge, the junctions and their traffic lights
     // belong to the road underneath (e.g. the Modřany estakáda), not to the tram
-    const placed = this._placeSignals(this.data.signals);
-    this.signals = placed.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d, i) => {
-      d = { ...d };
-      // a signal never stands along a platform: it moves to the platform head, just past where the
-      // tram front stops; if the crossing follows too closely for that, it hangs from the wire
-      for (const st of this.stops) {
-        const a = (st.p0 ?? st.target - 30) - 1, b = st.target + 2;
-        if (d.s > a && d.s < b) {
-          // (only while the platform head is still before the junction's near edge)
-          if (b < (d.edge ?? d.cross) - 1) d.s = b;
-          else {
-            // (the crossing right after the platform: its stop point, 3 m before the signal, is where the
-            // front stops for the passengers, or the crossing's edge if that comes first; hung 12-15 m
-            // back over the platform it made trams stop short of the platform end at red, Kublov)
-            d.hang = true; d.head = st;
-            d.s = Math.max(d.s, Math.min(st.target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
-            // (and the front stops for the passengers no further than that: the crossing began 4 m before
-            // the platform's end at Staroměstská, the tram served the stop 3 m past its red stop point)
-            // (served up to 0.5 m before the signal, 2.5 m past the stop point: 0.5 m was too little to stop a T3
-            // in, the user, #255)
-            if (d.s - 3 < st.target) { st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target); }
-          }
-        }
-      }
+    const live = (list) => list.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d) => ({ ...d }));
+    let placed;
+    if (built) {
+      placed = live(built).map((d) => ({ ...d, head: d.head !== undefined ? this.stops[d.head] : undefined }));
+      // (the stop point moves back before a hung signal as below, after the zone the set's length gave it)
+      for (const d of placed) if (d.head && d.s - 3 < d.head.target) this._stopBefore(d.head, d);
+      this._dryTargets = new Map();
+      this.placementDiffs = [...(this.stopTypeDiffs || []), ...this._placementDiffs(placed, live(own).map((d) => this._platformRule(d, true)))];
+      if (this.placementDiffs.length) console.log(`placement: the build and the game differ at ${this.placementDiffs.join('; ')}`);
+    } else placed = live(own).map((d) => this._platformRule(d));
+    this.signals = placed.map((d, i) => {
       const mesh = makeTramSignal();
       // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
       // the track, so the post does not hide it from the driver; the same pole carries the crossing's
@@ -405,6 +429,51 @@ export class Game {
     }).sort((a, b) => a.s - b.s);
     this._initGauntlets();
     this._initDistantSignals();
+  }
+
+  // A signal never stands along a platform: it moves to the platform head, just past where the tram front stops; if the
+  // crossing follows too closely for that, it hangs from the wire and the stop point moves back before it (tools/
+  // placement.py platform_rule, the same). `dry`: decide only, for the comparison with the build's placement, with the
+  // stop points moved so far kept in this._dryTargets.
+  _platformRule(d, dry = false) {
+    for (const st of this.stops) {
+      const target = dry ? this._dryTargets.get(st) ?? st.target : st.target;
+      const a = (st.p0 ?? target - 30) - 1, b = target + 2;
+      if (d.s > a && d.s < b) {
+        // (only while the platform head is still before the junction's near edge)
+        if (b < (d.edge ?? d.cross) - 1) d.s = b;
+        else {
+          // (the crossing right after the platform: its stop point, 3 m before the signal, is where the
+          // front stops for the passengers, or the crossing's edge if that comes first; hung 12-15 m
+          // back over the platform it made trams stop short of the platform end at red, Kublov)
+          d.hang = true; d.head = st;
+          d.s = Math.max(d.s, Math.min(target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
+          if (d.s - 3 < target) { if (dry) this._dryTargets.set(st, d.s - 3); else this._stopBefore(st, d); }
+        }
+      }
+    }
+    return d;
+  }
+
+  // (and the front stops for the passengers no further than that: the crossing began 4 m before the platform's end at
+  // Staroměstská, the tram served the stop 3 m past its red stop point; served up to 0.5 m before the signal, 2.5 m past
+  // the stop point: 0.5 m was too little to stop a T3 in, the user, #255)
+  _stopBefore(st, d) {
+    st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target);
+  }
+
+  // Where the build's placement and the rules here disagree: ["sig@s0: what"], by the signals' input position s0.
+  _placementDiffs(built, own) {
+    const key = (d) => Math.round((d.s0 ?? d.s) * 10), mine = new Map(own.map((d) => [key(d), d])), out = [];
+    for (const b of built) {
+      const o = mine.get(key(b)), at = `sig@${Math.round(b.s0 ?? b.s)}`;
+      mine.delete(key(b));
+      if (!o) { out.push(`${at}: only the build's`); continue; }
+      if (Math.abs(o.s - b.s) > 0.15) out.push(`${at}: at ${b.s.toFixed(1)}, the game's at ${o.s.toFixed(1)}`);
+      if (!!o.hang !== !!b.hang || o.head?.name !== b.head?.name) out.push(`${at}: hung ${!!b.hang} at ${b.head?.name ?? '-'}, the game's ${!!o.hang} at ${o.head?.name ?? '-'}`);
+    }
+    for (const o of mine.values()) out.push(`sig@${Math.round(o.s0 ?? o.s)}: only the game's`);
+    return out;
   }
 
   // Interlaced track (gauntlet), e.g. Letenska under the building near Malostranske namesti:

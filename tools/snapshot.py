@@ -510,7 +510,7 @@ def status(sid):
 
 
 # ---------------------------------------------------------------- built data
-LINE_STEPS = ("heights", "platforms", "speed", "clearances")   # keys the steps after build_line.py write (tools/rebuild.py)
+LINE_STEPS = ("heights", "platforms", "speed", "clearances", "signalsRaw")   # keys the steps after build_line.py write (tools/rebuild.py)
 
 
 def data_files():

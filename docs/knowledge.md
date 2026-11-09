@@ -53,6 +53,10 @@ What sessions learned and later work needs. Kept current and short; the full log
   leaves Řepy and returns to it over the same tracks: s 0–8 km and 20–28 km): the closest piece of it can be our own track. Matching
   onto another route takes the heading into account (`Route.nearestOnHeading`); plain `nearest` there
   spawned oncoming trams on our track and made two false 8 km gauntlets on line 9 (28 signals lost).
+  A platform there lies as near to the back path as to the route, and goes to the back path by a hair
+  about half the time: 15 stops of line 9 had a second, opposite-direction sign beside ours. The game marks
+  a platform the route passes on its doors' side as `ours` and draws no other sign there, but keeps it on
+  the back path, whose trams stop at it (`src/traffic.js` `backStops`, #22).
 - **The archived track heights (the `archive` candidates, 2008 records) under a structure measure what
   lies below it** (#176): at Modřany → Belárie the archive follows the embankment within 0.2 m of the
   lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
@@ -232,6 +236,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   (`tools/dtm_packages.py` `DTM`, `--check` recomputes it from the OSM district boundaries). The hand-made
   lists before #125 covered under half of line 22 (no Praha 1 or 6) and missed line 17's Troja and Libuš,
   with Trojský most. Its vertices are far apart (big river triangles), so terrain is lowered vertex by vertex under surveyed areas.
+- **`lineN.dtm.json` areas keep their holes apart** (`r` the outline, `h` the holes: 958 of line 9's 9,336
+  areas), and **some outlines cross themselves** (22 on line 9, among them the 27,644 m² carriageway of
+  Seifertova). The game triangulates both as they are (`src/terrain.js`); a tool reading them with shapely
+  takes the holes and repairs the ring (`make_valid`), or it loses the area: dropped, Seifertova's carriageway
+  hid the Vienna-type stop Lipanská A (#22, `tools/placement.py` `Survey`).
 - **An outline along a retaining wall takes the wall's top and foot by turns** (#147): the area's
   vertices coincide with the wall's 3D lines (`Hranice stavby`, ground level), whose heights alternate.
   Beside the tram embankment at Belárie (line 17) the tram area's edge read 195.8 / 199.7 / 196.8 /

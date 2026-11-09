@@ -91,6 +91,7 @@ pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packag
 | `dtm_points` | `lineN.dtmpoints.json` | street furniture from the archived technical map |
 | `osm_signals` | `lineN.signals.json` | line 17 only, until the placement rules (#22): OSM traffic signals |
 | `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
+| `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
 | `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
