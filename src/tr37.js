@@ -353,25 +353,18 @@ export class TR37 {
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
     if (w.noDrive) s = Math.min(0, s);
-    // a wheel that goes takes a step less, and the step stays less for a while: back on the same step at once it slipped through
-    // most of every start on autumn's leaves (6 s and 3 s [assumed]). On sand too: sand gives 0.1 of grip back, and step 5 pulls
-    // with more (up 50 ‰ it slipped 4.5 s on step 5 while sanding). The sand stays on through the start (the autopilot's).
-    // Lower again only if it still slips 0.8 s on: the wheels go on slipping while a step comes off (0.6 s), and a slip on step 4
-    // ended on step 1 for 6 s (up 50 ‰ on leaves, 17 s lost)
+    // a wheel that spins: noticed after 0.5 s, the pedal off for 0.6 s, and back on a step lower, the cap held 6 s [assumed]; the user,
+    // 2026-11-04: "the wheel spin up quickly and the reaction of real driver is slower. They ease of the drive and try again with less
+    // power". Spinning, the rail gives half its peak (#265's creep curve), and a step or two less still pulled more: stepped down one
+    // at a time the spin went on through steps 4 to 1, and on step 1, the lowest, for good (109 s of a 150 s drive up 50 ‰ on leaves)
     A.slipT = (A.slipT || 0) - w.dt;
     A.slideT = (A.slideT || 0) - w.dt;
-    A.slipWait = (A.slipWait || 0) - w.dt;
-    if (w.slip && now > 1) { if (!(A.slipT > 0) || (now <= A.slipCap && A.slipWait <= 0)) { A.slipCap = now - 1; A.slipWait = 0.8; } A.slipT = 6; }
-    if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
-    if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
-    // (on step 1 there is no step lower: spinning, the rail gives half its peak (#265's creep curve) and step 1's regulated current
-    // still pulls more, so the spin went on for good, 109 s of a 150 s drive up 50 ‰ on leaves. After 0.5 s of it the pedal comes
-    // off for 0.6 s and the wheels grip again, as a driver eases off and tries again: the user, 2026-11-04, "They ease of the drive
-    // and try again with less power")
-    A.spin1 = w.slip && now === 1 ? (A.spin1 || 0) + w.dt : 0;
-    if (A.spin1 > 0.5) { A.easeT = 0.6; A.spin1 = 0; }
     A.easeT = (A.easeT || 0) - w.dt;
+    A.spinT = w.slip && now > 0 ? (A.spinT || 0) + w.dt : 0;
+    if (A.spinT > 0.5 && !(A.easeT > 0)) { A.easeT = 0.6; A.slipCap = Math.max(1, (A.slipT > 0 ? Math.min(A.slipCap, now) : now) - 1); A.slipT = 6; A.spinT = 0; }
+    if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
     if (A.easeT > 0 && s > 0) s = 0;
+    if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
     if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast
