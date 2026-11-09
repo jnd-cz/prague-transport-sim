@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-11-06r",
- "built_at_commit": "478ed19",
- "published": "2026-11-08 23:13",
- "note": "heights of lines 9, 17, 22, 23, 37 rebuilt: held heights settled by the lidar (#202), the height review queue regenerated (#390)",
+ "snapshot": "2026-11-08r",
+ "built_at_commit": "b20d5db",
+ "published": "2026-11-09 09:26",
+ "note": "Stop signs from the user's review answers (#258): lines 9, 17, 22, 23, 37 rebuilt on 64 signs in data/truth.json stopSigns",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -29,16 +29,16 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6273036,
-   "sha256": "160a8af5c1ca98b1f4554d92d30893a071ae7cf012844225a426035e6faedc95"
+   "size": 6273040,
+   "sha256": "8649d9a6358fa0aec3bd487c2662327104b3e9ba5da2282295992e392cfaf07a"
   },
   "line17.signals.json": {
    "size": 36582,
    "sha256": "8698ef0e19017bcdd84848c74c82e24cd7635419e107f36365ec6858bf64dc59"
   },
   "line17.validate.json": {
-   "size": 4664,
-   "sha256": "3168a1f3d43c7e905a7453bba3584dbc6de5a507d01a4c468c37c5e97b2e73ca"
+   "size": 4663,
+   "sha256": "ec9ec797027243fd9c8ec1a87459b6c21cbc17afcf989d533ebab40f81167141"
   },
   "line17.zps.json": {
    "size": 6581522,
@@ -69,8 +69,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6328789,
-   "sha256": "eb5fb9ce0a3ca092ae1c07ed953be4acf70213589c54cf8fc7422c1b4039ab53"
+   "size": 6328787,
+   "sha256": "4709e176a4bc0c7d9cedd65ed1a3c2f1113237baa48c29e4b4b2b90eafbeaaf9"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -101,8 +101,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2364523,
-   "sha256": "c3f8f4910a732cc866803922603b4e7acc81f1a7589c9f5a42d18b54f7dd2b85"
+   "size": 2364511,
+   "sha256": "6cb691b36a12e9416d31ff0445b5a2a0d44f8c8c1214840b471b337c9fdbf14d"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -129,8 +129,8 @@
    "sha256": "cb0a10ac26f32199caf577e8e729af1d3689a1985766bb4d7c857a7bc35ce461"
   },
   "line37.json": {
-   "size": 2162825,
-   "sha256": "ac39472e0ccbc04000b2476ac8b15e20523afbecf1b9a0982a6fccaabfc87387"
+   "size": 2162905,
+   "sha256": "677bd859d25d090e7bbbc89311650ce0f40e166041bdd62d9e9c4cd3fac28766"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -157,8 +157,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5369986,
-   "sha256": "9791ac77269d41a8ec775cf695bfe96e59b9da501dc2eefd85f91a5c1c0cd4f6"
+   "size": 5369958,
+   "sha256": "a6231a6c0f371ecb3dfe1a9d9a59892c345212caaf172f1ae42d5dd7e7473d36"
   },
   "line9.validate.json": {
    "size": 6596,

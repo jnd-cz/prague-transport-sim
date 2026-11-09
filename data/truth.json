@@ -2280,6 +2280,58 @@
   "note": "Where the stop signs (označníky) stand: the point the tram front stops at (D 1/2 § 27.6), from the user's stop-sign review (#258), imported by tools/stop_signs_review.py --import; the build makes it the stop's point (tools/build_line.py). x, y in the city frame (tools/geo.py). osm_node and gtfs: the open data at the time of the answer. The user, 2026-11-05: \"Hercovka on gtfs mapy pid looks indeed wrong, malostranské náměstí on osm maps is too short\"; the sign usually stands \"slightly before platform's front end\" (2026-11-04).",
   "signs": [
    {
+    "stop": "Belárie",
+    "towards": "Hodkovičky",
+    "x": -2499.02,
+    "y": -7937.04,
+    "how": "placed on the map",
+    "osm_node": 30079843,
+    "gtfs": [
+     -2501.3,
+     -7936.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Belárie",
+    "towards": "Modřanská škola",
+    "x": -2512.3,
+    "y": -8007.7,
+    "how": "sign at the timetable point (GTFS)",
+    "osm_node": 3457515879,
+    "gtfs": [
+     -2512.3,
+     -8007.7
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Bertramka",
+    "towards": "U Zvonu",
+    "x": -2280.9,
+    "y": -1384.8,
+    "how": "sign at the pin",
+    "osm_node": 4533064817,
+    "gtfs": [
+     -2278.0,
+     -1386.5
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-9.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Brusnice",
+    "towards": "Pohořelec",
+    "x": -2045.7,
+    "y": 914.1,
+    "how": "sign at the pin",
+    "osm_node": 276837845,
+    "gtfs": [
+     -2045.5,
+     911.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
     "stop": "Brusnice",
     "towards": "Pražský hrad",
     "x": -2012.53,
@@ -2291,6 +2343,45 @@
      909.4
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Bílá labuť",
+    "towards": "Masarykovo nádraží",
+    "x": 1038.3,
+    "y": 168.5,
+    "how": "sign at the pin",
+    "osm_node": 4693353084,
+    "gtfs": [
+     1045.0,
+     167.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Březiněveská",
+    "towards": "Kobylisy",
+    "x": 3126.2,
+    "y": 3912.1,
+    "how": "sign at the pin",
+    "osm_node": 4096977771,
+    "gtfs": [
+     3126.3,
+     3911.5
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Březiněveská",
+    "towards": "Líbeznická",
+    "x": 3104.4,
+    "y": 4025.7,
+    "how": "sign at the pin",
+    "osm_node": 4096977777,
+    "gtfs": [
+     3104.6,
+     4024.8
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
    {
     "stop": "Dubečská",
@@ -2317,6 +2408,59 @@
     "gtfs": [
      2689.1,
      3521.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Hlavní nádraží",
+    "towards": "Viktoria Žižkov",
+    "x": 1006.2,
+    "y": -320.9,
+    "how": "sign at the pin",
+    "osm_node": 255617362,
+    "gtfs": [
+     1012.7,
+     -322.8
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-9.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Hloubětín",
+    "towards": "Starý Hloubětín",
+    "x": 8461.8,
+    "y": 953.9,
+    "how": "sign at the pin",
+    "osm_node": 4450425892,
+    "gtfs": [
+     8461.5,
+     950.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Hodkovičky",
+    "towards": "Belárie",
+    "x": -2380.5,
+    "y": -7398.4,
+    "how": "sign at the pin",
+    "note": "the user, Claude Code session 2026-11-09 (#258): \"Hodkovičky seems to be correct. I marked unsure because it's a new stop and ortophoto doesn't show so I could check properly.\"",
+    "osm_node": 13275534336,
+    "gtfs": [
+     -2380.5,
+     -7398.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-09 (#258)"
+   },
+   {
+    "stop": "Hodkovičky",
+    "towards": "Černý kůň",
+    "x": -2380.0,
+    "y": -7409.6,
+    "how": "sign at the pin",
+    "osm_node": 13275534335,
+    "gtfs": [
+     -2380.0,
+     -7409.2
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
@@ -2348,6 +2492,84 @@
     "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
    {
+    "stop": "Karlovo náměstí",
+    "towards": "Moráň",
+    "x": -294.5,
+    "y": -1247.2,
+    "how": "sign at the pin",
+    "osm_node": 8569961260,
+    "gtfs": [
+     -296.2,
+     -1249.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-9.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Karlovo náměstí",
+    "towards": "Novoměstská radnice",
+    "x": -294.5,
+    "y": -1247.2,
+    "how": "sign at the pin",
+    "osm_node": 8569961260,
+    "gtfs": [
+     -296.2,
+     -1249.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Karlovy lázně",
+    "towards": "Národní divadlo",
+    "x": -599.6,
+    "y": -231.8,
+    "how": "sign at the pin",
+    "osm_node": 4700724587,
+    "gtfs": [
+     -596.8,
+     -233.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Karlovy lázně",
+    "towards": "Staroměstská",
+    "x": -576.91,
+    "y": -207.02,
+    "how": "placed on the map",
+    "osm_node": 9802497363,
+    "gtfs": [
+     -581.7,
+     -210.8
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Ke Stírce",
+    "towards": "Hercovka",
+    "x": 2987.7,
+    "y": 3550.3,
+    "how": "sign at the timetable point (GTFS)",
+    "osm_node": 4096977750,
+    "gtfs": [
+     2987.7,
+     3550.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Klamovka",
+    "towards": "Kavalírka",
+    "x": -3250.6,
+    "y": -1437.8,
+    "how": "sign at the pin",
+    "osm_node": 4533064822,
+    "gtfs": [
+     -3245.7,
+     -1439.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-9.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
     "stop": "Koh-i-noor",
     "towards": "Slavia - Nádraží Eden",
     "x": 2602.31,
@@ -2360,6 +2582,46 @@
      -2564.7
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Krejcárek",
+    "towards": "Ohrada",
+    "x": 3862.0,
+    "y": 296.2,
+    "how": "sign at the pin",
+    "osm_node": 31624631,
+    "gtfs": [
+     3863.5,
+     297.2
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Krejcárek",
+    "towards": "Palmovka",
+    "x": 3919.91,
+    "y": 327.52,
+    "how": "placed on the map",
+    "note": "sign at OSM",
+    "osm_node": 3412553283,
+    "gtfs": [
+     3917.4,
+     328.2
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Krymská",
+    "towards": "Ruská",
+    "x": 1641.42,
+    "y": -1964.05,
+    "how": "placed on the map",
+    "osm_node": 4718117470,
+    "gtfs": [
+     1644.2,
+     -1962.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-06 (#258)"
    },
    {
     "stop": "Královka",
@@ -2375,6 +2637,32 @@
     "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-05 (#258)"
    },
    {
+    "stop": "Líbeznická",
+    "towards": "Březiněveská",
+    "x": 3053.3,
+    "y": 4230.8,
+    "how": "sign at the timetable point (GTFS)",
+    "osm_node": 4096977780,
+    "gtfs": [
+     3053.3,
+     4230.8
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Líbeznická",
+    "towards": "Vozovna Kobylisy",
+    "x": 3051.37,
+    "y": 4266.09,
+    "how": "placed on the map",
+    "osm_node": 4096977779,
+    "gtfs": [
+     3049.2,
+     4264.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
     "stop": "Malostranské náměstí",
     "towards": "Pražské Jezulátko",
     "x": -1195.47,
@@ -2387,6 +2675,71 @@
      232.3
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Masarykovo nádraží",
+    "towards": "Bílá labuť",
+    "x": 808.9,
+    "y": -10.2,
+    "how": "sign at the timetable point (GTFS)",
+    "osm_node": 4704922255,
+    "gtfs": [
+     808.9,
+     -10.2
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Modřanská škola",
+    "towards": "Belárie",
+    "x": -2482.15,
+    "y": -8431.32,
+    "how": "placed on the map",
+    "osm_node": 30079641,
+    "gtfs": [
+     -2484.7,
+     -8431.7
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Novoměstská radnice",
+    "towards": "Národní třída",
+    "x": -271.0,
+    "y": -1066.2,
+    "how": "sign at the pin",
+    "osm_node": 3026879036,
+    "gtfs": [
+     -274.4,
+     -1068.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Nádraží Holešovice",
+    "towards": "Trojská",
+    "x": 1486.4,
+    "y": 2336.4,
+    "how": "sign at the pin",
+    "osm_node": 4097081443,
+    "gtfs": [
+     1486.7,
+     2331.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Nádraží Holešovice",
+    "towards": "Výstaviště",
+    "x": 1487.2,
+    "y": 2294.0,
+    "how": "sign at the timetable point (GTFS)",
+    "osm_node": 25681629,
+    "gtfs": [
+     1487.2,
+     2294.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
    {
     "stop": "Nádraží Zahradní Město",
@@ -2430,6 +2783,45 @@
     "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
    },
    {
+    "stop": "Olšanské náměstí",
+    "towards": "Olšanská",
+    "x": 2507.1,
+    "y": -896.9,
+    "how": "sign at the pin",
+    "osm_node": 244178530,
+    "gtfs": [
+     2507.1,
+     -894.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-9.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Palmovka",
+    "towards": "Palmovka",
+    "x": 4105.59,
+    "y": 1332.44,
+    "how": "placed on the map",
+    "osm_node": 1298749754,
+    "gtfs": [
+     4107.1,
+     1330.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Pobřežní cesta",
+    "towards": "Nádraží Braník",
+    "x": -1764.9,
+    "y": -5793.3,
+    "how": "sign at the pin",
+    "osm_node": 3234296486,
+    "gtfs": [
+     -1762.4,
+     -5792.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
     "stop": "Pobřežní cesta",
     "towards": "Přístaviště",
     "x": -1790.79,
@@ -2469,6 +2861,19 @@
     "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
    },
    {
+    "stop": "Pražské Jezulátko",
+    "towards": "Újezd",
+    "x": -1241.5,
+    "y": -32.2,
+    "how": "sign at the pin",
+    "osm_node": 21711416,
+    "gtfs": [
+     -1238.7,
+     -21.4
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
     "stop": "Právnická fakulta",
     "towards": "Čechův most",
     "x": -191.2,
@@ -2478,6 +2883,110 @@
     "gtfs": [
      -208.4,
      469.6
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Spojovací",
+    "from": "Kněžská luka",
+    "x": 5600.1,
+    "y": -300.7,
+    "how": "sign at the pin",
+    "osm_node": 1371099971,
+    "gtfs": [
+     5600.1,
+     -300.7
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Starý Hloubětín",
+    "towards": "Hloubětín",
+    "x": 8027.9,
+    "y": 854.7,
+    "how": "sign at the pin",
+    "osm_node": 158747117,
+    "gtfs": [
+     8025.7,
+     857.5
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Sídliště Hloubětín",
+    "towards": "Hloubětín",
+    "x": 8908.0,
+    "y": 937.1,
+    "how": "sign at the pin",
+    "osm_node": 4450425893,
+    "gtfs": [
+     8906.3,
+     934.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-37.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Tyršův dům",
+    "towards": "Malostranské náměstí",
+    "x": -1246.6,
+    "y": -182.4,
+    "how": "sign at the pin",
+    "osm_node": 74218292,
+    "gtfs": [
+     -1248.9,
+     -185.9
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Veletržní palác",
+    "towards": "Strossmayerovo náměstí",
+    "x": 1040.5,
+    "y": 1526.1,
+    "how": "sign at the pin",
+    "osm_node": 1024913035,
+    "gtfs": [
+     1040.1,
+     1527.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Veletržní palác",
+    "towards": "Výstaviště",
+    "x": 1053.58,
+    "y": 1440.54,
+    "how": "placed on the map",
+    "osm_node": 320248553,
+    "gtfs": [
+     1051.2,
+     1439.2
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Vinohradská vodárna",
+    "towards": "Šumavská",
+    "x": 1804.6,
+    "y": -1587.5,
+    "how": "sign at the pin",
+    "osm_node": 4718170734,
+    "gtfs": [
+     1804.0,
+     -1592.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-9.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Vozovna Kobylisy",
+    "towards": "Líbeznická",
+    "x": 2968.6,
+    "y": 4588.6,
+    "how": "sign at the pin",
+    "osm_node": 4680784421,
+    "gtfs": [
+     2969.0,
+     4587.1
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
@@ -2510,6 +3019,32 @@
     "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
    },
    {
+    "stop": "Václavské náměstí",
+    "towards": "Jindřišská",
+    "x": 230.22,
+    "y": -639,
+    "how": "placed on the map",
+    "osm_node": 4704944966,
+    "gtfs": [
+     228.7,
+     -637.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-06 (#258)"
+   },
+   {
+    "stop": "Václavské náměstí",
+    "towards": "Vodičkova",
+    "x": 193.2,
+    "y": -667.4,
+    "how": "sign at the pin",
+    "osm_node": 4704944965,
+    "gtfs": [
+     195.3,
+     -668.1
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
     "stop": "Výstaviště",
     "towards": "Nádraží Holešovice",
     "x": 1065.07,
@@ -2536,6 +3071,19 @@
     "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
    {
+    "stop": "Výtoň",
+    "towards": "Podolská vodárna",
+    "x": -747.0,
+    "y": -2102.1,
+    "how": "sign at the pin",
+    "osm_node": 4759185034,
+    "gtfs": [
+     -746.8,
+     -2108.3
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
     "stop": "Čechova čtvrť",
     "towards": "Nádraží Modřany",
     "x": -2122.01,
@@ -2545,6 +3093,19 @@
     "gtfs": [
      -2116.7,
      -9268.5
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+   },
+   {
+    "stop": "Čechův most",
+    "towards": "Právnická fakulta",
+    "x": -216.44,
+    "y": 780.64,
+    "how": "placed on the map",
+    "osm_node": 4691199630,
+    "gtfs": [
+     -212.4,
+     774.6
     ],
     "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
    },
