@@ -17,9 +17,10 @@ DMR 5G (level 1: fine_terrain.py's rule, tools/dmr5g.py; no tile is downloaded f
 The mesh, in three steps:
   1. pydelatin over s = (z - base) / tol(d) with one max error of 1, which is exact where tol is constant. The base is
      the ground smoothed over ~BASE_SIGMA blocks of BASE_BLOCK m: dividing the heights themselves by a tol that grows
-     with d bends even a plane by z / tol, and the mesher spent its triangles on that bend (tools/bench/terrain_city.py).
-     No-ground cells take s from the ground around them (BLOCK m means) rising RAMP a cell away from it, so the mesh
-     follows the ground's edge.
+     with d bends even a plane by z / tol, and the mesher spends triangles on that bend (tools/bench/terrain_city.py
+     does; on a 3 x 3 km box by line 17 the base saves 8 % of the triangles, 15 % at 120-500 m, and leaves a quarter of
+     the cells over their tolerance). No-ground cells take s from the ground around them (BLOCK m means) rising RAMP a
+     cell away from it, so the mesh follows the ground's edge.
   2. every cell against the mesh, its vertices' heights rounded to cm as stored; a triangle over no ground cell is
      dropped.
   3. the second pass: each triangle with a ground cell over its own tolerance takes its worst cell as a vertex (split in
@@ -36,8 +37,8 @@ report and the picture are copied to reports/city-terrain/.
 
     python -P -E tools/city_terrain.py [--fetch] [--box x0,y0,x1,y1] [--force] [--min-free 6] [--threads 8]
 Waits its turn among the heavy jobs (baseline_store.HeavyJob) and stops itself when the free memory falls under
---min-free GB. --box: a part of the raster (city frame, m), for trials; one of SMALL cells or fewer is no heavy job
-(under 1 GB) and runs at once.
+--min-free GB; the whole city took 13 min and 15.0 GB on the dev PC (2026-11-10: 16.6 M triangles). --box: a part of the
+raster (city frame, m), for trials; one of SMALL cells or fewer is no heavy job (under 2 GB) and runs at once.
 """
 import hashlib
 import json
@@ -882,14 +883,15 @@ def zero_areas(lev, origin, parts, b=32, small=0.01):
 
 
 def draw(path, lev, origin, city, parts, segs, areas, px=20):
-    """The picture: IPR's ground grey (darker inside the city), the city limits and districts, the tracks, and the cells
-    inside the city where IPR has no ground, coloured by what fills them, with the areas' numbers."""
+    """The picture: IPR's ground grey (darker inside the city), the city limits and districts, the tracks, the cells
+    inside the city where IPR has no ground, coloured by what fills them, with the areas' numbers, and those where the
+    passages rule took DMR 5G. The legend lists what the picture shows."""
     from PIL import Image, ImageDraw, ImageFont
     h, w = lev.shape
     nby, nbx = -(-h // px), -(-w // px)
     img = np.full((nby, nbx, 3), 255, np.uint8)
     col = {0: (235, 235, 235), 4: (210, 210, 210), "dmr5g": (43, 108, 176), "grid": (221, 107, 32), "none": (197, 48, 48),
-           "out": (255, 205, 210)}
+           "out": (255, 205, 210), "passage": (128, 60, 160)}
     for by in range(nby):
         lv = np.asarray(lev[by * px:(by + 1) * px])
         if nbx * px > w:
@@ -897,12 +899,13 @@ def draw(path, lev, origin, city, parts, segs, areas, px=20):
         lv = lv.reshape(lv.shape[0], nbx, px)
         lvl, ins, kind = lv & LEVEL, (lv & INSIDE) != 0, (lv >> 3) & 3
         share_in = ins.mean((0, 2))
-        ground = (lvl == 0).mean((0, 2)) > 0.5
+        ground = (lvl != NO).mean((0, 2)) > 0.5
         row = img[by]
         row[ground & (share_in > 0.5)] = col[4]
         row[ground & (share_in <= 0.5)] = col[0]
         gap = ins & (kind != 0)
         row[(~ins & (kind != 0) & (kind != 2)).any((0, 2))] = col["out"]  # (0.00 m or under the floor outside: no ground)
+        row[(ins & (kind == 0) & (lvl == 1)).any((0, 2))] = col["passage"]
         for key, v in (("dmr5g", 1), ("grid", 2), ("none", 3)):
             row[(gap & (lvl == v)).any((0, 2))] = col[key]
     im = Image.fromarray(img)
@@ -932,13 +935,17 @@ def draw(path, lev, origin, city, parts, segs, areas, px=20):
               (col["dmr5g"], "no IPR ground inside the city: DMR 5G fills it"),
               (col["grid"], "no IPR ground inside the city: a 10 m grid fills it"),
               (col["none"], "no ground inside the city"), (col["out"], "IPR 0.00 m / under 170 m outside the city: no ground"),
-              ((0, 0, 0), "city limits (OSM relation 435514)"), ((120, 120, 120), "districts"),
-              ((40, 120, 40), "tram tracks (DI)")]
+              (col["passage"], "IPR over a passage, under DMR 5G at hand: DMR 5G")]
+    legend = [(c, t) for c, t in legend if (img == c).all(2).any()] + [
+        ((0, 0, 0), "city limits (OSM relation 435514)"), ((120, 120, 120), "districts"), ((40, 120, 40), "tram tracks (DI)")]
+    if not areas and not (img == col["dmr5g"]).all(2).any():
+        legend.insert(0, (None, "IPR has ground in every cell inside the city: no zero areas"))
     y = 12
     d.rectangle([8, 6, 470, 14 + 24 * len(legend)], fill=(255, 255, 255), outline=(0, 0, 0))
     for c, text in legend:
-        d.rectangle([16, y + 3, 34, y + 17], fill=c, outline=(0, 0, 0))
-        d.text((42, y), text, fill=(0, 0, 0), font=small)
+        if c is not None:
+            d.rectangle([16, y + 3, 34, y + 17], fill=c, outline=(0, 0, 0))
+        d.text((42 if c is not None else 16, y), text, fill=(0, 0, 0), font=small)
         y += 24
     d.line([(16, nby - 30), (16 + 5000 / px, nby - 30)], fill=(0, 0, 0), width=3)
     d.text((16, nby - 54), f"5 km ({px} m a pixel)", fill=(0, 0, 0), font=small)

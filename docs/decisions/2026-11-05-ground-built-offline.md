@@ -164,5 +164,26 @@ GLB with quantisation was compared on this mesh and lost by 17 % after brotli: [
 
 ## What it changes
 
-Nothing yet: the benches in `tools/bench/` (they need `pydelatin` and `pyfqmr`). The build tool and the page's loading
-follow in #276, after #237 (the ground is built on the track it corrects).
+The benches in `tools/bench/` (they need `pydelatin` and `pyfqmr`), and the city's terrain mesh, built offline into
+the machine cache by `tools/city_terrain.py` (#428; nothing in the game reads it yet). The page's loading follows in
+#276.
+
+**The city mesh as built** (#428, 2026-11-10; IPR's raster, DI's 335 km of track; the whole city in 13 min, 15.0 GB):
+16,646,113 triangles, no cell over its tolerance. Two changes to section 1, both measured:
+- **(z − base) / tol(d), not z / tol(d):** the base is the ground smoothed over ~1 km. Divided by a tol that grows with
+  d, the heights themselves bend even a plane, and the mesher spends triangles on the bend. On a 3 × 3 km box by line 17
+  the base gives 1,475,219 triangles against 1,600,628 (120-500 m: 640,119 against 753,103), and 0.14 % of the cells
+  over their tolerance after pydelatin against 0.51 %. The city: 16,496,105 triangles from pydelatin against the
+  bench's 18,314,418 (17,733,132 without its tiles with no data).
+- **The second pass inserts cells, it does not mesh again:** each triangle with a cell over its tolerance takes its
+  worst cell as a vertex (split in three, or in four with its neighbour on an edge). The city: 1,513,496 cells over
+  (0.23 %) after pydelatin, 76,391 vertices added in 17 rounds.
+
+| from the tracks | triangles | error mean / p99 / max (cm) |
+|---|---|---|
+| 0-10 m | 511,551 | 2.4 / 8.7 / 10.0 |
+| 10-120 m | 6,611,342 | 2.4 / 8.9 / 10.0 |
+| 120-500 m | 7,452,617 | 5.8 / 25.0 / 41.7 |
+| 500-1000 m | 1,324,496 | 14.1 / 52.1 / 83.2 |
+| 1-2 km | 477,763 | 28.8 / 104.3 / 166.0 |
+| over 2 km | 268,344 | 65.4 / 219.4 / 300.0 |

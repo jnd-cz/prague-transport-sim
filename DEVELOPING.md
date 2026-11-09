@@ -100,6 +100,13 @@ Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) a
 profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
 
+**The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
+1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
+cell over its tolerance. It is no line step: the mesh goes into the machine cache
+(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and code), not `data/`, and nothing in the game reads
+it yet. A heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a
+picture of the city limits go to `reports/city-terrain/`.
+
 ## Deploy
 
 The game is static files: `index.html`, `src/`, `assets/`, `data/`. Three.js comes from jsDelivr and
