@@ -297,10 +297,10 @@ export class Traffic {
     // back route: OSM shapes, GTFS positions). Mapped from our stop point they stopped 8 m into theirs:
     // our platform's far end is near the start of theirs (user: "they stop just before the stop instead
     // of running to its end"). Our stop mapped across stays the fallback where they have no platform.
-    // (on their right: the T3's doors)
+    // (on their right: the T3's doors; not at a platform no tram stops at, `unused`, #407)
     // (overlapping platforms of one stop, OSM and GTFS, are one stretch: two stop points in one platform
     // stopped the tram twice, Kobylisy 951 and 1012)
-    const backPl = (game.platforms || []).filter((p) => p.back && p.rt === this.back && p.side < 0).map((p) => [p.s0, p.s1]).sort((a, b) => a[0] - b[0]);
+    const backPl = (game.platforms || []).filter((p) => p.back && p.rt === this.back && p.side < 0 && !p.unused).map((p) => [p.s0, p.s1]).sort((a, b) => a[0] - b[0]);
     const runs = [];
     for (const [a, b] of backPl) if (runs.length && a < runs[runs.length - 1][1] + 10) runs[runs.length - 1][1] = Math.max(runs[runs.length - 1][1], b); else runs.push([a, b]);
     const ends = runs.map(([, b]) => b - 1);

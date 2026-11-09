@@ -267,7 +267,7 @@ export class Game {
       // (an OSM platform line usually runs along its middle, an area gives its outer edge)
       // (an OSM line: 2-3.5 m wide unless tagged; it reached over the car lane at Trojská, 5.1 m)
       const inner = 1.5, outer = pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner)));
-      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours };
+      const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours, twin: !!pl.twin, unused: !!pl.unused };
       this.platforms.push(plat);
       // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
       plat.kerb = side < 0 ? this._stopType(pl.vienna, () => this._vienna(rt, s0, s1), `platform ${pl.name}`) : null;
@@ -300,16 +300,18 @@ export class Game {
     }
     // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
     // their driving direction is along the back route), shelter where OSM has one. Not on our own platforms (`ours`:
-    // our stop's sign and shelter stand there). One sign per platform: where OSM draws a platform as two ways, the
-    // one without PID's stop got a blank sign beside the other's (Flora, Malostranská)
-    const twin = (p) => !p.stop && this.platforms.some((q) => q !== p && q.back && q.stop && q.rt === p.rt && q.side === p.side && q.s0 < p.s1 && p.s0 < q.s1);
+    // our stop's sign and shelter stand there). One sign per platform: where OSM draws a platform as several ways, the
+    // others (`twin`, tools/platforms.py; data before it: the ones overlapping it) got a blank sign beside its own
+    // (Flora, Malostranská). A platform no tram stops at (`unused`) has its sign without the lines' plate (the user,
+    // 2026-11-09, #407)
+    const twin = (p) => p.twin || (!p.stop && !p.unused && this.platforms.some((q) => q !== p && q.back && q.stop && q.rt === p.rt && q.side === p.side && q.s0 < p.s1 && p.s0 < q.s1));
     for (const p of this.platforms) {
       if (!p.back || p.ours) continue;
       if (!twin(p)) {
         const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
         const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);
         const zt = p.kerb !== null ? ground.surface(o.x, o.y) - 0.18 : ground.trackAt(o.x, o.y);
-        const sign = makeStopSign(p.name || '', false, p.lines || [String(this.data.line)]);
+        const sign = makeStopSign(p.name || '', false, p.unused ? [] : p.lines || [String(this.data.line)]);
         sign.position.set(o.x, zt + 0.18, -o.y);
         sign.rotation.y = Math.atan2(-h.hx, h.hy);
         this.objects.add(sign);

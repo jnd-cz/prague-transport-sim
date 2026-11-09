@@ -7,7 +7,9 @@ the track, on both sides (where the surveyed streets (DTM) have the platform, th
 
 Usage:  python -P -E tools/platforms.py --line 17   (the line's platform ways from the local OSM extract,
         cached in raw/lineN/platforms_box.json while extract, box and code are the same; --fetch redoes it)
-Adds "platforms": [{"p": [[x, y], ...], "area": 0|1, "w": width, "shelter": 0|1, "name": ...}] to data/lineN.json.
+Adds "platforms": [{"p": [[x, y], ...], "area": 0|1, "w": width, "shelter": 0|1, "name": ...}] to data/lineN.json,
+with PID's stop where one stands on it ("stop", "id", "code", "lines"), else "twin": 1 (the other OSM way of a platform
+that has it) or "unused": 1 (no tram stops there on the service date; tools/platform_match.py).
 """
 import json
 import math
@@ -75,19 +77,13 @@ def dist(q):
     return best
 
 
-# PID GTFS: every tram platform (a stop of a tram route, one per direction) with its exact position,
-# name, platform code and lines; those within 10 m of either path
-import csv  # noqa: E402
-import io  # noqa: E402
-import zipfile  # noqa: E402
+# PID GTFS: every tram platform (a stop of a tram trip on the service date, one per direction) with its exact
+# position, name, platform code and lines; those within 10 m of either path
+from build_line import gtfs_open  # noqa: E402
+import platform_match as pm  # noqa: E402
 
-z = zipfile.ZipFile(os.path.join(ROOT, "raw", "PID_GTFS.zip"))
-rd = lambda n: csv.DictReader(io.TextIOWrapper(z.open(n), "utf-8-sig"))  # noqa: E731
-trams = {r["route_id"]: r["route_short_name"] for r in rd("routes.txt") if r["route_type"] == "0" and r.get("is_substitute_transport") != "1"}
-lines_of = {}
-for r in rd("route_stops.txt"):
-    if r["route_id"] in trams:
-        lines_of.setdefault(r["stop_id"], set()).add(trams[r["route_id"]])
+rd, active = gtfs_open()
+lines_of = pm.tram_lines(rd, active)
 gtfs = []
 for r in rd("stops.txt"):
     if r["stop_id"] not in lines_of:
@@ -102,8 +98,8 @@ for e in osm["elements"]:
     t = e.get("tags", {})
     if "geometry" not in e or len(e["geometry"]) < 2:
         continue
-    # tram platforms only (a bus-only platform beside the track is not ours)
-    if t.get("tram") != "yes" and not (t.get("railway") == "platform" and t.get("bus") != "yes"):
+    # tram platforms at street level only (a bus-only platform beside the track is not ours, nor a metro or train one)
+    if not pm.tram_platform(t):
         continue
     pts = [P(g) for g in e["geometry"]]
     if min(dist(q) for q in pts) > 12:
@@ -115,25 +111,18 @@ for e in osm["elements"]:
         w = 0
     out.append({"p": pts[:-1] if area else pts, "area": area, "w": w,
                 "shelter": int(t.get("shelter") == "yes"), "name": t.get("name", "")})
-# each OSM platform takes the GTFS platform standing on it (within 4 m of its line or area, else the
-# nearest within 25 m); GTFS platforms without an OSM one are platforms of their own ("gtfs": 1)
-def seg_dist(q, pts):
-    best = math.inf
-    for a, b in zip(pts, pts[1:] + ([pts[0]] if len(pts) > 2 else [])):
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        l2 = dx * dx + dy * dy or 1e-9
-        t = max(0.0, min(1.0, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2))
-        best = min(best, math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dy * t))
-    return best
+# each PID platform on the OSM platform nearest to it (within 25 m, the nearest pairs first); PID platforms
+# without an OSM one are platforms of their own ("gtfs": 1); an OSM platform left without one is the other
+# way of one that has it ("twin") or a platform no tram stops at on the service date ("unused")
+from placement import Route  # noqa: E402  (the game's sampling of the paths)
 
-
-used = set()
-for pl in out:
-    cand = sorted((seg_dist(g["q"], pl["p"]), i) for i, g in enumerate(gtfs))
-    if cand and cand[0][0] < 25 and cand[0][1] not in used:
-        g = gtfs[cand[0][1]]
-        used.add(cand[0][1])
-        pl.update({"name": g["name"], "code": g["code"], "stop": g["q"], "lines": g["lines"], "id": g["id"]})
+paths = [Route(p) for p in (line["path"], line.get("pathBack") or []) if len(p) > 1]
+on = pm.match(out, gtfs, paths)
+used = set(on.values())
+for j, i in on.items():
+    g = gtfs[i]
+    out[j].update({"name": g["name"], "code": g["code"], "stop": g["q"], "lines": g["lines"], "id": g["id"]})
+pm.leftovers(out, paths)
 for i, g in enumerate(gtfs):
     if i not in used:
         out.append({"p": [g["q"]], "gtfs": 1, "area": 0, "w": 0, "shelter": 0, "name": g["name"], "code": g["code"],
@@ -148,4 +137,6 @@ line["attribution"] = sources.attribution(line["provenance"])
 with replacing(dst, "w", encoding="utf-8") as fh:
     json.dump(line, fh, ensure_ascii=False, separators=(",", ":"))
 print(f"line {LINE}: {len(out)} tram platforms ({sum(p['area'] for p in out)} OSM areas, {sum(p.get('gtfs', 0) for p in out)} "
-      f"from GTFS only); {len(gtfs)} PID tram platforms, {len(used)} matched to OSM")
+      f"from GTFS only); {len(gtfs)} PID tram platforms, {len(used)} matched to OSM; {sum(p.get('twin', 0) for p in out)} "
+      f"OSM platforms are the other way of one, {sum(p.get('unused', 0) for p in out)} unused: "
+      f"{[p['name'] or '(unnamed)' for p in out if p.get('unused')]}")
