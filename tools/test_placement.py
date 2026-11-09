@@ -76,6 +76,16 @@ class Rules(unittest.TestCase):
         self.assertAlmostEqual(pl.vienna(self.R, survey, 100, 130), 8.2, delta=0.41)
         self.assertIsNone(pl.vienna(self.R, survey, 310, 350))
 
+    def test_an_area_keeps_its_holes_and_a_crossed_ring(self):
+        # a road with a hole (`h`) at x 100-200, and its ring crossing itself at x 600 (a bow tie, as Seifertova's
+        # carriageway at Lipanská on line 9): the game triangulates both, the hole empty and the road on both sides
+        road = {'c': 'road', 'l': 0, 'r': [[0, -1], [500, -1], [700, -8], [1000, -8], [1000, -1], [700, -1], [500, -8], [0, -8]],
+                'h': [[[100, -2], [200, -2], [200, -6], [100, -6]]]}
+        survey = pl.Survey([road])
+        self.assertIsNone(survey.class_at(150, -4))
+        self.assertEqual(survey.class_at(300, -4), 'road')
+        self.assertEqual(survey.class_at(800, -4), 'road')
+
     def test_the_route_is_the_game_s_metre_by_metre_chords(self):
         R = pl.Route([[0, 0], [10, 0], [10, 10]])
         s, d = R.nearest(10.5, 5)

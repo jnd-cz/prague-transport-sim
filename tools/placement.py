@@ -305,19 +305,25 @@ class Survey:
     """The survey's ground areas (data/lineN.dtm.json) by point. Where areas overlap the game takes the one nearest the
     lidar ground, which measures the top of what stands there: an island over the road it was drawn on. Here the smaller
     area, the one drawn over the other (the higher rank took the road under every island: 39 platforms read as Vienna-type
-    stops on lines 17 and 22); the game logs where they disagree (#22 stage 2)."""
+    stops on lines 17 and 22); the game logs where they disagree (#22 stage 2). Each area with its holes (`h`) and a
+    self-intersecting ring repaired, as the game triangulates them (src/terrain.js): dropped, the 27,644 m² carriageway
+    of Seifertova hid the Vienna-type stop Lipanská on line 9."""
 
     def __init__(self, areas):
         from shapely.geometry import Polygon
+        from shapely.validation import make_valid
         self.polys, self.cls = [], []
         for a in areas:
             if a.get('l') != 0 or a['c'] in ('wall', 'roof', 'deck', 'rail'):
                 continue
-            rings = a['r'] if a['r'] and isinstance(a['r'][0][0], (list, tuple)) else [a['r']]
+            rings = a['r'] if a['r'] and isinstance(a['r'][0][0], (list, tuple)) else [a['r'], *(a.get('h') or [])]
             try:
-                poly = Polygon([q[:2] for q in rings[0]], [[q[:2] for q in h] for h in rings[1:]])
+                poly = Polygon([q[:2] for q in rings[0]], [[q[:2] for q in h] for h in rings[1:] if len(h) >= 3])
             except (ValueError, TypeError):
                 continue
+            if not poly.is_valid:
+                parts = [g for g in shapely.get_parts(make_valid(poly)) if g.geom_type in ('Polygon', 'MultiPolygon')]
+                poly = shapely.union_all(parts) if parts else poly
             if poly.is_valid and not poly.is_empty:
                 self.polys.append(poly)
                 self.cls.append(a['c'])
@@ -475,7 +481,8 @@ def main():
             data['platforms'][k]['vienna'] = kerb
         for i, kerb in stops.items():
             data['stops'][i]['vienna'] = kerb
-        print(f"line {a.line}: Vienna-type stops {[data['stops'][i]['name'] for i, k in stops.items() if k is not None]}")
+        print(f"line {a.line}: Vienna-type stops {[data['stops'][i]['name'] for i, k in stops.items() if k is not None]}, "
+              f"platforms {[(data['platforms'][k]['name'] + ' ' + (data['platforms'][k].get('code') or '')).strip() for k, kerb in plats.items() if kerb is not None]}")
     with replacing(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     gj = built_geojson(a.line, data, placed, targets, C, R, os.environ.get('BUILD_ID', 'build'))

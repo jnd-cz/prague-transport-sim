@@ -193,6 +193,13 @@
    "type": "street",
    "text": "road-level stop: boarding from the carriageway, the red stop post on the sidewalk (placed in OSM)",
    "source": "user 2026-10-23"
+  },
+  {
+   "name": "Lipanská",
+   "towards": "Viktoria Žižkov",
+   "type": "street",
+   "text": "user: \"Lipanská toward Viktoria Žižkov is open road lane type\" (platform A, U339Z1P: the build read it as an ordinary stop while the survey's carriageway of Seifertova was dropped as an invalid ring, #22)",
+   "source": "user 2026-11-09 (session on #22)"
   }
  ],
  "rules": [
