@@ -579,6 +579,10 @@ def run_one(page, errors, check, seed, timeout, load=0):
 
     try:
         js = CALLS[check].replace("SEED", str(seed))
+        if check in SEEDLESS:
+            # (without drawing, a seedless check also leaves the game unstepped while it reads the world, as it does
+            # after a drive in the same page, which sets window.headless: the same counts, #205, #411)
+            js = "if (window.headlessDraw === false) window.headless = true; " + js
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
             window._job = {{ done: false }};
