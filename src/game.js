@@ -215,6 +215,17 @@ export class Game {
     return nk ? kerb / nk : 6;
   }
 
+  // The stop type: the build's (tools/placement.py `vienna`: the kerb's offset or null) where the data has it, else the
+  // rule here; with the build's, the rule here runs too and a disagreement is logged with the placement's (#22 stage 2).
+  _stopType(built, own, what) {
+    if (built === undefined) return own();
+    const mine = own();
+    if ((mine === null) !== (built === null) || (mine !== null && Math.abs(mine - built) > 0.05)) {
+      (this.stopTypeDiffs ||= []).push(`${what}: Vienna ${built ?? 'no'}, the game's ${mine === null ? 'no' : mine.toFixed(2)}`);
+    }
+    return built;
+  }
+
   _buildPlatforms() {
     const routes = [this.route, this.backRoute].filter(Boolean), ground = this.route.ground, dtm = ground.dtm;
     const pos = [], col = [];
@@ -246,7 +257,7 @@ export class Game {
       const plat = { rt, back: rt !== this.route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter };
       this.platforms.push(plat);
       // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
-      plat.kerb = side < 0 ? this._vienna(rt, s0, s1) : null;
+      plat.kerb = side < 0 ? this._stopType(pl.vienna, () => this._vienna(rt, s0, s1), `platform ${pl.name}`) : null;
       if (plat.kerb !== null) { plat.inner = plat.kerb; plat.outer = plat.kerb + 2; plat.surveyed = true; continue; }
       const mid = rt.offset((s0 + s1) / 2, side * (inner + outer) / 2), cls = dtm?.classAt(mid.x, mid.y);
       plat.surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
@@ -302,7 +313,7 @@ export class Game {
     const osm = (this.platforms || []).find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20);
     const len = 30, mid = stop.target - len / 2 - 1;
     // (a Vienna-type stop: boarding from the sidewalk; sign and shelter stand at the kerb)
-    const kerb = osm ? osm.kerb : this._vienna(route, stop.target - len - 1, stop.target - 1);
+    const kerb = osm ? osm.kerb : this._stopType(this.data.stops[stop.i].vienna, () => this._vienna(route, stop.target - len - 1, stop.target - 1), `stop ${stop.name}`);
     stop.vienna = kerb !== null;
     const plat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), new THREE.MeshLambertMaterial({ color: 0xa7a197 }));
     plat.visible = !osm && !stop.vienna;
@@ -360,7 +371,7 @@ export class Game {
       // (the stop point moves back before a hung signal as below, after the zone the set's length gave it)
       for (const d of placed) if (d.head && d.s - 3 < d.head.target) this._stopBefore(d.head, d);
       this._dryTargets = new Map();
-      this.placementDiffs = this._placementDiffs(placed, live(own).map((d) => this._platformRule(d, true)));
+      this.placementDiffs = [...(this.stopTypeDiffs || []), ...this._placementDiffs(placed, live(own).map((d) => this._platformRule(d, true)))];
       if (this.placementDiffs.length) console.log(`placement: the build and the game differ at ${this.placementDiffs.join('; ')}`);
     } else placed = live(own).map((d) => this._platformRule(d));
     this.signals = placed.map((d, i) => {

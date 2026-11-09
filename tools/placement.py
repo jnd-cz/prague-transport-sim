@@ -295,6 +295,116 @@ def place(data, osm_tram):
     return placed, targets, moved, C, R
 
 
+# The survey's ground areas (src/terrain.js groundArea) and their rank where they overlap (SURFACE_RANK)
+SURFACE_RANK = {'tram': 9, 'road': 8, 'island': 7, 'platform': 7, 'sidewalk': 6, 'parking': 5, 'cycle': 5, 'paved': 4,
+                'stairs': 3, 'green': 2, 'water': 1}
+LANE, RAISED = {'road', 'parking'}, {'island', 'platform', 'sidewalk', 'paved'}
+
+
+class Survey:
+    """The survey's ground areas (data/lineN.dtm.json) by point. Where areas overlap the game takes the one nearest the
+    lidar ground, which measures the top of what stands there: an island over the road it was drawn on. Here the smaller
+    area, the one drawn over the other (the higher rank took the road under every island: 39 platforms read as Vienna-type
+    stops on lines 17 and 22); the game logs where they disagree (#22 stage 2)."""
+
+    def __init__(self, areas):
+        from shapely.geometry import Polygon
+        self.polys, self.cls = [], []
+        for a in areas:
+            if a.get('l') != 0 or a['c'] in ('wall', 'roof', 'deck', 'rail'):
+                continue
+            rings = a['r'] if a['r'] and isinstance(a['r'][0][0], (list, tuple)) else [a['r']]
+            try:
+                poly = Polygon([q[:2] for q in rings[0]], [[q[:2] for q in h] for h in rings[1:]])
+            except (ValueError, TypeError):
+                continue
+            if poly.is_valid and not poly.is_empty:
+                self.polys.append(poly)
+                self.cls.append(a['c'])
+        self.tree = shapely.STRtree(self.polys) if self.polys else None
+
+    def class_at(self, x, y):
+        if self.tree is None:
+            return None
+        hit = [int(i) for i in self.tree.query(Point(x, y), predicate='within')]
+        if not hit:
+            return None
+        return self.cls[min(hit, key=lambda i: (self.polys[i].area, -SURFACE_RANK.get(self.cls[i], 1)))]
+
+
+def offset(R, s, lateral):
+    """The point `lateral` m left of the route at s (src/route.js offset: the heading over 3 m either way)."""
+    x, y, _, _ = R.at(s)
+    ax, ay, _, _ = R.at(s - 3)
+    bx, by, _, _ = R.at(s + 3)
+    l = math.hypot(bx - ax, by - ay) or 1
+    return x - (by - ay) / l * lateral, y + (bx - ax) / l * lateral
+
+
+def vienna(R, survey, s0, s1):
+    """A Vienna-type stop (src/game.js _vienna): boarding from the sidewalk across the car lane, cars stop behind the
+    open doors. Right of the track along the stop (2.2-3.4 m) the survey has mostly car lane, not an island or a raised
+    edge. The kerb's offset (m right of the track: the first sidewalk out to 12 m), or None."""
+    lane = raised = 0
+    kerb, nk = 0.0, 0
+    s = s0 + 3
+    while s < s1 - 2:
+        for off in (2.2, 2.8, 3.4):
+            c = survey.class_at(*offset(R, s, -off))
+            lane += c in LANE
+            raised += c in RAISED
+        off = 3.4
+        while off <= 12 + 1e-9:
+            if survey.class_at(*offset(R, s, -off)) in RAISED:
+                kerb += off
+                nk += 1
+                break
+            off += 0.4
+        s += 4
+    if lane + raised < 3 or lane / (lane + raised) <= 0.5:
+        return None
+    return round(kerb / nk, 2) if nk else 6.0
+
+
+def stop_types(data, survey, targets, R, RB):
+    """The stop type of each OSM platform on the doors' side (`kerb` per data.platforms index, src/game.js
+    _buildPlatforms) and of each stop without such a platform over the 30 m before its point (_buildStop):
+    ({platform index: kerb}, {stop index: kerb}), kerb None for an ordinary stop."""
+    plats, ours = {}, []
+    for k, pl in enumerate(data.get('platforms') or []):
+        best = None
+        for rt in [R] + ([RB] if RB else []):
+            proj = [rt.nearest(x, y) for x, y in (q[:2] for q in pl['p'])]
+            if any(s is None for s, _ in proj):
+                continue
+            d = sum(q[1] for q in proj) / len(proj)
+            if best is None or d < best[2]:
+                best = (rt, proj, d)
+        if best is None or best[2] > 12:
+            continue
+        rt, proj, _ = best
+        s0, s1 = min(q[0] for q in proj), max(q[0] for q in proj)
+        if pl.get('gtfs'):
+            s1 = proj[0][0] + 1
+            s0 = s1 - 32
+        if s1 - s0 < 8 or s1 - s0 > 120:
+            continue
+        lats = []
+        for (x, y), (s, _) in zip((q[:2] for q in pl['p']), proj):
+            qx, qy, hx, hy = rt.at(s)
+            lats.append(hx * (y - qy) - hy * (x - qx))
+        side = (1 if sum(lats) > 0 else -1) if sum(lats) else -1
+        if side < 0:
+            plats[k] = vienna(rt, survey, s0, s1)
+            if rt is R:
+                ours.append((s0, s1, k))
+    stops = {}
+    for i, t in enumerate(targets):
+        osm = next((k for s0, s1, k in ours if s0 < t - 8 and s1 > t - 20), None)
+        stops[i] = plats[osm] if osm is not None else vienna(R, survey, t - 31, t - 1)
+    return plats, stops
+
+
 def built_geojson(line, data, placed, targets, C, R, build):
     """data/lineN.built.geojson: what the build decided (docs/architecture.md §10.4), in S-JTSK like the game's export."""
     e0, n0 = data['frame']['origin']
@@ -351,6 +461,21 @@ def main():
     placed, targets, moved, C, R = place(data, osm_tram_signals(a.line))
     data['signalsRaw'] = raw
     data['signals'] = [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in d.items() if k in SIGNAL_KEYS} for d in placed]
+    # the stop types from the survey (stage 2): `vienna` the kerb's offset or null, on the platforms judged and on the stops
+    dtm = ROOT / 'data' / f'line{a.line}.dtm.json'
+    for pl_ in data.get('platforms') or []:
+        pl_.pop('vienna', None)
+    for st in data['stops']:
+        st.pop('vienna', None)
+    if dtm.exists():
+        survey = Survey(json.loads(dtm.read_text(encoding='utf-8'))['areas'])
+        RB = Route(data['pathBack']) if len(data.get('pathBack') or []) > 1 else None
+        plats, stops = stop_types(data, survey, stop_points(data['stops'], R.length), R, RB)
+        for k, kerb in plats.items():
+            data['platforms'][k]['vienna'] = kerb
+        for i, kerb in stops.items():
+            data['stops'][i]['vienna'] = kerb
+        print(f"line {a.line}: Vienna-type stops {[data['stops'][i]['name'] for i, k in stops.items() if k is not None]}")
     with replacing(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     gj = built_geojson(a.line, data, placed, targets, C, R, os.environ.get('BUILD_ID', 'build'))

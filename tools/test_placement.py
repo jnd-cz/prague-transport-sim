@@ -66,6 +66,16 @@ class Rules(unittest.TestCase):
         self.assertEqual([d.get('rule') for d in out], ['junctionEdge', 'sameStopLine'])
         self.assertTrue(out[1]['drop'])
 
+    def test_a_stop_beside_the_car_lane_is_vienna_type_an_island_is_not(self):
+        # the road along the right of the route (y -1.6 to -8), the sidewalk beyond it; an island over the road at x 300-360
+        road = {'c': 'road', 'l': 0, 'r': [[0, -1.6], [1000, -1.6], [1000, -8], [0, -8]]}
+        walk = {'c': 'sidewalk', 'l': 0, 'r': [[0, -8], [1000, -8], [1000, -12], [0, -12]]}
+        island = {'c': 'island', 'l': 0, 'r': [[300, -1.6], [360, -1.6], [360, -4.6], [300, -4.6]]}
+        survey = pl.Survey([road, walk, island])
+        self.assertEqual(survey.class_at(330, -3), 'island')     # (the smaller area, drawn over the road)
+        self.assertAlmostEqual(pl.vienna(self.R, survey, 100, 130), 8.2, delta=0.41)
+        self.assertIsNone(pl.vienna(self.R, survey, 310, 350))
+
     def test_the_route_is_the_game_s_metre_by_metre_chords(self):
         R = pl.Route([[0, 0], [10, 0], [10, 10]])
         s, d = R.nearest(10.5, 5)
