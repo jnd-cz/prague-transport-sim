@@ -17,6 +17,29 @@ const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on
 // coasted 41–45 m, but the same reading takes a 32–37 m coast of the autopilot's for 7 m. ČKD, T3SU-03 p. 5: "fully use coasting,
 // above all when coming into stops"; the user, 2026-11-07: "Later braking to match real driver"
 const COAST_T = 8;
+// Time in hand (#242; the user, 2026-11-04: "coasting and braking more mildly when the driver is ahead or has enough time compared to
+// timetable"): the next stop's time in the timetable (its departure) less now, less the run there at the line's limits and a dwell.
+// From MILD_FROM s in hand the driving grows milder, fully so MILD_SPAN s later: the target down to 10 km/h under the limit (never under
+// 70 % of it), the coasting into stops and lower limits up to twice as long, the planned braking a quarter softer. Late, it drives as before.
+const MILD_FROM = 10, MILD_SPAN = 30;
+const DWELL = 15; // s at a stop, doors open to closed [assumed]
+const RUN_A = 0.8, RUN_D = 0.9; // m/s²: the quickest run's start and braking, for the run time to the next stop
+// the run there takes this many times the quickest run: on the five lines (seed 1, 169 stretches) the autopilot's took 1.20 times it
+// (median), 1.36 at p75: the signals, the traffic, the time a limit holds after a slow spot. Counted at 1.0 it eased off where it had
+// no time to spare: line 9 seed 1 arrived 13 s later on average, on time at 35 % of the stops against 43 %
+const RUN_SLACK = 1.3;
+
+// the quickest run along the route at the line's limits, stopping at every stop: the seconds from the start to each metre (one pass a route)
+function runProfile(g) {
+  const L = Math.ceil(g.route.length), ds = 2, n = Math.ceil(L / ds) + 1, v = new Float32Array(n), t = new Float64Array(n);
+  for (let i = 0; i < n; i++) v[i] = Math.max(1, g.limits.at(i * ds) / 3.6 - 0.4);
+  for (const st of g.stops) { const i = Math.round(st.target / ds); if (i >= 0 && i < n) v[i] = 0; }
+  v[0] = 0;
+  for (let i = 1; i < n; i++) v[i] = Math.min(v[i], Math.sqrt(v[i - 1] ** 2 + 2 * RUN_A * ds));
+  for (let i = n - 2; i >= 0; i--) v[i] = Math.min(v[i], Math.sqrt(v[i + 1] ** 2 + 2 * RUN_D * ds));
+  for (let i = 1; i < n; i++) t[i] = t[i - 1] + ds / Math.max(0.5, (v[i] + v[i - 1]) / 2);
+  return (s) => t[Math.max(0, Math.min(n - 1, Math.round(s / ds)))];
+}
 const STOP_SHORT = 3; // m: behind something that moves (a tram, a car), the planned curve ends this far before it
 const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far short of the point
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
@@ -29,10 +52,20 @@ export class Autopilot {
     this.input = { deadman: true, sand: false, switchBtn: false };
   }
 
+  // 0 with no time in hand to the next stop, 1 with MILD_FROM + MILD_SPAN s or more (#242); this.inHand keeps the seconds (F8, window.game)
+  _mild(g, tr) {
+    const st = g.stops?.[g.nextStop];
+    if (!st || st.served || st.sched == null || !g.limits || !g.route) return (this.inHand = null, 0);
+    if (this._runRoute !== g.route) { this._run = runProfile(g); this._runRoute = g.route; }
+    this.inHand = st.sched - g.clock - RUN_SLACK * Math.max(0, this._run(st.target) - this._run(tr.s)) - DWELL;
+    return Math.max(0, Math.min(1, (this.inHand - MILD_FROM) / MILD_SPAN));
+  }
+
   step(g, dt) {
     const tr = g.tram;
     const st = g.stops[g.nextStop];
     this.bellCooldown -= dt;
+    const mild = this.mild = this._mild(g, tr), coastT = COAST_T * (1 + mild);
 
     // doors: open at the platform, close once everyone is aboard and it is departure time
     if (st) {
@@ -45,7 +78,7 @@ export class Autopilot {
     // target speed: line speed, upcoming restrictions, then everything we must stop for
     // (1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed, the user, 2026-11-07:
     // "our autopilot can lean a bit on the faster side where it makes sense")
-    let vt = g.currentLimit / 3.6 - 0.4;
+    let vt = g.currentLimit / 3.6 - 0.4 - mild * Math.min(10 / 3.6, 0.3 * g.currentLimit / 3.6);
     let nl = g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
@@ -58,7 +91,7 @@ export class Autopilot {
     const mu = g.muBase ?? 0.3;
     // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
-    const planAt = (grade, pull = 0.5) => Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + pull * Math.min(0, grade)),
+    const planAt = (grade, pull = 0.5) => (1 - 0.25 * mild) * Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + pull * Math.min(0, grade)),
       0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
     const limitDecel = planAt(gradeHere, 1);
     // (to a lower limit as to a point, the steepest downhill on the way counts: planned on the 23 ‰ where it began braking, it met 59 ‰,
@@ -220,7 +253,7 @@ export class Autopilot {
     // driver of T3 6921 drove twice from Královský letohrádek to Malostranská, the autopilot 7-9 times, #396)
     if (nl) {
       const dl = Math.max(0, nl.d - 12);
-      const coastL = Math.min(dl, Math.max(look, COAST_T * tr.v));
+      const coastL = Math.min(dl, Math.max(look, coastT * tr.v));
       const gL = Math.min(gradeHere, g.profile.grade(tr.s + coastL / 2 - 7), g.profile.grade(tr.s + coastL - 7));
       const aCoastL = aCoast + (tr.mass * 9.81 * (gL - gradeHere)) / tr.inertia;
       vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, (nl.v / 3.6) ** 2 + 2 * limitPlan(nl.d) * Math.max(0, dl - coastL) + 2 * aCoastL * coastL)) - 0.3);
@@ -233,7 +266,7 @@ export class Autopilot {
       // (the coast too with the steepest downhill on its way: over a crest from 40 ‰ up into 50 ‰ down it came to the curve at 47 km/h,
       // where step 5 makes only 0.65 m/s², and stood on the track brakes; test drive "crest into the stop")
       const gain = Math.max(0, tr.a);
-      const coastIn = Math.min(dLeft, Math.max(look, COAST_T * tr.v));
+      const coastIn = Math.min(dLeft, Math.max(look, coastT * tr.v));
       const gIn = Math.min(gradeHere, g.profile.grade(tr.s + coastIn / 2 - 7), g.profile.grade(tr.s + coastIn - 7));
       const aCoastIn = aCoast + (tr.mass * 9.81 * (gIn - gradeHere)) / tr.inertia;
       vtDrive = Math.min(vtDrive, Math.sqrt(Math.max(0, 2 * stopDecel * Math.max(0, dLeft - coastIn - gain * 3.5) + 2 * aCoastIn * coastIn)) - gain);
