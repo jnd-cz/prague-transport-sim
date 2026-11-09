@@ -22,6 +22,8 @@ import threading
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "tools"))  # (python -P leaves it out)
+import gpu  # noqa: E402
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -40,8 +42,11 @@ def measure(line, models, frames, headless, warm=120, fovs=(None,)):
     out = []
     try:
         with sync_playwright() as p:
-            args = [] if headless else ["--disable-gpu-vsync", "--disable-frame-rate-limit"]
-            browser = p.chromium.launch(headless=headless, args=args)
+            # (headless on the GPU where there is one, as headed: SwiftShader's frame times say nothing of a player's, #411)
+            if headless:
+                browser = gpu.launch(p)[0]
+            else:
+                browser = p.chromium.launch(headless=False, args=["--disable-gpu-vsync", "--disable-frame-rate-limit"])
             for model, fov in [(m, f) for m in models for f in fovs]:
                 page = browser.new_page(viewport={"width": 1280, "height": 720}, device_scale_factor=1)
                 errors = []
@@ -75,7 +80,7 @@ def main():
     ap.add_argument("--models", default="detailed,classic,simple")
     ap.add_argument("--fov", default="", help="vertical fields to measure each model at, e.g. 62,22.75 (default: the camera's)")
     ap.add_argument("--frames", type=int, default=600)
-    ap.add_argument("--headless", action="store_true", help="software drawing: checks the bench runs, no timing")
+    ap.add_argument("--headless", action="store_true", help="headless, on the GPU where there is one (else SwiftShader): checks the bench runs")
     args = ap.parse_args()
     if not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):
         sys.exit(f"no data/line{args.line}.json: python -I tools/snapshot.py data-fetch")

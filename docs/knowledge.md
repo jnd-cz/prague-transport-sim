@@ -476,6 +476,13 @@ Review these when realism matters; most move into the build in M2.
 
 ## Checks and what they measure
 
+- **No check reads a drawn pixel** (#411): the 75 runs of every check on every line (seeds 1–2) gave the same
+  results, field by field, drawn once a second or not at all. Playwright's headless Chromium draws WebGL in
+  software (SwiftShader) unless launched on ANGLE D3D11. Once a second it still took 5–12 cores of a page's ~12,
+  against the game's ~1, and slowed the game's own thread (line 23's drive 55 → 41 s without it). The 75 runs took
+  1633 s drawing at 4 pages, 721 s without at 8, 706 s at 12. The same GPU draws 60 heavy frames in 0.28 s where
+  SwiftShader takes 47.5 s (Intel Arc A770, `tools/gpu.py`).
+
 - `tools/lint.js` (page with `?keepgeo`): consist at stops, signals in platforms (exempts island-tip
   poles marked at placement and heads hung over the track), trees in buildings, bridges, invented walls, tram
   envelope, grade separation, railSupport, verticalCurves, terrainOverSurvey, streetWaviness,

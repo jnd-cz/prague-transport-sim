@@ -10,6 +10,7 @@ from playwright.sync_api import sync_playwright, TimeoutError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shot import capture, combine, site
+import gpu
 import shot
 
 
@@ -58,7 +59,7 @@ class Shots(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True)
+        cls.browser, _ = gpu.launch(cls.pw, quiet=True)
 
     @classmethod
     def tearDownClass(cls):

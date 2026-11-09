@@ -17,12 +17,13 @@ thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
 Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
-any job; an occupied port fails. --url explicitly uses an existing server. WebGL runs on
-SwiftShader (software): slower than a desktop browser, the same results (the checks step the
-simulation themselves). --batch N (default 6) runs up to N checks of one line one after another in one
+any job; an occupied port fails. --url explicitly uses an existing server. The pages draw
+nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
+are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
+software as before; --gpu: on the machine's GPU, tools/gpu.py). --batch N (default 6) runs up to N checks of one line one after another in one
 loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
 counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). --jobs N runs N pages
-at once, each in a worker process with its own browser (default: half the cores, at most 4, and what free
+at once, each in a worker process with its own browser (default: half the cores, at most 8, and what free
 memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded, so the counts are the same as
 one after another.
 
@@ -67,6 +68,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
 from sysinfo import workers  # noqa: E402
+import gpu  # noqa: E402
 import baseline_store  # noqa: E402
 from baseline_store import MEASURED, HeavyJob  # noqa: E402
 
@@ -498,21 +500,25 @@ def serve(port, startup_timeout=10):
 ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
         "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
         "--disable-backgrounding-occluded-windows"]
+GPU_ARGS = [*gpu.HARDWARE, *ARGS[3:]]  # (WebGL on the machine's GPU, tools/gpu.py)
+PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free memory)
+PAGE = {"draw": False, "viewport": (960, 540), "gpu": False}  # (how the pages draw: --draw, --viewport, --gpu, #411)
 
 
-def worker(jobs, url, headed, timeout, done=None):
+def worker(jobs, url, headed, timeout, done=None, page_opts=None):
     """A batch of one line's jobs in a worker process, with a browser of its own (sync Playwright is one per
     process): one page load for all of them, the next shift started in the same page (#205: the load is ~60 s
     of a ~145 s run). A run that fails or times out leaves the page; the rest of the batch gets a fresh one.
-    Each result also goes to the queue `done` as it comes, for the progress lines."""
+    Each result also goes to the queue `done` as it comes, for the progress lines. `page_opts`: PAGE's keys."""
+    opts = {**PAGE, **(page_opts or {})}
     out = []
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not headed, args=ARGS)
+        browser = pw.chromium.launch(headless=not headed, args=GPU_ARGS if opts["gpu"] else ARGS)
         try:
             page = None
             for line, check, seed in jobs:
                 if page is None:
-                    page, errors, load = load_page(browser, url, line, timeout)
+                    page, errors, load = load_page(browser, url, line, timeout, opts)
                 r, secs = run_one(page, errors, check, seed, timeout, load)
                 load = 0
                 out.append(((line, check, seed), r, secs))
@@ -528,9 +534,12 @@ def worker(jobs, url, headed, timeout, done=None):
     return out
 
 
-def load_page(browser, url, line, timeout):
+def load_page(browser, url, line, timeout, opts=None):
     """A page with the line loaded: (page, its page errors, seconds or an error)."""
-    page = browser.new_page(viewport={"width": 960, "height": 540})
+    opts = {**PAGE, **(opts or {})}
+    page = browser.new_page(viewport={"width": opts["viewport"][0], "height": opts["viewport"][1]})
+    if not opts["draw"]:
+        page.add_init_script("window.headlessDraw = false")
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     t0 = time.monotonic()
@@ -571,6 +580,10 @@ def run_one(page, errors, check, seed, timeout, load=0):
 
     try:
         js = CALLS[check].replace("SEED", str(seed))
+        if check in SEEDLESS:
+            # (without drawing, a seedless check also leaves the game unstepped while it reads the world, as it does
+            # after a drive in the same page, which sets window.headless: the same counts, #205, #411)
+            js = "if (window.headlessDraw === false) window.headless = true; " + js
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
             window._job = {{ done: false }};
@@ -651,6 +664,10 @@ def main():
                     help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
     ap.add_argument("--batch", type=int, default=6,
                     help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
+    ap.add_argument("--draw", action="store_true",
+                    help="draw the pages once a second (default: no drawing, the same counts; the software draw took 5-12 cores a page, #411)")
+    ap.add_argument("--viewport", default="960x540", help="the pages' size, WxH (the software draw costs by the pixel)")
+    ap.add_argument("--gpu", action="store_true", help="WebGL on the machine's GPU (ANGLE D3D11) instead of SwiftShader")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
     ap.add_argument("--baseline", action="store_true",
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
@@ -674,6 +691,11 @@ def main():
         raise SystemExit(f"no checkpoint {a.against} in the store: python -I tools/baseline_store.py checkpoints")
     if a.timeout <= 0:
         ap.error("--timeout must be positive")
+    try:
+        vw, vh = (int(v) for v in a.viewport.lower().split("x"))
+    except ValueError:
+        ap.error(f"--viewport WxH, not {a.viewport!r}")
+    page_opts = {"draw": a.draw, "viewport": (vw, vh), "gpu": a.gpu}
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
     for c in checks:
         if c not in CALLS:
@@ -721,7 +743,9 @@ def main():
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
         if a.jobs is None:
-            a.jobs = workers(4.0)  # (sized by the memory free once its turn comes)
+            # (sized by the memory free once its turn comes; at most 8: without drawing a page takes ~2 cores, and 75
+            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411)
+            a.jobs = workers(4.0, most=PAGES)
         os.makedirs(a.out, exist_ok=True)
         # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs)
@@ -737,7 +761,7 @@ def main():
         if a.jobs > 1 and len(batches) > 1:
             with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
                 done = mgr.Queue()
-                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done) for b in batches]
+                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done, page_opts) for b in batches]
                 while i < len(jobs):
                     try:
                         res = done.get(timeout=5)
@@ -752,7 +776,7 @@ def main():
                         report(i, *part)
         else:
             for b in batches:
-                for res in worker(b, url, a.headed, a.timeout):
+                for res in worker(b, url, a.headed, a.timeout, None, page_opts):
                     for part in split(res):
                         i += 1
                         report(i, *part)
