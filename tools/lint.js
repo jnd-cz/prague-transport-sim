@@ -127,6 +127,17 @@ function signalsInPlatforms(g) {
   return check('signal-not-in-platform', g.signals.length, bad);
 }
 
+// Oncoming trams' platform points with a junction's stop line inside the platform (traffic.js platformCaps, #385):
+// moved to 3 m before the line, or kept where the front would no longer be 10 m into the platform. mag: metres moved.
+function backPlatformCaps(g) {
+  const tr = window.traffic, caps = tr?.platformCaps || [], br = g.backRoute;
+  const items = caps.map((c) => {
+    const p = br ? br.at(c.s) : { x: null, y: null };
+    return { s: Math.round(c.s), x: p.x, y: p.y, mag: c.to === null ? 0 : +(c.s - c.to).toFixed(1), info: c.to === null ? `kept: the line ${(c.s - c.line).toFixed(1)} m before the point, too near the platform's start (signal s ${c.sig})` : `moved ${(c.s - c.to).toFixed(1)} m back from ${c.s.toFixed(1)}, ${(c.line - c.s).toFixed(1)} m to the line (signal s ${c.sig})${c.platform ? '' : ', no platform: our stop mapped across'}` };
+  });
+  return check('back-platform-before-line', (tr?.backStops || []).length, items);
+}
+
 // Trees whose trunk stands inside a building, or whose crown reaches into one (the crown circle,
 // sampled at 8 points, passes under a roof that is higher than the crown's bottom).
 function treesInBuildings(world) {
@@ -882,6 +893,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     consist: consistAtStops(g),
     stopFacts: stopFacts(g, truth),
     signalsInPlatforms: signalsInPlatforms(g),
+    backPlatformCaps: backPlatformCaps(g),
     treeTrunks: trees.trunk,
     treeCrowns: trees.crown,
     bridges: bridgesWithoutDeck(g),

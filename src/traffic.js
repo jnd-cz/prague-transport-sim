@@ -309,6 +309,24 @@ export class Traffic {
       const n = this.back.nearestOnHeading(o.x, o.y, -o.hx, -o.hy);
       return n && n.d < 30 && !runs.some(([a, b]) => n.s + 8 > a - 30 && n.s + 8 < b + 30) ? n.s + 8 : null;
     }).filter((s) => s !== null)].sort((a, b) => a - b) : [];
+    // a junction's stop line for oncoming trams (backCross − 6, in update) inside a platform: the point lay up to 1.7 m past
+    // the line, and a tram pulling in as the signal turned red rolled over it to reach the point (line 37 s 4688, line 9
+    // s 5409, #385). A line up to 10 m before the point moves it to 3 m before the line, where a red stops it anyway, if
+    // the front is still 10 m into the platform there (a door at it); otherwise it stays and is listed as kept. Each one in
+    // platformCaps (lint). (A line further back, inside a long platform, is left to the red and dilemma rules below: one
+    // 41-52 m before the end of an 83 m platform at Přístaviště and Nádraží Modřany on line 17, where the tram passes it
+    // at speed, the phase held for it.)
+    this.platformCaps = [];
+    const lines = (game.signals || []).filter((g) => g.backCross !== undefined).map((g) => ({ sig: Math.round(g.s), line: g.backCross - 6 }));
+    this.backStops = this.backStops.map((p) => {
+      const piece = backPl.filter(([a, b]) => p >= a && p <= b).sort((x, y) => y[0] - x[0])[0];
+      const from = piece ? piece[0] : p - 10;
+      const L = lines.filter((x) => x.line > Math.max(from, p - 10) && x.line - 3 < p).sort((a, b) => a.line - b.line)[0];
+      if (!L) return p;
+      const to = L.line - 3, moved = to >= from + 10;
+      this.platformCaps.push({ s: p, to: moved ? to : null, line: L.line, sig: L.sig, platform: !!piece });
+      return moved ? to : p;
+    }).sort((a, b) => a - b);
     // other lines that really serve this route's stops (from GTFS)
     const other = new Set();
     const mine = new Set((game.segments || []).map((g) => g.line));
@@ -1731,7 +1749,7 @@ export class Traffic {
     for (const t of this.oncoming) {
       let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
-      const isStop = stopAt !== null;
+      const isStop = stopAt !== null, platformAt = stopAt;
       t.waitFor = null; t.stop = stopAt === null ? null : { s: stopAt, why: 'stop' };
       const stop = (s, why, who = null) => { if (s < (stopAt ?? Infinity)) { stopAt = s; t.stop = { s, why }; t.waitFor = who; } };
       for (const c of this.carsOnBack || []) if (c.s > t.s) stop(c.s - 2.5 - 4, 'car on track', c.car);
@@ -1752,7 +1770,10 @@ export class Traffic {
         // or just starting can always stay)
         if (d > 0 && d < 150 && (d > stopDistance(t.v, sig.backState) || t.v < 0.5)) t.redStops.add(sig);
         if (t.redStops.has(sig)) { if (d > -1) stop(line - 3, 'signal'); } // a little before the line
-        else if (d > 0 && d < 150 && sig.backState === 'warn') sig.backCommitted = true;
+        // (not a tram that stops at its platform before the line anyway: the controller held the green up to 10 s for it, line 37
+        // holds 1.6 → 4.6 a run once #385 put three platform points just before their lines. Behind a car it may still be committed:
+        // the car can move on)
+        else if (d > 0 && d < 150 && sig.backState === 'warn' && !(isStop && platformAt < line)) sig.backCommitted = true;
       }
       for (const G of gauntlets) {
         if (t.s > G.b0 && t.s - t.length < G.b1) G.theirs.occupied = true;
