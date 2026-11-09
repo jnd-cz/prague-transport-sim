@@ -47,7 +47,7 @@ ASKS = re.compile(r"^(#+\s*|\*\*)(open questions|questions|for the user|to decid
 # sessions at once per lane (AGENTS.md, Lanes): the world lane's second writes tools without publishing
 LIMITS = {"world": 2, "sim": 1, "assets": 1, "tooling": 1}
 # lanes that wait: none of their issues is offered as ready (AGENTS.md, Lanes; lifted at that checkpoint)
-PAUSED = {"sim": "until checkpoint W2"}
+PAUSED = {}  # (the simulation lane waited for checkpoint W2, #414)
 SHOW = 6  # ready issues printed per lane
 REBUILD = "rebuild"  # the label: the one issue whose branch may rebuild and publish data
 
