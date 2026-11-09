@@ -364,6 +364,14 @@ export class TR37 {
     if (w.slip && now > 1) { if (!(A.slipT > 0) || (now <= A.slipCap && A.slipWait <= 0)) { A.slipCap = now - 1; A.slipWait = 0.8; } A.slipT = 6; }
     if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
+    // (on step 1 there is no step lower: spinning, the rail gives half its peak (#265's creep curve) and step 1's regulated current
+    // still pulls more, so the spin went on for good, 109 s of a 150 s drive up 50 ‰ on leaves. After 0.5 s of it the pedal comes
+    // off for 0.6 s and the wheels grip again, as a driver eases off and tries again: the user, 2026-11-04, "They ease of the drive
+    // and try again with less power")
+    A.spin1 = w.slip && now === 1 ? (A.spin1 || 0) + w.dt : 0;
+    if (A.spin1 > 0.5) { A.easeT = 0.6; A.spin1 = 0; }
+    A.easeT = (A.easeT || 0) - w.dt;
+    if (A.easeT > 0 && s > 0) s = 0;
     if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast

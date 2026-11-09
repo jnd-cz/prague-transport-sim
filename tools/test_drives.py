@@ -60,7 +60,7 @@ RUN = """async (only) => {
       if (ahead) { for (const [t, v] of ahead.moves) if (T >= t) ahead.v = v; ahead.s += ahead.v * h; }
       if (o.crossing) g.carsCrossing = T >= (o.crossing.from ?? 0) && T <= (o.crossing.to ?? Infinity) ? [o.crossing] : [];
       const plan = pilot.step(g, h) || {};
-      tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed', mu: muAt(tr.s), sandKey: !!pilot.input.sand });
+      tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed', mu: muAt, weather: o.leaves ? 'leaves' : 'dry', sandKey: !!pilot.input.sand });
       if (tr.slip) R.slipSecs += h;
       if (tr.electric > 0) { R.lineJ += tr.electric * h; R.mechJ += Math.max(0, tr.drive * tr.v) * h; } else R.brakeJ -= tr.electric * h;
       if (tr.slide) R.slideSecs += h;

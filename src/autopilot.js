@@ -343,7 +343,9 @@ export class Autopilot {
     // (0.7 of the grip) do not climb with 0.15 m/s² to spare: a leaf patch over 26 ‰; on the level they still pull away, and the
     // box was still dry on lines 9, 17 and 22, with patches up 35–40 ‰ ahead (0.41 m/s² slipping: 38 ‰ at most). There, once it
     // slipped, until 3 m/s: sand for 1.5 s at a time slipped again after each
-    const slipClimbs = 0.7 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.15;
+    // (spinning, the rail gives half its peak, #265's creep curve, and pulling away up 50 ‰ on leaves without sand it slipped 25 s of
+    // 110: so sand where half the grip leaves under 0.3 m/s² to climb with; the box holds 25 minutes)
+    const slipClimbs = 0.5 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.3;
     this.startSand = tr.v < 3 && !slipClimbs && need > 0 && (tr.slip || !!this.startSand);
     // (braking: on every slide. Rationed while the box held 90 s, to a point within what a sliding tram needs, it slid twice without sand
     // braking for a lower limit down Chotkova's 55 ‰, held step 1 for 3 s after each and came into the 20 km/h at 35, line 23 seed 2 in
