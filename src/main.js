@@ -853,7 +853,11 @@ function frame(now) {
   const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
   if (draw) {
     if (people && game) people.sync(camera, traffic, game);
-    renderer.render(scene, camera); lastDraw = now; window.drawCount++;
+    // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
+    // pixels; the software draw took 5-12 cores of a page once a second, #411)
+    if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
+    else renderer.render(scene, camera);
+    lastDraw = now; window.drawCount++;
   }
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.

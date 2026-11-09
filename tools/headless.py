@@ -498,21 +498,26 @@ def serve(port, startup_timeout=10):
 ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
         "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
         "--disable-backgrounding-occluded-windows"]
+GPU_ARGS = ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization",
+            "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows"]
+PAGE = {"draw": True, "viewport": (960, 540), "gpu": False}  # (how the pages draw: --no-draw, --viewport, --gpu, #411)
 
 
-def worker(jobs, url, headed, timeout, done=None):
+def worker(jobs, url, headed, timeout, done=None, page_opts=None):
     """A batch of one line's jobs in a worker process, with a browser of its own (sync Playwright is one per
     process): one page load for all of them, the next shift started in the same page (#205: the load is ~60 s
     of a ~145 s run). A run that fails or times out leaves the page; the rest of the batch gets a fresh one.
-    Each result also goes to the queue `done` as it comes, for the progress lines."""
+    Each result also goes to the queue `done` as it comes, for the progress lines. `page_opts`: PAGE's keys."""
+    opts = {**PAGE, **(page_opts or {})}
     out = []
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not headed, args=ARGS)
+        browser = pw.chromium.launch(headless=not headed, args=GPU_ARGS if opts["gpu"] else ARGS)
         try:
             page = None
             for line, check, seed in jobs:
                 if page is None:
-                    page, errors, load = load_page(browser, url, line, timeout)
+                    page, errors, load = load_page(browser, url, line, timeout, opts)
                 r, secs = run_one(page, errors, check, seed, timeout, load)
                 load = 0
                 out.append(((line, check, seed), r, secs))
@@ -528,9 +533,12 @@ def worker(jobs, url, headed, timeout, done=None):
     return out
 
 
-def load_page(browser, url, line, timeout):
+def load_page(browser, url, line, timeout, opts=None):
     """A page with the line loaded: (page, its page errors, seconds or an error)."""
-    page = browser.new_page(viewport={"width": 960, "height": 540})
+    opts = {**PAGE, **(opts or {})}
+    page = browser.new_page(viewport={"width": opts["viewport"][0], "height": opts["viewport"][1]})
+    if not opts["draw"]:
+        page.add_init_script("window.headlessDraw = false")
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     t0 = time.monotonic()
@@ -651,6 +659,10 @@ def main():
                     help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
     ap.add_argument("--batch", type=int, default=6,
                     help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
+    ap.add_argument("--no-draw", action="store_true",
+                    help="headless runs keep a draw's world matrices without its pixels (the software draw: 5-12 cores a page, #411)")
+    ap.add_argument("--viewport", default="960x540", help="the pages' size, WxH (the software draw costs by the pixel)")
+    ap.add_argument("--gpu", action="store_true", help="WebGL on the machine's GPU (ANGLE D3D11) instead of SwiftShader")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "headless"))
     ap.add_argument("--baseline", action="store_true",
                     help="store these runs' counts as the baseline (reports/baseline/headless.json)")
@@ -674,6 +686,11 @@ def main():
         raise SystemExit(f"no checkpoint {a.against} in the store: python -I tools/baseline_store.py checkpoints")
     if a.timeout <= 0:
         ap.error("--timeout must be positive")
+    try:
+        vw, vh = (int(v) for v in a.viewport.lower().split("x"))
+    except ValueError:
+        ap.error(f"--viewport WxH, not {a.viewport!r}")
+    page_opts = {"draw": not a.no_draw, "viewport": (vw, vh), "gpu": a.gpu}
     checks = [c.strip() for c in a.checks.split(",") if c.strip()]
     for c in checks:
         if c not in CALLS:
@@ -737,7 +754,7 @@ def main():
         if a.jobs > 1 and len(batches) > 1:
             with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
                 done = mgr.Queue()
-                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done) for b in batches]
+                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done, page_opts) for b in batches]
                 while i < len(jobs):
                     try:
                         res = done.get(timeout=5)
@@ -752,7 +769,7 @@ def main():
                         report(i, *part)
         else:
             for b in batches:
-                for res in worker(b, url, a.headed, a.timeout):
+                for res in worker(b, url, a.headed, a.timeout, None, page_opts):
                     for part in split(res):
                         i += 1
                         report(i, *part)
