@@ -399,6 +399,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 ## Heuristics that stand in for missing data
 
 Review these when realism matters; most move into the build in M2.
+- **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
+  turning 170°+ street to street, its switches within 120 m, mean radius 18 m+. It finds 47 loops on DI's network.
+  It misses the block-circuit short workings (Karlovo náměstí, Zvonařka) and the loops DI does not draw yet
+  ([decision record](decisions/2026-11-07-speed-limits-and-signs.md)).
 - **Signals**: from OSM `traffic_signals` clusters near the route; never past the crossing they were
   made for (except along platforms, where the platform-head rules decide); two at one stop line are one.
   GO held for a tram in its dilemma zone (15 + v²/1.6 m). Distant signals where R < 110 m within 140 m.

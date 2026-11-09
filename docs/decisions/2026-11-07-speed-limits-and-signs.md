@@ -13,15 +13,15 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | `restriction-start-end` | front in, rear out | § 25.1, 49.14, 49.22 | holds (`currentLimit`, lowest under the whole tram) | holds |
 | `restriction-past` | a restriction ends right at a curve's end, a switch's frog or a crossing: "keep it simply right after", since "the tram bogie leaves the switch sooner than the end of car" | the user, 2026-11-08 (2 m on 2026-11-07) | **differs:** a curve's limit ran 15 m past its last low 5 m bin; a switch's ended at the frog's bin | 0 m, to the metre |
 | `higher-speed-start-end` | rear in, front out | § 25.1 | holds (falls out of the same minimum) | holds |
-| `point-restriction` | front only | § 49.16 | missing; no place known | missing |
+| `point-restriction` | front only | § 49.16 | missing; no place known | the stop signs' points (below) |
 | `switch-facing-speed` | 15 km/h facing, straight or diverging | § 25.4a | **differs:** 30 straight, 15 diverging; 18 m stretch | 15; blades to frog |
 | `switch-trailing-diverging-speed` | 15 km/h | § 25.4b | missing: trailing switches not in the data | build writes them, game reads them |
 | `switch-trailing-straight-speed` | 30 km/h | § 25.5a | missing | as above |
 | `crossing-speed` | 15 km/h over diamonds and wire crossings | § 25.4c | missing, except where OSM tags it | build writes the diamonds, game reads them; wire crossings not |
 | `small-radius-speed`, `small-radius-curves` | 15 km/h over a whole curve under 25 m | § 49.19; 11 places | **differs:** 10 at R 20 (8 of the 28 curves under 25 m) | at least 15 from a curve alone; the list is not read |
-| `loop-speed` | 15 km/h in a loop's curves | § 25.4e | only where OSM tags it | unchanged |
+| `loop-speed` | 15 km/h in a loop's curves | § 25.4e | only where OSM tags it | 15 from the switch into a loop to the switch out of it, the loops found by the user's rule (below) |
 | `switch-v-sign-speed` | 10 km/h facing diverging at a "V" | § 49.20 | missing; no list of places | missing |
-| `stop-pass-speed` | 30 km/h, the front passing a stop's sign without stopping | § 25.5b | missing | missing: a rule of the game, for after W2 |
+| `stop-pass-speed` | 30 km/h, the front passing a stop's sign without stopping | § 25.5b | missing | a point at each stop's sign for the front; the autopilot keeps it, passing it 3 km/h over costs the overspeed (below) |
 | `slow-sign-speed` | 10 km/h at *Pomalu* | § 49.13 | missing; no places | missing |
 | `gradient-no-speed` | the dangerous-gradient rules set no speed; PPS Q53 marks "25 km/h" wrong | § 49.9–12, the user | **differs:** 25 under −6 %, 35 under −4.5 %: 4.64 km of limits with no source | holds: no limit from a slope |
 | `trojska-descent` | 20–25 km/h, rolling, Hercovka → Nad Trojou | website, local rule | covered by chance by the rule above | 25 by its `place`, only where OSM tags no speed (the user: a backup after OSM) |
@@ -111,6 +111,38 @@ The earlier moves of 84640ad (`cyclesBroken` on line 9, `jump` on line 22) are i
 | 37 | 1696 [1644–1745] | 1672 [1621–1703] | −1.4 % |
 
 Dropping the slope limits (4.6 km at 25 or 35) and the 15 m window gains more than 50 on untagged track and 15 over a straight switch cost. On 84640ad, with the slope limits and the window, two seeds had read −2.3 % to +2.2 %.
+
+## Turning loops and stop signs (2026-11-09)
+
+The user, on PR 362's open points: the stop-pass limit is "point limit with overspeed penalty, autopilot has to follow", and where a loop is comes from a rule, not a list: "it's loop at the end of gtfs route, or any loop where two track diverge and come back together with larger than 180 degree turn, that's for double track loop (Sídliště Petřiny). There are side loops like Dvorce or Hlubočepy which are not used by regular service but still need the limit." Both quotes are on their facts in `data/truth.json`.
+
+**Loops** (`tools/track_loops.py`; `python -P -E tools/track_loops.py` lists them). A loop is a path over DI's passes from a switch entered by its toe to a switch left by its toe (the same switch for a balloon) that:
+- turns 170° or more from the heading arriving at the first switch to the heading leaving the second: the street's two tracks run opposite ways. From the switch's own leg the turn falls short by the switch's angle: Divoká Šárka 173°;
+- has its two switches within 120 m. Sídliště Petřiny's are 72 m apart, the farthest of the termini; circuits round city blocks come back 160–510 m away (Čechovo náměstí's other circuit, Palmovka, Strossmayerovo náměstí, Masarykovo nádraží, Náměstí Míru);
+- runs at most 600 m;
+- has a mean radius of at least `min-radius-network`, 18 m. A 52 m path turning 276° at Radošovická is a junction drawn in pieces.
+
+On DI's network (2026-09-30) the rule finds 47 loops: the termini, the depots, Dvorce, Hlubočepy and both of Petřiny's loop tracks. Of the 50 GTFS termini with 90 or more trips, the rule misses eight:
+- Karlovo náměstí and Zvonařka are short workings round city blocks;
+- DI does not draw the loops at Libuš, Nádraží Holešovice, Nákladové nádraží Žižkov, Pankrác and Slivenec yet;
+- Nádraží Hostivař lies outside DI's districts.
+
+None of the eight is on the five lines' routes.
+
+A route takes the loop's limit where it follows the loop's whole path, or the part of it from its own start or to its own end. A line that runs over one street of a circuit is not slowed. `tools/build_line.py` writes the stretches as `trackwork.loops`:
+
+| line | stretch | where |
+|---|---|---|
+| 9 | its first 44 m and last 79 m | Sídliště Řepy, where the run starts and ends |
+| 17 | its last 74 m | Vozovna Kobylisy |
+| 22 | its first 50 m | Bílá Hora |
+| 23 | its first 27 m | Královka |
+
+Line 9's run does not turn at Nákladové nádraží Žižkov: it goes on there as line 10, 89° round the corner.
+
+**Stop signs** are a point limit for the front (`point-restriction`), at each stop's sign (`stopPassPoints`, the game's stop target):
+- The game brings the next point to the autopilot through `nextLimitChange`. A train that stops comes to its sign at a crawl anyway.
+- A front passing a point more than 3 km/h over costs the overspeed penalty, counted as if the limit held over the set's own length. A point passes in a few frames, so the per-second penalty alone would cost almost nothing.
 
 ## Steep descents
 
