@@ -23,6 +23,13 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# m: a terrain height under this is no ground, in every terrain source the tools read: IPR's raster (ipr_dtm.py), the
+# DMR 5G tiles (fine_terrain.py, city_terrain.py) and the coarse grid (build_line.py). The user, 2026-11-09 (#428): "I
+# would put lower limit to 170 metres height which is well below lowest point of Prague". IPR's raster has 5,739,063
+# cells of 0.00 m along its south and east edges that no metadata declares as no-data (#325); its lowest other cell is
+# 170.73 m (the file's minVal).
+TERRAIN_FLOOR = 170.0
+
 
 @dataclass(frozen=True)
 class Source:

@@ -6,7 +6,9 @@ into raw/ipr-dtm/DTM/). Bare earth from the 2023 lidar (~40 points/m²), correct
 from 25 cm to 1 m on 2025-07-10 (lineage in dtm_1m.tif.xml).
 
 The file: BigTIFF, 35001 x 26001 float32, tiled 128 x 128, LZW without predictor, S-JTSK, no-data
--3.4e38 outside the city. Its cell centres are not on whole metres: the top-left centre is
+-3.4e38 outside the city (the declared one: GDAL_NODATA tag 42113 and NoDataValue in dtm_1m.tif.xml), and
+5,739,063 cells of 0.00 m along its south and east edges, declared nowhere: under sources.TERRAIN_FLOOR, so no
+ground either (#325, docs/knowledge.md). Its cell centres are not on whole metres: the top-left centre is
 (-757500.2778, -1034000.3889), so it is sampled bilinear at our lattice points, never copied cell by
 cell. It states no vertical datum (Bpv assumed and checked against DMR 5G on every build: fine_terrain.py).
 
@@ -33,6 +35,9 @@ try:
     PILLOW_LZW = features.check("libtiff")
 except ImportError:
     PILLOW_LZW = False
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+from sources import TERRAIN_FLOOR  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "raw", "ipr-dtm")
@@ -80,6 +85,13 @@ def tile_tiff(data, w, h):
         v = start if tag == 273 else v
         out += struct.pack("<HHI", tag, typ, 1) + (struct.pack("<HH", v, 0) if typ == 3 else struct.pack("<I", v))
     return bytes(out + struct.pack("<I", 0) + bytes(data))
+
+
+def ground(a):
+    """The cells in place, NaN where they hold no ground: the declared no-data (-3.4e38) and the 0.00 m cells along the
+    raster's south and east edges (#325), both under the floor."""
+    a[~(a >= TERRAIN_FLOOR)] = np.nan
+    return a
 
 
 class IprDtm:
@@ -134,8 +146,7 @@ class IprDtm:
                     a = np.array(im, dtype="<f4")
             else:
                 a = np.frombuffer(lzw(raw), dtype="<f4").reshape(self.th, self.tw).copy()
-            a[a < -1e30] = np.nan
-            self.tiles[k] = a
+            self.tiles[k] = ground(a)
         return self.tiles[k]
 
     def cells(self, i, j):

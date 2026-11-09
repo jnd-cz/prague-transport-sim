@@ -188,7 +188,7 @@ for k, (bi, bj) in enumerate(blocks):
     X, Y = F.to_jtsk(GX, GY)  # (the city frame is a shift of S-JTSK)
     z0 = ipr.sample(X, Y)
     z1 = sample(np.asarray(X), np.asarray(Y))
-    z1[z1 < 0] = np.nan  # (no data: outside the republic's model)
+    z1[~(z1 >= sources.TERRAIN_FLOOR)] = np.nan  # (no data: outside the republic's model, or under the floor)
     both = np.isfinite(z0) & np.isfinite(z1)
     diffs.append((z0 - z1)[both])
     if covers is not None:  # (IPR shows the passage, not its cover)

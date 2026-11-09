@@ -415,8 +415,8 @@ def fetch_terrain(P, x_min, x_max, y_min, y_max):
     h, w = len(grid), len(grid[0])
     de = (ext["xmax"] - ext["xmin"]) / w
     dn = (ext["ymax"] - ext["ymin"]) / h
-    # fill nodata cells from their neighbours
-    valid = [[v > -1000 for v in row] for row in grid]
+    # fill no-data cells (the export's -9999, and anything under the floor: sources.TERRAIN_FLOOR) from their neighbours
+    valid = [[v >= sources.TERRAIN_FLOOR for v in row] for row in grid]
     for _ in range(100):
         holes = 0
         for y in range(h):
