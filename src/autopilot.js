@@ -81,7 +81,9 @@ export class Autopilot {
     // a signal: when its GO starts blinking, stop if that is comfortable (~0.9 m/s2), else clear the
     // junction on it and keep going (the controller holds the phase for a committed tram); braking
     // for a blinking GO it could not stop for took it over the line on red (line 17 s 3158)
-    const sig = g.signals.find((x) => x.s > tr.s + 0.2);
+    // (a signal is ahead until the front is past its head: within 0.2 m of it, standing behind a car in the junction, it counted
+    // as passed, and the tram followed the car over the line on red at 0.3 m/s, line 9 seed 4 s 22350, #408's third case)
+    const sig = g.signals.find((x) => x.s > tr.s);
     if (this.stopFor && (this.stopFor !== sig || sig.state === 'go')) this.stopFor = null;
     if (sig && sig.state !== 'go') {
       const d = sig.s - 3 - tr.s;
@@ -89,9 +91,14 @@ export class Autopilot {
       // first sight of the blinking, and a stop stays a stop while service braking (1.15 m/s²) still makes it: the test, met
       // again on the way down, turned a tram braking for it into one going through 82 m out at 41 km/h, which then slowed for
       // the junction's 15 km/h, spent the controller's 10 s and met red 7 m before the signal (line 23 towards Královka, seed 5)
+      // A stop decided stays a stop as long as step 5 still makes it: D 1/2 § 42.8, "Pozor" obliges the driver to stop unless, when it
+      // lit, the tram was too close to stop safely. Turned to go at service braking's edge with its reaction time (1.15 m/s² after
+      // 0.3 s), 16 m out at 5.2 m/s already on step 5 with 1.04 m/s² still to brake, it let the brake off as the controller's 10 s ran
+      // out and crossed on red (line 9 seed 1 on #22's data, #408)
       if (sig.state === 'warn' && this.goThrough !== sig && tr.v > 1) {
+        const a5 = (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
         if (this.stopFor !== sig && d < (tr.v * tr.v) / 1.8 + tr.v) this.goThrough = sig;
-        else if (this.stopFor === sig && d < (tr.v * tr.v) / 2.3 + 0.3 * tr.v) { this.goThrough = sig; this.stopFor = null; }
+        else if (this.stopFor === sig && d < (tr.v * tr.v) / (2 * 0.95 * Math.max(0.5, a5))) { this.goThrough = sig; this.stopFor = null; }
         else this.stopFor = sig;
       }
       // (red after all, the hold having run out while it crawled up behind something: stop if service
@@ -102,6 +109,10 @@ export class Autopilot {
       if (this.goThrough === sig && tr.v < 0.3) this.goThrough = null;
       if (this.goThrough !== sig) consider(sig.s - 3, true, 'signal');
     }
+    // (and a red one after it within sight: two signals 53 m apart, the second came into view only past the first, at 12.7 m/s
+    // with 44 m left, and the tram crossed it on red at 6.9 m/s, line 17 seed 4 s 19808; the driver sees both)
+    const sig2 = sig && g.signals.find((x) => x.s > sig.s);
+    if (sig2 && sig2.state === 'stop' && sig2.s - tr.s < 150) consider(sig2.s - 3, true, 'signal');
     // past a signal, its crossing still ahead (stopped in the junction behind something): the driver no
     // longer sees the signal, and the cross street gives way to a tram in the junction; cars already on
     // the crossing drive off it first (the user, #268: "tram driver should wait until the tracks clear")

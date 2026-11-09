@@ -79,7 +79,7 @@ RUN = """async (only) => {
       jf += ((tr.a - lastA) * 30 - jf) * 0.17;
       lastA = tr.a;
       if (tr.v > 0.2) R.maxJerk = Math.max(R.maxJerk, Math.abs(jf));
-      for (const x of g.signals) if (x.state !== 'go' && x.s < tr.s && x.s > tr.s - 1 && tr.v > 0) R.overrun++;
+      for (const x of g.signals) if (x.state === 'stop' && x.s < tr.s && x.s > tr.s - 1 && tr.v > 0) R.overrun++; // (on red: a blinking GO may be passed, D 1/2 § 42.8)
       if (step % 8 === 0) R.series.push([+T.toFixed(2), +tr.s.toFixed(1), +tr.kmh.toFixed(1), n, +tr.eq.p.toFixed(1), Math.round(tr.current), Math.round(tr.voltage), Math.round(tr.eq.mg.rpm), tr.eq.shoe, +tr.a.toFixed(2), d === null ? null : +d.toFixed(1), g.tramAheadGap() === null ? null : +g.tramAheadGap().toFixed(1), tr.slip ? 1 : 0, tr.sanding ? 1 : 0, tr.slide ? 1 : 0, +(plan.vt ?? -1).toFixed(2), +(plan.vtDrive ?? -1).toFixed(2)]);
       if (tr.s >= lastS || (g.nextStop >= stops.length && o.endAtLastStop !== false)) break;
     }
@@ -114,6 +114,9 @@ RUN = """async (only) => {
     { name: 'red at a signal, in good time', stops: [20, 900], limit: 50, pax: 60, signals: [{ s: 500, states: [[0, 'stop'], [75, 'go']] }] },
     { name: 'red turns green on the way in', stops: [20, 900], limit: 50, pax: 60, signals: [{ s: 500, states: [[0, 'stop'], [32, 'go']] }] },
     { name: 'green turns red close by', stops: [20, 900], limit: 50, pax: 60, signals: [{ s: 500, states: [[0, 'go'], [36, 'warn'], [39, 'stop'], [80, 'go']] }] },
+    // (the blinking GO held for a tram the controller counts as committed, 3 s and 10 s more, then red: decided to stop, it went on at
+    // the edge of service braking and crossed on red, line 9 seed 1 on #22's data, #408; at 30 km/h towards a junction)
+    ...[60, 61, 62, 63, 64, 65, 66, 67].map((t) => ({ name: `green blinks held 13 s, at ${t} s`, stops: [20, 900], limits: [[0, 50], [420, 30]], pax: 60, signals: [{ s: 500, states: [[0, 'go'], [t, 'warn'], [t + 13, 'stop'], [t + 60, 'go']] }] })),
     { name: 'tram ahead stands at the stop, then leaves', stops: [20, 700], limit: 50, pax: 60, ahead: { s: 700, length: 30.24, moves: [[0, 0], [62, 6]] } },
     { name: 'tram ahead creeps on', stops: [20, 900], limit: 50, pax: 60, ahead: { s: 400, length: 30.24, moves: [[0, 2]] } },
     // (the bell rings for it, and the stop does not change: it took the last-metres rule away and stood 3.6 m short, line 17 seed 5, Nádraží Modřany)
