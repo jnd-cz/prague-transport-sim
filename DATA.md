@@ -42,7 +42,8 @@ queries.
    Test: `sftp tramdata` then `ls store` lists `sources` and `builds`.
 3. **Git identity** in the clone: `git config user.email "2506000+jnd-cz@users.noreply.github.com"`.
 4. **Python** 3.12+; the OSM tools need pyosmium (`python -m pip install --user osmium`) and run with
-   `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, Pillow;
+   `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, Pillow,
+   and `tools/city_terrain.py` pydelatin 0.4.0 (`python -m pip install --user pydelatin==0.4.0`);
    the headless checks need Playwright (`python -m pip install --user playwright`, then
    `python -m playwright install chromium`).
 5. **Machine cache** (optional; worth it from the second checkout on, e.g. several agents or worktrees):

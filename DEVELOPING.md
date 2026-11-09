@@ -81,7 +81,7 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packages):
+pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
 
 | step | writes | what |
 |---|---|---|
