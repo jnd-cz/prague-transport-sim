@@ -32,18 +32,26 @@ def tram_platform(t):
 
 
 def tram_lines(rd, active):
-    """{PID stop id: {line, ...}}: the tram lines whose trips stop there on the service date (`rd`, `active` from
-    tools/build_line.py gtfs_open). Not route_stops.txt: it lists no route at stops only some trips serve, and left
-    Pražský hrad and Královský letohrádek of lines 22 and 23 without (#407)."""
+    """{PID stop id: {line, ...}}: the tram stops and the lines on their signs. The lines of route_stops.txt, the
+    regular network a sign shows (the service date's trips run its diversions: on 2026-10-21 line 17 stopped at
+    Národní divadlo C/D instead of A/B, line 11 not at Krymská). Where it lists no route, at stops only some trips
+    serve, the service date's tram trips that stop there (`rd`, `active` from tools/build_line.py gtfs_open): their
+    regular ones, else the irregular (`exceptional`: runs to and from the depots). route_stops.txt alone left Pražský
+    hrad and Královský letohrádek of lines 22 and 23 without (#407)."""
     trams = {r["route_id"]: r["route_short_name"] for r in rd("routes.txt")
              if r["route_type"] == "0" and r.get("is_substitute_transport") != "1"}
-    trips = {t["trip_id"]: trams[t["route_id"]] for t in rd("trips.txt") if t["route_id"] in trams and t["service_id"] in active}
-    out = {}
+    listed = {}
+    for r in rd("route_stops.txt"):
+        if r["route_id"] in trams:
+            listed.setdefault(r["stop_id"], set()).add(trams[r["route_id"]])
+    trips = {t["trip_id"]: (trams[t["route_id"]], t.get("exceptional") == "1") for t in rd("trips.txt")
+             if t["route_id"] in trams and t["service_id"] in active}
+    regular, other = {}, {}
     for r in rd("stop_times.txt"):
-        line = trips.get(r["trip_id"])
-        if line:
-            out.setdefault(r["stop_id"], set()).add(line)
-    return out
+        t = trips.get(r["trip_id"])
+        if t and r["stop_id"] not in listed:
+            (other if t[1] else regular).setdefault(r["stop_id"], set()).add(t[0])
+    return {**{s: regular.get(s) or other[s] for s in regular.keys() | other.keys()}, **listed}
 
 
 def dist(q, pts, area):

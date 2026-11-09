@@ -41,18 +41,25 @@ class TramPlatform(unittest.TestCase):
 
 
 class TramLines(unittest.TestCase):
-    def test_the_lines_of_the_trips_on_the_service_date(self):
+    def test_the_route_list_s_lines_else_the_service_date_s_trips(self):
         tables = {
             'routes.txt': [{'route_id': 'L22', 'route_short_name': '22', 'route_type': '0'},
+                           {'route_id': 'L11', 'route_short_name': '11', 'route_type': '0'},
+                           {'route_id': 'L9', 'route_short_name': '9', 'route_type': '0'},
                            {'route_id': 'L180', 'route_short_name': '180', 'route_type': '3'}],
             'trips.txt': [{'trip_id': 'a', 'route_id': 'L22', 'service_id': 'wd'},
                           {'trip_id': 'b', 'route_id': 'L22', 'service_id': 'other day'},
-                          {'trip_id': 'c', 'route_id': 'L180', 'service_id': 'wd'}],
+                          {'trip_id': 'c', 'route_id': 'L180', 'service_id': 'wd'},
+                          {'trip_id': 'd', 'route_id': 'L9', 'service_id': 'wd', 'exceptional': '1'},
+                          {'trip_id': 'e', 'route_id': 'L22', 'service_id': 'wd'}],
             'stop_times.txt': [{'trip_id': 'a', 'stop_id': 'U598Z1P'}, {'trip_id': 'b', 'stop_id': 'U46Z3P'},
-                               {'trip_id': 'c', 'stop_id': 'U1Z1'}],
-            'route_stops.txt': [],   # (lists no route at Pražský hrad: not read)
+                               {'trip_id': 'c', 'stop_id': 'U1Z1'}, {'trip_id': 'd', 'stop_id': 'U598Z1P'},
+                               {'trip_id': 'd', 'stop_id': 'U864Z4P'}, {'trip_id': 'e', 'stop_id': 'U301Z1P'}],
+            # (no route at Pražský hrad U598Z1P; Krymská keeps 11, diverted on the service date)
+            'route_stops.txt': [{'route_id': 'L11', 'stop_id': 'U301Z1P'}, {'route_id': 'L22', 'stop_id': 'U301Z1P'}],
         }
-        self.assertEqual(pm.tram_lines(lambda n: iter(tables[n]), {'wd'}), {'U598Z1P': {'22'}})
+        self.assertEqual(pm.tram_lines(lambda n: iter(tables[n]), {'wd'}),
+                         {'U598Z1P': {'22'}, 'U864Z4P': {'9'}, 'U301Z1P': {'11', '22'}})
 
 
 class Match(unittest.TestCase):
