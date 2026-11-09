@@ -29,7 +29,7 @@ RUN = """async (only) => {
     tr.s = o.from ?? 0;
     if (o.supply) tr.supply = o.supply;
     if (o.sand !== undefined) tr.sand = o.sand;
-    const muAt = (s) => (o.patches || []).some(([a, b]) => s > a && s < b) ? 0.06 : o.mu ?? 0.3;
+    const muAt = (s) => (o.patches || []).some(([a, b]) => s > a && s < b) ? o.patchMu ?? 0.06 : o.mu ?? 0.3;
     const limitAt = (s) => { if (!o.limits) return o.limit ?? 50; let k = o.limits[0][1]; for (const [a, v] of o.limits) if (s >= a) k = v; return k; };
     const R = { name: o.name, series: [], changes: 0, flips: [], stands: [], shoes: 0, maxDecel: 0, maxJerk: 0, overrun: 0, slipSecs: 0, slideSecs: 0, emergencies: 0, overLimit: -99, lineJ: 0, mechJ: 0, brakeJ: 0 };
     const stops = (o.stops || []).map((s, i) => ({ name: 'S' + i, target: s, served: false, waiting: 0, alight: 0, alightFrac: 0, request: false, sched: 0, zone: [s - 2.5, s + 3] }));
@@ -60,7 +60,7 @@ RUN = """async (only) => {
       if (ahead) { for (const [t, v] of ahead.moves) if (T >= t) ahead.v = v; ahead.s += ahead.v * h; }
       if (o.crossing) g.carsCrossing = T >= (o.crossing.from ?? 0) && T <= (o.crossing.to ?? Infinity) ? [o.crossing] : [];
       const plan = pilot.step(g, h) || {};
-      tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed', mu: muAt, weather: o.leaves ? 'leaves' : 'dry', sandKey: !!pilot.input.sand });
+      tr.update(h, { grade: g.profile.grade(tr.s), doorsOpen: g.doorState !== 'closed', mu: muAt, weather: o.weather ?? (o.leaves ? 'leaves' : 'dry'), sandKey: !!pilot.input.sand });
       if (tr.slip) R.slipSecs += h;
       if (tr.electric > 0) { R.lineJ += tr.electric * h; R.mechJ += Math.max(0, tr.drive * tr.v) * h; } else R.brakeJ -= tr.electric * h;
       if (tr.slide) R.slideSecs += h;
@@ -131,6 +131,10 @@ RUN = """async (only) => {
     // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box held 90 s of a whole shift then, and the autopilot ran it dry
     // on every slip; with it empty a patch on 50 per mille can never be left (three runs stuck for good on lines 9 and 17)
     { name: 'leaves, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.15, leaves: true },
+    // snow: the rail at 0.10, packed snow and ice at the pedestrian crossings 0.08 (src/game.js; #265)
+    { name: 'snow, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.10, weather: 'snow', patches: [[300, 308], [690, 698]], patchMu: 0.08, leaves: true },
+    { name: 'snow, down 40 per mille', stops: [20, 700], limit: 50, pax: 60, mu: 0.10, weather: 'snow', grade: uphill(-0.04), patches: [[690, 698]], patchMu: 0.08, leaves: true },
+    { name: 'snow, up 40 per mille', stops: [20, 500], limit: 30, pax: 100, mu: 0.10, weather: 'snow', grade: uphill(0.04), leaves: true },
     { name: 'leaves, up 50 per mille', stops: [20, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), leaves: true },
     { name: 'leaves, a patch before the stop', stops: [20, 600], limit: 50, pax: 60, mu: 0.15, patches: [[520, 590]], leaves: true },
     { name: 'leaves, a patch at a red signal', stops: [20, 900], limit: 50, pax: 60, mu: 0.15, patches: [[440, 500]], signals: [{ s: 500, states: [[0, 'stop'], [100, 'go']] }], leaves: true },
