@@ -2431,6 +2431,20 @@
    },
    {
     "stop": "Hodkovičky",
+    "towards": "Belárie",
+    "x": -2380.5,
+    "y": -7398.4,
+    "how": "sign at the pin",
+    "note": "the user, Claude Code session 2026-11-09 (#258): \"Hodkovičky seems to be correct. I marked unsure because it's a new stop and ortophoto doesn't show so I could check properly.\"",
+    "osm_node": 13275534336,
+    "gtfs": [
+     -2380.5,
+     -7398.0
+    ],
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-09 (#258)"
+   },
+   {
+    "stop": "Hodkovičky",
     "towards": "Černý kůň",
     "x": -2380.0,
     "y": -7409.6,

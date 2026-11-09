@@ -2,45 +2,5 @@
  "schema": 1,
  "issue": 258,
  "over_m": 5.0,
- "findings": [
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-17-back-Hodkovičky-1",
-   "line": "17",
-   "stop": "Hodkovičky",
-   "towards": "Belárie",
-   "from": "Černý kůň",
-   "back": true,
-   "x": -2380.5,
-   "y": -7398.4,
-   "s": 15771.9,
-   "mag": 10,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": -2380.5,
-     "y": -7398.4,
-     "label": "OSM stop position",
-     "color": "#3e9dff"
-    },
-    {
-     "x": -2380.5,
-     "y": -7398.0,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    }
-   ],
-   "options": [
-    "OSM's stop position (blue)",
-    "the timetable point, GTFS (orange)",
-    "my own mark: place it on the map",
-    "unsure"
-   ],
-   "place_option": "my own mark: place it on the map",
-   "osm_node": 13275534336,
-   "gtfs_s": 15771.5,
-   "info": "Hodkovičky (towards Belárie) (the other direction): no DTM sign beside the track The pin is OSM's stop position. Where is the stop sign? Pick the source that is right, or place your own mark."
-  }
- ]
+ "findings": []
 }
