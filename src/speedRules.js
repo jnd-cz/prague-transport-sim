@@ -11,10 +11,11 @@ const NEAR_TRACKWORK = 15;   // m: an OSM 15 km/h piece this near a switch or cr
 
 const FACTS = { facing: 'switch-facing-speed', trailingDiverging: 'switch-trailing-diverging-speed',
                 trailingStraight: 'switch-trailing-straight-speed', crossing: 'crossing-speed',
-                general: 'max-speed', smallRadius: 'small-radius-speed', past: 'restriction-past' };
+                general: 'max-speed', smallRadius: 'small-radius-speed', past: 'restriction-past',
+                loop: 'loop-speed', stopPass: 'stop-pass-speed' };
 const PLACES = ['trojska-descent'];   // the local rules by place: only where OSM tags no speed (placeStretches)
 
-// {facing, trailingDiverging, trailingStraight, crossing, general, smallRadius} km/h and `past` m, by the facts' ids;
+// {facing, trailingDiverging, trailingStraight, crossing, general, smallRadius, loop, stopPass} km/h and `past` m, by the facts' ids;
 // `places`: [{from, to, v}], a local rule between two stops, at the highest speed it names
 export function speedFacts(truth) {
   const out = {}, facts = truth?.operation?.facts || [];
@@ -33,7 +34,8 @@ export function speedFacts(truth) {
 }
 
 // [{from, to, v}]: `switches` the route's facing switches ({s, frog?}), `trackwork` the line's {trailing: [{s, fromDiverging,
-// frog?}], crossings: [s]} (tools/build_line.py; absent from data built before #211)
+// frog?}], crossings: [s], loops: [{from, to}]} (tools/build_line.py; absent from data built before #211, loops before
+// 2026-11-09)
 export function trackworkStretches(switches, trackwork, facts) {
   const past = facts.past;
   const out = switches.map((w) => ({ from: w.s - TIP, to: w.s + (w.frog ?? FROG) + past, v: facts.facing }));
@@ -41,7 +43,18 @@ export function trackworkStretches(switches, trackwork, facts) {
     out.push({ from: w.s - (w.frog ?? FROG), to: w.s + TIP + past, v: w.fromDiverging ? facts.trailingDiverging : facts.trailingStraight });
   }
   for (const s of trackwork?.crossings || []) out.push({ from: s - DIAMOND, to: s + DIAMOND + past, v: facts.crossing });
+  // turning loops, from the switch into the loop to the switch out of it (§ 25.4 e; found on DI's network by the user's
+  // rule, tools/track_loops.py)
+  for (const l of trackwork?.loops || []) out.push({ from: l.from, to: l.to + past, v: facts.loop });
   return out;
+}
+
+// [{s, v, stop}] by s: limits the front alone keeps at a point (`point-restriction`, D 1/2 § 49.16): the stop sign of
+// each stop but the first at `stop-pass-speed` (§ 25.5 b, the front passing the sign of a stop where the train does not
+// stop; a train that stops there comes to its sign at a crawl anyway). `stops` the game's, `target` where the front stops
+// beside the sign. The user, 2026-11-09 (#211): "point limit with overspeed penalty, autopilot has to follow".
+export function stopPassPoints(stops, facts) {
+  return stops.slice(1).map((st) => ({ s: st.target, v: facts.stopPass, stop: st.name })).sort((a, b) => a.s - b.s);
 }
 
 // [{from, to, v}]: a local rule's speed where a line runs from its first stop straight to its second (so not the other

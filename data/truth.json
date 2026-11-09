@@ -7,12 +7,12 @@
   "places": "reference: places the user described, for the scenery and structure work",
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, line_heights.py",
-  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py (min-radius-network), line_heights.py (min-radius-passenger), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
+  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past and trojska-descent; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it"
  },
@@ -910,6 +910,10 @@
      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/predpis_d1-2_20260201.pdf",
      "page": 23,
      "section": "§ 25.4 e"
+    },
+    "user": {
+     "source": "Claude Code session 2026-11-09 (#211): where a loop is, by rule (tools/track_loops.py)",
+     "quote": "I would like to make rule instead of declarative list, it's loop at the end of gtfs route, or any loop where two track diverge and come back together with larger than 180 degree turn, that's for double track loop (Sídliště Petřiny). There are side loops like Dvorce or Hlubočepy which are not used by regular service but still need the limit. Not drivable today but should be in the future. Try the rules or adjust to catch all obvious loops."
     }
    },
    {
@@ -973,7 +977,11 @@
        "Q87"
       ]
      }
-    ]
+    ],
+    "user": {
+     "source": "Claude Code session 2026-11-09 (#211): how the game keeps it (src/speedRules.js stopPassPoints)",
+     "quote": "211 b) is point limit with overspeed penalty, autopilot has to follow."
+    }
    },
    {
     "id": "slow-sign-speed",
