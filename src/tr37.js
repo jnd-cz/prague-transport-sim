@@ -364,6 +364,8 @@ export class TR37 {
     if (A.spinT > 0.5 && !(A.easeT > 0)) { A.easeT = 0.6; A.slipCap = Math.max(1, (A.slipT > 0 ? Math.min(A.slipCap, now) : now) - 1); A.slipT = 6; A.spinT = 0; }
     if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
     if (A.easeT > 0 && s > 0) s = 0;
+    // (and back up a step at a time, each after 4 s without a spin: free after 6 s, it went back to step 5 and spun again at once)
+    if (!(A.slipT > 0) && A.slipCap != null && A.slipCap < 5) { A.slipCap++; A.slipT = 4; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
     if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
