@@ -234,15 +234,20 @@ TRUTH = os.path.join(ROOT, "data", "truth.json")
 
 
 def write_truth(facts, p=TRUTH):
-    """data/truth.json stopSigns (its last section), the rest of the file as it is"""
+    """data/truth.json stopSigns, the rest of the file as it is: the section replaced where it stands (other
+    sections follow it: #351's substations did, and an earlier import cut them off), else added at the end"""
     text = open(p, encoding="utf-8").read()
-    json.loads(text)
-    tail = '\n "stopSigns": '
-    if tail in text:
-        text = text[:text.index(tail)].rstrip().rstrip(",") + "\n}\n"
+    before = json.loads(text)
+    key = '\n "stopSigns": '
     body = json.dumps({"note": TRUTH_NOTE, "signs": facts}, ensure_ascii=False, indent=1).replace("\n", "\n ")
-    text = text.rstrip()[:-1].rstrip() + "," + tail + body + "\n}\n"
-    assert json.loads(text)["stopSigns"]["signs"] == facts
+    if key in text:
+        i = text.index(key) + len(key)
+        text = text[:i] + body + text[json.JSONDecoder().raw_decode(text, i)[1]:]
+    else:
+        text = text.rstrip()[:-1].rstrip() + "," + key + body + "\n}\n"
+    after = json.loads(text)
+    assert after["stopSigns"]["signs"] == facts
+    assert {k: v for k, v in after.items() if k != "stopSigns"} == {k: v for k, v in before.items() if k != "stopSigns"}
     with replacing(p, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
 
