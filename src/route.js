@@ -99,7 +99,7 @@ export function extendAlongTracks(tracks, pts, len = 60) {
 // piece.
 export const SURVEYED = new Set(['di', 'dtmp']);
 export const SMOOTH = 6, AS_SURVEYED = 0.1, AS_CURVED = 0;
-export function radiusAlong(ranges, offset = 0, curved = false) {
+function radiusAlong(ranges, offset = 0, curved = false) {
   if (curved) return AS_CURVED;
   if (!ranges?.length) return SMOOTH;
   return (s) => {

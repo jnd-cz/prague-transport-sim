@@ -3,6 +3,17 @@
 What sessions learned and later work needs. Kept current and short; the full logs are in
 [history/](history/) (HANDOFF.md §n, REMOTE-CHANGES.md §n). Tasks are GitHub issues, not here.
 
+Sections:
+
+- [Coordinates and heights](#coordinates-and-heights)
+- [Sources and their quirks](#sources-and-their-quirks): [OSM](#osm), [PID timetable (GTFS)](#pid-timetable-gtfs), [DI track geometry](#di-track-geometry), [Track heights: the archive, DI and the lidar](#track-heights-the-archive-di-and-the-lidar), [Terrain and the street survey (IPR, ČÚZK, ZPS)](#terrain-and-the-street-survey-ipr-čúzk-zps), [Buildings and structures (Geoportál, Mosty 3D)](#buildings-and-structures-geoportál-mosty-3d)
+- [The T3 and the network it runs on](#the-t3-and-the-network-it-runs-on)
+- [Heuristics that stand in for missing data](#heuristics-that-stand-in-for-missing-data)
+- [Checks and what they measure](#checks-and-what-they-measure)
+- [Czech tram terms](#czech-tram-terms)
+- [Environment (Windows dev machines)](#environment-windows-dev-machines)
+- [The test host](#the-test-host)
+
 ## Coordinates and heights
 
 - **The city frame** (`tools/geo.py`, every tool; [decision](decisions/2026-10-29-city-frame-and-tiles.md)):
@@ -32,6 +43,8 @@ What sessions learned and later work needs. Kept current and short; the full log
 
 ## Sources and their quirks
 
+### OSM
+
 - **OSM** (local extract only, [decision](decisions/2026-10-23-local-osm-extract.md)): route relations
   PTv2; track ways are merged into chains split only at junctions and bridge ends (no smoothing kinks).
   Tunnels from `tunnel`, `covered=yes`, negative `layer`. OSM splits tunnels and bridges into many ways:
@@ -39,6 +52,27 @@ What sessions learned and later work needs. Kept current and short; the full log
   Interlaced track is tagged `railway:interlaced=yes` (Letenská).
 - **Switch detection** (facing only): a route node with an extra track neighbour heading forward; a
   neighbour on a track passing straight through is a diamond crossing (line 22: 16 of 33 "switches").
+- **OSM maps a tram under reconstruction as `railway=disused` + `disused:railway=tram`** (Libeňský most,
+  `bridge=yes`, 2026-11 extract) while the 2026 DI keeps the track; tools that select `railway=tram` miss it.
+  The DI's own track there is new (inserted 2025-01-30, 24 m pieces, Z = 0).
+- **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
+  edges) where DI has them 0.4-0.5 m apart; a node placed nearest all its tracks lies off each of them.
+- **OSM draws interlaced track as one way** (#204): a `railway=switch` node at the tip (often with its number,
+  `ref` 111 at Čechův most), one way both routes share, and the split where the tracks part at a
+  `railway=railway_crossing` node noted "rozjezdová/sjezdová splítka" (diverging/converging interlace). Where DI
+  draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
+  the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
+  is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
+- **OSM roads drawn over the rails** (#344, the `railSupport` places left after the heights): where the street way runs
+  onto a bridge, `ground.at` gives it the ground under the bridge, at the abutment level with the deck (Most Legií, 8-18 cm
+  over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across
+  the rails (50.0755 N 14.4303 E, 28 cm; 50.0884 N 14.4325 E, 15 cm); a road crossing the track between two of its nodes
+  is linear between them (50.0707 N 14.3802 E, 7 cm). W3's ground surface (#276, #301) replaces this drawing.
+- **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
+  car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
+
+### PID timetable (GTFS)
+
 - **PID GTFS**, service date fixed at 2026-10-21. Line 22 needs `--headsign "Zahradní Město"`. Line 9 is
   built as a 9 → 10 run. Line 37 (a substitute line) has no OSM relation: built from its GTFS shapes,
   which run between the two tracks in places; the matcher prefers the right-hand track (regular
@@ -63,35 +97,11 @@ What sessions learned and later work needs. Kept current and short; the full log
   about half the time: 15 stops of line 9 had a second, opposite-direction sign beside ours. The game marks
   a platform the route passes on its doors' side as `ours` and draws no other sign there, but keeps it on
   the back path, whose trams stop at it (`src/traffic.js` `backStops`, #22).
-- **The archived track heights (the `archive` candidates, 2008 records) under a structure measure what
-  lies below it** (#176): at Modřany → Belárie the archive follows the embankment within 0.2 m of the
-  lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
-  stays on the river bed (187.3 m) across its whole span, Hlavní nádraží's tunnel climbs 6 m to the
-  street above. A track climbs a few per cent: an archive step over 10 % between points ~5 m apart is the
-  archive measuring something else (`tools/track_span_evidence.py` `dips`). It starts down before the steep
-  drop (Černý kůň: 4–5 % for 14 m, Modřany inbound ~8 % for 50 m), so a dip extends over the descent
-  and climb above 4 % around it (#184).
-- **The two directions of a line agree in the archive** (#184): over the 9806 archived axes, parallel axes
-  2.5–6 m apart differ by p50 0.02, p90 0.09, p99 0.45 m; more than 1 m on 0.4 % of 64,712 samples, mostly
-  structures. Where one direction leaves the other there, it measured something else: Hlavní nádraží
-  +6.9 m and +6.6 m (the road over the tram), Modřany inbound −6 m (the street under), Brusnice −1.1 m.
-- **Archive and DI share their heights where both exist** (#188): where the archive breaks a 500 m vertical
-  radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
-  1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
-  ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
-- **In the tunnels and structures DI added by 2026-11-06, it does not share the archive's heights** (#390):
-  numeric DI lies 0.1–0.2 m under the archive along Hlavní nádraží's Seifertova tunnel, 0.45–0.55 m under it
-  in Wilsonova's outbound track, and the raw DI the import rejects runs up to 1.5 m under it through
-  Malostranské náměstí. A series mixing the two at 1 m spacing steps 12–46 %, so the review answers
-  judge the archive's own heights.
-- **Where only the archive has a height, the 2023 terrain checks it** (#190): where a ZPS survey confirms
-  the archive, the two differ by more than 1 m on 13 of 45,577 samples (0.03 %); without a survey 848 samples
-  do (Malovanka 83 m, the Libeň bridge's dips to the streets, Troja's old alignment). Numeric DI agreeing with
-  the archive 7 m under the terrain is a structure the terrain cannot see, not an error
-  ([height fallback](decisions/2026-10-30-track-height-fallback.md)).
-- **OSM maps a tram under reconstruction as `railway=disused` + `disused:railway=tram`** (Libeňský most,
-  `bridge=yes`, 2026-11 extract) while the 2026 DI keeps the track; tools that select `railway=tram` miss it.
-  The DI's own track there is new (inserted 2025-01-30, 24 m pieces, Z = 0).
+- **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
+  to p50 0.04 m (#20); they cannot judge OSM against DI.
+
+### DI track geometry
+
 - **DI track records** (#20): pieces from 0.1 m to a few hundred metres, ending where the next begins
   (19,227 of 20,742 ends exactly, 1,168 more within 0.5 m). Some pieces are there twice under two IDs and
   some have zero length (45 dropped city-wide); counting record ends alone, a straight track looks like a
@@ -104,11 +114,6 @@ What sessions learned and later work needs. Kept current and short; the full log
   apart, the ends of a junction's short pieces up to 0.5 m apart (on a 4 % grade, 2–4 cm in height), and near
   Ke Stírce a piece lies along another for 30 m under its own records (not caught as a copy: it does not join the
   same two places).
-- **The robust smoother runs away where its radius is wrong** (#197): `vertical_profile` stops pulling towards
-  points it misses by more than 0.23 m (Tukey). Where the design radius cannot follow a real sag (Malostranská,
-  ~300 m, the archive and the terrain agreeing to 2 cm), it drops the whole stretch and runs 1–3 m under the data,
-  not 0.3 m. Points at weight 0 do not fix a curve either: across a 40 m hold it sagged 5 cm under the straight
-  grade (`tools/line_heights.py` starts held points on that line at weight 0.001).
 - **DI draws a switch three ways** (#204): records ending together and leaving apart (a fork of record ends);
   a branch ending on the middle of a through record that is not split there (Palackého náměstí, the branch
   19.8 m along it); interlaced track (below), where the switch is the branch's start, not where it leaves. At forks the branches' first points lie up to 0.18 m apart: the fork is their mean. OSM's
@@ -124,8 +129,6 @@ What sessions learned and later work needs. Kept current and short; the full log
   Dvorecký most the tip has the ZPS survey's switch machine cover (a small rectangle among its traffic-area lines)
   and OSM's switch (the user: "the OSM marker is on point there, it's right at the yellow rectangle which here fits
   the přestavník"). Elsewhere OSM marks 29 of the 48 nearer the tip, 19 nearer the joint.
-- **OSM joins a crossing and a switch in one node** (Strossmayerovo náměstí, Palackého náměstí: nodes of 5-6
-  edges) where DI has them 0.4-0.5 m apart; a node placed nearest all its tracks lies off each of them.
 - **The archive draws Dvorce's old connection** (#204): DI (2026-09-30) and the archive (2008-2024) have
   no track onto the new Dvorecký most (opened 04/2026: "No data is related to new Dvorecký most put in
   service in 04/2026", the user, track sources review, 2026-11-03); where OSM's new edges come within 2 m of
@@ -175,12 +178,6 @@ What sessions learned and later work needs. Kept current and short; the full log
   both tracks are split into short records, their joints 12 cm apart fall into one cluster of ends. OSM puts
   the switch at the tip (5-7 m from it at Čechův most), the user: "the fork starts and ends well in front
   of/behind the road junction".
-- **OSM draws interlaced track as one way** (#204): a `railway=switch` node at the tip (often with its number,
-  `ref` 111 at Čechův most), one way both routes share, and the split where the tracks part at a
-  `railway=railway_crossing` node noted "rozjezdová/sjezdová splítka" (diverging/converging interlace). Where DI
-  draws the tongue, its tip lies 0.4-3.3 m from OSM's switch (Dejvice, Chotkova, Čechovo náměstí); where DI starts
-  the branch 13 cm off at a record joint, OSM's switch lies a tongue (8.0-8.8 m) before it. Malostranské náměstí
-  is a gauntlet with no switch: crossing nodes at both ends, the two directions interlaced for 45 m.
 - **Interlaced tracks' record ends lie within JOIN of each other** (#368): 10-15 cm apart, where DI splits both tracks
   at the same places (Nádraží Libeň: every 6-27 m over 39 m) or starts or ends the branch beside a record joint of the
   through track (Ke Stírce 11.7 cm, Čechův most 12 cm with the through track's joint 0.6 m apart). Grouped as one place,
@@ -197,6 +194,40 @@ What sessions learned and later work needs. Kept current and short; the full log
 - **A track end walked back to its node keeps DI's record end** 1.8-2.3 m from the node (`Drawn`, `walk`): it is no
   node and an answer that frees the points around it frees it too (Čechovo náměstí: held, it hooked line 22's track
   3.5 cm in the last 0.76 m before the fork, 3.4 degrees).
+
+### Track heights: the archive, DI and the lidar
+
+- **The archived track heights (the `archive` candidates, 2008 records) under a structure measure what
+  lies below it** (#176): at Modřany → Belárie the archive follows the embankment within 0.2 m of the
+  lidar ground, then drops 6.4 m in 5 m to the street under the bridge (201.2 → 194.7 m) and climbs back 40 m on; Hodkovičky and Černý kůň are alike, Palackého most
+  stays on the river bed (187.3 m) across its whole span, Hlavní nádraží's tunnel climbs 6 m to the
+  street above. A track climbs a few per cent: an archive step over 10 % between points ~5 m apart is the
+  archive measuring something else (`tools/track_span_evidence.py` `dips`). It starts down before the steep
+  drop (Černý kůň: 4–5 % for 14 m, Modřany inbound ~8 % for 50 m), so a dip extends over the descent
+  and climb above 4 % around it (#184).
+- **The two directions of a line agree in the archive** (#184): over the 9806 archived axes, parallel axes
+  2.5–6 m apart differ by p50 0.02, p90 0.09, p99 0.45 m; more than 1 m on 0.4 % of 64,712 samples, mostly
+  structures. Where one direction leaves the other there, it measured something else: Hlavní nádraží
+  +6.9 m and +6.6 m (the road over the tram), Modřany inbound −6 m (the street under), Brusnice −1.1 m.
+- **Archive and DI share their heights where both exist** (#188): where the archive breaks a 500 m vertical
+  radius, it equals numeric DI to a median of 3 mm, so DI cannot judge the archive's wiggles. Over 5 m bins,
+  1–2 cm of noise already breaks 500 m: the 2023 lidar does so on 19.6 % of paved bins, the archive on 18.3 %
+  ([vertical profile](decisions/2026-11-02-vertical-profile.md)).
+- **In the tunnels and structures DI added by 2026-11-06, it does not share the archive's heights** (#390):
+  numeric DI lies 0.1–0.2 m under the archive along Hlavní nádraží's Seifertova tunnel, 0.45–0.55 m under it
+  in Wilsonova's outbound track, and the raw DI the import rejects runs up to 1.5 m under it through
+  Malostranské náměstí. A series mixing the two at 1 m spacing steps 12–46 %, so the review answers
+  judge the archive's own heights.
+- **Where only the archive has a height, the 2023 terrain checks it** (#190): where a ZPS survey confirms
+  the archive, the two differ by more than 1 m on 13 of 45,577 samples (0.03 %); without a survey 848 samples
+  do (Malovanka 83 m, the Libeň bridge's dips to the streets, Troja's old alignment). Numeric DI agreeing with
+  the archive 7 m under the terrain is a structure the terrain cannot see, not an error
+  ([height fallback](decisions/2026-10-30-track-height-fallback.md)).
+- **The robust smoother runs away where its radius is wrong** (#197): `vertical_profile` stops pulling towards
+  points it misses by more than 0.23 m (Tukey). Where the design radius cannot follow a real sag (Malostranská,
+  ~300 m, the archive and the terrain agreeing to 2 cm), it drops the whole stretch and runs 1–3 m under the data,
+  not 0.3 m. Points at weight 0 do not fix a curve either: across a 40 m hold it sagged 5 cm under the straight
+  grade (`tools/line_heights.py` starts held points on that line at weight 0.001).
 - **DI can hump on one track alone** (#344): line 9 at Sídliště Řepy, DI's outbound track rose 0.97 m over the lidar for
   90 m while the return track 3 m beside it, the archive and the lidar under both agreed within 0.2 m. Where DI is the
   source, the archive sided with the lidar at every such stretch of the network; on a bridge it does not (the bare-earth
@@ -206,11 +237,6 @@ What sessions learned and later work needs. Kept current and short; the full log
   141, the survey 11 of 14). On ordinary track the rail lies a median +1 cm over the lidar (p10 -7, p90 +18 cm). The
   lidar alone is no height for a funicular: Petřín's, held its whole length, took the hill's bare earth in steps of
   2-6 m. `held_settled`: held stretches over 60 m 81 -> 50 network-wide, 5 -> 0 on the lines' routes.
-- **OSM roads drawn over the rails** (#344, the `railSupport` places left after the heights): where the street way runs
-  onto a bridge, `ground.at` gives it the ground under the bridge, at the abutment level with the deck (Most Legií, 8-18 cm
-  over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across
-  the rails (50.0755 N 14.4303 E, 28 cm; 50.0884 N 14.4325 E, 15 cm); a road crossing the track between two of its nodes
-  is linear between them (50.0707 N 14.3802 E, 7 cm). W3's ground surface (#276, #301) replaces this drawing.
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
@@ -219,8 +245,6 @@ What sessions learned and later work needs. Kept current and short; the full log
   (`data/truth.json` radiusAnswers with `area`).
 - **The heights read IPR's 1 m raster, the game draws a 2 m grid of it** (`tools/fine_terrain.py` STEP; the 1 m mesh
   is #276): at Královka and Malovanka the 2 m grid lies within mean 0.6-0.9 cm, max 6.4 cm of the raster at the tracks.
-- **PID GTFS shapes are OSM's**: line 17's shapes run on the double track's midline and match OSM's midline
-  to p50 0.04 m (#20); they cannot judge OSM against DI.
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
   tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
   level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).
@@ -228,6 +252,16 @@ What sessions learned and later work needs. Kept current and short; the full log
   survey 198.6, archive 200.8, lidar 201.0 m; flagged `track_zps_level_unverified`), which is why the
   drawn rail there is low and wavy. The level-1 tram area over the Modřany underpass carries the
   ground's heights (194.9–195.8 m): the survey has the deck's outline but not its height.
+- **Track height checks depend on construction** (#106): paved embedded/panel/setts surfaces can
+  describe rail level, including a dedicated raised paved strip. Open-track outlines can describe
+  ditches or embankment edges; they neither supply rail Z nor veto the archive. A generic ZPS tram
+  area does not identify its material, and the panel drawing default is not evidence of pavement.
+  Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
+  Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
+  are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
+
+### Terrain and the street survey (IPR, ČÚZK, ZPS)
+
 - **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
   `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
@@ -273,24 +307,6 @@ What sessions learned and later work needs. Kept current and short; the full log
   the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
   is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street
   model, #21).
-- **Track height checks depend on construction** (#106): paved embedded/panel/setts surfaces can
-  describe rail level, including a dedicated raised paved strip. Open-track outlines can describe
-  ditches or embankment edges; they neither supply rail Z nor veto the archive. A generic ZPS tram
-  area does not identify its material, and the panel drawing default is not evidence of pavement.
-  Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
-  Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
-  are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
-- **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
-  breaks if IPR goes Draco-only), retaining walls with `vyska` (which side is retained is not in the
-  data), tree register (multipoint) and tree rows.
-- **Mosty 3D**: photogrammetry 2001–2008, ±0.5 m, blocks from the highest surface seen from the air
-  (parapets) down; can predate rebuilds. **The survey deck wins wherever it exists**; the model gives
-  sides, piers and spans elsewhere, and is trimmed over surveyed decks. The whole layer is small (49 meshes,
-  672 bridges, 7.7 MB): the height import reads it city-wide (`tools/mosty3d.py`). Its top at a tram bridge's
-  end is within 1.05 m of the rail (p50 0.13 m); a bridge over a tram is 3.3 m or more above it (#192). Its
-footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
-  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
-  river bridge and its viaduct (14.4624–14.4660 E).
 - **Regional DTM ZPS packages: what our tools rely on** (`tools/dtm.py`, `tools/gpkg.py`,
   `tools/registration.py`; audit of the 16 pinned packages of 2026-09-30, #63). What to compare after a
   format change (JVF 1.5.0.2 from 18 Nov 2026; refresh steps in DATA.md):
@@ -316,8 +332,23 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   - Versions: the GPKG `user_version` 10301 is GeoPackage 1.3.1, not the JVF version. The GPKG ZIPs
     carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
     `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
-- **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
-  car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
+
+### Buildings and structures (Geoportál, Mosty 3D)
+
+- **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
+  breaks if IPR goes Draco-only), retaining walls with `vyska` (which side is retained is not in the
+  data), tree register (multipoint) and tree rows.
+- **Mosty 3D**: photogrammetry 2001–2008, ±0.5 m, blocks from the highest surface seen from the air
+  (parapets) down; can predate rebuilds. **The survey deck wins wherever it exists**; the model gives
+  sides, piers and spans elsewhere, and is trimmed over surveyed decks. The whole layer is small (49 meshes,
+  672 bridges, 7.7 MB): the height import reads it city-wide (`tools/mosty3d.py`). Its top at a tram bridge's
+  end is within 1.05 m of the rail (p50 0.13 m); a bridge over a tram is 3.3 m or more above it (#192). Its
+footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
+  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
+  river bridge and its viaduct (14.4624–14.4660 E).
+
+## The T3 and the network it runs on
+
 - Tatra T3 figures (ČKD pamphlet, unverified): 16 t empty, 4 × 40 kW, ~39 kN, 1.8 m/s² service accel and
   brake, 5 m/s² emergency, 24 seated + 86 standing.
 - **The T3's electric system** (#351): `src/tr37.js`, `src/electric.js`, read from ČKD's manuals in
