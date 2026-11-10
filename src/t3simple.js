@@ -32,12 +32,14 @@ const SIDE = { f: 4.51, r: -4.84 }, SPLIT = { f: 6.05, r: -6.10 };
 const CORNER = { f: [1.0, 6.79], r: [1.0, -6.79] };
 const FACE = 0.21, FILLET = 0.32;
 // the nose (on the centreline) by height (the side view): the lower end, the windscreen leaning back from
-// 1.65 m, the roof cap's visor over it at 2.56 m, the cap curving down into the roof
+// 1.65 m, the roof cap's visor over it at 2.56 m; the brow over it upright to 2.91 m, then rounding into the
+// roof with 0.11 m, the rear's likewise (the user, 2026-11-10, beside the photo of 7290: "make the front brow less
+// slanted, perhaps even perpendicular? The back should be similar"; the side view had it leaning back 0.17 m)
 const NOSE = {
   f: [[0.35, 6.70], [0.47, 6.79], [0.70, 6.85], [0.80, 6.90], [1.04, 6.95], [1.54, 6.96], [1.65, 7.00], [2.53, 6.56], [2.56, 6.68],
-    [2.72, 6.63], [2.83, 6.58], [2.91, 6.56], [2.94, 6.51], [2.98, 6.43], [3.02, 6.15]],
+    [2.91, 6.68], [2.965, 6.665], [3.005, 6.625], [3.02, 6.57]],
   r: [[0.35, 6.71], [0.47, 6.81], [0.70, 6.86], [0.80, 6.91], [1.04, 6.94], [1.50, 6.98], [1.69, 7.00], [2.53, 6.77], [2.56, 6.82],
-    [2.72, 6.79], [2.83, 6.75], [2.94, 6.70], [2.98, 6.65], [3.02, 6.37]],
+    [2.91, 6.82], [2.965, 6.805], [3.005, 6.765], [3.02, 6.71]],
 };
 const BODY_FRONT = 7.0;
 // the heights of the outlines; a height given twice is a crease (the normals do not blend across it)
@@ -678,13 +680,14 @@ function shapes(wire, variant) {
     const body = bodyGeometry(), lamps = lampsGeometry();
     const probe = new THREE.Mesh(body);
     probe.updateMatrixWorld(true);
-    // Prague's plates and cards (src/models.js): the route number in the box on the front cap (0.49 x 0.30 m,
-    // its top 7 cm under the roof's: 6892 and 7290) and on the mirror arm (smaller, taller than wide), the
+    // Prague's plates and cards (src/models.js): the route number in the box on the front's brow (0.49 x 0.30 m,
+    // 6892 and 7290; its foot 3 cm over the brow's lower edge, the user, 2026-11-10: "adjust the line plate to sit
+    // lower, near the edge") and on the mirror arm (smaller, taller than wide), the
     // destination and the run number resting on the windscreen's lower edge (the user, 2026-11-09: "closer to
     // the bottom glass border"), the run number on the pane right of the post (left as seen from the front), the
     // route inverted in the rear window
     const plates = {
-      rb: onBody(probe, 0, 2.80, 1, ROUTE_BOX.w, ROUTE_BOX.h), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),
+      rb: onBody(probe, 0, 2.59 + ROUTE_BOX.h / 2, 1, ROUTE_BOX.w, ROUTE_BOX.h), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),
       dest: onBody(probe, -0.02, 1.77, 1, 0.46, 0.19), run: onBody(probe, -0.8, 1.725, 1, 0.12, 0.09), rear: onBody(probe, 0, 1.90, -1, 0.34, 0.3),
       led: onFlank(-1, SIDE_DISPLAY.z, SIDE_DISPLAY.h, SIDE_DISPLAY.w, SIDE_DISPLAY.hh),
     };

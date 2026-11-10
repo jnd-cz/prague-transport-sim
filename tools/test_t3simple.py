@@ -128,8 +128,12 @@ MEASURE = r"""async () => {
   a.updateMatrixWorld(true);
   const hit = (o, d) => new THREE.Raycaster(new THREE.Vector3(...o), new THREE.Vector3(...d)).intersectObject(body, false)[0]?.point;
   out.halfWidth = Object.fromEntries([0, 3.0, 5.5, -5.8].map((z) => [z, -hit([-5, 1.2, z], [1, 0, 0]).x]));
-  out.noseF = Object.fromEntries([1.0, 1.65, 2.3, 2.53, 2.65].map((h) => [h, hit([0, h, 20], [0, 0, -1]).z]));
-  out.noseR = Object.fromEntries([1.0, 1.69, 2.53].map((h) => [h, hit([0, h, -20], [0, 0, 1]).z]));
+  out.noseF = Object.fromEntries([1.0, 1.65, 2.3, 2.53, 2.65, 2.85].map((h) => [h, hit([0, h, 20], [0, 0, -1]).z]));
+  out.noseR = Object.fromEntries([1.0, 1.69, 2.53, 2.65, 2.85].map((h) => [h, hit([0, h, -20], [0, 0, 1]).z]));
+  // the route box's foot and top
+  const rbP = a.children.find((o) => o.material === m.userData.mats.rbMat).geometry.attributes.position, rbY = [];
+  for (let i = 0; i < rbP.count; i++) rbY.push(rbP.getY(i));
+  out.routeBox = [Math.min(...rbY), Math.max(...rbY)];
   // the ends open under the bumper to ±0.65 m: the livery's alpha where rays from ahead and behind meet the body
   const liv = body.material.map.image, lc = liv.getContext('2d');
   const alphaAt = (x, y, end) => {
@@ -264,6 +268,10 @@ def judge(r):
         "the side: the windscreen's top 0.44 m back": near(r["noseF"]["2.53"], 6.56, 0.03),
         "the side: the visor over it": r["noseF"]["2.65"] > r["noseF"]["2.53"] + 0.05,
         "the side: the rear window's foot at -7.0 m": near(r["noseR"]["1.69"], -7.0, 0.02),
+        # the user, 2026-11-10: "make the front brow less slanted, perhaps even perpendicular? The back should be similar"
+        "the brows upright over the visors": abs(r["noseF"]["2.85"] - r["noseF"]["2.65"]) < 0.005 and abs(r["noseR"]["2.85"] - r["noseR"]["2.65"]) < 0.005,
+        # "adjust the line plate to sit lower, near the edge": its foot 3 cm over the brow's lower edge (2.56 m)
+        "the route box 3 cm over the brow's edge": near(r["routeBox"][0], 2.59, 0.005) and near(r["routeBox"][1], 2.89, 0.005),
         "two cars CAR_PITCH apart": near(r["pitch"], r["CAR_PITCH"], 0.005),
         "the coupled heads meet": r["couplerGap"] < 0.01,
         "plates: 4 on the first car, the rear plate on the last": r["plates"] == [4, 1],
