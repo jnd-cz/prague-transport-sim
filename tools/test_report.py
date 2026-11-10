@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import serve  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 class Quiet(serve.NoCache):
@@ -33,7 +34,7 @@ def main():
     fails = []
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             page.goto(f"http://127.0.0.1:{server.server_port}/?line={args.line}", timeout=180000)
             page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)

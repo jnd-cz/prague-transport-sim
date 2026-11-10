@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from headless import serve,stop_server,judge
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT=Path(__file__).resolve().parent.parent
 
@@ -17,7 +18,7 @@ class CrossingCheck(unittest.TestCase):
         server,url=serve(0)
         try:
             with sync_playwright() as pw:
-                browser=pw.chromium.launch(headless=True)
+                browser=gpu.launch(pw)[0]
                 page=browser.new_page()
                 html=(ROOT/'index.html').read_text(encoding='utf-8')
                 importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
@@ -50,7 +51,7 @@ class CrossingCheck(unittest.TestCase):
         server,url=serve(0)
         try:
             with sync_playwright() as pw:
-                browser=pw.chromium.launch(headless=True)
+                browser=gpu.launch(pw)[0]
                 page=browser.new_page()
                 html=(ROOT/'index.html').read_text(encoding='utf-8')
                 importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]
@@ -76,7 +77,7 @@ class CrossingCheck(unittest.TestCase):
         server,url=serve(0)
         try:
             with sync_playwright() as pw:
-                browser=pw.chromium.launch(headless=True)
+                browser=gpu.launch(pw)[0]
                 page=browser.new_page()
                 html=(ROOT/'index.html').read_text(encoding='utf-8')
                 importmap=re.search(r'<script type="importmap">.*?</script>',html,re.S)[0]

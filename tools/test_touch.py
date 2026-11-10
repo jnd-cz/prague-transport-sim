@@ -12,6 +12,9 @@ import threading
 
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -41,7 +44,7 @@ def main():
     port, r, fails = server.server_port, {}, []
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             ctx, page, errors = shift(browser, port, args.line, (390, 844), True)
             r["buttons"] = page.is_visible("#touch button[data-k='w']")
             tap = lambda k: page.tap(f"#touch button[data-k='{k}']")  # noqa: E731

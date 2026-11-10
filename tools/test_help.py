@@ -13,8 +13,10 @@ import unittest
 
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 LINE, SHOTS = "37", None
 SIZES = {"phone": ((390, 844), True), "desktop": ((1280, 800), False)}
 WORDS = {"cs": ("Vaše směna", "Zavřít"), "en": ("Your shift", "Close")}
@@ -33,7 +35,7 @@ class Help(unittest.TestCase):
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
         cls.url = f"http://127.0.0.1:{cls.server.server_port}"
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True, args=ARGS)
+        cls.browser = gpu.launch(cls.pw)[0]
 
     @classmethod
     def tearDownClass(cls):
