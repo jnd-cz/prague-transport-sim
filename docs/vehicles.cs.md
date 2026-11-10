@@ -13,9 +13,9 @@ Volba *Model tramvaje* v menu vybírá jeden ze tří; model, který se nenačte
 
 | model | kde | z čeho | licence | co se hýbe |
 |---|---|---|---|---|
-| podrobný, pohyblivý (výchozí) | `src/t3h.js`, `assets/t3h/` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla; lehčí úroveň pro vzdálené cizí tramvaje |
+| podrobný, pohyblivý (výchozí) | `src/t3h.js`, `assets/t3h/` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla, směrovky, dálková světla; lehčí úroveň pro vzdálené cizí tramvaje |
 | podrobný, klasický | `src/models.js` (`loadDetailedT3`), `assets/t3/` | glTF s jednou texturou; stáhne se při výběru | CC BY-NC 4.0 | nic |
-| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | GPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu v #436 |
+| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | GPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu (brzdová, směrovky, dálková) |
 
 `makeT3({ line, cars, detailed, dest, run, variant })` v `src/models.js` postaví soupravu ve zvoleném
 modelu. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
@@ -42,9 +42,14 @@ modelu. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
   sítěmi.
 - **Nápisy:** `setConsistLine(model, line, dest, run)` překreslí tabule s číslem linky, směrovou ceduli
   a pořadí (textury z plátna, `src/models.js`), `setNextStop` boční panel T3M.
-- **Stav:** `poseT3(model, { doors, collector, braking, track })` (`src/models.js`): dveře 0–1, výška
-  trolejového drátu nad kolejnicí pro sběrač (pod jeho pracovním rozsahem se stáhne), brzdová světla, magnety
-  kolejnicových brzd. Podrobný model bere všechno (`poseHybrid`), vestavěný sběrač (`poseSimple`).
+- **Stav:** `poseT3(model, { doors, collector, braking, track, indicate, clock, highBeam })` (`src/models.js`):
+  dveře 0–1, výška trolejového drátu nad kolejnicí pro sběrač (pod jeho pracovním rozsahem se stáhne), brzdová
+  světla, magnety kolejnicových brzd, směrovky (`'left'`, `'right'`, `'hazard'` nebo nic, blikají podle `clock`:
+  `src/lamps.js`), dálková světla. Podrobný model bere všechno (`poseHybrid`), vestavěný vše kromě dveří a čelistí
+  (`poseSimple`). Světlomety a koncová světla svítí, kdykoli je tramvaj v provozu, čelo soupravy na prvním voze
+  a záď na posledním; brzdová světla na zádi soupravy. Náš řidič ovládá směrovky a dálková světla klávesami;
+  autopilot a cizí tramvaje dávají směrovky samy (`src/indicators.js`) a cizí T3M ukazuje další zastávku
+  (`setNextStop`).
 - **Cizí tramvaje** (`src/traffic.js`) se objevují a mizí přes `setOpacity`, po materiálech: vlastní
   průhlednost materiálu pod 1 zůstává v `userData.opacity`, materiál od začátku prolínaný zůstává prolínaný.
   Daleko od kamery přepne podrobný model na lehčí úroveň (`setHybridLevel`, 50–60 m). Souprava, která odjede,
@@ -58,7 +63,7 @@ Co model umí nabídnout a co mu hra řídí. Model uvede svou úroveň; víc po
    vůz sedí na svých čepech. Dnes klasický model.
 2. **Jedoucí:** podvozky se natáčejí do koleje, kola se točí, spřáhla mezi vozy se vychylují, sběrač drží
    výšku trolejového drátu a umí se stáhnout, brzdová světla, směrovky a světlomety podle stavu. Podrobný
-   model umí většinu, vestavěný pojezd a sběrač (#454); světla podle stavu jsou #436.
+   i vestavěný model to umějí (#454, #436).
 3. **Živý:** dveře se ve stanici otevírají a zavírají, čelisti kolejnicových brzd dosedají, v dešti jedou
    stěrače, otevírají se větrací klapky a poklopy, sklápí se rameno zrcátka, skříň pruží (náklon v obloucích,
    předklon při brzdění), světla v salonu a v kabině, řidič, jiskry na sběrači při námraze.

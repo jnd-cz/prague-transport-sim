@@ -4,9 +4,10 @@
 // instead of popping.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
-import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights, disposeModel } from './models.js';
+import { makeCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel } from './models.js';
 import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
-import { poseHybrid, setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
+import { setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
+import { junctionTurns, indicating } from './indicators.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 import { aiLineCurrent } from './electric.js';
 
@@ -312,6 +313,18 @@ export class Traffic {
     for (const [a, b] of backPl) if (runs.length && a < runs[runs.length - 1][1] + 10) runs[runs.length - 1][1] = Math.max(runs[runs.length - 1][1], b); else runs.push([a, b]);
     const ends = runs.map(([, b]) => b - 1);
     this.backStops = this.back ? ends : [];
+    // what AI trams show (#436, drawing only): the junction turns along our route, where they indicate; the stops
+    // where passengers cross a car lane (ours: Vienna-type, theirs: a platform with a kerb), where they indicate
+    // right; the stops' names in order, for a T3M's side display
+    this.lampWays = {
+      ahead: { turns: junctionTurns(route, game.data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target),
+        stops: game.stops.map((st) => ({ s: st.target, name: st.name })) },
+      back: { turns: [], kerb: [], stops: [] },
+    };
+    if (this.back) {
+      const pl = (game.platforms || []).filter((q) => q.back && q.rt === this.back && q.side < 0 && !q.unused).sort((a, b) => a.s1 - b.s1);
+      Object.assign(this.lampWays.back, { kerb: pl.filter((q) => q.kerb != null).map((q) => q.s1 - 1), stops: pl.map((q) => ({ s: q.s1 - 1, name: q.name })) });
+    }
     const backNames = new Set((game.platforms || []).filter((p) => p.back && p.rt === this.back && p.side < 0 && !p.unused).map((p) => p.name));
     this.noOppositeStop = this.back ? game.stops.filter((st) => !backNames.has(st.name)).map((st) => ({ stop: st.name, s: st.target })) : [];
     // a junction's stop line for oncoming trams (backCross − 6, in update) inside a platform: the point lay up to 1.7 m past
@@ -1563,15 +1576,23 @@ export class Traffic {
   _placeTram(t, route, s, profileZ, dt = 0) {
     placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p), route.rollAt(q)]; });
     const u = t.mesh.userData;
+    // the lamps (#436): the brake lamps while it slows or stands, the indicators at junction turns and stops where
+    // passengers cross a car lane (blinking out of step with the others'); a T3M's side display its next stop
+    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
+    t.vWas = t.v;
+    const way = this.lampWays[route === this.route ? 'ahead' : 'back'];
+    const lamps = { braking, indicate: indicating(way.turns, way.kerb, s, t.v, braking), clock: this.game.clock + 0.17 * (t.id % 4) };
+    if (u.kind === 'simple') {
+      poseT3(t.mesh, lamps);
+      if (u.variant === 'T3M') setNextStop(t.mesh, way.stops.find((st) => st.s > s - 2)?.name ?? null);
+    }
     if (!u.hybrid) return;
     // the detailed model: its full level near the camera; the doors open while it dwells at a stop (shut
-    // 2 s before it leaves, 2 s to move); the brake lamps while it slows or stands
+    // 2 s before it leaves, 2 s to move); its lamps as above (posed on the full level only)
     const c = u.cars[0].position, d = this.cam ? Math.hypot(c.x - this.cam[0], -c.z - this.cam[1]) : 0;
     setHybridLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
     t.doorU = Math.max(0, Math.min(1, (t.doorU ?? 0) + ((t.dwell ?? 0) > 2 ? dt : -dt) / 2));
-    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
-    t.vWas = t.v;
-    if (u.level === 'full') poseHybrid(t.mesh, { doors: t.doorU, braking });
+    if (u.level === 'full') poseT3(t.mesh, { doors: t.doorU, ...lamps });
   }
 
   // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it

@@ -548,10 +548,23 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   plate"), and green dot-matrix displays: the route on the front in the rounded box, and inside the right side's second
   window the route with the destination and the next stop. AI sets take each type as often as its range is long ("their
   proportion in service (probability to appear as AI tram) roughly related to their range sizes"): 60, 30 and 10 %.
+- **A T3's lamps in service** (the user, 2026-11-10, #436): "Trams run regular beams by default, off only when the car is
+  turned off. High beams can be flashed as warnings or used at night on dark stretches of line." So the dipped
+  headlights and the tail lamps are on by day too. The rear: the corner units' lower red lamps are the brake lamps, the
+  rear panel's two red lamps the tail lamps, the white one between them the reversing lamp. The indicators: "Turning at
+  junction and stopping at street level stop across car lane", at such a stop the right ones from braking into it until
+  it pulls away. The game lights a set's front on its leading car and its rear on the last (the coupled ends dark) and
+  blinks the indicators on every car, 1.5 times a second (`src/lamps.js`). The hybrid's glows (indicators, brake lamps)
+  are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew.
 
 ## Heuristics that stand in for missing data
 
 Review these when realism matters; most move into the build in M2.
+- **Junction turns** (`src/indicators.js`, #436), where the autopilot and AI trams indicate: a switch on the route after
+  which the route's heading turns more than 30° within 40 m (a crossover's S-bend comes back); on from 50 m before the
+  switch until the heading has turned 80 % of the way. On the five lines: 12 on line 9 (Anděl, Újezd, Lazarská, Flora,
+  Karlovo náměstí …), 3 on 17 (Výstaviště, Ke Stírce, Vozovna Kobylisy), 6 on 22, 8 on 23, 3 on 37; two switches of
+  one junction a few metres apart make overlapping turns. `game.lamps.turns` lists them.
 - **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
   turning 170°+ street to street, its switches within 150 m, mean radius 18 m+. It finds 47 loops on DI's network,
   all real by the user's review (2026-11-09); it names each by its nearest GTFS stop, so Špejchar's loop shows as

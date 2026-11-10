@@ -13,9 +13,9 @@ The menu's *Tram model* picks one of three; a model that does not load falls bac
 
 | model | where | made of | licence | moves |
 |---|---|---|---|---|
-| detailed, animated (the default) | `src/t3h.js`, `assets/t3h/` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps; a lighter level for AI trams far away |
+| detailed, animated (the default) | `src/t3h.js`, `assets/t3h/` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps, indicators, high beams; a lighter level for AI trams far away |
 | detailed, classic | `src/models.js` (`loadDetailedT3`), `assets/t3/` | a glTF, one texture; loaded when picked | CC BY-NC 4.0 | none |
-| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | GPL-3.0 | bogies, wheels, couplers, collector; the lamps by state in #436 |
+| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | GPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
 
 `makeT3({ line, cars, detailed, dest, run, variant })` in `src/models.js` builds a set with the chosen
 model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
@@ -42,9 +42,14 @@ model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
   moves its rig's nodes, the built-in car's its instanced meshes.
 - **Its texts:** `setConsistLine(model, line, dest, run)` redraws the route plates, the destination and run
   cards (canvas textures, `src/models.js`), `setNextStop` a T3M's side display.
-- **Its state:** `poseT3(model, { doors, collector, braking, track })` (`src/models.js`): the doors 0–1, the
-  collector's contact height over the rail (below its working range it lowers), the brake lamps, the track
-  brakes' magnets. The hybrid takes all of it (`poseHybrid`), the built-in car the collector (`poseSimple`).
+- **Its state:** `poseT3(model, { doors, collector, braking, track, indicate, clock, highBeam })` (`src/models.js`):
+  the doors 0–1, the collector's contact height over the rail (below its working range it lowers), the brake lamps,
+  the track brakes' magnets, the indicators (`'left'`, `'right'`, `'hazard'` or none, blinking by `clock`:
+  `src/lamps.js`), the high beams. The hybrid takes all of it (`poseHybrid`), the built-in car all but the doors and
+  the shoes (`poseSimple`). The headlights and tail lamps are lit whenever a tram is in service, a set's front on its
+  leading car and its rear on the last; the brake lamps at the set's rear. Our driver works the indicators and high
+  beams with keys; the autopilot and AI trams indicate by themselves (`src/indicators.js`), and an AI T3M shows its
+  next stop (`setNextStop`).
 - **AI trams** (`src/traffic.js`) fade in and out with `setOpacity`, per material: a material's own
   opacity under 1 stays in `userData.opacity`, a material blended from the start stays blended. Far from
   the camera the hybrid switches to its lighter level (`setHybridLevel`, 50–60 m). A set that leaves is freed
@@ -58,7 +63,7 @@ What a model can offer and the game drives. A model states its tier; the game as
    fleet numbers); the car rests on its pivots. The classic model today.
 2. **Running:** the bogies swivel to the track, the wheels roll, the couplers swing between cars, the
    collector rides the wire's height and lowers, brake lamps, indicators and headlights by state. The hybrid
-   has most of it, the built-in car its gear and collector (#454); the lamps by state are #436.
+   and the built-in car have it (#454, #436).
 3. **Living:** the doors open and close at stops, the track-brake shoes drop, the wipers run in the rain,
    roof vents and hatches open, the mirror arm folds, the body moves on its springs (leaning in curves,
    pitching as it brakes), the saloon and cab lights, the driver, sparks at the collector on a frosty wire.

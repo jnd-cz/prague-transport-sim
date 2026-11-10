@@ -36,7 +36,7 @@ MEASURE = r"""async () => {
   const m = models.makeT3({ line: '17', cars: 2, detailed: false, dest: 'Vozovna Kobylisy', run: '801', variant: 'T3SUCS' });
   new THREE.Scene().add(m);
   const [a, b] = m.userData.cars, out = { kind: m.userData.kind, bogie: m.userData.bogie };
-  const meshes = (car) => car.children.filter((o) => o.isMesh);
+  const meshes = (car) => car.children.filter((o) => o.isMesh && o.visible); // (drawn: the high beams' glow only while on)
   const named = (car, name) => car.children.find((o) => o.name === name);
   out.drawn = [meshes(a).length, meshes(b).length];
   out.tris = [a, b].map((c) => meshes(c).reduce((s, o) => s + (o.count ?? 1) * (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3, 0));
@@ -201,6 +201,33 @@ MEASURE = r"""async () => {
   out.collector.down = [a, b].map(topOf);
   models.poseT3(m, { collector: out.wire });
   out.collector.back = [a, b].map(topOf);
+  // #436, the lamps by state (a function lit when its colours are the lit ones, not dimmed): in service, braking with
+  // the left indicators in the blink's lit half (clock 0.1 s) and its dark half (0.5 s), the hazard lights, the high beams
+  const litOf = (car, fn) => {
+    const lp = car.userData.lamps, C = lp.geo.attributes.color.array;
+    let x = 0, y = 0;
+    for (const r of lp.byFn[fn]) for (let i = r.start * 3; i < (r.start + r.count) * 3; i++) { x += C[i]; y += lp.lit[i]; }
+    return x / y > 0.9;
+  };
+  const fns = ['head', 'pos', 'tail', 'brake', 'rev', 'indL', 'indR'];
+  const lampsOf = () => [a, b].map((car) => fns.filter((f) => litOf(car, f)).join(' '));
+  const beams = () => [a, b].map((car) => !!car.children.find((o) => o.name === 'beams')?.visible);
+  out.lampState = { rest: lampsOf() };
+  models.poseT3(m, { braking: true, indicate: 'left', clock: 0.1 }); out.lampState.left = lampsOf();
+  models.poseT3(m, { indicate: 'left', clock: 0.5 }); out.lampState.leftDark = lampsOf();
+  models.poseT3(m, { braking: false, indicate: 'hazard', clock: 0.1 }); out.lampState.hazard = lampsOf();
+  models.poseT3(m, { indicate: null, clock: 0, highBeam: true }); out.lampState.off = lampsOf(); out.lampState.beams = beams();
+  models.poseT3(m, { highBeam: false }); out.lampState.beamsOff = beams();
+  // the autopilot's and the AI trams' indicators (src/indicators.js) on a made-up route: straight to 100 m, a 90 deg
+  // turn to the left of 20 m radius, straight on; a switch on the straight at 30 m (no turn) and one at 100 m (the
+  // turn); a stop where passengers cross a car lane at 300 m
+  const { junctionTurns, indicating } = await import('/src/indicators.js');
+  const th = (q) => Math.min(Math.PI / 2, Math.max(0, (q - 100) / 20));
+  const fake = { heading: (q) => ({ hx: Math.cos(th(q)), hy: Math.sin(th(q)) }) };
+  const turns = junctionTurns(fake, [{ s: 30 }, { s: 100 }]), right = junctionTurns({ heading: (q) => { const h = fake.heading(q); return { hx: h.hx, hy: -h.hy }; } }, [{ s: 100 }]);
+  out.indicators = { turns, right: right.map((x) => x.side),
+    at: [[40, 8, false], [60, 8, false], [110, 5, false], [140, 8, false], [230, 8, false], [250, 6, true], [300, 0, false], [301, 0.2, false], [302, 2, false]]
+      .map(([q, v, br]) => indicating(turns, [300], q, v, br)) };
   return out;
 }"""
 
@@ -258,6 +285,7 @@ SHOTS = r"""async ({ kinds }) => {
     front: persp([0, 1.8, 22], [0, 1.7, 0], 14), set: persp([-14, 4, 24], [0, 1.4, -4], 40), elevation: elev,
     bogie: persp([-5, 0.9, 3.4], [0, 0.45, 3.2], 32), display: persp([-6.5, 2.0, 1.2], [-1.25, 2.0, 3.2], 34),
     coupler: persp([-1.9, 1.0, 9.6], [0, 0.6, 7.0], 30), top,
+    litFront: persp([-4.5, 1.7, 15], [0, 1.3, 7], 22), litRear: persp([4.5, 1.7, -15], [0, 1.2, -7], 22),
     curve: persp([-5.5, 1.3, 0.6], [0.3, 0.6, 0], 40), gear, lowered: persp([-12, 4.6, 3.1], [0, 3.5, 3.1], 30),
   };
   const out = {};
@@ -270,6 +298,8 @@ SHOTS = r"""async ({ kinds }) => {
       renderer.clippingPlanes = view === 'gear' ? cut : [];
       if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
       if (view === 'lowered') models.poseT3?.(m, { collector: 0 }); // (main has none)
+      // the lamps lit (#436): the high beams and the left indicators in front, braking with the left indicators behind
+      if (view === 'litFront' || view === 'litRear') models.poseT3?.(m, { braking: view === 'litRear', indicate: 'left', clock: 0.1, highBeam: view === 'litFront' });
       models.setNextStop(m, 'Palmovka');
       scene.add(m);
       renderer.render(scene, cam);
@@ -342,6 +372,20 @@ def judge(r):
         # #454: the body, the fixed parts, the lamps, the fleet numbers; the bogies, wheelsets, couplers and the
         # pantograph's frame instanced
         "at most eight draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 8 and r["drawn"][1] - r["plates"][1] <= 8,
+        # #436 (the user, 2026-11-10): the dipped headlights and tail lamps on in service, the front's on the leading car
+        # and the rear's on the last (the coupled ends dark), the brake lamps (the rear corners) while braking, the
+        # indicators on every car blinking 1.5 times a second, the reversing lamp off, the high beams' glow on the lead
+        "the lamps in service: the front's on the leading car, the tail lamps on the last": r["lampState"]["rest"] == ["head pos", "tail"],
+        "braking with the left indicators: the brake lamps at the rear, the left indicators on every car": r["lampState"]["left"] == ["head pos indL", "tail brake indL"],
+        "the indicators' dark half": r["lampState"]["leftDark"] == ["head pos", "tail brake"],
+        "the hazard lights: both sides": r["lampState"]["hazard"] == ["head pos indL indR", "tail indL indR"],
+        # the user, 2026-11-10: "Turning at junction and stopping at street level stop across car lane", at such a stop the
+        # right ones "braking to start": from 50 m before the switch until the turn is 80 % done (16 deg/m here: 125 m)
+        "the indicators at a junction turn, its side, and at a stop across a car lane": [(t["s0"], t["side"]) for t in r["indicators"]["turns"]] == [(50, "left")]
+        and 124 <= r["indicators"]["turns"][0]["s1"] <= 128 and r["indicators"]["right"] == ["right"]
+        and r["indicators"]["at"] == [None, "left", "left", None, None, "right", "right", "right", None],
+        "the high beams' glow on the leading car, drawn only while on": r["lampState"]["off"] == ["head pos", "tail"]
+        and r["lampState"]["beams"] == [True, False] and r["lampState"]["beamsOff"] == [False, False],
         # #454 on a curve of 25 m radius: the bogies turned to the chords between their axles (+-3.2/25 rad against
         # the body), the axles over the track (on the chord: 1.8 cm outside the circle)
         "in a curve the bogies turn under the body to the track": all(near(f, r["curve"]["want"], 0.002) and near(rr, -r["curve"]["want"], 0.002) for f, rr in r["curve"]["bogies"])

@@ -64,6 +64,9 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
 | `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |
 | `Z` | right mirror on and off |
+| `,` / `.` | indicators left / right (again: off); given before a turn at a junction and at a stop where passengers cross a car lane (right, from braking into it until pulling away) |
+| `/` (on a Czech keyboard `-`) | hazard lights |
+| `L` | high beams: held, a flash; with `Shift`, on and off |
 | `V` | cab or outside view |
 | `O` | autopilot on and off |
 | `M` | sound on and off |
@@ -222,7 +225,8 @@ equipment work the pedals as a careful driver (the advanced model: pulls away on
 step by step, into a stop on one curve and without going back to the drive pedal unless a tram stands ahead,
 parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
 slippery rail, and under contacts draws current for a turn (the switch button when slow enough, otherwise a short pulse of
-the drive pedal) or coasts (straight). Press **V** for
+the drive pedal) or coasts (straight), and indicates before a turn at a junction and at stops where passengers cross a car
+lane. Press **V** for
 the outside view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the
 menu; O hands back to the autopilot.
 

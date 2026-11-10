@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { T3 } from './tram.js';
+import { beamsMesh } from './lamps.js';
 
 // --- the drawings' numbers: metres above the rail top and from the car's centre
 const HW = 1.25;                                    // half width (2 500 mm)
@@ -625,34 +626,72 @@ function coupler() {
   return mergeGeometries(C);
 }
 
-// The lamps (lit): the round headlights; rectangular units by the corners, an orange indicator over a clear
+// The lamps: the round headlights; rectangular units by the corners, an orange indicator over a clear
 // lamp at the front and over a red one at the rear (the user, 2026-11-09: "round or rectangle, I would choose
 // the latter"); on the rear face two red lamps and the white one between them, the round red reflectors under
-// the bumper (the photos of 6892 and 6921)
+// the bumper (the photos of 6892 and 6921). By function (the user, 2026-11-10, #436): the front corners' clear
+// lamps are the position lamps, the rear corners' red ones the brake lamps ("as on the hybrid"), the rear face's
+// red pair the tail lamps, the white one between them the reversing lamp. Each part is tagged with its function
+// (geometry.userData.lamps: vertex ranges in merge order); a car lights them by its colours (setLamps).
 function lampsGeometry() {
-  const L = [];
+  const L = [], fns = [];
+  const add = (fn, g) => { L.push(g); fns.push(fn); };
+  const side = (sign) => (sign > 0 ? 'indL' : 'indR'); // (x left)
   for (const x of [-HEADLIGHT.x, HEADLIGHT.x]) {
-    L.push(part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x, HEADLIGHT.h, onFace(1, x, HEADLIGHT.h).z + 0.038] }));
+    add('head', part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x, HEADLIGHT.h, onFace(1, x, HEADLIGHT.h).z + 0.038] }));
   }
-  for (const [end, low] of [[1, '#f2efe4'], [-1, '#d8261a']]) for (const sign of [-1, 1]) {
+  for (const [end, low, fn] of [[1, '#f2efe4', 'pos'], [-1, '#d8261a', 'brake']]) for (const sign of [-1, 1]) {
     const c = atCorner(end, sign, CORNER_LAMP.x), at = (h) => [c.x + c.n[0] * 0.02, h, c.z + c.n[1] * 0.02], { high: [a0, a1], low: [c0, c1] } = CORNER_LAMP;
-    L.push(part(box(0.012, a1 - a0, 0.075), '#ff9a22', { at: at((a0 + a1) / 2), rot: [0, c.yaw, 0] }));
-    L.push(part(box(0.012, c1 - c0, 0.075), low, { at: at((c0 + c1) / 2), rot: [0, c.yaw, 0] }));
+    add(side(sign), part(box(0.012, a1 - a0, 0.075), '#ff9a22', { at: at((a0 + a1) / 2), rot: [0, c.yaw, 0] }));
+    add(fn, part(box(0.012, c1 - c0, 0.075), low, { at: at((c0 + c1) / 2), rot: [0, c.yaw, 0] }));
   }
-  const onRear = (x, h, w, hh, color) => {
+  const onRear = (fn, x, h, w, hh, color) => {
     const f = onFace(-1, x, h);
-    L.push(part(box(w, hh, 0.02), color, { at: [x + 0.012 * Math.sin(f.yaw), h, f.z + 0.012 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
+    add(fn, part(box(w, hh, 0.02), color, { at: [x + 0.012 * Math.sin(f.yaw), h, f.z + 0.012 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
   };
   // the side indicators: on the pillar between the first and second windows on the right, the second and third on
   // the left (both 3.05 m ahead of the centre), at the window band's foot (the user's photos of 8015 and 8080)
-  for (const sign of [-1, 1]) L.push(part(box(0.012, 0.11, 0.06), '#ff9a22', { at: [sign * (HW + 0.016), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
-  for (const x of [-0.47, 0.47]) onRear(x, 0.95, 0.2, 0.07, '#d8261a');
-  onRear(0, 0.95, 0.16, 0.055, '#f4f4ee');
+  for (const sign of [-1, 1]) add(side(sign), part(box(0.012, 0.11, 0.06), '#ff9a22', { at: [sign * (HW + 0.016), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
+  for (const x of [-0.47, 0.47]) onRear('tail', x, 0.95, 0.2, 0.07, '#d8261a');
+  onRear('rev', 0, 0.95, 0.16, 0.055, '#f4f4ee');
   for (const x of [-0.66, 0.66]) {
     const f = onFace(-1, x, 0.6);
-    L.push(part(new THREE.CircleGeometry(0.045, 14), '#c41e14', { at: [x + 0.008 * Math.sin(f.yaw), 0.6, f.z + 0.008 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
+    add('refl', part(new THREE.CircleGeometry(0.045, 14), '#c41e14', { at: [x + 0.008 * Math.sin(f.yaw), 0.6, f.z + 0.008 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
   }
-  return mergeGeometries(L);
+  const g = mergeGeometries(L);
+  let at = 0;
+  g.userData.lamps = L.map((p, i) => { const n = p.attributes.position.count, r = { fn: fns[i], start: at, count: n }; at += n; return r; });
+  return g;
+}
+
+// A car's lamps: its own copy of the lamps' colours, each function lit or dimmed to LAMP_DIM of its colour when
+// its state changes. A lamp off shows its lens, darker; the reflectors are not lamps and stay as they are.
+const LAMP_DIM = 0.2;
+function carLamps(shared) {
+  const geo = shared.clone(), lit = shared.attributes.color.array, byFn = {};
+  geo.userData = {}; // (its own: disposeModel frees it; clone shares the userData)
+  for (const r of shared.userData.lamps) (byFn[r.fn] ||= []).push(r);
+  delete byFn.refl;
+  return { geo, lit, byFn, on: {} };
+}
+function setLamps(lp, want) {
+  const C = lp.geo.attributes.color;
+  let dirty = false;
+  for (const [fn, ranges] of Object.entries(lp.byFn)) {
+    const on = !!want[fn];
+    if (lp.on[fn] === on) continue;
+    lp.on[fn] = on;
+    dirty = true;
+    const k = on ? 1 : LAMP_DIM;
+    for (const { start, count } of ranges) for (let i = start * 3; i < (start + count) * 3; i++) C.array[i] = lp.lit[i] * k;
+  }
+  if (dirty) C.needsUpdate = true;
+}
+// the lamps of car k of n wanted for the set's state: the front end lit on the leading car, the rear end on the
+// last one (the coupled ends dark), the indicators on every car
+function lampsWanted(k, n, { braking = false, signals = {} } = {}) {
+  const lead = k === 0, last = k === n - 1;
+  return { head: lead, pos: lead, tail: last, brake: last && braking, rev: false, indL: !!signals.left, indR: !!signals.right };
 }
 
 // A plate or card on the body: an upright quad 5 mm proud where a ray from outside the end meets it.
@@ -834,12 +873,18 @@ function posePanto(mesh, h) {
 }
 
 // The built-in car's state (src/models.js poseT3), each only when it changes: the collector's contact height
-// over the rail (below its working range it lies lowered)
-export function poseSimple(model, { collector } = {}) {
-  for (const car of model.userData.cars) {
+// over the rail (below its working range it lies lowered); the lamps: the brake lamps while braking, the
+// indicators' sides lit now (`signals`: { left, right }), the high beams' glow on the leading car
+export function poseSimple(model, { collector, braking, signals, highBeam } = {}) {
+  const { cars } = model.userData, st = model.userData.lampState;
+  if (braking !== undefined) st.braking = braking;
+  if (signals !== undefined) st.signals = signals;
+  cars.forEach((car, k) => {
     const p = car.userData.panto;
     if (collector !== undefined && Math.abs(collector - p.h) > 1e-3) { p.h = collector; posePanto(p.mesh, collector); }
-  }
+    setLamps(car.userData.lamps, lampsWanted(k, cars.length, st));
+    if (highBeam !== undefined && car.userData.beams) car.userData.beams.visible = !!highBeam;
+  });
 }
 
 // A set of `cars` built-in T3s in `root` (src/models.js makeT3): `mats` holds the plates' materials
@@ -853,7 +898,7 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
     parts: new THREE.MeshLambertMaterial({ vertexColors: true }),
     lamps: new THREE.MeshBasicMaterial({ vertexColors: true }),
   });
-  Object.assign(root.userData, { mats, bogie: PIVOT, bodyFront: BODY_FRONT, cars: [], variant, fleet });
+  Object.assign(root.userData, { mats, bogie: PIVOT, bodyFront: BODY_FRONT, cars: [], variant, fleet, lampState: { braking: false, signals: {} } });
   const colours = pantoBars(wire).map((b) => new THREE.Color(b[4]));
   for (let k = 0; k < cars; k++) {
     const car = new THREE.Group();
@@ -861,7 +906,15 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
     const mesh = (g, m, name) => { if (g) { const o = new THREE.Mesh(g, m); o.name = name; car.add(o); } };
     mesh(P.body, mats.body, 'body');
     mesh(P.parts, mats.parts, 'parts');
-    mesh(P.lamps, mats.lamps, 'lamps');
+    const lamps = carLamps(P.lamps);
+    mesh(lamps.geo, mats.lamps, 'lamps');
+    setLamps(lamps, lampsWanted(k, cars, root.userData.lampState)); // (in service: the ends' lamps lit)
+    car.userData.lamps = lamps;
+    // the high beams' glow over the leading car's headlights (drawn only while they are on)
+    if (k === 0) {
+      car.userData.beams = beamsMesh([-HEADLIGHT.x, HEADLIGHT.x].map((x) => [x, HEADLIGHT.h, onFace(1, x, HEADLIGHT.h).z + 0.05]));
+      car.add(car.userData.beams);
+    }
     // (a decal blended at its edges: traffic's fade keeps a blended material blended)
     const fm = new THREE.MeshLambertMaterial({ map: fleetTexture(fleet[k]), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
     mesh(P.fleet, fm, 'fleet');

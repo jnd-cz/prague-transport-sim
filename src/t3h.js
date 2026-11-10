@@ -11,6 +11,7 @@
 // forward, +Y up, +Z right, origin on the rail plane midway between the bogies; the game's cars face +Z.
 import * as THREE from 'three';
 import { T3, CAR_PITCH } from './tram.js';
+import { beamsMesh } from './lamps.js';
 
 export const T3H_FILES = ['assets/t3h/tatra-t3-hybrid-nc.glb', 'assets/t3h/rig.json'];
 export const T3H_CREDIT = 'Tatra T3 3D model: hybrid of "Tatra T3" by SimonStrikesBack (sketchfab.com, CC BY 4.0) '
@@ -237,7 +238,15 @@ export async function loadHybridT3(responses, contact) {
   }
   mixer.stopAllAction(); mixer.uncacheRoot(template);
   const bogie = T3.bogies / 2;
-  proto = { template, light, rig, clips: gl.animations, bogie, stats };
+  // the headlights (one emissive mesh across the front, lit always: the user, 2026-11-10, #436): their centres in the
+  // car's frame for the high beams' glow (the asset's (x, y, z) is the car's (-z, y, x))
+  let heads = [];
+  template.traverse((o) => {
+    if (heads.length || !o.isMesh || !o.name.startsWith('White_Emission')) return;
+    const b = box(o.geometry), r = (b.max.y - b.min.y) / 2, y = (b.min.y + b.max.y) / 2;
+    heads = [b.min.z + r, b.max.z - r].map((z) => [-z, y, b.max.x + 0.01]);
+  });
+  proto = { template, light, rig, clips: gl.animations, bogie, stats, heads };
   return proto;
 }
 
@@ -379,11 +388,14 @@ export function makeHybridSet(root, line, cars, dest, run, collector) {
       wheels: rig.wheels.map((w) => ({ node: n(w.name), r: w.radius })),
       couplers: [n('T3H_coupler_front'), n('T3H_coupler_rear')],
       brakes: (rig.brakes || []).map(n).filter(Boolean),
+      signals: { left: rig.signals.left.map(n).filter(Boolean), right: rig.signals.right.map(n).filter(Boolean) }, lit: { left: false, right: false },
       full: r, light: l, plates: {},
     };
     const cr = car.userData.rig;
     for (const b of cr.bogies) b.node?.traverse((o) => { if (o.name === 'T3H_shoe') b.shoes.push(o); });
     car.userData.gear = gear(cr);
+    // the high beams' glow over the leading car's headlights (src/lamps.js)
+    if (k === 0 && proto.heads.length) { car.userData.beams = beamsMesh(proto.heads); car.add(car.userData.beams); }
     // the cards: the route plates on every car (the front one shows on the leading car, the rear one on the
     // last), the destination and run number in the leading car only
     cr.plates = {
@@ -420,9 +432,10 @@ export function setHybridLine(model, line, dest = model.userData.dest, run = mod
 
 // The mechanisms from the game's state, each only when it changes: doors (0 closed .. 1 open), the
 // collector's contact height over the rail, the brake lamps, the track-brake magnets (0 off, 1 the rear
-// bogies', 2 all).
-export function poseHybrid(model, { doors, collector, braking, track } = {}) {
-  for (const car of model.userData.cars) {
+// bogies', 2 all), the indicators' sides lit now (`signals`: { left, right }), the high beams.
+export function poseHybrid(model, { doors, collector, braking, track, signals, highBeam } = {}) {
+  const { cars } = model.userData;
+  cars.forEach((car, k) => {
     const r = car.userData.rig;
     let scrub = false;
     if (doors !== undefined && Math.abs(doors - r.doors) > 1e-3) {
@@ -436,13 +449,17 @@ export function poseHybrid(model, { doors, collector, braking, track } = {}) {
       scrub = true;
     }
     if (scrub) r.mixer.update(0);
-    if (braking !== undefined && braking !== r.braking) { r.braking = braking; for (const b of r.brakes) b.visible = braking; }
+    // (the brake lamps at the set's rear: the coupled ends dark, as the built-in car's)
+    const brakeLit = !!braking && k === cars.length - 1;
+    if (braking !== undefined && brakeLit !== r.braking) { r.braking = brakeLit; for (const b of r.brakes) b.visible = brakeLit; }
+    if (signals !== undefined) for (const s of ['left', 'right']) if (!!signals[s] !== r.lit[s]) { r.lit[s] = !!signals[s]; for (const g of r.signals[s]) g.visible = r.lit[s]; }
+    if (highBeam !== undefined && car.userData.beams) car.userData.beams.visible = !!highBeam;
     if (track !== undefined && track !== r.track) {
       r.track = track;
       // (the rear bogie's magnets first, ČKD [ckd24] p. 16; src/tr37.js trackAngles)
       for (const b of r.bogies) for (const s of b.shoes) s.position.y = (track >= 2 || (track === 1 && !b.front)) ? -s.userData.drop : 0;
     }
-  }
+  });
 }
 
 // The level a set is drawn at: 'full', or 'light' (no saloon, doors shut, everything merged; for AI trams
