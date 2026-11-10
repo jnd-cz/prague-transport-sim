@@ -389,7 +389,14 @@ def load_snapshot(sid):
         return json.load(f)
 
 
+# a snapshot's id: its date, and a letter for a second one that day (2026-11-08r); any other word was taken for one,
+# `publish --help` included, which wrote snapshots/--help.json and set CURRENT to it (#424)
+SNAPSHOT_ID = re.compile(r"\d{4}-\d{2}-\d{2}[a-z]?")
+
+
 def publish(store, sid, note):
+    if not SNAPSHOT_ID.fullmatch(sid):
+        raise SystemExit(f"snapshot id {sid!r}: a date, and a letter for a second one that day (2026-11-09, 2026-11-09r)")
     if os.path.exists(os.path.join(SNAPDIR, f"{sid}.json")):
         raise SystemExit(f"snapshot {sid} exists: choose a new id")
     print("hashing raw/ ...", flush=True)
@@ -646,6 +653,9 @@ def data_status():
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    if "--help" in args or "-h" in args:
+        print(__doc__)
+        raise SystemExit(0)
     opt = lambda k, d=None: args[args.index(k) + 1] if k in args else d  # noqa: E731
     store = Store(opt("--store", os.environ.get("TRAMDATA_STORE", "tramdata:store")))
     cache = None if "--no-cache" in args else Cache.open(opt("--cache", os.environ.get("TRAMDATA_CACHE")))
