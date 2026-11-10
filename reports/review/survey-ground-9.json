@@ -12,8 +12,8 @@
    "kind": "survey ground",
    "x": 39.5,
    "y": -886.2,
-   "lat": 50.079525,
-   "lon": 14.42356,
+   "lat": 50.079526,
+   "lon": 14.423559,
    "mag": 0.62,
    "info": "paved, 471 m²: the survey +0.62 m off IPR (2023); DMR 5G +0.47 m off IPR, with the survey"
   },
@@ -22,7 +22,7 @@
    "x": -5010.4,
    "y": -1463.6,
    "lat": 50.068174,
-   "lon": 14.354776,
+   "lon": 14.354775,
    "mag": 0.98,
    "info": "paved, 355 m²: the survey -0.98 m off IPR (2023); DMR 5G +1.04 m off IPR"
   },
@@ -31,7 +31,7 @@
    "x": 814.1,
    "y": -332.1,
    "lat": 50.08541,
-   "lon": 14.433228,
+   "lon": 14.433227,
    "mag": 1.28,
    "info": "paved, 289 m²: the survey +1.28 m off IPR (2023); DMR 5G +1.82 m off IPR"
   },
