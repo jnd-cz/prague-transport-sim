@@ -244,6 +244,12 @@ their levels and height-accuracy classes); the JSON report retains their vertice
 Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
 in a separate checkout of that reference; comparisons never restore over the working data.
 
+**The limits against real rides** (#451): `python -P -E tools/rides_limits.py --lines 22,23` maps the GPS rides in
+`raw/reference/rides/` (`RIDES`, the ones in a line's direction) onto each line's track and lists where a ride went
+more than 3 km/h over our limit for 10 m or more, with what sets the limit there, and per stretch a quickest run at our
+limits and at them raised to the ride. It needs `raw/` (`snapshot.py fetch`) and starts its own server. On line 22 the
+two-car set keeps a limit 15 m longer than the rides' single T3, so it lists more places there.
+
 **Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
 **I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
 overlay is hidden and the mouse moves the camera: **orbit** around the tram or **fly** (C; Shift faster, wheel = flying speed). PgDn / PgUp
