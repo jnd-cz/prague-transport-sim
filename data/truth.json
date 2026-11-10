@@ -14,7 +14,8 @@
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
-  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it"
+  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
+  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it"
  },
  "stops": [
   {
@@ -3165,5 +3166,9 @@
    {"osm": "way/88598700", "ref": "TS7760", "e": -751045, "n": -1044498},
    {"osm": "way/90662133", "ref": "TS3110", "e": -738391, "n": -1045720}
   ]
+ },
+ "surveyGround": {
+  "note": "The user's answers to the survey-ground review cards (reports/review/survey-ground-N.json): a ground-level survey area that sits steadily off IPR's 2023 lidar where neither DI's rails nor DMR 5G decide. verdict survey: the area keeps the survey's heights (the ground changed); lidar: it moves to IPR. Keyed by a point in the area; tools/survey_ground_answers.py writes the places from review mode's answers.",
+  "places": []
  }
 }
