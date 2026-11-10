@@ -306,6 +306,23 @@ Sections:
   the street wall) keeps the points the terrain confirms. Without the terrain check the rule lifted
   Novoměstská náplavka's walk 6 m to the street. Line 17: 1,595 points, line 22: 693
   (`provenance … vertexHeights.spikes`).
+- **The survey's ground level against the lidar** (#446, `tools/bench/survey_ground.py` on main's data of
+  2026-11-08r): at the 2 m stations of DI's and DTMP's tracks under open sky in paved level-0 areas, IPR lies within
+  0.3 m of the top of rail at 96.8-99.3 % per line, the survey at 81.9-91.8 %. Whole areas steadily off IPR are few but
+  can be large: Kabešova's street block on line 37, 14,600 m², 1.75 m under IPR, DMR 5G and DI's rails, from its own
+  ZPS lines (#446). `dtm.py` checks level 0 against IPR 1 m inside the outline: the line's coarse 10 m grid read
+  Divadelní's deck (192.99 m) over the road 5 m below it and threw that road out. What tells survey from lidar
+  (`tools/zps_ground.py`):
+  - **Bare earth leaves out small things.** Planters, raised beds, light wells and short flights of steps sit off
+    the lidar but are surveyed right: on line 37, 94 of the 158 areas DMR 5G would have moved were under 10 m². Only
+    areas of 100 m² or more, with a point 1 m inside at two thirds of their corners, are judged.
+  - **The survey's dates say nothing about change**: line 37's areas that fit IPR mostly carry `DatumZmeny` of
+    2025 (3,777 of 4,522), from bulk edits. OSM's construction sites (`landuse` / `building` / `highway` =
+    `construction`) mark ground that changed since the lidar: three lawns at 50.0906 N 14.4666 E sit 1.5-1.75 m over
+    both lidars.
+  - **A ground-level outline that shares its lines with a deck carries the deck's heights**: under Divadelní's
+    deck the road's corners read 193.2-193.3 m at 11 of 16, the floor's 187.6-187.8 at the rest, both levels on the
+    same line; a height an upper level's line has at the same place, over 2 m above the area's ground, is the deck's.
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
   of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**

@@ -94,7 +94,7 @@ pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the
 | `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
-| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
 
 Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
 profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
@@ -323,6 +323,12 @@ directory show it answered where the page holds no answer under that decision's 
 Proposals stay separate from approved height evidence;
 the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
 reproduction commands and `--evidence` format.
+`?line=37&review=reports/review/survey-ground-37.json` lists the survey's ground-level areas that sit steadily off
+IPR's lidar where neither DI's rails nor DMR 5G say which is right (#446): `tools/dtm.py` writes the set per line
+(`tools/zps_ground.py`) and deletes it when nothing is held. `python -I tools/survey_ground_answers.py
+reports/reviews/line37.json` turns the answers that are a card's option into `data/truth.json` `surveyGround.places`,
+which the next `dtm.py` obeys; others stay held. `python -P -E tools/bench/survey_ground.py` measures every line's
+ground level against IPR and the rails (`--dtm DIR` for main's copies).
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
