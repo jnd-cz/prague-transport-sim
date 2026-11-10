@@ -1,4 +1,5 @@
-"""Tests of the top-of-rail assembly (tools/line_heights.py, #197) on synthetic chains:
+"""Tests of the top-of-rail assembly (tools/line_heights.py, #197) and of the answers' rules in front of it
+(tools/height_answers.py, #418) on synthetic chains:
 python -P -E tools/test_line_heights.py"""
 import contextlib
 import io
@@ -9,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import geo  # noqa: E402
+import height_answers as ha  # noqa: E402
 import line_heights as lh  # noqa: E402
 
 
@@ -94,21 +96,24 @@ class Assembly(unittest.TestCase):
 
     def test_a_follow_answer_given_before_the_floor_gives_way_only_to_it(self):
         c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
-        lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [{'xy': (100.0, 0.0), 'answer': lh.FOLLOW, 'date': '2026-11-03'}], '2026-11-07'
+        ha.RADIUS_ANSWERS, ha.FLOOR_SINCE = [{'xy': (100.0, 0.0), 'answer': ha.FOLLOW, 'date': '2026-11-03'}], '2026-11-07'
         try:
             quiet(lh.assemble, [c])
+            # (the build is the one without the answer: that the solver met it, and did not take it, is asserted here, #418)
+            self.assertIs(ha.answer_at([(100.0, 0.0)], (ha.FOLLOW,)), ha.RADIUS_ANSWERS[0])
+            self.assertFalse(ha.below_floor([(100.0, 0.0)]))
         finally:
-            lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [], None
+            ha.RADIUS_ANSWERS, ha.FLOOR_SINCE = [], None
         self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
         self.assertFalse(c.review[0]['fits'])
 
     def test_a_follow_answer_given_since_the_floor_follows_the_data_below_it(self):
         c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
-        lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [{'xy': (100.0, 0.0), 'answer': lh.FOLLOW, 'date': '2026-11-08'}], '2026-11-07'
+        ha.RADIUS_ANSWERS, ha.FLOOR_SINCE = [{'xy': (100.0, 0.0), 'answer': ha.FOLLOW, 'date': '2026-11-08'}], '2026-11-07'
         try:
             quiet(lh.assemble, [c])
         finally:
-            lh.RADIUS_ANSWERS, lh.FLOOR_SINCE = [], None
+            ha.RADIUS_ANSWERS, ha.FLOOR_SINCE = [], None
         self.assertLess(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + lh.FIT)
         self.assertLess(self.tightest(c), lh.radii()['min'])
 
@@ -128,11 +133,11 @@ class Assembly(unittest.TestCase):
         a = chain([(100, -150), (100, 150)], lambda s: 100.0)
         b = chain([(104, -150), (104, 150)], lambda s: 100.2)
         c = chain([(0, 0), (200, 0)], lambda s: 100.1)
-        lh.RADIUS_ANSWERS = [{'xy': (102.0, 0.0), 'answer': lh.HOLD, 'date': '2026-11-07'}]
+        ha.RADIUS_ANSWERS = [{'xy': (102.0, 0.0), 'answer': ha.HOLD, 'date': '2026-11-07'}]
         try:
             quiet(lh.assemble, [a, b, c])
         finally:
-            lh.RADIUS_ANSWERS = []
+            ha.RADIUS_ANSWERS = []
         self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
         self.assertLess(abs(c.z_at(100)[0] - a.z_at(150)[0]), .01)
         self.assertLess(abs(c.z_at(104)[0] - b.z_at(150)[0]), .01)
@@ -157,11 +162,13 @@ class Assembly(unittest.TestCase):
 
     def test_an_answer_to_hold_the_radius_keeps_it_and_the_place_is_reviewed(self):
         c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
-        lh.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': lh.HOLD}]
+        ha.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': ha.HOLD}]
         try:
             quiet(lh.assemble, [c])
+            # (the floor holds this sag without the answer too: that the solver met it is asserted here, #418)
+            self.assertIs(ha.answer_at([(100.0, 0.0)]), ha.RADIUS_ANSWERS[0])
         finally:
-            lh.RADIUS_ANSWERS = []
+            ha.RADIUS_ANSWERS = []
         self.assertGreater(max(abs(c.z_at(b['s'])[0] - b['z']) for b in c.bins), lh.BAND + .005)  # (the radius held)
         self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('band', 1.0)])
 
@@ -170,11 +177,11 @@ class Assembly(unittest.TestCase):
         # alone the curve misses the top by 16 cm)
         hump = lambda s: 100 + math.exp(-((s - 100) / 10) ** 2)
         c = chain([(0, 0), (200, 0)], hump, terrain=hump)
-        lh.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': lh.HOLD, 'outliers': 'drop'}]
+        ha.RADIUS_ANSWERS = [{'xy': (100.0, 0.0), 'answer': ha.HOLD, 'outliers': 'drop'}]
         try:
             quiet(lh.assemble, [c])
         finally:
-            lh.RADIUS_ANSWERS = []
+            ha.RADIUS_ANSWERS = []
         # (the four top bins dropped; the curve at the radius within the band of the rest)
         self.assertEqual(len(c.dropped), 4)
         self.assertEqual([(p['kind'], p['factor']) for p in c.review], [('band', 1.0)])
@@ -283,8 +290,8 @@ class TruePlaces(unittest.TestCase):
 
 class Answers(unittest.TestCase):
     def setUp(self):
-        self.old = lh.STEP_ANSWERS
-        self.addCleanup(lambda: setattr(lh, 'STEP_ANSWERS', self.old))
+        self.old = ha.STEP_ANSWERS
+        self.addCleanup(lambda: setattr(ha, 'STEP_ANSWERS', self.old))
 
     def test_an_answer_drops_a_sources_heights_along_a_stretch(self):
         # (line 9 at Olšanské hřbitovy: DI's 65 cm dip left of the card's marker goes, the curve bridges it)
@@ -292,23 +299,23 @@ class Answers(unittest.TestCase):
         c = chain([(0, 0), (200, 0)], dip)
         for x in c.bins:
             x['src'] = 'di'
-        lh.IGNORE_ANSWERS = [{'ignore': 'stretch', 'stretch': [(25.0, 0.0), (65.0, 0.0)], 'sources': ['di'], 'xy': (45.0, 0.0), 'reach': 15}]
+        ha.IGNORE_ANSWERS = [{'ignore': 'stretch', 'stretch': [(25.0, 0.0), (65.0, 0.0)], 'sources': ['di'], 'xy': (45.0, 0.0), 'reach': 15}]
         try:
-            self.assertEqual(lh.answered_ignore([c]), sum(1 for x in c.bins if 25 <= x['s'] <= 65))
+            self.assertEqual(ha.answered_ignore([c]), sum(1 for x in c.bins if 25 <= x['s'] <= 65))
             quiet(lh.assemble, [c])
         finally:
-            lh.IGNORE_ANSWERS = []
+            ha.IGNORE_ANSWERS = []
         self.assertAlmostEqual(c.z_at(45)[0], 100.0, delta=.02)
 
     def test_an_answer_drops_the_heights_between_a_junctions_switches(self):
         # (Malovanka: a 30 cm hump between the switches; within the junction's 15 cm band the curve rose half of it)
         c = chain([(0, 0), (200, 0)], lambda s: 100.0 + (0.3 if 90 <= s <= 110 else 0.0))
         c.switch = [(85.0, 95.0), (105.0, 115.0)]
-        lh.IGNORE_ANSWERS = [{'ignore': 'switches', 'xy': (100.0, 0.0), 'reach': 40, 'stretch': [], 'sources': []}]
+        ha.IGNORE_ANSWERS = [{'ignore': 'switches', 'xy': (100.0, 0.0), 'reach': 40, 'stretch': [], 'sources': []}]
         try:
             quiet(lh.solve, c, {}, lh.radii())
         finally:
-            lh.IGNORE_ANSWERS = []
+            ha.IGNORE_ANSWERS = []
         self.assertAlmostEqual(c.z_at(100)[0], 100.0, delta=.03)
 
     def test_an_answer_has_the_tracks_follow_the_ground_in_an_area(self):
@@ -316,37 +323,38 @@ class Answers(unittest.TestCase):
         # steeper than any track and the arm stayed 15-78 cm above the ground)
         ground = lambda s: 100.0 if s <= 95 else 99.4 if s >= 100 else 100.0 - .12 * (s - 95)
         c = chain([(0, 0), (260, 0)], lambda s: 100.0, terrain=ground)
-        lh.GROUND_ANSWERS = [{'area': lh.Polygon([(70, -5), (150, -5), (150, 5), (70, 5)]), 'answer': lh.FOLLOW, 'date': None,
+        ha.GROUND_ANSWERS = [{'area': ha.Polygon([(70, -5), (150, -5), (150, 5), (70, 5)]), 'answer': ha.FOLLOW, 'date': None,
                               'radius_min': 250.0}]
         try:
-            self.assertGreater(lh.answered_ground([c]), 0)
+            self.assertGreater(ha.answered_ground([c]), 0)
             for x in c.bins:
                 x['staged'] = x['z']
             quiet(lh.assemble, [c])
         finally:
-            lh.GROUND_ANSWERS = []
+            ha.GROUND_ANSWERS = []
         self.assertAlmostEqual(c.z_at(125)[0], 99.4, delta=lh.GROUND_BAND + .01)
         self.assertAlmostEqual(c.z_at(80)[0], 100.0, delta=lh.GROUND_BAND + .01)
         self.assertAlmostEqual(c.z_at(240)[0], 100.0, delta=lh.BAND)
         # (the edge makes no step: no grade steeper than any track's beyond the ground's own step)
         s = [5.0 * k for k in range(52)]
         z = [c.z_at(t)[0] for t in s]
-        self.assertLess(max(abs(b - a) / 5 for t, a, b in zip(s, z, z[1:]) if not 85 <= t <= 105), lh.MAX_GRADE)
+        self.assertLess(max(abs(b - a) / 5 for t, a, b in zip(s, z, z[1:]) if not 85 <= t <= 105), ha.MAX_GRADE)
         # (no tighter than the area's limit, within the solver's tolerance: the step itself needs 42 m)
         self.assertGreater(min(lh.implied_radii(c.runs[0]['s'], c.runs[0]['z'])), 250.0 * lh.TIGHT)
 
     def test_an_archive_answer_takes_the_archive_and_holds_where_it_has_none(self):
-        lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
+        ha.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
         series = [{'xy': (10.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}, {'xy': (20.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': None},
                   {'xy': (90.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}]
-        lh.answered_source(series)
+        ha.answered_source(series)
         self.assertEqual([(x['z'], x['w'], x['src']) for x in series], [(191.5, 1.0, 'dtmp'), (None, 0.0, None), (190.0, 1.0, 'di')])
 
     def test_a_di_answer_leaves_the_height(self):
-        lh.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'di', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
+        ha.STEP_ANSWERS = [{'xy': (0.0, 0.0), 'use': 'di', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0}]
         series = [{'xy': (10.0, 0.0), 'z': 190.0, 'w': 1.0, 'src': 'di', 'archive': 191.5}]
-        lh.answered_source(series)
+        ha.answered_source(series)
         self.assertEqual(series[0]['z'], 190.0)
+        self.assertIs(ha.step_answer_at((10.0, 0.0)), ha.STEP_ANSWERS[0])  # (met there, and the height left: #418)
 
     def test_outliers_go_only_within_the_reach(self):
         c = chain([(0, 0), (300, 0)], lambda s: 100 + .01 * s)
@@ -354,8 +362,8 @@ class Answers(unittest.TestCase):
             x['survey'] = None
         c.bins[10]['z'] += .3
         c.bins[50]['z'] += .3
-        lh.STEP_ANSWERS = [{'xy': (52.5, 0.0), 'use': 'di', 'drop': True, 'blend': False, 'radius': None, 'reach': 70.0}]
-        self.assertEqual(lh.answered_noise([c])[0], 1)
+        ha.STEP_ANSWERS = [{'xy': (52.5, 0.0), 'use': 'di', 'drop': True, 'blend': False, 'radius': None, 'reach': 70.0}]
+        self.assertEqual(ha.answered_noise([c])[0], 1)
         self.assertIsNone(c.bins[10]['z'])
         self.assertIsNotNone(c.bins[50]['z'])
 
@@ -364,9 +372,9 @@ class Answers(unittest.TestCase):
         for x in c.bins:
             x['survey'] = 100.0 + .01 * x['s']
         c.bins[10]['z'] += .1
-        lh.STEP_ANSWERS = [{'xy': (52.5, 0.0), 'use': 'di', 'drop': False, 'blend': True, 'radius': None, 'reach': 70.0}]
+        ha.STEP_ANSWERS = [{'xy': (52.5, 0.0), 'use': 'di', 'drop': False, 'blend': True, 'radius': None, 'reach': 70.0}]
         before = c.bins[10]['z']
-        self.assertGreaterEqual(lh.answered_noise([c])[1], 1)
+        self.assertGreaterEqual(ha.answered_noise([c])[1], 1)
         self.assertLess(c.bins[10]['z'], before)
 
     def test_the_surveys_pull_makes_no_step_between_bins(self):
@@ -376,8 +384,8 @@ class Answers(unittest.TestCase):
             x['survey'] = 99.8 + .01 * x['s']
             if k % 2:
                 x['z'] += .06
-        lh.STEP_ANSWERS = [{'xy': (150.0, 0.0), 'use': 'di', 'drop': False, 'blend': True, 'radius': None, 'reach': 70.0}]
-        lh.answered_noise([c])
+        ha.STEP_ANSWERS = [{'xy': (150.0, 0.0), 'use': 'di', 'drop': False, 'blend': True, 'radius': None, 'reach': 70.0}]
+        ha.answered_noise([c])
         steps = [abs(b['z'] - a['z'] - .05) for a, b in zip(c.bins, c.bins[1:])]
         self.assertLess(max(steps), .09)
         self.assertLess(c.bins[30]['z'], 100 + .01 * c.bins[30]['s'] - .02)
@@ -388,9 +396,9 @@ class Answers(unittest.TestCase):
         for x in c.bins:
             x['archive'], x['survey'], x['terrain'] = 100.0, 100.2, 100.2
         c.bins[0]['terrain'] = 101.0  # (another level: stays)
-        lh.STEP_ANSWERS = [{'xy': (60.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0,
+        ha.STEP_ANSWERS = [{'xy': (60.0, 0.0), 'use': 'archive', 'drop': False, 'blend': False, 'radius': None, 'reach': 70.0,
                             'toward': {'heights': 'survey+lidar', 'share': 0.5}}]
-        lh.answered_toward([c])
+        ha.answered_toward([c])
         # (s 2.5 on another level, s 62.5 at the answer, s 7.5 and 112.5 in the fade 52.5 m off, s 132.5 past the reach)
         for k, want in ((0, 100.0), (12, 100.1), (1, 100.0875), (22, 100.0875), (26, 100.0)):
             self.assertAlmostEqual(c.bins[k]['z'], want, places=6)
@@ -399,11 +407,32 @@ class Answers(unittest.TestCase):
 
     @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_a_step_answer_replaces_the_radius_answers_in_its_reach(self):
-        truth = {'trackHeights': {'radiusAnswers': [{'place': [50.08862, 14.40603], 'answer': lh.HOLD}, {'place': [50.05, 14.4], 'answer': lh.HOLD}],
+        truth = {'trackHeights': {'radiusAnswers': [{'place': [50.08862, 14.40603], 'answer': ha.HOLD}, {'place': [50.05, 14.4], 'answer': ha.HOLD}],
                                   'stepAnswers': [{'place': [50.08862, 14.40603], 'use': 'archive', 'radius': 'follow'}]}}
-        out = lh.load_radius_answers(truth)
-        self.assertEqual(sorted(a['answer'] for a in out), [lh.FOLLOW, lh.HOLD])
-        self.assertEqual(lh.answer_at([out[-1]['xy']]), None)
+        out = ha.load_radius_answers(truth)
+        self.assertEqual(sorted(a['answer'] for a in out), [ha.FOLLOW, ha.HOLD])
+        self.assertEqual(ha.answer_at([out[-1]['xy']]), None)
+
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
+    def test_load_sets_the_answers_where_the_rules_read_them(self):
+        names = ('RADIUS_ANSWERS', 'STEP_ANSWERS', 'IGNORE_ANSWERS', 'GROUND_ANSWERS', 'FLOOR_SINCE')
+        old = {n: getattr(ha, n) for n in names}
+        self.addCleanup(lambda: [setattr(ha, n, v) for n, v in old.items()])
+        place = [50.08862, 14.40603]
+        ha.load({'trackHeights': {'radiusAnswers': [{'place': place, 'answer': ha.HOLD},
+                                                    {'place': place, 'answer': ha.HOLD, 'ignore': 'switches'},
+                                                    {'area': [place, [50.0887, 14.4061], [50.0886, 14.4062]], 'answer': ha.FOLLOW}],
+                                  'stepAnswers': [{'place': place, 'use': 'archive'}]},
+                 'trackGeometry': {'facts': [{'id': 'vertical-radius-min', 'date': '2026-11-07'}]}})
+        self.assertEqual([len(ha.RADIUS_ANSWERS), len(ha.STEP_ANSWERS), len(ha.IGNORE_ANSWERS), len(ha.GROUND_ANSWERS)], [2, 1, 1, 1])
+        self.assertEqual(ha.FLOOR_SINCE, '2026-11-07')
+        self.assertIs(ha.step_answer_at(ha.STEP_ANSWERS[0]['xy']), ha.STEP_ANSWERS[0])
+
+    def test_the_answers_live_in_height_answers_alone(self):
+        # (#418: set on line_heights, an answer would sit on a copy that no rule reads, and the tests pass on nothing)
+        for n in ('RADIUS_ANSWERS', 'STEP_ANSWERS', 'IGNORE_ANSWERS', 'GROUND_ANSWERS', 'FLOOR_SINCE', 'NEIGHBOUR_LOG', 'LIDAR_LOG'):
+            self.assertTrue(hasattr(ha, n), n)
+            self.assertFalse(hasattr(lh, n), n)
 
 
 class Neighbour(unittest.TestCase):
@@ -414,13 +443,13 @@ class Neighbour(unittest.TestCase):
         a, b = self.tracks()
         for k in (40, 41, 42):
             a.bins[k]['z'] -= 1.0
-        self.assertEqual(lh.snap_to_neighbour([a, b]), 3)
+        self.assertEqual(ha.snap_to_neighbour([a, b]), 3)
         for k in (40, 41, 42):
             self.assertAlmostEqual(a.bins[k]['z'], 100 + .02 * a.bins[k]['s'], delta=.01)
 
     def test_tracks_that_really_differ_stay_apart(self):
         a, b = self.tracks()
-        self.assertEqual(lh.snap_to_neighbour([a, b]), 0)
+        self.assertEqual(ha.snap_to_neighbour([a, b]), 0)
         self.assertAlmostEqual(b.bins[40]['z'] - a.bins[40]['z'], .3, delta=1e-6)
 
     def test_a_dip_on_both_stays(self):
@@ -428,12 +457,12 @@ class Neighbour(unittest.TestCase):
         for k in (40, 41, 42):
             a.bins[k]['z'] -= 1.0
             b.bins[k]['z'] -= 1.0
-        self.assertEqual(lh.snap_to_neighbour([a, b]), 0)
+        self.assertEqual(ha.snap_to_neighbour([a, b]), 0)
 
     def test_a_lone_track_stays(self):
         a, _ = self.tracks()
         a.bins[40]['z'] -= 1.0
-        self.assertEqual(lh.snap_to_neighbour([a]), 0)
+        self.assertEqual(ha.snap_to_neighbour([a]), 0)
 
 
 class Sources(unittest.TestCase):
@@ -451,18 +480,18 @@ class Sources(unittest.TestCase):
 
     def test_dis_hump_on_one_track_takes_the_archive(self):
         a, b, ground = self.hump()
-        self.assertGreater(lh.archive_over_di([a, b]), 0)
-        self.assertLess(max(abs(x['z'] - ground(x['s']) - 0.15) for x in a.bins), lh.SOURCES_EDGE + 1e-9)
+        self.assertGreater(ha.archive_over_di([a, b]), 0)
+        self.assertLess(max(abs(x['z'] - ground(x['s']) - 0.15) for x in a.bins), ha.SOURCES_EDGE + 1e-9)
         self.assertTrue(all(x['src'] == 'di' for x in b.bins))
 
     def test_a_hump_on_both_tracks_stays(self):
         # (a rebuild may have raised both tracks since the archive)
         a, b, _ = self.hump(both=True)
-        self.assertEqual(lh.archive_over_di([a, b]), 0)
+        self.assertEqual(ha.archive_over_di([a, b]), 0)
 
     def test_on_a_structure_dis_height_stays(self):
         a, b, _ = self.hump(flags=['structure_hint'])
-        self.assertEqual(lh.archive_over_di([a, b]), 0)
+        self.assertEqual(ha.archive_over_di([a, b]), 0)
 
 
 class Held(unittest.TestCase):
@@ -482,22 +511,22 @@ class Held(unittest.TestCase):
 
     def test_the_lidar_picks_the_archive(self):
         c, ground = self.track(.02, -.33)
-        self.assertEqual(lh.held_settled([c]), (20, 0))
+        self.assertEqual(ha.held_settled([c]), (20, 0))
         self.assertTrue(all(x['src'] == 'dtmp' and abs(x['z'] - ground(x['s']) - .02) < 1e-9 for x in c.bins[20:40]))
 
     def test_the_lidar_picks_the_survey(self):
         c, _ = self.track(.4, -.03)
-        self.assertEqual(lh.held_settled([c]), (20, 0))
+        self.assertEqual(ha.held_settled([c]), (20, 0))
         self.assertTrue(all(x['src'] == 'zps' for x in c.bins[20:40]))
 
     def test_neither_near_the_lidar_stays_held(self):
         c, _ = self.track(.3, -.3)
-        self.assertEqual(lh.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0))
         self.assertTrue(all(x['z'] is None for x in c.bins[20:40]))
 
     def test_only_the_lidar_gives_it_with_the_rails_offset_around(self):
         c, ground = self.track(None, None)
-        self.assertEqual(lh.held_settled([c]), (0, 20))
+        self.assertEqual(ha.held_settled([c]), (0, 20))
         self.assertTrue(all(x['src'] == 'lidar' and abs(x['z'] - ground(x['s']) - .05) < 1e-9 for x in c.bins[20:40]))
 
     def test_a_lidar_steeper_than_any_track_stays_held(self):
@@ -505,18 +534,18 @@ class Held(unittest.TestCase):
         c, ground = self.track(None, None)
         for x in c.bins:
             x['terrain'] += .3 * max(0.0, x['s'] - 100)   # (30 % from s 100)
-        self.assertEqual(lh.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0))
 
     def test_a_lidar_that_does_not_meet_the_heights_beside_stays_held(self):
         c, _ = self.track(None, None)
         for x in c.bins[20:40]:
             x['terrain'] += 0.6
-        self.assertEqual(lh.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0))
 
     def test_on_a_structure_it_stays_held(self):
         # (the bare-earth lidar lies under a deck and over a tunnel)
         c, _ = self.track(None, None, flags=['structure_hint'])
-        self.assertEqual(lh.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0))
 
 
 class Smoothed(unittest.TestCase):
