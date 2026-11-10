@@ -269,7 +269,22 @@ Sections:
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
   DMR 5G per line; a Bpv / EVRF2007 mix-up is 0.13 m). The fine 2 m blocks within 120 m of the tracks
   come from it (`tools/fine_terrain.py`, `?nofine`). It has no covers over passages (underpasses,
-  culverts: bare earth shows the passage); near OSM passages DMR 5G, which kept them, takes over.
+  culverts: bare earth shows the passage). Near OSM passages, the lines' fine blocks take DMR 5G, which kept the covers.
+  The city mesh keeps IPR (#428): a street or track over a passage is a deck in #276's partition. The rule also took
+  roofs, garages, building interiors and proposed tunnels (decision record 2026-11-05, "No passages rule").
+- **Terrain under 170 m is no ground** (`sources.TERRAIN_FLOOR`, read by every terrain source; the user,
+  2026-11-09: "I would put lower limit to 170 metres height which is well below lowest point of Prague"). IPR's
+  image (35,001 x 26,001 cells) holds 660,025,394 cells of 170.73-421.15 m and 250,035,607 of its declared
+  no-data, -3.4e38 (GDAL_NODATA tag 42113, `NoDataValue` in `dtm_1m.tif.xml`): the counts of its own statistics
+  (`.aux.xml`), no cell of 0.00 m, none under the floor. The 5,739,063 cells of 0.00 m found in #325 are the padding
+  of its 128 m tiles past the image's south and east edges (274 x 204 tiles hold 35,072 x 26,112 cells): a reader
+  that decodes whole tiles crops them (`IprDtm.cells` checks the bounds, `tools/bench/terrain_city.py` and
+  `tools/city_terrain.py` crop). IPR has ground over the whole of Prague (OSM relation 435514, 496.2 km²) and
+  164 km² beyond, its no-data no nearer the limits than 47 m (a 10 m sample; 1.5 km in the median): the city
+  terrain needs no fallback (#428). DMR 5G has real cells under the floor: line 17's 10 m grid holds 57 cells of
+  163.1-169.8 m at Troja (50.1139 N, 14.4290 E, 334 m from the track), a pit in the 2009-2013 lidar (Trojský most
+  and the Blanka tunnel were built there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills
+  them from their neighbours at line 17's next `build_line.py`.
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches

@@ -81,7 +81,7 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packages):
+pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
 
 | step | writes | what |
 |---|---|---|
@@ -99,6 +99,13 @@ pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packag
 Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
 profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
+
+**The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
+1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
+cell over its tolerance. It is no line step: the mesh goes into the machine cache
+(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and code), not `data/`, and nothing in the game reads
+it yet. A heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a
+picture of the city limits go to `reports/city-terrain/`.
 
 ## Deploy
 

@@ -6,7 +6,10 @@ into raw/ipr-dtm/DTM/). Bare earth from the 2023 lidar (~40 points/m²), correct
 from 25 cm to 1 m on 2025-07-10 (lineage in dtm_1m.tif.xml).
 
 The file: BigTIFF, 35001 x 26001 float32, tiled 128 x 128, LZW without predictor, S-JTSK, no-data
--3.4e38 outside the city. Its cell centres are not on whole metres: the top-left centre is
+-3.4e38 outside the city (GDAL_NODATA tag 42113, NoDataValue in dtm_1m.tif.xml). Its 274 x 204 tiles hold
+35,072 x 26,112 cells: the last column and row of tiles pad the image with 5,739,063 cells of 0.00 m, which are
+no cells of it (cells() checks the bounds; a reader of whole tiles crops them, #325). A height under
+sources.TERRAIN_FLOOR is no ground, as the no-data. Its cell centres are not on whole metres: the top-left centre is
 (-757500.2778, -1034000.3889), so it is sampled bilinear at our lattice points, never copied cell by
 cell. It states no vertical datum (Bpv assumed and checked against DMR 5G on every build: fine_terrain.py).
 
@@ -33,6 +36,9 @@ try:
     PILLOW_LZW = features.check("libtiff")
 except ImportError:
     PILLOW_LZW = False
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves it out)
+from sources import TERRAIN_FLOOR  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "raw", "ipr-dtm")
@@ -82,6 +88,13 @@ def tile_tiff(data, w, h):
     return bytes(out + struct.pack("<I", 0) + bytes(data))
 
 
+def ground(a):
+    """The cells in place, NaN where they hold no ground: under the floor, as the declared no-data (-3.4e38) and the
+    0.00 m padding of the edge tiles past the image (#325)."""
+    a[~(a >= TERRAIN_FLOOR)] = np.nan
+    return a
+
+
 class IprDtm:
     """Heights at S-JTSK points: bilinear between the four nearest cells, NaN where one is no-data."""
 
@@ -123,19 +136,20 @@ class IprDtm:
         self.ntx = -(-self.w // self.tw)
         self.tiles = {}
 
+    def decode(self, tx, ty):
+        """One tile's cells as the file holds them (th x tw, float32), not kept."""
+        i = ty * self.ntx + tx
+        self.f.seek(int(self.offs[i]))
+        raw = self.f.read(int(self.cnts[i]))
+        if PILLOW_LZW:
+            with Image.open(io.BytesIO(tile_tiff(raw, self.tw, self.th))) as im:
+                return np.array(im, dtype="<f4")
+        return np.frombuffer(lzw(raw), dtype="<f4").reshape(self.th, self.tw).copy()
+
     def tile(self, tx, ty):
         k = (tx, ty)
         if k not in self.tiles:
-            i = ty * self.ntx + tx
-            self.f.seek(int(self.offs[i]))
-            raw = self.f.read(int(self.cnts[i]))
-            if PILLOW_LZW:
-                with Image.open(io.BytesIO(tile_tiff(raw, self.tw, self.th))) as im:
-                    a = np.array(im, dtype="<f4")
-            else:
-                a = np.frombuffer(lzw(raw), dtype="<f4").reshape(self.th, self.tw).copy()
-            a[a < -1e30] = np.nan
-            self.tiles[k] = a
+            self.tiles[k] = ground(self.decode(tx, ty))
         return self.tiles[k]
 
     def cells(self, i, j):
