@@ -18,7 +18,7 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | `switch-trailing-diverging-speed` | 15 km/h | § 25.4b | missing: trailing switches not in the data | build writes them, game reads them |
 | `switch-trailing-straight-speed` | 30 km/h | § 25.5a | missing | as above |
 | `crossing-speed` | 15 km/h over diamonds and wire crossings | § 25.4c | missing, except where OSM tags it | build writes the diamonds, game reads them; wire crossings not |
-| `small-radius-speed`, `small-radius-curves` | 15 km/h over a whole curve under 25 m | § 49.19; 11 places | **differs:** 10 at R 20 (8 of the 28 curves under 25 m) | at least 15 from a curve alone; the list is not read |
+| `small-radius-speed`, `small-radius-curves` | 15 km/h over a whole curve under 25 m | § 49.19; 11 places | **differs:** 10 at R 20 (8 of the 28 curves under 25 m) | at least 15 from a curve alone; the list is not read  15 under R 25 m, and a curve no sign sets at `curve-lateral-acceleration` 1.0 m/s² in whole km/h since #451 (was 0.8 in 5 km/h steps) |
 | `loop-speed` | 15 km/h in a loop's curves | § 25.4e | only where OSM tags it | 15 from the switch into a loop to the switch out of it, the loops found by the user's rule (below) |
 | `switch-v-sign-speed` | 10 km/h facing diverging at a "V" | § 49.20 | missing; no list of places | missing |
 | `stop-pass-speed` | 30 km/h, the front passing a stop's sign without stopping | § 25.5b | missing | a point at each stop's sign for the front; the autopilot keeps it, passing it 3 km/h over costs the overspeed (below) |

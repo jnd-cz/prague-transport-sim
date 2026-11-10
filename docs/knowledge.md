@@ -618,6 +618,17 @@ Review these when realism matters; most move into the build in M2.
   switch before the car's end, so no margin). The rear still has to leave each restriction. The radius is read over
   16 m of heading, which smears a sharp curve's end by about 12 m each way; most curves here have transitions, so the
   limit climbs along them.
+- **A curve's speed** (#451): no sign stands at most curves, and D 1/2 only asks for a speed that suits the curvature (§ 25.7),
+  so the limit is √((a + cant · g / 1.5) · R) in whole km/h at a = 1.0 m/s² unbalanced (`curve-lateral-acceleration`), and 15
+  under R 25 m, where the "r" sign stands (§ 49.19). Two line 23 rides mapped on our track (6312 on 2026-10-31, 6921 on
+  2026-11-08; GPS within 0–3 m of the track there) took the unsigned curves of R 30–60 m at 1.2–1.6 m/s² without cant
+  (R 54 m past Pražský hrad and above Chotkova's hairpin at 26–34 km/h), and the signed hairpin at Chotkovy sady (R 24 m, 15)
+  at 12–17 km/h, so the drivers keep a signed limit. The old 0.8 m/s² was a design value (0.65 comfortable, about 1.0 the
+  upper bound) in 5 km/h steps: 20 km/h for R 45–60 m. At 1.0 the rides go over our limit in no curve on 6312's ride and in
+  three on 6921's (4–8 km/h). With it the autopilot's moving time in the stops check fell by 95 s on line 22 and 55 s on line 23,
+  with fewer presses and the same energy. Derailment (`src/speedRules.js` `derailRisk`): a second over 2.25 m/s² in a curve, 1.5
+  times its limit's speed, or 1.5 times a switch's, crossing's or loop's 15 (the user, 2026-11-10: "40-50% over speed limit or
+  something over 2-2.5 m/s² for at least one second").
 - Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
   arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours

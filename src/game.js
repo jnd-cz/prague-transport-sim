@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
 import { Route } from './route.js';
-import { FROG, placeStretches, stopPassPoints, trackworkStretches, withoutOwnPieces } from './speedRules.js';
+import { DERAIL, FROG, derailRisk, placeStretches, stopPassPoints, trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
 import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
@@ -122,8 +122,8 @@ export class Game {
     // restrictions: switches and crossings (D 1/2 § 25.4-5), and a local rule where OSM tags no speed. A slope itself sets
     // none (`gradient-no-speed`; the user, 2026-11-07: the steep descents are tagged in OSM)
     const facts = opts.speedFacts, trackwork = data.trackwork || null;
-    route.speedTop = T3.vMax * 3.6;
-    route.curveFloor = facts.smallRadius;
+    // (the opposite track's too: the oncoming trams take its curves by the same rule, #451)
+    for (const r of [route, this.backRoute]) if (r) Object.assign(r, { speedTop: T3.vMax * 3.6, curveFloor: facts.smallRadius, curveAccel: facts.curveAccel });
     if (data.speed) route.speedInfo = { ...data.speed, osm: withoutOwnPieces(data.speed.osm, data.speed.step, this.switches, trackwork, facts) };
     const extra = [...trackworkStretches(this.switches, trackwork, facts),
                    ...placeStretches(facts.places, data.stops, data.speed?.osm, data.speed?.step ?? 5)];
@@ -1753,12 +1753,15 @@ export class Game {
       this.score -= pts;
       this.penalties.speed = (this.penalties.speed || 0) + pts;
       if (!this.overspeedWarned) { this.overspeedWarned = true; this.msg(t('msg.speeding', { v: lim }), 'bad'); }
-      if (tram.kmh > lim + 22 && lim <= 20) {
-        this.audio.crash();
-        this.penalty('derail', 1000, t('msg.derailed'));
-        this._end(true);
-      }
     } else if (tram.kmh < lim) this.overspeedWarned = false;
+    // (src/speedRules.js derailRisk: a second on end over the curve's or the switch's margin)
+    this.derailT = derailRisk(this.route, this.limits, tram.s, tram.length, tram.v) ? (this.derailT || 0) + dt : 0;
+    if (this.derailT >= DERAIL.secs && !this.derailed) {
+      this.derailed = true;
+      this.audio.crash();
+      this.penalty('derail', 1000, t('msg.derailed'));
+      this._end(true);
+    }
     // a point limit is kept as the front passes it; over it, the penalty is the overspeed's above as if the limit held over
     // the set's own length (a point passes in a few frames)
     const was = this._frontWas ?? tram.s;
