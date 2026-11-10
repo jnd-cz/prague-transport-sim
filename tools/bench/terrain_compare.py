@@ -357,13 +357,13 @@ def panel(path, ctx, cx, cy, size, title, lines=(), taken=None, lim=3.0, px=450)
     k = px / n
     views = [hillshade(z0), hillshade(z1), diverging(z0 - z1, lim)]
     names = ["IPR 1 m (lidar 2023), hillshade", "DMR 5G (lidar 2009-2013), hillshade", f"IPR - DMR 5G, ±{lim:g} m"]
-    W, H = 3 * px + 4 * 12, px + 120
+    W, H = 3 * px + 4 * 12, px + 140
     im = Image.new("RGB", (W, H), (255, 255, 255))
     d = ImageDraw.Draw(im)
     d.text((12, 8), title, fill=(0, 0, 0), font=font(18))
 
-    def pt(x, y, ox):
-        return (ox + (x - x0 + 0.5) * k, 44 + (y0 - y + 0.5) * k)
+    def pt(x, y, ox, top=44):
+        return (ox + (x - x0 + 0.5) * k, top + (y0 - y + 0.5) * k)
     tset = None
     if taken is not None and len(taken):
         ti = np.round((taken[:, 0] - x0)).astype(int)
@@ -373,23 +373,26 @@ def panel(path, ctx, cx, cy, size, title, lines=(), taken=None, lim=3.0, px=450)
         tset[tj[m], ti[m]] = True
     for v, (rgb, nm) in enumerate(zip(views, names)):
         ox = 12 + v * (px + 12)
-        im.paste(Image.fromarray(rgb).resize((px, px), Image.NEAREST), (ox, 44))
+        # (each view draws its outlines on its own image, so lines stop at the view's edge)
+        sub = Image.fromarray(rgb).resize((px, px), Image.NEAREST)
+        ds = ImageDraw.Draw(sub)
         box = (x0 - 1, y0 - n - 1, x0 + n + 1, y0 + 1)
         for xy in near(osm.get("building", []), ctx, "bld_box", box):
-            d.line([pt(x, y, ox) for x, y in xy], fill=(0, 0, 0), width=1)
+            ds.line([pt(x, y, 0, 0) for x, y in xy], fill=(0, 0, 0), width=1)
         for xy in near([(True, w[3]) for w in ways], ctx, "way_box", box):
-            d.line([pt(x, y, ox) for x, y in xy], fill=(220, 0, 200), width=3)
+            ds.line([pt(x, y, 0, 0) for x, y in xy], fill=(220, 0, 200), width=3)
         for xy in lines:
-            d.line([pt(x, y, ox) for x, y in xy], fill=(0, 140, 0), width=2)
+            ds.line([pt(x, y, 0, 0) for x, y in xy], fill=(0, 140, 0), width=2)
         if tset is not None:  # (the taken cells' outline: cell edges between taken and not)
             jj, ii = np.nonzero(tset[:, 1:] != tset[:, :-1])
             for j, i in zip(jj, ii):
-                a, b = pt(x0 + i + 0.5, y0 - j + 0.5, ox), pt(x0 + i + 0.5, y0 - j - 0.5, ox)
-                d.line([a, b], fill=(0, 200, 60), width=2)
+                a, b = pt(x0 + i + 0.5, y0 - j + 0.5, 0, 0), pt(x0 + i + 0.5, y0 - j - 0.5, 0, 0)
+                ds.line([a, b], fill=(0, 200, 60), width=2)
             jj, ii = np.nonzero(tset[1:, :] != tset[:-1, :])
             for j, i in zip(jj, ii):
-                a, b = pt(x0 + i - 0.5, y0 - j - 0.5, ox), pt(x0 + i + 0.5, y0 - j - 0.5, ox)
-                d.line([a, b], fill=(0, 200, 60), width=2)
+                a, b = pt(x0 + i - 0.5, y0 - j - 0.5, 0, 0), pt(x0 + i + 0.5, y0 - j - 0.5, 0, 0)
+                ds.line([a, b], fill=(0, 200, 60), width=2)
+        im.paste(sub, (ox, 44))
         d.rectangle([ox, 44, ox + px, 44 + px], outline=(0, 0, 0))
         d.text((ox, 44 + px + 6), nm, fill=(0, 0, 0), font=font(15))
     # the colour scale under the third view, and a 50 m bar
