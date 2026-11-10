@@ -46,8 +46,8 @@ modelu. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
   dveře 0–1, výška trolejového drátu nad kolejnicí pro sběrač (pod jeho pracovním rozsahem se stáhne), brzdová
   světla, magnety kolejnicových brzd, směrovky (`'left'`, `'right'`, `'hazard'` nebo nic, blikají podle `clock`:
   `src/lamps.js`), dálková světla. Podrobný model bere všechno (`poseHybrid`), vestavěný vše kromě dveří a čelistí
-  (`poseSimple`). Světlomety a koncová světla svítí, kdykoli je tramvaj v provozu, čelo soupravy na prvním voze
-  a záď na posledním; brzdová světla na zádi soupravy. Náš řidič ovládá směrovky a dálková světla klávesami;
+  (`poseSimple`). Světlomety a koncová světla svítí, kdykoli je tramvaj v provozu, čelo soupravy jen na prvním voze,
+  červená světla zádi (koncová a brzdová) na každém voze. Náš řidič ovládá směrovky a dálková světla klávesami;
   autopilot a cizí tramvaje dávají směrovky samy (`src/indicators.js`) a cizí T3M ukazuje další zastávku
   (`setNextStop`).
 - **Cizí tramvaje** (`src/traffic.js`) se objevují a mizí přes `setOpacity`, po materiálech: vlastní

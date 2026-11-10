@@ -47,7 +47,7 @@ model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
   the track brakes' magnets, the indicators (`'left'`, `'right'`, `'hazard'` or none, blinking by `clock`:
   `src/lamps.js`), the high beams. The hybrid takes all of it (`poseHybrid`), the built-in car all but the doors and
   the shoes (`poseSimple`). The headlights and tail lamps are lit whenever a tram is in service, a set's front on its
-  leading car and its rear on the last; the brake lamps at the set's rear. Our driver works the indicators and high
+  leading car only, the rear red lamps (tail and brake) on every car. Our driver works the indicators and high
   beams with keys; the autopilot and AI trams indicate by themselves (`src/indicators.js`), and an AI T3M shows its
   next stop (`setNextStop`).
 - **AI trams** (`src/traffic.js`) fade in and out with `setOpacity`, per material: a material's own
