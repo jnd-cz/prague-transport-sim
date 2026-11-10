@@ -6,6 +6,11 @@ CC BY 4.0 ČÚZK), exported in S-JTSK tiles of TILE m at PX m pixels: raw/dem/{i
 error unless the reader was made with fetch=True, which downloads it (then publish a snapshot with it, #223).
 Read by tools/fine_terrain.py (a line's band) and tools/city_terrain.py (IPR's gaps inside the city).
 
+    python -P -E tools/dmr5g.py --under-ipr [--pause 1]   # every tile holding a cell of IPR's raster with ground
+Downloads the tiles raw/dem/ lacks, one request at a time with `--pause` s between them; a tile refused through all the
+retries is tried again after 5 min (6 times), then the run stops (a rerun goes on from there). For tools/bench/
+terrain_compare.py (#428); such tiles go into a snapshot only by a decision.
+
 The passages rule: IPR is bare earth without structures, so over a passage (an underpass, a culvert) it shows the
 passage, not the surface over it, which DMR 5G kept. Near an OSM passage (PASSAGE_R), a point where IPR lies more
 than PASSAGE_DROP below DMR 5G takes DMR 5G: measured 2026-10-30, the track would otherwise dip 5-6 m into
@@ -112,3 +117,59 @@ class Tiles:
             c, d = img[j0 + 1, i0], img[j0 + 1, i0 + 1]
             out[m] = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
         return out
+
+
+def under_ipr(ipr=None):
+    """The tiles (ix, iy) holding any cell of IPR's raster with ground (tools/ipr_dtm.py), north to south."""
+    from ipr_dtm import IprDtm
+    from sources import TERRAIN_FLOOR
+    ipr = ipr or IprDtm()
+    out = set()
+    for ty in range(-(-ipr.h // ipr.th)):
+        for tx in range(ipr.ntx):
+            a = ipr.decode(tx, ty)[:min(ipr.th, ipr.h - ty * ipr.th), :min(ipr.tw, ipr.w - tx * ipr.tw)]
+            j, i = np.nonzero(a >= TERRAIN_FLOOR)
+            if not len(j):
+                continue
+            ix = np.floor((ipr.e0 + tx * ipr.tw + i) / TILE).astype(np.int64)
+            iy = np.floor((ipr.n0 - (ty * ipr.th + j)) / TILE).astype(np.int64)
+            k = np.unique((ix + (1 << 16)) * (1 << 18) + iy + (1 << 16))  # (one key a tile: unique on 1-D is fast)
+            out.update((int(v >> 18) - (1 << 16), int(v & ((1 << 18) - 1)) - (1 << 16)) for v in k)
+    return sorted(out, key=lambda t: (-t[1], t[0]))
+
+
+def fetch_all(tiles, pause=1.0, out=print):
+    """Download the tiles raw/dem/ lacks, one at a time; a tile refused through download()'s retries waits 5 min and
+    tries again, 6 times, before the run stops."""
+    todo = [t for t in tiles if not os.path.exists(os.path.join(DIR, name(*t)))]
+    out(f"{len(tiles)} tiles, {len(tiles) - len(todo)} in raw/dem/, {len(todo)} to download", flush=True)
+    t0, got, size = time.time(), 0, 0
+    for k, (ix, iy) in enumerate(todo):
+        f = os.path.join(DIR, name(ix, iy))
+        for wait in range(7):
+            try:
+                download(ix, iy, f, out=out)
+                break
+            except SystemExit:
+                if wait == 6:
+                    raise SystemExit(f"tile {ix},{iy} refused for {6 * 5} min: stopped after {got} tiles (a rerun goes on)") from None
+                out(f"  tile {ix},{iy} refused: waiting 5 min", flush=True)
+                time.sleep(300)
+        got, size = got + 1, size + os.path.getsize(f)
+        if (k + 1) % 25 == 0 or k + 1 == len(todo):
+            out(f"  {k + 1}/{len(todo)} tiles, {size / 1e6:.0f} MB, {time.time() - t0:.0f} s", flush=True)
+        time.sleep(pause)
+    return got, size
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if "--under-ipr" not in sys.argv:
+        raise SystemExit(__doc__)
+    pause = float(sys.argv[sys.argv.index("--pause") + 1]) if "--pause" in sys.argv else 1.0
+    t0 = time.time()
+    tiles = under_ipr()
+    print(f"{len(tiles)} tiles hold IPR's ground ({time.time() - t0:.0f} s)", flush=True)
+    os.makedirs(DIR, exist_ok=True)
+    got, size = fetch_all(tiles, pause)
+    print(f"downloaded {got} tiles, {size / 1e6:.0f} MB in {time.time() - t0:.0f} s", flush=True)
