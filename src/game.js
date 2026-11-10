@@ -18,6 +18,7 @@ const STOP_AHEAD = 6;          // without a stop sign in the data: the front sto
 // Without a platform (_stopZone): any front position this far either side of the sign counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
+const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
 import { Feeding } from './electric.js';
@@ -1079,21 +1080,24 @@ export class Game {
     if (text) this.msg(`${text} (+${pts})`, 'good', 3);
   }
 
-  get currentLimit() {
-    // the whole tram length must respect a restriction (metre by metre, as the limits are: 5 m steps could step over a
-    // curve's lowest few metres, and did so differently at each position of the tram)
+  get currentLimit() { return this.limitUnder(this.limits); }
+
+  // the lowest limit under the tram in `lim` (the game's limits, or the autopilot's milder ones, #242): the whole tram length
+  // must respect a restriction (metre by metre, as the limits are: 5 m steps could step over a curve's lowest few metres, and
+  // did so differently at each position of the tram)
+  limitUnder(lim) {
     let v = 99;
-    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 1) v = Math.min(v, this.limits.at(s));
+    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 1) v = Math.min(v, lim.at(s));
     return v;
   }
 
   // The most restrictive lower limit ahead: the one that needs braking soonest (a 10 km/h
   // curve shortly after a 40 km/h section matters more than the 40).
-  nextLimitChange() {
-    const cur = this.currentLimit;
+  nextLimitChange(lim = this.limits) {
+    const cur = this.limitUnder(lim);
     let best = null, bestNeed = Infinity;
     for (let d = 1; d < 300; d += 1) {
-      const v = this.limits.at(this.tram.s + d);
+      const v = lim.at(this.tram.s + d);
       if (v >= cur) continue;
       const need = Math.sqrt((v / 3.6) ** 2 + 2 * 0.7 * d); // speed allowed now to make it
       if (need < bestNeed) { bestNeed = need; best = { v, d }; }
@@ -1557,7 +1561,7 @@ export class Game {
     // used a shared budget up, and ours then got a red it could not stop for, line 17 s 3158, 10251)
     const backWarn = sig.t >= Y.gS - 6 && sig.t < Y.gS - 3, endOurs = inOurs() && b - sig.t < 3.2;
     const holds = [['ext', endOurs && committed], ['extAhead', endOurs && sig.aheadCommitted], ['extBack', backWarn && sig.backCommitted]];
-    const h = holds.find(([k, want]) => want && (sig[k] ?? 0) < 10);
+    const h = holds.find(([k, want]) => want && (sig[k] ?? 0) < PHASE_HOLD);
     // an on-demand crossing (sig.demand: no street or footway we know there) rests on GO for the trams
     // (before both directions' blinking) until someone asks to cross, about every two minutes; then
     // one cycle runs
@@ -1566,6 +1570,7 @@ export class Game {
     if (h) sig[h[0]] = (sig[h[0]] ?? 0) + dt;
     else if (!rest) sig.t += dt;
     if (sig.t >= Y.C) { sig.t -= Y.C; sig.ext = 0; sig.extAhead = 0; sig.extBack = 0; sig.request = false; }
+    sig.aheadHoldLeft = PHASE_HOLD - (sig.extAhead ?? 0); // (what an AI tram ahead can still count on, src/traffic.js)
     const prev = sig.state;
     sig.state = inOurs() ? (b - sig.t > 3 ? 'go' : 'warn') : 'stop';
     if (sig.state === 'stop' && prev !== 'stop') sig.stopSince = this.clock;

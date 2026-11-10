@@ -33,7 +33,7 @@ export function stopsWatch(game) {
     const car = [...(game.carsOnTrack || []), ...(game.carsCrossing || [])].some((c) => c.s > tr.s && c.s - tr.s < 12);
     a.behind = gap != null && gap < 12 ? 'tram' : car ? 'car' : false;
     R.stops.push({ stop: st.name, s: Math.round(st.target), v0: +(a.v0 * 3.6).toFixed(0), d0: Math.round(a.d0), secs: +(game.clock - a.t0).toFixed(1), flips: a.flips.length,
-      pulses: a.pulses, steps: a.changes, decel: +a.decel.toFixed(2), jerk: +a.jerk.toFixed(2), shoesAtSpeed: a.shoes, restarts: a.restarts, err: a.err, behind: a.behind });
+      pulses: a.pulses, steps: a.changes, decel: +a.decel.toFixed(2), jerk: +a.jerk.toFixed(2), shoesAtSpeed: a.shoes, restarts: a.restarts, err: a.err, behind: a.behind, arr: Math.round(game.clock - st.sched) });
     a = null;
   };
   return {
@@ -49,7 +49,8 @@ export function stopsWatch(game) {
       if (to) {
         if (to !== curTo) { curTo = to; R.stretches.push({ to: to.name, drive: 0, brake: 0, t0: game.clock, tMove: null }); }
         const q = R.stretches[R.stretches.length - 1];
-        if (q.tMove === null && tr.v > 0.3) q.tMove = game.clock;
+        // (and, moving off, the quickest run there at the line's limits and the time in hand the autopilot saw, #242)
+        if (q.tMove === null && tr.v > 0.3) { q.tMove = game.clock; q.quick = game.pilot?._run ? game.pilot._run(to.target) - game.pilot._run(tr.s) : null; q.hand = game.pilot?.inHand ?? null; q.sched = to.sched - game.clock; }
         if (n > 0 && lastStep <= 0) q.drive++;
         if (n < 0 && lastStep >= 0 && tr.v > 0.3) q.brake++;
       }
@@ -130,7 +131,11 @@ export function stopsWatch(game) {
         slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
         comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
-        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)) })) };
+        // (arrival against the timetable's time, which is the departure: arrOnTime the share within ±30 s of it, arrEarly the stops
+        // reached more than 30 s before it, where the tram then stands, arrMean in s; #242. The terminus is left out)
+        ...((A) => ({ arrOnTime: A.length ? +(A.filter((x) => Math.abs(x) <= 30).length / A.length).toFixed(2) : null, arrEarly: A.filter((x) => x < -30).length,
+          arrMean: A.length ? Math.round(A.reduce((t, x) => t + x, 0) / A.length) : null, arrs: A }))(S.slice(0, -1).map((x) => x.arr)),
+        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)), quick: q.quick == null ? null : Math.round(q.quick), hand: q.hand == null ? null : Math.round(q.hand), sched: q.sched == null ? null : Math.round(q.sched) })) };
     },
   };
 }

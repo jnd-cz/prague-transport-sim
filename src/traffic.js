@@ -59,10 +59,21 @@ function stopDistance(v, state) {
   return state === 'warn' ? (v * v) / 1.8 + v * 2 + 1 : (v * v) / 2.6 + v + 0.5;
 }
 
+// Seconds an AI tram at v takes to bring its front `d` m on, braking on its curve (0.7 m/s², as limitSpeed) to vEnd there, and no
+// faster than now (one that would still speed up gets there sooner: the count errs towards stopping)
+function timeTo(d, v, vEnd) {
+  let t = 0;
+  for (let x = 0.5; x < d; x += 1) t += 1 / Math.max(0.5, Math.min(Math.max(v, 0.5), Math.sqrt(vEnd * vEnd + 2 * 0.7 * (d - x))));
+  return t;
+}
+
 // The speed (m/s) an AI tram may run at s: the limit under the whole set, and every lower limit ahead
 // reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
 // stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
 // until it turned red (line 17 s 10826).
+// AI trams run AI_UNDER m/s under it, as our autopilot catching up (#242; the user, 2026-11-10: "keep them simply driving swiftly up
+// under the given speed limit"); the oncoming trams ran at 0.85 of it.
+const AI_UNDER = 0.2;
 function limitSpeed(lim, s, len) {
   let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
   for (let d = 5; d < 300; d += 5) v = Math.min(v, Math.sqrt((lim.at(s + d) / 3.6) ** 2 + 2 * 0.7 * Math.max(0, d - 5)));
@@ -1674,7 +1685,7 @@ export class Traffic {
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = limitSpeed(g.limits, t.s, t.length);
+      let vt = Math.max(0, limitSpeed(g.limits, t.s, t.length) - AI_UNDER);
       const close = t.s - t.length - tram.s < 300; // (our tram closing in)
       let stopAt = null;
       t.waitFor = null; t.stop = null;
@@ -1695,6 +1706,14 @@ export class Traffic {
         // already past "3 m before the signal": it stays as long as it is before the head itself)
         const d = sig.s - 3 - t.s;
         if ((d > 0 && d > stopDistance(t.v, sig.state)) || (t.v < 0.5 && t.s < sig.s - 0.3)) t.redStops.add(sig);
+        // (too close to stop comfortably for a blinking GO, it goes on only if it is there while the GO lasts: the rest of the blinking
+        // and what the controller can still hold for it. Slowing for a junction's 15 km/h past the signal, one took 12 s from 91 m out
+        // at 44 km/h, past the 10 s hold, and ran the red 1.4 s late, line 17 seed 5; 11 s at line 22 s 4211, #394. Not there in
+        // time and able to stop on full service braking, it stops)
+        else if (sig.state === 'warn' && d > 0 && d > stopDistance(t.v, 'stop')) {
+          const vSig = Math.min(limitSpeed(g.limits, sig.s, t.length) - AI_UNDER, stopAt !== null && stopAt > sig.s ? Math.sqrt(1.8 * Math.max(0, stopAt - 0.5 - sig.s)) : Infinity);
+          if (timeTo(sig.s - t.s, t.v, Math.max(0, vSig)) + 1 > (sig.timer ?? 0) + (sig.aheadHoldLeft ?? 0)) t.redStops.add(sig);
+        }
         if (t.redStops.has(sig)) stop(sig.s - 3, 'signal');
         else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
       }
@@ -1773,7 +1792,7 @@ export class Traffic {
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };
     for (const sig of this.game.signals) sig.backCommitted = false; // (set again below, read by the controller)
     for (const t of this.oncoming) {
-      let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
+      let vt = Math.max(0, limitSpeed(this.backLimits, t.s, t.length) - AI_UNDER);
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null, platformAt = stopAt;
       t.waitFor = null; t.stop = stopAt === null ? null : { s: stopAt, why: 'stop' };
