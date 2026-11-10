@@ -3168,7 +3168,186 @@
   ]
  },
  "surveyGround": {
-  "note": "The user's answers to the survey-ground review cards (reports/review/survey-ground-N.json): a ground-level survey area that sits steadily off IPR's 2023 lidar where neither DI's rails nor DMR 5G decide. verdict survey: the area keeps the survey's heights (the ground changed); lidar: it moves to IPR. Keyed by a point in the area; tools/survey_ground_answers.py writes the places from review mode's answers.",
-  "places": []
+  "note": "The user's answers to the survey-ground review cards (reports/review/survey-ground-N.json): a ground-level survey area that sits steadily off IPR's 2023 lidar where neither DI's rails nor DMR 5G decide. verdict survey: the area keeps the survey's heights (the ground changed); lidar: it moves to IPR. Keyed by a point in the area; tools/survey_ground_answers.py writes the places from review mode's answers. heldRule decides such an area without an answer (tools/zps_ground.py held_verdict: a courtyard is OSM buildings within 60 m in 12 of 16 directions).",
+  "heldRule": {
+   "courtyard": "lidar",
+   "outsideGreen": "survey",
+   "outside": "lidar",
+   "said": "I went over them and most cases is courtyard where I can't see much detail in ortophoto, ground view is missing, I would go with lidar in these cases. Outside it's often elecated greenery and we can go with the survey there, so just two general rules.",
+   "where": "the user, #446 session of 2026-11-10 (PR #448), after answering the 19 cards; outside paved areas go to the lidar as all 3 of the user's answers did"
+  },
+  "places": [
+   {
+    "lat": 50.006752,
+    "lon": 14.450276,
+    "verdict": "survey",
+    "line": "17",
+    "said": "The survey is right: the ground changed since the lidar",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line17.json, #446)",
+    "card": "green, 119 m²: the survey +0.64 m off IPR (2023); DMR 5G +0.75 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.065443,
+    "lon": 14.302005,
+    "verdict": "survey",
+    "line": "9",
+    "said": "The survey is right: the ground changed since the lidar (elevated greenery)",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line9.json, #446)",
+    "card": "green, 108 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.47 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.068174,
+    "lon": 14.354775,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it (unpaved mini island in the water)",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line9.json, #446)",
+    "card": "paved, 355 m²: the survey -0.98 m off IPR (2023); DMR 5G +1.04 m off IPR"
+   },
+   {
+    "lat": 50.069059,
+    "lon": 14.362801,
+    "verdict": "survey",
+    "line": "9",
+    "said": "The survey is right: the ground changed since the lidar (elevated shrubbery)",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line9.json, #446)",
+    "card": "green, 202 m²: the survey -1.05 m off IPR (2023); DMR 5G +0.33 m off IPR"
+   },
+   {
+    "lat": 50.069645,
+    "lon": 14.467699,
+    "verdict": "survey",
+    "line": "22",
+    "said": "The survey is right: the ground changed since the lidar",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line22.json, #446)",
+    "card": "sidewalk, 107 m²: the survey +1.59 m off IPR (2023); DMR 5G +0.88 m off IPR"
+   },
+   {
+    "lat": 50.071668,
+    "lon": 14.485149,
+    "verdict": "survey",
+    "line": "22",
+    "said": "The survey is right: the ground changed since the lidar (bushes and general overgrown greenery)",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line22.json, #446)",
+    "card": "green, 303 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.38 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.07619,
+    "lon": 14.455622,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line9.json, #446)",
+    "card": "green, 104 m²: the survey -0.71 m off IPR (2023); DMR 5G -0.41 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.079526,
+    "lon": 14.423559,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line23.json, #446)",
+    "card": "paved, 471 m²: the survey +0.62 m off IPR (2023); DMR 5G +0.47 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.083255,
+    "lon": 14.41486,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line17.json, #446)",
+    "card": "green, 307 m²: the survey -0.52 m off IPR (2023); DMR 5G -0.33 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.08541,
+    "lon": 14.433227,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it (structure above ground can be seen in ortophoto)",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line23.json, #446)",
+    "card": "paved, 289 m²: the survey +1.28 m off IPR (2023); DMR 5G +1.82 m off IPR"
+   },
+   {
+    "lat": 50.086259,
+    "lon": 14.43016,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line23.json, #446)",
+    "card": "paved, 197 m²: the survey -0.70 m off IPR (2023); DMR 5G -0.56 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.086612,
+    "lon": 14.414167,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line17.json, #446)",
+    "card": "paved, 148 m²: the survey -0.91 m off IPR (2023); DMR 5G -0.94 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.089899,
+    "lon": 14.436984,
+    "verdict": "lidar",
+    "line": "23",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line23.json, #446)",
+    "card": "paved, 132 m²: the survey -0.86 m off IPR (2023); DMR 5G -0.43 m off IPR"
+   },
+   {
+    "lat": 50.091148,
+    "lon": 14.418973,
+    "verdict": "survey",
+    "line": "17",
+    "said": "The survey is right: the ground changed since the lidar (elevated greenery and shrubs)",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line17.json, #446)",
+    "card": "green, 530 m²: the survey +1.20 m off IPR (2023); DMR 5G +0.65 m off IPR"
+   },
+   {
+    "lat": 50.097449,
+    "lon": 14.434373,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line17.json, #446)",
+    "card": "paved, 474 m²: the survey +6.07 m off IPR (2023); DMR 5G +0.70 m off IPR"
+   },
+   {
+    "lat": 50.099351,
+    "lon": 14.433835,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line17.json, #446)",
+    "card": "paved, 116 m²: the survey +0.81 m off IPR (2023); DMR 5G +0.70 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.1017,
+    "lon": 14.473353,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line37.json, #446)",
+    "card": "green, 463 m²: the survey -0.50 m off IPR (2023); DMR 5G -0.40 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.10172,
+    "lon": 14.504463,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line37.json, #446)",
+    "card": "green, 108 m²: the survey +0.85 m off IPR (2023); DMR 5G +0.63 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.105578,
+    "lon": 14.535314,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (..\\tg-deploy\\reports\\reviews\\line37.json, #446)",
+    "card": "green, 102 m²: the survey -0.58 m off IPR (2023); DMR 5G -0.58 m off IPR, with the survey"
+   }
+  ]
  }
 }

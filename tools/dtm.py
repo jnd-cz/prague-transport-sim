@@ -337,13 +337,14 @@ for package in packages:
 import dmr5g  # noqa: E402
 _truth_path = os.path.join(ROOT, "data", "truth.json")
 _facts = json.load(open(_truth_path, encoding="utf-8")) if os.path.exists(_truth_path) else {}
-_osm_cover, _changing = [], []
+_osm_cover, _changing, _buildings = [], [], []
 try:
     import osm_local
     if osm_local.available():
         _pts = line["path"] + line.get("pathBack", [])
         _osm_cover = zps_ground.osm_covers(osm_local.ways(zps_ground.is_cover, bbox=F.bbox(_pts, 150)), F)
         _changing = zps_ground.osm_covers(osm_local.ways(zps_ground.is_changing, bbox=F.bbox(_pts, 150)), F)
+        _buildings = zps_ground.osm_covers(osm_local.ways(lambda t: "building" in t, bbox=F.bbox(_pts, 220)), F)
 except ImportError:
     pass
 if not _osm_cover:
@@ -367,7 +368,8 @@ except (ImportError, OSError) as e:
     _rails = zps_ground.rail_points([])
 ground_verdicts = zps_ground.judge(areas, lambda E, N: _ipr.sample(E, N), _older, zps_ground.cover_union(areas, _osm_cover),
                                    _rails, F, _facts.get("surveyGround", {}).get("places", []),
-                                   zps_ground.cover_union([], _changing))
+                                   zps_ground.cover_union([], _changing), _facts.get("surveyGround", {}).get("heldRule"),
+                                   zps_ground.cover_union([], _buildings))
 ground_moved = zps_ground.apply(areas, ground_verdicts)
 ground_report = zps_ground.summary(ground_verdicts, ground_moved)
 print("survey ground:", ground_report["areas"], ground_report["m2"], f"{ground_moved} vertices moved")

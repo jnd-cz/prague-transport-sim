@@ -323,6 +323,11 @@ Sections:
   - **A ground-level outline that shares its lines with a deck carries the deck's heights**: under Divadelní's
     deck the road's corners read 193.2-193.3 m at 11 of 16, the floor's 187.6-187.8 at the rest, both levels on the
     same line; a height an upper level's line has at the same place, over 2 m above the area's ground, is the deck's.
+  - **What neither the rails nor DMR 5G decide** (19 areas on the five lines, the user's answers of 2026-11-10 in
+    `data/truth.json` `surveyGround`): mostly courtyards, where the orthophoto shows little and there is no street
+    view, given to the lidar (13), and greenery outside, raised beds and shrubs, given to the survey (6). Their rule
+    (`heldRule`): a courtyard (OSM buildings within 60 m in 12 of 16 directions) to the lidar, greenery outside to the
+    survey, paved outside to the lidar; it matches 14 of the 19 answers.
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
   of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**

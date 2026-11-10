@@ -43,6 +43,11 @@ MIN_INNER = 2 / 3  # share of its vertices with a point INNER m inside it
 # own rule, #447)
 NOT_GROUND = {"wall", "roof", "deck", "tunnel", "underpass", "water", "stairs"}
 RAIL_STEP = 2.0  # m between rail stations
+# Areas neither the rails nor DMR 5G decide: the user's rule (data/truth.json surveyGround.heldRule), a courtyard to the
+# lidar, greenery outside to the survey. A courtyard: OSM buildings within COURT_REACH in COURT_SHARE of COURT_RAYS
+# directions from the area's point. On the user's 19 answered cards of 2026-11-10: the courtyards 7 of 9 answered
+# lidar; outside, greenery 4 of 7 survey, paved 3 of 3 lidar (14 of 19; "outside to the survey" alone matches 11).
+COURT_RAYS, COURT_REACH, COURT_SHARE = 16, 60.0, 0.75
 FLOOR = 170.0  # m: no ground under it (tools/sources.py TERRAIN_FLOOR; DI writes 0 for a missing height)
 
 
@@ -137,13 +142,33 @@ def surface_at(r, x, y):
     return float((r[o, 2] * w).sum() / w.sum())
 
 
-def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None):
+def enclosed(x, y, buildings):
+    """The share of COURT_RAYS directions from a point in which a building (a geometry, or None) lies within COURT_REACH."""
+    if buildings is None or buildings.is_empty:
+        return 0.0
+    a = np.arange(COURT_RAYS) * 2 * np.pi / COURT_RAYS
+    rays = [shapely.LineString([(x, y), (x + COURT_REACH * np.cos(t), y + COURT_REACH * np.sin(t))]) for t in a]
+    return float(np.mean([buildings.intersects(ray) for ray in rays]))
+
+
+def held_verdict(v, rule, buildings):
+    """The user's rule for an area nothing else decides: the verdict, or None without the rule."""
+    if not rule:
+        return None
+    v["enclosed"] = round(enclosed(v["x"], v["y"], buildings), 2)
+    if v["enclosed"] >= COURT_SHARE:
+        return rule["courtyard"]
+    return rule["outsideGreen"] if v["c"] == "green" else rule["outside"]
+
+
+def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, rule=None, buildings=None):
     """A verdict per ground-level area (the index into areas): "fits" (within OFFSET of IPR), "small" (too small or
     narrow for the lidar), "covered", "uneven" (no steady offset), "lidar" (the survey is wrong: move it), "survey" (IPR
     is out of date there), "changing" (a construction site), "review" (held).
     ground / older: IPR and DMR 5G at S-JTSK arrays (NaN where none); cover: cover_union; rails: rail_points; frame:
     tools/geo.Frame (areas in its city frame); facts: data/truth.json surveyGround.places ({lat, lon, verdict});
-    changing: the union of OSM's construction sites."""
+    changing: the union of OSM's construction sites; rule: data/truth.json surveyGround.heldRule, with buildings (the
+    union of OSM's building footprints) for what neither the rails nor DMR 5G decide, else such an area is held."""
     out = {}
     rx, ry, rz = rails
     rtree = shapely.STRtree(shapely.points(rx, ry)) if len(rx) else None
@@ -208,7 +233,10 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None):
             if abs(v["older"]) <= AGREE:
                 v["verdict"], v["by"] = "lidar", "dmr5g"
                 continue
-        v["verdict"] = "review"
+        held = held_verdict(v, rule, buildings)
+        v["verdict"], v["by"] = (held, "rule") if held else ("review", None)
+        if v["by"] is None:
+            del v["by"]
     # the places of the areas a report names, in one call (lat/lon needs the projection grid: not for every area)
     named = [v for v in out.values() if v["verdict"] != "fits"]
     if named:
@@ -252,7 +280,7 @@ def summary(verdicts, moved):
         out["areas"][k] = out["areas"].get(k, 0) + 1
         out["m2"][k] = round(out["m2"].get(k, 0) + v["m2"])
     for k, name in (("lidar", "moved"), ("survey", "kept"), ("review", "review")):
-        out[name] = [{f: v[f] for f in ("c", "m2", "offset", "spread", "lat", "lon", "by", "rails", "older") if f in v}
+        out[name] = [{f: v[f] for f in ("c", "m2", "offset", "spread", "lat", "lon", "by", "rails", "older", "enclosed") if f in v}
                      for v in sorted(verdicts.values(), key=lambda v: -v["m2"]) if v["verdict"] == k]
     return out
 

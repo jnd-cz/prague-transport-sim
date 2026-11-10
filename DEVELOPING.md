@@ -327,7 +327,8 @@ reproduction commands and `--evidence` format.
 IPR's lidar where neither DI's rails nor DMR 5G say which is right (#446): `tools/dtm.py` writes the set per line
 (`tools/zps_ground.py`) and deletes it when nothing is held. `python -I tools/survey_ground_answers.py
 reports/reviews/line37.json` turns the answers that are a card's option into `data/truth.json` `surveyGround.places`,
-which the next `dtm.py` obeys; others stay held. `python -P -E tools/bench/survey_ground.py` measures every line's
+which the next `dtm.py` obeys; others stay held. An area without an answer takes the user's rule
+(`surveyGround.heldRule`: courtyards to the lidar, greenery outside to the survey), so a set appears only without it. `python -P -E tools/bench/survey_ground.py` measures every line's
 ground level against IPR and the rails (`--dtm DIR` for main's copies).
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),

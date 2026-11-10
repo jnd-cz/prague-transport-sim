@@ -83,6 +83,19 @@ class Judge(unittest.TestCase):
         v = verdict([square(0, 0, 20, GROUND + 1.2)], older=lambda E, N: np.full(np.shape(E), GROUND + 1.0))
         self.assertEqual(v["verdict"], "review")
 
+    def test_the_users_rule_decides_what_nothing_else_does(self):
+        """The user, 2026-11-10: courtyards to the lidar, greenery outside to the survey (paved outside: the lidar)."""
+        rule = {"courtyard": "lidar", "outsideGreen": "survey", "outside": "lidar"}
+        older = lambda E, N: np.full(np.shape(E), GROUND + 1.0)  # noqa: E731  (the lidars disagree: nothing else decides)
+        ring_of_houses = shapely.box(-40, -40, 60, 60).difference(shapely.box(-20, -20, 40, 40))
+        for area, buildings, want in ((square(0, 0, 20, GROUND + 1.2), ring_of_houses, "lidar"),
+                                      (square(0, 0, 20, GROUND + 1.2, cls="green"), shapely.box(100, 100, 120, 120), "survey"),
+                                      (square(0, 0, 20, GROUND + 1.2), shapely.box(100, 100, 120, 120), "lidar")):
+            v = zg.judge([area], ground, older, zg.cover_union([area]), NONE, F, rule=rule, buildings=buildings)[0]
+            self.assertEqual((v["verdict"], v["by"]), (want, "rule"))
+        v = zg.judge([square(0, 0, 20, GROUND + 1.2)], ground, older, zg.cover_union([]), NONE, F)[0]
+        self.assertEqual(v["verdict"], "review")  # (no rule: held)
+
     def test_small(self):
         """A planter or a light well: lidar's bare earth leaves it out."""
         self.assertEqual(verdict([square(0, 0, 5, GROUND + 1.5)])["verdict"], "small")
