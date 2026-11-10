@@ -110,6 +110,16 @@ class Check(unittest.TestCase):
         self.assertEqual(out["vertices"], {"model": 0, "rails": 1, "inside": 0})
         self.assertAlmostEqual(a["r"][2][2], 193.2)
 
+    def test_past_the_models_side_the_rails_of_the_same_deck(self):
+        """Krejcárek: the deck's corners on the model also agree with the rails; a tram area past the model's side sags."""
+        model = zd.Model(bridge(0, 0, 40, 5, DECK))
+        x = np.linspace(-5, 45, 51)
+        rails = zd.Rails((x, np.full(51, 4.0), np.full(51, DECK + 0.6)), ground)
+        on = square(0, 0, 10, DECK)  # (on the model and 0.6 m under the rails)
+        past = area([(10, 0, DECK), (20, 0, DECK), (20, 12, GROUND + 8.5), (10, 12, GROUND + 8.5)], cls="tram")
+        zd.check([on, past], model, rails)
+        self.assertEqual([q[2] for q in past["r"]], [DECK] * 4)
+
     def test_a_deck_over_the_track_is_not_the_tracks_deck(self):
         """A footbridge 6 m over raised rails: not lowered to them."""
         x = np.linspace(-5, 25, 31)

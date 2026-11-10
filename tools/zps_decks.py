@@ -213,14 +213,18 @@ def check(areas, model, rails):
     out["checked"] = {where[n]: float(ref[n]) for n in np.flatnonzero(np.isfinite(ref))}
     group = deck_groups(areas)
     ok, by_area, by_class, by_group = set(), {}, {}, {}
-    for (ai, _, _), k, o, g in zip(where, key, off, agree):
-        if not g:
-            continue
+    # (a vertex on a model that also agrees with raised rails within REACH counts for the rails too: with the model's
+    # EDGE most of Krejcárek's deck is the model's, and its tram areas past the model's side found no deck on the rails)
+    on_rail_too = np.isfinite(rz) & (z <= rz + OVER) & (np.abs(z - rz) <= TOL)
+    for (ai, _, _), k, o, g, rt, zr in zip(where, key, off, agree, on_rail_too, z - rz):
         gr, c = group.get(ai, ai), areas[ai]["c"]
-        ok.add((gr, k))
-        by_area.setdefault((ai, k), []).append(o)
-        by_class.setdefault((gr, c, k), []).append(o)
-        by_group.setdefault((gr, k), []).append(o)
+        for kk, oo, yes in ((k, o, g), (("rails", 0), zr, rt and k != ("rails", 0))):
+            if not yes:
+                continue
+            ok.add((gr, kk))
+            by_area.setdefault((ai, kk), []).append(oo)
+            by_class.setdefault((gr, c, kk), []).append(oo)
+            by_group.setdefault((gr, kk), []).append(oo)
     held = {}
     for n in np.flatnonzero(low):
         ai, ri, vi = where[n]
