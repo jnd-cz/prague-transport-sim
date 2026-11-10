@@ -54,6 +54,11 @@ MEASURE = r"""async () => {
   const auto = new Set();
   for (let r = 801; r < 849; r++) auto.add(models.makeT3({ line: '17', detailed: false, run: String(r) }).userData.variant);
   out.fleet.auto = [...auto].sort();
+  // faded in as an AI tram: the fleet numbers stay a blended decal, the body opaque
+  const { setOpacity } = await import('/src/traffic.js');
+  setOpacity(t3m, 0); setOpacity(t3m, 0.5); setOpacity(t3m, 1);
+  const tc = t3m.userData.cars[0], fm = named(tc, 'fleet').material, bm = named(tc, 'body').material;
+  out.fleet.faded = { transparent: fm.transparent, depthWrite: fm.depthWrite, opacity: fm.opacity, body: bm.transparent };
   body.geometry.computeBoundingBox();
   const bb = body.geometry.boundingBox;
   out.body = { x: [bb.min.x, bb.max.x], y: [bb.min.y, bb.max.y], z: [bb.min.z, bb.max.z] };
@@ -197,6 +202,7 @@ def judge(r):
         "fleet numbers by type, each car its own": all(7001 <= n <= 7292 for n in r["fleet"]["suc"]) and all(8001 <= n <= 8090 for n in r["fleet"]["m"])
         and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
         "AI sets of both types by run number": r["fleet"]["auto"] == ["T3M", "T3SUCS"],
+        "faded in: the fleet numbers stay blended, the body opaque": r["fleet"]["faded"] == {"transparent": True, "depthWrite": False, "opacity": 1, "body": False},
     }
     fails += [k for k, ok in want.items() if not ok]
     return fails

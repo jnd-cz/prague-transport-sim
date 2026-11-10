@@ -95,6 +95,12 @@ SYNTHETIC = r"""async () => {
   out.dest = [a, b].map((c) => c.userData.rig.plates.destAll.map((o) => o.visible));
   out.destCanvas = a.userData.rig.plates.dest.material.map?.image?.width ?? null;
   out.fleetOwn = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material !== b.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
+  // faded in as an AI tram: the fleet numbers' clear canvas stays clear, the body opaque
+  const { setOpacity } = await import('/src/traffic.js');
+  setOpacity(m, 0); setOpacity(m, 0.5); setOpacity(m, 1);
+  const fleetMat = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
+  out.fadedFleet = { transparent: fleetMat.transparent, depthWrite: fleetMat.depthWrite, opacity: fleetMat.opacity };
+  out.fadedOpaque = []; a.userData.rig.full.traverse((o) => { if (o.isMesh && o.material.transparent && !o.material.userData.glass && !proto.rig.numberPlates.includes(o.name) && !/^Route_Number/.test(o.name)) out.fadedOpaque.push(o.name); });
   // the lighter level
   t3h.setHybridLevel(m, 'light');
   out.drawnLight = drawn(a);
@@ -178,6 +184,8 @@ def main():
                 "the destination card in the leading car only": s["dest"][0] and all(s["dest"][0]) and not any(s["dest"][1]),
                 "the cards drawn (canvas)": s["destCanvas"] == 1024,
                 "each car its own fleet number": s["fleetOwn"],
+                "faded in: the fleet numbers stay blended (their clear canvas drew black)": s["fadedFleet"] == {"transparent": True, "depthWrite": False, "opacity": 1},
+                f"faded in: the rest opaque ({s['fadedOpaque'][:3]})": not s["fadedOpaque"],
                 "the glass see-through (0.18)": s["glass"] == 0.18,
             }
             fails += [f"synthetic: {k}" for k, ok in want.items() if not ok]

@@ -602,9 +602,8 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
     mesh(P.body, mats.body, 'body');
     mesh(P.parts, mats.parts, 'parts');
     mesh(P.lamps, mats.lamps, 'lamps');
-    // (a decal blended at its edges: its userData.opacity under 1 keeps it transparent when traffic fades the set)
-    const fm = new THREE.MeshLambertMaterial({ map: fleetTexture(fleet[k]), transparent: true, opacity: 0.999, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
-    fm.userData.opacity = 0.999;
+    // (a decal blended at its edges: traffic's fade keeps a blended material blended)
+    const fm = new THREE.MeshLambertMaterial({ map: fleetTexture(fleet[k]), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
     mesh(P.fleet, fm, 'fleet');
     // the leading car carries the plates and the cards in the windscreen (no destination card when it is
     // not known), the last one the inverted plate in the rear window
