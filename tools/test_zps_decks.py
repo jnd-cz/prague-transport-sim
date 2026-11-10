@@ -153,6 +153,32 @@ class Check(unittest.TestCase):
         self.assertEqual(out["vertices"], {"model": 0, "rails": 0, "inside": 0})
 
 
+class Split(unittest.TestCase):
+    def test_an_area_over_two_viaducts_is_two_decks(self):
+        """Libeň: a railway area spans two viaducts side by side at 205.7 and 212 m with a 4 m gap between them; each
+        piece lies on its own deck, straight across the span, and the gap goes."""
+        low, high = bridge(0, 0, 40, 10, 205.7).tris, bridge(0, 14, 40, 24, 212.0).tris
+        model = zd.Model(SimpleNamespace(tris=np.concatenate([low, high]), ids=[548, 551], owner=np.array([0, 0, 1, 1])))
+        a = area([(5, 2, 205.5), (35, 2, 205.5), (35, 22, 211.8), (5, 22, 211.8)], cls="rail")
+        areas = [a]
+        out = zd.split(areas, model)
+        self.assertEqual((out["areas"], out["pieces"]), (1, 2))
+        levels = sorted(round(float(np.mean([q[2] for q in p["r"]])), 1) for p in areas)
+        self.assertEqual(levels, [205.5, 211.8])
+        for p in areas:
+            zs = [q[2] for q in p["r"]]
+            self.assertLess(max(zs) - min(zs), 0.01)  # (flat on its deck)
+        ys = sorted(max(q[1] for q in p["r"]) for p in areas)
+        self.assertLessEqual(ys[0], 10 + zd.EDGE + 0.1)  # (the lower piece ends at its viaduct's edge)
+
+    def test_an_area_on_one_deck_stays_whole(self):
+        model = zd.Model(bridge(0, 0, 40, 20, 212.0))
+        a = area([(5, 2, 211.8), (35, 2, 211.0), (35, 12, 210.5), (5, 12, 211.5)], cls="rail")
+        areas = [a]
+        self.assertEqual(zd.split(areas, model), {"areas": 0, "pieces": 0})
+        self.assertEqual(len(areas), 1)
+
+
 class Openings(unittest.TestCase):
     def divadelni(self):
         """The street under the deck 5.26 m under its top, maxheight 4.4; the deck's portal corners sag to the floor."""

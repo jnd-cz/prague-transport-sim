@@ -299,6 +299,102 @@ def check(areas, model, rails):
     return out
 
 
+def _rings(poly):
+    """A polygon's outer ring and holes as coordinate lists (without the closing vertex)."""
+    return [np.asarray(poly.exterior.coords)[:-1]] + [np.asarray(h.coords)[:-1] for h in poly.interiors]
+
+
+def split(areas, model, checked=None):
+    """A deck area whose vertices on structures stand at levels more than TOL apart lies over several decks: one piece
+    per level, cut along the model's faces at that level (EDGE wide), each piece's vertices on its deck's faces with the
+    offset the area's own vertices keep from them; the parts beyond every structure keep their survey heights, the
+    slivers between the decks go (in place: the area keeps its index for its first piece, the others are appended).
+    Libeň's railway (line 37): the survey's railway areas span three viaducts side by side at 205.7, 210 and 212 m and
+    sloped 7 m across the gaps between them (the user, 2026-11-10: "Libeň viaduct's are several different one but they
+    should all hold straight across the spans"). checked: check's record, kept true for the pieces.
+    Returns {"areas": n split, "pieces": n}."""
+    out = {"areas": 0, "pieces": 0}
+    if model.tree is None:
+        return out
+    centroid_z = (model.tris[:, :, 2]).mean(axis=1)
+    for ai in range(len(areas)):
+        a = areas[ai]
+        if a["l"] < 1 or a["c"] in NOT_DECK or len(a["r"]) < 3:
+            continue
+        r = np.array([[q[0], q[1], np.nan if q[2] is None else q[2]] for q in a["r"]], float)
+        mz = model.top(r[:, 0], r[:, 1])[0]
+        on = np.isfinite(mz) & np.isfinite(r[:, 2])
+        if on.sum() < 2:
+            continue
+        zs = np.sort(r[on, 2])
+        cuts = np.flatnonzero(np.diff(zs) > TOL)
+        if not len(cuts):
+            continue
+        poly = shapely.Polygon(r[:, :2], [np.asarray(h)[:, :2] for h in a.get("h", []) if len(h) >= 3]).buffer(0)
+        near = model.tree.query(poly.buffer(EDGE))
+        levels = sorted(np.split(zs, cuts + 1), key=len, reverse=True)
+        taken, pieces = shapely.Polygon(), []
+        for lv in levels:
+            lo, hi, zc = lv.min() - TOL, lv.max() + TOL, float(np.median(lv))
+            band = [t for t in near if lo <= centroid_z[t] <= hi]
+            if not band:
+                continue
+            region = unary_union(shapely.polygons(model.tris[band][:, :, :2]).tolist()).buffer(EDGE, join_style="mitre")
+            part = poly.intersection(region).difference(taken)
+            taken = taken.union(part)
+            # (the level's offset from its faces: the area's own vertices at this level)
+            own = on & (r[:, 2] >= lv.min()) & (r[:, 2] <= lv.max())
+            fz = model.faces(r[own, 0], r[own, 1])
+            offs = [z - f[np.argmin(np.abs(f - z))] for z, f in zip(r[own, 2], fz) if len(f)]
+            off = float(np.median(offs)) if offs else 0.0
+            for g in getattr(part, "geoms", [part]):
+                if g.geom_type != "Polygon" or g.area < 1:
+                    continue
+                g = g.simplify(0.05)
+                rings = []
+                for ring in _rings(g):
+                    fz = model.faces(ring[:, 0], ring[:, 1])
+                    z = [round(float(f[np.argmin(np.abs(f - zc))] + off), 2) if len(f) else round(zc, 2) for f in fz]
+                    rings.append([[round(float(x), 2), round(float(y), 2), zz] for (x, y), zz in zip(ring, z)])
+                pieces.append((rings, True))
+        # (beyond every structure: the parts that hold some of the area's own vertices off them, at the survey's heights)
+        off_pts = r[~on & np.isfinite(r[:, 2])]
+        rest = poly.difference(taken)
+        for g in getattr(rest, "geoms", [rest]):
+            if g.geom_type != "Polygon" or g.area < 1 or not len(off_pts):
+                continue
+            inside = shapely.distance(g, shapely.points(off_pts[:, 0], off_pts[:, 1])) < 0.01
+            if not inside.any():
+                continue  # (a sliver between the decks)
+            src = off_pts[inside]
+            rings = []
+            for ring in _rings(g.simplify(0.05)):
+                d = np.hypot(ring[:, None, 0] - src[None, :, 0], ring[:, None, 1] - src[None, :, 1])
+                z = src[np.argmin(d, axis=1), 2]
+                rings.append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)] for (x, y), zz in zip(ring, z)])
+            pieces.append((rings, False))
+        if not pieces:
+            continue
+        base = {k: v for k, v in a.items() if k not in ("r", "h", "k")}
+        if checked is not None:
+            for key in [k for k in checked if k[0] == ai]:
+                del checked[key]
+        for n, (rings, on_structure) in enumerate(pieces):
+            piece = {**base, "r": rings[0], **({"h": rings[1:]} if len(rings) > 1 else {})}
+            idx = ai if n == 0 else len(areas)
+            if n == 0:
+                areas[ai] = piece
+            else:
+                areas.append(piece)
+            if checked is not None and on_structure:
+                for ri, ring in enumerate(rings):
+                    for vi, q in enumerate(ring):
+                        checked[(idx, ri, vi)] = q[2]
+        out["areas"] += 1
+        out["pieces"] += len(pieces)
+    return out
+
+
 def maxheight(tags):
     """OSM's maxheight in metres, None where it is missing, `default`, `none` or not a number."""
     m = re.match(r"\s*(\d+(?:\.\d+)?)\s*(m)?\s*$", str(tags.get("maxheight", "")).replace(",", "."))
@@ -467,7 +563,8 @@ def thickness(areas, model, flat):
 
 def summary(checked, flat, n_ramps, decks):
     """The build's record (provenance checks.decks)."""
-    return {"vertices": {**checked["vertices"], "opening": flat["vertices"]}, "held": checked["held"],
+    return {"vertices": {**checked["vertices"], "opening": flat["vertices"]}, "split": checked.get("split", {}),
+            "held": checked["held"],
             "heldAreas": checked["heldAreas"], "over": checked["over"], "ramps": n_ramps, "decks": decks,
             "openings": [o for o in flat["openings"] if o.get("sagging") or o.get("src", "default") != "default"]}
 

@@ -392,6 +392,7 @@ if _model.tree is None:
     print("decks: no Mosty 3D models (raw/geoportal/mosty3d): only the surveyed rails check the decks")
 _ramps_before = zps_decks.ramps(areas, _city_ground)
 deck_checked = zps_decks.check(areas, _model, zps_decks.Rails(_rails, _city_ground))
+deck_checked["split"] = zps_decks.split(areas, _model, deck_checked["checked"])
 deck_flat = zps_decks.flatten(areas, zps_decks.openings(_under_ways, areas, F), _city_ground, deck_checked["checked"])
 deck_report = zps_decks.summary(deck_checked, deck_flat, zps_decks.ramps(areas, _city_ground),
                                 zps_decks.thickness(areas, _model, deck_flat))
@@ -399,7 +400,8 @@ for _h in deck_report["heldAreas"]:
     _h["lat"], _h["lon"] = (round(float(v), 6) for v in F.ll(_h.pop("x"), _h.pop("y")))
 print("decks:", deck_report["vertices"], f"vertices moved; {deck_report['held']} vertices held under a structure their",
       f"deck is not on ({len(deck_report['heldAreas'])} areas); {deck_report['over']} over their structure;",
-      f"ramps {_ramps_before} -> {deck_report['ramps']}; decks by thickness {deck_report['decks']}")
+      f"ramps {_ramps_before} -> {deck_report['ramps']}; decks by thickness {deck_report['decks']};",
+      f"split over decks of several levels {deck_report['split']}")
 for _o in deck_report["openings"]:
     print(f"  opening: way {_o['way']} {_o['name'] or ''}: {_o.get('sagging', 0)} vertices on the deck's plane, gap",
           f"{_o.get('gap')} m, maxheight {_o['maxheight']}, deck {_o.get('t')} m ({_o.get('src')}), clearance {_o.get('clearance')} m",
