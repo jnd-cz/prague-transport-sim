@@ -553,7 +553,8 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   headlights and the tail lamps are on by day too. The rear: the corner units' lower red lamps are the brake lamps, the
   rear panel's two red lamps the tail lamps, the white one between them the reversing lamp. The indicators: "Turning at
   junction and stopping at street level stop across car lane", at such a stop the right ones from braking into it until
-  it pulls away. The game lights a set's front on its leading car and its rear on the last (the coupled ends dark) and
+  it pulls away. Between coupled cars "only the rear red lights light up" (the user's photo of 8088 coupled behind
+  another, 2026-11-10): the game lights a set's front on its leading car only, the rear red lamps on every car, and
   blinks the indicators on every car, 1.5 times a second (`src/lamps.js`). The hybrid's glows (indicators, brake lamps)
   are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew. Its
   asset has no tail lamps: they are added at load, 2 cm over its bumper (found by rays from behind), 0.47 m out.

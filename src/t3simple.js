@@ -667,6 +667,9 @@ function lampsGeometry() {
 // A car's lamps: its own copy of the lamps' colours, each function lit or dimmed to LAMP_DIM of its colour when
 // its state changes. A lamp off shows its lens, darker; the reflectors are not lamps and stay as they are.
 const LAMP_DIM = 0.2;
+// a lamp lit at twice its colour, not tone mapped: as bright as the hybrid's glows (the user, 2026-11-10: "The hybrid
+// model's light are brighter")
+const LAMP_LIT = 2;
 function carLamps(shared) {
   const geo = shared.clone(), lit = shared.attributes.color.array, byFn = {};
   geo.userData = {}; // (its own: disposeModel frees it; clone shares the userData)
@@ -682,16 +685,17 @@ function setLamps(lp, want) {
     if (lp.on[fn] === on) continue;
     lp.on[fn] = on;
     dirty = true;
-    const k = on ? 1 : LAMP_DIM;
+    const k = on ? LAMP_LIT : LAMP_DIM;
     for (const { start, count } of ranges) for (let i = start * 3; i < (start + count) * 3; i++) C.array[i] = lp.lit[i] * k;
   }
   if (dirty) C.needsUpdate = true;
 }
-// the lamps of car k of n wanted for the set's state: the front end lit on the leading car, the rear end on the
-// last one (the coupled ends dark), the indicators on every car
-function lampsWanted(k, n, { braking = false, signals = {} } = {}) {
-  const lead = k === 0, last = k === n - 1;
-  return { head: lead, pos: lead, tail: last, brake: last && braking, rev: false, indL: !!signals.left, indR: !!signals.right };
+// the lamps of car k wanted for the set's state: the front end lit on the leading car only, the rear end's red lamps
+// on every car (the user, 2026-11-10, with a photo of 8088 coupled behind another: "in between cars only the rear red
+// lights light up"), the indicators on every car
+function lampsWanted(k, { braking = false, signals = {} } = {}) {
+  const lead = k === 0;
+  return { head: lead, pos: lead, tail: true, brake: braking, rev: false, indL: !!signals.left, indR: !!signals.right };
 }
 
 // A plate or card on the body: an upright quad 5 mm proud where a ray from outside the end meets it.
@@ -882,7 +886,7 @@ export function poseSimple(model, { collector, braking, signals, highBeam } = {}
   cars.forEach((car, k) => {
     const p = car.userData.panto;
     if (collector !== undefined && Math.abs(collector - p.h) > 1e-3) { p.h = collector; posePanto(p.mesh, collector); }
-    setLamps(car.userData.lamps, lampsWanted(k, cars.length, st));
+    setLamps(car.userData.lamps, lampsWanted(k, st));
     if (highBeam !== undefined && car.userData.beams) car.userData.beams.visible = !!highBeam;
   });
 }
@@ -896,7 +900,7 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
   Object.assign(mats, {
     body: new THREE.MeshLambertMaterial({ map: P.livery, alphaTest: 0.5 }), // (the alpha: the skirt's cutouts)
     parts: new THREE.MeshLambertMaterial({ vertexColors: true }),
-    lamps: new THREE.MeshBasicMaterial({ vertexColors: true }),
+    lamps: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
   });
   Object.assign(root.userData, { mats, bogie: PIVOT, bodyFront: BODY_FRONT, cars: [], variant, fleet, lampState: { braking: false, signals: {} } });
   const colours = pantoBars(wire).map((b) => new THREE.Color(b[4]));
@@ -908,7 +912,7 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
     mesh(P.parts, mats.parts, 'parts');
     const lamps = carLamps(P.lamps);
     mesh(lamps.geo, mats.lamps, 'lamps');
-    setLamps(lamps, lampsWanted(k, cars, root.userData.lampState)); // (in service: the ends' lamps lit)
+    setLamps(lamps, lampsWanted(k, root.userData.lampState)); // (in service: the ends' lamps lit)
     car.userData.lamps = lamps;
     // the high beams' glow over the leading car's headlights (drawn only while they are on)
     if (k === 0) {

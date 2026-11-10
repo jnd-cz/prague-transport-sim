@@ -373,18 +373,19 @@ def judge(r):
         # pantograph's frame instanced
         "at most eight draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 8 and r["drawn"][1] - r["plates"][1] <= 8,
         # #436 (the user, 2026-11-10): the dipped headlights and tail lamps on in service, the front's on the leading car
-        # and the rear's on the last (the coupled ends dark), the brake lamps (the rear corners) while braking, the
-        # indicators on every car blinking 1.5 times a second, the reversing lamp off, the high beams' glow on the lead
-        "the lamps in service: the front's on the leading car, the tail lamps on the last": r["lampState"]["rest"] == ["head pos", "tail"],
-        "braking with the left indicators: the brake lamps at the rear, the left indicators on every car": r["lampState"]["left"] == ["head pos indL", "tail brake indL"],
-        "the indicators' dark half": r["lampState"]["leftDark"] == ["head pos", "tail brake"],
-        "the hazard lights: both sides": r["lampState"]["hazard"] == ["head pos indL indR", "tail indL indR"],
+        # only, the rear end's red lamps on every car ("in between cars only the rear red lights light up"), the brake
+        # lamps (the rear corners) while braking, the indicators on every car blinking 1.5 times a second, the reversing
+        # lamp off, the high beams' glow on the leading car
+        "the lamps in service: the front's on the leading car, the tail lamps on every car": r["lampState"]["rest"] == ["head pos tail", "tail"],
+        "braking with the left indicators: the brake lamps and the left indicators on every car": r["lampState"]["left"] == ["head pos tail brake indL", "tail brake indL"],
+        "the indicators' dark half": r["lampState"]["leftDark"] == ["head pos tail brake", "tail brake"],
+        "the hazard lights: both sides": r["lampState"]["hazard"] == ["head pos tail indL indR", "tail indL indR"],
         # the user, 2026-11-10: "Turning at junction and stopping at street level stop across car lane", at such a stop the
         # right ones "braking to start": from 50 m before the switch until the turn is 80 % done (16 deg/m here: 125 m)
         "the indicators at a junction turn, its side, and at a stop across a car lane": [(t["s0"], t["side"]) for t in r["indicators"]["turns"]] == [(50, "left")]
         and 124 <= r["indicators"]["turns"][0]["s1"] <= 128 and r["indicators"]["right"] == ["right"]
         and r["indicators"]["at"] == [None, "left", "left", None, None, "right", "right", "right", None],
-        "the high beams' glow on the leading car, drawn only while on": r["lampState"]["off"] == ["head pos", "tail"]
+        "the high beams' glow on the leading car, drawn only while on": r["lampState"]["off"] == ["head pos tail", "tail"]
         and r["lampState"]["beams"] == [True, False] and r["lampState"]["beamsOff"] == [False, False],
         # #454 on a curve of 25 m radius: the bogies turned to the chords between their axles (+-3.2/25 rad against
         # the body), the axles over the track (on the chord: 1.8 cm outside the circle)

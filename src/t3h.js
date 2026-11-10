@@ -417,10 +417,10 @@ export function makeHybridSet(root, line, cars, dest, run, collector) {
     for (const b of cr.bogies) b.node?.traverse((o) => { if (o.name === 'T3H_shoe') b.shoes.push(o); });
     car.userData.gear = gear(cr);
     // the high beams' glow over the leading car's headlights (src/lamps.js); the tail lamps, lit on the set's last car
-    // (the coupled ends dark: a lamp off is its lens at a fifth of its colour, as on the built-in car)
+    // (lit on every car: "in between cars only the rear red lights light up"; at twice its colour, as the built-in car's)
     if (k === 0 && proto.heads.length) { car.userData.beams = beamsMesh(proto.heads); car.add(car.userData.beams); }
     if (proto.tails) {
-      const tail = new THREE.Mesh(proto.tails, new THREE.MeshBasicMaterial({ color: new THREE.Color('#d8261a').multiplyScalar(k === cars - 1 ? 1 : 0.2) }));
+      const tail = new THREE.Mesh(proto.tails, new THREE.MeshBasicMaterial({ color: new THREE.Color('#d8261a').multiplyScalar(2), toneMapped: false }));
       tail.name = 'T3H_tail';
       car.add(tail);
     }
@@ -462,8 +462,7 @@ export function setHybridLine(model, line, dest = model.userData.dest, run = mod
 // collector's contact height over the rail, the brake lamps, the track-brake magnets (0 off, 1 the rear
 // bogies', 2 all), the indicators' sides lit now (`signals`: { left, right }), the high beams.
 export function poseHybrid(model, { doors, collector, braking, track, signals, highBeam } = {}) {
-  const { cars } = model.userData;
-  cars.forEach((car, k) => {
+  model.userData.cars.forEach((car) => {
     const r = car.userData.rig;
     let scrub = false;
     if (doors !== undefined && Math.abs(doors - r.doors) > 1e-3) {
@@ -477,9 +476,7 @@ export function poseHybrid(model, { doors, collector, braking, track, signals, h
       scrub = true;
     }
     if (scrub) r.mixer.update(0);
-    // (the brake lamps at the set's rear: the coupled ends dark, as the built-in car's)
-    const brakeLit = !!braking && k === cars.length - 1;
-    if (braking !== undefined && brakeLit !== r.braking) { r.braking = brakeLit; for (const b of r.brakes) b.visible = brakeLit; }
+    if (braking !== undefined && braking !== r.braking) { r.braking = braking; for (const b of r.brakes) b.visible = braking; }
     if (signals !== undefined) for (const s of ['left', 'right']) if (!!signals[s] !== r.lit[s]) { r.lit[s] = !!signals[s]; for (const g of r.signals[s]) g.visible = r.lit[s]; }
     if (highBeam !== undefined && car.userData.beams) car.userData.beams.visible = !!highBeam;
     if (track !== undefined && track !== r.track) {

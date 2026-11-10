@@ -133,20 +133,20 @@ def main():
         server.shutdown()
     print(json.dumps(r, ensure_ascii=False))
     ai = r["ai"]
-    # (standing at its first stop, held braked: the brake lamps lit)
-    idle, on = "head pos | brake tail", "head indL pos | brake indL tail"
+    # (standing at its first stop, held braked: the brake lamps lit; the rear red lamps on both cars)
+    idle, on = "brake head pos tail | brake tail", "brake head indL pos tail | brake indL tail"
     want = {
         "our tram is the built-in model": r["kind"] == "simple",
-        "in service: the front lamps on the leading car, the tail and brake lamps on the last, nothing blinking": r["rest"]["seen"] == [idle],
+        "in service: the front lamps on the leading car, the tail and brake lamps on both, nothing blinking": r["rest"]["seen"] == [idle],
         ", blinks the left indicators on both cars": r["left"]["indicate"] == "left" and r["left"]["seen"] == sorted([on, idle]),
         ", again switches them off": r["off"]["indicate"] is None and r["off"]["seen"] == [idle],
-        "/ blinks all of them": r["hazard"]["indicate"] == "hazard" and "head indL indR pos | brake indL indR tail" in r["hazard"]["seen"],
+        "/ blinks all of them": r["hazard"]["indicate"] == "hazard" and "brake head indL indR pos tail | brake indL indR tail" in r["hazard"]["seen"],
         "L held: the high beams' glow on the leading car, gone when let go; Shift+L latches it":
         r["flash"] == [True, False] and r["flashEnd"] == [False, False] and r["latched"] == [True, False],
         f"the line's junction turns and kerb stops found ({ai['ours']})": ai["ours"]["turns"] > 0 and ai["ours"]["kerb"] > 0 and ai["turns"] == ai["ours"]["turns"],
-        "an AI T3M braking into a kerb stop: the stop on its side display, the right indicators, the brake lamps at the rear":
+        "an AI T3M braking into a kerb stop: the stop on its side display, the right indicators, the brake lamps on both cars":
         "kerbStop" in ai and ai["kerbStop"]["next"] == ai["kerbStop"]["want"] and ai["kerbStop"]["indicate"] == "right"
-        and "brake" in ai["kerbStop"]["lamps"][1] and "brake" not in ai["kerbStop"]["lamps"][0] and not ai["kerbStop"]["signals"].get("left"),
+        and all("brake" in x for x in ai["kerbStop"]["lamps"]) and not ai["kerbStop"]["signals"].get("left"),
         "an AI tram before a junction turn indicates to its side": "turn" in ai and ai["turn"]["indicate"] == ai["turn"]["side"],
     }
     fails = [k for k, ok in want.items() if not ok] + [f"page error: {e}" for e in errors[:3]]
