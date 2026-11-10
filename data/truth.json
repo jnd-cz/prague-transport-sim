@@ -366,6 +366,12 @@
    "name": "Footbridge over the tram by Gymnastická (line 22, 50.0845 N 14.3805 E)",
    "text": "A footbridge over the tram area with stairs down to both platforms, going on over Gymnastická",
    "source": "user 2026-11-10, orthophoto, #445 session (PR #452)"
+  },
+  {
+   "name": "Libeň railway viaducts (line 37, 50.104-50.106 N 14.480 E)",
+   "text": "Several separate railway viaducts side by side (about 205.7, 210 and 212 m), each level straight across its spans. The survey's railway areas span two of them; tools/zps_decks.py splits such an area along the model, one piece per viaduct (#445)",
+   "source": "user 2026-11-10 with an orthophoto and four photos, #445 session (PR #452)",
+   "quote": "Libeň viaduct's are several different one but they should all hold straight across the spans"
   }
  ],
  "stopTypes": {
