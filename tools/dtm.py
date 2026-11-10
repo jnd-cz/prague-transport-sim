@@ -335,9 +335,10 @@ for package in packages:
 # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
 # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
 import dmr5g  # noqa: E402
+import zps_decks  # noqa: E402
 _truth_path = os.path.join(ROOT, "data", "truth.json")
 _facts = json.load(open(_truth_path, encoding="utf-8")) if os.path.exists(_truth_path) else {}
-_osm_cover, _changing, _buildings = [], [], []
+_osm_cover, _changing, _buildings, _under_ways = [], [], [], []
 try:
     import osm_local
     if osm_local.available():
@@ -345,6 +346,7 @@ try:
         _osm_cover = zps_ground.osm_covers(osm_local.ways(zps_ground.is_cover, bbox=F.bbox(_pts, 150)), F)
         _changing = zps_ground.osm_covers(osm_local.ways(zps_ground.is_changing, bbox=F.bbox(_pts, 150)), F)
         _buildings = zps_ground.osm_covers(osm_local.ways(lambda t: "building" in t, bbox=F.bbox(_pts, 220)), F)
+        _under_ways = osm_local.ways(zps_decks.is_under, bbox=F.bbox(_pts, 150))
 except ImportError:
     pass
 if not _osm_cover:
@@ -380,6 +382,28 @@ if _review:
         json.dump(_review, fh, ensure_ascii=False, indent=1)
 elif os.path.exists(_review_path):
     os.remove(_review_path)  # (nothing held any more: the set is this build's own)
+
+# the decks (level 1 and up): heights checked against the structure that carries them, flat over the way under them,
+# and their thickness (tools/zps_decks.py, #445)
+from mosty3d import Bridges  # noqa: E402
+_city_ground = lambda x, y: _ipr.sample(np.asarray(x, float) + F.E0, np.asarray(y, float) + F.N0)  # noqa: E731
+_model = zps_decks.Model(Bridges())
+if _model.tree is None:
+    print("decks: no Mosty 3D models (raw/geoportal/mosty3d): only the surveyed rails check the decks")
+_ramps_before = zps_decks.ramps(areas, _city_ground)
+deck_checked = zps_decks.check(areas, _model, zps_decks.Rails(_rails, _city_ground))
+deck_flat = zps_decks.flatten(areas, zps_decks.openings(_under_ways, areas, F), _city_ground)
+deck_report = zps_decks.summary(deck_checked, deck_flat, zps_decks.ramps(areas, _city_ground),
+                                zps_decks.thickness(areas, _model, deck_flat))
+for _h in deck_report["heldAreas"]:
+    _h["lat"], _h["lon"] = (round(float(v), 6) for v in F.ll(_h.pop("x"), _h.pop("y")))
+print("decks:", deck_report["vertices"], f"vertices moved; {deck_report['held']} vertices held under a structure their",
+      f"deck is not on ({len(deck_report['heldAreas'])} areas); {deck_report['over']} over their structure;",
+      f"ramps {_ramps_before} -> {deck_report['ramps']}; decks by thickness {deck_report['decks']}")
+for _o in deck_report["openings"]:
+    print(f"  opening: way {_o['way']} {_o['name'] or ''}: {_o.get('sagging', 0)} vertices on the deck's plane, gap",
+          f"{_o.get('gap')} m, maxheight {_o['maxheight']}, deck {_o.get('t')} m ({_o.get('src')}), clearance {_o.get('clearance')} m",
+          "(SHORT)" if zps_decks.is_short(_o) else "")
 
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
@@ -434,7 +458,8 @@ vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_dec
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
-                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report}),
+                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
+                                   "decks": deck_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])

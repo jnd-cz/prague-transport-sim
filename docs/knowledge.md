@@ -328,6 +328,18 @@ Sections:
     view, given to the lidar (13), and greenery outside, raised beds and shrubs, given to the survey (6). Their rule
     (`heldRule`): a courtyard (OSM buildings within 60 m in 12 of 16 directions) to the lidar, greenery outside to the
     survey, paved outside to the lidar; it matches 14 of the 19 answers.
+- **The survey's decks take the heights of the lines they share with the ground** (#445, `tools/zps_decks.py`,
+  `tools/bench/decks.py`). A level-1 outline that runs along a wall or a portal takes the wall's foot or the
+  underpass's floor from the same 3D line: on the Krejcárek viaduct (line 37) 53 % of the level-1 vertices within
+  12 m of the route lay over 2 m under the rails, a tram area ran from 208.19 to 228.41 m; at Divadelní five of the nine
+  pieces over the underpass sagged to its floor at the portals. Where the rails, Mosty 3D and the survey all exist,
+  2 m under the structure parts them: of the vertices within 1.5 m of DI's and DTMP's raised rails (1,033) three lie
+  over 2 m under the model's top, of those over 2 m under the rails (612) one lies within 2 m of it. Under the rails
+  the deck's own vertices sit -1.0 to +0.5 m (the surveyed bed under the ballast on Krejcárek, 0.73 m), the model's
+  top up to 1.7 m over the deck (parapets). A deck's vertex more than 2 m under its structure takes the structure's
+  height and the offset the deck's own vertices keep from it; a level-1 area with no vertex on the structure over it
+  is another one (level-1 railway areas at the ground on line 37, 7-16 m under a model's top) and stays.
+  The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
   of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**

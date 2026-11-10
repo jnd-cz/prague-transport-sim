@@ -175,7 +175,7 @@ class Readers(unittest.TestCase):
             tools = root / 'tools'
             tools.mkdir()
             for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py','kerbs.py',
-                         'zps_ground.py','survey_ground_answers.py','dmr5g.py'):
+                         'zps_ground.py','survey_ground_answers.py','dmr5g.py','zps_decks.py','mosty3d.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
                                               '    def sample(self, E, N):\n        return np.full(np.shape(E), 200.0)\n',
@@ -203,7 +203,7 @@ class Readers(unittest.TestCase):
             tools = root / 'tools'
             tools.mkdir()
             for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py','kerbs.py',
-                         'zps_ground.py','survey_ground_answers.py','dmr5g.py'):
+                         'zps_ground.py','survey_ground_answers.py','dmr5g.py','zps_decks.py','mosty3d.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             # (the IPR terrain is a 2 GB raster: a flat stand-in at the test's 200 m)
             (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'

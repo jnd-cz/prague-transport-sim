@@ -1,0 +1,172 @@
+"""tools/zps_decks.py: the survey's decks against their structures, flat over the openings, their thickness (#445).
+
+    python -P -E tools/test_zps_decks.py
+"""
+import os
+import sys
+import unittest
+from types import SimpleNamespace
+
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import zps_decks as zd  # noqa: E402
+
+GROUND = 200.0
+DECK = 210.0
+
+
+def ground(x, y):
+    return np.full(np.shape(x), GROUND)
+
+
+def bridge(x0, y0, x1, y1, z, fid=7):
+    """A Mosty 3D stand-in: one flat top over a rectangle."""
+    tris = np.array([[[x0, y0, z], [x1, y0, z], [x1, y1, z]], [[x0, y0, z], [x1, y1, z], [x0, y1, z]]], float)
+    return SimpleNamespace(tris=tris, ids=[fid], owner=np.array([0, 0]))
+
+
+def area(pts, cls="road", level=1):
+    return {"c": cls, "l": level, "r": [list(p) for p in pts]}
+
+
+def square(x0, y0, w, z, cls="road", level=1):
+    zs = z if isinstance(z, list) else [z] * 4
+    return area([(x0, y0, zs[0]), (x0 + w, y0, zs[1]), (x0 + w, y0 + w, zs[2]), (x0, y0 + w, zs[3])], cls, level)
+
+
+NO_RAILS = zd.Rails((np.zeros(0), np.zeros(0), np.zeros(0)), ground)
+
+
+class Frame:
+    """tools/geo.Frame's xy: lat/lon are y/x over 1000."""
+
+    def xy(self, lat, lon):
+        return np.asarray(lon, float) * 1000, np.asarray(lat, float) * 1000
+
+
+def way(wid, pts, **tags):
+    return {"id": wid, "tags": {"highway": "residential", **tags}, "geometry": [{"lat": y / 1000, "lon": x / 1000} for x, y in pts]}
+
+
+class Check(unittest.TestCase):
+    def test_a_sag_takes_the_model_and_its_decks_offset(self):
+        """Krejcárek: a deck vertex at the ground under the model's top takes the top less the deck's own offset."""
+        model = zd.Model(bridge(0, 0, 40, 20, DECK))
+        a = square(0, 0, 10, [DECK - 0.7, DECK - 0.7, DECK - 0.7, GROUND])  # (one corner took the ground's line)
+        out = zd.check([a], model, NO_RAILS)
+        self.assertEqual(out["vertices"], {"model": 1, "rails": 0})
+        self.assertAlmostEqual(a["r"][3][2], DECK - 0.7)
+
+    def test_the_neighbours_offset_where_the_area_has_none_on_it(self):
+        model = zd.Model(bridge(0, 0, 40, 20, DECK))
+        good = square(0, 0, 10, DECK - 0.5, cls="tram")
+        sunk = square(10, 0, 10, GROUND, cls="tram")  # (touches the good one: the same deck)
+        zd.check([good, sunk], model, NO_RAILS)
+        self.assertEqual([q[2] for q in sunk["r"]], [DECK - 0.5] * 4)
+
+    def test_an_area_wholly_under_a_structure_is_another_deck(self):
+        """A railway's level-1 area at the ground under a road bridge: no vertex of its deck on the bridge, it stays."""
+        model = zd.Model(bridge(0, 0, 40, 20, DECK + 6))
+        a = square(0, 0, 10, GROUND + 0.2, cls="rail")
+        out = zd.check([a], model, NO_RAILS)
+        self.assertEqual((out["held"], len(out["heldAreas"])), (4, 1))
+        self.assertEqual(a["r"][0][2], GROUND + 0.2)
+
+    def test_the_rails_where_no_model_is(self):
+        """Divadelní: no Mosty 3D model, the rails on the deck 5.3 m over IPR's floor."""
+        x = np.linspace(-5, 25, 31)
+        rails = zd.Rails((x, np.full(31, 5.0), np.full(31, 193.25)), lambda x, y: np.full(np.shape(x), 187.95))
+        a = square(0, 0, 10, [193.2, 193.2, 187.9, 193.2])
+        out = zd.check([a], zd.Model(), rails)
+        self.assertEqual(out["vertices"], {"model": 0, "rails": 1})
+        self.assertAlmostEqual(a["r"][2][2], 193.2)
+
+    def test_a_deck_over_the_track_is_not_the_tracks_deck(self):
+        """A footbridge 6 m over raised rails: not lowered to them."""
+        x = np.linspace(-5, 25, 31)
+        rails = zd.Rails((x, np.full(31, 5.0), np.full(31, DECK)), ground)
+        a = square(0, 0, 10, DECK + 6)
+        zd.check([a], zd.Model(), rails)
+        self.assertEqual(a["r"][0][2], DECK + 6)
+
+    def test_rails_at_grade_check_nothing(self):
+        x = np.linspace(-5, 25, 31)
+        rails = zd.Rails((x, np.full(31, 5.0), np.full(31, GROUND + 0.2)), ground)
+        a = square(0, 0, 10, [GROUND + 6, GROUND + 6, GROUND, GROUND + 6])
+        zd.check([a], zd.Model(), rails)
+        self.assertEqual(a["r"][2][2], GROUND)
+
+    def test_not_decks(self):
+        model = zd.Model(bridge(0, 0, 40, 20, DECK))
+        walls = [square(0, 0, 10, GROUND, cls=c) for c in ("wall", "stairs", "roof")] + [square(0, 0, 10, GROUND, level=0)]
+        out = zd.check(walls, model, NO_RAILS)
+        self.assertEqual(out["vertices"], {"model": 0, "rails": 0})
+
+
+class Openings(unittest.TestCase):
+    def divadelni(self):
+        """The street under the deck 5.26 m under its top, maxheight 4.4; the deck's portal corners sag to the floor."""
+        floor = lambda x, y: np.full(np.shape(x), 187.95)  # noqa: E731
+        deck = area([(0, 0, 193.21), (20, 0, 193.21), (20, 20, 193.21), (15, 20, 187.9), (5, 20, 187.9), (0, 20, 193.21)])
+        road = square(5, -30, 10, 187.95, level=0)
+        road["r"][2][1] = road["r"][3][1] = 50  # (the street runs on under the deck: 5-15 m wide, -30 to 50 m)
+        w = way(141140410, [(10, -30), (10, 50)], tunnel="yes", layer="-1", maxheight="4.4", name="Divadelní")
+        return [deck, road], w, floor
+
+    def test_the_deck_stays_on_its_plane_and_leaves_maxheight_and_the_margin(self):
+        areas, w, floor = self.divadelni()
+        op = zd.openings([w], areas, Frame())
+        self.assertEqual([(o["way"], o["width"], o["decks"]) for o in op], [(141140410, "survey", [0])])
+        out = zd.flatten(areas, op, floor)
+        o = out["openings"][0]
+        self.assertEqual(o["sagging"], 2)
+        self.assertEqual([q[2] for q in areas[0]["r"]], [193.21] * 6)
+        self.assertAlmostEqual(o["gap"], 5.26)
+        self.assertEqual((o["t"], o["src"]), (0.76, "maxheight"))
+        self.assertAlmostEqual(areas[0]["t"], 0.76)
+        self.assertAlmostEqual(o["clearance"], 4.5)
+
+    def test_without_maxheight_the_deck_is_a_metre(self):
+        areas, w, floor = self.divadelni()
+        del w["tags"]["maxheight"]
+        zd.flatten(areas, zd.openings([w], areas, Frame()), floor)
+        self.assertNotIn("t", areas[0])
+
+    def test_a_walkway_without_maxheight_keeps_room_to_walk(self):
+        """A footway 3.2 m under a deck's top: a metre would leave 2.2 m, the deck leaves 2.5 m and the margin."""
+        floor = lambda x, y: np.full(np.shape(x), 190.0)  # noqa: E731
+        areas = [square(0, 0, 20, 193.2), square(5, -30, 10, 190.0, cls="sidewalk", level=0)]
+        areas[1]["r"][2][1] = areas[1]["r"][3][1] = 50
+        w = way(805407405, [(10, -30), (10, 50)], highway="footway", tunnel="yes", layer="-1")
+        o = zd.flatten(areas, zd.openings([w], areas, Frame()), floor)["openings"][0]
+        self.assertEqual((o["t"], o["src"], o["clearance"]), (0.6, "walk", 2.6))
+
+    def test_no_way_under_no_opening(self):
+        """A ramp to an abutment: its low corners stand on the ground, nothing passes under them."""
+        areas, w, floor = self.divadelni()
+        self.assertEqual(zd.openings([], areas, Frame()), [])
+        self.assertEqual(areas[0]["r"][3][2], 187.9)
+
+    def test_which_ways_pass_under(self):
+        self.assertTrue(zd.is_under({"highway": "footway", "tunnel": "yes", "layer": "-1"}))
+        self.assertTrue(zd.is_under({"highway": "cycleway", "covered": "yes"}))
+        self.assertFalse(zd.is_under({"railway": "subway", "tunnel": "yes", "layer": "-3"}))
+        self.assertFalse(zd.is_under({"highway": "footway", "tunnel": "yes", "layer": "-4"}))
+        self.assertFalse(zd.is_under({"highway": "residential", "bridge": "yes"}))
+
+    def test_maxheight(self):
+        self.assertEqual([zd.maxheight({"maxheight": v}) for v in ("4.4", "3,9", "4 m", "default", "none")],
+                         [4.4, 3.9, 4.0, None, None])
+        self.assertIsNone(zd.maxheight({}))
+
+
+class Ramps(unittest.TestCase):
+    def test_a_deck_down_to_the_ground(self):
+        areas = [square(0, 0, 20, [GROUND + 6, GROUND + 6, GROUND + 0.5, GROUND + 0.5], cls="deck"),
+                 square(0, 40, 20, GROUND + 6, cls="deck")]
+        self.assertEqual(zd.ramps(areas, ground), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
