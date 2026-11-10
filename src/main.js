@@ -6,10 +6,12 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { T3H_FILES, T3H_CREDIT, loadHybridT3, poseHybrid } from './t3h.js';
+import { makeT3, placeConsist, poseT3, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
+import { T3H_FILES, T3H_CREDIT, loadHybridT3 } from './t3h.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
+import { junctionTurns, indicating } from './indicators.js';
+import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place } from './report.js';
@@ -343,7 +345,9 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0) });
+// (the built-in car as a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are T3s, T3SUCS or
+// T3Ms by their run numbers, src/t3simple.js T3_TYPES)
+let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -352,6 +356,10 @@ let tram = new Tram();
 let game = null;
 let traffic = null;
 let pilot = null; // autopilot driving the tram (watch the ride), or null
+// our tram's lamps (#436): the indicators ('left', 'right', 'hazard' or none: the driver's switch, the autopilot's
+// own while it drives), the high beams (latched on, or held for a flash); the line's junction turns and the
+// stops where passengers cross a car lane, where the autopilot indicates (src/indicators.js)
+const lamps = { indicate: null, high: false, held: false, lit: false, turns: [], kerb: [] };
 let chase = false;
 
 // ------------------------------------------------------------------ menu
@@ -424,7 +432,7 @@ async function start() {
   if (tramModel.userData.cars.length !== cars || tramModel.userData.kind !== have) {
     scene.remove(tramModel);
     disposeModel(tramModel);
-    tramModel = makeT3({ line: data.line, cars, detailed: kind, dest: lastStop, run: runNumber(0) });
+    tramModel = makeT3({ line: data.line, cars, detailed: kind, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
@@ -457,6 +465,8 @@ async function start() {
   if (traffic) traffic.dispose();
   traffic = new Traffic(scene, data, route, ground, game, random);
   debugOverlay.reset();
+  Object.assign(lamps, { indicate: null, high: false, held: false, turns: junctionTurns(route, data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target) });
+  game.lamps = lamps; // (the console and tests: the junction turns and kerb stops found, the lamps' state)
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   pedalKey = null;
@@ -591,6 +601,9 @@ window.addEventListener('keydown', (e) => {
   if (['arrowup', 'arrowdown', ' '].includes(k)) e.preventDefault();
   if (k === 'p' || k === 'escape') { game.paused = !game.paused; return; }
   if (k === 'g') { zoomTarget = ZOOM; return; }   // held: look closer (also while paused, to read a sign)
+  if (k === 'l' && !e.repeat) { // the high beams: held a flash, with Shift on and off
+    if (e.shiftKey) { lamps.high = !lamps.high; game.msg(t(lamps.high ? 'msg.highOn' : 'msg.highOff'), 'info', 2); } else lamps.held = true;
+  }
   if (game.paused) return;
   if (e.repeat && k !== 'w' && k !== 's' && k !== 'arrowup' && k !== 'arrowdown') return;
   const prev = command();
@@ -615,6 +628,10 @@ window.addEventListener('keydown', (e) => {
     case 'v': chase = !chase; document.body.classList.toggle('chase', chase); break;
     case 'm': audio.setMuted(!audio.muted); break;
   }
+  // the indicators' switch (by the keys' places, the same on Czech and English keyboards; the touch buttons' by their
+  // names): on until switched off
+  const side = { Comma: 'left', Period: 'right', Slash: 'hazard' }[e.code] ?? (e.code ? null : { ',': 'left', '.': 'right', '/': 'hazard' }[e.key]);
+  if (side) { lamps.indicate = lamps.indicate === side ? null : side; game.msg(t(`msg.ind.${lamps.indicate ?? 'off'}`), 'info', 2); }
   if (command() > 0 && prev <= 0 && game.doorState !== 'closed') {
     if (arcade()) tram.eq.lever = 0;
     audio.warning(); game.msg(t('msg.closeDoors'), 'warn');
@@ -631,6 +648,7 @@ window.addEventListener('keyup', (e) => {
   if (ku === 'y') input.switchBtn = false;
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (ku === 'g') zoomTarget = 1;
+  if (ku === 'l') lamps.held = false;
   if (e.key === ' ' && command() === -6) setStep(-5); // (the emergency stop let go: brake step 5)
   if ((ku === 'w' || ku === 'arrowup' || ku === 's' || ku === 'arrowdown') && pedalKey) pedalKey = null;
 });
@@ -706,8 +724,17 @@ function previewAt(s) {
 function placeTram(s) {
   // each car rests on its two bogies, so it follows curves and pitches with the gradient
   placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q), route.rollAt(q)]; });
-  // the doors, the brake lamps and the track-brake shoes from the game (the detailed model's)
-  if (tramModel.userData.hybrid && game) poseHybrid(tramModel, { doors: game.doorOpenness, braking: tram.brake > 500, track: tram.trackMagnets });
+  if (!game) return;
+  // the doors, the brake lamps and the track-brake shoes from the game; the collector on the wire (one height over
+  // the rail everywhere in the data, src/world.js); the indicators and the high beams
+  const braking = tram.brake > 500, clock = game.clock;
+  if (pilot) lamps.indicate = indicating(lamps.turns, lamps.kerb, tram.s, tram.v, braking);
+  poseT3(tramModel, { doors: game.doorOpenness, braking, track: tram.trackMagnets, collector: CONTACT_WIRE - RAIL_TOP,
+    indicate: lamps.indicate, clock, highBeam: lamps.high || lamps.held });
+  // the indicators' relay ticks in the cab as they go on and off
+  const sig = signalsAt(lamps.indicate, clock), lit = sig.left || sig.right;
+  if (lamps.indicate && lit !== lamps.lit) audio.click(0.05, lit ? 1250 : 950);
+  lamps.lit = lit;
 }
 
 function updateCamera(dt, t) {
