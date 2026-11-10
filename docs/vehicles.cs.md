@@ -15,7 +15,7 @@ Volba *Model tramvaje* v menu vybírá jeden ze tří; model, který se nenačte
 |---|---|---|---|---|
 | podrobný, pohyblivý (výchozí) | `src/t3h.js`, `assets/t3h/` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla; lehčí úroveň pro vzdálené cizí tramvaje |
 | podrobný, klasický | `src/models.js` (`loadDetailedT3`), `assets/t3/` | glTF s jednou texturou; stáhne se při výběru | CC BY-NC 4.0 | nic |
-| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | GPL-3.0 | zatím nic (#454, #436) |
+| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | GPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu v #436 |
 
 `makeT3({ line, cars, detailed, dest, run, variant })` v `src/models.js` postaví soupravu ve zvoleném
 modelu. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
@@ -35,12 +35,16 @@ modelu. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
 ## Co hra se soupravou dělá
 
 - **Každý snímek** `placeConsist(model, s, at)` posadí každý vůz na jeho dva otočné čepy, takže se stáčí,
-  naklápí a klopí s kolejí; podrobný model věší další vůz na spřáhlo (`placeHybridConsist`) a natáčí mu
-  podvozky a kola.
+  naklápí a klopí s kolejí. Podrobnému a vestavěnému modelu věší další vůz na spřáhlo a nastaví každému vozu
+  pojezd (`hangConsist`, `src/consist.js`): vůz s pohyblivým pojezdem nese `userData.gear`, které natočí
+  podvozky do tětivy mezi jejich nápravami, otočí kola podle ujeté dráhy a vychýlí spřáhla podél spojení
+  mezi vozy (volná rovně vpřed). Podrobný model tím hýbe uzly svého rigu, vestavěný svými instancovanými
+  sítěmi.
 - **Nápisy:** `setConsistLine(model, line, dest, run)` překreslí tabule s číslem linky, směrovou ceduli
   a pořadí (textury z plátna, `src/models.js`), `setNextStop` boční panel T3M.
-- **Stav:** `poseHybrid(model, { doors, collector, braking, track })`: dveře 0–1, výška sběrače, brzdová
-  světla, magnety kolejnicových brzd. Zatím ho bere jen podrobný model.
+- **Stav:** `poseT3(model, { doors, collector, braking, track })` (`src/models.js`): dveře 0–1, výška
+  trolejového drátu nad kolejnicí pro sběrač (pod jeho pracovním rozsahem se stáhne), brzdová světla, magnety
+  kolejnicových brzd. Podrobný model bere všechno (`poseHybrid`), vestavěný sběrač (`poseSimple`).
 - **Cizí tramvaje** (`src/traffic.js`) se objevují a mizí přes `setOpacity`, po materiálech: vlastní
   průhlednost materiálu pod 1 zůstává v `userData.opacity`, materiál od začátku prolínaný zůstává prolínaný.
   Daleko od kamery přepne podrobný model na lehčí úroveň (`setHybridLevel`, 50–60 m). Souprava, která odjede,
@@ -51,10 +55,10 @@ modelu. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
 Co model umí nabídnout a co mu hra řídí. Model uvede svou úroveň; víc po něm hra nechce.
 
 1. **Nehybný:** skříň a podvozky v jednom, tabule a cedule podle hry (linka, cíl, pořadí, evidenční čísla);
-   vůz sedí na svých čepech. Dnes klasický a vestavěný model.
+   vůz sedí na svých čepech. Dnes klasický model.
 2. **Jedoucí:** podvozky se natáčejí do koleje, kola se točí, spřáhla mezi vozy se vychylují, sběrač drží
    výšku trolejového drátu a umí se stáhnout, brzdová světla, směrovky a světlomety podle stavu. Podrobný
-   model umí většinu; vestavěný to dostane v #454 a #436.
+   model umí většinu, vestavěný pojezd a sběrač (#454); světla podle stavu jsou #436.
 3. **Živý:** dveře se ve stanici otevírají a zavírají, čelisti kolejnicových brzd dosedají, v dešti jedou
    stěrače, otevírají se větrací klapky a poklopy, sklápí se rameno zrcátka, skříň pruží (náklon v obloucích,
    předklon při brzdění), světla v salonu a v kabině, řidič, jiskry na sběrači při námraze.
@@ -75,22 +79,26 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
    `assets/t3h/rig.json`: `doors` (křídla dveří), `bogies` (název a čep), `wheels` (název a poloměr),
    `pantograph` (kořen, hlava, ramena, výšky drátu), `signals` (směrovky), `brakes` (brzdová světla),
    `numberPlates`, `routePlates`, `infoPlates` (cíl, pořadí, boční tabule), a animace podle názvu
-   (`Door_Front_Open`, `Pantograph_Lower`, …).
-4. **Kód:** modul jako `src/t3h.js` (načíst, postavit soupravu, posadit ji na kolej, nastavit stav), větev
-   v `makeT3` a volání v `src/main.js` a `src/traffic.js`, soubory na nahrávací obrazovce (`load.prefetch`,
+   (`Door_Front_Open`, `Pantograph_Lower`, …). Model kreslený kódem dá místo toho každému vozu `gear` pro
+   `src/consist.js`, jako to dělá `src/t3simple.js` s instancovanými sítěmi (jeho vůz kreslí 8 sítí mimo
+   tabule).
+4. **Kód:** modul jako `src/t3h.js` (načíst, postavit soupravu s `gear` každého vozu, nastavit stav), větev
+   v `makeT3` a v `poseT3` (`src/models.js`), soubory na nahrávací obrazovce (`load.prefetch`,
    `load.get` v `src/main.js`) a volba v menu (`optModel` v `index.html`, názvy v obou jazycích
    v `src/i18n.js`). Společné rozhraní vozidel zatím není: nový model dnes znamená tyto úpravy. Chystá se
    popis každého vozidla v jednom souboru (#455) a společné rozhraní, ve kterém hra vozidla při startu sama
    najde a zkontroluje a hráč si je může nainstalovat (#456).
 5. **Kontroly:** test jako `tools/test_t3h.py` (úrovně, spřáhla, podvozky, dveře, cedule, objevení), čas
    snímku přes `tools/frametime.py --models …` a obrázky všech modelů ze stejných pohledů přes
-   `python -P -E tools/test_t3simple.py --shots ADRESÁŘ` (bok, tři čtvrtiny, čelo, shora, podvozek, spřáhlo).
+   `python -P -E tools/test_t3simple.py --shots ADRESÁŘ` (bok, tři čtvrtiny, čelo, shora, podvozek, spřáhlo;
+   dvouvozová souprava v oblouku o poloměru 25 m a její pojezd v půdorysu; stažený sběrač).
 
 ## Úprava modelu
 
 - **Vestavěná T3** (`src/t3simple.js`): rozměry jsou pojmenované konstanty na začátku souboru (`NOSE`,
   `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), každá s uvedeným zdrojem; nátěr maluje `livery()`,
-  díly `partsGeometry()` a `bogie()`, typy a jejich evidenční čísla `T3_TYPES`. `tools/test_t3simple.py` ji
+  pevné díly `partsGeometry()`, pohyblivé `bogie()`, `wheelset()`, `coupler()` a `pantoBars()` (rám sběrače
+  pro danou výšku drátu), typy a jejich evidenční čísla `T3_TYPES`. `tools/test_t3simple.py` ji
   kontroluje proti těmto číslům.
 - **Tabule a cedule** všech modelů: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, bodový displej T3M `ledFace`).

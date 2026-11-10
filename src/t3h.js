@@ -16,7 +16,6 @@ export const T3H_FILES = ['assets/t3h/tatra-t3-hybrid-nc.glb', 'assets/t3h/rig.j
 export const T3H_CREDIT = 'Tatra T3 3D model: hybrid of "Tatra T3" by SimonStrikesBack (sketchfab.com, CC BY 4.0) '
   + 'and "Tatra T3" by Jakub Vaja (conflig) (sketchfab.com, CC BY-NC 4.0), modified; CC BY-NC 4.0.';
 
-const HALF = T3.length / 2;     // the coupler head's face from the car centre
 const PLANE = CAR_PITCH / 2;    // the plane two coupled heads meet in, from the car centre
 // saloon materials: the seats, their frames and the grab rails, the ceiling and its lamps, the cab desk
 const INSIDE = new Set(['Handles', 'Control_Panel', 'Red_Seat', 'Blue_Seat', 'Leather', 'Material',
@@ -382,6 +381,7 @@ export function makeHybridSet(root, line, cars, dest, run, collector) {
     };
     const cr = car.userData.rig;
     for (const b of cr.bogies) b.node?.traverse((o) => { if (o.name === 'T3H_shoe') b.shoes.push(o); });
+    car.userData.gear = gear(cr);
     // the cards: the route plates on every car (the front one shows on the leading car, the rear one on the
     // last), the destination and run number in the leading car only
     cr.plates = {
@@ -454,73 +454,23 @@ export function setHybridLevel(model, level) {
 export const FULL_IN = 50, FULL_OUT = 60; // m from the camera: AI trams' full level (the saloon through the windows)
 
 // ------------------------------------------------------------------------------------------ running
-const v3 = () => new THREE.Vector3();
-const A = v3(), B = v3(), F = v3(), Q = v3(), qi = new THREE.Quaternion();
-// A car's pose from the track: on its two bogie pivots, as the procedural and the earlier model (at(s) ->
-// [x, y, height, roll]); its bogies turn to the chord between their own axles, its wheels roll.
-function placeCar(car, c, at, bogie, wheelS) {
-  const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
-  car.position.set((ax + bx) / 2, (za + zb) / 2, -(ay + by) / 2);
-  car.rotation.y = Math.atan2(ax - bx, -(ay - by));
-  car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
-  car.rotation.z = -(ra + rb) / 2;
-  const r = car.userData.rig;
-  if (!r || !r.full.visible) return; // (the lighter level has them merged)
-  for (const b of r.bogies) {
-    if (!b.node) continue;
-    const s = c + (b.front ? bogie : -bogie), [px, py] = at(s + 0.91), [qx, qy] = at(s - 0.91);
-    let d = Math.atan2(px - qx, -(py - qy)) - car.rotation.y;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    b.node.rotation.y = d;
-  }
-  for (const w of r.wheels) if (w.node) w.node.rotation.z = -wheelS / w.r;
-}
-
-// a point of a car in world coordinates from its local (x left, y up, z forward)
-const carPoint = (car, x, y, z, out) => { car.updateMatrix(); return out.set(x, y, z).applyMatrix4(car.matrix); };
-
-// Each car of a set on the track. The first stands with its front coupler face at sFront; each next one
-// hangs on the coupling: the two coupled bars are one stiff link from pin to pin (the Prague head's two
-// pins, #248), so the next car stands where its front pin is that link's length from the car ahead's rear
-// pin, a few cm closer along the track in a curve than on the straight.
-export function placeHybridConsist(model, sFront, at, pitch = CAR_PITCH) {
-  const { cars, bogie } = model.userData, pin = T3.couplerPivot, link = pitch - 2 * pin;
-  const y = cars[0].userData.rig?.couplers[1]?.position.y ?? 0; // (the pins' height in the car: the link runs between them)
-  let c = sFront - HALF;
-  cars.forEach((car, k) => {
-    if (k > 0) {
-      const prev = cars[k - 1];
-      carPoint(prev, 0, y, -pin, A);
-      // the next car's centre along the track: two secant steps from the straight-track pitch
-      let c2 = c - pitch;
-      for (let i = 0; i < 3; i++) {
-        placeCar(car, c2, at, bogie, sFront);
-        carPoint(car, 0, y, pin, B);
-        const err = A.distanceTo(B) - link;
-        if (Math.abs(err) < 1e-4) break;
-        c2 += err;
-      }
-      c = c2;
-    }
-    placeCar(car, c, at, bogie, sFront);
-  });
-  // the couplers: coupled ones along the link, the free ones at the set's ends straight ahead
-  for (const car of cars) for (const bar of car.userData.rig.couplers) if (bar) bar.rotation.set(0, 0, 0);
-  cars.forEach((car, k) => {
-    const rear = car.userData.rig.couplers[1];
-    if (k === cars.length - 1 || !rear) return;
-    const next = cars[k + 1], nf = next.userData.rig.couplers[0];
-    carPoint(car, 0, y, -pin, A); carPoint(next, 0, y, pin, B);
-    F.subVectors(B, A); // from this car's rear pin to the next one's front pin, in the world
-    for (const [cc, bar, sign] of [[car, rear, -1], [next, nf, 1]]) {
-      if (!bar) continue;
-      Q.copy(F).multiplyScalar(-sign).applyQuaternion(qi.copy(cc.quaternion).invert()); // into the car's frame
-      // (the rig frame: +X = the car's forward (z), +Z = its right (-x)); the bar points along sign*X
-      const fx = Q.z, rz = -Q.x;
+// A car's running gear for src/consist.js (hangConsist places the cars): its bogies' and wheels' nodes, the
+// coupler bars' pivots. The rig's frame: +X the car's forward (z), +Z its right (-x).
+function gear(r) {
+  return {
+    axle: 0.91, pinY: r.couplers[1]?.position.y ?? 0,
+    live: () => r.full.visible, // (the lighter level has them merged)
+    turn(i, d) { for (const b of r.bogies) if (b.node && b.front === (i === 0)) b.node.rotation.y = d; },
+    roll(s) { for (const w of r.wheels) if (w.node) w.node.rotation.z = -s / w.r; },
+    swing(i, q) {
+      const bar = r.couplers[i];
+      if (!bar) return;
+      if (!q) { bar.rotation.set(0, 0, 0); return; }
+      // the bar points along sign*X; up and down too (held along its car, each head rode on that car's pitch
+      // and the two stepped against each other by cm where the track changes its grade between the cars, #356)
+      const sign = i === 0 ? 1 : -1, fx = q.z, rz = -q.x;
       bar.rotation.y = sign > 0 ? Math.atan2(-rz, fx) : Math.atan2(rz, -fx);
-      // (up and down too: held along its car, each head rode on that car's pitch and the two stepped against
-      // each other by cm where the track changes its grade between the cars, #356)
-      bar.rotation.z = sign * Math.atan2(Q.y, Math.hypot(fx, rz));
-    }
-  });
+      bar.rotation.z = sign * Math.atan2(q.y, Math.hypot(fx, rz));
+    },
+  };
 }

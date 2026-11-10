@@ -4,8 +4,9 @@
 // The body is one lofted surface: a plan outline per height (straight sides; the ends tapering in plan from
 // the doors to rounded corners and a bulged face) stacked along the side view's end profiles (the
 // windscreen leaning back under the roof cap's visor), painted from one canvas shared by every car. The
-// running gear, pantograph and fittings are one mesh in vertex colours, the lamps another, the car's fleet
-// numbers a third: four draw calls a car, and its plates. Three types: the T3 (a silver bumper, the route box
+// fittings are one mesh in vertex colours, the lamps another, the car's fleet numbers a third; the moving parts
+// (#454) are instanced in the same colours: the two bogies' frames, the four wheelsets, the two couplers, the
+// pantograph's bars. Eight draw calls a car, and its plates. Three types: the T3 (a silver bumper, the route box
 // square), the T3SUCS (a brown bumper, the route box rounded) and the T3M (as the T3SUCS, with the resistors' box
 // on the roof and its green dot-matrix displays; src/models.js draws the plates). One car: origin on the rail plane
 // midway between the bogie pivots, facing +Z, the right side (the doors) at -X.
@@ -430,21 +431,32 @@ function strip(sign, z0, h0, h1, out, color, hr = (h0 + h1) / 2) {
 // The pantograph (both drawings): seen from the side a rhombus, its lower arms from the base and its upper
 // arms to the collector meeting at knees fore and aft; two such frames side by side, the knees on shafts
 // across. The arms keep their lengths, so the knees spread as the head comes down to the wire.
-const PANTO = { z: 3.1, x: 0.55, lower: 1.70, upper: 1.75, head: 0.025 };
-function pantograph(wire) {
-  const base = ROOF + 0.09, top = wire - 0.005 - PANTO.head, rise = top - base, out = [], c = COL.panto;
+// Its frame is posed (poseSimple): the bars below, one instance each of a unit bar; the base stays put.
+const PANTO = { z: 3.1, x: 0.55, lower: 1.70, upper: 1.75, head: 0.025, base: ROOF + 0.09 };
+// the head's rise over the base: lowered, the knees level with the base (the arms' lengths allow no lower);
+// raised at most with the arms 0.1 m short of straight
+const RISE = { down: Math.sqrt(PANTO.upper ** 2 - PANTO.lower ** 2), up: PANTO.lower + PANTO.upper - 0.1 };
+// the collector's top for a contact height over the rail (5 mm under the wire), lowered below its range
+export const collectorTop = (h) => PANTO.base + PANTO.head + THREE.MathUtils.clamp(h - 0.005 - PANTO.head - PANTO.base, RISE.down, RISE.up);
+// the frame's bars for a contact height h: [from, to, radius, radius upwards, colour]
+function pantoBars(h) {
+  const rise = collectorTop(h) - PANTO.head - PANTO.base, out = [], c = COL.panto, dark = '#2b2b2b';
   // the knee's height a over the base: lower^2 - a^2 = upper^2 - (rise - a)^2
   const a = (PANTO.lower ** 2 - PANTO.upper ** 2 + rise ** 2) / (2 * rise), dz = Math.sqrt(Math.max(0, PANTO.lower ** 2 - a * a));
-  const P = (x, y, z) => [x, base + y, PANTO.z + z];
+  const P = (x, y, z) => [x, PANTO.base + y, PANTO.z + z];
   for (const x of [-PANTO.x, PANTO.x]) {
-    for (const s of [-1, 1]) out.push(bar(P(x, 0, 0), P(x, a, s * dz), 0.028, c), bar(P(x, a, s * dz), P(x, rise, 0), 0.022, c));
+    for (const s of [-1, 1]) out.push([P(x, 0, 0), P(x, a, s * dz), 0.028, 0.028, c], [P(x, a, s * dz), P(x, rise, 0), 0.022, 0.022, c]);
   }
-  for (const s of [-1, 1]) out.push(bar(P(-PANTO.x, a, s * dz), P(PANTO.x, a, s * dz), 0.02, c)); // the knees' shafts
-  // the collector: its bar across the top with the horns turned down, on the frames' tops
-  out.push(part(box(1.3, 2 * PANTO.head, 0.1), '#2b2b2b', { at: P(0, rise, 0) }));
-  for (const s of [-1, 1]) out.push(bar(P(s * 0.65, rise, 0), P(s * 0.92, rise - 0.12, 0), 0.02, '#2b2b2b'));
-  // the base frame on its insulators
-  out.push(part(box(1.3, 0.06, 1.2), '#2e2f30', { at: [0, ROOF + 0.06, PANTO.z] }));
+  for (const s of [-1, 1]) out.push([P(-PANTO.x, a, s * dz), P(PANTO.x, a, s * dz), 0.02, 0.02, c]); // the knees' shafts
+  // the collector: its bar across the top (0.1 m deep, 0.05 m high) with the horns turned down, on the frames' tops
+  out.push([P(-0.65, rise, 0), P(0.65, rise, 0), 0.05, PANTO.head, dark]);
+  for (const s of [-1, 1]) out.push([P(s * 0.65, rise, 0), P(s * 0.92, rise - 0.12, 0), 0.02, 0.02, dark]);
+  return out;
+}
+const PANTO_BARS = pantoBars(5).length;
+// the base frame on its insulators
+function pantoBase() {
+  const out = [part(box(1.3, 0.06, 1.2), '#2e2f30', { at: [0, ROOF + 0.06, PANTO.z] })];
   for (const x of [-0.5, 0.5]) for (const z of [-0.45, 0.45]) out.push(part(new THREE.CylinderGeometry(0.04, 0.05, 0.06, 6), '#8a6a3a', { at: [x, ROOF + 0.03, PANTO.z + z] }));
   return out;
 }
@@ -461,16 +473,25 @@ function onFace(sign, x, h) {
 // side beam at 0.40 m; the ribbed rubber spring in the middle up to the skirt, the gearbox's housing beside it, coil
 // springs by the wheels, a brake rod and a lever; all of it a dusty warm grey
 const BOGIE_COL = { disc: '#7f7866', hub: '#6d675a', boss: '#78725f', tyre: '#6a4c33', frame: '#77705e', guard: '#5f5a4e', shoe: '#7e7764', rubber: '#4f4a41', rib: '#68625a' };
-function bogie(zc) {
-  const P = [], C = BOGIE_COL, gap = T3.trackBrakeGap, sideways = { rot: [0, 0, Math.PI / 2] };
+const sideways = { rot: [0, 0, Math.PI / 2] };
+// a wheelset about its axle's middle: the two wheels (the hub's nut, flats on top at rest, shows them turn)
+function wheelset() {
+  const P = [], C = BOGIE_COL;
+  for (const sx of [-1, 1]) {
+    P.push(part(new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.1, 28), C.tyre, { at: [sx * 0.75, 0, 0], ...sideways }));
+    P.push(part(new THREE.CylinderGeometry(WHEEL_R - 0.06, WHEEL_R - 0.06, 0.104, 28), C.disc, { at: [sx * 0.75, 0, 0], ...sideways }));
+    P.push(part(new THREE.CylinderGeometry(0.135, 0.135, 0.03, 6), C.hub, { at: [sx * 0.817, 0, 0], ...sideways }));
+    P.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 14), C.boss, { at: [sx * 0.84, 0, 0], ...sideways }));
+    P.push(part(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 6), C.hub, { at: [sx * 0.86, 0, 0], ...sideways }));
+  }
+  return mergeGeometries(P);
+}
+// a bogie's frame about its pivot (zc 0), everything but the wheelsets
+function bogie(zc = 0) {
+  const P = [], C = BOGIE_COL, gap = T3.trackBrakeGap;
   for (const sx of [-1, 1]) {
     for (const dz of [-WHEELBASE / 2, WHEELBASE / 2]) {
       const z = zc + dz, inward = -Math.sign(dz);
-      P.push(part(new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.1, 28), C.tyre, { at: [sx * 0.75, WHEEL_R, z], ...sideways }));
-      P.push(part(new THREE.CylinderGeometry(WHEEL_R - 0.06, WHEEL_R - 0.06, 0.104, 28), C.disc, { at: [sx * 0.75, WHEEL_R, z], ...sideways }));
-      P.push(part(new THREE.CylinderGeometry(0.135, 0.135, 0.03, 6), C.hub, { at: [sx * 0.817, WHEEL_R, z], ...sideways })); // (flats on top)
-      P.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 14), C.boss, { at: [sx * 0.84, WHEEL_R, z], ...sideways }));
-      P.push(part(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 6), C.hub, { at: [sx * 0.86, WHEEL_R, z], ...sideways }));
       P.push(part(box(0.14, 0.2, 0.22), C.frame, { at: [sx * 0.62, WHEEL_R, z] })); // the axle box, behind the disc
       // the guard: an arc 0.37-0.42 m round the wheel's side towards the middle, from 5 cm over the rail to near its top
       for (let k = 0; k < 6; k++) {
@@ -502,7 +523,7 @@ function bogie(zc) {
     P.push(part(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 14), C.shoe, { at: [sx * 0.74, 0.54, zc + 0.36], ...sideways }));
   }
   P.push(part(box(1.4, 0.14, 0.5), C.frame, { at: [0, 0.48, zc] }));
-  return P;
+  return mergeGeometries(P);
 }
 
 // The mirror (the user's photos of 6921 and 7122): its arm rises from the cap's side over the front door, runs out
@@ -525,9 +546,9 @@ export const ROUTE_BOX = { w: 0.49, h: 0.30, r: 0.05 };
 const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.62, 2.94, 6.28], [-1.62, 2.3, 6.28]];
 const MIRROR_PLATE = [-1.62, 2.52, 6.31];
 
-function partsGeometry(wire, variant) {
+// the parts that never move (the running gear and the pantograph's frame are posed: gearShapes)
+function partsGeometry(variant) {
   const P = [], dark = '#2c2d2e';
-  for (const zc of [-PIVOT, PIVOT]) P.push(...bogie(zc));
   // under the body: the equipment's lower edge between the bogies, the floor's underside, the door steps
   P.push(part(box(2.0, 0.07, 3.6), dark, { at: [0, BOTTOM - 0.035, 0] }));
   P.push(part(cap(ring(BOTTOM), BOTTOM, -1), dark));
@@ -537,7 +558,7 @@ function partsGeometry(wire, variant) {
   }
   // the ends: the bumper round the end back to the doors (a T3's silver with two thin red stripes, 12 mm a
   // quarter of the bumper in from its edges as on 6892, the others' brown), the underframe's end dark behind
-  // the opening under it, the coupler's gear, the coupler's bar and head
+  // the opening under it, the coupler's gear
   const [b0, b1] = LIV.bumper, bh = b1 - b0;
   const bands = variant === 'T3'
     ? [[0, 0.115, COL.silver], [0.115, 0.23, COL.red], [0.23, 0.77, COL.silver], [0.77, 0.885, COL.red], [0.885, 1, COL.silver]]
@@ -549,7 +570,6 @@ function partsGeometry(wire, variant) {
     // its foot, where it is furthest back, so its corners do not come through the skirt)
     P.push(part(box(2 * OPEN + 0.1, b0 + 0.04 - BOTTOM, 0.04), '#262422', { at: [0, (BOTTOM + b0 + 0.04) / 2, sign * (Math.abs(onFace(sign, OPEN + 0.05, BOTTOM).z) - 0.05)] }));
     P.push(part(box(0.8, 0.12, 0.25), '#2a2a2a', { at: [0, 0.26, zf - sign * 0.5] }));
-    P.push(...coupler(sign));
   }
   // behind each bogie's cutouts, a dark panel down the middle (the cutouts do not show through the car)
   for (const zc of [-PIVOT, PIVOT]) P.push(part(box(0.02, CUTOUT.top - BOTTOM + 0.06, 2 * CUTOUT.half), '#2e2a26', { at: [0, (CUTOUT.top + BOTTOM) / 2, zc] }));
@@ -566,7 +586,7 @@ function partsGeometry(wire, variant) {
   }
   for (const sign of [-1, 1]) P.push(part(box(0.016, 0.135, 0.08), '#262626', { at: [sign * (HW + 0.006), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   // the roof (the colour elevation): three hatches, a low cover behind the pantograph, a box amidships, the
-  // aerial on the front cap, the pantograph; on a T3M the resistors' box towards the rear (the user's photos
+  // aerial on the front cap, the pantograph's base; on a T3M the resistors' box towards the rear (the user's photos
   // of 8080 and 8088: "Box on top with resistors towards back only for t3m")
   for (const z of [-5.2, -0.78, 4.69]) P.push(part(box(0.62, 0.06, 1.05), '#7c8084', { at: [0, ROOF + 0.03, z] }));
   P.push(part(box(0.9, 0.05, 1.45), '#5c6064', { at: [0, ROOF + 0.025, 1.7] }));
@@ -576,7 +596,7 @@ function partsGeometry(wire, variant) {
     for (let k = 0; k < 8; k++) P.push(part(box(1.32, 0.02, 0.05), '#5d6164', { at: [0, ROOF + 0.205, -3.35 + 0.1 * k] }));
   }
   P.push(bar([0, ROOF - 0.05, 5.68], [0, ROOF + 0.24, 5.68], 0.015, '#8a8d90'), bar([0, ROOF + 0.24, 5.55], [0, ROOF + 0.24, 5.81], 0.012, '#8a8d90'));
-  P.push(...pantograph(wire));
+  P.push(...pantoBase());
   for (let i = 1; i < ARM.length; i++) P.push(bar(ARM[i - 1], ARM[i], 0.02, '#8a8d90'));
   P.push(part(box(0.22, 0.38, 0.05), '#1c1c1c', { at: [-1.66, 2.2, 6.24] })); // (its top behind the plate)
   const lm = atCorner(1, 1, 0.98); // (the small mirror's bracket from the corner, just behind the windscreen's wrap)
@@ -587,10 +607,10 @@ function partsGeometry(wire, variant) {
 // The coupler (the user's picture of a T3's, 2026-11-10: "something like the attached image, only dark"): a round
 // bar from the yoke's pin under the body end (T3.couplerPivot) to a clamp, the head cast in one with a neck, its
 // mouth two jaws with the coupling pin down through them and its handle on top; the jaws' faces at the plane
-// where two coupled heads meet (sign 1 the front)
-function coupler(sign) {
-  const C = [], z = (d) => sign * (COUPLER_FACE - d), y = COUPLER_H, bar0 = '#2f3133', cast = '#28292b', along = { rot: [Math.PI / 2, 0, 0] };
-  C.push(bar([0, y, sign * T3.couplerPivot], [0, y, z(0.52)], 0.034, bar0));
+// where two coupled heads meet. Built as the front one about its pin (the yoke's): posed on either end (gear)
+function coupler() {
+  const C = [], sign = 1, z = (d) => COUPLER_FACE - T3.couplerPivot - d, y = 0, bar0 = '#2f3133', cast = '#28292b', along = { rot: [Math.PI / 2, 0, 0] };
+  C.push(bar([0, y, 0], [0, y, z(0.52)], 0.034, bar0));
   C.push(part(new THREE.CylinderGeometry(0.056, 0.056, 0.11, 12), '#36383a', { at: [0, y, z(0.47)], ...along })); // the clamp
   for (const s of [-1, 1]) C.push(part(box(0.03, 0.035, 0.09), '#36383a', { at: [s * 0.07, y + 0.035, z(0.47)] })); // its bolts' lugs
   // the neck widening from the clamp into the head: a square frustum, flattened to the head's height
@@ -602,7 +622,7 @@ function coupler(sign) {
   C.push(bar([-0.045, y + 0.12, z(0.06)], [0.045, y + 0.12, z(0.06)], 0.009, '#3a3c3e'));
   for (const s of [-1, 1]) C.push(bar([s * 0.045, y + 0.12, z(0.06)], [s * 0.03, y + 0.07, z(0.06)], 0.009, '#3a3c3e')); // the handle
   for (const s of [-1, 1]) C.push(part(new THREE.CylinderGeometry(0.03, 0.03, 0.015, 10), '#3a3c3e', { at: [s * 0.0835, y, z(0.2)], rot: [0, 0, Math.PI / 2] })); // the side bosses
-  return C;
+  return mergeGeometries(C);
 }
 
 // The lamps (lit): the round headlights; rectangular units by the corners, an orange indicator over a clear
@@ -714,8 +734,8 @@ export function fleetNumbers(variant, run, cars) {
 
 let SHAPES = null;
 const PARTS = new Map();
-function shapes(wire, variant) {
-  if (!SHAPES || SHAPES.wire !== wire) {
+function shapes(variant) {
+  if (!SHAPES) {
     const body = bodyGeometry(), lamps = lampsGeometry();
     const probe = new THREE.Mesh(body);
     probe.updateMatrixWorld(true);
@@ -732,19 +752,101 @@ function shapes(wire, variant) {
     };
     const fleet = mergeGeometries([onFaceStrip(1, FLEET.front, FLEET_QW, FLEET_QH), onFaceStrip(-1, FLEET.rear, FLEET_QW, FLEET_QH),
       ...[-1, 1].map((sign) => onFlank(sign, FLEET.side.z, FLEET.side.h, FLEET_QW, FLEET_QH))]);
-    for (const g of [body, lamps, fleet, ...Object.values(plates)]) if (g) g.userData.shared = true;
-    SHAPES = { wire, body, lamps, plates, fleet, livery: livery() };
-    PARTS.clear();
+    // the posed parts, one instance each: a bogie's frame, a wheelset, a coupler, a unit bar of the pantograph's
+    // frame (white: its instances' colours)
+    const gear = { bogie: bogie(), wheels: wheelset(), coupler: coupler(), bar: part(new THREE.CylinderGeometry(1, 1, 1, 6), '#ffffff') };
+    for (const g of [body, lamps, fleet, ...Object.values(plates), ...Object.values(gear)]) if (g) g.userData.shared = true;
+    SHAPES = { body, lamps, plates, fleet, gear, livery: livery() };
   }
-  if (!PARTS.has(variant)) { const g = partsGeometry(wire, variant); g.userData.shared = true; PARTS.set(variant, g); }
+  if (!PARTS.has(variant)) { const g = partsGeometry(variant); g.userData.shared = true; PARTS.set(variant, g); }
   return { ...SHAPES, parts: PARTS.get(variant) };
+}
+
+// ------------------------------------------------------------------------------------- the running gear
+// A car's moving parts are instances in its frame (src/consist.js poses them through car.userData.gear): the two
+// bogies' frames, turned about their pivots; the four wheelsets in them, rolled; the two couplers, swung about
+// their pins; the pantograph's bars (poseSimple). A car draws 8 meshes besides its plates.
+const _m = new THREE.Matrix4(), _w = new THREE.Matrix4(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+// (the instances move within the car: a sphere round all of it, so three culls them with the car)
+const CAR_SPHERE = new THREE.Sphere(new THREE.Vector3(0, 2.0, 0), 8.2);
+
+function instanced(geo, mat, n, name) {
+  const o = new THREE.InstancedMesh(geo, mat, n);
+  o.name = name;
+  o.boundingSphere = CAR_SPHERE.clone();
+  o.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  return o;
+}
+
+// a car's gear: its state, written into the instances in done() when it changed
+function carGear(meshes) {
+  const st = { yaw: [0, 0], s: 0, dir: [[0, 0], [0, 0]] }, eps = 1e-5;
+  let dirty = true;
+  const set = (v, k, x) => { if (Math.abs(v[k] - x) > eps) { v[k] = x; dirty = true; } };
+  return {
+    axle: WHEELBASE / 2, pinY: COUPLER_H, live: () => true, state: st,
+    turn(i, d) { set(st.yaw, i, d); },
+    roll(s) { if (Math.abs(s - st.s) > 1e-4) { st.s = s; dirty = true; } },
+    // a coupler's yaw (+ to the left of its own end's straight ahead) and pitch (+ up) from its outward direction
+    swing(i, q) {
+      const out = i === 0 ? 1 : -1;
+      set(st.dir[i], 0, q ? Math.atan2(out * q.x, out * q.z) : 0);
+      set(st.dir[i], 1, q ? Math.atan2(q.y, Math.hypot(q.x, q.z)) : 0);
+    },
+    done() {
+      if (!dirty) return;
+      dirty = false;
+      const turn = st.s / WHEEL_R; // (rolling forwards: the wheel's top to +z, about +x)
+      for (let i = 0; i < 2; i++) {
+        const out = i === 0 ? 1 : -1;
+        _m.makeRotationY(st.yaw[i]).setPosition(0, 0, out * PIVOT);
+        meshes.bogies.setMatrixAt(i, _m);
+        for (let j = 0; j < 2; j++) {
+          _w.makeRotationX(turn).setPosition(0, WHEEL_R, (j === 0 ? 1 : -1) * WHEELBASE / 2);
+          meshes.wheels.setMatrixAt(2 * i + j, _w.premultiply(_m));
+        }
+        // the coupler is built as the front one: the rear one turned round
+        _e.set(-st.dir[i][1], st.dir[i][0] + (out > 0 ? 0 : Math.PI), 0);
+        _m.makeRotationFromEuler(_e).setPosition(0, COUPLER_H, out * T3.couplerPivot);
+        meshes.couplers.setMatrixAt(i, _m);
+      }
+      for (const o of [meshes.bogies, meshes.wheels, meshes.couplers]) o.instanceMatrix.needsUpdate = true;
+    },
+  };
+}
+
+// the pantograph's bars for a contact height h over the rail: each a unit bar from a to b, r its radius across
+// (horizontal), ru upwards (the hexagon's corner up: the collector's top ru over its middle)
+function posePanto(mesh, h) {
+  pantoBars(h).forEach(([a, b, r, ru], i) => {
+    _a.set(...a); _b.set(...b);
+    _y.subVectors(_b, _a);
+    const len = _y.length();
+    _y.divideScalar(len);
+    _z.copy(_up).addScaledVector(_y, -_up.dot(_y));
+    if (_z.lengthSq() < 1e-8) _z.set(1, 0, 0); else _z.normalize();
+    _x.crossVectors(_y, _z);
+    _m.makeBasis(_x.multiplyScalar(r), _y.multiplyScalar(len), _z.multiplyScalar(ru)).setPosition(_a.add(_b).multiplyScalar(0.5));
+    mesh.setMatrixAt(i, _m);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+// The built-in car's state (src/models.js poseT3), each only when it changes: the collector's contact height
+// over the rail (below its working range it lies lowered)
+export function poseSimple(model, { collector } = {}) {
+  for (const car of model.userData.cars) {
+    const p = car.userData.panto;
+    if (collector !== undefined && Math.abs(collector - p.h) > 1e-3) { p.h = collector; posePanto(p.mesh, collector); }
+  }
 }
 
 // A set of `cars` built-in T3s in `root` (src/models.js makeT3): `mats` holds the plates' materials
 // (route box, mirror plate, rear plate, destination and run cards), which setConsistLine swaps; `variant`
-// 'T3', 'T3SUCS' or 'T3M' (T3_TYPES), `fleet` the cars' numbers.
+// 'T3', 'T3SUCS' or 'T3M' (T3_TYPES), `fleet` the cars' numbers; the collector on the wire `wire` m over the rail.
 export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = fleetNumbers(variant, '', cars) } = {}) {
-  const P = shapes(wire, variant);
+  const P = shapes(variant);
   // each set owns its materials (traffic fades them one set at a time); the shapes and the livery are shared
   Object.assign(mats, {
     body: new THREE.MeshLambertMaterial({ map: P.livery, alphaTest: 0.5 }), // (the alpha: the skirt's cutouts)
@@ -752,6 +854,7 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
     lamps: new THREE.MeshBasicMaterial({ vertexColors: true }),
   });
   Object.assign(root.userData, { mats, bogie: PIVOT, bodyFront: BODY_FRONT, cars: [], variant, fleet });
+  const colours = pantoBars(wire).map((b) => new THREE.Color(b[4]));
   for (let k = 0; k < cars; k++) {
     const car = new THREE.Group();
     car.rotation.order = 'YXZ';
@@ -762,6 +865,14 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
     // (a decal blended at its edges: traffic's fade keeps a blended material blended)
     const fm = new THREE.MeshLambertMaterial({ map: fleetTexture(fleet[k]), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
     mesh(P.fleet, fm, 'fleet');
+    const gm = { bogies: instanced(P.gear.bogie, mats.parts, 2, 'bogies'), wheels: instanced(P.gear.wheels, mats.parts, 4, 'wheels'),
+      couplers: instanced(P.gear.coupler, mats.parts, 2, 'couplers'), panto: instanced(P.gear.bar, mats.parts, PANTO_BARS, 'pantograph') };
+    for (const o of Object.values(gm)) car.add(o);
+    colours.forEach((c, i) => gm.panto.setColorAt(i, c));
+    car.userData.gear = carGear(gm);
+    car.userData.gear.done(); // (square, at rest)
+    car.userData.panto = { mesh: gm.panto, h: wire };
+    posePanto(gm.panto, wire);
     // the leading car carries the plates and the cards in the windscreen (no destination card when it is
     // not known), the last one the inverted plate in the rear window
     if (k === 0) {

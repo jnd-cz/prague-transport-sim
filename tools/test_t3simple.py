@@ -5,8 +5,9 @@ Usage: python -P -E tools/test_t3simple.py [--shots DIR] [--models simple,t3,t3m
 Needs no world data. Checks: the body is 14.0 x 2.5 m with its roof at 3.02 m; the ends in plan taper
 from the doors and in the side view lean back above the windscreen's foot (the drawing's numbers); the
 bogie pivots 6.4 m apart with wheels of 700 mm at 1.9 m; the couplers' heads meet in a two-car set; the
-pantograph's head at the wire; the plates and cards on the right cars and swapped with the line; at most
-four draw calls a car besides its plates; the headlights, corner lamps and bumper where 6892's head-on photo
+pantograph's head at the wire; on a curve the bogies turned to the track, the coupled heads meeting and the free
+ones straight, the wheels rolled by the distance; the collector at a given height and lowered; the plates and cards
+on the right cars and swapped with the line; at most eight draw calls a car besides its plates; the headlights, corner lamps and bumper where 6892's head-on photo
 has them, the ends open under the bumper, the skirt in arches over the wheels; the three types (T3, T3SUCS, T3M) with their bumpers, route boxes,
 the T3M's roof box and green display, fleet numbers by type, AI sets by run number in their ranges' shares;
 the fleet numbers' size and places. With --shots: the same views of each model (side, three-quarter
@@ -38,7 +39,13 @@ MEASURE = r"""async () => {
   const meshes = (car) => car.children.filter((o) => o.isMesh);
   const named = (car, name) => car.children.find((o) => o.name === name);
   out.drawn = [meshes(a).length, meshes(b).length];
-  out.tris = [a, b].map((c) => meshes(c).reduce((s, o) => s + (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3, 0));
+  out.tris = [a, b].map((c) => meshes(c).reduce((s, o) => s + (o.count ?? 1) * (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3, 0));
+  // an instanced part's points in its car's frame
+  const ptsOf = (o) => {
+    const pts = [], M = new THREE.Matrix4(), P = o.geometry.attributes.position;
+    for (let i = 0; i < (o.count ?? 1); i++) { if (o.isInstancedMesh) o.getMatrixAt(i, M); for (let j = 0; j < P.count; j++) pts.push(new THREE.Vector3().fromBufferAttribute(P, j).applyMatrix4(M)); }
+    return pts;
+  };
   const body = named(a, 'body'), parts = named(a, 'parts');
   // the variants: the T3M's resistor box towards the rear of the roof, its route display; the fleet numbers
   const roofBox = (geo) => { const P = geo.attributes.position; let top = 0; for (let i = 0; i < P.count; i++) if (P.getZ(i) < -1.2 && P.getZ(i) > -4.1 && Math.abs(P.getX(i)) < 0.7) top = Math.max(top, P.getY(i)); return top; };
@@ -110,14 +117,12 @@ MEASURE = r"""async () => {
   body.geometry.computeBoundingBox();
   const bb = body.geometry.boundingBox;
   out.body = { x: [bb.min.x, bb.max.x], y: [bb.min.y, bb.max.y], z: [bb.min.z, bb.max.z] };
-  // the parts: the wheels (the points on the rail), the couplers' faces, the pantograph's head
-  const P = parts.geometry.attributes.position, low = [];
-  let top = -Infinity, zMin = Infinity, zMax = -Infinity;
-  for (let i = 0; i < P.count; i++) {
-    const y = P.getY(i), z = P.getZ(i);
-    if (y < 0.01) low.push(z); // the wheels' lowest points (the track-brake shoes hang 12 mm up)
-    top = Math.max(top, y); zMin = Math.min(zMin, z); zMax = Math.max(zMax, z);
-  }
+  // the running gear at rest: the wheels (the points on the rail), the couplers' faces, the pantograph's head
+  // (nothing else of the car on the rail: the track-brake shoes hang 12 mm up)
+  const low = [...ptsOf(parts), ...ptsOf(named(a, 'bogies')), ...ptsOf(named(a, 'wheels'))].filter((p) => p.y < 0.01).map((p) => p.z);
+  const cz = ptsOf(named(a, 'couplers')).map((p) => p.z), zMin = Math.min(...cz), zMax = Math.max(...cz);
+  const topOf = (car) => Math.max(...ptsOf(named(car, 'pantograph')).map((p) => p.y));
+  const top = Math.max(topOf(a), ...ptsOf(parts).map((p) => p.y));
   // the points on the rail in groups (a wheel's are within its 0.7 m), each group's middle
   low.sort((p, q) => p - q);
   const groups = [];
@@ -166,6 +171,36 @@ MEASURE = r"""async () => {
   const rb = m.userData.mats.rbMat, map0 = rb.map;
   models.setConsistLine(m, '22', 'Bílá Hora', '802');
   out.swapped = rb.map !== map0 && m.userData.dest === 'Bílá Hora';
+  // #454, on a curve of 25 m radius curving left: each bogie's yaw against the body (the chord between its axles
+  // against the chord between the pivots: +-3.2 / 25 rad on a circle), its axles over the track; the coupled heads
+  // meeting, the free couplers straight ahead; the wheels' turn after 0.5 m; the collector at a height and lowered
+  const { T3 } = await import('/src/tram.js');
+  const R = 25, circle = (s) => [R * Math.sin(s / R), R * (1 - Math.cos(s / R)), 0, 0];
+  const wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x)), M = new THREE.Matrix4(), N = new THREE.Matrix4();
+  const at = (o, i) => { o.getMatrixAt(i, M); return M.clone(); };
+  const yawOf = (m4) => Math.atan2(m4.elements[8], m4.elements[10]);
+  models.placeConsist(m, 60, circle);
+  m.updateMatrixWorld(true);
+  const reach = CAR_PITCH / 2 - T3.couplerPivot; // the bar from its pin to the coupling plane
+  const face = (car, i) => new THREE.Vector3(0, 0, reach).applyMatrix4(at(named(car, 'couplers'), i)).applyMatrix4(car.matrixWorld);
+  const wheelR = (car) => [0, 1, 2, 3].map((i) => { const p = new THREE.Vector3().setFromMatrixPosition(at(named(car, 'wheels'), i)).applyMatrix4(car.matrixWorld); return Math.hypot(p.x, -p.z - R); });
+  out.curve = {
+    bogies: [a, b].map((car) => [0, 1].map((i) => yawOf(at(named(car, 'bogies'), i)))), want: T3.bogies / 2 / R,
+    axles: [a, b].map((car) => wheelR(car).map((r) => r - R)),
+    coupled: face(a, 1).distanceTo(face(b, 0)), coupledYaw: [yawOf(at(named(a, 'couplers'), 1)), yawOf(at(named(b, 'couplers'), 0))],
+    free: [yawOf(at(named(a, 'couplers'), 0)), wrap(yawOf(at(named(b, 'couplers'), 1)) - Math.PI)],
+  };
+  const wheelTurn = (car) => { N.copy(at(named(car, 'bogies'), 0)).invert().multiply(at(named(car, 'wheels'), 0)); return Math.atan2(N.elements[6], N.elements[5]); };
+  const w0 = [a, b].map(wheelTurn);
+  models.placeConsist(m, 60.5, circle);
+  out.curve.roll = [a, b].map((car, k) => wrap(wheelTurn(car) - w0[k]));
+  const { poseSimple } = await import('/src/t3simple.js');
+  poseSimple(m, { collector: 5.0 });
+  out.collector = { at5: [a, b].map(topOf) };
+  models.poseT3(m, { collector: 0 });
+  out.collector.down = [a, b].map(topOf);
+  models.poseT3(m, { collector: out.wire });
+  out.collector.back = [a, b].map(topOf);
   return out;
 }"""
 
@@ -192,11 +227,20 @@ SHOTS = r"""async ({ kinds }) => {
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.01;
   scene.add(ground);
+  const railMat = new THREE.MeshLambertMaterial({ color: 0x9a9a9a }), straight = new THREE.Group(), bent = new THREE.Group();
   for (const x of [-0.7175, 0.7175]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 60), new THREE.MeshLambertMaterial({ color: 0x9a9a9a }));
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 60), railMat);
     rail.position.set(x, 0, -10);
-    scene.add(rail);
+    straight.add(rail);
   }
+  // the curve's views: a 25 m radius curving left from z 0 both ways (the set's coupling there), its rails in 0.5 m pieces
+  const R = 25, arc = (s) => [R * (1 - Math.cos(s / R)), -R * Math.sin(s / R), 0, 0];
+  for (let s = -24; s < 24; s += 0.5) for (const off of [-0.7175, 0.7175]) {
+    const a = s / R, piece = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 0.52), railMat);
+    piece.position.set(R - (R - off) * Math.cos(a), 0, (R - off) * Math.sin(a)); piece.rotation.y = a;
+    bent.add(piece);
+  }
+  scene.add(straight, bent);
   const persp = (pos, look, fov = 32) => { const c = new THREE.PerspectiveCamera(fov, W / H, 0.1, 500); c.position.set(...pos); c.lookAt(...look); return c; };
   // the side elevation at the colour drawing's scale (12.66 mm a pixel, 79 px/m), the right side
   const elev = new THREE.OrthographicCamera(-W / 2 / 79, W / 2 / 79, H / 2 / 79, -H / 2 / 79, 0.1, 100);
@@ -204,19 +248,28 @@ SHOTS = r"""async ({ kinds }) => {
   // the plan from above at 80 px/m, the front to the left
   const top = new THREE.OrthographicCamera(-W / 2 / 80, W / 2 / 80, H / 2 / 80, -H / 2 / 80, 0.1, 100);
   top.position.set(0, 30, 0); top.up.set(-1, 0, 0); top.lookAt(0, 0, 0);
+  // a two-car set's running gear on the curve in plan at 60 px/m, all over 0.6 m cut away (the bogies' wheels and
+  // frames, the couplers between the cars)
+  const gear = new THREE.OrthographicCamera(-W / 2 / 60, W / 2 / 60, H / 2 / 60, -H / 2 / 60, 0.1, 100);
+  gear.position.set(1.0, 30, 0); gear.up.set(-1, 0, 0); gear.lookAt(1.0, 0, 0);
+  const cut = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.6)];
   const views = {
     side: persp([-24, 2.2, 0.5], [0, 1.6, 0.5], 36), front34: persp([-7.5, 2.3, 15], [0, 1.5, 5]), rear34: persp([7, 2.4, -15], [0, 1.5, -5]),
     front: persp([0, 1.8, 22], [0, 1.7, 0], 14), set: persp([-14, 4, 24], [0, 1.4, -4], 40), elevation: elev,
     bogie: persp([-5, 0.9, 3.4], [0, 0.45, 3.2], 32), display: persp([-6.5, 2.0, 1.2], [-1.25, 2.0, 3.2], 34),
     coupler: persp([-1.9, 1.0, 9.6], [0, 0.6, 7.0], 30), top,
+    curve: persp([-5.5, 1.3, 0.6], [0.3, 0.6, 0], 40), gear, lowered: persp([-12, 4.6, 3.1], [0, 3.5, 3.1], 30),
   };
   const out = {};
   for (const kind of kinds) {
     for (const [view, cam] of Object.entries(views)) {
-      const variant = { simple: 'T3SUCS', t3m: 'T3M', t3: 'T3' }[kind];
-      const m = models.makeT3({ line: '17', cars: view === 'set' ? 2 : 1, detailed: variant ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant });
-      models.placeConsist(m, 7.6, (s) => [0, -s, 0, 0]);
+      const variant = { simple: 'T3SUCS', t3m: 'T3M', t3: 'T3' }[kind], bend = view === 'curve' || view === 'gear';
+      const m = models.makeT3({ line: '17', cars: view === 'set' || bend ? 2 : 1, detailed: variant ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant });
+      straight.visible = !bend; bent.visible = bend;
+      models.placeConsist(m, bend ? 15.04 : 7.6, bend ? arc : (s) => [0, -s, 0, 0]); // (the coupling at z 0 on the curve)
+      renderer.clippingPlanes = view === 'gear' ? cut : [];
       if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
+      if (view === 'lowered') models.poseT3?.(m, { collector: 0 }); // (main has none)
       models.setNextStop(m, 'Palmovka');
       scene.add(m);
       renderer.render(scene, cam);
@@ -286,7 +339,18 @@ def judge(r):
         "the coupled heads meet": r["couplerGap"] < 0.01,
         "plates: 4 on the first car, the rear plate on the last": r["plates"] == [4, 1],
         "the plates follow the line": r["swapped"],
-        "four draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 4 and r["drawn"][1] - r["plates"][1] <= 4,
+        # #454: the body, the fixed parts, the lamps, the fleet numbers; the bogies, wheelsets, couplers and the
+        # pantograph's frame instanced
+        "at most eight draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 8 and r["drawn"][1] - r["plates"][1] <= 8,
+        # #454 on a curve of 25 m radius: the bogies turned to the chords between their axles (+-3.2/25 rad against
+        # the body), the axles over the track (on the chord: 1.8 cm outside the circle)
+        "in a curve the bogies turn under the body to the track": all(near(f, r["curve"]["want"], 0.002) and near(rr, -r["curve"]["want"], 0.002) for f, rr in r["curve"]["bogies"])
+        and all(abs(d) < 0.025 for car in r["curve"]["axles"] for d in car),
+        "the coupled heads meet along the link, the free couplers straight ahead": r["curve"]["coupled"] < 0.002
+        and all(abs(y) > 0.1 for y in r["curve"]["coupledYaw"]) and all(abs(y) < 1e-6 for y in r["curve"]["free"]),
+        "the wheels roll with the distance (0.5 m: 1.429 rad)": all(near(t, 0.5 / 0.35, 1e-3) for t in r["curve"]["roll"]),
+        "the collector at a given height (5.0 m), lowered (below 3.7 m) and back on the wire": all(near(t, 4.995, 0.003) for t in r["collector"]["at5"])
+        and all(3.3 < t < 3.7 for t in r["collector"]["down"]) and all(near(t, r["wire"] - 0.005, 0.003) for t in r["collector"]["back"]),
         # the types: only a T3M has the resistors' box on the roof (3.02 m) and the green-on-black display
         "types as asked": [r["variants"][k] for k in ("t3", "suc", "m")] == ["T3", "T3SUCS", "T3M"],
         "the T3M's roof box, none on the T3SUCS or the T3": r["variants"]["mRoof"] > 3.18 and r["variants"]["sucRoof"] < 3.12 and r["variants"]["t3Roof"] < 3.12,
