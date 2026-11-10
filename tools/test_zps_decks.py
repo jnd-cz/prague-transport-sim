@@ -171,6 +171,19 @@ class Split(unittest.TestCase):
         ys = sorted(max(q[1] for q in p["r"]) for p in areas)
         self.assertLessEqual(ys[0], 10 + zd.EDGE + 0.1)  # (the lower piece ends at its viaduct's edge)
 
+    def test_a_piece_beside_its_deck_over_a_lower_structure_stays_on_its_deck(self):
+        """Modřany: a piece's edge EDGE beside its deck lies over a structure far under it (193 m under 209 m); it takes
+        its own deck, not the face under it."""
+        low, under, high = bridge(0, 0, 40, 10, 205.7).tris, bridge(0, 10, 40, 14, 193.0).tris, bridge(0, 14, 40, 24, 212.0).tris
+        model = zd.Model(SimpleNamespace(tris=np.concatenate([low, under, high]), ids=[548, 549, 551],
+                                         owner=np.array([0, 0, 1, 1, 2, 2])))
+        areas = [area([(5, 2, 205.5), (35, 2, 205.5), (35, 22, 211.8), (5, 22, 211.8)], cls="rail")]
+        zd.split(areas, model)
+        self.assertEqual(len(areas), 2)
+        for p in areas:
+            zs = [q[2] for q in p["r"]]
+            self.assertLess(max(zs) - min(zs), 0.01)
+
     def test_an_area_on_one_deck_stays_whole(self):
         model = zd.Model(bridge(0, 0, 40, 20, 212.0))
         a = area([(5, 2, 211.8), (35, 2, 211.0), (35, 12, 210.5), (5, 12, 211.5)], cls="rail")

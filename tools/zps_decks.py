@@ -116,21 +116,30 @@ class Model:
         z[p[good]], fid[p[good]] = zz[k][good], self.owner[ti[k][good]]
         return z, fid
 
-    def faces(self, x, y, only=None):
-        """Every face of feature `only` over each point (within EDGE where none is right over it): a list of arrays."""
+    def faces(self, x, y, only=None, band=None):
+        """Every face of feature `only` over each point (within EDGE where none is right over it): a list of arrays.
+        band (lo, hi): only faces at those heights, so a point beside its deck and over a lower structure finds the
+        deck (Modřany, line 17: a sidewalk's edge by the deck at 209 m lies over a structure at 193 m)."""
         x, y = np.asarray(x, float), np.asarray(y, float)
         out = [np.zeros(0) for _ in x]
         if self.tree is None or not len(x):
             return out
         pts = shapely.points(x, y)
-        pi, ti = self.tree.query(pts, predicate="intersects")
+
+        def at(pi, ti):
+            zz = self._faces(x, y, pi, ti)
+            k = (zz >= band[0]) & (zz <= band[1]) if band is not None else np.ones(len(pi), bool)
+            return pi[k], ti[k], zz[k]
+
+        pi, ti, zz = at(*self.tree.query(pts, predicate="intersects"))
         miss = np.setdiff1d(np.arange(len(x)), pi)
         if len(miss):
             mi, mt = self.tree.query(shapely.buffer(pts[miss], EDGE, quad_segs=2), predicate="intersects")
-            pi, ti = np.r_[pi, miss[mi]], np.r_[ti, mt]
+            mp, mt, mz = at(miss[mi], mt)
+            pi, ti, zz = np.r_[pi, mp], np.r_[ti, mt], np.r_[zz, mz]
         if only is not None:
-            pi, ti = pi[self.owner[ti] == only], ti[self.owner[ti] == only]
-        zz = self._faces(x, y, pi, ti)
+            k = self.owner[ti] == only
+            pi, zz = pi[k], zz[k]
         for p, z_ in zip(pi, zz):
             out[p] = np.r_[out[p], z_]
         return out
@@ -358,7 +367,7 @@ def split(areas, model, checked=None):
             taken = taken.union(part)
             # (the level's offset from its faces: the area's own vertices at this level)
             own = on & (r[:, 2] >= lv.min()) & (r[:, 2] <= lv.max())
-            fz = model.faces(r[own, 0], r[own, 1])
+            fz = model.faces(r[own, 0], r[own, 1], band=(lo, hi))
             offs = [z - f[np.argmin(np.abs(f - z))] for z, f in zip(r[own, 2], fz) if len(f)]
             off = float(np.median(offs)) if offs else 0.0
             for g in getattr(part, "geoms", [part]):
@@ -367,7 +376,7 @@ def split(areas, model, checked=None):
                 g = g.simplify(0.05)
                 rings = []
                 for ring in _rings(g):
-                    fz = model.faces(ring[:, 0], ring[:, 1])
+                    fz = model.faces(ring[:, 0], ring[:, 1], band=(lo, hi))
                     z = [round(float(f[np.argmin(np.abs(f - zc))] + off), 2) if len(f) else round(zc, 2) for f in fz]
                     rings.append([[round(float(x), 2), round(float(y), 2), zz] for (x, y), zz in zip(ring, z)])
                 pieces.append((rings, True))
