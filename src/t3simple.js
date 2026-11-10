@@ -749,8 +749,10 @@ function fleetTexture(n) {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 160;
   const g = cv.getContext('2d'), s = String(n);
-  g.fillStyle = '#ffd21a';
-  g.font = 'bold 100px "Bahnschrift", "D-DIN", "DIN Alternate", Arial, sans-serif';
+  // (the hybrid's font and colour, src/t3h.js fleetTexture: the user, 2026-11-10, "the new model uses different font
+  // from the hybrid model and my photos")
+  g.fillStyle = '#e3b625';
+  g.font = 'bold 100px Arial, sans-serif';
   // the digits' own box scaled to FLEET_PX.h, whichever font the system has (squeezed only past FLEET_PX.w)
   const m = g.measureText(s), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
   const k = FLEET_PX.h / (A + D), kx = Math.min(k, FLEET_PX.w / (L + R));

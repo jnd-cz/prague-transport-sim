@@ -521,7 +521,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
   round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
   from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between
-  the first and second windows on the right, the second and third on the left; fleet numbers yellow, their digits 0.14 m tall
+  the first and second windows on the right, the second and third on the left; fleet numbers golden yellow (#e3b625) in
+  bold Arial on both models (2026-11-10: "the new model uses different font from the hybrid model and my photos": it
+  had Bahnschrift), their digits 0.14 m tall
   on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15 m against the red band's heights, conflig's
   model 0.13–0.146 m; the hybrid's quads were 0.19 m tall on the ends and 0.23 m on the sides under one texture, so 0.106
   and 0.13 m digits): on the front centred on the headlights, on the rear over the white lamp just above the lamps, on the
