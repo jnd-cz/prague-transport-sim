@@ -335,7 +335,6 @@ for package in packages:
 # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
 # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
 import dmr5g  # noqa: E402
-from dtmp_tracks import archive_data, di_data  # noqa: E402
 _truth_path = os.path.join(ROOT, "data", "truth.json")
 _facts = json.load(open(_truth_path, encoding="utf-8")) if os.path.exists(_truth_path) else {}
 _osm_cover, _changing = [], []
@@ -355,11 +354,17 @@ _dem = dmr5g.Tiles(directory=os.path.join(ROOT, "raw", "dem"))
 def _older(E, N):
     try:
         return _dem.sample(E, N)
-    except (OSError, ValueError):  # (a tile not in the snapshot)
+    except (OSError, ValueError, SystemExit) as e:  # (a tile not in the snapshot: the area goes to review)
+        print(f"survey ground: DMR 5G missing ({e})")
         return np.full(len(E), np.nan)
 
 
-_rails = zps_ground.rail_points(di_data()[1] + archive_data()[2])
+try:  # (DI's and DTMP's surveyed tracks from raw/: without them the rails decide nothing, and the build says so)
+    from dtmp_tracks import archive_data, di_data
+    _rails = zps_ground.rail_points(di_data()[1] + archive_data()[2])
+except (ImportError, OSError) as e:
+    print(f"survey ground: no surveyed rails ({e}): only DMR 5G decides")
+    _rails = zps_ground.rail_points([])
 ground_verdicts = zps_ground.judge(areas, lambda E, N: _ipr.sample(E, N), _older, zps_ground.cover_union(areas, _osm_cover),
                                    _rails, F, _facts.get("surveyGround", {}).get("places", []),
                                    zps_ground.cover_union([], _changing))

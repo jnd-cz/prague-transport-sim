@@ -158,9 +158,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None):
         d = r[:, 2] - g
         ok = np.isfinite(d)
         c = poly.representative_point()
-        lat, lon = frame.ll(c.x, c.y)
-        v = {"c": a["c"], "m2": round(poly.area, 1), "x": round(c.x, 1), "y": round(c.y, 1),
-             "lat": round(float(lat), 6), "lon": round(float(lon), 6)}
+        v = {"c": a["c"], "m2": round(poly.area, 1), "x": round(c.x, 1), "y": round(c.y, 1)}
         out[i] = v
         if ok.sum() < 3:
             v["verdict"] = "fits"  # (nothing to compare: outside IPR)
@@ -211,6 +209,16 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None):
                 v["verdict"], v["by"] = "lidar", "dmr5g"
                 continue
         v["verdict"] = "review"
+    # the places of the areas a report names, in one call (lat/lon needs the projection grid: not for every area)
+    named = [v for v in out.values() if v["verdict"] != "fits"]
+    if named:
+        try:
+            lat, lon = frame.ll(np.array([v["x"] for v in named]), np.array([v["y"] for v in named]))
+        except SystemExit as e:  # (tools/geo.py without its projection grid: a test's stand-in root)
+            print(f"survey ground: the areas named without their places ({e})")
+            return out
+        for v, la, lo in zip(named, np.atleast_1d(lat), np.atleast_1d(lon)):
+            v["lat"], v["lon"] = round(float(la), 6), round(float(lo), 6)
     return out
 
 
@@ -218,7 +226,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None):
 
 def review_set(line, verdicts):
     """The findings file of a line's held areas (reports/review/survey-ground-N.json), or None when none is held."""
-    held = sorted([v for v in verdicts.values() if v["verdict"] == "review"], key=lambda v: -v["m2"])
+    held = sorted([v for v in verdicts.values() if v["verdict"] == "review" and "lat" in v], key=lambda v: -v["m2"])
     if not held:
         return None
     return {
