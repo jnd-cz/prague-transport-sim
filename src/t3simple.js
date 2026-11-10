@@ -21,7 +21,9 @@ const BOTTOM = 0.35, EAVE = 2.62, ROOF = 3.02;      // the skirt's lower edge; t
 const SHOULDER = ROOF - EAVE;                       // its radius (the front view)
 const PIVOT = T3.bogies / 2;                // 6 400 mm apart, 3 800 mm from each end
 const WHEELBASE = 1.9, WHEEL_R = 0.35;              // 1 900 mm; wheels 700 mm
-const COUPLER_H = 0.552;                            // 552 mm above the rail
+// the coupler's bar 0.59 m over the rail, as the two other models have it (conflig's classic 0.594 m, the hybrid's 0.584 m;
+// the user, 2026-11-10: "I don't know proper figures so you might as well take it from the others")
+const COUPLER_H = 0.59;
 const COUPLER_FACE = T3.length / 2 - T3.couplerOverlap / 2; // where two coupled heads meet (src/tram.js)
 // The ends in plan: straight sides between SIDE.r and SIDE.f (the plan view), then tapering to the end's
 // corners (CORNER: half width, its z with the nose at 7.0 m), rounded by FILLET; the face bulges FACE m from
