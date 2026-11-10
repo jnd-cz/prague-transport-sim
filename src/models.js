@@ -2,7 +2,7 @@
 // in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
 import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
-import { makeSimpleSet, t3Variant, fleetNumbers } from './t3simple.js';
+import { makeSimpleSet, t3Variant, fleetNumbers, ROUTE_BOX } from './t3simple.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
@@ -69,25 +69,51 @@ function numberTexture(line, w, h, fg, bg, fill = 0.85) {
 // A T3M's displays are green dot-matrix LEDs (the user's photos of 8015 and 8080, 2026-11-09: "green top number plate",
 // "Green dot led panel with destination and next stop"): the text drawn in white on black, then sampled into round
 // diodes on a pitch, lit where the text covers their centre, dim where not.
-function ledFace(w, h, pitch, draw) {
-  return canvasTexture(w, h, (g) => {
-    const src = document.createElement('canvas');
-    src.width = w; src.height = h;
-    const s = src.getContext('2d');
-    s.fillStyle = '#000'; s.fillRect(0, 0, w, h);
-    s.fillStyle = '#fff'; s.textBaseline = 'middle';
-    draw(s, w, h);
-    const px = s.getImageData(0, 0, w, h).data;
-    g.fillStyle = '#0a0f0a'; g.fillRect(0, 0, w, h);
-    for (let y = pitch / 2; y < h; y += pitch) for (let x = pitch / 2; x < w; x += pitch) {
-      g.fillStyle = px[(Math.floor(y) * w + Math.floor(x)) * 4] > 110 ? '#a8f06e' : '#172414';
-      g.beginPath(); g.arc(x, y, pitch * 0.38, 0, 2 * Math.PI); g.fill();
+function ledDots(g, w, h, pitch, draw) {
+  const src = document.createElement('canvas');
+  src.width = w; src.height = h;
+  const s = src.getContext('2d');
+  s.fillStyle = '#000'; s.fillRect(0, 0, w, h);
+  s.fillStyle = '#fff'; s.textBaseline = 'middle';
+  draw(s, w, h);
+  const px = s.getImageData(0, 0, w, h).data;
+  g.fillStyle = '#0a0f0a'; g.fillRect(0, 0, w, h);
+  for (let y = pitch / 2; y < h; y += pitch) for (let x = pitch / 2; x < w; x += pitch) {
+    g.fillStyle = px[(Math.floor(y) * w + Math.floor(x)) * 4] > 110 ? '#a8f06e' : '#172414';
+    g.beginPath(); g.arc(x, y, pitch * 0.38, 0, 2 * Math.PI); g.fill();
+  }
+}
+const ledFace = (w, h, pitch, draw) => canvasTexture(w, h, (g) => ledDots(g, w, h, pitch, draw));
+// The route box on the built-in car's front cap (src/t3simple.js ROUTE_BOX): in a dark rim, white digits on DPP
+// blue, or a T3M's green display; the corners square on a T3, rounded on a T3SUCS and a T3M (the user,
+// 2026-11-10: "T3SUCS have the top line plate behind window with rounded corners, the same shape as T3M which has
+// digital display there instead"), clear outside them (the plate's material tests the alpha). The digits 0.8 of
+// the box's height, bold and wide as on 6892 and 7290. No variant: conflig's classic, over the box in its texture.
+function routeBoxTexture(line, variant) {
+  if (!variant) return numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9);
+  const H = 128, W = Math.round((H * ROUTE_BOX.w) / ROUTE_BOX.h), rim = 5, r = variant === 'T3' ? 0 : (H * ROUTE_BOX.r) / ROUTE_BOX.h;
+  return canvasTexture(W, H, (g) => {
+    g.fillStyle = '#1b1c1d';
+    g.beginPath(); g.roundRect(0, 0, W, H, r); g.fill();
+    const w = W - 2 * rim, h = H - 2 * rim, text = String(line);
+    g.save();
+    g.beginPath(); g.roundRect(rim, rim, w, h, Math.max(0, r - rim)); g.clip();
+    g.translate(rim, rim);
+    if (variant === 'T3M') {
+      ledDots(g, w, h, 5, (s) => { s.font = `bold ${h * 0.8}px "Arial Narrow", Arial, sans-serif`; s.textAlign = 'center'; s.fillText(text, w / 2, h / 2 + 4); });
+    } else {
+      g.fillStyle = DPP_BLUE; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#ffffff';
+      g.font = 'bold 100px Arial, sans-serif';
+      // (the digits' own box scaled to 0.8 of the box, squeezed only past 0.88 of its width)
+      const m = g.measureText(text), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+      const k = (0.8 * H) / (A + D), kx = Math.min(k, (0.88 * w) / (L + R));
+      g.setTransform(kx, 0, 0, k, W / 2 - (kx * (R - L)) / 2, H / 2 - (k * (D - A)) / 2);
+      g.fillText(text, 0, 0);
     }
+    g.restore();
   });
 }
-const routeBoxTexture = (line, variant) => (variant === 'T3M'
-  ? ledFace(160, 128, 5, (s, w, h) => { s.font = `bold ${h * 0.8}px "Arial Narrow", Arial, sans-serif`; s.textAlign = 'center'; s.fillText(String(line), w / 2, h / 2 + 4); })
-  : numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9));
 // the T3M's side panel: the route number large on the left, the destination over the next stop beside it (each only
 // when the set has it)
 function ledPanelTexture(line, dest, next) {
@@ -143,7 +169,7 @@ function destinationTexture(name) {
 // dest: the destination card's text (none: no card); run: the run number card
 // detailed: 'hybrid' (or true: the animated hybrid, src/t3h.js), 'classic' (conflig's model, loaded on the
 // player's choice), false (the built-in car, src/t3simple.js); a model not loaded falls back to the next simpler one.
-// variant (the built-in car): 'T3SUCS' or 'T3M'; none: one from the run number (a quarter of the sets T3Ms)
+// variant (the built-in car): 'T3', 'T3SUCS' or 'T3M'; none: one from the run number (src/t3simple.js T3_TYPES)
 export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '', variant = null } = {}) {
   const root = new THREE.Group();
   root.userData.line = line;
@@ -158,10 +184,10 @@ export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, ru
 
 // the plates' and cards' materials of a set: route box and mirror plate glowing, the cards on the glass lit like the body
 function plateMats(line, dest, run, variant) {
-  const plate = (map) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
+  const plate = (map, extra) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2, ...extra });
   const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
   return {
-    rbMat: plate(routeBoxTexture(line, variant)), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
+    rbMat: plate(routeBoxTexture(line, variant), { alphaTest: 0.5 }), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
     destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)),
     ...(variant === 'T3M' ? { ledMat: plate(ledPanelTexture(line, dest, null)) } : {}),
   };

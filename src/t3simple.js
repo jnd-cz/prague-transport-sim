@@ -5,8 +5,9 @@
 // the doors to rounded corners and a bulged face) stacked along the side view's end profiles (the
 // windscreen leaning back under the roof cap's visor), painted from one canvas shared by every car. The
 // running gear, pantograph and fittings are one mesh in vertex colours, the lamps another, the car's fleet
-// numbers a third: four draw calls a car, and its plates. Two variants: the T3SUCS, and the T3M with the
-// resistors' box on the roof and its green dot-matrix displays (src/models.js). One car: origin on the rail plane
+// numbers a third: four draw calls a car, and its plates. Three types: the T3 (a silver bumper, the route box
+// square), the T3SUCS (a brown bumper, the route box rounded) and the T3M (as the T3SUCS, with the resistors' box
+// on the roof and its green dot-matrix displays; src/models.js draws the plates). One car: origin on the rail plane
 // midway between the bogie pivots, facing +Z, the right side (the doors) at -X.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -49,13 +50,21 @@ const DOORS = [[-6.04, -4.71], [-1.41, -0.10], [4.71, 6.03]];
 // cab the red starts lower, under the cream band with the flap (the front view: 1.47 m on the face, 1.51 m on the
 // cab's sides), and steps up to the sill line behind it with a rounded corner: by the front door's edge on the
 // right (the red's corner rounded), behind the cab window on the left (the cream's corner rounded); the colour
-// elevation, the user, 2026-11-09: "the shape is closer to the 2d picture"
-const LIV = { bumper: [0.70, 0.80], red: [0.78, 1.62], redCab: 1.48, glass: [1.71, 2.52], transom: [2.10, 2.135], eave: 2.56, gutter: 2.85, capSide: 3.05, capTop: 6.08 };
+// elevation, the user, 2026-11-09: "the shape is closer to the 2d picture". The bumper 0.76-0.86 m: the user's
+// head-on photo of 6892 (2026-11-10), scaled by the skirt's foot (0.35 m), the red's top (1.48 m) and the roof
+// (3.02 m), which agree to 3 %; the colour elevation has it 6 cm lower.
+const LIV = { bumper: [0.76, 0.86], red: [0.84, 1.62], redCab: 1.48, glass: [1.71, 2.52], transom: [2.10, 2.135], eave: 2.56, gutter: 2.85, capSide: 3.05, capTop: 6.08 };
 const CAB_STEP = { r: 6.03, l: 6.11, radius: 0.09 };
 // the skirt cut out over each bogie up to 0.62 m (the colour elevation, conflig's model, the photos)
 const CUTOUT = { half: 1.2, top: 0.62, r: 0.15 };
+// the ends open under the bumper between the skirt's corners, which reach in to where the headlights start
+// (the user, 2026-11-10: "the skirt stays only on sides up until where the headlights start, front and back is
+// open under the bumper"; 6892's front and rear: ±0.65 m)
+const OPEN = 0.65;
 const COL = {
-  red: '#b3201a', cream: '#e6d8b8', roof: '#6e7276', glass: '#25303a', sky: '#56697a', rubber: '#1c1c1c', bumper: '#1e1e1e', step: '#3e2416',
+  red: '#b3201a', cream: '#e6d8b8', roof: '#6e7276', glass: '#25303a', sky: '#56697a', rubber: '#1c1c1c', step: '#3e2416',
+  // the bumper brown on a T3SUCS or T3M (the photo of 7290), silver with two thin red stripes on a T3 (6892)
+  bumper: '#55332f', silver: '#c3c5c4',
   louvre: '#6d1611', lamp: '#f2ecd6', panto: '#c49a3a', // (the pantograph's ochre as on conflig's model: the user, 2026-11-09, "Pantograph color is good")
   // the bogies dusty brown (the user's photo of a T3 bogie over the pit, 2026-11-09)
   wheel: '#51483f', tyre: '#6e665d', hub: '#625a50', frame: '#5d5146', spring: '#6e604f', shoe: '#40392f',
@@ -248,6 +257,12 @@ function livery() {
     g.roundRect(X(a), Y(CUTOUT.top), X(b) - X(a), Y(0.33) - Y(CUTOUT.top), [X(du(CUTOUT.r)), X(du(CUTOUT.r)), 0, 0]);
     g.fill();
   }
+  // and the ends under the bumper (its underside hides the cut's top; the edges' u from points on the face, as a
+  // point ahead of the curved face is nearest to one nearer the middle)
+  for (const sign of [1, -1]) {
+    const a = uAt(-OPEN, onFace(sign, -OPEN, REF_H).z), b = uAt(OPEN, onFace(sign, OPEN, REF_H).z);
+    g.fillRect(X(Math.min(a, b)), Y(LIV.bumper[0] + 0.01), X(Math.abs(b - a)), Y(0.33) - Y(LIV.bumper[0] + 0.01));
+  }
   g.restore();
   // the louvres of the motor-generator's air intake, left side
   for (let k = 0; k < 3; k++) {
@@ -325,9 +340,10 @@ function bar(a, b, r, color) {
   return part(g, color);
 }
 // a strip `out` m proud of the outline between heights h0 and h1, round an end from |z| = z0 (sign 1 the
-// front, -1 the rear): its outer face, top and underside, wound like the outline (outwards)
-function strip(sign, z0, h0, h1, out, color) {
-  const pts = ring((h0 + h1) / 2).filter((p) => sign * p.y >= z0);
+// front, -1 the rear): its outer face, top and underside, wound like the outline (outwards); the outline is the
+// one at height hr (bands of one bumper share it)
+function strip(sign, z0, h0, h1, out, color, hr = (h0 + h1) / 2) {
+  const pts = ring(hr).filter((p) => sign * p.y >= z0);
   const off = pts.map((p, i) => {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     const t = new THREE.Vector2(b.x - a.x, b.y - a.y).normalize();
@@ -412,9 +428,17 @@ function bogie(zc) {
 // and drops; the route plate hangs on the drop facing forward (src/models.js puts the plate on it), the mirror
 // below it, its back to the front. A small mirror on a bracket at the left corner.
 const SIDE_INDICATOR = { z: 3.05, h: 1.81 };
-const HEADLIGHT = { x: 0.53, h: 1.03 }; // (the colour elevation)
+// The headlights' centres and the corner units' housings and lenses, from the user's head-on photo of 6892
+// (2026-11-10: "check headlight position from this head on shot"), on the scale of the bumper's note (LIV): the
+// headlights 1.11 m up and 1.11 m apart (the colour elevation: 1.03 m, 1.06 m apart), the corner units 0.98-1.30 m
+// with the clear (rear: red) lamp just under the headlights' line, the indicator over it (were 1.115-1.355 m)
+const HEADLIGHT = { x: 0.555, h: 1.11 };
+const CORNER_LAMP = { housing: [0.98, 1.30], low: [0.99, 1.14], high: [1.17, 1.29] };
 // the T3M's side display: in the upper part of the right side's second window from the front (the user's photo of 8015)
 const SIDE_DISPLAY = { z: 2.29, h: 2.31, w: 1.05, hh: 0.33 };
+// the route box on the front cap: its corners square on a T3, rounded on a T3SUCS and round the T3M's display (the
+// user, 2026-11-10; 6892 and 7290: 0.49 x 0.30 m, the corners' radius 0.05 m); src/models.js draws it
+export const ROUTE_BOX = { w: 0.49, h: 0.30, r: 0.05 };
 const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.62, 2.94, 6.28], [-1.62, 2.3, 6.28]];
 const MIRROR_PLATE = [-1.62, 2.52, 6.31];
 
@@ -428,11 +452,18 @@ function partsGeometry(wire, variant) {
     const xa = sideX(-1, z0), xb = sideX(-1, z1);
     P.push(part(box(0.24, 0.05, Math.hypot(xb - xa, z1 - z0) - 0.06), COL.step, { at: [(xa + xb) / 2 + 0.1, BOTTOM - 0.03, (z0 + z1) / 2], rot: [0, Math.atan2(xb - xa, z1 - z0), 0] }));
   }
-  // the ends: the black bumper round the end back to the doors, the coupler's gear under the cream panel, the
-  // coupler's bar and head
+  // the ends: the bumper round the end back to the doors (a T3's silver with two thin red stripes, 12 mm a
+  // quarter of the bumper in from its edges as on 6892, the others' brown), the underframe's end dark behind
+  // the opening under it, the coupler's gear, the coupler's bar and head
+  const [b0, b1] = LIV.bumper, bh = b1 - b0;
+  const bands = variant === 'T3'
+    ? [[0, 0.115, COL.silver], [0.115, 0.23, COL.red], [0.23, 0.77, COL.silver], [0.77, 0.885, COL.red], [0.885, 1, COL.silver]]
+    : [[0, 1, COL.bumper]];
   for (const sign of [1, -1]) {
-    P.push(strip(sign, 6.05, LIV.bumper[0], LIV.bumper[1], 0.05, COL.bumper));
+    for (const [t0, t1, c] of bands) P.push(strip(sign, 6.05, b0 + t0 * bh, b0 + t1 * bh, 0.05, c, b0 + bh / 2));
     const zf = sign * lerpProfile(NOSE[sign > 0 ? 'f' : 'r'], 0.4);
+    // (just behind the opening's edges, wider than it: the skirt's corners from inside are not drawn)
+    P.push(part(box(2 * OPEN + 0.2, b0 + 0.04 - BOTTOM, 0.04), '#262422', { at: [0, (BOTTOM + b0 + 0.04) / 2, sign * (Math.abs(onFace(sign, OPEN, 0.5).z) - 0.1)] }));
     P.push(part(box(1.0, 0.18, 0.3), '#2e2e2e', { at: [0, 0.21, zf - sign * 0.42] }));
     P.push(bar([0, COUPLER_H, zf - sign * 0.3], [0, COUPLER_H, sign * (COUPLER_FACE - 0.16)], 0.045, steel));
     P.push(part(box(0.24, 0.17, 0.16), steel, { at: [0, COUPLER_H, sign * (COUPLER_FACE - 0.08)] }));
@@ -445,8 +476,8 @@ function partsGeometry(wire, variant) {
   }
   // the lamp units' housings by the corners, the side indicators' on the pillar amidships
   for (const [sign, z] of [[-1, 6.42], [1, 6.42], [-1, -6.45], [1, -6.45]]) {
-    const s = onSide(sign, z);
-    P.push(part(box(0.02, 0.24, 0.095), '#262626', { at: [s.x + s.n[0] * 0.008, 1.235, z + s.n[1] * 0.008], rot: [0, s.yaw, 0] }));
+    const s = onSide(sign, z), [h0, h1] = CORNER_LAMP.housing;
+    P.push(part(box(0.02, h1 - h0, 0.095), '#262626', { at: [s.x + s.n[0] * 0.008, (h0 + h1) / 2, z + s.n[1] * 0.008], rot: [0, s.yaw, 0] }));
   }
   for (const sign of [-1, 1]) P.push(part(box(0.016, 0.135, 0.08), '#262626', { at: [sign * (HW + 0.006), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   // the roof (the colour elevation): three hatches, a low cover behind the pantograph, a box amidships, the
@@ -478,9 +509,9 @@ function lampsGeometry() {
     L.push(part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x + 0.042 * Math.sin(f.yaw), HEADLIGHT.h, f.z + 0.042 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
   }
   for (const [sign, z, low] of [[-1, 6.42, '#f2efe4'], [1, 6.42, '#f2efe4'], [-1, -6.45, '#d8261a'], [1, -6.45, '#d8261a']]) {
-    const s = onSide(sign, z), at = (h) => [s.x + s.n[0] * 0.02, h, z + s.n[1] * 0.02];
-    L.push(part(box(0.012, 0.1, 0.075), '#ff9a22', { at: at(1.29), rot: [0, s.yaw, 0] }));
-    L.push(part(box(0.012, 0.1, 0.075), low, { at: at(1.175), rot: [0, s.yaw, 0] }));
+    const s = onSide(sign, z), at = (h) => [s.x + s.n[0] * 0.02, h, z + s.n[1] * 0.02], { high: [a0, a1], low: [c0, c1] } = CORNER_LAMP;
+    L.push(part(box(0.012, a1 - a0, 0.075), '#ff9a22', { at: at((a0 + a1) / 2), rot: [0, s.yaw, 0] }));
+    L.push(part(box(0.012, c1 - c0, 0.075), low, { at: at((c0 + c1) / 2), rot: [0, s.yaw, 0] }));
   }
   const onRear = (x, h, w, hh, color) => {
     const f = onFace(-1, x, h);
@@ -560,13 +591,19 @@ function fleetTexture(n) {
   return t;
 }
 
-// The variant and the fleet numbers of a set, from its run number when not given: a quarter of the sets T3Ms
-// (8001-8090), the rest T3SUCS (7001-7292), each car its own number
+// The types and their fleet numbers (the user, 2026-11-10: "Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106",
+// and "their proportion in service (probability to appear as AI tram) roughly related to their range sizes").
+// A set's type comes from its run number when not given, each car its own number.
+export const T3_TYPES = { T3: [6400, 6992], T3SUCS: [7001, 7292], T3M: [8005, 8106] };
 const hashOf = (s) => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
-export const t3Variant = (run) => (hashOf(run) % 4 === 1 ? 'T3M' : 'T3SUCS');
+export function t3Variant(run) {
+  const spans = Object.entries(T3_TYPES).map(([k, [a, b]]) => [k, b - a + 1]);
+  let h = hashOf(run) % spans.reduce((s, [, n]) => s + n, 0);
+  for (const [k, n] of spans) { if (h < n) return k; h -= n; }
+}
 export function fleetNumbers(variant, run, cars) {
-  const [lo, span] = variant === 'T3M' ? [8001, 90] : [7001, 292], h = hashOf(`${run}#`);
-  return Array.from({ length: cars }, (_, k) => lo + ((h + k * 37) % span));
+  const [lo, hi] = T3_TYPES[variant], h = hashOf(`${run}#`);
+  return Array.from({ length: cars }, (_, k) => lo + ((h + k * 37) % (hi - lo + 1)));
 }
 
 let SHAPES = null;
@@ -576,12 +613,13 @@ function shapes(wire, variant) {
     const body = bodyGeometry(), lamps = lampsGeometry();
     const probe = new THREE.Mesh(body);
     probe.updateMatrixWorld(true);
-    // Prague's plates and cards (src/models.js): the route number in the box on the front cap and on the
-    // mirror arm (smaller, taller than wide), the destination and the run number resting on the windscreen's
-    // lower edge (the user, 2026-11-09: "closer to the bottom glass border"), the run number on the pane right
-    // of the post (left as seen from the front), the route inverted in the rear window
+    // Prague's plates and cards (src/models.js): the route number in the box on the front cap (0.49 x 0.30 m,
+    // its top 7 cm under the roof's: 6892 and 7290) and on the mirror arm (smaller, taller than wide), the
+    // destination and the run number resting on the windscreen's lower edge (the user, 2026-11-09: "closer to
+    // the bottom glass border"), the run number on the pane right of the post (left as seen from the front), the
+    // route inverted in the rear window
     const plates = {
-      rb: onBody(probe, 0, 2.74, 1, 0.56, 0.3), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),
+      rb: onBody(probe, 0, 2.80, 1, ROUTE_BOX.w, ROUTE_BOX.h), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),
       dest: onBody(probe, -0.02, 1.77, 1, 0.46, 0.19), run: onBody(probe, -0.67, 1.725, 1, 0.12, 0.09), rear: onBody(probe, 0, 1.90, -1, 0.34, 0.3),
       led: onFlank(-1, SIDE_DISPLAY.z, SIDE_DISPLAY.h, SIDE_DISPLAY.w, SIDE_DISPLAY.hh),
     };
@@ -597,7 +635,7 @@ function shapes(wire, variant) {
 
 // A set of `cars` built-in T3s in `root` (src/models.js makeT3): `mats` holds the plates' materials
 // (route box, mirror plate, rear plate, destination and run cards), which setConsistLine swaps; `variant`
-// 'T3SUCS' or 'T3M', `fleet` the cars' numbers.
+// 'T3', 'T3SUCS' or 'T3M' (T3_TYPES), `fleet` the cars' numbers.
 export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = fleetNumbers(variant, '', cars) } = {}) {
   const P = shapes(wire, variant);
   // each set owns its materials (traffic fades them one set at a time); the shapes and the livery are shared

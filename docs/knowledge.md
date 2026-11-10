@@ -443,16 +443,28 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   user, 2026-11-09: "looks more narrow, like t1 or early prototype than t3"). Laid over the colour elevation at its scale, the
   built model's windows, doors, bands and ends fall on its lines.
 - **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
-  round the cab than along the saloon, under a cream band with a flap; the bumpers black (heritage cars: aluminium); the route
-  plate hangs on the mirror's arm, which drops from the cab's roof; rectangular lamp units (indicator over a lamp) by the
-  corners; a side indicator on the pillar between the first and second windows on the right, the second and third on the left;
-  fleet numbers yellow, their digits 0.14 m tall on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15
-  m against the red band's heights, conflig's model 0.13–0.146 m): on the front centred on the headlights, on the rear over
-  the white lamp just above the lamps, on the sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on
-  the right, behind the cab window on the left; the hybrid's ends carry smaller ones, 0.106 m). A T3M has the resistors' box on the
-  roof towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
-  plate"), and green dot-matrix displays: the route on the front, and inside the right side's second window the route with the
-  destination and the next stop.
+  round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
+  from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between
+  the first and second windows on the right, the second and third on the left; fleet numbers yellow, their digits 0.14 m tall
+  on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15 m against the red band's heights, conflig's
+  model 0.13–0.146 m; the hybrid's quads were 0.19 m tall on the ends and 0.23 m on the sides under one texture, so 0.106
+  and 0.13 m digits): on the front centred on the headlights, on the rear over the white lamp just above the lamps, on the
+  sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on the right, behind the cab window on the left).
+- **The T3 head on** (the user's photo of 6892, 2026-11-10, a telephoto from about 25 m): scaled by the skirt's foot (0.35 m),
+  the red's top (1.48 m) and the roof (3.02 m), which agree to 3 %, the headlights' centres are 1.11 m up and 1.11 m apart
+  (the colour elevation: 1.03 m, 1.06 m apart), the bumper 0.76–0.86 m (the elevation: 0.70–0.80), the corner units
+  0.98–1.30 m with the clear lamp's centre (1.06 m) just under the headlights' line, the route box 0.49 × 0.30 m with its top
+  7 cm under the roof's. The ends are open under the bumper between the skirt's corners, which reach in to the headlights'
+  outer edges, ±0.65 m (front and rear, "front and back is open under the bumper"). The same photo puts the corner units at
+  ±0.93–0.99 m and the windscreen's posts at ±0.71 m, where the model built from the plan view has ±0.81 and ±0.61 m: the
+  plan's ends may be too narrow.
+- **The three T3 types in Prague** (the user, 2026-11-10): the T3, fleet numbers 6400–6992, a silver bumper with two thin
+  red stripes (6892: 12 mm, a quarter of the bumper in from its edges), the route box square; the T3SUCS, 7001–7292, the
+  bumper brown, the route box with rounded corners; the T3M, 8005–8106, as the T3SUCS with the resistors' box on the roof
+  towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
+  plate"), and green dot-matrix displays: the route on the front in the rounded box, and inside the right side's second
+  window the route with the destination and the next stop. AI sets take each type as often as its range is long ("their
+  proportion in service (probability to appear as AI tram) roughly related to their range sizes"): 60, 30 and 10 %.
 
 ## Heuristics that stand in for missing data
 

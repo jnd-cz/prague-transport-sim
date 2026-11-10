@@ -343,7 +343,8 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-// (the built-in car as a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are T3Ms in part)
+// (the built-in car as a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are T3s, T3SUCS or
+// T3Ms by their run numbers, src/t3simple.js T3_TYPES)
 let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
 scene.add(tramModel);
 

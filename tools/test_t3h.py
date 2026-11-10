@@ -95,6 +95,14 @@ SYNTHETIC = r"""async () => {
   out.dest = [a, b].map((c) => c.userData.rig.plates.destAll.map((o) => o.visible));
   out.destCanvas = a.userData.rig.plates.dest.material.map?.image?.width ?? null;
   out.fleetOwn = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material !== b.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
+  // the fleet numbers' digits: each quad's height (the four merged, four corners each) times the digits' share of
+  // the texture's rows
+  const fn = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]), FP = fn.geometry.attributes.position, fh = [];
+  for (let q = 0; q + 3 < FP.count; q += 4) { const ys = [0, 1, 2, 3].map((i) => FP.getY(q + i)); fh.push(Math.max(...ys) - Math.min(...ys)); }
+  const fim = fn.material.map.image, fd = fim.getContext('2d').getImageData(0, 0, fim.width, fim.height).data;
+  let fr0 = Infinity, fr1 = -1;
+  for (let y = 0; y < fim.height; y++) for (let x = 0; x < fim.width; x++) if (fd[4 * (y * fim.width + x) + 3] > 127) { fr0 = Math.min(fr0, y); fr1 = Math.max(fr1, y); }
+  out.fleetDigits = fh.map((h) => h * (fr1 - fr0 + 1) / fim.height);
   // faded in as an AI tram: the fleet numbers' clear canvas stays clear, the body opaque
   const { setOpacity } = await import('/src/traffic.js');
   setOpacity(m, 0); setOpacity(m, 0.5); setOpacity(m, 1);
@@ -184,6 +192,10 @@ def main():
                 "the destination card in the leading car only": s["dest"][0] and all(s["dest"][0]) and not any(s["dest"][1]),
                 "the cards drawn (canvas)": s["destCanvas"] == 1024,
                 "each car its own fleet number": s["fleetOwn"],
+                # the user, 2026-11-10: "fix the hybrid's fleet number size" (0.14 m as on the photos; were 0.106 m on
+                # the ends, 0.13 m on the sides)
+                f"the fleet numbers' digits 0.14 m on all four quads ({[round(d, 3) for d in s['fleetDigits']]})": len(s["fleetDigits"]) == 4
+                and all(abs(d - 0.14) < 0.004 for d in s["fleetDigits"]),
                 "faded in: the fleet numbers stay blended (their clear canvas drew black)": s["fadedFleet"] == {"transparent": True, "depthWrite": False, "opacity": 1},
                 f"faded in: the rest opaque ({s['fadedOpaque'][:3]})": not s["fadedOpaque"],
                 "the glass see-through (0.18)": s["glass"] == 0.18,

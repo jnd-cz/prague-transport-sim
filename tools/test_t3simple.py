@@ -1,13 +1,15 @@
 """The built-in T3 (src/t3simple.js, #427) against the T3's general-arrangement drawing, in headless Chromium.
 
-Usage: python -P -E tools/test_t3simple.py [--shots DIR] [--models simple,classic,hybrid]
+Usage: python -P -E tools/test_t3simple.py [--shots DIR] [--models simple,t3,t3m,classic,hybrid]
 
 Needs no world data. Checks: the body is 14.0 x 2.5 m with its roof at 3.02 m; the ends in plan taper
 from the doors and in the side view lean back above the windscreen's foot (the drawing's numbers); the
 bogie pivots 6.4 m apart with wheels of 700 mm at 1.9 m; the couplers' heads meet in a two-car set; the
 pantograph's head at the wire; the plates and cards on the right cars and swapped with the line; at most
-four draw calls a car besides its plates; the T3M variant with its roof box and green display, fleet numbers by
-type, AI sets of both types. With --shots: the same views of each model (side, three-quarter
+four draw calls a car besides its plates; the headlights, corner lamps and bumper where 6892's head-on photo
+has them, the ends open under the bumper; the three types (T3, T3SUCS, T3M) with their bumpers, route boxes,
+the T3M's roof box and green display, fleet numbers by type, AI sets by run number in their ranges' shares;
+the fleet numbers' size and places. With --shots: the same views of each model (side, three-quarter
 front and rear, the front, a two-car set, an orthographic side elevation at the colour drawing's scale)
 as DIR/<model>-<view>.png and one picture per view with the models side by side (DIR/compare-<view>.png).
 """
@@ -39,11 +41,27 @@ MEASURE = r"""async () => {
   const body = named(a, 'body'), parts = named(a, 'parts');
   // the variants: the T3M's resistor box towards the rear of the roof, its route display; the fleet numbers
   const roofBox = (geo) => { const P = geo.attributes.position; let top = 0; for (let i = 0; i < P.count; i++) if (P.getZ(i) < -1.2 && P.getZ(i) > -4.1 && Math.abs(P.getX(i)) < 0.7) top = Math.max(top, P.getY(i)); return top; };
-  const px = (mat) => Array.from(mat.map.image.getContext('2d').getImageData(3, 3, 1, 1).data.slice(0, 3));
+  const px = (mat, x = 12, y = 64) => Array.from(mat.map.image.getContext('2d').getImageData(x, y, 1, 1).data);
   const t3m = models.makeT3({ line: '17', cars: 2, detailed: false, run: '801', variant: 'T3M' });
-  out.variants = { suc: m.userData.variant, m: t3m.userData.variant, sucRoof: roofBox(parts.geometry), mRoof: roofBox(named(t3m.userData.cars[0], 'parts').geometry),
-    sucDisplay: px(m.userData.mats.rbMat), mDisplay: px(t3m.userData.mats.rbMat) };
-  out.fleet = { suc: m.userData.fleet, m: t3m.userData.fleet, meshes: [a, b].map((c) => c.children.filter((o) => o.name === 'fleet').length) };
+  const t3 = models.makeT3({ line: '17', cars: 2, detailed: false, run: '801', variant: 'T3' });
+  const rbOf = (set) => set.userData.mats.rbMat;
+  out.variants = { suc: m.userData.variant, m: t3m.userData.variant, t3: t3.userData.variant, sucRoof: roofBox(parts.geometry), mRoof: roofBox(named(t3m.userData.cars[0], 'parts').geometry),
+    t3Roof: roofBox(named(t3.userData.cars[0], 'parts').geometry), sucDisplay: px(rbOf(m)), mDisplay: px(rbOf(t3m)), t3Display: px(rbOf(t3)),
+    // the route box's corner: square on a T3, clear outside the rounded corners of the others (tested away)
+    corners: [t3, m, t3m].map((s) => px(rbOf(s), 1, 1)[3]), alphaTest: [t3, m, t3m].map((s) => rbOf(s).alphaTest),
+    aspect: [t3, m, t3m].map((s) => { const i = rbOf(s).map.image; return i.width / i.height; }) };
+  // the bumpers: the colours across the front's middle between 0.7 and 0.9 m, and their heights
+  const bumper = (set) => {
+    const g = named(set.userData.cars[0], 'parts').geometry, P = g.attributes.position, C = g.attributes.color, cols = {};
+    for (let i = 0; i < P.count; i++) {
+      if (P.getZ(i) < 6.8 || Math.abs(P.getX(i)) > 0.3 || P.getY(i) < 0.7 || P.getY(i) > 0.9) continue;
+      const hex = new THREE.Color(C.getX(i), C.getY(i), C.getZ(i)).getHexString();
+      cols[hex] = [Math.min(cols[hex]?.[0] ?? 9, P.getY(i)), Math.max(cols[hex]?.[1] ?? 0, P.getY(i))];
+    }
+    return cols;
+  };
+  out.bumpers = { t3: bumper(t3), suc: bumper(m), m: bumper(t3m) };
+  out.fleet = { suc: m.userData.fleet, m: t3m.userData.fleet, t3: t3.userData.fleet, meshes: [a, b].map((c) => c.children.filter((o) => o.name === 'fleet').length) };
   // the four number quads (front, rear, right, left): their heights and middles; the digits' rows in the texture
   const FP = named(a, 'fleet').geometry.attributes.position, quads = { front: [], rear: [], right: [], left: [] };
   for (let i = 0; i < FP.count; i++) {
@@ -68,6 +86,20 @@ MEASURE = r"""async () => {
   const auto = new Set();
   for (let r = 801; r < 849; r++) auto.add(models.makeT3({ line: '17', detailed: false, run: String(r) }).userData.variant);
   out.fleet.auto = [...auto].sort();
+  // the types' shares among 3000 run numbers, against their fleet ranges' lengths
+  const { t3Variant, T3_TYPES } = await import('/src/t3simple.js'), n = {};
+  for (let r = 1; r <= 3000; r++) { const v = t3Variant(String(r)); n[v] = (n[v] || 0) + 1; }
+  const total = Object.values(T3_TYPES).reduce((s, [lo, hi]) => s + hi - lo + 1, 0);
+  out.fleet.shares = Object.fromEntries(Object.entries(T3_TYPES).map(([k, [lo, hi]]) => [k, [(n[k] || 0) / 3000, (hi - lo + 1) / total]]));
+  // the lit lamps: the headlights on the face (their discs' middles), the corner units' lenses
+  const lamp = { head: [], corner: [] };
+  for (let i = 0; i < L.count; i++) {
+    const x = Math.abs(L.getX(i)), y = L.getY(i), z = L.getZ(i);
+    if (z > 6.7 && x > 0.4 && x < 0.7) lamp.head.push([x, y]);
+    if (z > 6.3 && z < 6.6 && x > 0.7) lamp.corner.push(y);
+  }
+  out.lamps = { head: [lamp.head.reduce((s, p) => s + p[0], 0) / lamp.head.length, lamp.head.reduce((s, p) => s + p[1], 0) / lamp.head.length],
+    corner: [Math.min(...lamp.corner), Math.max(...lamp.corner)] };
   // faded in as an AI tram: the fleet numbers stay a blended decal, the body opaque
   const { setOpacity } = await import('/src/traffic.js');
   setOpacity(t3m, 0); setOpacity(t3m, 0.5); setOpacity(t3m, 1);
@@ -96,6 +128,13 @@ MEASURE = r"""async () => {
   out.halfWidth = Object.fromEntries([0, 3.0, 5.5, -5.8].map((z) => [z, -hit([-5, 1.2, z], [1, 0, 0]).x]));
   out.noseF = Object.fromEntries([1.0, 1.65, 2.3, 2.53, 2.65].map((h) => [h, hit([0, h, 20], [0, 0, -1]).z]));
   out.noseR = Object.fromEntries([1.0, 1.69, 2.53].map((h) => [h, hit([0, h, -20], [0, 0, 1]).z]));
+  // the ends open under the bumper to ±0.65 m: the livery's alpha where rays from ahead and behind meet the body
+  const liv = body.material.map.image, lc = liv.getContext('2d');
+  const alphaAt = (x, y, end) => {
+    const h = new THREE.Raycaster(new THREE.Vector3(x, y, end * 20), new THREE.Vector3(0, 0, -end)).intersectObject(body, false)[0];
+    return h ? lc.getImageData(Math.floor(h.uv.x * liv.width), Math.floor((1 - h.uv.y) * liv.height), 1, 1).data[3] : -1;
+  };
+  out.open = Object.fromEntries([1, -1].flatMap((e) => [[0, 0.5], [0, 0.72], [0.6, 0.5], [0.72, 0.5], [0, 0.95]].map(([x, y]) => [`${e > 0 ? 'f' : 'r'} ${x} ${y}`, alphaAt(x, y, e)])));
   // a set on a straight: the cars' centres, the couplers' heads
   models.placeConsist(m, 100, (s) => [s, 0, 0, 0]);
   out.pitch = Math.abs(a.position.x - b.position.x); out.CAR_PITCH = CAR_PITCH;
@@ -149,8 +188,8 @@ SHOTS = r"""async ({ kinds }) => {
   const out = {};
   for (const kind of kinds) {
     for (const [view, cam] of Object.entries(views)) {
-      const simple = kind === 'simple' || kind === 't3m';
-      const m = models.makeT3({ line: '17', cars: view === 'set' ? 2 : 1, detailed: simple ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant: kind === 't3m' ? 'T3M' : 'T3SUCS' });
+      const variant = { simple: 'T3SUCS', t3m: 'T3M', t3: 'T3' }[kind];
+      const m = models.makeT3({ line: '17', cars: view === 'set' ? 2 : 1, detailed: variant ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant });
       models.placeConsist(m, 7.6, (s) => [0, -s, 0, 0]);
       if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
       models.setNextStop(m, 'Palmovka');
@@ -213,20 +252,38 @@ def judge(r):
         "plates: 4 on the first car, the rear plate on the last": r["plates"] == [4, 1],
         "the plates follow the line": r["swapped"],
         "four draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 4 and r["drawn"][1] - r["plates"][1] <= 4,
-        # the variants: only a T3M has the resistors' box on the roof (3.02 m) and the green-on-black display
-        "variants as asked": r["variants"]["suc"] == "T3SUCS" and r["variants"]["m"] == "T3M",
-        "the T3M's roof box, none on the T3SUCS": r["variants"]["mRoof"] > 3.18 and r["variants"]["sucRoof"] < 3.12,
+        # the types: only a T3M has the resistors' box on the roof (3.02 m) and the green-on-black display
+        "types as asked": [r["variants"][k] for k in ("t3", "suc", "m")] == ["T3", "T3SUCS", "T3M"],
+        "the T3M's roof box, none on the T3SUCS or the T3": r["variants"]["mRoof"] > 3.18 and r["variants"]["sucRoof"] < 3.12 and r["variants"]["t3Roof"] < 3.12,
         "the T3M's side display on each car, none on the T3SUCS; the next stop shown": r["displays"]["m"] == [1, 1] and r["displays"]["suc"] == [0, 0] and r["displays"]["next"],
         "the side indicators on both sides": r["displays"]["indicators"] == [True, True],
-        "the T3M's display dark, the T3SUCS's plate blue": sum(r["variants"]["mDisplay"]) < 90 and r["variants"]["sucDisplay"][2] > 120,
-        "fleet numbers by type, each car its own": all(7001 <= n <= 7292 for n in r["fleet"]["suc"]) and all(8001 <= n <= 8090 for n in r["fleet"]["m"])
-        and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
-        "AI sets of both types by run number": r["fleet"]["auto"] == ["T3M", "T3SUCS"],
+        "the T3M's display dark, the T3SUCS's and the T3's plates blue": sum(r["variants"]["mDisplay"][:3]) < 90
+        and r["variants"]["sucDisplay"][2] > 120 and r["variants"]["t3Display"][2] > 120,
+        # the user, 2026-11-10: the route box square on a T3, rounded on a T3SUCS and round a T3M's display (6892, 7290)
+        "the route box's corners: square on the T3, rounded on the T3SUCS and the T3M": r["variants"]["corners"] == [255, 0, 0]
+        and r["variants"]["alphaTest"] == [0.5, 0.5, 0.5] and all(near(a, 0.49 / 0.30, 0.02) for a in r["variants"]["aspect"]),
+        # the bumper 0.76-0.86 m (6892 head on): silver with two red stripes on a T3, brown on the others
+        "the bumpers: the T3's silver and red, the others' brown, 0.76-0.86 m": set(r["bumpers"]["t3"]) == {"c3c5c4", "b3201a"}
+        and set(r["bumpers"]["suc"]) == {"55332f"} and set(r["bumpers"]["m"]) == {"55332f"}
+        and near(r["bumpers"]["suc"]["55332f"][0], 0.76, 0.002) and near(r["bumpers"]["suc"]["55332f"][1], 0.86, 0.002)
+        and near(r["bumpers"]["t3"]["b3201a"][0], 0.7715, 0.002) and near(r["bumpers"]["t3"]["b3201a"][1], 0.8485, 0.002),
+        # the user, 2026-11-10: "front and back is open under the bumper", the skirt to where the headlights start
+        "the ends open under the bumper to +-0.65 m, the skirt's corners and the red kept": all(r["open"][f"{e} 0 0.5"] == 0 and r["open"][f"{e} 0 0.72"] == 0
+        and r["open"][f"{e} 0.6 0.5"] == 0 and r["open"][f"{e} 0.72 0.5"] == 255 and r["open"][f"{e} 0 0.95"] == 255 for e in "fr"),
+        # 6892 head on: the headlights 1.11 m up and apart (the discs 4 cm proud along the face's normal, which
+        # leans outwards), the corner units' lenses 0.99-1.29 m
+        "the headlights 1.11 m up, 1.11 m apart": near(r["lamps"]["head"][1], 1.11, 0.005) and near(r["lamps"]["head"][0], 0.555, 0.02),
+        "the corner units' lenses 0.99-1.29 m": near(r["lamps"]["corner"][0], 0.99, 0.003) and near(r["lamps"]["corner"][1], 1.29, 0.003),
+        "fleet numbers by type, each car its own": all(6400 <= n <= 6992 for n in r["fleet"]["t3"]) and all(7001 <= n <= 7292 for n in r["fleet"]["suc"])
+        and all(8005 <= n <= 8106 for n in r["fleet"]["m"]) and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
+        "AI sets of every type by run number": set(r["fleet"]["auto"]) <= {"T3", "T3SUCS", "T3M"} and len(r["fleet"]["auto"]) >= 2,
+        # the user, 2026-11-10: "their proportion in service ... roughly related to their range sizes"
+        "the types' shares as their fleet ranges' lengths (within 3 points)": all(abs(got - want) < 0.03 for got, want in r["fleet"]["shares"].values()),
         # the user's photos and conflig's model (src/t3simple.js FLEET): the digits 0.14 m tall on every side; the
         # front's on the headlights' line, the rear's over the lamps, the sides' 1.36-1.50 m up, 4.17 m ahead
         f"the fleet numbers' digits 0.14 m tall on every side ({fleet_digits(r):.3f} m)": abs(fleet_digits(r) - 0.14) < 0.004
         and max(q["h"] for q in r["fleet"]["quads"].values()) - min(q["h"] for q in r["fleet"]["quads"].values()) < 1e-6,
-        "the fleet numbers where the photos have them": near(r["fleet"]["quads"]["front"]["y"], 1.03, 0.005) and near(r["fleet"]["quads"]["rear"]["y"], 1.105, 0.005)
+        "the fleet numbers where the photos have them": near(r["fleet"]["quads"]["front"]["y"], 1.11, 0.005) and near(r["fleet"]["quads"]["rear"]["y"], 1.105, 0.005)
         and all(near(r["fleet"]["quads"][s]["y"], 1.43, 0.005) and near(r["fleet"]["quads"][s]["z"], 4.17, 0.005) for s in ("right", "left")),
         "faded in: the fleet numbers stay blended, the body opaque": r["fleet"]["faded"] == {"transparent": True, "depthWrite": False, "opacity": 1, "body": False},
     }
@@ -249,7 +306,7 @@ def montage(outdir, kinds, views):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--shots", help="also save the views of each model into this directory")
-    ap.add_argument("--models", default="simple,t3m,classic,hybrid", help="the models for --shots (t3m: the built-in car as a T3M)")
+    ap.add_argument("--models", default="simple,t3,t3m,classic,hybrid", help="the models for --shots (simple: the built-in car as a T3SUCS, t3 and t3m: as a T3 and a T3M)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     faulthandler.dump_traceback_later(600, exit=True)  # the whole test: page.evaluate has no time limit
