@@ -96,7 +96,14 @@ export class Autopilot {
     // 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense")
     const lim = this._limits(g, mild), own = lim !== g.limits;
     const vLim = own ? g.limitUnder(lim) : g.currentLimit;
-    let vt = vLim / 3.6 - (UNDER_LATE + (UNDER - UNDER_LATE) * mild) - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
+    const ct = g.nextContact();
+    // (the next diverging contact, not only the next one: at Anděl one for a switch passed straight comes 4 m before it, and the turn
+    // went on the drive pedal at 18 km/h, 7.1 m short on the track brakes, line 9 seed 4 in autumn)
+    const cd = ct && ct.required === 'diverging' ? ct : (g.switches || []).find((w) => !w.auto && !w.passedContact && w.required === 'diverging' && w.contact > tr.panto - 1);
+    // (a turn's contact within reach keeps UNDER: UNDER_LATE under the 20 km/h street at Anděl is 19.3 km/h, where the accelerator
+    // stands at 31 coasting, over the switch button's 30, and the drive pedal turned between two brakings, line 9 seed 4)
+    const under = cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) ? UNDER : UNDER_LATE + (UNDER - UNDER_LATE) * mild;
+    let vt = vLim / 3.6 - under - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
     let nl = own ? g.nextLimitChange(lim) : g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
@@ -212,10 +219,6 @@ export class Autopilot {
     // a turn under a contact where it will be braking anyway, for a stop just past it or for the switch's own limit: slow enough
     // there for the switch button, as a limit of its own, or it would take the drive pedal between the brake. (Where it
     // is still at speed there, the drive pedal is the way: nothing else draws the current.)
-    const ct = g.nextContact();
-    // (the next diverging contact, not only the next one: at Anděl one for a switch passed straight comes 4 m before it, and the turn
-    // went on the drive pedal at 18 km/h, 7.1 m short on the track brakes, line 9 seed 4 in autumn)
-    const cd = ct && ct.required === 'diverging' ? ct : (g.switches || []).find((w) => !w.auto && !w.passedContact && w.required === 'diverging' && w.contact > tr.panto - 1);
     if (cd && tr.v > V_BUTTON) {
       const dc = cd.contact - tr.panto;
       const toLimit = nl && nl.d - 12 > dc ? curveTo({ v: nl.v, d: nl.d - dc }) : Infinity;
