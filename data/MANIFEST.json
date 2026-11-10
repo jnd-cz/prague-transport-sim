@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-11-08r",
- "built_at_commit": "030c614",
- "published": "2026-11-09 16:41",
- "note": "#407: platforms from PID and OSM, lines 9, 17, 22, 23, 37",
+ "snapshot": "2026-11-10",
+ "built_at_commit": "99d5f9f",
+ "published": "2026-11-10 11:30",
+ "note": "lines 9, 17, 22, 23, 37 survey (dtm.json): ground level checked against IPR, a deck's heights left to the deck, areas off the lidar judged by the rails and DMR 5G (#446)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "13743b62c7a658868db745968f5db2f092d585465fd200703ee6e26d6f769220"
   },
   "line17.dtm.json": {
-   "size": 9335366,
-   "sha256": "732c380fab374caab5041954dc8a23c3ede4dfbb16eed6c0e3cc2efe46553399"
+   "size": 9353449,
+   "sha256": "c56bbaf4710141c04fc2e1e9c8cb3eccae1b50574a1f71c34a1d5e4eeeaeb6b4"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -57,8 +57,8 @@
    "sha256": "99ca7460fb8a5d58420bc15686dd8e14f24bc5c3d5935467bbb61ecb2ccc01f7"
   },
   "line22.dtm.json": {
-   "size": 9507730,
-   "sha256": "7d5852da0d1b349558f1dca241a7922645c7a46a24698c0affff65dc5cd253f1"
+   "size": 9546907,
+   "sha256": "df69cdc488c3fe0f4521827018d0a8e1046772dcaadf42c39c656eee61e1cb0e"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -97,8 +97,8 @@
    "sha256": "b5dad79231566c0fe831d2e23228f52f121e16ed31890921dde0c17524032570"
   },
   "line23.dtm.json": {
-   "size": 4317511,
-   "sha256": "2b83d46318a6b911438f8962d0522fc3d259db6d07028aa1f7c620c4921b33e5"
+   "size": 4342999,
+   "sha256": "f8c4a9a47756ff9c9777c35a51e700ea65b41674491a4ebdce0716413ebe150c"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -137,8 +137,8 @@
    "sha256": "613e7bccc8fb1359390afd8a1e677e39550fe85b08acbd0cb9cdbf722e5d3446"
   },
   "line37.dtm.json": {
-   "size": 4682047,
-   "sha256": "3799f10bbbc7557b26b7d086cb7152bc545d09221fc446a462a934e8ccfd6aa6"
+   "size": 4689220,
+   "sha256": "e4d50fe92680470822f481999fb3552e084c1a259846b18887cae5a92553f0b8"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -177,8 +177,8 @@
    "sha256": "d3aaddf6b8adff92ba6ac18efe23a625bed5d3f94e11aabac03437c43ca0ad15"
   },
   "line9.dtm.json": {
-   "size": 9578218,
-   "sha256": "25c2eebfc3229131b2334b8e5d044279175cc435aa7520baa4dae81d22a48663"
+   "size": 9587748,
+   "sha256": "753e02d023c115ee52f6e1e13b9a4dc955806ddd4c7983c17d3ec1a707279a15"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
