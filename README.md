@@ -63,6 +63,9 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
+| `,` / `.` | směrovky vlevo / vpravo (znovu: vypnout); dávají se před odbočením na křižovatce a v zastávce, kde cestující přecházejí jízdní pruh (vpravo, od brzdění do rozjezdu) |
+| `/` (na české klávesnici `-`) | výstražná světla |
+| `L` | dálková světla: držením problik, se `Shift` zapnout a vypnout |
 | `V` | pohled ze stanoviště řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
@@ -203,7 +206,7 @@ zařízení). Posílají klávesy klávesnice:
 - řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
+- ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 
 Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
@@ -215,7 +218,8 @@ omezení, zastávek, návěstidel, překážek a tramvaje před sebou, volí sí
 ovládat šlapky jako pečlivý řidič (pokročilý model: na rovině rozjíždí na stupních 1–3, brzdí po stupních, do zastávky
 jednou křivkou a bez návratu na jízdní šlapku, pokud před ním nestojí tramvaj, ve stání zabrzdí zajišťovací brzdou, stupně
 1–4 jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty odebírá proud
-pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně).
+pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně),
+dává směrovky před odbočením na křižovatce a v zastávkách, kde cestující přecházejí jízdní pruh.
 Klávesou **V** přepnete na pohled zvenku. Řízení převezme
 kterákoli klávesa kontroléru nebo dveří (W/S/mezerník/N/D/R, 0–5), v ovládání zvoleném v menu; O je předá zpět
 autopilotu.

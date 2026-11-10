@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { hybridReady, makeHybridSet, setHybridLine, poseHybrid } from './t3h.js';
 import { makeSimpleSet, poseSimple, t3Variant, fleetNumbers, ROUTE_BOX } from './t3simple.js';
 import { hangConsist } from './consist.js';
+import { signalsAt } from './lamps.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
@@ -448,13 +449,16 @@ export function placeConsist(model, sFront, at) {
   });
 }
 
-// A set's mechanisms from the game's state, whichever model (each acts only on what changes): the hybrid's doors,
-// collector, brake lamps and track-brake shoes (src/t3h.js poseHybrid), the built-in car's collector
-// (src/t3simple.js poseSimple); the classic model has none.
+// A set's mechanisms from the game's state, whichever model (each acts only on what changes): the doors (0..1),
+// the collector's contact height, the track brakes' magnets (the hybrid's: src/t3h.js poseHybrid); the brake lamps
+// (`braking`), the indicators (`indicate`: 'left', 'right', 'hazard' or none, blinking by `clock` in s), the high
+// beams (`highBeam`) on both it and the built-in car (src/t3simple.js poseSimple); the classic model has none.
 export function poseT3(model, state) {
   const k = model.userData.kind;
-  if (k === 'hybrid') poseHybrid(model, state);
-  else if (k === 'simple') poseSimple(model, state);
+  if (k !== 'hybrid' && k !== 'simple') return;
+  const s = 'indicate' in state ? { ...state, signals: signalsAt(state.indicate, state.clock ?? 0) } : state;
+  if (k === 'hybrid') poseHybrid(model, s);
+  else poseSimple(model, s);
 }
 
 const CAR_COLORS = [0x2f4f7f, 0xa0a4a8, 0x1c1c1c, 0xe8e8e8, 0x7a1f1f, 0x3d5c3a, 0xc8b47a, 0x5a6f80, 0xd8d2c0, 0x324a63];
