@@ -12,7 +12,7 @@
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
   "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it"
@@ -961,6 +961,21 @@
       ]
      }
     ]
+   },
+   {
+    "id": "curve-lateral-acceleration",
+    "value": 1.0,
+    "unit": "m/s²",
+    "scope": "the limit in a curve no sign sets: √((a + cant · g / 1.5) · R), in whole km/h; D 1/2 § 25.7 only asks for a speed that suits the curvature, and a curve under 25 m has small-radius-speed",
+    "basis": "the drivers' speeds on two GPS rides, chosen by the user",
+    "source": {
+     "document": "GPS rides on line 23: T3 6312 Královka to Bílá labuť, 2026-10-31; T3 6921 Pražský hrad to Bílá labuť, 2026-11-08 (raw/reference/rides/), mapped on the game's track: the unsigned curves of R 30-60 m taken at 1.2-1.6 m/s² without cant; the signed hairpin at Chotkovy sady (R 24 m, 15 km/h) at 12-17 km/h (#451)",
+     "year": 2026
+    },
+    "user": {
+     "source": "Claude Code session 2026-11-10 (#451)",
+     "quote": "If it's not defined in D1/2 then I guess it's only up to the driver to keep reasonable speed. [...] The 1.0m/s² would fit real world recording better together with less granular limit for unsigned curves."
+    }
    },
    {
     "id": "stop-pass-speed",

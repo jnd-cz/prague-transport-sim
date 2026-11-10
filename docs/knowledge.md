@@ -457,6 +457,29 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   down every descent to 1 m/s under ran line 23 40 s later. On W2's data (73c2a32): brake applications −6 to −18 %, the wire's energy
   −4 to −11 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
   (2026-11-09), the timetable's part being #242.
+- **Driving to the timetable** (#242): the time in hand to the next stop sets how it drives. That is the stop's timetable
+  time, less now, less 1.3 times the quickest run there at the limits, less a 15 s dwell.
+  - **Up to 10 s in hand it catches up.** The target is 0.2 m/s under the limit, and brake step 1 holds down a descent only to
+    0.6 m/s under. At a 15 km/h limit, 0.4 and 1 m/s held it at 10-14.5 km/h, where the drivers of two line 23 rides held 14-16
+    down Chotkova (#431). Within reach of a turn's contact the target keeps 0.4: 0.2 under Anděl's 20 km/h put the accelerator
+    at 31 coasting, over the switch button's 30.
+  - **Over the next 30 s it grows milder:** curves as at 0.8 m/s², 0.4 under the limit, the 1 m/s hold, the target up to
+    10 km/h under, coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
+    autopilot doesn't go as hard into curves and uses less pedal presses to conserve power. If he's late then he uses the
+    probe's plan to catch up").
+  - **Against main at 973726c** (with #451's curves; stops check, seeds 1-5):
+
+    | line | arrivals within ±30 s | mean delay | drive presses |
+    |---|---|---|---|
+    | 9 | 40 → 47 % | 52 → 44 s | +7 % |
+    | 17 | 6 % → unchanged | 116 → 96 s | −7 % |
+    | 22 | 4 → 29 % | 160 → 75 s | −6 % |
+    | 23 | 8 → 19 % | 116 → 74 s | −15 % |
+    | 37 | 54 → 61 % | 44 → 37 s | unchanged |
+
+    Energy from the wire is 0-2 % lower on every line.
+  - **In other weathers** (`--checks autumn,rain,winter`): wheel spin, slides and sand stay within a few per cent of main's,
+    and the delay falls in all three.
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
@@ -618,10 +641,27 @@ Review these when realism matters; most move into the build in M2.
   switch before the car's end, so no margin). The rear still has to leave each restriction. The radius is read over
   16 m of heading, which smears a sharp curve's end by about 12 m each way; most curves here have transitions, so the
   limit climbs along them.
+- **A curve's speed** (#451): no sign stands at most curves, and D 1/2 only asks for a speed that suits the curvature (§ 25.7),
+  so the limit is √((a + cant · g / 1.5) · R) in whole km/h at a = 1.0 m/s² unbalanced (`curve-lateral-acceleration`), and 15
+  under R 25 m, where the "r" sign stands (§ 49.19). Two line 23 rides mapped on our track (6312 on 2026-10-31, 6921 on
+  2026-11-08; GPS within 0–3 m of the track there) took the unsigned curves of R 30–60 m at 1.2–1.6 m/s² without cant
+  (R 54 m past Pražský hrad and above Chotkova's hairpin at 26–34 km/h), and the signed hairpin at Chotkovy sady (R 24 m, 15)
+  at 12–17 km/h, so the drivers keep a signed limit. The old 0.8 m/s² was a design value (0.65 comfortable, about 1.0 the
+  upper bound) in 5 km/h steps: 20 km/h for R 45–60 m. At 1.0 the rides go over our limit in no curve on 6312's ride and in
+  three on 6921's (4–8 km/h). With it the autopilot's moving time in the stops check fell by 95 s on line 22 and 55 s on line 23,
+  with fewer presses and the same energy. Derailment (`src/speedRules.js` `derailRisk`): a second over 2.25 m/s² in a curve, 1.5
+  times its limit's speed, or 1.5 times a switch's, crossing's or loop's 15 (the user, 2026-11-10: "40-50% over speed limit or
+  something over 2-2.5 m/s² for at least one second").
 - Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
-  arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
+  arrive (16 m / 4 s); AI trams both ways run 0.2 m/s under the limit (the oncoming ones ran at 0.85 of it until
+  #242), spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.
+  An AI tram ahead goes on at a blinking GO only if its front gets there while the GO lasts: the blinking left plus the hold
+  the controller can still give it (10 s, `PHASE_HOLD`), less a second, on its braking curve to its speed at the signal.
+  Otherwise, able to stop on full service braking, it stops. Before, it went on at any blinking GO first seen inside its
+  comfortable stopping distance; slowing for a junction's 15 km/h past the signal it outlasted the hold and ran the red 1.4 s
+  late (line 17 seed 5, line 22 s 4211; #394). A longer hold was turned down (the user, 2026-11-10: "that would slow up the cycle and cause potential jams").
 - **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
   car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
   immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
@@ -652,7 +692,7 @@ Review these when realism matters; most move into the build in M2.
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - `--checks stops` counts the drive pedal's presses from 0 (*našlápnutí*), those made rolling (over 1 m/s), the brake's applies
   and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide, sand and
-  the emergency brake. A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
+  the emergency brake, `rain` in rain (0.17 ± 0.02) and `winter` in snow (ice, 0.08, ±4 m at the pedestrian crossings). A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
   coasting. Dry, main pressed 19–24 times a km (70 % rolling), the #351 autopilot 8.4–13 (lines 37 and 23).
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with main's baseline in the data store.
