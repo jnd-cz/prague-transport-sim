@@ -167,18 +167,26 @@ def facts_to_areas(areas, facts, frame):
     if not facts:
         return {}
     ground = [(i, a) for i, a in enumerate(areas) if a["l"] == 0 and a["c"] not in NOT_GROUND and len(a["r"]) >= 3]
-    polys = [shapely.Polygon(np.asarray(a["r"])[:, :2], [np.asarray(h)[:, :2] for h in a.get("h", []) if len(h) >= 3]).buffer(0)
-             for _, a in ground]
-    tree = shapely.STRtree(polys)
+    polys = [with_holes(a) for _, a in ground]
+    outer = [shapely.Polygon(np.asarray(a["r"])[:, :2]).buffer(0) for _, a in ground]
     out = {}
     for f in facts:
         x, y = frame.xy(f["lat"], f["lon"])
         p = shapely.Point(float(np.ravel(x)[0]), float(np.ravel(y)[0]))
-        hit = [j for j in tree.query(p, predicate="intersects") if f.get("c") in (None, ground[j][1]["c"])]
-        if hit:
-            j = min(hit, key=lambda j: abs(polys[j].area - f.get("m2", 0)))
-            out[ground[j][0]] = f["verdict"]
+        # (then the outlines alone: cards before 2026-11-10's last build took their point from the outline, and one,
+        # an island in the water on line 9, fell into a hole of its own area)
+        for shapes in (polys, outer):
+            hit = [j for j in shapely.STRtree(shapes).query(p, predicate="intersects") if f.get("c") in (None, ground[j][1]["c"])]
+            if hit:
+                j = min(hit, key=lambda j: abs(polys[j].area - f.get("m2", 0)))
+                out[ground[j][0]] = f["verdict"]
+                break
     return out
+
+
+def with_holes(a):
+    """An area's polygon with its holes."""
+    return shapely.Polygon(np.asarray(a["r"])[:, :2], [np.asarray(h)[:, :2] for h in a.get("h", []) if len(h) >= 3]).buffer(0)
 
 
 def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, rule=None, buildings=None):
@@ -202,7 +210,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         g = np.asarray(ground(E, N), float)
         d = r[:, 2] - g
         ok = np.isfinite(d)
-        c = poly.representative_point()
+        c = with_holes(a).representative_point() if a.get("h") else poly.representative_point()
         v = {"c": a["c"], "m2": round(poly.area, 1), "x": round(c.x, 1), "y": round(c.y, 1)}
         out[i] = v
         if ok.sum() < 3:
