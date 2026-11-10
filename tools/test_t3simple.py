@@ -120,7 +120,10 @@ MEASURE = r"""async () => {
   // the running gear at rest: the wheels (the points on the rail), the couplers' faces, the pantograph's head
   // (nothing else of the car on the rail: the track-brake shoes hang 12 mm up)
   const low = [...ptsOf(parts), ...ptsOf(named(a, 'bogies')), ...ptsOf(named(a, 'wheels'))].filter((p) => p.y < 0.01).map((p) => p.z);
-  const cz = ptsOf(named(a, 'couplers')).map((p) => p.z), zMin = Math.min(...cz), zMax = Math.max(...cz);
+  const cp = ptsOf(named(a, 'couplers')), cz = cp.map((p) => p.z), zMin = Math.min(...cz), zMax = Math.max(...cz);
+  // the bar's height: its end at the pin (6.25 m)
+  const bar = cp.filter((p) => Math.abs(p.z) > 6.2 && Math.abs(p.z) < 6.3).map((p) => p.y);
+  out.couplerBar = [Math.min(...bar), Math.max(...bar)];
   const topOf = (car) => Math.max(...ptsOf(named(car, 'pantograph')).map((p) => p.y));
   const top = Math.max(topOf(a), ...ptsOf(parts).map((p) => p.y));
   // the points on the rail in groups (a wheel's are within its 0.7 m), each group's middle
@@ -315,6 +318,8 @@ def judge(r):
         "the wheels on the rail at the pivots +-0.95 m": len(r["wheelZ"]) == 4
         and all(near(z, w, 0.01) for z, w in zip(r["wheelZ"], (-4.15, -2.25, 2.25, 4.15))),
         "the couplers' heads at +-7.52 m": near(r["couplers"][0], -7.52, 0.01) and near(r["couplers"][1], 7.52, 0.01),
+        # the other models' height (classic 0.594 m, hybrid 0.584 m): the user, 2026-11-10, "take it from the others"
+        "the coupler's bar 0.59 m over the rail": near(sum(r["couplerBar"]) / 2, 0.59, 0.005),
         "the collector's head just under the wire": near(r["top"], r["wire"] - 0.005, 0.01),
         # the plan view: straight sides, the ends tapering from 4.51 m ahead / 4.84 m behind the centre
         "the plan: 1.25 m half width amidships": near(r["halfWidth"]["0"], 1.25, 0.01) and near(r["halfWidth"]["3"], 1.25, 0.01),
