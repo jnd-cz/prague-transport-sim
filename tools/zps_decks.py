@@ -44,6 +44,10 @@ NOT_DECK = {"roof", "wall", "stairs", "underpass", "tunnel", "water"}
 # model next to its vertices on it (the spikes along Krejcárek's road deck), 223 of 246 on line 37 lie within 1 m of a
 # face, 237 within 1.5 m, and all of lines 9 and 17 within 1 m
 EDGE = 1.5  # m outside a model's faces: still on it
+# between two levels of one area's vertices: steeper is two decks (Libeň's viaducts side by side: 62-1404 % between the
+# nearest vertices of two levels), gentler one deck sloping between its ends (Most Legií's road: 2.9 m over 139 m, 2 %;
+# two paved areas on line 9: 2 % and 7 %)
+GRADE = 0.25
 TRUSS = 1.0  # m off a deck's median top: a truss, a pylon or a portal over the deck, not the deck (Výtoň: 210.4 m on 197.5)
 SAG = 0.1  # m under the deck's plane over an opening: the target's tolerance at Divadelní
 PLANE_REACH = 15.0  # m from the way under: the deck's vertices that give its plane
@@ -304,8 +308,17 @@ def _rings(poly):
     return [np.asarray(poly.exterior.coords)[:-1]] + [np.asarray(h.coords)[:-1] for h in poly.interiors]
 
 
+def _steep(lo, hi):
+    """Two levels of an area's vertices on structures are two decks when the nearest of them rise more than GRADE
+    between them (a step or a gap between structures); otherwise one deck slopes from one to the other."""
+    d = np.hypot(lo[:, None, 0] - hi[None, :, 0], lo[:, None, 1] - hi[None, :, 1])
+    i, j = np.unravel_index(np.argmin(d), d.shape)
+    return hi[j, 2] - lo[i, 2] > GRADE * d[i, j]
+
+
 def split(areas, model, checked=None):
-    """A deck area whose vertices on structures stand at levels more than TOL apart lies over several decks: one piece
+    """A deck area whose vertices on structures stand at levels more than TOL apart and more than GRADE steep between
+    them lies over several decks: one piece
     per level, cut along the model's faces at that level (EDGE wide), each piece's vertices on its deck's faces with the
     offset the area's own vertices keep from them; the parts beyond every structure keep their survey heights, the
     slivers between the decks go (in place: the area keeps its index for its first piece, the others are appended).
@@ -326,8 +339,9 @@ def split(areas, model, checked=None):
         on = np.isfinite(mz) & np.isfinite(r[:, 2])
         if on.sum() < 2:
             continue
-        zs = np.sort(r[on, 2])
-        cuts = np.flatnonzero(np.diff(zs) > TOL)
+        p = r[on][np.argsort(r[on, 2])]
+        zs = p[:, 2]
+        cuts = np.array([c for c in np.flatnonzero(np.diff(zs) > TOL) if _steep(p[:c + 1], p[c + 1:])], int)
         if not len(cuts):
             continue
         poly = shapely.Polygon(r[:, :2], [np.asarray(h)[:, :2] for h in a.get("h", []) if len(h) >= 3]).buffer(0)

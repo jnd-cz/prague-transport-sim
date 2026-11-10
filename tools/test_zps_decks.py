@@ -178,6 +178,17 @@ class Split(unittest.TestCase):
         self.assertEqual(zd.split(areas, model), {"areas": 0, "pieces": 0})
         self.assertEqual(len(areas), 1)
 
+    def test_a_sloping_deck_stays_whole(self):
+        """Most Legií: the road falls 2.9 m over 139 m and the survey's outline has vertices only at its two ends; the
+        ends are more than TOL apart but one deck slopes between them."""
+        x0, x1, z0, z1 = 0.0, 140.0, 193.3, 196.3
+        tris = np.array([[[x0, 0, z0], [x1, 0, z1], [x1, 20, z1]], [[x0, 0, z0], [x1, 20, z1], [x0, 20, z0]]], float)
+        model = zd.Model(SimpleNamespace(tris=tris, ids=[9], owner=np.array([0, 0])))
+        a = area([(1, 2, 193.3), (1, 18, 193.3), (139, 18, 196.3), (139, 2, 196.3)])
+        areas = [a]
+        self.assertEqual(zd.split(areas, model), {"areas": 0, "pieces": 0})
+        self.assertEqual(len(areas), 1)
+
 
 class Openings(unittest.TestCase):
     def divadelni(self):
