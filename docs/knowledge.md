@@ -567,7 +567,8 @@ Review these when realism matters; most move into the build in M2.
   something over 2-2.5 m/s² for at least one second").
 - Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
-  arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
+  arrive (16 m / 4 s); AI trams both ways run 0.2 m/s under the limit (the oncoming ones ran at 0.85 of it until
+  #242), spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.
 - **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
   car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
@@ -599,7 +600,7 @@ Review these when realism matters; most move into the build in M2.
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - `--checks stops` counts the drive pedal's presses from 0 (*našlápnutí*), those made rolling (over 1 m/s), the brake's applies
   and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide, sand and
-  the emergency brake. A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
+  the emergency brake, `rain` in rain (0.17 ± 0.02) and `winter` in snow (ice, 0.08, ±4 m at the pedestrian crossings). A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
   coasting. Dry, main pressed 19–24 times a km (70 % rolling), the #351 autopilot 8.4–13 (lines 37 and 23).
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with main's baseline in the data store.
