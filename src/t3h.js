@@ -80,7 +80,9 @@ export async function loadHybridT3(responses, contact) {
     if (o.isMesh && !mover && !o.children.length) return;
     const c = o.isMesh && mover ? new THREE.Mesh(o.geometry, o.material) : new THREE.Group();
     c.name = o.name;
-    o.matrix.decompose(c.position, c.quaternion, c.scale);
+    // (the node's own transform, not its matrix decomposed: the lamps' glows are stored off at scale 0, whose
+    // matrix decomposes to a NaN rotation, and they never drew)
+    c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale);
     copy.get(o.parent).add(c);
     copy.set(o, c);
   });
