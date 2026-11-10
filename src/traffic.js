@@ -58,6 +58,14 @@ function stopDistance(v, state) {
   return state === 'warn' ? (v * v) / 1.8 + v * 2 + 1 : (v * v) / 2.6 + v + 0.5;
 }
 
+// Seconds an AI tram at v takes to bring its front `d` m on, braking on its curve (0.7 m/s², as limitSpeed) to vEnd there, and no
+// faster than now (one that would still speed up gets there sooner: the count errs towards stopping)
+function timeTo(d, v, vEnd) {
+  let t = 0;
+  for (let x = 0.5; x < d; x += 1) t += 1 / Math.max(0.5, Math.min(Math.max(v, 0.5), Math.sqrt(vEnd * vEnd + 2 * 0.7 * (d - x))));
+  return t;
+}
+
 // The speed (m/s) an AI tram may run at s: the limit under the whole set, and every lower limit ahead
 // reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
 // stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
@@ -1674,9 +1682,16 @@ export class Traffic {
         // already past "3 m before the signal": it stays as long as it is before the head itself)
         const d = sig.s - 3 - t.s;
         if ((d > 0 && d > stopDistance(t.v, sig.state)) || (t.v < 0.5 && t.s < sig.s - 0.3)) t.redStops.add(sig);
+        // (too close to stop comfortably for a blinking GO, it goes on only if it is there while the GO lasts: the rest of the blinking
+        // and what the controller can still hold for it. Slowing for a junction's 15 km/h past the signal, one took 12 s from 91 m out
+        // at 44 km/h, past the 10 s hold, and ran the red 1.4 s late, line 17 seed 5; 11 s at line 22 s 4211, #394. Not there in
+        // time and able to stop on full service braking, it stops)
+        else if (sig.state === 'warn' && d > 0 && d > stopDistance(t.v, 'stop')) {
+          const vSig = Math.min(limitSpeed(g.limits, sig.s, t.length) - AI_UNDER, stopAt !== null && stopAt > sig.s ? Math.sqrt(1.8 * Math.max(0, stopAt - 0.5 - sig.s)) : Infinity);
+          if (timeTo(sig.s - t.s, t.v, Math.max(0, vSig)) + 1 > (sig.timer ?? 0) + (sig.aheadHoldLeft ?? 0)) t.redStops.add(sig);
+        }
         if (t.redStops.has(sig)) stop(sig.s - 3, 'signal');
-        // (moving: one standing before the signal can wait, and takes it as red, #394)
-        else if (sig.state === 'warn' && d > -3 && t.v > 0.5) sig.aheadCommitted = true;
+        else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
       }
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
       // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 6 m kept two 2-car sets off long platforms, #258)

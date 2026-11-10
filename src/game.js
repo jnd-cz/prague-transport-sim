@@ -18,7 +18,7 @@ const STOP_AHEAD = 6;          // without a stop sign in the data: the front sto
 // Without a platform (_stopZone): any front position this far either side of the sign counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
 const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
-const AHEAD_HOLD = 25;         // s: the most a junction holds its phase for an AI tram ahead committed to it (_runController, #394)
+const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
 import { Feeding } from './electric.js';
@@ -1534,7 +1534,7 @@ export class Game {
   // Junction controller (fixed cycle, see _initSignals) with tram priority: a tram detected 140 m
   // before the signal cuts the cross street's green short (after at least 8 s of it) and jumps to
   // our tram phase; a tram committed to the junction (dilemma zone: too close to stop when the GO
-  // starts blinking) holds the phase up to 10 s more: ours, an AI tram ahead of us (sig.aheadCommitted, up to AHEAD_HOLD)
+  // starts blinking) holds the phase up to 10 s more: ours, an AI tram ahead of us (sig.aheadCommitted)
   // or an oncoming one (sig.backCommitted; both set by traffic.js). Sets sig.state (our head: go / warn = last 3 s / stop), sig.timer (s to the
   // next change of our head) and sig.backState (the opposite direction, whose GO is the straight
   // phase but ends 3 s before it for clearance: go / warn = its last 3 s, blinking / stop).
@@ -1560,11 +1560,8 @@ export class Game {
     // (each its own 10 s: our tram, an AI tram ahead of it, an oncoming one; holding for another tram
     // used a shared budget up, and ours then got a red it could not stop for, line 17 s 3158, 10251)
     const backWarn = sig.t >= Y.gS - 6 && sig.t < Y.gS - 3, endOurs = inOurs() && b - sig.t < 3.2;
-    // (an AI tram ahead decides once, as it first sees the GO blink, and may then slow for a junction's 15 km/h past the signal: from
-    // 91 m out at 44 km/h it took 12 s and passed 1.4 s after red, line 17 seed 5, and 11 s at line 22 s 4211, #394. Its hold lasts
-    // while it comes on, up to AHEAD_HOLD)
     const holds = [['ext', endOurs && committed], ['extAhead', endOurs && sig.aheadCommitted], ['extBack', backWarn && sig.backCommitted]];
-    const h = holds.find(([k, want]) => want && (sig[k] ?? 0) < (k === 'extAhead' ? AHEAD_HOLD : 10));
+    const h = holds.find(([k, want]) => want && (sig[k] ?? 0) < PHASE_HOLD);
     // an on-demand crossing (sig.demand: no street or footway we know there) rests on GO for the trams
     // (before both directions' blinking) until someone asks to cross, about every two minutes; then
     // one cycle runs
@@ -1573,6 +1570,7 @@ export class Game {
     if (h) sig[h[0]] = (sig[h[0]] ?? 0) + dt;
     else if (!rest) sig.t += dt;
     if (sig.t >= Y.C) { sig.t -= Y.C; sig.ext = 0; sig.extAhead = 0; sig.extBack = 0; sig.request = false; }
+    sig.aheadHoldLeft = PHASE_HOLD - (sig.extAhead ?? 0); // (what an AI tram ahead can still count on, src/traffic.js)
     const prev = sig.state;
     sig.state = inOurs() ? (b - sig.t > 3 ? 'go' : 'warn') : 'stop';
     if (sig.state === 'stop' && prev !== 'stop') sig.stopSince = this.clock;
