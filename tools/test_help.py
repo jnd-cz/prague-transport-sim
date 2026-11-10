@@ -7,6 +7,7 @@ import faulthandler
 import functools
 import http.server
 import os
+import re
 import sys
 import threading
 import unittest
@@ -18,6 +19,14 @@ import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE, SHOTS = "37", None
+
+
+def table_rows(readme):
+    """The body rows of the guide's tables (the help shows them all): its table lines less a header and a separator each."""
+    lines = [x for x in open(os.path.join(ROOT, readme), encoding="utf-8").read().split("\n") if x.startswith("|")]
+    return len(lines) - 2 * sum(1 for x in lines if re.match(r"^\|[\s:|-]+\|\s*$", x))
+
+
 SIZES = {"phone": ((390, 844), True), "desktop": ((1280, 800), False)}
 WORDS = {"cs": ("Vaše směna", "Zavřít"), "en": ("Your shift", "Close")}
 
@@ -88,7 +97,7 @@ class Help(unittest.TestCase):
                         heads: t.querySelectorAll('h3').length, raw: /<!--|\\*\\*|^##/m.test(t.textContent), run: t.textContent.includes('serve.py') }; }""")
                     self.assertLessEqual(r["over"], 0, f"{name} {lang}: wider than its card")
                     self.assertTrue(r["scrolls"])
-                    self.assertEqual(r["rows"], 20)
+                    self.assertEqual(r["rows"], table_rows("README.md" if lang == "cs" else "README.en.md"))
                     self.assertEqual(r["nested"], 3)
                     self.assertGreater(r["heads"], 8)
                     self.assertFalse(r["raw"], "Markdown left in the text")
