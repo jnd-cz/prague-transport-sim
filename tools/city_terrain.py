@@ -11,8 +11,10 @@ The ground of each cell of IPR's raster (35,001 x 26,001 cells of 1 m, rows nort
     cell's centre (tools/dmr5g.py: the 500 m tiles in raw/dem/; --fetch downloads the missing ones);
   2 inside it still: the lines' 10 m grids (raw/line*/terrain5514.tif, build_line.py);
   else no ground, and no triangles. Outside the boundary, IPR's own cells only.
-Inside the boundary, a cell near an OSM passage where IPR lies more than PASSAGE_DROP under a DMR 5G tile at hand takes
-DMR 5G (level 1: fine_terrain.py's rule, tools/dmr5g.py; no tile is downloaded for it).
+No passages rule (fine_terrain.py's): IPR's ground stays where it has ground, the floors of underpasses and culverts and
+the streets through building passages included; a street or track over a passage becomes a deck in #276's partition (the
+user, 2026-11-10: "keeping IPR lidar everywhere to keep the actual lowest points. Then bridge the gaps on streets and
+track/rail passes with other data"; tools/bench/terrain_compare.py --passages measured what the rule took and why).
 
 The mesh, in three steps:
   1. pydelatin over s = (z - base) / tol(d) with one max error of 1, which is exact where tol is constant. The base is
@@ -31,8 +33,8 @@ Output in the machine cache, TRAMDATA_CACHE/city-terrain/<key>/ (nothing in data
             city-frame x, y of cell (0, 0): x = origin x + column, y = origin y - row
   report.json  triangles and the error per distance band, the fallbacks' shares, the no-ground area, the zero areas
   zero-areas.png  the city limits with the areas where IPR has no ground, by what fills them
-The key hashes the raster, the DMR 5G tiles in raw/dem/, the 10 m grids, DI's network, the OSM extract (the boundary and
-the passages), the floor, the tolerance and mesh parameters and the code; a rerun with the same key reads the cache. The
+The key hashes the raster, the DMR 5G tiles in raw/dem/, the 10 m grids, DI's network, the OSM extract (the boundary),
+the floor, the tolerance and mesh parameters and the code; a rerun with the same key reads the cache. The
 report and the picture are copied to reports/city-terrain/.
 
     python -P -E tools/city_terrain.py [--fetch] [--box x0,y0,x1,y1] [--force] [--min-free 6] [--threads 8]
@@ -708,52 +710,34 @@ class Grids:
         return out
 
 
-def fallbacks(Z, lev, origin, frame, dem, grids, covers=None, log=print):
-    """IPR's gaps inside the city from DMR 5G (dem: dmr5g.Tiles), then the 10 m grids (grids.sample); inside the city also
-    IPR over a passage under DMR 5G at hand (covers: bool rows x cols near OSM passages). Returns the counts."""
-    import dmr5g
+def fallbacks(Z, lev, origin, frame, dem, grids, log=print):
+    """IPR's gaps inside the city from DMR 5G (dem: dmr5g.Tiles), then the 10 m grids (grids.sample). Returns the counts."""
     h, w = Z.shape
     ox, oy = origin
     e0, n0 = ox + frame.E0, oy + frame.N0
-    out = {"dmr5g": 0, "grids": 0, "passages": 0}
+    out = {"dmr5g": 0, "grids": 0}
     for r0 in range(0, h, 256):
         r1 = min(h, r0 + 256)
         lv = np.asarray(lev[r0:r1])
         gap = ((lv & LEVEL) == NO) & ((lv & INSIDE) != 0)
-        if covers is not None:
-            cov = covers[r0:r1] & ((lv & LEVEL) == 0) & ((lv & INSIDE) != 0)
-        else:
-            cov = np.zeros_like(gap)
-        if not gap.any() and not cov.any():
+        if not gap.any():
             continue
-        rr, cc = np.nonzero(gap | cov)
+        rr, cc = np.nonzero(gap)
         E, N = e0 + cc, n0 - (r0 + rr)
-        if cov.any():  # (passages: tiles at hand only)
-            ix, iy = np.floor(E / dmr5g.TILE).astype(np.int64), np.floor(N / dmr5g.TILE).astype(np.int64)
-            u, inv = np.unique(np.stack([ix, iy], 1), axis=0, return_inverse=True)
-            hand = np.array([dem.have(a, b) for a, b in u.tolist()])[inv.ravel()]
-        else:
-            hand = np.zeros(len(rr), bool)
-        isgap = gap[rr, cc]
-        ask = isgap | hand
-        z1 = np.full(len(rr), np.nan, np.float32)
-        z1[ask] = dem.sample(E[ask], N[ask])
+        z1 = dem.sample(E, N).astype(np.float32)
         z1[~(z1 >= TERRAIN_FLOOR)] = np.nan
-        z0 = np.asarray(Z[r0 + rr, cc])
-        take = (~isgap) & hand & np.isfinite(z1) & (z0 < z1 - dmr5g.PASSAGE_DROP)
-        fill1 = isgap & np.isfinite(z1)
-        rest = isgap & ~np.isfinite(z1)
+        fill1 = np.isfinite(z1)
+        rest = ~fill1
         z2 = np.full(len(rr), np.nan, np.float32)
         if rest.any():
             z2[rest] = grids.sample(E[rest].astype(np.float64), N[rest].astype(np.float64))
         fill2 = rest & np.isfinite(z2)
-        for m, v, L in ((take, z1, 1), (fill1, z1, 1), (fill2, z2, 2)):
+        for m, v, L in ((fill1, z1, 1), (fill2, z2, 2)):
             if m.any():
                 Z[r0 + rr[m], cc[m]] = v[m]
                 lev[r0 + rr[m], cc[m]] = (lev[r0 + rr[m], cc[m]] & ~np.uint8(LEVEL)) | np.uint8(L)
         out["dmr5g"] += int(fill1.sum())
         out["grids"] += int(fill2.sum())
-        out["passages"] += int(take.sum())
     return out
 
 
@@ -774,33 +758,6 @@ def needed_tiles(lev, origin, frame):
         for (a, b), k in zip(u.tolist(), n.tolist()):
             out[(a, b)] = out.get((a, b), 0) + k
     return out
-
-
-def passage_covers(frame, shape, origin, city):
-    """bool (rows, cols): cells within dmr5g.PASSAGE_R of an OSM passage inside the city."""
-    import dmr5g
-    import osm_local
-    import shapely
-    from shapely.geometry import LineString
-    ways = osm_local.ways(dmr5g.passage)
-    lines = []
-    for wy in ways:
-        x, y = frame.xy([g["lat"] for g in wy["geometry"]], [g["lon"] for g in wy["geometry"]])
-        lines.append(LineString(np.column_stack([x, y])))
-    polys = shapely.buffer(np.array(lines, dtype=object), dmr5g.PASSAGE_R)
-    polys = polys[shapely.intersects(polys, city)]
-    h, w = shape
-    out = np.zeros(shape, bool)
-    ox, oy = origin
-    for p in polys:
-        x0, y0, x1, y1 = p.bounds
-        c0, c1 = max(0, int(math.floor(x0 - ox))), min(w, int(math.ceil(x1 - ox)) + 1)
-        r0, r1 = max(0, int(math.floor(oy - y1))), min(h, int(math.ceil(oy - y0)) + 1)
-        if c0 >= c1 or r0 >= r1:
-            continue
-        gx, gy = np.meshgrid(ox + np.arange(c0, c1), oy - np.arange(r0, r1))
-        out[r0:r1, c0:c1] |= shapely.contains_xy(p, gx, gy)
-    return out, len(lines)
 
 
 # ---------------------------------------------------------------- the zero areas
@@ -884,14 +841,14 @@ def zero_areas(lev, origin, parts, b=32, small=0.01):
 
 def draw(path, lev, origin, city, parts, segs, areas, px=20):
     """The picture: IPR's ground grey (darker inside the city), the city limits and districts, the tracks, the cells
-    inside the city where IPR has no ground, coloured by what fills them, with the areas' numbers, and those where the
-    passages rule took DMR 5G. The legend lists what the picture shows."""
+    inside the city where IPR has no ground, coloured by what fills them, with the areas' numbers. The legend lists what
+    the picture shows."""
     from PIL import Image, ImageDraw, ImageFont
     h, w = lev.shape
     nby, nbx = -(-h // px), -(-w // px)
     img = np.full((nby, nbx, 3), 255, np.uint8)
     col = {0: (235, 235, 235), 4: (210, 210, 210), "dmr5g": (43, 108, 176), "grid": (221, 107, 32), "none": (197, 48, 48),
-           "out": (255, 205, 210), "passage": (128, 60, 160)}
+           "out": (255, 205, 210)}
     for by in range(nby):
         lv = np.asarray(lev[by * px:(by + 1) * px])
         if nbx * px > w:
@@ -905,7 +862,6 @@ def draw(path, lev, origin, city, parts, segs, areas, px=20):
         row[ground & (share_in <= 0.5)] = col[0]
         gap = ins & (kind != 0)
         row[(~ins & (kind != 0) & (kind != 2)).any((0, 2))] = col["out"]  # (0.00 m or under the floor outside: no ground)
-        row[(ins & (kind == 0) & (lvl == 1)).any((0, 2))] = col["passage"]
         for key, v in (("dmr5g", 1), ("grid", 2), ("none", 3)):
             row[(gap & (lvl == v)).any((0, 2))] = col[key]
     im = Image.fromarray(img)
@@ -934,8 +890,7 @@ def draw(path, lev, origin, city, parts, segs, areas, px=20):
     legend = [((235, 235, 235), "IPR ground outside the city"), ((210, 210, 210), "IPR ground inside the city"),
               (col["dmr5g"], "no IPR ground inside the city: DMR 5G fills it"),
               (col["grid"], "no IPR ground inside the city: a 10 m grid fills it"),
-              (col["none"], "no ground inside the city"), (col["out"], "IPR 0.00 m / under 170 m outside the city: no ground"),
-              (col["passage"], "IPR over a passage, under DMR 5G at hand: DMR 5G")]
+              (col["none"], "no ground inside the city"), (col["out"], "IPR 0.00 m / under 170 m outside the city: no ground")]
     legend = [(c, t) for c, t in legend if (img == c).all(2).any()] + [
         ((0, 0, 0), "city limits (OSM relation 435514)"), ((120, 120, 120), "districts"), ((40, 120, 40), "tram tracks (DI)")]
     if not areas and not (img == col["dmr5g"]).all(2).any():
@@ -1080,10 +1035,9 @@ def main(argv):
             t0 = time.perf_counter()
             city, parts_ = boundaries(F)
             lev[paint(city, shape, origin)] |= INSIDE
-            covers, npass = passage_covers(F, shape, origin, city)
             secs["boundaries"] = time.perf_counter() - t0
             print(f"city limits {city.area / 1e6:.2f} km², {sum(p[0] == 'district' for p in parts_)} districts, "
-                  f"{sum(p[0] == 'cadastral' for p in parts_)} cadastral areas, {npass} OSM passages, "
+                  f"{sum(p[0] == 'cadastral' for p in parts_)} cadastral areas, "
                   f"{secs['boundaries']:.0f} s", flush=True)
             need = needed_tiles(lev, origin, F)
             dem = dmr5g.Tiles(fetch="--fetch" in argv)
@@ -1099,8 +1053,7 @@ def main(argv):
                     print(f"  {n_ + 1}/{len(missing)} tiles downloaded", flush=True)
             t0 = time.perf_counter()
             grids = Grids(grid_paths)
-            fb = fallbacks(Z, lev, origin, F, dem, grids, covers)
-            del covers
+            fb = fallbacks(Z, lev, origin, F, dem, grids)
             secs["fallbacks"] = time.perf_counter() - t0
             print(f"fallbacks: {fb} in {secs['fallbacks']:.0f} s", flush=True)
             if dem.fetched:

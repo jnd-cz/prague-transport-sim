@@ -269,7 +269,9 @@ Sections:
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
   DMR 5G per line; a Bpv / EVRF2007 mix-up is 0.13 m). The fine 2 m blocks within 120 m of the tracks
   come from it (`tools/fine_terrain.py`, `?nofine`). It has no covers over passages (underpasses,
-  culverts: bare earth shows the passage); near OSM passages DMR 5G, which kept them, takes over.
+  culverts: bare earth shows the passage). Near OSM passages, the lines' fine blocks take DMR 5G, which kept the covers.
+  The city mesh keeps IPR (#428): a street or track over a passage is a deck in #276's partition. The rule also took
+  roofs, garages, building interiors and proposed tunnels (decision record 2026-11-05, "No passages rule").
 - **Terrain under 170 m is no ground** (`sources.TERRAIN_FLOOR`, read by every terrain source; the user,
   2026-11-09: "I would put lower limit to 170 metres height which is well below lowest point of Prague"). IPR's
   image (35,001 x 26,001 cells) holds 660,025,394 cells of 170.73-421.15 m and 250,035,607 of its declared

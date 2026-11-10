@@ -187,3 +187,17 @@ the machine cache by `tools/city_terrain.py` (#428; nothing in the game reads it
 | 500-1000 m | 1,324,496 | 14.1 / 52.1 / 83.2 |
 | 1-2 km | 477,763 | 28.8 / 104.3 / 166.0 |
 | over 2 km | 268,344 | 65.4 / 219.4 / 300.0 |
+
+**No passages rule in the city mesh** (the user, 2026-11-10: "I would lean towards keeping IPR lidar everywhere to keep
+the actual lowest points. Then bridge the gaps on streets and track/rail passes with other data including dmr5g showing
+the deck height. But we can keep the culvert passing under", then "point 1 yes"). IPR's ground stays everywhere: the
+floors of underpasses and culverts, and the streets through building passages. A street or track over a passage becomes
+a deck in #276's partition (step 3). Measured by `tools/bench/terrain_compare.py --passages` on the snapshot's 263 DMR 5G
+tiles, the rule (`fine_terrain.py`'s) took 161,164 cells inside the city:
+- **Under buildings:** for building passages, 89 % of the cells it took lay in OSM buildings. It raised the hidden ground
+  there by a median 1.5 m, up to 14 m, where both models only interpolate.
+- **Not a deck:** it took roofs (`covered=yes`) and garages (`layer<0`) as surfaces.
+- **No tunnel:** 9.6 % of its cells lay on proposed or disused ways.
+- **Where it was right:** only 26 % lay under a street, rail, footway or track, where the deck is needed.
+
+The first build above still had the rule.

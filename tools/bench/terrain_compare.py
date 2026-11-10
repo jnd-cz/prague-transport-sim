@@ -49,6 +49,34 @@ def mapy(lat, lon):
     return f"https://mapy.cz/letecka?x={lon:.6f}&y={lat:.6f}&z=19"
 
 
+def passage_covers(frame, shape, origin, city):
+    """bool (rows, cols): cells within dmr5g.PASSAGE_R of an OSM passage inside the city (the rule's reach; the city
+    mesh had it until the user dropped the rule there, 2026-11-10)."""
+    import dmr5g
+    import osm_local
+    import shapely
+    from shapely.geometry import LineString
+    ways = osm_local.ways(dmr5g.passage)
+    lines = []
+    for wy in ways:
+        x, y = frame.xy([g["lat"] for g in wy["geometry"]], [g["lon"] for g in wy["geometry"]])
+        lines.append(LineString(np.column_stack([x, y])))
+    polys = shapely.buffer(np.array(lines, dtype=object), dmr5g.PASSAGE_R)
+    polys = polys[shapely.intersects(polys, city)]
+    h, w = shape
+    out = np.zeros(shape, bool)
+    ox, oy = origin
+    for p in polys:
+        x0, y0, x1, y1 = p.bounds
+        c0, c1 = max(0, int(math.floor(x0 - ox))), min(w, int(math.ceil(x1 - ox)) + 1)
+        r0, r1 = max(0, int(math.floor(oy - y1))), min(h, int(math.ceil(oy - y0)) + 1)
+        if c0 >= c1 or r0 >= r1:
+            continue
+        gx, gy = np.meshgrid(ox + np.arange(c0, c1), oy - np.arange(r0, r1))
+        out[r0:r1, c0:c1] |= shapely.contains_xy(p, gx, gy)
+    return out, len(lines)
+
+
 def snapshot_tiles():
     """The DMR 5G tiles (ix, iy) the current snapshot holds."""
     sid = open(os.path.join(ROOT, "snapshots", "CURRENT"), encoding="utf-8").read().strip()
@@ -424,7 +452,7 @@ def audit():
     city, parts = ct.boundaries(F)
     ways = passages(F)
     print(f"{len(ways)} OSM passages, {len(allowed)} DMR 5G tiles in snapshot {sid}, {time.time() - t0:.0f} s", flush=True)
-    covers, _ = ct.passage_covers(F, shape, origin, city)
+    covers, _ = passage_covers(F, shape, origin, city)
     covers &= ct.paint(city, shape, origin)
     rows, cols = np.nonzero(covers)
     del covers
