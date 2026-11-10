@@ -152,8 +152,9 @@ it also reports missing rail samples and the independently mapped evidence for s
 ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
 The pages draw nothing (#411): a page takes ~2 cores instead of ~12, with the same counts. `--draw` draws
 once a second in software as before; `--gpu` puts the pages' WebGL on the machine's GPU. Tools that need
-pictures (`tools/shot.py`, the mirror's screenshots, `tools/frametime.py --headless`) draw on the GPU
-through `tools/gpu.py`, and fall back to SwiftShader, saying so, where there is none.
+pictures (`tools/shot.py`, the mirror's screenshots, `tools/frametime.py --headless`) and every page test
+(`tools/test_*.py`, `browser = gpu.launch(p)[0]`, #463) draw on the GPU through `tools/gpu.py`, and fall back to
+SwiftShader, saying so, where there is none.
 
 The harness verifies its own server before launching a job. An occupied `--port` fails without using
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
