@@ -42,7 +42,8 @@ queries.
    Test: `sftp tramdata` then `ls store` lists `sources` and `builds`.
 3. **Git identity** in the clone: `git config user.email "2506000+jnd-cz@users.noreply.github.com"`.
 4. **Python** 3.12+; the OSM tools need pyosmium (`python -m pip install --user osmium`) and run with
-   `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, Pillow;
+   `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, Pillow,
+   and `tools/city_terrain.py` pydelatin 0.4.0 (`python -m pip install --user pydelatin==0.4.0`);
    the headless checks need Playwright (`python -m pip install --user playwright`, then
    `python -m playwright install chromium`).
 5. **Machine cache** (optional; worth it from the second checkout on, e.g. several agents or worktrees):
@@ -253,7 +254,7 @@ ZPS street survey: public **JVF ZIPs**, catalogue, exact download provenance and
 The snapshot scanner includes them; the report reads the ZIPs directly, without unpacking or
 altering generated line data. [Access/licence distinction and measurements](docs/decisions/2026-10-27-track-source.md#district-acquisition-2026-10-30-61).
 The first acquisition is published in snapshot `2026-10-30` (#61), the state 2026-10-31 in `2026-11-03b` (#209); the
-old records it keeps beside their re-entries: [knowledge](docs/knowledge.md#sources-and-their-quirks).
+old records it keeps beside their re-entries: [knowledge](docs/knowledge.md#di-track-geometry).
 
 ### IPR 1 m terrain
 

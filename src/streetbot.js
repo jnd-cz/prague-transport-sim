@@ -20,7 +20,7 @@ import { carPose } from './traffic.js';
 
 const CAR_BAD = new Set(['sidewalk', 'island', 'platform', 'green', 'stairs', 'water']);
 const WALK_BAD = new Set(['road', 'tram', 'parking']);
-export const BOT_COLORS = {
+const BOT_COLORS = {
   kerb: '#ff3b30', sidewalk: '#ff9500', jump: '#af52de', tilt: '#ffcc00', float: '#34c759', sunk: '#007aff',
   gap: '#8e8e93', bumpy: '#ff2d55', crossing: '#c7c7cc', road: '#5ac8fa', 'walk-kerb': '#ff6b5e', 'walk-float': '#7be08f', 'walk-sunk': '#5fa8ff',
 };

@@ -6,15 +6,16 @@
   "rules": "reference: signal-not-in-platform is checked by tools/lint.js signalsInPlatforms, consist-coupled by consistAtStops; the facts themselves are not read",
   "places": "reference: places the user described, for the scenery and structure work",
   "notes": "reference",
-  "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, line_heights.py",
-  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
+  "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
+  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
   "trackStyles": "src/heights.js",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
-  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it"
+  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
+  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it"
  },
  "stops": [
   {
@@ -960,6 +961,21 @@
       ]
      }
     ]
+   },
+   {
+    "id": "curve-lateral-acceleration",
+    "value": 1.0,
+    "unit": "m/s²",
+    "scope": "the limit in a curve no sign sets: √((a + cant · g / 1.5) · R), in whole km/h; D 1/2 § 25.7 only asks for a speed that suits the curvature, and a curve under 25 m has small-radius-speed",
+    "basis": "the drivers' speeds on two GPS rides, chosen by the user",
+    "source": {
+     "document": "GPS rides on line 23: T3 6312 Královka to Bílá labuť, 2026-10-31; T3 6921 Pražský hrad to Bílá labuť, 2026-11-08 (raw/reference/rides/), mapped on the game's track: the unsigned curves of R 30-60 m taken at 1.2-1.6 m/s² without cant; the signed hairpin at Chotkovy sady (R 24 m, 15 km/h) at 12-17 km/h (#451)",
+     "year": 2026
+    },
+    "user": {
+     "source": "Claude Code session 2026-11-10 (#451)",
+     "quote": "If it's not defined in D1/2 then I guess it's only up to the driver to keep reasonable speed. [...] The 1.0m/s² would fit real world recording better together with less granular limit for unsigned curves."
+    }
    },
    {
     "id": "stop-pass-speed",
@@ -3164,6 +3180,227 @@
    {"osm": "way/679597859", "ref": "TS8170", "e": -742281, "n": -1043819},
    {"osm": "way/88598700", "ref": "TS7760", "e": -751045, "n": -1044498},
    {"osm": "way/90662133", "ref": "TS3110", "e": -738391, "n": -1045720}
+  ]
+ },
+ "surveyGround": {
+  "note": "The user's answers to the survey-ground review cards (reports/review/survey-ground-N.json): a ground-level survey area that sits steadily off IPR's 2023 lidar where neither DI's rails nor DMR 5G decide. verdict survey: the area keeps the survey's heights (the ground changed); lidar: it moves to IPR. Keyed by a point in the area; tools/survey_ground_answers.py writes the places from review mode's answers. heldRule decides such an area without an answer (tools/zps_ground.py held_verdict: a courtyard is OSM buildings within 60 m in 12 of 16 directions).",
+  "heldRule": {
+   "courtyard": "lidar",
+   "outsideGreen": "survey",
+   "outside": "lidar",
+   "said": "I went over them and most cases is courtyard where I can't see much detail in ortophoto, ground view is missing, I would go with lidar in these cases. Outside it's often elecated greenery and we can go with the survey there, so just two general rules.",
+   "where": "the user, #446 session of 2026-11-10 (PR #448), after answering the 19 cards; outside paved areas go to the lidar as all 3 of the user's answers did"
+  },
+  "places": [
+   {
+    "lat": 50.006752,
+    "lon": 14.450276,
+    "c": "green",
+    "m2": 119.0,
+    "verdict": "survey",
+    "line": "17",
+    "said": "The survey is right: the ground changed since the lidar",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "green, 119 m²: the survey +0.64 m off IPR (2023); DMR 5G +0.75 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.065443,
+    "lon": 14.302005,
+    "c": "green",
+    "m2": 108.0,
+    "verdict": "survey",
+    "line": "9",
+    "said": "The survey is right: the ground changed since the lidar (elevated greenery)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "green, 108 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.47 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.068174,
+    "lon": 14.354775,
+    "c": "paved",
+    "m2": 355.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it (unpaved mini island in the water)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "paved, 355 m²: the survey -0.98 m off IPR (2023); DMR 5G +1.04 m off IPR"
+   },
+   {
+    "lat": 50.069059,
+    "lon": 14.362801,
+    "c": "green",
+    "m2": 202.0,
+    "verdict": "survey",
+    "line": "9",
+    "said": "The survey is right: the ground changed since the lidar (elevated shrubbery)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "green, 202 m²: the survey -1.05 m off IPR (2023); DMR 5G +0.33 m off IPR"
+   },
+   {
+    "lat": 50.069645,
+    "lon": 14.467699,
+    "c": "sidewalk",
+    "m2": 107.0,
+    "verdict": "survey",
+    "line": "22",
+    "said": "The survey is right: the ground changed since the lidar",
+    "where": "review mode, 2026-11-10 (reports/reviews/line22.json, #446)",
+    "card": "sidewalk, 107 m²: the survey +1.59 m off IPR (2023); DMR 5G +0.88 m off IPR"
+   },
+   {
+    "lat": 50.071668,
+    "lon": 14.485149,
+    "c": "green",
+    "m2": 303.0,
+    "verdict": "survey",
+    "line": "22",
+    "said": "The survey is right: the ground changed since the lidar (bushes and general overgrown greenery)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line22.json, #446)",
+    "card": "green, 303 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.38 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.07619,
+    "lon": 14.455622,
+    "c": "green",
+    "m2": 104.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "green, 104 m²: the survey -0.71 m off IPR (2023); DMR 5G -0.41 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.079526,
+    "lon": 14.423559,
+    "c": "paved",
+    "m2": 471.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 471 m²: the survey +0.62 m off IPR (2023); DMR 5G +0.47 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.083255,
+    "lon": 14.41486,
+    "c": "green",
+    "m2": 307.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "green, 307 m²: the survey -0.52 m off IPR (2023); DMR 5G -0.33 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.08541,
+    "lon": 14.433227,
+    "c": "paved",
+    "m2": 289.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it (structure above ground can be seen in ortophoto)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 289 m²: the survey +1.28 m off IPR (2023); DMR 5G +1.82 m off IPR"
+   },
+   {
+    "lat": 50.086259,
+    "lon": 14.43016,
+    "c": "paved",
+    "m2": 197.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 197 m²: the survey -0.70 m off IPR (2023); DMR 5G -0.56 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.086612,
+    "lon": 14.414167,
+    "c": "paved",
+    "m2": 148.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "paved, 148 m²: the survey -0.91 m off IPR (2023); DMR 5G -0.94 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.089899,
+    "lon": 14.436984,
+    "c": "paved",
+    "m2": 132.0,
+    "verdict": "lidar",
+    "line": "23",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 132 m²: the survey -0.86 m off IPR (2023); DMR 5G -0.43 m off IPR"
+   },
+   {
+    "lat": 50.091148,
+    "lon": 14.418973,
+    "c": "green",
+    "m2": 530.0,
+    "verdict": "survey",
+    "line": "17",
+    "said": "The survey is right: the ground changed since the lidar (elevated greenery and shrubs)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "green, 530 m²: the survey +1.20 m off IPR (2023); DMR 5G +0.65 m off IPR"
+   },
+   {
+    "lat": 50.097449,
+    "lon": 14.434373,
+    "c": "paved",
+    "m2": 474.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "paved, 474 m²: the survey +6.07 m off IPR (2023); DMR 5G +0.70 m off IPR"
+   },
+   {
+    "lat": 50.099351,
+    "lon": 14.433835,
+    "c": "paved",
+    "m2": 116.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "paved, 116 m²: the survey +0.81 m off IPR (2023); DMR 5G +0.70 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.1017,
+    "lon": 14.473353,
+    "c": "green",
+    "m2": 463.0,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
+    "card": "green, 463 m²: the survey -0.50 m off IPR (2023); DMR 5G -0.40 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.10172,
+    "lon": 14.504463,
+    "c": "green",
+    "m2": 108.0,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
+    "card": "green, 108 m²: the survey +0.85 m off IPR (2023); DMR 5G +0.63 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.105578,
+    "lon": 14.535314,
+    "c": "green",
+    "m2": 102.0,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
+    "card": "green, 102 m²: the survey -0.58 m off IPR (2023); DMR 5G -0.58 m off IPR, with the survey"
+   }
   ]
  }
 }

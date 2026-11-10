@@ -2,8 +2,8 @@
 
 > Moved 2026-10-29 from the root (was ARCHITECTURE-PROPOSAL.md); the companions it names are in
 > [history/](history/). §§0–8 and 10 are the current design; its tasks are GitHub issues (see
-> [ROADMAP.md](../ROADMAP.md)). §9 is mostly done (the GitHub repository, worktrees, the data store with
-> `tools/snapshot.py` in place of `fetch_data.py`; CI: #222, #102). §11 is done and kept as history.
+> [ROADMAP.md](../ROADMAP.md)). §9 is done and now says what replaced its proposal. §11 is done and kept
+> as history.
 
 Written in the remote session (2026-10-24) for the original project, after a long stretch of work on
 line 17: performance, signals, traffic, pedestrians, weather and OSM data. The companions are
@@ -159,52 +159,27 @@ Each step keeps the game playable, and the benches show whether it still behaves
 
 ## 9. Working from several computers and with several agents
 
-### Repository and data
-- **Put the repository on a private remote** (GitHub or GitLab; or a bare repository on a NAS or
-  server reachable by SSH). Everything goes in: `src/`, `tools/`, benches, docs, launch configs.
-  This session started from a partial deployment copy with no tools and no history: that is the
-  failure to avoid.
-- **Large and raw data outside the code history:**
-  - `raw/` (OSM caches, DTM, GTFS) and generated `data/*.bin`/`*.json` either in Git LFS, or in a
-    shared store (cloud drive, NAS, S3-like bucket);
-  - a committed `data/MANIFEST.json` with file, size, sha256, source and date;
-  - a `tools/fetch_data.py` that downloads or verifies against the manifest;
-  - generated files are reproducible from `raw/` plus the tools, so the manifest also records which
-    tool version built them.
-- **The deployment** is built from a tag, never edited in place. A deployed copy can be traced to its
-  commit if a file `VERSION` carries the commit hash.
+This section proposed a private remote, Git LFS or a shared store for the data, a `tools/fetch_data.py`
+and a `VERSION` file. What replaced them (2026-11-09):
 
-### Branches and reviews
-- `main` always passes the benches. Every task goes on its own branch (`feature/…`, `fix/…`, `data/…`)
-  and is merged by pull request, even when working alone: the PR is where the bench results and
-  screenshots go.
-- **One task, one branch, one agent.** Parallel agents work in separate **git worktrees** (Claude
-  Code can make them), each on its own branch, so they never edit the same checkout.
-- Split work so parallel tasks touch different files. Today `game.js` and `traffic.js` are hotspots
-  that collide; the module split in §4 helps here as much as for design.
+- **Repository:** GitHub, `jnd-cz/prague-transport-sim`. Tasks are its issues, grouped by milestone
+  ([ROADMAP.md](../ROADMAP.md)).
+- **Data:** outside the code history, in a private data store.
+  - `raw/` comes from pinned source snapshots and `data/` from published builds, both fetched by
+    `tools/snapshot.py`.
+  - `data/MANIFEST.json` is committed and names the build `main` uses.
+  - A machine cache shares the files between checkouts.
 
-### CI
-On every push and PR:
-- the type check;
-- a quick lint (syntax and unused code);
-- the benches on line 17, seeds 1–3, with the thresholds from the handoff doc §4.2;
-- a nightly longer run (more seeds, all lines) posting a report.
-
-This needs the headless core (§4) or Playwright with Chromium in CI. Until then, run
-`tools/bench/batch.html` on any machine.
-
-### Instructions for agents (`CLAUDE.md` at the repository root)
-- how to serve (the no-cache server), the test lines (17 first), and how to run the benches with
-  their expected results;
-- conventions: comment density, naming, every heuristic with its "why" and the place it was seen
-  (line, s, seed);
-- rules:
-  - never edit generated data by hand;
-  - the shared geo module for coordinates;
-  - log every heuristic's decisions to the console;
-- a **handoff convention:** a session that cannot commit (like this remote one) writes a
-  `REMOTE-CHANGES.md`-style log with files, reasons and results. The receiving session applies it on a
-  branch, runs the benches and merges.
+  [DATA.md](../DATA.md) has the details.
+- **Deployment:** `tools/autodeploy.py` deploys `main` after a merge, and `version.json` carries the
+  commit ([DEVELOPING.md](../DEVELOPING.md)).
+- **Branches and agents:** one issue, one branch, one worktree. PRs are squash-merged on the user's word.
+  `tools/board.py` shows who works where and which files clash. The hotspots are measured at each
+  checkpoint's review (#291).
+- **CI:** `.github/workflows/tests.yml` runs the tests that need no data, plus `ruff`. The headless
+  checks run on the dev PC: the nightly baseline and the checkpoints. CI for them is #102, the type
+  check #4.
+- **Instructions for agents:** [AGENTS.md](../AGENTS.md), which `CLAUDE.md` includes.
 
 ## 10. Ground truth: an annotation editor that scores the rules
 

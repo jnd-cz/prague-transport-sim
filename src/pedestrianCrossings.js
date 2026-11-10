@@ -35,7 +35,7 @@ export function pedestrianShape(x, y, ux, uy, area) {
   return along && across ? { along, across } : null;
 }
 
-export function crossingSpan(x, y, ux, uy, area) {
+function crossingSpan(x, y, ux, uy, area) {
   const shape = pedestrianShape(x, y, ux, uy, area);
   if (!shape) return null;
   const { along, across } = shape;

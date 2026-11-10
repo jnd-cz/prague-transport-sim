@@ -1,6 +1,6 @@
 # Tatra T3 — Prague trams
 
-**English** · [Česky](README.md) · [For developers](DEVELOPING.md)
+**English** · [Česky](README.md) · [For developers](DEVELOPING.md) · [Your own vehicles](docs/vehicles.md)
 
 Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
 and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
@@ -64,6 +64,9 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
 | `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |
 | `Z` | right mirror on and off |
+| `,` / `.` | indicators left / right (again: off); given before a turn at a junction and at a stop where passengers cross a car lane (right, from braking into it until pulling away) |
+| `/` (on a Czech keyboard `-`) | hazard lights |
+| `L` | high beams: held, a flash; with `Shift`, on and off |
 | `V` | cab or outside view |
 | `O` | autopilot on and off |
 | `M` | sound on and off |
@@ -195,7 +198,11 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
-  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one.
+  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one, with the
+  dimensions and livery of the T3's general-arrangement drawing, no saloon and no moving parts, the lightest
+  to draw. With it the other trams run as T3 (a silver bumper with red stripes), T3SUCS and T3M sets (the T3M
+  with the resistors' box on its roof and its green route display), each type as often as its range of fleet
+  numbers is long.
 
 ### On a phone or tablet
 
@@ -205,7 +212,7 @@ device). They send the keyboard's keys:
 - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
-- ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating,
+- ⋯ for the rest: indicators ⇦ ⇨, hazard lights ⚠, high beams (a flash held, on and off), park (advanced controls), switch contact, switch iron, heating cut-out, heating,
   autopilot, sound, ⚑ report.
 
 On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
@@ -218,7 +225,8 @@ equipment work the pedals as a careful driver (the advanced model: pulls away on
 step by step, into a stop on one curve and without going back to the drive pedal unless a tram stands ahead,
 parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
 slippery rail, and under contacts draws current for a turn (the switch button when slow enough, otherwise a short pulse of
-the drive pedal) or coasts (straight). Press **V** for
+the drive pedal) or coasts (straight), and indicates before a turn at a junction and at stops where passengers cross a car
+lane. Press **V** for
 the outside view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the
 menu; O hands back to the autopilot.
 

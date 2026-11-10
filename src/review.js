@@ -1083,7 +1083,7 @@ function band(pts, w, dz) {
 // Picked on line 17 (Křižovnická, a 12-way junction, Výstaviště, Belárie) against a global stretch,
 // unsharp masking, a high-pass and Sobel edges: edges outlined the paving's texture and gave each rail two
 // lines; a rail is a thin dark line, not a step.
-export function orthoLook(img, metres, { contrast = false, lines = false } = {}) {
+function orthoLook(img, metres, { contrast = false, lines = false } = {}) {
   const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, n = w * h, pm = w / metres;
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;

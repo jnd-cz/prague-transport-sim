@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-11-08r",
- "built_at_commit": "030c614",
- "published": "2026-11-09 16:41",
- "note": "#407: platforms from PID and OSM, lines 9, 17, 22, 23, 37",
+ "snapshot": "2026-11-10",
+ "built_at_commit": "2b1c3b0",
+ "published": "2026-11-10 13:29",
+ "note": "lines 9, 17, 22, 23, 37 survey (dtm.json): the same areas, the record names every answer (#446)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "13743b62c7a658868db745968f5db2f092d585465fd200703ee6e26d6f769220"
   },
   "line17.dtm.json": {
-   "size": 9335366,
-   "sha256": "732c380fab374caab5041954dc8a23c3ede4dfbb16eed6c0e3cc2efe46553399"
+   "size": 9353440,
+   "sha256": "9a3ab5f21bbf030380fc4a7c06d292fca9cf2450a40a271275806224f0eacbee"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -57,8 +57,8 @@
    "sha256": "99ca7460fb8a5d58420bc15686dd8e14f24bc5c3d5935467bbb61ecb2ccc01f7"
   },
   "line22.dtm.json": {
-   "size": 9507730,
-   "sha256": "7d5852da0d1b349558f1dca241a7922645c7a46a24698c0affff65dc5cd253f1"
+   "size": 9546904,
+   "sha256": "0d576bedffea92009abdde5c2ce8e5f62125e4329d748416134c620dcf003015"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -97,8 +97,8 @@
    "sha256": "b5dad79231566c0fe831d2e23228f52f121e16ed31890921dde0c17524032570"
   },
   "line23.dtm.json": {
-   "size": 4317511,
-   "sha256": "2b83d46318a6b911438f8962d0522fc3d259db6d07028aa1f7c620c4921b33e5"
+   "size": 4342964,
+   "sha256": "a8f573ecbdc7cfa75677ba7c8554a37eb139d88b6b6d4551d0c697fb663276ac"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -137,8 +137,8 @@
    "sha256": "613e7bccc8fb1359390afd8a1e677e39550fe85b08acbd0cb9cdbf722e5d3446"
   },
   "line37.dtm.json": {
-   "size": 4682047,
-   "sha256": "3799f10bbbc7557b26b7d086cb7152bc545d09221fc446a462a934e8ccfd6aa6"
+   "size": 4689193,
+   "sha256": "657c43fbcd3a94f316178416575a1e1576341ddccdab7804ca19f5eb768b4c50"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -177,8 +177,8 @@
    "sha256": "d3aaddf6b8adff92ba6ac18efe23a625bed5d3f94e11aabac03437c43ca0ad15"
   },
   "line9.dtm.json": {
-   "size": 9578218,
-   "sha256": "25c2eebfc3229131b2334b8e5d044279175cc435aa7520baa4dae81d22a48663"
+   "size": 9587726,
+   "sha256": "e8ad8f1a1354865ed040cd71cb19823a358fbc16f91181702536cc9346c01b02"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,

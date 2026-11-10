@@ -1,5 +1,6 @@
 // Route geometry along the line: arc-length parameterised polyline in local metres
 // (x = east, y = north). Three.js world uses (x, height, -y).
+import { SMALL_RADIUS } from './speedSigns.js';
 
 // Resample a polyline every `step` metres of its arc length and smooth it with a Gaussian
 // window (the window shrinks symmetrically at the ends, so end points stay put). OSM draws
@@ -99,7 +100,7 @@ export function extendAlongTracks(tracks, pts, len = 60) {
 // piece.
 export const SURVEYED = new Set(['di', 'dtmp']);
 export const SMOOTH = 6, AS_SURVEYED = 0.1, AS_CURVED = 0;
-export function radiusAlong(ranges, offset = 0, curved = false) {
+function radiusAlong(ranges, offset = 0, curved = false) {
   if (curved) return AS_CURVED;
   if (!ranges?.length) return SMOOTH;
   return (s) => {
@@ -109,7 +110,8 @@ export function radiusAlong(ranges, offset = 0, curved = false) {
   };
 }
 
-// curve speeds: comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m)
+// the cant's layout: the comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m); the limit in a curve
+// takes the route's `curveAccel` (_designSpeed)
 const A_LAT = 0.8, CANT_MAX = 0.1;
 // m a curve's limit starts before the radius asks for it: the 16 m estimate reads a curve's start late (its full radius
 // about 12 m in, where the transition is short), and the limit is for the front going in
@@ -327,31 +329,37 @@ export class Route {
   // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
   rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
 
-  // Speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral acceleration A_LAT plus what
-  // the cant takes. With full cant, the speed the track was laid out for (prepareCant): 50 in streets, 60 on dedicated
-  // track, however it is signed. Otherwise the limit: never above the posted speed, which stands for the sign, nor
-  // the car's top speed (`speedTop`), and 50 without a posted speed (`max-speed`: more needs a Rychlostník, also off the
-  // road). No curve alone asks for less than `curveFloor`: 15 km/h over the whole of a curve under 25 m
-  // (`small-radius-speed`), while the formula gave 10 at R 20.
-  _designSpeed(s, r, fullCant, cant = 0) {
+  // Speed a curve of radius r allows (km/h) with the given cant credit. With full cant, the speed the track was laid out
+  // for (prepareCant: unbalanced A_LAT plus the cant), in 5 km/h: 50 in streets, 60 on dedicated track, however it is
+  // signed. Otherwise the limit, in whole km/h, as no sign stands at such a curve: unbalanced `curveAccel`
+  // (`curve-lateral-acceleration`) plus what the cant takes. The drivers of two line 23 rides took the unsigned curves of
+  // R 30-60 m at 1.2-1.6 m/s², where 0.8 and the 5 km/h steps held the autopilot 6-14 km/h under them (#451). Never above
+  // the posted speed, which stands for the sign, nor the car's top speed (`speedTop`), and 50 without a posted speed
+  // (`max-speed`: more needs a Rychlostník, also off the road). A curve under SMALL_RADIUS has its sign: `curveFloor`,
+  // 15 km/h over the whole of it (`small-radius-speed`).
+  _designSpeed(s, r, fullCant, cant = 0, accel = this.curveAccel) {
     const { osm, dedicated } = this._speedInfo(s);
-    const a = A_LAT + (fullCant ? (dedicated ? CANT_MAX : 0) : cant) * 9.81 / 1.5;
-    const v = Math.floor((Math.sqrt(a * r) * 3.6) / 5) * 5;
-    if (fullCant) return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), v));
+    if (fullCant) {
+      const vd = Math.floor((Math.sqrt((A_LAT + (dedicated ? CANT_MAX : 0) * 9.81 / 1.5) * r) * 3.6) / 5) * 5;
+      return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), vd));
+    }
+    const floor = this.curveFloor ?? 10;
+    const v = r < SMALL_RADIUS ? floor : Math.max(floor, Math.floor(Math.sqrt(((accel ?? A_LAT) + cant * 9.81 / 1.5) * r) * 3.6));
     const cap = osm ? Math.min(osm, this.speedTop ?? osm) : 50;
-    return Math.min(cap, Math.max(this.curveFloor ?? 10, v));
+    return Math.min(cap, v);
   }
 
   // speed the curve at s allows (km/h), with the cant actually built there
-  curveSpeed(s) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s)); }
+  curveSpeed(s, accel = this.curveAccel) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s), accel); }
 
   // Speed limits (km/h) to the metre: the curve and the posted speed (curveSpeed), `past` metres on from where they ask
   // for it (`restriction-past`: 15 m on until #211, from 5 m bins) and CURVE_AHEAD before, plus the extra restrictions,
-  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs).
-  speedLimits(extra = [], past = 0) {
+  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs). `accel`: the curves' unbalanced
+  // lateral acceleration, the route's own unless the autopilot asks for its milder curves (#242).
+  speedLimits(extra = [], past = 0, accel = this.curveAccel) {
     const step = 5, metres = Math.ceil(this.length) + 1;
     const curve = new Float32Array(metres);
-    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m);
+    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m, accel);
     const base = new Float32Array(metres);
     for (let m = 0; m < metres; m++) {
       let v = 99;

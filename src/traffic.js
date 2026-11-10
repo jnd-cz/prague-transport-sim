@@ -4,9 +4,10 @@
 // instead of popping.
 import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
-import { makeCar, makeCrowd, makeT3, placeConsist, makeTrafficLights, makePedLights, disposeModel } from './models.js';
+import { makeCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel } from './models.js';
 import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
-import { poseHybrid, setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
+import { setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
+import { junctionTurns, indicating } from './indicators.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 import { aiLineCurrent } from './electric.js';
 
@@ -58,27 +59,41 @@ function stopDistance(v, state) {
   return state === 'warn' ? (v * v) / 1.8 + v * 2 + 1 : (v * v) / 2.6 + v + 0.5;
 }
 
+// Seconds an AI tram at v takes to bring its front `d` m on, braking on its curve (0.7 m/s², as limitSpeed) to vEnd there, and no
+// faster than now (one that would still speed up gets there sooner: the count errs towards stopping)
+function timeTo(d, v, vEnd) {
+  let t = 0;
+  for (let x = 0.5; x < d; x += 1) t += 1 / Math.max(0.5, Math.min(Math.max(v, 0.5), Math.sqrt(vEnd * vEnd + 2 * 0.7 * (d - x))));
+  return t;
+}
+
 // The speed (m/s) an AI tram may run at s: the limit under the whole set, and every lower limit ahead
 // reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
 // stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
 // until it turned red (line 17 s 10826).
+// AI trams run AI_UNDER m/s under it, as our autopilot catching up (#242; the user, 2026-11-10: "keep them simply driving swiftly up
+// under the given speed limit"); the oncoming trams ran at 0.85 of it.
+const AI_UNDER = 0.2;
 function limitSpeed(lim, s, len) {
   let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
   for (let d = 5; d < 300; d += 5) v = Math.min(v, Math.sqrt((lim.at(s + d) / 3.6) ** 2 + 2 * 0.7 * Math.max(0, d - 5)));
   return v;
 }
 
-function setOpacity(obj, a) {
+export function setOpacity(obj, a) {
   obj.visible = a > 0.01;
   obj.traverse((o) => {
     const m = o.material;
     if (!m) return;
-    // (glass keeps its own opacity: userData.opacity, src/t3h.js)
+    // (glass keeps its own opacity: userData.opacity, src/t3h.js. A material blended from the start
+    // stays blended: the hybrid's fleet numbers are a decal on a clear canvas, whose clear pixels drew
+    // black once the faded-in tram went opaque)
     const base = m.userData.opacity ?? 1;
+    m.userData.blend ??= m.transparent;
     m.userData.fade = a;
-    m.transparent = a < 0.999 || base < 1;
+    m.transparent = a < 0.999 || base < 1 || m.userData.blend;
     m.opacity = a * base;
-    m.depthWrite = a > 0.5 && base === 1;
+    m.depthWrite = a > 0.5 && base === 1 && !m.userData.blend;
   });
 }
 
@@ -296,7 +311,11 @@ export class Traffic {
     // where oncoming trams stop: the front at the far end of their own platform (game.platforms of the
     // back route: OSM shapes, GTFS positions). Mapped from our stop point they stopped 8 m into theirs:
     // our platform's far end is near the start of theirs (user: "they stop just before the stop instead
-    // of running to its end"). Our stop mapped across stays the fallback where they have no platform.
+    // of running to its end"). Only there: our stop mapped across, the fallback where they had no platform within
+    // 30 m, stopped them opposite our stop sign with doors open, a second stop where theirs is staggered 27-141 m
+    // away (42 of the 49 such points on the five lines) and one where PID has none for them (the user, 2026-11-09:
+    // "ai trams from other direction still seem to stop and open door at our direction's stops but a bit past the
+    // stop sign"). Our stops with no platform of the same name for them: noOppositeStop (lint).
     // (on their right: the T3's doors; not at a platform no tram stops at, `unused`, #407)
     // (overlapping platforms of one stop, OSM and GTFS, are one stretch: two stop points in one platform
     // stopped the tram twice, Kobylisy 951 and 1012)
@@ -304,11 +323,39 @@ export class Traffic {
     const runs = [];
     for (const [a, b] of backPl) if (runs.length && a < runs[runs.length - 1][1] + 10) runs[runs.length - 1][1] = Math.max(runs[runs.length - 1][1], b); else runs.push([a, b]);
     const ends = runs.map(([, b]) => b - 1);
-    this.backStops = this.back ? [...ends, ...game.stops.map((st) => {
-      const o = route.offset(st.target, 3.2);
-      const n = this.back.nearestOnHeading(o.x, o.y, -o.hx, -o.hy);
-      return n && n.d < 30 && !runs.some(([a, b]) => n.s + 8 > a - 30 && n.s + 8 < b + 30) ? n.s + 8 : null;
-    }).filter((s) => s !== null)].sort((a, b) => a - b) : [];
+    this.backStops = this.back ? ends : [];
+    // what AI trams show (#436, drawing only): the junction turns along our route, where they indicate; the stops
+    // where passengers cross a car lane (ours: Vienna-type, theirs: a platform with a kerb), where they indicate
+    // right; the stops' names in order, for a T3M's side display
+    this.lampWays = {
+      ahead: { turns: junctionTurns(route, game.data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target),
+        stops: game.stops.map((st) => ({ s: st.target, name: st.name })) },
+      back: { turns: [], kerb: [], stops: [] },
+    };
+    if (this.back) {
+      const pl = (game.platforms || []).filter((q) => q.back && q.rt === this.back && q.side < 0 && !q.unused).sort((a, b) => a.s1 - b.s1);
+      Object.assign(this.lampWays.back, { kerb: pl.filter((q) => q.kerb != null).map((q) => q.s1 - 1), stops: pl.map((q) => ({ s: q.s1 - 1, name: q.name })) });
+    }
+    const backNames = new Set((game.platforms || []).filter((p) => p.back && p.rt === this.back && p.side < 0 && !p.unused).map((p) => p.name));
+    this.noOppositeStop = this.back ? game.stops.filter((st) => !backNames.has(st.name)).map((st) => ({ stop: st.name, s: st.target })) : [];
+    // a junction's stop line for oncoming trams (backCross − 6, in update) inside a platform: the point lay up to 1.7 m past
+    // the line, and a tram pulling in as the signal turned red rolled over it to reach the point (line 37 s 4688, line 9
+    // s 5409, #385). A line up to 10 m before the point moves it to 3 m before the line, where a red stops it anyway, if
+    // the front is still 10 m into the platform there (a door at it); otherwise it stays and is listed as kept. Each one in
+    // platformCaps (lint). (A line further back, inside a long platform, is left to the red and dilemma rules below: one
+    // 41-52 m before the end of an 83 m platform at Přístaviště and Nádraží Modřany on line 17, where the tram passes it
+    // at speed, the phase held for it.)
+    this.platformCaps = [];
+    const lines = (game.signals || []).filter((g) => g.backCross !== undefined).map((g) => ({ sig: Math.round(g.s), line: g.backCross - 6 }));
+    this.backStops = this.backStops.map((p) => {
+      const piece = backPl.filter(([a, b]) => p >= a && p <= b).sort((x, y) => y[0] - x[0])[0];
+      const from = piece ? piece[0] : p - 10;
+      const L = lines.filter((x) => x.line > Math.max(from, p - 10) && x.line - 3 < p).sort((a, b) => a.line - b.line)[0];
+      if (!L) return p;
+      const to = L.line - 3, moved = to >= from + 10;
+      this.platformCaps.push({ s: p, to: moved ? to : null, line: L.line, sig: L.sig, platform: !!piece });
+      return moved ? to : p;
+    }).sort((a, b) => a - b);
     // other lines that really serve this route's stops (from GTFS)
     const other = new Set();
     const mine = new Set((game.segments || []).map((g) => g.line));
@@ -1540,15 +1587,23 @@ export class Traffic {
   _placeTram(t, route, s, profileZ, dt = 0) {
     placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p), route.rollAt(q)]; });
     const u = t.mesh.userData;
+    // the lamps (#436): the brake lamps while it slows or stands, the indicators at junction turns and stops where
+    // passengers cross a car lane (blinking out of step with the others'); a T3M's side display its next stop
+    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
+    t.vWas = t.v;
+    const way = this.lampWays[route === this.route ? 'ahead' : 'back'];
+    const lamps = { braking, indicate: indicating(way.turns, way.kerb, s, t.v, braking), clock: this.game.clock + 0.17 * (t.id % 4) };
+    if (u.kind === 'simple') {
+      poseT3(t.mesh, lamps);
+      if (u.variant === 'T3M') setNextStop(t.mesh, way.stops.find((st) => st.s > s - 2)?.name ?? null);
+    }
     if (!u.hybrid) return;
     // the detailed model: its full level near the camera; the doors open while it dwells at a stop (shut
-    // 2 s before it leaves, 2 s to move); the brake lamps while it slows or stands
+    // 2 s before it leaves, 2 s to move); its lamps as above (posed on the full level only)
     const c = u.cars[0].position, d = this.cam ? Math.hypot(c.x - this.cam[0], -c.z - this.cam[1]) : 0;
     setHybridLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
     t.doorU = Math.max(0, Math.min(1, (t.doorU ?? 0) + ((t.dwell ?? 0) > 2 ? dt : -dt) / 2));
-    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
-    t.vWas = t.v;
-    if (u.level === 'full') poseHybrid(t.mesh, { doors: t.doorU, braking });
+    if (u.level === 'full') poseT3(t.mesh, { doors: t.doorU, ...lamps });
   }
 
   // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it
@@ -1630,7 +1685,7 @@ export class Traffic {
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = limitSpeed(g.limits, t.s, t.length);
+      let vt = Math.max(0, limitSpeed(g.limits, t.s, t.length) - AI_UNDER);
       const close = t.s - t.length - tram.s < 300; // (our tram closing in)
       let stopAt = null;
       t.waitFor = null; t.stop = null;
@@ -1651,6 +1706,14 @@ export class Traffic {
         // already past "3 m before the signal": it stays as long as it is before the head itself)
         const d = sig.s - 3 - t.s;
         if ((d > 0 && d > stopDistance(t.v, sig.state)) || (t.v < 0.5 && t.s < sig.s - 0.3)) t.redStops.add(sig);
+        // (too close to stop comfortably for a blinking GO, it goes on only if it is there while the GO lasts: the rest of the blinking
+        // and what the controller can still hold for it. Slowing for a junction's 15 km/h past the signal, one took 12 s from 91 m out
+        // at 44 km/h, past the 10 s hold, and ran the red 1.4 s late, line 17 seed 5; 11 s at line 22 s 4211, #394. Not there in
+        // time and able to stop on full service braking, it stops)
+        else if (sig.state === 'warn' && d > 0 && d > stopDistance(t.v, 'stop')) {
+          const vSig = Math.min(limitSpeed(g.limits, sig.s, t.length) - AI_UNDER, stopAt !== null && stopAt > sig.s ? Math.sqrt(1.8 * Math.max(0, stopAt - 0.5 - sig.s)) : Infinity);
+          if (timeTo(sig.s - t.s, t.v, Math.max(0, vSig)) + 1 > (sig.timer ?? 0) + (sig.aheadHoldLeft ?? 0)) t.redStops.add(sig);
+        }
         if (t.redStops.has(sig)) stop(sig.s - 3, 'signal');
         else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
       }
@@ -1729,9 +1792,9 @@ export class Traffic {
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };
     for (const sig of this.game.signals) sig.backCommitted = false; // (set again below, read by the controller)
     for (const t of this.oncoming) {
-      let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
+      let vt = Math.max(0, limitSpeed(this.backLimits, t.s, t.length) - AI_UNDER);
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
-      const isStop = stopAt !== null;
+      const isStop = stopAt !== null, platformAt = stopAt;
       t.waitFor = null; t.stop = stopAt === null ? null : { s: stopAt, why: 'stop' };
       const stop = (s, why, who = null) => { if (s < (stopAt ?? Infinity)) { stopAt = s; t.stop = { s, why }; t.waitFor = who; } };
       for (const c of this.carsOnBack || []) if (c.s > t.s) stop(c.s - 2.5 - 4, 'car on track', c.car);
@@ -1752,7 +1815,10 @@ export class Traffic {
         // or just starting can always stay)
         if (d > 0 && d < 150 && (d > stopDistance(t.v, sig.backState) || t.v < 0.5)) t.redStops.add(sig);
         if (t.redStops.has(sig)) { if (d > -1) stop(line - 3, 'signal'); } // a little before the line
-        else if (d > 0 && d < 150 && sig.backState === 'warn') sig.backCommitted = true;
+        // (not a tram that stops at its platform before the line anyway: the controller held the green up to 10 s for it, line 37
+        // holds 1.6 → 4.6 a run once #385 put three platform points just before their lines. Behind a car it may still be committed:
+        // the car can move on)
+        else if (d > 0 && d < 150 && sig.backState === 'warn' && !(isStop && platformAt < line)) sig.backCommitted = true;
       }
       for (const G of gauntlets) {
         if (t.s > G.b0 && t.s - t.length < G.b1) G.theirs.occupied = true;

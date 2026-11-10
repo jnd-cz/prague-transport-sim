@@ -11,12 +11,12 @@
 // forward, +Y up, +Z right, origin on the rail plane midway between the bogies; the game's cars face +Z.
 import * as THREE from 'three';
 import { T3, CAR_PITCH } from './tram.js';
+import { beamsMesh } from './lamps.js';
 
 export const T3H_FILES = ['assets/t3h/tatra-t3-hybrid-nc.glb', 'assets/t3h/rig.json'];
 export const T3H_CREDIT = 'Tatra T3 3D model: hybrid of "Tatra T3" by SimonStrikesBack (sketchfab.com, CC BY 4.0) '
   + 'and "Tatra T3" by Jakub Vaja (conflig) (sketchfab.com, CC BY-NC 4.0), modified; CC BY-NC 4.0.';
 
-const HALF = T3.length / 2;     // the coupler head's face from the car centre
 const PLANE = CAR_PITCH / 2;    // the plane two coupled heads meet in, from the car centre
 // saloon materials: the seats, their frames and the grab rails, the ceiling and its lamps, the cab desk
 const INSIDE = new Set(['Handles', 'Control_Panel', 'Red_Seat', 'Blue_Seat', 'Leather', 'Material',
@@ -81,7 +81,9 @@ export async function loadHybridT3(responses, contact) {
     if (o.isMesh && !mover && !o.children.length) return;
     const c = o.isMesh && mover ? new THREE.Mesh(o.geometry, o.material) : new THREE.Group();
     c.name = o.name;
-    o.matrix.decompose(c.position, c.quaternion, c.scale);
+    // (the node's own transform, not its matrix decomposed: the lamps' glows are stored off at scale 0, whose
+    // matrix decomposes to a NaN rotation, and they never drew)
+    c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale);
     copy.get(o.parent).add(c);
     copy.set(o, c);
   });
@@ -116,7 +118,9 @@ export async function loadHybridT3(responses, contact) {
     if (textured || cards.has(o.name)) {
       const key = `${f.uuid}|${m.uuid}`;
       if (!kept.has(key)) kept.set(key, { f, m, geos: [], name: o.name });
-      kept.get(key).geos.push(o.geometry.clone().applyMatrix4(M));
+      const g = o.geometry.clone().applyMatrix4(M);
+      if (rig.numberPlates.includes(o.name)) fleetSize(g);
+      kept.get(key).geos.push(g);
       stats.kept++;
       return;
     }
@@ -234,8 +238,38 @@ export async function loadHybridT3(responses, contact) {
   }
   mixer.stopAllAction(); mixer.uncacheRoot(template);
   const bogie = T3.bogies / 2;
-  proto = { template, light, rig, clips: gl.animations, bogie, stats };
+  // the headlights (one emissive mesh across the front, lit always: the user, 2026-11-10, #436): their centres in the
+  // car's frame for the high beams' glow (the asset's (x, y, z) is the car's (-z, y, x))
+  let heads = [];
+  template.traverse((o) => {
+    if (heads.length || !o.isMesh || !o.name.startsWith('White_Emission')) return;
+    const b = box(o.geometry), r = (b.max.y - b.min.y) / 2, y = (b.min.y + b.max.y) / 2;
+    heads = [b.min.z + r, b.max.z - r].map((z) => [-z, y, b.max.x + 0.01]);
+  });
+  proto = { template, light, rig, clips: gl.animations, bogie, stats, heads, tails: tailLamps(template, mergeGeometries) };
   return proto;
+}
+
+// The tail lamps, which the asset has not: two red lamps on the rear panel 0.47 m either side of the middle (the
+// user, 2026-11-10, #436: "the two red lamps on the rear panel the tail lamps", as on the built-in car), 0.2 x 0.07 m,
+// their foot 2 cm over the bumper. The bumper's top found by rays from behind (it stands out of the panel), the panel
+// where a ray meets it; a geometry in the car's frame (the asset's (x, y, z) is the car's (-z, y, x)), or null.
+function tailLamps(template, mergeGeometries) {
+  const body = [];
+  template.traverse((o) => { if (o.isMesh && o.parent === template && !o.material.transparent) body.push(o); }); // (the car's own parts, not the glass)
+  const ray = new THREE.Raycaster(), back = (y) => {
+    ray.set(new THREE.Vector3(-20, y, 0.47), new THREE.Vector3(1, 0, 0));
+    return ray.intersectObjects(body, false)[0]?.point.x ?? null;
+  };
+  const panel = back(1.15);
+  if (panel === null) return null;
+  let top = null;
+  for (let y = 0.7; y < 1.15; y += 0.005) { const x = back(y); if (x !== null && x < panel - 0.02) top = y; }
+  if (top === null) return null;
+  const y = top + 0.02 + 0.035, x = back(y) ?? panel;
+  const g = mergeGeometries([-1, 1].map((sd) => new THREE.BoxGeometry(0.2, 0.07, 0.02).translate(sd * 0.47, y, x - 0.008)));
+  g.userData.shared = true;
+  return g;
 }
 
 // the collector clip's position (0..1) for a contact height over the rail
@@ -312,10 +346,24 @@ function runTexture(run) {
   x.fillStyle = '#fffdf4'; x.font = 'bold 390px Arial, sans-serif'; x.fillText(String(run ?? ''), 192, 234, 344);
   return texture(c);
 }
+// The fleet numbers' digits 0.14 m tall on every side (the user, 2026-11-10: "fix the hybrid's fleet number size";
+// src/t3simple.js FLEET has the photos' measurements). The asset's quads, under one texture, are 0.19 m tall on the
+// ends and 0.23 m on the sides, so its digits were 0.106 and 0.13 m: the texture's digits fill FLEET_FILL of its
+// height whatever the font, and each quad is scaled about its centre to FLEET_H / FLEET_FILL.
+const FLEET_H = 0.14, FLEET_FILL = 132 / 192;
+function fleetSize(g) {
+  g.computeBoundingBox();
+  const b = g.boundingBox, c = b.getCenter(new THREE.Vector3()), k = FLEET_H / FLEET_FILL / (b.max.y - b.min.y);
+  g.translate(-c.x, -c.y, -c.z).scale(k, k, k).translate(c.x, c.y, c.z);
+}
 function fleetTexture(n) {
   const [c, x] = canvas(512, 192);
   const t = String(n);
-  x.fillStyle = '#e3b625'; x.font = `bold ${Math.min(152, 600 / t.length)}px Arial, sans-serif`; x.fillText(t, 256, 103, 490);
+  x.fillStyle = '#e3b625'; x.font = 'bold 100px Arial, sans-serif';
+  const m = x.measureText(t), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+  const k = (FLEET_FILL * 192) / (A + D), kx = Math.min(k, 480 / (L + R));
+  x.setTransform(kx, 0, 0, k, 256 - (kx * (R - L)) / 2, 96 - (k * (D - A)) / 2);
+  x.fillText(t, 0, 0);
   return texture(c);
 }
 const setMap = (m, tex) => { if (!m || m.map === tex) return; if (m.map && !m.map.userData.shared && m.userData.own) m.map.dispose(); m.map = tex; m.userData.own = !tex.userData.shared; m.needsUpdate = true; };
@@ -362,10 +410,20 @@ export function makeHybridSet(root, line, cars, dest, run, collector) {
       wheels: rig.wheels.map((w) => ({ node: n(w.name), r: w.radius })),
       couplers: [n('T3H_coupler_front'), n('T3H_coupler_rear')],
       brakes: (rig.brakes || []).map(n).filter(Boolean),
+      signals: { left: rig.signals.left.map(n).filter(Boolean), right: rig.signals.right.map(n).filter(Boolean) }, lit: { left: false, right: false },
       full: r, light: l, plates: {},
     };
     const cr = car.userData.rig;
     for (const b of cr.bogies) b.node?.traverse((o) => { if (o.name === 'T3H_shoe') b.shoes.push(o); });
+    car.userData.gear = gear(cr);
+    // the high beams' glow over the leading car's headlights (src/lamps.js); the tail lamps, lit on the set's last car
+    // (lit on every car: "in between cars only the rear red lights light up"; at twice its colour, as the built-in car's)
+    if (k === 0 && proto.heads.length) { car.userData.beams = beamsMesh(proto.heads); car.add(car.userData.beams); }
+    if (proto.tails) {
+      const tail = new THREE.Mesh(proto.tails, new THREE.MeshBasicMaterial({ color: new THREE.Color('#d8261a').multiplyScalar(2), toneMapped: false }));
+      tail.name = 'T3H_tail';
+      car.add(tail);
+    }
     // the cards: the route plates on every car (the front one shows on the leading car, the rear one on the
     // last), the destination and run number in the leading car only
     cr.plates = {
@@ -402,9 +460,9 @@ export function setHybridLine(model, line, dest = model.userData.dest, run = mod
 
 // The mechanisms from the game's state, each only when it changes: doors (0 closed .. 1 open), the
 // collector's contact height over the rail, the brake lamps, the track-brake magnets (0 off, 1 the rear
-// bogies', 2 all).
-export function poseHybrid(model, { doors, collector, braking, track } = {}) {
-  for (const car of model.userData.cars) {
+// bogies', 2 all), the indicators' sides lit now (`signals`: { left, right }), the high beams.
+export function poseHybrid(model, { doors, collector, braking, track, signals, highBeam } = {}) {
+  model.userData.cars.forEach((car) => {
     const r = car.userData.rig;
     let scrub = false;
     if (doors !== undefined && Math.abs(doors - r.doors) > 1e-3) {
@@ -419,12 +477,14 @@ export function poseHybrid(model, { doors, collector, braking, track } = {}) {
     }
     if (scrub) r.mixer.update(0);
     if (braking !== undefined && braking !== r.braking) { r.braking = braking; for (const b of r.brakes) b.visible = braking; }
+    if (signals !== undefined) for (const s of ['left', 'right']) if (!!signals[s] !== r.lit[s]) { r.lit[s] = !!signals[s]; for (const g of r.signals[s]) g.visible = r.lit[s]; }
+    if (highBeam !== undefined && car.userData.beams) car.userData.beams.visible = !!highBeam;
     if (track !== undefined && track !== r.track) {
       r.track = track;
       // (the rear bogie's magnets first, ČKD [ckd24] p. 16; src/tr37.js trackAngles)
       for (const b of r.bogies) for (const s of b.shoes) s.position.y = (track >= 2 || (track === 1 && !b.front)) ? -s.userData.drop : 0;
     }
-  }
+  });
 }
 
 // The level a set is drawn at: 'full', or 'light' (no saloon, doors shut, everything merged; for AI trams
@@ -438,73 +498,23 @@ export function setHybridLevel(model, level) {
 export const FULL_IN = 50, FULL_OUT = 60; // m from the camera: AI trams' full level (the saloon through the windows)
 
 // ------------------------------------------------------------------------------------------ running
-const v3 = () => new THREE.Vector3();
-const A = v3(), B = v3(), F = v3(), Q = v3(), qi = new THREE.Quaternion();
-// A car's pose from the track: on its two bogie pivots, as the procedural and the earlier model (at(s) ->
-// [x, y, height, roll]); its bogies turn to the chord between their own axles, its wheels roll.
-function placeCar(car, c, at, bogie, wheelS) {
-  const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
-  car.position.set((ax + bx) / 2, (za + zb) / 2, -(ay + by) / 2);
-  car.rotation.y = Math.atan2(ax - bx, -(ay - by));
-  car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
-  car.rotation.z = -(ra + rb) / 2;
-  const r = car.userData.rig;
-  if (!r || !r.full.visible) return; // (the lighter level has them merged)
-  for (const b of r.bogies) {
-    if (!b.node) continue;
-    const s = c + (b.front ? bogie : -bogie), [px, py] = at(s + 0.91), [qx, qy] = at(s - 0.91);
-    let d = Math.atan2(px - qx, -(py - qy)) - car.rotation.y;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    b.node.rotation.y = d;
-  }
-  for (const w of r.wheels) if (w.node) w.node.rotation.z = -wheelS / w.r;
-}
-
-// a point of a car in world coordinates from its local (x left, y up, z forward)
-const carPoint = (car, x, y, z, out) => { car.updateMatrix(); return out.set(x, y, z).applyMatrix4(car.matrix); };
-
-// Each car of a set on the track. The first stands with its front coupler face at sFront; each next one
-// hangs on the coupling: the two coupled bars are one stiff link from pin to pin (the Prague head's two
-// pins, #248), so the next car stands where its front pin is that link's length from the car ahead's rear
-// pin, a few cm closer along the track in a curve than on the straight.
-export function placeHybridConsist(model, sFront, at, pitch = CAR_PITCH) {
-  const { cars, bogie } = model.userData, pin = T3.couplerPivot, link = pitch - 2 * pin;
-  const y = cars[0].userData.rig?.couplers[1]?.position.y ?? 0; // (the pins' height in the car: the link runs between them)
-  let c = sFront - HALF;
-  cars.forEach((car, k) => {
-    if (k > 0) {
-      const prev = cars[k - 1];
-      carPoint(prev, 0, y, -pin, A);
-      // the next car's centre along the track: two secant steps from the straight-track pitch
-      let c2 = c - pitch;
-      for (let i = 0; i < 3; i++) {
-        placeCar(car, c2, at, bogie, sFront);
-        carPoint(car, 0, y, pin, B);
-        const err = A.distanceTo(B) - link;
-        if (Math.abs(err) < 1e-4) break;
-        c2 += err;
-      }
-      c = c2;
-    }
-    placeCar(car, c, at, bogie, sFront);
-  });
-  // the couplers: coupled ones along the link, the free ones at the set's ends straight ahead
-  for (const car of cars) for (const bar of car.userData.rig.couplers) if (bar) bar.rotation.set(0, 0, 0);
-  cars.forEach((car, k) => {
-    const rear = car.userData.rig.couplers[1];
-    if (k === cars.length - 1 || !rear) return;
-    const next = cars[k + 1], nf = next.userData.rig.couplers[0];
-    carPoint(car, 0, y, -pin, A); carPoint(next, 0, y, pin, B);
-    F.subVectors(B, A); // from this car's rear pin to the next one's front pin, in the world
-    for (const [cc, bar, sign] of [[car, rear, -1], [next, nf, 1]]) {
-      if (!bar) continue;
-      Q.copy(F).multiplyScalar(-sign).applyQuaternion(qi.copy(cc.quaternion).invert()); // into the car's frame
-      // (the rig frame: +X = the car's forward (z), +Z = its right (-x)); the bar points along sign*X
-      const fx = Q.z, rz = -Q.x;
+// A car's running gear for src/consist.js (hangConsist places the cars): its bogies' and wheels' nodes, the
+// coupler bars' pivots. The rig's frame: +X the car's forward (z), +Z its right (-x).
+function gear(r) {
+  return {
+    axle: 0.91, pinY: r.couplers[1]?.position.y ?? 0,
+    live: () => r.full.visible, // (the lighter level has them merged)
+    turn(i, d) { for (const b of r.bogies) if (b.node && b.front === (i === 0)) b.node.rotation.y = d; },
+    roll(s) { for (const w of r.wheels) if (w.node) w.node.rotation.z = -s / w.r; },
+    swing(i, q) {
+      const bar = r.couplers[i];
+      if (!bar) return;
+      if (!q) { bar.rotation.set(0, 0, 0); return; }
+      // the bar points along sign*X; up and down too (held along its car, each head rode on that car's pitch
+      // and the two stepped against each other by cm where the track changes its grade between the cars, #356)
+      const sign = i === 0 ? 1 : -1, fx = q.z, rz = -q.x;
       bar.rotation.y = sign > 0 ? Math.atan2(-rz, fx) : Math.atan2(rz, -fx);
-      // (up and down too: held along its car, each head rode on that car's pitch and the two stepped against
-      // each other by cm where the track changes its grade between the cars, #356)
-      bar.rotation.z = sign * Math.atan2(Q.y, Math.hypot(fx, rz));
-    }
-  });
+      bar.rotation.z = sign * Math.atan2(q.y, Math.hypot(fx, rz));
+    },
+  };
 }

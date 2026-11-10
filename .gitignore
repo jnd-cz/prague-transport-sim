@@ -48,3 +48,6 @@ reports/autodeploy.*
 
 # the review directory's index (tools/review_sets.py; tools/deploy.py builds it at each deploy, #288)
 reports/review/index.json
+
+# tools/city_terrain.py: its report and picture (the mesh is in the machine cache)
+reports/city-terrain/

@@ -164,5 +164,59 @@ GLB with quantisation was compared on this mesh and lost by 17 % after brotli: [
 
 ## What it changes
 
-Nothing yet: the benches in `tools/bench/` (they need `pydelatin` and `pyfqmr`). The build tool and the page's loading
-follow in #276, after #237 (the ground is built on the track it corrects).
+The benches in `tools/bench/` (they need `pydelatin` and `pyfqmr`), and the city's terrain mesh, built offline into
+the machine cache by `tools/city_terrain.py` (#428; nothing in the game reads it yet). The page's loading follows in
+#276.
+
+**The city mesh as built** (#428, 2026-11-10; IPR's raster, DI's 335 km of track; the whole city in 13 min, 15.0 GB):
+16,646,113 triangles, no cell over its tolerance. Two changes to section 1, both measured:
+- **(z − base) / tol(d), not z / tol(d):** the base is the ground smoothed over ~1 km. Divided by a tol that grows with
+  d, the heights themselves bend even a plane, and the mesher spends triangles on the bend. On a 3 × 3 km box by line 17
+  the base gives 1,475,219 triangles against 1,600,628 (120-500 m: 640,119 against 753,103), and 0.14 % of the cells
+  over their tolerance after pydelatin against 0.51 %. The city: 16,496,105 triangles from pydelatin against the
+  bench's 18,314,418 (17,733,132 without its tiles with no data).
+- **The second pass inserts cells, it does not mesh again:** each triangle with a cell over its tolerance takes its
+  worst cell as a vertex (split in three, or in four with its neighbour on an edge). The city: 1,513,496 cells over
+  (0.23 %) after pydelatin, 76,391 vertices added in 17 rounds.
+
+| from the tracks | triangles | error mean / p99 / max (cm) |
+|---|---|---|
+| 0-10 m | 511,551 | 2.4 / 8.7 / 10.0 |
+| 10-120 m | 6,611,342 | 2.4 / 8.9 / 10.0 |
+| 120-500 m | 7,452,617 | 5.8 / 25.0 / 41.7 |
+| 500-1000 m | 1,324,496 | 14.1 / 52.1 / 83.2 |
+| 1-2 km | 477,763 | 28.8 / 104.3 / 166.0 |
+| over 2 km | 268,344 | 65.4 / 219.4 / 300.0 |
+
+**No passages rule in the city mesh** (the user, 2026-11-10: "I would lean towards keeping IPR lidar everywhere to keep
+the actual lowest points. Then bridge the gaps on streets and track/rail passes with other data including dmr5g showing
+the deck height. But we can keep the culvert passing under", then "point 1 yes"). IPR's ground stays everywhere: the
+floors of underpasses and culverts, and the streets through building passages. A street or track over a passage becomes
+a deck in #276's partition (step 3). Measured by `tools/bench/terrain_compare.py --passages` on the snapshot's 263 DMR 5G
+tiles, the rule (`fine_terrain.py`'s) took 161,164 cells inside the city:
+- **Under buildings:** for building passages, 89 % of the cells it took lay in OSM buildings. It raised the hidden ground
+  there by a median 1.5 m, up to 14 m, where both models only interpolate.
+- **Not a deck:** it took roofs (`covered=yes`) and garages (`layer<0`) as surfaces.
+- **No tunnel:** 9.6 % of its cells lay on proposed or disused ways.
+- **Where it was right:** only 26 % lay under a street, rail, footway or track, where the deck is needed.
+
+The first build above still had the rule. Without it, the city has 16,566,821 triangles (79,292 fewer). The bands'
+errors are the same to 0.1 cm, and the build took 807 s with a 14.8 GB peak.
+
+**Fields keep IPR** (the user, 2026-11-10: "5 yes"). Where the 2023 lidar read crops as ground (0.79 km² of the 198 km²
+of fields, over 1 m above DMR 5G), the city mesh keeps IPR: the fields lie far from the tracks, where the mesh's
+tolerance grows to 0.4-3 m.
+
+**Bridges and decks stand on the ground, they are not part of it** (the user, 2026-11-10: "Agree with the base layer and
+building decks and bridges on top of it, makes sense"). The fused ground stays one surface per point: the bare earth
+and what lies on it at grade. Anything with something under it (a bridge, the deck over an underpass such as
+Divadelní's, a culvert's deck) is a structure on top of it:
+- **Its top:** the survey's level 1, checked against Mosty 3D or the track profile, flat over the opening (#445).
+- **Its body:** Mosty 3D's model where there is one (#13, #54, W4). Elsewhere a slab 1 m thick, thinner where the way
+  under it carries `maxheight`: the gap − `maxheight` − 0.1 m (the user: "0.1 margin is fine. Good point about using
+  the osm height for tunnel/covered features"). Divadelní: `maxheight=4.4`, gap 5.26 m, slab 0.76 m.
+- **Its ends:** they meet the ground's streets at the abutments (T4's weld); the ramps up to them are IPR's ground.
+- **When:** W3 carries the deck tops and the slab, since the trams cross them and the city mesh keeps the floor under
+  them; W4 the models.
+
+IPR is bare earth under bridges already, so the city mesh needs no cut and does not change when a structure does.

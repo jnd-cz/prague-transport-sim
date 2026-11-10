@@ -63,7 +63,7 @@ async () => {
 
 SPEED_RULES = r"""
 async () => {
-  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, stopPassPoints, FROG } = await import('/src/speedRules.js');
+  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, stopPassPoints, FROG, derailRisk, DERAIL } = await import('/src/speedRules.js');
   const { signFacts } = await import('/src/speedSigns.js');
   const { Route } = await import('/src/route.js');
   const truth = await (await fetch('/data/truth.json')).json();
@@ -86,7 +86,8 @@ async () => {
     const lim = route.speedLimits([], past);
     let lowest = 99, last = 0, top = 0;
     for (let m = 150; m < 330; m++) lowest = Math.min(lowest, lim.at(m));
-    for (let m = 150; m < 330; m++) { if (lim.at(m) === lowest) last = m; if (lim.at(m) < 50) top = m; }
+    // (the curve's own speed to within 1 km/h: in whole km/h since #451, the 16 m estimate eases it off over the curve's last metres)
+    for (let m = 150; m < 330; m++) { if (lim.at(m) <= lowest + 1) last = m; if (lim.at(m) < 50) top = m; }
     return { lowest, last, top };
   };
   const ladder = route.speedLimits([{ from: 100, to: 110, v: 15 }], 2);
@@ -108,6 +109,22 @@ async () => {
     ownDropped: own(fill([50, 19], [15, 4], [50, 5]), work),
     farKept: own(fill([50, 40], [15, 2], [50, 5]), { trailing: [], crossings: [] }),
     withoutWork: own(fill([50, 19], [15, 4], [50, 5]), null),
+    // a curve's limit by its radius as the game sets the route up (#451), and the speed a dedicated curve's cant is laid out for
+    curve: (() => {
+      const ds = (r, osm = 0, cant = 0) => Route.prototype._designSpeed.call({ _speedInfo: () => ({ osm, dedicated: false }), curveFloor: facts.smallRadius,
+        curveAccel: facts.curveAccel, speedTop: 65 }, 0, r, false, cant);
+      return { r54: ds(54), r30: ds(30), r25: ds(25), r24: ds(24), posted20: ds(54, 20), canted: ds(54, 0, 0.05), open: ds(1000), posted60: ds(1000, 60),
+        cantLayout: Route.prototype._designSpeed.call({ _speedInfo: () => ({ osm: 0, dedicated: true }) }, 0, 54, true) };
+    })(),
+    // derailment: R 54 m at 39 and 40 km/h, the same with 100 mm of cant, a 15 km/h switch at 100-110 m under the front or the rear
+    derail: (() => {
+      const lim = { restriction: (x) => (x >= 100 && x <= 110 ? 15 : 99) };
+      const curve = (R, cant = 0) => ({ radiusAt: () => R, cantAt: () => cant }), straight = curve(1e6);
+      return { at39: derailRisk(curve(54), lim, 500, 15, 39 / 3.6), at40: derailRisk(curve(54), lim, 500, 15, 40 / 3.6),
+        canted: derailRisk(curve(54, 0.1), lim, 500, 15, 40 / 3.6), switch22: derailRisk(straight, lim, 105, 15, 22 / 3.6),
+        switch23: derailRisk(straight, lim, 105, 15, 23 / 3.6), rear: derailRisk(straight, lim, 120, 15, 23 / 3.6),
+        past: derailRisk(straight, lim, 130, 15, 23 / 3.6), DERAIL };
+    })(),
   };
 }
 """
@@ -260,7 +277,7 @@ def check_rules(r):
     want("R07 at the press release's speeds", [(w["straight"], w["diverging"]) for w in r["signs"]["speedSwitches"]][:1], [(50, 35)])
     want("Trojská's dangerous gradient", [(g["from"], g["to"], g["descending"], g["permille"]) for g in r["signs"]["gradients"]], [("Hercovka", "Nad Trojou", True, 80)])
     want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
-                                         "past": 0, "loop": 15, "stopPass": 30, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
+                                         "past": 0, "loop": 15, "stopPass": 30, "curveAccel": 1.0, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
     if "no value" not in (r["missing"] or ""):
         f.append(f"a missing fact must stop the game: {r['missing']}")
     want("switches from the blades to the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"], "v": 15}])
@@ -291,6 +308,14 @@ def check_rules(r):
     want("OSM's 15 at a switch is the switch's own", r["ownDropped"], [50] * 19 + [0] * 4 + [50] * 5)
     want("a 15 elsewhere stays", r["farKept"], [50] * 40 + [15] * 2 + [50] * 5)
     want("without the line's trackwork OSM's 15 stays", r["withoutWork"], [50] * 19 + [15] * 4 + [50] * 5)
+    c = r["curve"]
+    want("an unsigned curve at 1.0 m/s² in whole km/h, 15 under R 25 m, under the posted speed and the cant's credit (#451)",
+         [c["r54"], c["r30"], c["r25"], c["r24"], c["posted20"], c["canted"], c["open"], c["posted60"]], [26, 19, 18, 15, 20, 30, 50, 60])
+    want("the cant is laid out as before, in 5 km/h", c["cantLayout"], 30)
+    d = r["derail"]
+    want("derailment: over 2.25 m/s² in a curve, less the cant, or 1.5 times a switch's 15 under any part of the tram",
+         [d["at39"], d["at40"], d["canted"], d["switch22"], d["switch23"], d["rear"], d["past"]], [None, "curve", None, None, "trackwork", "trackwork", None])
+    want("for a second on end", d["DERAIL"]["secs"], 1)
     return f
 
 

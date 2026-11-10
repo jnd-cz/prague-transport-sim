@@ -81,7 +81,7 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packages):
+pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
 
 | step | writes | what |
 |---|---|---|
@@ -94,11 +94,18 @@ pyosmium, pyproj, shapely, numpy, Pillow and brotli live in the user site packag
 | `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
-| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS) with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
 
 Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
 profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
+
+**The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
+1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
+cell over its tolerance. It is no line step: the mesh goes into the machine cache
+(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and code), not `data/`, and nothing in the game reads
+it yet. A heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a
+picture of the city limits go to `reports/city-terrain/`.
 
 ## Deploy
 
@@ -237,6 +244,12 @@ their levels and height-accuracy classes); the JSON report retains their vertice
 Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
 in a separate checkout of that reference; comparisons never restore over the working data.
 
+**The limits against real rides** (#451): `python -P -E tools/rides_limits.py --lines 22,23` maps the GPS rides in
+`raw/reference/rides/` (`RIDES`, the ones in a line's direction) onto each line's track and lists where a ride went
+more than 3 km/h over our limit for 10 m or more, with what sets the limit there, and per stretch a quickest run at our
+limits and at them raised to the ride. It needs `raw/` (`snapshot.py fetch`) and starts its own server. On line 22 the
+two-car set keeps a limit 15 m longer than the rides' single T3, so it lists more places there.
+
 **Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
 **I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
 overlay is hidden and the mouse moves the camera: **orbit** around the tram or **fly** (C; Shift faster, wheel = flying speed). PgDn / PgUp
@@ -316,6 +329,13 @@ directory show it answered where the page holds no answer under that decision's 
 Proposals stay separate from approved height evidence;
 the [height fallback decision](docs/decisions/2026-10-30-track-height-fallback.md) gives the calibration,
 reproduction commands and `--evidence` format.
+`?line=37&review=reports/review/survey-ground-37.json` lists the survey's ground-level areas that sit steadily off
+IPR's lidar where neither DI's rails nor DMR 5G say which is right (#446): `tools/dtm.py` writes the set per line
+(`tools/zps_ground.py`) and deletes it when nothing is held. `python -I tools/survey_ground_answers.py
+reports/reviews/line37.json` turns the answers that are a card's option into `data/truth.json` `surveyGround.places`,
+which the next `dtm.py` obeys; others stay held. An area without an answer takes the user's rule
+(`surveyGround.heldRule`: courtyards to the lidar, greenery outside to the survey), so a set appears only without it. `python -P -E tools/bench/survey_ground.py` measures every line's
+ground level against IPR and the rails (`--dtm DIR` for main's copies).
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
@@ -363,7 +383,8 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   Mosty 3D sets the deck height on tagged bridges.
 - **Outdoor temperature:** Prague now comes from Open-Meteo, hourly.
 - **Tram models:** `assets/t3h/LICENSE.txt`, `assets/t3/LICENSE.txt`, the second car's coupling #248;
-  `ASSETS.md` lists them.
+  `ASSETS.md` lists them. How a model plugs into the game, the tiers of movement, and adding or changing one:
+  [docs/vehicles.md](docs/vehicles.md) (in Czech [docs/vehicles.cs.md](docs/vehicles.cs.md)).
 - **The autopilot** drives like the headless test bot: the same driver lives in `src/autopilot.js` and is
   used by `tools/autopilot.js`.
 - **Language:** strings live in `src/i18n.js`. The player's guide is `README.md` in Czech and `README.en.md`

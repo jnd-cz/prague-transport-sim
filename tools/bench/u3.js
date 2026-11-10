@@ -96,7 +96,7 @@ export async function run(seed = 1, opts = {}) {
         // (a trail of our tram near signals: s, v, the next signal's state, t, ext; every 0.5 s)
         if (R.steps % 15 === 0) {
           const nx = game.signals.find((x) => x.s > tr.s - 1);
-          if (nx && nx.s - tr.s < 120) { (R.trail ||= []).push(`${Math.round(game.clock)} s${Math.round(tr.s)} v${tr.v.toFixed(1)} ${Math.round(nx.s)}:${nx.state} t${nx.t?.toFixed(1) ?? (nx.gauntlet ? "gauntlet" : "-")} x${nx.ext?.toFixed(1) ?? "-"}${nx.backCommitted ? ' B' : ''}${nx.aheadCommitted ? ' A' : ''}`); if (R.trail.length > 40) R.trail.shift(); }
+          if (nx && nx.s - tr.s < 120) { (R.trail ||= []).push(`${Math.round(game.clock)} s${Math.round(tr.s)} v${tr.v.toFixed(1)} ${Math.round(nx.s)}:${nx.state} t${nx.t?.toFixed(1) ?? (nx.gauntlet ? "gauntlet" : "-")} x${nx.ext?.toFixed(1) ?? "-"}${nx.backCommitted ? ' B' : ''} P${game.pilot?.goThrough === nx ? 'go' : game.pilot?.stopFor === nx ? 'stop' : '-'}:${game.pilot?.stopWhy ?? '-'}@${game.pilot?.stopAtS == null ? '-' : Math.round(game.pilot.stopAtS)} n${tr.notch} a${tr.a.toFixed(2)}${nx.aheadCommitted ? ' A' : ''}`); if (R.trail.length > 40) R.trail.shift(); }
         }
         for (const c of traffic.cars) if (c.active && c.yielding && c.xing && Math.abs(c.xing.sx - tr.s) < 150) {
           yielded.add(c.id);

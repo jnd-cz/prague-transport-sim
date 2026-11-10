@@ -1,6 +1,6 @@
 # Tatra T3 — pražské tramvaje
 
-**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md)
+**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md) · [Vlastní vozidla](docs/vehicles.cs.md)
 
 Řízení tramvaje Tatra T3 v 3D Praze postavené ze skutečných dat, na linkách 9, 17, 22, 23 a 37 (linky 17
 a 22 se zaměřenými ulicemi): OpenStreetMap (kolejová síť, silnice, zeleň), Digitální technická mapa Prahy
@@ -63,6 +63,9 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
+| `,` / `.` | směrovky vlevo / vpravo (znovu: vypnout); dávají se před odbočením na křižovatce a v zastávce, kde cestující přecházejí jízdní pruh (vpravo, od brzdění do rozjezdu) |
+| `/` (na české klávesnici `-`) | výstražná světla |
+| `L` | dálková světla: držením problik, se `Shift` zapnout a vypnout |
 | `V` | pohled ze stanoviště řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
@@ -190,7 +193,10 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 - Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
-  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý.
+  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý, s rozměry a nátěrem podle
+  typového výkresu T3, bez interiéru a nehybný, nejlehčí na výkon. S ním jezdí cizí soupravy jako T3 (stříbrný
+  nárazník s červenými proužky), T3SUCS i T3M (T3M s bednou odporníků na střeše a zeleným číslem linky), každý typ
+  tak často, jak dlouhá je jeho řada evidenčních čísel.
 
 ### Na telefonu nebo tabletu
 
@@ -200,7 +206,7 @@ zařízení). Posílají klávesy klávesnice:
 - řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
+- ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 
 Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
@@ -212,7 +218,8 @@ omezení, zastávek, návěstidel, překážek a tramvaje před sebou, volí sí
 ovládat šlapky jako pečlivý řidič (pokročilý model: na rovině rozjíždí na stupních 1–3, brzdí po stupních, do zastávky
 jednou křivkou a bez návratu na jízdní šlapku, pokud před ním nestojí tramvaj, ve stání zabrzdí zajišťovací brzdou, stupně
 1–4 jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty odebírá proud
-pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně).
+pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně),
+dává směrovky před odbočením na křižovatce a v zastávkách, kde cestující přecházejí jízdní pruh.
 Klávesou **V** přepnete na pohled zvenku. Řízení převezme
 kterákoli klávesa kontroléru nebo dveří (W/S/mezerník/N/D/R, 0–5), v ovládání zvoleném v menu; O je předá zpět
 autopilotu.
