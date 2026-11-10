@@ -202,3 +202,21 @@ tiles, the rule (`fine_terrain.py`'s) took 161,164 cells inside the city:
 
 The first build above still had the rule. Without it, the city has 16,566,821 triangles (79,292 fewer). The bands'
 errors are the same to 0.1 cm, and the build took 807 s with a 14.8 GB peak.
+
+**Fields keep IPR** (the user, 2026-11-10: "5 yes"). Where the 2023 lidar read crops as ground (0.79 km² of the 198 km²
+of fields, over 1 m above DMR 5G), the city mesh keeps IPR: the fields lie far from the tracks, where the mesh's
+tolerance grows to 0.4-3 m.
+
+**Bridges and decks stand on the ground, they are not part of it** (the user, 2026-11-10: "Agree with the base layer and
+building decks and bridges on top of it, makes sense"). The fused ground stays one surface per point: the bare earth
+and what lies on it at grade. Anything with something under it (a bridge, the deck over an underpass such as
+Divadelní's, a culvert's deck) is a structure on top of it:
+- **Its top:** the survey's level 1, checked against Mosty 3D or the track profile, flat over the opening (#445).
+- **Its body:** Mosty 3D's model where there is one (#13, #54, W4). Elsewhere a slab 1 m thick, thinner where the way
+  under it carries `maxheight`: the gap − `maxheight` − 0.1 m (the user: "0.1 margin is fine. Good point about using
+  the osm height for tunnel/covered features"). Divadelní: `maxheight=4.4`, gap 5.26 m, slab 0.76 m.
+- **Its ends:** they meet the ground's streets at the abutments (T4's weld); the ramps up to them are IPR's ground.
+- **When:** W3 carries the deck tops and the slab, since the trams cross them and the city mesh keeps the floor under
+  them; W4 the models.
+
+IPR is bare earth under bridges already, so the city mesh needs no cut and does not change when a structure does.
