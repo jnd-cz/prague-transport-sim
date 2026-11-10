@@ -76,6 +76,7 @@ const DICT = {
     'k.pause': 'pause',
     'tb.stop': 'STOP', 'tb.doors': 'Doors', 'tb.bell': 'Bell', 'tb.sand': 'Sand', 'tb.view': 'View', 'tb.mirror': 'Mirror',
     'tb.switch': 'Switch', 'tb.park': 'Park', 'tb.iron': 'Iron', 'tb.cutout': 'Heat cut', 'tb.saloon': 'Saloon heat', 'tb.cab': 'Cab heat', 'tb.flap': 'Flap',
+    'tb.flash': 'Flash', 'tb.beam': 'High beam',
     'tb.auto': 'Autopilot', 'tb.mute': 'Sound', 'tb.deadman': 'Dead-man', 'tb.on': 'on-screen controls: on', 'tb.off': 'on-screen controls: off',
     'help': 'W/S pedals · 1–5 / Shift+1–5 steps · R park · Space emergency · A sand · D doors · B bell · Q/E look · Z mirror · H/K/F heating · C cut-out · X switch iron · , . indicators · / hazard · L high beams · V view · O autopilot · P pause',
     // HUD
@@ -225,6 +226,7 @@ const DICT = {
     'k.pause': 'pauza',
     'tb.stop': 'STOP', 'tb.doors': 'Dveře', 'tb.bell': 'Zvonec', 'tb.sand': 'Písek', 'tb.view': 'Pohled', 'tb.mirror': 'Zrcátko',
     'tb.switch': 'Výhybka', 'tb.park': 'Zajišť. br.', 'tb.iron': 'Stav. klíč', 'tb.cutout': 'Odp. topení', 'tb.saloon': 'Topení', 'tb.cab': 'Kalorifer', 'tb.flap': 'Klapka',
+    'tb.flash': 'Problik', 'tb.beam': 'Dálková',
     'tb.auto': 'Autopilot', 'tb.mute': 'Zvuk', 'tb.deadman': 'Bdělost', 'tb.on': 'ovládání na obrazovce: zapnout', 'tb.off': 'ovládání na obrazovce: vypnout',
     'help': 'W/S šlapky · 1–5 / Shift+1–5 stupně · R zajišťovací brzda · mezerník nouzová brzda · A písek · D dveře · B zvonec · Q/E rozhlédnout · Z zrcátko · H/K/F topení · C odpojit topení · X stavěcí klíč · , . směrovky · - výstražná světla · L dálková · V pohled · O autopilot · P pauza',
     'hud.points': 'bodů',

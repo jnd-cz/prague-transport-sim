@@ -628,8 +628,9 @@ window.addEventListener('keydown', (e) => {
     case 'v': chase = !chase; document.body.classList.toggle('chase', chase); break;
     case 'm': audio.setMuted(!audio.muted); break;
   }
-  // the indicators' switch (by the keys' places, the same on Czech and English keyboards): on until switched off
-  const side = { Comma: 'left', Period: 'right', Slash: 'hazard' }[e.code];
+  // the indicators' switch (by the keys' places, the same on Czech and English keyboards; the touch buttons' by their
+  // names): on until switched off
+  const side = { Comma: 'left', Period: 'right', Slash: 'hazard' }[e.code] ?? (e.code ? null : { ',': 'left', '.': 'right', '/': 'hazard' }[e.key]);
   if (side) { lamps.indicate = lamps.indicate === side ? null : side; game.msg(t(`msg.ind.${lamps.indicate ?? 'off'}`), 'info', 2); }
   if (command() > 0 && prev <= 0 && game.doorState !== 'closed') {
     if (arcade()) tram.eq.lever = 0;

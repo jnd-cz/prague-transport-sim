@@ -20,6 +20,8 @@ import threading
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "tools"))  # (python -P leaves it out)
+import gpu  # noqa: E402
 
 # a car's lamps lit by function (the colours as built, not dimmed: src/t3simple.js setLamps)
 LIT = """(car) => {
@@ -32,8 +34,9 @@ LIT = """(car) => {
   return on.sort().join(' ');
 }"""
 
-# the lamps seen frame by frame over 1.5 s of the game's clock (headless Chromium draws the city in software, about a
-# frame a second, each 0.1 s of game time): every state the two cars showed
+# the lamps seen frame by frame over 1.5 s of the game's clock (by the clock, not the wall: on SwiftShader, where
+# tools/gpu.py finds no GPU, a frame of the city takes about a second and moves the clock 0.1 s): every state the two
+# cars showed
 SEEN = """async () => {
   const lit = %s, seen = new Set(), t0 = performance.now(), c0 = window.game.clock;
   while (window.game.clock - c0 < 1.5 && performance.now() - t0 < 90000) {
@@ -95,7 +98,7 @@ def main():
     errors, r = [], {}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]  # (WebGL on the machine's GPU where it has one)
             page = browser.new_page(viewport={"width": 960, "height": 540})
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.goto(f"{base}/?line={args.line}", timeout=300000)

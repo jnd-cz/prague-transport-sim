@@ -212,7 +212,7 @@ device). They send the keyboard's keys:
 - the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
-- ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating,
+- ⋯ for the rest: indicators ⇦ ⇨, hazard lights ⚠, high beams (a flash held, on and off), park (advanced controls), switch contact, switch iron, heating cut-out, heating,
   autopilot, sound, ⚑ report.
 
 On a small screen the dashboard and the top bar are smaller and the minimap is hidden.

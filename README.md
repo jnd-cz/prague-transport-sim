@@ -206,7 +206,7 @@ zařízení). Posílají klávesy klávesnice:
 - řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
+- ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ⚑ hlášení.
 
 Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
