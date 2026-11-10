@@ -367,18 +367,31 @@ def split(areas, model, checked=None):
             taken = taken.union(part)
             # (the level's offset from its faces: the area's own vertices at this level)
             own = on & (r[:, 2] >= lv.min()) & (r[:, 2] <= lv.max())
+            # (against the level's highest face, a slab's top, as check measures: Libeň's railway areas lie about 1 m
+            # under the top, nearer the slab's underside, and the nearest face flipped between the two, 1.2 m steps)
             fz = model.faces(r[own, 0], r[own, 1], band=(lo, hi))
-            offs = [z - f[np.argmin(np.abs(f - z))] for z, f in zip(r[own, 2], fz) if len(f)]
+            offs = [z - f.max() for z, f in zip(r[own, 2], fz) if len(f)]
             off = float(np.median(offs)) if offs else 0.0
             for g in getattr(part, "geoms", [part]):
                 if g.geom_type != "Polygon" or g.area < 1:
                     continue
                 g = g.simplify(0.05)
-                rings = []
-                for ring in _rings(g):
-                    fz = model.faces(ring[:, 0], ring[:, 1], band=(lo, hi))
-                    z = [round(float(f[np.argmin(np.abs(f - zc))] + off), 2) if len(f) else round(zc, 2) for f in fz]
-                    rings.append([[round(float(x), 2), round(float(y), 2), zz] for (x, y), zz in zip(ring, z)])
+                xy = _rings(g)
+                pts = np.concatenate(xy)
+                fz = model.faces(pts[:, 0], pts[:, 1], band=(lo, hi))
+                z = np.array([f.max() + off if len(f) else np.nan for f in fz])
+                # (a vertex past its level's faces, in a corner of the region's mitred edge: the height of the piece's
+                # nearest vertex on them, not the level's median: at Libeň one level holds viaducts at 210 and 212 m)
+                ok = np.isfinite(z)
+                if ok.any() and not ok.all():
+                    d = np.hypot(pts[~ok, None, 0] - pts[None, ok, 0], pts[~ok, None, 1] - pts[None, ok, 1])
+                    z[~ok] = z[ok][np.argmin(d, axis=1)]
+                z[~np.isfinite(z)] = zc
+                rings, k = [], 0
+                for ring in xy:
+                    rings.append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)]
+                                  for (x, y), zz in zip(ring, z[k:k + len(ring)])])
+                    k += len(ring)
                 pieces.append((rings, True))
         # (beyond every structure: the parts that hold some of the area's own vertices off them, at the survey's heights)
         off_pts = r[~on & np.isfinite(r[:, 2])]

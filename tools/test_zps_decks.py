@@ -184,6 +184,19 @@ class Split(unittest.TestCase):
             zs = [q[2] for q in p["r"]]
             self.assertLess(max(zs) - min(zs), 0.01)
 
+    def test_a_piece_follows_its_slabs_top(self):
+        """Libeň: a slab's top and underside 1.2 m apart, the underside shorter; the railway area lies 1 m under the
+        top, nearer the underside. Every vertex of its piece keeps 1 m under the top, also past the underside's end."""
+        top, under = bridge(0, 0, 40, 10, 205.8).tris, bridge(0, 0, 36, 10, 204.6).tris
+        high = bridge(0, 14, 40, 24, 212.0).tris
+        model = zd.Model(SimpleNamespace(tris=np.concatenate([top, under, high]), ids=[548, 549, 551],
+                                         owner=np.array([0, 0, 1, 1, 2, 2])))
+        areas = [area([(5, 2, 204.8), (39, 2, 204.8), (39, 22, 211.8), (5, 22, 211.8)], cls="rail")]
+        zd.split(areas, model)
+        low = [p for p in areas if max(q[2] for q in p["r"]) < 208]
+        self.assertEqual(len(low), 1)
+        self.assertEqual(sorted({q[2] for q in low[0]["r"]}), [204.8])
+
     def test_an_area_on_one_deck_stays_whole(self):
         model = zd.Model(bridge(0, 0, 40, 20, 212.0))
         a = area([(5, 2, 211.8), (35, 2, 211.0), (35, 12, 210.5), (5, 12, 211.5)], cls="rail")
