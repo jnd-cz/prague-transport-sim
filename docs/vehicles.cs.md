@@ -108,7 +108,7 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
 - **Tabule a cedule** všech modelů: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, bodový displej T3M `ledFace`).
 - **Podrobný model:** soubor pochází z projektové dílny na modely; změna souboru jde přes ni, nebo se udělá
-  při načtení v `src/t3h.js` (tak jsou upravená jeho spřáhla, čelisti kolejnicových brzd a evidenční čísla).
+  při načtení v `src/t3h.js` (tak jsou upravená jeho spřáhla, čelisti kolejnicových brzd, evidenční čísla a koncová světla).
 - **Fakta:** rozměr, barva nebo detail skutečného vozu uvádí zdroj (výkres, fotka s evidenčním číslem,
   uživatel) v komentáři nebo v [docs/knowledge.md](knowledge.md). Fakta od uživatele, znalce pražských
   tramvají, mají přednost před výkresem i odhadem.

@@ -105,6 +105,10 @@ SYNTHETIC = r"""async () => {
   out.lamps.beams = [a, b].map((c) => !!c.userData.beams?.visible);
   out.lamps.beamAt = a.userData.beams ? (a.userData.beams.geometry.computeBoundingBox(), [a.userData.beams.geometry.boundingBox.min.toArray(), a.userData.beams.geometry.boundingBox.max.toArray()]) : null;
   models.poseT3(m, { highBeam: false });
+  // the tail lamps added at load (the asset has none): on the rear panel, lit on the set's last car
+  const tail = (c) => c.children.find((o) => o.name === 'T3H_tail');
+  out.lamps.tails = [a, b].map((c) => tail(c) && +tail(c).material.color.r.toFixed(3));
+  if (tail(a)) { const tb = new THREE.Box3().setFromBufferAttribute(tail(a).geometry.attributes.position); out.lamps.tailAt = [tb.min.toArray(), tb.max.toArray()].map((v) => v.map((x) => +x.toFixed(3))); }
   // the cards
   models.setConsistLine(m, '9', 'Sídliště Řepy', '816');
   out.dest = [a, b].map((c) => c.userData.rig.plates.destAll.map((o) => o.visible));
@@ -221,6 +225,9 @@ def main():
                 # the left front, repeater and rear indicators, the left and right brake lamps in the rear corner units
                 f"the glows where the lamps are ({s['lamps']['glowAt']})": all(all(v == v for v in p) for p in s["lamps"]["glowAt"])
                 and [round(p[2]) for p in s["lamps"]["glowAt"]] == [7, 3, -7, -7, -7] and all(abs(abs(p[0]) - 0.95) < 0.05 for p in s["lamps"]["glowAt"][:1] + s["lamps"]["glowAt"][2:]),
+                f"the tail lamps on the rear panel ({s['lamps'].get('tailAt')}), lit on the last car only": s["lamps"]["tails"][1] and s["lamps"]["tails"][0]
+                and s["lamps"]["tails"][1] > 4 * s["lamps"]["tails"][0] and s["lamps"]["tailAt"][0][2] < -6.9 and 0.85 < s["lamps"]["tailAt"][0][1] < 1.1
+                and abs(s["lamps"]["tailAt"][0][0] + 0.57) < 0.01,
                 "the brake lamps at the set's rear only": not any(s["lamps"]["brakes"][0]) and s["lamps"]["brakes"][1] and all(s["lamps"]["brakes"][1]),
                 "the high beams' glow on the leading car, at its headlights (7.0 m ahead, 1.2 m up)": s["lamps"]["beams"] == [True, False]
                 and s["lamps"]["beamAt"] and 6.9 < s["lamps"]["beamAt"][0][2] < 7.2 and 0.8 < s["lamps"]["beamAt"][0][1] < 1.3,

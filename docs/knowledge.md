@@ -555,7 +555,8 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   junction and stopping at street level stop across car lane", at such a stop the right ones from braking into it until
   it pulls away. The game lights a set's front on its leading car and its rear on the last (the coupled ends dark) and
   blinks the indicators on every car, 1.5 times a second (`src/lamps.js`). The hybrid's glows (indicators, brake lamps)
-  are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew.
+  are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew. Its
+  asset has no tail lamps: they are added at load, 2 cm over its bumper (found by rays from behind), 0.47 m out.
 
 ## Heuristics that stand in for missing data
 

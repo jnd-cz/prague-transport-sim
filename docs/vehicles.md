@@ -109,7 +109,7 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
 - **The plates and cards** for every model: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, the T3M's dot-matrix `ledFace`).
 - **The hybrid:** the asset comes from the project's asset lab; a change to the file goes through it, or is
-  made at load in `src/t3h.js` (as its couplers, track-brake shoes and fleet numbers are).
+  made at load in `src/t3h.js` (as its couplers, track-brake shoes, fleet numbers and tail lamps are).
 - **Facts:** a dimension, colour or detail of the real car cites its source (a drawing, a photo with its
   fleet number, the user) in a comment or in [docs/knowledge.md](knowledge.md). The user's facts as a Prague
   tram expert win over a drawing or a guess.

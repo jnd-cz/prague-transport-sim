@@ -246,8 +246,30 @@ export async function loadHybridT3(responses, contact) {
     const b = box(o.geometry), r = (b.max.y - b.min.y) / 2, y = (b.min.y + b.max.y) / 2;
     heads = [b.min.z + r, b.max.z - r].map((z) => [-z, y, b.max.x + 0.01]);
   });
-  proto = { template, light, rig, clips: gl.animations, bogie, stats, heads };
+  proto = { template, light, rig, clips: gl.animations, bogie, stats, heads, tails: tailLamps(template, mergeGeometries) };
   return proto;
+}
+
+// The tail lamps, which the asset has not: two red lamps on the rear panel 0.47 m either side of the middle (the
+// user, 2026-11-10, #436: "the two red lamps on the rear panel the tail lamps", as on the built-in car), 0.2 x 0.07 m,
+// their foot 2 cm over the bumper. The bumper's top found by rays from behind (it stands out of the panel), the panel
+// where a ray meets it; a geometry in the car's frame (the asset's (x, y, z) is the car's (-z, y, x)), or null.
+function tailLamps(template, mergeGeometries) {
+  const body = [];
+  template.traverse((o) => { if (o.isMesh && o.parent === template && !o.material.transparent) body.push(o); }); // (the car's own parts, not the glass)
+  const ray = new THREE.Raycaster(), back = (y) => {
+    ray.set(new THREE.Vector3(-20, y, 0.47), new THREE.Vector3(1, 0, 0));
+    return ray.intersectObjects(body, false)[0]?.point.x ?? null;
+  };
+  const panel = back(1.15);
+  if (panel === null) return null;
+  let top = null;
+  for (let y = 0.7; y < 1.15; y += 0.005) { const x = back(y); if (x !== null && x < panel - 0.02) top = y; }
+  if (top === null) return null;
+  const y = top + 0.02 + 0.035, x = back(y) ?? panel;
+  const g = mergeGeometries([-1, 1].map((sd) => new THREE.BoxGeometry(0.2, 0.07, 0.02).translate(sd * 0.47, y, x - 0.008)));
+  g.userData.shared = true;
+  return g;
 }
 
 // the collector clip's position (0..1) for a contact height over the rail
@@ -394,8 +416,14 @@ export function makeHybridSet(root, line, cars, dest, run, collector) {
     const cr = car.userData.rig;
     for (const b of cr.bogies) b.node?.traverse((o) => { if (o.name === 'T3H_shoe') b.shoes.push(o); });
     car.userData.gear = gear(cr);
-    // the high beams' glow over the leading car's headlights (src/lamps.js)
+    // the high beams' glow over the leading car's headlights (src/lamps.js); the tail lamps, lit on the set's last car
+    // (the coupled ends dark: a lamp off is its lens at a fifth of its colour, as on the built-in car)
     if (k === 0 && proto.heads.length) { car.userData.beams = beamsMesh(proto.heads); car.add(car.userData.beams); }
+    if (proto.tails) {
+      const tail = new THREE.Mesh(proto.tails, new THREE.MeshBasicMaterial({ color: new THREE.Color('#d8261a').multiplyScalar(k === cars - 1 ? 1 : 0.2) }));
+      tail.name = 'T3H_tail';
+      car.add(tail);
+    }
     // the cards: the route plates on every car (the front one shows on the leading car, the rear one on the
     // last), the destination and run number in the leading car only
     cr.plates = {
