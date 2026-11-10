@@ -7,7 +7,7 @@ from the doors and in the side view lean back above the windscreen's foot (the d
 bogie pivots 6.4 m apart with wheels of 700 mm at 1.9 m; the couplers' heads meet in a two-car set; the
 pantograph's head at the wire; the plates and cards on the right cars and swapped with the line; at most
 four draw calls a car besides its plates; the headlights, corner lamps and bumper where 6892's head-on photo
-has them, the ends open under the bumper; the three types (T3, T3SUCS, T3M) with their bumpers, route boxes,
+has them, the ends open under the bumper, the skirt in arches over the wheels; the three types (T3, T3SUCS, T3M) with their bumpers, route boxes,
 the T3M's roof box and green display, fleet numbers by type, AI sets by run number in their ranges' shares;
 the fleet numbers' size and places. With --shots: the same views of each model (side, three-quarter
 front and rear, the front, a two-car set, an orthographic side elevation at the colour drawing's scale)
@@ -38,6 +38,7 @@ MEASURE = r"""async () => {
   const meshes = (car) => car.children.filter((o) => o.isMesh);
   const named = (car, name) => car.children.find((o) => o.name === name);
   out.drawn = [meshes(a).length, meshes(b).length];
+  out.tris = [a, b].map((c) => meshes(c).reduce((s, o) => s + (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3, 0));
   const body = named(a, 'body'), parts = named(a, 'parts');
   // the variants: the T3M's resistor box towards the rear of the roof, its route display; the fleet numbers
   const roofBox = (geo) => { const P = geo.attributes.position; let top = 0; for (let i = 0; i < P.count; i++) if (P.getZ(i) < -1.2 && P.getZ(i) > -4.1 && Math.abs(P.getX(i)) < 0.7) top = Math.max(top, P.getY(i)); return top; };
@@ -95,11 +96,12 @@ MEASURE = r"""async () => {
   const lamp = { head: [], corner: [] };
   for (let i = 0; i < L.count; i++) {
     const x = Math.abs(L.getX(i)), y = L.getY(i), z = L.getZ(i);
-    if (z > 6.7 && x > 0.4 && x < 0.7) lamp.head.push([x, y]);
-    if (z > 6.3 && z < 6.6 && x > 0.7) lamp.corner.push(y);
+    if (z > 6.7 && x > 0.4 && x < 0.7) lamp.head.push([x, y, z]);
+    if (Math.abs(z) > 6.0 && x > 0.8) lamp.corner.push([x, y]);
   }
-  out.lamps = { head: [lamp.head.reduce((s, p) => s + p[0], 0) / lamp.head.length, lamp.head.reduce((s, p) => s + p[1], 0) / lamp.head.length],
-    corner: [Math.min(...lamp.corner), Math.max(...lamp.corner)] };
+  const mean = (a, k) => a.reduce((s, p) => s + p[k], 0) / a.length;
+  out.lamps = { head: [mean(lamp.head, 0), mean(lamp.head, 1)], headZ: Math.max(...lamp.head.map((p) => p[2])) - Math.min(...lamp.head.map((p) => p[2])),
+    corner: [Math.min(...lamp.corner.map((p) => p[1])), Math.max(...lamp.corner.map((p) => p[1]))], cornerX: mean(lamp.corner, 0) };
   // faded in as an AI tram: the fleet numbers stay a blended decal, the body opaque
   const { setOpacity } = await import('/src/traffic.js');
   setOpacity(t3m, 0); setOpacity(t3m, 0.5); setOpacity(t3m, 1);
@@ -135,6 +137,13 @@ MEASURE = r"""async () => {
     return h ? lc.getImageData(Math.floor(h.uv.x * liv.width), Math.floor((1 - h.uv.y) * liv.height), 1, 1).data[3] : -1;
   };
   out.open = Object.fromEntries([1, -1].flatMap((e) => [[0, 0.5], [0, 0.72], [0.6, 0.5], [0.72, 0.5], [0, 0.95]].map(([x, y]) => [`${e > 0 ? 'f' : 'r'} ${x} ${y}`, alphaAt(x, y, e)])));
+  // the skirt's arches over the wheels: the livery's alpha where rays from the right meet the side, by z ahead of
+  // the front bogie's pivot and height
+  const sideAlpha = (z, y) => {
+    const h = new THREE.Raycaster(new THREE.Vector3(-5, y, z), new THREE.Vector3(1, 0, 0)).intersectObject(body, false)[0];
+    return h ? lc.getImageData(Math.floor(h.uv.x * liv.width), Math.floor((1 - h.uv.y) * liv.height), 1, 1).data[3] : -1;
+  };
+  out.arches = Object.fromEntries([[0, 0.7], [0, 0.74], [0.95, 0.7], [0.95, 0.74], [1.25, 0.5], [1.25, 0.6], [1.4, 0.4]].map(([dz, y]) => [`${dz} ${y}`, sideAlpha(3.2 + dz, y)]));
   // a set on a straight: the cars' centres, the couplers' heads
   models.placeConsist(m, 100, (s) => [s, 0, 0, 0]);
   out.pitch = Math.abs(a.position.x - b.position.x); out.CAR_PITCH = CAR_PITCH;
@@ -180,10 +189,14 @@ SHOTS = r"""async ({ kinds }) => {
   // the side elevation at the colour drawing's scale (12.66 mm a pixel, 79 px/m), the right side
   const elev = new THREE.OrthographicCamera(-W / 2 / 79, W / 2 / 79, H / 2 / 79, -H / 2 / 79, 0.1, 100);
   elev.position.set(-40, 2.3, 0); elev.lookAt(0, 2.3, 0);
+  // the plan from above at 80 px/m, the front to the left
+  const top = new THREE.OrthographicCamera(-W / 2 / 80, W / 2 / 80, H / 2 / 80, -H / 2 / 80, 0.1, 100);
+  top.position.set(0, 30, 0); top.up.set(-1, 0, 0); top.lookAt(0, 0, 0);
   const views = {
     side: persp([-24, 2.2, 0.5], [0, 1.6, 0.5], 36), front34: persp([-7.5, 2.3, 15], [0, 1.5, 5]), rear34: persp([7, 2.4, -15], [0, 1.5, -5]),
     front: persp([0, 1.8, 22], [0, 1.7, 0], 14), set: persp([-14, 4, 24], [0, 1.4, -4], 40), elevation: elev,
     bogie: persp([-5, 0.9, 3.4], [0, 0.45, 3.2], 32), display: persp([-6.5, 2.0, 1.2], [-1.25, 2.0, 3.2], 34),
+    coupler: persp([-1.9, 1.0, 9.6], [0, 0.6, 7.0], 30), top,
   };
   const out = {};
   for (const kind of kinds) {
@@ -240,8 +253,12 @@ def judge(r):
         "the collector's head just under the wire": near(r["top"], r["wire"] - 0.005, 0.01),
         # the plan view: straight sides, the ends tapering from 4.51 m ahead / 4.84 m behind the centre
         "the plan: 1.25 m half width amidships": near(r["halfWidth"]["0"], 1.25, 0.01) and near(r["halfWidth"]["3"], 1.25, 0.01),
-        "the plan: the front tapered to 1.03 m at 5.5 m": near(r["halfWidth"]["5.5"], 1.025, 0.03),
-        "the plan: the rear tapered to 1.02 m at -5.8 m": near(r["halfWidth"]["-5.8"], 1.016, 0.03),
+        # the ends wider than the plan view's, to 6892 head on (the corner units at 0.93 m: the user, 2026-11-10,
+        # "Let's try widening")
+        "the plan: the front tapered to 1.14 m at 5.5 m": near(r["halfWidth"]["5.5"], 1.141, 0.01),
+        "the plan: the rear tapered to 1.13 m at -5.8 m": near(r["halfWidth"]["-5.8"], 1.127, 0.01),
+        # the user's photo of a bogie from the side: the skirt in arches 2 cm over the wheels, level between them
+        "the skirt's arches over the wheels": r["arches"] == {"0 0.7": 0, "0 0.74": 255, "0.95 0.7": 0, "0.95 0.74": 255, "1.25 0.5": 0, "1.25 0.6": 255, "1.4 0.4": 255},
         # the side view: the nose at 7.0 m at the windscreen's foot, the windscreen leaning back 0.44 m, the visor
         "the side: the windscreen's foot at 7.0 m": near(r["noseF"]["1.65"], 7.0, 0.02),
         "the side: the windscreen's top 0.44 m back": near(r["noseF"]["2.53"], 6.56, 0.03),
@@ -270,10 +287,12 @@ def judge(r):
         # the user, 2026-11-10: "front and back is open under the bumper", the skirt to where the headlights start
         "the ends open under the bumper to +-0.65 m, the skirt's corners and the red kept": all(r["open"][f"{e} 0 0.5"] == 0 and r["open"][f"{e} 0 0.72"] == 0
         and r["open"][f"{e} 0.6 0.5"] == 0 and r["open"][f"{e} 0.72 0.5"] == 255 and r["open"][f"{e} 0 0.95"] == 255 for e in "fr"),
-        # 6892 head on: the headlights 1.11 m up and apart (the discs 4 cm proud along the face's normal, which
-        # leans outwards), the corner units' lenses 0.99-1.29 m
-        "the headlights 1.11 m up, 1.11 m apart": near(r["lamps"]["head"][1], 1.11, 0.005) and near(r["lamps"]["head"][0], 0.555, 0.02),
-        "the corner units' lenses 0.99-1.29 m": near(r["lamps"]["corner"][0], 0.99, 0.003) and near(r["lamps"]["corner"][1], 1.29, 0.003),
+        # 6892 head on: the headlights 1.11 m up, 1.08 m apart ("a tad to far apart" at 1.11 m), pointing straight;
+        # the corner units' lenses 0.99-1.29 m, round the corners about 0.93 m off the centreline
+        "the headlights 1.11 m up, 1.08 m apart, pointing straight": near(r["lamps"]["head"][1], 1.11, 0.005)
+        and near(r["lamps"]["head"][0], 0.54, 0.005) and r["lamps"]["headZ"] < 1e-5,
+        "the corner units' lenses 0.99-1.29 m, 0.93 m off the centreline": near(r["lamps"]["corner"][0], 0.99, 0.003)
+        and near(r["lamps"]["corner"][1], 1.29, 0.003) and near(r["lamps"]["cornerX"], 0.94, 0.02),
         "fleet numbers by type, each car its own": all(6400 <= n <= 6992 for n in r["fleet"]["t3"]) and all(7001 <= n <= 7292 for n in r["fleet"]["suc"])
         and all(8005 <= n <= 8106 for n in r["fleet"]["m"]) and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
         "AI sets of every type by run number": set(r["fleet"]["auto"]) <= {"T3", "T3SUCS", "T3M"} and len(r["fleet"]["auto"]) >= 2,

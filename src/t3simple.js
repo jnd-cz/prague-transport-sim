@@ -21,13 +21,16 @@ const PIVOT = T3.bogies / 2;                // 6 400 mm apart, 3 800 mm from eac
 const WHEELBASE = 1.9, WHEEL_R = 0.35;              // 1 900 mm; wheels 700 mm
 const COUPLER_H = 0.552;                            // 552 mm above the rail
 const COUPLER_FACE = T3.length / 2 - T3.couplerOverlap / 2; // where two coupled heads meet (src/tram.js)
-// The ends in plan (the plan view): straight sides between SIDE.r and SIDE.f, then tapering to the end's
-// corners (CORNER: half width, its z with the nose at 7.0 m); the face bulges FACE m from the corners to
-// the nose. Up to SPLIT the taper is the same at every height (the front and rear doors stand on it);
-// beyond it, it follows the end's profile to the corner.
+// The ends in plan: straight sides between SIDE.r and SIDE.f (the plan view), then tapering to the end's
+// corners (CORNER: half width, its z with the nose at 7.0 m), rounded by FILLET; the face bulges FACE m from
+// the corners to the nose. Up to SPLIT the taper is the same at every height (the front and rear doors stand on
+// it); beyond it, it follows the end's profile to the corner. The corners are wider than the plan view's (0.73 and
+// 0.78 m): the user's head-on photos of 6892 put the corner lamp units at ±0.93-0.99 m on the front and ±0.96 m on
+// the rear, and the windscreen's posts at ±0.71 m (the user, 2026-11-10: "Let's try widening and we'll see how it
+// looks")
 const SIDE = { f: 4.51, r: -4.84 }, SPLIT = { f: 6.05, r: -6.10 };
-const CORNER = { f: [0.727, 6.81], r: [0.775, -6.79] };
-const FACE = 0.19, FILLET = 0.15;
+const CORNER = { f: [1.0, 6.79], r: [1.0, -6.79] };
+const FACE = 0.21, FILLET = 0.32;
 // the nose (on the centreline) by height (the side view): the lower end, the windscreen leaning back from
 // 1.65 m, the roof cap's visor over it at 2.56 m, the cap curving down into the roof
 const NOSE = {
@@ -55,8 +58,10 @@ const DOORS = [[-6.04, -4.71], [-1.41, -0.10], [4.71, 6.03]];
 // (3.02 m), which agree to 3 %; the colour elevation has it 6 cm lower.
 const LIV = { bumper: [0.76, 0.86], red: [0.84, 1.62], redCab: 1.48, glass: [1.71, 2.52], transom: [2.10, 2.135], eave: 2.56, gutter: 2.85, capSide: 3.05, capTop: 6.08 };
 const CAB_STEP = { r: 6.03, l: 6.11, radius: 0.09 };
-// the skirt cut out over each bogie up to 0.62 m (the colour elevation, conflig's model, the photos)
-const CUTOUT = { half: 1.2, top: 0.62, r: 0.15 };
+// the skirt cut out over each bogie in arches round the wheels, 2 cm clear of their treads, level over their tops
+// between them (the user's photo of a T3's bogie from the side, 2026-11-10; the colour elevation and conflig's
+// model have a lower, square cutout to 0.62 m)
+const CUTOUT = { arch: WHEEL_R + 0.02, top: 2 * WHEEL_R + 0.02, half: WHEELBASE / 2 + WHEEL_R + 0.02 };
 // the ends open under the bumper between the skirt's corners, which reach in to where the headlights start
 // (the user, 2026-11-10: "the skirt stays only on sides up until where the headlights start, front and back is
 // open under the bumper"; 6892's front and rear: ±0.65 m)
@@ -66,8 +71,6 @@ const COL = {
   // the bumper brown on a T3SUCS or T3M (the photo of 7290), silver with two thin red stripes on a T3 (6892)
   bumper: '#55332f', silver: '#c3c5c4',
   louvre: '#6d1611', lamp: '#f2ecd6', panto: '#c49a3a', // (the pantograph's ochre as on conflig's model: the user, 2026-11-09, "Pantograph color is good")
-  // the bogies dusty brown (the user's photo of a T3 bogie over the pit, 2026-11-09)
-  wheel: '#51483f', tyre: '#6e665d', hub: '#625a50', frame: '#5d5146', spring: '#6e604f', shoe: '#40392f',
 };
 
 const lerpProfile = (P, h) => {
@@ -149,6 +152,21 @@ function sideX(sign, z) {
   }
   return sign * HW;
 }
+// the point of the reference outline round an end's corner (end 1 the front, -1 the rear) on a side (sign -1 the
+// right) where it is ax off the centreline: its x and z, the outward normal in plan (x, z), the yaw that turns +z
+// along the outline
+function atCorner(end, sign, ax) {
+  const R = reference().pts.filter((p) => sign * p.x > 0 && end * p.z > 5.5);
+  for (let i = 1; i < R.length; i++) {
+    const a = R[i - 1], b = R[i];
+    if ((Math.abs(a.x) - ax) * (Math.abs(b.x) - ax) > 0 || a.x === b.x) continue;
+    const t = (ax - Math.abs(a.x)) / (Math.abs(b.x) - Math.abs(a.x)), tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz);
+    let n = [tz / l, -tx / l];
+    if (n[0] * sign + n[1] * end < 0) n = [-n[0], -n[1]]; // (outwards: away from the centreline and the car's middle)
+    return { x: sign * ax, z: a.z + t * tz, n, yaw: Math.atan2(tx, tz) };
+  }
+  return null;
+}
 // the point of the reference outline at u
 function atU(u) {
   const R = reference().pts;
@@ -227,10 +245,10 @@ function livery() {
     span(b, b + du(0.008), BOT_H, 2.6, COL.rubber);
   }
   // the ends' glazing: the panoramic windscreen wrapping round the corners onto the sides, two thin posts in
-  // it; the rear window likewise, with posts at the corners as well
+  // it (±0.71 m: 6892 head on); the rear window likewise, with posts at the corners as well
   const [fr, fl] = [sideU(-1, 6.22), sideU(1, 6.22)];
   rrect(fr, fl, 1.66, LIV.glass[1], 14, glass(1.66, LIV.glass[1]), COL.rubber, 2);
-  for (const x of [-0.61, 0.61]) { const u = uAt(x, 7); span(u - du(0.014), u + du(0.014), 1.66, LIV.glass[1], '#c9c3b2'); }
+  for (const x of [-0.71, 0.71]) { const u = uAt(x, onFace(1, x, REF_H).z); span(u - du(0.014), u + du(0.014), 1.66, LIV.glass[1], '#c9c3b2'); }
   g.strokeStyle = '#151515'; g.lineWidth = 3;
   for (const [x0, x1] of [[-0.40, -0.55], [0.06, -0.09]]) { // the wipers
     g.beginPath(); g.moveTo(X(uAt(x0, 7)), Y(1.70)); g.lineTo(X(uAt(x1, 7)), Y(2.24)); g.stroke();
@@ -245,16 +263,20 @@ function livery() {
   flap(-1, 1.36, 1.50, '#7a1812');
   const [rl, rr] = [sideU(1, -6.09), sideU(-1, -6.29)];
   rrect(rl, rr, 1.70, 2.53, 14, glass(1.70, 2.53), COL.rubber, 2);
-  for (const x of [-0.6, 0.6]) { const u = uAt(x, -7); span(u - du(0.014), u + du(0.014), 1.70, 2.53, '#c9c3b2'); }
-  for (const sign of [-1, 1]) { const u = uAt(sign * CORNER.r[0], CORNER.r[1]); span(u - du(0.012), u + du(0.012), 1.70, 2.53, '#c9c3b2'); }
+  for (const x of [-0.6, 0.6]) { const u = uAt(x, onFace(-1, x, REF_H).z); span(u - du(0.014), u + du(0.014), 1.70, 2.53, '#c9c3b2'); }
+  for (const sign of [-1, 1]) { const c = atCorner(-1, sign, CORNER.r[0] - 0.06), u = uAt(c.x, c.z); span(u - du(0.012), u + du(0.012), 1.70, 2.53, '#c9c3b2'); }
   // the skirt cut out over the bogies (transparent: the material tests the alpha)
   g.save();
   g.globalCompositeOperation = 'destination-out';
   for (const sign of [-1, 1]) for (const zc of [-PIVOT, PIVOT]) {
-    const [a, b] = along(sign, zc - CUTOUT.half, zc + CUTOUT.half);
-    g.beginPath();
     // (down to 0.33 m: under the body's edge at 0.35, and 6 rows clear of the roof's part of the texture)
-    g.roundRect(X(a), Y(CUTOUT.top), X(b) - X(a), Y(0.33) - Y(CUTOUT.top), [X(du(CUTOUT.r)), X(du(CUTOUT.r)), 0, 0]);
+    const w = WHEELBASE / 2, A = CUTOUT.arch, pts = [[zc - w - A, 0.33]];
+    for (let i = 0; i <= 12; i++) { const a = Math.PI * (1 - i / 24); pts.push([zc - w + A * Math.cos(a), WHEEL_R + A * Math.sin(a)]); }
+    for (let i = 0; i <= 12; i++) { const a = Math.PI * (0.5 - i / 24); pts.push([zc + w + A * Math.cos(a), WHEEL_R + A * Math.sin(a)]); }
+    pts.push([zc + w + A, 0.33]);
+    g.beginPath();
+    pts.forEach(([z, h], i) => (i ? g.lineTo : g.moveTo).call(g, X(sideU(sign, z)), Y(h)));
+    g.closePath();
     g.fill();
   }
   // and the ends under the bumper (its underside hides the cut's top; the edges' u from points on the face, as a
@@ -392,35 +414,53 @@ function onFace(sign, x, h) {
   return { z: sign * (lerpProfile(NOSE[k], h) - FACE * (x / cw) ** 2), yaw: Math.atan2(2 * FACE * x / cw ** 2, sign) };
 }
 
-// a point of a side (sign -1 the right, 1 the left) at z on the reference outline: its x, the yaw that turns
-// +z along the side, and the outward normal in plan (x, z)
-function onSide(sign, z) {
-  const x = sideX(sign, z), tx = sideX(sign, z + 0.05) - x, l = Math.hypot(tx, 0.05);
-  return { x, yaw: Math.atan2(tx, 0.05), n: [sign * 0.05 / l, -sign * tx / l] };
-}
-
-// The bogie (the user's photo of one over the pit): the wheels outermost, their discs inside the tyres with the
-// hub's hex; inside them the frame (a bridge bogie): the side beam low between the wheels, the axle boxes, coil
-// springs by the wheels and the ribbed rubber spring between them, the track-brake shoes 12 mm over the rail on
-// their hangers; all of it dusty brown
+// The bogie as the user's photos show it (one over the pit, 2026-11-09; one from the side, 2026-11-10): the wheels
+// outermost, grey discs with the hub's big hex nut and a boss inside rust-brown tyres, a curved guard inside each
+// wheel; between them, over the rail, the track-brake shoe 12 mm up, its upper bar with a row of nuts, hung from the
+// side beam at 0.40 m; the ribbed rubber spring in the middle up to the skirt, the gearbox's housing beside it, coil
+// springs by the wheels, a brake rod and a lever; all of it a dusty warm grey
+const BOGIE_COL = { disc: '#7f7866', hub: '#6d675a', boss: '#78725f', tyre: '#6a4c33', frame: '#77705e', guard: '#5f5a4e', shoe: '#7e7764', rubber: '#4f4a41', rib: '#68625a' };
 function bogie(zc) {
-  const P = [];
+  const P = [], C = BOGIE_COL, gap = T3.trackBrakeGap, sideways = { rot: [0, 0, Math.PI / 2] };
   for (const sx of [-1, 1]) {
     for (const dz of [-WHEELBASE / 2, WHEELBASE / 2]) {
-      const z = zc + dz, side = { rot: [0, 0, Math.PI / 2] };
-      P.push(part(new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.1, 24), COL.tyre, { at: [sx * 0.75, WHEEL_R, z], ...side }));
-      P.push(part(new THREE.CylinderGeometry(WHEEL_R - 0.055, WHEEL_R - 0.055, 0.106, 24), COL.wheel, { at: [sx * 0.75, WHEEL_R, z], ...side }));
-      P.push(part(new THREE.CylinderGeometry(0.085, 0.085, 0.03, 6), COL.hub, { at: [sx * 0.815, WHEEL_R, z], ...side }));
-      P.push(part(box(0.14, 0.2, 0.22), COL.frame, { at: [sx * 0.62, WHEEL_R, z] }));
-      P.push(part(new THREE.CylinderGeometry(0.05, 0.05, 0.17, 8), COL.spring, { at: [sx * 0.62, 0.55, z - Math.sign(dz) * 0.36] }));
+      const z = zc + dz, inward = -Math.sign(dz);
+      P.push(part(new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.1, 28), C.tyre, { at: [sx * 0.75, WHEEL_R, z], ...sideways }));
+      P.push(part(new THREE.CylinderGeometry(WHEEL_R - 0.06, WHEEL_R - 0.06, 0.104, 28), C.disc, { at: [sx * 0.75, WHEEL_R, z], ...sideways }));
+      P.push(part(new THREE.CylinderGeometry(0.135, 0.135, 0.03, 6), C.hub, { at: [sx * 0.817, WHEEL_R, z], ...sideways })); // (flats on top)
+      P.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 14), C.boss, { at: [sx * 0.84, WHEEL_R, z], ...sideways }));
+      P.push(part(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 6), C.hub, { at: [sx * 0.86, WHEEL_R, z], ...sideways }));
+      P.push(part(box(0.14, 0.2, 0.22), C.frame, { at: [sx * 0.62, WHEEL_R, z] })); // the axle box, behind the disc
+      // the guard: an arc 0.37-0.42 m round the wheel's side towards the middle, from 5 cm over the rail to near its top
+      for (let k = 0; k < 6; k++) {
+        const step = 125 / 6, a = (-45 + (k + 0.5) * step) * Math.PI / 180, r = WHEEL_R + 0.045;
+        P.push(part(box(0.03, 0.05, r * step * Math.PI / 180 + 0.01), C.guard, { at: [sx * 0.69, WHEEL_R + r * Math.sin(a), z + inward * r * Math.cos(a)], rot: [Math.PI / 2 - inward * a, 0, 0] }));
+      }
+      // a coil spring by the wheel: its rod and coils
+      const zs = z + inward * 0.47;
+      P.push(part(new THREE.CylinderGeometry(0.022, 0.022, 0.24, 6), C.frame, { at: [sx * 0.64, 0.5, zs] }));
+      for (let k = 0; k < 6; k++) P.push(part(new THREE.CylinderGeometry(0.045, 0.045, 0.014, 6), C.guard, { at: [sx * 0.64, 0.41 + k * 0.036, zs] }));
     }
-    P.push(part(box(0.12, 0.17, WHEELBASE + 0.2), COL.frame, { at: [sx * 0.62, 0.3, zc] }));
-    P.push(part(new THREE.CylinderGeometry(0.19, 0.19, 0.26, 16), COL.spring, { at: [sx * 0.6, 0.55, zc] }));
-    for (const y of [0.49, 0.57]) P.push(part(new THREE.CylinderGeometry(0.205, 0.205, 0.025, 16), COL.frame, { at: [sx * 0.6, y, zc] }));
-    P.push(part(box(0.1, 0.11, 1.05), COL.shoe, { at: [sx * 0.75, T3.trackBrakeGap + 0.055, zc] }));
-    for (const dz of [-0.42, 0.42]) P.push(part(box(0.04, 0.2, 0.04), COL.frame, { at: [sx * 0.75, 0.2, zc + dz] }));
+    // the track brake: the shoe 12 mm over the rail, its upper bar with seven nuts, the bracket in its middle and
+    // the hangers up to the side beam
+    P.push(part(box(0.1, 0.09, 1.1), C.shoe, { at: [sx * 0.75, gap + 0.045, zc] }));
+    P.push(part(box(0.07, 0.075, 1.04), C.shoe, { at: [sx * 0.75, gap + 0.1275, zc] }));
+    for (let k = -3; k <= 3; k++) P.push(part(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 6), C.hub, { at: [sx * 0.795, gap + 0.1275, zc + k * 0.14], ...sideways }));
+    P.push(part(box(0.06, 0.12, 0.16), C.frame, { at: [sx * 0.74, gap + 0.2, zc] }));
+    for (const dz of [-0.42, 0.42]) P.push(part(box(0.04, 0.2, 0.05), C.frame, { at: [sx * 0.74, 0.3, zc + dz] }));
+    // the side beam, the bracket at its end, the lever and the brake rod
+    P.push(part(box(0.14, 0.035, 1.1), C.frame, { at: [sx * 0.66, 0.40, zc - 0.1] }));
+    P.push(part(box(0.1, 0.24, 0.08), C.frame, { at: [sx * 0.66, 0.53, zc - 0.68] }));
+    P.push(bar([sx * 0.72, 0.36, zc - 0.6], [sx * 0.72, 0.43, zc - 0.05], 0.018, C.frame));
+    P.push(bar([sx * 0.73, 0.3, zc + 0.06], [sx * 0.73, 0.68, zc + 0.06], 0.011, C.guard));
+    // the rubber spring with its ribs and top plate; the gearbox's housing beside it with its round cover
+    P.push(part(new THREE.CylinderGeometry(0.2, 0.2, 0.26, 18), C.rubber, { at: [sx * 0.6, 0.56, zc] }));
+    for (const y of [0.47, 0.54, 0.61]) P.push(part(new THREE.CylinderGeometry(0.212, 0.212, 0.02, 18), C.rib, { at: [sx * 0.6, y, zc] }));
+    P.push(part(new THREE.CylinderGeometry(0.215, 0.215, 0.025, 18), C.frame, { at: [sx * 0.6, 0.7, zc] }));
+    P.push(part(box(0.22, 0.4, 0.26), C.frame, { at: [sx * 0.62, 0.5, zc + 0.36] }));
+    P.push(part(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 14), C.shoe, { at: [sx * 0.74, 0.54, zc + 0.36], ...sideways }));
   }
-  P.push(part(box(1.4, 0.14, 0.5), COL.frame, { at: [0, 0.48, zc] }));
+  P.push(part(box(1.4, 0.14, 0.5), C.frame, { at: [0, 0.48, zc] }));
   return P;
 }
 
@@ -430,10 +470,12 @@ function bogie(zc) {
 const SIDE_INDICATOR = { z: 3.05, h: 1.81 };
 // The headlights' centres and the corner units' housings and lenses, from the user's head-on photo of 6892
 // (2026-11-10: "check headlight position from this head on shot"), on the scale of the bumper's note (LIV): the
-// headlights 1.11 m up and 1.11 m apart (the colour elevation: 1.03 m, 1.06 m apart), the corner units 0.98-1.30 m
-// with the clear (rear: red) lamp just under the headlights' line, the indicator over it (were 1.115-1.355 m)
-const HEADLIGHT = { x: 0.555, h: 1.11 };
-const CORNER_LAMP = { housing: [0.98, 1.30], low: [0.99, 1.14], high: [1.17, 1.29] };
+// headlights 1.11 m up (the colour elevation: 1.03 m), 1.08 m apart (the photo 1.11 m; the user: "a tad to far
+// apart"), pointing straight ahead in a dark surround with a chrome rim ("they should both point straight", "dark
+// accent around them"); the corner units 0.98-1.30 m with the clear (rear: red) lamp just under the headlights'
+// line, the indicator over it, round the corners 0.93 m off the centreline (the photo, both ends)
+const HEADLIGHT = { x: 0.54, h: 1.11 };
+const CORNER_LAMP = { housing: [0.98, 1.30], low: [0.99, 1.14], high: [1.17, 1.29], x: 0.93 };
 // the T3M's side display: in the upper part of the right side's second window from the front (the user's photo of 8015)
 const SIDE_DISPLAY = { z: 2.29, h: 2.31, w: 1.05, hh: 0.33 };
 // the route box on the front cap: its corners square on a T3, rounded on a T3SUCS and round the T3M's display (the
@@ -443,7 +485,7 @@ const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.6
 const MIRROR_PLATE = [-1.62, 2.52, 6.31];
 
 function partsGeometry(wire, variant) {
-  const P = [], dark = '#2c2d2e', steel = '#3a3b3c';
+  const P = [], dark = '#2c2d2e';
   for (const zc of [-PIVOT, PIVOT]) P.push(...bogie(zc));
   // under the body: the equipment's lower edge between the bogies, the floor's underside, the door steps
   P.push(part(box(2.0, 0.07, 3.6), dark, { at: [0, BOTTOM - 0.035, 0] }));
@@ -462,22 +504,24 @@ function partsGeometry(wire, variant) {
   for (const sign of [1, -1]) {
     for (const [t0, t1, c] of bands) P.push(strip(sign, 6.05, b0 + t0 * bh, b0 + t1 * bh, 0.05, c, b0 + bh / 2));
     const zf = sign * lerpProfile(NOSE[sign > 0 ? 'f' : 'r'], 0.4);
-    // (just behind the opening's edges, wider than it: the skirt's corners from inside are not drawn)
-    P.push(part(box(2 * OPEN + 0.2, b0 + 0.04 - BOTTOM, 0.04), '#262422', { at: [0, (BOTTOM + b0 + 0.04) / 2, sign * (Math.abs(onFace(sign, OPEN, 0.5).z) - 0.1)] }));
-    P.push(part(box(1.0, 0.18, 0.3), '#2e2e2e', { at: [0, 0.21, zf - sign * 0.42] }));
-    P.push(bar([0, COUPLER_H, zf - sign * 0.3], [0, COUPLER_H, sign * (COUPLER_FACE - 0.16)], 0.045, steel));
-    P.push(part(box(0.24, 0.17, 0.16), steel, { at: [0, COUPLER_H, sign * (COUPLER_FACE - 0.08)] }));
+    // (behind the opening, wider than it: the skirt's corners from inside are not drawn; 3 cm inside the face at
+    // its foot, where it is furthest back, so its corners do not come through the skirt)
+    P.push(part(box(2 * OPEN + 0.1, b0 + 0.04 - BOTTOM, 0.04), '#262422', { at: [0, (BOTTOM + b0 + 0.04) / 2, sign * (Math.abs(onFace(sign, OPEN + 0.05, BOTTOM).z) - 0.05)] }));
+    P.push(part(box(0.8, 0.12, 0.25), '#2a2a2a', { at: [0, 0.26, zf - sign * 0.5] }));
+    P.push(...coupler(sign));
   }
   // behind each bogie's cutouts, a dark panel down the middle (the cutouts do not show through the car)
-  for (const zc of [-PIVOT, PIVOT]) P.push(part(box(0.02, CUTOUT.top - BOTTOM + 0.04, 2 * CUTOUT.half), '#2e2a26', { at: [0, (CUTOUT.top + BOTTOM) / 2, zc] }));
-  for (const x of [-HEADLIGHT.x, HEADLIGHT.x]) { // the headlights' housings, in the body's red
-    const f = onFace(1, x, HEADLIGHT.h);
-    P.push(part(new THREE.CylinderGeometry(0.115, 0.12, 0.05, 18), COL.red, { at: [x + 0.012 * Math.sin(f.yaw), HEADLIGHT.h, f.z + 0.012 * Math.cos(f.yaw)], rot: [Math.PI / 2, f.yaw, 0] }));
+  for (const zc of [-PIVOT, PIVOT]) P.push(part(box(0.02, CUTOUT.top - BOTTOM + 0.06, 2 * CUTOUT.half), '#2e2a26', { at: [0, (CUTOUT.top + BOTTOM) / 2, zc] }));
+  // the headlights' surrounds, dark, pointing straight ahead (reaching back into the curved face), a chrome rim
+  for (const x of [-HEADLIGHT.x, HEADLIGHT.x]) {
+    const front = onFace(1, x, HEADLIGHT.h).z + 0.035, ahead = { rot: [Math.PI / 2, 0, 0] };
+    P.push(part(new THREE.CylinderGeometry(0.125, 0.13, 0.11, 20), '#1b1b1b', { at: [x, HEADLIGHT.h, front - 0.055], ...ahead }));
+    P.push(part(new THREE.CircleGeometry(0.098, 20), '#aeb1b3', { at: [x, HEADLIGHT.h, front + 0.001] }));
   }
-  // the lamp units' housings by the corners, the side indicators' on the pillar amidships
-  for (const [sign, z] of [[-1, 6.42], [1, 6.42], [-1, -6.45], [1, -6.45]]) {
-    const s = onSide(sign, z), [h0, h1] = CORNER_LAMP.housing;
-    P.push(part(box(0.02, h1 - h0, 0.095), '#262626', { at: [s.x + s.n[0] * 0.008, (h0 + h1) / 2, z + s.n[1] * 0.008], rot: [0, s.yaw, 0] }));
+  // the lamp units' housings round the corners, the side indicators' on the pillar amidships
+  for (const end of [1, -1]) for (const sign of [-1, 1]) {
+    const c = atCorner(end, sign, CORNER_LAMP.x), [h0, h1] = CORNER_LAMP.housing;
+    P.push(part(box(0.02, h1 - h0, 0.095), '#262626', { at: [c.x + c.n[0] * 0.008, (h0 + h1) / 2, c.z + c.n[1] * 0.008], rot: [0, c.yaw, 0] }));
   }
   for (const sign of [-1, 1]) P.push(part(box(0.016, 0.135, 0.08), '#262626', { at: [sign * (HW + 0.006), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   // the roof (the colour elevation): three hatches, a low cover behind the pantograph, a box amidships, the
@@ -494,8 +538,30 @@ function partsGeometry(wire, variant) {
   P.push(...pantograph(wire));
   for (let i = 1; i < ARM.length; i++) P.push(bar(ARM[i - 1], ARM[i], 0.02, '#8a8d90'));
   P.push(part(box(0.22, 0.38, 0.05), '#1c1c1c', { at: [-1.66, 2.2, 6.24] })); // (its top behind the plate)
-  P.push(bar([0.78, 1.72, 6.58], [0.98, 1.8, 6.52], 0.012, '#8a8d90'), part(box(0.05, 0.18, 0.11), '#1c1c1c', { at: [1.0, 1.9, 6.5] }));
+  const lm = atCorner(1, 1, 0.98); // (the small mirror's bracket from the corner, just behind the windscreen's wrap)
+  P.push(bar([lm.x - 0.02, 1.72, lm.z], [lm.x + 0.18, 1.8, lm.z - 0.06], 0.012, '#8a8d90'), part(box(0.05, 0.18, 0.11), '#1c1c1c', { at: [lm.x + 0.2, 1.9, lm.z - 0.08] }));
   return mergeGeometries(P);
+}
+
+// The coupler (the user's picture of a T3's, 2026-11-10: "something like the attached image, only dark"): a round
+// bar from the yoke's pin under the body end (T3.couplerPivot) to a clamp, the head cast in one with a neck, its
+// mouth two jaws with the coupling pin down through them and its handle on top; the jaws' faces at the plane
+// where two coupled heads meet (sign 1 the front)
+function coupler(sign) {
+  const C = [], z = (d) => sign * (COUPLER_FACE - d), y = COUPLER_H, bar0 = '#2f3133', cast = '#28292b', along = { rot: [Math.PI / 2, 0, 0] };
+  C.push(bar([0, y, sign * T3.couplerPivot], [0, y, z(0.52)], 0.034, bar0));
+  C.push(part(new THREE.CylinderGeometry(0.056, 0.056, 0.11, 12), '#36383a', { at: [0, y, z(0.47)], ...along })); // the clamp
+  for (const s of [-1, 1]) C.push(part(box(0.03, 0.035, 0.09), '#36383a', { at: [s * 0.07, y + 0.035, z(0.47)] })); // its bolts' lugs
+  // the neck widening from the clamp into the head: a square frustum, flattened to the head's height
+  C.push(part(new THREE.CylinderGeometry(0.165 / Math.SQRT2, 0.075 / Math.SQRT2, 0.16, 4).rotateY(Math.PI / 4), cast, { at: [0, y, z(0.34)], rot: [sign * Math.PI / 2, 0, 0], scale: [1, 1, 0.76] }));
+  C.push(part(box(0.165, 0.125, 0.2), cast, { at: [0, y, z(0.2)] })); // the head
+  for (const s of [-1, 1]) C.push(part(box(0.05, 0.125, 0.1), cast, { at: [s * 0.0575, y, z(0.05)] })); // the jaws
+  C.push(part(box(0.065, 0.03, 0.1), cast, { at: [0, y - 0.0475, z(0.05)] })); // the mouth's floor
+  C.push(part(new THREE.CylinderGeometry(0.017, 0.017, 0.2, 8), '#3a3c3e', { at: [0, y + 0.02, z(0.06)] })); // the pin
+  C.push(bar([-0.045, y + 0.12, z(0.06)], [0.045, y + 0.12, z(0.06)], 0.009, '#3a3c3e'));
+  for (const s of [-1, 1]) C.push(bar([s * 0.045, y + 0.12, z(0.06)], [s * 0.03, y + 0.07, z(0.06)], 0.009, '#3a3c3e')); // the handle
+  for (const s of [-1, 1]) C.push(part(new THREE.CylinderGeometry(0.03, 0.03, 0.015, 10), '#3a3c3e', { at: [s * 0.0835, y, z(0.2)], rot: [0, 0, Math.PI / 2] })); // the side bosses
+  return C;
 }
 
 // The lamps (lit): the round headlights; rectangular units by the corners, an orange indicator over a clear
@@ -505,13 +571,12 @@ function partsGeometry(wire, variant) {
 function lampsGeometry() {
   const L = [];
   for (const x of [-HEADLIGHT.x, HEADLIGHT.x]) {
-    const f = onFace(1, x, HEADLIGHT.h);
-    L.push(part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x + 0.042 * Math.sin(f.yaw), HEADLIGHT.h, f.z + 0.042 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
+    L.push(part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x, HEADLIGHT.h, onFace(1, x, HEADLIGHT.h).z + 0.038] }));
   }
-  for (const [sign, z, low] of [[-1, 6.42, '#f2efe4'], [1, 6.42, '#f2efe4'], [-1, -6.45, '#d8261a'], [1, -6.45, '#d8261a']]) {
-    const s = onSide(sign, z), at = (h) => [s.x + s.n[0] * 0.02, h, z + s.n[1] * 0.02], { high: [a0, a1], low: [c0, c1] } = CORNER_LAMP;
-    L.push(part(box(0.012, a1 - a0, 0.075), '#ff9a22', { at: at((a0 + a1) / 2), rot: [0, s.yaw, 0] }));
-    L.push(part(box(0.012, c1 - c0, 0.075), low, { at: at((c0 + c1) / 2), rot: [0, s.yaw, 0] }));
+  for (const [end, low] of [[1, '#f2efe4'], [-1, '#d8261a']]) for (const sign of [-1, 1]) {
+    const c = atCorner(end, sign, CORNER_LAMP.x), at = (h) => [c.x + c.n[0] * 0.02, h, c.z + c.n[1] * 0.02], { high: [a0, a1], low: [c0, c1] } = CORNER_LAMP;
+    L.push(part(box(0.012, a1 - a0, 0.075), '#ff9a22', { at: at((a0 + a1) / 2), rot: [0, c.yaw, 0] }));
+    L.push(part(box(0.012, c1 - c0, 0.075), low, { at: at((c0 + c1) / 2), rot: [0, c.yaw, 0] }));
   }
   const onRear = (x, h, w, hh, color) => {
     const f = onFace(-1, x, h);
@@ -620,7 +685,7 @@ function shapes(wire, variant) {
     // route inverted in the rear window
     const plates = {
       rb: onBody(probe, 0, 2.80, 1, ROUTE_BOX.w, ROUTE_BOX.h), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),
-      dest: onBody(probe, -0.02, 1.77, 1, 0.46, 0.19), run: onBody(probe, -0.67, 1.725, 1, 0.12, 0.09), rear: onBody(probe, 0, 1.90, -1, 0.34, 0.3),
+      dest: onBody(probe, -0.02, 1.77, 1, 0.46, 0.19), run: onBody(probe, -0.8, 1.725, 1, 0.12, 0.09), rear: onBody(probe, 0, 1.90, -1, 0.34, 0.3),
       led: onFlank(-1, SIDE_DISPLAY.z, SIDE_DISPLAY.h, SIDE_DISPLAY.w, SIDE_DISPLAY.hh),
     };
     const fleet = mergeGeometries([onFaceStrip(1, FLEET.front, FLEET_QW, FLEET_QH), onFaceStrip(-1, FLEET.rear, FLEET_QW, FLEET_QH),

@@ -438,10 +438,13 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's outline** (#427, `src/t3simple.js`): drawingdatabase.com's general arrangement (`Tatra-T3-1.gif`, side and
   plan, dimensioned at 20 mm a pixel) and its colour elevation (`trams_t3_01.png`, 12.66 mm a pixel) agree with each other
   and with Dynybyl's table 3, Wikipedia and the 1977 Soviet manual: body 14 000 × 2 500 mm, 3 060 mm high, pivots 3 800 / 6 400
-  / 3 800 mm. In plan the ends taper from the doors (4.5 m ahead of and 4.8 m behind the centre) to corners 0.73–0.78 m off
-  the centreline; the front and rear doors stand on the taper. The plan view on p. 10 of Dynybyl's thesis is too narrow (the
-  user, 2026-11-09: "looks more narrow, like t1 or early prototype than t3"). Laid over the colour elevation at its scale, the
-  built model's windows, doors, bands and ends fall on its lines.
+  / 3 800 mm. In plan the ends taper from the doors (4.5 m ahead of and 4.8 m behind the centre); the front and rear doors
+  stand on the taper. The drawing's plan view ends in corners 0.73–0.78 m off the centreline, too narrow against the user's
+  head-on photos of 6892 (below): the model's corners are 1.0 m off it, rounded with 0.32 m, the face bulging 0.21 m (the
+  user, 2026-11-10: "Let's try widening"); from above its ends are ±0.97 m wide, the hybrid's ±1.0 m, conflig's ±0.88 m. The
+  plan view on p. 10 of Dynybyl's thesis is narrower still (the user, 2026-11-09: "looks more narrow, like t1 or early
+  prototype than t3"). Laid over the colour elevation at its scale, the built model's windows, doors, bands and ends fall on
+  its lines.
 - **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
   round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
   from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between
@@ -452,12 +455,19 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on the right, behind the cab window on the left).
 - **The T3 head on** (the user's photo of 6892, 2026-11-10, a telephoto from about 25 m): scaled by the skirt's foot (0.35 m),
   the red's top (1.48 m) and the roof (3.02 m), which agree to 3 %, the headlights' centres are 1.11 m up and 1.11 m apart
-  (the colour elevation: 1.03 m, 1.06 m apart), the bumper 0.76–0.86 m (the elevation: 0.70–0.80), the corner units
-  0.98–1.30 m with the clear lamp's centre (1.06 m) just under the headlights' line, the route box 0.49 × 0.30 m with its top
-  7 cm under the roof's. The ends are open under the bumper between the skirt's corners, which reach in to the headlights'
-  outer edges, ±0.65 m (front and rear, "front and back is open under the bumper"). The same photo puts the corner units at
-  ±0.93–0.99 m and the windscreen's posts at ±0.71 m, where the model built from the plan view has ±0.81 and ±0.61 m: the
-  plan's ends may be too narrow.
+  (the colour elevation: 1.03 m, 1.06 m apart; the model has them 1.08 m apart, the user finding 1.11 m "a tad to far
+  apart"), pointing straight ahead in black rubber surrounds with a chrome rim; the bumper 0.76–0.86 m (the elevation:
+  0.70–0.80), the corner units 0.98–1.30 m with the clear lamp's centre (1.06 m) just under the headlights' line, round the
+  corners ±0.93–0.99 m off the centreline (the rear's ±0.96 m), the windscreen's posts ±0.71 m, the route box 0.49 × 0.30 m
+  with its top 7 cm under the roof's. The ends are open under the bumper between the skirt's corners, which reach in to the
+  headlights' outer edges, ±0.65 m (front and rear, "front and back is open under the bumper").
+- **The T3's bogie from the side** (the user's photo, 2026-11-10; one over the pit, 2026-11-09): the skirt is cut out in arches
+  over the wheels, hugging their treads and level with their tops between them (the colour elevation and conflig's model have
+  a lower, square cutout); grey wheel discs with a big hex nut on the hub inside rust-brown tyres; a curved guard inside each
+  wheel; the track-brake shoe over the rail with a row of nuts on its upper bar; the ribbed rubber spring in the middle up to
+  the skirt with the gearbox's housing beside it, coil springs by the wheels; everything a dusty warm grey. The coupler (the
+  user's picture, "only dark"): a round bar from the yoke's pin to a clamp, the cast head with two jaws, the coupling pin
+  down through them with its handle on top.
 - **The three T3 types in Prague** (the user, 2026-11-10): the T3, fleet numbers 6400–6992, a silver bumper with two thin
   red stripes (6892: 12 mm, a quarter of the bumper in from its edges), the route box square; the T3SUCS, 7001–7292, the
   bumper brown, the route box with rounded corners; the T3M, 8005–8106, as the T3SUCS with the resistors' box on the roof
