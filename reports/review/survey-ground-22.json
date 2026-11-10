@@ -1,0 +1,30 @@
+{
+ "title": "Survey ground off the lidar, line 22",
+ "issue": 446,
+ "line": "22",
+ "about": "Ground-level survey areas that sit steadily off IPR's 2023 lidar where no surveyed rail runs and DMR 5G (2009-2013) disagrees with IPR too, so the ground changed between the two lidars. The survey may be newer than both; the orthophoto shows which. Answers become data/truth.json surveyGround (python -I tools/survey_ground_answers.py).",
+ "options": [
+  "The survey is right: the ground changed since the lidar",
+  "The lidar is right: move the survey to it"
+ ],
+ "findings": [
+  {
+   "kind": "survey ground",
+   "x": 4288.2,
+   "y": -2351.1,
+   "lat": 50.071668,
+   "lon": 14.485149,
+   "mag": 0.66,
+   "info": "green, 303 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.38 m off IPR, with the survey"
+  },
+  {
+   "kind": "survey ground",
+   "x": 3020.1,
+   "y": -2404.6,
+   "lat": 50.069645,
+   "lon": 14.467698,
+   "mag": 1.59,
+   "info": "sidewalk, 107 m²: the survey +1.59 m off IPR (2023); DMR 5G +0.88 m off IPR"
+  }
+ ]
+}
