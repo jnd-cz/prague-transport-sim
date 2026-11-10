@@ -748,7 +748,8 @@ const FLEET_PX = { w: 480, h: 120 }, FLEET_QH = (FLEET.h * 160) / FLEET_PX.h, FL
 function fleetTexture(n) {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 160;
-  const g = cv.getContext('2d'), s = String(n);
+  const g = cv.getContext('2d'), s = n == null ? '' : String(n);
+  if (!s) return new THREE.CanvasTexture(cv); // (a vehicle without fleet numbers for this type)
   // (the hybrid's font and colour, src/t3h.js fleetTexture: the user, 2026-11-10, "the new model uses different font
   // from the hybrid model and my photos")
   g.fillStyle = '#e3b625';
@@ -762,21 +763,6 @@ function fleetTexture(n) {
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
-}
-
-// The types and their fleet numbers (the user, 2026-11-10: "Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106",
-// and "their proportion in service (probability to appear as AI tram) roughly related to their range sizes").
-// A set's type comes from its run number when not given, each car its own number.
-export const T3_TYPES = { T3: [6400, 6992], T3SUCS: [7001, 7292], T3M: [8005, 8106] };
-const hashOf = (s) => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
-export function t3Variant(run) {
-  const spans = Object.entries(T3_TYPES).map(([k, [a, b]]) => [k, b - a + 1]);
-  let h = hashOf(run) % spans.reduce((s, [, n]) => s + n, 0);
-  for (const [k, n] of spans) { if (h < n) return k; h -= n; }
-}
-export function fleetNumbers(variant, run, cars) {
-  const [lo, hi] = T3_TYPES[variant], h = hashOf(`${run}#`);
-  return Array.from({ length: cars }, (_, k) => lo + ((h + k * 37) % (hi - lo + 1)));
 }
 
 let SHAPES = null;
@@ -897,8 +883,9 @@ export function poseSimple(model, { collector, braking, signals, highBeam } = {}
 
 // A set of `cars` built-in T3s in `root` (src/models.js makeT3): `mats` holds the plates' materials
 // (route box, mirror plate, rear plate, destination and run cards), which setConsistLine swaps; `variant`
-// 'T3', 'T3SUCS' or 'T3M' (T3_TYPES), `fleet` the cars' numbers; the collector on the wire `wire` m over the rail.
-export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = fleetNumbers(variant, '', cars) } = {}) {
+// 'T3', 'T3SUCS' or 'T3M' (its manifest's variants, assets/t3simple/vehicle.json), `fleet` the cars' numbers; the
+// collector on the wire `wire` m over the rail.
+export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = Array(cars).fill(null) } = {}) {
   const P = shapes(variant);
   // each set owns its materials (traffic fades them one set at a time); the shapes and the livery are shared
   Object.assign(mats, {

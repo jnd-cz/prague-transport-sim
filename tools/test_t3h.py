@@ -28,8 +28,12 @@ SYNTHETIC = r"""async () => {
   const THREE = await import('three');
   const t3h = await import('/src/t3h.js');
   const models = await import('/src/models.js');
-  const files = await Promise.all(t3h.T3H_FILES.map(async (f) => {
-    const r = await fetch('/' + f);
+  // (its files from its manifest; the registry gives the sets their fleet numbers)
+  const vehicles = await import('/src/vehicles.js');
+  await vehicles.loadRegistry();
+  const man = vehicles.byId.get('t3h');
+  const files = await Promise.all([man.model, man.rig].map(async (f) => {
+    const r = await fetch('/' + vehicles.fileUrl(man, f));
     return { ok: r.ok, json: () => r.json(), arrayBuffer: () => r.arrayBuffer() };
   }));
   const proto = await t3h.loadHybridT3(files, 5.34);
@@ -251,7 +255,7 @@ def main():
                 # the classic model, downloaded when picked
                 page.goto(f"{base}/?line={args.line}", timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
-                page.evaluate("document.getElementById('optAuto').checked = false; const o = document.getElementById('optModel'); o.value = 'classic'; o.dispatchEvent(new Event('change'))")
+                page.evaluate("document.getElementById('optAuto').checked = false; const o = document.getElementById('optModel'); o.value = 't3'; o.dispatchEvent(new Event('change'))")
                 page.evaluate("document.getElementById('btnStart').click()")
                 page.wait_for_function("window.game && window.tramModel && window.camera", timeout=120000)
                 r["classic"] = c = page.evaluate("({ kind: window.tramModel.userData.kind, cars: window.tramModel.userData.cars.length, credit: /conflig/.test(document.getElementById('attrib').textContent) })")

@@ -1,6 +1,6 @@
 """The frame time and the draw calls with each tram model (tools/bench/frametime.js), in a headed Chromium.
 
-Usage: python -P -E tools/frametime.py [--line 17] [--models detailed,classic,simple] [--fov 62,22.75] [--frames 600] [--headless]
+Usage: python -P -E tools/frametime.py [--line 17] [--models t3h,t3,t3simple] [--fov 62,22.75] [--frames 600] [--headless]
 
 Its own server on a free port; for each model a fresh page at 1280 x 720 loads the line, starts the first
 trip with that model, adds three more sets ahead and measures `--frames` frames with vsync off (so the
@@ -33,6 +33,9 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+
+OLD = {"detailed": "t3h", "classic": "t3", "simple": "t3simple"}  # (the models' names before #455)
 
 
 def measure(line, models, frames, headless, warm=120, fovs=(None,)):
@@ -77,7 +80,7 @@ def table(rows):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--line", default="17")
-    ap.add_argument("--models", default="detailed,classic,simple")
+    ap.add_argument("--models", default="t3h,t3,t3simple", help="vehicle ids (assets/vehicles.json); the old names detailed, classic, simple still work")
     ap.add_argument("--fov", default="", help="vertical fields to measure each model at, e.g. 62,22.75 (default: the camera's)")
     ap.add_argument("--frames", type=int, default=600)
     ap.add_argument("--headless", action="store_true", help="headless, on the GPU where there is one (else SwiftShader): checks the bench runs")
@@ -89,7 +92,7 @@ def main():
     with HeavyJob("frametime"):  # (frame times need the machine to itself: it waits for the heavy jobs, #280)
         faulthandler.dump_traceback_later(1800, exit=True)  # page.evaluate has no time limit
         fovs = [float(f) for f in args.fov.split(",") if f] or [None]
-        rows = measure(args.line, args.models.split(","), args.frames, args.headless, fovs=fovs)
+        rows = measure(args.line, [OLD.get(m, m) for m in args.models.split(",")], args.frames, args.headless, fovs=fovs)
         faulthandler.cancel_dump_traceback_later()
     os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
     with open(os.path.join(ROOT, "reports", "frametime.json"), "w", encoding="utf-8", newline="") as f:

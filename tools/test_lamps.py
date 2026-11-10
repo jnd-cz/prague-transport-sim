@@ -50,7 +50,7 @@ AI = """async () => {
   const models = await import('/src/models.js');
   const { indicating } = await import('/src/indicators.js');
   const tr = window.traffic, g = window.game, way = tr.lampWays.ahead, lit = %s;
-  const m = models.makeT3({ line: '9', cars: 2, detailed: false, variant: 'T3M', run: '801' });
+  const m = models.makeT3({ line: '9', cars: 2, vehicle: 't3simple', variant: 'T3M', run: '801' });
   tr.group.add(m);
   const out = { turns: way.turns.length, kerb: way.kerb.length, stops: way.stops.length, ours: { turns: g.lamps.turns.length, kerb: g.lamps.kerb.length } };
   // braking 20 m before the first stop where passengers cross a car lane
@@ -104,7 +104,7 @@ def main():
             page.goto(f"{base}/?line={args.line}", timeout=300000)
             page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
             page.evaluate("document.getElementById('optAuto').checked = false")
-            page.select_option("#optModel", "simple")
+            page.select_option("#optModel", "t3simple")
             page.evaluate("document.getElementById('btnStart').click()")
             page.wait_for_function("window.game && window.tramModel && window.traffic && window.game.lamps", timeout=60000)
             page.wait_for_timeout(1500)

@@ -13,10 +13,6 @@ import * as THREE from 'three';
 import { T3, CAR_PITCH } from './tram.js';
 import { beamsMesh } from './lamps.js';
 
-export const T3H_FILES = ['assets/t3h/tatra-t3-hybrid-nc.glb', 'assets/t3h/rig.json'];
-export const T3H_CREDIT = 'Tatra T3 3D model: hybrid of "Tatra T3" by SimonStrikesBack (sketchfab.com, CC BY 4.0) '
-  + 'and "Tatra T3" by Jakub Vaja (conflig) (sketchfab.com, CC BY-NC 4.0), modified; CC BY-NC 4.0.';
-
 const PLANE = CAR_PITCH / 2;    // the plane two coupled heads meet in, from the car centre
 // saloon materials: the seats, their frames and the grab rails, the ceiling and its lamps, the cab desk
 const INSIDE = new Set(['Handles', 'Control_Panel', 'Red_Seat', 'Blue_Seat', 'Leather', 'Material',
@@ -47,7 +43,7 @@ function painted(src, m, color) {
   return g;
 }
 
-// responses: the loader's bodies of T3H_FILES; contact: the contact wire over the rail (the lighter level's
+// responses: the loader's bodies of the model and its rig (assets/t3h/vehicle.json); contact: the contact wire over the rail (the lighter level's
 // collector)
 export async function loadHybridT3(responses, contact) {
   const [glbR, rigR] = responses;
@@ -369,15 +365,13 @@ function fleetTexture(n) {
 const setMap = (m, tex) => { if (!m || m.map === tex) return; if (m.map && !m.map.userData.shared && m.userData.own) m.map.dispose(); m.map = tex; m.userData.own = !tex.userData.shared; m.needsUpdate = true; };
 
 // ---------------------------------------------------------------------------------------------- sets
-let fleetCounter = 0;
-// A set of `cars` cars on `root`. Fleet numbers are placeholders (as the run number until the data has
-// them): Prague's T3SUCS were numbered from 7001.
-export function makeHybridSet(root, line, cars, dest, run, collector) {
+// A set of `cars` cars on `root`, `fleet` their numbers (src/vehicles.js fleetNumbers: the manifest's range picked by
+// the run number, a placeholder as the run number is until the data has them).
+export function makeHybridSet(root, line, cars, dest, run, collector, fleet = Array(cars).fill(null)) {
   const { template, rig, clips } = proto;
   const own = new Map();
   const mat = (m) => { let c = own.get(m); if (!c) { c = m.clone(); own.set(m, c); } return c; };
   Object.assign(root.userData, { hybrid: true, cars: [], bogie: proto.bogie, mats: { body: true }, line, dest, run, level: 'full' });
-  const first = 7001 + 2 * (fleetCounter++ % 140);
   for (let k = 0; k < cars; k++) {
     const car = new THREE.Group();
     car.rotation.order = 'YXZ';
@@ -389,7 +383,7 @@ export function makeHybridSet(root, line, cars, dest, run, collector) {
       x.traverse((o) => {
         if (!o.material) return;
         if (rig.numberPlates.includes(o.name)) {
-          if (!fleetMat.has(o.material)) { const c = o.material.clone(); c.map = fleetTexture(first + k); c.userData.own = true; fleetMat.set(o.material, c); }
+          if (!fleetMat.has(o.material)) { const c = o.material.clone(); c.map = fleetTexture(fleet[k] ?? ''); c.userData.own = true; fleetMat.set(o.material, c); }
           o.material = fleetMat.get(o.material);
         } else o.material = mat(o.material);
       });

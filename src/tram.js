@@ -7,7 +7,7 @@ import { TR37 } from './tr37.js';
 
 const G = 9.81;
 
-// the Tatra T3's body (per car)
+// the Tatra T3's body (per car); a vehicle's manifest names its type (assets/*/vehicle.json `type`, VEHICLE_TYPES)
 export const T3 = {
   length: 15.2,              // over couplers (body 14.0 m), DPP training manual: the head's face to the other's
   // (#248, the sources in the issue's research comment of 2026-11-04)
@@ -30,6 +30,7 @@ export const T3 = {
   sandSecs: 1500,
   lineVoltage: 600,
 };
+export const VEHICLE_TYPES = { T3 };
 
 // wheel/rail adhesion coefficient by weather (sand adds ~0.1); snow: the rail head under fresh snow
 // (game.js: compacted snow and ice at the pedestrian crossings is worse)

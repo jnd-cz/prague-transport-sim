@@ -1615,7 +1615,7 @@ export class Traffic {
     // (a run number from a counter, not this.rand: the seeded traffic runs stay as they were; no
     // destination card: where another line's tram goes is not in our data)
     this.tramCount = (this.tramCount || 0) + 1;
-    const mesh = makeT3({ line, cars, detailed: this.game.opts.detailed, run: `8${String(1 + ((this.tramCount * 17) % 40)).padStart(2, '0')}` });
+    const mesh = makeT3({ line, cars, vehicle: this.game.opts.vehicle, run: `8${String(1 + ((this.tramCount * 17) % 40)).padStart(2, '0')}` });
     setOpacity(mesh, 0);
     this.group.add(mesh);
     return { id: this.tramCount, mesh, length: T3.length * cars + COUPLING_GAP * (cars - 1) };

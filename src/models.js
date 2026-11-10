@@ -1,11 +1,12 @@
 // Low-poly models built from primitives: cars, pedestrians, signals and signs; the T3 sets (the built-in car
 // in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
 import * as THREE from 'three';
-import { hybridReady, makeHybridSet, setHybridLine, poseHybrid } from './t3h.js';
-import { makeSimpleSet, poseSimple, t3Variant, fleetNumbers, ROUTE_BOX } from './t3simple.js';
+import { hybridReady, loadHybridT3, makeHybridSet, setHybridLine, poseHybrid } from './t3h.js';
+import { makeSimpleSet, poseSimple, ROUTE_BOX } from './t3simple.js';
+import { vehicles, byId, fileUrl, variantOf, fleetNumbers } from './vehicles.js';
 import { hangConsist } from './consist.js';
 import { signalsAt } from './lamps.js';
-import { CAR_PITCH } from './tram.js';
+import { CAR_PITCH, VEHICLE_TYPES } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
 
@@ -169,19 +170,82 @@ function destinationTexture(name) {
 // separate children so each can follow the track on its own bogies: see placeConsist().
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
-// detailed: 'hybrid' (or true: the animated hybrid, src/t3h.js), 'classic' (conflig's model, loaded on the
-// player's choice), false (the built-in car, src/t3simple.js); a model not loaded falls back to the next simpler one.
-// variant (the built-in car): 'T3', 'T3SUCS' or 'T3M'; none: one from the run number (src/t3simple.js T3_TYPES)
-export function makeT3({ line = '22', cars = 1, detailed = true, dest = null, run = '', variant = null } = {}) {
-  const root = new THREE.Group();
+// vehicle: a vehicle's id (assets/vehicles.json); one not loaded gives way to the first loaded one in the index
+// (pickVehicle). variant: one of the vehicle's types ('T3', 'T3SUCS', 'T3M' for the built-in car); none: one from
+// the run number (src/vehicles.js variantOf); the cars' fleet numbers from its range.
+export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run = '', variant = null } = {}) {
+  const root = new THREE.Group(), v = pickVehicle(vehicle), loader = v?.loader ?? loadedLoader();
+  const type = variant ?? variantOf(v, run) ?? 'T3SUCS', fleet = fleetNumbers(v, type, run, cars);
   root.userData.line = line;
-  if (detailed === 'classic' && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
-  if (detailed && hybridReady()) { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP); root.userData.kind = 'hybrid'; return root; }
-  if (detailed && detailedProto) { makeDetailedSet(root, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
-  const v = variant ?? t3Variant(run);
-  makeSimpleSet(root, cars, dest, plateMats(line, dest, run, v), CONTACT_WIRE - RAIL_TOP, { variant: v, fleet: fleetNumbers(v, run, cars) });
+  root.userData.vehicle = v?.id ?? null;
+  if (loader === 'gltf-classic') { makeDetailedSet(root, detailedProto, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
+  if (loader === 'gltf') { makeDetailedSet(root, gltfProtos.get(v.id), line, cars, dest, run); root.userData.kind = 'gltf'; return root; }
+  if (loader === 'gltf-rigged') { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet); root.userData.kind = 'hybrid'; return root; }
+  makeSimpleSet(root, cars, dest, plateMats(line, dest, run, type), CONTACT_WIRE - RAIL_TOP, { variant: type, fleet });
   Object.assign(root.userData, { kind: 'simple', dest, run });
   return root;
+}
+
+// The vehicle a set is built as: the one asked for when it is loaded, else the first loaded one in the index's order
+// (the built-in car is always loaded); null without a registry (a test page that loads a model by itself, which
+// then builds with loadedLoader).
+const loaded = (v) => v.loader === 'builtin' || (v.loader === 'gltf-rigged' ? hybridReady()
+  : v.loader === 'gltf-classic' ? !!detailedProto : gltfProtos.has(v.id));
+export function pickVehicle(id) {
+  const v = byId.get(id);
+  return v && loaded(v) ? v : vehicles.find(loaded) ?? null;
+}
+const loadedLoader = () => (hybridReady() ? 'gltf-rigged' : detailedProto ? 'gltf-classic' : 'builtin');
+
+// Load a vehicle's files and make its template, once. get(url) -> a fetch-like body (the loading screen's
+// Loader.get counts its bytes): the files first, all of them, then the loader its manifest names.
+const loads = new Map();
+const MIME = { gltf: 'model/gltf+json', glb: 'model/gltf-binary', bin: 'application/octet-stream', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json' };
+export function loadVehicle(v, get = (u) => fetch(u)) {
+  if (!loads.has(v.id)) loads.set(v.id, (async () => {
+    const res = await Promise.all((v.files || []).map((f) => get(fileUrl(v, f.path))));
+    const missing = v.files.filter((f, i) => !res[i].ok).map((f) => f.path);
+    if (missing.length) throw new Error(`vehicle ${v.id}: files missing: ${missing.join(', ')}`);
+    const body = (path) => res[v.files.findIndex((f) => f.path === path)];
+    // (the glTF's own references to its buffers and images resolve to the files already downloaded)
+    const blobs = () => Object.fromEntries(v.files.map((f, i) => [fileUrl(v, f.path), res[i].blobUrl(MIME[f.path.split('.').pop().toLowerCase()])]));
+    if (v.loader === 'gltf-rigged') await loadHybridT3([body(v.model), body(v.rig)], CONTACT_WIRE - RAIL_TOP);
+    else if (v.loader === 'gltf-classic') await loadDetailedT3(fileUrl(v, v.model), blobs());
+    else if (v.loader === 'gltf') await loadGltfVehicle(v, blobs());
+    return v;
+  })());
+  return loads.get(v.id);
+}
+
+// A tier-1 glTF vehicle (loader 'gltf', docs/vehicles.md): a still model in metres, its origin on the rail plane
+// midway between the bogie pivots, +Y up, facing the manifest's `forward` ('+Z', the game's, unless it says '+X',
+// '-X' or '-Z'). Its meshes are baked into the game's axes once; its pivots are its type's (src/tram.js).
+const gltfProtos = new Map();
+const TURN = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
+async function loadGltfVehicle(v, files) {
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((u) => files[u] || u);
+  const gl = await new GLTFLoader(manager).loadAsync(fileUrl(v, v.model));
+  const turn = new THREE.Matrix4().makeRotationY(TURN[v.forward ?? '+Z'] ?? 0);
+  gl.scene.updateMatrixWorld(true);
+  const proto = new THREE.Group(), box = new THREE.Box3();
+  gl.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(turn, o.matrixWorld));
+    g.computeBoundingBox(); g.computeBoundingSphere();
+    box.union(g.boundingBox);
+    const m = new THREE.Mesh(g, o.material);
+    m.name = o.name;
+    proto.add(m);
+  });
+  if (!proto.children.length) throw new Error(`vehicle ${v.id}: no meshes in ${v.model}`);
+  const type = VEHICLE_TYPES[v.type];
+  if (!type) throw new Error(`vehicle ${v.id}: unknown type ${v.type}`);
+  proto.userData = { bogie: type.bogies / 2, bodyFront: box.max.z };
+  for (const m of proto.children) for (const x of [m.geometry, ...texturesOf(m.material)]) x.userData.shared = true;
+  gltfProtos.set(v.id, proto);
+  return proto;
 }
 
 // the plates' and cards' materials of a set: route box and mirror plate glowing, the cards on the glass lit like the body
@@ -201,12 +265,11 @@ function plateMats(line, dest, run, variant) {
 // found by principal component analysis of the body: length e1 (front = wipers), width e2
 // (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
 let detailedProto = null;
-export const classicReady = () => !!detailedProto;
 export const CONTACT_WIRE = 5.34;  // contact wire over top of rail (the track profile; src/heights.js)
 export const RAIL_TOP = 0;         // the wheels stand on the profile: it is the top of rail (src/heights.js)
 
 // files: { url: blob URL } of parts already downloaded (the loading screen counts their bytes)
-export async function loadDetailedT3(url = 'assets/t3/t3.gltf', files = {}) {
+export async function loadDetailedT3(url, files = {}) {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((u) => files[u] || u);
@@ -292,7 +355,7 @@ export async function loadDetailedT3(url = 'assets/t3/t3.gltf', files = {}) {
   return proto;
 }
 
-// The route number boxes painted in the model's texture (pixel rectangles in t3_color.jpg, found
+// The route number boxes painted in the model's texture (pixel rectangles in its colour map, found
 // by colour): map each rectangle's corners onto the model through the triangle whose texture
 // coordinates contain its centre (glTF texture v runs downwards), then make an upright quad over
 // it, a little proud of the surface and a little larger. The rear box mirrors the front one.
@@ -370,21 +433,22 @@ function boxQuad(b) {
   return g;
 }
 
-function makeDetailedSet(root, line, cars, dest, run) {
-  // own material per set (traffic fades sets individually), shared geometry
-  const mat = detailedProto.children[0].material.clone();
-  const mats = { ...plateMats(line, dest, run), body: mat };
+// A set of a still model (the classic, a tier-1 glTF): the template's meshes with the set's own copies of its
+// materials (traffic fades sets individually), the geometry shared
+function makeDetailedSet(root, proto, line, cars, dest, run) {
+  const own = new Map(), mat = (m) => { if (!own.has(m)) own.set(m, m.clone()); return own.get(m); };
+  const mats = { ...plateMats(line, dest, run), body: mat(proto.children[0].material) };
   root.userData.mats = mats;
   root.userData.dest = dest;
   root.userData.run = run;
-  root.userData.bogie = detailedProto.userData.bogie;
-  root.userData.bodyFront = detailedProto.userData.bodyFront;
+  root.userData.bogie = proto.userData.bogie;
+  root.userData.bodyFront = proto.userData.bodyFront;
   root.userData.cars = [];
-  const { boxes, cards } = detailedProto.userData;
+  const { boxes = [], cards = {} } = proto.userData;
   for (let k = 0; k < cars; k++) {
     const car = new THREE.Group();
     car.rotation.order = 'YXZ';
-    for (const m of detailedProto.children) car.add(new THREE.Mesh(m.geometry, mat));
+    for (const m of proto.children) { const c = new THREE.Mesh(m.geometry, mat(m.material)); c.name = m.name; car.add(c); }
     // the leading car: the roof and mirror plates over the boxes painted in the texture, the cards
     // behind the windscreen (no destination card on a tram whose destination we do not know); the
     // last car: the inverted plate in the rear window
@@ -432,11 +496,11 @@ export function setNextStop(model, next) {
 
 // Put each car of a set on the track (`at(s)` -> [x, y, track bed height, roll]): each car rests on its two bogie
 // pivots, so it yaws, pitches and leans with them, wheels on the rail heads. The hybrid and the built-in car hang
-// each next car on the coupling and pose their bogies, wheels and couplers (src/consist.js); the classic model
-// stands its cars CAR_PITCH apart, its body 0.6 m behind the coupler face, on its own pivots' spacing.
+// each next car on the coupling and pose their bogies, wheels and couplers (src/consist.js); the still models (the
+// classic, a tier-1 glTF) stand their cars CAR_PITCH apart, the body 0.6 m behind the coupler face, on their pivots.
 export function placeConsist(model, sFront, at) {
   const u = model.userData;
-  if (u.kind !== 'classic') { hangConsist(model, sFront, at); return; }
+  if (u.kind !== 'classic' && u.kind !== 'gltf') { hangConsist(model, sFront, at); return; }
   const { bogie, bodyFront } = u;
   u.cars.forEach((car, k) => {
     const c = sFront - k * CAR_PITCH - 0.6 - bodyFront; // car origin (midway between the bogies)

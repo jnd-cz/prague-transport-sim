@@ -123,8 +123,10 @@ export class Loader {
     this.render(true);
   }
 
-  // start downloading now; get(url) later waits for it
-  prefetch(url, label = url.split('/').pop()) {
+  // start downloading now; get(url) later waits for it. bytes: its size when known (a vehicle's manifest), for a
+  // compressed response
+  prefetch(url, bytes = 0, label = url.split('/').pop()) {
+    if (bytes) this.sizes = this.sizes.then((s) => (s[url] ? s : { ...s, [url]: bytes }));
     if (!this.files.has(url)) this.files.set(url, new Download(url, label, () => this.render(), this.sizes));
     return this;
   }

@@ -6,8 +6,8 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, poseT3, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { T3H_FILES, T3H_CREDIT, loadHybridT3 } from './t3h.js';
+import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
+import { loadRegistry, fileUrl, vehicleName } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
@@ -46,7 +46,9 @@ if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId =
 // every file of the line at once (the optional ones may be missing); the T3 model alongside
 for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json']) load.prefetch(`data/line${lineId}.${f}`);
 if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
-for (const f of T3H_FILES) load.prefetch(f);
+// the tram models (assets/vehicles.json, #455): the ones loaded at start downloaded with the line
+const vehicles = await loadRegistry((u) => load.get(u));
+for (const v of vehicles) if (v.preload) for (const f of v.files) load.prefetch(fileUrl(v, f.path), f.bytes);
 // the pedestrians' figures (#251); ?boxpeople keeps the box figures
 const figures = !params.has('boxpeople');
 if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
@@ -100,7 +102,7 @@ try {
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
-const t3Res = await Promise.all(T3H_FILES.map((f) => load.get(f)));
+await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
 // the two tracks of a double-track line at least 3 m apart (OSM sometimes draws them closer)
 // (dev switches for comparing lint runs: ?nospread, ?notunnels)
@@ -297,39 +299,33 @@ applyWeather('dry');
 await load.begin('gpu');
 uploadWorld();
 await load.begin('tram');
-// the detailed T3 (the hybrid model, CC BY-NC 4.0, #248); the built-in low-poly one is the fallback
-let detailedOk = false;
-try { await loadHybridT3(t3Res, CONTACT_WIRE - RAIL_TOP); detailedOk = true; data.attribution += ` ${T3H_CREDIT}`; }
-catch (e) { console.warn('detailed T3 model not loaded', e); }
+// a vehicle loaded (its files, its template) and credited once; one that fails stays out and makeT3 builds the
+// first loaded one before it in the index (the built-in car loads always)
+const credited = new Set();
+async function useVehicle(id) {
+  const v = vehicles.find((x) => x.id === id);
+  if (!v) return;
+  try { await loadVehicle(v, (u) => load.get(u)); }
+  catch (e) { console.warn(`vehicle ${id} not loaded`, e); return; }
+  if (v.licence.credit && !credited.has(id)) { credited.add(id); data.attribution += ` ${v.licence.credit}`; $('attrib').textContent = data.attribution; }
+}
+for (const v of vehicles) if (v.preload) await useVehicle(v.id);
 let people = null;
 if (figures) {
   try { people = new People(scene, await loadPeople(await Promise.all(PEOPLE_FILES.map((f) => load.get(f))))); }
   catch (e) { console.warn('pedestrian figures not loaded: the box figures stay', e); }
 }
 window.people = people;
-// conflig's classic model (CC BY-NC 4.0): simpler, no saloon and no moving parts; downloaded when the player
-// picks it in the menu (the user, 2026-11-04: "make it available for user's choice to load")
-const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.jpg'];
-const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg: 'image/jpeg' };
-const T3_CREDIT = 'Tatra T3 3D model (classic): "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).';
-let classicLoad = null;
-function loadClassic() {
-  classicLoad ??= (async () => {
-    const res = await Promise.all(T3_FILES.map((f) => load.get(f))), blobs = {};
-    for (const r of res) if (r.ok) blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
-    await loadDetailedT3(T3_FILES[0], blobs);
-    data.attribution += ` ${T3_CREDIT}`;
-    $('attrib').textContent = data.attribution;
-  })().catch((e) => console.warn('classic T3 model not loaded', e));
-  return classicLoad;
+// the menu's tram models, in the index's order with their names in the menu's language; the first is the default.
+// One not loaded at start downloads when the player picks it (the user, 2026-11-04, of the classic model: "make it
+// available for user's choice to load").
+function modelMenu() {
+  const sel = $('optModel'), was = sel.value;
+  sel.replaceChildren(...vehicles.map((v) => new Option(vehicleName(v, getLang()), v.id)));
+  sel.value = was || vehicles[0]?.id;
 }
-// the model the menu asks for: 'hybrid', 'classic' or false (the procedural car); makeT3 falls back
-const modelKind = () => {
-  const v = $('optModel').value;
-  if (v === 'simple' || !detailedOk && !classicReady()) return false;
-  return v === 'classic' ? 'classic' : 'hybrid';
-};
-$('optModel').addEventListener('change', () => { if ($('optModel').value === 'classic') loadClassic(); });
+modelMenu();
+$('optModel').addEventListener('change', () => useVehicle($('optModel').value));
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -345,9 +341,9 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-// (the built-in car as a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are T3s, T3SUCS or
-// T3Ms by their run numbers, src/t3simple.js T3_TYPES)
-let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
+// (a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are of the types their vehicle has, by
+// their run numbers: assets/*/vehicle.json `variants`)
+let tramModel = makeT3({ line: data.line, cars: lineCars, vehicle: $('optModel').value, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -396,7 +392,7 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-onLangChange(() => { menuTexts(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+onLangChange(() => { menuTexts(); modelMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
@@ -421,18 +417,18 @@ fillTrips();
 $('btnStart').addEventListener('click', start);
 
 async function start() {
-  if ($('optModel').value === 'classic') await loadClassic();
+  await useVehicle($('optModel').value);
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   zoom = zoomTarget = 1;
   tram.eq.mode = controlMode();
-  const kind = modelKind(), have = kind === 'classic' && !classicReady() ? 'hybrid' : kind || 'simple';
-  if (tramModel.userData.cars.length !== cars || tramModel.userData.kind !== have) {
+  const vehicle = $('optModel').value;
+  if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id) {
     scene.remove(tramModel);
     disposeModel(tramModel);
-    tramModel = makeT3({ line: data.line, cars, detailed: kind, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
+    tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
@@ -451,7 +447,7 @@ async function start() {
     autoIrc: $('optAutoSwitch').checked,
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
-    detailed: modelKind(),
+    vehicle: $('optModel').value,
     seed: Math.floor(random() * 1e9),
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
