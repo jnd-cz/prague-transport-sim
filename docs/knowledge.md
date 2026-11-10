@@ -445,8 +445,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   plan view on p. 10 of Dynybyl's thesis is narrower still (the user, 2026-11-09: "looks more narrow, like t1 or early
   prototype than t3"). Laid over the colour elevation at its scale, the built model's windows, doors, bands and ends fall on
   its lines, except the brows over the windscreen and the rear window: the side view leans them back 0.17 and 0.12 m, the
-  photo of 7290 has them upright, rounding into the roof (the user, 2026-11-10: "make the front brow less slanted, perhaps
-  even perpendicular? The back should be similar"), the route box low on the front one, 3 cm over its lower edge.
+  photo of 7290 has them upright to 2.86 m, then rolling into the roof over 0.5 m (the user, 2026-11-10: "make the front
+  brow less slanted, perhaps even perpendicular? The back should be similar", "a bit thinner, like running a bit down
+  towards the front and back"), the route box low on the front one, 3 cm over its lower edge. The windows wrapping round
+  the ends meet the sides in upright edges with rounded corners; the livery's u follows the outline's points, which move
+  back with the leaning end, so those edges are drawn through each height's own u (`ringU`), not straight in the texture.
 - **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
   round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
   from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between

@@ -32,18 +32,26 @@ const SIDE = { f: 4.51, r: -4.84 }, SPLIT = { f: 6.05, r: -6.10 };
 const CORNER = { f: [1.0, 6.79], r: [1.0, -6.79] };
 const FACE = 0.21, FILLET = 0.32;
 // the nose (on the centreline) by height (the side view): the lower end, the windscreen leaning back from
-// 1.65 m, the roof cap's visor over it at 2.56 m; the brow over it upright to 2.91 m, then rounding into the
-// roof with 0.11 m, the rear's likewise (the user, 2026-11-10, beside the photo of 7290: "make the front brow less
-// slanted, perhaps even perpendicular? The back should be similar"; the side view had it leaning back 0.17 m)
+// 1.65 m, the roof cap's visor over it at 2.56 m; the brow over it upright to 2.86 m, then rolling into the roof
+// over 0.5 m (a quarter ellipse, 0.16 m high), the rear's likewise (the user, 2026-11-10, beside the photo of 7290:
+// "make the front brow less slanted, perhaps even perpendicular? The back should be similar", then "make the brow on
+// both sides a bit thinner, like running a bit down towards the front and back"; the side view had it leaning back)
+const BROW = { top: 2.86, run: 0.5 };
+const brow = (z) => [0, 20, 40, 55, 70, 80, 90].map((d) => {
+  const a = (d * Math.PI) / 180;
+  return [BROW.top + (ROOF - BROW.top) * Math.sin(a), z - BROW.run + BROW.run * Math.cos(a)];
+});
 const NOSE = {
   f: [[0.35, 6.70], [0.47, 6.79], [0.70, 6.85], [0.80, 6.90], [1.04, 6.95], [1.54, 6.96], [1.65, 7.00], [2.53, 6.56], [2.56, 6.68],
-    [2.91, 6.68], [2.965, 6.665], [3.005, 6.625], [3.02, 6.57]],
+    ...brow(6.68)],
   r: [[0.35, 6.71], [0.47, 6.81], [0.70, 6.86], [0.80, 6.91], [1.04, 6.94], [1.50, 6.98], [1.69, 7.00], [2.53, 6.77], [2.56, 6.82],
-    [2.91, 6.82], [2.965, 6.805], [3.005, 6.765], [3.02, 6.71]],
+    ...brow(6.82)],
 };
 const BODY_FRONT = 7.0;
 // the heights of the outlines; a height given twice is a crease (the normals do not blend across it)
-const RINGS = [0.35, 0.47, 0.70, 0.80, 1.04, 1.30, 1.54, 1.65, 1.65, 1.69, 2.10, 2.53, 2.53, 2.56, 2.56, 2.62, 2.70, 2.78, 2.85, 2.91, 2.96, 2.99, 3.01, 3.02];
+// (every 0.1 m through the windows' band, where the end leans; close together where the brow rolls into the roof)
+const RINGS = [0.35, 0.47, 0.70, 0.80, 1.04, 1.30, 1.54, 1.65, 1.65, 1.69, 1.80, 1.90, 2.00, 2.10, 2.20, 2.30, 2.40, 2.53, 2.53,
+  2.56, 2.56, 2.62, 2.70, 2.78, 2.86, 2.91, 2.94, 2.965, 2.985, 3.0, 3.01, 3.017, 3.02];
 const REF_H = 1.2;                                  // the outline the texture is laid out on
 
 // the sides' windows and doors, z from-to (the colour elevation; the doors on the right side)
@@ -169,6 +177,20 @@ function atCorner(end, sign, ax) {
   }
   return null;
 }
+// the texture's u where the outline at height h reaches z on a side (sign -1 the right): the body's own texture
+// coordinates there, which follow the outline's points (they move with the end's lean, the reference's do not)
+function ringU(h, sign, z) {
+  const P = ring(h), R = reference().pts;
+  for (let j = 1; j < P.length; j++) {
+    const a = P[j - 1], b = P[j];
+    if (sign * a.x < 0.5 || sign * b.x < 0.5 || (a.y - z) * (b.y - z) > 0 || a.y === b.y) continue;
+    const t = (z - a.y) / (b.y - a.y);
+    return R[j - 1].u + t * (R[j].u - R[j - 1].u);
+  }
+  return sideU(sign, z);
+}
+// u of a side's point at z on the reference outline
+const sideU = (sign, z) => uAt(sideX(sign, z), z);
 // the point of the reference outline at u
 function atU(u) {
   const R = reference().pts;
@@ -222,8 +244,7 @@ function livery() {
       if (az > 3.3 && az < 5.9) col(LIV.gutter - 0.012, LIV.gutter + 0.004, '#3a3c3e');
     }
   }
-  const sideU = (sign, z) => uAt(sideX(sign, z), z);
-  const along = (sign, z0, z1) => { const a = sideU(sign, z0), b = sideU(sign, z1); return [Math.min(a, b), Math.max(a, b)]; };
+  const along =(sign, z0, z1) => { const a = sideU(sign, z0), b = sideU(sign, z1); return [Math.min(a, b), Math.max(a, b)]; };
   // windows: a thin rubber edge, glass, the transom and the upper pair of hoppers
   for (const [sign, list] of [[-1, WIN_R], [1, WIN_L]]) for (const [z0, z1] of list) {
     const [a, b] = along(sign, z0, z1), m = (a + b) / 2;
@@ -248,8 +269,27 @@ function livery() {
   }
   // the ends' glazing: the panoramic windscreen wrapping round the corners onto the sides, two thin posts in
   // it (±0.71 m: 6892 head on); the rear window likewise, with posts at the corners as well
-  const [fr, fl] = [sideU(-1, 6.22), sideU(1, 6.22)];
-  rrect(fr, fl, 1.66, LIV.glass[1], 14, glass(1.66, LIV.glass[1]), COL.rubber, 2);
+  // (A window's upright edges on the sides are drawn through the body's own coordinates at each height: the
+  // outline's points round an end move back with the leaning windscreen, so an edge straight in the texture
+  // came out kinked on the body; the user, 2026-11-10: "clean, rounded vertical cut on the side where it meets
+  // the doors, currently there's kind of zig zag pattern".)
+  const wrapped = (e, zr, zl, h0, h1, r) => { // e 1 the front; zr, zl: its edges' z on the right and the left
+    const pts = [], N = 6, steps = Math.ceil((h1 - h0 - 2 * r) / 0.04);
+    const arc = (sign, zc, hc, a0, a1) => { for (let i = 0; i <= N; i++) { const a = a0 + (a1 - a0) * i / N; pts.push([sign, zc + e * r * Math.cos(a), hc + r * Math.sin(a)]); } };
+    // the right edge from its foot up, the top across, the left edge down, the foot across
+    arc(-1, zr + e * r, h0 + r, -Math.PI / 2, -Math.PI);
+    for (let i = 1; i < steps; i++) pts.push([-1, zr, h0 + r + (h1 - h0 - 2 * r) * i / steps]);
+    arc(-1, zr + e * r, h1 - r, Math.PI, Math.PI / 2);
+    arc(1, zl + e * r, h1 - r, Math.PI / 2, Math.PI);
+    for (let i = steps - 1; i > 0; i--) pts.push([1, zl, h0 + r + (h1 - h0 - 2 * r) * i / steps]);
+    arc(1, zl + e * r, h0 + r, -Math.PI, -Math.PI / 2);
+    g.beginPath();
+    pts.forEach(([sign, z, h], i) => (i ? g.lineTo : g.moveTo).call(g, X(ringU(h, sign, z)), Y(h)));
+    g.closePath();
+    g.fillStyle = glass(h0, h1); g.fill();
+    g.strokeStyle = COL.rubber; g.lineWidth = 2; g.stroke();
+  };
+  wrapped(1, 6.22, 6.22, 1.66, LIV.glass[1], 0.07);
   for (const x of [-0.71, 0.71]) { const u = uAt(x, onFace(1, x, REF_H).z); span(u - du(0.014), u + du(0.014), 1.66, LIV.glass[1], '#c9c3b2'); }
   g.strokeStyle = '#151515'; g.lineWidth = 3;
   for (const [x0, x1] of [[-0.40, -0.55], [0.06, -0.09]]) { // the wipers
@@ -263,8 +303,7 @@ function livery() {
   };
   flap(1, 1.40, 1.555, '#7c3a2c');
   flap(-1, 1.36, 1.50, '#7a1812');
-  const [rl, rr] = [sideU(1, -6.09), sideU(-1, -6.29)];
-  rrect(rl, rr, 1.70, 2.53, 14, glass(1.70, 2.53), COL.rubber, 2);
+  wrapped(-1, -6.29, -6.09, 1.70, 2.53, 0.07);
   for (const x of [-0.6, 0.6]) { const u = uAt(x, onFace(-1, x, REF_H).z); span(u - du(0.014), u + du(0.014), 1.70, 2.53, '#c9c3b2'); }
   for (const sign of [-1, 1]) { const c = atCorner(-1, sign, CORNER.r[0] - 0.06), u = uAt(c.x, c.z); span(u - du(0.012), u + du(0.012), 1.70, 2.53, '#c9c3b2'); }
   // the skirt cut out over the bogies (transparent: the material tests the alpha)

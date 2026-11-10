@@ -147,6 +147,14 @@ MEASURE = r"""async () => {
     const h = new THREE.Raycaster(new THREE.Vector3(-5, y, z), new THREE.Vector3(1, 0, 0)).intersectObject(body, false)[0];
     return h ? lc.getImageData(Math.floor(h.uv.x * liv.width), Math.floor((1 - h.uv.y) * liv.height), 1, 1).data[3] : -1;
   };
+  // the windows' upright edges on the right side: glass just past the edge (front 6.22 m, rear -6.29 m), not just
+  // short of it, at four heights (the livery's colour where a ray from the right meets the body)
+  const sideRGB = (z, y) => {
+    const h = new THREE.Raycaster(new THREE.Vector3(-5, y, z), new THREE.Vector3(1, 0, 0)).intersectObject(body, false)[0];
+    return h ? Array.from(lc.getImageData(Math.floor(h.uv.x * liv.width), Math.floor((1 - h.uv.y) * liv.height), 1, 1).data.slice(0, 3)) : null;
+  };
+  const isGlass = (c) => !!c && c[0] + c[1] + c[2] < 300;
+  out.windowEdges = [[6.22, 1], [-6.29, -1]].flatMap(([z, e]) => [1.78, 2.0, 2.25, 2.42].map((y) => [isGlass(sideRGB(z + e * 0.04, y)), isGlass(sideRGB(z - e * 0.04, y))]));
   out.arches = Object.fromEntries([[0, 0.7], [0, 0.74], [0.95, 0.7], [0.95, 0.74], [1.25, 0.5], [1.25, 0.6], [1.4, 0.4]].map(([dz, y]) => [`${dz} ${y}`, sideAlpha(3.2 + dz, y)]));
   // a set on a straight: the cars' centres, the couplers' heads
   models.placeConsist(m, 100, (s) => [s, 0, 0, 0]);
@@ -270,6 +278,8 @@ def judge(r):
         "the side: the rear window's foot at -7.0 m": near(r["noseR"]["1.69"], -7.0, 0.02),
         # the user, 2026-11-10: "make the front brow less slanted, perhaps even perpendicular? The back should be similar"
         "the brows upright over the visors": abs(r["noseF"]["2.85"] - r["noseF"]["2.65"]) < 0.005 and abs(r["noseR"]["2.85"] - r["noseR"]["2.65"]) < 0.005,
+        # "clean, rounded vertical cut on the side where it meets the doors": the edge at one z at every height
+        "the windows' edges on the sides upright": r["windowEdges"] == [[True, False]] * 8,
         # "adjust the line plate to sit lower, near the edge": its foot 3 cm over the brow's lower edge (2.56 m)
         "the route box 3 cm over the brow's edge": near(r["routeBox"][0], 2.59, 0.005) and near(r["routeBox"][1], 2.89, 0.005),
         "two cars CAR_PITCH apart": near(r["pitch"], r["CAR_PITCH"], 0.005),
