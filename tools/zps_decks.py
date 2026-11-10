@@ -8,8 +8,10 @@ the nine pieces over the underpass sag to its floor at the portals. A vertex cou
 within TOL of its structure: the Mosty 3D model's top where the model is (tools/mosty3d.py), else the surveyed rails
 (DI, DTMP: tools/dtmp_tracks.py) where they stand on a structure (RAISED over IPR) within REACH. Under it by more, the
 vertex takes the structure's height plus the offset the deck's own vertices keep from it (the surveyed bed under the
-ballast is 0.73 m under the rails on the Krejcárek viaduct). Only on a deck that has vertices on that structure: a
-level-1 area wholly under a structure is another one (a lower deck, a railway under a road bridge) and stays, counted.
+ballast is 0.73 m under the rails on the Krejcárek viaduct). Only on a deck that has vertices on that structure, or
+an area that lies inside a model with every vertex under it (Výtoň's railway on Železniční most); any other level-1
+area under a structure is another one (a lower deck) and stays, counted. The model reaches EDGE past its faces: the
+survey's outlines and its edges part by up to a metre.
 
 Openings. Over an OSM way that passes under a deck (`tunnel=*`, `covered=yes`, layer -1 or above: not the metro), the
 deck's top stays on its plane across the opening: its length from the way, its width from the survey's level-0
@@ -38,9 +40,18 @@ OVER = 2.5  # m over the rails: something over the track, not the deck it runs o
 # not a deck's surface: a building's roof, a wall's top and foot, steps, and what lies under things (an underpass, a
 # tunnel; at level 1 on line 17 by Modřany an underpass area sat 5.5 m under the model's top) or is level (water)
 NOT_DECK = {"roof", "wall", "stairs", "underpass", "tunnel", "water"}
+# the survey's outlines and Mosty 3D's edges part by up to a metre or so: of the deck vertices left on the ground off a
+# model next to its vertices on it (the spikes along Krejcárek's road deck), 223 of 246 on line 37 lie within 1 m of a
+# face, 237 within 1.5 m, and all of lines 9 and 17 within 1 m
+EDGE = 1.5  # m outside a model's faces: still on it
+TRUSS = 1.0  # m off an area's median top: a truss, a pylon or a portal over the deck, not the deck (Výtoň: 210.4 m on 197.5)
 SAG = 0.1  # m under the deck's plane over an opening: the target's tolerance at Divadelní
 PLANE_REACH = 15.0  # m from the way under: the deck's vertices that give its plane
-WALK = 2.5  # m clear over a footway or a cycleway without maxheight (the plane's vertices stand higher)
+# m clear over a footway, a cycleway or steps without maxheight (with MARGIN, 2.3 m); the user, 2026-11-10, from street
+# view of the passages: "The underpasses have enough clearance, for walkway I would keep lower limit of 2.2-2.3 and then
+# whatever slab it leaves"
+WALK = 2.2
+SIDEWALK = 10.0  # m from a street's way under a deck: its sidewalk, not a passage of its own
 SLAB, MARGIN, MIN_SLAB = 1.0, 0.1, 0.3  # m: the default deck, the clearance's margin, the thinnest the page draws
 STREET = {"road", "sidewalk", "tram", "parking", "cycle", "island", "paved", "platform"}
 RAMP_OVER, RAMP_LOW = 4.0, 1.0  # a deck area this far over IPR somewhere and within RAMP_LOW of it elsewhere: a ramp
@@ -56,30 +67,56 @@ class Model:
         self.tris = tris[flat]
         self.owner = np.asarray(bridges.ids)[bridges.owner[flat]] if len(self.tris) else np.zeros(0, int)
         self.tree = shapely.STRtree(shapely.polygons(self.tris[:, :, :2])) if len(self.tris) else None
+        self._foot = {}
 
-    def top(self, x, y):
-        """The highest face over each point and its feature id: (z, id) arrays, NaN and -1 where none."""
-        x, y = np.asarray(x, float), np.asarray(y, float)
-        z, fid = np.full(len(x), np.nan), np.full(len(x), -1)
-        if self.tree is None or not len(x):
-            return z, fid
-        pi, ti = self.tree.query(shapely.points(x, y), predicate="intersects")
-        if not len(pi):
-            return z, fid
+    def _faces(self, x, y, pi, ti):
+        """z of faces ti at points pi (each face's plane at its point nearest to the point: within it, the point itself)."""
         t = self.tris[ti]
+        if not len(ti):
+            return np.zeros(0)
+        q = shapely.get_coordinates(shapely.shortest_line(shapely.polygons(t[:, :, :2]), shapely.points(x[pi], y[pi])))[0::2]
         (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = (t[:, k].T for k in range(3))
         d = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
         ok = np.abs(d) > 1e-9
         d = np.where(ok, d, 1)
-        a = ((y1 - y2) * (x[pi] - x2) + (x2 - x1) * (y[pi] - y2)) / d
-        b = ((y2 - y0) * (x[pi] - x2) + (x0 - x2) * (y[pi] - y2)) / d
-        zz = np.where(ok, a * z0 + b * z1 + (1 - a - b) * z2, -np.inf)
+        a = ((y1 - y2) * (q[:, 0] - x2) + (x2 - x1) * (q[:, 1] - y2)) / d
+        b = ((y2 - y0) * (q[:, 0] - x2) + (x0 - x2) * (q[:, 1] - y2)) / d
+        return np.where(ok, a * z0 + b * z1 + (1 - a - b) * z2, -np.inf)
+
+    def top(self, x, y, reach=None, only=None):
+        """The highest face over each point and its feature id: (z, id) arrays, NaN and -1 where none. A point within
+        `reach` (default EDGE) outside every face takes the highest face that near; `only`: of that feature alone."""
+        x, y = np.asarray(x, float), np.asarray(y, float)
+        z, fid = np.full(len(x), np.nan), np.full(len(x), -1)
+        if self.tree is None or not len(x):
+            return z, fid
+        reach = EDGE if reach is None else reach
+        pts = shapely.points(x, y)
+        pi, ti = self.tree.query(pts, predicate="intersects")
+        if only is not None:
+            pi, ti = pi[self.owner[ti] == only], ti[self.owner[ti] == only]
+        if reach > 0:
+            miss = np.setdiff1d(np.arange(len(x)), pi)
+            if len(miss):
+                mi, mt = self.tree.query(shapely.buffer(pts[miss], reach, quad_segs=2), predicate="intersects")
+                if only is not None:
+                    mi, mt = mi[self.owner[mt] == only], mt[self.owner[mt] == only]
+                pi, ti = np.r_[pi, miss[mi]], np.r_[ti, mt]
+        if not len(pi):
+            return z, fid
+        zz = self._faces(x, y, pi, ti)
         o = np.lexsort((zz, pi))  # by point, the highest last
         last = np.r_[pi[o][1:] != pi[o][:-1], True]
         p, k = pi[o][last], o[last]
         good = np.isfinite(zz[k])
         z[p[good]], fid[p[good]] = zz[k][good], self.owner[ti[k][good]]
         return z, fid
+
+    def footprint(self, fid):
+        """A feature's faces in plan (cached)."""
+        if fid not in self._foot:
+            self._foot[fid] = unary_union(shapely.polygons(self.tris[self.owner == fid][:, :, :2]).tolist()).buffer(EDGE)
+        return self._foot[fid]
 
 
 class Rails:
@@ -147,10 +184,19 @@ def _ring(a, ri):
 
 def check(areas, model, rails):
     """Level-1+ vertices more than TOL under their structure take its height and their deck's offset from it (in place).
-    model: Model; rails: Rails. Returns counts by reason and the areas left under a structure no vertex of their deck
-    is on: {"vertices": {"model": n, "rails": n}, "held": n, "heldAreas": [...], "over": n}."""
+    model: Model; rails: Rails. Returns counts by reason, the areas left under a structure no vertex of their deck is on,
+    and the vertices a structure checks with its height there (flatten keeps them within TOL of it):
+    {"vertices": {"model": n, "rails": n, "inside": n}, "held": n, "heldAreas": [...], "over": n,
+    "checked": {(area, ring, vertex): z}}.
+
+    An area that lies inside a model's faces (its footprint, EDGE wide) with every vertex more than TOL under them is on
+    that structure with the survey's ground heights, and takes the model's top: Výtoň's railway and its walkway on
+    Železniční most's land span, 5 m over the street (the user, 2026-11-10: "there are really three levels: the highest
+    is the railway bridge and walkway alongside. Middle level is the one with our tram tracks and car road, sidewalk
+    towards the river. And finally there's the lowest level right next to the water"); the road over the two arches
+    on line 22 at 50.0850 N 14.3835 E. A vertex whose top stands TRUSS off the area's median top takes the median."""
     where, xyz = _vertices(areas)
-    out = {"vertices": {"model": 0, "rails": 0}, "held": 0, "heldAreas": [], "over": 0}
+    out = {"vertices": {"model": 0, "rails": 0, "inside": 0}, "held": 0, "heldAreas": [], "over": 0, "checked": set()}
     if not len(where):
         return out
     x, y, z = xyz.T
@@ -164,6 +210,7 @@ def check(areas, model, rails):
     agree = np.abs(off) <= TOL
     low = off < -TOL
     out["over"] = int((off > TOL).sum())
+    out["checked"] = {where[n]: float(ref[n]) for n in np.flatnonzero(np.isfinite(ref))}
     group = deck_groups(areas)
     ok, by_area, by_class, by_group = set(), {}, {}, {}
     for (ai, _, _), k, o, g in zip(where, key, off, agree):
@@ -177,13 +224,40 @@ def check(areas, model, rails):
     held = {}
     for n in np.flatnonzero(low):
         ai, ri, vi = where[n]
-        k, gr = key[n], group.get(ai, ai)
+        k, gr, rn = key[n], group.get(ai, ai), ref[n]
+        if (gr, k) not in ok and k[0] == "model":
+            # (where two features meet, a vertex near one's face belongs to the one its deck is on: Libeň's viaducts,
+            # side by side at 210.3 and 212.0 m)
+            for g2, k2 in ok:
+                if g2 == gr and k2[0] == "model":
+                    zf = model.top(x[n:n + 1], y[n:n + 1], only=k2[1])[0][0]
+                    if np.isfinite(zf) and z[n] < zf - TOL:
+                        k, rn = k2, zf
+                        break
         if (gr, k) not in ok:
             held.setdefault(ai, []).append(k)
             continue
         o = by_area.get((ai, k)) or by_class.get((gr, areas[ai]["c"], k)) or by_group[(gr, k)]
-        _ring(areas[ai], ri)[vi][2] = round(float(ref[n] + np.median(o)), 2)
+        _ring(areas[ai], ri)[vi][2] = round(float(rn + np.median(o)), 2)
         out["vertices"][k[0]] += 1
+    mine = {}
+    for n, (ai, _, _) in enumerate(where):
+        if ai in held:
+            mine.setdefault(ai, []).append(n)
+    for ai in list(held):
+        ns = mine[ai]
+        k = key[ns[0]]
+        if k is None or k[0] != "model" or not all(low[n] and key[n] == k for n in ns):
+            continue
+        poly = shapely.Polygon(np.asarray(areas[ai]["r"], float)[:, :2]).buffer(0)
+        if poly.area <= 0 or poly.difference(model.footprint(k[1])).area > 0.1 * poly.area:
+            continue
+        med = float(np.median(ref[ns]))
+        for n in ns:
+            _, ri, vi = where[n]
+            _ring(areas[ai], ri)[vi][2] = round(float(ref[n] if abs(ref[n] - med) <= TRUSS else med), 2)
+        out["vertices"]["inside"] += len(ns)
+        del held[ai]
     out["held"] = sum(len(v) for v in held.values())
     for ai, ks in held.items():
         r = np.asarray(areas[ai]["r"], float)[:, :2]
@@ -243,7 +317,19 @@ def openings(ways, areas, frame):
         over = [i for i in over if decks[i].intersection(poly).area > 0.5]
         if over:
             out.append({"way": w["id"], "name": t.get("name"), "maxheight": maxheight(t), "axis": axis, "poly": poly,
-                        "width": width, "decks": over, "foot": t.get("highway") in ("footway", "cycleway", "steps", "path", "pedestrian")})
+                        "width": width, "decks": over, "foot": t.get("highway") in ("footway", "cycleway", "steps", "path", "pedestrian"),
+                        "sidewalk": t.get("footway") == "sidewalk"})
+    # a street's sidewalk passes under with it: its opening joins the street's beside it, and the deck over it is the
+    # street's (the user, 2026-11-10, on Divadelní's: "there's not really any sidealk from what I can see, only thin kerb
+    # alongside each side"; OSM's footway=sidewalk tunnel there lay under its own three pieces of the deck)
+    streets = [o for o in out if not o["foot"]]
+    for o in [o for o in out if o["sidewalk"]]:
+        near = [s for s in streets if s["axis"].distance(o["axis"]) <= SIDEWALK]
+        if near:
+            s = min(near, key=lambda s: s["axis"].distance(o["axis"]))
+            s["decks"] = sorted(set(s["decks"]) | set(o["decks"]))
+            s["poly"] = s["poly"].union(o["poly"])
+            out.remove(o)
     return out
 
 
@@ -259,14 +345,20 @@ def _plane(pts):
     return lambda x, y: np.full(np.shape(x), m)
 
 
-def flatten(areas, opens, ground):
+def flatten(areas, opens, ground, checked=None):
     """Each opening's decks stay on their plane across it, and are SLAB thick or less by maxheight (in place).
-    ground: IPR at city-frame arrays. Returns {"vertices": n, "openings": [...per opening...]}."""
+    ground: IPR at city-frame arrays (the floor: the user, 2026-11-10, on the sections: "The lidar floor generally looks
+    better and sits lower, have smooth believable curve, so I would prefer that one"); checked: the vertices a structure
+    checks and its height there (check's record): the plane lifts none of them over TOL above it (by Hlavní nádraží,
+    decks of 195-211 m over the same ways took one plane, which lifted a vertex Mosty 3D holds at 199.5 m to 206.4 m).
+    Each area keeps its own plane where it has three of the plane's vertices, else the opening's.
+    Returns {"vertices": n, "openings": [...per opening...], "src": {...}}."""
     where, xyz = _vertices(areas)
     out = {"vertices": 0, "openings": [], "src": {}}
     if not len(where):
         return out
     pts = shapely.points(xyz[:, 0], xyz[:, 1])
+    cap = np.array([(checked or {}).get(w, np.inf) + TOL for w in where])
     for o in opens:
         ax = np.array([o["axis"].interpolate(f, normalized=True).coords[0]
                        for f in np.linspace(0, 1, max(2, int(o["axis"].length) + 1))])
@@ -286,21 +378,20 @@ def flatten(areas, opens, ground):
         plane = _plane(xyz[cand])
         inside = mine & (shapely.distance(pts, o["poly"]) <= 0.5)
         pz = plane(xyz[:, 0], xyz[:, 1])
-        sag = inside & (xyz[:, 2] < pz - SAG)
+        sag = inside & (xyz[:, 2] < pz - SAG) & (pz <= cap)
         for n in np.flatnonzero(sag):
             ai, ri, vi = where[n]
             _ring(areas[ai], ri)[vi][2] = round(float(pz[n]), 2)
             xyz[n, 2] = pz[n]
-        # (the gap under the lowest of the deck's corners over the opening near each point of the way: the deck is drawn
-        # between its corners, and the plane through them ran 3 cm over the drawn top at Divadelní)
-        corner = pts[inside]
-        top = np.array([np.min(xyz[inside, 2][shapely.distance(corner, shapely.Point(p)) <= PLANE_REACH], initial=np.inf)
-                        for p in ax])
-        gap = np.where(np.isfinite(top), top, plane(ax[:, 0], ax[:, 1])) - floor
-        gap_min = float(np.nanmin(gap))
+        # (the gap under the deck's plane, less SAG: the deck is drawn between its corners, and the plane through them ran
+        # 3 cm over the drawn top at Divadelní; a gap under WALK is no floor the lidar saw: by Hlavní nádraží it reads the
+        # station's forecourt over the tram's tunnel, 1.0 m under the deck)
+        gap_min = float(np.nanmin(plane(ax[:, 0], ax[:, 1]) - floor)) - SAG
         t, src = SLAB, "default"
         need = o["maxheight"] or (WALK if o["foot"] else None)  # (a walkway without the tag: the clear height to walk)
-        if need and gap_min - need - MARGIN < SLAB:
+        if gap_min < WALK:
+            src = "unseen"
+        elif need and gap_min - need - MARGIN < SLAB:
             t, src = max(MIN_SLAB, round(gap_min - need - MARGIN, 2)), "maxheight" if o["maxheight"] else "walk"
             for ai in o["decks"]:
                 if t < areas[ai].get("t", SLAB):

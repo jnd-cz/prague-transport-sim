@@ -392,7 +392,7 @@ if _model.tree is None:
     print("decks: no Mosty 3D models (raw/geoportal/mosty3d): only the surveyed rails check the decks")
 _ramps_before = zps_decks.ramps(areas, _city_ground)
 deck_checked = zps_decks.check(areas, _model, zps_decks.Rails(_rails, _city_ground))
-deck_flat = zps_decks.flatten(areas, zps_decks.openings(_under_ways, areas, F), _city_ground)
+deck_flat = zps_decks.flatten(areas, zps_decks.openings(_under_ways, areas, F), _city_ground, deck_checked["checked"])
 deck_report = zps_decks.summary(deck_checked, deck_flat, zps_decks.ramps(areas, _city_ground),
                                 zps_decks.thickness(areas, _model, deck_flat))
 for _h in deck_report["heldAreas"]:

@@ -337,8 +337,13 @@ Sections:
   over 2 m under the model's top, of those over 2 m under the rails (612) one lies within 2 m of it. Under the rails
   the deck's own vertices sit -1.0 to +0.5 m (the surveyed bed under the ballast on Krejcárek, 0.73 m), the model's
   top up to 1.7 m over the deck (parapets). A deck's vertex more than 2 m under its structure takes the structure's
-  height and the offset the deck's own vertices keep from it; a level-1 area with no vertex on the structure over it
-  is another one (level-1 railway areas at the ground on line 37, 7-16 m under a model's top) and stays.
+  height and the offset the deck's own vertices keep from it. Where no vertex of a deck is on its structure, the area
+  lies inside the model with the ground's heights (Výtoň: the railway and its walkway on Železniční most's land span
+  carry the street's 192 m under the model's 197.5 m; the user: three levels, the railway and its walkway on top) and
+  takes the model's top. Mosty 3D's edges and the survey's outlines part by up to a metre: of the vertices left on the
+  ground beside a model's edge on line 37, 223 of 246 lie within 1 m of a face. Under a deck the floor is the lidar's
+  (the user, 2026-11-10: smoother and believable; the survey's level 0 runs 1-2 m under it in a 64 m covered passage on
+  line 9, too few cases for a rule). Walkways keep 2.2-2.3 m clear (the user, from street view of the passages).
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %

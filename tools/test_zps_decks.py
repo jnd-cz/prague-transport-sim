@@ -55,7 +55,7 @@ class Check(unittest.TestCase):
         model = zd.Model(bridge(0, 0, 40, 20, DECK))
         a = square(0, 0, 10, [DECK - 0.7, DECK - 0.7, DECK - 0.7, GROUND])  # (one corner took the ground's line)
         out = zd.check([a], model, NO_RAILS)
-        self.assertEqual(out["vertices"], {"model": 1, "rails": 0})
+        self.assertEqual(out["vertices"], {"model": 1, "rails": 0, "inside": 0})
         self.assertAlmostEqual(a["r"][3][2], DECK - 0.7)
 
     def test_the_neighbours_offset_where_the_area_has_none_on_it(self):
@@ -65,13 +65,41 @@ class Check(unittest.TestCase):
         zd.check([good, sunk], model, NO_RAILS)
         self.assertEqual([q[2] for q in sunk["r"]], [DECK - 0.5] * 4)
 
-    def test_an_area_wholly_under_a_structure_is_another_deck(self):
-        """A railway's level-1 area at the ground under a road bridge: no vertex of its deck on the bridge, it stays."""
+    def test_an_area_partly_under_a_structure_is_another_deck(self):
+        """A level-1 area at the ground running under a bridge and past it, no vertex of its deck on the bridge: it stays."""
         model = zd.Model(bridge(0, 0, 40, 20, DECK + 6))
-        a = square(0, 0, 10, GROUND + 0.2, cls="rail")
+        a = area([(30, 0, GROUND + 0.2), (39, 0, GROUND + 0.2), (39, 10, GROUND + 0.2), (30, 10, GROUND + 0.2),
+                  (30, 30, GROUND + 0.2), (20, 30, GROUND + 0.2), (20, 10, GROUND + 0.2)], cls="rail")
         out = zd.check([a], model, NO_RAILS)
-        self.assertEqual((out["held"], len(out["heldAreas"])), (4, 1))
+        self.assertEqual(len(out["heldAreas"]), 1)
         self.assertEqual(a["r"][0][2], GROUND + 0.2)
+
+    def test_an_area_inside_a_model_with_the_grounds_heights_takes_its_top(self):
+        """Výtoň: the railway and its walkway on Železniční most's land span carry the street's heights, 5 m under the
+        model's slab; a portal's face over one corner (a truss, a pylon) is not the deck."""
+        tris = bridge(0, 0, 40, 20, 197.5).tris
+        portal = bridge(8, 8, 12, 12, 210.4).tris
+        model = zd.Model(SimpleNamespace(tris=np.concatenate([tris, portal]), ids=[7], owner=np.zeros(4, int)))
+        a = square(0, 0, 10, [192.0, 192.1, 192.2, 191.9], cls="rail")
+        out = zd.check([a], model, NO_RAILS)
+        self.assertEqual((out["vertices"]["inside"], out["held"]), (4, 0))
+        self.assertEqual([q[2] for q in a["r"]], [197.5] * 4)
+
+    def test_where_two_features_meet_the_decks_own_one_counts(self):
+        """Libeň: two viaducts side by side at 210.3 and 212.0 m; a corner at the seam belongs to the deck's own one."""
+        a_, b_ = bridge(0, 0, 20, 20, 212.0).tris, bridge(20.5, 0, 40, 20, 210.3).tris
+        model = zd.Model(SimpleNamespace(tris=np.concatenate([a_, b_]), ids=[551, 548], owner=np.array([0, 0, 1, 1])))
+        a = area([(5, 5, 211.8), (19, 5, 211.8), (20.6, 15, 195.7), (5, 15, 211.8)], cls="rail")
+        out = zd.check([a], model, NO_RAILS)
+        self.assertEqual(out["held"], 0)
+        self.assertAlmostEqual(a["r"][2][2], 211.8)
+
+    def test_the_models_edge_reaches_past_its_faces(self):
+        """Krejcárek's road deck: its outline runs a few decimetres off the model's edge; the corner there is on it."""
+        model = zd.Model(bridge(0, 0, 40, 20, DECK))
+        a = area([(10, 5, DECK - 0.3), (20, 5, DECK - 0.3), (20, 20.8, GROUND), (10, 20.8, DECK - 0.3)])
+        zd.check([a], model, NO_RAILS)
+        self.assertAlmostEqual(a["r"][2][2], DECK - 0.3)
 
     def test_the_rails_where_no_model_is(self):
         """Divadelní: no Mosty 3D model, the rails on the deck 5.3 m over IPR's floor."""
@@ -79,7 +107,7 @@ class Check(unittest.TestCase):
         rails = zd.Rails((x, np.full(31, 5.0), np.full(31, 193.25)), lambda x, y: np.full(np.shape(x), 187.95))
         a = square(0, 0, 10, [193.2, 193.2, 187.9, 193.2])
         out = zd.check([a], zd.Model(), rails)
-        self.assertEqual(out["vertices"], {"model": 0, "rails": 1})
+        self.assertEqual(out["vertices"], {"model": 0, "rails": 1, "inside": 0})
         self.assertAlmostEqual(a["r"][2][2], 193.2)
 
     def test_a_deck_over_the_track_is_not_the_tracks_deck(self):
@@ -102,7 +130,7 @@ class Check(unittest.TestCase):
         walls = [square(0, 0, 10, GROUND, cls=c) for c in ("wall", "stairs", "roof", "underpass", "tunnel")]
         walls.append(square(0, 0, 10, GROUND, level=0))
         out = zd.check(walls, model, NO_RAILS)
-        self.assertEqual(out["vertices"], {"model": 0, "rails": 0})
+        self.assertEqual(out["vertices"], {"model": 0, "rails": 0, "inside": 0})
 
 
 class Openings(unittest.TestCase):
@@ -123,10 +151,23 @@ class Openings(unittest.TestCase):
         o = out["openings"][0]
         self.assertEqual(o["sagging"], 2)
         self.assertEqual([q[2] for q in areas[0]["r"]], [193.21] * 6)
-        self.assertAlmostEqual(o["gap"], 5.26)
-        self.assertEqual((o["t"], o["src"]), (0.76, "maxheight"))
-        self.assertAlmostEqual(areas[0]["t"], 0.76)
+        self.assertAlmostEqual(o["gap"], 5.16)  # (5.26 under the plane, less SAG)
+        self.assertEqual((o["t"], o["src"]), (0.66, "maxheight"))
+        self.assertAlmostEqual(areas[0]["t"], 0.66)
         self.assertAlmostEqual(o["clearance"], 4.5)
+
+    def test_a_sidewalk_passes_under_with_its_street(self):
+        """Divadelní: OSM's sidewalk beside the street lies under its own piece of the deck; that piece is the street's."""
+        areas, w, floor = self.divadelni()
+        areas.append(square(17, 0, 3, 193.21))  # (a piece of the deck by the street)
+        kerb = square(15, -30, 8, 188.1, cls="sidewalk", level=0)
+        kerb["r"][2][1] = kerb["r"][3][1] = 50
+        areas.append(kerb)
+        side = way(805407405, [(18.5, -30), (18.5, 50)], highway="footway", footway="sidewalk", tunnel="yes", layer="-1")
+        op = zd.openings([w, side], areas, Frame())
+        self.assertEqual([(o["way"], o["decks"]) for o in op], [(141140410, [0, 2])])
+        zd.flatten(areas, op, floor)
+        self.assertEqual((areas[0]["t"], areas[2]["t"]), (0.66, 0.66))
 
     def test_without_maxheight_the_deck_is_a_metre(self):
         areas, w, floor = self.divadelni()
@@ -135,13 +176,23 @@ class Openings(unittest.TestCase):
         self.assertNotIn("t", areas[0])
 
     def test_a_walkway_without_maxheight_keeps_room_to_walk(self):
-        """A footway 3.2 m under a deck's top: a metre would leave 2.2 m, the deck leaves 2.5 m and the margin."""
+        """A footway 3.0 m under a deck's top: a metre would leave 2.0 m, the deck leaves 2.2 m and the margin."""
         floor = lambda x, y: np.full(np.shape(x), 190.0)  # noqa: E731
-        areas = [square(0, 0, 20, 193.2), square(5, -30, 10, 190.0, cls="sidewalk", level=0)]
+        areas = [square(0, 0, 20, 193.0), square(5, -30, 10, 190.0, cls="sidewalk", level=0)]
         areas[1]["r"][2][1] = areas[1]["r"][3][1] = 50
         w = way(805407405, [(10, -30), (10, 50)], highway="footway", tunnel="yes", layer="-1")
         o = zd.flatten(areas, zd.openings([w], areas, Frame()), floor)["openings"][0]
-        self.assertEqual((o["t"], o["src"], o["clearance"]), (0.6, "walk", 2.6))
+        self.assertEqual((o["t"], o["src"], o["clearance"]), (0.6, "walk", 2.3))
+
+    def test_the_plane_leaves_what_a_structure_checks(self):
+        """By Hlavní nádraží two decks over the same way stand 6 m apart: the lower one, held by its model, stays."""
+        areas, w, floor = self.divadelni()
+        low = area([(2, 2, 189.0), (8, 2, 189.0), (8, 8, 189.0), (2, 8, 189.0)])  # (under the plane's deck, over the way)
+        areas.append(low)
+        op = zd.openings([w], areas, Frame())
+        zd.flatten(areas, op, floor, checked={(2, 0, i): 189.0 for i in range(4)})
+        self.assertEqual([q[2] for q in low["r"]], [189.0] * 4)
+        self.assertEqual([q[2] for q in areas[0]["r"]], [193.21] * 6)
 
     def test_no_way_under_no_opening(self):
         """A ramp to an abutment: its low corners stand on the ground, nothing passes under them."""
