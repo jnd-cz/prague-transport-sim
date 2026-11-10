@@ -62,6 +62,9 @@ function stopDistance(v, state) {
 // reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
 // stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
 // until it turned red (line 17 s 10826).
+// AI trams run AI_UNDER m/s under it, as our autopilot catching up (#242; the user, 2026-11-10: "keep them simply driving swiftly up
+// under the given speed limit"); the oncoming trams ran at 0.85 of it.
+const AI_UNDER = 0.2;
 function limitSpeed(lim, s, len) {
   let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
   for (let d = 5; d < 300; d += 5) v = Math.min(v, Math.sqrt((lim.at(s + d) / 3.6) ** 2 + 2 * 0.7 * Math.max(0, d - 5)));
@@ -1650,7 +1653,7 @@ export class Traffic {
     }
     const profile = this.ground.profile;
     for (const t of this.ahead) {
-      let vt = limitSpeed(g.limits, t.s, t.length);
+      let vt = Math.max(0, limitSpeed(g.limits, t.s, t.length) - AI_UNDER);
       const close = t.s - t.length - tram.s < 300; // (our tram closing in)
       let stopAt = null;
       t.waitFor = null; t.stop = null;
@@ -1749,7 +1752,7 @@ export class Traffic {
     for (const G of gauntlets) G.theirs = { requested: false, occupied: false };
     for (const sig of this.game.signals) sig.backCommitted = false; // (set again below, read by the controller)
     for (const t of this.oncoming) {
-      let vt = limitSpeed(this.backLimits, t.s, t.length) * 0.85;
+      let vt = Math.max(0, limitSpeed(this.backLimits, t.s, t.length) - AI_UNDER);
       let stopAt = this.backStops.find((s) => s > t.s + 0.5 && !t.served.has(s)) ?? null;
       const isStop = stopAt !== null, platformAt = stopAt;
       t.waitFor = null; t.stop = stopAt === null ? null : { s: stopAt, why: 'stop' };

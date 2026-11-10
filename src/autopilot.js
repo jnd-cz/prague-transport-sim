@@ -18,10 +18,18 @@ const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on
 // above all when coming into stops"; the user, 2026-11-07: "Later braking to match real driver"
 const COAST_T = 8;
 // Time in hand (#242; the user, 2026-11-04: "coasting and braking more mildly when the driver is ahead or has enough time compared to
-// timetable"): the next stop's time in the timetable (its departure) less now, less the run there at the line's limits and a dwell.
-// From MILD_FROM s in hand the driving grows milder, fully so MILD_SPAN s later: the target down to 10 km/h under the limit (never under
-// 70 % of it), the coasting into stops and lower limits up to twice as long, the planned braking a quarter softer. Late, it drives as before.
+// timetable"; 2026-11-10: "if there's enough time the autopilot doesn't go as hard into curves and uses less pedal presses to conserve
+// power. If he's late then he uses the probe's plan to catch up"): the next stop's time in the timetable (its departure) less now, less
+// the run there at the line's limits and a dwell. Up to MILD_FROM s in hand it catches up: the target UNDER_LATE under the limit, the
+// curves at the limit, brake step 1 held down a descent only to HOLD_LATE under. (At a 15 km/h limit 0.4 and 1 m/s under held it at
+// 10-14.5 km/h, where the drivers of two line 23 rides held 14-16 down Chotkova; with these and the curves at 1.0 m/s², line 23's moving
+// time fell 1448 -> 1363 s and its drive presses 99 -> 83, energy the same, #431.) From there it grows milder, fully so MILD_SPAN s later:
+// UNDER and HOLD, the curves as at GENTLE_A, the target down to 10 km/h under the limit (never under 70 % of it), the coasting into
+// stops and lower limits up to twice as long, the planned braking a quarter softer.
 const MILD_FROM = 10, MILD_SPAN = 30;
+const UNDER_LATE = 0.2, UNDER = 0.4; // m/s: where the target sits under the limit
+const HOLD_LATE = 0.6, HOLD = 1.0;   // m/s under the target that brake step 1 holds down a descent (src/tr37.js holdUnder)
+const GENTLE_A = 0.8;                // m/s²: the curves' unbalanced lateral acceleration with time in hand (src/route.js A_LAT, the cant's comfort)
 const DWELL = 15; // s at a stop, doors open to closed [assumed]
 const RUN_A = 0.8, RUN_D = 0.9; // m/s²: the quickest run's start and braking, for the run time to the next stop
 // the run there takes this many times the quickest run: on the five lines (seed 1, 169 stretches) the autopilot's took 1.20 times it
@@ -61,6 +69,14 @@ export class Autopilot {
     return Math.max(0, Math.min(1, (this.inHand - MILD_FROM) / MILD_SPAN));
   }
 
+  // the limits it drives to: the game's, their curves eased towards GENTLE_A with time in hand (one profile a route)
+  _limits(g, mild) {
+    if (mild <= 0 || !g.limits || !g.route?.speedLimits || !g.limitUnder) return g.limits;
+    if (this._gentleRoute !== g.route) { this._gentle = g.route.speedLimits([], g.opts?.speedFacts?.past ?? 0, GENTLE_A); this._gentleRoute = g.route; }
+    const full = g.limits, gentle = this._gentle;
+    return { at: (s) => { const v = full.at(s); return v - mild * Math.max(0, v - gentle.at(s)); } };
+  }
+
   step(g, dt) {
     const tr = g.tram;
     const st = g.stops[g.nextStop];
@@ -76,10 +92,12 @@ export class Autopilot {
     }
 
     // target speed: line speed, upcoming restrictions, then everything we must stop for
-    // (1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed, the user, 2026-11-07:
-    // "our autopilot can lean a bit on the faster side where it makes sense")
-    let vt = g.currentLimit / 3.6 - 0.4 - mild * Math.min(10 / 3.6, 0.3 * g.currentLimit / 3.6);
-    let nl = g.nextLimitChange();
+    // (0.7-1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed, the user,
+    // 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense")
+    const lim = this._limits(g, mild), own = lim !== g.limits;
+    const vLim = own ? g.limitUnder(lim) : g.currentLimit;
+    let vt = vLim / 3.6 - (UNDER_LATE + (UNDER - UNDER_LATE) * mild) - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
+    let nl = own ? g.nextLimitChange(lim) : g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
     const gradeHere = g.profile.grade(tr.s - 7);
@@ -406,7 +424,7 @@ export class Autopilot {
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
-      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)) });
+      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)), holdUnder: HOLD_LATE + (HOLD - HOLD_LATE) * mild });
     this.stopWhy = stopAt === null ? null : stopWhy; this.stopAtS = stopAt;
     return { vt, vtDrive, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }

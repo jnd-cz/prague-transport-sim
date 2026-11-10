@@ -1079,21 +1079,24 @@ export class Game {
     if (text) this.msg(`${text} (+${pts})`, 'good', 3);
   }
 
-  get currentLimit() {
-    // the whole tram length must respect a restriction (metre by metre, as the limits are: 5 m steps could step over a
-    // curve's lowest few metres, and did so differently at each position of the tram)
+  get currentLimit() { return this.limitUnder(this.limits); }
+
+  // the lowest limit under the tram in `lim` (the game's limits, or the autopilot's milder ones, #242): the whole tram length
+  // must respect a restriction (metre by metre, as the limits are: 5 m steps could step over a curve's lowest few metres, and
+  // did so differently at each position of the tram)
+  limitUnder(lim) {
     let v = 99;
-    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 1) v = Math.min(v, this.limits.at(s));
+    for (let s = this.tram.s - this.tram.length; s <= this.tram.s + 0.1; s += 1) v = Math.min(v, lim.at(s));
     return v;
   }
 
   // The most restrictive lower limit ahead: the one that needs braking soonest (a 10 km/h
   // curve shortly after a 40 km/h section matters more than the 40).
-  nextLimitChange() {
-    const cur = this.currentLimit;
+  nextLimitChange(lim = this.limits) {
+    const cur = this.limitUnder(lim);
     let best = null, bestNeed = Infinity;
     for (let d = 1; d < 300; d += 1) {
-      const v = this.limits.at(this.tram.s + d);
+      const v = lim.at(this.tram.s + d);
       if (v >= cur) continue;
       const need = Math.sqrt((v / 3.6) ** 2 + 2 * 0.7 * d); // speed allowed now to make it
       if (need < bestNeed) { bestNeed = need; best = { v, d }; }

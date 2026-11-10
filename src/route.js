@@ -337,28 +337,29 @@ export class Route {
   // the posted speed, which stands for the sign, nor the car's top speed (`speedTop`), and 50 without a posted speed
   // (`max-speed`: more needs a Rychlostník, also off the road). A curve under SMALL_RADIUS has its sign: `curveFloor`,
   // 15 km/h over the whole of it (`small-radius-speed`).
-  _designSpeed(s, r, fullCant, cant = 0) {
+  _designSpeed(s, r, fullCant, cant = 0, accel = this.curveAccel) {
     const { osm, dedicated } = this._speedInfo(s);
     if (fullCant) {
       const vd = Math.floor((Math.sqrt((A_LAT + (dedicated ? CANT_MAX : 0) * 9.81 / 1.5) * r) * 3.6) / 5) * 5;
       return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), vd));
     }
     const floor = this.curveFloor ?? 10;
-    const v = r < SMALL_RADIUS ? floor : Math.max(floor, Math.floor(Math.sqrt(((this.curveAccel ?? A_LAT) + cant * 9.81 / 1.5) * r) * 3.6));
+    const v = r < SMALL_RADIUS ? floor : Math.max(floor, Math.floor(Math.sqrt(((accel ?? A_LAT) + cant * 9.81 / 1.5) * r) * 3.6));
     const cap = osm ? Math.min(osm, this.speedTop ?? osm) : 50;
     return Math.min(cap, v);
   }
 
   // speed the curve at s allows (km/h), with the cant actually built there
-  curveSpeed(s) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s)); }
+  curveSpeed(s, accel = this.curveAccel) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s), accel); }
 
   // Speed limits (km/h) to the metre: the curve and the posted speed (curveSpeed), `past` metres on from where they ask
   // for it (`restriction-past`: 15 m on until #211, from 5 m bins) and CURVE_AHEAD before, plus the extra restrictions,
-  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs).
-  speedLimits(extra = [], past = 0) {
+  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs). `accel`: the curves' unbalanced
+  // lateral acceleration, the route's own unless the autopilot asks for its milder curves (#242).
+  speedLimits(extra = [], past = 0, accel = this.curveAccel) {
     const step = 5, metres = Math.ceil(this.length) + 1;
     const curve = new Float32Array(metres);
-    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m);
+    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m, accel);
     const base = new Float32Array(metres);
     for (let m = 0; m < metres; m++) {
       let v = 99;
