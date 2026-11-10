@@ -50,7 +50,7 @@ read from the GLBs and agree with the labs' catalogs.
 | geometry | 43,792 triangles, 262 meshes, 307 nodes, 47 materials. 13 embedded PNGs: 256–1024 px, 0.43 MB, for the lamps, collector, mirror and number and route cards |
 | size | bounding box 14.86 m long, 2.69 m wide, 6.37 m high with the collector at its top |
 | rig | rigid nodes, no skin (`rig.json`): 3 doors with 2 leaves each, 2 bogies and 8 wheels (r 0.396 m), the collector, and 3 indicators per side. 4 fleet numbers, 3 route plates, the destination, run number and 2 side boards |
-| bogies | pivots 6.48 m apart (±3.24 m). The game's built-in model uses 7.6 m; `tramClearance` (`src/tram.js`) assumes 6.36 m |
+| bogies | pivots 6.48 m apart (±3.24 m). The game's built-in model used 7.6 m until #427, now the drawing's 6.4 m, the `T3.bogies` that the physics and `tramClearance` (`src/tram.js`) use |
 | collector | contact height 3.89–6.37 m, default 6.00 m (the game's wire is 5.34 m over the rail, `CONTACT_WIRE`) |
 | clips | 13: Doors_Open / Doors_Close and one per door (2.2 s), Pantograph_Raise / Lower (3 s), Indicators_Left / Right / Hazard (0.8 s, loop), Brakes_On / Off (0.15 s), Bogies_Demo (6 s, illustrative) |
 | controller | `t3-controller.js`: fleet number, route (5 displays), destination (2 lines, Czech), run number, side text, doors, collector height, brakes, indicators, `setTrackPose(curvature, distance)`. The texts are drawn on canvas at run time |

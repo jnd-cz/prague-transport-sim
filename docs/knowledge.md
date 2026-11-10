@@ -503,10 +503,74 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
 - Prague signals: 4 white lamps on a white plate (stop = outer two), call box with three orange LED bars,
   distant signal with a yellow "P"; switch indicator a red LED chevron on the span wire.
+- **The T3's outline** (#427, `src/t3simple.js`): drawingdatabase.com's general arrangement (`Tatra-T3-1.gif`, side and
+  plan, dimensioned at 20 mm a pixel) and its colour elevation (`trams_t3_01.png`, 12.66 mm a pixel) agree with each other
+  and with Dynybyl's table 3, Wikipedia and the 1977 Soviet manual: body 14 000 × 2 500 mm, 3 060 mm high, pivots 3 800 / 6 400
+  / 3 800 mm. In plan the ends taper from the doors (4.5 m ahead of and 4.8 m behind the centre); the front and rear doors
+  stand on the taper. The drawing's plan view ends in corners 0.73–0.78 m off the centreline, too narrow against the user's
+  head-on photos of 6892 (below): the model's corners are 1.0 m off it, rounded with 0.32 m, the face bulging 0.21 m (the
+  user, 2026-11-10: "Let's try widening"); from above its ends are ±0.97 m wide, the hybrid's ±1.0 m, conflig's ±0.88 m. The
+  plan view on p. 10 of Dynybyl's thesis is narrower still (the user, 2026-11-09: "looks more narrow, like t1 or early
+  prototype than t3"). Laid over the colour elevation at its scale, the built model's windows, doors, bands and ends fall on
+  its lines, except the brows over the windscreen and the rear window: the side view leans them back 0.17 and 0.12 m, the
+  photo of 7290 has them upright to 2.86 m, then rolling into the roof over 0.5 m (the user, 2026-11-10: "make the front
+  brow less slanted, perhaps even perpendicular? The back should be similar", "a bit thinner, like running a bit down
+  towards the front and back"), the route box low on the front one, 3 cm over its lower edge. The windows wrapping round
+  the ends meet the sides in upright edges with rounded corners; the livery's u follows the outline's points, which move
+  back with the leaning end, so those edges are drawn through each height's own u (`ringU`), not straight in the texture.
+- **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
+  round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
+  from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between
+  the first and second windows on the right, the second and third on the left; fleet numbers golden yellow (#e3b625) in
+  bold Arial on both models (2026-11-10: "the new model uses different font from the hybrid model and my photos": it
+  had Bahnschrift), their digits 0.14 m tall
+  on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15 m against the red band's heights, conflig's
+  model 0.13–0.146 m; the hybrid's quads were 0.19 m tall on the ends and 0.23 m on the sides under one texture, so 0.106
+  and 0.13 m digits): on the front centred on the headlights, on the rear over the white lamp just above the lamps, on the
+  sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on the right, behind the cab window on the left).
+- **The T3 head on** (the user's photo of 6892, 2026-11-10, a telephoto from about 25 m): scaled by the skirt's foot (0.35 m),
+  the red's top (1.48 m) and the roof (3.02 m), which agree to 3 %, the headlights' centres are 1.11 m up and 1.11 m apart
+  (the colour elevation: 1.03 m, 1.06 m apart; the model has them 1.08 m apart, the user finding 1.11 m "a tad to far
+  apart"), pointing straight ahead in black rubber surrounds with a chrome rim; the bumper 0.76–0.86 m (the elevation:
+  0.70–0.80), the corner units 0.98–1.30 m with the clear lamp's centre (1.06 m) just under the headlights' line, round the
+  corners ±0.93–0.99 m off the centreline (the rear's ±0.96 m), the windscreen's posts ±0.71 m, the route box 0.49 × 0.30 m
+  with its top 7 cm under the roof's. The ends are open under the bumper between the skirt's corners, which reach in to the
+  headlights' outer edges, ±0.65 m (front and rear, "front and back is open under the bumper").
+- **The T3's bogie from the side** (the user's photo, 2026-11-10; one over the pit, 2026-11-09): the skirt is cut out in arches
+  over the wheels, hugging their treads and level with their tops between them (the colour elevation and conflig's model have
+  a lower, square cutout); grey wheel discs with a big hex nut on the hub inside rust-brown tyres; a curved guard inside each
+  wheel; the track-brake shoe over the rail with a row of nuts on its upper bar; the ribbed rubber spring in the middle up to
+  the skirt with the gearbox's housing beside it, coil springs by the wheels; everything a dusty warm grey. The coupler (the
+  user's picture, "only dark"): a round bar from the yoke's pin to a clamp, the cast head with two jaws, the coupling pin
+  down through them with its handle on top. Its height over the rail is the other models': conflig's classic has the bar
+  at 0.594 m (0.563-0.625), the hybrid at 0.584 m (bar and head 0.527-0.641), so the built-in car's is 0.59 m (the user,
+  2026-11-10: "I don't know proper figures so you might as well take it from the others"; it was 0.552 m, no source).
+- **The three T3 types in Prague** (the user, 2026-11-10): the T3, fleet numbers 6400–6992, a silver bumper with two thin
+  red stripes (6892: 12 mm, a quarter of the bumper in from its edges), the route box square; the T3SUCS, 7001–7292, the
+  bumper brown, the route box with rounded corners; the T3M, 8005–8106, as the T3SUCS with the resistors' box on the roof
+  towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
+  plate"), and green dot-matrix displays: the route on the front in the rounded box, and inside the right side's second
+  window the route with the destination and the next stop. AI sets take each type as often as its range is long ("their
+  proportion in service (probability to appear as AI tram) roughly related to their range sizes"): 60, 30 and 10 %.
+- **A T3's lamps in service** (the user, 2026-11-10, #436): "Trams run regular beams by default, off only when the car is
+  turned off. High beams can be flashed as warnings or used at night on dark stretches of line." So the dipped
+  headlights and the tail lamps are on by day too. The rear: the corner units' lower red lamps are the brake lamps, the
+  rear panel's two red lamps the tail lamps, the white one between them the reversing lamp. The indicators: "Turning at
+  junction and stopping at street level stop across car lane", at such a stop the right ones from braking into it until
+  it pulls away. Between coupled cars "only the rear red lights light up" (the user's photo of 8088 coupled behind
+  another, 2026-11-10): the game lights a set's front on its leading car only, the rear red lamps on every car, and
+  blinks the indicators on every car, 1.5 times a second (`src/lamps.js`). The hybrid's glows (indicators, brake lamps)
+  are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew. Its
+  asset has no tail lamps: they are added at load, 2 cm over its bumper (found by rays from behind), 0.47 m out.
 
 ## Heuristics that stand in for missing data
 
 Review these when realism matters; most move into the build in M2.
+- **Junction turns** (`src/indicators.js`, #436), where the autopilot and AI trams indicate: a switch on the route after
+  which the route's heading turns more than 30° within 40 m (a crossover's S-bend comes back); on from 50 m before the
+  switch until the heading has turned 80 % of the way. On the five lines: 12 on line 9 (Anděl, Újezd, Lazarská, Flora,
+  Karlovo náměstí …), 3 on 17 (Výstaviště, Ke Stírce, Vozovna Kobylisy), 6 on 22, 8 on 23, 3 on 37; two switches of
+  one junction a few metres apart make overlapping turns. `game.lamps.turns` lists them.
 - **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
   turning 170°+ street to street, its switches within 150 m, mean radius 18 m+. It finds 47 loops on DI's network,
   all real by the user's review (2026-11-09); it names each by its nearest GTFS stop, so Špejchar's loop shows as

@@ -7,7 +7,8 @@ const KEY = 'tram-touch';
 // [key, label, hold] — a held button sends keyup on release (sand, look, zoom, the emergency brake)
 const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', false, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', false, 'drive'], [' ', 'tb.stop', true, 'emerg']];
 const SIDE = [['d', 'tb.doors'], ['b', 'tb.bell'], ['a', 'tb.sand', true], ['q', '◀', true], ['e', '▶', true], ['g', '🔍', true], ['v', 'tb.view'], ['z', 'tb.mirror'], ['p', 'II']];
-const MORE = [['r', 'tb.park'], ['y', 'tb.switch', true], ['x', 'tb.iron'], ['c', 'tb.cutout', true], ['h', 'tb.saloon'], ['k', 'tb.cab'], ['f', 'tb.flap'], ['o', 'tb.auto'], ['m', 'tb.mute'], ['F9', '⚑']];
+// (the indicators: left, right, hazard; the high beams: held a flash, 'L' on and off as Shift+L)
+const MORE = [[',', '⇦'], ['.', '⇨'], ['/', '⚠'], ['l', 'tb.flash', true], ['L', 'tb.beam'], ['r', 'tb.park'], ['y', 'tb.switch', true], ['x', 'tb.iron'], ['c', 'tb.cutout', true], ['h', 'tb.saloon'], ['k', 'tb.cab'], ['f', 'tb.flap'], ['o', 'tb.auto'], ['m', 'tb.mute'], ['F9', '⚑']];
 
 export class TouchControls {
   constructor({ deadman }) {
@@ -46,7 +47,7 @@ body.shift .tbToggle { display: none }`;
     this.labels();
     // a pressed button: keydown, and keyup when the finger lifts (or slides off a held one)
     const down = new Map();
-    const send = (type, k) => window.dispatchEvent(new KeyboardEvent(type, { key: k === 'space' ? ' ' : k, bubbles: true }));
+    const send = (type, k) => window.dispatchEvent(new KeyboardEvent(type, { key: k === 'space' ? ' ' : k, shiftKey: k === 'L', bubbles: true }));
     box.addEventListener('pointerdown', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
