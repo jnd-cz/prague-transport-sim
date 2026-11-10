@@ -1,6 +1,6 @@
 # Tatra T3 — Prague trams
 
-**English** · [Česky](README.md) · [For developers](DEVELOPING.md)
+**English** · [Česky](README.md) · [For developers](DEVELOPING.md) · [Your own vehicles](docs/vehicles.md)
 
 Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
 and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
@@ -195,7 +195,11 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
-  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one.
+  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one, with the
+  dimensions and livery of the T3's general-arrangement drawing, no saloon and no moving parts, the lightest
+  to draw. With it the other trams run as T3 (a silver bumper with red stripes), T3SUCS and T3M sets (the T3M
+  with the resistors' box on its roof and its green route display), each type as often as its range of fleet
+  numbers is long.
 
 ### On a phone or tablet
 

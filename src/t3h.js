@@ -116,7 +116,9 @@ export async function loadHybridT3(responses, contact) {
     if (textured || cards.has(o.name)) {
       const key = `${f.uuid}|${m.uuid}`;
       if (!kept.has(key)) kept.set(key, { f, m, geos: [], name: o.name });
-      kept.get(key).geos.push(o.geometry.clone().applyMatrix4(M));
+      const g = o.geometry.clone().applyMatrix4(M);
+      if (rig.numberPlates.includes(o.name)) fleetSize(g);
+      kept.get(key).geos.push(g);
       stats.kept++;
       return;
     }
@@ -312,10 +314,24 @@ function runTexture(run) {
   x.fillStyle = '#fffdf4'; x.font = 'bold 390px Arial, sans-serif'; x.fillText(String(run ?? ''), 192, 234, 344);
   return texture(c);
 }
+// The fleet numbers' digits 0.14 m tall on every side (the user, 2026-11-10: "fix the hybrid's fleet number size";
+// src/t3simple.js FLEET has the photos' measurements). The asset's quads, under one texture, are 0.19 m tall on the
+// ends and 0.23 m on the sides, so its digits were 0.106 and 0.13 m: the texture's digits fill FLEET_FILL of its
+// height whatever the font, and each quad is scaled about its centre to FLEET_H / FLEET_FILL.
+const FLEET_H = 0.14, FLEET_FILL = 132 / 192;
+function fleetSize(g) {
+  g.computeBoundingBox();
+  const b = g.boundingBox, c = b.getCenter(new THREE.Vector3()), k = FLEET_H / FLEET_FILL / (b.max.y - b.min.y);
+  g.translate(-c.x, -c.y, -c.z).scale(k, k, k).translate(c.x, c.y, c.z);
+}
 function fleetTexture(n) {
   const [c, x] = canvas(512, 192);
   const t = String(n);
-  x.fillStyle = '#e3b625'; x.font = `bold ${Math.min(152, 600 / t.length)}px Arial, sans-serif`; x.fillText(t, 256, 103, 490);
+  x.fillStyle = '#e3b625'; x.font = 'bold 100px Arial, sans-serif';
+  const m = x.measureText(t), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+  const k = (FLEET_FILL * 192) / (A + D), kx = Math.min(k, 480 / (L + R));
+  x.setTransform(kx, 0, 0, k, 256 - (kx * (R - L)) / 2, 96 - (k * (D - A)) / 2);
+  x.fillText(t, 0, 0);
   return texture(c);
 }
 const setMap = (m, tex) => { if (!m || m.map === tex) return; if (m.map && !m.map.userData.shared && m.userData.own) m.map.dispose(); m.map = tex; m.userData.own = !tex.userData.shared; m.needsUpdate = true; };

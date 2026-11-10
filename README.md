@@ -1,6 +1,6 @@
 # Tatra T3 — pražské tramvaje
 
-**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md)
+**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md) · [Vlastní vozidla](docs/vehicles.cs.md)
 
 Řízení tramvaje Tatra T3 v 3D Praze postavené ze skutečných dat, na linkách 9, 17, 22, 23 a 37 (linky 17
 a 22 se zaměřenými ulicemi): OpenStreetMap (kolejová síť, silnice, zeleň), Digitální technická mapa Prahy
@@ -190,7 +190,10 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 - Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
-  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý.
+  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý, s rozměry a nátěrem podle
+  typového výkresu T3, bez interiéru a nehybný, nejlehčí na výkon. S ním jezdí cizí soupravy jako T3 (stříbrný
+  nárazník s červenými proužky), T3SUCS i T3M (T3M s bednou odporníků na střeše a zeleným číslem linky), každý typ
+  tak často, jak dlouhá je jeho řada evidenčních čísel.
 
 ### Na telefonu nebo tabletu
 
