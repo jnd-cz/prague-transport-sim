@@ -200,4 +200,5 @@ tiles, the rule (`fine_terrain.py`'s) took 161,164 cells inside the city:
 - **No tunnel:** 9.6 % of its cells lay on proposed or disused ways.
 - **Where it was right:** only 26 % lay under a street, rail, footway or track, where the deck is needed.
 
-The first build above still had the rule.
+The first build above still had the rule. Without it, the city has 16,566,821 triangles (79,292 fewer). The bands'
+errors are the same to 0.1 cm, and the build took 807 s with a 14.8 GB peak.
