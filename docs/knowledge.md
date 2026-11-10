@@ -347,7 +347,9 @@ Sections:
   One survey area can span several structures: Libeň's railway areas (line 37) lie over separate viaducts side by
   side at about 205.7 and 212 m and sloped 7 m across the gap. Between the nearest vertices of two levels Libeň's
   rise 62-1404 %, a deck sloping along one structure 2-7 % (Most Legií's road: 2.9 m over 139 m, vertices only at
-  its ends); over 25 % the area is cut along the model, one piece per deck.
+  its ends); over 25 % the area is cut along the model, one piece per deck. Mosty 3D models a slab's top and its
+  underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
+  the nearest face flipped between the two.
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
