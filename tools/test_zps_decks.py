@@ -99,7 +99,8 @@ class Check(unittest.TestCase):
 
     def test_not_decks(self):
         model = zd.Model(bridge(0, 0, 40, 20, DECK))
-        walls = [square(0, 0, 10, GROUND, cls=c) for c in ("wall", "stairs", "roof")] + [square(0, 0, 10, GROUND, level=0)]
+        walls = [square(0, 0, 10, GROUND, cls=c) for c in ("wall", "stairs", "roof", "underpass", "tunnel")]
+        walls.append(square(0, 0, 10, GROUND, level=0))
         out = zd.check(walls, model, NO_RAILS)
         self.assertEqual(out["vertices"], {"model": 0, "rails": 0})
 

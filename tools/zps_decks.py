@@ -35,7 +35,9 @@ TOL = 2.0  # m under the structure: a height taken from the ground or the floor 
 REACH = 12.0  # m from a surveyed rail station: the deck that carries the track (the issue's 12 m)
 RAISED = 3.0  # m of rail over IPR: the track stands on a structure
 OVER = 2.5  # m over the rails: something over the track, not the deck it runs on
-NOT_DECK = {"roof", "wall", "stairs"}  # a building's roof, a wall's top and foot, steps: not a deck's surface
+# not a deck's surface: a building's roof, a wall's top and foot, steps, and what lies under things (an underpass, a
+# tunnel; at level 1 on line 17 by Modřany an underpass area sat 5.5 m under the model's top) or is level (water)
+NOT_DECK = {"roof", "wall", "stairs", "underpass", "tunnel", "water"}
 SAG = 0.1  # m under the deck's plane over an opening: the target's tolerance at Divadelní
 PLANE_REACH = 15.0  # m from the way under: the deck's vertices that give its plane
 WALK = 2.5  # m clear over a footway or a cycleway without maxheight (the plane's vertices stand higher)
