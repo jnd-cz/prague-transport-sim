@@ -85,6 +85,16 @@ class Check(unittest.TestCase):
         self.assertEqual((out["vertices"]["inside"], out["held"]), (4, 0))
         self.assertEqual([q[2] for q in a["r"]], [197.5] * 4)
 
+    def test_a_piece_under_the_portal_takes_its_decks_level(self):
+        """Výtoň's walkway: a small piece of the deck lies wholly under a portal's face; the deck's level is the slab's."""
+        tris = bridge(0, 0, 40, 20, 197.5).tris
+        portal = bridge(8, 4, 13, 9, 210.4).tris
+        model = zd.Model(SimpleNamespace(tris=np.concatenate([tris, portal]), ids=[7], owner=np.zeros(4, int)))
+        track = area([(x_, 0, 192.0) for x_ in range(0, 21, 4)] + [(x_, 4, 192.0) for x_ in range(20, -1, -4)], cls="rail")
+        walk = square(9, 4, 3, 191.0, cls="sidewalk")
+        zd.check([track, walk], model, NO_RAILS)
+        self.assertEqual([q[2] for q in walk["r"]], [197.5] * 4)
+
     def test_where_two_features_meet_the_decks_own_one_counts(self):
         """Libeň: two viaducts side by side at 210.3 and 212.0 m; a corner at the seam belongs to the deck's own one."""
         a_, b_ = bridge(0, 0, 20, 20, 212.0).tris, bridge(20.5, 0, 40, 20, 210.3).tris

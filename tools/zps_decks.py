@@ -44,7 +44,7 @@ NOT_DECK = {"roof", "wall", "stairs", "underpass", "tunnel", "water"}
 # model next to its vertices on it (the spikes along Krejcárek's road deck), 223 of 246 on line 37 lie within 1 m of a
 # face, 237 within 1.5 m, and all of lines 9 and 17 within 1 m
 EDGE = 1.5  # m outside a model's faces: still on it
-TRUSS = 1.0  # m off an area's median top: a truss, a pylon or a portal over the deck, not the deck (Výtoň: 210.4 m on 197.5)
+TRUSS = 1.0  # m off a deck's median top: a truss, a pylon or a portal over the deck, not the deck (Výtoň: 210.4 m on 197.5)
 SAG = 0.1  # m under the deck's plane over an opening: the target's tolerance at Divadelní
 PLANE_REACH = 15.0  # m from the way under: the deck's vertices that give its plane
 # m clear over a footway, a cycleway or steps without maxheight (with MARGIN, 2.3 m); the user, 2026-11-10, from street
@@ -111,6 +111,25 @@ class Model:
         good = np.isfinite(zz[k])
         z[p[good]], fid[p[good]] = zz[k][good], self.owner[ti[k][good]]
         return z, fid
+
+    def faces(self, x, y, only=None):
+        """Every face of feature `only` over each point (within EDGE where none is right over it): a list of arrays."""
+        x, y = np.asarray(x, float), np.asarray(y, float)
+        out = [np.zeros(0) for _ in x]
+        if self.tree is None or not len(x):
+            return out
+        pts = shapely.points(x, y)
+        pi, ti = self.tree.query(pts, predicate="intersects")
+        miss = np.setdiff1d(np.arange(len(x)), pi)
+        if len(miss):
+            mi, mt = self.tree.query(shapely.buffer(pts[miss], EDGE, quad_segs=2), predicate="intersects")
+            pi, ti = np.r_[pi, miss[mi]], np.r_[ti, mt]
+        if only is not None:
+            pi, ti = pi[self.owner[ti] == only], ti[self.owner[ti] == only]
+        zz = self._faces(x, y, pi, ti)
+        for p, z_ in zip(pi, zz):
+            out[p] = np.r_[out[p], z_]
+        return out
 
     def footprint(self, fid):
         """A feature's faces in plan (cached)."""
@@ -194,7 +213,8 @@ def check(areas, model, rails):
     Železniční most's land span, 5 m over the street (the user, 2026-11-10: "there are really three levels: the highest
     is the railway bridge and walkway alongside. Middle level is the one with our tram tracks and car road, sidewalk
     towards the river. And finally there's the lowest level right next to the water"); the road over the two arches
-    on line 22 at 50.0850 N 14.3835 E. A vertex whose top stands TRUSS off the area's median top takes the median."""
+    on line 22 at 50.0850 N 14.3835 E. Each vertex takes the model's face nearest to its deck's median top (a portal or a
+    truss over part of the deck is not the deck), the median where none is within TRUSS."""
     where, xyz = _vertices(areas)
     out = {"vertices": {"model": 0, "rails": 0, "inside": 0}, "held": 0, "heldAreas": [], "over": 0, "checked": set()}
     if not len(where):
@@ -248,6 +268,7 @@ def check(areas, model, rails):
     for n, (ai, _, _) in enumerate(where):
         if ai in held:
             mine.setdefault(ai, []).append(n)
+    inside = {}  # (deck, feature): the areas lying inside that feature with every vertex under it
     for ai in list(held):
         ns = mine[ai]
         k = key[ns[0]]
@@ -256,12 +277,20 @@ def check(areas, model, rails):
         poly = shapely.Polygon(np.asarray(areas[ai]["r"], float)[:, :2]).buffer(0)
         if poly.area <= 0 or poly.difference(model.footprint(k[1])).area > 0.1 * poly.area:
             continue
+        inside.setdefault((group.get(ai, ai), k[1]), []).append(ai)
+    for (gr, f), ais in inside.items():
+        # (the deck's level: the median top over all its vertices; each vertex takes its face nearest to it, the median
+        # where none is within TRUSS: a portal or a truss over part of the deck, 210.4 m over Výtoň's 197.5 m)
+        ns = [n for ai in ais for n in mine[ai]]
         med = float(np.median(ref[ns]))
-        for n in ns:
+        fz = model.faces(x[ns], y[ns], only=f)
+        for n, zs in zip(ns, fz):
             _, ri, vi = where[n]
-            _ring(areas[ai], ri)[vi][2] = round(float(ref[n] if abs(ref[n] - med) <= TRUSS else med), 2)
+            best = zs[np.argmin(np.abs(zs - med))] if len(zs) else med
+            _ring(areas[where[n][0]], ri)[vi][2] = round(float(best if abs(best - med) <= TRUSS else med), 2)
         out["vertices"]["inside"] += len(ns)
-        del held[ai]
+        for ai in ais:
+            del held[ai]
     out["held"] = sum(len(v) for v in held.values())
     for ai, ks in held.items():
         r = np.asarray(areas[ai]["r"], float)[:, :2]
