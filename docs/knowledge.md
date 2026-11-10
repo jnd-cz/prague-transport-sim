@@ -446,7 +446,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   round the cab than along the saloon, under a cream band with a flap; the bumpers black (heritage cars: aluminium); the route
   plate hangs on the mirror's arm, which drops from the cab's roof; rectangular lamp units (indicator over a lamp) by the
   corners; a side indicator on the pillar between the first and second windows on the right, the second and third on the left;
-  fleet numbers yellow on the front between the headlights, on the rear and on both sides. A T3M has the resistors' box on the
+  fleet numbers yellow, their digits 0.14 m tall on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15
+  m against the red band's heights, conflig's model 0.13–0.146 m): on the front centred on the headlights, on the rear over
+  the white lamp just above the lamps, on the sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on
+  the right, behind the cab window on the left; the hybrid's ends carry smaller ones, 0.106 m). A T3M has the resistors' box on the
   roof towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
   plate"), and green dot-matrix displays: the route on the front, and inside the right side's second window the route with the
   destination and the next stop.

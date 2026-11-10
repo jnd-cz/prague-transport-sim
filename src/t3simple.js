@@ -412,6 +412,7 @@ function bogie(zc) {
 // and drops; the route plate hangs on the drop facing forward (src/models.js puts the plate on it), the mirror
 // below it, its back to the front. A small mirror on a bracket at the left corner.
 const SIDE_INDICATOR = { z: 3.05, h: 1.81 };
+const HEADLIGHT = { x: 0.53, h: 1.03 }; // (the colour elevation)
 // the T3M's side display: in the upper part of the right side's second window from the front (the user's photo of 8015)
 const SIDE_DISPLAY = { z: 2.29, h: 2.31, w: 1.05, hh: 0.33 };
 const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.62, 2.94, 6.28], [-1.62, 2.3, 6.28]];
@@ -438,9 +439,9 @@ function partsGeometry(wire, variant) {
   }
   // behind each bogie's cutouts, a dark panel down the middle (the cutouts do not show through the car)
   for (const zc of [-PIVOT, PIVOT]) P.push(part(box(0.02, CUTOUT.top - BOTTOM + 0.04, 2 * CUTOUT.half), '#2e2a26', { at: [0, (CUTOUT.top + BOTTOM) / 2, zc] }));
-  for (const x of [-0.53, 0.53]) { // the headlights' housings, in the body's red
-    const f = onFace(1, x, 1.03);
-    P.push(part(new THREE.CylinderGeometry(0.115, 0.12, 0.05, 18), COL.red, { at: [x + 0.012 * Math.sin(f.yaw), 1.03, f.z + 0.012 * Math.cos(f.yaw)], rot: [Math.PI / 2, f.yaw, 0] }));
+  for (const x of [-HEADLIGHT.x, HEADLIGHT.x]) { // the headlights' housings, in the body's red
+    const f = onFace(1, x, HEADLIGHT.h);
+    P.push(part(new THREE.CylinderGeometry(0.115, 0.12, 0.05, 18), COL.red, { at: [x + 0.012 * Math.sin(f.yaw), HEADLIGHT.h, f.z + 0.012 * Math.cos(f.yaw)], rot: [Math.PI / 2, f.yaw, 0] }));
   }
   // the lamp units' housings by the corners, the side indicators' on the pillar amidships
   for (const [sign, z] of [[-1, 6.42], [1, 6.42], [-1, -6.45], [1, -6.45]]) {
@@ -472,9 +473,9 @@ function partsGeometry(wire, variant) {
 // the bumper (the photos of 6892 and 6921)
 function lampsGeometry() {
   const L = [];
-  for (const x of [-0.53, 0.53]) {
-    const f = onFace(1, x, 1.03);
-    L.push(part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x + 0.042 * Math.sin(f.yaw), 1.03, f.z + 0.042 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
+  for (const x of [-HEADLIGHT.x, HEADLIGHT.x]) {
+    const f = onFace(1, x, HEADLIGHT.h);
+    L.push(part(new THREE.CircleGeometry(0.085, 18), COL.lamp, { at: [x + 0.042 * Math.sin(f.yaw), HEADLIGHT.h, f.z + 0.042 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
   }
   for (const [sign, z, low] of [[-1, 6.42, '#f2efe4'], [1, 6.42, '#f2efe4'], [-1, -6.45, '#d8261a'], [1, -6.45, '#d8261a']]) {
     const s = onSide(sign, z), at = (h) => [s.x + s.n[0] * 0.02, h, z + s.n[1] * 0.02];
@@ -531,16 +532,28 @@ function onFlank(sign, z, h, w, hh) {
 }
 
 // The fleet number, yellow as on the T3Ms (the user's photos of 8080 and 8088: "in style of the t3m photos, no
-// logos"): on the front between the headlights, on the rear over the lamps, on both sides at the red's top
-// behind the front door
+// logos"), its digits 0.14 m tall on every side (the user, 2026-11-10: "same size in all sides"). Measured on the
+// photos (the red band's heights as the scale): 0.13-0.15 m on the fronts of 8080, 0.14 m on the sides of 8015
+// and 8080; conflig's model 0.146 m on its ends, 0.13 m on its sides. Placed as on the photos:
+// - front: between the headlights, centred on them;
+// - rear: centred over the white lamp, its foot 5 cm over the lamps' tops (8088, 6921);
+// - sides: the top 0.12 m under the red's top; on the right under the first window behind the front door,
+//   ending 0.35 m before it (8015, 8080), on the left under the first window's front behind the cab window
+//   (8080), both 4.17 m ahead of the centre (conflig's: 4.15 and 4.17 m, its digits 1.35-1.50 m).
+const FLEET = { h: 0.14, front: HEADLIGHT.h, rear: 1.105, side: { z: 4.17, h: 1.43 } };
+// the canvas: the digits FLEET_PX.h px tall in a 512 x 160 px texture, so the quads are FLEET.h * 160 / 120 tall
+const FLEET_PX = { w: 480, h: 120 }, FLEET_QH = (FLEET.h * 160) / FLEET_PX.h, FLEET_QW = (FLEET_QH * 512) / 160;
 function fleetTexture(n) {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 160;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d'), s = String(n);
   g.fillStyle = '#ffd21a';
-  g.font = 'bold 148px "Bahnschrift", "D-DIN", "DIN Alternate", Arial, sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(String(n), 256, 86, 328);
+  g.font = 'bold 100px "Bahnschrift", "D-DIN", "DIN Alternate", Arial, sans-serif';
+  // the digits' own box scaled to FLEET_PX.h, whichever font the system has (squeezed only past FLEET_PX.w)
+  const m = g.measureText(s), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+  const k = FLEET_PX.h / (A + D), kx = Math.min(k, FLEET_PX.w / (L + R));
+  g.setTransform(kx, 0, 0, k, 256 - (kx * (R - L)) / 2, 80 - (k * (D - A)) / 2);
+  g.fillText(s, 0, 0);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
@@ -572,9 +585,8 @@ function shapes(wire, variant) {
       dest: onBody(probe, -0.02, 1.77, 1, 0.46, 0.19), run: onBody(probe, -0.67, 1.725, 1, 0.12, 0.09), rear: onBody(probe, 0, 1.90, -1, 0.34, 0.3),
       led: onFlank(-1, SIDE_DISPLAY.z, SIDE_DISPLAY.h, SIDE_DISPLAY.w, SIDE_DISPLAY.hh),
     };
-    // (the figures fill 0.64 of the texture's width and 0.66 of its height: 0.15 m tall on the front, between the
-    // headlights, 0.14 m on the rear, 0.10 m on the sides, as on 6921, 6892 and 8080)
-    const fleet = mergeGeometries([onFaceStrip(1, 1.03, 0.86, 0.23), onFaceStrip(-1, 1.15, 0.78, 0.21), onFlank(-1, 4.12, 1.5, 0.55, 0.15), onFlank(1, 4.12, 1.5, 0.55, 0.15)]);
+    const fleet = mergeGeometries([onFaceStrip(1, FLEET.front, FLEET_QW, FLEET_QH), onFaceStrip(-1, FLEET.rear, FLEET_QW, FLEET_QH),
+      ...[-1, 1].map((sign) => onFlank(sign, FLEET.side.z, FLEET.side.h, FLEET_QW, FLEET_QH))]);
     for (const g of [body, lamps, fleet, ...Object.values(plates)]) if (g) g.userData.shared = true;
     SHAPES = { wire, body, lamps, plates, fleet, livery: livery() };
     PARTS.clear();

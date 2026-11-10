@@ -44,6 +44,20 @@ MEASURE = r"""async () => {
   out.variants = { suc: m.userData.variant, m: t3m.userData.variant, sucRoof: roofBox(parts.geometry), mRoof: roofBox(named(t3m.userData.cars[0], 'parts').geometry),
     sucDisplay: px(m.userData.mats.rbMat), mDisplay: px(t3m.userData.mats.rbMat) };
   out.fleet = { suc: m.userData.fleet, m: t3m.userData.fleet, meshes: [a, b].map((c) => c.children.filter((o) => o.name === 'fleet').length) };
+  // the four number quads (front, rear, right, left): their heights and middles; the digits' rows in the texture
+  const FP = named(a, 'fleet').geometry.attributes.position, quads = { front: [], rear: [], right: [], left: [] };
+  for (let i = 0; i < FP.count; i++) {
+    const x = FP.getX(i), z = FP.getZ(i);
+    quads[z > 6.5 ? 'front' : z < -6.5 ? 'rear' : x < 0 ? 'right' : 'left'].push([FP.getY(i), z]);
+  }
+  out.fleet.quads = Object.fromEntries(Object.entries(quads).map(([k, p]) => {
+    const ys = p.map((q) => q[0]), zs = p.map((q) => q[1]);
+    return [k, { h: Math.max(...ys) - Math.min(...ys), y: (Math.max(...ys) + Math.min(...ys)) / 2, z: (Math.max(...zs) + Math.min(...zs)) / 2 }];
+  }));
+  const img = named(a, 'fleet').material.map.image, fpx = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
+  let r0 = Infinity, r1 = -1;
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) if (fpx[4 * (y * img.width + x) + 3] > 127) { r0 = Math.min(r0, y); r1 = Math.max(r1, y); }
+  out.fleet.digits = { rows: r1 - r0 + 1, of: img.height };
   // the T3M's side display on every car, none on the T3SUCS; the next stop redraws it; the side indicators on both sides
   const displays = (set) => set.userData.cars.map((c) => c.children.filter((o) => o.name === 'display').length);
   const led0 = t3m.userData.mats.ledMat.map;
@@ -166,6 +180,12 @@ def near(v, want, tol):
     return abs(v - want) <= tol
 
 
+def fleet_digits(r):
+    """the fleet number's digits' height in metres: their rows of the texture times the quad's height"""
+    d = r["fleet"]["digits"]
+    return r["fleet"]["quads"]["front"]["h"] * d["rows"] / d["of"]
+
+
 def judge(r):
     """The checks against the drawing's numbers: a list of failures."""
     fails = []
@@ -202,6 +222,12 @@ def judge(r):
         "fleet numbers by type, each car its own": all(7001 <= n <= 7292 for n in r["fleet"]["suc"]) and all(8001 <= n <= 8090 for n in r["fleet"]["m"])
         and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
         "AI sets of both types by run number": r["fleet"]["auto"] == ["T3M", "T3SUCS"],
+        # the user's photos and conflig's model (src/t3simple.js FLEET): the digits 0.14 m tall on every side; the
+        # front's on the headlights' line, the rear's over the lamps, the sides' 1.36-1.50 m up, 4.17 m ahead
+        f"the fleet numbers' digits 0.14 m tall on every side ({fleet_digits(r):.3f} m)": abs(fleet_digits(r) - 0.14) < 0.004
+        and max(q["h"] for q in r["fleet"]["quads"].values()) - min(q["h"] for q in r["fleet"]["quads"].values()) < 1e-6,
+        "the fleet numbers where the photos have them": near(r["fleet"]["quads"]["front"]["y"], 1.03, 0.005) and near(r["fleet"]["quads"]["rear"]["y"], 1.105, 0.005)
+        and all(near(r["fleet"]["quads"][s]["y"], 1.43, 0.005) and near(r["fleet"]["quads"][s]["z"], 4.17, 0.005) for s in ("right", "left")),
         "faded in: the fleet numbers stay blended, the body opaque": r["fleet"]["faded"] == {"transparent": True, "depthWrite": False, "opacity": 1, "body": False},
     }
     fails += [k for k, ok in want.items() if not ok]
