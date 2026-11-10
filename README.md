@@ -1,6 +1,6 @@
 # Tatra T3 — pražské tramvaje
 
-**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md)
+**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md) · [Vlastní vozidla](docs/vehicles.cs.md)
 
 Řízení tramvaje Tatra T3 v 3D Praze postavené ze skutečných dat, na linkách 9, 17, 22, 23 a 37 (linky 17
 a 22 se zaměřenými ulicemi): OpenStreetMap (kolejová síť, silnice, zeleň), Digitální technická mapa Prahy

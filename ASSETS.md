@@ -3,7 +3,7 @@
 Every file in the repository that is not code written for this project, with its source and licence.
 Nothing third-party goes into the repository without an entry here, and only under a licence that
 allows redistribution (CC0, CC BY, CC BY-SA, CC BY-NC, …). The code is GPL-3.0 ([LICENSE](LICENSE));
-the project's own assets are listed with their own licence.
+the project's own assets are listed with their own licence. Adding a vehicle model: [docs/vehicles.md](docs/vehicles.md).
 
 | Files | What | Author / source | Licence | Changes |
 |---|---|---|---|---|

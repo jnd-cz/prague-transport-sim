@@ -1,6 +1,6 @@
 # Tatra T3 — Prague trams
 
-**English** · [Česky](README.md) · [For developers](DEVELOPING.md)
+**English** · [Česky](README.md) · [For developers](DEVELOPING.md) · [Your own vehicles](docs/vehicles.md)
 
 Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
 and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital

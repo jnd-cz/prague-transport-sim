@@ -363,7 +363,8 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   Mosty 3D sets the deck height on tagged bridges.
 - **Outdoor temperature:** Prague now comes from Open-Meteo, hourly.
 - **Tram models:** `assets/t3h/LICENSE.txt`, `assets/t3/LICENSE.txt`, the second car's coupling #248;
-  `ASSETS.md` lists them.
+  `ASSETS.md` lists them. How a model plugs into the game, the tiers of movement, and adding or changing one:
+  [docs/vehicles.md](docs/vehicles.md) (in Czech [docs/vehicles.cs.md](docs/vehicles.cs.md)).
 - **The autopilot** drives like the headless test bot: the same driver lives in `src/autopilot.js` and is
   used by `tools/autopilot.js`.
 - **Language:** strings live in `src/i18n.js`. The player's guide is `README.md` in Czech and `README.en.md`
