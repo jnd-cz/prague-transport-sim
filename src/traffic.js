@@ -1675,7 +1675,8 @@ export class Traffic {
         const d = sig.s - 3 - t.s;
         if ((d > 0 && d > stopDistance(t.v, sig.state)) || (t.v < 0.5 && t.s < sig.s - 0.3)) t.redStops.add(sig);
         if (t.redStops.has(sig)) stop(sig.s - 3, 'signal');
-        else if (sig.state === 'warn' && d > -3) sig.aheadCommitted = true;
+        // (moving: one standing before the signal can wait, and takes it as red, #394)
+        else if (sig.state === 'warn' && d > -3 && t.v > 0.5) sig.aheadCommitted = true;
       }
       const other = this.ahead.find((o) => o !== t && o.s > t.s);
       // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 6 m kept two 2-car sets off long platforms, #258)
