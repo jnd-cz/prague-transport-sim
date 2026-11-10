@@ -15,7 +15,7 @@ The menu's *Tram model* picks one of three; a model that does not load falls bac
 |---|---|---|---|---|
 | detailed, animated (the default) | `src/t3h.js`, `assets/t3h/` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps; a lighter level for AI trams far away |
 | detailed, classic | `src/models.js` (`loadDetailedT3`), `assets/t3/` | a glTF, one texture; loaded when picked | CC BY-NC 4.0 | none |
-| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | GPL-3.0 | none yet (#454, #436) |
+| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | GPL-3.0 | bogies, wheels, couplers, collector; the lamps by state in #436 |
 
 `makeT3({ line, cars, detailed, dest, run, variant })` in `src/models.js` builds a set with the chosen
 model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
@@ -35,12 +35,16 @@ model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
 ## What the game does with a set
 
 - **Every frame** `placeConsist(model, s, at)` sets each car on its two bogie pivots, so it yaws, pitches
-  and leans with the track; the hybrid hangs the next car on the coupling (`placeHybridConsist`) and turns
-  its bogies and wheels.
+  and leans with the track. For the hybrid and the built-in car it hangs the next car on the coupling and
+  poses each car's running gear (`hangConsist`, `src/consist.js`): a car with moving gear carries
+  `userData.gear`, which turns its bogies to the chord between their axles, rolls its wheels by the distance
+  and swings its couplers along the link between the cars (the free ones straight ahead). The hybrid's gear
+  moves its rig's nodes, the built-in car's its instanced meshes.
 - **Its texts:** `setConsistLine(model, line, dest, run)` redraws the route plates, the destination and run
   cards (canvas textures, `src/models.js`), `setNextStop` a T3M's side display.
-- **Its state:** `poseHybrid(model, { doors, collector, braking, track })`: the doors 0–1, the collector's
-  height, the brake lamps, the track brakes' magnets. Only the hybrid takes it today.
+- **Its state:** `poseT3(model, { doors, collector, braking, track })` (`src/models.js`): the doors 0–1, the
+  collector's contact height over the rail (below its working range it lowers), the brake lamps, the track
+  brakes' magnets. The hybrid takes all of it (`poseHybrid`), the built-in car the collector (`poseSimple`).
 - **AI trams** (`src/traffic.js`) fade in and out with `setOpacity`, per material: a material's own
   opacity under 1 stays in `userData.opacity`, a material blended from the start stays blended. Far from
   the camera the hybrid switches to its lighter level (`setHybridLevel`, 50–60 m). A set that leaves is freed
@@ -51,10 +55,10 @@ model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
 What a model can offer and the game drives. A model states its tier; the game asks no more of it.
 
 1. **Still:** the body and running gear as one, the plates and cards parametric (route, destination, run,
-   fleet numbers); the car rests on its pivots. The classic and the built-in models today.
+   fleet numbers); the car rests on its pivots. The classic model today.
 2. **Running:** the bogies swivel to the track, the wheels roll, the couplers swing between cars, the
    collector rides the wire's height and lowers, brake lamps, indicators and headlights by state. The hybrid
-   has most of it; the built-in car gets it in #454 and #436.
+   has most of it, the built-in car its gear and collector (#454); the lamps by state are #436.
 3. **Living:** the doors open and close at stops, the track-brake shoes drop, the wipers run in the rain,
    roof vents and hatches open, the mirror arm folds, the body moves on its springs (leaning in curves,
    pitching as it brakes), the saloon and cab lights, the driver, sparks at the collector on a frosty wire.
@@ -75,22 +79,27 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
    `assets/t3h/rig.json`: `doors` (their leaves), `bogies` (name and pivot), `wheels` (name and radius),
    `pantograph` (root, head, linkages, contact heights), `signals` (indicators), `brakes` (brake lamps),
    `numberPlates`, `routePlates`, `infoPlates` (destination, run number, side boards), and animation clips by
-   name (`Door_Front_Open`, `Pantograph_Lower`, …).
-4. **The code:** a module like `src/t3h.js` (load, build a set, place it, pose it), a branch in `makeT3`
-   and the calls in `src/main.js` and `src/traffic.js`, the files in the loading screen (`load.prefetch`,
+   name (`Door_Front_Open`, `Pantograph_Lower`, …). A model drawn in code instead gives each car a `gear` for
+   `src/consist.js`, as `src/t3simple.js` does with instanced meshes (a car of it draws 8 meshes besides its
+   plates).
+4. **The code:** a module like `src/t3h.js` (load, build a set with each car's `gear`, pose it), a branch in
+   `makeT3` and in `poseT3`
+   (`src/models.js`), the files in the loading screen (`load.prefetch`,
    `load.get` in `src/main.js`), and a menu option (`optModel` in `index.html`, its names in both languages
    in `src/i18n.js`). There is no common vehicle interface yet: today a new model means these edits. A
    manifest per vehicle (#455) and a common interface, with vehicles found and checked at startup and
    installed by the player (#456), are planned.
 5. **The checks:** a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
    frame time with `tools/frametime.py --models …`, and pictures of every model from the same views with
-   `python -P -E tools/test_t3simple.py --shots DIR` (side, three-quarter, front, top, the bogie, the coupler).
+   `python -P -E tools/test_t3simple.py --shots DIR` (side, three-quarter, front, top, the bogie, the coupler; a
+   two-car set on a 25 m curve and its running gear in plan; the collector lowered).
 
 ## Changing a model
 
 - **The built-in T3** (`src/t3simple.js`): its measurements are named constants at the top of the file
   (`NOSE`, `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), each with where it comes from; the livery is
-  painted in `livery()`, the parts in `partsGeometry()` and `bogie()`, the types and their fleet numbers in
+  painted in `livery()`, the fixed parts in `partsGeometry()`, the moving ones in `bogie()`, `wheelset()`,
+  `coupler()` and `pantoBars()` (the pantograph's frame for a contact height), the types and their fleet numbers in
   `T3_TYPES`. `tools/test_t3simple.py` checks it against those numbers.
 - **The plates and cards** for every model: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, the T3M's dot-matrix `ledFace`).

@@ -1,8 +1,9 @@
 // Low-poly models built from primitives: cars, pedestrians, signals and signs; the T3 sets (the built-in car
 // in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
 import * as THREE from 'three';
-import { hybridReady, makeHybridSet, setHybridLine, placeHybridConsist } from './t3h.js';
-import { makeSimpleSet, t3Variant, fleetNumbers, ROUTE_BOX } from './t3simple.js';
+import { hybridReady, makeHybridSet, setHybridLine, poseHybrid } from './t3h.js';
+import { makeSimpleSet, poseSimple, t3Variant, fleetNumbers, ROUTE_BOX } from './t3simple.js';
+import { hangConsist } from './consist.js';
 import { CAR_PITCH } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
 import { drawSign, drawLedPanel, drawNumberPlate, shownSize, SIGN_SCALE } from './speedSigns.js';
@@ -428,14 +429,15 @@ export function setNextStop(model, next) {
   u.next = next;
 }
 
-// Put each car of a set on the track: cars are 15.2 m over couplers, the body starts 0.6 m
-// behind the coupler face, coupled cars CAR_PITCH apart; the car rests on its two bogie pivots (the
-// model's own spacing), so it yaws and pitches with them, wheels on the rail heads. `at(s)` -> [x, y,
-// track bed height]. (The hybrid hangs its cars on the coupling: src/t3h.js.)
+// Put each car of a set on the track (`at(s)` -> [x, y, track bed height, roll]): each car rests on its two bogie
+// pivots, so it yaws, pitches and leans with them, wheels on the rail heads. The hybrid and the built-in car hang
+// each next car on the coupling and pose their bogies, wheels and couplers (src/consist.js); the classic model
+// stands its cars CAR_PITCH apart, its body 0.6 m behind the coupler face, on its own pivots' spacing.
 export function placeConsist(model, sFront, at) {
-  if (model.userData.hybrid) { placeHybridConsist(model, sFront, at); return; }
-  const { bogie, bodyFront } = model.userData;
-  model.userData.cars.forEach((car, k) => {
+  const u = model.userData;
+  if (u.kind !== 'classic') { hangConsist(model, sFront, at); return; }
+  const { bogie, bodyFront } = u;
+  u.cars.forEach((car, k) => {
     const c = sFront - k * CAR_PITCH - 0.6 - bodyFront; // car origin (midway between the bogies)
     const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
     car.position.set((ax + bx) / 2, (za + zb) / 2 + RAIL_TOP, -(ay + by) / 2);
@@ -444,6 +446,15 @@ export function placeConsist(model, sFront, at) {
     car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
     car.rotation.z = -(ra + rb) / 2;
   });
+}
+
+// A set's mechanisms from the game's state, whichever model (each acts only on what changes): the hybrid's doors,
+// collector, brake lamps and track-brake shoes (src/t3h.js poseHybrid), the built-in car's collector
+// (src/t3simple.js poseSimple); the classic model has none.
+export function poseT3(model, state) {
+  const k = model.userData.kind;
+  if (k === 'hybrid') poseHybrid(model, state);
+  else if (k === 'simple') poseSimple(model, state);
 }
 
 const CAR_COLORS = [0x2f4f7f, 0xa0a4a8, 0x1c1c1c, 0xe8e8e8, 0x7a1f1f, 0x3d5c3a, 0xc8b47a, 0x5a6f80, 0xd8d2c0, 0x324a63];

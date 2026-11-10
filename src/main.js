@@ -6,8 +6,8 @@ import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { T3H_FILES, T3H_CREDIT, loadHybridT3, poseHybrid } from './t3h.js';
+import { makeT3, placeConsist, poseT3, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
+import { T3H_FILES, T3H_CREDIT, loadHybridT3 } from './t3h.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { Inspect } from './inspect.js';
@@ -708,8 +708,9 @@ function previewAt(s) {
 function placeTram(s) {
   // each car rests on its two bogies, so it follows curves and pitches with the gradient
   placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q), route.rollAt(q)]; });
-  // the doors, the brake lamps and the track-brake shoes from the game (the detailed model's)
-  if (tramModel.userData.hybrid && game) poseHybrid(tramModel, { doors: game.doorOpenness, braking: tram.brake > 500, track: tram.trackMagnets });
+  // the doors, the brake lamps and the track-brake shoes from the game; the collector on the wire (one height over
+  // the rail everywhere in the data, src/world.js)
+  if (game) poseT3(tramModel, { doors: game.doorOpenness, braking: tram.brake > 500, track: tram.trackMagnets, collector: CONTACT_WIRE - RAIL_TOP });
 }
 
 function updateCamera(dt, t) {
