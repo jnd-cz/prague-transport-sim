@@ -226,6 +226,8 @@ def osm_areas(F):
             return "railway"
         if t.get("man_made") == "bridge":
             return "bridge"
+        if lu in ("farmland", "meadow", "orchard", "vineyard"):
+            return "farmland"
         return None
     rings, ll = [], []
     for o in osmium.FileProcessor(osm_local.PRAHA).with_areas(
@@ -646,6 +648,7 @@ def compare(step=2, partial=False):
     osm = osm_areas(F)
     bld = paint_rings(osm.get("building", []), (h, w), origin, step)
     water = paint_rings(osm.get("water", []), (h, w), origin, step)
+    farm = paint_rings(osm.get("farmland", []), (h, w), origin, step)
     inside = paint_rings(rings(city), (h, w), origin, step)
     dist = Image.new("L", (w, h), 0)
     dd = ImageDraw.Draw(dist)
@@ -675,6 +678,9 @@ def compare(step=2, partial=False):
            "open": {"inside": stats(open_ & inside), "outside": stats(open_ & ~inside), "all": stats(open_)},
            "buildings": {"inside": stats(inbld & inside), "outside": stats(inbld & ~inside), "all": stats(inbld)},
            "water": {"inside": stats(onwater & inside), "outside": stats(onwater & ~inside), "all": stats(onwater)},
+           "farmland": {"inside": stats(open_ & farm & inside), "outside": stats(open_ & farm & ~inside),
+                        "all": stats(open_ & farm)},
+           "open_not_farmland": stats(open_ & ~farm),
            "districts": []}
     for i, nm in enumerate(names + ["(outside the city)"]):
         v = D[open_ & (dist == i + 1)] if i < len(names) else D[open_ & ~inside]
@@ -795,7 +801,8 @@ def compare(step=2, partial=False):
     res["s"] = round(time.time() - t0)
     res["peak_gb"] = round(ct.peak_gb(), 1)
     json.dump(res, open(os.path.join(OUT, "compare.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(json.dumps({k: res[k] for k in ("km2", "near_passages_km2", "open", "buildings", "water")}, indent=1))
+    print(json.dumps({k: res[k] for k in ("km2", "near_passages_km2", "open", "buildings", "water", "farmland",
+                                         "open_not_farmland")}, indent=1))
     print(f"written {OUT}/compare.json, compare-map.png, compare-*.png in {time.time() - t0:.0f} s, peak {res['peak_gb']} GB",
           flush=True)
 
