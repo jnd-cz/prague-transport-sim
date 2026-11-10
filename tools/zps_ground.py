@@ -161,6 +161,26 @@ def held_verdict(v, rule, buildings):
     return rule["outsideGreen"] if v["c"] == "green" else rule["outside"]
 
 
+def facts_to_areas(areas, facts, frame):
+    """{area index: verdict} for the user's answers: the ground-level area that holds the answer's point (its holes
+    left out: a courtyard's lawn is a hole in the sidewalk around it), of the card's class, the nearest the card's size."""
+    if not facts:
+        return {}
+    ground = [(i, a) for i, a in enumerate(areas) if a["l"] == 0 and a["c"] not in NOT_GROUND and len(a["r"]) >= 3]
+    polys = [shapely.Polygon(np.asarray(a["r"])[:, :2], [np.asarray(h)[:, :2] for h in a.get("h", []) if len(h) >= 3]).buffer(0)
+             for _, a in ground]
+    tree = shapely.STRtree(polys)
+    out = {}
+    for f in facts:
+        x, y = frame.xy(f["lat"], f["lon"])
+        p = shapely.Point(float(np.ravel(x)[0]), float(np.ravel(y)[0]))
+        hit = [j for j in tree.query(p, predicate="intersects") if f.get("c") in (None, ground[j][1]["c"])]
+        if hit:
+            j = min(hit, key=lambda j: abs(polys[j].area - f.get("m2", 0)))
+            out[ground[j][0]] = f["verdict"]
+    return out
+
+
 def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, rule=None, buildings=None):
     """A verdict per ground-level area (the index into areas): "fits" (within OFFSET of IPR), "small" (too small or
     narrow for the lidar), "covered", "uneven" (no steady offset), "lidar" (the survey is wrong: move it), "survey" (IPR
@@ -172,7 +192,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
     out = {}
     rx, ry, rz = rails
     rtree = shapely.STRtree(shapely.points(rx, ry)) if len(rx) else None
-    fact_pts = [(frame.xy(f["lat"], f["lon"]), f["verdict"]) for f in facts]
+    fact_of = facts_to_areas(areas, facts, frame)
     for i, a in enumerate(areas):
         if a["l"] != 0 or a["c"] in NOT_GROUND or len(a["r"]) < 3:
             continue
@@ -190,12 +210,11 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
             continue
         off = float(np.median(d[ok]))
         v["offset"], v["spread"] = round(off, 2), round(float(np.percentile(np.abs(d[ok] - off), 80)), 2)
-        fact = next((vd for (fx, fy), vd in fact_pts if poly.contains(shapely.Point(fx, fy))), None)
-        if fact:
-            v["verdict"], v["by"] = fact, "fact"
-            continue
         if abs(off) < OFFSET:
             v["verdict"] = "fits"
+            continue
+        if i in fact_of:
+            v["verdict"], v["by"] = fact_of[i], "fact"
             continue
         if poly.area < MIN_M2 or inside.mean() < MIN_INNER:
             v["verdict"] = "small"
@@ -264,7 +283,8 @@ def review_set(line, verdicts):
                  "newer than both; the orthophoto shows which. Answers become data/truth.json surveyGround "
                  "(python -I tools/survey_ground_answers.py).",
         "options": list(ANSWERS),
-        "findings": [{"kind": KIND, "x": v["x"], "y": v["y"], "lat": v["lat"], "lon": v["lon"], "mag": round(abs(v["offset"]), 2),
+        "findings": [{"kind": KIND, "x": v["x"], "y": v["y"], "lat": v["lat"], "lon": v["lon"], "c": v["c"], "m2": v["m2"],
+                      "mag": round(abs(v["offset"]), 2),
                       "info": f"{v['c']}, {v['m2']:.0f} m²: the survey {v['offset']:+.2f} m off IPR (2023); DMR 5G "
                               f"{v['older']:+.2f} m off IPR"
                               + (", with the survey" if abs(v["older"] - v["offset"]) <= AGREE else "")} for v in held],

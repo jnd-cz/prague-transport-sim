@@ -119,6 +119,16 @@ class Judge(unittest.TestCase):
         v = verdict([square(0, 0, 20, GROUND - 1.8)], rails_through(0, 0, 20, GROUND), facts=facts)
         self.assertEqual((v["verdict"], v["by"]), ("survey", "fact"))
 
+    def test_an_answer_takes_its_own_area_not_the_one_around_it(self):
+        """A courtyard's lawn is a hole in the sidewalk around it: the answer is the lawn's, the sidewalk fits."""
+        lawn = square(20, 20, 20, GROUND - 1.8, cls="green")
+        walk = square(0, 0, 60, GROUND - 0.1, cls="sidewalk")
+        walk["h"] = [[q[:] for q in lawn["r"]]]
+        facts = [{"lat": 0.03, "lon": 0.03, "verdict": "lidar", "c": "green", "m2": 400}]
+        v = zg.judge([walk, lawn], ground, ground, zg.cover_union([]), NONE, F, facts)
+        self.assertEqual((v[1]["verdict"], v[1]["by"]), ("lidar", "fact"))
+        self.assertEqual(v[0]["verdict"], "fits")
+
     def test_not_ground(self):
         v = zg.judge([square(0, 0, 20, GROUND + 3, cls="stairs"), square(0, 30, 20, GROUND + 3, cls="water")],
                      ground, ground, zg.cover_union([]), NONE, F)

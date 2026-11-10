@@ -13,6 +13,7 @@ import datetime
 import glob
 import json
 import os
+import re
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -56,8 +57,12 @@ def facts(answer_files, held_cards):
                 continue
             day = datetime.datetime.fromtimestamp((a.get("t") or 0) / 1000, datetime.timezone.utc).date().isoformat()
             said = a["v"] + (f" ({a['note']})" if a.get("note") else "")
-            new.append({"lat": card["lat"], "lon": card["lon"], "verdict": verdict, "line": card["line"],
-                        "said": said, "where": f"review mode, {day} ({os.path.relpath(path, ROOT)}, #446)",
+            # (the area's class and size pick it among those holding the point: a courtyard's lawn is a hole in the
+            # sidewalk around it; cards before #446's last build carry them only in their text)
+            cls = card.get("c") or card["info"].split(",")[0]
+            m2 = card.get("m2") or float(re.search(r"([\d.]+) m²", card["info"]).group(1))
+            new.append({"lat": card["lat"], "lon": card["lon"], "c": cls, "m2": m2, "verdict": verdict, "line": card["line"],
+                        "said": said, "where": f"review mode, {day} (reports/reviews/{os.path.basename(path)}, #446)",
                         "card": card["info"]})
     return new, held
 
