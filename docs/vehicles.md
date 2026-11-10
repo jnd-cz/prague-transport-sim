@@ -79,7 +79,9 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
 4. **The code:** a module like `src/t3h.js` (load, build a set, place it, pose it), a branch in `makeT3`
    and the calls in `src/main.js` and `src/traffic.js`, the files in the loading screen (`load.prefetch`,
    `load.get` in `src/main.js`), and a menu option (`optModel` in `index.html`, its names in both languages
-   in `src/i18n.js`). There is no common vehicle interface yet: today a new model means these edits.
+   in `src/i18n.js`). There is no common vehicle interface yet: today a new model means these edits. A
+   manifest per vehicle (#455) and a common interface, with vehicles found and checked at startup and
+   installed by the player (#456), are planned.
 5. **The checks:** a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
    frame time with `tools/frametime.py --models …`, and pictures of every model from the same views with
    `python -P -E tools/test_t3simple.py --shots DIR` (side, three-quarter, front, top, the bogie, the coupler).

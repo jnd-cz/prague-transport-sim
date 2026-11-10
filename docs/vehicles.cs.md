@@ -79,7 +79,9 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
 4. **Kód:** modul jako `src/t3h.js` (načíst, postavit soupravu, posadit ji na kolej, nastavit stav), větev
    v `makeT3` a volání v `src/main.js` a `src/traffic.js`, soubory na nahrávací obrazovce (`load.prefetch`,
    `load.get` v `src/main.js`) a volba v menu (`optModel` v `index.html`, názvy v obou jazycích
-   v `src/i18n.js`). Společné rozhraní vozidel zatím není: nový model dnes znamená tyto úpravy.
+   v `src/i18n.js`). Společné rozhraní vozidel zatím není: nový model dnes znamená tyto úpravy. Chystá se
+   popis každého vozidla v jednom souboru (#455) a společné rozhraní, ve kterém hra vozidla při startu sama
+   najde a zkontroluje a hráč si je může nainstalovat (#456).
 5. **Kontroly:** test jako `tools/test_t3h.py` (úrovně, spřáhla, podvozky, dveře, cedule, objevení), čas
    snímku přes `tools/frametime.py --models …` a obrázky všech modelů ze stejných pohledů přes
    `python -P -E tools/test_t3simple.py --shots ADRESÁŘ` (bok, tři čtvrtiny, čelo, shora, podvozek, spřáhlo).
