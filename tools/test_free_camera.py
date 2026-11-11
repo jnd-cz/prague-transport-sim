@@ -12,6 +12,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import serve  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 STATE = """(() => { const I = window.inspect, p = window.camera.position;
   return { yaw: I.yaw, pitch: I.pitch, flyYaw: I.flyYaw, flyPitch: I.flyPitch, x: p.x, y: p.y, z: p.z }; })()"""
@@ -38,7 +39,7 @@ def main():
             fails.append(what)
 
     with sync_playwright() as p:
-        b = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"])
+        b = gpu.launch(p)[0]
         page = b.new_page(viewport={"width": 1280, "height": 800})
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))

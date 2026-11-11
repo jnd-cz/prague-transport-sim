@@ -7,7 +7,8 @@ import unittest
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from headless import ARGS, serve, stop_server
+from headless import serve, stop_server
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 class TramCycles(unittest.TestCase):
@@ -16,7 +17,7 @@ class TramCycles(unittest.TestCase):
         faulthandler.dump_traceback_later(120, exit=True)
         cls.server, cls.url = serve(0)
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True, args=ARGS)
+        cls.browser = gpu.launch(cls.pw)[0]
         cls.page = cls.browser.new_page()
         html = (Path(__file__).resolve().parent.parent / 'index.html').read_text(encoding='utf-8')
         importmap = re.search(r'<script type="importmap">.*?</script>', html, re.S)[0]

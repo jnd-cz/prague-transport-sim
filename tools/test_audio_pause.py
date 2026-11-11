@@ -6,6 +6,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from headless import serve, stop_server
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 class AudioPause(unittest.TestCase):
@@ -13,7 +14,7 @@ class AudioPause(unittest.TestCase):
         server, url = serve(0)
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                browser = gpu.launch(p)[0]
                 page = browser.new_page(viewport={'width': 960, 'height': 600})
                 page.goto(url + '/?line=23', timeout=180000)
                 page.wait_for_selector('#btnStart', state='visible', timeout=180000)

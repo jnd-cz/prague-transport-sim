@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from headless import serve, stop_server
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -18,7 +19,7 @@ class HeightStyles(unittest.TestCase):
     def setUpClass(cls):
         cls.server, cls.url = serve(0)
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True)
+        cls.browser = gpu.launch(cls.pw)[0]
         cls.page = cls.browser.new_page()
         # An inert same-origin document avoids loading the whole game for module tests.
         cls.page.route(

@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import headless
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 HTML = """<!doctype html><title>9</title><div id="loading" class="hidden"></div>
@@ -65,7 +66,7 @@ class TimeoutTests(unittest.TestCase):
         cls.thread.start()
         cls.url = f'http://127.0.0.1:{cls.server.server_port}'
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True)
+        cls.browser = gpu.launch(cls.pw)[0]
 
     @classmethod
     def tearDownClass(cls):

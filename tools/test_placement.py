@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import placement as pl  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -122,7 +123,7 @@ class GameAgrees(unittest.TestCase):
         server, url = headless.serve(0)
         try:
             with sync_playwright() as pw:
-                b = pw.chromium.launch(headless=True)
+                b = gpu.launch(pw)[0]
                 for line in built:
                     page = b.new_page()
                     page.goto(f"{url}/?line={line}", wait_until='load')
