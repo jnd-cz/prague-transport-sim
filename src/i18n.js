@@ -60,8 +60,8 @@ const DICT = {
     'menu.help': 'Help', 'help.close': 'Close', 'help.failed': 'The help could not be loaded.',
     // performance (src/perf.js, src/main.js, #350)
     'menu.perfTest': 'Performance test (this line, 1 min)', 'menu.perfRef': 'Reference test (line 17, 1 min)', 'pt.titleRef': 'Reference test (line 17)', 'pt.running': 'Performance test: the autopilot drives for a minute, then the result',
-    'pt.title': 'Performance test', 'pt.good': 'Smooth: it keeps up with the display', 'pt.ok': 'Playable, with some slow frames', 'pt.slow': 'Slow on this machine',
-    'pt.fps': 'Frames per second', 'pt.slow33': 'Frames slower than 33 ms', 'pt.p90': '9 frames in 10 within', 'pt.gpu': 'Graphics card time per frame',
+    'pt.title': 'Performance test', 'pt.good': 'Smooth: it keeps up with the display', 'pt.ok': 'Playable: steady, but slower than the display (about 30 frames a second)', 'pt.slow': 'Slow on this machine',
+    'pt.fps': 'Frames per second', 'pt.slow20': 'Frames slower than 20 ms (below 60 a second)', 'pt.slow33': 'Frames slower than 33 ms', 'pt.p90': '9 frames in 10 within', 'pt.gpu': 'Graphics card time per frame',
     'pt.draws': 'Draw calls', 'pt.tris': 'Triangles', 'pt.gpuName': 'Graphics', 'pt.screen': 'Screen',
     'pt.note': 'Sending the result helps us see which machines the game suits. It goes without a name; with it the graphics card, browser and screen size.',
     'pt.send': 'Send the result to the authors', 'pt.sent': 'Sent, thank you.', 'pt.menu': 'Back to the menu',
@@ -229,8 +229,8 @@ const DICT = {
     'menu.help': 'Nápověda', 'help.close': 'Zavřít', 'help.failed': 'Nápovědu se nepodařilo načíst.',
     // výkon (src/perf.js, src/main.js, #350)
     'menu.perfTest': 'Test výkonu (tato linka, 1 min)', 'menu.perfRef': 'Referenční test (linka 17, 1 min)', 'pt.titleRef': 'Referenční test (linka 17)', 'pt.running': 'Test výkonu: minutu jede autopilot, pak výsledek',
-    'pt.title': 'Test výkonu', 'pt.good': 'Plynulé: stíhá obnovovací frekvenci displeje', 'pt.ok': 'Hratelné, občas pomalejší snímek', 'pt.slow': 'Na tomto počítači pomalé',
-    'pt.fps': 'Snímků za sekundu', 'pt.slow33': 'Snímků pomalejších než 33 ms', 'pt.p90': '9 snímků z 10 do', 'pt.gpu': 'Čas grafické karty na snímek',
+    'pt.title': 'Test výkonu', 'pt.good': 'Plynulé: stíhá obnovovací frekvenci displeje', 'pt.ok': 'Hratelné: stabilní, ale pomaleji než displej (kolem 30 snímků za sekundu)', 'pt.slow': 'Na tomto počítači pomalé',
+    'pt.fps': 'Snímků za sekundu', 'pt.slow20': 'Snímků pomalejších než 20 ms (pod 60 za sekundu)', 'pt.slow33': 'Snímků pomalejších než 33 ms', 'pt.p90': '9 snímků z 10 do', 'pt.gpu': 'Čas grafické karty na snímek',
     'pt.draws': 'Volání kreslení', 'pt.tris': 'Trojúhelníků', 'pt.gpuName': 'Grafika', 'pt.screen': 'Obrazovka',
     'pt.note': 'Odesláním výsledku nám pomůžete zjistit, na jakých počítačích hra poběží. Jde bez jména; s ním grafická karta, prohlížeč a velikost obrazovky.',
     'pt.send': 'Poslat výsledek autorům', 'pt.sent': 'Odesláno, děkujeme.', 'pt.menu': 'Zpět do menu',
