@@ -29,14 +29,14 @@ def floor(x, y):
 
 
 class Inside(unittest.TestCase):
-    def test_at_grade_areas_of_the_classes_drape(self):
-        areas = [rect(0, 0, 50, 50, 200, "rail"), rect(0, 0, 50, 50, 200, "green"), rect(0, 0, 50, 50, 200, "paved"),
-                 rect(0, 0, 50, 50, 200, "green"), rect(0, 0, 50, 50, 200, "road"), rect(0, 0, 50, 50, 205, "green", 1)]
-        verdicts = {0: {"verdict": "fits", "m2": 2500}, 1: {"verdict": "lidar", "m2": 2500}, 2: {"verdict": "fits", "m2": 2500},
-                    3: {"verdict": "uneven", "m2": 2500}, 4: {"verdict": "fits", "m2": 2500}}
+    def test_open_areas_of_the_classes_drape(self):
+        areas = [rect(0, 0, 50, 50, 200, c) for c in ("rail", "green", "paved", "green", "green", "paved", "green", "road")]
+        areas.append(rect(0, 0, 50, 50, 205, "green", 1))
+        verdicts = dict(enumerate({"verdict": v, "m2": 2500} for v in
+                                  ("fits", "lidar", "uneven", "small", "covered", "survey", "review", "fits")))
         out = zi.inside(areas, verdicts)
-        self.assertEqual([a.get("g") for a in areas], [1, 1, 1, None, None, None])
-        self.assertEqual(out["kept"], {"uneven": 1})
+        self.assertEqual([a.get("g") for a in areas], [1, 1, 1, None, None, None, None, None, None])
+        self.assertEqual(out["kept"], {"small": 1, "covered": 1, "survey": 1, "review": 1})
         self.assertEqual(out["classes"]["green"], {"areas": 1, "m2": 2500})
 
 

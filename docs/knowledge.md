@@ -351,6 +351,21 @@ Sections:
   underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
   the nearest face flipped between the two.
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
+- **Railway yards, lawns and paved yards have heights only on their outline** (#444, `tools/zps_inside.py`,
+  `tools/bench/ground_inside.py`). A street is dense with surveyed lines; these are not, and the linear sheet between
+  their outline vertices left 5-53 % of `rail`'s inside, 7-19 % of `paved`'s and 22-29 % of `green`'s more than 1 m off
+  IPR (the street classes 0-4 %). Those lying open on IPR's ground (#446's verdict within 0.5 m, moved there, or off
+  it unevenly along walls and slopes) take the lidar inside: the page drapes them on its terrain, 5 m triangles (10 m
+  left `green`'s p95 at 0.38-0.44 m, 5 m at 0.13-0.18 m). For the uneven ones a sheet left 30-54 % of the inside
+  beyond 1 m, draped 2-17 %; the small ones (planters, raised beds), the covered ones and those held off IPR keep
+  their sheet. Cut from the city
+  mesh and written as triangles, line 37's were 750,000 triangles, 24 MB more JSON: prebuilt, they wait for #276's
+  ground format. Under the decks IPR is not the floor everywhere: of 14,235 ground-level outline vertices under level-1
+  areas the middle half lie within -0.25 / +0.12 m of it, but by Hlavní nádraží IPR runs 4-8 m under the forecourt's
+  paving (interpolated under the wide deck) and on line 17 it reads a deck's cover over stairs going down. In an
+  opening whose floor IPR shows, only the vertices of the passage's own street standing at the deck move (Divadelní's
+  west kerb at 193.3 m, the floor 187.7 m); an area across the way stays (the tram over a footway's underpass at line
+  37's east end lies at its rails' top, IPR 2.3-4.2 m under them).
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
   of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**

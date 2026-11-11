@@ -5,18 +5,20 @@ The survey draws an area as its outline, with heights from its 3D lines. A stree
 its sheet between them is the street; a railway yard, a lawn or a paved yard has them only round its edge, and a sheet
 between them misses the ground inside: on the five lines 5-53 % of the inside of `rail`, 22-29 % of `green` and 7-19 %
 of `paved` lies more than 1 m off IPR's lidar, against 0-4 % for the street classes (tools/bench/ground_inside.py,
-2026-11-11). An area of these classes that lies on IPR's ground (tools/zps_ground.py's verdict: within its OFFSET of
-IPR, or moved there) takes the lidar inside: it is marked `g`, and the page drapes it on its terrain (src/terrain.js
-DtmSurface: its triangles split to 5 m, the new points inside on the lidar, the outline keeping the survey's heights;
-#276's ground built offline will cut the terrain mesh by it instead: on line 37 that mesh as JSON was 750,000 triangles
-and 24 MB more). Off IPR (on a structure, under a cover, or where the survey's heights stay by the rails, DMR 5G or the
-user), an area keeps its sheet.
+2026-11-11). An area of these classes takes the lidar inside where it lies open on IPR's ground (DRAPE: by
+tools/zps_ground.py's verdict within its OFFSET of IPR, moved there, or off it unevenly along walls and slopes): it is
+marked `g`, and the page drapes it on its terrain (src/terrain.js DtmSurface: its triangles split to 5 m, the new points
+inside on the lidar, the outline keeping the survey's heights; #276's ground built offline will cut the terrain mesh by
+it instead: on line 37 that mesh as JSON was 750,000 triangles and 24 MB more). The uneven ones measured, their inside
+beyond 1 m of IPR as a sheet and draped: green 54 % and 8.7 % (324,000 m²), paved 46 % and 17 %, rail 30 % and 1.7 %.
+An area too small for the lidar to see (a planter, a raised bed: #446), one under a cover (IPR interpolated under a wide
+deck, or the cover itself) and one the rails, DMR 5G or the user hold steadily off IPR keeps its sheet.
 
 Under a deck: where an OSM tunnel or covered way passes under the decks (tools/zps_decks.py openings) and IPR shows its
 floor (flatten's gap, WALK or more), the survey's ground-level street of the passage shares its 3D lines with the deck
 and alternates between its top and the floor (Divadelní: the road at the deck's height at both portals). Its vertices
-standing at the deck take IPR's ground (under_decks). Elsewhere under a level-1 area the survey's ground level stays: IPR is interpolated under
-wide decks (by Hlavní nádraží the forecourt's paving at 209-210 m over IPR's 201-205 m) or reads the cover (stairs at
+standing at the deck take IPR's ground (under_decks). Elsewhere under a level-1 area the survey's ground level
+stays: IPR is interpolated under wide decks (by Hlavní nádraží the forecourt's paving at 209-210 m over IPR's 201-205 m) or reads the cover (stairs at
 185 m under a deck at 189.6 m, IPR 189.5 m), and of the 14,235 ground-level outline vertices under level-1 areas on the
 five lines the middle half lie within -0.25 / +0.12 m of IPR.
 """
@@ -24,7 +26,7 @@ import numpy as np
 import shapely
 
 INSIDE = {"rail", "green", "paved"}  # the classes with heights only on their outline (measured above)
-AT_GRADE = {"fits", "lidar"}  # zps_ground.judge's verdicts of an area lying on IPR's ground
+DRAPE = {"fits", "lidar", "uneven"}  # zps_ground.judge's verdicts of an area lying open on IPR's ground
 REACH = 0.5  # m round an opening's streets: their vertices at its edge (the portals)
 PLUG = 1.0  # m under the deck's top: a ground-level vertex this high stands at the deck, not on the floor under it
 ALONG, ALONG_RATIO = np.radians(30), 1.5  # an area runs along the way: within this angle, this elongated
@@ -34,14 +36,14 @@ WALK = 2.2  # m under the deck's top: IPR this low shows the floor at the vertex
 
 
 def inside(areas, verdicts):
-    """The areas of INSIDE classes lying on IPR's ground take the lidar inside (in place: `g` 1). verdicts:
+    """The areas of INSIDE classes lying open on IPR's ground take the lidar inside (in place: `g` 1). verdicts:
     zps_ground.judge's. Returns {"classes": {class: {"areas", "m2"}}, "kept": {verdict: areas}}."""
     out = {"classes": {}, "kept": {}}
     for i, a in enumerate(areas):
         if a["l"] != 0 or a["c"] not in INSIDE or len(a["r"]) < 3:
             continue
         v = verdicts.get(i, {})
-        if v.get("verdict") not in AT_GRADE:
+        if v.get("verdict") not in DRAPE:
             k = v.get("verdict") or "none"
             out["kept"][k] = out["kept"].get(k, 0) + 1
             continue
