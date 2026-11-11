@@ -216,8 +216,6 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
-| crossing | 17 | 1 unexplained pedestrian obstruction | #146 |
-| crossing | 9 | 2 unexplained pedestrian obstructions: a surveyed sidewalk 0.40 m over the rails at s 3672 (since its survey, #125) | #146 |
 
 ## Code style
 
