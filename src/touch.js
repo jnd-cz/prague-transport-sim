@@ -49,8 +49,12 @@ body.touch.shift #touch { display: block }
 body.touch #rpBtn { display: none !important }
 .tbToggle { position: fixed; top: 8px; left: 8px; z-index: 11; font-size: 18px; padding: 6px 9px }
 body.shift .tbToggle { display: none }
-.tbToggle.fs { left: 56px }
-#fsAsk { position: fixed; top: 8px; left: 104px; right: 8px; z-index: 11; display: none; gap: 8px; align-items: center; flex-wrap: wrap;
+/* (a touch screen with the controls switched off has no pause and no way back to them: 🎮 stays in the shift, the user's
+   phone in landscape, 2026-11-11, #485) */
+@media (pointer: coarse) { body.shift:not(.touch) .tbToggle:not(.fs) { display: block } }
+/* (⛶ at the other corner: beside 🎮, a tap meant for full screen switched the controls off) */
+.tbToggle.fs { left: auto; right: 8px }
+#fsAsk { position: fixed; top: 8px; left: 56px; right: 56px; z-index: 11; display: none; gap: 8px; align-items: center; flex-wrap: wrap;
   background: rgba(15,20,17,.94); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 6px 10px; font: 14px system-ui, sans-serif; color: #eee }
 /* (only over the game's menu: not in a shift, nor over ?review's map) */
 #menu:not(.hidden) ~ #fsAsk.show { display: flex } body.shift #fsAsk { display: none }

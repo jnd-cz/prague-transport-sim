@@ -208,7 +208,7 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 ### On a phone or tablet
 
 On-screen buttons, shown on a touch screen by default and switched by 🎮 in the menu (remembered per
-device). They send the keyboard's keys:
+device; switched off, 🎮 brings them back during a shift too). They send the keyboard's keys:
 
 - the row above the dashboard (sideways, a column at the right): ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;

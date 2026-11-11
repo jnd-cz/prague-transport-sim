@@ -202,7 +202,7 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 ### Na telefonu nebo tabletu
 
 Tlačítka na obrazovce, na dotykové obrazovce zobrazená automaticky, přepínaná 🎮 v menu (pamatuje si je
-zařízení). Posílají klávesy klávesnice:
+zařízení; vypnutá je 🎮 vrátí i za jízdy). Posílají klávesy klávesnice:
 
 - řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
