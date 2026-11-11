@@ -1280,7 +1280,8 @@ export class Game {
       deadmanTrip,
       grade: this.profile.grade(mid),
       radius: this.route.radiusAt(tram.s - 4),
-      mu: this.muAt(tram.s),
+      mu: (s) => this.muAt(s), // (each axle its own rail, #265)
+      weather: this.weather,
       sandKey: !!input.sand,
       doorsOpen: this.doorState !== 'closed', // (the door relay keeps the line contactor out; no brake from it)
     });
@@ -1710,6 +1711,8 @@ export class Game {
   _changeLine(line) {
     const old = this.line;
     this.line = line;
+    // (the sand box is refilled at the terminus: data/truth.json t3-sand-refill)
+    this.tram.sand = 1;
     this.msg(t('msg.lineChange', { a: old, b: line }), 'info', 8);
     this.onLineChange?.(line, old);
   }

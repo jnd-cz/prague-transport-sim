@@ -135,6 +135,7 @@ export function groupCurrent(U, v, R, phi) {
 const tractive = (Im, phi) => (4 * motor(Im, phi)[1] * C.gear * C.gearEff) / C.wheelR;
 const braking = (Ib, phi = 1) => (4 * motor(Ib / 2, phi)[1] * C.gear) / C.gearEff / C.wheelR;
 
+const FORCE_AT = new Map(); // (TR37.driveForceAt's per car, by step and speed)
 export const accR = (p) => (p >= 75 ? 0 : (C.accDrive * (77 - p)) / 76); // M2 bridges it from 75 (§ 8.4)
 // (a stage's contactor closes over one position: the relay holds the current there, where the real one hunts; a
 // step would make the bar flicker)
@@ -217,6 +218,18 @@ export class TR37 {
   get buttonLive() { return !this.ls && this.p <= 30; }
   // a step's force standing to the end of the resistors (N), for the autopilot's choice
   driveForce(step) { return tractive(C.driveCurrent[step - 1] / 2, 1) * this.cars; }
+  // … and what it gives at speed v: its current while the accelerator can hold it (the resistances, then the field weakened as far
+  // as it goes), past that what the motors take with all of it out, which falls with the speed (at the line's 600 V; by half m/s)
+  driveForceAt(step, v) {
+    const key = step * 1000 + Math.round(Math.abs(v) * 2), hit = FORCE_AT.get(key);
+    if (hit !== undefined) return hit * this.cars;
+    const half = C.driveCurrent[step - 1] / 2, u = Math.round(Math.abs(v) * 2) / 2;
+    let f = null;
+    for (let p = 1; p <= 99 && f === null; p += 2) { const phi = field(p); if (groupCurrent(C.lineVoltage, u, accR(p), phi) >= half) f = tractive(half, phi); }
+    if (f === null) { const phi = field(99); f = tractive(groupCurrent(C.lineVoltage, u, 0, phi), phi); }
+    FORCE_AT.set(key, f);
+    return f * this.cars;
+  }
   // … and a brake step's at this speed: what the relay can hold between the two ends of the accelerator (N)
   brakeForce(step, v = 10) {
     const low = loopCurrent(v, C.pMin, 1), high = loopCurrent(v, 99, loopField(99, false));
@@ -299,7 +312,9 @@ export class TR37 {
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
   // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
-  // trackOk (false: no danger, so not the track brakes) }.
+  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather), railA (m/s² the rail
+  // gives here rolling at its grip, the gradient with it, on slippery rail), maxDrive (N: no drive step pulling more,
+  // on slippery rail: what the rail holds), minDrive (N: but not under the lowest step pulling this, what climbs the grade) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -354,18 +369,33 @@ export class TR37 {
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
     if (w.noDrive) s = Math.min(0, s);
-    // a wheel that goes takes a step less, and the step stays less for a while: back on the same step at once it slipped through
-    // most of every start on autumn's leaves (6 s and 3 s [assumed]). On sand too: sand gives 0.1 of grip back, and step 5 pulls
-    // with more (up 50 ‰ it slipped 4.5 s on step 5 while sanding). The sand stays on through the start (the autopilot's).
-    // Lower again only if it still slips 0.8 s on: the wheels go on slipping while a step comes off (0.6 s), and a slip on step 4
-    // ended on step 1 for 6 s (up 50 ‰ on leaves, 17 s lost)
+    // a wheel that spins: noticed after 0.5 s, the pedal off for 0.6 s, and back on a step lower, the cap held 6 s [assumed]; the user,
+    // 2026-11-04: "the wheel spin up quickly and the reaction of real driver is slower. They ease of the drive and try again with less
+    // power". Spinning, the rail gives half its peak (#265's creep curve), and a step or two less still pulled more: stepped down one
+    // at a time the spin went on through steps 4 to 1, and on step 1, the lowest, for good (109 s of a 150 s drive up 50 ‰ on leaves)
     A.slipT = (A.slipT || 0) - w.dt;
     A.slideT = (A.slideT || 0) - w.dt;
-    A.slipWait = (A.slipWait || 0) - w.dt;
-    if (w.slip && now > 1) { if (!(A.slipT > 0) || (now <= A.slipCap && A.slipWait <= 0)) { A.slipCap = now - 1; A.slipWait = 0.8; } A.slipT = 6; }
-    if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
+    A.easeT = (A.easeT || 0) - w.dt;
+    A.spinT = w.slip && now > 0 ? (A.spinT || 0) + w.dt : 0;
+    if (A.spinT > 0.5 && !(A.easeT > 0)) { A.easeT = 0.6; A.slipCap = Math.max(1, (A.slipT > 0 ? Math.min(A.slipCap, now) : now) - 1); A.slipT = 6; A.spinT = 0; }
+    // a wheel that slides, the same: noticed after 0.3 s (not in an emergency, step 6 with the track brakes), the foot off the brake
+    // until the wheels turn again (0.3 s at least, 1.5 s at most), and back a step lighter than where it slid, held 4 s, then heavier a
+    // step each 3 s without a slide [assumed]. A locked wheel gets SPIN_LEFT of the grip (src/tram.js), and the equipment sees it
+    // standing, so the shoes come in: stepping off one at a time it stayed locked down to step 1 and slid 5-8 s from 25 km/h to a stand,
+    // 40-46 s a run on line 9 in snow and autumn (#265)
+    // (not at a crawl: there a lock is a moment and stops it sooner than a release would; let go at 3 km/h behind a parked car, it rolled
+    // into it, line 17 seed 4 in snow)
+    A.slideRun = w.slide && now < 0 && now > -6 && v > 2.5 ? (A.slideRun || 0) + w.dt : 0;
+    A.offT = (A.offT || 0) - w.dt;
+    if (A.slideRun > 0.3 && !(A.offT > 0)) { A.offT = 0.3; A.offMax = 1.5; A.slideCap = Math.min(-1, (A.slideT > 0 ? Math.max(A.slideCap, now) : now) + 1); A.slideT = 4; A.slideRun = 0; }
+    if (A.offT > 0 && w.slide && A.offMax > 0) { A.offMax -= w.dt; A.offT = Math.max(A.offT, 2 * w.dt); }
+    if (!(A.slideT > 0) && A.slideCap != null && A.slideCap > -5) { A.slideCap--; A.slideT = 3; }
+    if (A.easeT > 0 && s > 0) s = 0;
+    // (and back up a step at a time, each after 4 s without a spin: free after 6 s, it went back to step 5 and spun again at once)
+    if (!(A.slipT > 0) && A.slipCap != null && A.slipCap < 5) { A.slipCap++; A.slipT = 4; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
-    if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
+    // (the rail's grip, last: a step held from a lower speed comes down too, #265)
+    if (w.maxDrive != null) while (s > 1 && this.driveForceAt(s, v) > w.maxDrive && this.driveForceAt(s - 1, v) >= (w.minDrive ?? 0)) s--;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast
     // before driving again ([ckd03] p. 11). (From a stand the loops are not the question.)
@@ -380,7 +410,8 @@ export class TR37 {
       // pedal for those 2 s it was one more release and press per stop.)
       // (step 5 only when partly is well short of it: the full shoes come in at 1.4 m/s², and the point has a margin)
       const a1 = (C.shoeForce[1] * this.cars) / w.inertia + Math.max(0, w.aCoast);
-      if (w.aNeed > a1 * 1.8) s = -5;
+      // (on slippery rail, lowMu, the full shoes lock the wheels: step 5 only where the partly applied ones are far short, #265)
+      if (w.aNeed > a1 * (w.lowMu ? 2.5 : 1.8)) s = -5;
       else if (w.aSoon >= a1 * 0.9 || this.shoe > 0) s = -3;
       else s = now < 0 ? Math.max(now, -2) : 0;
     } else if (s < 0 && v < 2.5 && !w.fixed) {
@@ -391,6 +422,10 @@ export class TR37 {
       const need = w.stopDist == null ? 0 : (w.v * w.v) / (2 * Math.max(0.3, w.stopDist));
       s = need > 0.15 || (w.stopDist != null && w.stopDist < 8) ? -5 : Math.min(s, -3);
     }
+    // (the slide's release and cap after the last metres' and the crawl's steps, which would put step 5 back on the locked wheels; the
+    // track brakes below still come in where the rail does not hold)
+    if (A.offT > 0 && s < 0 && s > -6) s = 0;
+    else if (A.slideT > 0 && s < A.slideCap && s > -6) s = A.slideCap;
     // a stop the service brake (≈1.3 m/s² on step 5) cannot make: the pedal to the floor, the track brakes
     // with it, as a driver does for a signal turning red too close (line 17 seed 3: red 36 m ahead at
     // 38 km/h, 1.6 m/s² needed; the old force model braked 1.8 m/s²); let go once it is in hand. Up a climb
@@ -407,7 +442,12 @@ export class TR37 {
       // Hřbitovy, up 25 ‰, and it had to drive again to get there, line 9 seed 3 in autumn)
       A.slideTrack = w.fixed && !w.sandLeft && ((w.slide && need > Math.max(0.35, w.slideA ?? 0)) || (A.slideTrack && now === -6 && need > 0.3 && need > 0.8 * (w.slideA ?? 0)));
       // (w.trackOk false: no danger, the service brake at most, src/autopilot.js)
-      if (w.trackOk !== false && ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack)) s = -6;
+      // (… and on slippery rail one the rail cannot give rolling at its grip, sanded where the sand is on, less a descent's pull, w.railA:
+      // unsanded a leaf patch down 42 ‰ gives 0.18 m/s², and coming to a red at 1.5 m/s on step 2, the wheels turning, it crept 3 m over
+      // it, line 9 seed 1 in autumn, #265. The autopilot sands there first)
+      // (held once on, as for a slide, until what is still needed is well within the rail: on and off, three times on one patch)
+      A.railTrack = w.fixed && w.railA != null && (need > Math.max(0.3, 1.1 * w.railA) || (A.railTrack && now === -6 && need > 0.2 && need > 0.8 * w.railA));
+      if (w.trackOk !== false && ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack || A.railTrack)) s = -6;
     }
     const contact = w.power != null;
     if (!w.urgent && !contact && s !== -6) {
