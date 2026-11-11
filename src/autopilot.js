@@ -7,6 +7,7 @@
 
 import { muSpeed } from './tram.js';
 
+const SIGHT = 200; // m: on slippery rail it can stop from within this on the grip down a descent (#265)
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
 const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on the level and empty (planAt: 0.85 of step 5 below that). Two real
@@ -127,6 +128,15 @@ export class Autopilot {
     const vLine = vt;
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitPlan(limit.d) * Math.max(0, limit.d - 12)) - 0.3;
     if (nl) vt = Math.min(vt, curveTo(nl));
+    // (on slippery rail no faster down a descent than it stops from within SIGHT on the grip it has at that speed less the descent's pull,
+    // the steepest in the next 250 m: down Modřanská rokle in snow it coasted to 60 km/h, where 0.085 of grip less the pull left 0.25
+    // m/s², and a signal 272 m ahead needing 0.46 took it over three limits, overspeed 41, line 37 seed 5, #265. On the level it binds
+    // only over 66 km/h in snow; down 60 ‰ in snow it holds 35 km/h)
+    if (mu < 0.2) {
+      let gMin = gradeHere;
+      for (let d = 25; d <= 250; d += 25) gMin = Math.min(gMin, g.profile.grade(tr.s + d - 7));
+      vt = Math.min(vt, Math.sqrt(2 * Math.max(0.15, 9.81 * (0.95 * mu * muSpeed(tr.v) + gMin)) * SIGHT));
+    }
     let vLimit = vt;
     let stopAt = null, fixed = false, fixedAt = null, stopWhy = null;
     // (fixed: a stop or a signal, which stays where it is; else something that can move off. Something nearer does not take
@@ -412,12 +422,25 @@ export class Autopilot {
     // slipped, until 3 m/s: sand for 1.5 s at a time slipped again after each
     // (spinning, the rail gives half its peak, #265's creep curve, and pulling away up 50 ‰ on leaves without sand it slipped 25 s of
     // 110: so sand where half the grip leaves under 0.3 m/s² to climb with; the box holds 25 minutes)
+    // (on slippery rail it drives on what the rail holds, as a driver on snow keeps to the low steps: no step pulling more than 0.95 of
+    // the weather's grip at this speed (what the step gives at it: past the accelerator's run the motors take less), but never under the
+    // lowest that climbs the grade here. Step 3 pulls 46 kN on a two-car set and snow's 0.12 holds 42 kN standing, 32 kN at 40 km/h: back
+    // on it every 4 s after a spin it spun again, 270 spins and 245 s on line 9 in snow, 303 of its 499 presses under a spin's cap. At
+    // 0.8 of 0.10 only step 1 was left, which does not lift a full set up 60 ‰: 10 runs stuck, #265)
+    const minDrive = tr.mass * 9.81 * Math.max(0, gradeHere) + 650 * tr.cars + 0.1 * tr.inertia;
+    const railHolds = (m) => 0.95 * m * muSpeed(tr.v) * tr.mass * 9.81;
+    // (and where a climb takes more than the bare rail holds, sand, rolling too: up Trojská's 80 ‰ in snow at 20-28 km/h step 1 does not
+    // lift it and step 2 is at the grip, 15 spins and presses on one climb, line 17 seed 1; sanded, snow's rail holds 0.165)
+    this.climbSand = mu < 0.2 && need > 0 && tr.v >= 3 && minDrive > 0.9 * railHolds(mu) && tr.sand > 0;
+    // (the sand does not raise the cap: only the first axle runs on it until its trail reaches the others, and on step 3 at 10 km/h up
+    // 56 ‰ on leaves, the sand just on, it spun 4.4 s; the floor lets through the step a climb takes, and the sand makes it hold)
+    const maxDrive = mu < 0.2 ? railHolds(mu) : null;
     const slipClimbs = 0.5 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.3;
     this.startSand = tr.v < 3 && !slipClimbs && need > 0 && (tr.slip || !!this.startSand);
     // (braking: on every slide. Rationed while the box held 90 s, to a point within what a sliding tram needs, it slid twice without sand
     // braking for a lower limit down Chotkova's 55 ‰, held step 1 for 3 s after each and came into the 20 km/h at 35, line 23 seed 2 in
     // autumn; the box holds 25 minutes)
-    this.sandT = this.startSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
+    this.sandT = this.startSand || this.climbSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
     // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
@@ -426,13 +449,6 @@ export class Autopilot {
     const trackOk = !dryRail || stopWhy === 'walker' || stopWhy === 'obstacle' || stopWhy === 'car';
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
-    // (on slippery rail it drives on what the rail holds, as a driver on snow keeps to the low steps: no step pulling more than 0.9 of
-    // the weather's grip at this speed, but never under the lowest that climbs the grade here. Step 3 pulls 46 kN on a two-car set and
-    // snow's 0.12 holds 42 kN standing, 32 kN at 40 km/h: back on it every 4 s after a spin it spun again, 270 spins and 245 s on line 9
-    // in snow, 303 of its 499 presses under a spin's cap. At 0.8 of 0.10 only step 1 was left, which does not lift a full set up 60 ‰:
-    // 10 runs stuck, #265)
-    const maxDrive = mu < 0.2 ? 0.9 * mu * muSpeed(tr.v) * tr.mass * 9.81 : null;
-    const minDrive = tr.mass * 9.81 * Math.max(0, gradeHere) + 650 * tr.cars + 0.1 * tr.inertia;
     tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,

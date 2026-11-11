@@ -135,6 +135,7 @@ export function groupCurrent(U, v, R, phi) {
 const tractive = (Im, phi) => (4 * motor(Im, phi)[1] * C.gear * C.gearEff) / C.wheelR;
 const braking = (Ib, phi = 1) => (4 * motor(Ib / 2, phi)[1] * C.gear) / C.gearEff / C.wheelR;
 
+const FORCE_AT = new Map(); // (TR37.driveForceAt's per car, by step and speed)
 export const accR = (p) => (p >= 75 ? 0 : (C.accDrive * (77 - p)) / 76); // M2 bridges it from 75 (§ 8.4)
 // (a stage's contactor closes over one position: the relay holds the current there, where the real one hunts; a
 // step would make the bar flicker)
@@ -217,6 +218,18 @@ export class TR37 {
   get buttonLive() { return !this.ls && this.p <= 30; }
   // a step's force standing to the end of the resistors (N), for the autopilot's choice
   driveForce(step) { return tractive(C.driveCurrent[step - 1] / 2, 1) * this.cars; }
+  // … and what it gives at speed v: its current while the accelerator can hold it (the resistances, then the field weakened as far
+  // as it goes), past that what the motors take with all of it out, which falls with the speed (at the line's 600 V; by half m/s)
+  driveForceAt(step, v) {
+    const key = step * 1000 + Math.round(Math.abs(v) * 2), hit = FORCE_AT.get(key);
+    if (hit !== undefined) return hit * this.cars;
+    const half = C.driveCurrent[step - 1] / 2, u = Math.round(Math.abs(v) * 2) / 2;
+    let f = null;
+    for (let p = 1; p <= 99 && f === null; p += 2) { const phi = field(p); if (groupCurrent(C.lineVoltage, u, accR(p), phi) >= half) f = tractive(half, phi); }
+    if (f === null) { const phi = field(99); f = tractive(groupCurrent(C.lineVoltage, u, 0, phi), phi); }
+    FORCE_AT.set(key, f);
+    return f * this.cars;
+  }
   // … and a brake step's at this speed: what the relay can hold between the two ends of the accelerator (N)
   brakeForce(step, v = 10) {
     const low = loopCurrent(v, C.pMin, 1), high = loopCurrent(v, 99, loopField(99, false));
@@ -379,7 +392,7 @@ export class TR37 {
     if (!(A.slipT > 0) && A.slipCap != null && A.slipCap < 5) { A.slipCap++; A.slipT = 4; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
     // (the rail's grip, last: a step held from a lower speed comes down too, #265)
-    if (w.maxDrive != null) while (s > 1 && this.driveForce(s) > w.maxDrive && this.driveForce(s - 1) >= (w.minDrive ?? 0)) s--;
+    if (w.maxDrive != null) while (s > 1 && this.driveForceAt(s, v) > w.maxDrive && this.driveForceAt(s - 1, v) >= (w.minDrive ?? 0)) s--;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast
     // before driving again ([ckd03] p. 11). (From a stand the loops are not the question.)
