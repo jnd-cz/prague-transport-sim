@@ -1711,8 +1711,7 @@ export class Game {
   _changeLine(line) {
     const old = this.line;
     this.line = line;
-    // (the sand box is refilled at the terminus: the user, 2026-11-04, #265: "Sand can be refilled at each terminus, starts with full
-    // from the depot")
+    // (the sand box is refilled at the terminus: data/truth.json t3-sand-refill)
     this.tram.sand = 1;
     this.msg(t('msg.lineChange', { a: old, b: line }), 'info', 8);
     this.onLineChange?.(line, old);

@@ -1881,6 +1881,17 @@
     }
    },
    {
+    "id": "t3-sand-refill",
+    "value": "at each terminus",
+    "unit": null,
+    "scope": "the sand box starts full from the depot and is refilled at each terminus of a run (src/game.js _changeLine); its size is src/tram.js sandSecs",
+    "basis": "user",
+    "user": {
+     "source": "Claude Code session 2026-11-04 (#265), confirmed in session 2026-11-12 (PR #426)",
+     "quote": "Sand can be refilled at each terminus, starts with full from the depot. [2026-11-12, on refilling at each terminus:] Yes that would be correct."
+    }
+   },
+   {
     "id": "t3-dimensions",
     "value": {
      "length": 15.2,
