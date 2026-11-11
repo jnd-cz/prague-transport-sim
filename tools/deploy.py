@@ -65,6 +65,7 @@ HTACCESS = """# tools/deploy.py: the data and models exist here only as <name>.b
   AddType model/gltf+json .gltf
   AddType model/gltf-binary .glb
   AddType application/octet-stream .bin
+  AddType application/manifest+json .webmanifest
   AddEncoding br .brotli
 </IfModule>
 RewriteEngine On
@@ -88,7 +89,7 @@ REVIEW_TOOLS = ("review.php", "reviews.html", "reviews/", "reports/review/")
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, encoding="utf-8", check=True).stdout.strip()
 
 
 def target(cfg, name):

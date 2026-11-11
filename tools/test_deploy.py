@@ -5,6 +5,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -169,6 +170,18 @@ class DeployTest(unittest.TestCase):
         v = json.load(open(os.path.join(self.server, "version.json"), encoding="utf-8"))
         self.assertEqual(len(v["commit"]), 40)
         self.assertIn("snapshot", v["data"])
+
+    def test_git_reads_utf8(self):
+        # (version.json said "Jan TichavskÃ½": git's UTF-8 read as cp1252, #487)
+        with tempfile.TemporaryDirectory() as repo:
+            run = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True, check=True)  # noqa: E731
+            run("init", "-q")
+            run("config", "user.name", "Jan Tichavský")
+            run("config", "user.email", "t@example.com")
+            run("commit", "-q", "--allow-empty", "-m", "Palackého náměstí, Výtoň")
+            with mock.patch.object(deploy, "ROOT", repo):
+                self.assertEqual(deploy.git("log", "-1", "--format=%s"), "Palackého náměstí, Výtoň")
+                self.assertEqual(deploy.git("config", "user.name"), "Jan Tichavský")
 
     def test_version_stays_after_a_second_deploy(self):
         # the server's manifest lists version.json from the first deploy on (#207)

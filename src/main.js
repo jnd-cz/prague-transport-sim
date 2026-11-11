@@ -429,9 +429,10 @@ function fillTrips() {
 selStop.addEventListener('change', fillTrips);
 fillTrips();
 
-$('btnStart').addEventListener('click', start);
+$('btnStart').addEventListener('click', () => start());
 
-async function start() {
+// extra: Game options over the menu's (the performance test's lead to the departure)
+async function start(extra = {}) {
   if ($('optModel').value === 'classic') await loadClassic();
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
@@ -467,6 +468,7 @@ async function start() {
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
     signFacts: signFacts(truth),
+    ...extra,
   });
   game.runSeed = seed; // (replay: ?seed=N)
   perfLog.reset({ line: data.line, model: have, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
@@ -570,25 +572,30 @@ function offerPerf(el) {
 
 // The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
 // compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
-// 5 s to settle. The GPU's own time per frame where the browser has a timer. Two buttons: the line loaded now, and
-// the reference run (line 17 with the detailed model, the heaviest line with surveyed streets: the one result
-// every machine has in common). From another line the reference opens line 17 (?reftest=<the line left>), runs
-// there, and its "Back to the menu" goes back to that line.
+// 5 s to settle and from the departure on. It starts 10 s before the departure, not a shift's 40 s, so the wait is
+// short and the minute all driving (the user, 2026-11-11: "autopilot waits half a minute standing for the timetable
+// departure"). The GPU's own time per
+// frame where the browser has a timer. Two buttons: the line loaded now, and the reference run: line 17 from
+// Palackého náměstí with the detailed model, the heaviest line with surveyed streets, the one result every machine
+// has in common. Its stop is named, not the middle one, so it stays when the route changes (the user, 2026-11-11:
+// "I would keep it fixed there even if later line 17 runs start from another stop like Libuš"). From another line
+// the reference opens line 17 (?reftest=<the line left>), runs there, and its "Back to the menu" goes back.
 // (window.perfTestMs: a shorter run for tools/test_perf.py)
 const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
-const REF_LINE = '17';
+const REF_LINE = '17', REF_STOP = 'Palackého náměstí', PT_LEAD = 10;
 let perfTest = null;
 async function startPerfTest(reference = false) {
   const keep = { auto: $('optAuto').checked, weather: $('optWeather').value, model: $('optModel').value, cars: $('optCars').value };
   if (reference) { $('optModel').value = 'detailed'; $('optCars').value = 'auto'; }
-  const si = Math.floor((data.stops.length - 1) / 2), at8 = (trip) => Math.abs(trip[si] - 8 * 3600);
+  const named = reference ? data.stops.slice(0, -1).findIndex((st) => st.name === REF_STOP) : -1;
+  const si = named >= 0 ? named : Math.floor((data.stops.length - 1) / 2), at8 = (trip) => Math.abs(trip[si] - 8 * 3600);
   selStop.value = si;
   fillTrips();
   selTrip.value = data.timetable.reduce((b, trip, i) => (at8(trip) < at8(data.timetable[b]) ? i : b), 0);
   $('optAuto').checked = true;
   $('optWeather').value = 'dry';
   window.runSeed = 1;
-  try { await start(); } finally {
+  try { await start({ lead: PT_LEAD }); } finally {
     delete window.runSeed;
     $('optAuto').checked = keep.auto;
     $('optWeather').value = keep.weather;
@@ -607,8 +614,10 @@ $('btnPerfRef').addEventListener('click', () => {
 function perfTestStep(now) {
   if (!perfTest || !game || game.finished) { perfTest = null; return; }
   const el = now - perfTest.t0;
-  if (perfTest.phase === 'warm' && el > PT_WARM) { perfTest.phase = 'run'; perfLog.reset(perfTest.meta); }
-  else if (perfTest.phase === 'run' && el > PT_WARM + PT_LEN) finishPerfTest();
+  // (the minute is measured from the departure: boarding and the doors take ~14 s after the start, 2026-11-11 trace)
+  const off = el > PT_WARM && (tram.v > 0.5 || el > PT_WARM + 60000);
+  if (perfTest.phase === 'warm' && off) { perfTest.phase = 'run'; perfTest.t1 = now; perfTest.s0 = tram.s; perfLog.reset(perfTest.meta); }
+  else if (perfTest.phase === 'run' && now - perfTest.t1 > PT_LEN) finishPerfTest();
   perfTest?.timer?.poll();
 }
 function finishPerfTest() {
@@ -616,15 +625,17 @@ function finishPerfTest() {
   perfTest = null;
   game.paused = true;
   hud.show(false);
-  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null }, m = machine(renderer);
-  const verdict = sum.over[33] < 2 ? 'good' : sum.over[33] < 10 ? 'ok' : 'slow';
+  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0) }, m = machine(renderer);
+  // (frames over 20 ms: below a 60 Hz display's rate; a steady 30 fps has nearly all of them there and few over 50:
+  // playable, not smooth. The first remote run, Intel HD Graphics 400 in Firefox: 34 fps, 74 % over 20 ms, 0.6 % over 33)
+  const verdict = sum.over[20] < 5 ? 'good' : sum.over[50] < 5 ? 'ok' : 'slow';
   const row = (k, v) => `<tr><td>${t(k)}</td><td>${v}</td></tr>`;
   $('resultsCard').innerHTML = `
     <h1>${t(pt.meta.reference ? 'pt.titleRef' : 'pt.title')}</h1>
     <div class="sub">${data.line} · ${pt.meta.stop} · ${sum.seconds} s</div>
     <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
     <table class="res">
-      ${row('pt.fps', sum.fps)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
+      ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
       ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
       ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}`)}
     </table>

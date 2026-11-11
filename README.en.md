@@ -210,13 +210,20 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 On-screen buttons, shown on a touch screen by default and switched by 🎮 in the menu (remembered per
 device). They send the keyboard's keys:
 
-- the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
+- the row above the dashboard (sideways, a column at the right): ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
 - ⋯ for the rest: indicators ⇦ ⇨, hazard lights ⚠, high beams (a flash held, on and off), park (advanced controls), switch contact, switch iron, heating cut-out, heating,
   autopilot, sound, ✉ feedback.
 
-On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
+On a small screen the dashboard and the top bar are smaller and the minimap is hidden. A phone held sideways has the
+controller as a column at the right thumb (▲ at the top, STOP at the bottom), the other buttons in two columns at the
+left and the dashboard between them.
+
+**Full screen:** a phone asks once in the menu; with "Full screen", every shift starts in full screen, turned
+sideways where the browser allows it (Chrome on Android), elsewhere the game asks you to turn the phone. ⛶ in the
+menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
+full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
 
 ## Autopilot
 

@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import review_sets  # noqa: E402
 import serve  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 A = {"issue": 258, "findings": [{"x": 1.0, "y": 2.0, "kind": "stop"}, {"x": 3.0, "y": 4.0, "kind": "stop"}, {"x": 5.0, "y": 6.0, "kind": "stop"}]}
 # (the second answered in data/truth.json, not on the page: #379)
@@ -81,7 +82,7 @@ def main():
             fails.append(what)
 
     with sync_playwright() as p:
-        b = p.chromium.launch()
+        b = gpu.launch(p)[0]
         for size in ({"width": 390, "height": 844}, {"width": 1280, "height": 800}):
             page = b.new_page(viewport=size)
             errors = []

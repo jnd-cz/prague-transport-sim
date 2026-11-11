@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from headless import serve, stop_server  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BODY = bytes(i % 251 for i in range(300000))
@@ -69,7 +70,7 @@ def messages(pw, check):
     a module that does not arrive; and a normal load, which says none of it."""
     srv, url = serve(0)
     other = url.replace("127.0.0.1", NAME)
-    b = pw.chromium.launch(args=["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", f"--host-resolver-rules=MAP {NAME} 127.0.0.1"])
+    b = gpu.launch(pw, args=[f"--host-resolver-rules=MAP {NAME} 127.0.0.1"])[0]
 
     def stopped(routes, base=url, locale="en-US", shot=None):
         ctx = b.new_context(locale=locale, viewport={"width": 1000, "height": 700})
@@ -145,7 +146,7 @@ def main():
             fails.append(what)
 
     with sync_playwright() as p:
-        b = p.chromium.launch()
+        b = gpu.launch(p)[0]
         page = b.new_page()
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))

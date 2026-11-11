@@ -52,7 +52,7 @@ def run(log, *cmd):
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+    return subprocess.run(["git", *args], cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
                           check=True, **QUIET).stdout.strip()
 
 

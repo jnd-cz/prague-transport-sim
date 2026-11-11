@@ -83,7 +83,8 @@ export class Game {
     this.paused = false;
 
     this.trip = data.timetable[opts.tripIndex];
-    this.clock = this.trip[opts.startStop] - 40;
+    // (s before the departure from the first stop: boarding time; the performance test starts closer, src/main.js)
+    this.clock = this.trip[opts.startStop] - (opts.lead ?? 40);
     this.doorState = 'open';
     this.doorTimer = 0;
     this.doorsMovingFlag = false;

@@ -285,6 +285,11 @@ def main():
         fails.append("Send stored no perftest note with the result")
     if not (ref.get("reference") and str(ref.get("line")) == "17" and ref.get("model") == "hybrid" and ref.get("frames", 0) > 10):
         fails.append(f"the reference run is not line 17 with the detailed model: {ref}")
+    if ref.get("stop") != "Palackého náměstí":
+        fails.append(f"the reference run starts at {ref.get('stop')!r}, not Palackého náměstí")
+    # (10 s before the departure, measured from 5 s on for 8 s: the tram leaves within the run)
+    if not (res.get("driven", 0) > 5 and ref.get("driven", 0) > 5):
+        fails.append(f"the tram stood through the test: driven {res.get('driven')} m, the reference {ref.get('driven')} m")
     if "17" not in (ref_title or "") or back != "9":
         fails.append(f"the reference run: title {ref_title!r}, back on line {back!r} (wants 9)")
     if fails:
