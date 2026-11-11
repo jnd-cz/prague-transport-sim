@@ -541,6 +541,32 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     - Each spin is the pedal off and a press again: autumn's presses were 1.2–1.4 times main's.
     - Sanding while the first axle crosses a patch on the drive pedal brings them within a few per cent of main's, at 2.5–3 times
       main's sand: 270–400 s of the 25-minute box per run (#265's PR).
+  - **The trade-offs kept, to re-evaluate once the leaf patches' amount is tuned** (the user, 2026-11-12, PR #426: "that's enough, we
+    will tune the amount of slippery patches later"; "I wouldn't sand preemptively on every patch, just where the grip is needed").
+    `--checks autumn,rain,winter`, all lines, seeds 1–5, against main's on/off model at 96537a5:
+    - **Speed.** It drives within the grip, and it slows only down a descent, to what stops within 200 m; on the level it keeps the limit.
+      Autumn runs 3 % longer: line 17's mean delay 170 → 239 s, spread 5–11 s over each stretch, where main spun 139 s a run. Snow's
+      delay stays within main's seed spread except line 37's late penalty (36 → 67).
+    - **Sand only where the grip is needed:**
+      - pulling away over a patch (under 6 m/s);
+      - a patch up a climb over 20 ‰, or a climb the bare rail cannot take;
+      - before the track brakes where the rail cannot give a stop;
+      - on a slide.
+      At speed it eases off over a patch instead.
+
+      In autumn this is about twice main's sand: 93–329 s a run, 6–22 % of the box. Rain uses 1–2 %, snow 2–11 %, and the box is
+      refilled at each terminus (`data/truth.json` t3-sand-refill).
+
+      The alternatives measured on line 9, 17 and 22, seed 1:
+
+      | patch rule | sand a run | presses | line 9's mean delay |
+      |---|---|---|---|
+      | sand over every patch it drives onto | 270–400 s | within 5 % of main's | 63 s |
+      | ease off over every patch, pulling away too | | | 302 s: it rolled to a stand on the patch and drove again |
+    - **Presses** in autumn are 7–33 % over main's: a spin on a patch it did not see coming, or a press after easing off over one.
+    - **Slides last longer than main's** (autumn 4–15 s a run, snow 8–32 s, main 1–6 s): on the creep curve a slide lasts until the brake
+      is eased, where main's model cut it at once. Most of it is emergency stops for walkers and cars on step 6 with the track brakes.
+      Slides begun within 30 m of a stop: line 17 in autumn 17.8 → 4 a run, in snow 9.2 → 4.6.
 - T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
   overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
