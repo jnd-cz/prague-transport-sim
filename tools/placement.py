@@ -37,22 +37,16 @@ GAP = 20.0           # m between conflicts of one junction (a wide junction has 
 
 
 class Route:
-    """The route as src/route.js Route keeps it for curved data (data.trackCurve): the points resampled every metre of
-    arc length (smoothPolyline at radius 0), `at` on those 1 m chords, `nearest` from samples every 4 m refined onto the
-    chords to their neighbours. The same sampling, so a position or a heading differs from the game's by nothing."""
+    """The route as src/route.js Route keeps it: the build's points as they are (#477), `at` on their segments, `nearest`
+    from samples every 4 m refined onto the chords to their neighbours. Along the path the game's s is the same with or
+    without the run past the termini, so a position or a heading differs from the game's by nothing."""
 
     def __init__(self, pts):
         p = np.asarray([q[:2] for q in pts], dtype=float)
         cum = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(p, axis=0).T))])
         L = float(cum[-1])
-        n = max(2, round(L) + 1)
-        ss = L * np.arange(n) / (n - 1)
-        j = np.clip(np.searchsorted(cum, ss, side='left') - 1, 0, len(p) - 2)
-        # (the game's index walks forward while cum[j + 1] < s: the segment whose end is the first at or past s)
-        seg = cum[j + 1] - cum[j]
-        t = np.clip((ss - cum[j]) / np.where(seg > 0, seg, 1e-9), 0, 1)
-        self.p = p[j] + (p[j + 1] - p[j]) * t[:, None]
-        self.s = ss
+        self.p = p
+        self.s = cum
         self.length = L
         samp = np.arange(0.0, L + 1e-9, 4.0)
         self.samples = np.array([self.at(s)[:2] for s in samp])

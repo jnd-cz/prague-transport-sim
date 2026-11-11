@@ -160,6 +160,17 @@ Sections:
   (Právnická fakulta), and the game's three-point average with a 1.5 m resample turned a 0.9° joint into 3.7°
   at a short piece's end. Rounded to the centimetre, points 0.4 m apart read a 19 m curve as 15.5 m over 2 m.
   Radii and joins are measured on the build's own points, written to the millimetre.
+- **The route the game drives is built** (#477, #276 step 2): the path and the run 60 m past both termini
+  (`pathExt`, `tools/route.py`), its points as they are. Resampled every metre (until #477), the chords cut each
+  point of a curve drawn every ~1 m by about a quarter of its turn: 1.0-1.1 cm on 23-24 m curves of lines 22 and
+  23, 1.9 cm at a 4.5° turn on line 9 (s 15958). Read as built, the speed limits moved 1 km/h in 0-2 bins of our
+  route per line and 0-8 of the opposite one, the cant at most 0.16 mm, and placement's junction edges
+  (`tools/placement.py` shares the sampling) 0.3-0.5 m at three signals, 2.9 m on line 23 (s 4920) and 15 m on
+  line 22 (s 14351), where a conflict sits at the rule's threshold. The run follows the drawn
+  chains in the most aligned direction and goes straight on where none continues, also where a chain ends
+  exactly at the path's end (it wins the walk's choice and has nothing ahead). Built against the page's walk it lies within 0.65 mm on every line (the
+  millimetre rounding). The opposite track's spread to 3 m (`trackfix.js`) went with it: since the DI track it
+  moved no point on any line.
 - **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
   and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
   split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to

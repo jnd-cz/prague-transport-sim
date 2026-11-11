@@ -81,6 +81,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from gtfs_runs import pair_continuations  # noqa: E402
+from route import path_ext  # noqa: E402
 import sources  # noqa: E402
 try:
     import osm_local
@@ -1201,12 +1202,15 @@ def main():
     terrain = fetch_terrain(P, min(x for x, _ in pts) - DEM_MARGIN, max(x for x, _ in pts) + DEM_MARGIN,
                             min(y for _, y in pts) - DEM_MARGIN, max(y for _, y in pts) + DEM_MARGIN)
 
+    path_xy = [[round(x, XY), round(y, XY)] for x, y in pts]
     out = {
         "line": LINE,
         "name": rel["tags"].get("name"),
         "origin": [round(float(v), 7) for v in P.origin_ll()],  # the city origin (the Marian column)
         "frame": {"crs": "EPSG:5514", "origin": [P.E0, P.N0]},  # game metres = S-JTSK minus this
-        "path": [[round(x, XY), round(y, XY)] for x, y in pts],
+        "path": path_xy,
+        # the track past both termini, which the game's route includes (tools/route.py, #477)
+        "pathExt": path_ext({"tracks": track_lines, "path": path_xy}, XY),
         "bridges": bridges,
         "tunnels": tunnels,
         "terrain": terrain,

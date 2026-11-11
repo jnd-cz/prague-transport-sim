@@ -664,7 +664,7 @@ function trackSpacing(g) {
   const r = g.route, b = g.backRoute, sw = (g.data.switches || []).map((w) => w.s ?? w), bad = new Map();
   let n = 0;
   if (!b) return check('tracks-apart', 0, []);
-  // (interlaced track, under 1.8 m apart, and 40 m around it: as src/trackfix.js)
+  // (interlaced track, under 1.8 m apart, and 40 m around it: a gauntlet, not two tracks too close)
   const gaunt = [];
   for (let s = 0; s < r.length; s += 2) { const p = r.at(s), q = b.nearest(p.x, p.y); if (q && q.d < 1.8) gaunt.push([s - 40, s + 40]); }
   for (let s = 0; s < r.length; s += 2) {

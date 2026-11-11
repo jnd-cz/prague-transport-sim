@@ -4,10 +4,10 @@ import { SMALL_RADIUS } from './speedSigns.js';
 
 // Resample a polyline every `step` metres of its arc length and smooth it with a Gaussian
 // window (the window shrinks symmetrically at the ends, so end points stay put). OSM draws
-// curves as straight segments; this turns them into continuous curves. Returns the points
-// and their arc-length positions along the ORIGINAL polyline. `radius` may be a function of that
-// arc length: surveyed track (DI, the archived DTMP axes; #20) is already curved and is only resampled.
-// A radius of 0 resamples only (a window under one step still averaged three points).
+// streets as straight segments; this turns them into continuous curves (the cars' and walkers'
+// paths). Returns the points and their arc-length positions along the ORIGINAL polyline. `radius`
+// may be a function of that arc length. A radius of 0 resamples only (a window under one step
+// still averaged three points). The track is not smoothed: the build draws it as curves (#204, #477).
 export function smoothPolyline(pts, step = 1, radius = 6) {
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
@@ -40,74 +40,12 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
   return { pts: out, s: ss };
 }
 
-// The track beyond the ends of a route: the GTFS path starts and ends at the terminus stops, but a
-// two-car set standing there reaches 30 m further back. Walk the OSM track chains from each end
-// (continuing across chain joints in the most aligned direction) for `len` metres; where no track
-// continues, go straight on. Returns {before, after} point lists (before runs towards the start).
-export function extendAlongTracks(tracks, pts, len = 60) {
-  const walk = (p, dx, dy) => {
-    const out = [];
-    let cur = [p[0], p[1]], hx = dx, hy = dy, left = len, guard = 0;
-    while (left > 0 && guard++ < 20) {
-      // the chain segment through cur that heads our way
-      let best = null;
-      for (const t of tracks) {
-        const q = t.p;
-        for (let i = 0; i < q.length - 1; i++) {
-          const ax = q[i][0], ay = q[i][1], bx = q[i + 1][0], by = q[i + 1][1];
-          const sx = bx - ax, sy = by - ay, l2 = sx * sx + sy * sy;
-          if (!l2) continue;
-          const u = Math.max(0, Math.min(1, ((cur[0] - ax) * sx + (cur[1] - ay) * sy) / l2));
-          const d = Math.hypot(ax + sx * u - cur[0], ay + sy * u - cur[1]);
-          if (d > 1.5) continue;
-          const l = Math.sqrt(l2), dot = (sx * hx + sy * hy) / l;
-          if (Math.abs(dot) < 0.6) continue;
-          // forward along the chain = increasing index if the segment points our way
-          const score = d - Math.abs(dot);
-          if (!best || score < best.score) best = { score, q, i, u, fwd: dot > 0 };
-        }
-      }
-      if (!best) break;
-      const { q, fwd } = best;
-      let i = best.i;
-      const seq = [];
-      if (fwd) for (let k = i + 1; k < q.length; k++) seq.push(q[k]);
-      else for (let k = i; k >= 0; k--) seq.push(q[k]);
-      let moved = false;
-      for (const n of seq) {
-        const l = Math.hypot(n[0] - cur[0], n[1] - cur[1]);
-        if (l < 0.05) continue;
-        if (l >= left) { cur = [cur[0] + (n[0] - cur[0]) * left / l, cur[1] + (n[1] - cur[1]) * left / l]; out.push(cur); left = 0; moved = true; break; }
-        hx = (n[0] - cur[0]) / l; hy = (n[1] - cur[1]) / l;
-        cur = [n[0], n[1]]; out.push(cur); left -= l; moved = true;
-      }
-      if (!moved) break;
-    }
-    if (left > 0) out.push([cur[0] + hx * left, cur[1] + hy * left]); // no track: straight on
-    return out;
-  };
-  const n = pts.length;
-  const h0 = [pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]], l0 = Math.hypot(...h0) || 1;
-  const h1 = [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1]], l1 = Math.hypot(...h1) || 1;
-  return { before: walk(pts[0], h0[0] / l0, h0[1] / l0).reverse(), after: walk(pts[n - 1], h1[0] / l1, h1[1] / l1) };
-}
-
-// Track geometry from a survey (the line data's trackSource ranges and track chains' `src`, #20) is drawn
-// as it is: smoothing it would pull a tight curve inside the real one (an 18 m curve: 0.2 m with the 6 m
-// window). OSM fill keeps the window, unless the build already drew all of it as smooth curves (the line
-// data's `trackCurve`, tools/track_curve.py, #204): those are resampled only (AS_CURVED). Averaging three
-// points 1.5 m apart turned a 0.9° joint of the build at Strossmayerovo náměstí into 3.7° at the end of a 4.6 m
-// piece.
-export const SURVEYED = new Set(['di', 'dtmp']);
-export const SMOOTH = 6, AS_SURVEYED = 0.1, AS_CURVED = 0;
-function radiusAlong(ranges, offset = 0, curved = false) {
-  if (curved) return AS_CURVED;
-  if (!ranges?.length) return SMOOTH;
-  return (s) => {
-    const x = s - offset;
-    const r = ranges.find(([a, b]) => x >= a && x <= b) || (x < ranges[0][0] ? ranges[0] : ranges[ranges.length - 1]);
-    return SURVEYED.has(r[2]) ? AS_SURVEYED : SMOOTH;
-  };
+// The line data is built with its track drawn as curves (`trackCurve`, tools/track_curve.py, #204) and the run past
+// both termini (`pathExt`, tools/route.py, #477): the page smooths no track and walks none (#276 step 2). Data built
+// before them cannot be drawn as the build meant it, so it does not load.
+export function checkBuiltRoute(data) {
+  const missing = ['trackCurve', 'pathExt'].filter((k) => !data[k]);
+  if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(' and ')}: built before #477, rebuild it (tools/rebuild.py)`);
 }
 
 // the cant's layout: the comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m); the limit in a curve
@@ -118,19 +56,20 @@ const A_LAT = 0.8, CANT_MAX = 0.1;
 const CURVE_AHEAD = 5;
 
 export class Route {
-  // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
-  constructor(pts, ext = null, sources = null, curved = false) {
-    // smooth curves but keep the original arc-length parameter (stops, switches and
-    // signals were measured along the unsmoothed OSM path)
+  // `ext` = {before, after}: the track past the ends (the line data's `pathExt`), at negative s / past length
+  constructor(pts, ext = null) {
+    // the build's points as they are, s along them (stops, switches and signals are measured along the path).
+    // (Resampled every metre, the chords cut each point of a curve by about a quarter of its turn: 1.0-1.9 cm on
+    // lines 9, 22 and 23, over the 1 cm the build is held to, #477)
     const before = ext?.before || [], after = ext?.after || [];
     const all = [...before, ...pts, ...after];
-    let s0 = 0; // arc length of the run-in = where the original path starts
-    for (let i = 1; i <= before.length; i++) s0 += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
+    const s = new Float64Array(all.length);
+    for (let i = 1; i < all.length; i++) s[i] = s[i - 1] + Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
+    const s0 = s[before.length]; // arc length of the run-in = where the path starts
     let L = 0;
     for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    const sm = smoothPolyline(all, 1, radiusAlong(sources, s0, curved));
-    this.pts = sm.pts;
-    this.s = Array.from(sm.s, (v) => v - s0);
+    this.pts = all.map((p) => [p[0], p[1]]);
+    this.s = Array.from(s, (v) => v - s0);
     this.length = L; // the route itself ends here; the run-out continues past it
     this.coarse = this.pts.filter((_, i) => i % 8 === 0); // for the minimap
     this._buildSamples();
