@@ -1,4 +1,4 @@
-"""The performance log and test (src/perf.js, #350): python -P -E tools/test_perf.py [--line 17] [--runs N] [--headed]
+"""The performance log and test (src/perf.js, #350): python -P -E tools/test_perf.py [--line 17] [--runs N [--same-page]] [--headed]
 
 tools/serve.py's handler on a free port, the notes in a temp folder, Chromium on the GPU (tools/gpu.py). Checks:
 - a feedback note sent after some driving carries the machine (its GPU), the load times and the frame-time log;
@@ -47,6 +47,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--line", default="17")
     ap.add_argument("--runs", type=int, default=0, help="full one-minute tests instead of the checks")
+    ap.add_argument("--same-page", action="store_true", help="--runs one after another in one page")
     ap.add_argument("--headed", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -64,14 +65,20 @@ def main():
             print(f"WebGL: {name}")
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             if args.runs:
-                menu(page, url, 0)
                 runs = []
                 for i in range(args.runs):
+                    # (a fresh page each run, as a player opens it; --same-page: the runs one after another in one
+                    # page, which shows what a page carries over from shift to shift)
+                    if i == 0 or not args.same_page:
+                        if i:
+                            page.close()
+                            page = browser.new_page(viewport={"width": 1280, "height": 720})
+                        menu(page, url, 0)
                     r = perf_test(page, 120000)
                     runs.append(r)
                     print(f"run {i + 1}: {r['fps']} fps, over 20/33/50 ms {r['over']['20']}/{r['over']['33']}/{r['over']['50']} %, "
                           f"p50/p90/p99 {r['ms']['p50']}/{r['ms']['p90']}/{r['ms']['p99']} ms, gpu {r.get('gpuMs')} ms, "
-                          f"{r['calls']['mean']} calls, {r['triangles']['mean'] / 1e6:.2f} M triangles")
+                          f"{r['calls']['mean']} calls, {r['triangles']['mean'] / 1e6:.2f} M triangles, heap {r.get('heapMB')} MB")
                     page.click("#ptMenu")
                 fps = [r["fps"] for r in runs]
                 if len(fps) > 1:
