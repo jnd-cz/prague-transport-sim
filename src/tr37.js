@@ -383,7 +383,9 @@ export class TR37 {
     // step each 3 s without a slide [assumed]. A locked wheel gets SPIN_LEFT of the grip (src/tram.js), and the equipment sees it
     // standing, so the shoes come in: stepping off one at a time it stayed locked down to step 1 and slid 5-8 s from 25 km/h to a stand,
     // 40-46 s a run on line 9 in snow and autumn (#265)
-    A.slideRun = w.slide && now < 0 && now > -6 ? (A.slideRun || 0) + w.dt : 0;
+    // (not at a crawl: there a lock is a moment and stops it sooner than a release would; let go at 3 km/h behind a parked car, it rolled
+    // into it, line 17 seed 4 in snow)
+    A.slideRun = w.slide && now < 0 && now > -6 && v > 2.5 ? (A.slideRun || 0) + w.dt : 0;
     A.offT = (A.offT || 0) - w.dt;
     if (A.slideRun > 0.3 && !(A.offT > 0)) { A.offT = 0.3; A.offMax = 1.5; A.slideCap = Math.min(-1, (A.slideT > 0 ? Math.max(A.slideCap, now) : now) + 1); A.slideT = 4; A.slideRun = 0; }
     if (A.offT > 0 && w.slide && A.offMax > 0) { A.offMax -= w.dt; A.offT = Math.max(A.offT, 2 * w.dt); }

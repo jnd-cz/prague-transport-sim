@@ -107,9 +107,12 @@ export class Autopilot {
     // stands at 31 coasting, over the switch button's 30, and the drive pedal turned between two brakings, line 9 seed 4)
     const under = cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) ? UNDER : UNDER_LATE + (UNDER - UNDER_LATE) * mild;
     let vt = vLim / 3.6 - under - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
-    // (and coasting to it about the button's speed, under that with the speed hold's band: down to Anděl in rain it gathered to 18.8 km/h
-    // over its 18.6, braked on step 1 22 m before the stop, the accelerator rose over 30 and the drive pedal turned, line 9 seed 5, #265)
-    if (cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) && tr.v < V_BUTTON_COAST + 0.5) vt = Math.min(vt, V_BUTTON_COAST - 0.25);
+    const lowMu = (g.muBase ?? 0.3) < 0.2;
+    // (and on slippery rail, coasting to it about the button's speed, under that with the speed hold's band: down to Anděl in rain it
+    // gathered to 18.8 km/h over its 18.6, braked on step 1 22 m before the stop, the accelerator rose over 30 and the drive pedal turned,
+    // line 9 seed 5, #265. Slippery rail only: its gentler braking plan puts the braking point at the contact, and on dry rail main's
+    // timing stays)
+    if (lowMu && cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) && tr.v < V_BUTTON_COAST + 0.5) vt = Math.min(vt, V_BUTTON_COAST - 0.25);
     let nl = own ? g.nextLimitChange(lim) : g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
@@ -406,10 +409,10 @@ export class Autopilot {
     // At 22.6 km/h down Chotkova's 49 ‰, 29 km/h the target, it pressed and was there in 2 s on step 1, where coasting took 5 s; the
     // driver of 6921 drove twice on the way down to Malostranská, #396)
     const gravityUp = !onCurve && !urgent && !hazard && aCoast < -0.05 && tr.v > 1 && tr.v < vtDrive && (vtDrive - tr.v) / -aCoast < COAST_T;
-    // (braking for a point just past a turn's contact, the brake waits until the pantograph is through on the button, where the point is
+    // (on slippery rail, braking for a point just past a turn's contact, the brake waits until the pantograph is through on the button, where the point is
     // still in hand at 1 m/s² from there: a brake step lifts the accelerator over 30 within a moment, and the drive pedal turned at 18.6
     // km/h 20 m before Anděl in rain, line 9 seeds 2 and 5, #265; a driver coasts through on the button and brakes after it)
-    const throughBtn = btnSoon && fixedAt !== null && !hazard && tr.v > 1 &&
+    const throughBtn = lowMu && btnSoon && fixedAt !== null && !hazard && tr.v > 1 &&
       (tr.v * tr.v) / (2 * Math.max(0.5, fixedAt - STOP_MARGIN - tr.s - (cd.contact - tr.panto))) < 1.0;
     const coast = (!onCurve && between) || (onCurve && need > -300 && !shortUphill) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
       (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6) || throughBtn || gravityUp;
