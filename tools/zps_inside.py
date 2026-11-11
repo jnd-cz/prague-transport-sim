@@ -62,7 +62,7 @@ def filled(ring, ground):
 
 def triangulate(rings):
     """(n, 3, 3) triangles of the linear sheet over an outline and its holes ((m, 3) arrays): shapely's constrained
-    Delaunay (#276's T2; the page's earcut keeps the same outline)."""
+    Delaunay (#276's T2; the page's earcut, flipped to Delaunay on the ground: src/terrain.js delaunayFlips)."""
     try:
         poly = shapely.Polygon(rings[0], rings[1:])
         if not poly.is_valid:

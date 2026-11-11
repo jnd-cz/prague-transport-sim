@@ -8,7 +8,7 @@ did (every ground-level `green`), not by the build's mark (`g`, #444); --edge M 
 
 Each level-0 area (not a wall or a roof) is sampled on a lattice of STEP m inside its outline, 0.5 m or more off it.
 The surface there, as the page draws it (src/terrain.js DtmSurface): the linear sheet between its outline vertices
-(shapely's constrained Delaunay, #276's T2, for the page's earcut over the same outline), and for an area the build
+(shapely's constrained Delaunay, #276's T2: the page's earcut flipped to Delaunay, src/terrain.js), and for an area the build
 marked `g` the page's drape: the outline cut to 4 m, the triangles halved to 5 m, each new point on the ground (here
 IPR's raster, where the page reads its terrain: IPR sampled every 2 m near the tracks). Against IPR's 1 m raster at
 the point, per class: areas, m², samples, the 5th / 50th / 95th percentile of surface − IPR and the share beyond 1 m.

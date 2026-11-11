@@ -336,6 +336,40 @@ function railSupport(g, world) {
   return check('rails-supported', n, [...bad.values()]);
 }
 
+// The ground-level survey over the rails (#444): every 2 m, across the tram's width (1.25 m either side of the route,
+// every 0.25 m), the highest ground-level surveyed surface over the rail top. railSupport's rays start 2.5 m over the
+// bed: they missed the ridge of an 800 m tram area on Krejcárek's ramp (line 37 s 2566-2746), up to 6 m over the
+// rails where earcut joined its outline's points far apart.
+function surveyOverTrack(g) {
+  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm;
+  if (!dtm) return check('survey-over-track', 0, []);
+  const ix = dtm.grid;
+  let n = 0;
+  const bad = new Map();
+  for (let s = 0; s < r.length; s += 2) {
+    if (pr.onBridge(s)) continue;
+    const zr = pr.height(s);
+    for (let lat = -1.25; lat <= 1.25; lat += 0.25) {
+      const o = r.offset(s, lat), k = ix.at(o.x, o.y);
+      n++;
+      if (k < 0) continue;
+      let top = -Infinity;
+      for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
+        const [p, q, u] = ix.tris[ix.ids[m]];
+        const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
+        if (Math.abs(d) < 1e-9) continue;
+        const w1 = ((q[1] - u[1]) * (o.x - u[0]) + (u[0] - q[0]) * (o.y - u[1])) / d;
+        const w2 = ((u[1] - p[1]) * (o.x - u[0]) + (p[0] - u[0]) * (o.y - u[1])) / d, w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        top = Math.max(top, w1 * p[2] + w2 * q[2] + w3 * u[2]);
+      }
+      const mag = top - zr, key = Math.round(s / 20);
+      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `survey ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
+    }
+  }
+  return check('survey-over-track', n, [...bad.values()]);
+}
+
 // Compare the drawn rail heads with actual bed and street triangles on each canted curve.
 // A separate missing-ray count makes registration gaps visible instead of calling them clear.
 export function cantedRailVisibility(g, world) {
@@ -916,6 +950,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     streetWaviness: streetWaviness(g),
     terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
+    surveyOverTrack: surveyOverTrack(g),
     cantedRailVisibility: cantedRailVisibility(g, world),
     verticalCurves: verticalCurves(g, geometryFact(truth, 'vertical-radius-street')),
     steppedCurves: steppedCurves(g),
