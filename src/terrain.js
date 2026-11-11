@@ -802,7 +802,7 @@ export class DtmSurface {
       let tri;
       try { tri = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2)); } catch { continue; }
       const all = [...outer, ...holes.flat()];
-      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId };
+      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId, t: a.t };
       // on a structure: a long deck outline (the Modřany estakáda's track bed runs from the foot of
       // one ramp to the other) must not be spanned by long triangles; inner points take the height
       // of the outline's own corners nearby

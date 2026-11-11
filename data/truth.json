@@ -269,6 +269,24 @@
    "text": "A two-car T3 set runs with both cars' pantographs up, as in real operation.",
    "source": "user 2026-11-03 (#215)",
    "quote": "for t3 we use both cars pantographs as it is in real operation"
+  },
+  {
+   "id": "user-deck-walk-clearance",
+   "text": "A deck over a walkway without maxheight leaves at least 2.2-2.3 m clear and is as thick as that allows, up to 1 m (tools/zps_decks.py WALK 2.2 + MARGIN 0.1); the passages on lines 9, 17, 22, 23 and 37 have enough clearance.",
+   "source": "user 2026-11-10 from street view of the passages, #445 session (PR #452)",
+   "quote": "The underpasses have enough clearance, for walkway I would keep lower lower limit of 2.2-2.3 and then whatever slab it leaves, even though the 0.5m in your measurements could be just fine."
+  },
+  {
+   "id": "user-deck-floor-lidar",
+   "text": "Under a deck the floor is IPR's lidar, not the survey's level 0 (tools/zps_decks.py flatten); the survey's floor may be the better one only where it lies well under the lidar outside a tunnel, not yet seen enough to make a rule.",
+   "source": "user 2026-11-10 on the sections of the passages, #445 session (PR #452)",
+   "quote": "The lidar floor generally looks better and sits lower, have smooth believable curve, so I would prefer that one. Survey floor could be even lower but it's wavy and hard to asses where it's more accurate. If lidar has big difference and survey is quite a bit lower (while not being downright in tunnel then it might be the better one but I haven't seen enough examples."
+  },
+  {
+   "id": "user-deck-model-simplified",
+   "text": "Mosty 3D's solid models are much simplified: a bridge's track and walkway run at one level, which the model's top stands for.",
+   "source": "user 2026-11-10 with a photo from Železniční most's walkway, #445 session (PR #452)",
+   "quote": "In reality the bridge has rail track continuing in the same level as outside of river area and sidewalk is next to it at about the same level too. The solid 3D model is very siplified."
   }
  ],
  "places": [
@@ -326,6 +344,34 @@
    "name": "Letenský tunel",
    "text": "Car tunnel: cars come out of the tube, not down the hill",
    "source": "user 2026-10-23"
+  },
+  {
+   "name": "Výtoň, Železniční most (line 17)",
+   "text": "Three levels: the railway bridge with the walkway beside the track on top, level with the track over the river; our tram tracks, the road and the sidewalk towards the river in the middle; the riverside walk at the water at the bottom. The survey's level-1 railway and walkway areas there carry the street's heights; tools/zps_decks.py lifts an area lying inside a model onto it (#445)",
+   "source": "user 2026-11-10, #445 session (PR #452), with a photo from the walkway",
+   "quote": "Výtoň case is more difficult one, there are really three levels: the highest is the railway bridge and walkway alongside. Middle level is the one with our tram tracks and car rode, sidewalk towards the river. And finally there's the lowest level right next to the water."
+  },
+  {
+   "name": "Divadelní underpass under Národní",
+   "text": "No sidewalk in the passage, only a thin kerb along each side (OSM's footway=sidewalk tunnel 805407405 there is the kerb)",
+   "source": "user 2026-11-10 from street view, #445 session (PR #452)",
+   "quote": "At Divadelní there's not really any sidealk from what I can see, only thin kerb alongside each side."
+  },
+  {
+   "name": "Bridge with two arches, line 22 at 50.0850 N 14.3835 E",
+   "text": "A road bridge on two arches over a parking place: the survey's level-1 road on it carries the heights of the ground under the arches (#445)",
+   "source": "user 2026-11-10, street view photo, #445 session (PR #452)"
+  },
+  {
+   "name": "Footbridge over the tram by Gymnastická (line 22, 50.0845 N 14.3805 E)",
+   "text": "A footbridge over the tram area with stairs down to both platforms, going on over Gymnastická",
+   "source": "user 2026-11-10, orthophoto, #445 session (PR #452)"
+  },
+  {
+   "name": "Libeň railway viaducts (line 37, 50.104-50.106 N 14.480 E)",
+   "text": "Several separate railway viaducts side by side (about 205.7, 210 and 212 m), each level straight across its spans. The survey's railway areas span two of them; tools/zps_decks.py splits such an area along the model, one piece per viaduct (#445)",
+   "source": "user 2026-11-10 with an orthophoto and four photos, #445 session (PR #452)",
+   "quote": "Libeň viaduct's are several different one but they should all hold straight across the spans"
   }
  ],
  "stopTypes": {
