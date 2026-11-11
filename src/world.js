@@ -912,7 +912,7 @@ function uncoveredRuns(line, dtm, hf = null) {
 // (same split as Terrain.height) is lowered by the excess.
 function lowerTerrainUnderDtm(dtm, T) {
   for (const a of dtm.areas) {
-    if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
+    if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || (a.c === 'rail' && !a.g)) continue;
     for (const [p, q, r] of a.mesh) {
       // (the corners and edge midpoints, without an array each: millions at load, #205)
       lowerTerrainAt(T, p[0], p[1], p[2] - 0.25);

@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-10",
- "built_at_commit": "cfaf6fd",
- "published": "2026-11-10 23:29",
- "note": "#445 decks: the survey's level-1 heights checked against Mosty 3D and the raised rails, one piece per deck (Libeň), flat over openings, thickness from maxheight/walkways; lines 9 17 22 23 37 rebuilt (dtm sidecars, heights)",
+ "built_at_commit": "64efc34",
+ "published": "2026-11-11 10:36",
+ "note": "#444: lawns, railway and paved yards with heights only on their outline drape on the lidar (g); plugged portals under the decks take the floor; built at 64efc34",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "13743b62c7a658868db745968f5db2f092d585465fd200703ee6e26d6f769220"
   },
   "line17.dtm.json": {
-   "size": 9355169,
-   "sha256": "53d6ab4cfaf838d7a3a44e730ad90bcec299412cb3d2a3a7bab89ed84b166597"
+   "size": 9375719,
+   "sha256": "e520fd0dc5085dd7e5a89ff2cd0972cde97d88e01d0385c86209b00e443fbb05"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -57,8 +57,8 @@
    "sha256": "99ca7460fb8a5d58420bc15686dd8e14f24bc5c3d5935467bbb61ecb2ccc01f7"
   },
   "line22.dtm.json": {
-   "size": 9548066,
-   "sha256": "a58572bb56b0106911b0b2a4458383dfca2e5f5f21eb3afae35c42e4d56f3601"
+   "size": 9570316,
+   "sha256": "7ea034042a5c31ac1bf9da156fe2f7a746a1bfb5a0b8755225b83cadb891d2e9"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -97,8 +97,8 @@
    "sha256": "b5dad79231566c0fe831d2e23228f52f121e16ed31890921dde0c17524032570"
   },
   "line23.dtm.json": {
-   "size": 4343697,
-   "sha256": "6496bde708780475dfcdca6b41af4a4224a39a9deef69b397fcb4641d8bdb331"
+   "size": 4352205,
+   "sha256": "377a0599ca21db85562fbc10677b0a3ea128a9df36451bcc48e98f6e7a5d4b73"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -137,8 +137,8 @@
    "sha256": "613e7bccc8fb1359390afd8a1e677e39550fe85b08acbd0cb9cdbf722e5d3446"
   },
   "line37.dtm.json": {
-   "size": 4689800,
-   "sha256": "fa6a40a6fcffe23941afca5d88df7a91e5e9dd0972cfb6ab6c3bf23fed3980a6"
+   "size": 4702591,
+   "sha256": "fc3b3508effe40fd3fc9e9f585314d4204522f2d8a39f2336a9efb40781031ec"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -177,8 +177,8 @@
    "sha256": "d3aaddf6b8adff92ba6ac18efe23a625bed5d3f94e11aabac03437c43ca0ad15"
   },
   "line9.dtm.json": {
-   "size": 9589156,
-   "sha256": "cca84b066d517775fa523870a47827ff0c80cf29d3fd09d501ced66e408afda1"
+   "size": 9610143,
+   "sha256": "9f3d2bc27c8683069dcf9be7f9713186caed6eebd90849ad6e0b51464fa2bec7"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
