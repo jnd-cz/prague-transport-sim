@@ -5,6 +5,8 @@
 // passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
 
+import { muSpeed } from './tram.js';
+
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
 const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on the level and empty (planAt: 0.85 of step 5 below that). Two real
@@ -424,7 +426,14 @@ export class Autopilot {
     const trackOk = !dryRail || stopWhy === 'walker' || stopWhy === 'obstacle' || stopWhy === 'car';
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
-    tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+    // (on slippery rail it drives on what the rail holds, as a driver on snow keeps to the low steps: no step pulling more than 0.9 of
+    // the weather's grip at this speed, but never under the lowest that climbs the grade here. Step 3 pulls 46 kN on a two-car set and
+    // snow's 0.12 holds 42 kN standing, 32 kN at 40 km/h: back on it every 4 s after a spin it spun again, 270 spins and 245 s on line 9
+    // in snow, 303 of its 499 presses under a spin's cap. At 0.8 of 0.10 only step 1 was left, which does not lift a full set up 60 ‰:
+    // 10 runs stuck, #265)
+    const maxDrive = mu < 0.2 ? 0.9 * mu * muSpeed(tr.v) * tr.mass * 9.81 : null;
+    const minDrive = tr.mass * 9.81 * Math.max(0, gradeHere) + 650 * tr.cars + 0.1 * tr.inertia;
+    tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,

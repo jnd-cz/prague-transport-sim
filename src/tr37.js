@@ -299,7 +299,8 @@ export class TR37 {
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
   // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
-  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather) }.
+  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather), maxDrive (N: no drive step pulling more,
+  // on slippery rail: what the rail holds), minDrive (N: but not under the lowest step pulling this, what climbs the grade) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
   autoDrive(w) {
@@ -363,12 +364,22 @@ export class TR37 {
     A.easeT = (A.easeT || 0) - w.dt;
     A.spinT = w.slip && now > 0 ? (A.spinT || 0) + w.dt : 0;
     if (A.spinT > 0.5 && !(A.easeT > 0)) { A.easeT = 0.6; A.slipCap = Math.max(1, (A.slipT > 0 ? Math.min(A.slipCap, now) : now) - 1); A.slipT = 6; A.spinT = 0; }
-    if (w.slide && now < -1) { A.slideCap = now + 1; A.slideT = 3; }
+    // a wheel that slides, the same: noticed after 0.3 s (not in an emergency, step 6 with the track brakes), the foot off the brake
+    // until the wheels turn again (0.3 s at least, 1.5 s at most), and back a step lighter than where it slid, held 4 s, then heavier a
+    // step each 3 s without a slide [assumed]. A locked wheel gets SPIN_LEFT of the grip (src/tram.js), and the equipment sees it
+    // standing, so the shoes come in: stepping off one at a time it stayed locked down to step 1 and slid 5-8 s from 25 km/h to a stand,
+    // 40-46 s a run on line 9 in snow and autumn (#265)
+    A.slideRun = w.slide && now < 0 && now > -6 ? (A.slideRun || 0) + w.dt : 0;
+    A.offT = (A.offT || 0) - w.dt;
+    if (A.slideRun > 0.3 && !(A.offT > 0)) { A.offT = 0.3; A.offMax = 1.5; A.slideCap = Math.min(-1, (A.slideT > 0 ? Math.max(A.slideCap, now) : now) + 1); A.slideT = 4; A.slideRun = 0; }
+    if (A.offT > 0 && w.slide && A.offMax > 0) { A.offMax -= w.dt; A.offT = Math.max(A.offT, 2 * w.dt); }
+    if (!(A.slideT > 0) && A.slideCap != null && A.slideCap > -5) { A.slideCap--; A.slideT = 3; }
     if (A.easeT > 0 && s > 0) s = 0;
     // (and back up a step at a time, each after 4 s without a spin: free after 6 s, it went back to step 5 and spun again at once)
     if (!(A.slipT > 0) && A.slipCap != null && A.slipCap < 5) { A.slipCap++; A.slipT = 4; }
     if (A.slipT > 0 && s > A.slipCap) s = A.slipCap;
-    if (A.slideT > 0 && s < A.slideCap && !w.urgent) s = A.slideCap;
+    // (the rail's grip, last: a step held from a lower speed comes down too, #265)
+    if (w.maxDrive != null) while (s > 1 && this.driveForce(s) > w.maxDrive && this.driveForce(s - 1) >= (w.minDrive ?? 0)) s--;
     // right after drive the brake loops are not excited yet: steps 1–4 only build more slowly, step 5 would
     // drop LO and bring the shoes in at speed, so step 4 at most until they settle; after braking, coast
     // before driving again ([ckd03] p. 11). (From a stand the loops are not the question.)
@@ -395,6 +406,10 @@ export class TR37 {
       const need = w.stopDist == null ? 0 : (w.v * w.v) / (2 * Math.max(0.3, w.stopDist));
       s = need > 0.15 || (w.stopDist != null && w.stopDist < 8) ? -5 : Math.min(s, -3);
     }
+    // (the slide's release and cap after the last metres' and the crawl's steps, which would put step 5 back on the locked wheels; the
+    // track brakes below still come in where the rail does not hold)
+    if (A.offT > 0 && s < 0 && s > -6) s = 0;
+    else if (A.slideT > 0 && s < A.slideCap && s > -6) s = A.slideCap;
     // a stop the service brake (≈1.3 m/s² on step 5) cannot make: the pedal to the floor, the track brakes
     // with it, as a driver does for a signal turning red too close (line 17 seed 3: red 36 m ahead at
     // 38 km/h, 1.6 m/s² needed; the old force model braked 1.8 m/s²); let go once it is in hand. Up a climb
