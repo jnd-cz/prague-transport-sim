@@ -1,7 +1,11 @@
 """On-screen controls and the viewport-sized mirror (#79): python -P -E tools/test_touch.py [--line 17]
 (its own server on a free port). On a phone (390 x 844, touch) a shift is driven by the buttons only:
 doors closed, two notches of power, the tram moves, the emergency brake; the outside view turns by a
-drag. On desktops the buttons stay hidden and the mirror frame grows with the viewport, its aspect fixed."""
+drag. On desktops the buttons stay hidden and the mirror frame grows with the viewport, its aspect fixed.
+Full screen (#485): a phone asks once; "Not now" keeps a start in the page, "Full screen" enters it and so does each later
+start after leaving it; a desktop isn't asked. In landscape (844 x 390, 740 x 360) the controller is a column at the right
+(top to bottom: power, 0, brake, STOP), the other buttons at the left, the dashboard between them, no button over another
+or off the screen; in portrait the controller stays a row."""
 import argparse
 import functools
 import http.server
@@ -23,13 +27,38 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def shift(browser, port, line, vp, mobile):
+FULL = "!!(document.fullscreenElement || document.webkitFullscreenElement)"
+
+
+def layout(page):
+    """What's wrong with the landscape layout: [] when nothing."""
+    return page.evaluate("""() => {
+      const box = (e) => { const r = e.getBoundingClientRect(); return { k: e.dataset.k || e.dataset.more || e.id, l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+      const main = [...document.querySelectorAll('#touch .main button')].filter((e) => e.offsetParent).map(box);
+      const side = [...document.querySelectorAll('#touch .side button')].map(box), dash = box(document.getElementById('dash'));
+      const all = [...main, ...side], bad = [];
+      for (const b of all) if (b.l < 0 || b.t < 0 || b.r > innerWidth + 0.5 || b.b > innerHeight + 0.5) bad.push(`${b.k} off the screen`);
+      for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+        const a = all[i], c = all[j];
+        if (a.l < c.r - 0.5 && c.l < a.r - 0.5 && a.t < c.b - 0.5 && c.t < a.b - 0.5) bad.push(`${a.k} over ${c.k}`);
+      }
+      const order = [...main].sort((a, b) => a.t - b.t).map((b) => b.k).join(' ');
+      if (order !== 'w n s space') bad.push(`controller top to bottom: ${order}`);
+      if (main.some((b) => b.l < dash.r - 0.5 || b.b - b.t < 58)) bad.push('the controller is not a column right of the dashboard, 58 px a button');
+      if (side.some((b) => b.r > dash.l + 0.5)) bad.push('a side button over the dashboard');
+      return bad;
+    }""")
+
+
+def shift(browser, port, line, vp, mobile, before=None):
     ctx = browser.new_context(viewport={"width": vp[0], "height": vp[1]}, is_mobile=mobile, has_touch=mobile)
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(f"http://127.0.0.1:{port}/?line={line}", timeout=180000)
     page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
+    if before:
+        before(page)
     page.click("#btnStart")
     page.wait_for_function("window.game && document.body.classList.contains('shift')", timeout=60000)
     return ctx, page, errors
@@ -45,7 +74,13 @@ def main():
     try:
         with sync_playwright() as p:
             browser = gpu.launch(p)[0]
-            ctx, page, errors = shift(browser, port, args.line, (390, 844), True)
+            def no(page):
+                r["asked"] = page.is_visible("#fsAsk")
+                page.tap("#fsAsk button[data-a='0']")
+            ctx, page, errors = shift(browser, port, args.line, (390, 844), True, no)
+            r["noFull"] = [page.evaluate(FULL), page.evaluate("localStorage.getItem('tram-fullscreen')")]
+            r["portraitRow"] = len({round(b["y"]) for b in (page.locator(f"#touch .main button[data-k='{k}']").bounding_box()
+                                                           for k in ("s", "n", "w", "space"))})
             r["buttons"] = page.is_visible("#touch button[data-k='w']")
             tap = lambda k: page.tap(f"#touch button[data-k='{k}']")  # noqa: E731
             # (headless software WebGL draws line 17 at ~2.5 fps, so game time crawls: the test steps it)
@@ -78,12 +113,32 @@ def main():
             r["orbit"] = round(((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5, 1)
             r["phoneErrors"] = errors[:3]
             ctx.close()
+            # landscape: the question's yes, full screen again on a start after leaving it, the layout at two sizes
+            def yes(page):
+                r["askedL"] = page.is_visible("#fsAsk")
+                page.tap("#fsAsk button[data-a='1']")
+                page.wait_for_function(FULL, timeout=5000)
+                page.evaluate("document.exitFullscreen()")
+                page.wait_for_function("!" + FULL, timeout=5000)
+            ctx, page, errors = shift(browser, port, args.line, (844, 390), True, yes)
+            page.wait_for_function(FULL, timeout=5000)
+            r["fullAgain"] = page.evaluate(FULL)
+            page.wait_for_timeout(300)
+            r["layout"] = {"844x390": layout(page)}
+            page.evaluate("document.exitFullscreen()")  # (a full-screen window can't be resized)
+            page.wait_for_function("!" + FULL, timeout=5000)
+            page.set_viewport_size({"width": 740, "height": 360})
+            page.wait_for_timeout(300)
+            r["layout"]["740x360"] = layout(page)
+            r["landscapeErrors"] = errors[:3]
+            ctx.close()
             r["mirror"] = {}
             for vp in ((1280, 720), (2560, 1440)):
                 ctx, page, errors = shift(browser, port, args.line, vp, False)
                 box = page.locator("#mirror").bounding_box()
                 r["mirror"][f"{vp[0]}x{vp[1]}"] = [round(box["width"]), round(box["height"])]
                 r.setdefault("deskButtons", []).append(page.is_visible("#touch button[data-k='w']"))
+                r.setdefault("deskAsked", []).append(page.evaluate("!!document.getElementById('fsAsk')?.classList.contains('show')"))
                 ctx.close()
             browser.close()
     finally:
@@ -101,12 +156,26 @@ def main():
         fails.append(f"page errors: {r['phoneErrors']}")
     if any(r["deskButtons"]):
         fails.append("on-screen controls shown on a desktop")
+    if not r["asked"] or r["noFull"] != [False, "0"]:
+        fails.append(f"full screen: a phone not asked, or 'Not now' still went full screen ({r['noFull']})")
+    if not r["askedL"] or not r["fullAgain"]:
+        fails.append("full screen: 'Full screen' or the next start after leaving it did not enter it")
+    if any(r["deskAsked"]):
+        fails.append("full screen asked on a desktop")
+    if r["portraitRow"] != 1:
+        fails.append("in portrait the controller is no longer one row")
+    for size, bad in r["layout"].items():
+        if bad:
+            fails.append(f"landscape {size}: {'; '.join(bad)}")
+    if r["landscapeErrors"]:
+        fails.append(f"page errors in landscape: {r['landscapeErrors']}")
     (w0, h0), (w1, h1) = r["mirror"].values()
     if not h1 > h0 * 1.5 or abs(w0 / h0 - 150 / 190) > 0.03 or abs(w1 / h1 - 150 / 190) > 0.03:
         fails.append(f"the mirror does not grow with the viewport at a fixed aspect: {r['mirror']}")
     if fails:
         sys.exit("; ".join(fails))
-    print("touch: buttons drive the tram, emergency brake held and let go, outside view turns, mirror sized by the viewport: pass")
+    print("touch: buttons drive the tram, emergency brake held and let go, outside view turns, mirror sized by the viewport, "
+          "full screen asked once and entered on a start, the landscape layout: pass")
 
 
 if __name__ == "__main__":

@@ -204,13 +204,18 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 Tlačítka na obrazovce, na dotykové obrazovce zobrazená automaticky, přepínaná 🎮 v menu (pamatuje si je
 zařízení). Posílají klávesy klávesnice:
 
-- řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
+- řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
 - ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
   zvuk, ✉ zpětná vazba.
 
-Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
+Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá. Telefon na šířku má ovládač jako
+sloupec u pravého palce (▲ nahoře, STOP dole), ostatní tlačítka ve dvou sloupcích vlevo a panel řidiče mezi nimi.
+
+**Celá obrazovka:** telefon se jednou zeptá v menu; s „Celá obrazovka“ se každá směna spustí na celé obrazovce,
+otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu ji
+kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí.
 
 ## Autopilot
 
