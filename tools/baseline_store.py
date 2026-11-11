@@ -41,7 +41,7 @@ LOCKS = os.path.join(tempfile.gettempdir(), "tram-heavy")
 
 
 def git(*args, root=ROOT):
-    r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+    r = subprocess.run(["git", *args], cwd=root, capture_output=True, encoding="utf-8")
     return r.stdout.strip() if r.returncode == 0 else None
 
 
