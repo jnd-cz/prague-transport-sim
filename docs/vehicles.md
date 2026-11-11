@@ -14,7 +14,7 @@ a model that does not load falls back to the first loaded one in that list.
 
 | model | where | made of | licence | moves |
 |---|---|---|---|---|
-| detailed, animated (the default) | `src/t3h.js`, `assets/t3h/` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps, indicators, high beams; a lighter level for AI trams far away |
+| detailed, animated (the default) | `assets/t3h/`, the rigged loader `src/rigged.js` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps, indicators, high beams; a lighter level for AI trams far away |
 | detailed, classic | `src/models.js` (`loadDetailedT3`), `assets/t3/` | a glTF, one texture; loaded when picked | CC BY-NC 4.0 | none |
 | simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | GPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
 
@@ -34,7 +34,7 @@ credits from the manifests (`src/vehicles.js`, `src/main.js`); `tools/test_vehic
 | `id` | the folder's name |
 | `names` | `cs` and `en`: the menu's text |
 | `type` | the vehicle type whose dimensions it has (`VEHICLE_TYPES` in `src/tram.js`: today `T3`) |
-| `loader` | `builtin` (drawn in code: `src/t3simple.js`), `gltf` (a still glTF, tier 1, no code), `gltf-classic` (conflig's model: its axes found from its wheels, `src/models.js`), `gltf-rigged` (a glTF with a rig file: `src/t3h.js`) |
+| `loader` | `builtin` (drawn in code: `src/t3simple.js`), `gltf` (a still glTF, tier 1, no code), `gltf-classic` (conflig's model: its axes found from its wheels, `src/models.js`), `gltf-rigged` (a glTF with a rig file, no code: `src/rigged.js`, below) |
 | `model`, `rig` | the glTF or GLB among its files; the rig file (`gltf-rigged`) |
 | `forward` | `gltf` only: the axis the model faces, `+Z` (the game's) unless `+X`, `-X` or `-Z` |
 | `files` | every file with its `path` in the folder and its size in `bytes` (the loading screen counts them) |
@@ -47,12 +47,35 @@ A **tier-1 glTF** needs no code: a still model in metres, its origin on the rail
 pivots, +Y up, facing `forward`; its pivots are its type's. The menu offers it, it loads when picked and the
 credits name it.
 
+## The rig
+
+A vehicle that moves without code of its own (loader `gltf-rigged`, `src/rigged.js`) names its parts in a rig file
+(`assets/t3h/rig.json` is the hybrid's), in the model's own frame (its `forward` axis, +Y up). The game drives them by
+name; a part its manifest's `moves` claims and the model lacks makes the game refuse the vehicle, naming the part.
+
+| moves | the rig names | the game does |
+|---|---|---|
+| `bogies` | `bogies`: each `name` (a node) and `pivot` | puts them at the type's pivots (`T3`: 3.2 m from the centre), turns each to the chord between its axles |
+| `wheels` | `wheels`: each `name` (a node under its bogie) and `radius` | rolls them by the distance; half a bogie's wheelbase comes from where they stand |
+| `couplers` | `couplers`: `front` and `rear`, the bar's meshes | turns each about the type's pin (6.25 m), its bar refitted from the pin to the coupling plane, along the link to the next car |
+| `collector` | `pantograph`: `root`, `head`, `linkages`, `clip` (lowering it, 0 raised .. 1 down), `minContactHeight`, `maxContactHeight` | scrubs the clip to the wire's height, lowers it below its range |
+| `lamps` | `signals`: `left`, `right` (glow nodes); `brakes`; `beams` (the headlights' centres, for the high beams' glow); `tailLamps` (`size`, `at`: lamps the model lacks) | lights them by state (`src/lamps.js`) |
+| `doors` | `doors`: each `name`, `clip` (opening it) and `leaves` (`outer`, `inner` nodes) | scrubs the clips by the doors' openness |
+| `trackBrakes` | `shoes`: a bogie's name and the shoes' meshes under it | hangs them at the type's gap over the rail (12 mm), drops them when the magnets are on |
+
+Also by name: `root` (the car's node), `saloon` (`materials`, and `within`: a box whose parts belong to the saloon;
+left out far away), `numberPlates` (drawn with the fleet number, its digits `fleetDigits` m tall), `routeStyles`
+(each route plate and its style: `normal`, `inverted`, `mirror`), `infoPlates` (`frontDestination`, `runNumber`,
+`sideBoards`). Transparent materials are the glass. The lighter level for AI trams far away is built at load: the
+doors shut, the collector at the wire, everything but the saloon merged by material. `tools/test_rigged.py` makes a
+sample vehicle with every part and checks each of them moves.
+
 ## What a set must be
 
 - A `THREE.Group` holding one `Group` per car in `userData.cars`, in order from the front.
 - Each car in metres, facing **+Z**, **+Y** up, the right side (the doors) at **−X**, its origin on the rail
   plane midway between the bogie pivots. Models from other tools usually face +X: turn them −90° about Y at
-  load, as `src/t3h.js` does.
+  load, as the rigged loader does by the manifest's `forward`.
 - `userData.bogie` (half the pivot distance), `userData.bodyFront` (the body's front from the car's origin),
   `userData.mats` (the plates' and cards' materials), `userData.kind`, `line`, `dest`, `run`.
 - The T3's numbers in `src/tram.js` (`T3`: 15.2 m over the couplers, body 14.0 m, pivots 6.4 m apart, the
@@ -72,14 +95,14 @@ credits name it.
 - **Its state:** `poseT3(model, { doors, collector, braking, track, indicate, clock, highBeam })` (`src/models.js`):
   the doors 0–1, the collector's contact height over the rail (below its working range it lowers), the brake lamps,
   the track brakes' magnets, the indicators (`'left'`, `'right'`, `'hazard'` or none, blinking by `clock`:
-  `src/lamps.js`), the high beams. The hybrid takes all of it (`poseHybrid`), the built-in car all but the doors and
+  `src/lamps.js`), the high beams. A rigged vehicle takes all of it its rig names (`poseRigged`), the built-in car all but the doors and
   the shoes (`poseSimple`). The headlights and tail lamps are lit whenever a tram is in service, a set's front on its
   leading car only, the rear red lamps (tail and brake) on every car. Our driver works the indicators and high
   beams with keys; the autopilot and AI trams indicate by themselves (`src/indicators.js`), and an AI T3M shows its
   next stop (`setNextStop`).
 - **AI trams** (`src/traffic.js`) fade in and out with `setOpacity`, per material: a material's own
   opacity under 1 stays in `userData.opacity`, a material blended from the start stays blended. Far from
-  the camera the hybrid switches to its lighter level (`setHybridLevel`, 50–60 m). A set that leaves is freed
+  the camera a rigged vehicle switches to its lighter level (`setRiggedLevel`, 50–60 m). A set that leaves is freed
   with `disposeModel`; geometry and textures marked `userData.shared` are kept for the next one.
 
 ## Tiers of movement
@@ -107,19 +130,14 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
 2. **The file:** glTF or GLB in metres, the origin and axes as above or adapted at load. Keep it lean: the
    hybrid is 2.9 MB and 44,000 triangles a car, and several AI sets are in view at once. The deploy compresses
    `.glb` and `.gltf` (DEVELOPING.md, *Deploy*).
-3. **The moving parts** (tier 2 and 3): separate, named nodes listed in a rig file like
-   `assets/t3h/rig.json`: `doors` (their leaves), `bogies` (name and pivot), `wheels` (name and radius),
-   `pantograph` (root, head, linkages, contact heights), `signals` (indicators), `brakes` (brake lamps),
-   `numberPlates`, `routePlates`, `infoPlates` (destination, run number, side boards), and animation clips by
-   name (`Door_Front_Open`, `Pantograph_Lower`, …). A model drawn in code instead gives each car a `gear` for
+3. **The moving parts** (tier 2 and 3): separate, named nodes and clips listed in its rig (*The rig*, above). A
+   model drawn in code instead gives each car a `gear` for
    `src/consist.js`, as `src/t3simple.js` does with instanced meshes (a car of it draws 8 meshes besides its
    plates).
 4. **The manifest:** `assets/<id>/vehicle.json` (above) and the id in `assets/vehicles.json`. A still model
-   (tier 1, loader `gltf`) needs nothing more. One that moves needs code today: a module like `src/t3h.js`
-   (load, build a set with each car's `gear`, pose it) and its loader in `makeT3`, `loadVehicle` and `poseT3`
-   (`src/models.js`). A common interface, driving any vehicle from its rig with no code of its own, found and
-   checked at startup and installed by the player, is planned (#456).
-5. **The checks:** `python -I tools/test_vehicles.py` (the manifest), `tools/test_vehicles_game.py`, a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
+   (tier 1, loader `gltf`) needs nothing more, nor does one that moves by its rig (loader `gltf-rigged`). Vehicles
+   found and checked at startup and installed by the player are planned (#456).
+5. **The checks:** `python -I tools/test_vehicles.py` (the manifest), `tools/test_vehicles_game.py`, `tools/test_rigged.py`, a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
    frame time with `tools/frametime.py --models …`, and pictures of every model from the same views with
    `python -P -E tools/test_t3simple.py --shots DIR` (side, three-quarter, front, top, the bogie, the coupler; a
    two-car set on a 25 m curve and its running gear in plan; the collector lowered).
@@ -133,8 +151,8 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
   its manifest's `variants` (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` checks it against those numbers.
 - **The plates and cards** for every model: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, the T3M's dot-matrix `ledFace`).
-- **The hybrid:** the asset comes from the project's asset lab; a change to the file goes through it, or is
-  made at load in `src/t3h.js` (as its couplers, track-brake shoes, fleet numbers and tail lamps are).
+- **The hybrid:** the asset comes from the project's asset lab; a change to the file goes through it, or into its
+  rig (its shoes, couplers, saloon, headlights, tail lamps and the fleet numbers' size are there, #467).
 - **Facts:** a dimension, colour or detail of the real car cites its source (a drawing, a photo with its
   fleet number, the user) in a comment or in [docs/knowledge.md](knowledge.md). The user's facts as a Prague
   tram expert win over a drawing or a guess.

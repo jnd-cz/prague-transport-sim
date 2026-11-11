@@ -1,7 +1,7 @@
 // Low-poly models built from primitives: cars, pedestrians, signals and signs; the T3 sets (the built-in car
-// in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
+// in src/t3simple.js, rigged glTF vehicles as the hybrid in src/rigged.js, conflig's classic loaded here).
 import * as THREE from 'three';
-import { hybridReady, loadHybridT3, makeHybridSet, setHybridLine, poseHybrid } from './t3h.js';
+import { riggedReady, riggedIds, loadRigged, makeRiggedSet, setRiggedLine, poseRigged } from './rigged.js';
 import { makeSimpleSet, poseSimple, ROUTE_BOX } from './t3simple.js';
 import { vehicles, byId, fileUrl, variantOf, fleetNumbers } from './vehicles.js';
 import { hangConsist } from './consist.js';
@@ -180,7 +180,7 @@ export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run
   root.userData.vehicle = v?.id ?? null;
   if (loader === 'gltf-classic') { makeDetailedSet(root, detailedProto, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
   if (loader === 'gltf') { makeDetailedSet(root, gltfProtos.get(v.id), line, cars, dest, run); root.userData.kind = 'gltf'; return root; }
-  if (loader === 'gltf-rigged') { makeHybridSet(root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet); root.userData.kind = 'hybrid'; return root; }
+  if (loader === 'gltf-rigged') { makeRiggedSet(v?.id ?? riggedIds()[0], root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet); root.userData.kind = 'rigged'; return root; }
   makeSimpleSet(root, cars, dest, plateMats(line, dest, run, type), CONTACT_WIRE - RAIL_TOP, { variant: type, fleet });
   Object.assign(root.userData, { kind: 'simple', dest, run });
   return root;
@@ -189,13 +189,13 @@ export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run
 // The vehicle a set is built as: the one asked for when it is loaded, else the first loaded one in the index's order
 // (the built-in car is always loaded); null without a registry (a test page that loads a model by itself, which
 // then builds with loadedLoader).
-const loaded = (v) => v.loader === 'builtin' || (v.loader === 'gltf-rigged' ? hybridReady()
+const loaded = (v) => v.loader === 'builtin' || (v.loader === 'gltf-rigged' ? riggedReady(v.id)
   : v.loader === 'gltf-classic' ? !!detailedProto : gltfProtos.has(v.id));
 export function pickVehicle(id) {
   const v = byId.get(id);
   return v && loaded(v) ? v : vehicles.find(loaded) ?? null;
 }
-const loadedLoader = () => (hybridReady() ? 'gltf-rigged' : detailedProto ? 'gltf-classic' : 'builtin');
+const loadedLoader = () => (riggedIds().length ? 'gltf-rigged' : detailedProto ? 'gltf-classic' : 'builtin');
 
 // Load a vehicle's files and make its template, once. get(url) -> a fetch-like body (the loading screen's
 // Loader.get counts its bytes): the files first, all of them, then the loader its manifest names.
@@ -209,7 +209,7 @@ export function loadVehicle(v, get = (u) => fetch(u)) {
     const body = (path) => res[v.files.findIndex((f) => f.path === path)];
     // (the glTF's own references to its buffers and images resolve to the files already downloaded)
     const blobs = () => Object.fromEntries(v.files.map((f, i) => [fileUrl(v, f.path), res[i].blobUrl(MIME[f.path.split('.').pop().toLowerCase()])]));
-    if (v.loader === 'gltf-rigged') await loadHybridT3([body(v.model), body(v.rig)], CONTACT_WIRE - RAIL_TOP);
+    if (v.loader === 'gltf-rigged') await loadRigged(v, body(v.model), body(v.rig), VEHICLE_TYPES[v.type], CONTACT_WIRE - RAIL_TOP);
     else if (v.loader === 'gltf-classic') await loadDetailedT3(fileUrl(v, v.model), blobs());
     else if (v.loader === 'gltf') await loadGltfVehicle(v, blobs());
     return v;
@@ -260,7 +260,7 @@ function plateMats(line, dest, run, variant) {
 }
 
 // The classic detailed T3 (Sketchfab "Tatra T3" low-poly model, CC BY-NC 4.0; see assets/t3/LICENSE.txt), the
-// player's choice beside the hybrid (src/t3h.js): simpler, no saloon and no moving parts.
+// player's choice beside the hybrid (src/rigged.js): simpler, no saloon and no moving parts.
 // reduced to a single 2048 px colour texture with the ambient occlusion baked in. Its axes were
 // found by principal component analysis of the body: length e1 (front = wipers), width e2
 // (doors on +e2 = right), height e3 (wheels on +e3 = down); units are metres (body 14.0 m).
@@ -469,7 +469,7 @@ function makeDetailedSet(root, proto, line, cars, dest, run) {
 // Change the route number on the plates, the destination card and the run number (a new shift, a run
 // continuing as another line). (A set made without a destination has no card to change.)
 export function setConsistLine(model, line, dest = model.userData.dest, run = model.userData.run) {
-  if (model.userData.hybrid) { setHybridLine(model, line, dest, run); return; }
+  if (model.userData.rigged) { setRiggedLine(model, line, dest, run); return; }
   const u = model.userData, { mats } = u;
   const swap = (m, tex) => { if (!m) return; const old = m.map; m.map = tex; m.needsUpdate = true; old?.dispose(); };
   if (u.line !== line) {
@@ -514,14 +514,14 @@ export function placeConsist(model, sFront, at) {
 }
 
 // A set's mechanisms from the game's state, whichever model (each acts only on what changes): the doors (0..1),
-// the collector's contact height, the track brakes' magnets (the hybrid's: src/t3h.js poseHybrid); the brake lamps
+// the collector's contact height, the track brakes' magnets (a rigged vehicle's: src/rigged.js poseRigged); the brake lamps
 // (`braking`), the indicators (`indicate`: 'left', 'right', 'hazard' or none, blinking by `clock` in s), the high
 // beams (`highBeam`) on both it and the built-in car (src/t3simple.js poseSimple); the classic model has none.
 export function poseT3(model, state) {
   const k = model.userData.kind;
-  if (k !== 'hybrid' && k !== 'simple') return;
+  if (k !== 'rigged' && k !== 'simple') return;
   const s = 'indicate' in state ? { ...state, signals: signalsAt(state.indicate, state.clock ?? 0) } : state;
-  if (k === 'hybrid') poseHybrid(model, s);
+  if (k === 'rigged') poseRigged(model, s);
   else poseSimple(model, s);
 }
 

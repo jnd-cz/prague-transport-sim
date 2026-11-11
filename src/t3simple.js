@@ -750,7 +750,7 @@ function fleetTexture(n) {
   cv.width = 512; cv.height = 160;
   const g = cv.getContext('2d'), s = n == null ? '' : String(n);
   if (!s) return new THREE.CanvasTexture(cv); // (a vehicle without fleet numbers for this type)
-  // (the hybrid's font and colour, src/t3h.js fleetTexture: the user, 2026-11-10, "the new model uses different font
+  // (the hybrid's font and colour, src/rigged.js fleetTexture: the user, 2026-11-10, "the new model uses different font
   // from the hybrid model and my photos")
   g.fillStyle = '#e3b625';
   g.font = 'bold 100px Arial, sans-serif';

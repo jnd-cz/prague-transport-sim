@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { smoothPolyline } from './route.js';
 import { makeCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel } from './models.js';
 import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
-import { setHybridLevel, FULL_IN, FULL_OUT } from './t3h.js';
+import { setRiggedLevel, FULL_IN, FULL_OUT } from './rigged.js';
 import { junctionTurns, indicating } from './indicators.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 import { aiLineCurrent } from './electric.js';
@@ -85,7 +85,7 @@ export function setOpacity(obj, a) {
   obj.traverse((o) => {
     const m = o.material;
     if (!m) return;
-    // (glass keeps its own opacity: userData.opacity, src/t3h.js. A material blended from the start
+    // (glass keeps its own opacity: userData.opacity, src/rigged.js. A material blended from the start
     // stays blended: the hybrid's fleet numbers are a decal on a clear canvas, whose clear pixels drew
     // black once the faded-in tram went opaque)
     const base = m.userData.opacity ?? 1;
@@ -1597,11 +1597,11 @@ export class Traffic {
       poseT3(t.mesh, lamps);
       if (u.variant === 'T3M') setNextStop(t.mesh, way.stops.find((st) => st.s > s - 2)?.name ?? null);
     }
-    if (!u.hybrid) return;
+    if (!u.rigged) return;
     // the detailed model: its full level near the camera; the doors open while it dwells at a stop (shut
     // 2 s before it leaves, 2 s to move); its lamps as above (posed on the full level only)
     const c = u.cars[0].position, d = this.cam ? Math.hypot(c.x - this.cam[0], -c.z - this.cam[1]) : 0;
-    setHybridLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
+    setRiggedLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
     t.doorU = Math.max(0, Math.min(1, (t.doorU ?? 0) + ((t.dwell ?? 0) > 2 ? dt : -dt) / 2));
     if (u.level === 'full') poseT3(t.mesh, { doors: t.doorU, ...lamps });
   }
