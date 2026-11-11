@@ -113,7 +113,7 @@ export class Game {
     this.segments = data.segments || [{ line: String(data.line), from: 0 }];
     this.line = this.segments.filter((g) => g.from <= opts.startStop).pop().line; // starting at the change stop = new line
     this.onLineChange = null;
-    this.backRoute = data.pathBack?.length > 1 ? new Route(data.pathBack, null, data.trackSource?.pathBack, !!data.trackCurve) : null;
+    this.backRoute = data.pathBack?.length > 1 ? new Route(data.pathBack) : null;
     this.backRoute && (this.backRoute.ground = route.ground);
     this._initStops();
     this._initSignals();

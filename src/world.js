@@ -1,6 +1,5 @@
 // Static 3D scenery built from the preprocessed OSM data, draped on the DMR 5G terrain.
 import * as THREE from 'three';
-import { smoothPolyline, SURVEYED, SMOOTH, AS_SURVEYED } from './route.js';
 import { rng } from './random.js';
 import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
@@ -442,12 +441,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   far.position.y = ground.terrain.min - 3;
   scene.add(far);
 
-  // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
+  // track geometry first: the curves and heights (once; kept across weather rebuilds),
   // then the terrain is lowered under every track so it can't poke through the bed
-  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20);
-  // where the build drew smooth curves (data.trackCurve, #204) its points as they are, a point every 1.5 m at most
+  // the build draws every track as curves (data.trackCurve, #204): its points as they are, a point every 1.5 m at most
   // (resampled, a 4.6 m piece's end became a chord and its joint at Strossmayerovo náměstí broke 2.9°)
-  for (const t of data.tracks) if (!t.smooth) t.smooth = data.trackCurve ? densify(t.p, 1.5) : smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) ? SMOOTH : AS_SURVEYED).pts;
+  for (const t of data.tracks) if (!t.smooth) t.smooth = densify(t.p, 1.5);
   // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
   // street surfaces laid flush with the track bed
   const tracks = new SegmentIndex(10);

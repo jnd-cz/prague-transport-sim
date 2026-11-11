@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Route, extendAlongTracks } from './route.js';
+import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
 import { Tram } from './tram.js';
@@ -17,7 +17,6 @@ import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
-import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 import { Loader } from './loading.js';
@@ -55,6 +54,7 @@ if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const data = await (await load.get(`data/line${lineId}.json`)).json();
 data.line = String(data.line);
+checkBuiltRoute(data); // (the track as the build draws it: its curves and the run past the termini, #477)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
 // ?profile=<name>: a trial height profile over the line's own, to drive and compare (reports/review/profiles/, #358)
 if (params.has('profile')) {
@@ -103,13 +103,11 @@ const truth = await loadHeightFacts();
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
 const t3Res = await Promise.all(T3H_FILES.map((f) => load.get(f)));
 await load.begin('terrain');
-// the two tracks of a double-track line at least 3 m apart (OSM sometimes draws them closer)
-// (dev switches for comparing lint runs: ?nospread, ?notunnels)
-if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
+// (dev switch for comparing lint runs: ?notunnels)
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
-// the track beyond both termini, so a two-car set standing at the first stop is on rails
-const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60), data.trackSource?.path, !!data.trackCurve);
+// the track beyond both termini as the build walked it, so a two-car set standing at the first stop is on rails
+const route = new Route(data.path, data.pathExt);
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
 // banked curves on dedicated track; level at platforms (stop zone from the stop sign back 30 m
 // where the data has no platform)
