@@ -304,7 +304,7 @@ SHOTS = r"""async ({ kinds }) => {
       straight.visible = !bend; bent.visible = bend;
       models.placeConsist(m, bend ? 15.04 : 7.6, bend ? arc : (s) => [0, -s, 0, 0]); // (the coupling at z 0 on the curve)
       renderer.clippingPlanes = view === 'gear' ? cut : [];
-      if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
+      if (m.userData.hybrid) (await import('/src/t3h.js')).poseHybrid(m, { doors: 0, braking: false, track: 0 });
       if (view === 'lowered') models.poseT3?.(m, { collector: 0 }); // (main has none)
       // the lamps lit (#436): the high beams and the left indicators in front, braking with the left indicators behind
       if (view === 'litFront' || view === 'litRear') models.poseT3?.(m, { braking: view === 'litRear', indicate: 'left', clock: 0.1, highBeam: view === 'litFront' });
