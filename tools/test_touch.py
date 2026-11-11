@@ -7,7 +7,9 @@ start after leaving it; a desktop isn't asked. In landscape (844 x 390, 740 x 36
 (top to bottom: power, 0, brake, STOP), the other buttons at the left, the dashboard between them, no button over another
 or off the screen; in portrait the controller stays a row. Safari on an iPhone (no Fullscreen API, played here by a page
 script) is told once how to add the game to the home screen; started from there (display-mode standalone, also played)
-it asks nothing and counts as full screen; the web manifest and the icons it names are served."""
+it asks nothing and counts as full screen; the web manifest and the icons it names are served. A phone whose controls
+were switched off keeps 🎮 in the shift, which brings them back; ⛶ stands apart from 🎮; a note's machine facts say
+whether the controls were on."""
 import argparse
 import functools
 import http.server
@@ -152,6 +154,21 @@ def main():
             r["layout"]["740x360"] = layout(page)
             r["landscapeErrors"] = errors[:3]
             ctx.close()
+            # the controls switched off in the menu: 🎮 stays in the shift and brings them back; ⛶ apart from it
+            def off(page):
+                a, b = (page.locator(q).bounding_box() for q in (".tbToggle:not(.fs)", ".tbToggle.fs"))
+                r["apart"] = round(abs(b["x"] - a["x"]))
+                page.tap(".tbToggle:not(.fs)")
+            ctx, page, errors = shift(browser, port, args.line, (844, 390), True, off)
+            way = {"off": not page.evaluate("document.body.classList.contains('touch')"), "toggle": page.is_visible(".tbToggle:not(.fs)")}
+            way["factsOff"] = page.evaluate("import('/src/perf.js').then((m) => m.machine({ getContext() { throw 0; } }).controls)")
+            if way["toggle"]:
+                page.tap(".tbToggle:not(.fs)")
+            way["back"] = page.evaluate("document.body.classList.contains('touch')") and page.is_visible("#touch button[data-k='p']")
+            way["factsOn"] = page.evaluate("import('/src/perf.js').then((m) => m.machine({ getContext() { throw 0; } }).controls)")
+            way["errors"] = errors[:3]
+            r["wayBack"] = way
+            ctx.close()
             # Safari on an iPhone, then started from the home screen; the manifest and its icons
             ctx, page, errors = menu(browser, port, args.line, SAFARI)
             r["safari"] = {"hint": page.is_visible("#fsAsk.home"), "text": page.text_content("#fsAsk span"),
@@ -205,6 +222,11 @@ def main():
     for size, bad in r["layout"].items():
         if bad:
             fails.append(f"landscape {size}: {'; '.join(bad)}")
+    wb = r["wayBack"]
+    if wb != {"off": True, "toggle": True, "factsOff": False, "back": True, "factsOn": True, "errors": []}:
+        fails.append(f"controls switched off on a phone: no way back in the shift, or the note's facts miss it: {wb}")
+    if r["apart"] < 300:
+        fails.append(f"⛶ only {r['apart']} px from 🎮")
     sf = r["safari"]
     if not sf["hint"] or "Add to Home Screen" not in (sf["text"] or "") or sf["toggle"] or sf["after"] != [False, "0"] or sf["errors"]:
         fails.append(f"Safari on an iPhone: the home-screen hint not shown once, or ⛶ offered: {sf}")
@@ -221,7 +243,7 @@ def main():
     if fails:
         sys.exit("; ".join(fails))
     print("touch: buttons drive the tram, emergency brake held and let go, outside view turns, mirror sized by the viewport, "
-          "full screen asked once and entered on a start, the landscape layout, Safari's home screen, the manifest: pass")
+          "full screen asked once and entered on a start, the landscape layout, Safari's home screen, the manifest, the way back to the controls: pass")
 
 
 if __name__ == "__main__":

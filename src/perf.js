@@ -73,7 +73,10 @@ export class PerfLog {
 export function machine(renderer) {
   const out = { cores: navigator.hardwareConcurrency || null, memoryGB: navigator.deviceMemory || null,
     screen: `${screen.width}x${screen.height}`, viewport: `${innerWidth}x${innerHeight}`, dpr: devicePixelRatio,
-    touch: navigator.maxTouchPoints > 0 };
+    touch: navigator.maxTouchPoints > 0,
+    // (the page's state when the note is sent: a phone's note says whether its on-screen controls were on, #485)
+    controls: document.body.classList.contains('touch'), fullscreen: !!(document.fullscreenElement || document.webkitFullscreenElement),
+    standalone: matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches, orientation: screen.orientation?.type ?? null };
   try {
     const gl = renderer.getContext();
     out.webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
