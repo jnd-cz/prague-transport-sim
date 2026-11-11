@@ -5,7 +5,9 @@ drag. On desktops the buttons stay hidden and the mirror frame grows with the vi
 Full screen (#485): a phone asks once; "Not now" keeps a start in the page, "Full screen" enters it and so does each later
 start after leaving it; a desktop isn't asked. In landscape (844 x 390, 740 x 360) the controller is a column at the right
 (top to bottom: power, 0, brake, STOP), the other buttons at the left, the dashboard between them, no button over another
-or off the screen; in portrait the controller stays a row."""
+or off the screen; in portrait the controller stays a row. Safari on an iPhone (no Fullscreen API, played here by a page
+script) is told once how to add the game to the home screen; started from there (display-mode standalone, also played)
+it asks nothing and counts as full screen; the web manifest and the icons it names are served."""
 import argparse
 import functools
 import http.server
@@ -28,6 +30,24 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 FULL = "!!(document.fullscreenElement || document.webkitFullscreenElement)"
+# (Safari on an iPhone: a page has no Fullscreen API)
+SAFARI = """for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) Object.defineProperty(Document.prototype, k, { get: () => false });
+delete Element.prototype.requestFullscreen; delete Element.prototype.webkitRequestFullscreen;"""
+# (started from the home screen)
+HOME = """const mm = window.matchMedia.bind(window);
+window.matchMedia = (q) => /display-mode: (fullscreen|standalone)/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : mm(q);"""
+
+
+def menu(browser, port, line, script):
+    """A phone's menu with a page script run first: (context, page, errors)."""
+    ctx = browser.new_context(viewport={"width": 844, "height": 390}, is_mobile=True, has_touch=True)
+    ctx.add_init_script(script)
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(f"http://127.0.0.1:{port}/?line={line}", timeout=180000)
+    page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
+    return ctx, page, errors
 
 
 def layout(page):
@@ -132,6 +152,24 @@ def main():
             r["layout"]["740x360"] = layout(page)
             r["landscapeErrors"] = errors[:3]
             ctx.close()
+            # Safari on an iPhone, then started from the home screen; the manifest and its icons
+            ctx, page, errors = menu(browser, port, args.line, SAFARI)
+            r["safari"] = {"hint": page.is_visible("#fsAsk.home"), "text": page.text_content("#fsAsk span"),
+                           "toggle": page.is_visible(".tbToggle.fs")}
+            page.tap("#fsAsk button")
+            r["safari"]["after"] = [page.is_visible("#fsAsk"), page.evaluate("localStorage.getItem('tram-fullscreen')")]
+            r["safari"]["errors"] = errors[:3]
+            ctx.close()
+            ctx, page, errors = menu(browser, port, args.line, HOME)
+            r["home"] = {"asked": page.is_visible("#fsAsk"), "toggle": page.is_visible(".tbToggle.fs"),
+                         "fs": page.evaluate("document.body.classList.contains('fs')"), "errors": errors[:3]}
+            r["manifest"] = page.evaluate("""async () => {
+              const href = document.querySelector('link[rel=manifest]').href, m = await (await fetch(href)).json();
+              const urls = [...m.icons.map((i) => new URL(i.src, href).href), document.querySelector('link[rel=apple-touch-icon]').href];
+              const got = await Promise.all(urls.map(async (u) => { const x = await fetch(u); return [x.status, x.headers.get('content-type')]; }));
+              return { display: m.display, orientation: m.orientation, icons: got };
+            }""")
+            ctx.close()
             r["mirror"] = {}
             for vp in ((1280, 720), (2560, 1440)):
                 ctx, page, errors = shift(browser, port, args.line, vp, False)
@@ -167,6 +205,14 @@ def main():
     for size, bad in r["layout"].items():
         if bad:
             fails.append(f"landscape {size}: {'; '.join(bad)}")
+    sf = r["safari"]
+    if not sf["hint"] or "Add to Home Screen" not in (sf["text"] or "") or sf["toggle"] or sf["after"] != [False, "0"] or sf["errors"]:
+        fails.append(f"Safari on an iPhone: the home-screen hint not shown once, or ⛶ offered: {sf}")
+    if r["home"]["asked"] or r["home"]["toggle"] or not r["home"]["fs"] or r["home"]["errors"]:
+        fails.append(f"started from the home screen: asked, ⛶ offered or not counted as full screen: {r['home']}")
+    m = r["manifest"]
+    if m["display"] != "fullscreen" or m["orientation"] != "landscape" or any(st != 200 or "image/png" not in (ct or "") for st, ct in m["icons"]):
+        fails.append(f"the web manifest or its icons: {m}")
     if r["landscapeErrors"]:
         fails.append(f"page errors in landscape: {r['landscapeErrors']}")
     (w0, h0), (w1, h1) = r["mirror"].values()
@@ -175,7 +221,7 @@ def main():
     if fails:
         sys.exit("; ".join(fails))
     print("touch: buttons drive the tram, emergency brake held and let go, outside view turns, mirror sized by the viewport, "
-          "full screen asked once and entered on a start, the landscape layout: pass")
+          "full screen asked once and entered on a start, the landscape layout, Safari's home screen, the manifest: pass")
 
 
 if __name__ == "__main__":

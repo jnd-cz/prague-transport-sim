@@ -65,6 +65,7 @@ HTACCESS = """# tools/deploy.py: the data and models exist here only as <name>.b
   AddType model/gltf+json .gltf
   AddType model/gltf-binary .glb
   AddType application/octet-stream .bin
+  AddType application/manifest+json .webmanifest
   AddEncoding br .brotli
 </IfModule>
 RewriteEngine On

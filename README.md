@@ -215,7 +215,8 @@ sloupec u pravého palce (▲ nahoře, STOP dole), ostatní tlačítka ve dvou s
 
 **Celá obrazovka:** telefon se jednou zeptá v menu; s „Celá obrazovka“ se každá směna spustí na celé obrazovce,
 otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu ji
-kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí.
+kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí: hra jednou poradí
+Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na celé obrazovce.
 
 ## Autopilot
 

@@ -99,6 +99,7 @@ const DICT = {
     'tb.auto': 'Autopilot', 'tb.mute': 'Sound', 'tb.deadman': 'Dead-man', 'tb.on': 'on-screen controls: on', 'tb.off': 'on-screen controls: off',
     'fs.ask': 'Play in full screen? Shifts start in it, turned to landscape.', 'fs.yes': 'Full screen', 'fs.no': 'Not now',
     'fs.on': 'full screen: on', 'fs.off': 'full screen: off', 'fs.turn': 'Turn the phone sideways',
+    'fs.home': 'For full screen: Share ⬆ → Add to Home Screen, then start the game from its icon.', 'fs.ok': 'OK',
     'help': 'W/S pedals · 1–5 / Shift+1–5 steps · R park · Space emergency · A sand · D doors · B bell · Q/E look · Z mirror · H/K/F heating · C cut-out · X switch iron · , . indicators · / hazard · L high beams · V view · O autopilot · P pause',
     // HUD
     'hud.points': 'points',
@@ -270,6 +271,7 @@ const DICT = {
     'tb.auto': 'Autopilot', 'tb.mute': 'Zvuk', 'tb.deadman': 'Bdělost', 'tb.on': 'ovládání na obrazovce: zapnout', 'tb.off': 'ovládání na obrazovce: vypnout',
     'fs.ask': 'Hrát na celou obrazovku? Směna se spustí v ní, na šířku.', 'fs.yes': 'Celá obrazovka', 'fs.no': 'Teď ne',
     'fs.on': 'celá obrazovka: zapnout', 'fs.off': 'celá obrazovka: vypnout', 'fs.turn': 'Otočte telefon na šířku',
+    'fs.home': 'Na celou obrazovku: Sdílet ⬆ → Přidat na plochu a hru spouštějte z její ikony.', 'fs.ok': 'OK',
     'help': 'W/S šlapky · 1–5 / Shift+1–5 stupně · R zajišťovací brzda · mezerník nouzová brzda · A písek · D dveře · B zvonec · Q/E rozhlédnout · Z zrcátko · H/K/F topení · C odpojit topení · X stavěcí klíč · , . směrovky · - výstražná světla · L dálková · V pohled · O autopilot · P pauza',
     'hud.points': 'bodů',
     'hud.atPlatform': 'u nástupiště',

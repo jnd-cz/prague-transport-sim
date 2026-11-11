@@ -3,7 +3,9 @@
 // the 🎮 button in the menu switches them, remembered per device. ⋯ opens the rarer ones, ✉ the feedback note.
 // Full screen (#485): asked once in the menu on a touch screen; with a yes, a shift starts in full screen turned to
 // landscape (a browser goes full screen only from a tap: Start's), and ⛶ switches it any time. Leaving it (the back
-// gesture) holds until the next start. In landscape on a phone the controller is a column at the right thumb and the
+// gesture) holds until the next start. Safari on an iPhone has no full screen for a page: there the question becomes how
+// to add the game to the home screen, from where it opens full screen (app.webmanifest, the apple-* tags in index.html);
+// opened so, it asks nothing and only the hint to turn the phone stays. In landscape on a phone the controller is a column at the right thumb and the
 // other buttons two columns at the left, the dashboard between them (the CSS below).
 import { t } from './i18n.js';
 
@@ -13,6 +15,8 @@ const STARTS = ['btnStart', 'btnPerfTest', 'btnPerfRef'];
 const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { /* (no storage) */ } return null; };
 const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 const fsAble = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+// (started from the home screen: full screen already, the browser's bars gone)
+const standalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
 // [key, label, hold] — a held button sends keyup on release (sand, look, zoom, the emergency brake)
 const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', false, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', false, 'drive'], [' ', 'tb.stop', true, 'emerg']];
 const SIDE = [['d', 'tb.doors'], ['b', 'tb.bell'], ['a', 'tb.sand', true], ['q', '◀', true], ['e', '▶', true], ['g', '🔍', true], ['v', 'tb.view'], ['z', 'tb.mirror'], ['p', 'II']];
@@ -117,7 +121,23 @@ body.shift .tbToggle { display: none }
 
   // full screen: the question, ⛶, the starts that enter it, the landscape lock and the hint to turn the phone
   fullscreen() {
-    if (!fsAble()) return;
+    const turn = (this.fsTurn = document.createElement('div'));
+    turn.id = 'fsTurn';
+    document.body.appendChild(turn);
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    if (standalone()) { document.body.classList.add('fs'); this.fsLabels(); return; }
+    if (!fsAble()) {
+      // (Safari on an iPhone: the way to full screen is the home screen; said once)
+      if (!coarse || store(FS_KEY) !== null) return;
+      const ask = (this.fsAsk = document.createElement('div'));
+      ask.id = 'fsAsk';
+      ask.className = 'show home';
+      ask.innerHTML = '<span></span><button data-a="0"></button>';
+      ask.addEventListener('click', (e) => { if (e.target.closest('button')) { store(FS_KEY, '0'); ask.classList.remove('show'); } });
+      document.body.appendChild(ask);
+      this.fsLabels();
+      return;
+    }
     const fs = (this.fsToggle = document.createElement('button'));
     fs.className = 'tbToggle fs';
     fs.textContent = '⛶';
@@ -137,15 +157,12 @@ body.shift .tbToggle { display: none }
       if (b.dataset.a === '1') this.enter();
     });
     document.body.appendChild(ask);
-    if (store(FS_KEY) === null && matchMedia('(pointer: coarse)').matches) ask.classList.add('show');
-    const turn = (this.fsTurn = document.createElement('div'));
-    turn.id = 'fsTurn';
-    document.body.appendChild(turn);
+    if (store(FS_KEY) === null && coarse) ask.classList.add('show');
     // (a start's tap is the gesture the browser asks for; capture: before main.js starts the shift)
     document.addEventListener('click', (e) => {
       if (store(FS_KEY) === '1' && !fsElement() && STARTS.includes(e.target.closest('button')?.id)) this.enter();
     }, true);
-    const sync = () => { document.body.classList.toggle('fs', !!fsElement()); this.fsLabels(); };
+    const sync = () => { document.body.classList.toggle('fs', !!fsElement() || standalone()); this.fsLabels(); };
     document.addEventListener('fullscreenchange', sync);
     document.addEventListener('webkitfullscreenchange', sync);
     this.fsLabels();
@@ -159,13 +176,14 @@ body.shift .tbToggle { display: none }
   }
 
   fsLabels() {
-    if (!this.fsToggle) return;
-    this.fsToggle.title = t(fsElement() ? 'fs.off' : 'fs.on');
-    const [q, yes, no] = this.fsAsk.children;
+    if (this.fsTurn) this.fsTurn.textContent = '↻ ' + t('fs.turn');
+    if (this.fsToggle) this.fsToggle.title = t(fsElement() ? 'fs.off' : 'fs.on');
+    if (!this.fsAsk) return;
+    const [q, a, b] = this.fsAsk.children;
+    if (this.fsAsk.classList.contains('home')) { q.textContent = t('fs.home'); a.textContent = t('fs.ok'); return; }
     q.textContent = t('fs.ask');
-    yes.textContent = t('fs.yes');
-    no.textContent = t('fs.no');
-    this.fsTurn.textContent = '↻ ' + t('fs.turn');
+    a.textContent = t('fs.yes');
+    b.textContent = t('fs.no');
   }
 
   set(on, keep = true) {
