@@ -113,9 +113,7 @@ export class Autopilot {
     // slide, and nothing does for a limit. Down Chotkova's 55 ‰ half of 0.15's grip planned 0.74 m/s² where the grip held 0.56 after the
     // pull, and it came into the 20 km/h at 35, line 23 seed 2 in autumn; with the whole pull to the points too, the autumn runs' mean
     // delay rose by 100 s on lines 17 and 22)
-    // (in autumn it plans on a leaf patch with sand, 0.06 × 2.5, which it cannot see coming: the rail between the patches holds 0.22
-    // (#266), and planned on that it locked the wheels on the patches, #265)
-    const mu = g.weather === 'leaves' ? Math.min(g.muBase ?? 0.3, 0.15) : g.muBase ?? 0.3;
+    const mu = g.muBase ?? 0.3;
     // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
     const planAt = (grade, pull = 0.5) => (1 - 0.25 * mild) * Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + pull * Math.min(0, grade)),

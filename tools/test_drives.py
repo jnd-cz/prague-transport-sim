@@ -134,10 +134,10 @@ RUN = """async (only) => {
     // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box held 90 s of a whole shift then, and the autopilot ran it dry
     // on every slip; with it empty a patch on 50 per mille can never be left (three runs stuck for good on lines 9 and 17)
     { name: 'leaves, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.15, leaves: true },
-    // snow: the rail at 0.10, packed snow and ice at the pedestrian crossings 0.08 (src/game.js; #265)
-    { name: 'snow, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.10, weather: 'snow', patches: [[300, 308], [690, 698]], patchMu: 0.08, leaves: true },
-    { name: 'snow, down 40 per mille', stops: [20, 700], limit: 50, pax: 60, mu: 0.10, weather: 'snow', grade: uphill(-0.04), patches: [[690, 698]], patchMu: 0.08, leaves: true },
-    { name: 'snow, up 40 per mille', stops: [20, 500], limit: 30, pax: 100, mu: 0.10, weather: 'snow', grade: uphill(0.04), leaves: true },
+    // snow: the rail at 0.12, packed snow and ice at the pedestrian crossings 0.08 (src/game.js; #265)
+    { name: 'snow, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.12, weather: 'snow', patches: [[300, 308], [690, 698]], patchMu: 0.08, leaves: true },
+    { name: 'snow, down 40 per mille', stops: [20, 700], limit: 50, pax: 60, mu: 0.12, weather: 'snow', grade: uphill(-0.04), patches: [[690, 698]], patchMu: 0.08, leaves: true },
+    { name: 'snow, up 40 per mille', stops: [20, 500], limit: 30, pax: 100, mu: 0.12, weather: 'snow', grade: uphill(0.04), leaves: true },
     { name: 'leaves, up 50 per mille', stops: [20, 500], limit: 30, pax: 60, mu: 0.15, grade: uphill(0.05), leaves: true },
     { name: 'leaves, a patch before the stop', stops: [20, 600], limit: 50, pax: 60, mu: 0.15, patches: [[520, 590]], leaves: true },
     { name: 'leaves, a patch at a red signal', stops: [20, 900], limit: 50, pax: 60, mu: 0.15, patches: [[440, 500]], signals: [{ s: 500, states: [[0, 'stop'], [100, 'go']] }], leaves: true },

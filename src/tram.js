@@ -31,11 +31,10 @@ export const T3 = {
   lineVoltage: 600,
 };
 
-// Wheel/rail adhesion (peak, at a standstill) by weather, from docs/research/rail-adhesion.md (#266):
-// dry 0.30 (Moore 0.25–0.30; tram rig 0.4), steady rain on rinsed rail 0.18 (BR 0.2, Moore 0.18–0.20),
-// autumn rail between the leaf patches 0.22 (estimate: leaves act through the patches, game.js 0.06),
-// light snow 0.10 (Moore). game.js: leaf patches and the icy pedestrian crossings.
-export const ADHESION = { dry: 0.30, rain: 0.18, leaves: 0.22, snow: 0.10 };
+// Wheel/rail adhesion (peak, at a standstill) by weather: the game's values, which the checks were set on. The research
+// (docs/research/rail-adhesion.md, #266) has rain 0.18, autumn rail between the leaf patches 0.22 (an estimate) and light
+// snow 0.10; the user, 2026-11-11, kept these ("Keep the main values"). game.js: leaf patches and the icy pedestrian crossings.
+export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15, snow: 0.12 };
 
 // Adhesion falls with speed: Curtius–Kniffler, μ = 0.161 + 7.5 / (v + 44) with v in km/h, as a factor of
 // its standstill value: 1.00 at 0, 0.75 at 40, 0.70 at 60 km/h (#266)
