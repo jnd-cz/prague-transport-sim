@@ -157,8 +157,10 @@ someone decides so.
 intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
 browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)
 says what a frame costs here. A shift's end offers to send the summary; the menu's Performance test drives a
-fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1) with the GPU's own time per frame where
-the browser has `EXT_disjoint_timer_query_webgl2`. `tools/test_perf.py --runs N` runs it N times here.
+fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1; the Reference test below) with the GPU's own time per frame where
+the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the departure, not a shift's 40 s, and the
+minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
+the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
 ## Dev
 
