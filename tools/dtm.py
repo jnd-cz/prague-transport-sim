@@ -393,7 +393,8 @@ if _model.tree is None:
 _ramps_before = zps_decks.ramps(areas, _city_ground)
 deck_checked = zps_decks.check(areas, _model, zps_decks.Rails(_rails, _city_ground))
 deck_checked["split"] = zps_decks.split(areas, _model, deck_checked["checked"])
-deck_flat = zps_decks.flatten(areas, zps_decks.openings(_under_ways, areas, F), _city_ground, deck_checked["checked"])
+deck_opens = zps_decks.openings(_under_ways, areas, F)
+deck_flat = zps_decks.flatten(areas, deck_opens, _city_ground, deck_checked["checked"])
 deck_report = zps_decks.summary(deck_checked, deck_flat, zps_decks.ramps(areas, _city_ground),
                                 zps_decks.thickness(areas, _model, deck_flat))
 for _h in deck_report["heldAreas"]:
@@ -406,6 +407,14 @@ for _o in deck_report["openings"]:
     print(f"  opening: way {_o['way']} {_o['name'] or ''}: {_o.get('sagging', 0)} vertices on the deck's plane, gap",
           f"{_o.get('gap')} m, maxheight {_o['maxheight']}, deck {_o.get('t')} m ({_o.get('src')}), clearance {_o.get('clearance')} m",
           "(SHORT)" if zps_decks.is_short(_o) else "")
+
+# the ground level under the decks: in an opening whose floor IPR shows, the streets take IPR's ground; and the classes
+# with heights only on their outline take the lidar inside where they lie on IPR's ground (tools/zps_inside.py, #444)
+import zps_inside  # noqa: E402
+under_report = zps_inside.under_decks(areas, deck_opens, deck_flat, _city_ground)
+inside_report = zps_inside.inside(areas, ground_verdicts)
+print("under decks:", under_report)
+print("lidar inside:", inside_report["classes"], "kept their sheet:", inside_report["kept"])
 
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
@@ -461,7 +470,7 @@ nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
                            checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
-                                   "decks": deck_report}),
+                                   "decks": deck_report, "underDecks": under_report, "inside": inside_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])
