@@ -92,6 +92,21 @@ class DeployTest(unittest.TestCase):
         # (a replaced file is deleted before its .part is renamed: not a removal)
         return up, [r for op, r in self.ftp.log if op == "DELE" and r + ".part" not in up]
 
+    def test_password_from_netrc_by_its_own_name(self):
+        # two users on one FTP host (the test site and the alpha, #350): each reads its own .netrc machine
+        rc = os.path.join(self.tmp, "netrc")
+        with open(rc, "w", newline="\n") as fh:
+            fh.write("machine ftp.example login u password test-site\nmachine sim.8b.cz login a password alpha\n")
+        real = deploy.netrc.netrc
+        with mock.patch.dict(os.environ, {"TRAM_DEPLOY_PASSWORD": ""}), \
+                mock.patch.object(deploy.netrc, "netrc", lambda: real(rc)):
+            self.assertEqual(deploy.password({"host": "ftp.example", "user": "u"}), "test-site")
+            self.assertEqual(deploy.password({"host": "ftp.example", "user": "a", "netrc": "sim.8b.cz"}), "alpha")
+            # (a login that doesn't match the entry is not given its password)
+            with mock.patch.object(deploy.sys, "stdin", None), self.assertRaises(SystemExit) as e:
+                deploy.password({"host": "ftp.example", "user": "a"})
+            self.assertIn("machine ftp.example login a", str(e.exception))
+
     def test_first_then_unchanged_then_changed(self):
         up, _ = self.run_deploy()
         for rel in SOME:

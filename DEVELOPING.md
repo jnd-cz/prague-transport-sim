@@ -122,7 +122,7 @@ whose data matches the manifest:
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
 
-The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
+The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc` (`machine <host>`, or the config's `"netrc"` name when two FTP users share one host, as the test site and the alpha's `sim.8b.cz`, #350). The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
 
 Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
 `deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
