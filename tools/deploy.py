@@ -15,7 +15,7 @@ A "public" target (the closed alpha, #350) has no login: no review tools go up (
 reports/review/), search engines are asked not to index it, it is deployed only from a tagged commit (the
 version testers name), and after a deploy the URL is checked to serve the page and none of the review tools.
 Player feedback (src/report.js): tools/feedback.php goes up as feedback.php on every target and stores notes in
-feedback/ (no direct access); --pull moves them into reports/feedback/<target>/ (tools/feedback.py lists them).
+feedback/ (no direct access); --pull moves them into <feedback>/<target>/ (tools/feedback.py DEST, beside the data cache; it lists them).
 
 What goes up: tools/make_dist.py's files, plus version.json (commit, data snapshot, date) and an
 .htaccess (brotli, revalidation). The data heavy packs go up only compressed, as <name>.brotli (#275): the

@@ -37,6 +37,7 @@ def menu(page, url, short):
 
 
 def perf_test(page, timeout):
+    page.evaluate("delete window.perfTestResult")  # (the last run's)
     page.click("#btnPerfTest")
     page.wait_for_function("window.perfTestResult", timeout=timeout)
     return page.evaluate("window.perfTestResult")

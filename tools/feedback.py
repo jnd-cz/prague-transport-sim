@@ -1,8 +1,10 @@
-"""Player feedback (#350): python -I tools/feedback.py [--site NAME] [--kind K] [--line N] [--all]
+"""Player feedback (#350): python -I tools/feedback.py [--site NAME] [--kind K] [--line N] [--all] [--perf]
 
-Lists the notes in reports/feedback/<site>/ (pulled from a host by tools/deploy.py --pull, or written by
-tools/serve.py as site "local"), newest first, grouped by kind. Reads only: a note becomes an issue when
+Lists the notes in <feedback>/<site>/ (pulled from a host by tools/deploy.py --pull, or written by tools/serve.py
+as site "local"; <feedback> is beside the data cache, _dest()), newest first, grouped by kind. Reads only: a note becomes an issue when
 someone decides so. --all also lists notes marked done (a "done" file beside the note: <id>.done).
+--perf: how the game runs per machine, from the shifts' summaries (kind perf) and the performance tests
+(perftest): runs, frames per second and the share of frames over 33 ms, medians.
 save() is the one writer of a note: the screenshot goes beside it as <id>.jpg.
 """
 import argparse
@@ -13,7 +15,20 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEST = os.path.join(ROOT, "reports", "feedback")
+
+
+def _dest():
+    """Where the notes live: $TRAM_FEEDBACK, else beside the machine's data cache ($TRAMDATA_CACHE/../feedback), so
+    every checkout and worktree on the machine reads the same notes and the deploy checkout's pulls reach them;
+    else reports/feedback/ of this checkout. Never in git: a tester's note is theirs, not the public repo's."""
+    if os.environ.get("TRAM_FEEDBACK"):
+        return os.environ["TRAM_FEEDBACK"]
+    if os.environ.get("TRAMDATA_CACHE"):
+        return os.path.join(os.path.dirname(os.path.abspath(os.environ["TRAMDATA_CACHE"])), "feedback")
+    return os.path.join(ROOT, "reports", "feedback")
+
+
+DEST = _dest()
 ID = re.compile(r"fb-\d{8}-\d{6}-[0-9a-f]{8}")
 JPEG = "data:image/jpeg;base64,"
 # (the caps of tools/feedback.php, which tools/serve.py applies to the notes it takes locally: change both)
@@ -88,6 +103,22 @@ def machine(n):
     return "?"
 
 
+def perf_table(got):
+    """Lines of the per-machine table: the performance tests and the shifts' summaries apart."""
+    rows = {}
+    for _, n in got:
+        p = n.get("perftest") if n.get("kind") == "perftest" else n.get("perf") if n.get("kind") == "perf" else None
+        if p and p.get("frames"):
+            rows.setdefault((machine(n), n["kind"]), []).append(p)
+    med = lambda xs: sorted(xs)[len(xs) // 2]  # noqa: E731
+    out = [f"{'machine':60} {'kind':8} {'runs':>4} {'fps':>6} {'>33 ms':>7} {'GPU ms':>7}"]
+    for (m, k), ps in sorted(rows.items()):
+        gpu = [p["gpuMs"] for p in ps if p.get("gpuMs") is not None]
+        out.append(f"{m[:60]:60} {k:8} {len(ps):>4} {med([p['fps'] for p in ps]):>6} "
+                   f"{med([p['over']['33'] for p in ps]):>6}% {med(gpu) if gpu else '-':>7}")
+    return out
+
+
 def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -96,11 +127,15 @@ def main(argv=None):
     ap.add_argument("--kind", help="one kind")
     ap.add_argument("--line", help="one line")
     ap.add_argument("--all", action="store_true", help="also the notes marked done")
+    ap.add_argument("--perf", action="store_true", help="the per-machine performance table")
     args = ap.parse_args(argv)
     got = [(s, n) for s, n in notes(site=args.site, everything=args.all)
            if (not args.kind or n.get("kind") == args.kind) and (not args.line or str(n.get("line")) == args.line)]
     if not got:
         print("no notes")
+        return
+    if args.perf:
+        print("\n".join(perf_table(got)))
         return
     kinds = {}
     for s, n in got:
@@ -112,10 +147,13 @@ def main(argv=None):
             where = f"line {n.get('line')}" + (f" s {n['tram']['s']}" if isinstance(n.get("tram"), dict) else "")
             note = " ".join((n.get("note") or "").split())
             errs = f", {len(n['errors'])} errors" if n.get("errors") else ""
+            p = n.get("perftest") or (n.get("perf") if n.get("kind") == "perf" else None)
+            if p and not note:
+                note = f"{p.get('fps')} fps, {p.get('over', {}).get('33')} % over 33 ms, {p.get('seconds')} s"
             print(f"  {n.get('id')} [{s}] {ver} {where}, {machine(n)}{errs}{', shot' if n.get('shot') else ''}")
             if note:
                 print(f"    {note[:300]}")
-    print(f"\n{len(got)} notes in {os.path.relpath(DEST, ROOT)}")
+    print(f"\n{len(got)} notes in {DEST}")
 
 
 if __name__ == "__main__":

@@ -95,6 +95,19 @@ class NoteTest(unittest.TestCase):
         self.assertIn("brzdí pozdě", out.getvalue())
         self.assertRegex(feedback.new_id(), feedback.ID)
 
+    def test_perf_table(self):
+        run = lambda fps, over, g=None: {"frames": 100, "fps": fps, "over": {"33": over}, "gpuMs": g}  # noqa: E731
+        arc = {"gpu": "Intel Arc A770"}
+        got = [("alpha", {"kind": "perftest", "machine": arc, "perftest": run(60, 0, 4.1)}),
+               ("alpha", {"kind": "perftest", "machine": arc, "perftest": run(58, 1.5, 4.3)}),
+               ("alpha", {"kind": "perftest", "machine": arc, "perftest": run(59, 0.5, 4.2)}),
+               ("alpha", {"kind": "perf", "ua": "Android", "perf": run(31, 12)}),
+               ("alpha", {"kind": "driving", "machine": arc, "perf": run(60, 0)})]  # (a note's log is not a run)
+        rows = feedback.perf_table(got)
+        self.assertEqual(len(rows), 3)
+        self.assertRegex(rows[2], r"Intel Arc A770\s+perftest\s+3\s+59\s+0.5%\s+4.2")
+        self.assertRegex(rows[1], r"Android\s+perf\s+1\s+31\s+12%\s+-")
+
 
 class Quiet(serve.NoCache):
     def log_message(self, *args):
@@ -102,7 +115,7 @@ class Quiet(serve.NoCache):
 
 
 class ServeTest(unittest.TestCase):
-    """tools/serve.py takes notes as the host's feedback.php does, into reports/feedback/local/."""
+    """tools/serve.py takes notes as the host's feedback.php does, into <feedback>/local/."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()

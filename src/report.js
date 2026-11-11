@@ -1,7 +1,7 @@
 // Feedback from a shift (#138, #350): ✉ (or F9) pauses the game and opens a note; Send posts the note, the
 // moment's state (place, tram, run, camera, version), the errors met so far and, if ticked, a screenshot to
 // feedback.php (tools/feedback.php on the host, tools/serve.py locally), which stores it under an id of its own.
-// tools/deploy.py --pull moves the notes into reports/feedback/<site>/ and tools/feedback.py lists them: a note
+// tools/deploy.py --pull moves the notes into the machine's feedback folder (tools/feedback.py) and tools/feedback.py lists them: a note
 // is read, and becomes an issue only when someone decides so. The form tells the player what goes with a note.
 // The errors are kept from the page's start (script errors, rejected promises, a lost WebGL context), so a
 // note says what went wrong before it; a page that cannot start offers to send them alone (failNote).

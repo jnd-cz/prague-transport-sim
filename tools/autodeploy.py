@@ -4,7 +4,7 @@ Runs in a checkout kept for deploys (a worktree with deploy.local.json and its H
 ../tg-deploy): fetches origin/main and, when it moved since the last deploy, checks it out, fetches
 the data its manifest names (tools/snapshot.py data-fetch) and runs tools/deploy.py. Every run then
 pulls the review verdicts from the host into reports/reviews/ (#136) and the feedback notes of every target in
-deploy.local.json into reports/feedback/<target>/ (deploy.py --pull, #350); it never deploys any target but
+deploy.local.json into the feedback folder (tools/feedback.py, #350); it never deploys any target but
 the test site. A failed deploy is retried after an hour, not on every run (the host bans
 repeated failed logins). The password comes from ~/.netrc (machine <host> login <user> password …)
 or TRAM_DEPLOY_PASSWORD: there is nobody to ask.

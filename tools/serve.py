@@ -99,7 +99,7 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
 
     def feedback(self):
         """A player's note (src/report.js, #350) as the host's feedback.php takes it, into
-        reports/feedback/local/ (tools/feedback.py lists it); also from the home network."""
+        <feedback>/local/ (tools/feedback.py DEST, which lists it); also from the home network."""
         n = int(self.headers.get("Content-Length", 0))
         if not self.headers.get("X-Feedback"):
             self.send_error(405)

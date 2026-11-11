@@ -194,7 +194,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 ### Menu options
 
 - Automatic switches (the onboard computer sets every switch by radio instead of the overhead contacts);
-  performance overlay (FPS, frame time, draw calls, triangles, JS heap).
+  performance overlay (FPS, frame time, draw calls, triangles, JS heap); Performance test (a minute of the
+  autopilot on a fixed stretch, [Testing](#testing)).
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
@@ -234,6 +235,26 @@ menu; O hands back to the autopilot.
 
 The interface and this help are in Czech or English (Settings → Language in the menu; remembered in the
 browser).
+
+## Testing
+
+The game is in alpha: it can be driven end to end, but the world and the driving are still being built. What
+helps most is how driving and the traffic feel to you.
+
+- **What we ask:** how the controller, pulling away, coasting and braking feel; stops and the timetable;
+  signals, switches and the rules; which terms don't sound like tram drivers'; what breaks the spell.
+- **How to write:** ✉ Feedback (**F9**, on a phone under ⋯) pauses the game and opens a note. It adds the place
+  on the line, the tram's state, the game's version and, if you like, a screenshot, so it's enough to write what
+  you see and how it should be. When the game doesn't start or the graphics stop, the "Send the error to the
+  authors" button sends what happened.
+- **Smoothness:** the menu's Performance test drives the same stretch by autopilot for a minute and shows how
+  the game keeps up; you can send the result. After a shift the game asks whether to send its performance
+  summary.
+- **Leave for now:** the ground and kerbs, buildings and street furniture (they come with the next layers of the
+  world), the simplified cars and pedestrians, the synthesised sound, power in steps instead of current through
+  the accelerator, driving in one direction only and the missing depots.
+- **What is sent:** only what you send: the note and with it the place, the game's settings and version, the
+  browser, graphics card, screen size and errors. No name, account or address.
 
 <!-- /help -->
 
