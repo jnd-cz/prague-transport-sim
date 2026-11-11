@@ -35,22 +35,23 @@ def mound(x, y):
 
 
 class Inside(unittest.TestCase):
-    def test_open_areas_of_the_classes_drape_where_their_sheet_misses_the_ground(self):
-        areas = [rect(0, 0, 50, 50, 200, c) for c in ("rail", "green", "paved", "green", "green", "paved", "green", "road")]
-        areas.append(rect(0, 0, 50, 50, 205, "green", 1))
+    def test_lawns_drape_unless_held_and_yards_where_their_sheet_misses_the_ground(self):
+        cls = ("rail", "green", "paved", "green", "green", "paved", "green", "road", "paved")
+        areas = [rect(0, 0, 50, 50, 200, c) for c in cls] + [rect(0, 0, 50, 50, 205, "green", 1)]
         verdicts = dict(enumerate({"verdict": v, "m2": 2500} for v in
-                                  ("fits", "lidar", "uneven", "small", "covered", "survey", "review", "fits")))
+                                  ("fits", "lidar", "uneven", "small", "covered", "survey", "review", "fits", "covered")))
         out = zi.inside(areas, verdicts, mound)
-        self.assertEqual([a.get("g") for a in areas], [1, 1, 1, None, None, None, None, None, None])
-        self.assertEqual(out["kept"], {"small": 1, "covered": 1, "survey": 1, "review": 1})
-        self.assertEqual(out["classes"]["green"], {"areas": 1, "m2": 2500})
+        self.assertEqual([a.get("g") for a in areas], [1, 1, 1, 1, 1, None, None, None, None, None])
+        self.assertEqual(out["kept"], {"survey": 1, "review": 1, "covered": 1})
+        self.assertEqual(out["classes"]["green"], {"areas": 3, "m2": 7500})
 
-    def test_a_sheet_that_fits_stays(self):
+    def test_a_yards_sheet_that_fits_stays(self):
         """A flat paved yard on flat ground: draped, it would follow the lidar's noise (the street check's waves)."""
-        areas = [rect(0, 0, 50, 50, 200, "paved"), rect(0, 0, 3, 3, 200, "green")]
-        out = zi.inside(areas, {0: {"verdict": "fits"}, 1: {"verdict": "fits"}}, lambda x, y: np.full(np.shape(x), 200.1))
-        self.assertEqual([a.get("g") for a in areas], [None, None])
-        self.assertEqual(out["fit"], {"paved": 1, "green": 1})  # (the small one: no lattice point inside)
+        areas = [rect(0, 0, 50, 50, 200, "paved"), rect(0, 0, 3, 3, 200, "paved"), rect(0, 0, 50, 50, 200, "green")]
+        flat = lambda x, y: np.full(np.shape(x), 200.1)  # noqa: E731
+        out = zi.inside(areas, {0: {"verdict": "fits"}, 1: {"verdict": "fits"}, 2: {"verdict": "fits"}}, flat)
+        self.assertEqual([a.get("g") for a in areas], [None, None, 1])  # (the lawn drapes as on main)
+        self.assertEqual(out["fit"], {"paved": 2})  # (the small one: no lattice point inside)
 
 
 class UnderDecks(unittest.TestCase):
