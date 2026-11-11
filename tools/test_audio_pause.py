@@ -6,6 +6,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from headless import serve, stop_server
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 class AudioPause(unittest.TestCase):
@@ -13,7 +14,7 @@ class AudioPause(unittest.TestCase):
         server, url = serve(0)
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                browser = gpu.launch(p)[0]
                 page = browser.new_page(viewport={'width': 960, 'height': 600})
                 page.goto(url + '/?line=23', timeout=180000)
                 page.wait_for_selector('#btnStart', state='visible', timeout=180000)
@@ -60,14 +61,17 @@ class AudioPause(unittest.TestCase):
                 crash = page.evaluate('''() => {
                   const a = game.audio, source = a.ctx.createBufferSource.bind(a.ctx); let crashes = 0;
                   a.ctx.createBufferSource = () => { crashes++; return source(); };
-                  Object.defineProperty(game, 'currentLimit', {value: 20, configurable: true});
-                  game.tram.v = 15; game._updateRules(0.01);
+                  // (a derailment: 54 km/h through a 10 km/h trackwork restriction for DERAIL.secs, src/speedRules.js)
+                  const lim = game.limits, r = lim.restriction; lim.restriction = () => 10;
+                  game.tram.v = 15; game._updateRules(1); lim.restriction = r;
                   a.ctx.createBufferSource = source;
                   return {finished:game.finished, failed:game.failed, crashes};
                 }''')
                 self.assertEqual(crash, {'finished':True, 'failed':True, 'crashes':1})
                 page.wait_for_function('game.finished && !game.audio.active', timeout=30000)
-                self.assertGreater(page.evaluate('game.audio.master.gain.value'), 0.01)
+                # (the end fades over 1.3 s so the crash plays out, src/audio.js setActive; a sampled gain raced the ramp on a
+                # busy machine drawing in software: 0 on 2026-11-08, #381)
+                self.assertEqual(page.evaluate('[game.audio.finishing, game.audio.muted]'), [True, False])
                 gain(0)
                 browser.close()
         finally:

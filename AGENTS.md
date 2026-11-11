@@ -216,8 +216,6 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
-| `tools/test_audio_pause.py` `test_shift_lifecycle` | 23 | the master gain is 0 after the shift starts (wants over 0.01) | #381 |
-| `tools/test_headless_timeout.py` `test_stuck_and_scheduled_wait` | (its own page) | `KeyError: 'stuck'` in both modes | #381 |
 
 ## Code style
 

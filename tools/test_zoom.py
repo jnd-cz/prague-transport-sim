@@ -16,6 +16,9 @@ import threading
 
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
 CAB_FOV, ZOOM = 62, 3
@@ -66,7 +69,7 @@ def main():
     near = lambda v: f"Math.abs(window.camera.fov - {v}) < 0.3"  # noqa: E731
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             ctx, page, errors = shift(browser, port, args.line, (1920, 1080), False)
             r["start"] = page.evaluate(FOV)
             # 75 m before the first restriction board past 300 m, paused there

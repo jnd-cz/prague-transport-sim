@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import headless
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 HTML = """<!doctype html><title>9</title><div id="loading" class="hidden"></div>
@@ -21,7 +22,7 @@ if (mode === 'loading') document.getElementById('loading').className = '';
 // (as the real page: Start makes a new game, after an await, #400)
 document.getElementById('btnStart').onclick = async () => {
   await null;
-  window.traffic = {oncoming: [], ahead: [], backStops: [], update() {}};
+  window.traffic = {oncoming: [], ahead: [], backStops: [], cars: [], update() {}};
   window.camera = {position: {set() {}}};
   window.game = {
     clock: 0, tram: {s: 11221, v: 0}, route: {length: 20000, at: () => ({x: 0, y: 0})},
@@ -65,7 +66,7 @@ class TimeoutTests(unittest.TestCase):
         cls.thread.start()
         cls.url = f'http://127.0.0.1:{cls.server.server_port}'
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True)
+        cls.browser = gpu.launch(cls.pw)[0]
 
     @classmethod
     def tearDownClass(cls):
@@ -108,6 +109,7 @@ class TimeoutTests(unittest.TestCase):
                     'const r = await run(SEED); return {...r, clock: window.game.clock};')
                 with patch.dict(headless.CALLS, redruns=js):
                     result = self.run_bench(mode)
+                self.assertNotIn('error', result, result)  # (a page error ends as a timeout: say which)
                 self.assertEqual(result['stuck'], 11221)
                 self.assertGreater(result['clock'], departure + 600)
                 self.assertLess(result['clock'], departure + 630)
