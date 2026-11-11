@@ -310,5 +310,19 @@
       ]
     ]
   },
-  "fleetDigits": 0.14
+  "fleetDigits": 0.14,
+  "handWritten": {
+    "fields": [
+      "doors[].clip",
+      "pantograph.clip",
+      "saloon",
+      "shoes",
+      "couplers",
+      "beams",
+      "tailLamps",
+      "fleetDigits"
+    ],
+    "by": "PR #469 (#467), from what src/t3h.js found by rule in revision 5",
+    "until": "the asset lab's revision 6 writes them (#471; the user, 2026-11-11: \"the asset lab should write them\")"
+  }
 }

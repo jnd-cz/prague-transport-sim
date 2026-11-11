@@ -70,6 +70,9 @@ left out far away), `numberPlates` (drawn with the fleet number, its digits `fle
 doors shut, the collector at the wire, everything but the saloon merged by material. `tools/test_rigged.py` makes a
 sample vehicle with every part and checks each of them moves.
 
+A rig is written by whatever exports the model, not by hand: the hybrid's comes from the project's asset lab. Eight of
+its fields are hand-written until the lab's next revision exports them (the rig's `handWritten`, #471).
+
 ## What a set must be
 
 - A `THREE.Group` holding one `Group` per car in `userData.cars`, in order from the front.

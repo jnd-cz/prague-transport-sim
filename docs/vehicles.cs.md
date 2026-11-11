@@ -70,6 +70,9 @@ materiály jsou sklo. Lehčí úroveň pro vzdálené cizí tramvaje vznikne př
 vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrobí vzorové vozidlo se všemi díly a zkontroluje,
 že se každý hýbe.
 
+Rig píše to, co model exportuje, ne ruka: rig podrobného modelu pochází z projektové dílny na modely. Osm jeho polí
+je zatím dopsaných ručně, než je exportuje příští revize dílny (`handWritten` v rigu, #471).
+
 ## Co musí souprava splňovat
 
 - `THREE.Group` s jedním `Group` na vůz v `userData.cars`, popořadě od čela.

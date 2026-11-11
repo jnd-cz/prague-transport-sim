@@ -61,7 +61,10 @@ export function rigProblems(rig, moves, has, clips) {
   }
   if (moves.includes('lamps')) for (const s of ['left', 'right']) { if (!rig.signals?.[s]?.length) out.push(`indicators ${s}: none`); for (const n of rig.signals?.[s] || []) need(`indicator ${s}`, n); }
   if (moves.includes('doors')) for (const d of rig.doors || []) { clip(`door ${d.name}`, d.clip); for (const l of d.leaves) { need(`door ${d.name}`, l.outer); need(`door ${d.name}`, l.inner); } }
-  if (moves.includes('trackBrakes')) for (const [b, names] of Object.entries(rig.shoes || {})) { need('shoe bogie', b); for (const n of names) need(`shoe under ${b}`, n); }
+  if (moves.includes('trackBrakes')) {
+    if (!Object.keys(rig.shoes || {}).length) out.push('shoes: none');
+    for (const [b, names] of Object.entries(rig.shoes || {})) { need('shoe bogie', b); for (const n of names) need(`shoe under ${b}`, n); }
+  }
   return out;
 }
 
