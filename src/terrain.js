@@ -748,13 +748,62 @@ export function carveCorridor(T, route, profile, dtm = null) {
 // drawn DTM surfaces stand this much above their surveyed height (no z-fighting between classes)
 import { STREET_BELOW, ROAD_BELOW, resampleHeights, meetHeights } from './heights.js';
 
-export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, water: 0.01 };
+export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, rail: 0.02, water: 0.01 };
 export const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
 export const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'platform', 'cycle']);
 // level 1+ surfaces that carry traffic: what cars and walkers on a bridge stand on
 const DECK = new Set(['deck', 'road', 'tram', 'paved', 'sidewalk', 'cycle', 'island', 'parking']);
+const DRAPE_EDGE = 5; // m: the longest edge of a draped area's triangles (its inside on the lidar: green p95 0.14-0.18 m against 0.38-0.44 at 10 m, #444)
 const SURFACE_RANK = { tram: 9, road: 8, island: 7, platform: 7, sidewalk: 6, parking: 5, cycle: 5, paved: 4, stairs: 3, green: 2, water: 1 };
-const groundArea = (a) => a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && a.c !== 'rail';
+// (a railway yard on the lidar ground, `g`, is ground; one standing off it keeps its sheet and stays out)
+const groundArea = (a) => a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && (a.c !== 'rail' || a.g);
+// Lawson's edge flips on a triangulation of a polygon (earcut's, from THREE.ShapeUtils): each inner edge whose
+// opposite corner lies in the other triangle's circumcircle is flipped until none does, which is the constrained
+// Delaunay triangulation of the same points (#276's T2), the polygon's own edges kept (an edge of one triangle only is
+// never flipped). Earcut clips its ears along a strip's sides and joins points far apart: an 800 m tram area on
+// Krejcárek's ramp (line 37) had triangles along its length whose linear heights stood up to 6 m over the rails between
+// outline points within 0.3 m of them (#444). pts: [[x, y, ...]]; tris: [[i, j, k]], changed in place and returned.
+export function delaunayFlips(pts, tris) {
+  const n = pts.length, key = (a, b) => (a < b ? a * n + b : b * n + a);
+  const edges = new Map(); // edge key -> the triangles that have it
+  const add = (t, a, b) => { const k = key(a, b), e = edges.get(k); if (e) e.push(t); else edges.set(k, [t]); };
+  tris.forEach((t, i) => { add(i, t[0], t[1]); add(i, t[1], t[2]); add(i, t[2], t[0]); });
+  const orient = (a, b, c) => (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]);
+  // d strictly inside the circumcircle of (a, b, c), whichever way round (a, b, c) is
+  const inCircle = (a, b, c, d) => {
+    const ax = pts[a][0] - pts[d][0], ay = pts[a][1] - pts[d][1], bx = pts[b][0] - pts[d][0], by = pts[b][1] - pts[d][1];
+    const cx = pts[c][0] - pts[d][0], cy = pts[c][1] - pts[d][1];
+    const det = (ax * ax + ay * ay) * (bx * cy - cx * by) - (bx * bx + by * by) * (ax * cy - cx * ay) + (cx * cx + cy * cy) * (ax * by - bx * ay);
+    const o = orient(a, b, c);
+    return o > 0 ? det > 1e-9 : o < 0 ? det < -1e-9 : true; // (a sliver of no area: any d beside it)
+  };
+  const stack = [];
+  for (const [k, e] of edges) if (e.length === 2) stack.push(k);
+  const swap = (k, from, to) => { const e = edges.get(k); e[e.indexOf(from)] = to; };
+  let flips = 0;
+  const cap = 30 * tris.length + 100; // (Lawson's flips end; the cap guards against rounding)
+  while (stack.length && flips < cap) {
+    const k = stack.pop(), e = edges.get(k);
+    if (!e || e.length !== 2) continue;
+    const a = Math.floor(k / n), b = k % n, [t1, t2] = e;
+    const c = tris[t1].find((v) => v !== a && v !== b), d = tris[t2].find((v) => v !== a && v !== b);
+    if (c === undefined || d === undefined || c === d) continue;
+    if (!inCircle(a, b, c, d)) continue;
+    // (only across a convex pair: a and b on either side of c-d)
+    if (orient(c, d, a) * orient(c, d, b) >= 0) continue;
+    const sign = Math.sign(orient(...tris[t1])) || Math.sign(orient(...tris[t2])) || 1;
+    const make = (p, q, r) => (Math.sign(orient(p, q, r)) === sign ? [p, q, r] : [p, r, q]);
+    tris[t1] = make(c, a, d);
+    tris[t2] = make(d, b, c);
+    edges.delete(k);
+    swap(key(b, c), t1, t2);
+    swap(key(a, d), t2, t1);
+    edges.set(key(c, d), [t1, t2]);
+    for (const kk of [key(a, c), key(b, c), key(a, d), key(b, d)]) if (edges.get(kk)?.length === 2) stack.push(kk);
+    flips++;
+  }
+  return tris;
+}
 export class DtmSurface {
   constructor(dtm, terrain, THREE) {
     this.terrain = terrain;
@@ -802,7 +851,11 @@ export class DtmSurface {
       let tri;
       try { tri = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2)); } catch { continue; }
       const all = [...outer, ...holes.flat()];
-      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId };
+      // on the ground, the constrained Delaunay triangles over the same points (#276's T2): earcut's slivers along a
+      // long strip joined points far apart, and their linear heights left a ridge up to 6 m over the rails on
+      // Krejcárek's ramp (line 37 s 2566-2746: the tram area's outline within 0.3 m of the rails, #444)
+      if (a.l === 0) delaunayFlips(all, tri);
+      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId, t: a.t, g: a.g };
       // on a structure: a long deck outline (the Modřany estakáda's track bed runs from the foot of
       // one ramp to the other) must not be spanned by long triangles; inner points take the height
       // of the outline's own corners nearby
@@ -818,11 +871,13 @@ export class DtmSurface {
         // render mesh: split to <= 5 m edges, linear between the surveyed vertices (the survey's own
         // meaning; averaging the surveyed points inside roads doubled their bumps, #21)
         const n0 = area.mesh.length;
-        if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh);
+        // a railway yard, a lawn or a paved yard has surveyed heights only on its outline: lying on the lidar
+        // ground (`g`, tools/zps_inside.py), it takes the lidar inside (a flat sheet between the edges ran up
+        // to 8.7 m under the Letná slope; Krejcárek's yard crossed the terrain in wedges, #444); the outline,
+        // cut to 4 m above, is never split and keeps the survey's heights
+        if (a.l === 0 && a.g) this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, DRAPE_EDGE);
+        else if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh);
         else if (a.l >= 1 && a.c !== 'roof') this._split(p, q, r, ringZ, area.mesh);
-        // a lawn or park has surveyed heights only on its outline: inside, the lidar ground (a flat
-        // sheet between the edges ran up to 8.7 m under the Letná slope, the terrain showing through)
-        else if (a.l === 0 && a.c === 'green') this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, 10);
         else area.mesh.push([p, q, r]);
         // the height lookup uses exactly the drawn triangles, so cars stand on what is drawn
         if (ground) for (let m = n0; m < area.mesh.length; m++) this.grid.add(area.mesh[m], rank, a.c);

@@ -4,10 +4,12 @@
     python tools/serve.py 8744 1500     # each response sent no faster than 1500 KB/s (the loading screen
                                         # on a slow connection; from the remote session's serve_nocache.py)
     python tools/serve.py 8742 --lan    # also to the home network (a phone: review mode, #129): only what
-                                        # the game loads, read-only apart from review verdicts;
+                                        # the game loads, read-only apart from review verdicts
+                                        # and feedback notes;
                                         # prints the address to open
 """
 import argparse
+import datetime
 import functools
 import http.server
 import json
@@ -24,6 +26,7 @@ from urllib.parse import unquote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import feedback  # noqa: E402
 import reviews  # noqa: E402
 
 
@@ -60,6 +63,9 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
         Review verdicts (#136): POST /review/<name>.json merges into reports/reviews/<name>.json, also
         from the home network (with the page's X-Review header, which no cross-site form sends)."""
         name = os.path.basename(self.path)
+        if self.path.split("?", 1)[0] == "/feedback.php":
+            self.feedback()
+            return
         if self.path.startswith("/review/"):
             n = int(self.headers.get("Content-Length", 0))
             if not self.headers.get("X-Review") or not reviews.NAME.fullmatch(name.removesuffix(".json")) or n > reviews.MAX:
@@ -90,6 +96,36 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
             fh.write(body)
         self.send_response(204)
         self.end_headers()
+
+    def feedback(self):
+        """A player's note (src/report.js, #350) as the host's feedback.php takes it, into
+        <feedback>/local/ (tools/feedback.py DEST, which lists it); also from the home network."""
+        n = int(self.headers.get("Content-Length", 0))
+        if not self.headers.get("X-Feedback"):
+            self.send_error(405)
+            return
+        if n > feedback.MAX_BODY:
+            # (read and dropped: a reply before the body is taken aborts the sender's connection)
+            while n > 0:
+                n -= len(self.rfile.read(min(n, 1 << 16)) or b"x" * n)
+            self.send_error(413)
+            return
+        try:
+            rec = json.loads(self.rfile.read(n))
+        except ValueError:
+            rec = None
+        if feedback.invalid(rec):
+            self.send_error(400)
+            return
+        rec["id"] = feedback.new_id()
+        rec["received"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+        feedback.save(os.path.join(feedback.DEST, "local"), rec)
+        body = json.dumps({"ok": True, "id": rec["id"]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
 REVIEWS = os.path.join(ROOT, "reports", "reviews")

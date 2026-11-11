@@ -120,6 +120,11 @@ export class Loader {
       a.textContent = t('load.https');
       step.replaceChildren(`${what}${t('load.http')} `, a);
     } else step.textContent = what + t('load.reload');
+    // (a button to send what stopped it, #350; loaded only now, so a module that did not arrive still shows the message)
+    import('./report.js').then((m) => {
+      m.noteError('load', error.message || error);
+      m.failNote('load', this.el?.querySelector('.loadBox') || step);
+    }, () => {});
     this.render(true);
   }
 

@@ -14,7 +14,8 @@ import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
-import { Reporter, canvasShot, place } from './report.js';
+import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
+import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
@@ -146,8 +147,18 @@ window.renderer = renderer; // (from the start, also in the menu: performance ch
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
+// Leaving the page (another line from the menu, a reload, a link): the graphics memory goes back at once instead of
+// whenever the browser collects the old page, and a page the browser kept for Back (its back/forward cache) loads
+// afresh rather than resuming without it (#350). Not on a hidden tab: that is visibilitychange, and the world stays.
+let leaving = false;
+addEventListener('pagehide', () => {
+  leaving = true;
+  try { renderer.dispose(); renderer.forceContextLoss(); } catch { /* (already lost) */ }
+});
+addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
+  if (leaving) return; // (our own release above, not the browser's)
   // (window.game, not game: the context can be lost while the world uploads, before `let game` below
   // is reached, and reading it then threw instead of showing this card)
   if (window.game) window.game.paused = true;
@@ -155,6 +166,8 @@ canvas.addEventListener('webglcontextlost', (e) => {
   card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
   $('results').classList.remove('hidden');
   $('glReload').onclick = () => location.reload();
+  noteError('contextlost', 'WebGL context lost');
+  failNote('contextlost', card);
 });
 const scene = new THREE.Scene();
 const debugOverlay = createDebugOverlay(scene);
@@ -418,9 +431,10 @@ function fillTrips() {
 selStop.addEventListener('change', fillTrips);
 fillTrips();
 
-$('btnStart').addEventListener('click', start);
+$('btnStart').addEventListener('click', () => start());
 
-async function start() {
+// extra: Game options over the menu's (the performance test's lead to the departure)
+async function start(extra = {}) {
   if ($('optModel').value === 'classic') await loadClassic();
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
@@ -456,8 +470,10 @@ async function start() {
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
     signFacts: signFacts(truth),
+    ...extra,
   });
   game.runSeed = seed; // (replay: ?seed=N)
+  perfLog.reset({ line: data.line, model: have, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
@@ -529,9 +545,116 @@ function showResults() {
     <div>${t('res.avgDev')} <b>${fmtDev(avg).slice(1)}</b></div>
     ${pen ? `<h3>${t('res.penalties')}</h3><table class="res">${pen}</table>` : ''}
     <h3>${t('res.stops')}</h3><table class="res">${rows}</table>
+    <div id="perfAsk" class="sub" style="margin:10px 0"></div>
     <button class="primary" id="again">${t('res.again')}</button>`;
   $('results').classList.remove('hidden');
   $('again').onclick = () => { $('results').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+  offerPerf($('perfAsk'));
+}
+
+// ------------------------------------------------------------------ how it ran (#350)
+// Every drawn frame of a shift goes into the frame-time log (src/perf.js); a note carries its summary, the
+// machine and the load times, and a shift's end offers to send the summary: once, always (kept in this
+// browser) or not now. Nothing is sent without a click or that "always".
+const perfLog = new PerfLog();
+window.perfLog = perfLog;
+addFacts(() => ({ machine: machine(renderer), load: window.loadTimes || null, perf: perfLog.summary() }));
+const PERF_KEY = 'tram.perfSend';
+function offerPerf(el) {
+  const sum = perfLog.summary();
+  if (!sum || sum.seconds < 30) return;
+  let always = false;
+  try { always = localStorage.getItem(PERF_KEY) === 'always'; } catch { /* (no storage) */ }
+  const send = async () => { el.textContent = (await sendNote({ kind: 'perf', line: data.line })) ? t('res.perfSent') : t('fb.errorFailed'); };
+  if (always) { send(); return; }
+  el.innerHTML = `<div>${t('res.perfAsk')}</div><button id="perfSend">${t('res.perfSend')}</button> <button id="perfAlways">${t('res.perfAlways')}</button>`;
+  $('perfSend').onclick = send;
+  $('perfAlways').onclick = () => { try { localStorage.setItem(PERF_KEY, 'always'); } catch { /* (no storage) */ } send(); };
+}
+
+// The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
+// compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
+// 5 s to settle and from the departure on. It starts 10 s before the departure, not a shift's 40 s, so the wait is
+// short and the minute all driving (the user, 2026-11-11: "autopilot waits half a minute standing for the timetable
+// departure"). The GPU's own time per
+// frame where the browser has a timer. Two buttons: the line loaded now, and the reference run: line 17 from
+// Palackého náměstí with the detailed model, the heaviest line with surveyed streets, the one result every machine
+// has in common. Its stop is named, not the middle one, so it stays when the route changes (the user, 2026-11-11:
+// "I would keep it fixed there even if later line 17 runs start from another stop like Libuš"). From another line
+// the reference opens line 17 (?reftest=<the line left>), runs there, and its "Back to the menu" goes back.
+// (window.perfTestMs: a shorter run for tools/test_perf.py)
+const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
+const REF_LINE = '17', REF_STOP = 'Palackého náměstí', PT_LEAD = 10;
+let perfTest = null;
+async function startPerfTest(reference = false) {
+  const keep = { auto: $('optAuto').checked, weather: $('optWeather').value, model: $('optModel').value, cars: $('optCars').value };
+  if (reference) { $('optModel').value = 'detailed'; $('optCars').value = 'auto'; }
+  const named = reference ? data.stops.slice(0, -1).findIndex((st) => st.name === REF_STOP) : -1;
+  const si = named >= 0 ? named : Math.floor((data.stops.length - 1) / 2), at8 = (trip) => Math.abs(trip[si] - 8 * 3600);
+  selStop.value = si;
+  fillTrips();
+  selTrip.value = data.timetable.reduce((b, trip, i) => (at8(trip) < at8(data.timetable[b]) ? i : b), 0);
+  $('optAuto').checked = true;
+  $('optWeather').value = 'dry';
+  window.runSeed = 1;
+  try { await start({ lead: PT_LEAD }); } finally {
+    delete window.runSeed;
+    $('optAuto').checked = keep.auto;
+    $('optWeather').value = keep.weather;
+    $('optModel').value = keep.model;
+    $('optCars').value = keep.cars;
+  }
+  perfTest = { t0: performance.now(), phase: 'warm', timer: gpuTimer(renderer.getContext()),
+    meta: { ...perfLog.meta, test: true, reference, stop: data.stops[si].name } };
+  game.msg(t('pt.running'), 'info', 8);
+}
+$('btnPerfTest').addEventListener('click', () => startPerfTest(false));
+$('btnPerfRef').addEventListener('click', () => {
+  if (String(data.line) === REF_LINE) startPerfTest(true);
+  else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}`;
+});
+function perfTestStep(now) {
+  if (!perfTest || !game || game.finished) { perfTest = null; return; }
+  const el = now - perfTest.t0;
+  // (the minute is measured from the departure: boarding and the doors take ~14 s after the start, 2026-11-11 trace)
+  const off = el > PT_WARM && (tram.v > 0.5 || el > PT_WARM + 60000);
+  if (perfTest.phase === 'warm' && off) { perfTest.phase = 'run'; perfTest.t1 = now; perfTest.s0 = tram.s; perfLog.reset(perfTest.meta); }
+  else if (perfTest.phase === 'run' && now - perfTest.t1 > PT_LEN) finishPerfTest();
+  perfTest?.timer?.poll();
+}
+function finishPerfTest() {
+  const pt = perfTest;
+  perfTest = null;
+  game.paused = true;
+  hud.show(false);
+  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0) }, m = machine(renderer);
+  // (frames over 20 ms: below a 60 Hz display's rate; a steady 30 fps has nearly all of them there and few over 50:
+  // playable, not smooth. The first remote run, Intel HD Graphics 400 in Firefox: 34 fps, 74 % over 20 ms, 0.6 % over 33)
+  const verdict = sum.over[20] < 5 ? 'good' : sum.over[50] < 5 ? 'ok' : 'slow';
+  const row = (k, v) => `<tr><td>${t(k)}</td><td>${v}</td></tr>`;
+  $('resultsCard').innerHTML = `
+    <h1>${t(pt.meta.reference ? 'pt.titleRef' : 'pt.title')}</h1>
+    <div class="sub">${data.line} · ${pt.meta.stop} · ${sum.seconds} s</div>
+    <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
+    <table class="res">
+      ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
+      ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
+      ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}`)}
+    </table>
+    <div class="sub">${t('pt.note')}</div>
+    <button class="primary" id="ptSend">${t('pt.send')}</button> <button id="ptMenu">${t('pt.menu')}</button>`;
+  $('results').classList.remove('hidden');
+  $('ptSend').onclick = async () => {
+    $('ptSend').disabled = true;
+    $('ptSend').textContent = (await sendNote({ kind: 'perftest', line: data.line, perftest: sum })) ? t('pt.sent') : t('fb.errorFailed');
+  };
+  $('ptMenu').onclick = () => {
+    // (a reference run started from another line goes back to it)
+    if (params.get('reftest')) { location.search = `?line=${encodeURIComponent(params.get('reftest'))}`; return; }
+    $('results').classList.add('hidden');
+    $('menu').classList.remove('hidden');
+  };
+  window.perfTestResult = sum; // (tools/test_perf.py)
 }
 
 // ------------------------------------------------------------------ outdoor temperature
@@ -788,7 +911,7 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
-// ⚑ Report (F9, #138): a note with the moment's state and a screenshot, for the agent to look into
+// ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php
 const reporter = new Reporter({
   shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
   pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },
@@ -883,9 +1006,17 @@ function frame(now) {
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
-    else renderer.render(scene, camera);
+    else {
+      const timing = perfTest?.phase === 'run' && perfTest.timer;
+      if (timing) timing.begin();
+      renderer.render(scene, camera);
+      if (timing) timing.end();
+    }
     lastDraw = now; window.drawCount++;
+    // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
+    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render);
   }
+  if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
@@ -917,7 +1048,10 @@ if (params.has('review')) {
   review = new Review({ scene, camera, canvas, data, route, ground, world, url: params.get('review'), at: parseAt(params.get('at')) });
   window.review = review;
 } else if (params.has('seed') && params.has('at')) replayTo(+params.get('seed'), +params.get('at'));
-else $('menu').classList.remove('hidden');
+else {
+  $('menu').classList.remove('hidden');
+  if (params.has('reftest') && String(data.line) === REF_LINE) startPerfTest(true); // (the reference run, opened from another line)
+}
 requestAnimationFrame(frame);
 
 // ?seed=N&at=S: the traffic check's run with that seed (tools/traffic_lint.js: the same settings and

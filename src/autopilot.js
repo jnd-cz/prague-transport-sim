@@ -5,6 +5,9 @@
 // passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
 
+import { muSpeed, sandedMu } from './tram.js';
+
+const SIGHT = 200; // m: on slippery rail it can stop from within this on the grip down a descent (#265)
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
 const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
 const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on the level and empty (planAt: 0.85 of step 5 below that). Two real
@@ -104,6 +107,12 @@ export class Autopilot {
     // stands at 31 coasting, over the switch button's 30, and the drive pedal turned between two brakings, line 9 seed 4)
     const under = cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) ? UNDER : UNDER_LATE + (UNDER - UNDER_LATE) * mild;
     let vt = vLim / 3.6 - under - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
+    const lowMu = (g.muBase ?? 0.3) < 0.2;
+    // (and on slippery rail, coasting to it about the button's speed, under that with the speed hold's band: down to Anděl in rain it
+    // gathered to 18.8 km/h over its 18.6, braked on step 1 22 m before the stop, the accelerator rose over 30 and the drive pedal turned,
+    // line 9 seed 5, #265. Slippery rail only: its gentler braking plan puts the braking point at the contact, and on dry rail main's
+    // timing stays)
+    if (lowMu && cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) && tr.v < V_BUTTON_COAST + 0.5) vt = Math.min(vt, V_BUTTON_COAST - 0.25);
     let nl = own ? g.nextLimitChange(lim) : g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
@@ -125,6 +134,15 @@ export class Autopilot {
     const vLine = vt;
     const curveTo = (limit) => Math.sqrt((limit.v / 3.6) ** 2 + 2 * limitPlan(limit.d) * Math.max(0, limit.d - 12)) - 0.3;
     if (nl) vt = Math.min(vt, curveTo(nl));
+    // (on slippery rail no faster down a descent than it stops from within SIGHT on the grip it has at that speed less the descent's pull,
+    // the steepest in the next 250 m: down Modřanská rokle in snow it coasted to 60 km/h, where 0.085 of grip less the pull left 0.25
+    // m/s², and a signal 272 m ahead needing 0.46 took it over three limits, overspeed 41, line 37 seed 5, #265. On the level it binds
+    // only over 66 km/h in snow; down 60 ‰ in snow it holds 35 km/h)
+    if (mu < 0.2) {
+      let gMin = gradeHere;
+      for (let d = 25; d <= 250; d += 25) gMin = Math.min(gMin, g.profile.grade(tr.s + d - 7));
+      vt = Math.min(vt, Math.sqrt(2 * Math.max(0.15, 9.81 * (0.95 * mu * muSpeed(tr.v) + gMin)) * SIGHT));
+    }
     let vLimit = vt;
     let stopAt = null, fixed = false, fixedAt = null, stopWhy = null;
     // (fixed: a stop or a signal, which stays where it is; else something that can move off. Something nearer does not take
@@ -391,8 +409,13 @@ export class Autopilot {
     // At 22.6 km/h down Chotkova's 49 ‰, 29 km/h the target, it pressed and was there in 2 s on step 1, where coasting took 5 s; the
     // driver of 6921 drove twice on the way down to Malostranská, #396)
     const gravityUp = !onCurve && !urgent && !hazard && aCoast < -0.05 && tr.v > 1 && tr.v < vtDrive && (vtDrive - tr.v) / -aCoast < COAST_T;
+    // (on slippery rail, braking for a point just past a turn's contact, the brake waits until the pantograph is through on the button, where the point is
+    // still in hand at 1 m/s² from there: a brake step lifts the accelerator over 30 within a moment, and the drive pedal turned at 18.6
+    // km/h 20 m before Anděl in rain, line 9 seeds 2 and 5, #265; a driver coasts through on the button and brakes after it)
+    const throughBtn = lowMu && btnSoon && fixedAt !== null && !hazard && tr.v > 1 &&
+      (tr.v * tr.v) / (2 * Math.max(0.5, fixedAt - STOP_MARGIN - tr.s - (cd.contact - tr.panto))) < 1.0;
     const coast = (!onCurve && between) || (onCurve && need > -300 && !shortUphill) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
-      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6) || gravityUp;
+      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6) || throughBtn || gravityUp;
     // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
     // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
@@ -408,12 +431,47 @@ export class Autopilot {
     // (0.7 of the grip) do not climb with 0.15 m/s² to spare: a leaf patch over 26 ‰; on the level they still pull away, and the
     // box was still dry on lines 9, 17 and 22, with patches up 35–40 ‰ ahead (0.41 m/s² slipping: 38 ‰ at most). There, once it
     // slipped, until 3 m/s: sand for 1.5 s at a time slipped again after each
-    const slipClimbs = 0.7 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.15;
+    // (spinning, the rail gives half its peak, #265's creep curve, and pulling away up 50 ‰ on leaves without sand it slipped 25 s of
+    // 110: so sand where half the grip leaves under 0.3 m/s² to climb with; the box holds 25 minutes)
+    // (on slippery rail it drives on what the rail holds, as a driver on snow keeps to the low steps: no step pulling more than 0.95 of
+    // the weather's grip at this speed (what the step gives at it: past the accelerator's run the motors take less), but never under the
+    // lowest that climbs the grade here. Step 3 pulls 46 kN on a two-car set and snow's 0.12 holds 42 kN standing, 32 kN at 40 km/h: back
+    // on it every 4 s after a spin it spun again, 270 spins and 245 s on line 9 in snow, 303 of its 499 presses under a spin's cap. At
+    // 0.8 of 0.10 only step 1 was left, which does not lift a full set up 60 ‰: 10 runs stuck, #265)
+    const minDrive = tr.mass * 9.81 * Math.max(0, gradeHere) + 650 * tr.cars + 0.1 * tr.inertia;
+    const railHolds = (m) => 0.95 * m * muSpeed(tr.v) * tr.mass * 9.81;
+    // (and where a climb takes more than the bare rail holds, sand, rolling too: up Trojská's 80 ‰ in snow at 20-28 km/h step 1 does not
+    // lift it and step 2 is at the grip, 15 spins and presses on one climb, line 17 seed 1; sanded, snow's rail holds 0.165)
+    this.climbSand = mu < 0.2 && need > 0 && tr.v >= 3 && minDrive > 0.9 * railHolds(mu) && tr.sand > 0;
+    // (the sand does not raise the cap: only the first axle runs on it until its trail reaches the others, and on step 3 at 10 km/h up
+    // 56 ‰ on leaves, the sand just on, it spun 4.4 s; the floor lets through the step a climb takes, and the sand makes it hold)
+    const maxDrive = mu < 0.2 ? railHolds(mu) : null;
+    const slipClimbs = 0.5 * 9.81 * g.muAt(tr.s) > 9.81 * Math.max(0, gradeHere) + 0.3;
     this.startSand = tr.v < 3 && !slipClimbs && need > 0 && (tr.slip || !!this.startSand);
     // (braking: on every slide. Rationed while the box held 90 s, to a point within what a sliding tram needs, it slid twice without sand
     // braking for a lower limit down Chotkova's 55 ‰, held step 1 for 3 s after each and came into the 20 km/h at 35, line 23 seed 2 in
     // autumn; the box holds 25 minutes)
-    this.sandT = this.startSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
+    // (and to a stop or a signal the bare rail cannot give rolling at its grip, less a descent's pull, sand first, the track brakes only if
+    // the sanded rail cannot either (src/tr37.js): coming to a red at 1.5 m/s on a leaf patch down 42 ‰, the wheels turning and not
+    // sanded, it crept 3 m over it, line 9 seed 1 in autumn; a patch sanded holds 2.5 times as much)
+    const railA = (sanded) => 9.81 * (sanded ? sandedMu(g.muAt(tr.s)) : g.muAt(tr.s)) * muSpeed(tr.v) + 9.81 * gradeHere;
+    const needStop = fixed && stopAt !== null && tr.v > 0.8 ? (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s)) : 0;
+    this.railSand = mu < 0.2 && needStop > Math.max(0.3, 1.1 * railA(false)) && tr.sand > 0;
+    // (a leaf patch the driver sees, on slippery rail: at speed off the drive pedal until the tram is over it, as a careful driver eases off
+    // (the user, 2026-11-04, #265: "They ease of the drive and try again with less power"); pulling away or up a climb, where that would
+    // stall it, the drive stays on and it sands as the first axle crosses ("Only at grades where it would be difficult to get moving they would sand when
+    // accelerating"). Unsanded on the drive pedal any step spins on a patch's 0.06, and each spin is the pedal off and a press again:
+    // autumn's presses 1.2-1.4 times main's. Sanding over every patch it drove onto brought them to main's, at 2.5-3 times main's sand)
+    let onPatch = false, patchFirst = false;
+    if (mu < 0.2 && tr.v > 0.5) {
+      for (let d = -tr.length; d <= 3; d += 2) if (g.muAt(tr.s + d) < 0.07) { onPatch = true; if (d >= -4) patchFirst = true; }
+    }
+    // (at speed only: pulling away is getting moving, and kept off the pedal over a patch under the tram from 0.5 m/s it rolled to a stand
+    // and drove again, the mean delay 63 -> 302 s on line 9 in autumn)
+    const patchMove = gradeHere > 0.02 || tr.v < 6;
+    this.patchSand = patchFirst && patchMove && tr.notch > 0 && tr.sand > 0;
+    this.patchCoast = onPatch && !patchMove;
+    this.sandT = this.startSand || this.climbSand || this.railSand || this.patchSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
     // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
@@ -422,9 +480,10 @@ export class Autopilot {
     const trackOk = !dryRail || stopWhy === 'walker' || stopWhy === 'obstacle' || stopWhy === 'car';
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
-    tr.eq.autoDrive({ trackOk, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
+    tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn || this.patchCoast) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
+      railA: mu < 0.2 ? railA(tr.sanding || this.input.sand) : null,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
       speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)), holdUnder: HOLD_LATE + (HOLD - HOLD_LATE) * mild });

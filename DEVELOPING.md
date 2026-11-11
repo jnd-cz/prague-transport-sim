@@ -94,7 +94,7 @@ pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the
 | `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
-| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), their decks checked against Mosty 3D and the raised rails, flat over the ways under them, thinner by `maxheight` (`tools/zps_decks.py`, #445), railway yards, lawns and paved yards on IPR's ground marked to take the lidar inside and the passages' plugged portals on IPR's floor (`tools/zps_inside.py`, #444), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
 
 Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
 profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
@@ -122,14 +122,45 @@ whose data matches the manifest:
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
 
-The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
+The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc` (`machine <host>`, or the config's `"netrc"` name when two FTP users share one host, as the test site and the alpha's `sim.8b.cz`, #350). The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
 
 Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
 `deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
 checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
 it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
 `~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
-hour. Log: `reports/autodeploy.log`.
+hour. Log: `reports/autodeploy.log`. Every run also pulls the review verdicts and every target's feedback notes
+(`deploy.py --pull`). It deploys only the test site.
+
+**The closed alpha** (#350): `sim.8b.cz` on the same host, without a login. `deploy.local.json` names it under
+`targets` (`{"alpha": {"user": …, "netrc": "sim.8b.cz", "url": "https://sim.8b.cz/", "public": true}}`); a
+named target takes the top level's keys it does not set. A public target:
+- gets no review tools (`review.php`, `reviews.html`, `reports/review/`), and `robots.txt` with an
+  `X-Robots-Tag: noindex` header ask search engines to keep away;
+- is deployed only from a tagged commit (`git tag alpha-N`, pushed), never with `--dirty` or `--reports`;
+  `version.json` names the tag, so a tester's note says which version it was;
+- is checked after a deploy: the page and `version.json` served, every review tool 404, `feedback/` 403.
+
+`python -P -E tools/deploy.py --target alpha` from a checkout at the tag (`--dry-run` first).
+
+**Feedback** (#350): ✉ Feedback in a shift (F9, `src/report.js`) posts a note to `feedback.php` (`tools/feedback.php`,
+on every target): the note, the moment's state (place, tram, run, camera), the errors met on the page, the
+machine, the load times, the frame-time log (`src/perf.js`) and, if ticked, a screenshot. It only takes notes in,
+within its caps (2 MB a post, 5000 characters, 3000 notes and 500 MB kept, 20 a minute), stores no IP address,
+and nothing reads them back over HTTP. `deploy.py --pull` moves them off each host into the machine's feedback
+folder (`$TRAM_FEEDBACK`, else beside the data cache: `tramdata/feedback/<target>/`, never in git); `tools/serve.py`
+takes them locally into `local/` there. `python -I tools/feedback.py` lists them by kind (`--site`, `--line`,
+`--kind`), `--perf` gives frames per second and slow frames per machine. A note becomes an issue only when
+someone decides so.
+
+**Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame
+intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
+browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)
+says what a frame costs here. A shift's end offers to send the summary; the menu's Performance test drives a
+fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1; the Reference test below) with the GPU's own time per frame where
+the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the departure, not a shift's 40 s, and the
+minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
+the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
 ## Dev
 
@@ -304,7 +335,7 @@ grey. The answers are kept per line in the browser and sent to the server, which
 (the newer wins), so a phone and a computer share one review:
 - on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
   `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
-  on every run, and `python -P -E tools/deploy.py --pull-reviews` does it at once;
+  on every run, and `python -P -E tools/deploy.py --pull` does it at once;
 - with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
 
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
@@ -336,7 +367,12 @@ IPR's lidar where neither DI's rails nor DMR 5G say which is right (#446): `tool
 reports/reviews/line37.json` turns the answers that are a card's option into `data/truth.json` `surveyGround.places`,
 which the next `dtm.py` obeys; others stay held. An area without an answer takes the user's rule
 (`surveyGround.heldRule`: courtyards to the lidar, greenery outside to the survey), so a set appears only without it. `python -P -E tools/bench/survey_ground.py` measures every line's
-ground level against IPR and the rails (`--dtm DIR` for main's copies).
+ground level against IPR and the rails (`--dtm DIR` for main's copies). `python -P -E tools/bench/decks.py` measures
+the decks (level 1 and up) against Mosty 3D and the raised rails, the Krejcárek viaduct and Divadelní's deck and
+clearance (#445; `--dtm DIR` too); the build's own record is `provenance … checks.decks`. `python -P -E
+tools/bench/ground_inside.py` measures the inside of every ground-level area against IPR as the page draws it, per line
+and class (#444; `--dtm DIR`, `--page main` for main's drawing); the build marks what it drapes in `checks.inside` and
+what it took under the decks in `checks.underDecks`.
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a

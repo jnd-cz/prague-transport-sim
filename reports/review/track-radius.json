@@ -1,8 +1,391 @@
 {
  "schema": 1,
- "snapshot": "2026-11-08r",
- "issue": 358,
+ "snapshot": "2026-11-10",
+ "issue": 276,
  "title": "Track radius: where no curve of 500 m fits the data",
- "lines": [],
- "findings": []
+ "lines": [
+  "37"
+ ],
+ "findings": [
+  {
+   "kind": "trackheight",
+   "id": "radius-50.1036-14.4735",
+   "x": 3942.7300000000396,
+   "y": 1281.0599999999977,
+   "mag": 0.034,
+   "status": "review",
+   "place": [
+    50.1036,
+    14.47349
+   ],
+   "lines_near": [
+    "37"
+   ],
+   "info": "junction: no curve of 500 m joins the rails here: held at it, they stay up to 3 cm apart. As built they join, at 164 m.",
+   "decision": {
+    "span_ids": [
+     "radius-50.1036-14.4735:track1"
+    ],
+    "structure": {
+     "kind": "junction"
+    },
+    "status": "review"
+   },
+   "spans": [
+    {
+     "id": "radius-50.1036-14.4735:track1",
+     "line": 37,
+     "direction": "path",
+     "structure": {
+      "kind": "junction"
+     },
+     "status": "review",
+     "start_s": -52.5,
+     "length_m": 140.0,
+     "profile": [
+      {
+       "s": 0.0,
+       "xy": [
+        3965.45,
+        1280.4
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 2.5,
+       "xy": [
+        3963.05,
+        1279.69
+       ],
+       "archive": [
+        {
+         "z": 190.864
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.955
+      },
+      {
+       "s": 7.5,
+       "xy": [
+        3958.17,
+        1278.62
+       ],
+       "archive": [
+        {
+         "z": 190.842
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.945
+      },
+      {
+       "s": 13.7,
+       "xy": [
+        3951.99,
+        1278.43
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 15.9,
+       "xy": [
+        3949.79,
+        1278.71
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 17.5,
+       "xy": [
+        3948.24,
+        1279.04
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.842
+      },
+      {
+       "s": 22.5,
+       "xy": [
+        3943.53,
+        1280.67
+       ],
+       "archive": [
+        {
+         "z": 190.702
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.719
+      },
+      {
+       "s": 27.5,
+       "xy": [
+        3939.22,
+        1283.19
+       ],
+       "archive": [
+        {
+         "z": 190.656
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.597
+      },
+      {
+       "s": 32.5,
+       "xy": [
+        3935.46,
+        1286.49
+       ],
+       "archive": [
+        {
+         "z": 190.471
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.43
+      },
+      {
+       "s": 37.5,
+       "xy": [
+        3932.41,
+        1290.44
+       ],
+       "archive": [
+        {
+         "z": 190.286
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.236
+      },
+      {
+       "s": 39.2,
+       "xy": [
+        3931.55,
+        1291.93
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      },
+      {
+       "s": 42.5,
+       "xy": [
+        3930.18,
+        1294.9
+       ],
+       "archive": [
+        {
+         "z": 190.101
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 190.059
+      },
+      {
+       "s": 47.5,
+       "xy": [
+        3928.84,
+        1299.71
+       ],
+       "archive": [
+        {
+         "z": 189.916
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 189.753
+      },
+      {
+       "s": 52.5,
+       "xy": [
+        3928.38,
+        1304.69
+       ],
+       "archive": [
+        {
+         "z": 189.701
+        }
+       ],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": 189.51
+      },
+      {
+       "s": 54.5,
+       "xy": [
+        3928.34,
+        1306.64
+       ],
+       "archive": [],
+       "di_z": null,
+       "surfaces": [],
+       "ipr_terrain_z": null
+      }
+     ]
+    }
+   ],
+   "options": [
+    "hold the radius",
+    "follow the data",
+    "unsure"
+   ],
+   "answer_explanations": {
+    "hold the radius": "The rails must meet, so the radius still gives way at the junction (164 m); add 'Discard the outliers' in the note to drop the points it misses first and fit the rest at the floor.",
+    "follow the data": "Keeps the rails joined at 164 m, as built."
+   },
+   "answer_previews": {
+    "hold the radius": {
+     "radius-50.1036-14.4735:track1": [
+      [
+       0.0,
+       190.871
+      ],
+      [
+       2.5,
+       190.874
+      ],
+      [
+       7.5,
+       190.885
+      ],
+      [
+       13.7,
+       190.918
+      ],
+      [
+       15.9,
+       190.919
+      ],
+      [
+       17.5,
+       190.913
+      ],
+      [
+       22.5,
+       190.857
+      ],
+      [
+       27.5,
+       190.742
+      ],
+      [
+       32.5,
+       190.573
+      ],
+      [
+       37.5,
+       190.351
+      ],
+      [
+       39.2,
+       190.263
+      ],
+      [
+       42.5,
+       190.103
+      ],
+      [
+       47.5,
+       189.873
+      ],
+      [
+       52.5,
+       189.614
+      ],
+      [
+       54.5,
+       189.507
+      ]
+     ]
+    },
+    "follow the data": {
+     "radius-50.1036-14.4735:track1": [
+      [
+       0.0,
+       190.87
+      ],
+      [
+       2.5,
+       190.854
+      ],
+      [
+       7.5,
+       190.829
+      ],
+      [
+       13.7,
+       190.889
+      ],
+      [
+       15.9,
+       190.951
+      ],
+      [
+       17.5,
+       190.976
+      ],
+      [
+       22.5,
+       190.956
+      ],
+      [
+       27.5,
+       190.783
+      ],
+      [
+       32.5,
+       190.55
+      ],
+      [
+       37.5,
+       190.331
+      ],
+      [
+       39.2,
+       190.257
+      ],
+      [
+       42.5,
+       190.114
+      ],
+      [
+       47.5,
+       189.886
+      ],
+      [
+       52.5,
+       189.618
+      ],
+      [
+       54.5,
+       189.507
+      ]
+     ]
+    }
+   }
+  }
+ ]
 }

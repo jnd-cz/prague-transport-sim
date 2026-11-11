@@ -912,7 +912,7 @@ function uncoveredRuns(line, dtm, hf = null) {
 // (same split as Terrain.height) is lowered by the excess.
 function lowerTerrainUnderDtm(dtm, T) {
   for (const a of dtm.areas) {
-    if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
+    if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || (a.c === 'rail' && !a.g)) continue;
     for (const [p, q, r] of a.mesh) {
       // (the corners and edge midpoints, without an array each: millions at load, #205)
       lowerTerrainAt(T, p[0], p[1], p[2] - 0.25);
@@ -1125,7 +1125,8 @@ function buildDtm(group, ground) {
     const cg = cgs[DTM_KIND[a.c] || 'other'];
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
     const startFace = c.pos.length / 9;
-    const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
+    // (a deck over a way with maxheight is thinner where 1 m would leave less than it and 0.1 m: tools/zps_decks.py, #445)
+    const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : a.t ?? 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
     const fz = (v) => v[2];
     for (const [p, q, r] of a.mesh) {

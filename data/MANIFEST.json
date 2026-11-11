@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-10",
- "built_at_commit": "2b1c3b0",
- "published": "2026-11-10 13:29",
- "note": "lines 9, 17, 22, 23, 37 survey (dtm.json): the same areas, the record names every answer (#446)",
+ "built_at_commit": "64efc34",
+ "published": "2026-11-11 10:36",
+ "note": "#444: lawns, railway and paved yards with heights only on their outline drape on the lidar (g); plugged portals under the decks take the floor; built at 64efc34",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "13743b62c7a658868db745968f5db2f092d585465fd200703ee6e26d6f769220"
   },
   "line17.dtm.json": {
-   "size": 9353440,
-   "sha256": "9a3ab5f21bbf030380fc4a7c06d292fca9cf2450a40a271275806224f0eacbee"
+   "size": 9375719,
+   "sha256": "e520fd0dc5085dd7e5a89ff2cd0972cde97d88e01d0385c86209b00e443fbb05"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -34,7 +34,7 @@
   },
   "line17.json": {
    "size": 6278787,
-   "sha256": "dbbe741090aaa7e84aefaf6c719644880fc67b1b75c20ba90fb54cdfac2df2c6"
+   "sha256": "da933617d320ce4a3977f1d132d2e6fa3134c2f145f84ad8516b9cb104dee5f2"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -57,8 +57,8 @@
    "sha256": "99ca7460fb8a5d58420bc15686dd8e14f24bc5c3d5935467bbb61ecb2ccc01f7"
   },
   "line22.dtm.json": {
-   "size": 9546904,
-   "sha256": "0d576bedffea92009abdde5c2ce8e5f62125e4329d748416134c620dcf003015"
+   "size": 9570316,
+   "sha256": "7ea034042a5c31ac1bf9da156fe2f7a746a1bfb5a0b8755225b83cadb891d2e9"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -97,8 +97,8 @@
    "sha256": "b5dad79231566c0fe831d2e23228f52f121e16ed31890921dde0c17524032570"
   },
   "line23.dtm.json": {
-   "size": 4342964,
-   "sha256": "a8f573ecbdc7cfa75677ba7c8554a37eb139d88b6b6d4551d0c697fb663276ac"
+   "size": 4352205,
+   "sha256": "377a0599ca21db85562fbc10677b0a3ea128a9df36451bcc48e98f6e7a5d4b73"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -137,8 +137,8 @@
    "sha256": "613e7bccc8fb1359390afd8a1e677e39550fe85b08acbd0cb9cdbf722e5d3446"
   },
   "line37.dtm.json": {
-   "size": 4689193,
-   "sha256": "657c43fbcd3a94f316178416575a1e1576341ddccdab7804ca19f5eb768b4c50"
+   "size": 4702591,
+   "sha256": "fc3b3508effe40fd3fc9e9f585314d4204522f2d8a39f2336a9efb40781031ec"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -157,8 +157,8 @@
    "sha256": "cb0a10ac26f32199caf577e8e729af1d3689a1985766bb4d7c857a7bc35ce461"
   },
   "line37.json": {
-   "size": 2163673,
-   "sha256": "72697e9c23ceaf531b74ed99d3466af41230c941233c6fb5990d44fc4894d70c"
+   "size": 2163808,
+   "sha256": "16857af6ef440c6addf3d87783ea18a2f49572c2f6d0bec8722f32c02cf322ba"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -177,8 +177,8 @@
    "sha256": "d3aaddf6b8adff92ba6ac18efe23a625bed5d3f94e11aabac03437c43ca0ad15"
   },
   "line9.dtm.json": {
-   "size": 9587726,
-   "sha256": "e8ad8f1a1354865ed040cd71cb19823a358fbc16f91181702536cc9346c01b02"
+   "size": 9610143,
+   "sha256": "9f3d2bc27c8683069dcf9be7f9713186caed6eebd90849ad6e0b51464fa2bec7"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
