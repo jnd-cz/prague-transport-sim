@@ -244,6 +244,12 @@ their levels and height-accuracy classes); the JSON report retains their vertice
 Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
 in a separate checkout of that reference; comparisons never restore over the working data.
 
+**The limits against real rides** (#451): `python -P -E tools/rides_limits.py --lines 22,23` maps the GPS rides in
+`raw/reference/rides/` (`RIDES`, the ones in a line's direction) onto each line's track and lists where a ride went
+more than 3 km/h over our limit for 10 m or more, with what sets the limit there, and per stretch a quickest run at our
+limits and at them raised to the ride. It needs `raw/` (`snapshot.py fetch`) and starts its own server. On line 22 the
+two-car set keeps a limit 15 m longer than the rides' single T3, so it lists more places there.
+
 **Inspect mode** (looking around fast): open `index.html?line=17&inspect` and start a shift, or press
 **I** during one. The autopilot drives, time runs at 4× (Space pause, + / − from 1/4× to 32×), the cab
 overlay is hidden and the mouse moves the camera: **orbit** around the tram or **fly** (C; Shift faster, wheel = flying speed). PgDn / PgUp
@@ -379,7 +385,8 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   Mosty 3D sets the deck height on tagged bridges.
 - **Outdoor temperature:** Prague now comes from Open-Meteo, hourly.
 - **Tram models:** `assets/t3h/LICENSE.txt`, `assets/t3/LICENSE.txt`, the second car's coupling #248;
-  `ASSETS.md` lists them.
+  `ASSETS.md` lists them. How a model plugs into the game, the tiers of movement, and adding or changing one:
+  [docs/vehicles.md](docs/vehicles.md) (in Czech [docs/vehicles.cs.md](docs/vehicles.cs.md)).
 - **The autopilot** drives like the headless test bot: the same driver lives in `src/autopilot.js` and is
   used by `tools/autopilot.js`.
 - **Language:** strings live in `src/i18n.js`. The player's guide is `README.md` in Czech and `README.en.md`

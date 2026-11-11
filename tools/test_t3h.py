@@ -90,11 +90,44 @@ SYNTHETIC = r"""async () => {
   m.updateMatrixWorld(true);
   const head = a.userData.rig.full.getObjectByName(proto.rig.pantograph.head);
   out.contact = head.getWorldPosition(new THREE.Vector3()).y + proto.rig.pantograph.contactHeadOffset;
+  // #436: the indicators' glows by side on both cars (in the blink's lit half, then its dark half), the brake lamps on
+  // every car, the high beams' glow on the leading car
+  const glows = (car, side) => car.userData.rig.signals[side].map((g) => g.visible);
+  models.poseT3(m, { braking: true, indicate: 'left', clock: 0.1 });
+  out.lamps = { left: [a, b].map((c) => [glows(c, 'left'), glows(c, 'right')]), brakes: [a, b].map((c) => c.userData.rig.brakes.map((g) => g.visible)) };
+  // where the glows draw in the car (they were stored at scale 0, and copied with a NaN rotation never drew)
+  m.updateMatrixWorld(true);
+  const inCar = (g) => { const box = new THREE.Box3().setFromObject(g).applyMatrix4(a.matrixWorld.clone().invert()), c = box.getCenter(new THREE.Vector3()); return [c.x, c.y, c.z].map((v) => +v.toFixed(2)); };
+  out.lamps.glowAt = [...a.userData.rig.signals.left, ...a.userData.rig.brakes].map(inCar);
+  models.poseT3(m, { indicate: 'left', clock: 0.5 });
+  out.lamps.dark = [a, b].map((c) => glows(c, 'left'));
+  models.poseT3(m, { braking: false, indicate: null, highBeam: true });
+  out.lamps.beams = [a, b].map((c) => !!c.userData.beams?.visible);
+  out.lamps.beamAt = a.userData.beams ? (a.userData.beams.geometry.computeBoundingBox(), [a.userData.beams.geometry.boundingBox.min.toArray(), a.userData.beams.geometry.boundingBox.max.toArray()]) : null;
+  models.poseT3(m, { highBeam: false });
+  // the tail lamps added at load (the asset has none): on the rear panel, lit on every car
+  const tail = (c) => c.children.find((o) => o.name === 'T3H_tail');
+  out.lamps.tails = [a, b].map((c) => tail(c) && +tail(c).material.color.r.toFixed(3));
+  if (tail(a)) { const tb = new THREE.Box3().setFromBufferAttribute(tail(a).geometry.attributes.position); out.lamps.tailAt = [tb.min.toArray(), tb.max.toArray()].map((v) => v.map((x) => +x.toFixed(3))); }
   // the cards
   models.setConsistLine(m, '9', 'Sídliště Řepy', '816');
   out.dest = [a, b].map((c) => c.userData.rig.plates.destAll.map((o) => o.visible));
   out.destCanvas = a.userData.rig.plates.dest.material.map?.image?.width ?? null;
   out.fleetOwn = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material !== b.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
+  // the fleet numbers' digits: each quad's height (the four merged, four corners each) times the digits' share of
+  // the texture's rows
+  const fn = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]), FP = fn.geometry.attributes.position, fh = [];
+  for (let q = 0; q + 3 < FP.count; q += 4) { const ys = [0, 1, 2, 3].map((i) => FP.getY(q + i)); fh.push(Math.max(...ys) - Math.min(...ys)); }
+  const fim = fn.material.map.image, fd = fim.getContext('2d').getImageData(0, 0, fim.width, fim.height).data;
+  let fr0 = Infinity, fr1 = -1;
+  for (let y = 0; y < fim.height; y++) for (let x = 0; x < fim.width; x++) if (fd[4 * (y * fim.width + x) + 3] > 127) { fr0 = Math.min(fr0, y); fr1 = Math.max(fr1, y); }
+  out.fleetDigits = fh.map((h) => h * (fr1 - fr0 + 1) / fim.height);
+  // faded in as an AI tram: the fleet numbers' clear canvas stays clear, the body opaque
+  const { setOpacity } = await import('/src/traffic.js');
+  setOpacity(m, 0); setOpacity(m, 0.5); setOpacity(m, 1);
+  const fleetMat = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
+  out.fadedFleet = { transparent: fleetMat.transparent, depthWrite: fleetMat.depthWrite, opacity: fleetMat.opacity };
+  out.fadedOpaque = []; a.userData.rig.full.traverse((o) => { if (o.isMesh && o.material.transparent && !o.material.userData.glass && !proto.rig.numberPlates.includes(o.name) && !/^Route_Number/.test(o.name)) out.fadedOpaque.push(o.name); });
   // the lighter level
   t3h.setHybridLevel(m, 'light');
   out.drawnLight = drawn(a);
@@ -178,7 +211,27 @@ def main():
                 "the destination card in the leading car only": s["dest"][0] and all(s["dest"][0]) and not any(s["dest"][1]),
                 "the cards drawn (canvas)": s["destCanvas"] == 1024,
                 "each car its own fleet number": s["fleetOwn"],
+                # the user, 2026-11-10: "fix the hybrid's fleet number size" (0.14 m as on the photos; were 0.106 m on
+                # the ends, 0.13 m on the sides)
+                f"the fleet numbers' digits 0.14 m on all four quads ({[round(d, 3) for d in s['fleetDigits']]})": len(s["fleetDigits"]) == 4
+                and all(abs(d - 0.14) < 0.004 for d in s["fleetDigits"]),
+                "faded in: the fleet numbers stay blended (their clear canvas drew black)": s["fadedFleet"] == {"transparent": True, "depthWrite": False, "opacity": 1},
+                f"faded in: the rest opaque ({s['fadedOpaque'][:3]})": not s["fadedOpaque"],
                 "the glass see-through (0.18)": s["glass"] == 0.18,
+                # #436: the indicators by side on every car, blinking; the brake lamps at the set's rear (the coupled
+                # ends dark, as the built-in car's); the high beams' glow over the leading car's headlights
+                "the left indicators on both cars, the right ones off, then the blink's dark half": s["lamps"]["left"] == [[[True] * 3, [False] * 3]] * 2
+                and s["lamps"]["dark"] == [[False] * 3] * 2,
+                # the left front, repeater and rear indicators, the left and right brake lamps in the rear corner units
+                f"the glows where the lamps are ({s['lamps']['glowAt']})": all(all(v == v for v in p) for p in s["lamps"]["glowAt"])
+                and [round(p[2]) for p in s["lamps"]["glowAt"]] == [7, 3, -7, -7, -7] and all(abs(abs(p[0]) - 0.95) < 0.05 for p in s["lamps"]["glowAt"][:1] + s["lamps"]["glowAt"][2:]),
+                f"the tail lamps on the rear panel ({s['lamps'].get('tailAt')}), lit on every car": s["lamps"]["tails"][0] == s["lamps"]["tails"][1] > 1
+                and s["lamps"]["tailAt"][0][2] < -6.9 and 0.85 < s["lamps"]["tailAt"][0][1] < 1.1
+                and abs(s["lamps"]["tailAt"][0][0] + 0.57) < 0.01,
+                # the user, 2026-11-10: "in between cars only the rear red lights light up"
+                "the brake lamps on every car": s["lamps"]["brakes"] == [[True, True], [True, True]],
+                "the high beams' glow on the leading car, at its headlights (7.0 m ahead, 1.2 m up)": s["lamps"]["beams"] == [True, False]
+                and s["lamps"]["beamAt"] and 6.9 < s["lamps"]["beamAt"][0][2] < 7.2 and 0.8 < s["lamps"]["beamAt"][0][1] < 1.3,
             }
             fails += [f"synthetic: {k}" for k, ok in want.items() if not ok]
             if data and not args.synthetic:

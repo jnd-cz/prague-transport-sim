@@ -480,6 +480,29 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   down every descent to 1 m/s under ran line 23 40 s later. On W2's data (73c2a32): brake applications −6 to −18 %, the wire's energy
   −4 to −11 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
   (2026-11-09), the timetable's part being #242.
+- **Driving to the timetable** (#242): the time in hand to the next stop sets how it drives. That is the stop's timetable
+  time, less now, less 1.3 times the quickest run there at the limits, less a 15 s dwell.
+  - **Up to 10 s in hand it catches up.** The target is 0.2 m/s under the limit, and brake step 1 holds down a descent only to
+    0.6 m/s under. At a 15 km/h limit, 0.4 and 1 m/s held it at 10-14.5 km/h, where the drivers of two line 23 rides held 14-16
+    down Chotkova (#431). Within reach of a turn's contact the target keeps 0.4: 0.2 under Anděl's 20 km/h put the accelerator
+    at 31 coasting, over the switch button's 30.
+  - **Over the next 30 s it grows milder:** curves as at 0.8 m/s², 0.4 under the limit, the 1 m/s hold, the target up to
+    10 km/h under, coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
+    autopilot doesn't go as hard into curves and uses less pedal presses to conserve power. If he's late then he uses the
+    probe's plan to catch up").
+  - **Against main at 973726c** (with #451's curves; stops check, seeds 1-5):
+
+    | line | arrivals within ±30 s | mean delay | drive presses |
+    |---|---|---|---|
+    | 9 | 40 → 47 % | 52 → 44 s | +7 % |
+    | 17 | 6 % → unchanged | 116 → 96 s | −7 % |
+    | 22 | 4 → 29 % | 160 → 75 s | −6 % |
+    | 23 | 8 → 19 % | 116 → 74 s | −15 % |
+    | 37 | 54 → 61 % | 44 → 37 s | unchanged |
+
+    Energy from the wire is 0-2 % lower on every line.
+  - **In other weathers** (`--checks autumn,rain,winter`): wheel spin, slides and sand stay within a few per cent of main's,
+    and the delay falls in all three.
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
@@ -526,10 +549,74 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
 - Prague signals: 4 white lamps on a white plate (stop = outer two), call box with three orange LED bars,
   distant signal with a yellow "P"; switch indicator a red LED chevron on the span wire.
+- **The T3's outline** (#427, `src/t3simple.js`): drawingdatabase.com's general arrangement (`Tatra-T3-1.gif`, side and
+  plan, dimensioned at 20 mm a pixel) and its colour elevation (`trams_t3_01.png`, 12.66 mm a pixel) agree with each other
+  and with Dynybyl's table 3, Wikipedia and the 1977 Soviet manual: body 14 000 × 2 500 mm, 3 060 mm high, pivots 3 800 / 6 400
+  / 3 800 mm. In plan the ends taper from the doors (4.5 m ahead of and 4.8 m behind the centre); the front and rear doors
+  stand on the taper. The drawing's plan view ends in corners 0.73–0.78 m off the centreline, too narrow against the user's
+  head-on photos of 6892 (below): the model's corners are 1.0 m off it, rounded with 0.32 m, the face bulging 0.21 m (the
+  user, 2026-11-10: "Let's try widening"); from above its ends are ±0.97 m wide, the hybrid's ±1.0 m, conflig's ±0.88 m. The
+  plan view on p. 10 of Dynybyl's thesis is narrower still (the user, 2026-11-09: "looks more narrow, like t1 or early
+  prototype than t3"). Laid over the colour elevation at its scale, the built model's windows, doors, bands and ends fall on
+  its lines, except the brows over the windscreen and the rear window: the side view leans them back 0.17 and 0.12 m, the
+  photo of 7290 has them upright to 2.86 m, then rolling into the roof over 0.5 m (the user, 2026-11-10: "make the front
+  brow less slanted, perhaps even perpendicular? The back should be similar", "a bit thinner, like running a bit down
+  towards the front and back"), the route box low on the front one, 3 cm over its lower edge. The windows wrapping round
+  the ends meet the sides in upright edges with rounded corners; the livery's u follows the outline's points, which move
+  back with the leaning end, so those edges are drawn through each height's own u (`ringU`), not straight in the texture.
+- **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
+  round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
+  from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between
+  the first and second windows on the right, the second and third on the left; fleet numbers golden yellow (#e3b625) in
+  bold Arial on both models (2026-11-10: "the new model uses different font from the hybrid model and my photos": it
+  had Bahnschrift), their digits 0.14 m tall
+  on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15 m against the red band's heights, conflig's
+  model 0.13–0.146 m; the hybrid's quads were 0.19 m tall on the ends and 0.23 m on the sides under one texture, so 0.106
+  and 0.13 m digits): on the front centred on the headlights, on the rear over the white lamp just above the lamps, on the
+  sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on the right, behind the cab window on the left).
+- **The T3 head on** (the user's photo of 6892, 2026-11-10, a telephoto from about 25 m): scaled by the skirt's foot (0.35 m),
+  the red's top (1.48 m) and the roof (3.02 m), which agree to 3 %, the headlights' centres are 1.11 m up and 1.11 m apart
+  (the colour elevation: 1.03 m, 1.06 m apart; the model has them 1.08 m apart, the user finding 1.11 m "a tad to far
+  apart"), pointing straight ahead in black rubber surrounds with a chrome rim; the bumper 0.76–0.86 m (the elevation:
+  0.70–0.80), the corner units 0.98–1.30 m with the clear lamp's centre (1.06 m) just under the headlights' line, round the
+  corners ±0.93–0.99 m off the centreline (the rear's ±0.96 m), the windscreen's posts ±0.71 m, the route box 0.49 × 0.30 m
+  with its top 7 cm under the roof's. The ends are open under the bumper between the skirt's corners, which reach in to the
+  headlights' outer edges, ±0.65 m (front and rear, "front and back is open under the bumper").
+- **The T3's bogie from the side** (the user's photo, 2026-11-10; one over the pit, 2026-11-09): the skirt is cut out in arches
+  over the wheels, hugging their treads and level with their tops between them (the colour elevation and conflig's model have
+  a lower, square cutout); grey wheel discs with a big hex nut on the hub inside rust-brown tyres; a curved guard inside each
+  wheel; the track-brake shoe over the rail with a row of nuts on its upper bar; the ribbed rubber spring in the middle up to
+  the skirt with the gearbox's housing beside it, coil springs by the wheels; everything a dusty warm grey. The coupler (the
+  user's picture, "only dark"): a round bar from the yoke's pin to a clamp, the cast head with two jaws, the coupling pin
+  down through them with its handle on top. Its height over the rail is the other models': conflig's classic has the bar
+  at 0.594 m (0.563-0.625), the hybrid at 0.584 m (bar and head 0.527-0.641), so the built-in car's is 0.59 m (the user,
+  2026-11-10: "I don't know proper figures so you might as well take it from the others"; it was 0.552 m, no source).
+- **The three T3 types in Prague** (the user, 2026-11-10): the T3, fleet numbers 6400–6992, a silver bumper with two thin
+  red stripes (6892: 12 mm, a quarter of the bumper in from its edges), the route box square; the T3SUCS, 7001–7292, the
+  bumper brown, the route box with rounded corners; the T3M, 8005–8106, as the T3SUCS with the resistors' box on the roof
+  towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
+  plate"), and green dot-matrix displays: the route on the front in the rounded box, and inside the right side's second
+  window the route with the destination and the next stop. AI sets take each type as often as its range is long ("their
+  proportion in service (probability to appear as AI tram) roughly related to their range sizes"): 60, 30 and 10 %.
+- **A T3's lamps in service** (the user, 2026-11-10, #436): "Trams run regular beams by default, off only when the car is
+  turned off. High beams can be flashed as warnings or used at night on dark stretches of line." So the dipped
+  headlights and the tail lamps are on by day too. The rear: the corner units' lower red lamps are the brake lamps, the
+  rear panel's two red lamps the tail lamps, the white one between them the reversing lamp. The indicators: "Turning at
+  junction and stopping at street level stop across car lane", at such a stop the right ones from braking into it until
+  it pulls away. Between coupled cars "only the rear red lights light up" (the user's photo of 8088 coupled behind
+  another, 2026-11-10): the game lights a set's front on its leading car only, the rear red lamps on every car, and
+  blinks the indicators on every car, 1.5 times a second (`src/lamps.js`). The hybrid's glows (indicators, brake lamps)
+  are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew. Its
+  asset has no tail lamps: they are added at load, 2 cm over its bumper (found by rays from behind), 0.47 m out.
 
 ## Heuristics that stand in for missing data
 
 Review these when realism matters; most move into the build in M2.
+- **Junction turns** (`src/indicators.js`, #436), where the autopilot and AI trams indicate: a switch on the route after
+  which the route's heading turns more than 30° within 40 m (a crossover's S-bend comes back); on from 50 m before the
+  switch until the heading has turned 80 % of the way. On the five lines: 12 on line 9 (Anděl, Újezd, Lazarská, Flora,
+  Karlovo náměstí …), 3 on 17 (Výstaviště, Ke Stírce, Vozovna Kobylisy), 6 on 22, 8 on 23, 3 on 37; two switches of
+  one junction a few metres apart make overlapping turns. `game.lamps.turns` lists them.
 - **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
   turning 170°+ street to street, its switches within 150 m, mean radius 18 m+. It finds 47 loops on DI's network,
   all real by the user's review (2026-11-09); it names each by its nearest GTFS stop, so Špejchar's loop shows as
@@ -577,10 +664,27 @@ Review these when realism matters; most move into the build in M2.
   switch before the car's end, so no margin). The rear still has to leave each restriction. The radius is read over
   16 m of heading, which smears a sharp curve's end by about 12 m each way; most curves here have transitions, so the
   limit climbs along them.
+- **A curve's speed** (#451): no sign stands at most curves, and D 1/2 only asks for a speed that suits the curvature (§ 25.7),
+  so the limit is √((a + cant · g / 1.5) · R) in whole km/h at a = 1.0 m/s² unbalanced (`curve-lateral-acceleration`), and 15
+  under R 25 m, where the "r" sign stands (§ 49.19). Two line 23 rides mapped on our track (6312 on 2026-10-31, 6921 on
+  2026-11-08; GPS within 0–3 m of the track there) took the unsigned curves of R 30–60 m at 1.2–1.6 m/s² without cant
+  (R 54 m past Pražský hrad and above Chotkova's hairpin at 26–34 km/h), and the signed hairpin at Chotkovy sady (R 24 m, 15)
+  at 12–17 km/h, so the drivers keep a signed limit. The old 0.8 m/s² was a design value (0.65 comfortable, about 1.0 the
+  upper bound) in 5 km/h steps: 20 km/h for R 45–60 m. At 1.0 the rides go over our limit in no curve on 6312's ride and in
+  three on 6921's (4–8 km/h). With it the autopilot's moving time in the stops check fell by 95 s on line 22 and 55 s on line 23,
+  with fewer presses and the same energy. Derailment (`src/speedRules.js` `derailRisk`): a second over 2.25 m/s² in a curve, 1.5
+  times its limit's speed, or 1.5 times a switch's, crossing's or loop's 15 (the user, 2026-11-10: "40-50% over speed limit or
+  something over 2-2.5 m/s² for at least one second").
 - Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
-  arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
+  arrive (16 m / 4 s); AI trams both ways run 0.2 m/s under the limit (the oncoming ones ran at 0.85 of it until
+  #242), spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.
+  An AI tram ahead goes on at a blinking GO only if its front gets there while the GO lasts: the blinking left plus the hold
+  the controller can still give it (10 s, `PHASE_HOLD`), less a second, on its braking curve to its speed at the signal.
+  Otherwise, able to stop on full service braking, it stops. Before, it went on at any blinking GO first seen inside its
+  comfortable stopping distance; slowing for a junction's 15 km/h past the signal it outlasted the hold and ran the red 1.4 s
+  late (line 17 seed 5, line 22 s 4211; #394). A longer hold was turned down (the user, 2026-11-10: "that would slow up the cycle and cause potential jams").
 - **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
   car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
   immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
@@ -611,7 +715,7 @@ Review these when realism matters; most move into the build in M2.
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - `--checks stops` counts the drive pedal's presses from 0 (*našlápnutí*), those made rolling (over 1 m/s), the brake's applies
   and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide, sand and
-  the emergency brake. A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
+  the emergency brake, `rain` in rain (0.17 ± 0.02) and `winter` in snow (ice, 0.08, ±4 m at the pedestrian crossings). A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
   coasting. Dry, main pressed 19–24 times a km (70 % rolling), the #351 autopilot 8.4–13 (lines 37 and 23).
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with main's baseline in the data store.

@@ -12,10 +12,10 @@ const NEAR_TRACKWORK = 15;   // m: an OSM 15 km/h piece this near a switch or cr
 const FACTS = { facing: 'switch-facing-speed', trailingDiverging: 'switch-trailing-diverging-speed',
                 trailingStraight: 'switch-trailing-straight-speed', crossing: 'crossing-speed',
                 general: 'max-speed', smallRadius: 'small-radius-speed', past: 'restriction-past',
-                loop: 'loop-speed', stopPass: 'stop-pass-speed' };
+                loop: 'loop-speed', stopPass: 'stop-pass-speed', curveAccel: 'curve-lateral-acceleration' };
 const PLACES = ['trojska-descent'];   // the local rules by place: only where OSM tags no speed (placeStretches)
 
-// {facing, trailingDiverging, trailingStraight, crossing, general, smallRadius, loop, stopPass} km/h and `past` m, by the facts' ids;
+// {facing, trailingDiverging, trailingStraight, crossing, general, smallRadius, loop, stopPass} km/h, `past` m and `curveAccel` m/s², by the facts' ids;
 // `places`: [{from, to, v}], a local rule between two stops, at the highest speed it names
 export function speedFacts(truth) {
   const out = {}, facts = truth?.operation?.facts || [];
@@ -55,6 +55,25 @@ export function trackworkStretches(switches, trackwork, facts) {
 // beside the sign. The user, 2026-11-09 (#211): "point limit with overspeed penalty, autopilot has to follow".
 export function stopPassPoints(stops, facts) {
   return stops.slice(1).map((st) => ({ s: st.target, v: facts.stopPass, stop: st.name })).sort((a, b) => a.s - b.s);
+}
+
+// Derailment, a game rule (#451; the user, 2026-11-10: "Instead of flat offset I would build something like 40-50% over speed limit or
+// something over 2-2.5 m/s² for at least one second"): for DERAIL.secs on end, a curve under any part of the tram taken at more than
+// DERAIL.lateral unbalanced, 1.5 times the speed `curve-lateral-acceleration` allows there, or a switch, crossing or loop restriction of
+// DERAIL.upTo km/h or less taken at more than DERAIL.over times its speed. It was 22 km/h over any limit of 20 and under: 37 km/h on
+// a 15 km/h hairpin, and none at all on the curves #451 raised over 20.
+export const DERAIL = { lateral: 2.25, over: 1.5, upTo: 20, secs: 1 };
+
+// 'curve', 'trackwork' or null: what the tram (front at s, `length` m, v m/s) would derail on if it kept this up, on `route`
+// (radiusAt, cantAt) under `limits` (the game's speedLimits: restriction)
+export function derailRisk(route, limits, s, length, v) {
+  const kmh = v * 3.6;
+  for (let x = s - length; x <= s + 0.1; x += 2) {
+    if ((v * v) / route.radiusAt(x) - (route.cantAt(x) * 9.81) / 1.5 > DERAIL.lateral) return 'curve';
+    const r = limits.restriction(x);
+    if (r <= DERAIL.upTo && kmh > DERAIL.over * r) return 'trackwork';
+  }
+  return null;
 }
 
 // [{from, to, v}]: a local rule's speed where a line runs from its first stop straight to its second (so not the other
