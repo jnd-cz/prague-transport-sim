@@ -457,7 +457,14 @@ export class Autopilot {
     const railA = (sanded) => 9.81 * (sanded ? sandedMu(g.muAt(tr.s)) : g.muAt(tr.s)) * muSpeed(tr.v) + 9.81 * gradeHere;
     const needStop = fixed && stopAt !== null && tr.v > 0.8 ? (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s)) : 0;
     this.railSand = mu < 0.2 && needStop > Math.max(0.3, 1.1 * railA(false)) && tr.sand > 0;
-    this.sandT = this.startSand || this.climbSand || this.railSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
+    // (and on the drive pedal over a leaf patch, sand while the first axle crosses it (coasting it does not spin): a driver sees the leaf mash on the rail, and the sand laid in
+    // front of the first axle stays for the axles behind (src/tram.js). Unsanded, any step spins on a patch's 0.06, and each spin is the
+    // pedal off and a press again: autumn's presses 1.2-1.4 times main's, #265. From 20 m before each patch and at the packed snow of
+    // every crossing it sanded 568 s a run on line 9 in autumn (main 145) and 1241 s in snow, most of the 25-minute box)
+    let patchAhead = false;
+    if (mu < 0.2 && tr.notch > 0 && tr.v > 0.5 && tr.sand > 0) for (let d = -4; d <= 3 && !patchAhead; d += 1) patchAhead = g.muAt(tr.s + d) < 0.07;
+    this.patchSand = patchAhead;
+    this.sandT = this.startSand || this.climbSand || this.railSand || this.patchSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
     // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
