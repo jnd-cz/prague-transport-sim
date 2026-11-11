@@ -5,7 +5,7 @@
 // passes overhead contacts (with the pantograph) drawing current or coasting. Used for "watch the ride" and for the
 // headless rule tests (tools/autopilot.js).
 
-import { muSpeed } from './tram.js';
+import { muSpeed, sandedMu } from './tram.js';
 
 const SIGHT = 200; // m: on slippery rail it can stop from within this on the grip down a descent (#265)
 const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at least 1 m)
@@ -107,6 +107,9 @@ export class Autopilot {
     // stands at 31 coasting, over the switch button's 30, and the drive pedal turned between two brakings, line 9 seed 4)
     const under = cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) ? UNDER : UNDER_LATE + (UNDER - UNDER_LATE) * mild;
     let vt = vLim / 3.6 - under - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
+    // (and coasting to it about the button's speed, under that with the speed hold's band: down to Anděl in rain it gathered to 18.8 km/h
+    // over its 18.6, braked on step 1 22 m before the stop, the accelerator rose over 30 and the drive pedal turned, line 9 seed 5, #265)
+    if (cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) && tr.v < V_BUTTON_COAST + 0.5) vt = Math.min(vt, V_BUTTON_COAST - 0.25);
     let nl = own ? g.nextLimitChange(lim) : g.nextLimitChange();
     // the deceleration to plan on: 0.85 of what step 5 gives, so less on a steep downhill, where the electric brake has to hold the tram's
     // weight too (70 ‰ takes ≈0.7 of step 5's ≈1 m/s²: braking at 0.65 there ended on the track brakes), and less with a full load
@@ -440,7 +443,13 @@ export class Autopilot {
     // (braking: on every slide. Rationed while the box held 90 s, to a point within what a sliding tram needs, it slid twice without sand
     // braking for a lower limit down Chotkova's 55 ‰, held step 1 for 3 s after each and came into the 20 km/h at 35, line 23 seed 2 in
     // autumn; the box holds 25 minutes)
-    this.sandT = this.startSand || this.climbSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
+    // (and to a stop or a signal the bare rail cannot give rolling at its grip, less a descent's pull, sand first, the track brakes only if
+    // the sanded rail cannot either (src/tr37.js): coming to a red at 1.5 m/s on a leaf patch down 42 ‰, the wheels turning and not
+    // sanded, it crept 3 m over it, line 9 seed 1 in autumn; a patch sanded holds 2.5 times as much)
+    const railA = (sanded) => 9.81 * (sanded ? sandedMu(g.muAt(tr.s)) : g.muAt(tr.s)) * muSpeed(tr.v) + 9.81 * gradeHere;
+    const needStop = fixed && stopAt !== null && tr.v > 0.8 ? (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s)) : 0;
+    this.railSand = mu < 0.2 && needStop > Math.max(0.3, 1.1 * railA(false)) && tr.sand > 0;
+    this.sandT = this.startSand || this.climbSand || this.railSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
     // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
@@ -452,6 +461,7 @@ export class Autopilot {
     tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
+      railA: mu < 0.2 ? railA(tr.sanding || this.input.sand) : null,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
       speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)), holdUnder: HOLD_LATE + (HOLD - HOLD_LATE) * mild });

@@ -312,7 +312,8 @@ export class TR37 {
   // is), aNeed (m/s² still needed to end there), aSoon (the same half a second on, what the foot and the shoes take),
   // aCoast (m/s² it slows by itself), inertia (kg), grade, speedErr (m/s over the speed to hold, null when not holding one), sandLeft, slideA (m/s² a sliding tram
   // still gets here), aService (m/s² step 5 gives here, the gradient with it), holdSag (m/s under the speed held before a new press),
-  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather), maxDrive (N: no drive step pulling more,
+  // trackOk (false: no danger, so not the track brakes), lowMu (true: slippery rail by the weather), railA (m/s² the rail
+  // gives here rolling at its grip, the gradient with it, on slippery rail), maxDrive (N: no drive step pulling more,
   // on slippery rail: what the rail holds), minDrive (N: but not under the lowest step pulling this, what climbs the grade) }.
   // Stands parked; one step at a time unless urgent; drives as T3SU-03 p. 4 asks ("zpravidla" steps 1–3 on the level, more only
   // at speed or uphill, a step back before letting go), coasts 2.5 s between drive and brake unless urgent ([ckd03] p. 11).
@@ -439,7 +440,12 @@ export class TR37 {
       // Hřbitovy, up 25 ‰, and it had to drive again to get there, line 9 seed 3 in autumn)
       A.slideTrack = w.fixed && !w.sandLeft && ((w.slide && need > Math.max(0.35, w.slideA ?? 0)) || (A.slideTrack && now === -6 && need > 0.3 && need > 0.8 * (w.slideA ?? 0)));
       // (w.trackOk false: no danger, the service brake at most, src/autopilot.js)
-      if (w.trackOk !== false && ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack)) s = -6;
+      // (… and on slippery rail one the rail cannot give rolling at its grip, sanded where the sand is on, less a descent's pull, w.railA:
+      // unsanded a leaf patch down 42 ‰ gives 0.18 m/s², and coming to a red at 1.5 m/s on step 2, the wheels turning, it crept 3 m over
+      // it, line 9 seed 1 in autumn, #265. The autopilot sands there first)
+      // (held once on, as for a slide, until what is still needed is well within the rail: on and off, three times on one patch)
+      A.railTrack = w.fixed && w.railA != null && (need > Math.max(0.3, 1.1 * w.railA) || (A.railTrack && now === -6 && need > 0.2 && need > 0.8 * w.railA));
+      if (w.trackOk !== false && ((v > 2 && (need > Math.max(1.15, 0.95 * (w.aService ?? 0)) || (now === -6 && need > 0.6))) || A.slideTrack || A.railTrack)) s = -6;
     }
     const contact = w.power != null;
     if (!w.urgent && !contact && s !== -6) {
