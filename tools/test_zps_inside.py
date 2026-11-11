@@ -28,16 +28,29 @@ def floor(x, y):
     return np.full(np.shape(x), FLOOR)
 
 
+def mound(x, y):
+    """IPR: 200 m with a mound 1 m high over the middle of the 50 m squares below."""
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    return 200 + 1.0 * ((np.abs(x - 25) < 15) & (np.abs(y - 25) < 15))
+
+
 class Inside(unittest.TestCase):
-    def test_open_areas_of_the_classes_drape(self):
+    def test_open_areas_of_the_classes_drape_where_their_sheet_misses_the_ground(self):
         areas = [rect(0, 0, 50, 50, 200, c) for c in ("rail", "green", "paved", "green", "green", "paved", "green", "road")]
         areas.append(rect(0, 0, 50, 50, 205, "green", 1))
         verdicts = dict(enumerate({"verdict": v, "m2": 2500} for v in
                                   ("fits", "lidar", "uneven", "small", "covered", "survey", "review", "fits")))
-        out = zi.inside(areas, verdicts)
+        out = zi.inside(areas, verdicts, mound)
         self.assertEqual([a.get("g") for a in areas], [1, 1, 1, None, None, None, None, None, None])
         self.assertEqual(out["kept"], {"small": 1, "covered": 1, "survey": 1, "review": 1})
         self.assertEqual(out["classes"]["green"], {"areas": 1, "m2": 2500})
+
+    def test_a_sheet_that_fits_stays(self):
+        """A flat paved yard on flat ground: draped, it would follow the lidar's noise (the street check's waves)."""
+        areas = [rect(0, 0, 50, 50, 200, "paved"), rect(0, 0, 3, 3, 200, "green")]
+        out = zi.inside(areas, {0: {"verdict": "fits"}, 1: {"verdict": "fits"}}, lambda x, y: np.full(np.shape(x), 200.1))
+        self.assertEqual([a.get("g") for a in areas], [None, None])
+        self.assertEqual(out["fit"], {"paved": 1, "green": 1})  # (the small one: no lattice point inside)
 
 
 class UnderDecks(unittest.TestCase):

@@ -28,31 +28,17 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import shapely  # noqa: E402
 from shapely.ops import unary_union  # noqa: E402
 
+import zps_inside as zi  # noqa: E402
 from geo import Frame  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
 
 F = Frame()
 SKIP = {"wall", "roof"}
-INSIDE = {"rail", "green", "paved"}  # (tools/zps_inside.py: the classes the build may drape)
 UNDER = "under a deck"
 
 
 def arg(name, default):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else default
-
-
-def filled(ring, ground):
-    """The ring's heights, a missing one from its nearest neighbour on the ring, else the ground (as the page)."""
-    r = np.array([[q[0], q[1], np.nan if q[2] is None else q[2]] for q in ring], float)
-    bad = np.flatnonzero(np.isnan(r[:, 2]))
-    ok = np.flatnonzero(~np.isnan(r[:, 2]))
-    for i in bad:
-        if len(ok):
-            d = np.minimum(np.abs(ok - i), len(r) - np.abs(ok - i))
-            r[i, 2] = r[ok[np.argmin(d)], 2]
-        else:
-            r[i, 2] = ground(r[i:i + 1, 0], r[i:i + 1, 1])[0]
-    return r
 
 
 def pieces(ring, piece=4.0):
@@ -92,52 +78,13 @@ EDGE = 5.0  # m: the page's drape (src/terrain.js DRAPE_EDGE); --edge to try ano
 
 
 def triangles(a, ground):
-    """(n, 3, 3) triangles of the area's surface as the page draws it: T2 over its outline (the page's earcut keeps the
-    same outline), draped on the ground where the build marked it (`g`, #444)."""
-    rings = [filled(a["r"], ground)] + [filled(h, ground) for h in a.get("h", []) if len(h) >= 3]
+    """(n, 3, 3) triangles of the area's surface as the page draws it: the sheet over its outline (tools/zps_inside.py
+    triangulate), draped on the ground where the build marked it (`g`, #444)."""
+    rings = [zi.filled(a["r"], ground)] + [zi.filled(h, ground) for h in a.get("h", []) if len(h) >= 3]
     if DRAPED(a):
         rings = [pieces(r) for r in rings]
-    try:
-        poly = shapely.Polygon(rings[0], rings[1:])
-        if not poly.is_valid:
-            poly = shapely.make_valid(poly)
-        tris = shapely.constrained_delaunay_triangles(poly)
-    except shapely.errors.GEOSException:
-        return np.zeros((0, 3, 3))
-    out = [shapely.get_coordinates(t, include_z=True)[:3] for t in getattr(tris, "geoms", [])]
-    out = [t for t in out if t.shape == (3, 3) and np.isfinite(t).all()]
-    out = np.array(out, float) if out else np.zeros((0, 3, 3))
+    out = zi.triangulate(rings)
     return drape(out, ground, EDGE) if DRAPED(a) and len(out) else out
-
-
-def at(tris, x, y):
-    """The surface's height at points (NaN off it): the first triangle holding each point, barycentric."""
-    z = np.full(len(x), np.nan)
-    if not len(tris) or not len(x):
-        return z
-    tree = shapely.STRtree(shapely.polygons(tris[:, :, :2]))
-    pi, ti = tree.query(shapely.points(x, y), predicate="intersects")
-    t = tris[ti]
-    (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = (t[:, k].T for k in range(3))
-    d = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
-    ok = np.abs(d) > 1e-12
-    d = np.where(ok, d, 1)
-    w0 = ((y1 - y2) * (x[pi] - x2) + (x2 - x1) * (y[pi] - y2)) / d
-    w1 = ((y2 - y0) * (x[pi] - x2) + (x0 - x2) * (y[pi] - y2)) / d
-    zz = w0 * z0 + w1 * z1 + (1 - w0 - w1) * z2
-    first = np.r_[True, pi[1:] != pi[:-1]] & ok
-    z[pi[first]] = zz[first]
-    return z
-
-
-def lattice(poly, step):
-    x0, y0, x1, y1 = poly.bounds
-    xs, ys = np.meshgrid(np.arange(np.floor(x0 / step) * step + step / 2, x1, step),
-                         np.arange(np.floor(y0 / step) * step + step / 2, y1, step))
-    xs, ys = xs.ravel(), ys.ravel()
-    inner = poly.buffer(-0.5)
-    keep = shapely.contains_xy(inner, xs, ys) if not inner.is_empty else np.zeros(len(xs), bool)
-    return xs[keep], ys[keep]
 
 
 def main():
@@ -164,15 +111,15 @@ def main():
             poly = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3]).buffer(0)
             if poly.is_empty:
                 continue
-            x, y = lattice(poly, step)
+            x, y = zi.lattice(poly, step)
             # (an area of a draped class the build left as a sheet: its own row)
-            name = a["c"] + (" (sheet)" if marked and a["c"] in INSIDE and not a.get("g") else "")
+            name = a["c"] + (" (sheet)" if marked and a["c"] in zi.INSIDE and not a.get("g") else "")
             row = rows.setdefault(name, {"areas": 0, "m2": 0.0, "d": []})
             row["areas"] += 1
             row["m2"] += poly.area
             if not len(x):
                 continue
-            z = at(triangles(a, ground), x, y)
+            z = zi.at(triangles(a, ground), x, y)
             g = ground(x, y)
             d = z - g
             under = shapely.contains_xy(decks, x, y) if not decks.is_empty else np.zeros(len(x), bool)

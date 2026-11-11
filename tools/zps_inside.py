@@ -9,7 +9,8 @@ of `paved` lies more than 1 m off IPR's lidar, against 0-4 % for the street clas
 tools/zps_ground.py's verdict within its OFFSET of IPR, moved there, or off it unevenly along walls and slopes): it is
 marked `g`, and the page drapes it on its terrain (src/terrain.js DtmSurface: its triangles split to 5 m, the new points
 inside on the lidar, the outline keeping the survey's heights; #276's ground built offline will cut the terrain mesh by
-it instead: on line 37 that mesh as JSON was 750,000 triangles and 24 MB more). The uneven ones measured, their inside
+it instead: on line 37 that mesh as JSON was 750,000 triangles and 24 MB more), where its sheet misses the ground (MISS:
+a sheet that fits stays, smooth). The uneven ones measured, their inside
 beyond 1 m of IPR as a sheet and draped: green 54 % and 8.7 % (324,000 m²), paved 46 % and 17 %, rail 30 % and 1.7 %.
 An area too small for the lidar to see (a planter, a raised bed: #446), one under a cover (IPR interpolated under a wide
 deck, or the cover itself) and one the rails, DMR 5G or the user hold steadily off IPR keeps its sheet.
@@ -27,6 +28,11 @@ import shapely
 
 INSIDE = {"rail", "green", "paved"}  # the classes with heights only on their outline (measured above)
 DRAPE = {"fits", "lidar", "uneven"}  # zps_ground.judge's verdicts of an area lying open on IPR's ground
+# m: the sheet misses the ground where the 95th percentile of |sheet - IPR| inside is over this (zps_ground's OFFSET);
+# a sheet that fits stays (a paved yard draped on the lidar's 2 m terrain in 5 m triangles counted 8 cm waves the
+# street check reads: line 9's streetWaviness 2348 -> 2617 with every open area draped)
+MISS = 0.5
+STEP, INSET = 2.0, 0.5  # m: the lattice inside an area where its sheet is compared with IPR, and its distance off the outline
 REACH = 0.5  # m round an opening's streets: their vertices at its edge (the portals)
 PLUG = 1.0  # m under the deck's top: a ground-level vertex this high stands at the deck, not on the floor under it
 ALONG, ALONG_RATIO = np.radians(30), 1.5  # an area runs along the way: within this angle, this elongated
@@ -35,10 +41,84 @@ MIN_AXIS = 5.0  # m of the way under the decks: a shorter stub has no direction 
 WALK = 2.2  # m under the deck's top: IPR this low shows the floor at the vertex (tools/zps_decks.py WALK); higher, the cover
 
 
-def inside(areas, verdicts):
-    """The areas of INSIDE classes lying open on IPR's ground take the lidar inside (in place: `g` 1). verdicts:
-    zps_ground.judge's. Returns {"classes": {class: {"areas", "m2"}}, "kept": {verdict: areas}}."""
-    out = {"classes": {}, "kept": {}}
+def filled(ring, ground):
+    """The ring (n, 3) with its heights, a missing one from its nearest neighbour on the ring, else the ground (as the
+    page fills them)."""
+    r = np.array([[q[0], q[1], np.nan if q[2] is None else q[2]] for q in ring], float)
+    ok = np.flatnonzero(np.isfinite(r[:, 2]))
+    for i in np.flatnonzero(~np.isfinite(r[:, 2])):
+        if len(ok):
+            d = np.minimum(np.abs(ok - i), len(r) - np.abs(ok - i))
+            r[i, 2] = r[ok[np.argmin(d)], 2]
+        else:
+            r[i, 2] = np.asarray(ground(r[i:i + 1, 0], r[i:i + 1, 1]), float)[0]
+    return r
+
+
+def triangulate(rings):
+    """(n, 3, 3) triangles of the linear sheet over an outline and its holes ((m, 3) arrays): shapely's constrained
+    Delaunay (#276's T2; the page's earcut keeps the same outline)."""
+    try:
+        poly = shapely.Polygon(rings[0], rings[1:])
+        if not poly.is_valid:
+            poly = shapely.make_valid(poly)
+        tris = shapely.constrained_delaunay_triangles(poly)
+    except shapely.errors.GEOSException:
+        return np.zeros((0, 3, 3))
+    out = [shapely.get_coordinates(t, include_z=True)[:3] for t in shapely.get_parts(tris)]
+    out = [t for t in out if t.shape == (3, 3) and np.isfinite(t).all()]
+    return np.array(out, float) if out else np.zeros((0, 3, 3))
+
+
+def at(tris, x, y):
+    """Heights of a surface of triangles (n, 3, 3) at points (NaN off it): the first triangle holding each, barycentric."""
+    z = np.full(len(x), np.nan)
+    if not len(tris) or not len(x):
+        return z
+    tree = shapely.STRtree(shapely.polygons(tris[:, :, :2]))
+    pi, ti = tree.query(shapely.points(x, y), predicate="intersects")
+    t = tris[ti]
+    (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = (t[:, k].T for k in range(3))
+    d = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+    ok = np.abs(d) > 1e-12
+    d = np.where(ok, d, 1)
+    w0 = ((y1 - y2) * (x[pi] - x2) + (x2 - x1) * (y[pi] - y2)) / d
+    w1 = ((y2 - y0) * (x[pi] - x2) + (x0 - x2) * (y[pi] - y2)) / d
+    zz = w0 * z0 + w1 * z1 + (1 - w0 - w1) * z2
+    first = np.r_[True, pi[1:] != pi[:-1]] & ok
+    z[pi[first]] = zz[first]
+    return z
+
+
+def lattice(poly, step=STEP):
+    """Points every `step` m inside a polygon, INSET m or more off its outline."""
+    x0, y0, x1, y1 = poly.bounds
+    xs, ys = np.meshgrid(np.arange(np.floor(x0 / step) * step + step / 2, x1, step),
+                         np.arange(np.floor(y0 / step) * step + step / 2, y1, step))
+    xs, ys = xs.ravel(), ys.ravel()
+    inner = poly.buffer(-INSET)
+    keep = shapely.contains_xy(inner, xs, ys) if not inner.is_empty else np.zeros(len(xs), bool)
+    return xs[keep], ys[keep]
+
+
+def misses(a, ground):
+    """How far the area's sheet misses the ground inside it: the 95th percentile of |sheet - IPR| on the lattice, or
+    None where no point of the lattice lies in it (a narrow or small area)."""
+    rings = [filled(a["r"], ground)] + [filled(h, ground) for h in a.get("h", []) if len(h) >= 3]
+    poly = shapely.Polygon(rings[0][:, :2], [r[:, :2] for r in rings[1:]]).buffer(0)
+    x, y = lattice(poly)
+    if not len(x):
+        return None
+    d = np.abs(at(triangulate(rings), x, y) - np.asarray(ground(x, y), float))
+    d = d[np.isfinite(d)]
+    return float(np.percentile(d, 95)) if len(d) else None
+
+
+def inside(areas, verdicts, ground):
+    """The areas of INSIDE classes lying open on IPR's ground whose sheet misses it take the lidar inside (in place: `g`
+    1). verdicts: zps_ground.judge's; ground: IPR at city-frame arrays. Returns {"classes": {class: {"areas", "m2"}},
+    "fit": {class: areas whose sheet fits}, "kept": {verdict: areas}}."""
+    out = {"classes": {}, "fit": {}, "kept": {}}
     for i, a in enumerate(areas):
         if a["l"] != 0 or a["c"] not in INSIDE or len(a["r"]) < 3:
             continue
@@ -46,6 +126,10 @@ def inside(areas, verdicts):
         if v.get("verdict") not in DRAPE:
             k = v.get("verdict") or "none"
             out["kept"][k] = out["kept"].get(k, 0) + 1
+            continue
+        miss = misses(a, ground)
+        if miss is None or miss <= MISS:
+            out["fit"][a["c"]] = out["fit"].get(a["c"], 0) + 1
             continue
         a["g"] = 1
         c = out["classes"].setdefault(a["c"], {"areas": 0, "m2": 0.0})
