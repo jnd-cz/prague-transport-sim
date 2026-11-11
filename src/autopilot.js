@@ -406,8 +406,13 @@ export class Autopilot {
     // At 22.6 km/h down Chotkova's 49 ‰, 29 km/h the target, it pressed and was there in 2 s on step 1, where coasting took 5 s; the
     // driver of 6921 drove twice on the way down to Malostranská, #396)
     const gravityUp = !onCurve && !urgent && !hazard && aCoast < -0.05 && tr.v > 1 && tr.v < vtDrive && (vtDrive - tr.v) / -aCoast < COAST_T;
+    // (braking for a point just past a turn's contact, the brake waits until the pantograph is through on the button, where the point is
+    // still in hand at 1 m/s² from there: a brake step lifts the accelerator over 30 within a moment, and the drive pedal turned at 18.6
+    // km/h 20 m before Anděl in rain, line 9 seeds 2 and 5, #265; a driver coasts through on the button and brakes after it)
+    const throughBtn = btnSoon && fixedAt !== null && !hazard && tr.v > 1 &&
+      (tr.v * tr.v) / (2 * Math.max(0.5, fixedAt - STOP_MARGIN - tr.s - (cd.contact - tr.panto))) < 1.0;
     const coast = (!onCurve && between) || (onCurve && need > -300 && !shortUphill) || (!onCurve && Math.abs(vt - tr.v) < 0.25 && Math.abs(need) < 3000) ||
-      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6) || gravityUp;
+      (btnSoon && vt > vLine - 0.6 && !onCurve && !urgent && !hazard && tr.v > vt - 0.25 && tr.v < vt + 0.6) || throughBtn || gravityUp;
     // a turn under a contact while braking or coasting in: the switch button draws the current, the drive pedal stays off;
     // too fast for the button (the accelerator over 30), only the drive pedal can: the wrong way otherwise
     // (the position still falls as it brakes: the pedal only at the last moment, the foot's 0.3 s before the contact, if that was not enough)
