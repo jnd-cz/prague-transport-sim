@@ -78,6 +78,24 @@ class UnderDecks(unittest.TestCase):
         self.assertEqual(zs, [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR + 0.05])  # (the floor's own stays)
         self.assertEqual(deck["r"][0][2], DECK)
 
+    def test_a_vertex_nearer_the_top_than_the_floor_moves_its_twin_too(self):
+        """Modřany: of two vertices 0.1 m apart 0.98 and 1.03 m under the deck's top, both stand at the deck (a fixed 1 m
+        under the top moved one, a 1.6 m step); one over the floor is the floor's."""
+        deck, o, flat, ground = self.setup()
+        road = area([(5, -10, FLOOR), (15, -10, FLOOR), (15, 0, DECK - 0.98), (15, 0.1, DECK - 1.03), (15, 30, FLOOR),
+                     (5, 30, FLOOR), (5, 10, FLOOR + 0.6), (5, 5, FLOOR + 0.1)])
+        out = zi.under_decks([deck, road], [o], flat, ground)
+        self.assertEqual(out["vertices"], 2)
+        self.assertEqual([q[2] for q in road["r"]], [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR + 0.6, FLOOR + 0.1])
+
+    def test_a_level_over_the_passage_stays(self):
+        """By Hlavní nádraží a paved strip of the forecourt at 205 m lies over the tram's tunnel (the tram at 198 m) along
+        it, under the deck's underside at 207.7 m: a level between, not the deck's."""
+        deck, o, flat, ground = self.setup()
+        forecourt = rect(5, -10, 9, 30, DECK - 3.0, "paved")
+        self.assertEqual(zi.under_decks([deck, forecourt], [o], flat, ground)["vertices"], 0)
+        self.assertEqual({q[2] for q in forecourt["r"]}, {DECK - 3.0})
+
     def test_an_area_across_the_way_stays(self):
         """The tram over a footway's underpass at grade (line 37's east end): it runs across the way."""
         deck, o, flat, ground = self.setup()

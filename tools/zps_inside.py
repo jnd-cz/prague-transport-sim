@@ -23,9 +23,10 @@ Under a deck: where an OSM tunnel or covered way passes under the decks (tools/z
 floor (flatten's gap, WALK or more), the survey's ground-level street of the passage shares its 3D lines with the deck
 and alternates between its top and the floor (Divadelní: the road at the deck's height at both portals). Its vertices
 standing at the deck take IPR's ground (under_decks). Elsewhere under a level-1 area the survey's ground level
-stays: IPR is interpolated under wide decks (by Hlavní nádraží the forecourt's paving at 209-210 m over IPR's
-201-205 m) or reads the cover (stairs at 185 m under a deck at 189.6 m, IPR 189.5 m), and of the 14,235 ground-level outline vertices under level-1 areas on the
-five lines the middle half lie within -0.25 / +0.12 m of IPR.
+stays: a level may lie between the floor and the deck (by Hlavní nádraží the forecourt at 205 m over the tram's tunnel
+at 198 m, under a deck at 208.7 m), IPR reads the cover (stairs at 185 m under a deck at 189.6 m, IPR 189.5 m), and of
+the 14,235 ground-level outline vertices under level-1 areas on the five lines the middle half lie within -0.25 /
++0.12 m of IPR.
 """
 import numpy as np
 import shapely
@@ -39,7 +40,10 @@ HELD = {"survey", "review", "changing"}  # its verdicts holding an area off IPR 
 MISS = 0.5
 STEP, INSET = 2.0, 0.5  # m: the lattice inside an area where its sheet is compared with IPR, and its distance off the outline
 REACH = 0.5  # m round an opening's streets: their vertices at its edge (the portals)
-PLUG = 1.0  # m under the deck's top: a ground-level vertex this high stands at the deck, not on the floor under it
+# m under the deck's underside (its top less its slab `t`, else SLAB as the page draws it): a ground-level vertex this
+# high or higher stands at the deck, not on the floor under it (Modřany's pair 0.1 m apart, 0.98 and 1.03 m under a deck's
+# top, both within it; the forecourt's strip over the tram's tunnel by Hlavní nádraží, 3.6 m under the deck, not)
+AT_DECK, SLAB = 0.5, 1.0
 ALONG, ALONG_RATIO = np.radians(30), 1.5  # an area runs along the way: within this angle, this elongated
 AROUND = 20.0  # m round the way's axis: where an area's direction is read
 MIN_AXIS = 5.0  # m of the way under the decks: a shorter stub has no direction to read
@@ -164,8 +168,9 @@ def _bearing(g):
 
 
 def _deck_top(areas, decks):
-    """The decks' surface: z at points (the linear sheet over their outlines, constrained Delaunay), NaN off them."""
-    tris = []
+    """The decks' surface: (top, underside) at points, the top the linear sheet over their outlines (constrained Delaunay),
+    the underside the top less the deck's slab; NaN off them, the highest where decks overlap."""
+    tris, slab = [], []
     for i in decks:
         r = np.array([[q[0], q[1], np.nan if q[2] is None else q[2]] for q in areas[i]["r"]], float)
         if len(r) < 3 or not np.isfinite(r[:, 2]).all():
@@ -175,12 +180,13 @@ def _deck_top(areas, decks):
             c = shapely.get_coordinates(t, include_z=True)[:3]
             if c.shape == (3, 3) and np.isfinite(c).all():
                 tris.append(c)
-    tris = np.array(tris, float)
+                slab.append(areas[i].get("t") or SLAB)
+    tris, slab = np.array(tris, float), np.array(slab, float)
 
     def at(x, y):
-        z = np.full(len(x), np.nan)
+        z, u = np.full(len(x), np.nan), np.full(len(x), np.nan)
         if not len(tris):
-            return z
+            return z, u
         tree = shapely.STRtree(shapely.polygons(tris[:, :, :2]))
         pi, ti = tree.query(shapely.points(x, y), predicate="intersects")
         t = tris[ti]
@@ -191,17 +197,20 @@ def _deck_top(areas, decks):
         w1 = ((y2 - y0) * (x[pi] - x2) + (x0 - x2) * (y[pi] - y2)) / d
         zz = w0 * z0 + w1 * z1 + (1 - w0 - w1) * z2
         np.fmax.at(z, pi, zz)  # (the top one where decks overlap)
-        return z
+        np.fmax.at(u, pi, zz - slab[ti])
+        return z, u
     return at
 
 
 def under_decks(areas, opens, flat, ground):
     """In each opening whose floor IPR shows, the ground-level areas that run along the way under the decks (the street
-    of the passage, its sidewalks and kerbs) take IPR's ground at their vertices that stand at the deck (within PLUG under
-    its top or over it: the survey's lines shared with the deck). An area across the way is the one over the passage at
-    grade (the tram over a footway's underpass at the east end of line 37: its vertices at the rails' top, IPR 2.3-4.2 m
-    under them), a vertex well under the deck is the survey's floor, and one where IPR stands within WALK of the deck's top
-    reads the cover there (the forecourt by Hlavní nádraží): all stay. In place. opens: zps_decks.openings;
+    of the passage, its sidewalks and kerbs) take IPR's ground at their vertices that stand at the deck (AT_DECK under its
+    underside or higher: the survey's lines shared with the deck; Divadelní's kerb at the deck's 193.3 m over a floor at
+    187.7 m). An area across the way is the one over the passage at grade (the tram over a footway's underpass at the east
+    end of line 37: its vertices at the rails' top, IPR 2.3-4.2 m under them), a vertex under the deck's underside is the
+    survey's floor or a level between (by Hlavní nádraží the forecourt at 205 m over the tram's tunnel at 198 m and under
+    the deck at 208.7 m: the tram's area shares the forecourt's line there, #449), and one where IPR stands within WALK of
+    the deck's top reads the cover there: all stay. In place. opens: zps_decks.openings;
     flat: zps_decks.flatten's record (its "openings": the gap per way); ground: IPR at city-frame arrays.
     Returns {"openings": n, "areas": n, "vertices": n, "moved": [p5, p50, p95 of the moves]}."""
     seen = {o["way"] for o in flat["openings"] if o.get("gap") is not None and o.get("src") != "unseen"}
@@ -230,11 +239,11 @@ def under_decks(areas, opens, flat, ground):
                 hit = np.flatnonzero(shapely.contains_xy(cover, r[:, 0], r[:, 1]))
                 if not len(hit):
                     continue
-                t = top(r[hit, 0], r[hit, 1])
+                t, u = top(r[hit, 0], r[hit, 1])
                 g = np.asarray(ground(r[hit, 0], r[hit, 1]), float)
-                for i, zt, zg in zip(hit, t, g):
+                for i, zt, zu, zg in zip(hit, t, u, g):
                     z0 = r[i, 2]
-                    if not np.isfinite(zg) or not np.isfinite(zt) or (np.isfinite(z0) and z0 < zt - PLUG) or zg > zt - WALK:
+                    if not np.isfinite(zg) or not np.isfinite(zt) or (np.isfinite(z0) and z0 < zu - AT_DECK) or zg > zt - WALK:
                         continue
                     if np.isfinite(z0):
                         moves.append(zg - z0)
