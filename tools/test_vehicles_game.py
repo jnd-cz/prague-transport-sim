@@ -136,7 +136,7 @@ def main():
                 page.goto(f"{base}/?line={args.line}", timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
                 if vid == order[0]:
-                    menu = lambda: page.evaluate("[...document.getElementById('optModel').options].map((o) => [o.value, o.text])")  # noqa: E731
+                    menu = lambda page=page: page.evaluate("[...document.getElementById('optModel').options].map((o) => [o.value, o.text])")  # noqa: E731
                     r["menu"] = {"en": menu()}
                     page.evaluate("import('/src/i18n.js').then((m) => m.setLang('cs'))")
                     r["menu"]["cs"] = menu()
