@@ -62,6 +62,9 @@ BEND = 1.0         # m either side of a sample for the short radius (a 5 m windo
 BEND_LONG = 2.5    # m either side for the long radius (as tools/lint.js trackRadius; over 2 m a scatter of 2 cm alone
                    # reads as 25 m)
 NEAR = 10.0        # m around a place bending too tight whose points' tolerance grows
+HINGE = 1.5        # x MIN_RADIUS: the radius the sample a heading holds must reach over its own two segments, a
+                   # shorter reach than the 5 m MIN_RADIUS is held over (at 1x line 9's switch past Flora kept a 2.3° corner
+                   # between 0.3° turns; at 1.5x it eases off 0.9°, 0.7°, 0.4°, its points within 9.2 cm, under class 3)
 REPORT = 0.01      # m: a surveyed point the final curve misses by more than TOL + this is listed
 STEP = 1.0         # m between the curve's samples
 LAMBDA = 300.0     # bending weight: a smoothing length of (LAMBDA / point density)^(1/4), 5 m at a point per 2 m
@@ -168,6 +171,22 @@ def tight_at(px, py):
     return [min(l, s * f) for s, l in zip(short, long_)]
 
 
+def hinge_radii(px, py, hinges):
+    """{sample: the radius of its own turn, half its two segments over the angle}: at the sample a heading holds next to an
+    end, where the windows of `radii` reach only the end on one side (line 9 s 15958, a trailing switch: 4.5° in a metre
+    read 18.9 m over 2 m, and the branch met the straight with a corner)."""
+    out = {}
+    for s in hinges:
+        a, b = (px[s] - px[s - 1], py[s] - py[s - 1]), (px[s + 1] - px[s], py[s + 1] - py[s])
+        la, lb = math.hypot(*a), math.hypot(*b)
+        if la < 1e-9 or lb < 1e-9:
+            continue
+        turn = abs(math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]))
+        if turn > 1e-9:
+            out[s] = (la + lb) / 2 / turn
+    return out
+
+
 def class_errors(truth=None):
     """{accuracy class: mean coordinate error in metres} (data/truth.json `sourceAccuracy`, the decree's table)."""
     import json
@@ -203,6 +222,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     limit = list(limit) if limit is not None else list(tol)
     # held samples: fixed points, and the sample next to a fixed end along its heading
     held = {at[i]: q for i, q in fixed.items()}
+    hinges = []   # the samples a heading holds: the curve turns there from the held direction to its points
     for i, (hx, hy) in heading.items():
         s = at[i]
         nxt = s + 1 if i == 0 else s - 1   # (an end: the first point or the last)
@@ -211,6 +231,8 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
         h = abs(u[nxt] - u[s])
         p0 = held.get(s, (xs[s], ys[s]))
         held[nxt] = (p0[0] + hx * h, p0[1] + hy * h)
+        if 0 < nxt < n - 1:
+            hinges.append(nxt)
     weight = [0.0] * n
     for i, t in enumerate(tol):
         if t is not None and at[i] not in held:
@@ -261,6 +283,8 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
                 break
             px, py = solve()
         r = tight_at(px, py)
+        for s, rh in hinge_radii(px, py, hinges).items():
+            r[s] = min(r[s], rh / HINGE)
         tight = [u[i] for i in range(n) if r[i] < MIN_RADIUS * SLACK]
         grow = [i for i in data if tol[i] < limit[i] - 1e-9 and any(abs(u[at[i]] - t) <= NEAR for t in tight)]
         if not grow:

@@ -72,6 +72,26 @@ class Fit(unittest.TestCase):
         self.assertLessEqual(max(tol), tc.HOLD_LIMIT + 1e-9)
 
 
+    def test_a_branch_held_tangent_eases_off_without_a_corner(self):
+        # line 9 s 15958, a trailing switch past Flora: DI's branch, its first 11 m from the switch (relative to it), held
+        # tangent to the straight (`switch-start`). Held to 2 cm it turned 4.5° at the held sample a metre out (12.5 m
+        # over its own two metres), a corner the windows near the end read as 18.9 m
+        pts = [(0.0, 0.0), (-0.105, 1.985), (-0.145, 2.355), (-0.175, 2.735), (-0.205, 3.105), (-0.235, 3.475),
+               (-0.255, 3.855), (-0.275, 4.225), (-0.295, 4.605), (-0.305, 4.975), (-0.315, 5.355), (-0.325, 5.725),
+               (-0.335, 6.105), (-0.335, 6.475), (-0.335, 6.855), (-0.325, 7.225), (-0.325, 7.605), (-0.315, 7.975),
+               (-0.295, 8.235), (-0.275, 8.495), (-0.255, 8.755), (-0.225, 9.015), (-0.195, 9.275), (-0.165, 9.535),
+               (-0.125, 9.795), (-0.085, 10.045), (-0.045, 10.305), (0.005, 10.565), (0.045, 10.815), (0.105, 11.075)]
+        straight = (-0.10756377715724001, 0.994198186401317)
+        errors = tc.class_errors()
+        samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), fixed={0: pts[0]}, heading={0: straight},
+                                       limit=[errors['3']] * len(pts))
+        lead = (samples[1][0] - samples[0][0], samples[1][1] - samples[0][1])
+        self.assertLess(abs(lead[0] * straight[1] - lead[1] * straight[0]) / math.hypot(*lead), 1e-4)   # leaves along it
+        hinge = tc.hinge_radii([q[0] for q in samples], [q[1] for q in samples], [1])[1]
+        self.assertGreater(hinge, tc.HINGE * tc.MIN_RADIUS * tc.SLACK)
+        self.assertLessEqual(max(tol), errors['3'] + 1e-9)
+
+
 class Network(unittest.TestCase):
     def test_a_diverging_track_leaves_tangent_to_the_through_track(self):
         # the branch's points run straight 4° off the through track from the switch node
