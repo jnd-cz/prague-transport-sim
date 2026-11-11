@@ -714,10 +714,15 @@ Review these when realism matters; most move into the build in M2.
   miss a vertical kerb: the crossing check intersects its drawn top edge with rail-head chords too.
   Decisions are in `window.game.route.ground.pedestrianCrossings`.
   `--checks crossing` retains raw hits and source IDs, and fails on unexplained crossing obstructions.
-  Geometric side-surface classes have separate counts and places for rebuild comparisons. Held
-  patches go through `tools/crossing_review.py` into `reports/review/pedestrian-crossings.json`, opened
-  with `?line=17&review=reports/review/pedestrian-crossings.json`; answers stay held until reviewed
-  evidence supplies a place-based fact. Overlapping survey slab sides remain #166.
+  Geometric side-surface classes have separate counts and places for rebuild comparisons. A walkable
+  patch over the rail head within 6 m of a track, with no crossing evidence and not spanning the track,
+  keeps its survey height (`crossingSurveyReview`). Since #444 (PR #466: the survey's ground-level
+  triangles flipped to constrained Delaunay) none of them covers a rail head: on 2026-11-11, line 17 had
+  four beside the route's rails (U Libušského potoka, Pobřežní cesta, Nad Trojou twice), line 9 four
+  18–22 m from the route on Vozovna Motol's depot track, and the other lines none. #146's queue of six such
+  places on line 17 was dropped unanswered: four had stopped being candidates and two cover no rail. A
+  patch that covers a rail fails the check as an unexplained section. Overlapping survey slab sides
+  remain #166.
 - **Vienna-type stops**: carriageway on the doors' side 2.2–3.4 m from the track along the stop (the
   tram bed is not a car lane); facts per stop and direction in `truth.json` `stopTypes`.
 - **Bridges on the model deck**: on tagged spans with model samples, the model deck is fixed like a
