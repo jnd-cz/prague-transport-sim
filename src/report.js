@@ -29,11 +29,20 @@ addEventListener('unhandledrejection', (e) => noteError('rejection', e.reason?.m
 let version = null;
 fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => { version = v; }, () => {});
 
+// what the game adds to every note once it runs (src/main.js: the machine, the load times, the frame-time log)
+let extra = () => ({});
+export function addFacts(f) { extra = f; }
+
 // what any note carries about the page, whatever its state
 function pageFacts() {
+  let more = {};
+  try { more = extra() || {}; } catch { /* (a fact that fails leaves the others) */ }
   return { lang: getLang(), url: location.href, viewport: `${innerWidth}x${innerHeight}@${devicePixelRatio}`, ua: navigator.userAgent,
-    version: version || window.deployVersion || null, errors: errors.slice() };
+    version: version || window.deployVersion || null, errors: errors.slice(), ...more };
 }
+
+// a note of any kind with the page's facts: its id, or null
+export function sendNote(rec) { return postFeedback({ note: '', ...rec, ...pageFacts(), t: Date.now() }); }
 
 // a note to feedback.php: its id, or null when nothing took it
 export async function postFeedback(rec) {
@@ -51,7 +60,7 @@ export function failNote(where, el) {
   b.textContent = t('fb.sendError');
   b.onclick = async () => {
     b.disabled = true;
-    const id = await postFeedback({ kind: 'error', note: '', where, line: new URLSearchParams(location.search).get('line'), ...pageFacts(), t: Date.now() });
+    const id = await sendNote({ kind: 'error', where, line: new URLSearchParams(location.search).get('line') });
     b.textContent = id ? t('fb.errorSent') : t('fb.errorFailed');
   };
   el.append(b);

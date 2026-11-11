@@ -14,7 +14,8 @@ import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
-import { Reporter, canvasShot, place, noteError, failNote } from './report.js';
+import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
+import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
@@ -460,6 +461,7 @@ async function start() {
     signFacts: signFacts(truth),
   });
   game.runSeed = seed; // (replay: ?seed=N)
+  perfLog.reset({ line: data.line, model: have, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
@@ -531,9 +533,90 @@ function showResults() {
     <div>${t('res.avgDev')} <b>${fmtDev(avg).slice(1)}</b></div>
     ${pen ? `<h3>${t('res.penalties')}</h3><table class="res">${pen}</table>` : ''}
     <h3>${t('res.stops')}</h3><table class="res">${rows}</table>
+    <div id="perfAsk" class="sub" style="margin:10px 0"></div>
     <button class="primary" id="again">${t('res.again')}</button>`;
   $('results').classList.remove('hidden');
   $('again').onclick = () => { $('results').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+  offerPerf($('perfAsk'));
+}
+
+// ------------------------------------------------------------------ how it ran (#350)
+// Every drawn frame of a shift goes into the frame-time log (src/perf.js); a note carries its summary, the
+// machine and the load times, and a shift's end offers to send the summary: once, always (kept in this
+// browser) or not now. Nothing is sent without a click or that "always".
+const perfLog = new PerfLog();
+window.perfLog = perfLog;
+addFacts(() => ({ machine: machine(renderer), load: window.loadTimes || null, perf: perfLog.summary() }));
+const PERF_KEY = 'tram.perfSend';
+function offerPerf(el) {
+  const sum = perfLog.summary();
+  if (!sum || sum.seconds < 30) return;
+  let always = false;
+  try { always = localStorage.getItem(PERF_KEY) === 'always'; } catch { /* (no storage) */ }
+  const send = async () => { el.textContent = (await sendNote({ kind: 'perf', line: data.line })) ? t('res.perfSent') : t('fb.errorFailed'); };
+  if (always) { send(); return; }
+  el.innerHTML = `<div>${t('res.perfAsk')}</div><button id="perfSend">${t('res.perfSend')}</button> <button id="perfAlways">${t('res.perfAlways')}</button>`;
+  $('perfSend').onclick = send;
+  $('perfAlways').onclick = () => { try { localStorage.setItem(PERF_KEY, 'always'); } catch { /* (no storage) */ } send(); };
+}
+
+// The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
+// compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
+// 5 s to settle. The GPU's own time per frame where the browser has a timer.
+// (window.perfTestMs: a shorter run for tools/test_perf.py)
+const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
+let perfTest = null;
+async function startPerfTest() {
+  const keep = { auto: $('optAuto').checked, weather: $('optWeather').value };
+  const si = Math.floor((data.stops.length - 1) / 2), at8 = (trip) => Math.abs(trip[si] - 8 * 3600);
+  selStop.value = si;
+  fillTrips();
+  selTrip.value = data.timetable.reduce((b, trip, i) => (at8(trip) < at8(data.timetable[b]) ? i : b), 0);
+  $('optAuto').checked = true;
+  $('optWeather').value = 'dry';
+  window.runSeed = 1;
+  try { await start(); } finally {
+    delete window.runSeed;
+    $('optAuto').checked = keep.auto;
+    $('optWeather').value = keep.weather;
+  }
+  perfTest = { t0: performance.now(), phase: 'warm', timer: gpuTimer(renderer.getContext()), meta: { ...perfLog.meta, test: true, stop: data.stops[si].name } };
+  game.msg(t('pt.running'), 'info', 8);
+}
+$('btnPerfTest').addEventListener('click', startPerfTest);
+function perfTestStep(now) {
+  if (!perfTest || !game || game.finished) { perfTest = null; return; }
+  const el = now - perfTest.t0;
+  if (perfTest.phase === 'warm' && el > PT_WARM) { perfTest.phase = 'run'; perfLog.reset(perfTest.meta); }
+  else if (perfTest.phase === 'run' && el > PT_WARM + PT_LEN) finishPerfTest();
+  perfTest?.timer?.poll();
+}
+function finishPerfTest() {
+  const pt = perfTest;
+  perfTest = null;
+  game.paused = true;
+  hud.show(false);
+  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null }, m = machine(renderer);
+  const verdict = sum.over[33] < 2 ? 'good' : sum.over[33] < 10 ? 'ok' : 'slow';
+  const row = (k, v) => `<tr><td>${t(k)}</td><td>${v}</td></tr>`;
+  $('resultsCard').innerHTML = `
+    <h1>${t('pt.title')}</h1>
+    <div class="sub">${data.line} · ${pt.meta.stop} · ${sum.seconds} s</div>
+    <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
+    <table class="res">
+      ${row('pt.fps', sum.fps)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
+      ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
+      ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}`)}
+    </table>
+    <div class="sub">${t('pt.note')}</div>
+    <button class="primary" id="ptSend">${t('pt.send')}</button> <button id="ptMenu">${t('pt.menu')}</button>`;
+  $('results').classList.remove('hidden');
+  $('ptSend').onclick = async () => {
+    $('ptSend').disabled = true;
+    $('ptSend').textContent = (await sendNote({ kind: 'perftest', line: data.line, perftest: sum })) ? t('pt.sent') : t('fb.errorFailed');
+  };
+  $('ptMenu').onclick = () => { $('results').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+  window.perfTestResult = sum; // (tools/test_perf.py)
 }
 
 // ------------------------------------------------------------------ outdoor temperature
@@ -885,9 +968,17 @@ function frame(now) {
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
-    else renderer.render(scene, camera);
+    else {
+      const timing = perfTest?.phase === 'run' && perfTest.timer;
+      if (timing) timing.begin();
+      renderer.render(scene, camera);
+      if (timing) timing.end();
+    }
     lastDraw = now; window.drawCount++;
+    // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
+    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render);
   }
+  if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
