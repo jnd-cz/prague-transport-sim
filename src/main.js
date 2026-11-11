@@ -147,8 +147,18 @@ window.renderer = renderer; // (from the start, also in the menu: performance ch
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
+// Leaving the page (another line from the menu, a reload, a link): the graphics memory goes back at once instead of
+// whenever the browser collects the old page, and a page the browser kept for Back (its back/forward cache) loads
+// afresh rather than resuming without it (#350). Not on a hidden tab: that is visibilitychange, and the world stays.
+let leaving = false;
+addEventListener('pagehide', () => {
+  leaving = true;
+  try { renderer.dispose(); renderer.forceContextLoss(); } catch { /* (already lost) */ }
+});
+addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
+  if (leaving) return; // (our own release above, not the browser's)
   // (window.game, not game: the context can be lost while the world uploads, before `let game` below
   // is reached, and reading it then threw instead of showing this card)
   if (window.game) window.game.paused = true;
