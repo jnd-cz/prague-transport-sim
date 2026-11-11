@@ -2,7 +2,9 @@
 
 Config (git-ignored, in the checkout's root): deploy.local.json
     {"host": "<FTP host>", "user": "<FTP user>", "dir": "/httpdocs", "url": "https://testing.pipethebytes.com/"}
-Password: TRAM_DEPLOY_PASSWORD, else ~/.netrc (machine <host>), else asked; never stored by this tool.
+    optional "netrc": "<name>": the ~/.netrc machine to read instead of the host (two users on one FTP host)
+Password: TRAM_DEPLOY_PASSWORD, else ~/.netrc (machine <netrc or host> login <user>), else asked; never
+stored by this tool.
 Access protection is the web host's (Plesk: Password-Protected Directories); after a deploy the URL is
 checked to answer 401 without a login.
 
@@ -150,14 +152,18 @@ def plan(local, remote):
 def password(cfg):
     if os.environ.get("TRAM_DEPLOY_PASSWORD"):
         return os.environ["TRAM_DEPLOY_PASSWORD"]
+    # (.netrc keeps one entry per machine name: two FTP users on one host, the test site and the alpha's
+    # sim.8b.cz (#350), each look up a name of their own)
+    key = cfg.get("netrc") or cfg["host"]
     try:
-        auth = netrc.netrc().authenticators(cfg["host"])
+        auth = netrc.netrc().authenticators(key)
         if auth and auth[0] in (None, "", cfg["user"]) and auth[2]:
             return auth[2]
     except (FileNotFoundError, netrc.NetrcParseError):
         pass
     if not sys.stdin or not sys.stdin.isatty():
-        raise SystemExit(f"no password for {cfg['host']}: TRAM_DEPLOY_PASSWORD or ~/.netrc (nobody to ask)")
+        raise SystemExit(f"no password for {cfg['user']}@{cfg['host']}: TRAM_DEPLOY_PASSWORD or ~/.netrc "
+                         f"(machine {key} login {cfg['user']}; nobody to ask)")
     return getpass.getpass(f"FTP password for {cfg['user']}@{cfg['host']}: ")
 
 
