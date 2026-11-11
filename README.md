@@ -189,8 +189,8 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 ### Volby v menu
 
 - Automatické výhybky (palubní počítač staví každou výhybku rádiem místo trolejových kontaktů); přehled výkonu
-  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS); Test výkonu (minuta autopilotu na pevném úseku,
-  [Testování](#testování)).
+  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS); Test výkonu a Referenční test (minuta autopilotu na pevném
+  úseku, [Testování](#testování)).
 - Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
@@ -239,8 +239,10 @@ působí řízení a provoz.
 - **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v ⋯) zastaví hru a otevře poznámku. Přiloží místo na
   lince, stav tramvaje, verzi hry a případně obrázek obrazovky, takže stačí napsat, co vidíte a jak by to mělo
   být. Když se hra nespustí nebo grafika přestane pracovat, tlačítko „Poslat chybu autorům“ pošle, co se stalo.
-- **Plynulost:** Test výkonu v menu minutu jede autopilotem stejný úsek a ukáže, jak hra stíhá; výsledek můžete
-  poslat. Po směně se hra zeptá, jestli poslat její souhrn výkonu.
+- **Plynulost:** test výkonu v menu minutu jede autopilotem pevný úsek linky a ukáže, jak hra stíhá; výsledek
+  můžete poslat. Prosíme aspoň jednou o Referenční test: vždy linka 17 s podrobným modelem, takže jde porovnat
+  mezi počítači; Test výkonu změří linku, kterou právě máte. Po směně se hra zeptá, jestli poslat její souhrn
+  výkonu.
 - **Zatím nehodnoťte:** terén a obrubníky, budovy a mobiliář (přijdou v dalších vrstvách světa), zjednodušená
   auta a chodce, syntetizovaný zvuk, výkon po stupních místo proudu přes zrychlovač, jízdu jen jedním směrem a
   chybějící vozovny.

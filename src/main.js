@@ -572,12 +572,17 @@ function offerPerf(el) {
 
 // The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
 // compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
-// 5 s to settle. The GPU's own time per frame where the browser has a timer.
+// 5 s to settle. The GPU's own time per frame where the browser has a timer. Two buttons: the line loaded now, and
+// the reference run (line 17 with the detailed model, the heaviest line with surveyed streets: the one result
+// every machine has in common). From another line the reference opens line 17 (?reftest=<the line left>), runs
+// there, and its "Back to the menu" goes back to that line.
 // (window.perfTestMs: a shorter run for tools/test_perf.py)
 const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
+const REF_LINE = '17';
 let perfTest = null;
-async function startPerfTest() {
-  const keep = { auto: $('optAuto').checked, weather: $('optWeather').value };
+async function startPerfTest(reference = false) {
+  const keep = { auto: $('optAuto').checked, weather: $('optWeather').value, model: $('optModel').value, cars: $('optCars').value };
+  if (reference) { $('optModel').value = 'detailed'; $('optCars').value = 'auto'; }
   const si = Math.floor((data.stops.length - 1) / 2), at8 = (trip) => Math.abs(trip[si] - 8 * 3600);
   selStop.value = si;
   fillTrips();
@@ -589,11 +594,18 @@ async function startPerfTest() {
     delete window.runSeed;
     $('optAuto').checked = keep.auto;
     $('optWeather').value = keep.weather;
+    $('optModel').value = keep.model;
+    $('optCars').value = keep.cars;
   }
-  perfTest = { t0: performance.now(), phase: 'warm', timer: gpuTimer(renderer.getContext()), meta: { ...perfLog.meta, test: true, stop: data.stops[si].name } };
+  perfTest = { t0: performance.now(), phase: 'warm', timer: gpuTimer(renderer.getContext()),
+    meta: { ...perfLog.meta, test: true, reference, stop: data.stops[si].name } };
   game.msg(t('pt.running'), 'info', 8);
 }
-$('btnPerfTest').addEventListener('click', startPerfTest);
+$('btnPerfTest').addEventListener('click', () => startPerfTest(false));
+$('btnPerfRef').addEventListener('click', () => {
+  if (String(data.line) === REF_LINE) startPerfTest(true);
+  else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}`;
+});
 function perfTestStep(now) {
   if (!perfTest || !game || game.finished) { perfTest = null; return; }
   const el = now - perfTest.t0;
@@ -610,7 +622,7 @@ function finishPerfTest() {
   const verdict = sum.over[33] < 2 ? 'good' : sum.over[33] < 10 ? 'ok' : 'slow';
   const row = (k, v) => `<tr><td>${t(k)}</td><td>${v}</td></tr>`;
   $('resultsCard').innerHTML = `
-    <h1>${t('pt.title')}</h1>
+    <h1>${t(pt.meta.reference ? 'pt.titleRef' : 'pt.title')}</h1>
     <div class="sub">${data.line} · ${pt.meta.stop} · ${sum.seconds} s</div>
     <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
     <table class="res">
@@ -625,7 +637,12 @@ function finishPerfTest() {
     $('ptSend').disabled = true;
     $('ptSend').textContent = (await sendNote({ kind: 'perftest', line: data.line, perftest: sum })) ? t('pt.sent') : t('fb.errorFailed');
   };
-  $('ptMenu').onclick = () => { $('results').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+  $('ptMenu').onclick = () => {
+    // (a reference run started from another line goes back to it)
+    if (params.get('reftest')) { location.search = `?line=${encodeURIComponent(params.get('reftest'))}`; return; }
+    $('results').classList.add('hidden');
+    $('menu').classList.remove('hidden');
+  };
   window.perfTestResult = sum; // (tools/test_perf.py)
 }
 
@@ -1020,7 +1037,10 @@ if (params.has('review')) {
   review = new Review({ scene, camera, canvas, data, route, ground, world, url: params.get('review'), at: parseAt(params.get('at')) });
   window.review = review;
 } else if (params.has('seed') && params.has('at')) replayTo(+params.get('seed'), +params.get('at'));
-else $('menu').classList.remove('hidden');
+else {
+  $('menu').classList.remove('hidden');
+  if (params.has('reftest') && String(data.line) === REF_LINE) startPerfTest(true); // (the reference run, opened from another line)
+}
 requestAnimationFrame(frame);
 
 // ?seed=N&at=S: the traffic check's run with that seed (tools/traffic_lint.js: the same settings and

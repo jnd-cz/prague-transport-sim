@@ -109,12 +109,14 @@ def perf_table(got):
     for _, n in got:
         p = n.get("perftest") if n.get("kind") == "perftest" else n.get("perf") if n.get("kind") == "perf" else None
         if p and p.get("frames"):
-            rows.setdefault((machine(n), n["kind"]), []).append(p)
+            # (the reference run apart: line 17, the detailed model, the one result every machine has)
+            kind = "reference" if p.get("reference") else f"{n['kind']} {p.get('line', n.get('line', '?'))}"
+            rows.setdefault((machine(n), kind), []).append(p)
     med = lambda xs: sorted(xs)[len(xs) // 2]  # noqa: E731
-    out = [f"{'machine':60} {'kind':8} {'runs':>4} {'fps':>6} {'>33 ms':>7} {'GPU ms':>7}"]
+    out = [f"{'machine':60} {'kind':12} {'runs':>4} {'fps':>6} {'>33 ms':>7} {'GPU ms':>7}"]
     for (m, k), ps in sorted(rows.items()):
         gpu = [p["gpuMs"] for p in ps if p.get("gpuMs") is not None]
-        out.append(f"{m[:60]:60} {k:8} {len(ps):>4} {med([p['fps'] for p in ps]):>6} "
+        out.append(f"{m[:60]:60} {k:12} {len(ps):>4} {med([p['fps'] for p in ps]):>6} "
                    f"{med([p['over']['33'] for p in ps]):>6}% {med(gpu) if gpu else '-':>7}")
     return out
 

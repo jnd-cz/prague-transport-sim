@@ -1,9 +1,11 @@
 """The performance log and test (src/perf.js, #350): python -P -E tools/test_perf.py [--line 17] [--runs N [--same-page]] [--headed]
     python -P -E tools/test_perf.py --switch 17,9 --times 3     # line switches in one page, memory and CPU watched
+    python -P -E tools/test_perf.py --switch 17,9 --firefox --address [--no-release]
 
 tools/serve.py's handler on a free port, the notes in a temp folder, Chromium on the GPU (tools/gpu.py). Checks:
 - a feedback note sent after some driving carries the machine (its GPU), the load times and the frame-time log;
-- the menu's performance test (shortened to 8 s) drives, shows its result card, and Send stores a perftest note.
+- the menu's performance test (shortened to 8 s) drives, shows its result card, and Send stores a perftest note;
+- the reference test started on line 9 opens line 17, runs there with the detailed model, and goes back to line 9.
 --runs N: N full one-minute tests instead (headed, so the GPU draws as it does for a player), and the spread of
 their numbers: how comparable two runs on one machine are.
 --switch A,B: loads the lines in turn in one page as a player does (the menu's line choice: a navigation, with the
@@ -11,7 +13,11 @@ back/forward cache on as in a player's Chrome; Playwright turns it off by defaul
 with a 20 s autopilot shift, --times rounds. After each run or load (--runs and --switch) it prints what the page
 and the browser hold: the JS heap, the GPU geometries and textures three.js keeps, the main thread's busy time,
 and the private memory and CPU of this browser's processes by type (Windows; the machine should be quiet, as
-every Playwright Chromium on it is counted).
+every Playwright browser of that kind on it is counted).
+--firefox: --switch in Playwright's Firefox (its own back/forward cache on: browser.sessionhistory.max_total_viewers
+-1, Firefox's default); no JS heap or main-thread time there (Chromium's DevTools protocol). --address: each line by
+a new address in the same tab, as typed into the address bar, instead of the menu. --no-release: the page's
+release of the graphics on leaving (src/main.js pagehide) left out, to compare.
 """
 import argparse
 import faulthandler
@@ -46,21 +52,30 @@ def menu(page, url, short):
     page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
 
 
-PS = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.ExecutablePath -like '*ms-playwright*' } | "
-      "ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.ProcessId, $_.PrivatePageCount, ($_.KernelModeTime + $_.UserModeTime), $_.CommandLine }")
+PS = ("Get-CimInstance Win32_Process -Filter \"Name='{exe}'\" | Where-Object {{ $_.ExecutablePath -like '*ms-playwright*' }} | "
+      "ForEach-Object {{ '{{0}}|{{1}}|{{2}}|{{3}}' -f $_.ProcessId, $_.PrivatePageCount, ($_.KernelModeTime + $_.UserModeTime), $_.CommandLine }}")
+EXE = "chrome.exe"  # (firefox.exe with --firefox)
+
+
+def kind_of(cmd):
+    """renderer, gpu, browser or other, from a process's command line (Chromium's --type=, Firefox's last word)."""
+    if "-contentproc" in cmd:  # (Firefox: "... tab", "... gpu", "... rdd" ...)
+        k = cmd.split()[-1].strip('"')
+        return "renderer" if k == "tab" else "gpu" if k == "gpu" else "other"
+    m = re.search(r"--type=([\w-]+)", cmd)
+    return "browser" if not m else "renderer" if m[1] == "renderer" else "gpu" if m[1] == "gpu-process" else "other"
 
 
 def procs():
-    """{pid: (type, private MB, CPU s)} of Playwright's Chromium processes (Windows; {} elsewhere)."""
+    """{pid: (type, private MB, CPU s)} of Playwright's browser processes (Windows; {} elsewhere)."""
     if sys.platform != "win32":
         return {}
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", PS], capture_output=True, text=True).stdout
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", PS.format(exe=EXE)], capture_output=True, text=True).stdout
     got = {}
     for ln in out.splitlines():
         parts = ln.split("|", 3)
         if len(parts) == 4 and parts[0].isdigit():
-            kind = (re.search(r"--type=([\w-]+)", parts[3]) or [None, "browser"])[1]
-            got[int(parts[0])] = (kind, int(parts[1] or 0) / 1e6, int(parts[2] or 0) / 1e7)
+            got[int(parts[0])] = (kind_of(parts[3]), int(parts[1] or 0) / 1e6, int(parts[2] or 0) / 1e7)
     return got
 
 
@@ -75,9 +90,15 @@ class Watch:
               f"{'browser MB':>10} {'pages':>5} | cores busy: renderer gpu browser")
 
     def attach(self, page):
-        self.page, self.cdp = page, page.context.new_cdp_session(page)
+        self.page = page
+        try:
+            self.cdp = page.context.new_cdp_session(page)
+        except Exception:  # (Firefox: no DevTools protocol)
+            self.cdp = None
 
     def metrics(self):
+        if not self.cdp:
+            return {}
         self.cdp.send("Performance.enable")
         return {m["name"]: m["value"] for m in self.cdp.send("Performance.getMetrics")["metrics"]}
 
@@ -85,11 +106,10 @@ class Watch:
         m, now, cur = self.metrics(), time.time(), procs()
         mem = self.page.evaluate("window.renderer ? window.renderer.info.memory : {}")
         by = {}
-        for pid, (kind, mb, cpu) in cur.items():
-            k = "renderer" if kind == "renderer" else "gpu" if kind == "gpu-process" else "browser" if kind == "browser" else "other"
+        for pid, (k, mb, cpu) in cur.items():
             b = by.setdefault(k, [0.0, 0.0, 0])
             b[0] += mb
-            b[1] += cpu - self.cpu.get(pid, (kind, 0, cpu))[2]
+            b[1] += cpu - self.cpu.get(pid, (k, 0, cpu))[2]
             b[2] += 1
         wall = now - self.t
         # (the counter starts over with each document: after a navigation the new page's whole count)
@@ -102,15 +122,25 @@ class Watch:
         self.t, self.cpu = now, cur
 
 
-def switch(page, url, lines, times):
-    """Line after line in one page, as the menu's line choice loads it, each with a short autopilot shift."""
-    menu(page, url.split("?")[0] + f"?line={lines[0]}", 0)
+# (what the page does when it is left, src/main.js pagehide / pageshow, kept from being registered)
+NO_RELEASE = """{ const add = window.addEventListener;
+  window.addEventListener = function (type, ...rest) { if (type === 'pagehide' || type === 'pageshow') return; return add.call(this, type, ...rest); }; }"""
+
+
+def switch(page, url, lines, times, address=False):
+    """Line after line in one page, as the menu's line choice (or a new address) loads it, each with a short
+    autopilot shift."""
+    base = url.split("?")[0]
+    menu(page, f"{base}?line={lines[0]}", 0)
     w = Watch(page)
     w.step(f"line {lines[0]} loaded")
     for r in range(times):
         for i, ln in enumerate(lines):
             if r or i:
-                page.select_option("#selLine", ln)  # (a navigation: the page loads the other line's world)
+                if address:
+                    page.goto(f"{base}?line={ln}", timeout=180000)  # (as pasted into the address bar)
+                else:
+                    page.select_option("#selLine", ln)  # (a navigation: the page loads the other line's world)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
                 page.wait_for_timeout(3000)
                 w.step(f"round {r + 1}: line {ln} loaded")
@@ -137,6 +167,9 @@ def main():
     ap.add_argument("--same-page", action="store_true", help="--runs one after another in one page")
     ap.add_argument("--switch", help="lines to load in turn in one page, e.g. 17,9")
     ap.add_argument("--times", type=int, default=3, help="rounds of --switch")
+    ap.add_argument("--firefox", action="store_true", help="--switch in Firefox")
+    ap.add_argument("--address", action="store_true", help="--switch by a new address instead of the menu")
+    ap.add_argument("--no-release", action="store_true", help="--switch without the page's release on leaving")
     ap.add_argument("--headed", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -150,7 +183,12 @@ def main():
     fails = []
     try:
         with sync_playwright() as p:
-            if args.switch:
+            if args.switch and args.firefox:
+                global EXE
+                EXE = "firefox.exe"
+                browser = p.firefox.launch(headless=False, firefox_user_prefs={"browser.sessionhistory.max_total_viewers": -1})
+                name = gpu.renderer(browser)
+            elif args.switch:
                 # (Playwright turns the back/forward cache off; a player's Chrome keeps the left page there, and that
                 # is what a line switch may pile up)
                 browser = p.chromium.launch(headless=False, args=gpu.HARDWARE, ignore_default_args=["--disable-back-forward-cache"])
@@ -160,7 +198,9 @@ def main():
             print(f"WebGL: {name}")
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             if args.switch:
-                switch(page, url, args.switch.split(","), args.times)
+                if args.no_release:
+                    page.add_init_script(NO_RELEASE)
+                switch(page, url, args.switch.split(","), args.times, args.address)
                 browser.close()
                 return
             if args.runs:
@@ -207,6 +247,18 @@ def main():
             card = page.text_content("#resultsCard")
             page.click("#ptSend")
             page.wait_for_function("document.getElementById('ptSend').textContent.includes('Sent')", timeout=20000)
+            # the reference run from another line: line 17 with the detailed model, then back to the line left
+            page.click("#ptMenu")
+            page.goto(url.split("?")[0] + "?line=9", timeout=180000)
+            page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
+            page.evaluate("document.getElementById('optModel').value = 'simple'")
+            page.click("#btnPerfRef")
+            page.wait_for_function("window.perfTestResult", timeout=240000)
+            ref = page.evaluate("window.perfTestResult")
+            ref_title = page.text_content("#resultsCard h1")
+            page.click("#ptMenu")
+            page.wait_for_function("!document.getElementById('menu').classList.contains('hidden') && document.getElementById('selLine')", timeout=180000)
+            back = page.evaluate("new URLSearchParams(location.search).get('line')")
             browser.close()
     finally:
         server.shutdown()
@@ -231,9 +283,14 @@ def main():
         fails.append("no result card")
     if not test or test["perftest"].get("frames") != res.get("frames"):
         fails.append("Send stored no perftest note with the result")
+    if not (ref.get("reference") and str(ref.get("line")) == "17" and ref.get("model") == "hybrid" and ref.get("frames", 0) > 10):
+        fails.append(f"the reference run is not line 17 with the detailed model: {ref}")
+    if "17" not in (ref_title or "") or back != "9":
+        fails.append(f"the reference run: title {ref_title!r}, back on line {back!r} (wants 9)")
     if fails:
         sys.exit("; ".join(fails))
-    print("perf: a note carries the machine, load times and frame log; the test drives, shows and sends: pass")
+    print("perf: a note carries the machine, load times and frame log; the test drives, shows and sends; the reference "
+          "runs line 17 detailed and goes back: pass")
 
 
 if __name__ == "__main__":

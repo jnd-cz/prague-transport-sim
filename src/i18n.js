@@ -59,7 +59,7 @@ const DICT = {
     'menu.reviews': 'Review sets: findings waiting for an answer',
     'menu.help': 'Help', 'help.close': 'Close', 'help.failed': 'The help could not be loaded.',
     // performance (src/perf.js, src/main.js, #350)
-    'menu.perfTest': 'Performance test (1 min)', 'pt.running': 'Performance test: the autopilot drives for a minute, then the result',
+    'menu.perfTest': 'Performance test (this line, 1 min)', 'menu.perfRef': 'Reference test (line 17, 1 min)', 'pt.titleRef': 'Reference test (line 17)', 'pt.running': 'Performance test: the autopilot drives for a minute, then the result',
     'pt.title': 'Performance test', 'pt.good': 'Smooth: it keeps up with the display', 'pt.ok': 'Playable, with some slow frames', 'pt.slow': 'Slow on this machine',
     'pt.fps': 'Frames per second', 'pt.slow33': 'Frames slower than 33 ms', 'pt.p90': '9 frames in 10 within', 'pt.gpu': 'Graphics card time per frame',
     'pt.draws': 'Draw calls', 'pt.tris': 'Triangles', 'pt.gpuName': 'Graphics', 'pt.screen': 'Screen',
@@ -228,7 +228,7 @@ const DICT = {
     'menu.reviews': 'Sady k revizi: nálezy čekající na odpověď',
     'menu.help': 'Nápověda', 'help.close': 'Zavřít', 'help.failed': 'Nápovědu se nepodařilo načíst.',
     // výkon (src/perf.js, src/main.js, #350)
-    'menu.perfTest': 'Test výkonu (1 min)', 'pt.running': 'Test výkonu: minutu jede autopilot, pak výsledek',
+    'menu.perfTest': 'Test výkonu (tato linka, 1 min)', 'menu.perfRef': 'Referenční test (linka 17, 1 min)', 'pt.titleRef': 'Referenční test (linka 17)', 'pt.running': 'Test výkonu: minutu jede autopilot, pak výsledek',
     'pt.title': 'Test výkonu', 'pt.good': 'Plynulé: stíhá obnovovací frekvenci displeje', 'pt.ok': 'Hratelné, občas pomalejší snímek', 'pt.slow': 'Na tomto počítači pomalé',
     'pt.fps': 'Snímků za sekundu', 'pt.slow33': 'Snímků pomalejších než 33 ms', 'pt.p90': '9 snímků z 10 do', 'pt.gpu': 'Čas grafické karty na snímek',
     'pt.draws': 'Volání kreslení', 'pt.tris': 'Trojúhelníků', 'pt.gpuName': 'Grafika', 'pt.screen': 'Obrazovka',

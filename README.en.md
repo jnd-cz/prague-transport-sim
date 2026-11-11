@@ -194,8 +194,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 ### Menu options
 
 - Automatic switches (the onboard computer sets every switch by radio instead of the overhead contacts);
-  performance overlay (FPS, frame time, draw calls, triangles, JS heap); Performance test (a minute of the
-  autopilot on a fixed stretch, [Testing](#testing)).
+  performance overlay (FPS, frame time, draw calls, triangles, JS heap); Performance test and Reference test (a minute
+  of the autopilot on a fixed stretch, [Testing](#testing)).
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
@@ -247,9 +247,10 @@ helps most is how driving and the traffic feel to you.
   on the line, the tram's state, the game's version and, if you like, a screenshot, so it's enough to write what
   you see and how it should be. When the game doesn't start or the graphics stop, the "Send the error to the
   authors" button sends what happened.
-- **Smoothness:** the menu's Performance test drives the same stretch by autopilot for a minute and shows how
-  the game keeps up; you can send the result. After a shift the game asks whether to send its performance
-  summary.
+- **Smoothness:** a performance test in the menu drives a fixed stretch of a line by autopilot for a minute and
+  shows how the game keeps up; you can send the result. Please run the Reference test at least once: always
+  line 17 with the detailed model, so machines compare; the Performance test measures the line you have
+  loaded. After a shift the game asks whether to send its performance summary.
 - **Leave for now:** the ground and kerbs, buildings and street furniture (they come with the next layers of the
   world), the simplified cars and pedestrians, the synthesised sound, power in steps instead of current through
   the accelerator, driving in one direction only and the missing depots.
