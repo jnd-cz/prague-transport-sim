@@ -129,7 +129,36 @@ Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys
 checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
 it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
 `~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
-hour. Log: `reports/autodeploy.log`.
+hour. Log: `reports/autodeploy.log`. Every run also pulls the review verdicts and every target's feedback notes
+(`deploy.py --pull`). It deploys only the test site.
+
+**The closed alpha** (#350): `sim.8b.cz` on the same host, without a login. `deploy.local.json` names it under
+`targets` (`{"alpha": {"user": …, "netrc": "sim.8b.cz", "url": "https://sim.8b.cz/", "public": true}}`); a
+named target takes the top level's keys it does not set. A public target:
+- gets no review tools (`review.php`, `reviews.html`, `reports/review/`), and `robots.txt` with an
+  `X-Robots-Tag: noindex` header ask search engines to keep away;
+- is deployed only from a tagged commit (`git tag alpha-N`, pushed), never with `--dirty` or `--reports`;
+  `version.json` names the tag, so a tester's note says which version it was;
+- is checked after a deploy: the page and `version.json` served, every review tool 404, `feedback/` 403.
+
+`python -P -E tools/deploy.py --target alpha` from a checkout at the tag (`--dry-run` first).
+
+**Feedback** (#350): ✉ Feedback in a shift (F9, `src/report.js`) posts a note to `feedback.php` (`tools/feedback.php`,
+on every target): the note, the moment's state (place, tram, run, camera), the errors met on the page, the
+machine, the load times, the frame-time log (`src/perf.js`) and, if ticked, a screenshot. It only takes notes in,
+within its caps (2 MB a post, 5000 characters, 3000 notes and 500 MB kept, 20 a minute), stores no IP address,
+and nothing reads them back over HTTP. `deploy.py --pull` moves them off each host into the machine's feedback
+folder (`$TRAM_FEEDBACK`, else beside the data cache: `tramdata/feedback/<target>/`, never in git); `tools/serve.py`
+takes them locally into `local/` there. `python -I tools/feedback.py` lists them by kind (`--site`, `--line`,
+`--kind`), `--perf` gives frames per second and slow frames per machine. A note becomes an issue only when
+someone decides so.
+
+**Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame
+intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
+browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)
+says what a frame costs here. A shift's end offers to send the summary; the menu's Performance test drives a
+fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1) with the GPU's own time per frame where
+the browser has `EXT_disjoint_timer_query_webgl2`. `tools/test_perf.py --runs N` runs it N times here.
 
 ## Dev
 
@@ -303,7 +332,7 @@ grey. The answers are kept per line in the browser and sent to the server, which
 (the newer wins), so a phone and a computer share one review:
 - on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
   `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
-  on every run, and `python -P -E tools/deploy.py --pull-reviews` does it at once;
+  on every run, and `python -P -E tools/deploy.py --pull` does it at once;
 - with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
 
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.

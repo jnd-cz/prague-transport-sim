@@ -70,7 +70,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
 | `P` / `Esc` | pauza |
-| `F9` | nahlásit problém |
+| `F9` | napsat nám (zpětná vazba) |
 
 Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 
@@ -189,7 +189,8 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 ### Volby v menu
 
 - Automatické výhybky (palubní počítač staví každou výhybku rádiem místo trolejových kontaktů); přehled výkonu
-  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS).
+  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS); Test výkonu a Referenční test (minuta autopilotu na pevném
+  úseku, [Testování](#testování)).
 - Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
@@ -207,7 +208,7 @@ zařízení). Posílají klávesy klávesnice:
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
 - ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
-  zvuk, ⚑ hlášení.
+  zvuk, ✉ zpětná vazba.
 
 Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
 
@@ -227,6 +228,26 @@ autopilotu.
 ## Jazyk
 
 Rozhraní i tato nápověda jsou česky nebo anglicky (Nastavení → Jazyk v menu; prohlížeč si volbu pamatuje).
+
+## Testování
+
+Hra je v alfa verzi: celá jde projet, ale svět i jízda se teprve dodělávají. Nejvíc nám pomůže, jak na vás
+působí řízení a provoz.
+
+- **Na co se ptáme:** jak se ovládá kontrolér, rozjezd, výběh a brzdění; zastávky a jízdní řád; návěsti,
+  výhybky a pravidla; které pojmy nezní jako u řidičů tramvají; co vás při jízdě vytrhne.
+- **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v ⋯) zastaví hru a otevře poznámku. Přiloží místo na
+  lince, stav tramvaje, verzi hry a případně obrázek obrazovky, takže stačí napsat, co vidíte a jak by to mělo
+  být. Když se hra nespustí nebo grafika přestane pracovat, tlačítko „Poslat chybu autorům“ pošle, co se stalo.
+- **Plynulost:** test výkonu v menu minutu jede autopilotem pevný úsek linky a ukáže, jak hra stíhá; výsledek
+  můžete poslat. Prosíme aspoň jednou o Referenční test: vždy linka 17 s podrobným modelem, takže jde porovnat
+  mezi počítači; Test výkonu změří linku, kterou právě máte. Po směně se hra zeptá, jestli poslat její souhrn
+  výkonu.
+- **Zatím nehodnoťte:** terén a obrubníky, budovy a mobiliář (přijdou v dalších vrstvách světa), zjednodušená
+  auta a chodce, syntetizovaný zvuk, výkon po stupních místo proudu přes zrychlovač, jízdu jen jedním směrem a
+  chybějící vozovny.
+- **Co se odesílá:** jen to, co odešlete vy: poznámka a k ní místo, nastavení a verze hry, prohlížeč, grafická
+  karta, velikost obrazovky a chyby. Žádné jméno, účet ani adresa.
 
 <!-- /help -->
 

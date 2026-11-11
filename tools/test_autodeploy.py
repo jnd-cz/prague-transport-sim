@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autodeploy  # noqa: E402
 
 # stand-ins for the clone's snapshot.py and deploy.py: append their name to calls.txt ("pull" for
-# deploy.py --pull-reviews); a deploy fails when fail.txt exists, a pull when pullfail.txt does
+# deploy.py --pull); a deploy fails when fail.txt exists, a pull when pullfail.txt does
 STUB = """import os, sys
-pull = "--pull-reviews" in sys.argv
+pull = "--pull" in sys.argv
 open("calls.txt", "a").write(("pull" if pull else os.path.basename(__file__)) + "\\n")
 sys.exit(1 if os.path.exists("pullfail.txt" if pull else "fail.txt") and __file__.endswith("deploy.py") else 0)
 """

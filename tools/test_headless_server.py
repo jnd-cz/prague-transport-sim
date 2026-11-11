@@ -55,8 +55,9 @@ class Ownership(unittest.TestCase):
     def checkout(self, name, body):
         root = self.root / name
         (root/'tools').mkdir(parents=True)
-        # (serve.py imports reviews.py since #136: without it every server in these checkouts died at start)
-        for name in ('serve.py','reviews.py'):
+        # (serve.py imports reviews.py since #136 and feedback.py since #350: without them every server in these
+        # checkouts died at start)
+        for name in ('serve.py','reviews.py','feedback.py'):
             shutil.copyfile(SERVE.with_name(name),root/'tools'/name)
         (root/'index.html').write_text(body,encoding='utf-8')
         return root
