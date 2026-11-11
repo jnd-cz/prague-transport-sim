@@ -511,7 +511,7 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   minutes if not more"). That is a tram box's least, 17 dm³ by ČSN 28 1300, at a sander's 400–500 g per 30 s (Matečka 2015, VUT Brno,
   `raw/reference/adhesion/`, #266); the T3's own box is not known. 90 s ran dry on every line 9 run; the
   track brakes sand too. On a leaf patch (0.06) every step slips from a stand (step 1 pulls 0.60 m/s², the grip is 0.59), and
-  slipping wheels pull 0.7 of the grip, 0.41 m/s²: with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
+  slipping wheels pull 0.7 of the grip, 0.41 m/s² (main's on/off model; #265's creep curve, half the grip): with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
   at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). With 90 s, sanding at every slip and slide ran the box dry half way
   along lines 9, 17 and 22; sanding only where it decides something, it still ran dry there, while 23 and 37 kept a third to two
   thirds. Pulling away the autopilot sands only where slipping wheels would not climb with 0.15 m/s² to spare, then up to 3 m/s;
@@ -519,8 +519,28 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   20 km/h down 55 ‰ without sand and came in at 35; the autumn runs' speed penalty was 495, main's 53, and 38 with sand on every slide
   and the plan less the downhill's pull (`--checks autumn`, all lines, seeds 1–5). With the box empty the track brakes take a slide toward a
   point and let go once the rail under the tram gives what is still needed: held past a patch's end they stood the tram 13 m short
-  of Mezi Hřbitovy up 25 ‰. A slip takes a step less for 6 s, lower only if it still
-  slips 0.8 s on (the equipment lags the pedal). A slide over 1.2 s above 3 m/s costs the flats penalty (`src/game.js`).
+  of Mezi Hřbitovy up 25 ‰. How it reacts to a spin and a slide on the wheels' own speed: the next entry. A slide over 1.2 s above
+  3 m/s costs the flats penalty (`src/game.js`).
+- **Driving on slippery rail, the wheels turning on their own** (#265; `--checks autumn,rain,winter`, all lines, seeds 1–5, against
+  main's on/off model):
+  - **A step's force is fixed by its current** and does not fall with speed until the accelerator has run out
+    (`TR37.driveForceAt`). On a two-car set it is 23, 34, 46 and 59 kN on steps 1–4, up to 20 km/h. At 40 km/h steps 3 and 4 pull
+    35 and 41 kN.
+  - **Snow's 0.12 holds 42 kN standing and 32 kN at 40 km/h** (Curtius–Kniffler, `muSpeed`). Step 3 never stays within it.
+    - Let back onto step 3 every 4 s after a spin, it spun again: 270 spins on line 9 in snow.
+    - Capped at the grip at the speed, slipping fell to 0–4 s a run (main 29–125 s), and the presses and comfort came to about main's.
+    - The cap stops at the lowest step that still climbs the grade. Up Trojská's 80 ‰ in snow that step is at the grip, and only
+      sand holds it.
+  - **A locked wheel stays locked:**
+    - it gets half the grip;
+    - the equipment sees it standing, so the shoes come in.
+    Stepping off one step at a time, it slid 5–8 s from 25 km/h. Released at once, it grips again within a second.
+  - **At 57 km/h down Modřanská rokle in snow the rail gives 0.25 m/s²** after the descent's pull. A signal 272 m ahead then took the
+    tram over three limits. Down a descent it now keeps to what stops within 200 m.
+  - **Any step spins on a leaf patch (0.06).**
+    - Each spin is the pedal off and a press again: autumn's presses were 1.2–1.4 times main's.
+    - Sanding while the first axle crosses a patch on the drive pedal brings them within a few per cent of main's, at 2.5–3 times
+      main's sand: 270–400 s of the 25-minute box per run (#265's PR).
 - T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
   overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.

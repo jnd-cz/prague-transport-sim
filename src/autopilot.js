@@ -457,13 +457,20 @@ export class Autopilot {
     const railA = (sanded) => 9.81 * (sanded ? sandedMu(g.muAt(tr.s)) : g.muAt(tr.s)) * muSpeed(tr.v) + 9.81 * gradeHere;
     const needStop = fixed && stopAt !== null && tr.v > 0.8 ? (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s)) : 0;
     this.railSand = mu < 0.2 && needStop > Math.max(0.3, 1.1 * railA(false)) && tr.sand > 0;
-    // (and on the drive pedal over a leaf patch, sand while the first axle crosses it (coasting it does not spin): a driver sees the leaf mash on the rail, and the sand laid in
-    // front of the first axle stays for the axles behind (src/tram.js). Unsanded, any step spins on a patch's 0.06, and each spin is the
-    // pedal off and a press again: autumn's presses 1.2-1.4 times main's, #265. From 20 m before each patch and at the packed snow of
-    // every crossing it sanded 568 s a run on line 9 in autumn (main 145) and 1241 s in snow, most of the 25-minute box)
-    let patchAhead = false;
-    if (mu < 0.2 && tr.notch > 0 && tr.v > 0.5 && tr.sand > 0) for (let d = -4; d <= 3 && !patchAhead; d += 1) patchAhead = g.muAt(tr.s + d) < 0.07;
-    this.patchSand = patchAhead;
+    // (a leaf patch the driver sees, on slippery rail: at speed off the drive pedal until the tram is over it, as a careful driver eases off
+    // (the user, 2026-11-04, #265: "They ease of the drive and try again with less power"); pulling away or up a climb, where that would
+    // stall it, the drive stays on and it sands as the first axle crosses ("Only at grades where it would be difficult to get moving they would sand when
+    // accelerating"). Unsanded on the drive pedal any step spins on a patch's 0.06, and each spin is the pedal off and a press again:
+    // autumn's presses 1.2-1.4 times main's. Sanding over every patch it drove onto brought them to main's, at 2.5-3 times main's sand)
+    let onPatch = false, patchFirst = false;
+    if (mu < 0.2 && tr.v > 0.5) {
+      for (let d = -tr.length; d <= 3; d += 2) if (g.muAt(tr.s + d) < 0.07) { onPatch = true; if (d >= -4) patchFirst = true; }
+    }
+    // (at speed only: pulling away is getting moving, and kept off the pedal over a patch under the tram from 0.5 m/s it rolled to a stand
+    // and drove again, the mean delay 63 -> 302 s on line 9 in autumn)
+    const patchMove = gradeHere > 0.02 || tr.v < 6;
+    this.patchSand = patchFirst && patchMove && tr.notch > 0 && tr.sand > 0;
+    this.patchCoast = onPatch && !patchMove;
     this.sandT = this.startSand || this.climbSand || this.railSand || this.patchSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
     // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
@@ -474,7 +481,7 @@ export class Autopilot {
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
-      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn) && !needPedal && !shortUphill, fixed, aNeed,
+      stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn || this.patchCoast) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       railA: mu < 0.2 ? railA(tr.sanding || this.input.sand) : null,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
