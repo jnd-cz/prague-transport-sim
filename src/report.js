@@ -1,25 +1,71 @@
-// Report an issue from a shift or inspect mode (#138): ⚑ (or F9) pauses the game and opens a note; Send
-// stores the note, the state of the moment (place, tram, run, camera, version) and a screenshot as one
-// record report-<time>-<random> through the review store (src/verdicts.js: review.php on the host,
-// tools/serve.py locally), where tools/deploy.py --pull-reviews hands it to the agent as
-// reports/reviews/report-….json and .jpg. The id is shown to be quoted in chat.
+// Feedback from a shift (#138, #350): ✉ (or F9) pauses the game and opens a note; Send posts the note, the
+// moment's state (place, tram, run, camera, version), the errors met so far and, if ticked, a screenshot to
+// feedback.php (tools/feedback.php on the host, tools/serve.py locally), which stores it under an id of its own.
+// tools/deploy.py --pull moves the notes into reports/feedback/<site>/ and tools/feedback.py lists them: a note
+// is read, and becomes an issue only when someone decides so. The form tells the player what goes with a note.
+// The errors are kept from the page's start (script errors, rejected promises, a lost WebGL context), so a
+// note says what went wrong before it; a page that cannot start offers to send them alone (failNote).
 import { toLatLon } from './geo.js';
-import { postRecord } from './verdicts.js';
+import { t, getLang, onLangChange } from './i18n.js';
 
-const KINDS = ['track / terrain', 'streets / kerbs', 'buildings / objects', 'traffic / pedestrians', 'signals / rules', 'tram / physics', 'sound / HUD', 'other'];
+const KINDS = ['driving', 'stops', 'signals', 'track', 'city', 'traffic', 'controls', 'speed', 'other'];
 const SHOT_W = 1280; // px: the screenshot's largest width
+const MAX_ERRORS = 20, MAX_NOTE = 5000; // (MAX_NOTE: feedback.php's cap)
+
+// ------------------------------------------------------------------ errors met on this page
+export const errors = [];
+export function noteError(kind, msg, where) {
+  if (errors.length >= MAX_ERRORS) errors.shift();
+  errors.push({ t: Math.round(performance.now() / 100) / 10, kind, msg: String(msg).slice(0, 300), ...(where ? { where } : {}) });
+}
+addEventListener('error', (e) => {
+  // (no e.error: the browser's own notices, like a ResizeObserver loop; a resource that failed has no message)
+  if (e.error || e.message) noteError('error', e.message || e.error, e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : undefined);
+});
+addEventListener('unhandledrejection', (e) => noteError('rejection', e.reason?.message || e.reason));
+
+// the deployed version (tools/deploy.py's version.json; none locally). Fetched here as well as in main.js: on a
+// phone main's answer came back empty in the first reports
+let version = null;
+fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => { version = v; }, () => {});
+
+// what any note carries about the page, whatever its state
+function pageFacts() {
+  return { lang: getLang(), url: location.href, viewport: `${innerWidth}x${innerHeight}@${devicePixelRatio}`, ua: navigator.userAgent,
+    version: version || window.deployVersion || null, errors: errors.slice() };
+}
+
+// a note to feedback.php: its id, or null when nothing took it
+export async function postFeedback(rec) {
+  try {
+    const r = await fetch('feedback.php', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Feedback': '1' }, body: JSON.stringify(rec) });
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return null;
+    return (await r.json()).id || null;
+  } catch { return null; } // (offline)
+}
+
+// the errors alone, from a page that stopped (the loading screen, a lost context): one click sends them
+export function failNote(where, el) {
+  const b = document.createElement('button');
+  b.className = 'fbSendError';
+  b.textContent = t('fb.sendError');
+  b.onclick = async () => {
+    b.disabled = true;
+    const id = await postFeedback({ kind: 'error', note: '', where, line: new URLSearchParams(location.search).get('line'), ...pageFacts(), t: Date.now() });
+    b.textContent = id ? t('fb.errorSent') : t('fb.errorFailed');
+  };
+  el.append(b);
+  return b;
+}
 
 export class Reporter {
   // state(): the moment's facts; shot(): a data URL of the frame as drawn now; pause(on) / paused()
   constructor({ state, shot, pause }) {
     Object.assign(this, { state, shot, pause });
-    this.version = null;
-    // (also from main.js's own request: on a phone this one came back empty in the first reports)
-    fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => { this.version = v; }, () => {});
     const css = document.createElement('style');
     css.textContent = `
-#rpBtn { position: fixed; left: 8px; bottom: 8px; z-index: 70; font: 600 15px system-ui, sans-serif; color: #fff; background: rgba(150,40,40,.85);
-  border: 1px solid #e88; border-radius: 8px; padding: 6px 10px; cursor: pointer; display: none }
+#rpBtn { position: fixed; left: 8px; bottom: 8px; z-index: 70; font: 600 15px system-ui, sans-serif; color: #fff; background: rgba(40,80,130,.85);
+  border: 1px solid #8ab; border-radius: 8px; padding: 6px 10px; cursor: pointer; display: none }
 body.shift #rpBtn { display: block }
 #rpBox { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.45) }
 #rpBox.show { display: flex }
@@ -34,40 +80,56 @@ body.shift #rpBtn { display: block }
     document.head.appendChild(css);
     const b = (this.btn = document.createElement('button'));
     b.id = 'rpBtn';
-    b.textContent = '⚑ Report';
-    b.title = 'report what you see here (F9)';
     b.onclick = () => this.open();
     const box = (this.box = document.createElement('div'));
     box.id = 'rpBox';
-    box.innerHTML = `<div class="p"><b>Report an issue</b>
-<select id="rpKind">${KINDS.map((k) => `<option>${k}</option>`).join('')}</select>
-<textarea id="rpNote" rows="4" placeholder="what is wrong here, what should it be"></textarea>
-<label><input type="checkbox" id="rpShot" checked> with the screenshot</label><img id="rpImg" alt="">
+    box.innerHTML = `<div class="p"><b id="rpTitle"></b>
+<select id="rpKind">${KINDS.map((k) => `<option value="${k}"></option>`).join('')}</select>
+<textarea id="rpNote" rows="4" maxlength="${MAX_NOTE}"></textarea>
+<label><input type="checkbox" id="rpShot" checked> <span id="rpShotL"></span></label><img id="rpImg" alt="">
+<div class="dim" id="rpWhat"></div>
 <div class="dim" id="rpWhere"></div>
-<div class="row"><button id="rpCancel">Cancel</button><button class="go" id="rpSend">Send</button></div>
+<div class="row"><button id="rpCancel"></button><button class="go" id="rpSend"></button></div>
 <div class="dim" id="rpMsg"></div></div>`;
     document.body.append(b, box);
     const $ = (id) => box.querySelector(`#${id}`);
     this.$ = $;
+    this.texts();
+    onLangChange(() => this.texts());
     $('rpCancel').onclick = () => this.close();
     $('rpSend').onclick = () => this.send();
     $('rpShot').onchange = () => { $('rpImg').style.display = $('rpShot').checked ? '' : 'none'; };
     box.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') this.close(); });
   }
 
+  // the labels in the language chosen now
+  texts() {
+    const $ = this.$;
+    this.btn.textContent = t('fb.button');
+    this.btn.title = t('fb.buttonTitle');
+    $('rpTitle').textContent = t('fb.title');
+    for (const o of $('rpKind').options) o.textContent = t(`fb.k.${o.value}`);
+    $('rpNote').placeholder = t('fb.note');
+    $('rpShotL').textContent = t('fb.shot');
+    $('rpWhat').textContent = t('fb.what');
+    $('rpCancel').textContent = t('fb.cancel');
+    $('rpSend').textContent = t('fb.send');
+  }
+
   get isOpen() { return this.box.classList.contains('show'); }
 
   open() {
     if (this.isOpen) return;
-    // (the picture and the facts first: what is on the screen when the reporter decided to report)
+    // (the picture and the facts first: what is on the screen when the player decided to write)
     this.img = (() => { try { return this.shot(); } catch { return null; } })();
     this.facts = this.state();
     this.wasPaused = this.pause();
     const $ = this.$, f = this.facts;
+    this.texts();
     $('rpImg').src = this.img || '';
-    $('rpImg').style.display = this.img ? '' : 'none';
+    $('rpImg').style.display = this.img && $('rpShot').checked ? '' : 'none';
     $('rpShot').parentElement.style.display = this.img ? '' : 'none';
-    $('rpWhere').textContent = [`line ${f.line}`, f.tram && `s ${f.tram.s} m, ${f.tram.kmh} km/h`, f.nextStop && `next ${f.nextStop}`, f.clock, `${f.lat}, ${f.lon}`].filter(Boolean).join(' · ');
+    $('rpWhere').textContent = [`${f.line}`, f.tram && `${f.tram.kmh} km/h`, f.nextStop && `→ ${f.nextStop}`, f.clock].filter(Boolean).join(' · ');
     $('rpMsg').textContent = '';
     $('rpSend').disabled = false;
     this.box.classList.add('show');
@@ -80,24 +142,23 @@ body.shift #rpBtn { display: block }
   }
 
   async send() {
-    const $ = this.$, d = new Date(), p = (n) => String(n).padStart(2, '0');
-    const id = `report-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}`;
-    const rec = { kind: $('rpKind').value, note: $('rpNote').value.trim(), ...this.facts, version: this.version || window.deployVersion || null,
-      shot: $('rpShot').checked ? this.img : null, t: Date.now() };
+    const $ = this.$, note = $('rpNote').value.trim();
+    if (!note) { $('rpMsg').textContent = t('fb.empty'); return; }
+    const rec = { kind: $('rpKind').value, note, ...this.facts, ...pageFacts(), shot: $('rpShot').checked ? this.img : null, t: Date.now() };
     $('rpSend').disabled = true;
-    $('rpMsg').textContent = 'sending…';
-    const ok = await postRecord(id, { meta: { report: true }, items: { [id]: rec } });
-    if (ok) {
-      $('rpMsg').innerHTML = `Sent as <b>${id}</b>: quote it in the chat.`;
+    $('rpMsg').textContent = t('fb.sending');
+    const id = await postFeedback(rec);
+    if (id) {
+      $('rpMsg').textContent = t('fb.sent', { id });
       setTimeout(() => { if (this.isOpen && $('rpMsg').textContent.includes(id)) this.close(); }, 4000);
       $('rpNote').value = '';
     } else {
-      // (no server: the record as a file, so nothing is lost)
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify({ items: { [id]: rec } })], { type: 'application/json' }));
-      a.download = `${id}.json`;
+      // (no server took it: the note as a file, so nothing is lost)
+      const file = `feedback-${Date.now()}.json`, a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(rec)], { type: 'application/json' }));
+      a.download = file;
       a.click();
-      $('rpMsg').textContent = `The server did not take it: saved as ${id}.json in your downloads.`;
+      $('rpMsg').textContent = t('fb.failed', { file });
       $('rpSend').disabled = false;
     }
   }

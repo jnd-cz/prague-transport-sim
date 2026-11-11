@@ -303,7 +303,7 @@ grey. The answers are kept per line in the browser and sent to the server, which
 (the newer wins), so a phone and a computer share one review:
 - on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
   `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
-  on every run, and `python -P -E tools/deploy.py --pull-reviews` does it at once;
+  on every run, and `python -P -E tools/deploy.py --pull` does it at once;
 - with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
 
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.

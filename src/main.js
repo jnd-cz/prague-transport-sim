@@ -14,7 +14,7 @@ import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
-import { Reporter, canvasShot, place } from './report.js';
+import { Reporter, canvasShot, place, noteError, failNote } from './report.js';
 import { TouchControls } from './touch.js';
 import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
@@ -155,6 +155,8 @@ canvas.addEventListener('webglcontextlost', (e) => {
   card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
   $('results').classList.remove('hidden');
   $('glReload').onclick = () => location.reload();
+  noteError('contextlost', 'WebGL context lost');
+  failNote('contextlost', card);
 });
 const scene = new THREE.Scene();
 const debugOverlay = createDebugOverlay(scene);
@@ -788,7 +790,7 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
-// ⚑ Report (F9, #138): a note with the moment's state and a screenshot, for the agent to look into
+// ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php
 const reporter = new Reporter({
   shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
   pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },

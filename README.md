@@ -70,7 +70,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
 | `P` / `Esc` | pauza |
-| `F9` | nahlásit problém |
+| `F9` | napsat nám (zpětná vazba) |
 
 Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 
@@ -207,7 +207,7 @@ zařízení). Posílají klávesy klávesnice:
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
 - ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
-  zvuk, ⚑ hlášení.
+  zvuk, ✉ zpětná vazba.
 
 Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
 

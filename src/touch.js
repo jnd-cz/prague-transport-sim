@@ -1,6 +1,6 @@
 // On-screen controls for a phone or tablet (#79): the essentials as buttons over the view, sending the same
 // key events as the keyboard (src/main.js keeps one control path). Shown on a touch screen by default;
-// the 🎮 button in the menu switches them, remembered per device. ⋯ opens the rarer ones, ⚑ the report.
+// the 🎮 button in the menu switches them, remembered per device. ⋯ opens the rarer ones, ✉ the feedback note.
 import { t } from './i18n.js';
 
 const KEY = 'tram-touch';
@@ -8,7 +8,7 @@ const KEY = 'tram-touch';
 const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', false, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', false, 'drive'], [' ', 'tb.stop', true, 'emerg']];
 const SIDE = [['d', 'tb.doors'], ['b', 'tb.bell'], ['a', 'tb.sand', true], ['q', '◀', true], ['e', '▶', true], ['g', '🔍', true], ['v', 'tb.view'], ['z', 'tb.mirror'], ['p', 'II']];
 // (the indicators: left, right, hazard; the high beams: held a flash, 'L' on and off as Shift+L)
-const MORE = [[',', '⇦'], ['.', '⇨'], ['/', '⚠'], ['l', 'tb.flash', true], ['L', 'tb.beam'], ['r', 'tb.park'], ['y', 'tb.switch', true], ['x', 'tb.iron'], ['c', 'tb.cutout', true], ['h', 'tb.saloon'], ['k', 'tb.cab'], ['f', 'tb.flap'], ['o', 'tb.auto'], ['m', 'tb.mute'], ['F9', '⚑']];
+const MORE = [[',', '⇦'], ['.', '⇨'], ['/', '⚠'], ['l', 'tb.flash', true], ['L', 'tb.beam'], ['r', 'tb.park'], ['y', 'tb.switch', true], ['x', 'tb.iron'], ['c', 'tb.cutout', true], ['h', 'tb.saloon'], ['k', 'tb.cab'], ['f', 'tb.flap'], ['o', 'tb.auto'], ['m', 'tb.mute'], ['F9', '✉']];
 
 export class TouchControls {
   constructor({ deadman }) {

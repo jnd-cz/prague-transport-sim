@@ -71,7 +71,7 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `O` | autopilot on and off |
 | `M` | sound on and off |
 | `P` / `Esc` | pause |
-| `F9` | report a problem |
+| `F9` | write to us (feedback) |
 
 The dead-man pedal, when it is on in the menu, is `Shift` held.
 
@@ -213,7 +213,7 @@ device). They send the keyboard's keys:
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
 - ⋯ for the rest: indicators ⇦ ⇨, hazard lights ⚠, high beams (a flash held, on and off), park (advanced controls), switch contact, switch iron, heating cut-out, heating,
-  autopilot, sound, ⚑ report.
+  autopilot, sound, ✉ feedback.
 
 On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
 
