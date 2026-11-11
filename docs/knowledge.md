@@ -711,8 +711,8 @@ Review these when realism matters; most move into the build in M2.
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - `--checks stops` counts the drive pedal's presses from 0 (*našlápnutí*), those made rolling (over 1 m/s), the brake's applies
-  and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide, sand and
-  the emergency brake, `rain` in rain (0.17 ± 0.02) and `winter` in snow (ice, 0.08, ±4 m at the pedestrian crossings). A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
+  and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide (seconds, episodes, and slides
+  begun within 30 m of a stop: `slidesAtStops`, #265), sand and the emergency brake, `rain` in rain (0.17 ± 0.02) and `winter` in snow (ice, 0.08, ±4 m at the pedestrian crossings). A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
   coasting. Dry, main pressed 19–24 times a km (70 % rolling), the #351 autopilot 8.4–13 (lines 37 and 23).
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with main's baseline in the data store.
