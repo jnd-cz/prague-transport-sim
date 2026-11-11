@@ -52,7 +52,8 @@ body.shift .tbToggle { display: none }
 .tbToggle.fs { left: 56px }
 #fsAsk { position: fixed; top: 8px; left: 104px; right: 8px; z-index: 11; display: none; gap: 8px; align-items: center; flex-wrap: wrap;
   background: rgba(15,20,17,.94); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 6px 10px; font: 14px system-ui, sans-serif; color: #eee }
-#fsAsk.show { display: flex } body.shift #fsAsk { display: none }
+/* (only over the game's menu: not in a shift, nor over ?review's map) */
+#menu:not(.hidden) ~ #fsAsk.show { display: flex } body.shift #fsAsk { display: none }
 #fsAsk button { font: 600 14px system-ui, sans-serif; padding: 6px 12px; border-radius: 6px }
 #fsTurn { position: fixed; top: 40%; left: 50%; transform: translateX(-50%); z-index: 7; display: none; pointer-events: none;
   background: rgba(10,14,12,.86); color: #eee; padding: 8px 14px; border-radius: 8px; font: 600 15px system-ui, sans-serif }
