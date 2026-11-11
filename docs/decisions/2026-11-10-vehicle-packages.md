@@ -1,7 +1,9 @@
 # Vehicles, liveries and sound packs as data packages a player installs (#456)
 
-Status: **proposed**. Questions for the user at the end. It builds on the registry of #455 (a `vehicle.json`
-per model in `assets/<id>/`, listed in `assets/vehicles.json`, PR #461) and on tier 2 movement (#454).
+Status: **accepted** with the user's answers (2026-11-11, PR #462), quoted at the end and folded into the sections
+below. It builds on the registry of #455 (a `vehicle.json` per model in `assets/<id>/`, listed in
+`assets/vehicles.json`, PR #461) and on tier 2 movement (#454). The first step is the rigged loader (section 2,
+#467).
 
 The user, 2026-11-10 (PR #430): "build up common vehicle interface ... To make it easy to plug in new vehicles
 that can be also automatically recognized and checked by the game on startup, so the player can install it
@@ -59,6 +61,11 @@ A package is a folder (in the repository, or a .zip the player installs) with `p
 }
 ```
 
+**A complete vehicle pack** is one archive holding several packages, each in its own folder with its own
+`package.json` (the vehicle, its liveries, its sounds, its fleet): installing the archive installs them all, and
+each can still be switched off or removed alone (the user: "separate with possibility to bundle them together in a
+single archive for complete vehicle pack").
+
 The rest of the file depends on its `kind`. `vehicle` is #455's `vehicle.json` grown into this format (#455's fields
 stay; `version`, `game`, `requires`, `description`, `thumbnail` and the hashes are added). `livery`, `sounds` and
 `fleet` packages name the vehicle they are for in `requires` and add to it; any number of them can be installed
@@ -93,10 +100,10 @@ a slot name and the glTF material whose `baseColorTexture` it replaces) and its 
   "textures": { "sides": "sides.webp", "front": "front.webp" },
   "colours": { "band": "#efe3c0" },
   "numbers": { "font": "fleet-dpp", "colour": "#e3b625" },
-  "types": ["T3SUCS"], "era": [1990, 2010] }
+  "types": ["T3SUCS"] }
 ```
 Only what it changes; every other slot falls back to the vehicle's own. `types` limits it to some of the vehicle's
-variants, `era` to the years it was on the street (for a timetable of that year, later).
+variants. No years: the user saw no use for them (answer 2).
 
 **Advanced livery**, additions:
 - `mask`: one RGB texture whose channels each take a `colours` entry (ETS2's colormask), so one file gives many
@@ -119,23 +126,28 @@ Numbers are **drawn by the game** into the placeholders (MSFS's way, and the bui
 A `fleet` (in the vehicle's manifest, or a `fleet` package for an operator or a period) lists what may appear:
 ```json
 { "kind": "fleet", "requires": { "t3h": ">=1" },
-  "operator": "DPP", "year": 2005,
+  "operator": "DPP",
   "types": {
-    "T3SUCS": { "ranges": [[7001, 7292]], "except": [7019, [7100, 7104]] },
-    "T3M":    { "ranges": [[8005, 8106]] },
-    "T3R.P":  { "list": [8409, 8544, 8545, 8565] }
+    "T3":     { "ranges": [[6400, 6992]], "except": [] },
+    "T3SUCS": { "ranges": [[7001, 7292]] },
+    "T3M":    { "ranges": [[8005, 8106]] }
   },
-  "sets": [[8565, 8409], [8544, 8545]],
-  "liveries": { "8544": "cvr.besip", "8545": "cvr.besip" } }
+  "sets": [[6892, 6921], [7269, 7290], [8080, 8074]],
+  "liveries": { "<number>": "<livery id>" } }
 ```
 - `ranges` with `except` (holes: withdrawn cars, renumbered ones) or an explicit `list`;
 - `sets`: pairs that run together (Prague's sets are not consecutive, SimT declares them in the lead car); a set
-  not listed is two numbers dealt from the same type;
+  not listed is two numbers dealt from the same type. Real sets change, so a fleet lists the pairs it means rather
+  than a source's: the project's first ones are the historic cars still kept, paired as the user gives them,
+  6892+6921, 7269+7290 and 8080+8074 (answer 2);
+- the player's **preferred set** (optional, answer 2): the set our own tram runs as, picked in the menu from the
+  fleet's sets and numbers; without one it is dealt like the others;
 - `liveries`: the livery a number wears (an advertising wrap), by the livery's id;
 - **dealing**: the run's seeded random stream (`src/random.js`) shuffles the numbers of each type and deals them
   without repeats, so no two sets on the street carry the same number, and a replay of the run deals the same;
   each type as often as it has numbers (the user, 2026-11-10: "roughly related to their range sizes"); when every
-  number is out, it deals again from the start. Our own tram's number: the player's pick, or dealt the same way.
+  number is out, it deals again from the start. Our own tram's numbers: the player's preferred set, or dealt the
+  same way, and no AI tram is dealt them;
 - today's `variants` in #455's manifest (`{ type, fleet: [[first, last]] }`) is the first step of this; the game
   picks by the run number now and moves to the dealing with this.
 
@@ -155,6 +167,12 @@ The game publishes two lists in `docs/vehicles.md`, generated from the code so t
   `tractiveForce` (kN), `brakeForce` (kN), `controller` (the cam's position), `mgRpm` (the motor-generator),
   `curveRadius` (m), `slide` (0/1), `trackBrake` (0/1), `doors` (0–1), `wire` (0/1: on the wire), `rain` (0/1),
   `tunnel` (0/1), `view` (cab, saloon, outside).
+
+**The sounds to get right first** (the user, answer 3): the door alert (`door.buzzer`), the main bell (`bell`),
+accelerating under power (`motor` by `motorCurrent`), idle (the motor-generator and the standing tram's hum,
+`mg`), running over switches and crossing rails (`points`, per axle at a frog or a crossing), the screech in tight
+curves (`flange`), and for the animated models the doors opening and closing (`door.open`, `door.close`, timed to
+their clips). The event list grows `crossing` beside `points` for a diamond crossing's frogs.
 
 **Basic sound pack**: a file (or a list, one picked at random each time) per event, and the loops the game
 already plays, each with the speed it was recorded at:
@@ -205,6 +223,9 @@ events at the doors' clips' times.
   version. Only with the player's click, and the files' hashes are checked.
 - **In a self-hosted copy**: folders in `assets/` listed in `assets/vehicles.json`, as #455 has them; the repository's
   own vehicles stay this way.
+- **A curated list** (answer 6): packages their authors submit to the project officially (an issue with the
+  package's URL, its licence and its check's report), reviewed and listed in the game's *Vehicles…* with a link to
+  their host. The project hosts none it did not make; a listed package is installed by URL as above.
 
 ### 7. The check at startup and at install
 
@@ -243,20 +264,17 @@ Prague types (KT8D5, 14T, 15T) as types of their own.
   refuses them with a reason, never guesses (SimT's repaints break with each game update because they carry the
   game's own config).
 
-## Questions for the user
+## The user's answers (2026-11-11, PR #462)
 
-1. **Package kinds:** vehicle, livery, sounds and fleet as separate packages, each naming the vehicle it is for
-   (section 1)? Or liveries and fleets only inside a vehicle's own package?
-2. **Fleet numbers:** ranges with exceptions, explicit lists and explicit sets, dealt without repeats from the
-   run's seed (section 4)? Should a fleet carry the year it describes, so a 1990s timetable shows 1990s numbers?
-   Is there a source for Prague's real T3 sets (which cars ran together) we may use?
-3. **Sounds:** the event and parameter lists of section 5, a basic and an advanced pack as proposed? Which T3
-   sounds matter most to get from recordings first (motor, contactors, bell, doors)?
-4. **Liveries:** the basic livery as texture and colour slots, the advanced adding the colour mask, per-number
-   wraps and options (section 3)?
-5. **Installing:** a .zip or folder picked in the menu and kept in the browser (OPFS), and a URL (section 6)? Any
-   other way the players you have in mind would expect (a shared catalogue page, like simtrepainty.cz)?
-6. **Hosting third-party packages:** may the project list packages others host (a catalogue with links), or only
-   ship what is in the repository?
-7. **The first step after this record:** the generic rigged loader with the hybrid moved onto it (section 2), or
-   liveries and fleet numbers first (sections 3 and 4), or sounds (section 5)?
+1. Package kinds: "I would allow them to be separate with possibility to bundle them together in a single archive
+   for complete vehicle pack" (section 1).
+2. Fleet numbers: "Yes and I would add optinal preferred set for the player. I think year is not needed, not sure
+   how it would be needed. Not sure about source for real sets because they can change. What we can use is the
+   remaining historic fleet numbers and pair them like: 6892+6921, 7269+7290, 8080+8074" (section 4).
+3. Sounds: "your general description looks good. Most important set to get right would be: door alert, main bell,
+   sound when accelerating under power, idle, going over switches and crossing rails, low radius screech. Door
+   opening and closing for the animated models" (section 5).
+4. Liveries: "yes" (section 3).
+5. Installing: "yes" (section 6).
+6. Hosting: "perhaps some curated list of what others officially submitted" (section 6).
+7. The first step: "let's start with the loader" (section 2; #467).
