@@ -19,7 +19,8 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
 - **The holes** (#503; the user, 2026-11-12: "the green cover is not placed around stop platforms on either side and
   road, pedestrian crossings, junctions. Open ballast can be nect to stops but elso end before road and pedestrian
   crossings"): grass and ballast stop at streets, paths and footways crossing at street level and OSM's crossing
-  nodes, at switches and diamonds; grass also at the platforms beside either track. HOLE metres past each, measured on
+  nodes; grass also at the platforms beside either track. Not at switches and diamonds (open ballast runs through
+  them; one in a street lies in its hole). HOLE metres past each, measured on
   OSM's grass areas inside the known spans (tools/grass_review.py prints how near). A street across the track is an
   `embedded` section; pieces under MIN_PIECE between two holes are left out.
 
@@ -45,8 +46,8 @@ from route import Route  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE, MIN_GRASS, JOIN = 4, 20, 30   # m (src/heights.js trackStyles until #479)
 # The holes (#503), m beyond the thing itself: where OSM maps grass inside the known spans (2026-11-12), its areas
-# end 2-5 m short of a footway crossing, 5-15 m of a street's edge, 3-4 m of a platform and 4-7 m of a switch.
-HOLE = {"footway": 3, "road": 8, "node": 5, "platform": 3, "switch": 5, "diamond": 8}
+# end 2-5 m short of a footway crossing, 5-15 m of a street's edge and 3-4 m of a platform.
+HOLE = {"footway": 3, "road": 8, "node": 5, "platform": 3}
 PLATFORM_NEAR = 6      # m from our axis: our platform and the other direction's beside the other track
 MIN_PIECE = MIN_GRASS  # m: a shorter piece left between two holes is not laid (OSM maps none of the 12-14 m ones)
 RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
@@ -156,14 +157,9 @@ def holes(data):
                 out.append({"s0": c - half - HOLE[kind], "s1": c + half + HOLE[kind], "kind": kind, "grass": False})
     for s in data.get("crossings", []):   # (OSM's crossing nodes on the track)
         out.append({"s0": s - HOLE["node"], "s1": s + HOLE["node"], "kind": "footway", "grass": False})
-    # junctions: a facing switch from its points to its frog, a trailing one from its frog to its points, diamonds
-    for w in data.get("switches", []):
-        out.append({"s0": w["s"] - HOLE["switch"], "s1": w["s"] + w.get("frog", 12) + HOLE["switch"], "kind": "junction", "grass": False})
-    tw = data.get("trackwork", {})
-    for w in tw.get("trailing", []):
-        out.append({"s0": w["s"] - w.get("frog", 12) - HOLE["switch"], "s1": w["s"] + HOLE["switch"], "kind": "junction", "grass": False})
-    for s in tw.get("crossings", []):
-        out.append({"s0": s - HOLE["diamond"], "s1": s + HOLE["diamond"], "kind": "junction", "grass": False})
+    # (no holes at switches and diamonds: the user, 2026-11-12, #503: "I wouldn't make holes for switches and
+    # diamonds, the branch to depo hostivař loop has open ballast including switches. They are covered if they lie
+    # on paved surface", which the streets' holes already are)
     return sorted(out, key=lambda h: h["s0"])
 
 

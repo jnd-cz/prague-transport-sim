@@ -91,9 +91,11 @@ class Holes(unittest.TestCase):
         for style in ("grass", "ballast"):
             self.assertEqual(spans_of(styled(style, **self.STREETS)), [(a, b, s.format(style)) for a, b, s in want])
 
-    def test_junctions_cut_and_short_pieces_go(self):
-        secs = styled("grass", switches=[{"s": 100, "frog": 12}], crossings=[130.0])
-        self.assertEqual(spans_of(secs), [(0, 95, "grass"), (135, 600, "grass")])   # (the 13 m between them: too short)
+    def test_switches_do_not_cut_and_short_pieces_go(self):
+        tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}
+        self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through the switches)
+        secs = styled("grass", crossings=[130.0, 145.0])
+        self.assertEqual(spans_of(secs), [(0, 125, "grass"), (150, 600, "grass")])   # (the 10 m between them: too short)
         self.assertEqual(spans_of(styled("panels", **self.STREETS)), [(0, 600, "panels")])
 
     def test_a_platform_passed_twice_has_a_hole_on_each_pass(self):
