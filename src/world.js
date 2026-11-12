@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { rng } from './random.js';
 import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
-import { RAIL_HEAD, BED_BELOW, STREET_BELOW, meetHeights } from './heights.js';
+import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
@@ -258,40 +258,8 @@ function addSide(cg, line, offset, zTop, zBot) {
   }
 }
 
-// Heights along a track chain without assembled heights (#197: OSM or archive fill, lines not rebuilt yet),
-// smoothed along its length (Gaussian, ±9 m) so rails never step where the ground function changes regime
-// (route profile / terrain / bridge).
-function trackHeights(line, hf, byDistance = false) {
-  const raw = line.map((p) => hf(p[0], p[1]));
-  const n = raw.length, k = 6, out = new Float32Array(n);
-  if (byDistance) {
-    // (points unevenly spaced, the build's curves: the same window in metres, ±9 m with σ 4.5 m)
-    const s = [0];
-    for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
-    let lo = 0, hi = 0;
-    for (let i = 0; i < n; i++) {
-      const r = Math.min(9, s[i], s[n - 1] - s[i]);
-      while (s[i] - s[lo] > r + 1e-6) lo++;
-      hi = Math.max(hi, i);
-      while (hi < n - 1 && s[hi + 1] - s[i] <= r + 1e-6) hi++;
-      let acc = 0, wsum = 0;
-      for (let j = lo; j <= hi; j++) { const w = Math.exp(-0.5 * ((s[j] - s[i]) / 4.5) ** 2); acc += raw[j] * w; wsum += w; }
-      out[i] = acc / wsum;
-    }
-    return Array.from(out);
-  }
-  for (let i = 0; i < n; i++) {
-    const r = Math.min(k, i, n - 1 - i);
-    let acc = 0, wsum = 0;
-    for (let d = -r; d <= r; d++) { const w = Math.exp(-0.5 * (d / 3) ** 2); acc += raw[i + d] * w; wsum += w; }
-    out[i] = acc / wsum;
-  }
-  return Array.from(out);
-}
-
-// A track's assembled heights at its drawn points: `zs` comes every `step` m along the raw line t.p; the drawn
-// line t.smooth is resampled (and smoothed where it is OSM), so its arc length is scaled to the raw one.
-function ownHeights(t, step, old) {
+// A track's assembled top of rail (`zs` every `step` m along t.p, tools/line_heights.py) at its drawn points t.smooth.
+function ownHeights(t, step) {
   const len = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
   const sm = t.smooth, k = len(t.p) / (len(sm) || 1), d = new Float32Array(sm.length);
   let acc = 0;
@@ -300,7 +268,8 @@ function ownHeights(t, step, old) {
     const f = (acc * k) / step, i0 = Math.min(Math.floor(f), t.zs.length - 1), a = t.zs[i0], b = t.zs[Math.min(i0 + 1, t.zs.length - 1)];
     d[i] = a == null || b == null ? NaN : a + (b - a) * (f - i0);
   }
-  return Array.from(d.some(Number.isNaN) ? meetHeights(d, old(t)) : d);
+  if (d.some(Number.isNaN)) throw new Error('a track without a height: data built before #480, rebuild it (tools/rebuild.py)');
+  return Array.from(d);
 }
 
 // Height function for an OSM way: bridges not on our route span linearly between their ends.
@@ -459,20 +428,9 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   for (const t of data.tracks) near.addLine(t.smooth);
   ground.trackWithin = (x, y, r) => near.within(x, y, r);
   if (ground.dtm) flushDtm(ground);
-  // track heights after the streets are laid to the track profile, so other lines' tracks sit in them
-  // (another line's track in a street: its top of rail is the street surface, as on our own route)
-  const embedded = (hf) => hf;
-  // (every track within 6 m of the route, ours and the opposite one (4.5 m apart on the Modřany
-  // corridor), lies on the track profile, on a
-  // bridge tagged in OSM or not: the opposite track 4.2 m off took the raw survey, 3 m off ours)
-  const onDeck = (hf) => (x, y) => {
-    const n = route.nearest(x, y);
-    return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
-  };
-  const old = (t) => trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))), !!data.trackCurve);
-  // a track with assembled heights (#197: `zs` every 2 m along t.p, tools/line_heights.py) takes its own top of
-  // rail, unsmoothed; a stretch without one takes the heights above, shifted to meet it at both ends
-  for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights?.step ?? 2, old) : old(t);
+  // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
+  // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
+  for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights.step) : t.smooth.map(() => 0);
   // Share the exact rail cant with pedestrian crossings; a crossing must meet each rail's height.
   const tiltCache = new WeakMap();
   const tiltOf = (t) => {

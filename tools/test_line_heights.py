@@ -572,5 +572,44 @@ class Smoothed(unittest.TestCase):
         self.assertLessEqual(max(abs(x['z'] - z) for x, z in zip(c.bins, z0)), lh.SMOOTH_CLAMP + 1e-9)
 
 
+
+class NoLift:
+    def at(self, xy):
+        return 0.04 if xy and xy[0] > 150 else 0.0
+
+
+class Surface(unittest.TestCase):
+    """Where no source has a height (#480): the surface plus the style's lift, no sample left without one."""
+
+    def test_a_long_hold_takes_the_surface_and_a_short_one_stays_for_the_curve(self):
+        held = lambda a, b: (lambda s: None if a <= s <= b else 100.0)  # noqa: E731
+        long_, short = chain([(0, 0), (300, 0)], held(50, 200), terrain=lambda s: 100.5), chain([(0, 0), (300, 0)], held(100, 140), terrain=lambda s: 100.5)
+        filled, left = lh.surface_fill([long_, short], NoLift())
+        got = [(x['s'], x['z'], x['src']) for x in long_.bins if x['src'] == 'surface']
+        self.assertEqual(got[0][:2], (52.5, 100.5))
+        self.assertEqual(got[-1][:2], (197.5, 100.54))   # (past s 150 the grass lift)
+        self.assertTrue(all(x['z'] is None for x in short.bins if 100 <= x['s'] <= 140))
+        self.assertEqual((filled, left), (150.0, 0.0))
+
+    def test_not_on_a_steep_hill_and_on_a_structure_the_deck(self):
+        steep = chain([(0, 0), (300, 0)], lambda s: None if 50 <= s <= 200 else 100.0, terrain=lambda s: 100 + 0.2 * s)
+        deck = chain([(0, 0), (300, 0)], lambda s: None if 50 <= s <= 200 else 100.0, terrain=lambda s: 90.0)
+        for x in deck.bins:
+            if x['z'] is None:
+                x['flags'], x['survey'] = ['structure_hint'], 101.0
+        lh.surface_fill([steep, deck], NoLift())
+        self.assertTrue(all(x['z'] is None for x in steep.bins if 50 <= x['s'] <= 200))   # (Petřín's funicular)
+        self.assertEqual({x['z'] for x in deck.bins if 50 <= x['s'] <= 200}, {101.0})   # (not the lidar under it)
+
+    def test_a_tracks_end_past_its_chain_meets_its_own_height(self):
+        zs = [None, None, 101.0, 101.2, None, None, None, 101.4]
+        filled = lh.fill_gaps([(0, 0), (14, 0)], zs, srcs := ['x'] * 8, lambda xy: 100.0 + xy[0] * 0.01)
+        self.assertEqual(filled, 10.0)
+        # (an end: the shift at the one side, the surface's slope kept; between: the shifts at both sides, linear)
+        self.assertEqual(zs[:2], [100.96, 100.98])
+        self.assertEqual(zs[4:7], [101.25, 101.3, 101.35])
+        self.assertEqual(srcs, ['surface', 'surface', 'x', 'x', 'surface', 'surface', 'surface', 'x'])
+
+
 if __name__ == '__main__':
     unittest.main()

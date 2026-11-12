@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "snapshot": "2026-11-10",
+ "snapshot": "2026-11-11r",
  "issue": 276,
  "title": "Track radius: where no curve of 500 m fits the data",
  "lines": [
@@ -12,7 +12,7 @@
    "id": "radius-50.1036-14.4735",
    "x": 3942.7300000000396,
    "y": 1281.0599999999977,
-   "mag": 0.034,
+   "mag": 0.03,
    "status": "review",
    "place": [
     50.1036,
@@ -21,7 +21,7 @@
    "lines_near": [
     "37"
    ],
-   "info": "junction: no curve of 500 m joins the rails here: held at it, they stay up to 3 cm apart. As built they join, at 164 m.",
+   "info": "junction: no curve of 500 m joins the rails here: held at it, they stay up to 3 cm apart. As built they join, at 205 m.",
    "decision": {
     "span_ids": [
      "radius-50.1036-14.4735:track1"
@@ -253,47 +253,47 @@
     "unsure"
    ],
    "answer_explanations": {
-    "hold the radius": "The rails must meet, so the radius still gives way at the junction (164 m); add 'Discard the outliers' in the note to drop the points it misses first and fit the rest at the floor.",
-    "follow the data": "Keeps the rails joined at 164 m, as built."
+    "hold the radius": "The rails must meet, so the radius still gives way at the junction (205 m); add 'Discard the outliers' in the note to drop the points it misses first and fit the rest at the floor.",
+    "follow the data": "Keeps the rails joined at 205 m, as built."
    },
    "answer_previews": {
     "hold the radius": {
      "radius-50.1036-14.4735:track1": [
       [
        0.0,
-       190.871
+       190.869
       ],
       [
        2.5,
-       190.874
+       190.872
       ],
       [
        7.5,
-       190.885
+       190.883
       ],
       [
        13.7,
-       190.918
+       190.914
       ],
       [
        15.9,
-       190.919
+       190.915
       ],
       [
        17.5,
-       190.913
+       190.909
       ],
       [
        22.5,
-       190.857
+       190.853
       ],
       [
        27.5,
-       190.742
+       190.74
       ],
       [
        32.5,
-       190.573
+       190.572
       ],
       [
        37.5,
@@ -305,15 +305,15 @@
       ],
       [
        42.5,
-       190.103
+       190.104
       ],
       [
        47.5,
-       189.873
+       189.874
       ],
       [
        52.5,
-       189.614
+       189.615
       ],
       [
        54.5,
@@ -325,15 +325,15 @@
      "radius-50.1036-14.4735:track1": [
       [
        0.0,
-       190.87
+       190.869
       ],
       [
        2.5,
-       190.854
+       190.855
       ],
       [
        7.5,
-       190.829
+       190.835
       ],
       [
        13.7,
@@ -341,27 +341,27 @@
       ],
       [
        15.9,
-       190.951
+       190.941
       ],
       [
        17.5,
-       190.976
+       190.964
       ],
       [
        22.5,
-       190.956
+       190.955
       ],
       [
        27.5,
-       190.783
+       190.824
       ],
       [
        32.5,
-       190.55
+       190.572
       ],
       [
        37.5,
-       190.331
+       190.335
       ],
       [
        39.2,
@@ -369,15 +369,15 @@
       ],
       [
        42.5,
-       190.114
+       190.11
       ],
       [
        47.5,
-       189.886
+       189.882
       ],
       [
        52.5,
-       189.618
+       189.617
       ],
       [
        54.5,

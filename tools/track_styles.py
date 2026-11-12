@@ -51,6 +51,7 @@ HOLE = {"footway": 3, "road": 8, "node": 5, "platform": 3}
 PLATFORM_NEAR = 6      # m from our axis: our platform and the other direction's beside the other track
 MIN_PIECE = MIN_GRASS  # m: a shorter piece left between two holes is not laid (OSM maps none of the 12-14 m ones)
 MIN_EMBEDDED = 5       # m: a street's hole the section's end cuts shorter is not an embedded section of its own
+RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its section; `lift` every LIFT_STEP m
 RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
 
@@ -263,6 +264,40 @@ def spans(data, truth, survey):
     return sorted(facts + found, key=lambda x: x["s0"])
 
 
+def offsets(truth):
+    """How high the rails stand over each style's bed, m (truth.json trackHeights.railAboveDeck, scope all), as
+    src/heights.js trackStyleOffsets reads them: one value per style, else an error."""
+    out = {}
+    for style in ("embedded", "panels", "grass", "ballast"):
+        fs = [f for f in truth.get("trackHeights", {}).get("railAboveDeck", [])
+              if f.get("scope") == "all" and (not f.get("styles") or style in f["styles"])]
+        if not fs or len({f["metres"] for f in fs}) != 1:
+            raise SystemExit(f"missing or conflicting rail offset facts: {style}")
+        out[style] = fs[0]["metres"]
+    return out
+
+
+def lift(secs, off, s):
+    """The rails' height over the bed at route position s: the section's style offset, blended in over RAMP m inside
+    each end of its section (#480: blended outside, the ballast bed fell 8-12 cm under the footway crossing before line
+    17's open ballast at s 3236, a hole of #503); a section shorter than 2 RAMP blends over half its length."""
+    v = 0.0
+    for x in secs:
+        d = off.get(x["style"], 0)
+        if not d or s < x["s0"] or s > x["s1"]:
+            continue
+        r = min(RAMP, (x["s1"] - x["s0"]) / 2)
+        k = min(1.0, (s - x["s0"]) / r, (x["s1"] - s) / r) if r > 0 else 1.0
+        v = max(v, d * k * k * (3 - 2 * k))
+    return v
+
+
+def lift_series(data, secs, off):
+    """`lift` every LIFT_STEP m of the route (the page's profile step), in mm."""
+    n = int(Route(data["path"], data.get("pathExt")).length / LIFT_STEP) + 2
+    return {"step": LIFT_STEP, "unit": 0.001, "v": [round(lift(secs, off, k * LIFT_STEP) * 1000) for k in range(n)]}
+
+
 def main():
     if "--line" not in sys.argv:
         sys.exit(__doc__)
@@ -273,6 +308,7 @@ def main():
     dp = ROOT / "data" / f"line{line}.dtm.json"
     survey = Survey(json.loads(dp.read_text(encoding="utf-8"))) if dp.exists() else None
     data["styles"] = sections(data, truth, survey)
+    data["lift"] = lift_series(data, data["styles"], offsets(truth))
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"line {line}: " + ", ".join(f"{x['style']} {x['s0']:.0f}-{x['s1']:.0f} ({x['source']})" for x in data["styles"]) or "none")

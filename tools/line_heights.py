@@ -36,7 +36,7 @@ from track_profile import BIN, HELD_GAP, ROOT, STEP as MISS, STRUCTURE, BIG, ban
 from track_curve import geometry_fact  # noqa: E402
 # (the answers are height_answers' globals, read there: set them as ha.RADIUS_ANSWERS ..., never on this module)
 import height_answers as ha  # noqa: E402
-from height_answers import (BLEND_REACH, FOLLOW, HOLD, MAX_GRADE, SMOOTH_WAVELENGTH, answer_at, answered_source,  # noqa: E402
+from height_answers import (BLEND_REACH, FOLLOW, HOLD, MAX_GRADE, SMOOTH_WAVELENGTH, STRUCTURE_FLAGS, answer_at, answered_source,  # noqa: E402
                             below_floor, ground_at, height_runs, smooth_line, staged_heights)
 
 OUT_STEP = 2.0  # m between heights along a line's path and tracks (the game's profile step, src/terrain.js)
@@ -76,6 +76,7 @@ ACROSS_MIN, ACROSS_MAX = 2.0, 6.0  # m: the opposite track beside ours (the game
 EXTEND = BIN    # m: a chain's height reaches this far past its first and last bin (its ends, junctions)
 CODE = {'di': 'di', 'archive': 'dtmp', 'reviewed': 'review', 'deck': 'zps', 'survey': 'zps'}  # staged dataset -> code
 LEVELS = ('di', 'dtmp', 'review', 'zps', 'lidar', 'curve', 'surface')  # codes in the order of sources.LAYERS['heights']
+LIFT_REACH = 6.0  # m: a point takes the lift of the line route this near (src/world.js liftAt)
 
 
 SMOOTH_CLAMP = 0.10   # m: the most the smoother may move a height; the band rule then applies around the smoothed height
@@ -84,6 +85,67 @@ SMOOTH_JUNCTION = (20.0, 0.01)  # m, m: this near a junction it may move a heigh
                                 # with this, for 0.6 degrees per km more coupler travel)
 GROUND_BAND = 0.05   # m: the curve stays within this of the ground where an answer has the tracks follow it
 DROP_MAX = 12     # rounds: where an answer holds the radius and discards the outliers, one point dropped per round
+
+
+class LiftMap:
+    """The rails' height over the bed at a point (the line data's `lift`, tools/track_styles.py): that of the nearest
+    line route within LIFT_REACH m, else 0 (panels, the default style)."""
+
+    def __init__(self, root=ROOT):
+        self.items = []
+        for p in sorted((root / 'data').glob('line*.json')):
+            if not p.stem[4:].isdigit():
+                continue
+            d = json.loads(p.read_text(encoding='utf-8'))
+            if d.get('lift') and len(d.get('path') or []) > 1:
+                self.items.append((LineString([q[:2] for q in d['path']]), d['lift']))
+        self.tree = shapely.STRtree([g for g, _ in self.items]) if self.items else None
+
+    def at(self, xy):
+        if self.tree is None or xy is None:
+            return 0.0
+        p, best = Point(xy), None
+        for k in self.tree.query(p, predicate='dwithin', distance=LIFT_REACH):
+            g, L = self.items[int(k)]
+            d = g.distance(p)
+            if best is None or d < best[0]:
+                best = (d, g.project(p), L)
+        if best is None:
+            return 0.0
+        _, s, L = best
+        v, f = L['v'], max(0.0, min(len(L['v']) - 1.001, s / L['step']))
+        i = int(f)
+        return (v[i] + (v[i + 1] - v[i]) * (f - i)) * L['unit']
+
+
+def surface_fill(chs, lifts):
+    """Where a chain is held for longer than HELD_GAP (no source the staging could choose, the curve does not bridge
+    it), the surface at the axis plus the style's lift (#480; the page's surface profile until then): the lidar ground
+    off structures, the survey's deck on one (the lidar lies under it). Weighted as a height, so the solver curves into
+    it; source 'surface'. Not where the lidar is steeper than any track (MAX_GRADE: Petřín's funicular, held its whole
+    length, took 2-3 m steps on the hill). Returns the metres filled and those left without a surface (a structure
+    without a deck)."""
+    filled = left = 0.0
+    for c in chs:
+        bins = sorted((x for x in c.bins if x['xy']), key=lambda x: x['s'])
+        run = []
+        for x in bins + [None]:
+            if x is not None and x.get('z') is None and (not run or x['s'] - run[-1]['s'] <= 2 * BIN + 1e-6):
+                run.append(x)
+                continue
+            steep = any(a.get('terrain') is not None and b.get('terrain') is not None
+                        and abs(b['terrain'] - a['terrain']) > MAX_GRADE * (b['s'] - a['s']) for a, b in zip(run, run[1:]))
+            if run and run[-1]['s'] - run[0]['s'] > HELD_GAP and not steep:
+                for h in run:
+                    on_structure = bool(STRUCTURE_FLAGS & set(h.get('flags') or ()))
+                    z = h.get('survey') if on_structure else (None if h.get('terrain') is None else h['terrain'] + lifts.at(h['xy']))
+                    if z is None:
+                        left += BIN
+                        continue
+                    h['z'], h['w'], h['src'] = round(z, 3), 1.0, 'surface'
+                    filled += BIN
+            run = [x] if x is not None and x.get('z') is None else []
+    return filled, left
 
 
 def follow_curve(s, z, rmin, tol, weight, fit, place):
@@ -842,6 +904,57 @@ def join_ends(tracks, step=OUT_STEP):
     return len(moves)
 
 
+class Surface:
+    """The surface at the axis plus the style's lift, where no chain has a height (#480): the IPR lidar
+    (tools/import_track_heights.py Terrain), read on first use."""
+
+    def __init__(self, lifts):
+        self.lifts, self.terrain = lifts, None
+
+    def __call__(self, xy):
+        if self.terrain is None:
+            from import_track_heights import Terrain
+            self.terrain = Terrain()
+        z = self.terrain([xy[0]], [xy[1]])[0]
+        return None if z is None or z != z else z + self.lifts.at(xy)
+
+
+def fill_gaps(pts, zs, srcs, surface, step=OUT_STEP):
+    """Every sample without a height along a polyline (`zs` from Lookup.along) takes the surface, shifted to meet the
+    heights on both sides of its run (linearly between them; at an end, the one side's): a track's end past its chain
+    (line 9's depot tracks, 2-4 m; line 22's at Depo Hostivař, 33 m). Source 'surface'. Returns the metres filled."""
+    line_, n, filled = LineString(pts), len(zs), 0
+    k = 0
+    while k < n:
+        if zs[k] is not None:
+            k += 1
+            continue
+        j = k
+        while j + 1 < n and zs[j + 1] is None:
+            j += 1
+        def surf(i):
+            p = line_.interpolate(min(line_.length, i * step))
+            return surface((p.x, p.y))
+        sf = [surf(i) for i in range(k, j + 1)]
+        # (the shift at each side: the height there against the surface there, as the page's meetHeights did)
+        ea = surf(k - 1) if k > 0 else None
+        eb = surf(j + 1) if j + 1 < n else None
+        if any(v is None for v in sf) or (k > 0 and ea is None) or (j + 1 < n and eb is None):
+            k = j + 1
+            continue
+        a = zs[k - 1] - ea if k > 0 else None
+        b = zs[j + 1] - eb if j + 1 < n else None
+        for i, v in enumerate(sf):
+            u = (i + 1) / (len(sf) + 1)
+            shift = (a if b is None else b if a is None else a + (b - a) * u) if (a is not None or b is not None) else 0.0
+            zs[k + i] = round(v + shift, 3)
+            if srcs is not None:
+                srcs[k + i] = 'surface'
+            filled += step
+        k = j + 1
+    return filled
+
+
 def write_line(line, lookup, chs):
     """The line's heights: path and pathBack every 2 m, each drawn track's `zs`, with provenance."""
     import sources
@@ -849,10 +962,12 @@ def write_line(line, lookup, chs):
     dst = ROOT / 'data' / f'line{line}.json'
     data = json.loads(dst.read_text(encoding='utf-8'))
     heights, src_ranges, metres = {'step': OUT_STEP}, {}, Counter()
+    surface = Surface(LiftMap())
     for key in ('path', 'pathBack'):
         if not data.get(key) or len(data[key]) < 2:
             continue
         zs, srcs, L = lookup.along([tuple(p[:2]) for p in data[key]])
+        fill_gaps([tuple(p[:2]) for p in data[key]], zs, srcs, surface)
         heights[key] = zs
         src_ranges[key] = ranges(srcs)
         for a, b, v in src_ranges[key]:
@@ -862,12 +977,13 @@ def write_line(line, lookup, chs):
     if heights.get('path') and heights.get('pathBack'):
         heights['backOff'], heights['backZ'] = across([tuple(p[:2]) for p in data['path']],
                                                       [tuple(p[:2]) for p in data['pathBack']], heights['pathBack'])
-    covered = 0
+    covered, track_filled = 0, 0.0
     for t in data['tracks']:
         t.pop('zs', None)
         if len(t['p']) < 2:
             continue
         zs, _, _ = lookup.along([tuple(p[:2]) for p in t['p']])
+        track_filled += fill_gaps([tuple(p[:2]) for p in t['p']], zs, None, surface)
         if any(z is not None for z in zs):
             t['zs'] = zs
             covered += 1
@@ -882,8 +998,13 @@ def write_line(line, lookup, chs):
     with replacing(dst, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     total = sum(metres.values()) or 1
+    # (no height may be missing: the page keeps no profile of its own since #480)
+    nulls = (sum(z is None for key in ('path', 'pathBack') for z in heights.get(key, []))
+             + sum(1 for t in data['tracks'] if len(t['p']) > 1 for z in (t.get('zs') or [None]) if z is None))
     print(f'line {line}: path and pathBack {total:.0f} m: ' + ', '.join(f'{k} {metres[k]:.0f} m' for k in LEVELS if metres[k])
-          + f'; {covered} of {len(data["tracks"])} tracks with heights; wrote {dst.name}', flush=True)
+          + f'; {covered} of {len(data["tracks"])} tracks with heights, {track_filled:.0f} m of them the surface; '
+          + f'{nulls} samples without a height; wrote {dst.name}', flush=True)
+    data['_nulls'] = nulls
     return heights, src_ranges, data
 
 
@@ -1028,6 +1149,8 @@ def main():
     chs = build_chains(staged)
     del staged
     ha.apply(chs)
+    filled, left = surface_fill(chs, LiftMap())
+    print(f'surface where a hold is too long to bridge: {filled:.0f} m filled, {left:.0f} m on a structure without a deck', flush=True)
     for c in chs:
         for x in c.bins:
             x['staged'] = x['z']
@@ -1069,13 +1192,17 @@ def main():
                                                'held_settled': [[round(float(v), 5) for v in F.ll(*xy)] + [rule, z] for xy, rule, z in ha.LIDAR_LOG],
                                                'dropped_by_answers': [[round(float(v), 5) for v in F.ll(*xy)]
                                                                       for c in chs for xy in c.dropped]}, 'lines': {}}
+    nulls = 0
     for line in args.lines:
         _, _, data = write_line(line, lookup, chs)
+        nulls += data.pop('_nulls')
         report['lines'][line] = line_report(line, chs, lookup, data, summary)
     out = ROOT / 'reports' / 'line-heights.json'
     out.write_text(json.dumps(report, indent=1, ensure_ascii=False), encoding='utf-8')
     print(f'report: {out.relative_to(ROOT)}')
-    sys.exit(1 if bad or summary['over_1cm'] else 0)
+    if nulls:
+        print(f'{nulls} samples without a height: the game has no profile of its own to fill them (#480)')
+    sys.exit(1 if bad or summary['over_1cm'] or nulls else 0)
 
 
 if __name__ == '__main__':

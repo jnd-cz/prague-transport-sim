@@ -1,4 +1,5 @@
 """The track styles built offline (tools/track_styles.py, #479): python -P -E tools/test_track_styles.py."""
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -103,6 +104,30 @@ class Holes(unittest.TestCase):
                 "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 1203.0}], **self.PLATFORM}
         hs = [(round(h["s0"]), round(h["s1"])) for h in T.holes(data) if h["kind"] == "platform"]
         self.assertEqual(hs, [(197, 243), (960, 1006)])
+
+
+class Lift(unittest.TestCase):
+    TRUTH = {"trackHeights": {"railAboveDeck": [
+        {"id": "a", "metres": 0.0, "styles": ["embedded", "panels"], "scope": "all"},
+        {"id": "g", "metres": 0.04, "styles": ["grass"], "scope": "all"},
+        {"id": "b", "metres": 0.17, "styles": ["ballast"], "scope": "all"}]}}
+
+    def test_the_offset_blends_in_inside_the_section(self):
+        off = T.offsets(self.TRUTH)
+        secs = [{"s0": 100, "s1": 200, "style": "ballast"}, {"s0": 300, "s1": 310, "style": "grass"}]
+        at = lambda s: round(T.lift(secs, off, s), 4)  # noqa: E731
+        self.assertEqual([at(s) for s in (99, 100, 107.5, 115, 150, 185, 200, 201)], [0, 0, 0.085, 0.17, 0.17, 0.17, 0, 0])
+        self.assertEqual([at(s) for s in (300, 305, 310)], [0, 0.04, 0])   # (a short one: over half its length)
+
+    def test_a_changed_fact_moves_the_lift_and_a_conflict_stops_the_build(self):
+        truth = json.loads(json.dumps(self.TRUTH))
+        truth["trackHeights"]["railAboveDeck"][1]["metres"] = 0.09
+        data = {"path": [[0.0, 0.0], [100.0, 0.0]]}
+        series = T.lift_series(data, [{"s0": 0, "s1": 100, "style": "grass"}], T.offsets(truth))
+        self.assertEqual((series["step"], series["unit"], series["v"][25]), (2, 0.001, 90))
+        truth["trackHeights"]["railAboveDeck"].append({"id": "x", "metres": 0.05, "styles": ["grass"], "scope": "all"})
+        with self.assertRaises(SystemExit):
+            T.offsets(truth)
 
 
 if __name__ == "__main__":
