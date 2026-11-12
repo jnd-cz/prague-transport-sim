@@ -239,7 +239,8 @@ function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1, cros
     R.push(W(rx, ry, (fixed ? hfn[i] : hfn(rx, ry)) + lift - dz));
   }
   const c = cg._chunk(line[0][0], line[0][1]);
-  for (let i = 0; i < line.length - 1; i++) cg.quad(c, R[i], R[i + 1], L[i + 1], L[i], col);
+  // (`col` a function: each segment's own colour, from its first point)
+  for (let i = 0; i < line.length - 1; i++) cg.quad(c, R[i], R[i + 1], L[i + 1], L[i], typeof col === 'function' ? col(i) : col);
 }
 
 // A vertical strip along `line` at `offset` m to its left, from zBot up to zTop (arrays per point):
@@ -568,6 +569,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // track bed + rails for every tram track around the route
   const bedCg = new ChunkedGeometry(flatMat('#77736a', '#5f5c56'), { color: true });
   const bed = new THREE.Color('#77736a').toArray();
+  // the bed by the route's track style (#52; colours until #308's textures): on our route's tracks (within 6 m of it)
+  // the style at the nearest route point, elsewhere the plain bed
+  const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a' })
+    .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
+  const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? ground.styles.at(n.s) : null; };
   // (rails: glossy when wet, roughness set by the weather; trams keep them clear of snow)
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.6, roughness: 0.4 });
   const railCg = new ChunkedGeometry(railMat);
@@ -583,7 +589,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // on a canted curve of our route the outer rail is higher, the inner one lower
     const tilt = tiltOf(t);
     // The bed is the same canted plane as the rails, including its transition ramps.
-    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, bed, 0, 1, tilt.map((z) => z / 0.72));
+    const cols = t.smooth.map(([x, y]) => STYLE_BED[styleAt(x, y)] || bed);
+    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, (i) => cols[i], 0, 1, tilt.map((z) => z / 0.72));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
