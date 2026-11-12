@@ -36,8 +36,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MEASURE = r"""async () => {
   const THREE = await import('three');
   const models = await import('/src/models.js');
+  const vehicles = await import('/src/vehicles.js');
+  await vehicles.loadRegistry();
   const { CAR_PITCH } = await import('/src/tram.js');
-  const m = models.makeT3({ line: '17', cars: 2, detailed: false, dest: 'Vozovna Kobylisy', run: '801', variant: 'T3SUCS' });
+  const m = models.makeT3({ line: '17', cars: 2, vehicle: 't3simple', dest: 'Vozovna Kobylisy', run: '801', variant: 'T3SUCS' });
   new THREE.Scene().add(m);
   const [a, b] = m.userData.cars, out = { kind: m.userData.kind, bogie: m.userData.bogie };
   const meshes = (car) => car.children.filter((o) => o.isMesh && o.visible); // (drawn: the high beams' glow only while on)
@@ -54,8 +56,8 @@ MEASURE = r"""async () => {
   // the variants: the T3M's resistor box towards the rear of the roof, its route display; the fleet numbers
   const roofBox = (geo) => { const P = geo.attributes.position; let top = 0; for (let i = 0; i < P.count; i++) if (P.getZ(i) < -1.2 && P.getZ(i) > -4.1 && Math.abs(P.getX(i)) < 0.7) top = Math.max(top, P.getY(i)); return top; };
   const px = (mat, x = 12, y = 64) => Array.from(mat.map.image.getContext('2d').getImageData(x, y, 1, 1).data);
-  const t3m = models.makeT3({ line: '17', cars: 2, detailed: false, run: '801', variant: 'T3M' });
-  const t3 = models.makeT3({ line: '17', cars: 2, detailed: false, run: '801', variant: 'T3' });
+  const t3m = models.makeT3({ line: '17', cars: 2, vehicle: 't3simple', run: '801', variant: 'T3M' });
+  const t3 = models.makeT3({ line: '17', cars: 2, vehicle: 't3simple', run: '801', variant: 'T3' });
   const rbOf = (set) => set.userData.mats.rbMat;
   out.variants = { suc: m.userData.variant, m: t3m.userData.variant, t3: t3.userData.variant, sucRoof: roofBox(parts.geometry), mRoof: roofBox(named(t3m.userData.cars[0], 'parts').geometry),
     t3Roof: roofBox(named(t3.userData.cars[0], 'parts').geometry), sucDisplay: px(rbOf(m)), mDisplay: px(rbOf(t3m)), t3Display: px(rbOf(t3)),
@@ -96,11 +98,12 @@ MEASURE = r"""async () => {
   const ind = [-1, 1].map((s) => { for (let i = 0; i < L.count; i++) if (s * L.getX(i) > 1.255 && Math.abs(L.getZ(i) - 3.05) < 0.05 && Math.abs(L.getY(i) - 1.81) < 0.07) return true; return false; });
   out.displays = { suc: displays(m), m: displays(t3m), next: t3m.userData.mats.ledMat.map !== led0 && t3m.userData.next === 'Palmovka', indicators: ind };
   const auto = new Set();
-  for (let r = 801; r < 849; r++) auto.add(models.makeT3({ line: '17', detailed: false, run: String(r) }).userData.variant);
+  for (let r = 801; r < 849; r++) auto.add(models.makeT3({ line: '17', vehicle: 't3simple', run: String(r) }).userData.variant);
   out.fleet.auto = [...auto].sort();
   // the types' shares among 3000 run numbers, against their fleet ranges' lengths
-  const { t3Variant, T3_TYPES } = await import('/src/t3simple.js'), n = {};
-  for (let r = 1; r <= 3000; r++) { const v = t3Variant(String(r)); n[v] = (n[v] || 0) + 1; }
+  // (the types and their ranges: the built-in car's manifest, assets/t3simple/vehicle.json)
+  const v3 = vehicles.byId.get('t3simple'), T3_TYPES = Object.fromEntries(v3.variants.map((x) => [x.type, x.fleet[0]])), n = {};
+  for (let r = 1; r <= 3000; r++) { const v = vehicles.variantOf(v3, String(r)); n[v] = (n[v] || 0) + 1; }
   const total = Object.values(T3_TYPES).reduce((s, [lo, hi]) => s + hi - lo + 1, 0);
   out.fleet.shares = Object.fromEntries(Object.entries(T3_TYPES).map(([k, [lo, hi]]) => [k, [(n[k] || 0) / 3000, (hi - lo + 1) / total]]));
   // the lit lamps: the headlights on the face (their discs' middles), the corner units' lenses
@@ -242,12 +245,14 @@ MEASURE = r"""async () => {
 SHOTS = r"""async ({ kinds }) => {
   const THREE = await import('three');
   const models = await import('/src/models.js');
-  const t3h = await import('/src/t3h.js');
-  if (kinds.includes('hybrid')) {
-    const files = await Promise.all(t3h.T3H_FILES.map(async (f) => { const r = await fetch('/' + f); return { ok: r.ok, json: () => r.json(), arrayBuffer: () => r.arrayBuffer() }; }));
-    await t3h.loadHybridT3(files, models.CONTACT_WIRE - models.RAIL_TOP);
-  }
-  if (kinds.includes('classic')) await models.loadDetailedT3('assets/t3/t3.gltf');
+  const vehicles = await import('/src/vehicles.js');
+  await vehicles.loadRegistry();
+  // (each model by its manifest: assets/vehicles.json)
+  const ids = { hybrid: 't3h', classic: 't3' };
+  for (const k of kinds) if (ids[k]) await models.loadVehicle(vehicles.byId.get(ids[k]), async (u) => {
+    const r = await fetch('/' + u), buf = r.ok ? await r.arrayBuffer() : null;
+    return { ok: r.ok, json: async () => JSON.parse(new TextDecoder().decode(buf)), arrayBuffer: async () => buf, blobUrl: (type) => URL.createObjectURL(new Blob([buf], { type })) };
+  });
   const W = 1280, H = 720;
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(W, H);
@@ -299,11 +304,11 @@ SHOTS = r"""async ({ kinds }) => {
   for (const kind of kinds) {
     for (const [view, cam] of Object.entries(views)) {
       const variant = { simple: 'T3SUCS', t3m: 'T3M', t3: 'T3' }[kind], bend = view === 'curve' || view === 'gear';
-      const m = models.makeT3({ line: '17', cars: view === 'set' || bend ? 2 : 1, detailed: variant ? false : kind, dest: 'Sídliště Ďáblice', run: '801', variant });
+      const m = models.makeT3({ line: '17', cars: view === 'set' || bend ? 2 : 1, vehicle: variant ? 't3simple' : ids[kind], dest: 'Sídliště Ďáblice', run: '801', variant });
       straight.visible = !bend; bent.visible = bend;
       models.placeConsist(m, bend ? 15.04 : 7.6, bend ? arc : (s) => [0, -s, 0, 0]); // (the coupling at z 0 on the curve)
       renderer.clippingPlanes = view === 'gear' ? cut : [];
-      if (m.userData.hybrid) t3h.poseHybrid(m, { doors: 0, braking: false, track: 0 });
+      if (m.userData.hybrid) (await import('/src/t3h.js')).poseHybrid(m, { doors: 0, braking: false, track: 0 });
       if (view === 'lowered') models.poseT3?.(m, { collector: 0 }); // (main has none)
       // the lamps lit (#436): the high beams and the left indicators in front, braking with the left indicators behind
       if (view === 'litFront' || view === 'litRear') models.poseT3?.(m, { braking: view === 'litRear', indicate: 'left', clock: 0.1, highBeam: view === 'litFront' });

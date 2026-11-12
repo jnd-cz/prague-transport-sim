@@ -3,7 +3,9 @@
 Every file in the repository that is not code written for this project, with its source and licence.
 Nothing third-party goes into the repository without an entry here, and only under a licence that
 allows redistribution (CC0, CC BY, CC BY-SA, CC BY-NC, …). The code is AGPL-3.0 ([LICENSE](LICENSE), #518);
-the project's own assets are listed with their own licence. Adding a vehicle model: [docs/vehicles.md](docs/vehicles.md).
+the project's own assets are listed with their own licence. Adding a vehicle model: [docs/vehicles.md](docs/vehicles.md);
+each vehicle's `assets/<id>/vehicle.json` repeats its licence, authors and credit for the game, and
+`tools/test_vehicles.py` checks its files have a row here.
 
 | Files | What | Author / source | Licence | Changes |
 |---|---|---|---|---|

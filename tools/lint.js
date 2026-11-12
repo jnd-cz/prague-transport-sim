@@ -93,7 +93,7 @@ function check(rule, of, items, key = (p) => p.mag) {
 // with no track behind it (the second car was drawn inside the first at Sídliště Řepy).
 function consistAtStops(g) {
   const route = g.route, prof = g.route.ground?.profile;
-  const model = window.tramModel?.userData.cars.length >= 2 ? window.tramModel : makeT3({ line: g.data.line, cars: 2, detailed: false });
+  const model = window.tramModel?.userData.cars.length >= 2 ? window.tramModel : makeT3({ line: g.data.line, cars: 2, vehicle: 't3simple' });
   const keep = model === window.tramModel ? model.userData.cars.map((c) => [c.position.clone(), c.rotation.clone()]) : null;
   const at = (q) => { const p = route.at(q); return [p.x, p.y, prof ? prof.height(q) : 0]; };
   // distance from a point to the route curve near s (the route includes the run-in / run-out)
