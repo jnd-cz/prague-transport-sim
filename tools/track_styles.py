@@ -4,13 +4,18 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
     python -P -E tools/track_styles.py --line 22     # writes `styles` into data/line22.json
 
 - **The user's marks** (data/truth.json `trackStyles`, by stops so they hold in any frame): from the first stop of the
-  mark's `from` name to the next stop of its `to` name.
+  mark's `from` name to the next stop of its `to` name; a mark with `between` (two lat, lon points) runs between the
+  route positions nearest them.
+- **The grassed-track list** (data/truth.json `grassTrack`, prazsketramvaje.cz): every line passing both stops of a
+  stretch takes it, each time it passes them (an out-and-back line twice). Where the user's marks cover the track they
+  win, and what is left of a stretch stays if MIN_GRASS long.
 - **The survey's grass track:** a `green` area under the track axis (the survey's ground-level area at the route,
   data/lineN.dtm.json) for MIN_GRASS metres and more, read every SAMPLE m, runs less than JOIN m apart one section.
-  The user's marks win where they overlap (line 22 Koh-i-noor - Slavia, whose bank fell 0.5 m across the rails).
+  The facts (the user's marks, the list) win where they overlap (line 22 Koh-i-noor - Slavia, whose bank fell 0.5 m
+  across the rails).
 
-`styles` is a list of {s0, s1, style, source, mark}: `mark` is the index of the user's mark in truth.json, `source`
-'user' or 'survey'. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
+`styles` is a list of {s0, s1, style, source, mark | stretch}, by s0: `source` 'user', 'list' or 'survey'; `mark` is
+the index of the user's mark in truth.json `trackStyles`, `stretch` the index in `grassTrack.stretches`. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
 page reads with the sections. Where ground-level areas overlap at a point, the higher rank counts. The page picked the
 one whose surface lay nearest the lidar ground, then the rank (src/terrain.js DtmSurface._hitTri): on all five lines
 the two agree at every sample (21,641, #479).
@@ -20,10 +25,11 @@ from pathlib import Path
 import sys
 
 import shapely
-from shapely.geometry import Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
+from geo import Frame  # noqa: E402
 from route import Route  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -65,20 +71,50 @@ class Survey:
         return self.areas[max(hits, key=lambda k: RANK.get(self.areas[k], 1))]
 
 
+def passes(stops, a, b):
+    """Each pass of the route between stop names a and b, either way: (s0, s1), no other stop of either name between."""
+    idx = [(i, st["name"]) for i, st in enumerate(stops) if st["name"] in (a, b)]
+    return [(min(stops[i]["s"], stops[j]["s"]), max(stops[i]["s"], stops[j]["s"]))
+            for (i, n), (j, m) in zip(idx, idx[1:]) if n != m]
+
+
+def minus(s0, s1, cover):
+    """What of [s0, s1] the sections in cover leave."""
+    out = [(s0, s1)]
+    for c in cover:
+        out = [p for a, b in out for p in ((a, min(b, c["s0"])), (max(a, c["s1"]), b)) if p[1] > p[0]]
+    return out
+
+
 def sections(data, truth, survey):
-    """The style sections along the route (src/heights.js trackStyles until #479)."""
-    secs = []
+    """The style sections along the route, by s0 (src/heights.js trackStyles until #479)."""
+    user = []
     for mark, t in enumerate(truth.get("trackStyles", [])):
         if str(t["line"]) != str(data["line"]):
             continue
-        a = next((i for i, st in enumerate(data["stops"]) if st["name"] == t["from"]), -1)
-        b = next((i for i, st in enumerate(data["stops"]) if a >= 0 and i > a and st["name"] == t["to"]), -1)
-        if a < 0 or b < 0:
+        if "between" in t:   # (two points: the route positions nearest them, where the route passes within 15 m)
+            path = LineString([p[:2] for p in data["path"]])
+            pts = [Point(*map(float, Frame().xy(lat, lon))) for lat, lon in t["between"]]
+            if max(path.distance(p) for p in pts) > 15:
+                continue
+            s0, s1 = sorted(path.project(p) for p in pts)
+        else:
+            a = next((i for i, st in enumerate(data["stops"]) if st["name"] == t["from"]), -1)
+            b = next((i for i, st in enumerate(data["stops"]) if a >= 0 and i > a and st["name"] == t["to"]), -1)
+            if a < 0 or b < 0:
+                continue
+            s0, s1 = data["stops"][a]["s"], data["stops"][b]["s"]
+        user.append({"s0": s0, "s1": s1, "style": t["style"], "source": "user", "mark": mark})
+    listed = []
+    for k, t in enumerate(truth.get("grassTrack", {}).get("stretches", [])):
+        if "from" not in t or t.get("removed"):
             continue
-        secs.append({"s0": data["stops"][a]["s"], "s1": data["stops"][b]["s"], "style": t["style"], "source": "user", "mark": mark})
+        for s0, s1 in passes(data["stops"], t["from"], t["to"]):
+            listed += [{"s0": a, "s1": b, "style": "grass", "source": "list", "stretch": k}
+                       for a, b in minus(s0, s1, user) if b - a >= MIN_GRASS]
+    facts, found = user + listed, []
     if survey is not None:
         rt = Route(data["path"], data.get("pathExt"))
-        user = list(secs)
         start, s = None, 0
         while s <= rt.length + SAMPLE:
             x, y = rt.at(s)[:2]
@@ -87,14 +123,14 @@ def sections(data, truth, survey):
                 start = s
             if not green and start is not None:
                 s1 = s - SAMPLE
-                last = secs[-1] if secs else None
-                if last and last["source"] == "survey" and start - last["s1"] < JOIN:
+                last = found[-1] if found else None
+                if last and start - last["s1"] < JOIN:
                     last["s1"] = s1
-                elif s1 - start >= MIN_GRASS and not any(s1 > x["s0"] and start < x["s1"] for x in user):
-                    secs.append({"s0": start, "s1": s1, "style": "grass", "source": "survey"})
+                elif s1 - start >= MIN_GRASS and not any(s1 > x["s0"] and start < x["s1"] for x in facts):
+                    found.append({"s0": start, "s1": s1, "style": "grass", "source": "survey"})
                 start = None
             s += SAMPLE
-    return secs
+    return sorted(facts + found, key=lambda x: x["s0"])
 
 
 def main():

@@ -31,7 +31,29 @@ class Styles(unittest.TestCase):
         truth = {"trackStyles": [{"line": "x", "from": "C", "to": "B", "style": "embedded"}]}
         secs = T.sections(DATA, truth, sv)
         self.assertEqual([(x["s0"], x["s1"], x["style"], x["source"]) for x in secs],
-                         [(300.0, 400.0, "embedded", "user"), (100, 260, "grass", "survey")])
+                         [(100, 260, "grass", "survey"), (300.0, 400.0, "embedded", "user")])
+
+    def test_the_list_takes_every_pass_and_leaves_the_users_marks_their_track(self):
+        stops = [{"name": "A", "s": 0.0}, {"name": "B", "s": 100.0}, {"name": "C", "s": 300.0}, {"name": "B", "s": 400.0},
+                 {"name": "A", "s": 550.0}]
+        data = {**DATA, "stops": stops}
+        truth = {"trackStyles": [{"line": "x", "from": "C", "to": "B", "style": "embedded"}],
+                 "grassTrack": {"stretches": [{"from": "A", "to": "B"}, {"from": "C", "to": "B"}, {"at": "C"},
+                                              {"from": "B", "to": "C", "removed": 2009}]}}
+        secs = T.sections(data, truth, None)
+        self.assertEqual([(x["s0"], x["s1"], x["source"], x.get("stretch")) for x in secs],
+                         [(0.0, 100.0, "list", 0), (100.0, 300.0, "list", 1), (300.0, 400.0, "user", None),
+                          (400.0, 550.0, "list", 0)])   # (C - B both ways; the user's mark keeps the way back)
+
+    def test_a_mark_between_two_points_runs_between_their_route_positions(self):
+        ll = [list(map(float, T.Frame().ll(x, y))) for x, y in ((420.0, 3.0), (180.0, -2.0))]
+        truth = {"trackStyles": [{"line": "x", "between": ll, "style": "grass"}],
+                 "grassTrack": {"stretches": [{"from": "B", "to": "C"}]}}
+        secs = T.sections(DATA, truth, None)
+        self.assertEqual([(round(x["s0"], 3), round(x["s1"], 3), x["source"]) for x in secs],
+                         [(100.0, 180.0, "list"), (180.0, 420.0, "user")])
+        far = [list(map(float, T.Frame().ll(x, y))) for x, y in ((420.0, 30.0), (180.0, 0.0))]
+        self.assertEqual(T.sections(DATA, {"trackStyles": [{"line": "x", "between": far, "style": "grass"}]}, None), [])
 
     def test_an_area_of_higher_rank_over_the_green_decides(self):
         sv = T.Survey({"areas": [rect(100, 200, -5, 5, "green"), rect(140, 160, -5, 5, "road"), rect(0, 600, -9, 9, "wall")]})

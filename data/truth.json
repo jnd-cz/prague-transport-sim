@@ -9,7 +9,8 @@
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
   "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
-  "trackStyles": "src/heights.js",
+  "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
+  "grassTrack": "tools/track_styles.py, tools/track_decks.py",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
@@ -592,9 +593,10 @@
    "line": "22",
    "from": "Malý Břevnov",
    "to": "Obora Hvězda",
-   "style": "ballast",
-   "extent": "mostly",
-   "source": "user 2026-10-29"
+   "between": [[50.0765432, 14.3347445], [50.0778945, 14.3399846]],
+   "style": "grass",
+   "extent": "between the two points",
+   "source": "user 2026-11-12, #479: \"I looked at ortophoto and steer view and now confirm there is grass between 50.0765432N, 14.3347445E and 50.0778945N, 14.3399846E. It looked dry so got confused with open ballast earlier.\" (was ballast, mostly: user 2026-10-29)"
   },
   {
    "line": "22",
@@ -636,6 +638,44 @@
    "source": "user 2026-10-29"
   }
  ],
+ "grassTrack": {
+  "document": "prazsketramvaje.cz: Zatravněný svršek tramvajové tratě",
+  "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041490",
+  "read": "2026-11-12",
+  "note": "DP Praha's grassed track by the year it was laid, from stop to stop; found by the user (#479, 2026-11-12). A '?' in the article marks only an unknown year (the user, 2026-11-12: \"The article has question mark only because the year of construction if the grass cover is unknown\"): `yearKnown` false. Stop names as our data spells them (the article: 'Pražský Hrad', 'Obora Hvěda'). Every line passing both stops takes the stretch between them; the user's trackStyles marks win where they overlap (tools/track_styles.py).",
+  "stretches": [
+   {"from": "Brusnice", "to": "Pražský hrad", "year": 1995},
+   {"from": "Pohořelec", "to": "Brusnice", "year": 2000},
+   {"from": "Prašný most", "to": "Hradčanská", "year": 2002, "removed": 2009},
+   {"from": "Černokostelecká", "to": "Vinice", "year": 2002},
+   {"from": "Nádraží Libeň", "to": "Balabenka", "year": 2004},
+   {"from": "Sídliště Barrandov", "to": "Hlubočepy", "year": 2004, "removed": 2020, "note": "watering added 2006; removed 2020 except a short piece around Chaplinovo náměstí"},
+   {"from": "Balabenka", "to": "Poliklinika Vysočany", "year": 2005},
+   {"from": "Hradčanská", "to": "Špejchar", "year": 2010},
+   {"from": "Sídliště Řepy", "to": "Slánská", "year": 2010},
+   {"from": "Vítězné náměstí", "to": "Podbaba", "year": 2011},
+   {"from": "Sparta", "to": "Korunovační", "year": 2012},
+   {"from": "Harfa", "to": "Podkovářská", "year": 2013, "yearKnown": false},
+   {"from": "Prašný most", "to": "Hradčanská", "year": 2013},
+   {"from": "Nad Džbánem", "to": "Červený Vrch", "year": 2013, "yearKnown": false},
+   {"from": "Červený Vrch", "to": "Thákurova", "year": 2013, "yearKnown": false},
+   {"from": "Na Padesátém", "to": "Průběžná", "year": 2014, "yearKnown": false},
+   {"from": "Průběžná", "to": "Kubánské náměstí", "year": 2014, "yearKnown": false},
+   {"from": "Malý Břevnov", "to": "Obora Hvězda", "year": 2014, "yearKnown": false},
+   {"from": "Břevnovský klášter", "to": "Malovanka", "year": 2014, "yearKnown": false},
+   {"from": "Sídliště Petřiny", "to": "Octárna", "year": 2015, "yearKnown": false},
+   {"from": "Kubánské náměstí", "to": "Koh-i-noor", "year": 2015, "yearKnown": false},
+   {"from": "Koh-i-noor", "to": "Otakarova", "year": 2015, "yearKnown": false},
+   {"from": "Invalidovna", "to": "Urxova", "year": 2016, "yearKnown": false},
+   {"from": "Flora", "to": "Želivského", "year": 2018},
+   {"from": "Špitálská", "to": "Nový Hloubětín", "year": 2018},
+   {"from": "Strašnická", "to": "Průběžná", "year": 2020},
+   {"at": "Depo Hostivař", "year": 2022},
+   {"from": "Náměstí Olgy Scheinpflugové", "to": "Sídliště Barrandov", "year": 2022},
+   {"from": "Libuš", "to": "Sídliště Libuš", "year": 2023},
+   {"from": "Ciolkovského", "to": "Vlastina", "year": 2023, "yearKnown": false}
+  ]
+ },
  "trackSources": {
   "note": "Answers to the track sources review (tools/track_sources.py, #20): 'matches reality' without a note takes the finding of its kind within 3 m off the list. Answers with a note stay held there.",
   "reviewAnswers": [
