@@ -383,8 +383,9 @@ Sections:
   own large errors are runs of vertices on another line's height (a road edge on a wall's top line, a sawtooth of
   1.2 m by Jižní spojka on line 22; Náhorní's sidewalk 1.40 m low on line 17, #315) and lone vertices off their kerb.
   `tools/zps_outline.py` moves those where IPR runs calm, on road, tram and sidewalk, a run of them whole or not at all
-  (moved in part, a stretch 1-3 m off became a sawtooth): over 0.3 m off, 1,135-3,540 vertices per line → 91-325; over
-  8 cm off the mean, roads 1.8-2.7 → 1.4-1.7 %, sidewalks 4.0-5.1 → 3.1-4.0 %. 79 % of straight street outline lies in
+  (moved in part, a stretch 1-3 m off became a sawtooth): over 0.3 m off, 1,135-3,540 vertices per line → 90-260; over
+  8 cm off the mean, roads 1.8-2.7 → 1.3-1.6 %, sidewalks 4.0-5.1 → 3.1-4.0 %. A vertex one outline agrees with IPR
+  at and another not is a step (a track bed under its kerb on line 9), not an error. 79 % of straight street outline lies in
   gaps over 5 m between vertices (line 22). A platform's edge shared with the tram area is its top (#21), not the
   tram's foot: its vertices stay out of the rule.
 - **Railway yards, lawns and paved yards have heights only on their outline** (#444, `tools/zps_inside.py`,

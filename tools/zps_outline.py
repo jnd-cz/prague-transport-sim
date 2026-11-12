@@ -23,9 +23,10 @@ Kept as the survey has them: the classes where IPR scatters more than the survey
 vertices under a cover (the survey's upper levels, OSM's bridges, buildings and covered ways: IPR reads the cover or a
 guess under it), areas held off IPR (zps_ground's verdicts), the shapes IPR sees too (lowered kerbs, driveways, ramps),
 faces the survey drew (FACE: IPR's 1 m raster has no 20 cm step within a metre) and runs that cannot move whole.
-On the five lines (2026-11-12) straight outline over 8 cm off its mean went from 1.8-2.7 to 1.4-1.7 % on roads, 1.7-3.3 to
-0.7-2.5 % on tram areas and 4.0-5.1 to 3.1-4.0 % on sidewalks; vertices over 0.3 m off from 1,135-3,540 to 91-325 per
-line.
+On the five lines (2026-11-12) straight outline over 8 cm off its mean went from 1.8-2.7 to 1.3-1.6 % on roads, 1.7-3.3 to
+0.8-2.7 % on tram areas and 4.0-5.1 to 3.1-4.0 % on sidewalks; vertices over 0.3 m off from 1,135-3,540 to 90-260 per
+line. A vertex another outline sharing it agrees with IPR at is a step between them, not an error: it stays (line 9's
+track bed 0.30 m under the kerb it shares with a sidewalk on IPR; pulled down, the kerb went flat).
 """
 import numpy as np
 import shapely
