@@ -42,10 +42,11 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
 
 // The line data is built with its track drawn as curves (`trackCurve`, tools/track_curve.py, #204), the run past
 // both termini (`pathExt`, tools/route.py, #477) and the route's radius and cant (`curvature`, `cant`, tools/cant.py,
-// #478): the page smooths no track, walks none and works out no curve (#276 step 2). Data built before them does not load.
+// #478), and its track styles (`styles`, tools/track_styles.py, #479): the page smooths no track, walks none and works
+// out no curve or style (#276 step 2). Data built before them does not load.
 export function checkBuiltRoute(data) {
-  const missing = ['trackCurve', 'pathExt', 'curvature', 'cant'].filter((k) => !data[k]);
-  if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(', ')}: built before #478, rebuild it (tools/rebuild.py)`);
+  const missing = ['trackCurve', 'pathExt', 'curvature', 'cant', 'styles'].filter((k) => !data[k]);
+  if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(', ')}: built before #479, rebuild it (tools/rebuild.py)`);
 }
 
 // the unbalanced lateral acceleration (m/s2) a curve's limit takes where the route has no `curveAccel` (_designSpeed)

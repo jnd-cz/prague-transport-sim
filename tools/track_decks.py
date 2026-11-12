@@ -206,27 +206,25 @@ def load_decks(root):
             )
     truth = json.loads((root / 'data/truth.json').read_text(encoding='utf-8'))
     facts = truth.get('trackHeights', {}).get('railAboveDeck', [])
-    styles, lines = [], {}
-    for mark_index, mark in enumerate(truth.get('trackStyles', [])):
-        line = str(mark['line'])
-        if line not in lines:
-            lines[line] = json.loads((root / f'data/line{line}.json').read_text(encoding='utf-8'))
-        data = lines[line]
-        a = next((i for i, st in enumerate(data['stops']) if st['name'] == mark['from']), None)
-        b = next(
-            (i for i, st in enumerate(data['stops']) if a is not None and i > a and st['name'] == mark['to']),
-            None,
-        )
-        if a is None or b is None:
-            continue
-        section = substring(
-            LineString([p[:2] for p in data['path']]), data['stops'][a]['s'], data['stops'][b]['s']
-        )
-        styles.append(
-            {
-                'style': mark['style'],
-                'polygon': section.buffer(5, cap_style=2),
-                'source': {'record': f'data/truth.json#trackStyles/{mark_index}', **mark},
-            }
-        )
+    styles = []
+    # (the user's marks as the build placed them: data/lineN.json `styles`, tools/track_styles.py, #479; the survey's
+    # grass sections are not facts and stay out)
+    marks = truth.get('trackStyles', [])
+    for line in sorted({str(m['line']) for m in marks}):
+        data = json.loads((root / f'data/line{line}.json').read_text(encoding='utf-8'))
+        if 'styles' not in data:
+            raise ValueError(f'data/line{line}.json has no `styles`: run tools/track_styles.py --line {line} (#479)')
+        for sec in data['styles']:
+            if sec.get('source') != 'user':
+                continue
+            mark_index = sec['mark']
+            section = substring(LineString([p[:2] for p in data['path']]), sec['s0'], sec['s1'])
+            styles.append(
+                {
+                    'style': sec['style'],
+                    'polygon': section.buffer(5, cap_style=2),
+                    'source': {'record': f'data/truth.json#trackStyles/{mark_index}', **marks[mark_index]},
+                }
+            )
+    styles.sort(key=lambda x: int(x['source']['record'].rsplit('/', 1)[1]))   # (in the marks' order, as before)
     return Decks(records, facts, styles)

@@ -38,18 +38,15 @@ class HeightStyles(unittest.TestCase):
         result = self.page.evaluate(
             """async (truth) => {
           const {trackStyles} = await import('/src/heights.js');
-          const data = {line: 'test', stops: [{name: 'A', s: 100}, {name: 'B', s: 200}]};
+          // (the sections are the build's, tools/track_styles.py: tools/test_track_styles.py)
           const styles = ['embedded', 'panels', 'grass', 'ballast'];
           const values = styles.map((style) => {
-            const t = structuredClone(truth);
-            t.trackStyles = [{line: 'test', from: 'A', to: 'B', style}];
-            const s = trackStyles(t, data);
+            const s = trackStyles(truth, {line: 'test', styles: [{s0: 100, s1: 200, style, source: 'user', mark: 0}]});
             return {style, d: s.sections[0].d, ids: s.sections[0].offsetFactIds};
           });
-          truth.trackStyles = [];
           const fact = truth.trackHeights.railAboveDeck.find((f) => f.styles.includes('grass'));
-          fact.metres = 0.09; // A changed fact must affect the runtime, including inferred grass.
-          const inferred = trackStyles(truth, data, () => 'green', 100);
+          fact.metres = 0.09; // A changed fact must affect the runtime, including the survey's grass.
+          const inferred = trackStyles(truth, {line: 'test', styles: [{s0: 0, s1: 100, style: 'grass', source: 'survey'}]});
           return {values, inferred: inferred.lift(50), ids: inferred.sections[0].offsetFactIds};
         }""",
             self.truth,

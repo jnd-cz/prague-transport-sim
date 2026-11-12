@@ -127,7 +127,7 @@ logProvenance(built);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 await load.begin('profile');
 // real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const styles = trackStyles(truth, data, dtm ? (s) => { const p = route.at(s); return dtm.classAt(p.x, p.y); } : null, route.length);
+const styles = trackStyles(truth, data); // (the build's sections, tools/track_styles.py, #479)
 const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || [], styles.lift,
   data.heights ? { ...data.heights, source: data.heightSource } : null); // (the assembled top of rail, #197)
 const ground = makeGround(route, terrain, profile, dtm);
