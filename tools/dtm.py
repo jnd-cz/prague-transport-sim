@@ -418,6 +418,14 @@ print("under decks:", under_report)
 print("lidar inside:", inside_report["classes"], "their sheet fits:", inside_report["fit"], "kept their sheet:",
       inside_report["kept"])
 
+# the street outlines where the survey alone sets a vertex off and the lidar beside it runs smooth (tools/zps_outline.py,
+# #470); before the kerbs, which read the outline's heights
+import zps_outline  # noqa: E402
+outline_report = zps_outline.correct(
+    areas, _city_ground, [i for i, v in ground_verdicts.items() if v.get("verdict") in zps_outline.HELD],
+    zps_ground.cover_union(areas, _osm_cover))
+print("street outlines:", outline_report["places"], "places moved", outline_report["vertices"], outline_report["sizes"])
+
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
 kerb_structures, kerb_low = [], []
@@ -472,7 +480,8 @@ nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
                            checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
-                                   "decks": deck_report, "underDecks": under_report, "inside": inside_report}),
+                                   "decks": deck_report, "underDecks": under_report, "inside": inside_report,
+                                   "outlines": outline_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])
