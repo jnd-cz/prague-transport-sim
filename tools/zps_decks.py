@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The survey's decks (areas of level 1 and up) checked against the structures that carry them, kept flat over the
 openings under them, and how thick they are (#445). Read by tools/dtm.py; numpy and shapely.
 

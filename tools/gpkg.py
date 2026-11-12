@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Minimal GeoPackage reader (no GDAL): layers, attributes and geometries decoded from the
 GPKG binary header + WKB. Enough for the DTM Praha open data (points, lines, polygons, Z)."""
 import sqlite3

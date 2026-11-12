@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Terrain meshes from IPR's 1 m lidar, simplified by an error that grows with distance from the tracks (#276).
 
 Measures candidate meshers on IPR cells (the raster's own cell centres, no resampling): triangles, vertices,

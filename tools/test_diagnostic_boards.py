@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The diagnostic speed boards only with the debug overlay (#389): python -P -E tools/test_diagnostic_boards.py [--line 17]
 (its own server on a free port).
 

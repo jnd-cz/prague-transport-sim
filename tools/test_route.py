@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The run past the termini (tools/route.py, #477): python -I tools/test_route.py."""
 import math
 from pathlib import Path

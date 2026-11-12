@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check (not part of the game): cars turning across our track in front of the tram (PLAN U3).
 // Drives a whole line headless with the autopilot; in the page (after loading):
 //   const { run } = await import('/tools/bench/u3.js'); await run(seed)

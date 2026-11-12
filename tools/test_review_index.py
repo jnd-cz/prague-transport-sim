@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The review directory (reviews.html, src/reviewIndex.js, #288) on a phone-sized and a desktop page:
 python -P -E tools/test_review_index.py
 The page comes from tools/serve.py's handler on a free port; the index, the sets and the answer store are

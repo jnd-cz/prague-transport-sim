@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The DMR 5G tiles and the passages rule: python -P -E tools/test_dmr5g.py (no download, no raw/ needed)."""
 import os
 from pathlib import Path

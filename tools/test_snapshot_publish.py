@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """A snapshot's id is a date (and a letter), and --help is help: python -I tools/test_snapshot_publish.py (#424)"""
 import os
 from pathlib import Path

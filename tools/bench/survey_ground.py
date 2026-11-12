@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The street survey's ground-level areas against IPR's lidar and the surveyed rails, as built (#446).
 
     python -P -E tools/bench/survey_ground.py [--lines 9,17,22,23,37] [--top 10] [--dtm DIR] [--json reports/survey-ground.json]

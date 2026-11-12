@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Player feedback (#350): python -I tools/feedback.py [--site NAME] [--kind K] [--line N] [--all] [--perf]
 
 Lists the notes in <feedback>/<site>/ (pulled from a host by tools/deploy.py --pull, or written by tools/serve.py

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev bench (not part of the game): the frame time and the draw calls with a tram model (#248, #250).
 // In a page with the menu up (tools/frametime.py drives it in a headed browser; headless draws in software):
 //   const { run } = await import('/tools/bench/frametime.js'); await run({ model: 'detailed' })

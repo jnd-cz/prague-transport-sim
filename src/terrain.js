@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Terrain heights (ČÚZK DMR 5G grid) and the smoothed vertical profile of the route.
 
 // A regular height grid (rows go south: dy < 0): the coarse terrain of a line, or one block of the

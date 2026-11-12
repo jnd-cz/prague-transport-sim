@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Turning loops by the user's rule (tools/track_loops.py, #211): python -P -E tools/test_track_loops.py."""
 import math
 from pathlib import Path

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Traffic-signal data along a line from OpenStreetMap, for the game's traffic lights.
 # Belongs into the build with the other placement rules (#22).
 #   python -P -E tools/osm_signals.py 17      -> data/line17.signals.json

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check (not part of the game): how the autopilot brings the tram to its stops (#351). A watcher on the
 // u3 drive (tools/bench/u3.js, opts.also); in the page after loading:
 //   const { run } = await import('/tools/bench/stops.js'); await run(seed)

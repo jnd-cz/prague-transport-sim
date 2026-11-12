@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Checks a line's data against OpenStreetMap. Not part of the game.
 #   python -P -E tools/osm_validate.py 17
 # Reads the snapshot's OSM extract (tools/osm_local.py). Prints: the coordinate fit (OSM tram ways vs our

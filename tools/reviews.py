@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Review verdicts (#136): one file per review, {"meta": {...}, "items": {finding id: record}}.
 src/review.js sends the records it changed; tools/serve.py (reports/reviews/), tools/review.php (on the
 host) and tools/deploy.py --pull-reviews merge them by this rule: per finding, the newer "t" wins, so

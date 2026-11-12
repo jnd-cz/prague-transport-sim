@@ -264,11 +264,13 @@ helps most is how driving and the traffic feel to you.
 - **What is sent:** only what you send: the note and with it the place, the game's settings and version, the
   browser, graphics card, screen size and errors. No name, account or address.
 
-<!-- /help -->
-
 ## Licences
 
-Code: GNU GPL v3 ([LICENSE](LICENSE)). Assets: [ASSETS.md](ASSETS.md) (the detailed T3 model is CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](NOTICE.md).
+The game runs at [sim.8b.cz](https://sim.8b.cz/); its source code is on [GitHub](https://github.com/jnd-cz/prague-transport-sim).
+
+Code and the project's own models (the built-in tram, the pedestrians): GNU AGPL v3 ([LICENSE](https://github.com/jnd-cz/prague-transport-sim/blob/main/LICENSE)). Whoever changes the game and offers it to people over a network must offer them its source code too. Other models and textures: [ASSETS.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/ASSETS.md) (the detailed T3 models are CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/NOTICE.md).
 
 Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
 terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).
+
+<!-- /help -->

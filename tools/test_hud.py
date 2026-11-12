@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The HUD's distances: python -P -E tools/test_hud.py [--line 17] (its own server on a free port).
 
 The limit ahead in the chip ("Limit 30 km/h in 87 m") and on the info screen (I) is shown in whole metres, also

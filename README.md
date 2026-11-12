@@ -255,11 +255,13 @@ působí řízení a provoz.
 - **Co se odesílá:** jen to, co odešlete vy: poznámka a k ní místo, nastavení a verze hry, prohlížeč, grafická
   karta, velikost obrazovky a chyby. Žádné jméno, účet ani adresa.
 
-<!-- /help -->
-
 ## Licence
 
-Kód: GNU GPL v3 ([LICENSE](LICENSE)). Modely a textury: [ASSETS.md](ASSETS.md) (podrobný model T3 je CC BY-NC 4.0). Zdroje dat a jejich uvedení: [NOTICE.md](NOTICE.md).
+Hra běží na [sim.8b.cz](https://sim.8b.cz/), její zdrojový kód je na [GitHubu](https://github.com/jnd-cz/prague-transport-sim).
+
+Kód a vlastní modely projektu (vestavěná tramvaj, chodci): GNU AGPL v3 ([LICENSE](https://github.com/jnd-cz/prague-transport-sim/blob/main/LICENSE)). Kdo hru upraví a nabídne ji lidem přes síť, musí jim nabídnout i svůj zdrojový kód. Ostatní modely a textury: [ASSETS.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/ASSETS.md) (podrobné modely T3 jsou CC BY-NC 4.0). Zdroje dat a jejich uvedení: [NOTICE.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/NOTICE.md).
 
 Data © přispěvatelé OpenStreetMap (ODbL); jízdní řád PID GTFS, data.pid.cz (CC BY 4.0);
 terén ČÚZK DMR 5G (CC BY 4.0); 3D budovy, opěrné zdi a stromy: datový podklad © IPR Praha (CC BY 4.0).
+
+<!-- /help -->

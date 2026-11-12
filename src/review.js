@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Review mode (?review, #129): the findings of our checks on the map of the game, with layers that show
 // the survey and links to street-level imagery at each place, on a desktop or a phone. No shift runs.
 //   ?review                     findings from the data: the kerb review list (data/lineN.dtm.json

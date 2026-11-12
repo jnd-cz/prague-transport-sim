@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Cab instruments and overlays (DOM/SVG), plus the minimap.
 import { fmtTime, fmtDev, demandAt } from './game.js';
 import { t, onLangChange } from './i18n.js';

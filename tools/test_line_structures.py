@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The route's structures built offline (tools/line_structures.py, #480): python -P -E tools/test_line_structures.py."""
 from pathlib import Path
 import sys

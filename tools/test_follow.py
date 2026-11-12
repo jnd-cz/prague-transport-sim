@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """A tram stopping dead in front of our autopilot (#221, #260): python -P -E tools/test_follow.py [--line 22]
 (its own server on a free port). The autopilot drives the line until it runs at 30 km/h or more on open
 track; an AI tram is put 60 m ahead of it at the same speed, keeps that distance for 2 s, then stands where it is

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The whole city's terrain as one greedy mesh of IPR's 1 m raster, 10 cm at the track (#428, #276's step 1).
 
 The decisions (docs/decisions/2026-11-05-ground-built-offline.md, the user's): greedy insertion with pydelatin; the

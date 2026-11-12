@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The city terrain's mesh on a synthetic raster (#428): python -P -E tools/test_city_terrain.py (needs pydelatin)."""
 import faulthandler
 from pathlib import Path

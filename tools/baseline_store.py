@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Main's regression baseline in the data store, and the machine's heavy-job lock (#157). Stdlib only:
 tools/headless.py (--baseline --publish, --compare) and tools/autodeploy.py (the nightly measurement)
 use it.

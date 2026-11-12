@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Player feedback (#350): python -I tools/test_feedback.py
 
 tools/feedback.py (the note's checks, saving with its screenshot, the listing), tools/serve.py's POST

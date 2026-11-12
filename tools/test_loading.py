@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """src/loading.js on responses as the test host sends them (#275), and what its screen says when the page stops (#371):
 python -P -E tools/test_loading.py
 For the sizes the page comes from a small server on a free port: src/ from this checkout, and a data manifest and files

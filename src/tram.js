@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // A tram's longitudinal dynamics: the body (mass, length, capacity) and the forces on it (gravity,
 // running and curve resistance, adhesion, sand), with the traction equipment as its own part (#221):
 // `tram.eq` turns the driver's controls into tractive and brake forces and the line current. The T3SUCS

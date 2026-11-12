@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """A line file from build_line.py alone is no full build: python -I tools/test_snapshot_lines.py"""
 import json
 import os

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The rear view has a separate texture cadence. Its cached picture must still be composited after
 // every main draw, or the main scene wipes it on the frames between updates (#79).
 import * as THREE from 'three';

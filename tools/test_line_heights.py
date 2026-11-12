@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests of the top-of-rail assembly (tools/line_heights.py, #197) and of the answers' rules in front of it
 (tools/height_answers.py, #418) on synthetic chains:
 python -P -E tools/test_line_heights.py"""

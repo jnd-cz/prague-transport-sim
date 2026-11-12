@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Crossing geometry and grade separation: python -P -E tools/test_pedestrian_crossings.py."""
 from pathlib import Path
 import json

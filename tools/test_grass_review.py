@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OSM's grass over our track for review (tools/grass_review.py, #503): python -P -E tools/test_grass_review.py."""
 import json
 from pathlib import Path

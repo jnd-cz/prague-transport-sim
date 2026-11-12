@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Smoke test of review mode (?review, src/review.js) on a phone-sized page with touch:
 python -P -E tools/test_review.py [--line 17]
 (tools/serve.py's handler on a free port, its review answers in a temp folder; the findings file is

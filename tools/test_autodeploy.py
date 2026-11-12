@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/autodeploy.py on a temp origin and deploy clone: python -I tools/test_autodeploy.py
 
 The deploy cycle runs with nightly() replaced by a recorder, so the hour the test runs at does not matter (#323:

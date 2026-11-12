@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The game's route is the build's (#276 step 2, #477): python -P -E tools/test_built_route.py.
 
 On every line in data/: the page's route, from the path and the run the build wrote (`pathExt`), passes within 1 cm

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The nightly baseline's key, inputs, lock and decision (#157, #126): python -I tools/test_baseline_store.py"""
 import datetime
 import glob

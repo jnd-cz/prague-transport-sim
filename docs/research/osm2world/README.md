@@ -34,7 +34,7 @@ to whole window bays, and the tile encoding.
 
 - **Ideas, reimplemented in our tools: yes.** Every item below is a reimplementation in Python (build) or
   JavaScript (page). No OSM2World code is ported; a file that ends up a close translation carries OSM2World's
-  MIT notice in its header (MIT code may go into our GPL-3.0 project with the notice kept).
+  MIT notice in its header (MIT code may go into our AGPL-3.0 project with the notice kept).
 - **Running OSM2World as a build step: no.** It brings a JVM, its outputs carry its guesses where we have
   measurements, its per-tile conversion lets neighbouring tiles disagree at junctions ([output.md](output.md)),
   and its height constraints are not enforced at this commit ([terrain.md](terrain.md)).

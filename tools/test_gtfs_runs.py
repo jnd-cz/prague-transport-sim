@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Run with python -I tools/test_gtfs_runs.py."""
 import os
 import sys

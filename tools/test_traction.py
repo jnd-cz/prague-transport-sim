@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The T3's traction and brakes (#221, src/tr37.js through src/tram.js), without the game:
 python -P -E tools/test_traction.py
 (its own server on a free port; a blank page imports the two modules). An empty car on the level:

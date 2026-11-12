@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The lamps' common parts (#436), for every tram model: the indicators' rhythm and the high beams' glow.
 // What is lit when (the user, 2026-11-10, #436): the dipped headlights and the tail lamps whenever a tram is
 // in service ("off only when the car is turned off"), the brake lamps while it brakes, the indicators before a

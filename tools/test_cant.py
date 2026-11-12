@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The route's radius and cant built offline (tools/cant.py, #478): python -I tools/test_cant.py."""
 import math
 from pathlib import Path

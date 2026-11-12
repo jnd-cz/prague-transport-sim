@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The inside of the survey's level-0 areas against IPR's lidar, per line and class (#444).
 
     python -P -E tools/bench/ground_inside.py [--lines 9,17,22,23,37] [--dtm DIR] [--page main] [--edge 5] [--step 2]

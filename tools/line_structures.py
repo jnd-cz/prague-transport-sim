@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The route's structures for the game (#480, #276 step 2): where it runs on a bridge, which spans have a deck the track
 lies on, and the roads under it with their clearance. Built once here, read by the page (src/terrain.js Profile, which
 worked them out at every load until #480).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // What each height means (docs/decisions/2026-10-29-what-each-height-means.md, #9). All heights are Bpv
 // metres. The track profile is the top of rail (TOR): the tram's wheels stand on it, rails, bed and
 // catenary are measured from it. Until 2026-10-29 the profile was the street under the track, with the

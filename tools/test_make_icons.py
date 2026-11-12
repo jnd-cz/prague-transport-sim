@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/make_icons.py draws the committed icons: python -P -E tools/test_make_icons.py"""
 import contextlib
 import io

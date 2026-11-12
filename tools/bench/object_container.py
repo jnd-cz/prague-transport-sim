@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tile container for a tile's objects: what the game has today, GLB with KHR_mesh_quantization, integer differences (#307).
 
 Cuts each line's objects into tiles and encodes them every way, keeping every format on the data's own lattice, so none loses

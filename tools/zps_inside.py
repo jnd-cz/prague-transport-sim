@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The inside of the survey's ground-level areas that have heights only on their outline, and the ground under the decks
 (#444, part of #276's partition). Read by tools/dtm.py.
 

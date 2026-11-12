@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """On-screen controls and the viewport-sized mirror (#79): python -P -E tools/test_touch.py [--line 17]
 (its own server on a free port). On a phone (390 x 844, touch) a shift is driven by the buttons only:
 doors closed, two notches of power, the tram moves, the emergency brake; the outside view turns by a

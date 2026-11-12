@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test which files verify downloads, without the store: python -I tools/test_snapshot_verify.py."""
 import contextlib
 import io

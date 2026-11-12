@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Route geometry along the line: arc-length parameterised polyline in local metres
 // (x = east, y = north). Three.js world uses (x, height, -y).
 import { SMALL_RADIUS } from './speedSigns.js';

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Sources per layer, in fallback order, and the provenance every built file carries (#10).
 
 The one table of what the world is built from: SOURCES (who, licence, the date of the data, the height

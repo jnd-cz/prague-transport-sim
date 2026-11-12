@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Import the Prague Digital Technical Map (DTM, open part: ZPS) along a built line.
 
 DTM Praha open data, "Základní prostorová situace" per city district (městská část), GeoPackage,

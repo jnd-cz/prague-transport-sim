@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Pinned source snapshots and built game data, kept in the data store (not in git). See DATA.md.
 
 The world is built from raw sources (OSM, PID GTFS, the Prague street survey, Geoportál, terrain) that

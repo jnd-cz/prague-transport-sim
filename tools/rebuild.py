@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Rebuild lines from the snapshot: every build step, one log per step.
 
     python -P -E tools/rebuild.py 17 22         # lines (default: all)

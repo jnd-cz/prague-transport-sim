@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Profile rendering: python -P -E tools/test_track_height_profile.py (free-port server)."""
 from pathlib import Path
 import json

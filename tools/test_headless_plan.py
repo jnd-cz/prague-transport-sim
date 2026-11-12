@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Batch planning from this machine's run times (#413): python -P -E tools/test_headless_plan.py"""
 from contextlib import redirect_stdout
 import io

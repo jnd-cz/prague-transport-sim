@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // How the game runs on the player's machine (#350): a frame-time log over a shift, the machine's facts, and
 // the GPU's own time per frame where the browser offers a timer. A note carries them (src/report.js), a shift's
 // end offers to send them, and the menu's performance test drives a fixed stretch to compare machines.

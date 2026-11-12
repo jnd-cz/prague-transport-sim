@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The rides-against-limits comparison's parts on a made-up track: python -P -E tools/test_rides_limits.py (#451)"""
 import os
 import sys

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/osm_local.py: the extract's index answers as a pass over the extract does (#511).
 
     python -P -E tools/test_osm_local.py

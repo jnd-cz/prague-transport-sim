@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Headless checks from the command line (issue #2): the in-page benches and lints in headless Chromium.
 
     python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3

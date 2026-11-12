@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Rendered crossing check and triangle filtering: python -P -E tools/test_crossing_check.py."""
 from pathlib import Path
 import re

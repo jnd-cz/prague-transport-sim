@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev overlay (?debug, toggled with F8): markers for what the signal and traffic logic decided, drawn
 // over everything (no depth test). Rebuilt on each toggle (the data does not move during a shift).
 //   magenta ball / bar   tram signal head / where the tram stops for it (s − 3)

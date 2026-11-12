@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/zps_decks.py: the survey's decks against their structures, flat over the openings, their thickness (#445).
 
     python -P -E tools/test_zps_decks.py

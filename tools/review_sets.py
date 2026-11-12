@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The review directory's index (#288): every review set in reports/review/, the issue that waits for it, its
 lines, and the open PRs' questions for the user, for reviews.html.
 

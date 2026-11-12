@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Top-of-rail heights for the game (#197): one vertical profile per track of the network, written into the lines.
 
     python -P -E tools/line_heights.py 17 22       # stage the heights, assemble, write data/line17.json, line22.json

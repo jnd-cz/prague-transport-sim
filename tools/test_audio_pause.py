@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Audio lifecycle: python -P -E tools/test_audio_pause.py (own free-port server)."""
 from pathlib import Path
 import sys
