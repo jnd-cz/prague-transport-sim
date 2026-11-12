@@ -98,6 +98,7 @@ def ring_fixes(r, poly, ground, skip=None, covered=None):
         nb = np.roll(np.arange(n), -j)
         face |= (np.hypot(*(xy[nb] - xy).T) < FACE) & (np.abs(s[nb] - s) > OFF)
     off = np.zeros(n, bool)  # (off the local offset, or far off IPR with no offset in reach)
+    far = np.zeros(n, bool)  # (off by more than AGREE: what makes a run)
     new = np.full(n, np.nan)
     for k in range(n):
         if not np.isfinite(e[k]):
@@ -108,30 +109,45 @@ def ring_fixes(r, poly, ground, skip=None, covered=None):
         ag = cand[np.abs(e[cand]) <= AGREE]
         ag = ag[np.argsort(np.abs(rel[ag]))]
         if not len(lo) or not len(hi) or len(ag) < MIN_AGREE:
-            off[k] = abs(e[k]) > AGREE
+            off[k] = far[k] = abs(e[k]) > AGREE
             continue
         w = max(WIN, -lo.max(), hi.min())
         # (the agreeing vertices within w, or the MIN_AGREE nearest within WIDE: a run longer than the window)
         o = float(np.median(e[ag[(np.abs(rel[ag]) <= w) | (np.arange(len(ag)) < MIN_AGREE)]]))
         if abs(e[k] - o) > OFF:
-            off[k] = True
+            off[k], far[k] = True, abs(e[k] - o) > AGREE
             new[k] = g[k] + o
-    movable = (off & np.isfinite(new) & ~face & (np.abs(bend) <= CALM) & (np.abs(new - s) <= MAX)
-               & (True if covered is None else ~covered))
-    # a run (the vertices off in a row along the ring) moves whole or not at all: moved in part, a stretch 1-3 m off IPR
-    # became a sawtooth on line 22 (at -4224, 80 and 1892, -1931)
+    # a run (the vertices far off in a row along the ring) moves whole or not at all: moved in part, a stretch 1-3 m off
+    # IPR became a sawtooth on line 22 (at -4224, 80 and 1892, -1931). A vertex off by less (a kerb's scatter) is one of
+    # its own: left, it makes no jump; joined to a run, one beside Náhorní's held the run back.
     out = {}
-    if off.all():
+    if far.all():
         return out
-    k0 = int(np.flatnonzero(~off)[0])
+    still = ~far & np.isfinite(e)  # (a run's ends: their own offset, scatter or not)
+    k0 = int(np.flatnonzero(~far)[0])
     run = []
     for j in range(1, n + 1):
         k = (k0 + j) % n
-        if off[k]:
+        if far[k]:
             run.append(k)
             continue
-        if run and movable[run].all():
-            out.update({i: float(new[i]) for i in run})
+        units = [run] if run else []
+        if off[k]:
+            units.append([k])
+        for run in units:
+            z = new[run]
+            a, b = (run[0] - 1) % n, (run[-1] + 1) % n  # (the vertices either side of the run)
+            if not np.isfinite(z).all() and still[a] and still[b]:
+                # a run longer than the offset's reach (Náhorní on line 17: 18 of a sidewalk's 30 vertices 1.3-1.6 m
+                # under IPR): the offset from its two ends, along the ring between them
+                t = np.array([(d[i] - d[a]) % L for i in run]) / max((d[b] - d[a]) % L, 1e-9)
+                z = g[run] + e[a] + (e[b] - e[a]) * t
+            dz = np.abs(z - s[run])
+            # (IPR's own shape blocks a move only where it is a fair part of it: CALM, or a quarter of the move)
+            ok = (np.isfinite(z) & ~face[run] & (np.abs(bend[run]) <= np.maximum(CALM, dz / 4)) & (dz <= MAX)
+                  & (True if covered is None else ~covered[run]))
+            if ok.all():
+                out.update({i: float(v) for i, v in zip(run, z)})
         run = []
     return out
 

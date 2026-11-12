@@ -102,6 +102,30 @@ class Outline(unittest.TestCase):
         self.assertEqual(shared, [a["r"][6][2]])
         self.assertAlmostEqual(shared[0], float(plane(30, 0)), delta=0.011)
 
+    def test_a_run_longer_than_the_offsets_reach_takes_the_offset_of_its_ends(self):
+        # Náhorní (line 17): most of a sidewalk's outline 1.4 m under IPR, its ends on IPR (and its foot line 5 cm under it)
+        xs = np.arange(0, 201, 5.0)
+        zs = plane(xs, 0) - 0.05
+        zs[2:39] -= 1.4
+        a = {"c": "sidewalk", "l": 0, "r": [[float(x), 0.0, round(float(z), 2)] for x, z in zip(xs, zs)]
+             + [[200.0, 3.0, round(float(plane(200, 0)), 2)], [0.0, 3.0, round(float(plane(0, 0)), 2)]]}
+        zo.correct([a], plane)
+        np.testing.assert_allclose([q[2] for q in a["r"][:41]], plane(xs, 0) - 0.05, atol=0.011)
+
+    def test_scatter_beside_a_run_does_not_hold_it(self):
+        xs = np.arange(0, 61, 5.0)
+        zs = plane(xs, 0)
+        zs[5:8] -= 1.4
+        zs[9] += 0.15  # (a vertex off a little where IPR has a bump of its own)
+
+        def ground(x, y):
+            x = np.asarray(x, float)
+            return plane(x, y) + 0.2 * np.clip(1 - np.abs(x - 45) / 1.0, 0, 1)
+        a = road(zs)
+        zo.correct([a], ground)
+        np.testing.assert_allclose(heights(a)[5:8], plane(xs[5:8], 0), atol=0.03)  # (the bump nudges the median)
+        self.assertAlmostEqual(heights(a)[9], float(plane(45, 0)) + 0.15, delta=0.011)
+
     def test_a_larger_move_is_another_level(self):
         zs = plane(np.arange(0, 61, 5.0), 0)
         zs[6] += 2.5
