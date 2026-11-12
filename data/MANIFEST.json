@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "423a7e7",
- "published": "2026-11-12 16:36",
- "note": "#491: switch corners — branch held tangent meets its points without a corner; deadlocked ends refitted (lines 9, 17, 22, 23, 37)",
+ "built_at_commit": "2cb6700",
+ "published": "2026-11-12 21:43",
+ "note": "#470: street outlines where survey and lidar disagree — the survey's lone errors and runs take IPR (lines 9, 17, 22, 23, 37)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "5e200065a38933b48a37f7985836fe47f20ba459d3ddef56e16f73296b8cd8ba"
   },
   "line17.dtm.json": {
-   "size": 9375719,
-   "sha256": "e520fd0dc5085dd7e5a89ff2cd0972cde97d88e01d0385c86209b00e443fbb05"
+   "size": 9376511,
+   "sha256": "cd6f7d503fece1df01d435bdec3d6ae9c8cc62c7fd90e196181bf6eb4f74fd8d"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -33,8 +33,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6626669,
-   "sha256": "0d3cd48356c389109891ddd3595fd925594d58b4ce13acade57a8804b58c602b"
+   "size": 6626749,
+   "sha256": "9abf0b56efeae86985165f86ba693fb3b1aa9c8703ad3d972981f9f7b4bad098"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -57,8 +57,8 @@
    "sha256": "aa25d6461aca296d22661d8044764df4e9b34a342840abff582c6c3bc7c01dfe"
   },
   "line22.dtm.json": {
-   "size": 9570316,
-   "sha256": "7ea034042a5c31ac1bf9da156fe2f7a746a1bfb5a0b8755225b83cadb891d2e9"
+   "size": 9571571,
+   "sha256": "ea6298afbb6e4008385274bbf10429cf1bcaf49c00768b5cfff1d6c3feeaceff"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6614224,
-   "sha256": "7ba780357b21a88f1bac09c63117f14d70c785c0cad868eba69358d29af443a1"
+   "size": 6614222,
+   "sha256": "047ca2640871a21f6bf53eba1b66b566790fb1ec0f1fa4c5a3d4755c6437d283"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -97,8 +97,8 @@
    "sha256": "06c53f3b6020a0e047fc18afee00683f9e4708e8fabe35e92f7a53f3c3362902"
   },
   "line23.dtm.json": {
-   "size": 4352205,
-   "sha256": "377a0599ca21db85562fbc10677b0a3ea128a9df36451bcc48e98f6e7a5d4b73"
+   "size": 4353177,
+   "sha256": "d64195c4caf8c781d3296011d8139c3c887a8ba911de567ec8d4e7294f6c9c1c"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -117,8 +117,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2502946,
-   "sha256": "a8053f7948893d56e8ec29f9e6813e0fef77d4d01939d82e6f87030286b39232"
+   "size": 2502951,
+   "sha256": "cc79b0417c64bd48db01d3676b66a52bf74aa2a2b43163770a51392d8a34978a"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -137,8 +137,8 @@
    "sha256": "5804b06c5a9104287594c32e56ccb73d68499d9cebb1417f134558c7afc892d8"
   },
   "line37.dtm.json": {
-   "size": 4702591,
-   "sha256": "fc3b3508effe40fd3fc9e9f585314d4204522f2d8a39f2336a9efb40781031ec"
+   "size": 4702626,
+   "sha256": "f32a720bd76a83060940083a2234cf2d953a4af7281659b03287ce29f01f925e"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -157,8 +157,8 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.json": {
-   "size": 2305879,
-   "sha256": "4ec4cc120fe89f6b668c226f4b9e1a097f1a26e99bc44aa4d782eec2b5e0cd43"
+   "size": 2305874,
+   "sha256": "c3f96dbbcaeeb338017ad72c401b3f59ac58196cb22b5e6c2e2db0195b5ee4c4"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -177,8 +177,8 @@
    "sha256": "d53e05de667e67e70b19c122f226ae3a98b7a7e3d66c34fddce92ddcd1b63b72"
   },
   "line9.dtm.json": {
-   "size": 9610143,
-   "sha256": "9f3d2bc27c8683069dcf9be7f9713186caed6eebd90849ad6e0b51464fa2bec7"
+   "size": 9609754,
+   "sha256": "016d29288cb607a6c321b3447e80e6e107ae4f223648b93b144d0310e6fc064a"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
@@ -197,8 +197,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5810190,
-   "sha256": "a3400f6a2df72c4a939abb94cdfe1d00fa99f78f9d2b3e098fc4f131f07dd008"
+   "size": 5810156,
+   "sha256": "e8dd11d9b0c931a022ca2d277c69abd327922e8404deaa15d8e15ee760bdb0c5"
   },
   "line9.validate.json": {
    "size": 6596,
