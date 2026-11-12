@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The vehicle registry's manifests (#455): assets/vehicles.json and each assets/<id>/vehicle.json.
 
     python -I tools/test_vehicles.py

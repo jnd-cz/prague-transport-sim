@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The vehicle registry in the game (#455), in headless Chromium: every model from its manifest, and a sample added
 as a folder alone.
 
