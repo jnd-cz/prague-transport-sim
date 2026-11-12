@@ -1,4 +1,5 @@
 <?php
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Review verdicts on the web host (#136): tools/deploy.py uploads this as /review.php, behind the site's
 // basic auth. GET ?f=NAME returns reviews/NAME.json; POST ?f=NAME merges the posted records into it:
 // per finding the newer "t" wins (the rule of tools/reviews.py: change both). The page sends an

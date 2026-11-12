@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The performance log and test (src/perf.js, #350): python -P -E tools/test_perf.py [--line 17] [--runs N [--same-page]] [--headed]
     python -P -E tools/test_perf.py --switch 17,9 --times 3     # line switches in one page, memory and CPU watched
     python -P -E tools/test_perf.py --switch 17,9 --firefox --address [--no-release]

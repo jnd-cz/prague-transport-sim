@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Static dev server with caching disabled (so edited ES modules reload).
 
     python tools/serve.py 8742          # the project root on http://localhost:8742

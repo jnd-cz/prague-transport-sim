@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // User interface strings in English and Czech. t('key', {vars}) fills {placeholders}.
 const DICT = {
   en: {

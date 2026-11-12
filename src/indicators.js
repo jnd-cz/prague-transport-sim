@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // When a tram blinks its indicators by itself: the autopilot (src/main.js) and the AI trams (src/traffic.js); our
 // driver works them with keys. The user, 2026-11-10 (#436): "Turning at junction and stopping at street level
 // stop across car lane", at such a stop the right ones from braking into it until it pulls away.

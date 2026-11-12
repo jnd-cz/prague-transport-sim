@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The hybrid T3 model (src/t3h.js, #248) in headless Chromium.
 
 Usage: python -P -E tools/test_t3h.py [--line 17] [--synthetic]

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """One ZPS month per district: CURRENT's snapshot, otherwise the newest local month (#113).
 
     python -P -E tools/dtm_packages.py --check     # DTM below against the rule (OSM district boundaries)

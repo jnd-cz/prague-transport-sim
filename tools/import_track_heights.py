@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Stage guarded DI/archive height proposals for #20; never rewrites game geometry (#106).
 
     python -P -E tools/import_track_heights.py

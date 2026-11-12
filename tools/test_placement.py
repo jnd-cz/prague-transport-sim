@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Where signals and stop points stand, decided in the build (tools/placement.py, #22): python -P -E tools/test_placement.py.
 
 The rules on made-up streets, and on each line's data the build's placement against the game's own rules

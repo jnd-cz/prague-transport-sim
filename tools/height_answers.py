@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The user's answers on the track heights and the rules that apply them before the solve (tools/line_heights.py, #418).
 
 The answers (data/truth.json trackHeights radiusAnswers and stepAnswers, `load`) are this module's globals, read here by

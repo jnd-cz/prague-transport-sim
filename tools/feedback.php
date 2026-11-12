@@ -1,4 +1,5 @@
 <?php
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Player feedback on the web host (#350): tools/deploy.py uploads this as /feedback.php on every target. It only
 // takes notes in: POST a JSON note (src/report.js), stored as feedback/<id>.json under an id made here. Nothing
 // is read back over HTTP (feedback/ is denied to the web); tools/deploy.py --pull moves the notes off the host

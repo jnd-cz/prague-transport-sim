@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The game's speed limits along the route and what sets them (#211). Seedless.
 // On a loaded page, with a shift started: (await import('/tools/bench/speedLimits.js')).run()
 //

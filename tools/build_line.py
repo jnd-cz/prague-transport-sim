@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Build a compact game data file for one Prague tram line.
 
 Sources:

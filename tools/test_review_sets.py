@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The review directory's index (#288): which files are sets, their issue and lines: python -I tools/test_review_sets.py"""
 import json
 import os

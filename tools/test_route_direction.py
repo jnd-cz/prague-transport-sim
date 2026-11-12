@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Browser geometry tests of Route.nearestOnHeading: python -P -E tools/test_route_direction.py
 (serves the checkout itself on a free port)."""
 import functools

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """src/geo.js's lat/lon against tools/geo.py on points across Prague: python -P -E tools/test_geo_js.py
 (serves the checkout itself on a free port; fails over 2 m)."""
 import functools

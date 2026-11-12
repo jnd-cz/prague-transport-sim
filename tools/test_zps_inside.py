@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/zps_inside.py: the lidar inside the survey's outline-only areas, the ground under the decks (#444).
 
     python -P -E tools/test_zps_inside.py

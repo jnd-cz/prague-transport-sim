@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Where the signals and the stop points stand, decided in the build instead of at every game start (#22 stage 1):
 
     python -P -E tools/placement.py --line 17      # the last step after build_line (platforms, osm_signals, the

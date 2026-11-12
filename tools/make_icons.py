@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The site's icons (#485): python -P -E tools/make_icons.py [--out DIR]
 
 The T3's face: a cream band on top, the red below with two round headlights in dark rings, a cream "T3" between

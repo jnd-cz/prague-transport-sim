@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The line's track styles, built offline (#276 step 2, #479): one implementation of the user's marks and the survey's
 grass track, read by the page (src/heights.js) and the height import (tools/track_decks.py).
 

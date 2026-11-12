@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/rebuild.py with tools/stepcache.py: a step runs again only when what it read changed (#511).
 
     python -I tools/test_rebuild.py

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test the complete GTFS run planner with a small feed: python -I tools/test_plan_run.py."""
 import contextlib
 import csv

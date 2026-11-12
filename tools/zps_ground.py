@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The survey's ground-level areas against the lidar (#446): which of the two is wrong where they part.
 
 Read by tools/dtm.py and tools/bench/survey_ground.py.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """DI's track network as a graph, and routes matched over it (#237).
 
     python -P -E tools/di_network.py --line 17     # build the network, match the line's routes, print what was found

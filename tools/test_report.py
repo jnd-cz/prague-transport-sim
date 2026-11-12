@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The ✉ Feedback button in a shift (src/report.js, #138, #350): python -P -E tools/test_report.py [--line 17]
 (tools/serve.py's handler on a free port, the notes in a temp folder). Starts a shift, opens the form with
 F9, checks it in Czech too, sends a note and checks the stored note: the note, the state, the errors met,

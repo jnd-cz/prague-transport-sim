@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The track styles built offline (tools/track_styles.py, #479): python -P -E tools/test_track_styles.py."""
 import json
 from pathlib import Path

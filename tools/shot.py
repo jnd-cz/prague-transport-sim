@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Render a paused view and the same camera in a reference checkout (#158).
 
     python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main

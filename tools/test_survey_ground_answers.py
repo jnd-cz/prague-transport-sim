@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/survey_ground_answers.py: review answers into data/truth.json surveyGround, the rest of the file untouched (#446).
 
     python -I tools/test_survey_ground_answers.py

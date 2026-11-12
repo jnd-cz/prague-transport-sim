@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The drawn track as smooth curves (#204): python -P -E tools/test_track_curve.py."""
 import math
 from pathlib import Path

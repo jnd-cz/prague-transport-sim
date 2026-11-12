@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Idle drawing (#149): python -P -E tools/test_idle.py [--line 23]
 (its own server on a free port). Counts the page's draws (window.drawCount) against the browser's frames
 for 2 s in each state: the menu, driving, paused, and review mode at rest and moving. Idle

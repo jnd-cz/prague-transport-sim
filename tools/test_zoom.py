@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The cab view's zoom key (#382): python -P -E tools/test_zoom.py [--line 17] (its own server on a free port).
 
 At 1920 x 1080: holding G narrows the cab camera to ZOOM's field and letting go brings back 62 degrees; from 75 m before a

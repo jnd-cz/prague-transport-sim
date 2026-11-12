@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Height-import guard regressions: python -P -E tools/test_track_heights.py."""
 
 from contextlib import redirect_stdout

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """What a track rebuild moved (#20): route-keyed layers of two builds of a line, compared by position.
 
     python -I tools/track_moves.py OLD/line17.json data/line17.json [--json reports/track-moves-17.json]

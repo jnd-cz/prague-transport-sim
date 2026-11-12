@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Who works where, what clashes, what waits: the work in flight from git, GitHub and the heavy-job queue (#280).
 
     python -I tools/board.py               # the board

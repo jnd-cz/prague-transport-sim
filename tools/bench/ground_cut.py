@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The terrain mesh cut by the survey's ground areas (#276, T1-T3 of docs/research/osm2world/terrain.md).
 
 Builds terrain_mesh.py's greedy (delatin) mesh on one tile, removes what the survey's level-0 ground areas cover

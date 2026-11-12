@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Track pair spacing at the pilot cross-sections (#20): our route against the opposite one, every 5 m, as the
 // game drives them (the build's curves, resampled every metre). Seedless.
 // On a loaded page: (await import('/tools/bench/spacing.js')).run()

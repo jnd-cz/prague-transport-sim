@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The speed survey's rules: python -P -E tools/test_speed_survey.py. Needs no data (pyosmium for its imports only)."""
 import os
 import sys

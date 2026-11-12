@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The route as the game drives it, built offline (#276 step 2): the track past both termini (#477), and `Route`, the
 route as the page builds it, for what the build derives from it (tools/cant.py, #478).
 

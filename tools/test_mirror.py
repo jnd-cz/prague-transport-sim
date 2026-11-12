@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Mirror texture cadence, composition and renderer state: python -P -E tools/test_mirror.py.
 
 Uses the real Three.js camera/target/geometry and a recording renderer, on its own free-port server.

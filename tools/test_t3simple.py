@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The built-in T3 (src/t3simple.js, #427) against the T3's general-arrangement drawing, in headless Chromium.
 
 Usage: python -P -E tools/test_t3simple.py [--shots DIR] [--models simple,t3,t3m,classic,hybrid]

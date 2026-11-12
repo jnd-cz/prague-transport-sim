@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """IPR's 1 m terrain against ČÚZK DMR 5G: where the two lidar models disagree, and what the passages rule takes (#428).
 
     python -P -E tools/bench/terrain_compare.py [--step 2] [--partial]   # the city-wide comparison

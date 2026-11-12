@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Feedback from a shift (#138, #350): ✉ (or F9) pauses the game and opens a note; Send posts the note, the
 // moment's state (place, tram, run, camera, version), the errors met so far and, if ticked, a screenshot to
 // feedback.php (tools/feedback.php on the host, tools/serve.py locally), which stores it under an id of its own.

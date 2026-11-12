@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The whole city's terrain as one greedy mesh: what it costs (#276). Waits its turn among the heavy jobs.
 
 Reads every tile of IPR's 1 m raster into one float32 array of height / tol(d) (terrain_mesh.py's tolerance, d the

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Help in the game's menu (#330): python -P -E tools/test_help.py [--line 37] [--shots DIR]
 The real game on a phone and a desktop page, Czech and English: the entry opens the player's guide in the
 language of the setting, the language can change while it is open, nothing runs off the side, Esc and the

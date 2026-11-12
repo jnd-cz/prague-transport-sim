@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/deploy.py against a fake FTP server in a temp folder: python -P -E tools/test_deploy.py"""
 import base64
 import ftplib

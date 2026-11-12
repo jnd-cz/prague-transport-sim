@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Deploy each new main to the test host (#131): python -I tools/autodeploy.py [--install [MIN] | --uninstall]
 
 Runs in a checkout kept for deploys (a worktree with deploy.local.json and its HEAD detached, as

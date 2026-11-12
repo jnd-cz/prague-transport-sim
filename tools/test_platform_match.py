@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The rules tools/platforms.py builds the tram platforms by (tools/platform_match.py, #407):
 python -P -E tools/test_platform_match.py."""
 from pathlib import Path

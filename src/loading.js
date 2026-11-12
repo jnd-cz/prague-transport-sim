@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Loading screen with a progress bar. All files of a line are requested at once (the browser
 // streams them in parallel) and counted byte by byte; after the downloads come the build steps
 // (terrain, track profile, city), which block the page, so each one yields a frame first to show

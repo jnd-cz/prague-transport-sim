@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // On-screen controls for a phone or tablet (#79): the essentials as buttons over the view, sending the same
 // key events as the keyboard (src/main.js keeps one control path). Shown on a touch screen by default;
 // the 🎮 button in the menu switches them, remembered per device. ⋯ opens the rarer ones, ✉ the feedback note.

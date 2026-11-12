@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Real mirror integration and viewport screenshots (#79).
 
     python -P -E tools/test_mirror_game.py --line 17

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Review verdicts (#136): what the reviewer decided per finding, kept in the browser and sent to the server,
 // which merges them per finding (the newer "t" wins: tools/reviews.py). On the web host that is
 // review.php (tools/review.php, uploaded by tools/deploy.py); without it (tools/serve.py) POST

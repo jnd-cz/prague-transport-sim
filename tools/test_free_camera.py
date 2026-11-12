@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The game's free cameras take the same mouse and keys as review mode (#342): python -P -E tools/test_free_camera.py [--line 37]
 Inspect mode's orbit and fly on a paused game, then the outside view. Its own server on a free port. Review mode's
 side is in tools/test_review.py."""

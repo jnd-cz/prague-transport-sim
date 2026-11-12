@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The T3SUCS's traction equipment ČKD TR 37 as the driver works it (#221): the pedals, the accelerator
 // (zrychlovač), the motors and the brakes. Sources, numbers and the derivation:
 // docs/research/prazsketramvaje/t3-accelerator.md (§ 2 pedals, § 3 accelerator, § 5 numbers, § 6 the

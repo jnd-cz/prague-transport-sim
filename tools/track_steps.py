@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The places where the rail as built steps, for the user's review (#344): reports/review/track-steps.json.
 
     python -P -E tools/track_steps.py [--checkpoint W1]

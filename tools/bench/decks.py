@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The survey's decks against the structures that carry them, as built (#445).
 
     python -P -E tools/bench/decks.py [--lines 9,17,22,23,37] [--dtm DIR]

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The validation report of a build (#23): data/lineN.validate.json (tools/osm_validate.py) against limits.
 
     python -I tools/validation.py 9 17 22 23 37      # prints the table, writes reports/rebuild/validation.md

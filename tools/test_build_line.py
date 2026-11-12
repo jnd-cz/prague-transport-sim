@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test build_line's terrain grid from the snapshot (#223): python -I tools/test_build_line.py."""
 import json
 import os

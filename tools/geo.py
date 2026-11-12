@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The one coordinate conversion of the world (docs/decisions/2026-10-29-city-frame-and-tiles.md, #7).
 Every tool imports it.
 

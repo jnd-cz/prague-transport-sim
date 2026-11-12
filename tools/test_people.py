@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The pedestrians' figures (#251): python -P -E tools/test_people.py [--line 17] [--synthetic]
 (its own server on a free port). Part 1, without world data: the figures (src/people.js, assets/people/)
 load with their skeleton and clips, and on a synthetic crowd of 100 walkers in a row the nearest ones

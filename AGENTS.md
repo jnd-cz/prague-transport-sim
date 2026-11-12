@@ -225,6 +225,8 @@ both post on the pinned #291 and only propose.
   changes). Match the surrounding code: plain modules, short names in hot loops, comments that say why (the data
   quirk, the measured case), not what. Units are metres, seconds, m/s unless named otherwise.
 - Docs say what is and what was measured, briefly: no disclaimers or hedges, no restating.
+- A new source file in `src/` or `tools/` starts with `SPDX-License-Identifier: AGPL-3.0-or-later` in a
+  comment (after a shebang, `<?php` or doctype; #518).
 - No new dependencies or build steps without an issue that decides it. Tests and benches: Python +
   Playwright (headless Chromium); Node / Deno only once the simulation core is split out.
 - Randomness must be reproducible: today the benches override `Math.random` with a seeded one; new

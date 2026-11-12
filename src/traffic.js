@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Ambient life: cars on the road network (a lane graph: one smooth lane per road and direction,
 // connector curves through the junctions), pedestrians on footways and sidewalks, and other trams
 // (ahead of us on our track, and oncoming on the opposite track). Everything fades in and out

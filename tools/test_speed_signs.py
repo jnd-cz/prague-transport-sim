@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The speed signs' placement rule and faces (src/speedSigns.js) and the speeds over trackwork (src/speedRules.js, #211), in headless Chromium:
 
     python -P -E tools/test_speed_signs.py

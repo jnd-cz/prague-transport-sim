@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Upload the game to the web host over FTPS (#131): python -P -E tools/deploy.py [--target NAME] [--dry-run] [--reports]
     python -P -E tools/deploy.py --pull [--target NAME]   # only fetch review verdicts and feedback notes
 

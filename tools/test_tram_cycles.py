@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """AI waiting cycles: python -P -E tools/test_tram_cycles.py (own free-port server)."""
 import faulthandler
 from pathlib import Path

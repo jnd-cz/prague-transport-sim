@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The cant and the curve radius of a line's route, built offline (#276 step 2, #478).
 
     python -I tools/cant.py --line 17      # writes `cant` and `curvature` into data/line17.json

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev tool: run the real game and traffic headless along the line (the autopilot drives, fixed
 // time step, the camera follows the tram as in play) and watch what the player would see. Every
 // `sample` seconds the pose of each visible car, walker, AI tram and our tram is recorded:

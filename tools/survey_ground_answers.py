@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The user's answers to the survey-ground review cards into data/truth.json surveyGround.places (#446).
 
     python -I tools/survey_ground_answers.py reports/reviews/line37.json [...]   # answer files of review mode

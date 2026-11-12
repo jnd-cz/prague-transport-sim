@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Build steps keyed by what they read (#511): a step's run traced, what it read and wrote recorded, and the step
 skipped while its tool, the modules it imported and every file it read hash as in a recorded run. Its outputs are
 then put back from the store as that run left them: a file several steps rewrite in turn (data/lineN.json) comes

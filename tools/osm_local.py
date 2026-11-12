@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OSM from a local extract instead of the public Overpass servers (user, 2026-10-23: build the whole city
 network and keep the servers less loaded).
 

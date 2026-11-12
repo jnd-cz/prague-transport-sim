@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The city's lidar area by distance from its tram tracks (#276: to scale terrain_mesh.py's line 17 to Prague).
 
 Decodes every tile of IPR's 1 m raster once and keeps a cell every STEP m where it has data, then measures each

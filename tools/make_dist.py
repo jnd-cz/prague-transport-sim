@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Pack the playable static site into dist/tatra-t3-prague.zip (no build tools, caches or tests).
 The same files are what tools/deploy.py uploads."""
 import os

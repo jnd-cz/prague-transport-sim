@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Clearances of the roads passing under our route, from OSM `maxheight` (user idea, 2026-10-23).
 
 Where a road crosses our route (path or pathBack) on a tagged bridge of ours, or carries a posted

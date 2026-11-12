@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Level-aware ZPS surface checks and deck fallback; offsets come only from truth facts."""
 
 import json

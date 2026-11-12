@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // A set of cars on the track (src/models.js placeConsist): each car on its two bogie pivots, hung on the
 // coupling, and its running gear posed from the track. A car with moving gear carries it as
 // car.userData.gear (src/t3h.js, src/t3simple.js):

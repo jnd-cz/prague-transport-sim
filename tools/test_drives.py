@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test drives of the autopilot on the T3 (#351, src/autopilot.js, src/tr37.js), on made-up straight lines without the game:
 python -P -E tools/test_drives.py [--report FILE] [-k NAME]
 (its own server on a free port; a blank page imports the modules through sync_playwright; --report saves each drive's time series).

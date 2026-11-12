@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The drawn track in plan as smooth curves through the surveyed points, continuous in direction at every node (#204).
 
     python -P -E tools/track_curve.py --line 17     # fit the DI edges line 17's routes run on, print what moved and what was left

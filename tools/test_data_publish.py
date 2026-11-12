@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test manifest replacement without contacting the store: python -I tools/test_data_publish.py."""
 import contextlib
 import io

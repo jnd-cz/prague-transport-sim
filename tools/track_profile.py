@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vertical track profile: the smallest change to the selected rail heights that keeps every change of grade
 within the design radius (#188).
 

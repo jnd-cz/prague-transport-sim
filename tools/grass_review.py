@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OSM's grass over our track: candidates for the user's review, and how well the built styles' holes match OSM (#503).
 
     python -P -E tools/grass_review.py [--lines 9,17,22,23,37]

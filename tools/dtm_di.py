@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Acquire and report district DI set 7, without importing it into the world (#61).
 
     python -P -E tools/dtm_di.py --fetch     # deliberate upstream refresh; stage raw/dtm-di/

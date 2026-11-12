@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Where are the stop signs? The archive DTM's signs against OSM's stop positions and the timetable's (GTFS)
 stop points, both directions, for the review page (#258):
     python -P -E tools/stop_signs_review.py [--lines 9,17,22,23,37] [--over 5]

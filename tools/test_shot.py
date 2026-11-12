@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Screenshot controls and isolation: python -P -E tools/test_shot.py."""
 from pathlib import Path
 import sys

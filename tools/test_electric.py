@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test drives of the T3's electric system (#351, #355, src/tr37.js, src/electric.js through src/tram.js), without the game:
 python -P -E tools/test_electric.py [--report FILE]
 (its own server on a free port; a blank page imports the modules through sync_playwright; --report saves the drives' time series).

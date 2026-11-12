@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Holes in a line's drawn tracks (#237): python -P -E tools/bench/track_holes.py [--lines 9,17,22,23,37]
 
 A network edge (tools/di_network.py) no drawn track runs along, while drawn tracks continue through it at both of its
