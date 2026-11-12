@@ -171,6 +171,11 @@ Sections:
   exactly at the path's end (it wins the walk's choice and has nothing ahead). Built against the page's walk it lies within 0.65 mm on every line (the
   millimetre rounding). The opposite track's spread to 3 m (`trackfix.js`) went with it: since the DI track it
   moved no point on any line.
+- **The route's radius and cant are built** (#478, `tools/cant.py`): the radius at every metre (the heading change
+  over 16 m, written as 1e9 / r) for our route and the opposite one, the cant every 2 m for ours (0.01 mm). Against
+  the page's own computation the speed limits are identical on every line and the cant within 0.005 mm. At 1e6 / r
+  the radius was 0.07 % off near 1500 m and three 5 m bins moved 1 km/h (lines 17 and 23), where a whole km/h sat on
+  the edge; 1e9 costs 365 KB on line 9. The page keeps `radiusAt`, `cantAt` and `rollAt` as lookups.
 - **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
   and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
   split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to

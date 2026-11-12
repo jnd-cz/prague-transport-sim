@@ -149,7 +149,7 @@ function curveEnds(game) {
   const shortSpeed = (m) => {
     const a = route.heading(m - SHORT, SHORT), b = route.heading(m + SHORT, SHORT);
     const t = Math.acos(Math.max(-1, Math.min(1, a.hx * b.hx + a.hy * b.hy)));
-    return route._designSpeed(m, t > 1e-4 ? 2 * SHORT / t : 1e6, false, route.cantAt(m));
+    return route._designSpeed(m, t > 1e-4 ? 2 * SHORT / t : 1e6, route.cantAt(m));
   };
   const posted = (m) => { const o = route._speedInfo(m).osm; return o ? Math.min(o, route.speedTop) : 50; };
   for (let m = 1; m < L; m++) {

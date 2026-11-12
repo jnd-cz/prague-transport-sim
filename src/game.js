@@ -115,6 +115,7 @@ export class Game {
     this.line = this.segments.filter((g) => g.from <= opts.startStop).pop().line; // starting at the change stop = new line
     this.onLineChange = null;
     this.backRoute = data.pathBack?.length > 1 ? new Route(data.pathBack) : null;
+    this.backRoute?.useBuilt(data.curvature.pathBack, data.curvature.unit); // (its radius from the build; it has no cant)
     this.backRoute && (this.backRoute.ground = route.ground);
     this._initStops();
     this._initSignals();
