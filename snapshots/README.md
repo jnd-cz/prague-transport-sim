@@ -6,6 +6,7 @@ How to publish, fetch and verify one: [DATA.md](../DATA.md).
 
 | id | note |
 |---|---|
+| `2026-11-12s` | `2026-11-12r` + T3M 8088 on line 37 on 2026-11-12, from Strážní to Palmovka with the phone at the end of the second car, in `raw/reference/rides/`, private reference only (#500). Read by `tools/rides_limits.py` and `docs/knowledge.md`, not by a build. |
 | `2026-11-12r` | `2026-11-11r` + the user's rides of 2026-11-11 in `raw/reference/rides/`, private reference only (#500): T2R 6003 and T2R 6004 on line 23's diverted route, each with a phone's accelerometer for the whole ride; T3M 8088 (second car) from Strážní to Palmovka on line 37. Read by the ride comparisons in `docs/knowledge.md` and `tools/rides_limits.py`, not by a build. |
 | `2026-11-11r` | `2026-11-10` + the four ČKD T3SU manual parts the research sessions never fetched, in `raw/reference/ckd-t3su/`, private reference only, from the user on 2026-11-11 (#493): 07 small motors' maintenance, 11 the pantograph puller, 21 the PA system, 28 fluorescent lighting. The set now has all 29 parts. No build reads them. |
 | `2026-11-10` | `2026-11-09r` + ČÚZK DMR 5G under IPR's whole coverage: 2,383 more 500 m tiles at 1 m in `raw/dem/` (2,502 MB, 2,646 in all), downloaded 2026-11-10 by `python -P -E tools/dmr5g.py --under-ipr` (#428; the user, 2026-11-10: "I would still download the full dmr 5g terrain under ipr lidar tiles coverage"). Read by `tools/bench/terrain_compare.py`; the city mesh reads them only where IPR has no ground inside the city (none). |
