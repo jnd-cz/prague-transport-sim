@@ -553,6 +553,40 @@ function steppedCurves(g) {
 // least-squares parabola's through them: three points whose first step was 0.17 m read a smooth 21 m curve's
 // joint at a crossing as a 1.2° break (0.2° fitted over 2-3 m).
 const JOIN_REACH = 2.0;
+
+// Corners (#491): a vertex of the built track turning more than CORNER while its neighbours turn under CORNER_NEXT, its
+// segments both at most CORNER_SEG (the build keeps every 1 m sample near a node, tools/track_curve.py KEEP). trackRadius
+// leaves out 2.5 m at each end and reads a corner over its 5 m window as a gentle bend: a branch held tangent at a switch
+// turned 4.5° in its first metre (line 9 s 15958) and neither saw it.
+const CORNER = 1.5, CORNER_NEXT = 1.0, CORNER_SEG = 1.5;
+function trackCorners(g) {
+  const d = g.data, lines = [['our', d.path], ['opposite', d.pathBack], ...(d.tracks || []).map((t) => [t.src || 'osm', t.smooth || t.p])];
+  const bad = [], kinds = {};
+  let n = 0;
+  const turn = (a, b, c) => {
+    const t = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return Math.abs(((t + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * 180 / Math.PI;
+  };
+  for (const [kind, p] of lines) {
+    if (!p || p.length < 3) continue;
+    const t = [0];
+    for (let i = 1; i < p.length - 1; i++) t.push(turn(p[i - 1], p[i], p[i + 1]));
+    t.push(0);
+    const cum = [0];
+    for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    for (let i = 1; i < p.length - 1; i++) {
+      n++;
+      if (t[i] <= CORNER || t[i - 1] >= CORNER_NEXT || t[i + 1] >= CORNER_NEXT) continue;
+      if (cum[i] - cum[i - 1] > CORNER_SEG || cum[i + 1] - cum[i] > CORNER_SEG) continue;
+      kinds[kind] = (kinds[kind] || 0) + 1;
+      bad.push({ kind, x: p[i][0], y: p[i][1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(cum[i]) } : {}), mag: t[i] / CORNER, info: `${kind} track turns ${t[i].toFixed(2)}° at one vertex` });
+    }
+  }
+  const c = check('track-corners', n, bad);
+  c.kinds = kinds;
+  return c;
+}
+
 function trackJoins(g) {
   const ends = [];
   for (const t of g.data.tracks || []) {
@@ -958,6 +992,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     trackSpacing: trackSpacing(g),
     trackRadius: trackRadius(g, geometryFact(truth, 'min-radius-network'), geometryFact(truth, 'min-radius-passenger')),
     trackJoins: trackJoins(g),
+    trackCorners: trackCorners(g),
     trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),
