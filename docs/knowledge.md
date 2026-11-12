@@ -68,6 +68,12 @@ Sections:
   over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across
   the rails (50.0755 N 14.4303 E, 28 cm; 50.0884 N 14.4325 E, 15 cm); a road crossing the track between two of its nodes
   is linear between them (50.0707 N 14.3802 E, 7 cm). W3's ground surface (#276, #301) replaces this drawing.
+- **OSM has no grassed-track tag on the tram ways**; mappers draw the grass as areas over the track (`landuse=grass`,
+  `village_green`, `leisure=park`: 2026-11 extract, #503). Inside the known grass spans (the user's marks and
+  prazsketramvaje.cz's list) they cover 3.7 km and stop 2-5 m short of a footway crossing, 5-15 m of a street's edge,
+  3-4 m of a platform and 4-7 m of a switch: `tools/track_styles.py` `HOLE`. They miss 6 km of the known grass
+  (Sídliště Řepy - Slánská, most of Malý Břevnov - Obora Hvězda), and some lie under our bridges (Střelecký ostrov's
+  park under line 22 at Újezd), so OSM's grass outside the facts goes to the user's review (`tools/grass_review.py`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 

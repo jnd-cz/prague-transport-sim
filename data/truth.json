@@ -11,6 +11,7 @@
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
   "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
   "grassTrack": "tools/track_styles.py, tools/track_decks.py",
+  "grassReview": "tools/track_styles.py (answered grass), tools/grass_review.py (answered places get no card)",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
@@ -3516,5 +3517,9 @@
     "card": "green, 102 m²: the survey -0.58 m off IPR (2023); DMR 5G -0.58 m off IPR, with the survey"
    }
   ]
+ },
+ "grassReview": {
+  "note": "The user's answers to the grass track review (reports/review/grass-track-N.json, tools/grass_review.py, #503): OSM's grass over our track. `answer` grass lays grass track between the two points on the card's lines (tools/track_styles.py, its holes cut); not grass and other level keep the place as it is and off the review.",
+  "answers": []
  }
 }
