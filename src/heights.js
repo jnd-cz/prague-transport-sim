@@ -66,12 +66,11 @@ export function meetHeights(d, base) {
   return out;
 }
 
-const RAMP = 15; // m: a style's offset blends in and out over this at the ends of its section
-
 // The line's track styles, as functions of the route position: `at(s)` the style ('panels' where nothing says
-// otherwise), `lift(s)` its top of rail over the surface, blended at the section ends. The sections are the build's
-// (the line data's `styles`, tools/track_styles.py, #479: the user's marks in data/truth.json and the survey's grass
-// track); how high the rails stand over each style is truth.json's `railAboveDeck`.
+// otherwise), `lift(s)` its top of rail over the surface, blended inside the section ends. The sections and the lift
+// are the build's (the line data's `styles` and `lift`, tools/track_styles.py, #479, #480: the user's marks in
+// data/truth.json, the grassed-track list and the survey's grass track); how high the rails stand over each style
+// is truth.json's `railAboveDeck`.
 export function trackStyles(truth, data) {
   const offsets = trackStyleOffsets(truth);
   const secs = (data.styles || []).map((x) => {
@@ -80,14 +79,11 @@ export function trackStyles(truth, data) {
     return { ...x, d: offset.metres, offsetFactIds: offset.factIds };
   });
   const at = (s) => secs.find((x) => s >= x.s0 && s <= x.s1)?.style ?? 'panels';
+  const L = data.lift, n = L ? L.v.length : 0;
   const lift = (s) => {
-    let v = 0;
-    for (const x of secs) {
-      if (!x.d || s < x.s0 - RAMP || s > x.s1 + RAMP) continue;
-      const k = Math.min(1, (s - (x.s0 - RAMP)) / RAMP, ((x.s1 + RAMP) - s) / RAMP);
-      v = Math.max(v, x.d * k * k * (3 - 2 * k));
-    }
-    return v;
+    if (!n) return 0;
+    const f = Math.max(0, Math.min(n - 1.001, s / L.step)), i = Math.floor(f), t = f - i;
+    return (L.v[i] * (1 - t) + L.v[i + 1] * t) * L.unit;
   };
   return { sections: secs, at, lift };
 }

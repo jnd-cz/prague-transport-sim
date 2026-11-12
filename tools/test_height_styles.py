@@ -44,10 +44,10 @@ class HeightStyles(unittest.TestCase):
             const s = trackStyles(truth, {line: 'test', styles: [{s0: 100, s1: 200, style, source: 'user', mark: 0}]});
             return {style, d: s.sections[0].d, ids: s.sections[0].offsetFactIds};
           });
-          const fact = truth.trackHeights.railAboveDeck.find((f) => f.styles.includes('grass'));
-          fact.metres = 0.09; // A changed fact must affect the runtime, including the survey's grass.
-          const inferred = trackStyles(truth, {line: 'test', styles: [{s0: 0, s1: 100, style: 'grass', source: 'survey'}]});
-          return {values, inferred: inferred.lift(50), ids: inferred.sections[0].offsetFactIds};
+          // (the lift is the build's, data `lift` in mm every 2 m, tools/track_styles.py: the page interpolates it)
+          const inferred = trackStyles(truth, {line: 'test', styles: [{s0: 0, s1: 100, style: 'grass', source: 'survey'}],
+                                               lift: {step: 2, unit: 0.001, v: [0, 20, 40, 40]}});
+          return {values, inferred: [inferred.lift(3), inferred.lift(6)], ids: inferred.sections[0].offsetFactIds};
         }""",
             self.truth,
         )
@@ -55,7 +55,8 @@ class HeightStyles(unittest.TestCase):
             fact = next(f for f in self.truth['trackHeights']['railAboveDeck'] if row['style'] in f['styles'])
             self.assertEqual(row['d'], fact['metres'])
             self.assertEqual(row['ids'], [fact['id']])
-        self.assertAlmostEqual(result['inferred'], 0.09)
+        self.assertAlmostEqual(result['inferred'][0], 0.03)
+        self.assertAlmostEqual(result['inferred'][1], 0.04)
         self.assertEqual(result['ids'], ['rail-above-deck-grass'])
 
     def test_missing_and_conflicting_facts_fail_instead_of_guessing(self):

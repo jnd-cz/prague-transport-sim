@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
 import { Tram } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -126,10 +126,8 @@ data.attribution = credits(built);
 logProvenance(built);
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
 await load.begin('profile');
-// real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const styles = trackStyles(truth, data); // (the build's sections, tools/track_styles.py, #479)
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || [], styles.lift,
-  data.heights ? { ...data.heights, source: data.heightSource } : null); // (the assembled top of rail, #197)
+const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
+const profile = new Profile(route, data, styles.lift, dtm, terrain); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)

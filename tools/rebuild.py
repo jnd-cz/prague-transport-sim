@@ -10,9 +10,11 @@ group writes data/lineN.json, each writer whole and renamed):
   fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
     the source lines for review mode)
-then track_styles (the user's marks and the survey's grass track, #479: it reads the survey's areas and writes
-data/lineN.json), then line_heights once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's
-survey sidecar, so it runs after them all), then the validation report (tools/validation.py, #23).
+then track_styles (the user's marks, the grassed-track list and the survey's grass track with their holes, and the
+rails' height over the bed, #479, #503, #480: it reads the survey's areas and writes data/lineN.json), then line_heights
+once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's survey sidecar and the
+lines' lift, so it runs after them all), then line_structures per line (the spans, decks and underpasses: they read the
+built top of rail, #480), then the validation report (tools/validation.py, #23).
 Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log, reports/rebuild/heights.log, validation.md. After it:
 python -I tools/snapshot.py data-publish.
 """
@@ -98,7 +100,14 @@ def heights(lines):
                            stderr=subprocess.STDOUT, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     if r.returncode:
         return f"heights of {', '.join(lines)}: FAILED, see reports/rebuild/heights.log"
-    return f"heights of {', '.join(lines)}: done in {(time.time() - t) / 60:.1f} min"
+    # (the spans, decks and underpasses read the built top of rail: tools/line_structures.py, #480)
+    for line in lines:
+        with open(os.path.join(ROOT, "reports", "rebuild", f"line{line}.line_structures.log"), "w", encoding="utf-8") as f:
+            r = subprocess.run([*PY, os.path.join(ROOT, "tools", "line_structures.py"), "--line", line], cwd=ROOT, stdout=f,
+                               stderr=subprocess.STDOUT, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+        if r.returncode:
+            return f"structures of line {line}: FAILED, see reports/rebuild/line{line}.line_structures.log"
+    return f"heights and structures of {', '.join(lines)}: done in {(time.time() - t) / 60:.1f} min"
 
 
 def main():
