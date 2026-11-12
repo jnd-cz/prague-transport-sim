@@ -10,6 +10,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -96,20 +97,30 @@ class NoteTest(unittest.TestCase):
         self.assertRegex(feedback.new_id(), feedback.ID)
 
     def test_perf_table(self):
-        run = lambda fps, over, g=None: {"frames": 100, "fps": fps, "over": {"33": over}, "gpuMs": g}  # noqa: E731
-        arc = {"gpu": "Intel Arc A770"}
+        run = lambda fps, o20, o33, g=None: {"frames": 100, "fps": fps, "over": {"20": o20, "33": o33}, "gpuMs": g}  # noqa: E731
+        arc, ff, cr = {"gpu": "Intel Arc A770"}, "Mozilla/5.0 (Windows NT 10.0) Gecko/20100101 Firefox/159.0", \
+            "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/156.0.0.0 Safari/537.36"
         ref = lambda *a: {**run(*a), "reference": True, "line": "17"}  # noqa: E731
-        got = [("alpha", {"kind": "perftest", "machine": arc, "perftest": ref(60, 0, 4.1)}),
-               ("alpha", {"kind": "perftest", "machine": arc, "perftest": ref(58, 1.5, 4.3)}),
-               ("alpha", {"kind": "perftest", "machine": arc, "perftest": ref(59, 0.5, 4.2)}),
-               ("alpha", {"kind": "perftest", "machine": arc, "perftest": {**run(50, 3), "line": "9"}}),
-               ("alpha", {"kind": "perf", "ua": "Android", "line": "22", "perf": run(31, 12)}),
-               ("alpha", {"kind": "driving", "machine": arc, "perf": run(60, 0)})]  # (a note's log is not a run)
+        v = lambda tag: {"tag": tag, "commit": "0" * 40}  # noqa: E731
+        # (newest first, as notes() gives them)
+        got = [("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-2"), "perftest": ref(32, 84.4, 2.8, 26)}),
+               ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-2"), "perftest": ref(36, 66, 0.4)}),
+               ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-1"), "perftest": ref(34.4, 73.8, 0.6)}),
+               ("alpha", {"kind": "perftest", "machine": arc, "ua": cr, "version": v("alpha-2"), "perftest": ref(58, 1, 0)}),
+               ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-2"), "perftest": {**run(50, 9, 3), "line": "9"}}),
+               ("alpha", {"kind": "perf", "ua": "Mozilla/5.0 (Android 17; Mobile) Firefox/159.0", "line": "22", "perf": run(31, 40, 12)}),
+               ("alpha", {"kind": "driving", "machine": arc, "perf": run(60, 0, 0)})]  # (a note's log is not a run)
         rows = feedback.perf_table(got)
-        self.assertEqual(len(rows), 4)
-        self.assertRegex(rows[3], r"Intel Arc A770\s+reference\s+3\s+59\s+0.5%\s+4.2")
-        self.assertRegex(rows[2], r"Intel Arc A770\s+perftest 9\s+1\s+50\s+3%\s+-")
-        self.assertRegex(rows[1], r"Android\s+perf 22\s+1\s+31\s+12%\s+-")
+        self.assertEqual(len(rows), 6, "\n".join(rows))
+        def row(pattern):
+            hits = [r for r in rows[1:] if re.search(pattern, r)]
+            self.assertEqual(len(hits), 1, pattern + "\n" + "\n".join(rows))
+        # one row per browser and version; the latest run's figures, all from that one run
+        row(r"^Intel Arc A770\s+Firefox\s+reference\s+alpha-2\s+2\s+32\s+84.4%\s+2.8%\s+26$")
+        row(r"^Intel Arc A770\s+Firefox\s+reference\s+alpha-1\s+1\s+34.4\s+73.8%\s+0.6%\s+-$")
+        row(r"^Intel Arc A770\s+Chrome\s+reference\s+alpha-2\s+1\s+58\s+1%\s+0%\s+-$")
+        row(r"^Intel Arc A770\s+Firefox\s+perftest 9\s+alpha-2\s+1\s+50\s+9%\s+3%\s+-$")
+        row(r"^Android\s+Firefox\s+perf 22\s+\?\s+1\s+31\s+40%\s+12%\s+-$")
 
 
 class Quiet(serve.NoCache):

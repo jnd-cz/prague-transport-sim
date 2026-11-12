@@ -4,7 +4,8 @@ Lists the notes in <feedback>/<site>/ (pulled from a host by tools/deploy.py --p
 as site "local"; <feedback> is beside the data cache, _dest()), newest first, grouped by kind. Reads only: a note becomes an issue when
 someone decides so. --all also lists notes marked done (a "done" file beside the note: <id>.done).
 --perf: how the game runs per machine, from the shifts' summaries (kind perf) and the performance tests
-(perftest): runs, frames per second and the share of frames over 33 ms, medians.
+(perftest): a row per machine, browser, kind and game version, with that row's run count and the latest run's
+frames per second, shares of frames over 20 and 33 ms and GPU time (one run's figures, never mixed).
 save() is the one writer of a note: the screenshot goes beside it as <id>.jpg.
 """
 import argparse
@@ -103,21 +104,39 @@ def machine(n):
     return "?"
 
 
+def browser(n):
+    """The browser's name from the note's user agent (the same GPU runs differently in two of them)."""
+    ua = n.get("ua") or ""
+    for k, name in (("Edg/", "Edge"), ("Firefox/", "Firefox"), ("Chrome/", "Chrome"), ("Safari/", "Safari")):
+        if k in ua:
+            return name
+    return "?"
+
+
+def version(n):
+    v = n.get("version") or {}
+    return v.get("tag") or (v.get("commit") or "?")[:7]
+
+
 def perf_table(got):
-    """Lines of the per-machine table: the performance tests and the shifts' summaries apart."""
+    """Lines of the per-machine table: the performance tests and the shifts' summaries apart.
+
+    A row per machine, browser, kind and game version; its figures are the latest run's, whole (a median per
+    column took fps from one run and the slow frames from another, #350). got is newest first, as notes() gives."""
     rows = {}
     for _, n in got:
         p = n.get("perftest") if n.get("kind") == "perftest" else n.get("perf") if n.get("kind") == "perf" else None
         if p and p.get("frames"):
             # (the reference run apart: line 17, the detailed model, the one result every machine has)
             kind = "reference" if p.get("reference") else f"{n['kind']} {p.get('line', n.get('line', '?'))}"
-            rows.setdefault((machine(n), kind), []).append(p)
-    med = lambda xs: sorted(xs)[len(xs) // 2]  # noqa: E731
-    out = [f"{'machine':60} {'kind':12} {'runs':>4} {'fps':>6} {'>33 ms':>7} {'GPU ms':>7}"]
-    for (m, k), ps in sorted(rows.items()):
-        gpu = [p["gpuMs"] for p in ps if p.get("gpuMs") is not None]
-        out.append(f"{m[:60]:60} {k:12} {len(ps):>4} {med([p['fps'] for p in ps]):>6} "
-                   f"{med([p['over']['33'] for p in ps]):>6}% {med(gpu) if gpu else '-':>7}")
+            rows.setdefault((machine(n), browser(n), kind, version(n)), []).append(p)
+    pct = lambda p, k: f"{p['over'][k]}%" if p.get("over", {}).get(k) is not None else "-"  # noqa: E731
+    out = [f"{'machine':48} {'browser':8} {'kind':12} {'version':8} {'runs':>4} {'fps':>6} {'>20 ms':>7} {'>33 ms':>7} {'GPU ms':>7}"]
+    for (m, b, k, v), ps in sorted(rows.items()):
+        p = ps[0]  # (the latest)
+        gpu = p.get("gpuMs")
+        out.append(f"{m[:48]:48} {b:8} {k:12} {v:8} {len(ps):>4} {p['fps']:>6} {pct(p, '20'):>7} {pct(p, '33'):>7} "
+                   f"{gpu if gpu is not None else '-':>7}")
     return out
 
 
