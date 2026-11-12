@@ -518,6 +518,43 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   down every descent to 1 m/s under ran line 23 40 s later. On W2's data (73c2a32): brake applications −6 to −18 %, the wire's energy
   −4 to −11 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
   (2026-11-09), the timetable's part being #242.
+- **The rides of 2026-11-11** (#500; `raw/reference/rides/`, snapshot 2026-11-12r):
+  - **The recordings:**
+    - T2R 6003 (5.7 km) and T2R 6004 (5.1 km), TR37, on line 23's diverted loop (Václavské náměstí, Masarykovo nádraží, Těšnov,
+      Vltavská, Dlouhá třída), each with a phone lying still for the whole ride.
+    - T3M 8088 on line 37 from Strážní toward Palmovka, the phone in the second car.
+  - **Reading the phone:**
+    - The phone's clock is the file's save time less its length; the GPS acceleration fits it within 3–13 s.
+    - The forward axis is fitted per part where the gravity vector holds still, which catches the phone moved once mid ride
+      (r 0.80–0.97 against the GPS; 6003's first 207 s 0.44, left out). The zero is taken at each stand.
+    - Phases: drive over 0.20 m/s², brake under −0.25, for 1.5 s or more.
+  - **The two T2R drivers** (6003 / 6004):
+    - presses: 5.8 / 7.6 a km;
+    - coasting: 67 / 54 % of the distance;
+    - drive level up to 30 km/h: 1.0 / 1.2–1.3 m/s² (the model's steps 3 / 4 with 40 passengers);
+    - braking below 20 km/h: 0.5 / 0.9 m/s² (steps 2 / 4);
+    - approach to a stop (medians):
+      - the drive off 163 / 97 m out, at 26 / 27 km/h;
+      - the last braking 30 / 54 m from 21 / 32 km/h, at 0.54 / 0.68 m/s² (GPS).
+    - A drive of 0.8 m/s² or more ends within 0.25–0.3 s at this 0.5 s smoothing, as in #396.
+  - **Against the autopilot on the four stretches line 23 shares, Vodičkova to Bílá labuť** (dry, seeds 1–3):
+
+    | | 6004's run, presses (drive + brake) | autopilot's |
+    |---|---|---|
+    | Vodičkova to Václavské náměstí | 67 s, 1 + 2 | 39–70 s, 2–4 + 1–4 |
+    | to Jindřišská | 94 s, 2 + 2 | 55–60 s, 1–4 + 1–3 |
+    | Jindřišská to Masarykovo nádraží | 76 s, 4 + 4 | 91–155 s, 8–9 + 3–4 |
+    | to Bílá labuť | 95 s, 4 + 4 (6003: 81 s, 1 + 3) | 73–79 s, 6–7 + 4–5 |
+  - **The T3M on line 37** (front 23 m ahead of the phone):
+    - **The trip:** it left Vozovna Žižkov 50 s after the game timetable's 08:20 (trip 17; the user: "always assume same or delayed
+      trip, never earlier"), Ohrada +107 s, Krejcárek +171 s.
+    - **Running times:** 84 s to Ohrada (timetable 60, the autopilot 60–62). To Krejcárek 164 s, 68 of them standing at the
+      junction past Ohrada (timetable 120, the autopilot 103–110 with 7–8 brake applications).
+    - **Over our limits:**
+      - 19.7 km/h over Ohrada's crossings (15; 1.31 times, under the derailment's 1.5);
+      - 46.9 in a 43 curve;
+      - 54–58 where 50 is posted and 63–67 where 60 is posted, about 200 m down toward Krejcárek;
+      - 29.4 where 25 is posted before Palmovka.
 - **Driving to the timetable** (#242): the time in hand to the next stop sets how it drives. That is the stop's timetable
   time, less now, less 1.3 times the quickest run there at the limits, less a 15 s dwell.
   - **Up to 10 s in hand it catches up.** The target is 0.2 m/s under the limit, and brake step 1 holds down a descent only to
