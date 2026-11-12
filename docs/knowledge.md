@@ -374,6 +374,20 @@ Sections:
   underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
   the nearest face flipped between the two.
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
+- **Along a kerb the survey and IPR's lidar are equally noisy** (#470, `tools/bench/street_scatter.py` on the five lines'
+  data of 2026-11-12). Straight street outline over 8 cm off its 21 m mean, survey / IPR read 1 m inside the area:
+  road 1.8-2.7 / 1.6-2.3 %, tram 1.7-3.3 / 0.4-2.1 %, sidewalk 4.0-5.1 / 3.6-5.9 %, parking 1.5-4.3 / 4.5-9.6 %, paved
+  6-11 / 22-33 % (IPR read on the outline itself, or 0.5 m in, rounds the kerb and is worse). Against DI's rails the
+  noise left in each is alike: median 1.5 cm, 90th percentile 5-10 cm. Of the road samples over 15 cm off, 0.4-0.7 %
+  are the survey's alone, as many IPR's alone, 0.1 % both. So IPR does not replace the survey's heights; the survey's
+  own large errors are runs of vertices on another line's height (a road edge on a wall's top line, a sawtooth of
+  1.2 m by Jižní spojka on line 22; Náhorní's sidewalk 1.40 m low on line 17, #315) and lone vertices off their kerb.
+  `tools/zps_outline.py` moves those where IPR runs calm, on road, tram and sidewalk, a run of them whole or not at all
+  (moved in part, a stretch 1-3 m off became a sawtooth): over 0.3 m off, 1,135-3,540 vertices per line → 90-260; over
+  8 cm off the mean, roads 1.8-2.7 → 1.3-1.6 %, sidewalks 4.0-5.1 → 3.1-4.0 %. A vertex one outline agrees with IPR
+  at and another not is a step (a track bed under its kerb on line 9), not an error. 79 % of straight street outline lies in
+  gaps over 5 m between vertices (line 22). A platform's edge shared with the tram area is its top (#21), not the
+  tram's foot: its vertices stay out of the rule.
 - **Railway yards, lawns and paved yards have heights only on their outline** (#444, `tools/zps_inside.py`,
   `tools/bench/ground_inside.py`). A street is dense with surveyed lines; these are not, and the linear sheet between
   their outline vertices left 5-53 % of `rail`'s inside, 7-19 % of `paved`'s and 22-29 % of `green`'s more than 1 m off

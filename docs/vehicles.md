@@ -9,7 +9,8 @@ request ([AGENTS.md](../AGENTS.md): an issue first, the checks below in the PR).
 
 ## The models today
 
-The menu's *Tram model* picks one of three; a model that does not load falls back to the next simpler one.
+The menu's *Tram model* picks one of three, listed in `assets/vehicles.json` with a manifest each (below);
+a model that does not load falls back to the first loaded one in that list.
 
 | model | where | made of | licence | moves |
 |---|---|---|---|---|
@@ -17,8 +18,34 @@ The menu's *Tram model* picks one of three; a model that does not load falls bac
 | detailed, classic | `src/models.js` (`loadDetailedT3`), `assets/t3/` | a glTF, one texture; loaded when picked | CC BY-NC 4.0 | none |
 | simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | AGPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
 
-`makeT3({ line, cars, detailed, dest, run, variant })` in `src/models.js` builds a set with the chosen
-model. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
+`makeT3({ line, cars, vehicle, dest, run, variant })` in `src/models.js` builds a set as the vehicle with that id. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
+
+## The manifest
+
+Every model is a folder `assets/<id>/` with a `vehicle.json`, listed in `assets/vehicles.json`. The index's order
+is the menu's (the first is the default) and the fallback's: a vehicle that does not load gives way to the first
+loaded one in that order, and the built-in car always loads. The game builds its menu, its loading screen and its
+credits from the manifests (`src/vehicles.js`, `src/main.js`); `tools/test_vehicles.py` checks them, and
+`tools/test_vehicles_game.py` loads each one in the game, with a sample added as a folder alone.
+
+| field | what |
+|---|---|
+| `schema` | 1 |
+| `id` | the folder's name |
+| `names` | `cs` and `en`: the menu's text |
+| `type` | the vehicle type whose dimensions it has (`VEHICLE_TYPES` in `src/tram.js`: today `T3`) |
+| `loader` | `builtin` (drawn in code: `src/t3simple.js`), `gltf` (a still glTF, tier 1, no code), `gltf-classic` (conflig's model: its axes found from its wheels, `src/models.js`), `gltf-rigged` (a glTF with a rig file: `src/t3h.js`) |
+| `model`, `rig` | the glTF or GLB among its files; the rig file (`gltf-rigged`) |
+| `forward` | `gltf` only: the axis the model faces, `+Z` (the game's) unless `+X`, `-X` or `-Z` |
+| `files` | every file with its `path` in the folder and its size in `bytes` (the loading screen counts them) |
+| `preload` | `true`: downloaded with the line; else when the player picks it |
+| `licence` | `spdx` (a licence that allows redistribution), `commercial` (false for NC), `file` (its `LICENSE.txt`), `authors`, `sources` (URLs), `credit` (the line the game shows) |
+| `tier` | its tier of movement (below), `moves` the parts it moves, `levels` its distance levels |
+| `variants` | the types it can be (`type`, e.g. `T3SUCS`) and their fleet numbers (`fleet`: ranges `[first, last]`); an AI tram's type and its cars' numbers come from its run number (`src/vehicles.js`), each type as often as it has numbers |
+
+A **tier-1 glTF** needs no code: a still model in metres, its origin on the rail plane midway between the bogie
+pivots, +Y up, facing `forward`; its pivots are its type's. The menu offers it, it loads when picked and the
+credits name it.
 
 ## What a set must be
 
@@ -75,7 +102,7 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
 
 1. **The licence first.** Only what may be redistributed (CC0, CC BY, CC BY-SA, CC BY-NC, …). The files go
    into `assets/<name>/` with a `LICENSE.txt` (author, source URL, licence, what you changed), a row in
-   [ASSETS.md](../ASSETS.md), and the credit line the game shows (as `T3H_CREDIT` in `src/t3h.js`).
+   [ASSETS.md](../ASSETS.md), and the credit line the game shows (the manifest's `licence.credit`).
    A non-commercial model cannot ship in a commercial release; the built-in one can.
 2. **The file:** glTF or GLB in metres, the origin and axes as above or adapted at load. Keep it lean: the
    hybrid is 2.9 MB and 44,000 triangles a car, and several AI sets are in view at once. The deploy compresses
@@ -87,14 +114,12 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
    name (`Door_Front_Open`, `Pantograph_Lower`, …). A model drawn in code instead gives each car a `gear` for
    `src/consist.js`, as `src/t3simple.js` does with instanced meshes (a car of it draws 8 meshes besides its
    plates).
-4. **The code:** a module like `src/t3h.js` (load, build a set with each car's `gear`, pose it), a branch in
-   `makeT3` and in `poseT3`
-   (`src/models.js`), the files in the loading screen (`load.prefetch`,
-   `load.get` in `src/main.js`), and a menu option (`optModel` in `index.html`, its names in both languages
-   in `src/i18n.js`). There is no common vehicle interface yet: today a new model means these edits. A
-   manifest per vehicle (#455) and a common interface, with vehicles found and checked at startup and
-   installed by the player (#456), are planned.
-5. **The checks:** a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
+4. **The manifest:** `assets/<id>/vehicle.json` (above) and the id in `assets/vehicles.json`. A still model
+   (tier 1, loader `gltf`) needs nothing more. One that moves needs code today: a module like `src/t3h.js`
+   (load, build a set with each car's `gear`, pose it) and its loader in `makeT3`, `loadVehicle` and `poseT3`
+   (`src/models.js`). A common interface, driving any vehicle from its rig with no code of its own, found and
+   checked at startup and installed by the player, is planned (#456).
+5. **The checks:** `python -I tools/test_vehicles.py` (the manifest), `tools/test_vehicles_game.py`, a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
    frame time with `tools/frametime.py --models …`, and pictures of every model from the same views with
    `python -P -E tools/test_t3simple.py --shots DIR` (side, three-quarter, front, top, the bogie, the coupler; a
    two-car set on a 25 m curve and its running gear in plan; the collector lowered).
@@ -105,7 +130,7 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
   (`NOSE`, `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), each with where it comes from; the livery is
   painted in `livery()`, the fixed parts in `partsGeometry()`, the moving ones in `bogie()`, `wheelset()`,
   `coupler()` and `pantoBars()` (the pantograph's frame for a contact height), the types and their fleet numbers in
-  `T3_TYPES`. `tools/test_t3simple.py` checks it against those numbers.
+  its manifest's `variants` (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` checks it against those numbers.
 - **The plates and cards** for every model: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, the T3M's dot-matrix `ledFace`).
 - **The hybrid:** the asset comes from the project's asset lab; a change to the file goes through it, or is

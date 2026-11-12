@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "t3simple",
+  "names": { "cs": "Jednoduchý (vestavěný)", "en": "Simple (built in)" },
+  "type": "T3",
+  "loader": "builtin",
+  "files": [],
+  "preload": false,
+  "licence": {
+    "spdx": "AGPL-3.0-or-later",
+    "commercial": true,
+    "authors": ["the project"],
+    "sources": ["src/t3simple.js"],
+    "credit": ""
+  },
+  "tier": 2,
+  "moves": ["bogies", "wheels", "couplers", "collector", "lamps"],
+  "levels": 1,
+  "variants_source": "the user, 2026-11-10: \"Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106\"; a type's share of AI trams follows its range's size (\"roughly related to their range sizes\")",
+  "variants": [
+    { "type": "T3", "fleet": [[6400, 6992]] },
+    { "type": "T3SUCS", "fleet": [[7001, 7292]] },
+    { "type": "T3M", "fleet": [[8005, 8106]] }
+  ]
+}

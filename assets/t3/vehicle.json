@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "t3",
+  "names": { "cs": "Podrobný, klasický (Sketchfab, CC BY-NC; bez interiéru, nehybný)", "en": "Detailed, classic (Sketchfab, CC BY-NC; no saloon, still)" },
+  "type": "T3",
+  "loader": "gltf-classic",
+  "model": "t3.gltf",
+  "files": [
+    { "path": "t3.gltf", "bytes": 40674 },
+    { "path": "t3.bin", "bytes": 1607388 },
+    { "path": "t3_color.jpg", "bytes": 428741 }
+  ],
+  "preload": false,
+  "licence": {
+    "spdx": "CC-BY-NC-4.0",
+    "commercial": false,
+    "file": "LICENSE.txt",
+    "authors": ["Jakub Vaja (conflig)"],
+    "sources": ["https://sketchfab.com/3d-models/tatra-t3-76aa08d7c06340fc89229551c45e3c3a"],
+    "credit": "Tatra T3 3D model (classic): \"Tatra T3\" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified)."
+  },
+  "tier": 1,
+  "moves": [],
+  "levels": 1,
+  "variants": []
+}

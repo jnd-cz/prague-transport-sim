@@ -8,7 +8,7 @@ import { TR37 } from './tr37.js';
 
 const G = 9.81;
 
-// the Tatra T3's body (per car)
+// the Tatra T3's body (per car); a vehicle's manifest names its type (assets/*/vehicle.json `type`, VEHICLE_TYPES)
 export const T3 = {
   length: 15.2,              // over couplers (body 14.0 m), DPP training manual: the head's face to the other's
   // (#248, the sources in the issue's research comment of 2026-11-04)
@@ -32,6 +32,7 @@ export const T3 = {
   sandSecs: 1500,
   lineVoltage: 600,
 };
+export const VEHICLE_TYPES = { T3 };
 
 // Wheel/rail adhesion (peak, at a standstill) by weather: the game's values, which the checks were set on. The research
 // (docs/research/rail-adhesion.md, #266) has rain 0.18, autumn rail between the leaf patches 0.22 (an estimate) and light
