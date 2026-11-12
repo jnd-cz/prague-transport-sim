@@ -347,6 +347,9 @@ A findings file can bring its own answers (`"options": [...]`). Lists for review
 `reports/review/` and deployed with the site (the review directory lists them). A set whose issue is
 closed while findings wait is out of date and is deleted (the user, 2026-11-05): #106's track-height
 disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
+`?line=17&review=reports/review/grass-track-17.json` lists where OSM maps grass over the track and nothing we know
+says so (#503, `python -P -E tools/grass_review.py`, which also prints how near the built grass's holes come to OSM's
+edges); `--import` takes the answers into `data/truth.json` `grassReview`, and grass answered lays grass track.
 `?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.

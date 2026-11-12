@@ -14,8 +14,19 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
   The facts (the user's marks, the list) win where they overlap (line 22 Koh-i-noor - Slavia, whose bank fell 0.5 m
   across the rails).
 
-`styles` is a list of {s0, s1, style, source, mark | stretch}, by s0: `source` 'user', 'list' or 'survey'; `mark` is
-the index of the user's mark in truth.json `trackStyles`, `stretch` the index in `grassTrack.stretches`. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
+- **The answered review** (data/truth.json `grassReview`, tools/grass_review.py): OSM's grass the user confirmed,
+  between the card's two points; as strong as the user's marks.
+- **The holes** (#503; the user, 2026-11-12: "the green cover is not placed around stop platforms on either side and
+  road, pedestrian crossings, junctions. Open ballast can be nect to stops but elso end before road and pedestrian
+  crossings"): grass and ballast stop at streets, paths and footways crossing at street level and OSM's crossing
+  nodes; grass also at the platforms beside either track. Not at switches and diamonds (open ballast runs through
+  them; one in a street lies in its hole). HOLE metres past each, measured on
+  OSM's grass areas inside the known spans (tools/grass_review.py prints how near). A street across the track is an
+  `embedded` section; pieces under MIN_PIECE between two holes are left out.
+
+`styles` is a list of {s0, s1, style, source, mark | stretch | card | hole}, by s0: `source` 'user', 'review', 'list',
+'survey' or 'hole'; `mark` is the index of the user's mark in truth.json `trackStyles`, `stretch` the index in
+`grassTrack.stretches`, `card` the review card's id. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
 page reads with the sections. Where ground-level areas overlap at a point, the higher rank counts. The page picked the
 one whose surface lay nearest the lidar ground, then the rank (src/terrain.js DtmSurface._hitTri): on all five lines
 the two agree at every sample (21,641, #479).
@@ -34,6 +45,12 @@ from route import Route  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE, MIN_GRASS, JOIN = 4, 20, 30   # m (src/heights.js trackStyles until #479)
+# The holes (#503), m beyond the thing itself: where OSM maps grass inside the known spans (2026-11-12), its areas
+# end 2-5 m short of a footway crossing, 5-15 m of a street's edge and 3-4 m of a platform.
+HOLE = {"footway": 3, "road": 8, "node": 5, "platform": 3}
+PLATFORM_NEAR = 6      # m from our axis: our platform and the other direction's beside the other track
+MIN_PIECE = MIN_GRASS  # m: a shorter piece left between two holes is not laid (OSM maps none of the 12-14 m ones)
+MIN_EMBEDDED = 5       # m: a street's hole the section's end cuts shorter is not an embedded section of its own
 RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
 
@@ -86,8 +103,112 @@ def minus(s0, s1, cover):
     return out
 
 
+def holes(data):
+    """Where grass and ballast track stop along the route (#503): [{s0, s1, kind, grass}], `grass` the holes only grass
+    track has (platforms). The route is walked every metre, so a place passed twice (an out-and-back line) has a hole
+    on each pass."""
+    rt = Route(data["path"], data.get("pathExt"))
+    n = int(rt.length) + 1
+    pts = [rt.at(min(s, rt.length))[:2] for s in range(n + 1)]
+    out = []
+    # platforms beside either track: both directions' (PLATFORM_NEAR of the axis), and our stops' own extents
+    plats = [Polygon([q[:2] for q in pl["p"]]) for pl in data.get("platforms", []) if len(pl["p"]) >= 3]
+    plats = [p if p.is_valid else p.buffer(0) for p in plats]
+    if plats:
+        tree, run, hit = shapely.STRtree(plats), None, set()
+        for s in range(n + 2):
+            near = {int(k) for k in tree.query(Point(pts[s]), predicate="dwithin", distance=PLATFORM_NEAR)} if s <= n else set()
+            if near and run is None:
+                run = s
+            hit |= near
+            if not near and run is not None:
+                # (the platforms' own length along this pass, not the reach of PLATFORM_NEAR past their ends)
+                a = max(0, run - 2 * PLATFORM_NEAR)
+                piece = LineString(pts[a:min(n, s + 2 * PLATFORM_NEAR) + 1])
+                ss = [a + piece.project(Point(q)) for k in hit for q in plats[k].exterior.coords]
+                out.append({"s0": min(ss) - HOLE["platform"], "s1": max(ss) + HOLE["platform"], "kind": "platform", "grass": True})
+                run, hit = None, set()
+    for st in data["stops"]:
+        if st.get("p0") is not None:
+            out.append({"s0": st["p0"] - HOLE["platform"], "s1": st["p1"] + HOLE["platform"], "kind": "platform", "grass": True})
+    # streets, paths and footways across the route at street level (as src/game.js _routeConflicts finds them)
+    segs, kinds = [], []
+    for r in data.get("roads", []):
+        if r.get("t") or r.get("b"):
+            continue
+        kind = "road" if r.get("c") and not r.get("f") else "footway"
+        for a, b in zip(r["p"], r["p"][1:]):
+            segs.append(LineString([a[:2], b[:2]]))
+            kinds.append((kind, r.get("w") or 3))
+    if segs:
+        tree = shapely.STRtree(segs)
+        for s in range(n):
+            step = LineString([pts[s], pts[s + 1]])
+            for k in tree.query(step, predicate="intersects"):
+                seg, (kind, w) = segs[int(k)], kinds[int(k)]
+                (ax, ay), (bx, by) = seg.coords
+                L = seg.length or 1e-9
+                hx, hy = pts[s + 1][0] - pts[s][0], pts[s + 1][1] - pts[s][1]
+                hl = (hx * hx + hy * hy) ** 0.5 or 1e-9
+                cos = abs(((bx - ax) * hx + (by - ay) * hy) / (L * hl))
+                if cos >= 0.95:   # (a street along the track, not across it)
+                    continue
+                c = s + step.project(seg.intersection(step).representative_point())
+                half = w / 2 / max(0.3, (1 - cos * cos) ** 0.5)
+                out.append({"s0": c - half - HOLE[kind], "s1": c + half + HOLE[kind], "kind": kind, "grass": False})
+    for s in data.get("crossings", []):   # (OSM's crossing nodes on the track)
+        out.append({"s0": s - HOLE["node"], "s1": s + HOLE["node"], "kind": "footway", "grass": False})
+    # (no holes at switches and diamonds: the user, 2026-11-12, #503: "I wouldn't make holes for switches and
+    # diamonds, the branch to depo hostivař loop has open ballast including switches. They are covered if they lie
+    # on paved surface", which the streets' holes already are)
+    return sorted(out, key=lambda h: h["s0"])
+
+
+def cut(secs, hs):
+    """The grass and ballast sections with their holes cut out; a road crossing inside one is embedded track."""
+    out = []
+    for x in secs:
+        if x["style"] not in ("grass", "ballast"):
+            out.append(x)
+            continue
+        mine = [h for h in hs if (x["style"] == "grass" or not h["grass"]) and h["s1"] > x["s0"] and h["s0"] < x["s1"]]
+        out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], mine) if b - a >= MIN_PIECE]
+        out += [{"s0": max(h["s0"], x["s0"]), "s1": min(h["s1"], x["s1"]), "style": "embedded", "source": "hole", "hole": "road"}
+                for h in mine if h["kind"] == "road" and min(h["s1"], x["s1"]) - max(h["s0"], x["s0"]) >= MIN_EMBEDDED]
+    out.sort(key=lambda x: x["s0"])
+    merged = []   # (road holes overlapping one another: one section)
+    for x in out:
+        last = merged[-1] if merged else None
+        if last and x["source"] == "hole" and last["source"] == "hole" and x["s0"] <= last["s1"]:
+            last["s1"] = max(last["s1"], x["s1"])
+        else:
+            merged.append(dict(x))
+    return merged
+
+
+def reviewed(data, truth):
+    """The user's answers to the OSM grass review (truth.json `grassReview`, tools/grass_review.py): grass between
+    the card's two points on every line it lists."""
+    path = LineString([p[:2] for p in data["path"]])
+    out = []
+    for a in truth.get("grassReview", {}).get("answers", []):
+        if a.get("answer") != "grass" or str(data["line"]) not in [str(v) for v in a.get("lines", [])]:
+            continue
+        pts = [Point(*map(float, Frame().xy(*e))) for e in a["between"]]
+        if any(path.distance(p) > 15 for p in pts):
+            continue
+        s0, s1 = sorted(path.project(p) for p in pts)
+        out.append({"s0": s0, "s1": s1, "style": "grass", "source": "review", "card": a["id"]})
+    return out
+
+
 def sections(data, truth, survey):
-    """The style sections along the route, by s0 (src/heights.js trackStyles until #479)."""
+    """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479)."""
+    return cut(spans(data, truth, survey), holes(data))
+
+
+def spans(data, truth, survey):
+    """The style sections from end to end, before the holes."""
     user = []
     for mark, t in enumerate(truth.get("trackStyles", [])):
         if str(t["line"]) != str(data["line"]):
@@ -113,6 +234,7 @@ def sections(data, truth, survey):
                 continue
             s0, s1 = data["stops"][a]["s"], data["stops"][b]["s"]
         user.append({"s0": s0, "s1": s1, "style": t["style"], "source": "user", "mark": mark})
+    user += reviewed(data, truth)
     listed = []
     for k, t in enumerate(truth.get("grassTrack", {}).get("stretches", [])):
         if "from" not in t or t.get("removed"):

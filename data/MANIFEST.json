@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "277dc8e",
- "published": "2026-11-12 08:57",
- "note": "#479: track styles built offline (styles in every line), grassed-track list from prazsketramvaje.cz, user marks at Malý Břevnov, Výstaviště, Kabešova-Podkovářská",
+ "built_at_commit": "c67bc8e",
+ "published": "2026-11-12 10:11",
+ "note": "#503: track style holes at platforms and crossings; grass review answered",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -33,8 +33,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6601093,
-   "sha256": "8c2ae46dac8ba4cfc008e4da2b915478df8b10b7087b9906613c9af26113ce3a"
+   "size": 6601353,
+   "sha256": "fdab896a165fca845d029b4321ade22cea5a44909d7fff1e50987aa9f3a3e669"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6588495,
-   "sha256": "40d5193b06982da79e8adab7d18c13423d20b626ce02b07a7da4c0878a712c37"
+   "size": 6592667,
+   "sha256": "5be6cbe08d2332f10ec3240973d9ddfd65de26c5bba83138cd47d3d7f6ae522d"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -117,8 +117,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2492683,
-   "sha256": "132778e6d94454424e0c86ad5857d1aca39c54236915a0aef87cfae2f0f2724f"
+   "size": 2493098,
+   "sha256": "9c3996c613bdf4d66f67ae5bfcb2a0062cbb741ec55fb49b9d2c6c06fada4fae"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -157,8 +157,8 @@
    "sha256": "cb0a10ac26f32199caf577e8e729af1d3689a1985766bb4d7c857a7bc35ce461"
   },
   "line37.json": {
-   "size": 2291870,
-   "sha256": "ab4161b3aeea198392cb1206ec88f61bf815e488146f16568e2fa813eb3ec6a6"
+   "size": 2293190,
+   "sha256": "9214df08ae23b4957e46a72bf59ff58ffbc13c1cadc81577f15be760e45ae2e8"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -197,8 +197,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5777373,
-   "sha256": "e592fc74057b02bf7a48aea31268353c68cf46d95a2c1d6e1680672c2e51d3fb"
+   "size": 5779329,
+   "sha256": "b192c39721a910b6faea992f614e2612eebdabfd0df2302f45c7aa531f1cc56d"
   },
   "line9.validate.json": {
    "size": 6596,

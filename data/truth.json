@@ -11,6 +11,7 @@
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
   "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
   "grassTrack": "tools/track_styles.py, tools/track_decks.py",
+  "grassReview": "tools/track_styles.py (answered grass), tools/grass_review.py (answered places get no card)",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
@@ -652,6 +653,13 @@
    "style": "grass",
    "extent": "from the point to the stop",
    "source": "user 2026-11-12, #479: \"Another green span is on line 37 between 50.1021863N, 14.5062906E and podkovářská stop.\""
+  },
+  {
+   "line": "17",
+   "between": [[50.0038606, 14.4170011], [50.002275, 14.4112849]],
+   "style": "ballast",
+   "extent": "between the grass review card's pins (grass-50.0027-14.4144)",
+   "source": "user 2026-11-12, grass track review (#503), answered not grass: \"there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast\""
   }
  ],
  "grassTrack": {
@@ -3514,6 +3522,160 @@
     "said": "The lidar is right: move the survey to it",
     "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
     "card": "green, 102 m²: the survey -0.58 m off IPR (2023); DMR 5G -0.58 m off IPR, with the survey"
+   }
+  ]
+ },
+ "grassReview": {
+  "note": "The user's answers to the grass track review (reports/review/grass-track-N.json, tools/grass_review.py, #503): OSM's grass over our track. `answer` grass lays grass track between the two points on the card's lines (tools/track_styles.py, its holes cut); not grass and other level keep the place as it is and off the review.",
+  "answers": [
+   {
+    "id": "grass-50.0027-14.4144",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0038606,
+      14.4170011
+     ],
+     [
+      50.002275,
+      14.4112849
+     ]
+    ],
+    "answer": "not grass",
+    "note": "there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0043-14.4180",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0045159,
+      14.4185998
+     ],
+     [
+      50.00403,
+      14.417362
+     ]
+    ],
+    "answer": "not grass",
+    "note": "grass is around the tracks, not on or between them",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0050-14.4200",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0050565,
+      14.4204301
+     ],
+     [
+      50.0048635,
+      14.4196086
+     ]
+    ],
+    "answer": "not grass",
+    "note": "grass is around the tracks, not on or between them",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0071-14.4558",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0078867,
+      14.4558588
+     ],
+     [
+      50.006218,
+      14.4557291
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0662-14.4982",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.0666083,
+      14.4969686
+     ],
+     [
+      50.065902,
+      14.4994736
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0670-14.4957",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.067082,
+      14.4954007
+     ],
+     [
+      50.06691,
+      14.4959696
+     ]
+    ],
+    "answer": "grass",
+    "note": "correct, grass between pins and switch at the end is paved",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0692-14.4909",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.0697367,
+      14.4897409
+     ],
+     [
+      50.0687097,
+      14.491998
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0914-14.3889",
+    "lines": [
+     "23"
+    ],
+    "between": [
+     [
+      50.0890646,
+      14.3880018
+     ],
+     [
+      50.0929174,
+      14.3909781
+     ]
+    ],
+    "answer": "grass",
+    "note": "same span as on line 22 Pohořelec - Brusnice",
+    "source": "user, grass track review (reports/review/grass-track-23.json), 2026-11-12 (#503)"
    }
   ]
  }

@@ -66,5 +66,44 @@ class Styles(unittest.TestCase):
         self.assertIsNone(sv.class_at(300, 0))   # (a wall is not ground)
 
 
+def styled(style, **extra):
+    """A 600 m straight route, one mark of `style` over all of it, and what crosses it."""
+    data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **extra}
+    return T.sections(data, {"trackStyles": [{"line": "x", "from": "A", "to": "B", "style": style}]}, None)
+
+
+def spans_of(secs):
+    return [(round(x["s0"]), round(x["s1"]), x["style"]) for x in secs]
+
+
+class Holes(unittest.TestCase):
+    PLATFORM = {"platforms": [{"p": [[200, 1.5], [240, 1.5], [240, 4], [200, 4]]}]}
+    STREETS = {"roads": [{"p": [[300, -20], [300, 20]], "w": 2, "f": 1}, {"p": [[400, -20], [400, 20]], "w": 8, "c": 1},
+                         {"p": [[0, 30], [600, 30]], "w": 8, "c": 1},                                  # (along, away)
+                         {"p": [[500, -20], [500, 20]], "w": 8, "c": 1, "b": 1}]}                      # (a bridge over)
+
+    def test_grass_stops_at_a_platform_and_ballast_runs_past_it(self):
+        self.assertEqual(spans_of(styled("grass", **self.PLATFORM)), [(0, 197, "grass"), (243, 600, "grass")])
+        self.assertEqual(spans_of(styled("ballast", **self.PLATFORM)), [(0, 600, "ballast")])
+
+    def test_both_stop_at_crossings_and_a_street_across_is_embedded(self):
+        want = [(0, 296, "{0}"), (304, 388, "{0}"), (388, 412, "embedded"), (412, 600, "{0}")]   # (half the width + HOLE)
+        for style in ("grass", "ballast"):
+            self.assertEqual(spans_of(styled(style, **self.STREETS)), [(a, b, s.format(style)) for a, b, s in want])
+
+    def test_switches_do_not_cut_and_short_pieces_go(self):
+        tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}
+        self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through the switches)
+        secs = styled("grass", crossings=[130.0, 145.0])
+        self.assertEqual(spans_of(secs), [(0, 125, "grass"), (150, 600, "grass")])   # (the 10 m between them: too short)
+        self.assertEqual(spans_of(styled("panels", **self.STREETS)), [(0, 600, "panels")])
+
+    def test_a_platform_passed_twice_has_a_hole_on_each_pass(self):
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0], [600.0, -3.0], [0.0, -3.0]],
+                "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 1203.0}], **self.PLATFORM}
+        hs = [(round(h["s0"]), round(h["s1"])) for h in T.holes(data) if h["kind"] == "platform"]
+        self.assertEqual(hs, [(197, 243), (960, 1006)])
+
+
 if __name__ == "__main__":
     unittest.main()
