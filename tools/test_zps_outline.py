@@ -80,6 +80,7 @@ class Outline(unittest.TestCase):
         self.assertEqual(zo.correct([road(zs)], plane, covers=cover)["places"], 0)
         self.assertEqual(zo.correct([road(zs)], plane, held=[0])["places"], 0)
         self.assertEqual(zo.correct([road(zs, cls="paved")], plane)["places"], 0)
+        self.assertEqual(zo.correct([road(zs, cls="platform")], plane)["places"], 0)
         self.assertEqual(zo.correct([road(zs)], plane)["places"], 1)
 
     def test_a_face_the_survey_drew_stays(self):

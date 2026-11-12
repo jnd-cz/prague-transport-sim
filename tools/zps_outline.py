@@ -17,7 +17,7 @@ neither replaces the other (the user, 2026-11-12: "yes lets go with the consensu
   them on another line's height (a road edge on a wall's top line, +1.0-1.8 m by Jižní spojka on line 22; Náhorní's
   sidewalk 1.40 m low on line 17, #315);
 - one height per place: every level-0 vertex at the same position with the same old height takes it.
-Kept as the survey has them: paved areas (IPR's own shapes there), vertices under a cover (the survey's upper levels,
+Kept as the survey has them: the classes where IPR scatters more than the survey (CLASSES), vertices under a cover (the survey's upper levels,
 OSM's bridges, buildings and covered ways: IPR reads the cover or a guess under it), areas held off IPR (zps_ground's
 verdicts), the shapes IPR sees too (lowered kerbs, driveways, ramps) and kerb faces drawn into the outline (IPR's 1 m
 raster has no 20 cm step within a metre: they stay what the survey says).
@@ -25,7 +25,11 @@ raster has no 20 cm step within a metre: they stay what the survey says).
 import numpy as np
 import shapely
 
-CLASSES = {"road", "tram", "parking", "cycle", "sidewalk", "island", "platform"}  # (not paved: above)
+# the classes where IPR read 1 m inside scatters no more than the survey along straight outline (over 8 cm off the 21 m
+# mean on the five lines, survey / IPR: road 1.8-2.7 / 1.6-2.3 %, tram 1.7-3.3 / 0.4-2.1 %, sidewalk 4.0-5.1 / 3.6-5.9 %).
+# Not parking (1.5-4.3 / 4.5-9.6 %), cycle, island, platform (small or narrow: IPR inside reads their edges; with them
+# the rule raised the platforms' share on line 37 from 0.95 to 5.3 %) and paved (6-11 / 22-33 %)
+CLASSES = {"road", "tram", "sidewalk"}
 # m along the outline either side for the local offset, widened up to WIDE until it holds a vertex on each side (79 % of
 # straight street outline lies in gaps over 5 m between vertices, line 22) and MIN_AGREE vertices agreeing with IPR
 WIN, WIDE = 10.0, 30.0
