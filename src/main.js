@@ -465,7 +465,7 @@ async function start(extra = {}) {
     ...extra,
   });
   game.runSeed = seed; // (replay: ?seed=N)
-  perfLog.reset({ line: data.line, model: have, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
+  perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
