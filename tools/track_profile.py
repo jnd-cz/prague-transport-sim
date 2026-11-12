@@ -185,6 +185,9 @@ def vertical_profile(s, z, rmin, weight=None, pins=(), scale=.05, pin_weight=1e6
 SMOOTH = 1.0  # curvature penalty of the band rule, in h^4 (h the median spacing): smooths noise over ~h, not more
 
 
+_INVERSES = {}  # (banded_profile's last systems: their inverses by points, weights and smoothing)
+
+
 def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
     """Heights nearest z (least squares, `weight` per point) that stay within `tol` of it (a number or one per point;
     None: no band there, a held bin or a lone bad point) and turn no tighter than rmin, with a small penalty on
@@ -202,7 +205,15 @@ def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
     h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
     rho1, rho2 = max(h,.5)**4, 1.0
     D = _D(s)
-    Ai = D.inverse([wi+rho2 for wi in w],[(smooth+1)*rho1]*(n-2))
+    # (the system depends on the points and their weights, not on rmin or tol: a chain's solve asks for it again with each
+    # radius and band it tries, so the last ones are kept; the same inverse, ~1 s for 3000 points, #511)
+    key = (np.asarray(s, dtype=float).tobytes(), np.asarray(w).tobytes(), smooth)
+    Ai = _INVERSES.get(key)
+    if Ai is None:
+        Ai = D.inverse([wi+rho2 for wi in w],[(smooth+1)*rho1]*(n-2))
+        if len(_INVERSES) >= 2:
+            del _INVERSES[next(iter(_INVERSES))]
+        _INVERSES[key] = Ai
     z = np.asarray(z, dtype=float)
     free = np.array([t is None for t in tol])
     t = np.array([0.0 if t is None else t for t in tol])

@@ -22,8 +22,11 @@ game keeps its surface-plus-style profile there (src/terrain.js Profile).
 import argparse
 import bisect
 from collections import Counter, defaultdict
+from concurrent.futures import FIRST_COMPLETED, wait
+import heapq
 import json
 import math
+import os
 import time
 from pathlib import Path
 import sys
@@ -613,6 +616,91 @@ def solve(c, pins, r, relax=None):
                                       if run['src'][j]), 'curve')
 
 
+POOL = 16  # chains: fewer are solved in this process (a worker takes ~2 s to start: the network has ~600)
+
+
+ANSWERS = ('RADIUS_ANSWERS', 'STEP_ANSWERS', 'IGNORE_ANSWERS', 'GROUND_ANSWERS', 'FLOOR_SINCE')  # (what ha.load sets)
+
+
+def _worker(answers, chs=None):
+    """A worker process: height_answers' globals as this process has them (solve reads the answers there), and for the
+    lines' writing the chains and their lookup."""
+    global _CHS, _LOOKUP
+    for k, v in answers.items():
+        setattr(ha, k, v)
+    if chs is not None:
+        _CHS, _LOOKUP = chs, Lookup(chs)
+
+
+def _write(line):
+    return write_line(line, _LOOKUP, _CHS)[2]
+
+
+def _solve(c, pins, r):
+    solve(c, pins, r)
+    return c.runs, c.held, c.steps, c.review, c.dropped, c.apart
+
+
+BLAS = 4  # numpy's BLAS threads per worker: a long chain's solve on one thread took twice as long, and the longest set the pace
+
+
+def _pool(n, chs=None):
+    """Worker processes, n at most: a core per BLAS thread, 1 GB apiece of free memory (tools/sysinfo.py). Their numpy runs
+    BLAS threads as this process's do, when rebuild.py gave it 4 (the environment is read at their start, #511)."""
+    from concurrent.futures import ProcessPoolExecutor
+    import sysinfo
+    os.environ['OPENBLAS_NUM_THREADS'] = str(BLAS)
+    return ProcessPoolExecutor(min(n, sysinfo.workers(1.0, most=max(1, (os.cpu_count() or 4) // BLAS))), initializer=_worker,
+                               initargs=({k: getattr(ha, k) for k in ANSWERS}, chs))
+
+
+def presolve(chs, order, r, pool=None):
+    """Every chain's first solve, without pins: each reads only its own chain, so they run side by side in the workers,
+    the longest first (one process solved a line's chains in 192 s, these first solves about half of it, #511).
+    {chain: (runs, held, steps, review, dropped, apart)}."""
+    if pool is None:
+        return {i: _solve(chs[i], {}, r) for i in order}
+    return dict(zip(order, pool.map(_solve, [chs[i] for i in order], [{}] * len(order), [r] * len(order))))
+
+
+def in_turn(chs, order, waits, prepare, r, pool):
+    """Each chain of `order` once the chains it waits for (before it in the order) are done: prepare(i) gives its pins, or
+    None where it is not solved (again). A chain with pins is solved in the pool when there is one, side by side with the
+    others whose waits are over; without one, here, strictly in the order: as one loop over it (#511)."""
+    pos = {i: n for n, i in enumerate(order)}
+    after, left = defaultdict(list), {}
+    for i in order:
+        left[i] = len(waits[i])
+        for j in waits[i]:
+            after[j].append(i)
+    ready, running = [pos[i] for i in order if not left[i]], {}
+    heapq.heapify(ready)
+
+    def finish(i):
+        for k in after[i]:
+            left[k] -= 1
+            if not left[k]:
+                heapq.heappush(ready, pos[k])
+
+    while ready or running:
+        while ready:
+            i = order[heapq.heappop(ready)]
+            pins = prepare(i)
+            if pins is None:
+                finish(i)
+            elif pool is None:
+                solve(chs[i], pins, r)
+                finish(i)
+            else:
+                running[pool.submit(_solve, chs[i], pins, r)] = i
+        if running:
+            over, _ = wait(running, return_when=FIRST_COMPLETED)
+            for f in over:
+                i = running.pop(f)
+                chs[i].runs, chs[i].held, chs[i].steps, chs[i].review, chs[i].dropped, chs[i].apart = f.result()
+                finish(i)
+
+
 def assemble(chs):
     """Solve every chain, longest first; a chain meeting one already solved (a junction, a group of ends, a crossing
     at grade) is pinned to its heights there. One pass: the pins come only from final curves (each crossing at the
@@ -654,44 +742,73 @@ def assemble(chs):
                 if j1 != j2 and not any(m[1] == j2 and abs(m[0] - u1) <= NEAR_MEET for m in meets[j1]):
                     meets[j1].append((u1, j2, u2, 'near'))
                     meets[j2].append((u2, j1, u1, 'near'))
-    solved, pinned, used, apart, t0 = set(), 0, [], {}, time.time()
+    pinned, used, apart, t0 = 0, [], {}, time.time()
     order = sorted(range(len(chs)), key=lambda i: -chs[i].length)
-    last = {}
-    for n, i in enumerate(order):
+    pool = _pool(len(order)) if len(order) >= POOL else None
+    unpinned = presolve(chs, order, r, pool)
+    print(f'  every chain solved without pins, {time.time() - t0:.0f} s', flush=True)
+    pos = {i: n for n, i in enumerate(order)}
+
+    def pin(i):
+        """Chain i's pins from the chains before it in the order that it meets, as they are final: (pins, its entries of
+        `used`, the crossings it lists apart)."""
         c = chs[i]
-        solve(c, {}, r)
-        cands = []
+        c.runs, c.held, c.steps, c.review, c.dropped, c.apart = unpinned[i]
+        cands, gone = [], []
         for ti, j, tj, kind in meets[i]:
-            if j not in solved:
+            if pos[j] > pos[i]:
                 continue
             zj, zi = chs[j].z_at(tj)[0], c.z_at(ti)[0]
             if zj is None:
                 continue
             if kind == 'cross' and (zi is None or abs(zi - zj) > CROSS):
                 if zi is not None:  # (one track over the other, or one of them wrong there: listed)
-                    apart[(min(i, j), max(i, j), round(ti), round(tj))] = (abs(zi - zj), c.line.interpolate(ti))
+                    gone.append(((min(i, j), max(i, j), round(ti), round(tj)), (abs(zi - zj), c.line.interpolate(ti))))
                 continue
             cands.append((ti, kind in ('ends', 'near'), -chs[j].length, zj, j, tj))
         # (several at one spot: a fork's or crossing's own point first, then the longer track; at a fork on a 4 %
         # grade the end of a third track 0.5 m off gave 4 cm more)
-        pins = {}
+        pins, mine = {}, []
         for x in sorted(cands, key=lambda x: (x[1], x[2])):
             if all(abs(x[0] - t) > PIN_MERGE for t in pins):
                 pins[x[0]] = x[3]
-                used.append((i, x[0], x[4], x[5]))
-        if pins:
-            solve(c, pins, r)
-            pinned += 1
+                mine.append((i, x[0], x[4], x[5]))
+        return pins, mine, gone
+
+    got, done = {}, [0]
+
+    def pinned_pass(i):
+        got[i] = pin(i)
+        done[0] += 1
+        if done[0] % 200 == 0:
+            print(f'  {done[0]} of {len(chs)} chains solved ({sum(bool(g[0]) for g in got.values())} pinned), '
+                  f'{time.time() - t0:.0f} s', flush=True)
+        return got[i][0] or None
+
+    in_turn(chs, order, {i: {j for _, j, _, _ in meets[i] if pos[j] < pos[i]} for i in order}, pinned_pass, r, pool)
+    last = {}
+    for i in order:
+        pins, mine, gone = got[i]
         last[i] = pins
-        solved.add(i)
-        if n % 200 == 199:
-            print(f'  {n + 1} of {len(chs)} chains solved ({pinned} pinned), {time.time() - t0:.0f} s', flush=True)
+        used += mine
+        pinned += bool(pins)
+        apart.update(gone)
     # where an answer holds the floor at a junction whose rails meet only below it (solve: c.apart), the tracks meet half
     # way: the track the chain is pinned to there takes the middle of their heights as a pin of its own, and every chain
     # whose pins moved is solved again in the order above, until they meet (each round halves what is left)
-    by_chain, extra, met = defaultdict(list), defaultdict(dict), 0
+    by_chain, extra, met = defaultdict(list), defaultdict(dict), [0]
     for u in used:
         by_chain[u[0]].append(u)
+
+    def meet(i):
+        p = {ti: chs[j].z_at(tj)[0] for _, ti, j, tj in by_chain[i]}
+        p = {t: z for t, z in p.items() if z is not None} | extra[i]
+        if p.keys() != last[i].keys() or any(abs(p[t] - last[i][t]) > 0.001 for t in p):
+            last[i] = p
+            met[0] += 1
+            return p
+        return None
+
     gaps = []
     for _ in range(MEET_ROUNDS):
         gap = 0.0
@@ -704,12 +821,11 @@ def assemble(chs):
         gaps.append(round(gap, 4))
         if not gap:
             break
-        for i in order:
-            p = {ti: chs[j].z_at(tj)[0] for _, ti, j, tj in by_chain[i]}
-            p = {t: z for t, z in p.items() if z is not None} | extra[i]
-            if p.keys() != last[i].keys() or any(abs(p[t] - last[i][t]) > 0.001 for t in p):
-                solve(chs[i], p, r)
-                last[i], met = p, met + 1
+        # (a chain's pins come from the chains it is pinned to, before it in the order: it waits for them this round)
+        in_turn(chs, order, {i: {u[2] for u in by_chain[i]} for i in order}, meet, r, pool)
+    if pool is not None:
+        pool.shutdown()
+    met = met[0]
     if met:
         print(f'junctions held at the floor: the tracks met half way, {met} chains solved again; the widest gap by round, m: '
               f'{gaps}', flush=True)
@@ -1145,10 +1261,14 @@ def main():
     sys.stdout.reconfigure(encoding='utf-8')
     truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
     ha.load(truth)
+    t0 = time.time()
+    took = lambda what: print(f'({what}: {time.time() - t0:.0f} s from the start)', flush=True)  # noqa: E731
     staged = staged_heights(args.staged)
+    took('staged')
     chs = build_chains(staged)
     del staged
     ha.apply(chs)
+    took('chains and answers')
     filled, left = surface_fill(chs, LiftMap())
     print(f'surface where a hold is too long to bridge: {filled:.0f} m filled, {left:.0f} m on a structure without a deck', flush=True)
     for c in chs:
@@ -1156,7 +1276,9 @@ def main():
             x['staged'] = x['z']
     if args.smooth == 'wh3':
         smooth_heights(chs)
+    took('smoothed')
     summary = assemble(chs)
+    took('assembled')
     from geo import Frame
     F = Frame()
     steps = [dict(s, lat=round(float(F.ll(*s['xy'])[0]), 5), lon=round(float(F.ll(*s['xy'])[1]), 5))
@@ -1185,6 +1307,7 @@ def main():
     review = radius_review(chs, (ROOT / 'snapshots/CURRENT').read_text().strip())
     print(f"radius review: {len(review)} places ({sum(f['decision']['structure']['kind'] == 'junction' for f in review)} "
           f"at junctions), reports/review/track-radius.json")
+    took('the radius review')
     lookup, report = Lookup(chs), {'network': {**summary, 'steps_by_cause': dict(by), 'unexplained_steps': bad,
                                                'moved_m': {'p50': q(.5), 'p90': q(.9), 'p99': q(.99)},
                                                'held_over_60m': held,
@@ -1193,10 +1316,16 @@ def main():
                                                'dropped_by_answers': [[round(float(v), 5) for v in F.ll(*xy)]
                                                                       for c in chs for xy in c.dropped]}, 'lines': {}}
     nulls = 0
-    for line in args.lines:
-        _, _, data = write_line(line, lookup, chs)
+    if len(args.lines) > 1:  # (each line's writing reads only the chains: side by side, ~30 s a line, #511)
+        with _pool(len(args.lines), chs) as ex:
+            written = list(ex.map(_write, args.lines))
+    else:
+        written = [write_line(line, lookup, chs)[2] for line in args.lines]
+    took('written')
+    for line, data in zip(args.lines, written):
         nulls += data.pop('_nulls')
         report['lines'][line] = line_report(line, chs, lookup, data, summary)
+    took('reported')
     out = ROOT / 'reports' / 'line-heights.json'
     out.write_text(json.dumps(report, indent=1, ensure_ascii=False), encoding='utf-8')
     print(f'report: {out.relative_to(ROOT)}')

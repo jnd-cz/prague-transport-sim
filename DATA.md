@@ -119,7 +119,9 @@ it was published. Don't restore the whole snapshot into a fresh checkout to chec
 
 Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`, unpacked `.gpkg`) are
 not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query
-and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes).
+and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes). So are the
+extract's index beside the machine cache (`TRAMDATA_CACHE/osm-index/<extract>-<code>/`, DEVELOPING.md) and the
+rebuild's step records with the outputs they name (`reports/rebuild/cache/`).
 
 ## Regional DTM monthly downloads and JVF transition (#63)
 
