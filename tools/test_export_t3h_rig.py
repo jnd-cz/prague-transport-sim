@@ -8,20 +8,21 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from export_t3h_rig import ASSET, ROLES, export_rig, read_glb  # noqa: E402
+from export_t3h_rig import ASSET, BASE_RIG, ROLES, export_rig, read_glb  # noqa: E402
 
 
 class ExportHybridRig(unittest.TestCase):
     def setUp(self):
         self.glb = read_glb(ASSET / "tatra-t3-hybrid-nc.glb")
-        self.base = json.loads((ASSET / "rig.json").read_bytes())
+        self.base = json.loads(BASE_RIG.read_bytes())
         self.roles = json.loads(ROLES.read_bytes())
 
     def test_exports_all_roles_and_preserves_base_bindings(self):
         self.base["handWritten"] = {"fields": ["couplers"]}
         original = json.dumps(self.base)
         rig = export_rig(self.glb, self.base, self.roles)
-        self.assertEqual(rig["revision"], 6)
+        self.assertEqual(rig["revision"], self.base["revision"])
+        self.assertEqual(rig["rigRevision"], 1)
         self.assertNotIn("handWritten", rig)
         self.assertEqual(rig["bogies"], self.base["bogies"])
         self.assertEqual(rig["infoPlates"], self.base["infoPlates"])
@@ -40,6 +41,12 @@ class ExportHybridRig(unittest.TestCase):
     def test_rejects_shoe_under_wrong_bogie(self):
         self.roles["shoes"]["Bogie_Front"][0] = "Black_Metal_116"
         with self.assertRaisesRegex(ValueError, "shoe under Bogie_Front.*Black_Metal_116"):
+            export_rig(self.glb, self.base, self.roles)
+
+    def test_rejects_stale_beam_after_headlight_moves(self):
+        mesh = next(n for n in self.glb["nodes"] if n.get("name") == self.roles["headlightMesh"])
+        mesh["translation"] = [0, 0, 0.2]
+        with self.assertRaisesRegex(ValueError, "beam 1.*outside the headlight bounds"):
             export_rig(self.glb, self.base, self.roles)
 
     def test_cli_is_repeatable_and_leaves_output_on_failure(self):

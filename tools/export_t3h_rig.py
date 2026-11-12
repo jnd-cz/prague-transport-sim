@@ -3,12 +3,13 @@
 
     python -I tools/export_t3h_rig.py --out reports/t3h-rig.json
 
-Use --model, --base-rig and --roles to check a different export. The base rig supplies the
-original pivots and plate bindings. Review the role assignments and lamp coordinates in
-t3h_rig_roles.json when the model changes. Coordinates use the GLB's frame and metres.
+The asset revision comes from t3h_base_rig.json, the original revision 5 rig.
+rigRevision versions the generated rig separately. Use --model, --base-rig and --roles
+for a different model export. Coordinates use the GLB's frame and metres.
 """
 import argparse
 from collections import defaultdict
+from itertools import product
 import json
 import math
 from pathlib import Path
@@ -20,6 +21,7 @@ from atomic import replacing  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET = ROOT / "assets/t3h"
+BASE_RIG = ROOT / "tools/t3h_base_rig.json"
 ROLES = ROOT / "tools/t3h_rig_roles.json"
 
 
@@ -42,6 +44,50 @@ def vector(value, label, positive=False):
         for v in value
     ):
         raise ValueError(f"{label}: expected three finite {'positive ' if positive else ''}coordinates")
+
+
+def transform_point(point, node):
+    if "matrix" in node:
+        matrix = node["matrix"]
+        return [matrix[12 + i] + sum(matrix[j * 4 + i] * v for j, v in enumerate(point))
+                for i in range(3)]
+    scaled = [p * s for p, s in zip(point, node.get("scale", [1, 1, 1]))]
+    x, y, z, w = node.get("rotation", [0, 0, 0, 1])
+    u, v, t = scaled
+    # Rotate the scaled point by the glTF quaternion, then translate.
+    a, b, c = 2 * (y * t - z * v), 2 * (z * u - x * t), 2 * (x * v - y * u)
+    rotated = [u + w * a + y * c - z * b,
+               v + w * b + z * a - x * c,
+               t + w * c + x * b - y * a]
+    return [p + offset for p, offset in zip(rotated, node.get("translation", [0, 0, 0]))]
+
+
+def check_beams(glb, mesh_node, points, forward):
+    nodes = glb["nodes"]
+    parents = {child: i for i, n in enumerate(nodes) for child in n.get("children", [])}
+    chain = [mesh_node]
+    while chain[-1] in parents:
+        parent = parents[chain[-1]]
+        if parent in chain:
+            raise ValueError("headlight mesh has a cyclic parent chain")
+        chain.append(parent)
+    corners = []
+    for primitive in glb["meshes"][nodes[mesh_node]["mesh"]]["primitives"]:
+        position = glb["accessors"][primitive["attributes"]["POSITION"]]
+        for corner in product(*zip(position["min"], position["max"])):
+            for i in chain:
+                corner = transform_point(corner, nodes[i])
+            corners.append(corner)
+    lo, hi = [list(map(reduce_axis, zip(*corners))) for reduce_axis in (min, max)]
+    axis = "XYZ".index(forward[1])
+    # The original loader placed each glow 10 mm forward of the emissive face.
+    if forward[0] == "+":
+        hi[axis] += 0.01
+    else:
+        lo[axis] -= 0.01
+    for i, point in enumerate(points, 1):
+        if any(not a - 0.0001 <= p <= b + 0.0001 for a, p, b in zip(lo, point, hi)):
+            raise ValueError(f"beam {i}: centre lies outside the headlight bounds")
 
 
 def export_rig(glb, rig, roles):
@@ -156,6 +202,8 @@ def export_rig(glb, rig, roles):
             raise ValueError(f"{role}: expected two centres")
         for point in points:
             vector(point, role)
+    headlight = node(roles["headlightMesh"], "headlight", scope, mesh=True)
+    check_beams(glb, headlight, roles["beams"], rig["forward"])
     vector(roles["tailLamps"]["size"], "tail lamp size", positive=True)
     digits = roles["fleetDigits"]
     if type(digits) not in (int, float) or not math.isfinite(digits) or digits <= 0:
@@ -163,7 +211,7 @@ def export_rig(glb, rig, roles):
 
     result = {**rig, "doors": doors, "pantograph": panto}
     result.update({key: roles[key] for key in (
-        "revision", "saloon", "shoes", "couplers", "beams", "tailLamps", "fleetDigits"
+        "rigRevision", "saloon", "shoes", "couplers", "beams", "tailLamps", "fleetDigits"
     )})
     result.pop("handWritten", None)
     return result
@@ -172,7 +220,7 @@ def export_rig(glb, rig, roles):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", type=Path, default=ASSET / "tatra-t3-hybrid-nc.glb")
-    parser.add_argument("--base-rig", type=Path, default=ASSET / "rig.json")
+    parser.add_argument("--base-rig", type=Path, default=BASE_RIG)
     parser.add_argument("--roles", type=Path, default=ROLES)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -188,7 +236,8 @@ def main(argv=None):
             f.write("\n")
     except (OSError, ValueError, TypeError, KeyError, IndexError) as exc:
         parser.exit(1, f"export_t3h_rig: {exc}\n")
-    print(f"{args.out}: revision {result['revision']}, {len(result['doors'])} doors, "
+    print(f"{args.out}: asset revision {result['revision']}, rig revision {result['rigRevision']}, "
+          f"{len(result['doors'])} doors, "
           f"{sum(map(len, result['shoes'].values()))} shoes")
 
 

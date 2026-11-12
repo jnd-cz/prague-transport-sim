@@ -1,6 +1,6 @@
 {
   "source": "Hybrid revision 5 bindings from PR #469 and issue #471. Tail lamp placement and fleet digit height come from the user's decisions in #436 and #471.",
-  "revision": 6,
+  "rigRevision": 1,
   "forward": "+X",
   "up": "+Y",
   "doorClips": {
@@ -21,6 +21,7 @@
     "front": ["Black_Metal_109"],
     "rear": ["Black_Metal_111"]
   },
+  "headlightMesh": "White_Emission_Car_79",
   "beams": [[7.0624, 1.2191, -0.4919], [7.0624, 1.2191, 0.4857]],
   "tailLamps": {
     "size": [0.02, 0.07, 0.2],
