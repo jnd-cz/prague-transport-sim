@@ -1,4 +1,5 @@
-"""The route as the game drives it, built offline (#276 step 2, #477): the track past both termini.
+"""The route as the game drives it, built offline (#276 step 2): the track past both termini (#477), and `Route`, the
+route as the page builds it, for what the build derives from it (tools/cant.py, #478).
 
     python -I tools/route.py 17      # the run past line 17's termini from its data/line17.json (a check; the build writes it)
 
@@ -91,6 +92,58 @@ def path_ext(data, xy=3):
     """The line data's `pathExt`: the run past both termini, rounded as the build rounds coordinates."""
     ext = extend([t["p"] for t in data["tracks"]], data["path"])
     return {k: [[round(x, xy), round(y, xy)] for x, y in v] for k, v in ext.items()}
+
+
+class Route:
+    """The route as src/route.js Route builds it (#477): the build's points as they are, s along them from the path's
+    start (negative over the run-in), `at` on their segments, `heading` the chord between two points around s. The same
+    arithmetic in the same order, so what the build derives from it is what the page derived."""
+
+    def __init__(self, pts, ext=None):
+        before, after = (ext or {}).get("before", []), (ext or {}).get("after", [])
+        allp = [(p[0], p[1]) for p in [*before, *pts, *after]]
+        cum = [0.0]
+        for a, b in zip(allp, allp[1:]):
+            cum.append(cum[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+        s0 = cum[len(before)]
+        L = 0.0
+        for a, b in zip(pts, pts[1:]):
+            L += math.hypot(b[0] - a[0], b[1] - a[1])
+        self.p, self.s, self.length = allp, [c - s0 for c in cum], L
+
+    def _index(self, s):
+        lo, hi = 0, len(self.s) - 1
+        if s <= self.s[0]:
+            return 0
+        if s >= self.s[hi]:
+            return hi - 1
+        while hi - lo > 1:
+            mid = (lo + hi) >> 1
+            if self.s[mid] <= s:
+                lo = mid
+            else:
+                hi = mid
+        return lo
+
+    def at(self, s):
+        """(x, y, hx, hy) at s."""
+        i = self._index(s)
+        a, b = self.p[i], self.p[i + 1]
+        seg = self.s[i + 1] - self.s[i] or 1e-9
+        t = max(0.0, min(1.0, (s - self.s[i]) / seg))
+        dl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1e-9
+        return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / dl, (b[1] - a[1]) / dl
+
+    def heading(self, s, span=6.0):
+        a, b = self.at(s - span), self.at(s + span)
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        l = math.hypot(dx, dy) or 1
+        return dx / l, dy / l
+
+    def turn(self, s):
+        """The signed heading change over 16 m around s (+ = left), as src/route.js reads a curve."""
+        a, b = self.heading(s - 8, 4), self.heading(s + 8, 4)
+        return math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1])
 
 
 def main():

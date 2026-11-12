@@ -54,7 +54,7 @@ if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const data = await (await load.get(`data/line${lineId}.json`)).json();
 data.line = String(data.line);
-checkBuiltRoute(data); // (the track as the build draws it: its curves and the run past the termini, #477)
+checkBuiltRoute(data); // (the track as the build draws it: its curves, the run past the termini, radius and cant: #477, #478)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
 // ?profile=<name>: a trial height profile over the line's own, to drive and compare (reports/review/profiles/, #358)
 if (params.has('profile')) {
@@ -109,9 +109,8 @@ chainTunnels(data.roads); // road tunnels and bridges: heights between their rea
 // the track beyond both termini as the build walked it, so a two-car set standing at the first stop is on rails
 const route = new Route(data.path, data.pathExt);
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
-// banked curves on dedicated track; level at platforms (stop zone from the stop sign back 30 m
-// where the data has no platform)
-route.prepareCant(data.stops.map((st) => ({ p0: st.p0 ?? st.s - 30, p1: st.p1 ?? st.s })));
+// the curves' radius and the banked curves as the build worked them out (tools/cant.py, #478)
+route.useBuilt(data.curvature.path, data.curvature.unit, data.cant);
 const terrain = new Terrain(data.terrain);
 // the fine terrain near the tracks (2 m, tools/fine_terrain.py), where it was made for this line
 // (dev switch ?nofine: the coarse grid only, for comparing lint runs)

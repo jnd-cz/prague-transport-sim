@@ -40,17 +40,16 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
   return { pts: out, s: ss };
 }
 
-// The line data is built with its track drawn as curves (`trackCurve`, tools/track_curve.py, #204) and the run past
-// both termini (`pathExt`, tools/route.py, #477): the page smooths no track and walks none (#276 step 2). Data built
-// before them cannot be drawn as the build meant it, so it does not load.
+// The line data is built with its track drawn as curves (`trackCurve`, tools/track_curve.py, #204), the run past
+// both termini (`pathExt`, tools/route.py, #477) and the route's radius and cant (`curvature`, `cant`, tools/cant.py,
+// #478): the page smooths no track, walks none and works out no curve (#276 step 2). Data built before them does not load.
 export function checkBuiltRoute(data) {
-  const missing = ['trackCurve', 'pathExt'].filter((k) => !data[k]);
-  if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(' and ')}: built before #477, rebuild it (tools/rebuild.py)`);
+  const missing = ['trackCurve', 'pathExt', 'curvature', 'cant'].filter((k) => !data[k]);
+  if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(', ')}: built before #478, rebuild it (tools/rebuild.py)`);
 }
 
-// the cant's layout: the comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m); the limit in a curve
-// takes the route's `curveAccel` (_designSpeed)
-const A_LAT = 0.8, CANT_MAX = 0.1;
+// the unbalanced lateral acceleration (m/s2) a curve's limit takes where the route has no `curveAccel` (_designSpeed)
+const A_LAT = 0.8;
 // m a curve's limit starts before the radius asks for it: the 16 m estimate reads a curve's start late (its full radius
 // about 12 m in, where the transition is short), and the limit is for the front going in
 const CURVE_AHEAD = 5;
@@ -192,11 +191,19 @@ export class Route {
     return out;
   }
 
-  // Curve radius (m) at s itself, from heading change over 16 m.
+  // The radius and the cant the build worked out for this route (tools/cant.py, #478): `curv` the line data's
+  // `curvature` (K / r every metre, 0 where straight) for this path, `cant` the line data's `cant` (our route only).
+  useBuilt(curv, unit, cant = null) {
+    this.curv = curv;
+    this.curvUnit = unit;
+    this.radii = null;
+    if (cant) this.cant = { step: cant.step, c: Float32Array.from(cant.c, (v) => v * cant.unit) };
+  }
+
+  // Curve radius (m) at s: the heading change over 16 m around the nearest metre, as the build read it
   _radius(s) {
-    const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
-    const dTheta = Math.acos(Math.max(-1, Math.min(1, a.hx * b.hx + a.hy * b.hy)));
-    return dTheta > 1e-4 ? 16 / dTheta : 1e6;
+    const k = this.curv[Math.max(0, Math.min(this.curv.length - 1, Math.round(s)))];
+    return k ? 1 / (k * this.curvUnit) : 1e6;
   }
 
   // The same at the nearest 5 m, for what is read many times a frame.
@@ -218,43 +225,9 @@ export class Route {
     return { osm: I.osm[k], dedicated: !!I.dedicated[k] };
   }
 
-  // Cant (superelevation) profile along the route, every 2 m, signed (+ = the left rail lower, the
-  // tram leans left). Only on dedicated track, which has no road surface to keep level, and not at
-  // stops (a platform edge stays level with the doors) nor near the ends of the route (terminus
-  // loops, depots). The cant a curve gets is 60 % of the balanced cant v² / (g R) · 1.5 m at the
-  // speed the curve allows with full cant, at most 100 mm; it runs in and out linearly at most
-  // 100 mm per 30 m (a transition curve), then is smoothed, so the tram and the view roll gently.
-  // `stops`: [{p0, p1}] platform stretches along the route.
-  prepareCant(stops = []) {
-    const step = 2, n = Math.ceil(this.length / step) + 1;
-    const c = new Float32Array(n);
-    const level = (s) => s < 150 || s > this.length - 150 || stops.some((st) => s > st.p0 - 25 && s < st.p1 + 25);
-    for (let i = 0; i < n; i++) {
-      const s = i * step;
-      if (!this._speedInfo(s).dedicated || level(s)) continue;
-      const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
-      const turn = Math.atan2(a.hx * b.hy - a.hy * b.hx, a.hx * b.hx + a.hy * b.hy); // over 16 m
-      const r = Math.abs(turn) > 1e-4 ? 16 / Math.abs(turn) : 1e6;
-      if (r > 1500) continue;
-      const v = this._designSpeed(s, r, true) / 3.6;
-      c[i] = Math.sign(turn) * Math.min(CANT_MAX, 0.6 * 1.5 * v * v / (9.81 * r));
-    }
-    // run-in / run-out ramps: at most CANT_MAX per 30 m, both ways, towards zero first
-    const d = (CANT_MAX / 30) * step;
-    for (let pass = 0; pass < 2; pass++) {
-      for (let i = 1; i < n; i++) c[i] = Math.sign(c[i]) * Math.min(Math.abs(c[i]), Math.abs(c[i - 1]) + d) * (Math.sign(c[i]) === Math.sign(c[i - 1]) || !c[i - 1] ? 1 : 0);
-      for (let i = n - 2; i >= 0; i--) c[i] = Math.sign(c[i]) * Math.min(Math.abs(c[i]), Math.abs(c[i + 1]) + d) * (Math.sign(c[i]) === Math.sign(c[i + 1]) || !c[i + 1] ? 1 : 0);
-    }
-    // smooth over ±6 m (the ramp corners)
-    const out = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      let sum = 0, w = 0;
-      for (let k = -3; k <= 3; k++) { const j = i + k; if (j < 0 || j >= n) continue; const ww = 4 - Math.abs(k); sum += c[j] * ww; w += ww; }
-      out[i] = sum / w;
-    }
-    this.cant = { step, c: out };
-  }
-
+  // Cant (superelevation) along the route, every 2 m, signed (+ = the left rail lower, the tram leans left): the build's
+  // (tools/cant.py, `useBuilt`). Only on dedicated track, level at stops and near the route's ends, ramps of at most
+  // 100 mm per 30 m.
   _cantSigned(s) {
     const C = this.cant;
     if (!C) return 0;
@@ -268,20 +241,15 @@ export class Route {
   // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
   rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
 
-  // Speed a curve of radius r allows (km/h) with the given cant credit. With full cant, the speed the track was laid out
-  // for (prepareCant: unbalanced A_LAT plus the cant), in 5 km/h: 50 in streets, 60 on dedicated track, however it is
-  // signed. Otherwise the limit, in whole km/h, as no sign stands at such a curve: unbalanced `curveAccel`
+  // Speed a curve of radius r allows (km/h) with the given cant credit (the cant's own design speed is the build's,
+  // tools/cant.py): the limit, in whole km/h, as no sign stands at such a curve: unbalanced `curveAccel`
   // (`curve-lateral-acceleration`) plus what the cant takes. The drivers of two line 23 rides took the unsigned curves of
   // R 30-60 m at 1.2-1.6 m/s², where 0.8 and the 5 km/h steps held the autopilot 6-14 km/h under them (#451). Never above
   // the posted speed, which stands for the sign, nor the car's top speed (`speedTop`), and 50 without a posted speed
   // (`max-speed`: more needs a Rychlostník, also off the road). A curve under SMALL_RADIUS has its sign: `curveFloor`,
   // 15 km/h over the whole of it (`small-radius-speed`).
-  _designSpeed(s, r, fullCant, cant = 0, accel = this.curveAccel) {
-    const { osm, dedicated } = this._speedInfo(s);
-    if (fullCant) {
-      const vd = Math.floor((Math.sqrt((A_LAT + (dedicated ? CANT_MAX : 0) * 9.81 / 1.5) * r) * 3.6) / 5) * 5;
-      return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), vd));
-    }
+  _designSpeed(s, r, cant = 0, accel = this.curveAccel) {
+    const { osm } = this._speedInfo(s);
     const floor = this.curveFloor ?? 10;
     const v = r < SMALL_RADIUS ? floor : Math.max(floor, Math.floor(Math.sqrt(((accel ?? A_LAT) + cant * 9.81 / 1.5) * r) * 3.6));
     const cap = osm ? Math.min(osm, this.speedTop ?? osm) : 50;
@@ -289,7 +257,7 @@ export class Route {
   }
 
   // speed the curve at s allows (km/h), with the cant actually built there
-  curveSpeed(s, accel = this.curveAccel) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s), accel); }
+  curveSpeed(s, accel = this.curveAccel) { return this._designSpeed(s, this._radius(s), this.cantAt(s), accel); }
 
   // Speed limits (km/h) to the metre: the curve and the posted speed (curveSpeed), `past` metres on from where they ask
   // for it (`restriction-past`: 15 m on until #211, from 5 m bins) and CURVE_AHEAD before, plus the extra restrictions,
