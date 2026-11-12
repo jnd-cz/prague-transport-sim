@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """A fixed lattice of cells over the city frame (#326): the feature services' answers are asked and named per cell, so
 an answer always stands for the same place, a small change of a route asks for few new files, and lines share them.
 """

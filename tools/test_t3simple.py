@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The built-in T3 (src/t3simple.js, #427) against the T3's general-arrangement drawing, in headless Chromium.
 
 Usage: python -P -E tools/test_t3simple.py [--shots DIR] [--models simple,t3,t3m,classic,hybrid]
@@ -26,6 +27,9 @@ import sys
 import threading
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -472,7 +476,7 @@ def main():
     errors = []
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.route(base + "/__t3s.html", lambda route: route.fulfill(

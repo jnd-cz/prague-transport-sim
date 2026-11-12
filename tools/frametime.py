@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The frame time and the draw calls with each tram model (tools/bench/frametime.js), in a headed Chromium.
 
 Usage: python -P -E tools/frametime.py [--line 17] [--models t3h,t3,t3simple] [--fov 62,22.75] [--frames 600] [--headless]

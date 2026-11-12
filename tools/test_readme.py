@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The player's guide in two languages stays in step (#330): python -I tools/test_readme.py
 Same headings by level and count, the same help markers, the same key table, and every file a link in
 README.md, README.en.md or DEVELOPING.md names exists, with the heading its #anchor names. It cannot see a

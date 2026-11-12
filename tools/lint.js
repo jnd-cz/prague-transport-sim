@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev tool: lints for the loaded line. Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
 // In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
@@ -336,6 +337,40 @@ function railSupport(g, world) {
   return check('rails-supported', n, [...bad.values()]);
 }
 
+// The ground-level survey over the rails (#444): every 2 m, across the tram's width (1.25 m either side of the route,
+// every 0.25 m), the highest ground-level surveyed surface over the rail top. railSupport's rays start 2.5 m over the
+// bed: they missed the ridge of an 800 m tram area on Krejcárek's ramp (line 37 s 2566-2746), up to 6 m over the
+// rails where earcut joined its outline's points far apart.
+function surveyOverTrack(g) {
+  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm;
+  if (!dtm) return check('survey-over-track', 0, []);
+  const ix = dtm.grid;
+  let n = 0;
+  const bad = new Map();
+  for (let s = 0; s < r.length; s += 2) {
+    if (pr.onBridge(s)) continue;
+    const zr = pr.height(s);
+    for (let lat = -1.25; lat <= 1.25; lat += 0.25) {
+      const o = r.offset(s, lat), k = ix.at(o.x, o.y);
+      n++;
+      if (k < 0) continue;
+      let top = -Infinity;
+      for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
+        const [p, q, u] = ix.tris[ix.ids[m]];
+        const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
+        if (Math.abs(d) < 1e-9) continue;
+        const w1 = ((q[1] - u[1]) * (o.x - u[0]) + (u[0] - q[0]) * (o.y - u[1])) / d;
+        const w2 = ((u[1] - p[1]) * (o.x - u[0]) + (p[0] - u[0]) * (o.y - u[1])) / d, w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        top = Math.max(top, w1 * p[2] + w2 * q[2] + w3 * u[2]);
+      }
+      const mag = top - zr, key = Math.round(s / 20);
+      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `survey ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
+    }
+  }
+  return check('survey-over-track', n, [...bad.values()]);
+}
+
 // Compare the drawn rail heads with actual bed and street triangles on each canted curve.
 // A separate missing-ray count makes registration gaps visible instead of calling them clear.
 export function cantedRailVisibility(g, world) {
@@ -519,6 +554,40 @@ function steppedCurves(g) {
 // least-squares parabola's through them: three points whose first step was 0.17 m read a smooth 21 m curve's
 // joint at a crossing as a 1.2° break (0.2° fitted over 2-3 m).
 const JOIN_REACH = 2.0;
+
+// Corners (#491): a vertex of the built track turning more than CORNER while its neighbours turn under CORNER_NEXT, its
+// segments both at most CORNER_SEG (the build keeps every 1 m sample near a node, tools/track_curve.py KEEP). trackRadius
+// leaves out 2.5 m at each end and reads a corner over its 5 m window as a gentle bend: a branch held tangent at a switch
+// turned 4.5° in its first metre (line 9 s 15958) and neither saw it.
+const CORNER = 1.5, CORNER_NEXT = 1.0, CORNER_SEG = 1.5;
+function trackCorners(g) {
+  const d = g.data, lines = [['our', d.path], ['opposite', d.pathBack], ...(d.tracks || []).map((t) => [t.src || 'osm', t.smooth || t.p])];
+  const bad = [], kinds = {};
+  let n = 0;
+  const turn = (a, b, c) => {
+    const t = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return Math.abs(((t + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * 180 / Math.PI;
+  };
+  for (const [kind, p] of lines) {
+    if (!p || p.length < 3) continue;
+    const t = [0];
+    for (let i = 1; i < p.length - 1; i++) t.push(turn(p[i - 1], p[i], p[i + 1]));
+    t.push(0);
+    const cum = [0];
+    for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    for (let i = 1; i < p.length - 1; i++) {
+      n++;
+      if (t[i] <= CORNER || t[i - 1] >= CORNER_NEXT || t[i + 1] >= CORNER_NEXT) continue;
+      if (cum[i] - cum[i - 1] > CORNER_SEG || cum[i + 1] - cum[i] > CORNER_SEG) continue;
+      kinds[kind] = (kinds[kind] || 0) + 1;
+      bad.push({ kind, x: p[i][0], y: p[i][1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(cum[i]) } : {}), mag: t[i] / CORNER, info: `${kind} track turns ${t[i].toFixed(2)}° at one vertex` });
+    }
+  }
+  const c = check('track-corners', n, bad);
+  c.kinds = kinds;
+  return c;
+}
+
 function trackJoins(g) {
   const ends = [];
   for (const t of g.data.tracks || []) {
@@ -630,7 +699,7 @@ function trackSpacing(g) {
   const r = g.route, b = g.backRoute, sw = (g.data.switches || []).map((w) => w.s ?? w), bad = new Map();
   let n = 0;
   if (!b) return check('tracks-apart', 0, []);
-  // (interlaced track, under 1.8 m apart, and 40 m around it: as src/trackfix.js)
+  // (interlaced track, under 1.8 m apart, and 40 m around it: a gauntlet, not two tracks too close)
   const gaunt = [];
   for (let s = 0; s < r.length; s += 2) { const p = r.at(s), q = b.nearest(p.x, p.y); if (q && q.d < 1.8) gaunt.push([s - 40, s + 40]); }
   for (let s = 0; s < r.length; s += 2) {
@@ -916,6 +985,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     streetWaviness: streetWaviness(g),
     terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
+    surveyOverTrack: surveyOverTrack(g),
     cantedRailVisibility: cantedRailVisibility(g, world),
     verticalCurves: verticalCurves(g, geometryFact(truth, 'vertical-radius-street')),
     steppedCurves: steppedCurves(g),
@@ -923,6 +993,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     trackSpacing: trackSpacing(g),
     trackRadius: trackRadius(g, geometryFact(truth, 'min-radius-network'), geometryFact(truth, 'min-radius-passenger')),
     trackJoins: trackJoins(g),
+    trackCorners: trackCorners(g),
     trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),

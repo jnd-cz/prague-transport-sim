@@ -16,7 +16,7 @@ a model that does not load falls back to the first loaded one in that list.
 |---|---|---|---|---|
 | detailed, animated (the default) | `src/t3h.js`, `assets/t3h/` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps, indicators, high beams; a lighter level for AI trams far away |
 | detailed, classic | `src/models.js` (`loadDetailedT3`), `assets/t3/` | a glTF, one texture; loaded when picked | CC BY-NC 4.0 | none |
-| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | GPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
+| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | AGPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
 
 `makeT3({ line, cars, vehicle, dest, run, variant })` in `src/models.js` builds a set as the vehicle with that id. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The game's speed limits against the GPS rides in raw/reference/rides/ (#451).
 
     python -P -E tools/rides_limits.py                      # every ride in RIDES on line 23

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Where a check's time goes (#205): one run of a headless.py check in headless Chromium under the CPU profiler.
 
     python -P -E tools/profile_check.py --line 17 --check u3 --seed 1 [--out reports/profile/17-u3-1.json]

@@ -16,7 +16,7 @@ Volba *Model tramvaje* v menu vybírá jeden ze tří, uvedených v `assets/vehi
 |---|---|---|---|---|
 | podrobný, pohyblivý (výchozí) | `src/t3h.js`, `assets/t3h/` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla, směrovky, dálková světla; lehčí úroveň pro vzdálené cizí tramvaje |
 | podrobný, klasický | `src/models.js` (`loadDetailedT3`), `assets/t3/` | glTF s jednou texturou; stáhne se při výběru | CC BY-NC 4.0 | nic |
-| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | GPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu (brzdová, směrovky, dálková) |
+| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | AGPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu (brzdová, směrovky, dálková) |
 
 `makeT3({ line, cars, vehicle, dest, run, variant })` v `src/models.js` postaví soupravu jako vozidlo s tímto id. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
 

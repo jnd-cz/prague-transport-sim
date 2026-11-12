@@ -1,10 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Static 3D scenery built from the preprocessed OSM data, draped on the DMR 5G terrain.
 import * as THREE from 'three';
-import { smoothPolyline, SURVEYED, SMOOTH, AS_SURVEYED } from './route.js';
 import { rng } from './random.js';
 import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
-import { RAIL_HEAD, BED_BELOW, STREET_BELOW, meetHeights } from './heights.js';
+import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
@@ -240,7 +240,8 @@ function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1, cros
     R.push(W(rx, ry, (fixed ? hfn[i] : hfn(rx, ry)) + lift - dz));
   }
   const c = cg._chunk(line[0][0], line[0][1]);
-  for (let i = 0; i < line.length - 1; i++) cg.quad(c, R[i], R[i + 1], L[i + 1], L[i], col);
+  // (`col` a function: each segment's own colour, from its first point)
+  for (let i = 0; i < line.length - 1; i++) cg.quad(c, R[i], R[i + 1], L[i + 1], L[i], typeof col === 'function' ? col(i) : col);
 }
 
 // A vertical strip along `line` at `offset` m to its left, from zBot up to zTop (arrays per point):
@@ -258,40 +259,8 @@ function addSide(cg, line, offset, zTop, zBot) {
   }
 }
 
-// Heights along a track chain without assembled heights (#197: OSM or archive fill, lines not rebuilt yet),
-// smoothed along its length (Gaussian, ±9 m) so rails never step where the ground function changes regime
-// (route profile / terrain / bridge).
-function trackHeights(line, hf, byDistance = false) {
-  const raw = line.map((p) => hf(p[0], p[1]));
-  const n = raw.length, k = 6, out = new Float32Array(n);
-  if (byDistance) {
-    // (points unevenly spaced, the build's curves: the same window in metres, ±9 m with σ 4.5 m)
-    const s = [0];
-    for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
-    let lo = 0, hi = 0;
-    for (let i = 0; i < n; i++) {
-      const r = Math.min(9, s[i], s[n - 1] - s[i]);
-      while (s[i] - s[lo] > r + 1e-6) lo++;
-      hi = Math.max(hi, i);
-      while (hi < n - 1 && s[hi + 1] - s[i] <= r + 1e-6) hi++;
-      let acc = 0, wsum = 0;
-      for (let j = lo; j <= hi; j++) { const w = Math.exp(-0.5 * ((s[j] - s[i]) / 4.5) ** 2); acc += raw[j] * w; wsum += w; }
-      out[i] = acc / wsum;
-    }
-    return Array.from(out);
-  }
-  for (let i = 0; i < n; i++) {
-    const r = Math.min(k, i, n - 1 - i);
-    let acc = 0, wsum = 0;
-    for (let d = -r; d <= r; d++) { const w = Math.exp(-0.5 * (d / 3) ** 2); acc += raw[i + d] * w; wsum += w; }
-    out[i] = acc / wsum;
-  }
-  return Array.from(out);
-}
-
-// A track's assembled heights at its drawn points: `zs` comes every `step` m along the raw line t.p; the drawn
-// line t.smooth is resampled (and smoothed where it is OSM), so its arc length is scaled to the raw one.
-function ownHeights(t, step, old) {
+// A track's assembled top of rail (`zs` every `step` m along t.p, tools/line_heights.py) at its drawn points t.smooth.
+function ownHeights(t, step) {
   const len = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
   const sm = t.smooth, k = len(t.p) / (len(sm) || 1), d = new Float32Array(sm.length);
   let acc = 0;
@@ -300,7 +269,8 @@ function ownHeights(t, step, old) {
     const f = (acc * k) / step, i0 = Math.min(Math.floor(f), t.zs.length - 1), a = t.zs[i0], b = t.zs[Math.min(i0 + 1, t.zs.length - 1)];
     d[i] = a == null || b == null ? NaN : a + (b - a) * (f - i0);
   }
-  return Array.from(d.some(Number.isNaN) ? meetHeights(d, old(t)) : d);
+  if (d.some(Number.isNaN)) throw new Error('a track without a height: data built before #480, rebuild it (tools/rebuild.py)');
+  return Array.from(d);
 }
 
 // Height function for an OSM way: bridges not on our route span linearly between their ends.
@@ -442,12 +412,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   far.position.y = ground.terrain.min - 3;
   scene.add(far);
 
-  // track geometry first: smoothed curves and heights (once; kept across weather rebuilds),
+  // track geometry first: the curves and heights (once; kept across weather rebuilds),
   // then the terrain is lowered under every track so it can't poke through the bed
-  // OSM draws curves as straight segments: render them as smoothed curves; surveyed track only resampled (#20);
-  // where the build drew smooth curves (data.trackCurve, #204) its points as they are, a point every 1.5 m at most
+  // the build draws every track as curves (data.trackCurve, #204): its points as they are, a point every 1.5 m at most
   // (resampled, a 4.6 m piece's end became a chord and its joint at Strossmayerovo náměstí broke 2.9°)
-  for (const t of data.tracks) if (!t.smooth) t.smooth = data.trackCurve ? densify(t.p, 1.5) : smoothPolyline(t.p, 1.5, t.p.length > 2 && !SURVEYED.has(t.src) ? SMOOTH : AS_SURVEYED).pts;
+  for (const t of data.tracks) if (!t.smooth) t.smooth = densify(t.p, 1.5);
   // every track centre line, for keeping trees, zebra paint and poles off the tracks and for the
   // street surfaces laid flush with the track bed
   const tracks = new SegmentIndex(10);
@@ -460,20 +429,9 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   for (const t of data.tracks) near.addLine(t.smooth);
   ground.trackWithin = (x, y, r) => near.within(x, y, r);
   if (ground.dtm) flushDtm(ground);
-  // track heights after the streets are laid to the track profile, so other lines' tracks sit in them
-  // (another line's track in a street: its top of rail is the street surface, as on our own route)
-  const embedded = (hf) => hf;
-  // (every track within 6 m of the route, ours and the opposite one (4.5 m apart on the Modřany
-  // corridor), lies on the track profile, on a
-  // bridge tagged in OSM or not: the opposite track 4.2 m off took the raw survey, 3 m off ours)
-  const onDeck = (hf) => (x, y) => {
-    const n = route.nearest(x, y);
-    return n && n.d < 6 ? ground.trackAt(x, y) : hf(x, y);
-  };
-  const old = (t) => trackHeights(t.smooth, onDeck(t.b ? wayHeight(t.p, t.b, ground) : embedded(wayHeight(t.p, t.b, ground))), !!data.trackCurve);
-  // a track with assembled heights (#197: `zs` every 2 m along t.p, tools/line_heights.py) takes its own top of
-  // rail, unsmoothed; a stretch without one takes the heights above, shifted to meet it at both ends
-  for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights?.step ?? 2, old) : old(t);
+  // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
+  // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
+  for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights.step) : t.smooth.map(() => 0);
   // Share the exact rail cant with pedestrian crossings; a crossing must meet each rail's height.
   const tiltCache = new WeakMap();
   const tiltOf = (t) => {
@@ -570,6 +528,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // track bed + rails for every tram track around the route
   const bedCg = new ChunkedGeometry(flatMat('#77736a', '#5f5c56'), { color: true });
   const bed = new THREE.Color('#77736a').toArray();
+  // the bed by the route's track style (#52; colours until #308's textures): on our route's tracks (within 6 m of it)
+  // the style at the nearest route point, elsewhere the plain bed
+  const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a' })
+    .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
+  const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? ground.styles.at(n.s) : null; };
   // (rails: glossy when wet, roughness set by the weather; trams keep them clear of snow)
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.6, roughness: 0.4 });
   const railCg = new ChunkedGeometry(railMat);
@@ -585,7 +548,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // on a canted curve of our route the outer rail is higher, the inner one lower
     const tilt = tiltOf(t);
     // The bed is the same canted plane as the rails, including its transition ramps.
-    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, bed, 0, 1, tilt.map((z) => z / 0.72));
+    const cols = t.smooth.map(([x, y]) => STYLE_BED[styleAt(x, y)] || bed);
+    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, (i) => cols[i], 0, 1, tilt.map((z) => z / 0.72));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
@@ -912,7 +876,7 @@ function uncoveredRuns(line, dtm, hf = null) {
 // (same split as Terrain.height) is lowered by the excess.
 function lowerTerrainUnderDtm(dtm, T) {
   for (const a of dtm.areas) {
-    if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || a.c === 'rail') continue;
+    if (a.l !== 0 || a.c === 'roof' || a.c === 'deck' || (a.c === 'rail' && !a.g)) continue;
     for (const [p, q, r] of a.mesh) {
       // (the corners and edge midpoints, without an array each: millions at load, #205)
       lowerTerrainAt(T, p[0], p[1], p[2] - 0.25);
@@ -1125,7 +1089,8 @@ function buildDtm(group, ground) {
     const cg = cgs[DTM_KIND[a.c] || 'other'];
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
     const startFace = c.pos.length / 9;
-    const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : 1.0) : 0;
+    // (a deck over a way with maxheight is thinner where 1 m would leave less than it and 0.1 m: tools/zps_decks.py, #445)
+    const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : a.t ?? 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
     const fz = (v) => v[2];
     for (const [p, q, r] of a.mesh) {

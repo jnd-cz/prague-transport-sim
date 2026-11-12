@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The speeds D 1/2 § 25 sets over switches and crossings, read from data/truth.json `operation`, as stretches of route
 // for Route.speedLimits (#211). Pure: docs/decisions/2026-11-07-speed-limits-and-signs.md measures and explains them.
 //

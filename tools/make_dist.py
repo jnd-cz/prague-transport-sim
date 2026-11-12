@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Pack the playable static site into dist/tatra-t3-prague.zip (no build tools, caches or tests).
 The same files are what tools/deploy.py uploads."""
 import os
@@ -7,7 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DST = os.path.join(ROOT, "dist", "tatra-t3-prague.zip")
 # (reports/review: the findings lists for review mode, ?review=reports/review/track-sources-17.json; reviews.html:
 # the directory of them, #288)
-INCLUDE = ["index.html", "reviews.html", "README.md", "README.en.md", "src", "assets", "data", "reports/review"]
+INCLUDE = ["index.html", "app.webmanifest", "reviews.html", "README.md", "README.en.md", "src", "assets", "data", "reports/review"]
 
 
 def files(root=ROOT):

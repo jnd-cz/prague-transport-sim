@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The drawn track as smooth curves (#204): python -P -E tools/test_track_curve.py."""
 import math
 from pathlib import Path
@@ -72,6 +73,38 @@ class Fit(unittest.TestCase):
         self.assertLessEqual(max(tol), tc.HOLD_LIMIT + 1e-9)
 
 
+    def test_a_branch_held_tangent_eases_off_without_a_corner(self):
+        # line 9 s 15958, a trailing switch past Flora: DI's branch, its first 11 m from the switch (relative to it), held
+        # tangent to the straight (`switch-start`). Held to 2 cm it turned 4.5° at the held sample a metre out (12.5 m
+        # over its own two metres), a corner the windows near the end read as 18.9 m
+        pts = [(0.0, 0.0), (-0.105, 1.985), (-0.145, 2.355), (-0.175, 2.735), (-0.205, 3.105), (-0.235, 3.475),
+               (-0.255, 3.855), (-0.275, 4.225), (-0.295, 4.605), (-0.305, 4.975), (-0.315, 5.355), (-0.325, 5.725),
+               (-0.335, 6.105), (-0.335, 6.475), (-0.335, 6.855), (-0.325, 7.225), (-0.325, 7.605), (-0.315, 7.975),
+               (-0.295, 8.235), (-0.275, 8.495), (-0.255, 8.755), (-0.225, 9.015), (-0.195, 9.275), (-0.165, 9.535),
+               (-0.125, 9.795), (-0.085, 10.045), (-0.045, 10.305), (0.005, 10.565), (0.045, 10.815), (0.105, 11.075)]
+        straight = (-0.10756377715724001, 0.994198186401317)
+        errors = tc.class_errors()
+        samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), fixed={0: pts[0]}, heading={0: straight},
+                                       limit=[errors['3']] * len(pts))
+        lead = (samples[1][0] - samples[0][0], samples[1][1] - samples[0][1])
+        self.assertLess(abs(lead[0] * straight[1] - lead[1] * straight[0]) / math.hypot(*lead), 1e-4)   # leaves along it
+        px, py = [q[0] for q in samples], [q[1] for q in samples]
+        self.assertLessEqual(tc.corner_excess(px, py, 1, 1), tc.CORNER + 1e-6)   # no corner where the points begin
+        turn = [abs(math.degrees(heading(samples[i:], d=1.0) - heading(samples[i + 1:], d=1.0))) for i in range(4)]
+        self.assertLess(max(turn), 1.5)
+        self.assertLessEqual(max(tol), errors['3'] + 1e-9)
+
+    def test_a_switch_curving_from_its_blade_keeps_its_curve(self):
+        # (Národní divadlo: a branch curving at 20 m from the switch is no corner; a limit on the radius at the held sample
+        # pushed its turn into a 13 m bend further on, #477)
+        r = 20.0
+        pts = [(r * math.sin(a / 100), r * (1 - math.cos(a / 100))) for a in range(0, 101, 2)]
+        samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), fixed={0: pts[0]}, heading={0: (1.0, 0.0)},
+                                       limit=[tc.class_errors()['3']] * len(pts))
+        self.assertGreater(min(rad[2:-3]), tc.MIN_RADIUS * tc.SLACK)
+        self.assertLess(max(off(p, samples) for p in pts), tc.TOL + 0.005)
+
+
 class Network(unittest.TestCase):
     def test_a_diverging_track_leaves_tangent_to_the_through_track(self):
         # the branch's points run straight 4° off the through track from the switch node
@@ -115,6 +148,22 @@ class Network(unittest.TestCase):
             self.assertGreater(side * out[len(out) // 2][1], 0.03)        # (and off to its own side)
             turn = [abs(math.degrees(heading(out[i:], d=1.0) - heading(out[i + 1:], d=1.0))) for i in range(len(out) - 3)]
             self.assertLess(max(turn), 0.5)                                # (smoothly: no bend over 0.5 degree a metre)
+
+    def test_where_the_order_deadlocks_the_end_fitted_first_takes_the_heading_of_the_track_through_it(self):
+        # (line 37 s 3700, a facing switch) the branch leaves the straight at node 2 3° off and passes through node 3, where
+        # the straight ends coming in at 10°: each passes through the other's end. The longer branch was fitted first, its
+        # end at 2 free, and it left at 2.2° where the straight passed through later
+        a, c = math.tan(math.radians(10)) / 3600, math.tan(math.radians(3)) / 3600
+        west = [(x, 0.0) for x in range(-50, 1, 2)]
+        straight = [(x, a * x * x * (x - 60)) for x in range(0, 61, 2)]
+        b1 = [(x, c * x * (60 - x) ** 2) for x in range(0, 31, 2)]
+        b2 = [(x, c * x * (60 - x) ** 2) for x in range(30, 61, 2)]
+        east = [(x, 0.0) for x in range(60, 201, 2)]
+        pos = {1: west[0], 2: (0.0, 0.0), 3: (60.0, 0.0), 4: east[-1], 5: b1[-1]}
+        edges = {(1, 2): west, (2, 3): straight, (2, 5): b1, (3, 5): b2[::-1], (3, 4): east}
+        net = tc.Network(pos, edges, {e: 'di' for e in edges})
+        self.assertEqual(net.report['refitted'], 1)
+        self.assertLess(abs(math.degrees(heading(net.pts[(2, 5)], d=1.0))), 1.0)
 
     def test_a_branch_starting_at_its_own_angle_keeps_it(self):
         # beyond START the branch leaves at its own angle (data/truth.json `switch-start`: some designs start abruptly)

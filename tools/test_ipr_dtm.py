@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The terrain raster's reader: python -P -E tools/test_ipr_dtm.py (no download needed)."""
 import io
 from pathlib import Path

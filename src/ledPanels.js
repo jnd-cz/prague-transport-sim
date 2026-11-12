@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The LED panels of junction signals and switches, drawn on a 2D canvas (#376). Pure: no Three.js, no game state, so a
 // page can draw them and a test can count their LEDs. Shapes from D 1/2 (p. 37, 44, 45) and photos, measured below.
 

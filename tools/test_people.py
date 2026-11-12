@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The pedestrians' figures (#251): python -P -E tools/test_people.py [--line 17] [--synthetic]
 (its own server on a free port). Part 1, without world data: the figures (src/people.js, assets/people/)
 load with their skeleton and clips, and on a synthetic crowd of 100 walkers in a row the nearest ones
@@ -18,6 +19,9 @@ import sys
 import threading
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -104,7 +108,7 @@ def main():
     fails, r = [], {}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             page = browser.new_page(viewport={"width": 960, "height": 540})
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))

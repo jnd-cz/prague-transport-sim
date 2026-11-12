@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Run the tools' tests: every tools/test_*.py, each in its own process, the way it must run.
 
     python -I tools/test_all.py                  # the tests without a browser (CI runs these)

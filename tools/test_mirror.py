@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Mirror texture cadence, composition and renderer state: python -P -E tools/test_mirror.py.
 
 Uses the real Three.js camera/target/geometry and a recording renderer, on its own free-port server.
@@ -11,6 +12,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shot import site
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = Path(__file__).resolve().parent.parent
 SETUP = '''async () => {
@@ -43,7 +45,7 @@ class MirrorTests(unittest.TestCase):
         cls.host = site(ROOT)
         url = cls.host.__enter__()
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True)
+        cls.browser = gpu.launch(cls.pw)[0]
         cls.page = cls.browser.new_page()
         importmap = (ROOT/'index.html').read_text(encoding='utf-8').split('<script type="importmap">')[1].split('</script>')[0]
         cls.page.route('**/mirror-test', lambda route: route.fulfill(body=f'<script type="importmap">{importmap}</script>'))

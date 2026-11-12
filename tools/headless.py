@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Headless checks from the command line (issue #2): the in-page benches and lints in headless Chromium.
 
     python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
@@ -20,9 +21,11 @@ Starts its own tools/serve.py on --port (0 picks a free port) and verifies its l
 any job; an occupied port fails. --url explicitly uses an existing server. The pages draw
 nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
 are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
-software as before; --gpu: on the machine's GPU, tools/gpu.py). --batch N (default 6) runs up to N checks of one line one after another in one
+software as before; --gpu: on the machine's GPU, tools/gpu.py). A batch runs checks of one line one after another in one
 loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
-counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). --jobs N runs N pages
+counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). The batches are planned from
+this machine's run times (TIMINGS, kept by every run): each line split so that the pages, taking the longest
+batch first, finish soonest (#413); --batch N: at most N runs a batch instead (1: a fresh page per run). --jobs N runs N pages
 at once, each in a worker process with its own browser (default: half the cores, at most 8, and what free
 memory holds at ~4 GB a page: line 17 measured 4.1 GB): every run is seeded, so the counts are the same as
 one after another.
@@ -153,7 +156,7 @@ def judge(check, r):
         more = (f"{r.get('stops')} stops, flips short/ahead/signal/car/contact {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}/{r.get('flipsContact')}, pulses {r.get('pulses')}, "
                 f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}, "
                 f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
-                + (f", slip {r.get('slipSecs')} s, slide {r.get('slideSecs')} s, emergencies {r.get('emergencies')}" if check in WEATHER else ""))
+                + (f", slip {r.get('slipSecs')} s ({r.get('slips')}), slide {r.get('slideSecs')} s ({r.get('slides')}, {r.get('slidesAtStops')} at stops), emergencies {r.get('emergencies')}" if check in WEATHER else ""))
     elif check == "canted":
         c = (r.get("checks") or {}).get("cantedRailVisibility", {})
         if c.get("count"):
@@ -251,7 +254,7 @@ def counts(check, r):
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in STOPS_LIKE:
-        keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "sandSecs", "sandLeft", "emergencies") if check in WEATHER else ("simSeconds",) if check.startswith("load") else ()
+        keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "slips", "slides", "slidesAtStops", "sandSecs", "sandLeft", "emergencies") if check in WEATHER else ("simSeconds",) if check.startswith("load") else ()
         return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
@@ -513,11 +516,111 @@ PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free
 PAGE = {"draw": False, "viewport": (960, 540), "gpu": False}  # (how the pages draw: --draw, --viewport, --gpu, #411)
 
 
+# This machine's run times, for planning the batches (#413): {"runs": {"line|check|seed": s}, "loads": {line: s}}, a
+# run's seconds without the page load, beside the baselines kept on this machine (every checkout reads them). None: not kept.
+TIMINGS = os.path.join(baseline_store._kept_dir(), "timings.json")
+LOAD, RUN = 60, 60  # s: a page load and a run that this machine has not timed (#205)
+
+
+def load_timings(path=None):
+    path = path or TIMINGS
+    try:
+        with open(path, encoding="utf-8") as f:
+            t = json.load(f)
+        return {"runs": dict(t.get("runs", {})), "loads": dict(t.get("loads", {}))}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {"runs": {}, "loads": {}}
+
+
+def save_timings(runs, loads, path=None):
+    """Adds these runs' seconds ({(line, check, seed): s}) and the lines' page loads ({line: s}) to the file."""
+    path = path or TIMINGS
+    t = load_timings(path)
+    t["runs"].update({f"{l}|{c}|{s}": v for (l, c, s), v in runs.items()})
+    t["loads"].update(loads)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"runs": dict(sorted(t["runs"].items())), "loads": dict(sorted(t["loads"].items()))}, f, indent=0)
+    os.replace(tmp, path)
+
+
+def median(vs):
+    vs = sorted(vs)
+    return (vs[(len(vs) - 1) // 2] + vs[len(vs) // 2]) / 2
+
+
+def estimate(job, t):
+    """A run's expected seconds: as timed, else the mean of its line's other seeds of the check, else the check's
+    median on the other lines, else RUN."""
+    line, check, seed = job
+    runs = t["runs"]
+    if (k := f"{line}|{check}|{seed}") in runs:
+        return runs[k]
+    keys = [k.split("|") + [v] for k, v in runs.items()]
+    same = [v for l, c, _, v in keys if l == line and c == check]
+    if same:
+        return sum(same) / len(same)
+    other = [v for _, c, _, v in keys if c == check]
+    return median(other) if other else RUN
+
+
+def load_of(line, t):
+    loads = t["loads"]
+    return loads[line] if line in loads else median(loads.values()) if loads else LOAD
+
+
+def finish(durations, pages):
+    """When the last of these batches ends when each free page takes the next one in this order."""
+    free = [0.0] * max(1, pages)
+    for d in durations:
+        i = free.index(min(free))
+        free[i] += d
+    return max(free)
+
+
+def balance(jobs, k, est):
+    """These jobs in k batches of near equal expected seconds (the longest run first to the least loaded batch); a
+    batch keeps the jobs' order."""
+    bins = [[0.0, []] for _ in range(k)]
+    for j in sorted(jobs, key=est, reverse=True):
+        b = min(bins, key=lambda b: b[0])
+        b[0] += est(j)
+        b[1].append(j)
+    return [sorted(b[1], key=jobs.index) for b in bins if b[1]]
+
+
+def plan(runs, pages, t, batch=None):
+    """The batches of one line's runs each, longest expected first, in the order pages take them (#413).
+
+    Every batch pays its line's page load; more batches spread a long line over more pages. For each batch
+    length that a line's split gives, every line is split into the fewest batches within it, and the pages'
+    finish is modelled with the times this machine measured (TIMINGS): the length that finishes first wins, and
+    of equal finishes the one with fewer loads. `batch`: at most this many runs a batch instead (--batch)."""
+    est = lambda j: estimate(j, t)  # noqa: E731
+    lines = list(dict.fromkeys(j[0] for j in runs))
+    mine = {line: [j for j in runs if j[0] == line] for line in lines}
+    dur = lambda b: load_of(b[0][0], t) + sum(est(j) for j in b)  # noqa: E731
+    if batch:
+        out = [b for line in lines for b in (mine[line][k:k + batch] for k in range(0, len(mine[line]), batch))]
+        return sorted(out, key=dur, reverse=True)
+    splits = {line: [balance(mine[line], k, est) for k in range(1, len(mine[line]) + 1)] for line in lines}
+    best = None
+    for limit in sorted({max(map(dur, s)) for line in lines for s in splits[line]}):
+        out = [b for line in lines for b in next((s for s in splits[line] if max(map(dur, s)) <= limit), splits[line][-1])]
+        out.sort(key=dur, reverse=True)
+        score = (finish(map(dur, out), pages), len(out))
+        if best is None or score < best[0]:
+            best = (score, out)
+    return best[1] if best else []
+
+
 def worker(jobs, url, headed, timeout, done=None, page_opts=None):
     """A batch of one line's jobs in a worker process, with a browser of its own (sync Playwright is one per
     process): one page load for all of them, the next shift started in the same page (#205: the load is ~60 s
     of a ~145 s run). A run that fails or times out leaves the page; the rest of the batch gets a fresh one.
-    Each result also goes to the queue `done` as it comes, for the progress lines. `page_opts`: PAGE's keys."""
+    Each result (job, result, seconds, of them the page load's) also goes to the queue `done` as it comes, for the
+    progress lines. `page_opts`: PAGE's keys."""
     opts = {**PAGE, **(page_opts or {})}
     out = []
     with sync_playwright() as pw:
@@ -528,8 +631,8 @@ def worker(jobs, url, headed, timeout, done=None, page_opts=None):
                 if page is None:
                     page, errors, load = load_page(browser, url, line, timeout, opts)
                 r, secs = run_one(page, errors, check, seed, timeout, load)
+                out.append(((line, check, seed), r, secs, load if isinstance(load, (int, float)) else 0))
                 load = 0
-                out.append(((line, check, seed), r, secs))
                 if done is not None:
                     done.put(out[-1])
                 if r.get("error") or r.get("pageErrors"):
@@ -670,8 +773,9 @@ def main():
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
     ap.add_argument("--separate", action="store_true",
                     help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
-    ap.add_argument("--batch", type=int, default=6,
-                    help="runs of one line per page load (1: a fresh page per run); the counts are the same (#205)")
+    ap.add_argument("--batch", type=int, default=None,
+                    help="at most N runs of one line per page load (1: a fresh page per run; default: planned from this "
+                         "machine's run times, #413); the counts are the same (#205)")
     ap.add_argument("--draw", action="store_true",
                     help="draw the pages once a second (default: no drawing, the same counts; the software draw took 5-12 cores a page, #411)")
     ap.add_argument("--viewport", default="960x540", help="the pages' size, WxH (the software draw costs by the pixel)")
@@ -723,7 +827,9 @@ def main():
     server, url = (None, a.url) if a.url else serve(a.port)
     failed, t0 = 0, time.time()
 
-    def report(i, job, r, secs):
+    timed, loads = {}, {}
+
+    def report(i, job, r, secs, load=0):
         nonlocal failed
         line, check, seed = job
         ok, text = judge(check, r)
@@ -732,18 +838,23 @@ def main():
         found[job] = places(check, r)
         name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + ".json"
         with open(os.path.join(a.out, name), "w", encoding="utf-8") as f:
-            json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "ok": ok,
+            json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "load": load, "ok": ok,
                        "time": time.strftime("%Y-%m-%dT%H:%M:%S"), "result": r}, f, ensure_ascii=False, indent=1)
         print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
     def split(res):
-        """A drive's result as the u3 and redruns results it holds (an error goes to both)."""
-        (line, check, seed), r, secs = res
+        """A drive's result as the u3 and redruns results it holds (an error goes to both); its time noted."""
+        (line, check, seed), r, secs, *rest = res
+        load = rest[0] if rest else 0
+        if not r.get("error") and secs - load > 0:  # (a timeout or a failed load says nothing of the run's length)
+            timed[(line, check, seed)] = secs - load
+            if load:
+                loads[line] = load
         if check != "drive":
-            return [res]
+            return [((line, check, seed), r, secs, load)]
         extra = {"pageErrors": r["pageErrors"]} if r.get("pageErrors") else {}
-        return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs)
+        return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs, load)
                 for c in ("u3", "redruns")]
 
     heavy = HeavyJob("headless")  # (waits its turn among the heavy jobs, and the nightly baseline for it: #280)
@@ -761,10 +872,11 @@ def main():
             both = {(l, s) for l, c, s in jobs if c == "u3"} & {(l, s) for l, c, s in jobs if c == "redruns"}
             runs = [(l, "drive", s) if c == "u3" and (l, s) in both else (l, c, s) for l, c, s in jobs
                     if not (c == "redruns" and (l, s) in both)]
-        batches = []
-        for line in lines:
-            mine = [j for j in runs if j[0] == line]
-            batches += [mine[k:k + max(1, a.batch)] for k in range(0, len(mine), max(1, a.batch))]
+        t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
+        batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
+        dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
+        print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
+              f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
         i = 0
         if a.jobs > 1 and len(batches) > 1:
             with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
@@ -792,6 +904,11 @@ def main():
         heavy.__exit__()
         if server:
             stop_server(server)
+        if TIMINGS and timed:
+            try:
+                save_timings(timed, loads)
+            except OSError as e:
+                print(f"note: run times not kept ({e})")
     print(f"{len(jobs) - failed}/{len(jobs)} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
           f"results in {os.path.relpath(a.out, ROOT)}")
     base = json.load(open(BASELINE, encoding="utf-8")) if os.path.exists(BASELINE) else {}

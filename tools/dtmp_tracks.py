@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Archived DTMP tram axes and height fallback assessment for the DI districts (#61).
 
     python -P -E tools/dtmp_tracks.py --fetch --acquire-only  # explicit upstream acquisition

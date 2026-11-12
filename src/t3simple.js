@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The built-in Tatra T3 (#427): our own shapes after the T3's general-arrangement drawing (side and plan
 // views, dimensioned) and a colour elevation of both sides and both ends, both on drawingdatabase.com
 // (`Tatra-T3-1.gif`, `trams_t3_01.png`; measured in #427), with the T3's numbers from src/tram.js.

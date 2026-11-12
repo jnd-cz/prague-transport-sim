@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Smoke test of review mode (?review, src/review.js) on a phone-sized page with touch:
 python -P -E tools/test_review.py [--line 17]
 (tools/serve.py's handler on a free port, its review answers in a temp folder; the findings file is
@@ -22,6 +23,7 @@ from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import review_sets  # noqa: E402
 import serve  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 FILE = {"options": ["right", "wrong"],
         "checks": {"demo": {"places": [{"x": 0.0, "y": 0.0, "kind": "here", "mag": 5, "info": "the city origin"},
@@ -91,7 +93,7 @@ def main():
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             ctx = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
             page = ctx.new_page()
             page.route("**/test-findings.json", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(FILE)))

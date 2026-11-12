@@ -9,7 +9,9 @@
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
   "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
-  "trackStyles": "src/heights.js",
+  "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
+  "grassTrack": "tools/track_styles.py, tools/track_decks.py",
+  "grassReview": "tools/track_styles.py (answered grass), tools/grass_review.py (answered places get no card)",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
@@ -269,6 +271,24 @@
    "text": "A two-car T3 set runs with both cars' pantographs up, as in real operation.",
    "source": "user 2026-11-03 (#215)",
    "quote": "for t3 we use both cars pantographs as it is in real operation"
+  },
+  {
+   "id": "user-deck-walk-clearance",
+   "text": "A deck over a walkway without maxheight leaves at least 2.2-2.3 m clear and is as thick as that allows, up to 1 m (tools/zps_decks.py WALK 2.2 + MARGIN 0.1); the passages on lines 9, 17, 22, 23 and 37 have enough clearance.",
+   "source": "user 2026-11-10 from street view of the passages, #445 session (PR #452)",
+   "quote": "The underpasses have enough clearance, for walkway I would keep lower lower limit of 2.2-2.3 and then whatever slab it leaves, even though the 0.5m in your measurements could be just fine."
+  },
+  {
+   "id": "user-deck-floor-lidar",
+   "text": "Under a deck the floor is IPR's lidar, not the survey's level 0 (tools/zps_decks.py flatten); the survey's floor may be the better one only where it lies well under the lidar outside a tunnel, not yet seen enough to make a rule.",
+   "source": "user 2026-11-10 on the sections of the passages, #445 session (PR #452)",
+   "quote": "The lidar floor generally looks better and sits lower, have smooth believable curve, so I would prefer that one. Survey floor could be even lower but it's wavy and hard to asses where it's more accurate. If lidar has big difference and survey is quite a bit lower (while not being downright in tunnel then it might be the better one but I haven't seen enough examples."
+  },
+  {
+   "id": "user-deck-model-simplified",
+   "text": "Mosty 3D's solid models are much simplified: a bridge's track and walkway run at one level, which the model's top stands for.",
+   "source": "user 2026-11-10 with a photo from Železniční most's walkway, #445 session (PR #452)",
+   "quote": "In reality the bridge has rail track continuing in the same level as outside of river area and sidewalk is next to it at about the same level too. The solid 3D model is very siplified."
   }
  ],
  "places": [
@@ -326,6 +346,34 @@
    "name": "Letenský tunel",
    "text": "Car tunnel: cars come out of the tube, not down the hill",
    "source": "user 2026-10-23"
+  },
+  {
+   "name": "Výtoň, Železniční most (line 17)",
+   "text": "Three levels: the railway bridge with the walkway beside the track on top, level with the track over the river; our tram tracks, the road and the sidewalk towards the river in the middle; the riverside walk at the water at the bottom. The survey's level-1 railway and walkway areas there carry the street's heights; tools/zps_decks.py lifts an area lying inside a model onto it (#445)",
+   "source": "user 2026-11-10, #445 session (PR #452), with a photo from the walkway",
+   "quote": "Výtoň case is more difficult one, there are really three levels: the highest is the railway bridge and walkway alongside. Middle level is the one with our tram tracks and car rode, sidewalk towards the river. And finally there's the lowest level right next to the water."
+  },
+  {
+   "name": "Divadelní underpass under Národní",
+   "text": "No sidewalk in the passage, only a thin kerb along each side (OSM's footway=sidewalk tunnel 805407405 there is the kerb)",
+   "source": "user 2026-11-10 from street view, #445 session (PR #452)",
+   "quote": "At Divadelní there's not really any sidealk from what I can see, only thin kerb alongside each side."
+  },
+  {
+   "name": "Bridge with two arches, line 22 at 50.0850 N 14.3835 E",
+   "text": "A road bridge on two arches over a parking place: the survey's level-1 road on it carries the heights of the ground under the arches (#445)",
+   "source": "user 2026-11-10, street view photo, #445 session (PR #452)"
+  },
+  {
+   "name": "Footbridge over the tram by Gymnastická (line 22, 50.0845 N 14.3805 E)",
+   "text": "A footbridge over the tram area with stairs down to both platforms, going on over Gymnastická",
+   "source": "user 2026-11-10, orthophoto, #445 session (PR #452)"
+  },
+  {
+   "name": "Libeň railway viaducts (line 37, 50.104-50.106 N 14.480 E)",
+   "text": "Several separate railway viaducts side by side (about 205.7, 210 and 212 m), each level straight across its spans. The survey's railway areas span two of them; tools/zps_decks.py splits such an area along the model, one piece per viaduct (#445)",
+   "source": "user 2026-11-10 with an orthophoto and four photos, #445 session (PR #452)",
+   "quote": "Libeň viaduct's are several different one but they should all hold straight across the spans"
   }
  ],
  "stopTypes": {
@@ -546,9 +594,10 @@
    "line": "22",
    "from": "Malý Břevnov",
    "to": "Obora Hvězda",
-   "style": "ballast",
-   "extent": "mostly",
-   "source": "user 2026-10-29"
+   "between": [[50.0765432, 14.3347445], [50.0778945, 14.3399846]],
+   "style": "grass",
+   "extent": "between the two points",
+   "source": "user 2026-11-12, #479: \"I looked at ortophoto and steer view and now confirm there is grass between 50.0765432N, 14.3347445E and 50.0778945N, 14.3399846E. It looked dry so got confused with open ballast earlier.\" (was ballast, mostly: user 2026-10-29)"
   },
   {
    "line": "22",
@@ -588,8 +637,69 @@
    "extent": "all",
    "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
    "source": "user 2026-10-29"
+  },
+  {
+   "line": "17",
+   "from": "Výstaviště",
+   "between": [[50.10526, 14.43336], [50.10617, 14.43473]],
+   "style": "grass",
+   "extent": "between the two points",
+   "source": "user 2026-11-12, #479: \"The newly rebuild street beyond Výstaviště stop has now grass cover, between 50.10526°, 14.43336° and 50.10617°, 14.43473°. Osm viewer shows green patch there\""
+  },
+  {
+   "line": "37",
+   "to": "Podkovářská",
+   "between": [[50.1021863, 14.5062906], "Podkovářská"],
+   "style": "grass",
+   "extent": "from the point to the stop",
+   "source": "user 2026-11-12, #479: \"Another green span is on line 37 between 50.1021863N, 14.5062906E and podkovářská stop.\""
+  },
+  {
+   "line": "17",
+   "between": [[50.0038606, 14.4170011], [50.002275, 14.4112849]],
+   "style": "ballast",
+   "extent": "between the grass review card's pins (grass-50.0027-14.4144)",
+   "source": "user 2026-11-12, grass track review (#503), answered not grass: \"there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast\""
   }
  ],
+ "grassTrack": {
+  "document": "prazsketramvaje.cz: Zatravněný svršek tramvajové tratě",
+  "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041490",
+  "read": "2026-11-12",
+  "note": "DP Praha's grassed track by the year it was laid, from stop to stop; found by the user (#479, 2026-11-12). A '?' in the article marks only an unknown year (the user, 2026-11-12: \"The article has question mark only because the year of construction if the grass cover is unknown\"): `yearKnown` false. Stop names as our data spells them (the article: 'Pražský Hrad', 'Obora Hvěda'). Every line passing both stops takes the stretch between them; the user's trackStyles marks win where they overlap (tools/track_styles.py).",
+  "stretches": [
+   {"from": "Brusnice", "to": "Pražský hrad", "year": 1995},
+   {"from": "Pohořelec", "to": "Brusnice", "year": 2000},
+   {"from": "Prašný most", "to": "Hradčanská", "year": 2002, "removed": 2009},
+   {"from": "Černokostelecká", "to": "Vinice", "year": 2002},
+   {"from": "Nádraží Libeň", "to": "Balabenka", "year": 2004},
+   {"from": "Sídliště Barrandov", "to": "Hlubočepy", "year": 2004, "removed": 2020, "note": "watering added 2006; removed 2020 except a short piece around Chaplinovo náměstí"},
+   {"from": "Balabenka", "to": "Poliklinika Vysočany", "year": 2005},
+   {"from": "Hradčanská", "to": "Špejchar", "year": 2010},
+   {"from": "Sídliště Řepy", "to": "Slánská", "year": 2010},
+   {"from": "Vítězné náměstí", "to": "Podbaba", "year": 2011},
+   {"from": "Sparta", "to": "Korunovační", "year": 2012},
+   {"from": "Harfa", "to": "Podkovářská", "year": 2013, "yearKnown": false},
+   {"from": "Prašný most", "to": "Hradčanská", "year": 2013},
+   {"from": "Nad Džbánem", "to": "Červený Vrch", "year": 2013, "yearKnown": false},
+   {"from": "Červený Vrch", "to": "Thákurova", "year": 2013, "yearKnown": false},
+   {"from": "Na Padesátém", "to": "Průběžná", "year": 2014, "yearKnown": false},
+   {"from": "Průběžná", "to": "Kubánské náměstí", "year": 2014, "yearKnown": false},
+   {"from": "Malý Břevnov", "to": "Obora Hvězda", "year": 2014, "yearKnown": false},
+   {"from": "Břevnovský klášter", "to": "Malovanka", "year": 2014, "yearKnown": false},
+   {"from": "Sídliště Petřiny", "to": "Octárna", "year": 2015, "yearKnown": false},
+   {"from": "Kubánské náměstí", "to": "Koh-i-noor", "year": 2015, "yearKnown": false},
+   {"from": "Koh-i-noor", "to": "Otakarova", "year": 2015, "yearKnown": false},
+   {"from": "Invalidovna", "to": "Urxova", "year": 2016, "yearKnown": false},
+   {"from": "Flora", "to": "Želivského", "year": 2018},
+   {"from": "Špitálská", "to": "Nový Hloubětín", "year": 2018},
+   {"from": "Strašnická", "to": "Průběžná", "year": 2020},
+   {"at": "Depo Hostivař", "year": 2022},
+   {"from": "Náměstí Olgy Scheinpflugové", "to": "Sídliště Barrandov", "year": 2022},
+   {"from": "Libuš", "to": "Sídliště Libuš", "year": 2023},
+   {"from": "Ciolkovského", "to": "Vlastina", "year": 2023, "yearKnown": false}
+  ]
+ },
  "trackSources": {
   "note": "Answers to the track sources review (tools/track_sources.py, #20): 'matches reality' without a note takes the finding of its kind within 3 m off the list. Answers with a note stay held there.",
   "reviewAnswers": [
@@ -1878,6 +1988,18 @@
      "year": 2009,
      "url": "https://www.prazsketramvaje.cz/obrazky/stahuj/testy/ucebnice_t3.pdf",
      "page": 6
+    }
+   },
+   {
+    "id": "t3-sand-refill",
+    "value": "at each terminus",
+    "unit": null,
+    "scope": "the sand box starts full from the depot and is refilled at each terminus of a run (src/game.js _changeLine); its size is src/tram.js sandSecs",
+    "basis": "user",
+    "source": "user 2026-11-04 (#265), confirmed 2026-11-12 (PR #426)",
+    "user": {
+     "source": "Claude Code session 2026-11-04 (#265), confirmed in session 2026-11-12 (PR #426)",
+     "quote": "Sand can be refilled at each terminus, starts with full from the depot. [2026-11-12, on refilling at each terminus:] Yes that would be correct."
     }
    },
    {
@@ -3400,6 +3522,160 @@
     "said": "The lidar is right: move the survey to it",
     "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
     "card": "green, 102 m²: the survey -0.58 m off IPR (2023); DMR 5G -0.58 m off IPR, with the survey"
+   }
+  ]
+ },
+ "grassReview": {
+  "note": "The user's answers to the grass track review (reports/review/grass-track-N.json, tools/grass_review.py, #503): OSM's grass over our track. `answer` grass lays grass track between the two points on the card's lines (tools/track_styles.py, its holes cut); not grass and other level keep the place as it is and off the review.",
+  "answers": [
+   {
+    "id": "grass-50.0027-14.4144",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0038606,
+      14.4170011
+     ],
+     [
+      50.002275,
+      14.4112849
+     ]
+    ],
+    "answer": "not grass",
+    "note": "there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0043-14.4180",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0045159,
+      14.4185998
+     ],
+     [
+      50.00403,
+      14.417362
+     ]
+    ],
+    "answer": "not grass",
+    "note": "grass is around the tracks, not on or between them",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0050-14.4200",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0050565,
+      14.4204301
+     ],
+     [
+      50.0048635,
+      14.4196086
+     ]
+    ],
+    "answer": "not grass",
+    "note": "grass is around the tracks, not on or between them",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0071-14.4558",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0078867,
+      14.4558588
+     ],
+     [
+      50.006218,
+      14.4557291
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0662-14.4982",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.0666083,
+      14.4969686
+     ],
+     [
+      50.065902,
+      14.4994736
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0670-14.4957",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.067082,
+      14.4954007
+     ],
+     [
+      50.06691,
+      14.4959696
+     ]
+    ],
+    "answer": "grass",
+    "note": "correct, grass between pins and switch at the end is paved",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0692-14.4909",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.0697367,
+      14.4897409
+     ],
+     [
+      50.0687097,
+      14.491998
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0914-14.3889",
+    "lines": [
+     "23"
+    ],
+    "between": [
+     [
+      50.0890646,
+      14.3880018
+     ],
+     [
+      50.0929174,
+      14.3909781
+     ]
+    ],
+    "answer": "grass",
+    "note": "same span as on line 22 Pohořelec - Brusnice",
+    "source": "user, grass track review (reports/review/grass-track-23.json), 2026-11-12 (#503)"
    }
   ]
  }

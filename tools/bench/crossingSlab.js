@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Rendered pedestrian surfaces above rail heads, grouped in 20 m route sections (#146).
 // On a running shift loaded with ?keepgeo: (await import('/tools/bench/crossingSlab.js')).run()
 import * as THREE from 'three';

@@ -211,7 +211,8 @@ tolerance grows to 0.4-3 m.
 building decks and bridges on top of it, makes sense"). The fused ground stays one surface per point: the bare earth
 and what lies on it at grade. Anything with something under it (a bridge, the deck over an underpass such as
 Divadelní's, a culvert's deck) is a structure on top of it:
-- **Its top:** the survey's level 1, checked against Mosty 3D or the track profile, flat over the opening (#445).
+- **Its top:** the survey's level 1, checked against Mosty 3D or the surveyed rails, flat over the opening (#445). The
+  check runs in `tools/dtm.py` (`tools/zps_decks.py`), so the partition reads level-1 heights already validated.
 - **Its body:** Mosty 3D's model where there is one (#13, #54, W4). Elsewhere a slab 1 m thick, thinner where the way
   under it carries `maxheight`: the gap − `maxheight` − 0.1 m (the user: "0.1 margin is fine. Good point about using
   the osm height for tunnel/covered features"). Divadelní: `maxheight=4.4`, gap 5.26 m, slab 0.76 m.

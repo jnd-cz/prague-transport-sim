@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """How many things to run at once: by cores and by free memory (the parallel tools cap themselves by it).
 
     from sysinfo import workers

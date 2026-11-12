@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Track pair spacing at the pilot cross-sections (#20): our route against the opposite one, every 5 m, as the
-// game drives them (after src/trackfix.js and the route smoothing). Seedless.
+// game drives them (the build's curves, resampled every metre). Seedless.
 // On a loaded page: (await import('/tools/bench/spacing.js')).run()
 
 // Sections by stop and route distance from it (along our direction). `expect`: the surveyed spacing, from
@@ -45,5 +46,5 @@ export function run(game = window.game) {
                     min: ds.length ? Math.min(...ds) : null, max: ds.length ? Math.max(...ds) : null,
                     expect: sec.expect || null, outside: out, kinks, spacing });
   }
-  return { checks: { spacing: { count, sections, spread: game.data.trackSpread || null } } };
+  return { checks: { spacing: { count, sections } } };
 }

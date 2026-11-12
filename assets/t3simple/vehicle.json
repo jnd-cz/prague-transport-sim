@@ -7,7 +7,7 @@
   "files": [],
   "preload": false,
   "licence": {
-    "spdx": "GPL-3.0",
+    "spdx": "AGPL-3.0-or-later",
     "commercial": true,
     "authors": ["the project"],
     "sources": ["src/t3simple.js"],

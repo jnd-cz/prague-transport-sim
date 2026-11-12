@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Switch tips where the drawn track has trouble, for the review page (#237):
     python -P -E tools/fork_review.py [--lines 9,17,22,23,37]
 

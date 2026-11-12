@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Height-matching checks: python -P -E tools/test_dtmp_tracks.py."""
 from pathlib import Path
 import sys

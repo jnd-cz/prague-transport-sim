@@ -20,15 +20,30 @@ python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, t
 
 Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
 (`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
+The extract's tagged ways and nodes and its relations are decoded once per extract and machine into
+`TRAMDATA_CACHE/osm-index/` (else `raw/osm/index/`; ~50 s, keyed by the extract's hash and the code that writes
+it): `tools/osm_local.py`'s `ways()`, `nodes()` and `relations()` answer from it, where each was a pass of
+~15-30 s over the file (#511).
 All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
 
 The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
 side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
-The OSM extract is read once per build (~1 min), and a line takes ~2-4 min:
+A line takes ~2-4 min:
 
 ```bash
 python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
+python -P -E tools/rebuild.py 9 --from dtm   # that step runs again (track = build_line, heights = line_heights)
+python -P -E tools/rebuild.py --force        # every step runs
 ```
+
+A step runs only when something it read changed (`tools/stepcache.py`, #511): each run is traced (the files it
+opened, probed or listed under the checkout, the modules it imported from it, the packages' versions) and
+recorded in `reports/rebuild/cache/`; a step whose record still holds is skipped and its outputs put back as that
+run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
+turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
+same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
+changed`). A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
+`--from` or `--force`.
 
 The single steps:
 
@@ -41,10 +56,13 @@ python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, contin
 python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
 ```
 
-`rebuild.py` ends with `line_heights.py` for all the lines it built (~6 min: it stages the network's heights
+`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~5 min: it stages the network's heights
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
-the steps. `headless.py --checks heights` compares the game's track with the staged heights.
+the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
+stage ended (`(staged: 97 s from the start)` …). The chains are solved in worker processes (#511): every chain's
+first solve side by side, then each chain pinned as soon as the chains before it that it meets are final, and the
+lines written side by side; with under 16 chains (the tests) all of it runs in one process, strictly in the order.
 Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
 of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
 curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.
@@ -94,10 +112,12 @@ pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the
 | `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
-| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), their decks checked against Mosty 3D and the raised rails, flat over the ways under them, thinner by `maxheight` (`tools/zps_decks.py`, #445), railway yards, lawns and paved yards on IPR's ground marked to take the lidar inside and the passages' plugged portals on IPR's floor (`tools/zps_inside.py`, #444), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `track_styles` | `lineN.json` | the track styles (`styles`: the user's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
+| `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
+| `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
 
-Underpasses and tunnels on the route (OSM `tunnel`/`covered`/negative `layer`) are spanned in the track
-profile. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
+The page computes no profile of its own (#480): it reads the built top of rail, the lift and the structures. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
 
 **The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
@@ -122,14 +142,49 @@ whose data matches the manifest:
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
 
-The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc`. The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
+The host, the FTP user and the folder go in `deploy.local.json` (git-ignored; format at the top of the tool). The password is asked for each time, or read from `TRAM_DEPLOY_PASSWORD` or `~/.netrc` (`machine <host>`, or the config's `"netrc"` name when two FTP users share one host, as the test site and the alpha's `sim.8b.cz`, #350). The site's own protection is the host's: in Plesk, Password-Protected Directories on `/`. After each upload the tool checks that `version.json` answers 401 without a login.
 
 Automatic (#131): `python -I tools/autodeploy.py` in a checkout kept for deploys (detached HEAD, with
 `deploy.local.json`, as `../tg-deploy`) deploys `origin/main` when it moved since the last deploy:
 checkout, `snapshot.py data-fetch`, `deploy.py`. `--install` registers a Windows scheduled task that runs
 it every 10 minutes while you are logged on (`--uninstall` removes it). It needs the password in
 `~/.netrc` (`machine <host> login <user> password <password>`); a failed deploy is retried after an
-hour. Log: `reports/autodeploy.log`.
+hour. Log: `reports/autodeploy.log`. Every run also pulls the review verdicts and every target's feedback notes
+(`deploy.py --pull`). It deploys only the test site.
+
+**The closed alpha** (#350): `sim.8b.cz` on the same host, without a login. `deploy.local.json` names it under
+`targets` (`{"alpha": {"user": …, "netrc": "sim.8b.cz", "url": "https://sim.8b.cz/", "public": true}}`); a
+named target takes the top level's keys it does not set. A public target:
+- gets no review tools (`review.php`, `reviews.html`, `reports/review/`), and `robots.txt` with an
+  `X-Robots-Tag: noindex` header ask search engines to keep away;
+- is deployed only from a tagged commit (`git tag alpha-N`, pushed), never with `--dirty` or `--reports`;
+  `version.json` names the tag, so a tester's note says which version it was;
+- is checked after a deploy: the page and `version.json` served, every review tool 404, `feedback/` 403.
+
+`python -P -E tools/deploy.py --target alpha` from a checkout at the tag (`--dry-run` first).
+
+**Feedback** (#350): ✉ Feedback in a shift (F9, `src/report.js`) posts a note to `feedback.php` (`tools/feedback.php`,
+on every target): the note, the moment's state (place, tram, run, camera), the errors met on the page, the
+machine, the load times, the frame-time log (`src/perf.js`) and, if ticked, a screenshot. It only takes notes in,
+within its caps (2 MB a post, 5000 characters, 3000 notes and 500 MB kept, 20 a minute), stores no IP address,
+and nothing reads them back over HTTP. `deploy.py --pull` moves them off each host into the machine's feedback
+folder (`$TRAM_FEEDBACK`, else beside the data cache: `tramdata/feedback/<target>/`, never in git); `tools/serve.py`
+takes them locally into `local/` there. `python -I tools/feedback.py` lists them by kind (`--site`, `--line`,
+`--kind`), `--perf` gives frames per second and slow frames per machine. A note becomes an issue only when
+someone decides so.
+
+**Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame
+intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
+browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)
+says what a frame costs here. A shift's end offers to send the summary; the menu's Performance test drives a
+fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1; the Reference test below) with the GPU's own time per frame where
+the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the departure, not a shift's 40 s, and the
+minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
+the detailed model. `tools/test_perf.py --runs N` runs it N times here.
+
+**The site's icons** (#485): `assets/icons/icon-{32,180,192,512}.png`, the favicon, the iPhone's home-screen icon
+(`apple-touch-icon` in `index.html`) and the web manifest's (`app.webmanifest`), are drawn by
+`python -P -E tools/make_icons.py`: change the drawing there and run it, never the PNGs by hand.
 
 ## Dev
 
@@ -152,8 +207,9 @@ it also reports missing rail samples and the independently mapped evidence for s
 ~4 GB a page for line 17). The runs are seeded per page, so the counts are the same as one after another.
 The pages draw nothing (#411): a page takes ~2 cores instead of ~12, with the same counts. `--draw` draws
 once a second in software as before; `--gpu` puts the pages' WebGL on the machine's GPU. Tools that need
-pictures (`tools/shot.py`, the mirror's screenshots, `tools/frametime.py --headless`) draw on the GPU
-through `tools/gpu.py`, and fall back to SwiftShader, saying so, where there is none.
+pictures (`tools/shot.py`, the mirror's screenshots, `tools/frametime.py --headless`) and every page test
+(`tools/test_*.py`, `browser = gpu.launch(p)[0]`, #463) draw on the GPU through `tools/gpu.py`, and fall back to
+SwiftShader, saying so, where there is none.
 
 The harness verifies its own server before launching a job. An occupied `--port` fails without using
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
@@ -303,7 +359,7 @@ grey. The answers are kept per line in the browser and sent to the server, which
 (the newer wins), so a phone and a computer share one review:
 - on the test host: `review.php` (uploaded by `tools/deploy.py`, behind the site's login), stored in
   `reviews/`; `tools/autodeploy.py` pulls them into `reports/reviews/lineN.json` of the deploy checkout
-  on every run, and `python -P -E tools/deploy.py --pull-reviews` does it at once;
+  on every run, and `python -P -E tools/deploy.py --pull` does it at once;
 - with `tools/serve.py`: straight into `reports/reviews/lineN.json`.
 
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
@@ -311,6 +367,9 @@ A findings file can bring its own answers (`"options": [...]`). Lists for review
 `reports/review/` and deployed with the site (the review directory lists them). A set whose issue is
 closed while findings wait is out of date and is deleted (the user, 2026-11-05): #106's track-height
 disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
+`?line=17&review=reports/review/grass-track-17.json` lists where OSM maps grass over the track and nothing we know
+says so (#503, `python -P -E tools/grass_review.py`, which also prints how near the built grass's holes come to OSM's
+edges); `--import` takes the answers into `data/truth.json` `grassReview`, and grass answered lays grass track.
 `?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.
@@ -335,7 +394,12 @@ IPR's lidar where neither DI's rails nor DMR 5G say which is right (#446): `tool
 reports/reviews/line37.json` turns the answers that are a card's option into `data/truth.json` `surveyGround.places`,
 which the next `dtm.py` obeys; others stay held. An area without an answer takes the user's rule
 (`surveyGround.heldRule`: courtyards to the lidar, greenery outside to the survey), so a set appears only without it. `python -P -E tools/bench/survey_ground.py` measures every line's
-ground level against IPR and the rails (`--dtm DIR` for main's copies).
+ground level against IPR and the rails (`--dtm DIR` for main's copies). `python -P -E tools/bench/decks.py` measures
+the decks (level 1 and up) against Mosty 3D and the raised rails, the Krejcárek viaduct and Divadelní's deck and
+clearance (#445; `--dtm DIR` too); the build's own record is `provenance … checks.decks`. `python -P -E
+tools/bench/ground_inside.py` measures the inside of every ground-level area against IPR as the page draws it, per line
+and class (#444; `--dtm DIR`, `--page main` for main's drawing); the build marks what it drapes in `checks.inside` and
+what it took under the decks in `checks.underDecks`.
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a

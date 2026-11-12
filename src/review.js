@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Review mode (?review, #129): the findings of our checks on the map of the game, with layers that show
 // the survey and links to street-level imagery at each place, on a desktop or a phone. No shift runs.
 //   ?review                     findings from the data: the kerb review list (data/lineN.dtm.json
@@ -169,6 +170,7 @@ export class Review {
       if (at) {
         [this.T.x, this.T.y, this.yaw, this.pitch, this.dist] = at;
         this.T.z = ground.at(this.T.x, this.T.y);
+        this.atPlace = true; // (the place the address names, until a finding is picked: the answers arriving chose the first)
         this._render();
         this._note(`${this.list.length} findings: tap a pin or choose one in the list`);
       }
@@ -404,6 +406,7 @@ body.review #gl { touch-action: none }
     const f = this.list[i];
     if (!f) return;
     this.cur = i;
+    this.atPlace = false;
     this.T = { x: f.x, y: f.y, z: f.z };
     if (this.dist > 120) this.dist = 60;
     this.box.querySelectorAll('.rvItem').forEach((r) => r.classList.toggle('sel', +r.dataset.i === i));
@@ -586,7 +589,8 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
       this.cur = i;
       this.box.querySelectorAll('.rvItem').forEach((r) => r.classList.toggle('sel', +r.dataset.i === i));
       this._card(f);
-    } else if (this.list.length) this.select(Math.min(Math.max(this.cur, 0), this.list.length - 1));
+    } else if (this.atPlace) this.cur = -1;
+    else if (this.list.length) this.select(Math.min(Math.max(this.cur, 0), this.list.length - 1));
     else { this.cur = -1; this.$('rvCard').innerHTML = '<div class="dim">nothing left in this list</div>'; }
   }
 

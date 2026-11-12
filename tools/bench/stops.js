@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check (not part of the game): how the autopilot brings the tram to its stops (#351). A watcher on the
 // u3 drive (tools/bench/u3.js, opts.also); in the page after loading:
 //   const { run } = await import('/tools/bench/stops.js'); await run(seed)
@@ -15,14 +16,15 @@
 // cost it: 4 % slower on the same line took line 22's penalty from 17 to 509.
 // The drive pedal's use, on the whole run: presses (from 0 to a drive step, "našlápnutí"), pressesRolling (of them while already moving
 // faster than 1 m/s, the rest are the starts), brakeApplies (from coasting or drive to a brake step), the shares of the distance on drive,
-// coasting and brake, coastStretches (coasting 20 m or more). In the wet: slipSecs, slideSecs, sandSecs, emergencies (the pedal to the floor).
+// coasting and brake, coastStretches (coasting 20 m or more). In the wet: slipSecs, slideSecs, sandSecs, emergencies (the pedal to the floor),
+// slips and slides as episodes, slidesAtStops (a slide begun within 30 m before the stop point, #265).
 // Per stretch, the way to each stop (stretches: drive presses, brake applications, seconds from moving off the stop before it to standing
 // served at this one), as the user counted them on a ride, "drive + braking" (#396).
 // Energy a km (kWh/km, the traction only): lineKWh drawn from the wire, wasteKWh of it not turned into the motors' work (the starting
 // resistors above all: a press held at a low step keeps them in the circuit), brakeKWh burnt in the brake resistors.
 
 export function stopsWatch(game) {
-  const R = { stops: [], flips: [], stretches: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, emergencies: 0, emergencyAt: [], lineJ: 0, mechJ: 0, brakeJ: 0 };
+  const R = { stops: [], flips: [], stretches: [], changes: 0, driveSteps: 0, steps: 0, presses: 0, pressesRolling: 0, brakeApplies: 0, driveM: 0, coastM: 0, brakeM: 0, coastStretches: 0, slip: 0, slide: 0, sand: 0, slips: 0, slides: 0, slidesAtStops: 0, emergencies: 0, emergencyAt: [], lineJ: 0, mechJ: 0, brakeJ: 0 };
   let a = null, cur = null, last = 0, lastA = 0, lastStep = 0, jf = 0, lastS = null, coastRun = 0, lastClock = null, curTo = null;
   const finish = (st, tr) => {
     a.err = +(st.target - tr.s).toFixed(2);
@@ -69,6 +71,10 @@ export function stopsWatch(game) {
       // (the traction's power: tr.electric is the wire's (+) or the brake resistors' (−); the motors' work is the drive force by the speed)
       if (tr.electric > 0) { R.lineJ += tr.electric * dt; R.mechJ += Math.max(0, tr.drive * tr.v) * dt; } else R.brakeJ -= tr.electric * dt;
       if (tr.slide) R.slide += dt;
+      // (and as episodes, #265: a spin or a slide from its start; a slide at a stop, its start within 30 m before the stop point)
+      if (tr.slip && !R.wasSlip) R.slips++;
+      if (tr.slide && !R.wasSlide) { R.slides++; if (st && !st.served && st.target - tr.s < 30 && st.target - tr.s > -5) R.slidesAtStops++; }
+      R.wasSlip = !!tr.slip; R.wasSlide = !!tr.slide;
       if (tr.sanding) R.sand += dt;
       if (n !== lastStep) { R.changes++; lastStep = n; }
       if (n > 0) R.driveSteps++;
@@ -128,7 +134,7 @@ export function stopsWatch(game) {
         presses: R.presses, pressesPerKm: +(R.presses / Math.max(1, game.tram.s / 1000)).toFixed(2), pressesPerStop: +(R.presses / Math.max(1, S.length)).toFixed(2), pressesRolling: R.pressesRolling,
         brakeApplies: R.brakeApplies, driveM: Math.round(R.driveM), coastM: Math.round(R.coastM), brakeM: Math.round(R.brakeM), coastStretches: R.coastStretches,
         lineKWh: +(R.lineJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), wasteKWh: +((R.lineJ - R.mechJ) / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), brakeKWh: +(R.brakeJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3),
-        slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
+        slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), slips: R.slips, slides: R.slides, slidesAtStops: R.slidesAtStops, sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
         comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
         // (arrival against the timetable's time, which is the departure: arrOnTime the share within ±30 s of it, arrEarly the stops

@@ -195,7 +195,7 @@ both post on the pinned #291 and only propose.
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
-- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, DEVELOPING.md), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, DEVELOPING.md), `?bot`, `?keepgeo`, `?nofine`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
   default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
   of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside
@@ -216,10 +216,8 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
-| crossing | 17 | 1 unexplained pedestrian obstruction | #146 |
-| crossing | 9 | 2 unexplained pedestrian obstructions: a surveyed sidewalk 0.40 m over the rails at s 3672 (since its survey, #125) | #146 |
-| `tools/test_audio_pause.py` `test_shift_lifecycle` | 23 | the master gain is 0 after the shift starts (wants over 0.01) | #381 |
-| `tools/test_headless_timeout.py` `test_stuck_and_scheduled_wait` | (its own page) | `KeyError: 'stuck'` in both modes | #381 |
+| traffic, seed 1 | 23 | does not finish (stop 6, 7200 s): a car held behind a walker jams the tram 253 m before Malostranská; slide ≈207 000 | #496 |
+| u3, seed 1 | 23 | stuck at s 3350: the same jam (since #480's heights; seeds 2 and 3 drive clean) | #496 |
 
 ## Code style
 
@@ -227,6 +225,8 @@ both post on the pinned #291 and only propose.
   changes). Match the surrounding code: plain modules, short names in hot loops, comments that say why (the data
   quirk, the measured case), not what. Units are metres, seconds, m/s unless named otherwise.
 - Docs say what is and what was measured, briefly: no disclaimers or hedges, no restating.
+- A new source file in `src/` or `tools/` starts with `SPDX-License-Identifier: AGPL-3.0-or-later` in a
+  comment (after a shebang, `<?php` or doctype; #518).
 - No new dependencies or build steps without an issue that decides it. Tests and benches: Python +
   Playwright (headless Chromium); Node / Deno only once the simulation core is split out.
 - Randomness must be reproducible: today the benches override `Math.random` with a seeded one; new

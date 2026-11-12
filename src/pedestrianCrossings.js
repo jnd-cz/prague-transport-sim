@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Surveyed pedestrian crossings and footways at track level (#146). Geometry is in city metres.
 import { RAIL_HEAD } from './heights.js';
 const CELL = 12, REACH = 7, MAX_CROSSING = 20, LEVEL_TOLERANCE = 0.4;

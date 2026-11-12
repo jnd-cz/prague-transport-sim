@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The hybrid Tatra T3 (#248; assets/t3h/, CC BY-NC 4.0, see its LICENSE.txt): SimonStrikesBack's body,
 // interior and cab (CC BY 4.0) with conflig's collector, mirror and lamps (CC BY-NC 4.0), rigged in the
 // project's asset lab (street-life-boarding v14). Loaded once into a car template:

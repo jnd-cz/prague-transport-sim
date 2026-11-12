@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """src/geo.js's lat/lon against tools/geo.py on points across Prague: python -P -E tools/test_geo_js.py
 (serves the checkout itself on a free port; fails over 2 m)."""
 import functools
@@ -13,6 +14,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from geo import Frame, ORIGIN  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIMIT = 2.0  # m (#129: enough to open street-level imagery at a place)
@@ -31,7 +33,7 @@ server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Qui
 threading.Thread(target=server.serve_forever, daemon=True).start()
 try:
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = gpu.launch(p)[0]
         page = browser.new_page()
         page.goto(f'http://127.0.0.1:{server.server_port}/README.md')
         got = page.evaluate('''async ([pts, origin]) => {

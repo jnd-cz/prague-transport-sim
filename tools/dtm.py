@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Import the Prague Digital Technical Map (DTM, open part: ZPS) along a built line.
 
 DTM Praha open data, "Základní prostorová situace" per city district (městská část), GeoPackage,
@@ -335,9 +336,10 @@ for package in packages:
 # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
 # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
 import dmr5g  # noqa: E402
+import zps_decks  # noqa: E402
 _truth_path = os.path.join(ROOT, "data", "truth.json")
 _facts = json.load(open(_truth_path, encoding="utf-8")) if os.path.exists(_truth_path) else {}
-_osm_cover, _changing, _buildings = [], [], []
+_osm_cover, _changing, _buildings, _under_ways = [], [], [], []
 try:
     import osm_local
     if osm_local.available():
@@ -345,6 +347,7 @@ try:
         _osm_cover = zps_ground.osm_covers(osm_local.ways(zps_ground.is_cover, bbox=F.bbox(_pts, 150)), F)
         _changing = zps_ground.osm_covers(osm_local.ways(zps_ground.is_changing, bbox=F.bbox(_pts, 150)), F)
         _buildings = zps_ground.osm_covers(osm_local.ways(lambda t: "building" in t, bbox=F.bbox(_pts, 220)), F)
+        _under_ways = osm_local.ways(zps_decks.is_under, bbox=F.bbox(_pts, 150))
 except ImportError:
     pass
 if not _osm_cover:
@@ -380,6 +383,48 @@ if _review:
         json.dump(_review, fh, ensure_ascii=False, indent=1)
 elif os.path.exists(_review_path):
     os.remove(_review_path)  # (nothing held any more: the set is this build's own)
+
+# the decks (level 1 and up): heights checked against the structure that carries them, flat over the way under them,
+# and their thickness (tools/zps_decks.py, #445)
+from mosty3d import Bridges  # noqa: E402
+_city_ground = lambda x, y: _ipr.sample(np.asarray(x, float) + F.E0, np.asarray(y, float) + F.N0)  # noqa: E731
+_model = zps_decks.Model(Bridges())
+if _model.tree is None:
+    print("decks: no Mosty 3D models (raw/geoportal/mosty3d): only the surveyed rails check the decks")
+_ramps_before = zps_decks.ramps(areas, _city_ground)
+deck_checked = zps_decks.check(areas, _model, zps_decks.Rails(_rails, _city_ground))
+deck_checked["split"] = zps_decks.split(areas, _model, deck_checked["checked"])
+deck_opens = zps_decks.openings(_under_ways, areas, F)
+deck_flat = zps_decks.flatten(areas, deck_opens, _city_ground, deck_checked["checked"])
+deck_report = zps_decks.summary(deck_checked, deck_flat, zps_decks.ramps(areas, _city_ground),
+                                zps_decks.thickness(areas, _model, deck_flat))
+for _h in deck_report["heldAreas"]:
+    _h["lat"], _h["lon"] = (round(float(v), 6) for v in F.ll(_h.pop("x"), _h.pop("y")))
+print("decks:", deck_report["vertices"], f"vertices moved; {deck_report['held']} vertices held under a structure their",
+      f"deck is not on ({len(deck_report['heldAreas'])} areas); {deck_report['over']} over their structure;",
+      f"ramps {_ramps_before} -> {deck_report['ramps']}; decks by thickness {deck_report['decks']};",
+      f"split over decks of several levels {deck_report['split']}")
+for _o in deck_report["openings"]:
+    print(f"  opening: way {_o['way']} {_o['name'] or ''}: {_o.get('sagging', 0)} vertices on the deck's plane, gap",
+          f"{_o.get('gap')} m, maxheight {_o['maxheight']}, deck {_o.get('t')} m ({_o.get('src')}), clearance {_o.get('clearance')} m",
+          "(SHORT)" if zps_decks.is_short(_o) else "")
+
+# the ground level under the decks: in an opening whose floor IPR shows, the streets take IPR's ground; and the classes
+# with heights only on their outline take the lidar inside where they lie on IPR's ground (tools/zps_inside.py, #444)
+import zps_inside  # noqa: E402
+under_report = zps_inside.under_decks(areas, deck_opens, deck_flat, _city_ground)
+inside_report = zps_inside.inside(areas, ground_verdicts, _city_ground)
+print("under decks:", under_report)
+print("lidar inside:", inside_report["classes"], "their sheet fits:", inside_report["fit"], "kept their sheet:",
+      inside_report["kept"])
+
+# the street outlines where the survey alone sets a vertex off and the lidar beside it runs smooth (tools/zps_outline.py,
+# #470); before the kerbs, which read the outline's heights
+import zps_outline  # noqa: E402
+outline_report = zps_outline.correct(
+    areas, _city_ground, [i for i, v in ground_verdicts.items() if v.get("verdict") in zps_outline.HELD],
+    zps_ground.cover_union(areas, _osm_cover))
+print("street outlines:", outline_report["places"], "places moved", outline_report["vertices"], outline_report["sizes"])
 
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
@@ -434,7 +479,9 @@ vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_dec
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
-                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report}),
+                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
+                                   "decks": deck_report, "underDecks": under_report, "inside": inside_report,
+                                   "outlines": outline_report}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])

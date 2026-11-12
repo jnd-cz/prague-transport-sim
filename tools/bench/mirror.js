@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Mirror rendering cost, at a fixed line position, on a foreground page (#79).
 //   const { run } = await import('/tools/bench/mirror.js'); await run({ s: 5064, seconds: 10 });
 // Keeps the real renderer and native frame loop: no background/throttled-page FPS claims. Each pair

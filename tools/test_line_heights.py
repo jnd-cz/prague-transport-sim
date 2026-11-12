@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests of the top-of-rail assembly (tools/line_heights.py, #197) and of the answers' rules in front of it
 (tools/height_answers.py, #418) on synthetic chains:
 python -P -E tools/test_line_heights.py"""
@@ -7,6 +8,7 @@ import math
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import geo  # noqa: E402
@@ -511,41 +513,52 @@ class Held(unittest.TestCase):
 
     def test_the_lidar_picks_the_archive(self):
         c, ground = self.track(.02, -.33)
-        self.assertEqual(ha.held_settled([c]), (20, 0))
+        self.assertEqual(ha.held_settled([c]), (20, 0, 0))
         self.assertTrue(all(x['src'] == 'dtmp' and abs(x['z'] - ground(x['s']) - .02) < 1e-9 for x in c.bins[20:40]))
 
     def test_the_lidar_picks_the_survey(self):
         c, _ = self.track(.4, -.03)
-        self.assertEqual(ha.held_settled([c]), (20, 0))
+        self.assertEqual(ha.held_settled([c]), (20, 0, 0))
         self.assertTrue(all(x['src'] == 'zps' for x in c.bins[20:40]))
 
     def test_neither_near_the_lidar_stays_held(self):
         c, _ = self.track(.3, -.3)
-        self.assertEqual(ha.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0, 0))
         self.assertTrue(all(x['z'] is None for x in c.bins[20:40]))
 
     def test_only_the_lidar_gives_it_with_the_rails_offset_around(self):
         c, ground = self.track(None, None)
-        self.assertEqual(ha.held_settled([c]), (0, 20))
+        self.assertEqual(ha.held_settled([c]), (0, 20, 0))
         self.assertTrue(all(x['src'] == 'lidar' and abs(x['z'] - ground(x['s']) - .05) < 1e-9 for x in c.bins[20:40]))
+
+    def test_the_lidar_confirms_a_lone_source(self):
+        # (#480: line 37 at Palmovka, only the archive, 1-2 cm off the lidar)
+        c, ground = self.track(.02, None)
+        self.assertEqual(ha.held_settled([c]), (0, 0, 20))
+        self.assertTrue(all(x['src'] == 'dtmp' and abs(x['z'] - ground(x['s']) - .02) < 1e-9 for x in c.bins[20:40]))
+        c, _ = self.track(None, -.04)
+        self.assertEqual(ha.held_settled([c]), (0, 0, 20))
+        self.assertTrue(all(x['src'] == 'zps' for x in c.bins[20:40]))
+        c, _ = self.track(.3, None)   # (the lidar does not confirm it: held)
+        self.assertEqual(ha.held_settled([c]), (0, 0, 0))
 
     def test_a_lidar_steeper_than_any_track_stays_held(self):
         # (Petřín's funicular: held its whole length, the hill's bare earth stepped 2-6 m)
         c, ground = self.track(None, None)
         for x in c.bins:
             x['terrain'] += .3 * max(0.0, x['s'] - 100)   # (30 % from s 100)
-        self.assertEqual(ha.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0, 0))
 
     def test_a_lidar_that_does_not_meet_the_heights_beside_stays_held(self):
         c, _ = self.track(None, None)
         for x in c.bins[20:40]:
             x['terrain'] += 0.6
-        self.assertEqual(ha.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0, 0))
 
     def test_on_a_structure_it_stays_held(self):
         # (the bare-earth lidar lies under a deck and over a tunnel)
         c, _ = self.track(None, None, flags=['structure_hint'])
-        self.assertEqual(ha.held_settled([c]), (0, 0))
+        self.assertEqual(ha.held_settled([c]), (0, 0, 0))
 
 
 class Smoothed(unittest.TestCase):
@@ -570,6 +583,72 @@ class Smoothed(unittest.TestCase):
         z0 = [x['z'] for x in c.bins]
         lh.smooth_heights([c])
         self.assertLessEqual(max(abs(x['z'] - z) for x, z in zip(c.bins, z0)), lh.SMOOTH_CLAMP + 1e-9)
+
+
+
+class NoLift:
+    def at(self, xy):
+        return 0.04 if xy and xy[0] > 150 else 0.0
+
+
+class Surface(unittest.TestCase):
+    """Where no source has a height (#480): the surface plus the style's lift, no sample left without one."""
+
+    def test_a_long_hold_takes_the_surface_and_a_short_one_stays_for_the_curve(self):
+        held = lambda a, b: (lambda s: None if a <= s <= b else 100.0)  # noqa: E731
+        long_, short = chain([(0, 0), (300, 0)], held(50, 200), terrain=lambda s: 100.5), chain([(0, 0), (300, 0)], held(100, 140), terrain=lambda s: 100.5)
+        filled, left = lh.surface_fill([long_, short], NoLift())
+        got = [(x['s'], x['z'], x['src']) for x in long_.bins if x['src'] == 'surface']
+        self.assertEqual(got[0][:2], (52.5, 100.5))
+        self.assertEqual(got[-1][:2], (197.5, 100.54))   # (past s 150 the grass lift)
+        self.assertTrue(all(x['z'] is None for x in short.bins if 100 <= x['s'] <= 140))
+        self.assertEqual((filled, left), (150.0, 0.0))
+
+    def test_not_on_a_steep_hill_and_on_a_structure_the_deck(self):
+        steep = chain([(0, 0), (300, 0)], lambda s: None if 50 <= s <= 200 else 100.0, terrain=lambda s: 100 + 0.2 * s)
+        deck = chain([(0, 0), (300, 0)], lambda s: None if 50 <= s <= 200 else 100.0, terrain=lambda s: 90.0)
+        for x in deck.bins:
+            if x['z'] is None:
+                x['flags'], x['survey'] = ['structure_hint'], 101.0
+        lh.surface_fill([steep, deck], NoLift())
+        self.assertTrue(all(x['z'] is None for x in steep.bins if 50 <= x['s'] <= 200))   # (Petřín's funicular)
+        self.assertEqual({x['z'] for x in deck.bins if 50 <= x['s'] <= 200}, {101.0})   # (not the lidar under it)
+
+    def test_a_tracks_end_past_its_chain_meets_its_own_height(self):
+        zs = [None, None, 101.0, 101.2, None, None, None, 101.4]
+        filled = lh.fill_gaps([(0, 0), (14, 0)], zs, srcs := ['x'] * 8, lambda xy: 100.0 + xy[0] * 0.01)
+        self.assertEqual(filled, 10.0)
+        # (an end: the shift at the one side, the surface's slope kept; between: the shifts at both sides, linear)
+        self.assertEqual(zs[:2], [100.96, 100.98])
+        self.assertEqual(zs[4:7], [101.25, 101.3, 101.35])
+        self.assertEqual(srcs, ['surface', 'surface', 'x', 'x', 'surface', 'surface', 'surface', 'x'])
+
+
+class Workers(unittest.TestCase):
+    def test_first_solves_in_workers_as_in_one_process(self):
+        """#511: the chains' first solves side by side in worker processes give what one process gives, with the answers
+        this process holds (a 'hold' answer at a crossing), and the pinned pass after them the same pins."""
+        def network():
+            out = [chain([(0, 40 * k), (400, 40 * k)], lambda s, k=k: 101 + .001 * k * (s - 200) + (.3 if 150 < s < 160 else 0))
+                   for k in range(18)]  # (each at 101 m where the long track crosses it: pinned there)
+            return out + [chain([(200, -50), (200, 18 * 40)], lambda s: 101.0)]  # (crossing them all)
+        saved = ha.RADIUS_ANSWERS
+        self.addCleanup(setattr, ha, 'RADIUS_ANSWERS', saved)
+        ha.RADIUS_ANSWERS = [{'xy': (200.0, 80.0), 'answer': ha.HOLD}]
+        one, many = network(), network()
+        with mock.patch.object(lh, 'POOL', 10 ** 6):
+            a = quiet(lh.assemble, one)
+        with mock.patch.object(lh, 'POOL', 2):
+            b = quiet(lh.assemble, many)
+        self.assertEqual(a['pinned'], 18)
+        self.assertEqual(a['pinned'], b['pinned'])
+        for x, y in zip(one, many):
+            self.assertEqual(len(x.runs), len(y.runs))
+            for p, q in zip(x.runs, y.runs):
+                self.assertEqual(p['s'], q['s'])
+                for u, v in zip(p['z'], q['z']):  # (one BLAS thread in the workers: equal to its last bits, or nearly)
+                    self.assertAlmostEqual(u, v, places=9)
+            self.assertEqual((len(x.review), len(x.dropped), len(x.apart), x.held), (len(y.review), len(y.dropped), len(y.apart), y.held))
 
 
 if __name__ == '__main__':

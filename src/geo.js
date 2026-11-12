@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Game metres to WGS84 in the browser (#129): the city frame (data.frame: S-JTSK EPSG:5514 minus its
 // origin) through the inverse Křovák projection (EPSG guidance note 7-2) on the Bessel ellipsoid, then
 // a 7-parameter Helmert shift to WGS84 (S-JTSK to WGS 84, EPSG:1623's values). tools/geo.py uses ČÚZK's

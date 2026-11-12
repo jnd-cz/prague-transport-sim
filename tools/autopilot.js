@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev tool: drives a game headlessly (fixed time step) to exercise the gameplay rules.
 // In the browser console:  const { autopilot } = await import('/tools/autopilot.js'); await autopilot(0, 10)
 import { Autopilot } from '../src/autopilot.js';

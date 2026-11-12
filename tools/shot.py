@@ -1,7 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Render a paused view and the same camera in a reference checkout (#158).
 
     python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main
     python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
+    python -P -E tools/shot.py --line 17 --s 0 --view review --at 3185.9,3756.8 --dist 25   # a place off the route
 
 Writes individual PNGs, a labelled side-by-side PNG, and camera/data hashes to reports/shots/.
 Git references are exported temporarily and use verified published files from TRAMDATA_CACHE.
@@ -78,7 +80,7 @@ def font(size=20):
     return ImageFont.load_default(size)
 
 
-def capture(browser, root, line, s, view, output, timeout, pose=None, target=None):
+def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45):
     context = browser.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1)
     context.add_init_script('''window.headless = true;
       let state = 158; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);''')
@@ -116,7 +118,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
             }''', s)
             target = target or point
             if view == 'review':
-                at = f"{target['x']},{target['y']},{target['yaw']},45,60"
+                at = f"{target['x']},{target['y']},{target['yaw']},{pitch},{dist}"
                 page.goto(f'{url}/?line={line}&seed=158&keepgeo&review&at={at}', timeout=remaining())
                 page.wait_for_function('window.review', timeout=remaining())
                 require(page, 'review')
@@ -193,11 +195,22 @@ def main(argv=None, root=ROOT):
     ap.add_argument('--cache', help='read-only machine cache (default TRAMDATA_CACHE)')
     ap.add_argument('--timeout', type=float, default=240, help='seconds per capture, including loading')
     ap.add_argument('--out', type=Path, default=root / 'reports/shots')
+    ap.add_argument('--at', help='review: the place to look at, X,Y in the local frame (default the route at s)')
+    ap.add_argument('--dist', type=float, default=60, help='review: the camera\'s distance in m (default 60)')
+    ap.add_argument('--pitch', type=float, default=45, help='review: degrees down from level (default 45)')
+    ap.add_argument('--yaw', type=float, default=0, help='review with --at: the heading looked along, degrees')
     a = ap.parse_args(argv)
+    at = None
+    if a.at:
+        try:
+            x, y = (float(v) for v in a.at.split(','))
+        except ValueError:
+            ap.error('--at takes X,Y')
+        at = {'x': x, 'y': y, 'yaw': a.yaw}
     if a.line <= 0 or not math.isfinite(a.s) or a.s < 0 or not math.isfinite(a.timeout) or a.timeout <= 0:
         ap.error('s must be finite and nonnegative; timeout must be finite and positive')
     a.out.mkdir(parents=True, exist_ok=True)
-    stem = f'line{a.line}-s{a.s:g}-{a.view}'
+    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '')
     try:
         reference_rev = (git(root, 'rev-parse', '--verify', a.ref + '^{commit}')
                          if a.ref and not Path(a.ref).is_dir() else None)
@@ -207,7 +220,7 @@ def main(argv=None, root=ROOT):
             # (both pictures drawn the same way, on the GPU where there is one, #411)
             browser, renderer = gpu.launch(pw)
             try:
-                now = capture(browser, root, a.line, a.s, a.view, current, a.timeout)
+                now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch)
                 report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
@@ -215,7 +228,7 @@ def main(argv=None, root=ROOT):
                     reference = work / f'{stem}-reference.png'
                     with checkout(root, reference_rev or a.ref, a.cache, a.line) as other:
                         report['reference'] = capture(browser, other, a.line, a.s, a.view, reference, a.timeout,
-                                                      pose=now['camera'], target=now['target_xy'])
+                                                      pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch)
                         if reference_rev is None:
                             try:
                                 report['reference_commit'] = git(other, 'rev-parse', 'HEAD')

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The street survey's 3D lines as they come, for review mode's Source layer (#140):
     python -P -E tools/zps_source.py --line 17      -> data/lineN.zps.json
 

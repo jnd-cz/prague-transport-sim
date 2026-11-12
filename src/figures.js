@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The pedestrian figure's geometry built at load (#251): the middle level and the hair styles.
 // The middle level is the asset lab's simplified body (no nose, ears or eyes; 6 x 4 spheres, 5-sided
 // limbs), which the lab's recipe bakes into the static far figure (person-far.glb): here it stays
 // skinned to the near figure's skeleton, so the same clips drive it. Ported from the recipe's person()
-// (street-life-boarding v14, tools/prepare-traffic-assets.mjs; own work, GPL-3.0), with its bone
+// (street-life-boarding v14, tools/prepare-traffic-assets.mjs; own work, AGPL-3.0), with its bone
 // weights; the bind pose is read from person-near.glb. Hair styles are extra pieces on the Head bone,
 // in the baked hair colour so that each person's hair colour replaces them as it does the base cap.
 import * as THREE from 'three';

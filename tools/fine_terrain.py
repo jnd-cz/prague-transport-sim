@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Fine terrain along a line: bare-earth lidar on a 2 m lattice near the tracks.
 
 The game's terrain is a 10 m grid over the whole line (build_line.py), too coarse for the ground

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Shared truth-fact offsets in the browser: python -P -E tools/test_height_styles.py."""
 
 import json
@@ -9,6 +10,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from headless import serve, stop_server
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -18,7 +20,7 @@ class HeightStyles(unittest.TestCase):
     def setUpClass(cls):
         cls.server, cls.url = serve(0)
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True)
+        cls.browser = gpu.launch(cls.pw)[0]
         cls.page = cls.browser.new_page()
         # An inert same-origin document avoids loading the whole game for module tests.
         cls.page.route(
@@ -37,19 +39,16 @@ class HeightStyles(unittest.TestCase):
         result = self.page.evaluate(
             """async (truth) => {
           const {trackStyles} = await import('/src/heights.js');
-          const data = {line: 'test', stops: [{name: 'A', s: 100}, {name: 'B', s: 200}]};
+          // (the sections are the build's, tools/track_styles.py: tools/test_track_styles.py)
           const styles = ['embedded', 'panels', 'grass', 'ballast'];
           const values = styles.map((style) => {
-            const t = structuredClone(truth);
-            t.trackStyles = [{line: 'test', from: 'A', to: 'B', style}];
-            const s = trackStyles(t, data);
+            const s = trackStyles(truth, {line: 'test', styles: [{s0: 100, s1: 200, style, source: 'user', mark: 0}]});
             return {style, d: s.sections[0].d, ids: s.sections[0].offsetFactIds};
           });
-          truth.trackStyles = [];
-          const fact = truth.trackHeights.railAboveDeck.find((f) => f.styles.includes('grass'));
-          fact.metres = 0.09; // A changed fact must affect the runtime, including inferred grass.
-          const inferred = trackStyles(truth, data, () => 'green', 100);
-          return {values, inferred: inferred.lift(50), ids: inferred.sections[0].offsetFactIds};
+          // (the lift is the build's, data `lift` in mm every 2 m, tools/track_styles.py: the page interpolates it)
+          const inferred = trackStyles(truth, {line: 'test', styles: [{s0: 0, s1: 100, style: 'grass', source: 'survey'}],
+                                               lift: {step: 2, unit: 0.001, v: [0, 20, 40, 40]}});
+          return {values, inferred: [inferred.lift(3), inferred.lift(6)], ids: inferred.sections[0].offsetFactIds};
         }""",
             self.truth,
         )
@@ -57,7 +56,8 @@ class HeightStyles(unittest.TestCase):
             fact = next(f for f in self.truth['trackHeights']['railAboveDeck'] if row['style'] in f['styles'])
             self.assertEqual(row['d'], fact['metres'])
             self.assertEqual(row['ids'], [fact['id']])
-        self.assertAlmostEqual(result['inferred'], 0.09)
+        self.assertAlmostEqual(result['inferred'][0], 0.03)
+        self.assertAlmostEqual(result['inferred'][1], 0.04)
         self.assertEqual(result['ids'], ['rail-above-deck-grass'])
 
     def test_missing_and_conflicting_facts_fail_instead_of_guessing(self):

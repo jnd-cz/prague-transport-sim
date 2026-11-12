@@ -17,7 +17,7 @@ ASSETS = os.path.join(ROOT, "assets")
 LOADERS = {"builtin", "gltf", "gltf-classic", "gltf-rigged"}
 # licences that allow the files to be redistributed with the game (ASSETS.md); NC ones not in a commercial release
 LICENCES = {"CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-NC-SA-4.0", "GPL-3.0", "GPL-3.0-only",
-            "GPL-3.0-or-later", "MIT"}
+            "GPL-3.0-or-later", "AGPL-3.0-or-later", "MIT"}
 MOVES = {"bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"}
 MODEL_EXT = {".gltf", ".glb"}
 

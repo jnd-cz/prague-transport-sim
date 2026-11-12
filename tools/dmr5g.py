@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """ČÚZK DMR 5G in 500 m tiles at 1 m pixels, and the passages rule: level 1 of the terrain chain (tools/sources.py).
 
 Source: the dmr5g ImageServer at ags.cuzk.gov.cz (bare earth from the 2009-2013 lidar, a 2 m TIN raster, Bpv;

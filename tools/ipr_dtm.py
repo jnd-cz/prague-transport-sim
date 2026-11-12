@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """IPR Praha's 1 m terrain raster (the first level of the terrain chain, tools/sources.py; #10).
 
 Source: "Digitální model terénu - rastr" (opendata.geoportalpraha.cz item 97d2c9c11aa9478cb21b469b8a4f820e,

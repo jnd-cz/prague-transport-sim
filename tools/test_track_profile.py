@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vertical profile rule (#188): python -P -E tools/test_track_profile.py."""
 import math
 from pathlib import Path

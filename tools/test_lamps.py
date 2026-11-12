@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The trams' lamps in the game (#436), in headless Chromium: our driver's keys and the AI trams' own.
 
 Usage: python -P -E tools/test_lamps.py [--line 17]

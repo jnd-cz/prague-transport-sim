@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The drawn track in plan as smooth curves through the surveyed points, continuous in direction at every node (#204).
 
     python -P -E tools/track_curve.py --line 17     # fit the DI edges line 17's routes run on, print what moved and what was left
@@ -62,6 +63,15 @@ BEND = 1.0         # m either side of a sample for the short radius (a 5 m windo
 BEND_LONG = 2.5    # m either side for the long radius (as tools/lint.js trackRadius; over 2 m a scatter of 2 cm alone
                    # reads as 25 m)
 NEAR = 10.0        # m around a place bending too tight whose points' tolerance grows
+CORNER = 0.5       # degrees: the sample a heading holds may turn this much more than the next CORNER_REACH of the curve
+                   # (at 1° a branch leaving at 42 m off a through track at 120 m kept a 1.53° vertex, line 22 by
+                   # 4400.9, -2364.8; at 0.5° the five lines' isolated corners fall a further third, every point in its class)
+                   # bends at its rate; beyond it the turn is a corner and the points near it ease off within their class
+                   # (line 9 s 15958, a trailing switch past Flora: 4.5° in its first metre, then 0.3°). A limit on the
+                   # radius there instead (27 m, #477) forbade a switch curving at 18-20 m from its blade, as at Národní
+                   # divadlo, and squeezed the turn into a 13 m bend further on
+CORNER_REACH = 2.0 # m
+BEHIND = BEND_LONG + 1.0  # m of the track fitted before that the windows near a held end read on into
 REPORT = 0.01      # m: a surveyed point the final curve misses by more than TOL + this is listed
 STEP = 1.0         # m between the curve's samples
 LAMBDA = 300.0     # bending weight: a smoothing length of (LAMBDA / point density)^(1/4), 5 m at a point per 2 m
@@ -168,6 +178,40 @@ def tight_at(px, py):
     return [min(l, s * f) for s, l in zip(short, long_)]
 
 
+def corner_excess(px, py, s, inward):
+    """Degrees by which sample s turns more than the curve after it, inward (+1 or -1) from s, over CORNER_REACH turns at
+    that rate per metre: a corner where a held heading meets the points."""
+    def turn(i):
+        a, b, c = (px[i - 1], py[i - 1]), (px[i], py[i]), (px[i + 1], py[i + 1])
+        d = math.atan2(c[1] - b[1], c[0] - b[0]) - math.atan2(b[1] - a[1], b[0] - a[0])
+        return (d + math.pi) % (2 * math.pi) - math.pi
+    if not 0 < s < len(px) - 1:
+        return 0.0
+    here = turn(s)
+    rate, run, i = 0.0, 0.0, s + inward
+    while 0 < i < len(px) - 1 and run < CORNER_REACH:
+        rate += turn(i)
+        run += math.dist((px[i], py[i]), (px[i - inward], py[i - inward]))
+        i += inward
+    if run <= 0:
+        return 0.0
+    seg = (math.dist((px[s - 1], py[s - 1]), (px[s], py[s])) + math.dist((px[s], py[s]), (px[s + 1], py[s + 1]))) / 2
+    expect = rate / run * seg
+    return math.degrees(abs(here - expect)) if here * expect >= 0 or abs(here) > abs(expect) else 0.0
+
+def tight_with(px, py, behind):
+    """tight_at with the track beyond each end: behind {0 or n-1: points going outward from that end, nearest first} (the
+    track fitted before that this one leaves or continues). Without it the windows near an end reach only the end on one
+    side: easing a branch off its switch at Národní divadlo bent it 14.5 m over 5 m 2 m from the node, unseen."""
+    n = len(px)
+    head = list(reversed(behind.get(0, ())))
+    tail = list(behind.get(n - 1, ()))
+    if not head and not tail:
+        return tight_at(px, py)
+    r = tight_at([q[0] for q in head] + list(px) + [q[0] for q in tail], [q[1] for q in head] + list(py) + [q[1] for q in tail])
+    return r[len(head):len(head) + n]
+
+
 def class_errors(truth=None):
     """{accuracy class: mean coordinate error in metres} (data/truth.json `sourceAccuracy`, the decree's table)."""
     import json
@@ -175,15 +219,16 @@ def class_errors(truth=None):
     return {k: v['mxy'] * SIGMAS for k, v in json.loads(Path(path).read_text(encoding='utf-8'))['sourceAccuracy']['classes'].items()}
 
 
-def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
+def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None, behind=None):
     """A smooth curve through polyline `pts` within `tol` of each of its points (None: not data). `fixed`
     {point index: (x, y)} holds positions; `heading` {point index: (ux, uy)} holds the direction the curve leaves
     that (fixed, end) point in, into the polyline; `limit` per point: how far its tolerance may grow where the curve
     would bend tighter than MIN_RADIUS (default: as far as it starts); where it still bends tighter than
     NETWORK_RADIUS the curve stiffens there and its points may move up to HOLD_LIMIT. Returns (samples, each point's sample index, the final tolerance per point,
-    the radius per sample over 2 m). A point's miss is its distance to the curve (the
+    the radius per sample over 2 m). `behind` {point index of an end: the points of the track beyond it, going out}: the
+    radius windows near that end read on into it. A point's miss is its distance to the curve (the
     samples slide along it)."""
-    fixed, heading = fixed or {}, heading or {}
+    fixed, heading, behind = fixed or {}, heading or {}, behind or {}
     xs, ys, at = [], [], []
     for i, p in enumerate(pts):
         if i:
@@ -203,6 +248,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     limit = list(limit) if limit is not None else list(tol)
     # held samples: fixed points, and the sample next to a fixed end along its heading
     held = {at[i]: q for i, q in fixed.items()}
+    hinges = []   # (sample a heading holds, inward): the curve turns there from the held direction to its points
     for i, (hx, hy) in heading.items():
         s = at[i]
         nxt = s + 1 if i == 0 else s - 1   # (an end: the first point or the last)
@@ -211,6 +257,9 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
         h = abs(u[nxt] - u[s])
         p0 = held.get(s, (xs[s], ys[s]))
         held[nxt] = (p0[0] + hx * h, p0[1] + hy * h)
+        if 0 < nxt < n - 1:
+            hinges.append((nxt, 1 if i == 0 else -1))
+    beyond = {at[i]: q for i, q in behind.items() if at[i] in (0, n - 1) and q}
     weight = [0.0] * n
     for i, t in enumerate(tol):
         if t is not None and at[i] not in held:
@@ -247,7 +296,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
     data = [i for i, t in enumerate(tol) if t is not None and at[i] not in held]
     px, py = solve()
     if n < 3 or not data:
-        return list(zip(px, py)), at, tol, tight_at(px, py)
+        return list(zip(px, py)), at, tol, tight_with(px, py, beyond)
     for _ in range(WIDEN):
         for _ in range(ROUNDS):
             worst = 1.0
@@ -260,8 +309,9 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
             if worst < 1.02:
                 break
             px, py = solve()
-        r = tight_at(px, py)
+        r = tight_with(px, py, beyond)
         tight = [u[i] for i in range(n) if r[i] < MIN_RADIUS * SLACK]
+        tight += [u[s] for s, inward in hinges if corner_excess(px, py, s, inward) > CORNER]
         grow = [i for i in data if tol[i] < limit[i] - 1e-9 and any(abs(u[at[i]] - t) <= NEAR for t in tight)]
         if not grow:
             # every point near a curve under 20 m is at its class: under 18 m the curve stiffens there and its points'
@@ -284,7 +334,7 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None):
             tol[i] = min(limit[i], tol[i] * GROW)
             weight[at[i]] = 1.0
         px, py = solve()
-    return list(zip(px, py)), at, tol, tight_at(px, py)
+    return list(zip(px, py)), at, tol, tight_with(px, py, beyond)
 
 
 def crossing_point(px, py, s, qx, qy, r, reach=12):
@@ -498,8 +548,9 @@ class Network:
         chains = [chains[c] for c in order]
 
         # node -> {'pos', 'dirs': directions of the tracks through it, 'at': [(track, index in its seq)]}
-        node, fitted, misses, tight, held, widened = {}, [], [], [], [], 0
-        for c, seq in enumerate(chains):
+        node, fitted, found = {}, {}, {}
+
+        def fit_chain(c, seq):
             # the points and their tolerance: a node off its surveyed tracks is no data point (the point nearest
             # all of them: 0.2 m off each at a junction at Národní divadlo, where the tracks run 1.3 m apart); the
             # longer track fixes it, the shorter one passes through. A node on them is (a crossing point stands in
@@ -581,10 +632,10 @@ class Network:
             # a track continuing one fitted before (a diverging track, a track's end at a joint) leaves along the
             # track through the node nearest its own direction (a node of a crossing and a switch at Strossmayerovo
             # náměstí: the first track through it lay 11° off the one the branch leaves)
-            heading = {}
+            heading, behind = {}, {}
             for j, inward in ((0, 1), (len(seq) - 1, -1)):
                 n = seq[j]
-                if n not in node or (j and seq[0] == seq[-1]) or len(pts_c) < 2 or length(seq) < 2 * STEP:
+                if n not in node or not node[n]['dirs'] or (j and seq[0] == seq[-1]) or len(pts_c) < 2 or length(seq) < 2 * STEP:
                     continue
                 d = own(j)
                 d = (d[0] * inward, d[1] * inward)
@@ -596,7 +647,21 @@ class Network:
                 if abs(dot) >= math.cos(math.radians(START)) or photo:
                     sg = 1 if dot > 0 else -1
                     heading[node_at[j]] = (sg * t0[0], sg * t0[1])
-            samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim)
+                    # the track it leaves, from the node back against the heading: the curve's windows read on into it
+                    cc, jj = node[n]['at'][node[n]['dirs'].index(t0)]
+                    f = fitted[cc]
+                    seg = f['cut'][jj][0]
+                    idx = range(seg, -1, -1) if sg > 0 else range(seg + 1, len(f['px']))
+                    back = []
+                    for i in idx:
+                        q = (f['px'][i], f['py'][i])
+                        d = math.dist(q, node[n]['pos'])
+                        if d > BEHIND:
+                            break
+                        if d > 0.05:
+                            back.append(q)
+                    behind[node_at[j]] = back
+            samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim, behind=behind)
             px, py = [q[0] for q in samples], [q[1] for q in samples]
             for j in crossing:
                 n = seq[j]
@@ -605,7 +670,7 @@ class Network:
                 hit = crossing_point(px, py, at[node_at[j]], other['px'], other['py'], other['cut'][oj][0])
                 if hit is None:   # (the curves do not cross near it: hold it after all)
                     fixed[node_at[j]] = node[n]['pos']
-                    samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim)
+                    samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim, behind=behind)
                     px, py = [q[0] for q in samples], [q[1] for q in samples]
                     continue
                 q, (s_o, t_o) = hit
@@ -622,7 +687,7 @@ class Network:
                             break
                 if hit is None:   # (no crossing near it: hold the node after all)
                     fixed[node_at[j]] = node[n]['pos']
-                    samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim)
+                    samples, at, tol_out, rad = fit(pts_c, tol, fixed, heading, limit=lim, behind=behind)
                     px, py = [q[0] for q in samples], [q[1] for q in samples]
                     own_point.clear()
                     continue
@@ -652,7 +717,8 @@ class Network:
                 l = math.dist(a, b) or 1.0
                 node[n]['dirs'].append(((b[0] - a[0]) / l, (b[1] - a[1]) / l))
                 node[n]['at'].append((c, j))
-            fitted.append({'px': px, 'py': py, 'cut': cut, 'own': own_point})
+            fitted[c] = {'px': px, 'py': py, 'cut': cut, 'own': own_point}
+            misses, tight, held, widened = [], [], [], 0
             for i, p in enumerate(pts_c):
                 if tol[i] is None or tol[i] > TOL + 1e-9:
                     continue
@@ -666,9 +732,36 @@ class Network:
             for i, r in enumerate(rad):
                 if r < MIN_RADIUS * SLACK:
                     tight.append({'radius_m': round(r, 1), 'xy': [round(px[i], 1), round(py[i], 1)]})
+            found[c] = (misses, tight, held, widened)
+
+        first = {}   # chain -> its end nodes no track held when it was fitted
+        for c, seq in enumerate(chains):
+            first[c] = [j for j in (0, len(seq) - 1) if seq[j] not in node and not (j and seq[0] == seq[-1])]
+            fit_chain(c, seq)
+        # where the order rule deadlocks (each of two tracks passes through the other's end node, and the longer went
+        # first), the end fitted free is refitted with the heading of the track fitted through it after it (line 37 s 3700,
+        # a facing switch: the through track passed the branch's end 1.66° off it)
+        for c, seq in enumerate(chains):
+            again = False
+            for j in first[c]:
+                n = seq[j]
+                mine = [d for (cc, jj), d in zip(node[n]['at'], node[n]['dirs']) if cc == c]
+                for (cc, jj), d in zip(node[n]['at'], node[n]['dirs']):
+                    if cc != c and 0 < jj < len(chains[cc]) - 1 and mine and                             abs(mine[0][0] * d[0] + mine[0][1] * d[1]) >= math.cos(math.radians(START)):
+                        again = True
+            if again:
+                for n in set(seq):
+                    keep = [(a, d) for a, d in zip(node[n]['at'], node[n]['dirs']) if a[0] != c]
+                    node[n]['at'], node[n]['dirs'] = [a for a, _ in keep], [d for _, d in keep]
+                fit_chain(c, seq)
+                self.refitted = getattr(self, 'refitted', 0) + 1
+        misses = [m for c in found for m in found[c][0]]
+        tight = [m for c in found for m in found[c][1]]
+        held = [m for c in found for m in found[c][2]]
+        widened = sum(found[c][3] for c in found)
         # the edges: each track's samples between its nodes' cuts, ending at the nodes' final positions
         out_pts = {}
-        for seq, f in zip(chains, fitted):
+        for seq, f in zip(chains, (fitted[c] for c in range(len(chains)))):
             px, py, cut = f['px'], f['py'], f['cut']
             for j, (a, b) in enumerate(zip(seq, seq[1:])):
                 p0, p1 = f['own'].get(j, node[a]['pos']), f['own'].get(j + 1, node[b]['pos'])
@@ -687,7 +780,7 @@ class Network:
                 continue
             piece = out_pts[k(ra, rb)]
             self.pts[(a, b)] = thin([tuple(q) for q in (piece if k(ra, rb) == (ra, rb) else piece[::-1])])
-        self.report = {'through_tracks': len(chains), 'points_widened': widened, 'missed_over_cm': len(misses),
+        self.report = {'through_tracks': len(chains), 'refitted': getattr(self, 'refitted', 0), 'points_widened': widened, 'missed_over_cm': len(misses),
                        'missed_unwidened': sum(not m['widened'] for m in misses),
                        'misses': self._places(misses, 'm', -1)[:15],
                        'held_to_network_radius': self._places(held, 'm', -1),

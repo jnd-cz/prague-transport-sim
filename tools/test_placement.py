@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Where signals and stop points stand, decided in the build (tools/placement.py, #22): python -P -E tools/test_placement.py.
 
 The rules on made-up streets, and on each line's data the build's placement against the game's own rules
@@ -10,6 +11,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import placement as pl  # noqa: E402
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -122,7 +124,7 @@ class GameAgrees(unittest.TestCase):
         server, url = headless.serve(0)
         try:
             with sync_playwright() as pw:
-                b = pw.chromium.launch(headless=True)
+                b = gpu.launch(pw)[0]
                 for line in built:
                     page = b.new_page()
                     page.goto(f"{url}/?line={line}", wait_until='load')

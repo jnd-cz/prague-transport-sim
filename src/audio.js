@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Synthesised tram sounds (Web Audio): traction motor whine, rolling noise, rail joints,
 // flange squeal, the T3 bell, door buzzer and controller clicks.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests of the stepped-curve review cards (tools/stepped_review.py, #368) on synthetic tracks:
 python -P -E tools/test_stepped_review.py"""
 import json

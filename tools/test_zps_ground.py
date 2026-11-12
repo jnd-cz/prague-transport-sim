@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/zps_ground.py: the survey's ground-level areas judged against the lidar, the rails and DMR 5G (#446).
 
     python -P -E tools/test_zps_ground.py

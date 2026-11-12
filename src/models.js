@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Low-poly models built from primitives: cars, pedestrians, signals and signs; the T3 sets (the built-in car
 // in src/t3simple.js, the hybrid in src/t3h.js, conflig's classic loaded here).
 import * as THREE from 'three';

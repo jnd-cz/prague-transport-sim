@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Profile rendering: python -P -E tools/test_track_height_profile.py (free-port server)."""
 from pathlib import Path
 import json
@@ -9,6 +10,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from headless import serve,stop_server
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 
 class HeightProfile(unittest.TestCase):
@@ -20,7 +22,7 @@ class HeightProfile(unittest.TestCase):
         server,url=serve(0)
         try:
             with sync_playwright() as p:
-                browser=p.chromium.launch(headless=True)
+                browser=gpu.launch(p)[0]
                 page=browser.new_page()
                 page.route('**/test-findings.json',lambda r:r.fulfill(content_type='application/json',body=json.dumps(data)))
                 page.route('**/test-spans.json',lambda r:r.fulfill(content_type='application/json',body=raw))
@@ -54,7 +56,7 @@ class HeightProfile(unittest.TestCase):
         server,url=serve(0)
         try:
             with sync_playwright() as p:
-                browser=p.chromium.launch(headless=True)
+                browser=gpu.launch(p)[0]
                 page=browser.new_page()
                 page.goto(url+'/tools/bench/batch.html')
                 result=page.evaluate('''async items => {
@@ -73,7 +75,7 @@ class HeightProfile(unittest.TestCase):
         server,url=serve(0)
         try:
             with sync_playwright() as p:
-                browser=p.chromium.launch(headless=True)
+                browser=gpu.launch(p)[0]
                 page=browser.new_page()
                 page.goto(url+'/tools/bench/batch.html')
                 result=page.evaluate('''async () => {
