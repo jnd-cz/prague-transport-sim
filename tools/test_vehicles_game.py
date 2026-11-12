@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The vehicle registry in the game (#455), in headless Chromium: every model from its manifest, and a sample added
 as a folder alone.
 
@@ -6,7 +7,7 @@ Usage: python -P -E tools/test_vehicles_game.py [--line 17]
 Needs the line's data (python -I tools/snapshot.py data-fetch); skips without it. A sample tier-1 vehicle is made
 in the page (a 14 m box in the T3's dimensions with a red block on its nose, a GLB facing +X) and served beside the
 repository's vehicles with its vehicle.json and a line in assets/vehicles.json, as a folder in assets/ would be;
-a broken manifest (no names) is served too. Checks: the menu lists the index's vehicles in order with their names
+so is tools/test_rigged.py's rigged sample (#467), and a broken manifest (no names). Checks: the menu lists the index's vehicles in order with their names
 in both languages and leaves the broken one out; picking each starts a shift with it (the right model, its cars, no
 page errors), AI trams use it, it credits itself; the sample stands facing +Z with its nose forward and its wheels'
 plane on the rails. The manifests themselves: tools/test_vehicles.py.
@@ -27,6 +28,7 @@ from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))  # (python -P leaves it out)
 import gpu  # noqa: E402
+from test_rigged import sample_rig  # noqa: E402
 
 # the sample: a body 14.0 x 2.5 m from 0.35 to 3.1 m over the rail, a red block on its nose, the length along +X
 MAKE = r"""async () => {
@@ -110,6 +112,7 @@ def main():
             page.route(base + "/__make.html", lambda route: route.fulfill(content_type="text/html", body=f"<!doctype html><html><head>{imap}</head><body></body></html>"))
             page.goto(base + "/__make.html")
             glb = base64.b64decode(page.evaluate(MAKE))
+            rig_glb, rig_json, rig_man = sample_rig(page, base, imap)
             page.close()
             sample = {
                 "schema": 1, "id": "sample", "names": {"cs": "Vzorek (test)", "en": "Sample (test)"}, "type": "T3",
@@ -119,16 +122,19 @@ def main():
                             "sources": ["tools/test_vehicles_game.py"], "credit": "Sample tram: a box from the vehicle test."},
             }
             served = {
-                "/assets/vehicles.json": json.dumps({**index, "vehicles": ids + ["sample", "broken"]}),
+                "/assets/vehicles.json": json.dumps({**index, "vehicles": ids + ["sample", "sample-rig", "broken"]}),
                 "/assets/sample/vehicle.json": json.dumps(sample),
+                "/assets/sample-rig/vehicle.json": json.dumps(rig_man),
+                "/assets/sample-rig/rig.json": rig_json.decode(),
                 "/assets/broken/vehicle.json": json.dumps({**sample, "id": "broken", "names": {}}),
             }
-            order = ids + ["sample"]
+            order = ids + ["sample", "sample-rig"]
             for vid in order:
                 ctx = browser.new_context(viewport={"width": 960, "height": 540})
                 for path, body in served.items():
                     ctx.route(base + path, serve(body))
                 ctx.route(base + "/assets/sample/sample.glb", lambda route: route.fulfill(content_type="model/gltf-binary", body=glb))
+                ctx.route(base + "/assets/sample-rig/model.glb", lambda route: route.fulfill(content_type="model/gltf-binary", body=rig_glb))
                 page = ctx.new_page()
                 errors, warns = [], []
                 page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
@@ -149,17 +155,17 @@ def main():
     finally:
         server.shutdown()
     print(json.dumps(r, ensure_ascii=False, indent=1))
-    all_names = {**names, "sample": sample["names"]}
+    all_names = {**names, "sample": sample["names"], "sample-rig": rig_man["names"]}
     for lang in ("en", "cs"):
         want = [[i, all_names[i][lang]] for i in order]
         if r["menu"][lang] != want:
             fails.append(f"the menu in {lang} is {r['menu'][lang]}, wants {want}")
     if not r["brokenWarned"]:
         fails.append("the broken manifest was not refused with a warning")
-    kinds = {"builtin": "simple", "gltf": "gltf", "gltf-classic": "classic", "gltf-rigged": "hybrid"}
+    kinds = {"builtin": "simple", "gltf": "gltf", "gltf-classic": "classic", "gltf-rigged": "rigged"}
     for vid in order:
         g = r[vid]
-        man = sample if vid == "sample" else json.load(open(os.path.join(ROOT, "assets", vid, "vehicle.json"), encoding="utf-8"))
+        man = sample if vid == "sample" else rig_man if vid == "sample-rig" else json.load(open(os.path.join(ROOT, "assets", vid, "vehicle.json"), encoding="utf-8"))
         if g["vehicle"] != vid or g["kind"] != kinds[man["loader"]] or g["cars"] != 2:
             fails.append(f"{vid}: built as {g['vehicle']} ({g['kind']}, {g['cars']} cars), wants {vid} ({kinds[man['loader']]}, 2 cars on line 17)")
         if g["errors"]:

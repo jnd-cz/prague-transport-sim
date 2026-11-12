@@ -14,7 +14,7 @@ Volba *Model tramvaje* v menu vybírá jeden ze tří, uvedených v `assets/vehi
 
 | model | kde | z čeho | licence | co se hýbe |
 |---|---|---|---|---|
-| podrobný, pohyblivý (výchozí) | `src/t3h.js`, `assets/t3h/` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla, směrovky, dálková světla; lehčí úroveň pro vzdálené cizí tramvaje |
+| podrobný, pohyblivý (výchozí) | `assets/t3h/`, loader `src/rigged.js` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla, směrovky, dálková světla; lehčí úroveň pro vzdálené cizí tramvaje |
 | podrobný, klasický | `src/models.js` (`loadDetailedT3`), `assets/t3/` | glTF s jednou texturou; stáhne se při výběru | CC BY-NC 4.0 | nic |
 | jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | AGPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu (brzdová, směrovky, dálková) |
 
@@ -34,7 +34,7 @@ načte ve hře, i se vzorkem přidaným jen jako složka.
 | `id` | název složky |
 | `names` | `cs` a `en`: text v menu |
 | `type` | typ vozidla, jehož rozměry má (`VEHICLE_TYPES` v `src/tram.js`: zatím `T3`) |
-| `loader` | `builtin` (kreslený kódem: `src/t3simple.js`), `gltf` (nehybný glTF, úroveň 1, bez kódu), `gltf-classic` (model od conflig: osy se najdou podle kol, `src/models.js`), `gltf-rigged` (glTF se souborem pohyblivých dílů: `src/t3h.js`) |
+| `loader` | `builtin` (kreslený kódem: `src/t3simple.js`), `gltf` (nehybný glTF, úroveň 1, bez kódu), `gltf-classic` (model od conflig: osy se najdou podle kol, `src/models.js`), `gltf-rigged` (glTF se souborem pohyblivých dílů, bez kódu: `src/rigged.js`, níže) |
 | `model`, `rig` | glTF nebo GLB mezi soubory; soubor pohyblivých dílů (`gltf-rigged`) |
 | `forward` | jen `gltf`: osa, ke které model míří čelem, `+Z` (jako hra), jinak `+X`, `-X` nebo `-Z` |
 | `files` | každý soubor s cestou `path` ve složce a velikostí `bytes` (nahrávací obrazovka je počítá) |
@@ -47,12 +47,39 @@ načte ve hře, i se vzorkem přidaným jen jako složka.
 podvozků, +Y nahoru, čelem k `forward`; čepy má podle svého typu. Menu ho nabídne, při výběru se načte a
 poděkování ho uvede.
 
+## Soubor pohyblivých dílů (rig)
+
+Vozidlo, které se hýbe bez vlastního kódu (loader `gltf-rigged`, `src/rigged.js`), jmenuje své díly v souboru
+pohyblivých dílů (podrobného modelu `assets/t3h/rig.json`), v souřadnicích modelu (jeho osa `forward`, +Y nahoru).
+Hra jimi hýbe podle jmen; díl, který jeho popis tvrdí v `moves` a model nemá, vozidlo vyřadí a hra ten díl jmenuje.
+
+| moves | rig jmenuje | hra |
+|---|---|---|
+| `bogies` | `bogies`: každý `name` (uzel) a `pivot` | dá je na čepy typu (`T3`: 3,2 m od středu), natočí každý k tětivě mezi jeho nápravami |
+| `wheels` | `wheels`: každé `name` (uzel pod podvozkem) a `radius` | otáčí je podle ujeté dráhy; polovinu rozvoru podvozku zjistí z jejich polohy |
+| `couplers` | `couplers`: `front` a `rear`, sítě tyče | otáčí každé kolem čepu typu (6,25 m), tyč natažená od čepu k rovině spojení, ve směru spojnice k dalšímu vozu |
+| `collector` | `pantograph`: `root`, `head`, `linkages`, `clip` (stažení, 0 nahoře .. 1 dole), `minContactHeight`, `maxContactHeight` | posune animaci na výšku drátu, pod rozsahem ho stáhne |
+| `lamps` | `signals`: `left`, `right` (uzly svitu); `brakes`; `beams` (středy světlometů, pro záři dálkových); `tailLamps` (`size`, `at`: světla, která model nemá) | rozsvítí je podle stavu (`src/lamps.js`) |
+| `doors` | `doors`: každé `name`, `clip` (otevření) a `leaves` (uzly `outer`, `inner`) | posune animace podle otevření dveří |
+| `trackBrakes` | `shoes`: jméno podvozku a sítě čelistí pod ním | zavěsí je v mezeře typu nad kolejnicí (12 mm), spustí je při zapnutých magnetech |
+
+Dále podle jmen: `root` (uzel vozu), `saloon` (`materials` a `within`: kvádr, jehož díly patří k interiéru; zdálky
+se vynechá), `numberPlates` (s evidenčním číslem, číslice vysoké `fleetDigits` m), `routeStyles` (každá tabule linky
+a její styl: `normal`, `inverted`, `mirror`), `infoPlates` (`frontDestination`, `runNumber`, `sideBoards`). Průhledné
+materiály jsou sklo. Lehčí úroveň pro vzdálené cizí tramvaje vznikne při načtení: dveře zavřené, sběrač na drátu,
+vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrobí vzorové vozidlo se všemi díly a zkontroluje,
+že se každý hýbe.
+
+Rig se generuje, needituje se ručně. Podrobný model se udržuje v repozitáři (projektová dílna na modely, ze které
+pochází, už se nepoužívá); jeho rig má generovat `tools/export_t3h_rig.py` z `tools/t3h_rig_roles.json` s kontrolou
+proti GLB (#471), do té doby je osm jeho polí dopsaných ručně (`handWritten` v rigu).
+
 ## Co musí souprava splňovat
 
 - `THREE.Group` s jedním `Group` na vůz v `userData.cars`, popořadě od čela.
 - Každý vůz v metrech, čelem k **+Z**, **+Y** nahoru, pravý bok (dveře) na **−X**, počátek v rovině
   kolejnic uprostřed mezi otočnými čepy podvozků. Modely z jiných nástrojů míří obvykle na +X: při načtení je
-  otočte o −90° kolem Y, jako to dělá `src/t3h.js`.
+  otočte kolem Y, jako to podle `forward` v popisu dělá loader `gltf-rigged`.
 - `userData.bogie` (polovina rozteče čepů), `userData.bodyFront` (čelo skříně od počátku vozu),
   `userData.mats` (materiály tabulí a cedulí), `userData.kind`, `line`, `dest`, `run`.
 - Rozměry T3 v `src/tram.js` (`T3`: 15,2 m přes spřáhla, skříň 14,0 m, čepy 6,4 m od sebe, čep spřáhla
@@ -72,14 +99,14 @@ poděkování ho uvede.
 - **Stav:** `poseT3(model, { doors, collector, braking, track, indicate, clock, highBeam })` (`src/models.js`):
   dveře 0–1, výška trolejového drátu nad kolejnicí pro sběrač (pod jeho pracovním rozsahem se stáhne), brzdová
   světla, magnety kolejnicových brzd, směrovky (`'left'`, `'right'`, `'hazard'` nebo nic, blikají podle `clock`:
-  `src/lamps.js`), dálková světla. Podrobný model bere všechno (`poseHybrid`), vestavěný vše kromě dveří a čelistí
+  `src/lamps.js`), dálková světla. Vozidlo s rigem bere vše, co rig jmenuje (`poseRigged`), vestavěný vše kromě dveří a čelistí
   (`poseSimple`). Světlomety a koncová světla svítí, kdykoli je tramvaj v provozu, čelo soupravy jen na prvním voze,
   červená světla zádi (koncová a brzdová) na každém voze. Náš řidič ovládá směrovky a dálková světla klávesami;
   autopilot a cizí tramvaje dávají směrovky samy (`src/indicators.js`) a cizí T3M ukazuje další zastávku
   (`setNextStop`).
 - **Cizí tramvaje** (`src/traffic.js`) se objevují a mizí přes `setOpacity`, po materiálech: vlastní
   průhlednost materiálu pod 1 zůstává v `userData.opacity`, materiál od začátku prolínaný zůstává prolínaný.
-  Daleko od kamery přepne podrobný model na lehčí úroveň (`setHybridLevel`, 50–60 m). Souprava, která odjede,
+  Daleko od kamery přepne vozidlo s rigem na lehčí úroveň (`setRiggedLevel`, 50–60 m). Souprava, která odjede,
   se uvolní přes `disposeModel`; geometrie a textury s `userData.shared` zůstanou pro další.
 
 ## Úrovně pohybu
@@ -107,19 +134,14 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
 2. **Soubor:** glTF nebo GLB v metrech, počátek a osy jako výše, nebo upravené při načtení. Ať je lehký:
    podrobný model má 2,9 MB a 44 000 trojúhelníků na vůz a cizích souprav je na očích několik naráz. Nasazení
    soubory `.glb` a `.gltf` komprimuje (DEVELOPING.md, *Deploy*).
-3. **Pohyblivé díly** (úroveň 2 a 3): samostatné pojmenované uzly, vyjmenované v souboru jako
-   `assets/t3h/rig.json`: `doors` (křídla dveří), `bogies` (název a čep), `wheels` (název a poloměr),
-   `pantograph` (kořen, hlava, ramena, výšky drátu), `signals` (směrovky), `brakes` (brzdová světla),
-   `numberPlates`, `routePlates`, `infoPlates` (cíl, pořadí, boční tabule), a animace podle názvu
-   (`Door_Front_Open`, `Pantograph_Lower`, …). Model kreslený kódem dá místo toho každému vozu `gear` pro
+3. **Pohyblivé díly** (úroveň 2 a 3): samostatné pojmenované uzly a animace, vyjmenované v rigu (výše). Model
+   kreslený kódem dá místo toho každému vozu `gear` pro
    `src/consist.js`, jako to dělá `src/t3simple.js` s instancovanými sítěmi (jeho vůz kreslí 8 sítí mimo
    tabule).
 4. **Popis:** `assets/<id>/vehicle.json` (výše) a id v `assets/vehicles.json`. Nehybnému modelu (úroveň 1,
-   loader `gltf`) to stačí. Model, který se hýbe, dnes potřebuje kód: modul jako `src/t3h.js` (načíst, postavit
-   soupravu s `gear` každého vozu, nastavit stav) a svůj loader v `makeT3`, `loadVehicle` a `poseT3`
-   (`src/models.js`). Chystá se společné rozhraní, které hýbe každým vozidlem podle jeho souboru pohyblivých dílů
-   bez vlastního kódu, vozidla při startu samo najde a zkontroluje a hráč si je může nainstalovat (#456).
-5. **Kontroly:** `python -I tools/test_vehicles.py` (popis), `tools/test_vehicles_game.py`, test jako `tools/test_t3h.py` (úrovně, spřáhla, podvozky, dveře, cedule, objevení), čas
+   loader `gltf`) to stačí, stejně jako modelu, který se hýbe podle rigu (loader `gltf-rigged`). Chystá se, že hra
+   vozidla při startu sama najde a zkontroluje a hráč si je může nainstalovat (#456).
+5. **Kontroly:** `python -I tools/test_vehicles.py` (popis), `tools/test_vehicles_game.py`, `tools/test_rigged.py`, test jako `tools/test_t3h.py` (úrovně, spřáhla, podvozky, dveře, cedule, objevení), čas
    snímku přes `tools/frametime.py --models …` a obrázky všech modelů ze stejných pohledů přes
    `python -P -E tools/test_t3simple.py --shots ADRESÁŘ` (bok, tři čtvrtiny, čelo, shora, podvozek, spřáhlo;
    dvouvozová souprava v oblouku o poloměru 25 m a její pojezd v půdorysu; stažený sběrač).
@@ -133,8 +155,9 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
   kontroluje proti těmto číslům.
 - **Tabule a cedule** všech modelů: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, bodový displej T3M `ledFace`).
-- **Podrobný model:** soubor pochází z projektové dílny na modely; změna souboru jde přes ni, nebo se udělá
-  při načtení v `src/t3h.js` (tak jsou upravená jeho spřáhla, čelisti kolejnicových brzd, evidenční čísla a koncová světla).
+- **Podrobný model:** udržuje se v repozitáři (dílna na modely se už nepoužívá): změnu modelu dělá nástroj
+  v repozitáři a uvede ji v `assets/t3h/LICENSE.txt`, jak licence CC BY-NC 4.0 žádá; změna přiřazení dílů jde do rolí
+  jeho rigu (čelisti, spřáhla, interiér, světlomety, koncová světla a velikost evidenčních čísel, #467, #471).
 - **Fakta:** rozměr, barva nebo detail skutečného vozu uvádí zdroj (výkres, fotka s evidenčním číslem,
   uživatel) v komentáři nebo v [docs/knowledge.md](knowledge.md). Fakta od uživatele, znalce pražských
   tramvají, mají přednost před výkresem i odhadem.
