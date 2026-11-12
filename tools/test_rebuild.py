@@ -13,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TOOLS)
@@ -158,8 +159,16 @@ class StepCacheTest(unittest.TestCase):
         self.assertIsNone(rec["inputs"]["raw/extra.txt"])  # (probed, not there)
         self.assertEqual(set(rec["listings"]), {"raw/cells"})
         self.assertEqual(set(rec["outputs"]), {"data/x.json"})  # (not atomic's temporary file)
+        self.assertEqual(rec["env"]["OPENBLAS_NUM_THREADS"], rebuild.BLAS["line"])
         self.write("raw/in.txt", "two")
-        self.assertEqual(rebuild.CACHE.match(name), (None, "raw/in.txt changed"))
+        self.assertEqual(rebuild.CACHE.match(name, env=rebuild.step_env("line")), (None, "raw/in.txt changed"))
+
+    def test_blas_threads_in_the_key(self):
+        """numpy's BLAS threads change results in their last bits: another number runs the step again."""
+        self.build()
+        with mock.patch.dict(rebuild.BLAS, {"line": "3"}):
+            self.assertEqual(self.build(), [0, 0])
+        self.assertEqual(self.build(), ["skip", "skip"])  # (the record of each number kept)
 
     def test_reader_beside_writers_keyed_as_before_them(self):
         """c beside b (b rewrites data/x.json while c reads it): c's key holds x.json as a left it."""

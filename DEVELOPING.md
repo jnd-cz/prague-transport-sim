@@ -20,15 +20,30 @@ python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, t
 
 Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
 (`raw/osm/praha.osm.pbf`, pyosmium, so the OSM tools run with `-P -E`). The Overpass API is not used.
+The extract's tagged ways and nodes and its relations are decoded once per extract and machine into
+`TRAMDATA_CACHE/osm-index/` (else `raw/osm/index/`; ~50 s, keyed by the extract's hash and the code that writes
+it): `tools/osm_local.py`'s `ways()`, `nodes()` and `relations()` answer from it, where each was a pass of
+~15-30 s over the file (#511).
 All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
 
 The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
 side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
-The OSM extract is read once per build (~1 min), and a line takes ~2-4 min:
+A line takes ~2-4 min:
 
 ```bash
 python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
+python -P -E tools/rebuild.py 9 --from dtm   # that step runs again (track = build_line, heights = line_heights)
+python -P -E tools/rebuild.py --force        # every step runs
 ```
+
+A step runs only when something it read changed (`tools/stepcache.py`, #511): each run is traced (the files it
+opened, probed or listed under the checkout, the modules it imported from it, the packages' versions) and
+recorded in `reports/rebuild/cache/`; a step whose record still holds is skipped and its outputs put back as that
+run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
+turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
+same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
+changed`). A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
+`--from` or `--force`.
 
 The single steps:
 

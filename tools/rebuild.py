@@ -42,6 +42,19 @@ BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsig
 ALIAS = {"track": "build_line", "heights": "line_heights", "structures": "line_structures"}
 CACHE = None  # (stepcache.Cache of ROOT, made by main)
 FORCE = set()  # steps that run whatever their records say ("*": all)
+# numpy's BLAS threads per step: by default one per core in every process, and with the steps and lines side by side
+# hundreds of them fought for 24 cores (an ADMM-sized inverse and 300 products, n 1200: 5.1 s against 0.08 s with 4
+# threads, #511). A line's steps run four at a time (and lines side by side), the heights alone. The same numbers
+# whatever runs beside them: they enter the results' last bits, so the steps' keys (tools/stepcache.py ENV). An
+# OPENBLAS_NUM_THREADS of the caller's own is kept.
+BLAS = {"line": "1", "heights": "4"}
+
+
+def step_env(phase):
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    if "OPENBLAS_NUM_THREADS" not in os.environ:
+        env["OPENBLAS_NUM_THREADS"] = BLAS[phase]
+    return env
 
 
 def writers(line):
@@ -73,19 +86,18 @@ def names():
     return out | {st[0][:-3] for st in writers("17")}
 
 
-def run_step(label, st, log, phase0=None):
+def run_step(label, st, log, phase0=None, phase="line"):
     """One step, or its outputs put back when a record of it holds: (name, seconds, exit code or "skip", why, key,
     record, ran)."""
-    key, t = CACHE.name(label, st[0], st[1:]), time.time()
+    key, t, env = CACHE.name(label, st[0], st[1:]), time.time(), step_env(phase)
     name = st[0][:-3]
-    rec, why = (None, "--force" if "*" in FORCE else "--from") if FORCE & {"*", name} else CACHE.match(key, phase0)
+    rec, why = (None, "--force" if "*" in FORCE else "--from") if FORCE & {"*", name} else CACHE.match(key, phase0, env)
     if rec:
         CACHE.restore(rec, stepcache.relpath(ROOT, log))
         return st[0], round(time.time() - t), "skip", f"as run {rec['when']}, {rec['secs']:.0f} s", key, rec, False
     tmp = CACHE.tmp_record(key)
     with open(log, "w", encoding="utf-8") as f:
-        r = subprocess.run(CACHE.command(PY, st[0], st[1:], tmp), cwd=ROOT, stdout=f, stderr=subprocess.STDOUT,
-                           env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+        r = subprocess.run(CACHE.command(PY, st[0], st[1:], tmp), cwd=ROOT, stdout=f, stderr=subprocess.STDOUT, env=env)
     rec = CACHE.save(key, tmp, log) if r.returncode == 0 else None
     return st[0], round(time.time() - t), r.returncode, why, key, rec, True
 
@@ -165,13 +177,13 @@ def heights(lines):
     """The top of rail of the lines rebuilt (tools/line_heights.py), after all their steps."""
     t = time.time()
     log = os.path.join(ROOT, "reports", "rebuild", "heights.log")
-    times = [run_step("heights", ["line_heights.py", *lines], log)]
+    times = [run_step("heights", ["line_heights.py", *lines], log, phase="heights")]
     if times[0][2] != "skip" and times[0][2]:
         return f"heights of {', '.join(lines)}: FAILED, see reports/rebuild/heights.log"
     # (the spans, decks and underpasses read the built top of rail: tools/line_structures.py, #480)
     for line in lines:
         log = os.path.join(ROOT, "reports", "rebuild", f"line{line}.line_structures.log")
-        times.append(run_step(f"line{line}", ["line_structures.py", "--line", line], log))
+        times.append(run_step(f"line{line}", ["line_structures.py", "--line", line], log, phase="heights"))
         if times[-1][2] not in (0, "skip"):
             return f"structures of line {line}: FAILED, see reports/rebuild/line{line}.line_structures.log"
     with open(os.path.join(ROOT, "reports", "rebuild", "heights.summary.log"), "w", encoding="utf-8") as f:
