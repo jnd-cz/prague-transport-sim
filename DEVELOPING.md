@@ -162,6 +162,10 @@ the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the dep
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
+**The site's icons** (#485): `assets/icons/icon-{32,180,192,512}.png`, the favicon, the iPhone's home-screen icon
+(`apple-touch-icon` in `index.html`) and the web manifest's (`app.webmanifest`), are drawn by
+`python -P -E tools/make_icons.py`: change the drawing there and run it, never the PNGs by hand.
+
 ## Dev
 
 **Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
