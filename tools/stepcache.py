@@ -50,13 +50,21 @@ def relpath(root, p):
     return r
 
 
-def listing(root, r, drop=()):
-    """The hash of a folder's names (None when it is not there), less the names in drop."""
+def names(root, r):
+    """A folder's names (None when it is not there), less the temporary files of writes in flight (tools/atomic.py's
+    `<name>.<pid>.part`: a step listing raw/ while another line's step wrote there ran again the next time, #511)."""
     try:
-        names = sorted(set(os.listdir(os.path.join(root, r))) - set(drop))
+        return {n for n in os.listdir(os.path.join(root, r)) if not n.endswith(".part")}
     except (FileNotFoundError, NotADirectoryError):
         return None
-    return hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest()
+
+
+def listing(root, r, drop=()):
+    """The hash of a folder's names (None when it is not there), less the names in drop."""
+    got = names(root, r)
+    if got is None:
+        return None
+    return hashlib.sha256("\n".join(sorted(got - set(drop))).encode("utf-8")).hexdigest()
 
 
 class Hashes:
@@ -139,42 +147,40 @@ def versions(names):
 
 # ---- the traced run (a child process) ----
 
-def trace(root, record, tool, args):
-    """Run tool as __main__ with args, recording what it reads and writes; the record is written on success."""
-    import runpy
-    root = os.path.abspath(root)
-    hashes = Hashes(root, os.path.join(root, "reports", "rebuild", "cache", "hashes.json"))
-    inputs, lists, written, removed, moved = {}, {}, set(), set(), set()
-    lock, busy, on = threading.RLock(), threading.local(), [True]
-    used_osmium = [False]
+class _Tracer:
+    """What one process reads and writes under root, from its install() on; its multiprocessing children run under a
+    tracer of their own (`child` below) and leave their part beside the step's record, merged at the end."""
 
-    def seen(p, kind="read"):
-        if not on[0] or getattr(busy, "v", False):
+    def __init__(self, root, record):
+        self.root, self.record = os.path.abspath(root), record
+        self.hashes = Hashes(self.root, os.path.join(self.root, "reports", "rebuild", "cache", "hashes.json"))
+        self.inputs, self.lists, self.written, self.removed, self.moved = {}, {}, set(), set(), set()
+        self.lock, self.busy, self.on, self.osmium, self.parts = threading.RLock(), threading.local(), True, False, []
+
+    def seen(self, p, kind="read"):
+        if not self.on or getattr(self.busy, "v", False):
             return
-        busy.v = True
+        self.busy.v = True
         try:
-            r = relpath(root, p)
+            r = relpath(self.root, p)
             if r is None:
                 return
-            with lock:
+            with self.lock:
                 if kind == "write":
-                    written.add(r)
+                    self.written.add(r)
                 elif kind == "remove":
-                    removed.add(r)
+                    self.removed.add(r)
                 elif kind == "move":
-                    moved.add(r)
+                    self.moved.add(r)
                 elif kind == "list":
-                    if r not in lists:
-                        try:
-                            lists[r] = set(os.listdir(os.path.join(root, r)))
-                        except (FileNotFoundError, NotADirectoryError):
-                            lists[r] = None
-                elif r not in inputs and r not in written:
-                    inputs[r] = hashes.state(r)
+                    if r not in self.lists:
+                        self.lists[r] = names(self.root, r)
+                elif r not in self.inputs and r not in self.written:
+                    self.inputs[r] = self.hashes.state(r)
         finally:
-            busy.v = False
+            self.busy.v = False
 
-    def hook(event, a):
+    def hook(self, event, a):
         if event == "open":
             if isinstance(a[0], int):
                 return
@@ -186,43 +192,114 @@ def trace(root, record, tool, args):
                 w = acc in (os.O_WRONLY, os.O_RDWR) or bool(flags & (os.O_CREAT | os.O_APPEND | os.O_TRUNC))
                 r = acc != os.O_WRONLY and not flags & (os.O_TRUNC | os.O_EXCL) or bool(flags & os.O_APPEND)
             if r:
-                seen(a[0])
+                self.seen(a[0])
             if w:
-                seen(a[0], "write")
+                self.seen(a[0], "write")
         elif event == "os.rename":
-            seen(a[0], "move")
-            seen(a[1], "write")
+            self.seen(a[0], "move")
+            self.seen(a[1], "write")
         elif event in ("os.remove", "os.rmdir"):
-            seen(a[0], "remove")
+            self.seen(a[0], "remove")
         elif event in ("os.listdir", "os.scandir"):
             # (not the import system's own listings of sys.path: a new tool beside them changes no step)
             if sys._getframe(1).f_globals.get("__name__") not in ("_frozen_importlib_external", "importlib._bootstrap_external"):
-                seen(a[0] if a[0] is not None else ".", "list")
+                self.seen(a[0] if a[0] is not None else ".", "list")
 
-    def probe(f):
-        def wrapped(p, *a, **k):
-            if not isinstance(p, int):
-                seen(p)
-            return f(p, *a, **k)
-        wrapped.__wrapped__ = f
-        return wrapped
+    def install(self):
+        def probe(f):
+            def wrapped(p, *a, **k):
+                if not isinstance(p, int):
+                    self.seen(p)
+                return f(p, *a, **k)
+            wrapped.__wrapped__ = f
+            return wrapped
 
-    os.stat = probe(os.stat)
-    for n in ("exists", "isfile", "isdir", "getsize", "getmtime"):
-        setattr(os.path, n, probe(getattr(os.path, n)))
-    try:  # (osmium opens its file in C, past the audit hook)
-        import osmium
-        fp = osmium.FileProcessor
+        os.stat = probe(os.stat)
+        for n in ("exists", "isfile", "isdir", "getsize", "getmtime"):
+            setattr(os.path, n, probe(getattr(os.path, n)))
+        try:  # (osmium opens its file in C, past the audit hook)
+            import osmium
+            fp = osmium.FileProcessor
 
-        def file_processor(src, *a, **k):
-            used_osmium[0] = True
-            seen(src)
-            return fp(src, *a, **k)
-        osmium.FileProcessor = file_processor
-    except ImportError:
-        pass
-    sys.addaudithook(hook)
-    before = set(sys.modules)
+            def file_processor(src, *a, **k):
+                self.osmium = True
+                self.seen(src)
+                return fp(src, *a, **k)
+            osmium.FileProcessor = file_processor
+        except ImportError:
+            pass
+        import multiprocessing.spawn as mps
+        command = mps.get_command_line
+
+        def child_command(**kw):  # (a child of the step, spawned: this file runs it, under a tracer of its own)
+            c = command(**kw)
+            if "-c" not in c:
+                return c
+            with self.lock:
+                part = f"{self.record}.{os.getpid()}.{len(self.parts)}.child"
+                self.parts.append(part)
+            i = c.index("-c")
+            return [*c[:i], os.path.abspath(__file__), "child", self.root, part, *c[i:]]
+        mps.get_command_line = child_command
+        sys.addaudithook(self.hook)
+        self.before = set(sys.modules)
+
+    def found(self):
+        """What this process read and wrote, its children's merged in: (modules, packages, the merged sets)."""
+        self.on = False
+        modules, pkgs = set(), set()
+        me = os.path.normcase(os.path.abspath(__file__))
+        for name, m in list(sys.modules.items()):
+            f = getattr(m, "__file__", None)
+            if f and os.path.normcase(os.path.abspath(f)) == me:
+                continue  # (this tracer, as __main__ and multiprocessing's __mp_main__: FORMAT says when its records change)
+            r = relpath(self.root, f) if f else None
+            if r:
+                modules.add(r)
+            elif f and "." not in name and name not in sys.stdlib_module_names and (
+                    name not in self.before or name == "osmium" and self.osmium):
+                pkgs.add(name)  # (imported by the tool; osmium, imported here first, only when it read with it)
+        cpu, missing = time.process_time(), 0
+        for part in self.parts:
+            try:
+                with open(part, encoding="utf-8") as f:
+                    c = json.load(f)
+                os.remove(part)
+            except FileNotFoundError:
+                missing += 1  # (a child that was killed: what it did is not known)
+                continue
+            for r, s in c["inputs"].items():
+                if r not in self.inputs and r not in self.written:
+                    self.inputs[r] = s
+            for r, names in c["lists"].items():
+                self.lists.setdefault(r, None if names is None else set(names))
+            self.written.update(c["written"])
+            self.removed.update(c["removed"])
+            self.moved.update(c["moved"])
+            modules.update(c["modules"])
+            pkgs.update(c["packages"])
+            self.hashes.merge(c["hashes"])
+            cpu += c["cpu"]
+            missing += c["missing"]
+        return modules, pkgs, cpu, missing
+
+    def part(self, path):
+        """A child's part for its parent's record."""
+        modules, pkgs, cpu, missing = self.found()
+        tmp = f"{path}.part"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"inputs": self.inputs, "lists": {r: None if n is None else sorted(n) for r, n in self.lists.items()},
+                       "written": sorted(self.written), "removed": sorted(self.removed), "moved": sorted(self.moved),
+                       "modules": sorted(modules), "packages": sorted(pkgs), "cpu": cpu, "missing": missing,
+                       "hashes": self.hashes.new}, f)
+        _replace(tmp, path)
+
+
+def trace(root, record, tool, args):
+    """Run tool as __main__ with args, recording what it reads and writes; the record is written on success."""
+    import runpy
+    t = _Tracer(root, record)
+    t.install()
     sys.argv = [tool, *args]
     t0, code = time.time(), 0
     try:
@@ -233,44 +310,52 @@ def trace(root, record, tool, args):
         import traceback
         traceback.print_exc()
         code = 1
-    on[0] = False
     sys.stdout.flush()
+    modules, pkgs, cpu, missing = t.found()
     if code not in (0, None):
         sys.exit(code)
-    modules, pkgs = {}, set()
+    root, hashes = t.root, t.hashes
     tools = relpath(root, tool)
-    for name, m in list(sys.modules.items()):
-        if name == "__main__":
-            continue  # (this tracer: FORMAT says when its records change)
-        f = getattr(m, "__file__", None)
-        r = relpath(root, f) if f else None
-        if r:
-            modules[r] = hashes.state(r)
-        elif f and "." not in name and name not in sys.stdlib_module_names and (name not in before or name == "osmium" and used_osmium[0]):
-            pkgs.add(name)  # (imported by the tool; osmium, imported here first, only when it read with it)
-    modules[tools] = hashes.state(tools)
+    modules = {r: hashes.state(r) for r in sorted(modules | {tools})}
     outputs = {}
-    for r in written | removed:
+    for r in t.written | t.removed:
         s = hashes.state(r)
-        if s is None and r not in removed:
+        if s is None and r not in t.removed:
             continue  # (a temporary file, renamed or removed)
         outputs[r] = s
-    for r in moved - set(outputs):
-        if r in inputs:
+    for r in t.moved - set(outputs):
+        if r in t.inputs:
             outputs[r] = None  # (an input moved away)
     rec = {"format": FORMAT, "tool": tools, "args": args, "python": sys.version.split()[0],
            "env": {k: os.environ.get(k) for k in ENV}, "packages": versions(sorted(pkgs)), "modules": modules,
-           "inputs": {r: s for r, s in sorted(inputs.items()) if r not in modules and r != "."},
+           "inputs": {r: s for r, s in sorted(t.inputs.items()) if r not in modules and r != "."},
            "listings": {r: (None if names is None else
                             hashlib.sha256("\n".join(sorted(names - {o.rsplit("/", 1)[-1] for o in outputs if o.rsplit("/", 1)[0] == r})).encode("utf-8")).hexdigest())
-                        for r, names in sorted(lists.items())},
+                        for r, names in sorted(t.lists.items())},
            "outputs": dict(sorted(outputs.items())), "secs": round(time.time() - t0, 1),
-           "cpu": round(time.process_time(), 1),  # (all the process's threads, its imports too: the cores it kept busy)
+           "cpu": round(cpu, 1),  # (all the process's threads and its children's, imports too: the cores it kept busy)
            "when": time.strftime("%Y-%m-%d %H:%M"), "hashes": hashes.new}
+    if missing:
+        rec["untraced"] = f"{missing} child process(es) left no trace"
     tmp = f"{record}.part"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(rec, f)
     _replace(tmp, record)
+
+
+def child(root, part, argv):
+    """A multiprocessing child of a traced step: `python stepcache.py child ROOT PART -c PROG --multiprocessing-fork`."""
+    t = _Tracer(root, part)
+    t.install()
+    prog, sys.argv = argv[1], ["-c", *argv[2:]]
+    code = 0
+    try:
+        exec(compile(prog, "-c", "exec"), {"__name__": "__main__"})
+    except SystemExit as e:
+        code = e.code
+    finally:
+        t.part(part)
+    sys.exit(code)
 
 
 # ---- the cache (rebuild.py's side) ----
@@ -316,6 +401,8 @@ class Cache:
         environment (os.environ by default)."""
         if rec.get("format") != FORMAT:
             return "the record's format"
+        if rec.get("untraced"):
+            return rec["untraced"]
         if rec["python"] != sys.version.split()[0]:
             return f"Python {rec['python']} → {sys.version.split()[0]}"
         env = os.environ if env is None else env
@@ -454,6 +541,8 @@ class Cache:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 6 and sys.argv[1] == "child":
+        child(sys.argv[2], sys.argv[3], sys.argv[4:])
     if len(sys.argv) < 5 or sys.argv[1] != "trace":
         print(__doc__)
         sys.exit(2)
