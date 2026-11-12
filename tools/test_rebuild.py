@@ -48,6 +48,26 @@ d = json.load(open(os.path.join(ROOT, "data", "x.json"), encoding="utf-8"))
 open(os.path.join(ROOT, "data", "c.json"), "w", encoding="utf-8").write(json.dumps(d["src"]))
 '''
 
+# (a step that hands its work to multiprocessing children: each reads raw/pN.txt and writes data/pN.out)
+P = '''import os, sys
+from concurrent.futures import ProcessPoolExecutor
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def work(n):
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import helper  # noqa: F401
+    p = os.path.join(ROOT, "raw", f"p{n}.txt")
+    text = open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+    open(os.path.join(ROOT, "data", f"p{n}.out"), "w", encoding="utf-8").write(text + "!")
+    return n
+
+
+if __name__ == "__main__":
+    with ProcessPoolExecutor(2) as ex:
+        print(list(ex.map(work, [1, 2])))
+'''
+
 
 class StepCacheTest(unittest.TestCase):
     def setUp(self):
@@ -132,6 +152,7 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(self.build(), [0, 0])
         self.assertEqual(self.data()["cells"], ["1.bin", "2.bin"])
         self.write("tools/other.py", "")  # (a new tool beside the steps: the import system's listing is no input)
+        self.write("raw/cells/3.bin.4711.part", "")  # (another step's write in flight)
         self.assertEqual(self.build(), ["skip", "skip"])
 
     def test_lost_output_put_back(self):
@@ -182,6 +203,22 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(phase(), ["skip", "skip"])
         self.write("tools/b.py", B.replace("B_ADD", "10"))
         self.assertEqual(phase(), [0, "skip"])  # (b's new output is not what c read)
+
+    def test_child_processes_traced(self):
+        """A step whose work runs in multiprocessing children: what they read and write is in its record."""
+        self.write("tools/p.py", P)
+        self.write("raw/p1.txt", "1")
+        fail, times = rebuild.run_steps("9", [["p.py", "--line", "9"]])
+        self.assertIsNone(fail, open(os.path.join(self.root, "reports", "rebuild", "line9.p.log")).read() if fail else "")
+        rec = times[0][5]
+        self.assertEqual(set(rec["outputs"]), {"data/p1.out", "data/p2.out"})
+        self.assertEqual(set(rec["inputs"]), {"raw/p1.txt", "raw/p2.txt"})
+        self.assertIn("tools/helper.py", rec["modules"])  # (imported by the children only)
+        self.assertNotIn("untraced", rec)
+        self.assertEqual(rebuild.run_steps("9", [["p.py", "--line", "9"]])[1][0][2], "skip")
+        self.write("raw/p1.txt", "one")  # (read by a child only)
+        self.assertEqual(rebuild.run_steps("9", [["p.py", "--line", "9"]])[1][0][2], 0)
+        self.assertEqual(open(os.path.join(self.root, "data", "p1.out"), encoding="utf-8").read(), "one!")
 
     def test_failed_step_keeps_no_record(self):
         self.write("tools/b.py", "raise SystemExit('no')\n")

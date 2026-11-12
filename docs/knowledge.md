@@ -885,6 +885,15 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   simulation in JS (`window.headless`) rather than waiting in real time.
 - Memory: the whole line is built at load (no streaming); fine terrain adds ~0.15–0.2 GB.
 - The `gh` CLI lives in `C:\Program Files\GitHub CLI` (not always on the Bash PATH).
+- numpy's OpenBLAS starts a thread per core in every process. Several processes side by side (a rebuild's
+  steps, two jobs at once) then fight over the cores: an ADMM-sized inverse and 300 products (n 1200) took
+  5.1 s with the default 24 threads beside a rebuild, 0.14 s with one and 0.08 s with four (#511). Alone,
+  4 threads and 24 run about as fast. The thread count changes BLAS results in their last bits (sums split
+  differently); the line heights came out byte-identical at 4 and at 24. `tools/rebuild.py` sets
+  `OPENBLAS_NUM_THREADS` per step.
+- Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
+  rewritten within the same second at the same size runs the old code (a test that edits a module must
+  change its size).
 
 ## The test host
 
