@@ -70,8 +70,9 @@ materiály jsou sklo. Lehčí úroveň pro vzdálené cizí tramvaje vznikne př
 vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrobí vzorové vozidlo se všemi díly a zkontroluje,
 že se každý hýbe.
 
-Rig píše to, co model exportuje, ne ruka: rig podrobného modelu pochází z projektové dílny na modely. Osm jeho polí
-je zatím dopsaných ručně, než je exportuje příští revize dílny (`handWritten` v rigu, #471).
+Rig se generuje, needituje se ručně. Podrobný model se udržuje v repozitáři (projektová dílna na modely, ze které
+pochází, už se nepoužívá); jeho rig má generovat `tools/export_t3h_rig.py` z `tools/t3h_rig_roles.json` s kontrolou
+proti GLB (#471), do té doby je osm jeho polí dopsaných ručně (`handWritten` v rigu).
 
 ## Co musí souprava splňovat
 
@@ -154,8 +155,9 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
   kontroluje proti těmto číslům.
 - **Tabule a cedule** všech modelů: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, bodový displej T3M `ledFace`).
-- **Podrobný model:** soubor pochází z projektové dílny na modely; změna souboru jde přes ni, nebo se udělá
-  v jeho rigu (jsou tam jeho čelisti, spřáhla, interiér, světlomety, koncová světla a velikost evidenčních čísel, #467).
+- **Podrobný model:** udržuje se v repozitáři (dílna na modely se už nepoužívá): změnu modelu dělá nástroj
+  v repozitáři a uvede ji v `assets/t3h/LICENSE.txt`, jak licence CC BY-NC 4.0 žádá; změna přiřazení dílů jde do rolí
+  jeho rigu (čelisti, spřáhla, interiér, světlomety, koncová světla a velikost evidenčních čísel, #467, #471).
 - **Fakta:** rozměr, barva nebo detail skutečného vozu uvádí zdroj (výkres, fotka s evidenčním číslem,
   uživatel) v komentáři nebo v [docs/knowledge.md](knowledge.md). Fakta od uživatele, znalce pražských
   tramvají, mají přednost před výkresem i odhadem.
