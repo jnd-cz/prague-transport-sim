@@ -4,8 +4,8 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
     python -P -E tools/track_styles.py --line 22     # writes `styles` into data/line22.json
 
 - **The user's marks** (data/truth.json `trackStyles`, by stops so they hold in any frame): from the first stop of the
-  mark's `from` name to the next stop of its `to` name; a mark with `between` (two lat, lon points) runs between the
-  route positions nearest them.
+  mark's `from` name to the next stop of its `to` name; a mark with `between` runs between its two ends, each a lat,
+  lon point (the route position nearest it) or a stop name (that stop nearest the point end).
 - **The grassed-track list** (data/truth.json `grassTrack`, prazsketramvaje.cz): every line passing both stops of a
   stretch takes it, each time it passes them (an out-and-back line twice). Where the user's marks cover the track they
   win, and what is left of a stretch stays if MIN_GRASS long.
@@ -92,12 +92,20 @@ def sections(data, truth, survey):
     for mark, t in enumerate(truth.get("trackStyles", [])):
         if str(t["line"]) != str(data["line"]):
             continue
-        if "between" in t:   # (two points: the route positions nearest them, where the route passes within 15 m)
+        if "between" in t:   # (two ends, each a lat, lon point or a stop: points within 15 m of the route, by position)
             path = LineString([p[:2] for p in data["path"]])
-            pts = [Point(*map(float, Frame().xy(lat, lon))) for lat, lon in t["between"]]
-            if max(path.distance(p) for p in pts) > 15:
+            pts = [None if isinstance(e, str) else Point(*map(float, Frame().xy(*e))) for e in t["between"]]
+            if any(p is not None and path.distance(p) > 15 for p in pts):
                 continue
-            s0, s1 = sorted(path.project(p) for p in pts)
+            ss = [None if p is None else path.project(p) for p in pts]
+            known = [v for v in ss if v is not None]
+            for i, e in enumerate(t["between"]):
+                if isinstance(e, str):   # (the stop of that name nearest the point end)
+                    at = [st["s"] for st in data["stops"] if st["name"] == e]
+                    ss[i] = min(at, key=lambda v: abs(v - known[0]) if known else v) if at else None
+            if None in ss:
+                continue
+            s0, s1 = sorted(ss)
         else:
             a = next((i for i, st in enumerate(data["stops"]) if st["name"] == t["from"]), -1)
             b = next((i for i, st in enumerate(data["stops"]) if a >= 0 and i > a and st["name"] == t["to"]), -1)

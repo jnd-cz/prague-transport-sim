@@ -52,6 +52,8 @@ class Styles(unittest.TestCase):
         secs = T.sections(DATA, truth, None)
         self.assertEqual([(round(x["s0"], 3), round(x["s1"], 3), x["source"]) for x in secs],
                          [(100.0, 180.0, "list"), (180.0, 420.0, "user")])
+        to_stop = {"trackStyles": [{"line": "x", "between": [ll[1], "B"], "style": "grass"}]}   # (B at 100 and 400: the nearer)
+        self.assertEqual([(round(x["s0"], 3), x["s1"]) for x in T.sections(DATA, to_stop, None)], [(100.0, 180.0)])
         far = [list(map(float, T.Frame().ll(x, y))) for x, y in ((420.0, 30.0), (180.0, 0.0))]
         self.assertEqual(T.sections(DATA, {"trackStyles": [{"line": "x", "between": far, "style": "grass"}]}, None), [])
 

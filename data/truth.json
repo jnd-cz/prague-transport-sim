@@ -636,6 +636,22 @@
    "extent": "all",
    "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
    "source": "user 2026-10-29"
+  },
+  {
+   "line": "17",
+   "from": "Výstaviště",
+   "between": [[50.10526, 14.43336], [50.10617, 14.43473]],
+   "style": "grass",
+   "extent": "between the two points",
+   "source": "user 2026-11-12, #479: \"The newly rebuild street beyond Výstaviště stop has now grass cover, between 50.10526°, 14.43336° and 50.10617°, 14.43473°. Osm viewer shows green patch there\""
+  },
+  {
+   "line": "37",
+   "to": "Podkovářská",
+   "between": [[50.1021863, 14.5062906], "Podkovářská"],
+   "style": "grass",
+   "extent": "from the point to the stop",
+   "source": "user 2026-11-12, #479: \"Another green span is on line 37 between 50.1021863N, 14.5062906E and podkovářská stop.\""
   }
  ],
  "grassTrack": {
