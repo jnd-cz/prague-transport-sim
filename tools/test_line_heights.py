@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import geo  # noqa: E402
@@ -620,6 +621,33 @@ class Surface(unittest.TestCase):
         self.assertEqual(zs[:2], [100.96, 100.98])
         self.assertEqual(zs[4:7], [101.25, 101.3, 101.35])
         self.assertEqual(srcs, ['surface', 'surface', 'x', 'x', 'surface', 'surface', 'surface', 'x'])
+
+
+class Workers(unittest.TestCase):
+    def test_first_solves_in_workers_as_in_one_process(self):
+        """#511: the chains' first solves side by side in worker processes give what one process gives, with the answers
+        this process holds (a 'hold' answer at a crossing), and the pinned pass after them the same pins."""
+        def network():
+            out = [chain([(0, 40 * k), (400, 40 * k)], lambda s, k=k: 101 + .001 * k * (s - 200) + (.3 if 150 < s < 160 else 0))
+                   for k in range(18)]  # (each at 101 m where the long track crosses it: pinned there)
+            return out + [chain([(200, -50), (200, 18 * 40)], lambda s: 101.0)]  # (crossing them all)
+        saved = ha.RADIUS_ANSWERS
+        self.addCleanup(setattr, ha, 'RADIUS_ANSWERS', saved)
+        ha.RADIUS_ANSWERS = [{'xy': (200.0, 80.0), 'answer': ha.HOLD}]
+        one, many = network(), network()
+        with mock.patch.object(lh, 'POOL', 10 ** 6):
+            a = quiet(lh.assemble, one)
+        with mock.patch.object(lh, 'POOL', 2):
+            b = quiet(lh.assemble, many)
+        self.assertEqual(a['pinned'], 18)
+        self.assertEqual(a['pinned'], b['pinned'])
+        for x, y in zip(one, many):
+            self.assertEqual(len(x.runs), len(y.runs))
+            for p, q in zip(x.runs, y.runs):
+                self.assertEqual(p['s'], q['s'])
+                for u, v in zip(p['z'], q['z']):  # (one BLAS thread in the workers: equal to its last bits, or nearly)
+                    self.assertAlmostEqual(u, v, places=9)
+            self.assertEqual((len(x.review), len(x.dropped), len(x.apart), x.held), (len(y.review), len(y.dropped), len(y.apart), y.held))
 
 
 if __name__ == '__main__':

@@ -301,6 +301,7 @@ def trace(root, record, tool, args):
     t = _Tracer(root, record)
     t.install()
     sys.argv = [tool, *args]
+    env = {k: os.environ.get(k) for k in ENV}  # (as the step was given it: a tool may set its workers' own)
     t0, code = time.time(), 0
     try:
         runpy.run_path(tool, run_name="__main__")
@@ -327,7 +328,7 @@ def trace(root, record, tool, args):
         if r in t.inputs:
             outputs[r] = None  # (an input moved away)
     rec = {"format": FORMAT, "tool": tools, "args": args, "python": sys.version.split()[0],
-           "env": {k: os.environ.get(k) for k in ENV}, "packages": versions(sorted(pkgs)), "modules": modules,
+           "env": env, "packages": versions(sorted(pkgs)), "modules": modules,
            "inputs": {r: s for r, s in sorted(t.inputs.items()) if r not in modules and r != "."},
            "listings": {r: (None if names is None else
                             hashlib.sha256("\n".join(sorted(names - {o.rsplit("/", 1)[-1] for o in outputs if o.rsplit("/", 1)[0] == r})).encode("utf-8")).hexdigest())
