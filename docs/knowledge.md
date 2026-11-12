@@ -805,7 +805,9 @@ Review these when realism matters; most move into the build in M2.
   `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
   `trackRadius` (over 5 m through the build's points, under 18 m; 18-20 m listed as exceptions) and `trackJoins`
   (through tracks breaking over 1° where chains meet, diverging start angles listed; direction from the parabola
-  through the first three drawn points).
+  through the first three drawn points),
+  `trackCorners` (a vertex turning over 1.5° between neighbours under 1°, segments up to 1.5 m: the corner a held
+  heading leaves where the points begin, which `trackRadius` cannot see within 2.5 m of a track's end, #491).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
