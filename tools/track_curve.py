@@ -62,7 +62,9 @@ BEND = 1.0         # m either side of a sample for the short radius (a 5 m windo
 BEND_LONG = 2.5    # m either side for the long radius (as tools/lint.js trackRadius; over 2 m a scatter of 2 cm alone
                    # reads as 25 m)
 NEAR = 10.0        # m around a place bending too tight whose points' tolerance grows
-CORNER = 1.0       # degrees: the sample a heading holds may turn this much more than the next CORNER_REACH of the curve
+CORNER = 0.5       # degrees: the sample a heading holds may turn this much more than the next CORNER_REACH of the curve
+                   # (at 1° a branch leaving at 42 m off a through track at 120 m kept a 1.53° vertex, line 22 by
+                   # 4400.9, -2364.8; at 0.5° the five lines' isolated corners fall a further third, every point in its class)
                    # bends at its rate; beyond it the turn is a corner and the points near it ease off within their class
                    # (line 9 s 15958, a trailing switch past Flora: 4.5° in its first metre, then 0.3°). A limit on the
                    # radius there instead (27 m, #477) forbade a switch curving at 18-20 m from its blade, as at Národní
