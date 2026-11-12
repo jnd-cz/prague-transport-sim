@@ -70,10 +70,10 @@ def _inner(xy, poly):
     return out, np.column_stack([nrm[:, 1], -nrm[:, 0]])
 
 
-def ring_fixes(r, poly, ground, skip=None):
+def ring_fixes(r, poly, ground, skip=None, covered=None):
     """{vertex index: new height} for one closed ring (n, 3) (no closing point) of an area (its polygon `poly`).
     ground: IPR at arrays (x, y) in the ring's frame; skip: a boolean per vertex left out, neither moved nor in the
-    offset."""
+    offset; covered: a boolean per vertex IPR does not see (it stays, and so does its run)."""
     n = len(r)
     if n < 3:
         return {}
@@ -97,25 +97,42 @@ def ring_fixes(r, poly, ground, skip=None):
     for j in (-1, 1):
         nb = np.roll(np.arange(n), -j)
         face |= (np.hypot(*(xy[nb] - xy).T) < FACE) & (np.abs(s[nb] - s) > OFF)
-    out = {}
+    off = np.zeros(n, bool)  # (off the local offset, or far off IPR with no offset in reach)
+    new = np.full(n, np.nan)
     for k in range(n):
-        if face[k] or not np.isfinite(e[k]) or not abs(bend[k]) <= CALM:
+        if not np.isfinite(e[k]):
             continue
         rel = (d - d[k] + L / 2) % L - L / 2  # (signed distance along the ring, wrapped)
         cand = np.flatnonzero((np.abs(rel) <= WIDE) & (np.arange(n) != k) & np.isfinite(e))
         lo, hi = rel[cand][rel[cand] < 0], rel[cand][rel[cand] > 0]
-        if not len(lo) or not len(hi):
-            continue
-        w = max(WIN, -lo.max(), hi.min())
         ag = cand[np.abs(e[cand]) <= AGREE]
         ag = ag[np.argsort(np.abs(rel[ag]))]
-        if len(ag) < MIN_AGREE:
+        if not len(lo) or not len(hi) or len(ag) < MIN_AGREE:
+            off[k] = abs(e[k]) > AGREE
             continue
+        w = max(WIN, -lo.max(), hi.min())
         # (the agreeing vertices within w, or the MIN_AGREE nearest within WIDE: a run longer than the window)
-        agree = e[ag[(np.abs(rel[ag]) <= w) | (np.arange(len(ag)) < MIN_AGREE)]]
-        o = float(np.median(agree))
-        if OFF < abs(e[k] - o) <= MAX:
-            out[k] = float(g[k] + o)
+        o = float(np.median(e[ag[(np.abs(rel[ag]) <= w) | (np.arange(len(ag)) < MIN_AGREE)]]))
+        if abs(e[k] - o) > OFF:
+            off[k] = True
+            new[k] = g[k] + o
+    movable = (off & np.isfinite(new) & ~face & (np.abs(bend) <= CALM) & (np.abs(new - s) <= MAX)
+               & (True if covered is None else ~covered))
+    # a run (the vertices off in a row along the ring) moves whole or not at all: moved in part, a stretch 1-3 m off IPR
+    # became a sawtooth on line 22 (at -4224, 80 and 1892, -1931)
+    out = {}
+    if off.all():
+        return out
+    k0 = int(np.flatnonzero(~off)[0])
+    run = []
+    for j in range(1, n + 1):
+        k = (k0 + j) % n
+        if off[k]:
+            run.append(k)
+            continue
+        if run and movable[run].all():
+            out.update({i: float(new[i]) for i in run})
+        run = []
     return out
 
 
@@ -147,13 +164,10 @@ def correct(areas, ground, held=(), covers=None):
         except (ValueError, shapely.errors.GEOSException):
             continue
         for r in arr:
-            fx = ring_fixes(r, poly, ground, np.array([(q[0], q[1]) in edge for q in r.tolist()]))
-            if not fx:
-                continue
-            ks = np.array(sorted(fx))
-            if covers is not None and not covers.is_empty:
-                ks = ks[~shapely.contains_xy(covers, r[ks, 0], r[ks, 1])]
-            for k in ks:
+            under = (shapely.contains_xy(covers, r[:, 0], r[:, 1]) if covers is not None and not covers.is_empty
+                     else None)
+            fx = ring_fixes(r, poly, ground, np.array([(q[0], q[1]) in edge for q in r.tolist()]), under)
+            for k in sorted(fx):
                 new.setdefault((round(float(r[k, 0]), 2), round(float(r[k, 1]), 2), round(float(r[k, 2]), 2)), []).append(fx[k])
                 count[a["c"]] = count.get(a["c"], 0) + 1
     z_at = {(x, y): (z, round(float(np.mean(v)), 2)) for (x, y, z), v in new.items()}

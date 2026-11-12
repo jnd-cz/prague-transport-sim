@@ -107,6 +107,15 @@ class Outline(unittest.TestCase):
         zs[6] += 2.5
         self.assertEqual(zo.correct([road(zs)], plane)["places"], 0)
 
+    def test_a_run_moves_whole_or_not_at_all(self):
+        # a stretch off IPR whose middle lies beyond MAX: moved in part it would become a sawtooth
+        zs = plane(np.arange(0, 61, 5.0), 0)
+        zs[4:9] -= np.array([1.0, 1.5, 2.5, 1.5, 1.0])
+        a = road(zs)
+        before = heights(a)
+        self.assertEqual(zo.correct([a], plane)["places"], 0)
+        self.assertEqual(before, heights(a))
+
 
 if __name__ == "__main__":
     unittest.main()
