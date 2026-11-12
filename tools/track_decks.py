@@ -3,6 +3,7 @@
 import json
 import math
 from pathlib import Path
+import re
 
 import shapely
 from shapely.geometry import LineString, Point, Polygon
@@ -206,27 +207,25 @@ def load_decks(root):
             )
     truth = json.loads((root / 'data/truth.json').read_text(encoding='utf-8'))
     facts = truth.get('trackHeights', {}).get('railAboveDeck', [])
-    styles, lines = [], {}
-    for mark_index, mark in enumerate(truth.get('trackStyles', [])):
-        line = str(mark['line'])
-        if line not in lines:
-            lines[line] = json.loads((root / f'data/line{line}.json').read_text(encoding='utf-8'))
-        data = lines[line]
-        a = next((i for i, st in enumerate(data['stops']) if st['name'] == mark['from']), None)
-        b = next(
-            (i for i, st in enumerate(data['stops']) if a is not None and i > a and st['name'] == mark['to']),
-            None,
-        )
-        if a is None or b is None:
+    styles = []
+    # (the facts as the build placed them on every line: data/lineN.json `styles`, tools/track_styles.py, #479: the
+    # user's marks and the grassed-track list; the survey's grass sections are not facts and stay out)
+    marks = truth.get('trackStyles', [])
+    listed = truth.get('grassTrack', {}).get('stretches', [])
+    for p in sorted((root / 'data').glob('line*.json'), key=lambda p: p.name):
+        if not re.fullmatch(r'line\d+\.json', p.name):
             continue
-        section = substring(
-            LineString([p[:2] for p in data['path']]), data['stops'][a]['s'], data['stops'][b]['s']
-        )
-        styles.append(
-            {
-                'style': mark['style'],
-                'polygon': section.buffer(5, cap_style=2),
-                'source': {'record': f'data/truth.json#trackStyles/{mark_index}', **mark},
-            }
-        )
+        data = json.loads(p.read_text(encoding='utf-8'))
+        if 'styles' not in data:
+            raise ValueError(f'data/{p.name} has no `styles`: run tools/track_styles.py --line {data["line"]} (#479)')
+        for sec in data['styles']:
+            if sec.get('source') == 'user':
+                record = {'record': f'data/truth.json#trackStyles/{sec["mark"]}', **marks[sec['mark']]}
+            elif sec.get('source') == 'list':
+                record = {'record': f'data/truth.json#grassTrack/stretches/{sec["stretch"]}', **listed[sec['stretch']]}
+            else:
+                continue
+            section = substring(LineString([q[:2] for q in data['path']]), sec['s0'], sec['s1'])
+            styles.append({'style': sec['style'], 'polygon': section.buffer(5, cap_style=2), 'source': record})
+    styles.sort(key=lambda x: x['source']['record'])
     return Decks(records, facts, styles)

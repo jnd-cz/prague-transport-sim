@@ -68,38 +68,17 @@ export function meetHeights(d, base) {
 
 const RAMP = 15; // m: a style's offset blends in and out over this at the ends of its section
 
-// The line's track styles, as functions of the route position: `at(s)` the style ('panels' where nothing
-// says otherwise), `lift(s)` its top of rail over the surface, blended at the section ends. From the
-// user's marks (data/truth.json trackStyles, by stops so they hold in any frame) and from the survey:
-// a green area under the track axis for 20 m and more is grass track (line 22 Koh-i-noor - Slavia,
-// whose bank fell 0.5 m across the rails). The user's marks win where they overlap.
-export function trackStyles(truth, data, surveyClass = null, length = 0) {
+// The line's track styles, as functions of the route position: `at(s)` the style ('panels' where nothing says
+// otherwise), `lift(s)` its top of rail over the surface, blended at the section ends. The sections are the build's
+// (the line data's `styles`, tools/track_styles.py, #479: the user's marks in data/truth.json and the survey's grass
+// track); how high the rails stand over each style is truth.json's `railAboveDeck`.
+export function trackStyles(truth, data) {
   const offsets = trackStyleOffsets(truth);
-  const secs = [];
-  for (const t of truth?.trackStyles || []) {
-    if (String(t.line) !== String(data.line)) continue;
-    const a = data.stops.findIndex((st) => st.name === t.from);
-    const b = a < 0 ? -1 : data.stops.findIndex((st, i) => i > a && st.name === t.to);
-    if (a < 0 || b < 0) continue;
-    const offset = offsets[t.style];
-    if (!offset) throw new Error(`Unknown track style: ${t.style}`);
-    secs.push({ s0: data.stops[a].s, s1: data.stops[b].s, style: t.style, d: offset.metres, offsetFactIds: offset.factIds, source: 'user' });
-  }
-  if (surveyClass) {
-    const user = secs.slice();
-    let a = null;
-    for (let s = 0; s <= length + 4; s += 4) {
-      const green = s <= length && surveyClass(s) === 'green';
-      if (green && a === null) a = s;
-      if (!green && a !== null) {
-        const s1 = s - 4;
-        const last = secs[secs.length - 1];
-        if (last?.source === 'survey' && a - last.s1 < 30) last.s1 = s1; // (short gaps: one section)
-        else if (s1 - a >= 20 && !user.some((x) => s1 > x.s0 && a < x.s1)) secs.push({ s0: a, s1, style: 'grass', d: offsets.grass.metres, offsetFactIds: offsets.grass.factIds, source: 'survey' });
-        a = null;
-      }
-    }
-  }
+  const secs = (data.styles || []).map((x) => {
+    const offset = offsets[x.style];
+    if (!offset) throw new Error(`Unknown track style: ${x.style}`);
+    return { ...x, d: offset.metres, offsetFactIds: offset.factIds };
+  });
   const at = (s) => secs.find((x) => s >= x.s0 && s <= x.s1)?.style ?? 'panels';
   const lift = (s) => {
     let v = 0;

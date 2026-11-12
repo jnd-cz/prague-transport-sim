@@ -52,10 +52,10 @@ class BuiltRoute(unittest.TestCase):
         result = self.page.evaluate('''async () => {
           const {checkBuiltRoute}=await import('/src/route.js');
           const fails=(d)=>{try{checkBuiltRoute(d);return null;}catch(e){return String(e.message);}};
-          return {none:fails({line:'x'}), curves:fails({line:'x',trackCurve:{}}), all:fails({line:'x',trackCurve:{},pathExt:{before:[],after:[]},curvature:{},cant:{}})};
+          return {none:fails({line:'x'}), curves:fails({line:'x',trackCurve:{}}), all:fails({line:'x',trackCurve:{},pathExt:{before:[],after:[]},curvature:{},cant:{},styles:[]})};
         }''')
-        self.assertIn('trackCurve, pathExt, curvature, cant', result['none'])
-        self.assertIn('pathExt, curvature, cant', result['curves'])
+        self.assertIn('trackCurve, pathExt, curvature, cant, styles', result['none'])
+        self.assertIn('pathExt, curvature, cant, styles', result['curves'])
         self.assertIsNone(result['all'])
 
     def test_the_route_passes_every_built_point(self):

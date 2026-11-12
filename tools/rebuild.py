@@ -10,7 +10,8 @@ group writes data/lineN.json, each writer whole and renamed):
   fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
     the source lines for review mode)
-then line_heights once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's
+then track_styles (the user's marks and the survey's grass track, #479: it reads the survey's areas and writes
+data/lineN.json), then line_heights once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's
 survey sidecar, so it runs after them all), then the validation report (tools/validation.py, #23).
 Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log, reports/rebuild/heights.log, validation.md. After it:
 python -I tools/snapshot.py data-publish.
@@ -77,6 +78,9 @@ def rebuild(line):
             for f, ts in ex.map(lambda g: run_steps(line, g), groups):
                 times += ts
                 fail = fail or f
+    if not fail:   # (the track styles read the survey's areas, and the heights read the styles: #479)
+        fail, ts = run_steps(line, [["track_styles.py", "--line", line]])
+        times += ts
     with open(os.path.join(ROOT, "reports", "rebuild", f"line{line}.log"), "w", encoding="utf-8") as f:
         for name, secs, code in times:
             f.write(f"{name:18s} {secs:5d} s  exit {code}\n")
