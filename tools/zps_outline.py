@@ -75,13 +75,20 @@ def _inner(xy, poly):
     return out, np.column_stack([nrm[:, 1], -nrm[:, 0]])
 
 
-def ring_fixes(r, poly, ground, skip=None, covered=None):
+def ring_fixes(r, poly, ground, skip=None, covered=None, blocked=None):
     """{vertex index: new height} for one closed ring (n, 3) (no closing point) of an area (its polygon `poly`).
     ground: IPR at arrays (x, y) in the ring's frame; skip: a boolean per vertex left out, neither moved nor in the
-    offset; covered: a boolean per vertex IPR does not see (it stays, and so does its run)."""
+    offset; covered: a boolean per vertex IPR does not see; blocked: a boolean per vertex another outline sharing it
+    agrees with (a step between the two). A covered or blocked vertex stays, and so does its run."""
+    st = assess(r, poly, ground, skip)
+    return moves(st, covered, blocked) if st else {}
+
+
+def assess(r, poly, ground, skip=None):
+    """A ring's vertices against IPR (ring_fixes): their offsets, which are off and far off, and their new heights."""
     n = len(r)
     if n < 3:
-        return {}
+        return None
     xy = r[:, :2]
     s = r[:, 2]
     pin, tan = _inner(xy, poly)
@@ -122,6 +129,14 @@ def ring_fixes(r, poly, ground, skip=None, covered=None):
         if abs(e[k] - o) > OFF:
             off[k], far[k] = True, abs(e[k] - o) > AGREE
             new[k] = g[k] + o
+    return {"n": n, "s": s, "g": g, "e": e, "d": d, "L": L, "bend": bend, "face": face, "off": off, "far": far,
+            "new": new}
+
+
+def moves(st, covered=None, blocked=None):
+    """{vertex index: new height} from assess's state (ring_fixes)."""
+    n, s, g, e, d, L = st["n"], st["s"], st["g"], st["e"], st["d"], st["L"]
+    bend, face, off, far, new = st["bend"], st["face"], st["off"], st["far"], st["new"]
     # a run (the vertices far off in a row along the ring) moves whole or not at all: moved in part, a stretch 1-3 m off
     # IPR became a sawtooth on line 22 (at -4224, 80 and 1892, -1931). A vertex off by less (a kerb's scatter) is one of
     # its own: left, it makes no jump; joined to a run, one beside Náhorní's held the run back.
@@ -150,7 +165,7 @@ def ring_fixes(r, poly, ground, skip=None, covered=None):
             dz = np.abs(z - s[run])
             # (IPR's own shape blocks a move only where it is a fair part of it: CALM, or a quarter of the move)
             ok = (np.isfinite(z) & ~face[run] & (np.abs(bend[run]) <= np.maximum(CALM, dz / 4)) & (dz <= MAX)
-                  & (True if covered is None else ~covered[run]))
+                  & (True if covered is None else ~covered[run]) & (True if blocked is None else ~blocked[run]))
             if ok.all():
                 out.update({i: float(v) for i, v in zip(run, z)})
         run = []
@@ -169,8 +184,7 @@ def correct(areas, ground, held=(), covers=None):
     # their mean 0.95 -> 4.55 %)
     edge = {(q[0], q[1]) for a in areas if a["l"] == 0 and a["c"] in KERB_TOPS for ring in [a["r"]] + a.get("h", [])
             for q in ring}
-    new = {}  # (x, y, old z) -> [candidate heights]
-    count = {}
+    rings_of = []  # (class, ring, state)
     for i, a in enumerate(areas):
         if a["l"] != 0 or a["c"] not in CLASSES or i in held or len(a["r"]) < 3:
             continue
@@ -185,12 +199,22 @@ def correct(areas, ground, held=(), covers=None):
         except (ValueError, shapely.errors.GEOSException):
             continue
         for r in arr:
-            under = (shapely.contains_xy(covers, r[:, 0], r[:, 1]) if covers is not None and not covers.is_empty
-                     else None)
-            fx = ring_fixes(r, poly, ground, np.array([(q[0], q[1]) in edge for q in r.tolist()]), under)
-            for k in sorted(fx):
-                new.setdefault((round(float(r[k, 0]), 2), round(float(r[k, 1]), 2), round(float(r[k, 2]), 2)), []).append(fx[k])
-                count[a["c"]] = count.get(a["c"], 0) + 1
+            st = assess(r, poly, ground, np.array([(q[0], q[1]) in edge for q in r.tolist()]))
+            if st:
+                rings_of.append((a["c"], r, st))
+    # a vertex one outline agrees with IPR at and another not is a step between them, not an error: line 9's track bed
+    # 0.30 m under its kerb for 60 m by a sidewalk on IPR (pulled down, the kerb went flat: flatKerbs 450 -> 580)
+    agree = {(round(float(r[k, 0]), 2), round(float(r[k, 1]), 2)) for _, r, st in rings_of
+             for k in np.flatnonzero(np.isfinite(st["e"]) & ~st["off"])}
+    new = {}  # (x, y, old z) -> [candidate heights]
+    count = {}
+    for c, r, st in rings_of:
+        under = (shapely.contains_xy(covers, r[:, 0], r[:, 1]) if covers is not None and not covers.is_empty
+                 else None)
+        fx = moves(st, under, np.array([(round(float(x), 2), round(float(y), 2)) in agree for x, y in r[:, :2]]))
+        for k in sorted(fx):
+            new.setdefault((round(float(r[k, 0]), 2), round(float(r[k, 1]), 2), round(float(r[k, 2]), 2)), []).append(fx[k])
+            count[c] = count.get(c, 0) + 1
     z_at = {(x, y): (z, round(float(np.mean(v)), 2)) for (x, y, z), v in new.items()}
     for a in areas:
         if a["l"] != 0:
@@ -200,9 +224,9 @@ def correct(areas, ground, held=(), covers=None):
                 hit = z_at.get((q[0], q[1]))
                 if hit and q[2] is not None and abs(q[2] - hit[0]) < 0.011:
                     q[2] = hit[1]
-    moves = sorted(({"x": x, "y": y, "from": z0, "to": z1} for (x, y), (z0, z1) in z_at.items()),
+    moved = sorted(({"x": x, "y": y, "from": z0, "to": z1} for (x, y), (z0, z1) in z_at.items()),
                    key=lambda m: -abs(m["to"] - m["from"]))
     sizes = {f"<={s}": 0 for s in SIZES}
-    for m in moves:
+    for m in moved:
         sizes[f"<={next(s for s in SIZES if abs(m['to'] - m['from']) <= s + 1e-9)}"] += 1
-    return {"vertices": dict(sorted(count.items())), "places": len(z_at), "sizes": sizes, "moved": moves[:20]}
+    return {"vertices": dict(sorted(count.items())), "places": len(z_at), "sizes": sizes, "moved": moved[:20]}

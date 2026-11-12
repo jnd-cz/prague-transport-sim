@@ -126,6 +126,21 @@ class Outline(unittest.TestCase):
         np.testing.assert_allclose(heights(a)[5:8], plane(xs[5:8], 0), atol=0.03)  # (the bump nudges the median)
         self.assertAlmostEqual(heights(a)[9], float(plane(45, 0)) + 0.15, delta=0.011)
 
+    def test_a_step_between_two_outlines_stays(self):
+        # line 9: a track bed 0.30 m under the kerb it shares with a sidewalk on IPR
+        xs = np.arange(0, 61, 5.0)
+        kerb = plane(xs, 0)
+
+        def ground(x, y):
+            return plane(x, y) - 0.30 * (np.asarray(y, float) < 0)  # (the bed south of the kerb)
+        bed = road(kerb, cls="tram")
+        bed["r"][13:] = [[60.0, -6.0, round(float(plane(60, 0)) - 0.30, 2)], [0.0, -6.0, round(float(plane(0, 0)) - 0.30, 2)]]
+        walk = {"c": "sidewalk", "l": 0, "r": [list(q) for q in bed["r"][:13]][::-1]
+                + [[0.0, 3.0, round(float(plane(0, 0)), 2)], [60.0, 3.0, round(float(plane(60, 0)), 2)]]}
+        before = heights(bed)
+        zo.correct([bed, walk], ground)
+        self.assertEqual(before, heights(bed))
+
     def test_a_larger_move_is_another_level(self):
         zs = plane(np.arange(0, 61, 5.0), 0)
         zs[6] += 2.5
