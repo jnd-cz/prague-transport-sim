@@ -45,6 +45,7 @@ AGREE = 0.30
 # m inside the area where IPR is read: on straight road outline IPR's share over 8 cm off its mean is 2.0-3.0 % at 0.5 m
 # (the raster rounds the kerb), 1.6-2.3 % at 1 m, 1.3-2.0 % at 1.5 m (narrow sidewalks have no 1.5 m)
 INNER = 1.0
+KERB_TOPS = {"platform"}  # areas whose shared edge is their top (above)
 HELD = {"survey", "review", "changing", "covered"}  # zps_ground's verdicts that keep an area off IPR
 # m: a vertex this near its neighbour on the ring and more than OFF off its height is a face the survey drew (a kerb
 # corner at a crossing: line 22, three vertices within 0.3 m at -0.24 / -0.24 / +0.22 m off IPR): kept
@@ -69,9 +70,10 @@ def _inner(xy, poly):
     return out, np.column_stack([nrm[:, 1], -nrm[:, 0]])
 
 
-def ring_fixes(r, poly, ground):
+def ring_fixes(r, poly, ground, skip=None):
     """{vertex index: new height} for one closed ring (n, 3) (no closing point) of an area (its polygon `poly`).
-    ground: IPR at arrays (x, y) in the ring's frame."""
+    ground: IPR at arrays (x, y) in the ring's frame; skip: a boolean per vertex left out, neither moved nor in the
+    offset."""
     n = len(r)
     if n < 3:
         return {}
@@ -86,6 +88,8 @@ def ring_fixes(r, poly, ground):
         b = np.asarray(ground(*(pin[ok] + CALM_REACH * tan[ok]).T), float)
         bend[ok] = g[ok] - (a + b) / 2  # (IPR's own shape at the vertex: a lowered kerb, a driveway, a drain)
     e = s - g
+    if skip is not None:
+        e[skip] = np.nan
     seg = np.hypot(*np.diff(np.vstack([xy, xy[:1]]), axis=0).T)
     L = seg.sum()
     d = np.r_[0, np.cumsum(seg)[:-1]]
@@ -121,6 +125,12 @@ def correct(areas, ground, held=(), covers=None):
     (zps_ground.cover_union). Returns {"vertices": moved per class, "places": positions moved, "sizes": places per
     size of the move, "moved": the largest moves}."""
     held = set(held)
+    # a platform's edge: the survey's line is its top on the carriageway's side (line 17: +0.17 m over the road), and the
+    # kerbs measure each platform's step from it (tools/kerbs.py); taken into a tram area's offset beside its foot-level
+    # vertices it split the edge on line 37 (part pulled to the floor, part raised by the step: platforms over 8 cm off
+    # their mean 0.95 -> 4.55 %)
+    edge = {(q[0], q[1]) for a in areas if a["l"] == 0 and a["c"] in KERB_TOPS for ring in [a["r"]] + a.get("h", [])
+            for q in ring}
     new = {}  # (x, y, old z) -> [candidate heights]
     count = {}
     for i, a in enumerate(areas):
@@ -137,7 +147,7 @@ def correct(areas, ground, held=(), covers=None):
         except (ValueError, shapely.errors.GEOSException):
             continue
         for r in arr:
-            fx = ring_fixes(r, poly, ground)
+            fx = ring_fixes(r, poly, ground, np.array([(q[0], q[1]) in edge for q in r.tolist()]))
             if not fx:
                 continue
             ks = np.array(sorted(fx))
