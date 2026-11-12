@@ -29,6 +29,8 @@ class Decks:
         self.tree = STRtree(self.polygons)
         self.facts = list(facts)
         self.style_regions = list(style_regions)
+        # (each region's and triangle's bounds: covers() asked only where the point lies within them, #511)
+        self.style_bounds = [r['polygon'].bounds for r in self.style_regions]
         ids = set()
         for fact in self.facts:
             if (not fact.get('id') or fact['id'] in ids or not fact.get('source') or not fact.get('date') or
@@ -58,10 +60,11 @@ class Decks:
                 vertices = list(t.exterior.coords)[:3]
                 if poly.covers(t) and all(len(zs.get(v, ())) == 1 for v in vertices):
                     triangles.append((t, [(*v, next(iter(zs[v]))) for v in vertices]))
-            self.triangles[index] = triangles
+            self.triangles[index] = [(t, v, t.bounds) for t, v in triangles]
         heights = []
-        for triangle, v in self.triangles[index]:
-            if not triangle.covers(point):
+        px, py = point.x, point.y
+        for triangle, v, (bx0, by0, bx1, by1) in self.triangles[index]:
+            if not (bx0 <= px <= bx1 and by0 <= py <= by1) or not triangle.covers(point):
                 continue
             (x0,y0,z0),(x1,y1,z1),(x2,y2,z2) = v
             det = (y1-y2)*(x0-x2) + (x2-x1)*(y0-y2)
@@ -102,7 +105,8 @@ class Decks:
         if structure_hint and level == 0:
             level = None
         level_sources = [r['id'] for _, r in anchors]
-        regions = [r for r in self.style_regions if r['polygon'].covers(point)]
+        regions = [r for r, (bx0, by0, bx1, by1) in zip(self.style_regions, self.style_bounds)
+                   if bx0 <= x <= bx1 and by0 <= y <= by1 and r['polygon'].covers(point)]
         styles = {r['style'] for r in regions}
         defaulted = not styles
         styles = styles or {'panels'}

@@ -26,6 +26,8 @@ import time
 
 FORMAT = 1
 KEEP = 2  # records kept per step: a branch switched back finds its own
+# (the threads of numpy's BLAS: its sums are split by them, so results differ in the last bits with their number)
+ENV = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")
 _stat, _replace = os.stat, os.replace  # (the tracer wraps os.stat; its own reads must not count)
 
 
@@ -257,7 +259,7 @@ def trace(root, record, tool, args):
         if r in inputs:
             outputs[r] = None  # (an input moved away)
     rec = {"format": FORMAT, "tool": tools, "args": args, "python": sys.version.split()[0],
-           "packages": versions(sorted(pkgs)), "modules": modules,
+           "env": {k: os.environ.get(k) for k in ENV}, "packages": versions(sorted(pkgs)), "modules": modules,
            "inputs": {r: s for r, s in sorted(inputs.items()) if r not in modules and r != "."},
            "listings": {r: (None if names is None else
                             hashlib.sha256("\n".join(sorted(names - {o.rsplit("/", 1)[-1] for o in outputs if o.rsplit("/", 1)[0] == r})).encode("utf-8")).hexdigest())
@@ -308,12 +310,17 @@ class Cache:
                 self.pkgs.update(versions(missing))
         return {n: self.pkgs[n] for n in names}
 
-    def why(self, rec, phase0=None):
-        """None when rec still holds (the step may be skipped), else the first thing that differs."""
+    def why(self, rec, phase0=None, env=None):
+        """None when rec still holds (the step may be skipped), else the first thing that differs. env: the step's
+        environment (os.environ by default)."""
         if rec.get("format") != FORMAT:
             return "the record's format"
         if rec["python"] != sys.version.split()[0]:
             return f"Python {rec['python']} → {sys.version.split()[0]}"
+        env = os.environ if env is None else env
+        for k in ENV:
+            if rec.get("env", {}).get(k) != env.get(k):
+                return f"{k} {rec.get('env', {}).get(k)} → {env.get(k)}"
         for n, v in self.versions(sorted(rec["packages"])).items():
             if v != rec["packages"][n]:
                 return f"{n} {rec['packages'][n]} → {v}"
@@ -337,14 +344,14 @@ class Cache:
             return "the log: not in the store"
         return None
 
-    def match(self, name, phase0=None):
+    def match(self, name, phase0=None, env=None):
         """(the record that holds, None) or (None, why the latest does not)."""
         recs = self.records(name)
         if not recs:
             return None, "no record"
         first = None
         for rec in recs:
-            w = self.why(rec, phase0)
+            w = self.why(rec, phase0, env)
             if w is None:
                 return rec, None
             first = first or w
@@ -409,7 +416,7 @@ class Cache:
         """rec first among name's records (one equal in its key replaced), at most KEEP of them; amend: rec
         replaces the first, the same run's record changed after it was kept."""
         with self.lock:
-            same = lambda o: all(o.get(k) == rec.get(k) for k in ("modules", "inputs", "listings", "packages"))  # noqa: E731
+            same = lambda o: all(o.get(k) == rec.get(k) for k in ("modules", "inputs", "listings", "packages", "env"))  # noqa: E731
             old = self.records(name)
             if amend and old and (old[0]["when"], old[0]["outputs"]) == (rec["when"], rec["outputs"]):
                 old = old[1:]
