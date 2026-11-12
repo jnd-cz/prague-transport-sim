@@ -56,10 +56,13 @@ python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, contin
 python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
 ```
 
-`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~6 min: it stages the network's heights
+`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~5 min: it stages the network's heights
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
-the steps. `headless.py --checks heights` compares the game's track with the staged heights.
+the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
+stage ended (`(staged: 97 s from the start)` …). The chains are solved in worker processes (#511): every chain's
+first solve side by side, then each chain pinned as soon as the chains before it that it meets are final, and the
+lines written side by side; with under 16 chains (the tests) all of it runs in one process, strictly in the order.
 Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
 of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
 curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.

@@ -10,7 +10,8 @@ which opens its file in C), paths probed (os.stat, os.path.exists, isfile, isdir
 test a file's date and size) and folders listed. A file read before the step wrote it is an input too. What it
 wrote: files opened for writing, the targets of renames, files removed. The key also holds Python's version and the
 version of every package imported from outside the checkout; other files outside the checkout are not in it.
-A tool that reads a file in some other way (C code, a subprocess) is not seen: rebuild.py --from or --force then.
+A tool that reads a file in some other way (C code, a subprocess, a child forked by an explicit fork context) is not
+seen: rebuild.py --from or --force then. Multiprocessing children are spawned (Linux too) and traced like the step.
 
 Kept in reports/rebuild/cache/: hashes.json (a file's SHA-256 by its size, date and file id), steps/ (each step's
 last records), store/ (the files the records name, by hash).
@@ -228,7 +229,11 @@ class _Tracer:
             osmium.FileProcessor = file_processor
         except ImportError:
             pass
+        import multiprocessing
         import multiprocessing.spawn as mps
+        # (children spawned on every system, as on Windows: a forked one never passes through the command line below,
+        # and what it did would not reach the record; Linux forks by default)
+        multiprocessing.set_start_method("spawn", force=True)
         command = mps.get_command_line
 
         def child_command(**kw):  # (a child of the step, spawned: this file runs it, under a tracer of its own)
