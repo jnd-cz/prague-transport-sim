@@ -42,6 +42,7 @@ BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsig
 ALIAS = {"track": "build_line", "heights": "line_heights", "structures": "line_structures"}
 CACHE = None  # (stepcache.Cache of ROOT, made by main)
 FORCE = set()  # steps that run whatever their records say ("*": all)
+CPU = []  # (the CPU seconds of each step run)
 # numpy's BLAS threads per step: by default one per core in every process, and with the steps and lines side by side
 # hundreds of them fought for 24 cores (an ADMM-sized inverse and 300 products, n 1200: 5.1 s against 0.08 s with 4
 # threads, #511). A line's steps run four at a time (and lines side by side), the heights alone. The same numbers
@@ -99,6 +100,8 @@ def run_step(label, st, log, phase0=None, phase="line"):
     with open(log, "w", encoding="utf-8") as f:
         r = subprocess.run(CACHE.command(PY, st[0], st[1:], tmp), cwd=ROOT, stdout=f, stderr=subprocess.STDOUT, env=env)
     rec = CACHE.save(key, tmp, log) if r.returncode == 0 else None
+    if rec:
+        CPU.append(rec.get("cpu", 0))
     return st[0], round(time.time() - t), r.returncode, why, key, rec, True
 
 
@@ -157,7 +160,8 @@ def rebuild(line):
         times += ts
     with open(os.path.join(ROOT, "reports", "rebuild", f"line{line}.log"), "w", encoding="utf-8") as f:
         f.write(summary(times))
-        f.write(f"wall clock {time.time() - t0:.0f} s\n")
+        cpu = sum(t[5].get("cpu", 0) for t in times if t[6] and t[5])
+        f.write(f"wall clock {time.time() - t0:.0f} s, cpu {cpu:.0f} s\n")
     ran = [t[0][:-3] for t in times if t[6]]
     if fail:
         return f"line {line}: FAILED at {fail}, see reports/rebuild/line{line}.{fail[:-3]}.log"
@@ -165,8 +169,13 @@ def rebuild(line):
 
 
 def summary(times):
-    return "".join(f"{name:18s} {secs:5d} s  {'skip  ' if code == 'skip' else f'exit {code}'}  ({why})\n"
-                   for name, secs, code, why, *_ in times)
+    """A line per step: its seconds, the CPU seconds of its process when it ran (all its threads: CPU over seconds is the
+    cores it kept busy), and why it ran or what it was skipped for."""
+    out = []
+    for name, secs, code, why, _, rec, _ in times:
+        cpu = f"cpu {rec.get('cpu', 0):5.0f} s  " if code != "skip" and rec else ""
+        out.append(f"{name:18s} {secs:5d} s  {cpu}{'skip  ' if code == 'skip' else f'exit {code}'}  ({why})\n")
+    return "".join(out)
 
 
 def ran_text(ran, n):
@@ -240,7 +249,8 @@ def main():
     CACHE.hashes.save()
     n, size = CACHE.prune()
     print("\n".join(results))
-    print(f"total {time.time() - t0:.0f} s" + (f"; store: {n} files no record names removed ({size / 1e6:.0f} MB)" if n else ""))
+    wall = time.time() - t0
+    print(f"total {wall:.0f} s, the steps' cpu {sum(CPU):.0f} s ({sum(CPU) / wall:.1f} cores busy on average)" + (f"; store: {n} files no record names removed ({size / 1e6:.0f} MB)" if n else ""))
     if built:  # (the report does not fail a build: most of what it counts waits for #22)
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import validation

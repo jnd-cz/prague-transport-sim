@@ -265,6 +265,7 @@ def trace(root, record, tool, args):
                             hashlib.sha256("\n".join(sorted(names - {o.rsplit("/", 1)[-1] for o in outputs if o.rsplit("/", 1)[0] == r})).encode("utf-8")).hexdigest())
                         for r, names in sorted(lists.items())},
            "outputs": dict(sorted(outputs.items())), "secs": round(time.time() - t0, 1),
+           "cpu": round(time.process_time(), 1),  # (all the process's threads, its imports too: the cores it kept busy)
            "when": time.strftime("%Y-%m-%d %H:%M"), "hashes": hashes.new}
     tmp = f"{record}.part"
     with open(tmp, "w", encoding="utf-8") as f:
