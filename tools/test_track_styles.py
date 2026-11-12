@@ -4,6 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import geo  # noqa: E402
 import track_styles as T  # noqa: E402
 
 
@@ -45,6 +46,7 @@ class Styles(unittest.TestCase):
                          [(0.0, 100.0, "list", 0), (100.0, 300.0, "list", 1), (300.0, 400.0, "user", None),
                           (400.0, 550.0, "list", 0)])   # (C - B both ways; the user's mark keeps the way back)
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_a_mark_between_two_points_runs_between_their_route_positions(self):
         ll = [list(map(float, T.Frame().ll(x, y))) for x, y in ((420.0, 3.0), (180.0, -2.0))]
         truth = {"trackStyles": [{"line": "x", "between": ll, "style": "grass"}],
