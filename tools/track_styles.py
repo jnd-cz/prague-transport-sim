@@ -50,6 +50,7 @@ SAMPLE, MIN_GRASS, JOIN = 4, 20, 30   # m (src/heights.js trackStyles until #479
 HOLE = {"footway": 3, "road": 8, "node": 5, "platform": 3}
 PLATFORM_NEAR = 6      # m from our axis: our platform and the other direction's beside the other track
 MIN_PIECE = MIN_GRASS  # m: a shorter piece left between two holes is not laid (OSM maps none of the 12-14 m ones)
+MIN_EMBEDDED = 5       # m: a street's hole the section's end cuts shorter is not an embedded section of its own
 RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
 
@@ -173,7 +174,7 @@ def cut(secs, hs):
         mine = [h for h in hs if (x["style"] == "grass" or not h["grass"]) and h["s1"] > x["s0"] and h["s0"] < x["s1"]]
         out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], mine) if b - a >= MIN_PIECE]
         out += [{"s0": max(h["s0"], x["s0"]), "s1": min(h["s1"], x["s1"]), "style": "embedded", "source": "hole", "hole": "road"}
-                for h in mine if h["kind"] == "road"]
+                for h in mine if h["kind"] == "road" and min(h["s1"], x["s1"]) - max(h["s0"], x["s0"]) >= MIN_EMBEDDED]
     out.sort(key=lambda x: x["s0"])
     merged = []   # (road holes overlapping one another: one section)
     for x in out:
