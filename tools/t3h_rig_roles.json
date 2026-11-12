@@ -1,0 +1,30 @@
+{
+  "source": "Hybrid revision 5 bindings from PR #469 and issue #471. Tail lamp placement and fleet digit height come from the user's decisions in #436 and #471.",
+  "revision": 6,
+  "forward": "+X",
+  "up": "+Y",
+  "doorClips": {
+    "Front": "Door_Front_Open",
+    "Middle": "Door_Middle_Open",
+    "Rear": "Door_Rear_Open"
+  },
+  "pantographClip": "Pantograph_Lower",
+  "saloon": {
+    "materials": ["Handles", "Control_Panel", "Red_Seat", "Blue_Seat", "Leather", "Material", "Inner_Plastic_Glass", "Interior_Walls", "White_Ceiling"],
+    "within": [[-6.95, 0.84, -1.25], [6.95, 3.1, 1.25]]
+  },
+  "shoes": {
+    "Bogie_Rear": ["Black_Metal_116", "Black_Metal_117"],
+    "Bogie_Front": ["Black_Metal_123", "Black_Metal_124"]
+  },
+  "couplers": {
+    "front": ["Black_Metal_109"],
+    "rear": ["Black_Metal_111"]
+  },
+  "beams": [[7.0624, 1.2191, -0.4919], [7.0624, 1.2191, 0.4857]],
+  "tailLamps": {
+    "size": [0.02, 0.07, 0.2],
+    "at": [[-7.0204, 0.995, -0.47], [-7.0204, 0.995, 0.47]]
+  },
+  "fleetDigits": 0.14
+}
