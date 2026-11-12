@@ -345,8 +345,12 @@ def held_settled(chs):
        over it on the chain's heights within LIDAR_AROUND m, else LIDAR_OFFSET (line 22's west end: 74-80 m). Only a
        stretch the lidar draws no steeper than any track (MAX_GRADE) and that meets the heights either side of it within
        SOURCES_ON: Petřín's funicular, held its whole length, took the hill's bare earth, steps of 2.2-6.1 m.
+    3. Where only one of the archive and the survey has a height and the lidar lies within HELD_NEAR m of it, that one: two
+       sources agree (#480: line 37 at Palmovka, held 110 + 154 m, the archive within 1-2 cm of the lidar). Calibrated
+       where DI has a height too: such a lone source matched DI within HELD_NEAR at 13,953 of 15,448 bins (90 %; median
+       1.6 cm, 95th percentile 16 cm); of the 372 over 20 cm off DI, 267 had DI itself over 20 cm off the lidar.
     Returns the counts per rule; each height goes to LIDAR_LOG and its source code is the one taken ('lidar' for 2)."""
-    n1 = n2 = 0
+    n1 = n2 = n3 = 0
     LIDAR_LOG.clear()
     usable = lambda x: (x.get('z') is not None and x.get('terrain') is not None and x.get('src') in ('di', 'dtmp')
                         and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and abs(x['z'] - x['terrain']) < 1.0)
@@ -365,12 +369,14 @@ def held_settled(chs):
                     todo.append((x, a, 'dtmp', 1))
                 elif abs(s - g) <= HELD_NEAR < abs(a - g):
                     todo.append((x, s, 'zps', 1))
+            elif (a is None) != (s is None) and abs((a if s is None else s) - g) <= HELD_NEAR:
+                todo.append((x, a, 'dtmp', 3) if s is None else (x, s, 'zps', 3))
             elif a is None and s is None:
                 near = sorted(o for t, o in ref if abs(t - x['s']) <= LIDAR_AROUND)
                 todo.append((x, g + (near[len(near) // 2] if near else LIDAR_OFFSET), 'lidar', 2))
         # (rule 2 by stretch: no steeper than any track, meeting the heights either side)
         lid = [t for t in todo if t[3] == 2]
-        todo = [t for t in todo if t[3] == 1]
+        todo = [t for t in todo if t[3] != 2]
         lid.sort(key=lambda t: t[0]['s'])
         runs = []
         for t in lid:
@@ -393,9 +399,11 @@ def held_settled(chs):
             LIDAR_LOG.append((x['xy'], rule, round(z, 3)))
             if rule == 1:
                 n1 += 1
-            else:
+            elif rule == 2:
                 n2 += 1
-    return n1, n2
+            else:
+                n3 += 1
+    return n1, n2, n3
 
 
 def archive_over_di(chs):
@@ -505,8 +513,9 @@ def apply(chs):
     dropped, blended = answered_noise(chs)
     print(f'step answers: {len(STEP_ANSWERS)}; {dropped} heights dropped, {blended} weighed with the survey', flush=True)
     print(f'{archive_over_di(chs)} heights took the archive where DI alone stood off the lidar and the track beside it', flush=True)
-    n1, n2 = held_settled(chs)
-    print(f'held heights settled by the lidar: {n1} where it sided with the archive or the survey, {n2} where only it had one', flush=True)
+    n1, n2, n3 = held_settled(chs)
+    print(f'held heights settled by the lidar: {n1} where it sided with the archive or the survey, {n2} where only it had one, '
+          f'{n3} where it confirmed the only source', flush=True)
     print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
     print(f'{answered_ground(chs)} heights took the ground, or part way to it, in {len(GROUND_ANSWERS)} areas an answer has '
           f'follow the ground', flush=True)
