@@ -382,9 +382,11 @@ Sections:
   are the survey's alone, as many IPR's alone, 0.1 % both. So IPR does not replace the survey's heights; the survey's
   own large errors are runs of vertices on another line's height (a road edge on a wall's top line, a sawtooth of
   1.2 m by Jižní spojka on line 22; Náhorní's sidewalk 1.40 m low on line 17, #315) and lone vertices off their kerb.
-  `tools/zps_outline.py` moves those where IPR runs calm, on road, tram and sidewalk: over 0.3 m off, 1,473-4,061 such
-  vertices per line → 181-491. 79 % of straight street outline lies in gaps over 5 m between vertices (line 22). A
-  platform's edge shared with the tram area is its top (#21), not the tram's foot: its vertices stay out of the rule.
+  `tools/zps_outline.py` moves those where IPR runs calm, on road, tram and sidewalk, a run of them whole or not at all
+  (moved in part, a stretch 1-3 m off became a sawtooth): over 0.3 m off, 1,135-3,540 vertices per line → 91-325; over
+  8 cm off the mean, roads 1.8-2.7 → 1.4-1.7 %, sidewalks 4.0-5.1 → 3.1-4.0 %. 79 % of straight street outline lies in
+  gaps over 5 m between vertices (line 22). A platform's edge shared with the tram area is its top (#21), not the
+  tram's foot: its vertices stay out of the rule.
 - **Railway yards, lawns and paved yards have heights only on their outline** (#444, `tools/zps_inside.py`,
   `tools/bench/ground_inside.py`). A street is dense with surveyed lines; these are not, and the linear sheet between
   their outline vertices left 5-53 % of `rail`'s inside, 7-19 % of `paved`'s and 22-29 % of `green`'s more than 1 m off

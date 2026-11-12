@@ -9,18 +9,23 @@ better a source: against DI's rails the noise left in each is alike (median 1.5 
 15 cm off their mean on straight road outline, 0.4-0.7 % of the samples are the survey's alone (IPR within 8 cm there),
 as many IPR's alone and 0.1 % both; on paved areas IPR's alone are 11-17 % (yards, steps, walls by buildings). So
 neither replaces the other (the user, 2026-11-12: "yes lets go with the consensus based on your measurements"):
-- at each vertex of a street outline at level 0, survey - IPR (IPR read INNER m inside the area) against its local
-  offset: the median of survey - IPR over the vertices within WIN m along the outline (widened up to WIDE m to reach a
-  vertex on each side) that agree with IPR within AGREE;
-- a vertex off that offset by more than OFF, where IPR has no shape of its own (within CALM of its mean CALM_REACH m
-  either side along the edge), takes IPR's height plus the offset. That is a lone vertex off its kerb, or a run of
-  them on another line's height (a road edge on a wall's top line, +1.0-1.8 m by Jižní spojka on line 22; Náhorní's
-  sidewalk 1.40 m low on line 17, #315);
+- at each vertex of a road, tram or sidewalk outline at level 0, survey - IPR (IPR read INNER m inside the area) against
+  its local offset: the median of survey - IPR over the vertices within WIN m along the outline (widened up to WIDE m to
+  reach a vertex on each side and MIN_AGREE agreeing ones) that agree with IPR within AGREE;
+- a vertex off that offset by more than OFF takes IPR's height plus the offset, where IPR has no shape of its own there
+  (within CALM, or a quarter of the move, of its mean CALM_REACH m either side along the edge): a lone vertex off its
+  kerb;
+- vertices off by more than AGREE in a row are a run, moved whole or not at all (in part they became a sawtooth); a run
+  beyond the offset's reach takes the offset of its two ends. Runs are another line's height: a road edge on a wall's
+  top line (a sawtooth of 1.2 m by Jižní spojka on line 22), Náhorní's sidewalk 1.3-1.6 m low on line 17 (#315);
 - one height per place: every level-0 vertex at the same position with the same old height takes it.
-Kept as the survey has them: the classes where IPR scatters more than the survey (CLASSES), vertices under a cover (the survey's upper levels,
-OSM's bridges, buildings and covered ways: IPR reads the cover or a guess under it), areas held off IPR (zps_ground's
-verdicts), the shapes IPR sees too (lowered kerbs, driveways, ramps) and kerb faces drawn into the outline (IPR's 1 m
-raster has no 20 cm step within a metre: they stay what the survey says).
+Kept as the survey has them: the classes where IPR scatters more than the survey (CLASSES), a platform's edge (KERB_TOPS),
+vertices under a cover (the survey's upper levels, OSM's bridges, buildings and covered ways: IPR reads the cover or a
+guess under it), areas held off IPR (zps_ground's verdicts), the shapes IPR sees too (lowered kerbs, driveways, ramps),
+faces the survey drew (FACE: IPR's 1 m raster has no 20 cm step within a metre) and runs that cannot move whole.
+On the five lines (2026-11-12) straight outline over 8 cm off its mean went from 1.8-2.7 to 1.4-1.7 % on roads, 1.7-3.3 to
+0.7-2.5 % on tram areas and 4.0-5.1 to 3.1-4.0 % on sidewalks; vertices over 0.3 m off from 1,135-3,540 to 91-325 per
+line.
 """
 import numpy as np
 import shapely
