@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The hybrid T3 model (src/t3h.js, #248) in headless Chromium.
+"""The hybrid T3 model (assets/t3h/, #248) through the rigged loader (src/rigged.js, #467) in headless Chromium.
 
 Usage: python -P -E tools/test_t3h.py [--line 17] [--synthetic]
 
@@ -30,7 +30,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SYNTHETIC = r"""async () => {
   const THREE = await import('three');
-  const t3h = await import('/src/t3h.js');
+  const rigged = await import('/src/rigged.js');
+  const { T3 } = await import('/src/tram.js');
   const models = await import('/src/models.js');
   // (its files from its manifest; the registry gives the sets their fleet numbers)
   const vehicles = await import('/src/vehicles.js');
@@ -40,16 +41,16 @@ SYNTHETIC = r"""async () => {
     const r = await fetch('/' + vehicles.fileUrl(man, f));
     return { ok: r.ok, json: () => r.json(), arrayBuffer: () => r.arrayBuffer() };
   }));
-  const proto = await t3h.loadHybridT3(files, 5.34);
+  const proto = await rigged.loadRigged(man, files[0], files[1], T3, 5.34);
   const tris = (root, pred = () => true) => { let n = 0; root.traverse((o) => { if (o.isMesh && pred(o)) { const g = o.geometry; n += (g.index ? g.index.count : g.attributes.position.count) / 3; } }); return n; };
   const shown = (o) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; };
   const drawn = (car) => { let n = 0; car.traverse((o) => { if (o.isMesh && shown(o)) n++; }); return n; };
-  const out = { stats: proto.stats, fullTris: tris(proto.template), insideTris: tris(proto.template, (o) => o.name === 'T3H_in'),
-    lightTris: tris(proto.light), lightInside: tris(proto.light, (o) => o.name === 'T3H_in') };
+  const out = { stats: proto.stats, fullTris: tris(proto.template), insideTris: tris(proto.template, (o) => o.name === 'R_in'),
+    lightTris: tris(proto.light), lightInside: tris(proto.light, (o) => o.name === 'R_in') };
   const m = models.makeT3({ line: '17', cars: 2, dest: 'Vozovna Kobylisy', run: '801' });
   new THREE.Scene().add(m);
   const [a, b] = m.userData.cars;
-  out.hybrid = !!m.userData.hybrid;
+  out.hybrid = !!m.userData.rigged;
   out.drawnFull = drawn(a);
   const pin = (car, z) => car.localToWorld(new THREE.Vector3(0, 0, z));
   const link = (k) => pin(m.userData.cars[k], -6.25).distanceTo(pin(m.userData.cars[k + 1], 6.25));
@@ -59,14 +60,14 @@ SYNTHETIC = r"""async () => {
   m.updateMatrixWorld(true);
   out.straight = { c1: a.position.x, c2: b.position.x, link: link(0), rear: deg(a.userData.rig.couplers[1].rotation.y), front: deg(b.userData.rig.couplers[0].rotation.y) };
   // the shoes released: their lowest point over the rail (the car on the rail plane at height 0)
-  const shoeLow = () => { let y = Infinity; a.traverse((o) => { if (o.name === 'T3H_shoe') y = Math.min(y, new THREE.Box3().setFromObject(o).min.y); }); return y; };
+  const shoeLow = () => { let y = Infinity; a.traverse((o) => { if (o.name === 'R_shoe') y = Math.min(y, new THREE.Box3().setFromObject(o).min.y); }); return y; };
   m.updateMatrixWorld(true);
   out.shoeGap = shoeLow();
   const shoes = (car) => car.userData.rig.bogies.map((g) => g.shoes.map((s) => +s.position.y.toFixed(4)));
-  t3h.poseHybrid(m, { track: 1 }); out.track1 = shoes(a);
-  t3h.poseHybrid(m, { track: 2 }); out.track2 = shoes(a);
+  rigged.poseRigged(m, { track: 1 }); out.track1 = shoes(a);
+  rigged.poseRigged(m, { track: 2 }); out.track2 = shoes(a);
   m.updateMatrixWorld(true); out.shoeGapOn = shoeLow();
-  t3h.poseHybrid(m, { track: 0 }); out.track0 = shoes(a);
+  rigged.poseRigged(m, { track: 0 }); out.track0 = shoes(a);
   // a 20 m curve to the left
   const R = 20, along = (car) => R * Math.atan2(car.position.x, R + car.position.z);
   models.placeConsist(m, 60, (s) => [R * Math.sin(s / R), R * (1 - Math.cos(s / R)), 0, 0]);
@@ -92,8 +93,8 @@ SYNTHETIC = r"""async () => {
   // the doors and the collector
   const leaf = a.userData.rig.full.getObjectByName('Door_Front_Left_Outer');
   const q0 = leaf.quaternion.clone();
-  t3h.poseHybrid(m, { doors: 1 }); out.doorTurn = deg(q0.angleTo(leaf.quaternion));
-  t3h.poseHybrid(m, { doors: 0 }); out.doorBack = deg(q0.angleTo(leaf.quaternion));
+  rigged.poseRigged(m, { doors: 1 }); out.doorTurn = deg(q0.angleTo(leaf.quaternion));
+  rigged.poseRigged(m, { doors: 0 }); out.doorBack = deg(q0.angleTo(leaf.quaternion));
   models.placeConsist(m, 100, (s) => [s, 0, 0, 0]);
   m.updateMatrixWorld(true);
   const head = a.userData.rig.full.getObjectByName(proto.rig.pantograph.head);
@@ -114,7 +115,7 @@ SYNTHETIC = r"""async () => {
   out.lamps.beamAt = a.userData.beams ? (a.userData.beams.geometry.computeBoundingBox(), [a.userData.beams.geometry.boundingBox.min.toArray(), a.userData.beams.geometry.boundingBox.max.toArray()]) : null;
   models.poseT3(m, { highBeam: false });
   // the tail lamps added at load (the asset has none): on the rear panel, lit on every car
-  const tail = (c) => c.children.find((o) => o.name === 'T3H_tail');
+  const tail = (c) => c.children.find((o) => o.name === 'R_tail');
   out.lamps.tails = [a, b].map((c) => tail(c) && +tail(c).material.color.r.toFixed(3));
   if (tail(a)) { const tb = new THREE.Box3().setFromBufferAttribute(tail(a).geometry.attributes.position); out.lamps.tailAt = [tb.min.toArray(), tb.max.toArray()].map((v) => v.map((x) => +x.toFixed(3))); }
   // the cards
@@ -137,16 +138,16 @@ SYNTHETIC = r"""async () => {
   out.fadedFleet = { transparent: fleetMat.transparent, depthWrite: fleetMat.depthWrite, opacity: fleetMat.opacity };
   out.fadedOpaque = []; a.userData.rig.full.traverse((o) => { if (o.isMesh && o.material.transparent && !o.material.userData.glass && !proto.rig.numberPlates.includes(o.name) && !/^Route_Number/.test(o.name)) out.fadedOpaque.push(o.name); });
   // the lighter level
-  t3h.setHybridLevel(m, 'light');
+  rigged.setRiggedLevel(m, 'light');
   out.drawnLight = drawn(a);
   out.levels = [a.userData.rig.full.visible, a.userData.rig.light.visible];
-  out.glass = proto.template.getObjectByName('T3H_glass').material.userData.opacity;
+  out.glass = proto.template.getObjectByName('R_glass').material.userData.opacity;
   return out;
 }"""
 
 GAME = """() => {
   const u = window.tramModel.userData, r = u.cars[0].userData.rig;
-  return { hybrid: !!u.hybrid, cars: u.cars.length, doors: r.doors, open: window.game.doorOpenness,
+  return { hybrid: !!u.rigged && u.vehicle === 't3h', cars: u.cars.length, doors: r.doors, open: window.game.doorOpenness,
     credit: /SimonStrikesBack/.test(document.body.innerHTML + (window.game.data?.attribution || '')) };
 }"""
 
