@@ -2,7 +2,7 @@
 
 On every line in data/: the page's route, from the path and the run the build wrote (`pathExt`), passes within 1 cm
 of every built point at its arc length: the page reads the build's points as they are (resampled every metre, the
-chords cut curves by up to 1.9 cm). Data built without the run or the curves does not load. Lines without data are skipped (python -I tools/snapshot.py data-fetch)."""
+chords cut curves by up to 1.9 cm). Data built without the run, the curves, the radius or the cant does not load. Lines without data are skipped (python -I tools/snapshot.py data-fetch)."""
 import faulthandler
 import functools
 import http.server
@@ -52,11 +52,11 @@ class BuiltRoute(unittest.TestCase):
         result = self.page.evaluate('''async () => {
           const {checkBuiltRoute}=await import('/src/route.js');
           const fails=(d)=>{try{checkBuiltRoute(d);return null;}catch(e){return String(e.message);}};
-          return {none:fails({line:'x'}), curves:fails({line:'x',trackCurve:{}}), both:fails({line:'x',trackCurve:{},pathExt:{before:[],after:[]}})};
+          return {none:fails({line:'x'}), curves:fails({line:'x',trackCurve:{}}), all:fails({line:'x',trackCurve:{},pathExt:{before:[],after:[]},curvature:{},cant:{}})};
         }''')
-        self.assertIn('trackCurve and pathExt', result['none'])
-        self.assertIn('pathExt', result['curves'])
-        self.assertIsNone(result['both'])
+        self.assertIn('trackCurve, pathExt, curvature, cant', result['none'])
+        self.assertIn('pathExt, curvature, cant', result['curves'])
+        self.assertIsNone(result['all'])
 
     def test_the_route_passes_every_built_point(self):
         names = [n for n in lines() if os.path.exists(os.path.join(ROOT, 'data', f'line{n}.json'))]
