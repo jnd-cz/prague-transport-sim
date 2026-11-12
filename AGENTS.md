@@ -216,6 +216,7 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
+| traffic, seed 1 | 23 | does not finish (stop 6, 7200 s): a car held behind a walker jams the tram 253 m before Malostranská; slide ≈207 000 | #496 |
 
 ## Code style
 
