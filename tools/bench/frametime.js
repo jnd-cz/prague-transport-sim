@@ -35,7 +35,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   await startShift({ timeout: 120 });
   await until(() => window.tramModel?.userData.vehicle === model && window.camera);
   const { makeT3, placeConsist } = await import('/src/models.js');
-  const { setHybridLevel, FULL_OUT } = await import('/src/t3h.js');
+  const { setRiggedLevel, FULL_OUT } = await import('/src/rigged.js');
   const g = window.game, route = g.route, s0 = g.tram.s;
   const at = (q) => { const p = route.at(q); return [p.x, p.y, g.profile.height(q), route.rollAt(q)]; };
   // the camera: 14 m off the platform (right) side of our set's middle, 3 m up, looking 40 m ahead
@@ -50,7 +50,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
     placeConsist(m, s0 + d, at);
     window.scene.add(m);
     const p = m.userData.cars[0].position, far = Math.hypot(p.x - window.camera.position.x, p.z - window.camera.position.z);
-    setHybridLevel(m, far < FULL_OUT ? 'full' : 'light');
+    setRiggedLevel(m, far < FULL_OUT ? 'full' : 'light');
     return { m, far: Math.round(far) };
   });
   // the CPU time of each render (the GPU's work shows in the frame interval)

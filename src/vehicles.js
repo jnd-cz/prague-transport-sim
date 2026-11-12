@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The vehicle registry (#455): every tram model the game offers is a folder in assets/ with a vehicle.json
 // (its names, files, licence and credit, tier, variants with their fleet numbers), listed in
 // assets/vehicles.json. The index's order is the menu's and the fallback's: a vehicle that is not loaded
