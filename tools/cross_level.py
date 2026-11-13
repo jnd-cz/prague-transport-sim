@@ -247,10 +247,115 @@ def build(data, sample, truth=None):
     return out
 
 
+def survey_tris(areas, near, r=30.0):
+    """The survey's level-0 areas within r m of the points `near` as triangles with heights ((k, 3, 3)): the page
+    fills an area linearly from its outline."""
+    import shapely
+    from shapely.geometry import Polygon
+    pts = shapely.points(np.asarray(near, float))
+    tris = []
+    for a in areas:
+        if a.get("l") != 0 or len(a.get("r") or []) < 3:
+            continue
+        xyz = [(q[0], q[1], np.nan if q[2] is None else q[2]) for q in a["r"]]
+        g = Polygon(xyz, [[(q[0], q[1], np.nan if q[2] is None else q[2]) for q in hh] for hh in a.get("h", []) if len(hh) >= 3])
+        if not g.is_valid or not shapely.dwithin(g, pts, r).any():
+            continue
+        for t in shapely.get_parts(shapely.constrained_delaunay_triangles(g)):
+            c = np.asarray(t.exterior.coords)[:3]
+            if c.shape[1] == 3 and np.all(np.isfinite(c)):
+                tris.append(c)
+    return np.array(tris)
+
+
+def sample_tris(tris, x, y):
+    """Heights of triangles at points, NaN outside every one (barycentric; as tools/street_profile.py, #512)."""
+    import shapely
+    z = np.full(len(x), np.nan)
+    if not len(tris):
+        return z
+    tree = shapely.STRtree(shapely.polygons(tris[:, :, :2]))
+    pi, ti = tree.query(shapely.points(x, y), predicate="intersects")
+    a, b, c = tris[ti, 0], tris[ti, 1], tris[ti, 2]
+    d = (b[:, 1] - c[:, 1]) * (a[:, 0] - c[:, 0]) + (c[:, 0] - b[:, 0]) * (a[:, 1] - c[:, 1])
+    ok = np.abs(d) > 1e-9
+    w1 = ((b[:, 1] - c[:, 1]) * (x[pi] - c[:, 0]) + (c[:, 0] - b[:, 0]) * (y[pi] - c[:, 1])) / np.where(ok, d, 1)
+    w2 = ((c[:, 1] - a[:, 1]) * (x[pi] - c[:, 0]) + (a[:, 0] - c[:, 0]) * (y[pi] - c[:, 1])) / np.where(ok, d, 1)
+    v = w1 * a[:, 2] + w2 * b[:, 2] + (1 - w1 - w2) * c[:, 2]
+    z[pi[ok][::-1]] = v[ok][::-1]
+    return z
+
+
+def section_svg(line, s, p, hd, z0, off, zb, c, ipr_at, tris):
+    """A cross-section across the tracks at route position s (point p, heading hd), seen along the line: IPR, the
+    survey's surface today, and each track's rails before (level, as main draws them) and after (the cross level c,
+    + = the left rail lower). Heights exaggerated; the offset axis is to the left of the line's direction."""
+    nl = np.array([-hd[1], hd[0]])
+    has_b = np.isfinite(off) and np.isfinite(zb)
+    lo = (min(0.0, off) if has_b else 0.0) - 8.0
+    hi = (max(0.0, off) if has_b else 0.0) + 8.0
+    u = np.arange(lo, hi + 1e-9, 0.25)
+    along = np.array([-1.0, -0.5, 0.0, 0.5, 1.0])
+    X = p[0] + nl[0] * u[:, None] + hd[0] * along[None, :]
+    Y = p[1] + nl[1] * u[:, None] + hd[1] * along[None, :]
+    zi = np.nanmean(np.asarray(ipr_at(X.ravel(), Y.ravel()), float).reshape(X.shape), axis=1)
+    zs = sample_tris(tris, p[0] + nl[0] * u, p[1] + nl[1] * u)
+    tracks = [(0.0, z0)] + ([(off, zb)] if has_b else [])
+    allz = np.concatenate([zi[np.isfinite(zi)], zs[np.isfinite(zs)], [t[1] for t in tracks]]) - z0
+    zr = math.ceil(min(1.6, max(0.2, float(np.percentile(np.abs(allz), 98)) + 0.05)) * 5) / 5  # (grid every 5 cm multiple)
+    W, H, L, R, T, B = 640, 300, 46, 14, 34, 54
+    px = lambda v: L + (hi - v) / (hi - lo) * (W - L - R)  # noqa: E731  (seen along the line: its left on the left)
+    py = lambda z: T + (zr - (z - z0)) / (2 * zr) * (H - T - B)  # noqa: E731
+    ex = ((H - T - B) / (2 * zr)) / ((W - L - R) / (hi - lo))
+
+    def poly(z, col, w, dash=""):
+        segs, cur = [], []
+        for v, q in zip(u, z):
+            if np.isfinite(q):
+                cur.append(f"{px(v):.1f},{py(q):.1f}")
+            elif cur:
+                segs.append(cur)
+                cur = []
+        if cur:
+            segs.append(cur)
+        return "".join(f'<polyline fill="none" stroke="{col}" stroke-width="{w}"{dash} points="{" ".join(sg)}"/>' for sg in segs)
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="sans-serif" font-size="12">',
+           f'<rect width="{W}" height="{H}" fill="#1d2127"/>']
+    for k in range(-4, 5):  # height grid every zr / 4
+        z = z0 + k * zr / 4
+        out.append(f'<line x1="{L}" x2="{W - R}" y1="{py(z):.1f}" y2="{py(z):.1f}" stroke="#333a44"/>'
+                   f'<text x="{L - 4}" y="{py(z) + 4:.1f}" fill="#8a94a3" text-anchor="end">{k * zr / 4 * 100:+.0f}</text>')
+    for v in range(int(math.ceil(lo / 2)) * 2, int(hi) + 1, 2):
+        out.append(f'<text x="{px(v):.1f}" y="{H - B + 16}" fill="#8a94a3" text-anchor="middle">{abs(v)}</text>')
+    out.append(poly(zs, "#b8b8b8", 1.5))
+    out.append(poly(zi, "#3e9dff", 2))
+    for k, (uc, zc) in enumerate(tracks):
+        name = "our track" if k == 0 else "the opposite track"
+        out.append(f'<line x1="{px(uc):.1f}" x2="{px(uc):.1f}" y1="{T}" y2="{H - B}" stroke="#555" stroke-dasharray="3 3"/>'
+                   f'<text x="{px(uc):.1f}" y="{T - 6}" fill="#cfd6df" text-anchor="middle">{name}</text>')
+        for col, dz in (("#ff9e31", 0.0), ("#ff4d4d", c / 2)):
+            a, b = (uc + 0.75, zc - dz), (uc - 0.75, zc + dz)  # (left rail, right rail)
+            out.append(f'<line x1="{px(a[0]):.1f}" y1="{py(a[1]):.1f}" x2="{px(b[0]):.1f}" y2="{py(b[1]):.1f}" stroke="{col}" stroke-width="2"/>'
+                       + "".join(f'<circle cx="{px(q[0]):.1f}" cy="{py(q[1]):.1f}" r="3.5" fill="{col}"/>' for q in (a, b)))
+    out.append(f'<text x="{L}" y="{H - B + 32}" fill="#cfd6df">'
+               f'<tspan fill="#3e9dff">— IPR lidar</tspan>  <tspan fill="#b8b8b8">— survey surface (game today)</tspan>  '
+               f'<tspan fill="#ff9e31">● rails level (main)</tspan>  <tspan fill="#ff4d4d">● rails tilted ({abs(c) * 1000:.0f} mm)</tspan></text>'
+               f'<text x="{L}" y="{H - 6}" fill="#8a94a3">line {line}, s {s:.0f}, seen along the line: m left | right, '
+               f'cm from our rail top (×{ex:.0f})</text></svg>')
+    return "".join(out)
+
+
 def cards(lines):
-    """reports/review/cross-level-N.json: a card for each stretch of CARD_MM or more, not yet answered."""
+    """reports/review/cross-level-N.json: a card for each stretch of CARD_MM or more, not yet answered, with a
+    cross-section picture (reports/review/cross-level/)."""
     from geo import Frame
+    from ipr_dtm import IprDtm
     F = Frame()
+    ipr = IprDtm()
+    pics = ROOT / "reports" / "review" / "cross-level"
+    pics.mkdir(parents=True, exist_ok=True)
+    for old in pics.glob("*.svg"):
+        old.unlink()
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
     # (a place answered, or a fact from the user, by its two points: its card is not asked again)
     done = [[F.xy(*ll) for ll in a["between"]] for a in (truth.get("crossLevelReview") or {}).get("answers", [])]
@@ -258,11 +363,24 @@ def cards(lines):
     for line in lines:
         data = json.loads((ROOT / "data" / f"line{line}.json").read_text(encoding="utf-8"))
         rt = Route(data["path"])
+        H, CL = data["heights"], data["crossLevel"]
+        big = [q for q in CL["places"] if abs(q["mm"]) >= CARD_MM]
+        dtm_p = ROOT / "data" / f"line{line}.dtm.json"
+        tris = survey_tris(json.loads(dtm_p.read_text(encoding="utf-8"))["areas"], [(q["x"], q["y"]) for q in big]) \
+            if big and dtm_p.exists() else np.zeros((0, 3, 3))
         out = []
-        for q in data["crossLevel"]["places"]:
-            if abs(q["mm"]) < CARD_MM:
-                continue
+        for q in big:
             a, b = rt.at(q["s"])[:2], rt.at(q["s"] + q["length"])[:2]
+            # (the section at the stretch's largest value)
+            k = min(range(int(q["s"] / STEP), int((q["s"] + q["length"]) / STEP) + 1),
+                    key=lambda i: math.hypot(rt.at(i * STEP)[0] - q["x"], rt.at(i * STEP)[1] - q["y"]))
+            pt = rt.at(k * STEP)
+            val = lambda arr, k=k: np.nan if k >= len(arr) or arr[k] is None else float(arr[k])  # noqa: E731
+            pic = f"{line}-{q['s']}.svg"
+            (pics / pic).write_text(section_svg(line, k * STEP, pt[:2], pt[2:], val(H["path"]), val(H.get("backOff") or []),
+                                                val(H.get("backZ") or []), val(CL["path"]) * CL["unit"],
+                                                lambda x, y: ipr.sample(x + F.E0, y + F.N0), tris),
+                                    encoding="utf-8", newline="\n")
             lat, lon = (float(v) for v in F.ll(q["x"], q["y"]))
             near = min(data["stops"], key=lambda st: abs(st["s"] - q["s"]))
             side = "left" if q["mm"] > 0 else "right"
@@ -277,7 +395,10 @@ def cards(lines):
                 "info": f"near {near['name']}: the road falls across both tracks here and the build tilts the rails "
                         f"with it, the {side} rail up to {abs(q['mm']):.0f} mm lower ({abs(q['mm']) / 15:.1f} % across "
                         f"the gauge) for {q['length']} m (s {q['s']}-{q['s'] + q['length']}). Do the rails tilt across "
-                        f"here in reality?"})
+                        f"here in reality?"
+                        f'<a href="reports/review/cross-level/{pic}" target="_blank" rel="noopener">'
+                        f'<img src="reports/review/cross-level/{pic}" alt="the cross-section" '
+                        f'style="display:block;width:100%;margin:6px 0"></a>'})
         per[line] = out
     flat = [c for cs in per.values() for c in cs]
     for c in flat:
