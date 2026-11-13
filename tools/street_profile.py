@@ -256,7 +256,9 @@ def surface_tris(areas, classes):
     for a in areas:
         if a["l"] != 0 or a["c"] not in classes or len(a["r"]) < 3:
             continue
-        g = Polygon([p[:3] for p in a["r"]], [[p[:3] for p in h] for h in a.get("h", []) if len(h) >= 3])
+        def xyz(q):  # (a vertex without a height: NaN, its triangles left out below)
+            return (q[0], q[1], np.nan if q[2] is None else q[2])
+        g = Polygon([xyz(p) for p in a["r"]], [[xyz(p) for p in h] for h in a.get("h", []) if len(h) >= 3])
         if not g.is_valid:
             continue
         for t in shapely.get_parts(shapely.constrained_delaunay_triangles(g)):
