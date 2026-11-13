@@ -102,6 +102,28 @@ class Junctions(unittest.TestCase):
         self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through them)
 
 
+class OtherTracks(unittest.TestCase):
+    """#546: every drawn track's own sections beyond our route."""
+
+    def test_a_side_track_gets_its_crossings_diamond_and_switch(self):
+        side = {"p": [[300.0, 20.0], [300.0, 220.0]]}                        # (40 m off our route at its nearest)
+        branch = {"p": [[300.0, 120.0], [400.0, 160.0]]}                     # (leaves the side track at its y 120)
+        across = {"p": [[250.0, 180.0], [350.0, 180.0]]}                     # (crosses it square at y 180)
+        near = {"p": [[0.0, 3.0], [600.0, 3.0]]}                             # (the opposite track: the route's style)
+        data = {"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [side, branch, across, near],
+                "roads": [{"p": [[280, 60], [320, 60]], "w": 8, "c": 1}]}
+        own = T.track_sections(data, None)
+        self.assertNotIn(3, own)
+        s = [(round(a), round(b), st) for a, b, st in own[0]]
+        self.assertEqual(s, [(36, 44, "embedded"), (92, 108, "embedded"), (159, 161, "embedded")])   # (the road, the switch, the diamond)
+        self.assertEqual([(round(a), round(b)) for a, b, _ in own[1]], [(0, 15)])   # (it leaves the side track)
+
+    def test_green_under_a_side_track_is_grass(self):
+        sv = T.Survey({"areas": [rect(290, 310, 40, 120, "green")]})
+        own = T.track_sections({"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [{"p": [[300.0, 20.0], [300.0, 220.0]]}]}, sv)
+        self.assertEqual([(a, b, st) for a, b, st in own[0]], [(20.0, 100.0, "grass")])
+
+
 def styled(style, **extra):
     """A 600 m straight route, one mark of `style` over all of it, and what crosses it."""
     data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **extra}

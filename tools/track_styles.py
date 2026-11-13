@@ -38,6 +38,12 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
   points only: along the route its road areas run over grass track it does not map (line 22 at Pohořelec). Embedded
   and panels stand the same height over the bed (`railAboveDeck`), so this moves no height.
 
+- **Every other drawn track** (`track_sections`, written as the track's `styles`, [[s0, s1, style]] along its `p`; the
+  page draws a track within NEAR_ROUTE m of our route in the route's style): embedded at its own road crossings,
+  diamonds and switches by the same rule, grass where the survey's green lies under it, panels elsewhere. The survey
+  reaches only near our route and OSM maps almost no grass over these tracks (0-380 m of 14-21 km per line), so
+  they get no grass where neither has it.
+
 `styles` is a list of {s0, s1, style, source, mark | stretch | card | hole}, by s0: `source` 'user', 'review', 'list',
 'survey' or 'hole'; `mark` is the index of the user's mark in truth.json `trackStyles`, `stretch` the index in
 `grassTrack.stretches`, `card` the review card's id. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
@@ -72,6 +78,8 @@ DIAMOND_MIN = 20       # degrees: another track crossing ours more shallowly is 
 BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond covers on ours
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
+NEAR_ROUTE = 6         # m: a drawn track this near our route takes the route's style (src/world.js styleAt)
+BRANCH = 15            # m of a track along where another one leaves it, or it leaves another: the switch
 RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its section; `lift` every LIFT_STEP m
 RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
@@ -284,6 +292,82 @@ def junctions(data, survey):
     return sorted(out, key=lambda j: j["s0"])
 
 
+def track_sections(data, survey):
+    """Every drawn track's own style sections beyond our route (#546; the user, 2026-11-13, on the tracks that branch
+    off and run elsewhere: they "don't have consistent styles"): {track index: [[s0, s1, style], ...]}, s along the
+    track's `p`. Grass where the survey's green lies under the track (MIN_GRASS m or more, gaps under JOIN m joined),
+    embedded over a carriageway crossing it, a diamond (another track or our route crossing it at DIAMOND_MIN° or more)
+    and a switch (BRANCH m from where another track's end meets it, or it ends on another), panels elsewhere (no
+    section). The page draws a track within NEAR_ROUTE m of our route in the route's style instead."""
+    near = LineString([q[:2] for q in data["path"]]).buffer(NEAR_ROUTE)
+    lines = []
+    for tr in data.get("tracks") or []:
+        pts = [q[:2] for q in tr.get("p") or []]
+        lines.append(LineString(pts) if len(pts) >= 2 else None)
+    out = {}
+    for i, (tr, tl) in enumerate(zip(data.get("tracks") or [], lines)):
+        if tl is None or tl.length < 1 or near.covers(tl):
+            continue
+        rt = Route(tr["p"])
+        L = rt.length
+        secs = []
+        if survey is not None:
+            run, s = None, 0.0
+            while s <= L + SAMPLE:
+                green = s <= L and survey.class_at(*rt.at(s)[:2]) == "green"
+                if green and run is None:
+                    run = s
+                if not green and run is not None:
+                    s1 = min(s - SAMPLE, L)
+                    if secs and run - secs[-1][1] < JOIN:
+                        secs[-1][1] = s1
+                    elif s1 - run >= MIN_GRASS:
+                        secs.append([run, s1, "grass"])
+                    run = None
+                s += SAMPLE
+        js = []
+        road = (lambda v, rt=rt, L=L: survey.carriageway(*rt.at(min(max(v, 0), L))[:2])) if survey else None
+        for c, half, _, cars in crossing_roads(data, rt):
+            if cars or (road and road(c)):
+                js.append((c - half, c + half))
+        for j, ol in enumerate(lines):
+            if j == i or ol is None:
+                continue
+            for other in (ol,):
+                x = tl.intersection(other)
+                for g in [g for g in getattr(x, "geoms", [x]) if g.geom_type == "Point"] if not x.is_empty else []:
+                    s = tl.project(g)
+                    d = other.project(g)
+                    a, b = other.interpolate(max(0, d - 1)), other.interpolate(min(other.length, d + 1))
+                    h = rt.at(min(max(s, 0), L))[2:]
+                    v = (b.x - a.x, b.y - a.y)
+                    sin = abs(h[0] * v[1] - h[1] * v[0]) / ((v[0] ** 2 + v[1] ** 2) ** 0.5 or 1e-9)
+                    if sin >= math.sin(math.radians(DIAMOND_MIN)):
+                        half = BED / 2 / sin + BED / 2 * (1 - sin * sin) ** 0.5 / sin
+                        js.append((s - half, s + half))
+            # (a switch: the other track's end on this one, or this one's end on the other)
+            for e in (Point(ol.coords[0]), Point(ol.coords[-1])):
+                s = tl.project(e)
+                if tl.distance(e) < 0.5 and 1 < s < L - 1:
+                    js.append((s - BRANCH / 2, s + BRANCH / 2))
+            for k, e in ((0, Point(tl.coords[0])), (1, Point(tl.coords[-1]))):
+                if ol.distance(e) < 0.5 and 1 < ol.project(e) < ol.length - 1:
+                    js.append((0, BRANCH) if k == 0 else (L - BRANCH, L))
+        js = sorted((max(0.0, a), min(L, b)) for a, b in js if b > 0 and a < L)
+        emb = []
+        for a, b in js:
+            if emb and a - emb[-1][1] < MIN_PIECE:
+                emb[-1][1] = max(emb[-1][1], b)
+            else:
+                emb.append([a, b])
+        grass = [[a, b, "grass"] for g in secs for a, b in minus(g[0], g[1], [{"s0": e[0], "s1": e[1]} for e in emb])
+                 if b - a >= MIN_PIECE]
+        own = sorted(grass + [[a, b, "embedded"] for a, b in emb if b - a >= 1])
+        if own:
+            out[i] = [[round(a, 1), round(b, 1), st] for a, b, st in own]
+    return out
+
+
 def embed(secs, js):
     """Embedded over the junctions `js`, whatever the section there, but open ballast (the user, #503: "the branch to
     depo hostivař loop has open ballast including switches") and the user's own marks of another style than grass.
@@ -462,10 +546,18 @@ def main():
     dp = ROOT / "data" / f"line{line}.dtm.json"
     survey = Survey(json.loads(dp.read_text(encoding="utf-8"))) if dp.exists() else None
     data["styles"] = sections(data, truth, survey)
+    own = track_sections(data, survey)
+    for i, tr in enumerate(data.get("tracks") or []):
+        if i in own:
+            tr["styles"] = own[i]
+        else:
+            tr.pop("styles", None)
     data["lift"] = lift_series(data, data["styles"], offsets(truth))
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"line {line}: " + ", ".join(f"{x['style']} {x['s0']:.0f}-{x['s1']:.0f} ({x['source']})" for x in data["styles"]) or "none")
+    print(f"line {line}: other tracks: " + ", ".join(f"{st} {sum(b - a for v in own.values() for a, b, s in v if s == st):.0f} m"
+                                                    for st in ("grass", "embedded")) + f" on {len(own)} tracks")
 
 
 if __name__ == "__main__":
