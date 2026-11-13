@@ -113,7 +113,7 @@ chainTunnels(data.roads); // road tunnels and bridges: heights between their rea
 const route = new Route(data.path, data.pathExt);
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
 // the curves' radius and the banked curves as the build worked them out (tools/cant.py, #478)
-route.useBuilt(data.curvature.path, data.curvature.unit, data.cant);
+route.useBuilt(data.curvature.path, data.curvature.unit, data.cant, data.crossLevel && { ...data.crossLevel, c: data.crossLevel.path });
 const terrain = new Terrain(data.terrain);
 // the fine terrain near the tracks (2 m, tools/fine_terrain.py), where it was made for this line
 // (dev switch ?nofine: the coarse grid only, for comparing lint runs)

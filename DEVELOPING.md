@@ -59,7 +59,7 @@ python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, contin
 python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
 ```
 
-`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~2.5 min: it stages the network's heights
+`rebuild.py` ends with `line_heights.py` for all the lines it built `line_structures.py` and `cross_level.py` per line (~2.5 min: it stages the network's heights
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
@@ -128,6 +128,7 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 | `track_styles` | `lineN.json` | the track styles (`styles`: the user's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
 | `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
 | `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
+| `cross_level` | `lineN.json` | the cross level of paved track where the road tilts across both tracks: one plane of IPR across them, the rails tilted with it (`crossLevel`, #538) |
 
 The page computes no profile of its own (#480): it reads the built top of rail, the lift and the structures. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
