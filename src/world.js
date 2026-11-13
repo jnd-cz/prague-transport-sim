@@ -244,6 +244,55 @@ function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1, cros
   for (let i = 0; i < line.length - 1; i++) cg.quad(c, R[i], R[i + 1], L[i + 1], L[i], typeof col === 'function' ? col(i) : col);
 }
 
+// A track's bed (#547): out to its width each side (`t.bed`, tools/track_beds.py: the survey's area of its style, the
+// middle of the strip to a paired track), the rails' plane between them and beyond, except where it meets the paired
+// track: there the edge lies at the mean of the two near rails, as the street between them (terrain.js heightAt).
+// Without `t.bed` (data built before #547) the 2.7 m ribbon.
+const GAUGE_HALF = 0.72;
+function addBed(cg, t, step, zBed, tilt, col, otherRail) {
+  const line = t.smooth;
+  if (line.length < 2) return;
+  if (!t.bed) { addRibbon(cg, line, 2.7, zBed, 0, col, 0, 1, tilt.map((z) => z / GAUGE_HALF)); return; }
+  const len = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
+  const k = len(t.p) / (len(line) || 1), n = t.bed.l.length;
+  const rows = [];
+  let acc = 0;
+  for (let i = 0; i < line.length; i++) {
+    const p = line[i];
+    if (i) acc += Math.hypot(p[0] - line[i - 1][0], p[1] - line[i - 1][1]);
+    const f = Math.min(n - 1, (acc * k) / step), i0 = Math.min(Math.floor(f), n - 1), i1 = Math.min(i0 + 1, n - 1), u = f - i0;
+    const near = u < 0.5 ? i0 : i1;
+    const prev = line[Math.max(0, i - 1)], next = line[Math.min(line.length - 1, i + 1)];
+    let dx = next[0] - prev[0], dy = next[1] - prev[1];
+    const l = Math.hypot(dx, dy) || 1;
+    dx /= l; dy /= l;
+    let scale = 1;
+    if (i > 0 && i < line.length - 1) {
+      const ax = p[0] - prev[0], ay = p[1] - prev[1], al = Math.hypot(ax, ay) || 1;
+      scale = Math.min(2, 1 / Math.max(0.5, (ax / al) * dx + (ay / al) * dy));
+    }
+    const nx = -dy, ny = dx, slope = tilt[i] / GAUGE_HALF;
+    const at = (o) => [p[0] + nx * o * scale, p[1] + ny * o * scale];
+    const row = [];
+    for (const [side, key, bit] of [[-1, 'r', 2], [1, 'l', 1]]) {
+      const w = (t.bed[key][i0] * (1 - u) + t.bed[key][i1] * u) / 100, e = at(side * w);
+      let z = zBed[i] + slope * side * w;
+      if (t.bed.meet[near] & bit) {
+        const o = otherRail(e[0], e[1]);
+        if (o !== null) z = (zBed[i] + tilt[i] * side + o) / 2;
+      }
+      row.push(W(e[0], e[1], z));
+      if (side < 0) { const r = at(-GAUGE_HALF), q = at(GAUGE_HALF); row.push(W(r[0], r[1], zBed[i] - tilt[i]), W(q[0], q[1], zBed[i] + tilt[i])); }
+    }
+    rows.push(row); // right edge, right rail, left rail, left edge
+  }
+  const c = cg._chunk(line[0][0], line[0][1]);
+  for (let i = 0; i < line.length - 1; i++) {
+    const A = rows[i], B = rows[i + 1], cc = typeof col === 'function' ? col(i) : col;
+    for (let j = 0; j < 3; j++) cg.quad(c, A[j], B[j], B[j + 1], A[j + 1], cc);
+  }
+}
+
 // A vertical strip along `line` at `offset` m to its left, from zBot up to zTop (arrays per point):
 // the sides of the rails where the bed lies well under the heads (grass, ballast)
 function addSide(cg, line, offset, zTop, zBot) {
@@ -552,18 +601,41 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (src/heights.js: t.z is the top of rail; the bed lies the track style's offset under it, the
   // rail heads stand just over it, and where the bed is well below, the rails get their sides)
   const keepTrackRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  // (each track's bed and tilt first: a bed meeting its paired track's lays its edge at the mean of their near rails)
+  const beds = data.tracks.map((t) => {
+    const lift = t.smooth.map(([x, y]) => liftAt(x, y));
+    return { lift, zBed: t.z.map((z, i) => z - lift[i] - BED_BELOW), tilt: tiltOf(t) };
+  });
+  const bedGrid = new Map(), cell = (x, y) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
+  data.tracks.forEach((t, k) => t.smooth.forEach(([x, y], i) => {
+    const key = cell(x, y);
+    if (!bedGrid.has(key)) bedGrid.set(key, []);
+    bedGrid.get(key).push([k, i]);
+  }));
+  // (the near rail of the nearest other track at (x, y): its height there)
+  const otherRail = (own, x, y) => {
+    let best = null, bd = Infinity;
+    const cx = Math.floor(x / 4), cy = Math.floor(y / 4);
+    for (let a = cx - 1; a <= cx + 1; a++) for (let b = cy - 1; b <= cy + 1; b++) for (const [k, i] of bedGrid.get(`${a},${b}`) || []) {
+      if (k === own) continue;
+      const p = data.tracks[k].smooth[i], d = Math.hypot(p[0] - x, p[1] - y);
+      if (d < bd) { bd = d; best = [k, i]; }
+    }
+    if (!best) return null;
+    const [k, i] = best, L = data.tracks[k].smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
+    const side = (b[0] - a[0]) * (y - L[i][1]) - (b[1] - a[1]) * (x - L[i][0]) >= 0 ? 1 : -1;
+    return beds[k].zBed[i] + beds[k].tilt[i] * side;
+  };
   for (const [trackId, t] of data.tracks.entries()) {
     const bc = keepTrackRanges && t.smooth.length > 1 ? bedCg._chunk(...t.smooth[0]) : null;
     const rc = keepTrackRanges && t.smooth.length > 1 ? railCg._chunk(...t.smooth[0]) : null;
     const bedStart = bc && bc.pos.length / 9, railStart = rc && rc.pos.length / 9;
-    const lift = t.smooth.map(([x, y]) => liftAt(x, y));
-    const zBed = t.z.map((z, i) => z - lift[i] - BED_BELOW);
     // on a canted curve of our route the outer rail is higher, the inner one lower
-    const tilt = tiltOf(t);
+    const { lift, zBed, tilt } = beds[trackId];
     // The bed is the same canted plane as the rails, including its transition ramps.
     const own = ownStyles(t);
     const cols = t.smooth.map(([x, y], i) => STYLE_BED[styleAt(x, y) ?? own[i]] || bed);
-    addRibbon(bedCg, t.smooth, 2.7, zBed, 0, (i) => cols[i], 0, 1, tilt.map((z) => z / 0.72));
+    addBed(bedCg, t, data.heights.step, zBed, tilt, (i) => cols[i], (x, y) => otherRail(trackId, x, y));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
