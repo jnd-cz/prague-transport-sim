@@ -12,6 +12,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cross_level as cl  # noqa: E402
+import geo  # noqa: E402
 
 
 def street(n=101, off=3.7):
@@ -213,6 +214,7 @@ class Opposite(unittest.TestCase):
         far = cl.opposite(c, xy, h, xy + [0, 9.0], h)
         self.assertFalse(far.any())
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_a_level_answer_levels_between_its_pins(self):
         from geo import Frame
         F = Frame()
