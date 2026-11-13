@@ -20,7 +20,8 @@ Every STEP m along our route (`path`, s from 0 as tools/route.py and the page co
 - **Level** where the plane falls less than LEVEL. The norm's road crossfall is 2.5 %, but the tracks' band is laid
   level across a crowned street; measured on the five lines' clean planes the fall is 0.3-0.7 % (p50), 1-2.4 % (p90).
   A stretch that reaches LEVEL keeps its flanks down to FLANK.
-- **Smoothed** over ±SMOOTH m, then ramps of at most CANT_MAX per 30 m (tools/cant.py's), capped at CANT_MAX.
+- **Smoothed** over ±SMOOTH m and capped at CANT_MAX. Ramps of at most CANT_MAX per 30 m (tools/cant.py's limit): where the
+  road tilts faster, the ramp starts earlier and ends later, keeping the full tilt (`extend`).
 
 Written as cant is (the page's `atan2(c, 1.5)`, + = the left rail lower), in 0.01 mm every STEP m, for our route and
 for the opposite one where it runs beside ours (the same plane, the sign as its direction reads it). Kept apart from
@@ -113,7 +114,8 @@ def planes(sample, xy, h, off):
 
 
 def ramp(c, d):
-    """Ramps of at most d per sample, each sign's stretches on their own (tools/cant.py's ramps)."""
+    """Ramps of at most d per sample, each sign's stretches on their own (tools/cant.py's ramps), lowering values: after
+    a level answer, and where two opposite tilts meet closer than their ramps."""
     out = []
     for part in (np.maximum(c, 0), np.maximum(-c, 0)):
         x = part.copy()
@@ -156,8 +158,23 @@ def cross_level(fall, res, street, pair):
             i = j + 1
     sm = np.where(keep, sm, 0.0)
     c = np.clip(-sm * GAUGE, -CANT_MAX, CANT_MAX)
-    c = ramp(c, CANT_MAX / 30 * STEP)
+    c = extend(c, CANT_MAX / 30 * STEP)
     return np.where(np.abs(c) < 0.002, 0.0, c), ok
+
+
+def extend(c, d):
+    """Ramps of at most d per sample that keep every value: where the road tilts faster than the ramp allows, the
+    ramp starts earlier and ends later instead (the user, 2026-11-13, #538: "If the road tilts faster then extend the
+    start/end of twist back/forward"). Each sign's stretches on their own."""
+    out = []
+    for part in (np.maximum(c, 0), np.maximum(-c, 0)):
+        x = part.copy()
+        for i in range(1, len(x)):
+            x[i] = max(x[i], x[i - 1] - d)
+        for i in range(len(x) - 2, -1, -1):
+            x[i] = max(x[i], x[i + 1] - d)
+        out.append(x)
+    return out[0] - out[1]
 
 
 def opposite(c, xy, h, xyb, hb):

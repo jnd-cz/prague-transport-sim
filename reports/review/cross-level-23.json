@@ -11,7 +11,7 @@
    "x": -1544.9,
    "y": 878.3,
    "s0": 1862,
-   "s1": 1928,
+   "s1": 1936,
    "mag": 47.6,
    "status": "review",
    "place": [
@@ -24,8 +24,8 @@
      14.3976688
     ],
     [
-     50.0933178,
-     14.3985646
+     50.0933333,
+     14.3986738
     ]
    ],
    "marks": [
@@ -36,8 +36,8 @@
      "color": "#3e9dff"
     },
     {
-     "x": -1523.1,
-     "y": 877.5,
+     "x": -1515.1,
+     "y": 878.1,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -47,7 +47,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Pražský hrad: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 48 mm lower (3.2 % across the gauge) for 66 m (s 1862-1928). Do the rails tilt across here in reality?",
+   "info": "near Pražský hrad: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 48 mm lower (3.2 % across the gauge) for 74 m (s 1862-1936). Do the rails tilt across here in reality?",
    "lines": [
     "22",
     "23"
@@ -206,8 +206,8 @@
    "line": "23",
    "x": -791.6,
    "y": 714.8,
-   "s0": 3278,
-   "s1": 3352,
+   "s0": 3276,
+   "s1": 3354,
    "mag": 79.5,
    "status": "review",
    "place": [
@@ -216,24 +216,24 @@
    ],
    "between": [
     [
-     50.0928717,
-     14.4084305
+     50.0928701,
+     14.4084026
     ],
     [
-     50.0925355,
-     14.409208
+     50.0925183,
+     14.4092163
     ]
    ],
    "marks": [
     {
-     "x": -830.5,
-     "y": 731.9,
+     "x": -832.5,
+     "y": 732.0,
      "label": "the tilt starts",
      "color": "#3e9dff"
     },
     {
-     "x": -780.5,
-     "y": 687.3,
+     "x": -780.2,
+     "y": 685.3,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -243,7 +243,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Malostranská: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 80 mm lower (5.3 % across the gauge) for 74 m (s 3278-3352). Do the rails tilt across here in reality?",
+   "info": "near Malostranská: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 80 mm lower (5.3 % across the gauge) for 78 m (s 3276-3354). Do the rails tilt across here in reality?",
    "lines": [
     "22",
     "23"
@@ -255,8 +255,8 @@
    "line": "23",
    "x": -1174.9,
    "y": 282.3,
-   "s0": 4100,
-   "s1": 4142,
+   "s0": 4098,
+   "s1": 4150,
    "mag": 40.4,
    "status": "review",
    "place": [
@@ -265,24 +265,24 @@
    ],
    "between": [
     [
-     50.0885217,
-     14.4047381
+     50.0885267,
+     14.404765
     ],
     [
-     50.0882508,
-     14.4043909
+     50.088179,
+     14.404383
     ]
    ],
    "marks": [
     {
-     "x": -1158.3,
-     "y": 288.7,
+     "x": -1156.3,
+     "y": 289.0,
      "label": "the tilt starts",
      "color": "#3e9dff"
     },
     {
-     "x": -1187.0,
-     "y": 262.3,
+     "x": -1188.7,
+     "y": 254.5,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -292,7 +292,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Malostranské náměstí: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 40 mm lower (2.7 % across the gauge) for 42 m (s 4100-4142). Do the rails tilt across here in reality?",
+   "info": "near Malostranské náměstí: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 40 mm lower (2.7 % across the gauge) for 52 m (s 4098-4150). Do the rails tilt across here in reality?",
    "lines": [
     "22",
     "23"
@@ -304,8 +304,8 @@
    "line": "23",
    "x": -1245.0,
    "y": 180.7,
-   "s0": 4210,
-   "s1": 4300,
+   "s0": 4208,
+   "s1": 4302,
    "mag": 46.9,
    "status": "review",
    "place": [
@@ -314,24 +314,24 @@
    ],
    "between": [
     [
-     50.0877461,
-     14.4040229
+     50.0877537,
+     14.4040482
     ],
     [
-     50.0870098,
-     14.4037297
+     50.0869925,
+     14.4037374
     ]
    ],
    "marks": [
     {
-     "x": -1220.8,
-     "y": 210.3,
+     "x": -1218.9,
+     "y": 210.9,
      "label": "the tilt starts",
      "color": "#3e9dff"
     },
     {
-     "x": -1252.8,
-     "y": 132.0,
+     "x": -1252.5,
+     "y": 130.0,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -341,7 +341,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Malostranské náměstí: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 47 mm lower (3.1 % across the gauge) for 90 m (s 4210-4300). Do the rails tilt across here in reality?",
+   "info": "near Malostranské náměstí: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 47 mm lower (3.1 % across the gauge) for 94 m (s 4208-4302). Do the rails tilt across here in reality?",
    "lines": [
     "22",
     "23"
@@ -353,8 +353,8 @@
    "line": "23",
    "x": -81.9,
    "y": -914.2,
-   "s0": 6490,
-   "s1": 6614,
+   "s0": 6488,
+   "s1": 6616,
    "mag": 43.0,
    "status": "review",
    "place": [
@@ -363,24 +363,24 @@
    ],
    "between": [
     [
-     50.079105,
-     14.4214338
+     50.0791058,
+     14.4214059
     ],
     [
-     50.0796301,
-     14.4228745
+     50.0796427,
+     14.4228944
     ]
    ],
    "marks": [
     {
-     "x": -117.6,
-     "y": -911.8,
+     "x": -119.6,
+     "y": -911.5,
      "label": "the tilt starts",
      "color": "#3e9dff"
     },
     {
-     "x": -7.5,
-     "y": -868.0,
+     "x": -5.9,
+     "y": -866.8,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -390,7 +390,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Lazarská: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 43 mm lower (2.9 % across the gauge) for 124 m (s 6490-6614). Do the rails tilt across here in reality?",
+   "info": "near Lazarská: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 43 mm lower (2.9 % across the gauge) for 128 m (s 6488-6616). Do the rails tilt across here in reality?",
    "lines": [
     "9",
     "23"
@@ -398,38 +398,38 @@
   },
   {
    "kind": "cross level",
-   "id": "cross-50.0815-14.4252",
+   "id": "cross-50.0816-14.4253",
    "line": "23",
-   "x": 188.7,
-   "y": -679.9,
-   "s0": 6760,
-   "s1": 6900,
-   "mag": 44.6,
+   "x": 197.0,
+   "y": -671.2,
+   "s0": 6758,
+   "s1": 6912,
+   "mag": 46.7,
    "status": "review",
    "place": [
-    50.081546,
-    14.425232
+    50.081634,
+    14.42533
    ],
    "between": [
     [
-     50.0806639,
-     14.4241296
+     50.0806497,
+     14.4241126
     ],
     [
-     50.0816484,
-     14.4253464
+     50.0817368,
+     14.4254425
     ]
    ],
    "marks": [
     {
-     "x": 97.2,
-     "y": -766.3,
+     "x": 95.8,
+     "y": -767.8,
      "label": "the tilt starts",
      "color": "#3e9dff"
     },
     {
-     "x": 198.4,
-     "y": -669.7,
+     "x": 206.5,
+     "y": -660.9,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -439,7 +439,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Vodičkova: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 45 mm lower (3.0 % across the gauge) for 140 m (s 6760-6900). Do the rails tilt across here in reality?",
+   "info": "near Vodičkova: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 47 mm lower (3.1 % across the gauge) for 154 m (s 6758-6912). Do the rails tilt across here in reality?",
    "lines": [
     "9",
     "23"

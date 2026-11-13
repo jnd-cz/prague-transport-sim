@@ -63,6 +63,17 @@ class Level(unittest.TestCase):
         self.assertGreaterEqual(c.min(), -cl.CANT_MAX - 1e-9)
         self.assertLessEqual(np.abs(np.diff(c)).max(), cl.CANT_MAX / 30 * cl.STEP + 1e-9)
 
+    def test_a_road_tilting_faster_than_the_ramp_starts_it_earlier(self):
+        # the road goes from level to 5 % in 10 m (Sokolovská's is 20 m): the full tilt where the road has it, the
+        # ramp before it
+        fall = np.zeros(80)
+        fall[40:45] = -np.linspace(0.01, 0.05, 5)
+        fall[45:] = -0.05
+        c = self.run_rule(fall, street_=np.r_[np.zeros(40, bool), np.ones(40, bool)])
+        self.assertAlmostEqual(c[50], 0.05 * cl.GAUGE, delta=0.002)
+        self.assertGreater(c[38], 0)  # (begun before the road tilts)
+        self.assertLessEqual(np.abs(np.diff(c)).max(), cl.CANT_MAX / 30 * cl.STEP + 1e-9)
+
     def test_no_plane_and_open_bed_stay_level(self):
         fall = np.full(60, 0.05)
         self.assertFalse(self.run_rule(fall, res=np.full(60, 0.05)).any())
