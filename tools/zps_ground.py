@@ -104,11 +104,53 @@ def is_cover(t):
                 and any(t.get(k, "no") != "no" for k in ("bridge", "tunnel", "covered"))))
 
 
+class Covers:
+    """The union of polygons, asked at points and along lines without building it. A union of a line's OSM covers and
+    buildings took 18-22 s (65 000-68 000 polygons, line 17) and dtm.py built three, while the questions are local
+    (#517): a point lies inside the union where it lies inside one of them, or where those it lies on the edge of meet
+    around it (their own union, a few polygons, says); a line meets the union where it meets one of them."""
+
+    def __init__(self, polys):
+        self.polys = [p for p in polys if not p.is_empty]
+        self.is_empty = not self.polys
+        self.tree, self._arr, self._local = shapely.STRtree(self.polys), np.asarray(self.polys, object), {}
+
+    def contains_xy(self, x, y):
+        pts = shapely.points(np.asarray(x, float), np.asarray(y, float))
+        out = np.zeros(pts.shape, bool)
+        if self.is_empty or not pts.size:
+            return out
+        flat = pts.reshape(-1)
+        i, j = self.tree.query(flat, predicate="intersects")
+        inside = shapely.contains_xy(self._arr[j], shapely.get_x(flat[i]), shapely.get_y(flat[i]))
+        hit = np.zeros(flat.shape, bool)
+        hit[i[inside]] = True
+        edge = {}
+        for a, b in zip(i[~inside].tolist(), j[~inside].tolist()):
+            if not hit[a]:
+                edge.setdefault(a, []).append(b)
+        for a, bs in edge.items():  # (on the edges of several: inside their union where they meet around it)
+            if len(bs) > 1:
+                key = tuple(sorted(bs))
+                if key not in self._local:
+                    self._local[key] = unary_union([self.polys[b] for b in key])
+                hit[a] = bool(shapely.contains_xy(self._local[key], shapely.get_x(flat[a]), shapely.get_y(flat[a])))
+        out.reshape(-1)[:] = hit
+        return out
+
+    def intersects(self, geom):
+        return bool(len(self.tree.query(geom, predicate="intersects")))
+
+
+def covered(cover, x, y):
+    """shapely.contains_xy for a geometry or a Covers."""
+    return cover.contains_xy(x, y) if isinstance(cover, Covers) else shapely.contains_xy(cover, x, y)
+
+
 def cover_union(areas, osm_polys=()):
-    """What lidar can't see through: the survey's areas of level 1 or more and the OSM covers."""
+    """What lidar can't see through: the survey's areas of level 1 or more and the OSM covers (a Covers)."""
     polys = [shapely.Polygon(np.asarray(a["r"])[:, :2]).buffer(0) for a in areas if a["l"] >= 1 and len(a["r"]) >= 3]
-    polys += [p for p in osm_polys if not p.is_empty]
-    return unary_union(polys) if polys else shapely.Polygon()
+    return Covers(polys + [p for p in osm_polys if not p.is_empty])
 
 
 def rail_points(paths):
@@ -228,7 +270,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         if poly.area < MIN_M2 or inside.mean() < MIN_INNER:
             v["verdict"] = "small"
             continue
-        if not cover.is_empty and shapely.contains_xy(cover, pin[:, 0], pin[:, 1]).mean() > COVERED:
+        if not cover.is_empty and covered(cover, pin[:, 0], pin[:, 1]).mean() > COVERED:
             v["verdict"] = "covered"
             continue
         if v["spread"] >= STEADY:
@@ -238,7 +280,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         if rtree is not None:
             k = rtree.query(poly, predicate="contains")
             if len(k) and not cover.is_empty:
-                k = k[~shapely.contains_xy(cover, rx[k], ry[k])]
+                k = k[~covered(cover, rx[k], ry[k])]
             if len(k) >= RAIL_MIN:
                 sv = np.array([surface_at(r, rx[j], ry[j]) for j in k]) - rz[k]
                 gE, gN = frame.to_jtsk(rx[k], ry[k])
@@ -251,7 +293,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
                 if abs(s_off) <= AGREE < abs(i_off):
                     v["verdict"], v["by"] = "survey", "rails"
                     continue
-        if changing is not None and not changing.is_empty and shapely.contains_xy(changing, pin[:, 0], pin[:, 1]).mean() > COVERED:
+        if changing is not None and not changing.is_empty and covered(changing, pin[:, 0], pin[:, 1]).mean() > COVERED:
             v["verdict"] = "changing"
             continue
         o = np.asarray(older(E, N), float) - g

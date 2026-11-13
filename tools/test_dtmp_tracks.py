@@ -1,13 +1,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Height-matching checks: python -P -E tools/test_dtmp_tracks.py."""
+import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 from shapely.geometry import box
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from dtmp_tracks import Segments, samples, quantile, summary
+import dtmp_tracks  # noqa: E402
+from dtmp_tracks import Segments, samples, quantile, summary  # noqa: E402
 
 
 def path(identity, coords):
@@ -71,6 +76,31 @@ class HeightMatch(unittest.TestCase):
                            'archive': {'status': 'numeric', 'z': 180, 'distance': .01}}])
         self.assertEqual(result['lengths']['fallback_structure_review_m'], 30)
         self.assertEqual(result['eligible_percent_of_missing'], 0)
+
+
+@unittest.skipUnless((dtmp_tracks.DI / 'provenance.json').exists() and (dtmp_tracks.RAW / 'provenance.json').exists(),
+                     'needs raw/dtm-di and raw/dtmp-tracks: python -I tools/snapshot.py fetch')
+class Parsed(unittest.TestCase):
+    """DI and the archive parsed once per machine (#517): what a later build reads back is the parse."""
+
+    def test_kept_parse_is_the_parse(self):
+        di_prov = json.loads((dtmp_tracks.DI / 'provenance.json').read_text(encoding='utf-8'))
+        ar_prov = json.loads((dtmp_tracks.RAW / 'provenance.json').read_text(encoding='utf-8'))
+        ids = json.loads((dtmp_tracks.RAW / 'ids.json').read_text(encoding='utf-8'))
+        fresh = dtmp_tracks._di_parse(di_prov), dtmp_tracks._archive_parse(ar_prov, ids)
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'TRAMDATA_CACHE': d}):
+            for _ in range(2):  # (the first parses and keeps it, the second reads it back)
+                di, ar = dtmp_tracks.di_data(), dtmp_tracks.archive_data()
+                self.assertEqual(sorted(p.name.split('-')[0] for p in Path(d, 'kept').iterdir()), ['archive', 'di'])
+                self.assertEqual(di[1], fresh[0][1])
+                self.assertEqual([x | {'polygon': x['polygon'].wkb} for x in di[0]],
+                                 [x | {'polygon': x['polygon'].wkb} for x in fresh[0][0]])
+                self.assertEqual(ar, fresh[1])
+                # (a path's attributes are the same dict as its source's, as the parse made them)
+                self.assertIs(di[1][0]['attrs'], di[1][0]['sources'][0]['attributes'])
+            with mock.patch.object(dtmp_tracks, 'sha', return_value='0' * 64):
+                with self.assertRaises(ValueError):  # (a source that no longer matches its provenance is refused first)
+                    dtmp_tracks.di_data()
 
 
 if __name__ == '__main__':

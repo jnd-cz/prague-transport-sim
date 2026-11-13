@@ -23,7 +23,10 @@ Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from
 The extract's tagged ways and nodes and its relations are decoded once per extract and machine into
 `TRAMDATA_CACHE/osm-index/` (else `raw/osm/index/`; ~50 s, keyed by the extract's hash and the code that writes
 it): `tools/osm_local.py`'s `ways()`, `nodes()` and `relations()` answer from it, where each was a pass of
-~15-30 s over the file (#511).
+~15-30 s over the file (#511). DI's and the archive's tracks are parsed, and DI's network built, once per machine
+into `TRAMDATA_CACHE/kept/` (else `reports/cache/kept/`; `tools/dtmp_tracks.py` `kept`, keyed by the sources'
+provenance hashes and the code that reads them, the last 4 of each kind kept): `build_line`, `dtm` and the heights'
+staging read them back, where each spent ~15-25 s on them (#517).
 All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
 
 The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps

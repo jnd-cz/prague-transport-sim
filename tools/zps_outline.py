@@ -31,6 +31,8 @@ track bed 0.30 m under the kerb it shares with a sidewalk on IPR; pulled down, t
 import numpy as np
 import shapely
 
+import zps_ground
+
 # the classes where IPR read 1 m inside scatters no more than the survey along straight outline (over 8 cm off the 21 m
 # mean on the five lines, survey / IPR: road 1.8-2.7 / 1.6-2.3 %, tram 1.7-3.3 / 0.4-2.1 %, sidewalk 4.0-5.1 / 3.6-5.9 %).
 # Not parking (1.5-4.3 / 4.5-9.6 %), cycle, island, platform (small or narrow: IPR inside reads their edges; with them
@@ -210,7 +212,7 @@ def correct(areas, ground, held=(), covers=None):
     new = {}  # (x, y, old z) -> [candidate heights]
     count = {}
     for c, r, st in rings_of:
-        under = (shapely.contains_xy(covers, r[:, 0], r[:, 1]) if covers is not None and not covers.is_empty
+        under = (zps_ground.covered(covers, r[:, 0], r[:, 1]) if covers is not None and not covers.is_empty
                  else None)
         fx = moves(st, under, np.array([(round(float(x), 2), round(float(y), 2)) in agree for x, y in r[:, :2]]))
         for k in sorted(fx):
