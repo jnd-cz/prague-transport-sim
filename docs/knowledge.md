@@ -444,7 +444,9 @@ Sections:
     `shape`).
   - Geometry: OPL polygons / multipolygons (XY); KR line strings with Z (boundary heights) and points
     (registration). `gpkg.py`'s WKB reader takes base types 1–7 with ISO / EWKB Z and M (M dropped) and
-    envelope codes 0–4: curved types would need work.
+    envelope codes 0–4: curved types would need work. The blobs carry no envelope (flags 0) and the packages
+    no R-tree index, so a reader that wants only the features near the line reads every box through GEOS
+    (`gpkg.features(keep=)`, #517): a district holds ~300 000 features, line 17's corridor a few per cent.
   - CRS: everything is EPSG:5514 metres, M = 0, and no tool reprojects or rejects another CRS.
   - Per district (OPL polygon / KR line / KR point layers): Praha 1 50/28/61, 2 43/26/52, 4 49/28/60,
     7 45/28/56, 8 53/29/63, 10 49/27/62, 12 50/29/58, 17 43/26/47.
@@ -910,6 +912,12 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 - Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
   rewritten within the same second at the same size runs the old code (a test that edits a module must
   change its size).
+- `np.hypot` and `math.hypot` differ in the last bit in ~17 % of pairs (2 000 000 random pairs, #517), and so does
+  `np.sqrt(x*x + y*y)`; numpy's `+ - * /` and Python's floats agree to the bit. A loop moved to numpy keeps its
+  results only where it keeps `math.hypot` (`tools/track_curve.py` `misses`: numpy picks, `math.hypot` measures).
+  shapely's array functions (`distance`, `line_locate_point`, `line_interpolate_point`, `buffer`, an `STRtree`
+  query of many geometries, which lists each one's hits in the order a query of it alone gives) run the same GEOS
+  operations as its scalar methods: the same bits.
 - `os.replace` onto a file another handle holds open fails on Windows (`PermissionError`, WinError 5), and
   so does opening a file while it is being replaced; POSIX lets both through. Python's `open` does not share
   delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
