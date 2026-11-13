@@ -759,5 +759,39 @@ class Workers(unittest.TestCase):
             self.assertEqual((len(x.review), len(x.dropped), len(x.apart), x.held), (len(y.review), len(y.dropped), len(y.apart), y.held))
 
 
+class Kept(unittest.TestCase):
+    def test_runs_kept_as_solved_again(self):
+        """#516: a run whose points are as at an earlier solve of its chain keeps what it found then: the network's
+        heights to their last bit as when every run is solved again (one process), and some runs were kept."""
+        def network():
+            out = [chain([(0, 40 * k), (1000, 40 * k)], lambda s, k=k: 101 + .001 * k * (s - 200) + (.3 if 150 < s < 160 else 0))
+                   for k in range(6)]  # (solved first: the longest)
+            # (a track crossing them, its runs cut by a held stretch: the far one has no pins)
+            far = lambda s: None if 300 < s < 420 else 101.0 + .002 * (s - 300) * (s > 420)  # noqa: E731
+            return out + [chain([(200, -50), (200, 6 * 40 + 400)], far)]
+        saved = ha.RADIUS_ANSWERS
+        self.addCleanup(setattr, ha, 'RADIUS_ANSWERS', saved)
+        ha.RADIUS_ANSWERS = [{'xy': (200.0, 80.0), 'answer': ha.HOLD}]
+        solved = [0]
+        run = lh.solve_run
+
+        def counted(*a):
+            solved[0] += 1
+            return run(*a)
+        with mock.patch.object(lh, 'POOL', 10 ** 6), mock.patch.object(lh, 'solve_run', counted):
+            kept_net = network()
+            a = quiet(lh.assemble, kept_net)
+            n_kept = solved[0]
+            fresh_net, keys = network(), iter(range(10 ** 9))
+            with mock.patch.object(lh, '_key', lambda run: next(keys)):
+                b = quiet(lh.assemble, fresh_net)
+            n_fresh = solved[0] - n_kept
+        self.assertEqual(a, b)
+        self.assertLess(n_kept, n_fresh)
+        for x, y in zip(kept_net, fresh_net):
+            self.assertEqual((x.runs, x.held, x.steps, x.review, x.dropped, x.apart),
+                             (y.runs, y.held, y.steps, y.review, y.dropped, y.apart))
+
+
 if __name__ == '__main__':
     unittest.main()

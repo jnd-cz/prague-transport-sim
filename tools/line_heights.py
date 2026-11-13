@@ -387,6 +387,14 @@ def held_runs(series):
 def solve(c, pins, r, relax=None):
     """The chain's runs of heights with its pinned points {t: z}: radius by construction, switch radius near a
     junction, short holds bridged; `relax` {t: factor} scales the radius within RELAX_REACH of t."""
+    runs = runs_of(c, pins)
+    c.runs, c.steps, c.review, c.dropped, c.apart = [], [], [], [], []
+    for run in runs:
+        add_run(c, solve_run(c, run, r))
+
+
+def runs_of(c, pins):
+    """The chain's series with its pins {t: z}, cut into the runs solve_run solves (c.held: the stretches held out)."""
     # (pins nearer than PIN_MERGE are one: a fork's diverging end and its crossing with the through track lie
     # 0.003-1.6 m apart, and points that close make the solver's steps unequal by thousands)
     groups = []
@@ -403,9 +411,7 @@ def solve(c, pins, r, relax=None):
     runs, cut = held_runs(series)
     c.held = [{'s0': h[0]['s'], 's1': h[-1]['s'], 'flags': sorted({f for x in h for f in x['flags']}),
                'xy': h[len(h) // 2]['xy']} for h in cut]
-    c.runs, c.steps, c.review, c.dropped, c.apart = [], [], [], [], []
-    for run in runs:
-        add_run(c, solve_run(c, run, r))
+    return runs
 
 
 def add_run(c, got):
@@ -635,6 +641,7 @@ def solve_run(c, run, r):
             src[i] = next((src[j] for j in sorted(range(len(src)), key=lambda j: abs(j - i)) if src[j]), 'curve')
     return found_run, found_steps, found_review, found_dropped, found_apart
 
+
 POOL = 16  # chains: fewer are solved in this process (a worker takes ~2 s to start: the network has ~600)
 
 
@@ -655,9 +662,15 @@ def _write(line):
     return write_line(line, _LOOKUP, _CHS)[2]
 
 
-def _solve(c, pins, r):
-    solve(c, pins, r)
-    return c.runs, c.held, c.steps, c.review, c.dropped, c.apart
+def _run(i, run, r):
+    return solve_run(_CHS[i], run, r)
+
+
+def _key(run):
+    """A run's points as they are, for the results kept (in_turn)."""
+    import hashlib
+    import pickle
+    return hashlib.sha1(pickle.dumps(run, protocol=pickle.HIGHEST_PROTOCOL)).digest()
 
 
 BLAS = 4  # numpy's BLAS threads per worker: a long chain's solve on one thread took twice as long, and the longest set the pace
@@ -673,26 +686,30 @@ def _pool(n, chs=None):
                                initargs=({k: getattr(ha, k) for k in ANSWERS}, chs))
 
 
-def presolve(chs, order, r, pool=None):
+def presolve(chs, order, r, pool=None, kept=None):
     """Every chain's first solve, without pins: each reads only its own chain, so they run side by side in the workers,
     the longest first (one process solved a line's chains in 192 s, these first solves about half of it, #511).
     {chain: (runs, held, steps, review, dropped, apart)}."""
-    if pool is None:
-        return {i: _solve(chs[i], {}, r) for i in order}
-    return dict(zip(order, pool.map(_solve, [chs[i] for i in order], [{}] * len(order), [r] * len(order))))
+    in_turn(chs, order, {i: () for i in order}, lambda i: {}, r, pool, kept)
+    return {i: (chs[i].runs, chs[i].held, chs[i].steps, chs[i].review, chs[i].dropped, chs[i].apart) for i in order}
 
 
-def in_turn(chs, order, waits, prepare, r, pool):
+def in_turn(chs, order, waits, prepare, r, pool, kept=None):
     """Each chain of `order` once the chains it waits for (before it in the order) are done: prepare(i) gives its pins, or
-    None where it is not solved (again). A chain with pins is solved in the pool when there is one, side by side with the
-    others whose waits are over; without one, here, strictly in the order: as one loop over it (#511)."""
+    None where it is not solved (again). A chain's runs are solved in the pool when there is one, side by side with the
+    others' whose waits are over (the longest chain's first solve set the pace of all the first solves, ~20 s of 26, #516);
+    without one, here, strictly in the order. A run whose points are as at an earlier solve of its chain (`kept`: {chain:
+    {run's key: what it found}}) keeps what it found then: the rounds of meeting half way move a few pins of a chain and
+    solved all its runs again (#516)."""
+    import copy
+    kept = {} if kept is None else kept
     pos = {i: n for n, i in enumerate(order)}
     after, left = defaultdict(list), {}
     for i in order:
         left[i] = len(waits[i])
         for j in waits[i]:
             after[j].append(i)
-    ready, running = [pos[i] for i in order if not left[i]], {}
+    ready, running, found, keys = [pos[i] for i in order if not left[i]], {}, {}, {}
     heapq.heapify(ready)
 
     def finish(i):
@@ -701,23 +718,42 @@ def in_turn(chs, order, waits, prepare, r, pool):
             if not left[k]:
                 heapq.heappush(ready, pos[k])
 
+    def done(i):
+        c, mine = chs[i], kept.setdefault(i, {})
+        c.runs, c.steps, c.review, c.dropped, c.apart = [], [], [], [], []
+        for k, got in zip(keys.pop(i), found.pop(i)):
+            mine[k] = copy.deepcopy(got)
+            add_run(c, got)
+        finish(i)
+
     while ready or running:
         while ready:
             i = order[heapq.heappop(ready)]
             pins = prepare(i)
             if pins is None:
                 finish(i)
-            elif pool is None:
-                solve(chs[i], pins, r)
-                finish(i)
+                continue
+            runs = runs_of(chs[i], pins)
+            keys[i] = [_key(run) for run in runs]
+            mine = kept.get(i, {})
+            found[i] = [copy.deepcopy(mine[k]) if k in mine else None for k in keys[i]]
+            todo = [n for n, got in enumerate(found[i]) if got is None]
+            if pool is None:
+                for n in todo:
+                    found[i][n] = solve_run(chs[i], runs[n], r)
+                done(i)
+            elif not todo:
+                done(i)
             else:
-                running[pool.submit(_solve, chs[i], pins, r)] = i
+                for n in sorted(todo, key=lambda n: -len(runs[n])):
+                    running[pool.submit(_run, i, runs[n], r)] = (i, n)
         if running:
             over, _ = wait(running, return_when=FIRST_COMPLETED)
             for f in over:
-                i = running.pop(f)
-                chs[i].runs, chs[i].held, chs[i].steps, chs[i].review, chs[i].dropped, chs[i].apart = f.result()
-                finish(i)
+                i, n = running.pop(f)
+                found[i][n] = f.result()
+                if all(got is not None for got in found[i]):
+                    done(i)
 
 
 def assemble(chs):
@@ -763,8 +799,9 @@ def assemble(chs):
                     meets[j2].append((u2, j1, u1, 'near'))
     pinned, used, apart, t0 = 0, [], {}, time.time()
     order = sorted(range(len(chs)), key=lambda i: -chs[i].length)
-    pool = _pool(len(order)) if len(order) >= POOL else None
-    unpinned = presolve(chs, order, r, pool)
+    pool = _pool(len(order), chs) if len(order) >= POOL else None
+    kept = {}  # (each chain's runs and what they found: a run as it was at an earlier solve keeps it, in_turn)
+    unpinned = presolve(chs, order, r, pool, kept)
     print(f'  every chain solved without pins, {time.time() - t0:.0f} s', flush=True)
     pos = {i: n for n, i in enumerate(order)}
 
@@ -804,7 +841,7 @@ def assemble(chs):
                   f'{time.time() - t0:.0f} s', flush=True)
         return got[i][0] or None
 
-    in_turn(chs, order, {i: {j for _, j, _, _ in meets[i] if pos[j] < pos[i]} for i in order}, pinned_pass, r, pool)
+    in_turn(chs, order, {i: {j for _, j, _, _ in meets[i] if pos[j] < pos[i]} for i in order}, pinned_pass, r, pool, kept)
     last = {}
     for i in order:
         pins, mine, gone = got[i]
@@ -841,7 +878,7 @@ def assemble(chs):
         if not gap:
             break
         # (a chain's pins come from the chains it is pinned to, before it in the order: it waits for them this round)
-        in_turn(chs, order, {i: {u[2] for u in by_chain[i]} for i in order}, meet, r, pool)
+        in_turn(chs, order, {i: {u[2] for u in by_chain[i]} for i in order}, meet, r, pool, kept)
     if pool is not None:
         pool.shutdown()
     met = met[0]
