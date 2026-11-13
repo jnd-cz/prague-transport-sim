@@ -8,6 +8,7 @@ export const INDEX = 'assets/vehicles.json';
 export const LOADERS = ['builtin', 'gltf', 'gltf-classic', 'gltf-rigged'];
 export const vehicles = [];   // the manifests in the index's order
 export const byId = new Map();
+export const liveries = new Map();   // id -> a livery's manifest (#529), only those that fit their vehicle
 
 const dir = (id) => `assets/${id}/`;
 export const fileUrl = (v, path) => dir(v.id) + path;
@@ -26,7 +27,57 @@ export async function loadRegistry(get = (u) => fetch(u)) {
     } catch (e) { console.warn(`vehicle ${id} left out:`, e); return null; }
   }));
   for (const v of list) if (v) { vehicles.push(v); byId.set(v.id, v); }
+  // the liveries (#529): assets/<id>/livery.json, each for the vehicle its `requires` names
+  const looks = await Promise.all((index.liveries || []).map(async (id) => {
+    try {
+      const l = await (await get(`${dir(id)}livery.json`)).json();
+      const bad = liveryProblems(l, byId.get(liveryVehicle(l)), id);
+      if (bad.length) { console.warn(`livery ${id} left out:`, bad.join('; ')); return null; }
+      return l;
+    } catch (e) { console.warn(`livery ${id} left out:`, e); return null; }
+  }));
+  for (const l of looks) if (l) liveries.set(l.id, l);
   return vehicles;
+}
+
+// A livery (#529; docs/decisions/2026-11-10-vehicle-packages.md, section 3): `textures` and `colours` by the slots
+// its vehicle declares (the manifest's `slots`, a slot's glTF materials; `colours`, the colours a model painted by
+// colour takes), `numbers` the fleet numbers' `font` and `colour`, `types` the fleet types it fits, `share` the part
+// of AI sets of those types that wear it. Every slot it leaves out keeps the vehicle's own.
+export const liveryVehicle = (l) => Object.keys(l?.requires || {})[0];
+export const liveryUrl = (l, path) => dir(l.id) + path;
+const HEX = /^#[0-9a-f]{6}$/i;
+export function liveryProblems(l, v, id = l?.id) {
+  const out = [];
+  if (l?.id !== id) out.push(`its id ${l?.id} is not its folder's ${id}`);
+  if (l?.kind !== 'livery') out.push(`kind ${l?.kind} is not livery`);
+  if (!l?.names?.en || !l?.names?.cs) out.push('no names in both languages');
+  if (!v) { out.push(`its vehicle ${liveryVehicle(l)} is not loaded`); return out; }
+  const slots = v.slots || {}, paints = v.colours || [], files = new Set((l.files || []).map((f) => f.path));
+  for (const [s, path] of Object.entries(l.textures || {})) {
+    if (!slots[s]) out.push(`texture slot ${s}: ${v.id} has no such slot`);
+    if (!files.has(path)) out.push(`texture ${path} is not among its files`);
+  }
+  for (const [s, c] of Object.entries(l.colours || {})) {
+    if (!slots[s] && !paints.includes(s)) out.push(`colour slot ${s}: ${v.id} has no such slot`);
+    if (!HEX.test(c)) out.push(`colour ${s} ${c} is not #rrggbb`);
+  }
+  if (l.numbers?.colour && !HEX.test(l.numbers.colour)) out.push(`numbers.colour ${l.numbers.colour} is not #rrggbb`);
+  const types = fleetOf(v)?.types.map((t) => t.type) || [];
+  for (const t of l.types || []) if (!types.includes(t)) out.push(`type ${t}: ${v.id}'s fleet has no such type`);
+  if (l.share != null && !(l.share >= 0 && l.share <= 1)) out.push(`share ${l.share} is not between 0 and 1`);
+  return out;
+}
+// the liveries a set of vehicle v and fleet type `type` may wear
+export const liveriesFor = (v, type = null) => [...liveries.values()].filter((l) => liveryVehicle(l) === v?.id && (!type || !l.types || l.types.includes(type)));
+// the livery a set wears: the one the fleet gives one of its numbers (an advertising wrap, the fleet's `liveries`),
+// else one of those that fit its type, each on its `share` of the sets (r: a draw in [0, 1)), else the vehicle's own
+export function liveryOf(v, type, numbers, r) {
+  const wrap = v?.fleet?.liveries;
+  for (const n of numbers || []) { const id = wrap?.[n]; if (id && liveryVehicle(liveries.get(id)) === v.id) return id; }
+  let acc = 0;
+  for (const l of liveriesFor(v, type)) { acc += l.share || 0; if (r < acc) return l.id; }
+  return null;
 }
 
 // what the game cannot do without (the full check, files and licence included, is tools/test_vehicles.py)
@@ -90,6 +141,7 @@ export function fleetChoices(v) {
 // (src/random.js), so dealing draws nothing from the traffic's.
 export class FleetDealer {
   constructor(v, rand) {
+    this.v = v; this.rand = rand;
     this.f = fleetOf(v);
     this.out = new Map();   // number -> how many sets carry it
     this.at = 0;
@@ -104,7 +156,7 @@ export class FleetDealer {
       const numbers = prefer.numbers.slice(0, cars);
       for (const n of numbers) this._take(n);
       while (numbers.length < cars) numbers.push(this._next(prefer.type, numbers, true) ?? numbers[0]);
-      return { type: prefer.type, numbers };
+      return { type: prefer.type, numbers, livery: liveryOf(this.v, prefer.type, numbers, this.rand()) };
     }
     return this.deal(cars, this.f.types.some((t) => t.type === type) ? type : null);
   }
@@ -128,7 +180,7 @@ export class FleetDealer {
         }
         this.at = (this.at + i + 1) % L;
         for (const m of numbers) this._take(m);
-        return { type: t, numbers };
+        return { type: t, numbers, livery: liveryOf(this.v, t, numbers, this.rand()) };
       }
     }
     return { type: null, numbers: Array(cars).fill(null) };   // (no set of that length or type at all)

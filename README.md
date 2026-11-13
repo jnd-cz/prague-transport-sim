@@ -202,6 +202,8 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
   nebo jedno číslo (druhý vůz dostane číslo stejného typu); hra si volbu pamatuje pro každý model.
   „Libovolné“ přidělí číslo jako ostatním. Žádné číslo nejezdí po ulici dvakrát a vaše nedostane žádná cizí
   souprava.
+- Nátěr: původní, některý z nátěrů modelu (zatím ukázkový modrý pro podrobný model a zelený pro jednoduchý), nebo
+  „Libovolný“, přidělený jako ostatním; hra si volbu pamatuje pro každý model. Nátěry nosí i část cizích souprav.
 
 ### Na telefonu nebo tabletu
 

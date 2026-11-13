@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "livery",
+  "id": "sample.t3h-blue",
+  "requires": {
+    "t3h": ">=1"
+  },
+  "names": {
+    "cs": "Ukázkový: modrý",
+    "en": "Sample: blue"
+  },
+  "licence": {
+    "spdx": "CC0-1.0",
+    "commercial": true,
+    "authors": [
+      "the project"
+    ],
+    "sources": [
+      "#529"
+    ],
+    "credit": ""
+  },
+  "files": [
+    {
+      "path": "body.png",
+      "bytes": 425
+    }
+  ],
+  "textures": {
+    "body": "body.png"
+  },
+  "colours": {
+    "band": "#e4e9ee"
+  },
+  "numbers": {
+    "colour": "#ffffff"
+  },
+  "types": [
+    "T3SUCS"
+  ],
+  "share": 0.15
+}

@@ -8,7 +8,7 @@ import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices } from './vehicles.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
@@ -351,15 +351,40 @@ function fleetMenu() {
   sel.value = preferredSet(v, fleetPicks[v.id]) ? fleetPicks[v.id] : '';
 }
 fleetMenu();
-$('optModel').addEventListener('change', () => { fleetMenu(); useVehicle($('optModel').value); });
+// Our tram's livery (#529): the vehicle's own, one of its liveries, or one dealt as an AI tram's is; remembered per
+// vehicle.
+const LIVERY_KEY = 'tram.livery';
+let liveryPicks = {};
+try { liveryPicks = JSON.parse(localStorage.getItem(LIVERY_KEY) || '{}'); } catch { /* storage unavailable */ }
+function liveryMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), list = liveriesFor(v), sel = $('optLivery');
+  $('liveryRow').hidden = !list.length;
+  sel.replaceChildren(new Option(t('livery.own'), ''), ...(list.length ? [new Option(t('livery.dealt'), '*')] : []),
+    ...list.map((l) => new Option(vehicleName(l, getLang()) + (l.types ? ` (${l.types.join(', ')})` : ''), l.id)));
+  const pick = liveryPicks[v?.id];
+  sel.value = pick === '*' || list.some((l) => l.id === pick) ? pick : '';
+}
+liveryMenu();
+$('optModel').addEventListener('change', () => { fleetMenu(); liveryMenu(); useVehicle($('optModel').value); });
 $('optFleet').addEventListener('change', () => {
   fleetPicks[$('optModel').value] = $('optFleet').value;
   try { localStorage.setItem(FLEET_KEY, JSON.stringify(fleetPicks)); } catch { /* storage unavailable */ }
 });
+$('optLivery').addEventListener('change', () => {
+  liveryPicks[$('optModel').value] = $('optLivery').value;
+  try { localStorage.setItem(LIVERY_KEY, JSON.stringify(liveryPicks)); } catch { /* storage unavailable */ }
+});
 // the run's fleet: its own stream from the run's seed (src/random.js), so dealing draws nothing from the traffic's
 // and a replay deals the same
 const fleetDealer = (vehicle, seed) => new FleetDealer(pickVehicle(vehicle), rng((seed ^ 0x6a09e667) >>> 0));
-const ourSet = (dealer, vehicle, cars) => dealer.ours(cars, preferredSet(pickVehicle(vehicle), $('optFleet').value));
+// (a livery limited to some types: our set dealt of one of them, unless the preferred set is of another; then the
+// vehicle's own)
+function ourSet(dealer, vehicle, cars) {
+  const v = pickVehicle(vehicle), pick = $('optLivery').value, l = liveries.get(pick);
+  const s = dealer.ours(cars, preferredSet(v, $('optFleet').value), l?.types && !l.types.includes('T3SUCS') ? l.types[0] : 'T3SUCS');
+  if (pick !== '*') s.livery = l && (!l.types || l.types.includes(s.type)) ? l.id : null;
+  return s;
+}
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -427,7 +452,7 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
@@ -465,7 +490,7 @@ async function start(extra = {}) {
   const seed = runSeed(), random = rng(seed);
   const dealer = fleetDealer(vehicle, seed), ours = ourSet(dealer, vehicle, cars);
   if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
-    || String(tramModel.userData.fleet) !== String(ours.numbers)) {
+    || String(tramModel.userData.fleet) !== String(ours.numbers) || tramModel.userData.livery !== (ours.livery ?? null)) {
     scene.remove(tramModel);
     disposeModel(tramModel);
     tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), dealt: ours });

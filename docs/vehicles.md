@@ -42,10 +42,36 @@ credits from the manifests (`src/vehicles.js`, `src/main.js`); `tools/test_vehic
 | `licence` | `spdx` (a licence that allows redistribution), `commercial` (false for NC), `file` (its `LICENSE.txt`), `authors`, `sources` (URLs), `credit` (the line the game shows) |
 | `tier` | its tier of movement (below), `moves` the parts it moves, `levels` its distance levels |
 | `fleet` | the numbers its sets run as (#527): `types`, per type (e.g. `T3SUCS`) its `ranges` `[first, last]` with `except` (holes), or a `list`; `sets`, the pairs that run together and with no other car, though either car may run alone where a line runs single cars, its partner then free for another single car (a set not listed is two numbers of one type); `liveries`, number → livery id (#529). The run deals them (`src/vehicles.js` `FleetDealer`): a deck of every number shuffled by the run's seed, so each type comes up as often as it has numbers, none twice on the street, given back when a set leaves; our tram runs as the player's preferred set from the menu, else as a T3SUCS dealt the same way, and no AI tram is dealt its numbers. `tools/test_fleet.py` checks the dealing |
+| `slots` | a glTF vehicle's livery slots (#529): a slot's name and the materials it paints, e.g. the hybrid's `body` (`Red_Hull`) and `band` (`Beige`, `Beige_wbackface`); the rigged loader keeps their parts apart (with their uv) so a livery can give them a texture or a colour |
+| `colours` | a model painted by colour: the names of the colours a livery may replace (the built-in car's `body`, `band`, `roof`) |
 
 A **tier-1 glTF** needs no code: a still model in metres, its origin on the rail plane midway between the bogie
 pivots, +Y up, facing `forward`; its pivots are its type's. The menu offers it, it loads when picked and the
 credits name it.
+
+## Liveries
+
+A livery (#529; the decision record `docs/decisions/2026-11-10-vehicle-packages.md`, section 3) is a folder
+`assets/<id>/` with a `livery.json`, listed under `liveries` in `assets/vehicles.json`; its id is its author's name and
+its own (`sample.t3h-blue`). The menu offers our tram the vehicle's own look, one of its liveries, or one dealt as an AI
+tram's; AI trams are dealt one (`src/vehicles.js` `liveryOf`). `tools/test_vehicles.py` checks the manifests,
+`tools/test_liveries.py` the looks and the dealing in the game.
+
+| field | what |
+|---|---|
+| `schema`, `id`, `names`, `licence`, `files` | as a vehicle's |
+| `kind` | `livery` |
+| `requires` | `{ "<vehicle id>": ">=1" }`: the vehicle it paints |
+| `textures` | slot → an image among its files: replaces the slot's materials' texture and colour; WebP, PNG or JPEG, power-of-two sides up to 2048 px |
+| `colours` | slot or painted colour → `#rrggbb`: replaces the slot's materials' colour, or the built-in car's colour |
+| `numbers` | the fleet numbers' `font` (a CSS font family, Arial where it is missing) and `colour` |
+| `types` | the fleet types it fits (default: all) |
+| `share` | the part of AI sets of those types that wear it, 0 to 1 (default 0: only our tram's, or a number's in the fleet's `liveries`) |
+
+Every slot it leaves out keeps the vehicle's own. A livery naming a slot or a type its vehicle lacks is left out with
+the slot's name (`livery x left out: texture slot roof: t3h has no such slot`). The two samples: `sample.t3h-blue` (the
+hybrid's body a texture, its band a colour) and `sample.t3simple-green` (the built-in car's three colours), each on
+15 % of the AI sets.
 
 ## The rig
 

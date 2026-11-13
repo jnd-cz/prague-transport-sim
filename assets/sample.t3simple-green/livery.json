@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "kind": "livery",
+  "id": "sample.t3simple-green",
+  "requires": {
+    "t3simple": ">=1"
+  },
+  "names": {
+    "cs": "Ukázkový: zelený",
+    "en": "Sample: green"
+  },
+  "licence": {
+    "spdx": "CC0-1.0",
+    "commercial": true,
+    "authors": [
+      "the project"
+    ],
+    "sources": [
+      "#529"
+    ],
+    "credit": ""
+  },
+  "files": [],
+  "colours": {
+    "body": "#2f6b3a",
+    "band": "#efe9d6",
+    "roof": "#5d6266"
+  },
+  "numbers": {
+    "colour": "#f2f2f2"
+  },
+  "share": 0.15
+}
