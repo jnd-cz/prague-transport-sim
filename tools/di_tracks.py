@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """DI's track records as chains (#20, #237): the current DTM transport layer (DI) and the archived DTMP axes.
 
 `Source` merges a source's track records end to end into chains that end only at forks, crossings and track ends,

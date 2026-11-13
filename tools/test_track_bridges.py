@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Track on or under a Mosty 3D bridge (#192): python -P -E tools/test_track_bridges.py."""
 from pathlib import Path
 import sys

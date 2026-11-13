@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Loading screen with a progress bar. All files of a line are requested at once (the browser
 // streams them in parallel) and counted byte by byte; after the downloads come the build steps
 // (terrain, track profile, city), which block the page, so each one yields a frame first to show
@@ -120,11 +121,18 @@ export class Loader {
       a.textContent = t('load.https');
       step.replaceChildren(`${what}${t('load.http')} `, a);
     } else step.textContent = what + t('load.reload');
+    // (a button to send what stopped it, #350; loaded only now, so a module that did not arrive still shows the message)
+    import('./report.js').then((m) => {
+      m.noteError('load', error.message || error);
+      m.failNote('load', this.el?.querySelector('.loadBox') || step);
+    }, () => {});
     this.render(true);
   }
 
-  // start downloading now; get(url) later waits for it
-  prefetch(url, label = url.split('/').pop()) {
+  // start downloading now; get(url) later waits for it. bytes: its size when known (a vehicle's manifest), for a
+  // compressed response
+  prefetch(url, bytes = 0, label = url.split('/').pop()) {
+    if (bytes) this.sizes = this.sizes.then((s) => (s[url] ? s : { ...s, [url]: bytes }));
     if (!this.files.has(url)) this.files.set(url, new Download(url, label, () => this.render(), this.sizes));
     return this;
   }

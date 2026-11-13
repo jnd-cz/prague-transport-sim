@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "snapshot": "2026-11-08r",
- "issue": 358,
+ "snapshot": "2026-11-11r",
+ "issue": 276,
  "title": "Track radius: where no curve of 500 m fits the data",
  "lines": [],
  "findings": []

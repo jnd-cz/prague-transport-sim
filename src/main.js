@@ -1,20 +1,23 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
-import { Route, extendAlongTracks } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeDecks, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
+import { Route, checkBuiltRoute } from './route.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
-import { Tram } from './tram.js';
+import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
-import { makeT3, placeConsist, setConsistLine, loadDetailedT3, classicReady, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { T3H_FILES, T3H_CREDIT, loadHybridT3, poseHybrid } from './t3h.js';
+import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
+import { junctionTurns, indicating } from './indicators.js';
+import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
-import { Reporter, canvasShot, place } from './report.js';
+import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
+import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
-import { spreadTracks } from './trackfix.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 import { Loader } from './loading.js';
@@ -44,7 +47,9 @@ if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId =
 // every file of the line at once (the optional ones may be missing); the T3 model alongside
 for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json']) load.prefetch(`data/line${lineId}.${f}`);
 if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
-for (const f of T3H_FILES) load.prefetch(f);
+// the tram models (assets/vehicles.json, #455): the ones loaded at start downloaded with the line
+const vehicles = await loadRegistry((u) => load.get(u));
+for (const v of vehicles) if (v.preload) for (const f of v.files) load.prefetch(fileUrl(v, f.path), f.bytes);
 // the pedestrians' figures (#251); ?boxpeople keeps the box figures
 const figures = !params.has('boxpeople');
 if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
@@ -52,6 +57,7 @@ if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const data = await (await load.get(`data/line${lineId}.json`)).json();
 data.line = String(data.line);
+checkBuiltRoute(data); // (the track as the build draws it: its curves, the run past the termini, radius and cant: #477, #478)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
 // ?profile=<name>: a trial height profile over the line's own, to drive and compare (reports/review/profiles/, #358)
 if (params.has('profile')) {
@@ -98,19 +104,16 @@ try {
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
 const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
-const t3Res = await Promise.all(T3H_FILES.map((f) => load.get(f)));
+await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
-// the two tracks of a double-track line at least 3 m apart (OSM sometimes draws them closer)
-// (dev switches for comparing lint runs: ?nospread, ?notunnels)
-if (!params.has('nospread')) data.trackSpread = spreadTracks(data);
+// (dev switch for comparing lint runs: ?notunnels)
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
-// the track beyond both termini, so a two-car set standing at the first stop is on rails
-const route = new Route(data.path, extendAlongTracks(data.tracks, data.path, 60), data.trackSource?.path, !!data.trackCurve);
+// the track beyond both termini as the build walked it, so a two-car set standing at the first stop is on rails
+const route = new Route(data.path, data.pathExt);
 route.speedInfo = data.speed || null; // posted speeds and dedicated track (tools/osm_speeds.py)
-// banked curves on dedicated track; level at platforms (stop zone from the stop sign back 30 m
-// where the data has no platform)
-route.prepareCant(data.stops.map((st) => ({ p0: st.p0 ?? st.s - 30, p1: st.p1 ?? st.s })));
+// the curves' radius and the banked curves as the build worked them out (tools/cant.py, #478)
+route.useBuilt(data.curvature.path, data.curvature.unit, data.cant, data.crossLevel && { ...data.crossLevel, c: data.crossLevel.path });
 const terrain = new Terrain(data.terrain);
 // the fine terrain near the tracks (2 m, tools/fine_terrain.py), where it was made for this line
 // (dev switch ?nofine: the coarse grid only, for comparing lint runs)
@@ -124,12 +127,11 @@ if (!params.has('nofine')) try {
 } catch { /* not made for this line */ }
 data.attribution = credits(built);
 logProvenance(built);
-const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
+// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548)
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, nearTracks(data.tracks)) : null;
 await load.begin('profile');
-// real bridge decks under the track (Geoportál Mosty 3D) set the track height there
-const styles = trackStyles(truth, data, dtm ? (s) => { const p = route.at(s); return dtm.classAt(p.x, p.y); } : null, route.length);
-const profile = new Profile(route, terrain, data.bridges, data.tunnels || [], bridgeDecks(data.geo, route, terrain, data.bridges), dtm, data.clearances || [], styles.lift,
-  data.heights ? { ...data.heights, source: data.heightSource } : null); // (the assembled top of rail, #197)
+const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
+const profile = new Profile(route, data, styles.lift, dtm, terrain); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
@@ -144,8 +146,18 @@ window.renderer = renderer; // (from the start, also in the menu: performance ch
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
+// Leaving the page (another line from the menu, a reload, a link): the graphics memory goes back at once instead of
+// whenever the browser collects the old page, and a page the browser kept for Back (its back/forward cache) loads
+// afresh rather than resuming without it (#350). Not on a hidden tab: that is visibilitychange, and the world stays.
+let leaving = false;
+addEventListener('pagehide', () => {
+  leaving = true;
+  try { renderer.dispose(); renderer.forceContextLoss(); } catch { /* (already lost) */ }
+});
+addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
+  if (leaving) return; // (our own release above, not the browser's)
   // (window.game, not game: the context can be lost while the world uploads, before `let game` below
   // is reached, and reading it then threw instead of showing this card)
   if (window.game) window.game.paused = true;
@@ -153,6 +165,8 @@ canvas.addEventListener('webglcontextlost', (e) => {
   card.innerHTML = `<h1>${t('gl.lost')}</h1><p>${t('gl.lostWhy')}</p><button class="primary" id="glReload">${t('gl.reload')}</button>`;
   $('results').classList.remove('hidden');
   $('glReload').onclick = () => location.reload();
+  noteError('contextlost', 'WebGL context lost');
+  failNote('contextlost', card);
 });
 const scene = new THREE.Scene();
 const debugOverlay = createDebugOverlay(scene);
@@ -295,39 +309,83 @@ applyWeather('dry');
 await load.begin('gpu');
 uploadWorld();
 await load.begin('tram');
-// the detailed T3 (the hybrid model, CC BY-NC 4.0, #248); the built-in low-poly one is the fallback
-let detailedOk = false;
-try { await loadHybridT3(t3Res, CONTACT_WIRE - RAIL_TOP); detailedOk = true; data.attribution += ` ${T3H_CREDIT}`; }
-catch (e) { console.warn('detailed T3 model not loaded', e); }
+// a vehicle loaded (its files, its template) and credited once; one that fails stays out and makeT3 builds the
+// first loaded one before it in the index (the built-in car loads always)
+const credited = new Set();
+async function useVehicle(id) {
+  const v = vehicles.find((x) => x.id === id);
+  if (!v) return;
+  try { await loadVehicle(v, (u) => load.get(u)); }
+  catch (e) { console.warn(`vehicle ${id} not loaded`, e); return; }
+  if (v.licence.credit && !credited.has(id)) { credited.add(id); data.attribution += ` ${v.licence.credit}`; $('attrib').textContent = data.attribution; }
+}
+for (const v of vehicles) if (v.preload) await useVehicle(v.id);
 let people = null;
 if (figures) {
   try { people = new People(scene, await loadPeople(await Promise.all(PEOPLE_FILES.map((f) => load.get(f))))); }
   catch (e) { console.warn('pedestrian figures not loaded: the box figures stay', e); }
 }
 window.people = people;
-// conflig's classic model (CC BY-NC 4.0): simpler, no saloon and no moving parts; downloaded when the player
-// picks it in the menu (the user, 2026-11-04: "make it available for user's choice to load")
-const T3_FILES = ['assets/t3/t3.gltf', 'assets/t3/t3.bin', 'assets/t3/t3_color.jpg'];
-const T3_TYPES = { gltf: 'model/gltf+json', bin: 'application/octet-stream', jpg: 'image/jpeg' };
-const T3_CREDIT = 'Tatra T3 3D model (classic): "Tatra T3" by Jakub Vaja (conflig), sketchfab.com, CC BY-NC 4.0 (simplified).';
-let classicLoad = null;
-function loadClassic() {
-  classicLoad ??= (async () => {
-    const res = await Promise.all(T3_FILES.map((f) => load.get(f))), blobs = {};
-    for (const r of res) if (r.ok) blobs[r.url] = r.blobUrl(T3_TYPES[r.url.split('.').pop()]);
-    await loadDetailedT3(T3_FILES[0], blobs);
-    data.attribution += ` ${T3_CREDIT}`;
-    $('attrib').textContent = data.attribution;
-  })().catch((e) => console.warn('classic T3 model not loaded', e));
-  return classicLoad;
+// the menu's tram models, in the index's order with their names in the menu's language; the first is the default.
+// One not loaded at start downloads when the player picks it (the user, 2026-11-04, of the classic model: "make it
+// available for user's choice to load").
+function modelMenu() {
+  const sel = $('optModel'), was = sel.value;
+  sel.replaceChildren(...vehicles.map((v) => new Option(vehicleName(v, getLang()), v.id)));
+  sel.value = was || vehicles[0]?.id;
 }
-// the model the menu asks for: 'hybrid', 'classic' or false (the procedural car); makeT3 falls back
-const modelKind = () => {
-  const v = $('optModel').value;
-  if (v === 'simple' || !detailedOk && !classicReady()) return false;
-  return v === 'classic' ? 'classic' : 'hybrid';
-};
-$('optModel').addEventListener('change', () => { if ($('optModel').value === 'classic') loadClassic(); });
+modelMenu();
+// The player's preferred set (#527; the user, 2026-11-11: "I would add optinal preferred set for the player"): the
+// vehicle's listed sets, then its numbers by type (a lone number: the second car dealt of its type); remembered per
+// vehicle. Our tram runs as it and no AI tram is dealt it; "any" deals ours like the others.
+const FLEET_KEY = 'tram.fleet';
+let fleetPicks = {};
+try { fleetPicks = JSON.parse(localStorage.getItem(FLEET_KEY) || '{}'); } catch { /* storage unavailable */ }
+function fleetMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), c = fleetChoices(v), sel = $('optFleet');
+  $('fleetRow').hidden = !c;
+  if (!c) { sel.replaceChildren(); return; }
+  const group = (label, opts) => { const g = document.createElement('optgroup'); g.label = label; g.append(...opts); return g; };
+  sel.replaceChildren(new Option(t('fleet.dealt'), ''),
+    ...(c.sets.length ? [group(t('fleet.sets'), c.sets.map((s) => new Option(`${s.value.replace('+', ' + ')} (${s.type})`, s.value)))] : []),
+    ...c.types.map((x) => group(x.type, x.numbers.map((n) => new Option(String(n), String(n))))));
+  sel.value = preferredSet(v, fleetPicks[v.id]) ? fleetPicks[v.id] : '';
+}
+fleetMenu();
+// Our tram's livery (#529): the vehicle's own, one of its liveries, or one dealt as an AI tram's is; remembered per
+// vehicle.
+const LIVERY_KEY = 'tram.livery';
+let liveryPicks = {};
+try { liveryPicks = JSON.parse(localStorage.getItem(LIVERY_KEY) || '{}'); } catch { /* storage unavailable */ }
+function liveryMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), list = liveriesFor(v), sel = $('optLivery');
+  $('liveryRow').hidden = !list.length;
+  sel.replaceChildren(new Option(t('livery.own'), ''), ...(list.length ? [new Option(t('livery.dealt'), '*')] : []),
+    ...list.map((l) => new Option(vehicleName(l, getLang()) + (l.types ? ` (${l.types.join(', ')})` : ''), l.id)));
+  const pick = liveryPicks[v?.id];
+  sel.value = pick === '*' || list.some((l) => l.id === pick) ? pick : '';
+}
+liveryMenu();
+$('optModel').addEventListener('change', () => { fleetMenu(); liveryMenu(); useVehicle($('optModel').value); });
+$('optFleet').addEventListener('change', () => {
+  fleetPicks[$('optModel').value] = $('optFleet').value;
+  try { localStorage.setItem(FLEET_KEY, JSON.stringify(fleetPicks)); } catch { /* storage unavailable */ }
+});
+$('optLivery').addEventListener('change', () => {
+  liveryPicks[$('optModel').value] = $('optLivery').value;
+  try { localStorage.setItem(LIVERY_KEY, JSON.stringify(liveryPicks)); } catch { /* storage unavailable */ }
+});
+// the run's fleet: its own stream from the run's seed (src/random.js), so dealing draws nothing from the traffic's
+// and a replay deals the same
+const fleetDealer = (vehicle, seed) => new FleetDealer(pickVehicle(vehicle), rng((seed ^ 0x6a09e667) >>> 0));
+// (a livery limited to some types: our set dealt of one of them, unless the preferred set is of another; then the
+// vehicle's own)
+function ourSet(dealer, vehicle, cars) {
+  const v = pickVehicle(vehicle), pick = $('optLivery').value, l = liveries.get(pick);
+  const s = dealer.ours(cars, preferredSet(v, $('optFleet').value), l?.types && !l.types.includes('T3SUCS') ? l.types[0] : 'T3SUCS');
+  if (pick !== '*') s.livery = l && (!l.types || l.types.includes(s.type)) ? l.id : null;
+  return s;
+}
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -343,7 +401,10 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-let tramModel = makeT3({ line: data.line, cars: lineCars, detailed: detailedOk && 'hybrid', dest: lastStop, run: runNumber(0) });
+// (a T3SUCS, the tram the simulation drives with its TR 37 equipment, or the player's preferred set; AI trams are
+// dealt the types and numbers of their vehicle's fleet: assets/*/vehicle.json `fleet`, src/vehicles.js FleetDealer)
+let tramModel = makeT3({ line: data.line, cars: lineCars, vehicle: $('optModel').value, dest: lastStop, run: runNumber(0),
+  dealt: ourSet(fleetDealer($('optModel').value, 0), $('optModel').value, lineCars) });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -352,6 +413,10 @@ let tram = new Tram();
 let game = null;
 let traffic = null;
 let pilot = null; // autopilot driving the tram (watch the ride), or null
+// our tram's lamps (#436): the indicators ('left', 'right', 'hazard' or none: the driver's switch, the autopilot's
+// own while it drives), the high beams (latched on, or held for a flash); the line's junction turns and the
+// stops where passengers cross a car lane, where the autopilot indicates (src/indicators.js)
+const lamps = { indicate: null, high: false, held: false, lit: false, turns: [], kerb: [] };
 let chase = false;
 
 // ------------------------------------------------------------------ menu
@@ -388,7 +453,7 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-onLangChange(() => { menuTexts(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
@@ -410,26 +475,31 @@ function fillTrips() {
 selStop.addEventListener('change', fillTrips);
 fillTrips();
 
-$('btnStart').addEventListener('click', start);
+$('btnStart').addEventListener('click', () => start());
 
-async function start() {
-  if ($('optModel').value === 'classic') await loadClassic();
+// extra: Game options over the menu's (the performance test's lead to the departure)
+async function start(extra = {}) {
+  await useVehicle($('optModel').value);
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
+  // the vehicle's sound pack (#528), the built-in sounds where it has none
+  try { await audio.usePack(soundsFor(pickVehicle($('optModel').value))); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   zoom = zoomTarget = 1;
   tram.eq.mode = controlMode();
-  const kind = modelKind(), have = kind === 'classic' && !classicReady() ? 'hybrid' : kind || 'simple';
-  if (tramModel.userData.cars.length !== cars || tramModel.userData.kind !== have) {
+  const vehicle = $('optModel').value;
+  // one seeded stream for the whole run (rules and traffic), apart from Math.random
+  const seed = runSeed(), random = rng(seed);
+  const dealer = fleetDealer(vehicle, seed), ours = ourSet(dealer, vehicle, cars);
+  if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
+    || String(tramModel.userData.fleet) !== String(ours.numbers) || tramModel.userData.livery !== (ours.livery ?? null)) {
     scene.remove(tramModel);
     disposeModel(tramModel);
-    tramModel = makeT3({ line: data.line, cars, detailed: kind, dest: lastStop, run: runNumber(0) });
+    tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), dealt: ours });
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  // one seeded stream for the whole run (rules and traffic), apart from Math.random
-  const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
   applyWeather(weather);
   game = new Game(scene, data, route, tram, audio, {
@@ -443,13 +513,16 @@ async function start() {
     autoIrc: $('optAutoSwitch').checked,
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
-    detailed: modelKind(),
+    vehicle: $('optModel').value,
+    dealer,
     seed: Math.floor(random() * 1e9),
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
     signFacts: signFacts(truth),
+    ...extra,
   });
   game.runSeed = seed; // (replay: ?seed=N)
+  perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
@@ -457,6 +530,8 @@ async function start() {
   if (traffic) traffic.dispose();
   traffic = new Traffic(scene, data, route, ground, game, random);
   debugOverlay.reset();
+  Object.assign(lamps, { indicate: null, high: false, held: false, turns: junctionTurns(route, data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target) });
+  game.lamps = lamps; // (the console and tests: the junction turns and kerb stops found, the lamps' state)
   pilot = $('optAuto').checked ? new Autopilot() : null;
   game.autopilot = !!pilot;
   pedalKey = null;
@@ -519,9 +594,116 @@ function showResults() {
     <div>${t('res.avgDev')} <b>${fmtDev(avg).slice(1)}</b></div>
     ${pen ? `<h3>${t('res.penalties')}</h3><table class="res">${pen}</table>` : ''}
     <h3>${t('res.stops')}</h3><table class="res">${rows}</table>
+    <div id="perfAsk" class="sub" style="margin:10px 0"></div>
     <button class="primary" id="again">${t('res.again')}</button>`;
   $('results').classList.remove('hidden');
   $('again').onclick = () => { $('results').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+  offerPerf($('perfAsk'));
+}
+
+// ------------------------------------------------------------------ how it ran (#350)
+// Every drawn frame of a shift goes into the frame-time log (src/perf.js); a note carries its summary, the
+// machine and the load times, and a shift's end offers to send the summary: once, always (kept in this
+// browser) or not now. Nothing is sent without a click or that "always".
+const perfLog = new PerfLog();
+window.perfLog = perfLog;
+addFacts(() => ({ machine: machine(renderer), load: window.loadTimes || null, perf: perfLog.summary() }));
+const PERF_KEY = 'tram.perfSend';
+function offerPerf(el) {
+  const sum = perfLog.summary();
+  if (!sum || sum.seconds < 30) return;
+  let always = false;
+  try { always = localStorage.getItem(PERF_KEY) === 'always'; } catch { /* (no storage) */ }
+  const send = async () => { el.textContent = (await sendNote({ kind: 'perf', line: data.line })) ? t('res.perfSent') : t('fb.errorFailed'); };
+  if (always) { send(); return; }
+  el.innerHTML = `<div>${t('res.perfAsk')}</div><button id="perfSend">${t('res.perfSend')}</button> <button id="perfAlways">${t('res.perfAlways')}</button>`;
+  $('perfSend').onclick = send;
+  $('perfAlways').onclick = () => { try { localStorage.setItem(PERF_KEY, 'always'); } catch { /* (no storage) */ } send(); };
+}
+
+// The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
+// compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
+// 5 s to settle and from the departure on. It starts 10 s before the departure, not a shift's 40 s, so the wait is
+// short and the minute all driving (the user, 2026-11-11: "autopilot waits half a minute standing for the timetable
+// departure"). The GPU's own time per
+// frame where the browser has a timer. Two buttons: the line loaded now, and the reference run: line 17 from
+// Palackého náměstí with the detailed model, the heaviest line with surveyed streets, the one result every machine
+// has in common. Its stop is named, not the middle one, so it stays when the route changes (the user, 2026-11-11:
+// "I would keep it fixed there even if later line 17 runs start from another stop like Libuš"). From another line
+// the reference opens line 17 (?reftest=<the line left>), runs there, and its "Back to the menu" goes back.
+// (window.perfTestMs: a shorter run for tools/test_perf.py)
+const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
+const REF_LINE = '17', REF_STOP = 'Palackého náměstí', PT_LEAD = 10;
+let perfTest = null;
+async function startPerfTest(reference = false) {
+  const keep = { auto: $('optAuto').checked, weather: $('optWeather').value, model: $('optModel').value, cars: $('optCars').value };
+  if (reference) { $('optModel').value = 'detailed'; $('optCars').value = 'auto'; }
+  const named = reference ? data.stops.slice(0, -1).findIndex((st) => st.name === REF_STOP) : -1;
+  const si = named >= 0 ? named : Math.floor((data.stops.length - 1) / 2), at8 = (trip) => Math.abs(trip[si] - 8 * 3600);
+  selStop.value = si;
+  fillTrips();
+  selTrip.value = data.timetable.reduce((b, trip, i) => (at8(trip) < at8(data.timetable[b]) ? i : b), 0);
+  $('optAuto').checked = true;
+  $('optWeather').value = 'dry';
+  window.runSeed = 1;
+  try { await start({ lead: PT_LEAD }); } finally {
+    delete window.runSeed;
+    $('optAuto').checked = keep.auto;
+    $('optWeather').value = keep.weather;
+    $('optModel').value = keep.model;
+    $('optCars').value = keep.cars;
+  }
+  perfTest = { t0: performance.now(), phase: 'warm', timer: gpuTimer(renderer.getContext()),
+    meta: { ...perfLog.meta, test: true, reference, stop: data.stops[si].name } };
+  game.msg(t('pt.running'), 'info', 8);
+}
+$('btnPerfTest').addEventListener('click', () => startPerfTest(false));
+$('btnPerfRef').addEventListener('click', () => {
+  if (String(data.line) === REF_LINE) startPerfTest(true);
+  else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}`;
+});
+function perfTestStep(now) {
+  if (!perfTest || !game || game.finished) { perfTest = null; return; }
+  const el = now - perfTest.t0;
+  // (the minute is measured from the departure: boarding and the doors take ~14 s after the start, 2026-11-11 trace)
+  const off = el > PT_WARM && (tram.v > 0.5 || el > PT_WARM + 60000);
+  if (perfTest.phase === 'warm' && off) { perfTest.phase = 'run'; perfTest.t1 = now; perfTest.s0 = tram.s; perfLog.reset(perfTest.meta); }
+  else if (perfTest.phase === 'run' && now - perfTest.t1 > PT_LEN) finishPerfTest();
+  perfTest?.timer?.poll();
+}
+function finishPerfTest() {
+  const pt = perfTest;
+  perfTest = null;
+  game.paused = true;
+  hud.show(false);
+  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0) }, m = machine(renderer);
+  // (frames over 20 ms: below a 60 Hz display's rate; a steady 30 fps has nearly all of them there and few over 50:
+  // playable, not smooth. The first remote run, Intel HD Graphics 400 in Firefox: 34 fps, 74 % over 20 ms, 0.6 % over 33)
+  const verdict = sum.over[20] < 5 ? 'good' : sum.over[50] < 5 ? 'ok' : 'slow';
+  const row = (k, v) => `<tr><td>${t(k)}</td><td>${v}</td></tr>`;
+  $('resultsCard').innerHTML = `
+    <h1>${t(pt.meta.reference ? 'pt.titleRef' : 'pt.title')}</h1>
+    <div class="sub">${data.line} · ${pt.meta.stop} · ${sum.seconds} s</div>
+    <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
+    <table class="res">
+      ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
+      ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
+      ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}`)}
+    </table>
+    <div class="sub">${t('pt.note')}</div>
+    <button class="primary" id="ptSend">${t('pt.send')}</button> <button id="ptMenu">${t('pt.menu')}</button>`;
+  $('results').classList.remove('hidden');
+  $('ptSend').onclick = async () => {
+    $('ptSend').disabled = true;
+    $('ptSend').textContent = (await sendNote({ kind: 'perftest', line: data.line, perftest: sum })) ? t('pt.sent') : t('fb.errorFailed');
+  };
+  $('ptMenu').onclick = () => {
+    // (a reference run started from another line goes back to it)
+    if (params.get('reftest')) { location.search = `?line=${encodeURIComponent(params.get('reftest'))}`; return; }
+    $('results').classList.add('hidden');
+    $('menu').classList.remove('hidden');
+  };
+  window.perfTestResult = sum; // (tools/test_perf.py)
 }
 
 // ------------------------------------------------------------------ outdoor temperature
@@ -591,6 +773,9 @@ window.addEventListener('keydown', (e) => {
   if (['arrowup', 'arrowdown', ' '].includes(k)) e.preventDefault();
   if (k === 'p' || k === 'escape') { game.paused = !game.paused; return; }
   if (k === 'g') { zoomTarget = ZOOM; return; }   // held: look closer (also while paused, to read a sign)
+  if (k === 'l' && !e.repeat) { // the high beams: held a flash, with Shift on and off
+    if (e.shiftKey) { lamps.high = !lamps.high; game.msg(t(lamps.high ? 'msg.highOn' : 'msg.highOff'), 'info', 2); } else lamps.held = true;
+  }
   if (game.paused) return;
   if (e.repeat && k !== 'w' && k !== 's' && k !== 'arrowup' && k !== 'arrowdown') return;
   const prev = command();
@@ -615,11 +800,15 @@ window.addEventListener('keydown', (e) => {
     case 'v': chase = !chase; document.body.classList.toggle('chase', chase); break;
     case 'm': audio.setMuted(!audio.muted); break;
   }
+  // the indicators' switch (by the keys' places, the same on Czech and English keyboards; the touch buttons' by their
+  // names): on until switched off
+  const side = { Comma: 'left', Period: 'right', Slash: 'hazard' }[e.code] ?? (e.code ? null : { ',': 'left', '.': 'right', '/': 'hazard' }[e.key]);
+  if (side) { lamps.indicate = lamps.indicate === side ? null : side; game.msg(t(`msg.ind.${lamps.indicate ?? 'off'}`), 'info', 2); }
   if (command() > 0 && prev <= 0 && game.doorState !== 'closed') {
     if (arcade()) tram.eq.lever = 0;
-    audio.warning(); game.msg(t('msg.closeDoors'), 'warn');
+    audio.emit('warning'); game.msg(t('msg.closeDoors'), 'warn');
   }
-  if (command() !== prev) audio.click(0.12, 1600);
+  if (command() !== prev) audio.emit(command() > prev ? 'notch.up' : 'notch.down');
 });
 // a held key whose keyup never comes (the window lost focus) lets the view go back
 window.addEventListener('blur', () => { zoomTarget = 1; });
@@ -631,6 +820,7 @@ window.addEventListener('keyup', (e) => {
   if (ku === 'y') input.switchBtn = false;
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (ku === 'g') zoomTarget = 1;
+  if (ku === 'l') lamps.held = false;
   if (e.key === ' ' && command() === -6) setStep(-5); // (the emergency stop let go: brake step 5)
   if ((ku === 'w' || ku === 'arrowup' || ku === 's' || ku === 'arrowdown') && pedalKey) pedalKey = null;
 });
@@ -663,8 +853,10 @@ window.addEventListener('blur', () => {
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = null;
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
-// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342)
-const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
+// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
+// It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
+// set's rear and 17 degrees up (pitch is added to that)
+const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 }, ORBIT_EL = 0.3;
 {
   const ptr = new Map();
   let pinch = null;
@@ -681,7 +873,7 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
       pinch = d1;
     } else {
       orbit.yaw -= (e.clientX - p.x) * 0.006;
-      orbit.pitch = Math.max(-0.35, Math.min(1.1, orbit.pitch + (e.clientY - p.y) * 0.004));
+      orbit.pitch = Math.max(0.03 - ORBIT_EL, Math.min(1.45 - ORBIT_EL, orbit.pitch + (e.clientY - p.y) * 0.004));
       p.x = e.clientX; p.y = e.clientY;
     }
     orbit.drag = 0.3;
@@ -706,8 +898,17 @@ function previewAt(s) {
 function placeTram(s) {
   // each car rests on its two bogies, so it follows curves and pitches with the gradient
   placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q), route.rollAt(q)]; });
-  // the doors, the brake lamps and the track-brake shoes from the game (the detailed model's)
-  if (tramModel.userData.hybrid && game) poseHybrid(tramModel, { doors: game.doorOpenness, braking: tram.brake > 500, track: tram.trackMagnets });
+  if (!game) return;
+  // the doors, the brake lamps and the track-brake shoes from the game; the collector on the wire (one height over
+  // the rail everywhere in the data, src/world.js); the indicators and the high beams
+  const braking = tram.brake > 500, clock = game.clock;
+  if (pilot) lamps.indicate = indicating(lamps.turns, lamps.kerb, tram.s, tram.v, braking);
+  poseT3(tramModel, { doors: game.doorOpenness, braking, track: tram.trackMagnets, collector: CONTACT_WIRE - RAIL_TOP,
+    indicate: lamps.indicate, clock, highBeam: lamps.high || lamps.held });
+  // the indicators' relay ticks in the cab as they go on and off
+  const sig = signalsAt(lamps.indicate, clock), lit = sig.left || sig.right;
+  if (lamps.indicate && lit !== lamps.lit) audio.emit(lit ? 'indicator.tick' : 'indicator.tock');
+  lamps.lit = lit;
 }
 
 function updateCamera(dt, t) {
@@ -721,12 +922,11 @@ function updateCamera(dt, t) {
   const fov = zoomFov(zoom);
   if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (chase) {
-    // behind and above the tram body (works also at the very start of the route)
-    // (around the point 10 m ahead of the front: by default behind and above the set, as before)
-    const lead = tramModel.userData.cars[0], back = 30 + (tramModel.userData.cars.length - 1) * 8;
-    const q = route.at(s + 10);
-    camLook.set(q.x, profile.height(s + 10) + 1.5, -q.y);
-    const a = lead.rotation.y + orbit.yaw, el = Math.atan2(7, back) + orbit.pitch, R = Math.hypot(back, 7) * orbit.k;
+    // around the lead car's centre (#541; it turned about a point 10 m ahead of the front before)
+    const lead = tramModel.userData.cars[0], c = lead.position;
+    camLook.set(c.x, c.y + 2, c.z);
+    const back = T3.length / 2 + (tramModel.userData.cars.length - 1) * CAR_PITCH + 16, el = ORBIT_EL + orbit.pitch;
+    const a = lead.rotation.y + orbit.yaw, R = back / Math.cos(ORBIT_EL) * orbit.k;
     camPos.set(camLook.x - Math.sin(a) * Math.cos(el) * R, camLook.y + Math.sin(el) * R, camLook.z - Math.cos(a) * Math.cos(el) * R);
     // (while the reviewer turns it, the camera follows at once; else it trails the tram smoothly)
     orbit.drag -= dt;
@@ -761,7 +961,7 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
 }
 
-// ⚑ Report (F9, #138): a note with the moment's state and a screenshot, for the agent to look into
+// ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php
 const reporter = new Reporter({
   shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
   pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },
@@ -856,9 +1056,17 @@ function frame(now) {
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
-    else renderer.render(scene, camera);
+    else {
+      const timing = perfTest?.phase === 'run' && perfTest.timer;
+      if (timing) timing.begin();
+      renderer.render(scene, camera);
+      if (timing) timing.end();
+    }
     lastDraw = now; window.drawCount++;
+    // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
+    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render);
   }
+  if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
@@ -875,12 +1083,19 @@ world.traverse(o => {
 });
 const mirror = new Mirror(renderer, scene, $('mirror'), mirrorHidden);
 window.mirror = mirror; // cadence, target and excluded geometry are inspectable without changing the simulation
+// It is fixed to the lead car's body (#541): in a curve the body is the chord between its bogies, its front over
+// the outside of the track, and it leans in a canted one, so a camera posed from the track turned against it.
+const mirrorTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.04, 0.1, 0, 'YXZ'));
 function poseMirror(mirrorCam) {
-  const s = tram.s, p = route.offset(s - 0.6, -1.55), h = route.heading(s - 6, 6), z = profile.height(s);
-  mirrorCam.position.set(p.x, z + 2.09, -p.y);
-  // looking back, turned a little outwards so the side of the tram fills the inner edge
-  mirrorCam.rotation.order = 'YXZ';
-  mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.1, 0);
+  const u = tramModel.userData, lead = u.cars[0];
+  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front: 0.6 m behind the coupler's face
+  // (the car's frame: x left, y up, z forward from its centre between the bogies, src/consist.js)
+  const front = u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+  lead.updateWorldMatrix(true, false);
+  mirrorCam.position.set(-1.55, 2.09, front).applyMatrix4(lead.matrixWorld);
+  // looking back (a camera looks down its -z, the car's rear), turned a little outwards so the side of the tram
+  // fills the inner edge, and a little down
+  lead.getWorldQuaternion(mirrorCam.quaternion).multiply(mirrorTurn);
 }
 
 load.finish();
@@ -890,7 +1105,10 @@ if (params.has('review')) {
   review = new Review({ scene, camera, canvas, data, route, ground, world, url: params.get('review'), at: parseAt(params.get('at')) });
   window.review = review;
 } else if (params.has('seed') && params.has('at')) replayTo(+params.get('seed'), +params.get('at'));
-else $('menu').classList.remove('hidden');
+else {
+  $('menu').classList.remove('hidden');
+  if (params.has('reftest') && String(data.line) === REF_LINE) startPerfTest(true); // (the reference run, opened from another line)
+}
 requestAnimationFrame(frame);
 
 // ?seed=N&at=S: the traffic check's run with that seed (tools/traffic_lint.js: the same settings and

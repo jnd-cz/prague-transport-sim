@@ -1,10 +1,22 @@
-"""Upload the game to the web host over FTPS (#131): python -P -E tools/deploy.py [--dry-run] [--reports]
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Upload the game to the web host over FTPS (#131): python -P -E tools/deploy.py [--target NAME] [--dry-run] [--reports]
+    python -P -E tools/deploy.py --pull [--target NAME]   # only fetch review verdicts and feedback notes
 
 Config (git-ignored, in the checkout's root): deploy.local.json
-    {"host": "<FTP host>", "user": "<FTP user>", "dir": "/httpdocs", "url": "https://testing.pipethebytes.com/"}
-Password: TRAM_DEPLOY_PASSWORD, else ~/.netrc (machine <host>), else asked; never stored by this tool.
-Access protection is the web host's (Plesk: Password-Protected Directories); after a deploy the URL is
-checked to answer 401 without a login.
+    {"host": "<FTP host>", "user": "<FTP user>", "dir": "/httpdocs", "url": "https://testing.pipethebytes.com/",
+     "targets": {"alpha": {"user": "<FTP user>", "netrc": "sim.8b.cz", "url": "https://sim.8b.cz/", "public": true}}}
+    The top level is the target "test" (the default, which tools/autodeploy.py deploys); a named target takes
+    the top level's keys it does not set. "netrc": the ~/.netrc machine to read instead of the host (two users
+    on one FTP host).
+Password: TRAM_DEPLOY_PASSWORD, else ~/.netrc (machine <netrc or host> login <user>), else asked; never
+stored by this tool.
+The test site's access protection is the web host's (Plesk: Password-Protected Directories); after a deploy
+the URL is checked to answer 401 without a login.
+A "public" target (the closed alpha, #350) has no login: no review tools go up (review.php, reviews.html,
+reports/review/), search engines are asked not to index it, it is deployed only from a tagged commit (the
+version testers name), and after a deploy the URL is checked to serve the page and none of the review tools.
+Player feedback (src/report.js): tools/feedback.php goes up as feedback.php on every target and stores notes in
+feedback/ (no direct access); --pull moves them into <feedback>/<target>/ (tools/feedback.py DEST, beside the data cache; it lists them).
 
 What goes up: tools/make_dist.py's files, plus version.json (commit, data snapshot, date) and an
 .htaccess (brotli, revalidation). The data heavy packs go up only compressed, as <name>.brotli (#275): the
@@ -35,6 +47,7 @@ import urllib.request
 import brotli
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import feedback  # noqa: E402
 import reviews  # noqa: E402
 import review_sets  # noqa: E402
 from make_dist import ROOT, files  # noqa: E402
@@ -53,6 +66,7 @@ HTACCESS = """# tools/deploy.py: the data and models exist here only as <name>.b
   AddType model/gltf+json .gltf
   AddType model/gltf-binary .glb
   AddType application/octet-stream .bin
+  AddType application/manifest+json .webmanifest
   AddEncoding br .brotli
 </IfModule>
 RewriteEngine On
@@ -65,14 +79,36 @@ RewriteRule ^(.*)$ $1.brotli [L]
   Require all denied
 </Files>
 """
+# a public target is not indexed while it is a closed test (#350)
+NOINDEX = """<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+"""
+ROBOTS = b"User-agent: *\nDisallow: /\n"
+# what serves review mode and its answers: never on a public target (#350)
+REVIEW_TOOLS = ("review.php", "reviews.html", "reviews/", "reports/review/")
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, encoding="utf-8", check=True).stdout.strip()
 
 
-def checks(allow_dirty):
-    """The commit to deploy; stops on uncommitted changes or data that differs from the manifest."""
+def target(cfg, name):
+    """The config of one target: the top level is "test", a named one takes the top level's keys it does not set."""
+    top = {k: v for k, v in cfg.items() if k != "targets"}
+    if name in (None, "test"):
+        return {**top, "name": "test"}
+    named = cfg.get("targets") or {}
+    if name not in named:
+        raise SystemExit(f"no target {name!r} in {os.path.basename(CONFIG)}: test, {', '.join(named) or '(none)'}")
+    return {**top, "netrc": None, **named[name], "name": name}
+
+
+def checks(allow_dirty, public=False):
+    """The commit to deploy; stops on uncommitted changes or data that differs from the manifest. A public
+    target also needs a tag on the commit, and never takes uncommitted changes."""
+    if public and allow_dirty:
+        raise SystemExit("a public target is deployed only from a commit, never with --dirty")
     if not allow_dirty and git("status", "--porcelain", "--untracked-files=no"):
         raise SystemExit("uncommitted changes: commit them, or --dirty for a test deploy")
     st = subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "snapshot.py"), "status"], cwd=ROOT,
@@ -96,10 +132,15 @@ def pack(rels):
         return dict(ex.map(one, rels))
 
 
-def site(commit, reports=False, github=True):
+def tag(commit):
+    """The tags on the commit, comma-separated, or ''."""
+    return ", ".join(git("tag", "--points-at", commit).split())
+
+
+def site(commit, reports=False, github=True, public=False):
     """{path: bytes or a local file path} of everything that goes up (github: the review index asks it for the
-    issues' titles and the PRs' questions)."""
-    rels = list(files())
+    issues' titles and the PRs' questions). A public target has no review tools and is not indexed."""
+    rels = [r for r in files() if not (public and r.startswith(REVIEW_TOOLS))]
     out = {rel: os.path.join(ROOT, rel) for rel in rels if not packed(rel)}
     out.update(pack([rel for rel in rels if packed(rel)]))
     if reports:
@@ -113,7 +154,15 @@ def site(commit, reports=False, github=True):
                "data": {k: man[k] for k in ("snapshot", "built_at_commit", "published", "note") if k in man},
                "deployed": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
                "by": git("config", "user.name")}
+    if tag(commit):
+        version["tag"] = tag(commit)
     out["version.json"] = json.dumps(version, ensure_ascii=False, indent=1).encode()
+    out["feedback.php"] = os.path.join(ROOT, "tools", "feedback.php")
+    out["feedback/.htaccess"] = b"Require all denied\n"
+    if public:
+        out["robots.txt"] = ROBOTS
+        out[".htaccess"] = (HTACCESS + NOINDEX).encode()
+        return out
     out["review.php"] = os.path.join(ROOT, "tools", "review.php")
     out["reviews/.htaccess"] = b"Require all denied\n"
     # the review directory's index (reviews.html, #288), built at each deploy: a new set shows up by itself
@@ -150,14 +199,18 @@ def plan(local, remote):
 def password(cfg):
     if os.environ.get("TRAM_DEPLOY_PASSWORD"):
         return os.environ["TRAM_DEPLOY_PASSWORD"]
+    # (.netrc keeps one entry per machine name: two FTP users on one host, the test site and the alpha's
+    # sim.8b.cz (#350), each look up a name of their own)
+    key = cfg.get("netrc") or cfg["host"]
     try:
-        auth = netrc.netrc().authenticators(cfg["host"])
+        auth = netrc.netrc().authenticators(key)
         if auth and auth[0] in (None, "", cfg["user"]) and auth[2]:
             return auth[2]
     except (FileNotFoundError, netrc.NetrcParseError):
         pass
     if not sys.stdin or not sys.stdin.isatty():
-        raise SystemExit(f"no password for {cfg['host']}: TRAM_DEPLOY_PASSWORD or ~/.netrc (nobody to ask)")
+        raise SystemExit(f"no password for {cfg['user']}@{cfg['host']}: TRAM_DEPLOY_PASSWORD or ~/.netrc "
+                         f"(machine {key} login {cfg['user']}; nobody to ask)")
     return getpass.getpass(f"FTP password for {cfg['user']}@{cfg['host']}: ")
 
 
@@ -238,14 +291,71 @@ def pull_reviews(ftp, dest=os.path.join(ROOT, "reports", "reviews")):
             print(f"{os.path.relpath(path, ROOT)}: {len(out['items'])} findings, {done} with a verdict")
 
 
-def protected(url):
-    """The HTTP status of version.json without a login: 401 when the host protects the site."""
+def pull_feedback(ftp, dest):
+    """feedback/*.json moved from the host into dest (each saved before it is deleted there, so the caps of
+    feedback.php count only what is not pulled yet); prints each note."""
     try:
-        return urllib.request.urlopen(url.rstrip("/") + "/version.json", timeout=20).status
+        names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("feedback")]
+    except ftplib.error_perm:
+        return 0  # (no note yet)
+    got = 0
+    for n in sorted(names):
+        if not (n.endswith(".json") and feedback.ID.fullmatch(n[:-5])):
+            continue
+        buf = io.BytesIO()
+        ftp.retrbinary(f"RETR feedback/{n}", buf.write)
+        try:
+            rec = json.loads(buf.getvalue())
+        except ValueError:
+            print(f"feedback/{n}: not JSON, left on the host")
+            continue
+        if not isinstance(rec, dict) or rec.get("id") != n[:-5] or not feedback.save(dest, rec):
+            print(f"feedback/{n}: not a note, left on the host")
+            continue
+        ftp.delete(f"feedback/{n}")
+        got += 1
+        print(f"{os.path.relpath(os.path.join(dest, n), ROOT)}: {rec.get('kind')}, line {rec.get('line')}: "
+              f"{' '.join(str(rec.get('note') or '').split())[:80]}")
+    return got
+
+
+def pull(cfg, connect):
+    """One target's review verdicts (not on a public one) and feedback notes."""
+    ftp = connect(cfg, password(cfg))
+    try:
+        if not cfg.get("public"):
+            pull_reviews(ftp)
+        pull_feedback(ftp, os.path.join(feedback.DEST, cfg["name"]))
+    finally:
+        ftp.quit()
+
+
+def status(url, path=""):
+    """The HTTP status of url + path without a login."""
+    try:
+        return urllib.request.urlopen(url.rstrip("/") + "/" + path, timeout=20).status
     except urllib.error.HTTPError as e:
         return e.code
     except OSError as e:
         return f"unreachable ({e})"
+
+
+def public_ok(url, get=status):
+    """A public target's answers without a login: the page and version.json served, every review tool and
+    the stored notes not ([] when all is as it should be, else what is wrong)."""
+    want = {"": 200, "version.json": 200, "feedback/": 403, **{p: 404 for p in ("review.php", "reviews.html", "reports/review/index.json")}}
+    bad = []
+    for p, w in want.items():
+        got = get(url, p)
+        # (a denied folder may answer 403 or 404: both keep the notes unread)
+        if got != w and not (w == 403 and got == 404):
+            bad.append(f"/{p} answers {got}, wants {w}")
+    return bad
+
+
+def protected(url):
+    """The HTTP status of version.json without a login: 401 when the host protects the site."""
+    return status(url, "version.json")
 
 
 def main(argv=None, connect=connect):
@@ -255,21 +365,34 @@ def main(argv=None, connect=connect):
     ap.add_argument("--dry-run", action="store_true", help="list what would change, write nothing")
     ap.add_argument("--reports", action="store_true", help="also upload reports/headless/*.json")
     ap.add_argument("--dirty", action="store_true", help="deploy with uncommitted changes (a test)")
-    ap.add_argument("--pull-reviews", action="store_true", help="only fetch the review verdicts from the host")
+    ap.add_argument("--target", help="the target in deploy.local.json (default: test, the top level)")
+    ap.add_argument("--pull", "--pull-reviews", dest="pull", action="store_true",
+                    help="only fetch the review verdicts and the feedback notes (every target unless --target)")
     args = ap.parse_args(argv)
     if not os.path.exists(CONFIG):
         raise SystemExit(f"no {os.path.basename(CONFIG)}: see the usage at the top of tools/deploy.py")
     with open(CONFIG, encoding="utf-8") as fh:
-        cfg = json.load(fh)
-    if args.pull_reviews:
-        ftp = connect(cfg, password(cfg))
-        try:
-            pull_reviews(ftp)
-        finally:
-            ftp.quit()
+        conf = json.load(fh)
+    if args.pull:
+        failed = []
+        for name in [args.target] if args.target else ["test", *(conf.get("targets") or {})]:
+            try:
+                pull(target(conf, name), connect)
+            except (ftplib.Error, OSError, SystemExit) as e:
+                print(f"{name}: pulling failed: {e}")
+                failed.append(name)
+        if failed:
+            raise SystemExit(1)
         return
-    commit = checks(args.dirty)
-    local = site(commit, args.reports)
+    cfg = target(conf, args.target)
+    public = bool(cfg.get("public"))
+    if public and args.reports:
+        raise SystemExit("--reports serves the checks' findings for review mode: not on a public target")
+    commit = checks(args.dirty, public)
+    if public and not tag(commit) and not args.dry_run:
+        raise SystemExit(f"{commit[:7]} has no tag: a public target gets only a tagged commit "
+                         "(git tag alpha-N, git push origin alpha-N), the version its testers name")
+    local = site(commit, args.reports, public=public)
     hashes = {r: digest(v) for r, v in local.items()}
     ftp = connect(cfg, password(cfg))
     try:
@@ -279,7 +402,7 @@ def main(argv=None, connect=connect):
         up, gone = plan(hashes, remote)
         up = [r for r in up if r != "version.json"]
         size = sum(len(local[r]) if isinstance(local[r], bytes) else os.path.getsize(local[r]) for r in up)
-        print(f"{commit[:7]}: {len(up)} files to upload ({size / 1e6:.1f} MB), {len(gone)} to delete, "
+        print(f"{cfg['name']} {commit[:7]}{' ' + tag(commit) if tag(commit) else ''}: {len(up)} files to upload ({size / 1e6:.1f} MB), {len(gone)} to delete, "
               f"{len(hashes) - 1 - len(up)} unchanged")
         if args.dry_run:
             for r in up:
@@ -302,7 +425,12 @@ def main(argv=None, connect=connect):
             ftp.quit()
         except (ftplib.Error, OSError):
             pass
-    if cfg.get("url"):
+    if cfg.get("url") and public:
+        bad = public_ok(cfg["url"])
+        print(f"{cfg['url']}: " + ("the page served, no review tools, notes unreadable" if not bad else "WRONG: " + "; ".join(bad)))
+        if bad:
+            raise SystemExit(1)
+    elif cfg.get("url"):
         code = protected(cfg["url"])
         note = "protected" if code == 401 else "NOT PROTECTED: set a password in Plesk (Password-Protected Directories)" if code == 200 else ""
         print(f"{cfg['url']}: version.json without a login answers {code} {note}")

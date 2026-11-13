@@ -1,0 +1,876 @@
+{
+ "schema": 1,
+ "issue": 548,
+ "line": "22",
+ "title": "Troughs beside the track beds: ditch, wall or our ground",
+ "findings": [
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07809-14.34057",
+   "line": "22",
+   "x": -5866.4,
+   "y": -231,
+   "mag": 99,
+   "status": "review",
+   "place": [
+    50.078094,
+    14.340566
+   ],
+   "marks": [
+    {
+     "x": -5866.4,
+     "y": -231,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Obora Hvězda (route s 1330, 6 m off the route): beside track 230's bed the ground 1 m past its edge lies 99 cm under the edge and under the ground 4 m out (the ground 4 m out stands 7 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07400-14.41871",
+   "line": "22",
+   "x": -387.9,
+   "y": -1448.2,
+   "mag": 98,
+   "status": "review",
+   "place": [
+    50.073996,
+    14.418714
+   ],
+   "marks": [
+    {
+     "x": -387.9,
+     "y": -1448.2,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Karlovo náměstí (route s 11051, 214 m off the route): beside track 145's bed the ground 1 m past its edge lies 98 cm under the edge and under the ground 4 m out (the ground 4 m out lies 18 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09377-14.41654",
+   "line": "22",
+   "x": -242.1,
+   "y": 752.2,
+   "mag": 86,
+   "status": "review",
+   "place": [
+    50.093774,
+    14.416539
+   ],
+   "marks": [
+    {
+     "x": -242.1,
+     "y": 752.2,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Královský letohrádek (route s 7091, 506 m off the route): beside track 41's bed the ground 1 m past its edge lies 86 cm under the edge and under the ground 4 m out (the ground 4 m out lies 612 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08145-14.41384",
+   "line": "22",
+   "x": -620.6,
+   "y": -579,
+   "mag": 80,
+   "status": "review",
+   "place": [
+    50.081453,
+    14.413837
+   ],
+   "marks": [
+    {
+     "x": -620.6,
+     "y": -579,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Národní divadlo (route s 9925, 6 m off the route): beside track 58's bed the ground 1 m past its edge lies 80 cm under the edge and under the ground 4 m out (the ground 4 m out lies 22 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08615-14.38513",
+   "line": "22",
+   "x": -2584.4,
+   "y": 219.2,
+   "mag": 80,
+   "status": "review",
+   "place": [
+    50.08615,
+    14.385129
+   ],
+   "marks": [
+    {
+     "x": -2584.4,
+     "y": 219.2,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Malovanka (route s 4683, 10 m off the route): beside track 220's bed the ground 1 m past its edge lies 80 cm under the edge and under the ground 4 m out (the ground 4 m out stands 66 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07748-14.41429",
+   "line": "22",
+   "x": -648.9,
+   "y": -1021.1,
+   "mag": 74,
+   "status": "review",
+   "place": [
+    50.07748,
+    14.414288
+   ],
+   "marks": [
+    {
+     "x": -648.9,
+     "y": -1021.1,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Karlovo náměstí (route s 10910, 371 m off the route): beside track 73's bed the ground 1 m past its edge lies 74 cm under the edge and under the ground 4 m out (the ground 4 m out lies 23 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.05956-14.50882",
+   "line": "22",
+   "x": 5785.2,
+   "y": -3915.2,
+   "mag": 73,
+   "status": "review",
+   "place": [
+    50.059555,
+    14.508823
+   ],
+   "marks": [
+    {
+     "x": 5785.2,
+     "y": -3915.2,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Zahradní Město (route s 18420, 236 m off the route): beside track 330's bed the ground 1 m past its edge lies 73 cm under the edge and under the ground 4 m out (the ground 4 m out lies 14 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07762-14.41692",
+   "line": "22",
+   "x": -459.8,
+   "y": -1031.3,
+   "mag": 69,
+   "status": "review",
+   "place": [
+    50.077621,
+    14.416925
+   ],
+   "marks": [
+    {
+     "x": -459.8,
+     "y": -1031.3,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Karlovo náměstí (route s 10861, 186 m off the route): beside track 18's bed the ground 1 m past its edge lies 69 cm under the edge and under the ground 4 m out (the ground 4 m out stands 8 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08858-14.40581",
+   "line": "22",
+   "x": -1081.8,
+   "y": 284.4,
+   "mag": 67,
+   "status": "review",
+   "place": [
+    50.088577,
+    14.405806
+   ],
+   "marks": [
+    {
+     "x": -1081.8,
+     "y": 284.4,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Malostranské náměstí (route s 8331, 3 m off the route): beside track 88's bed the ground 1 m past its edge lies 67 cm under the edge and under the ground 4 m out (the ground 4 m out lies 2 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07275-14.41825",
+   "line": "22",
+   "x": -439.7,
+   "y": -1580.6,
+   "mag": 66,
+   "status": "review",
+   "place": [
+    50.072753,
+    14.418249
+   ],
+   "marks": [
+    {
+     "x": -439.7,
+     "y": -1580.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Karlovo náměstí (route s 11051, 356 m off the route): beside track 213's bed the ground 1 m past its edge lies 66 cm under the edge and under the ground 4 m out (the ground 4 m out lies 139 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08397-14.36937",
+   "line": "22",
+   "x": -3734.7,
+   "y": 133,
+   "mag": 64,
+   "status": "review",
+   "place": [
+    50.083966,
+    14.369372
+   ],
+   "marks": [
+    {
+     "x": -3734.7,
+     "y": 133,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Drinopol (route s 3523, 2 m off the route): beside track 224's bed the ground 1 m past its edge lies 64 cm under the edge and under the ground 4 m out (the ground 4 m out lies 33 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07329-14.41851",
+   "line": "22",
+   "x": -412.8,
+   "y": -1523.8,
+   "mag": 62,
+   "status": "review",
+   "place": [
+    50.073292,
+    14.418514
+   ],
+   "marks": [
+    {
+     "x": -412.8,
+     "y": -1523.8,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Karlovo náměstí (route s 11051, 293 m off the route): beside track 213's bed the ground 1 m past its edge lies 62 cm under the edge and under the ground 4 m out (the ground 4 m out stands 22 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09353-14.39974",
+   "line": "22",
+   "x": -1436.8,
+   "y": 889,
+   "mag": 60,
+   "status": "review",
+   "place": [
+    50.093526,
+    14.399737
+   ],
+   "marks": [
+    {
+     "x": -1436.8,
+     "y": 889,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Pražský hrad (route s 6323, 3 m off the route): beside track 46's bed the ground 1 m past its edge lies 60 cm under the edge and under the ground 4 m out (the ground 4 m out stands 26 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08366-14.41336",
+   "line": "22",
+   "x": -620.9,
+   "y": -330.6,
+   "mag": 58,
+   "status": "review",
+   "place": [
+    50.083665,
+    14.413359
+   ],
+   "marks": [
+    {
+     "x": -620.9,
+     "y": -330.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Národní divadlo (route s 9900, 253 m off the route): beside track 0's bed the ground 1 m past its edge lies 58 cm under the edge and under the ground 4 m out (the ground 4 m out lies 27 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08438-14.37481",
+   "line": "22",
+   "x": -3342.9,
+   "y": 125.6,
+   "mag": 57,
+   "status": "review",
+   "place": [
+    50.084383,
+    14.374809
+   ],
+   "marks": [
+    {
+     "x": -3342.9,
+     "y": 125.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Marjánka (route s 3918, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 57 cm under the edge and under the ground 4 m out (the ground 4 m out lies 2 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08495-14.37838",
+   "line": "22",
+   "x": -3081,
+   "y": 153.3,
+   "mag": 55,
+   "status": "review",
+   "place": [
+    50.084952,
+    14.378381
+   ],
+   "marks": [
+    {
+     "x": -3081,
+     "y": 153.3,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Marjánka (route s 4182, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 55 cm under the edge and under the ground 4 m out (the ground 4 m out lies 10 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08889-14.38595",
+   "line": "22",
+   "x": -2484.2,
+   "y": 513.2,
+   "mag": 54,
+   "status": "review",
+   "place": [
+    50.088892,
+    14.385954
+   ],
+   "marks": [
+    {
+     "x": -2484.2,
+     "y": 513.2,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Pohořelec (route s 5131, 147 m off the route): beside track 13's bed the ground 1 m past its edge lies 54 cm under the edge and under the ground 4 m out (the ground 4 m out lies 1 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09071-14.38540",
+   "line": "22",
+   "x": -2495.7,
+   "y": 718.9,
+   "mag": 54,
+   "status": "review",
+   "place": [
+    50.09071,
+    14.385402
+   ],
+   "marks": [
+    {
+     "x": -2495.7,
+     "y": 718.9,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Pohořelec (route s 5258, 224 m off the route): beside track 13's bed the ground 1 m past its edge lies 54 cm under the edge and under the ground 4 m out (the ground 4 m out lies 4 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08417-14.37361",
+   "line": "22",
+   "x": -3430.8,
+   "y": 114.4,
+   "mag": 50,
+   "status": "review",
+   "place": [
+    50.084175,
+    14.373614
+   ],
+   "marks": [
+    {
+     "x": -3430.8,
+     "y": 114.4,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Marjánka (route s 3829, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 50 cm under the edge and under the ground 4 m out (the ground 4 m out lies 2 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08405-14.36738",
+   "line": "22",
+   "x": -3874.6,
+   "y": 161.9,
+   "mag": 49,
+   "status": "review",
+   "place": [
+    50.084051,
+    14.36738
+   ],
+   "marks": [
+    {
+     "x": -3874.6,
+     "y": 161.9,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Drinopol (route s 3380, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 49 cm under the edge and under the ground 4 m out (the ground 4 m out stands 4 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09025-14.38571",
+   "line": "22",
+   "x": -2480.7,
+   "y": 665.2,
+   "mag": 45,
+   "status": "review",
+   "place": [
+    50.09025,
+    14.385712
+   ],
+   "marks": [
+    {
+     "x": -2480.7,
+     "y": 665.2,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Pohořelec (route s 5216, 186 m off the route): beside track 13's bed the ground 1 m past its edge lies 45 cm under the edge and under the ground 4 m out (the ground 4 m out lies 12 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08478-14.37728",
+   "line": "22",
+   "x": -3161.4,
+   "y": 145.6,
+   "mag": 45,
+   "status": "review",
+   "place": [
+    50.084784,
+    14.377283
+   ],
+   "marks": [
+    {
+     "x": -3161.4,
+     "y": 145.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Marjánka (route s 4101, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 45 cm under the edge and under the ground 4 m out (the ground 4 m out lies 5 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09435-14.39183",
+   "line": "22",
+   "x": -1984.5,
+   "y": 1056.8,
+   "mag": 45,
+   "status": "review",
+   "place": [
+    50.094348,
+    14.391833
+   ],
+   "marks": [
+    {
+     "x": -1984.5,
+     "y": 1056.8,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Brusnice (route s 5770, 146 m off the route): beside track 225's bed the ground 1 m past its edge lies 45 cm under the edge and under the ground 4 m out (the ground 4 m out lies 15 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07715-14.43154",
+   "line": "22",
+   "x": 569.2,
+   "y": -1225.7,
+   "mag": 44,
+   "status": "review",
+   "place": [
+    50.077151,
+    14.431537
+   ],
+   "marks": [
+    {
+     "x": 569.2,
+     "y": -1225.7,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near I. P. Pavlova (route s 11890, 190 m off the route): beside track 162's bed the ground 1 m past its edge lies 44 cm under the edge and under the ground 4 m out (the ground 4 m out stands 33 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08709-14.38813",
+   "line": "22",
+   "x": -2357.3,
+   "y": 293.6,
+   "mag": 43,
+   "status": "review",
+   "place": [
+    50.087092,
+    14.388131
+   ],
+   "marks": [
+    {
+     "x": -2357.3,
+     "y": 293.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Pohořelec (route s 4922, 3 m off the route): beside track 21's bed the ground 1 m past its edge lies 43 cm under the edge and under the ground 4 m out (the ground 4 m out stands 21 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.06980-14.47771",
+   "line": "22",
+   "x": 3732.6,
+   "y": -2485,
+   "mag": 42,
+   "status": "review",
+   "place": [
+    50.069798,
+    14.477712
+   ],
+   "marks": [
+    {
+     "x": 3732.6,
+     "y": -2485,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Kubánské náměstí (route s 15676, 111 m off the route): beside track 17's bed the ground 1 m past its edge lies 42 cm under the edge and under the ground 4 m out (the ground 4 m out stands 2 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09340-14.41473",
+   "line": "22",
+   "x": -376,
+   "y": 729,
+   "mag": 42,
+   "status": "review",
+   "place": [
+    50.093403,
+    14.41473
+   ],
+   "marks": [
+    {
+     "x": -376,
+     "y": 729,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Královský letohrádek (route s 7121, 383 m off the route): beside track 118's bed the ground 1 m past its edge lies 42 cm under the edge and under the ground 4 m out (the ground 4 m out stands 132 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.07036-14.48893",
+   "line": "22",
+   "x": 4536.4,
+   "y": -2531.6,
+   "mag": 42,
+   "status": "review",
+   "place": [
+    50.070362,
+    14.488926
+   ],
+   "marks": [
+    {
+     "x": 4536.4,
+     "y": -2531.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Na Hroudě (route s 16561, 6 m off the route): beside track 279's bed the ground 1 m past its edge lies 42 cm under the edge and under the ground 4 m out (the ground 4 m out lies 7 cm under the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.09381-14.40162",
+   "line": "22",
+   "x": -1298.9,
+   "y": 901.6,
+   "mag": 41,
+   "status": "review",
+   "place": [
+    50.093808,
+    14.401622
+   ],
+   "marks": [
+    {
+     "x": -1298.9,
+     "y": 901.6,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Královský letohrádek (route s 6461, 4 m off the route): beside track 46's bed the ground 1 m past its edge lies 41 cm under the edge and under the ground 4 m out (the ground 4 m out stands 19 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08401-14.36837",
+   "line": "22",
+   "x": -3804.7,
+   "y": 147.5,
+   "mag": 40,
+   "status": "review",
+   "place": [
+    50.084009,
+    14.368375
+   ],
+   "marks": [
+    {
+     "x": -3804.7,
+     "y": 147.5,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Drinopol (route s 3451, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 40 cm under the edge and under the ground 4 m out (the ground 4 m out stands 2 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  },
+  {
+   "kind": "bed trough",
+   "id": "trough-50.08464-14.37637",
+   "line": "22",
+   "x": -3228.5,
+   "y": 138.9,
+   "mag": 40,
+   "status": "review",
+   "place": [
+    50.084642,
+    14.376367
+   ],
+   "marks": [
+    {
+     "x": -3228.5,
+     "y": 138.9,
+     "label": "the trough",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "a ditch or a cutting: the ground is right",
+    "a retaining wall is missing here",
+    "our ground is wrong here (sunk around the bed)",
+    "unsure"
+   ],
+   "info": "near Marjánka (route s 4033, 3 m off the route): beside track 224's bed the ground 1 m past its edge lies 40 cm under the edge and under the ground 4 m out (the ground 4 m out stands 2 cm over the bed's edge). What is there in reality: a ditch or a cutting's side, a retaining wall, or is our ground sunk around the bed?"
+  }
+ ]
+}

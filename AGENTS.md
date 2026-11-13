@@ -63,6 +63,10 @@ both post on the pinned #291 and only propose.
   that belongs to another issue moves there (a comment, a blocked-by link), so an open issue holds only
   its own open points. Only the PR that finishes it says `Closes #N`. A reviewer who finds an open point changes the keyword before the
   merge (#146 was nearly closed with six places still awaiting the user's answers).
+- **Stacked work:** an issue that needs another branch's unmerged work branches from it, and its PR is opened with
+  `--base` on that branch. Once the base squash-merges, merge main into the stacked branch (no force-push). A
+  conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and merge
+  (#578 on #575).
 - Review findings: a reviewer posts them as a PR comment ("To fix before merge", "Smaller"); the author
   answers point by point in a comment and pushes. A PR is marked ready and merged on the user's word only.
 - **Merge windows:** the user merges ready PRs in batches. A session whose checks are done says so and
@@ -153,7 +157,7 @@ both post on the pinned #291 and only propose.
   use or stop it. A tool or test that needs a page starts its own server on a free port; the
   per-agent ports are for interactive dev servers.
 - Python: `python -I` for stdlib-only tools; `python -P -E` for tools needing the user site packages
-  (pyosmium, pyproj, shapely, numpy, Pillow, brotli). Write multi-line scripts to a file and run it: shell
+  (pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli, pydelatin 0.4.0). Write multi-line scripts to a file and run it: shell
   heredocs with quotes can break in the Windows shells.
 - Tests: `python -I tools/test_all.py` runs every `tools/test_*.py` the way it must run (`-I` or `-P -E`
   from its imports; `--browser` adds the page tests, `-k name` picks some). A tool's test is
@@ -164,10 +168,19 @@ both post on the pinned #291 and only propose.
   --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold, the thresholds being
   `judge` in that tool; `--jobs N` pages at once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
   (`--parallel` for several lines).
-- **Heavy jobs take turns:** `headless.py`, `rebuild.py` and `frametime.py` queue for the machine
-  (`baseline_store.HeavyJob`, first come first served, #280), print whom they wait for, and size their
-  pages and builds by the memory free when their turn comes (`tools/sysinfo.py`). Start one in the
-  background and let it wait; `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- **Heavy jobs take turns:** every job that keeps several cores or GBs busy for over a minute waits for the
+  machine's other heavy jobs (`baseline_store.HeavyJob`, first come first served, #280) and holds its turn
+  while it runs, so that it neither slows nor spoils another's measurement (the user, 2026-11-12, #516:
+  "Make sure to run any comparison or heavy job in a queue to not affect other work").
+  - These take their turn themselves: `headless.py`, `rebuild.py`, `frametime.py` and `city_terrain.py`;
+    `build_line.py`, `dtm.py`, `line_heights.py` and `import_track_heights.py` when run alone; `test_all.py`
+    for the whole suite (#536).
+  - Anything else runs through `python -I tools/heavy.py "what" -- CMD ...`: a profile, a bench, a
+    comparison, a script of several runs. What it starts runs in its turn without waiting again.
+  - Each prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
+    (`tools/sysinfo.py`).
+  - Start one in the background and let it wait. `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it
+    slows both).
 - **Which checks a change needs** (`/regress` picks them from the diff; a change of two kinds runs both):
 
   | change | runs | leaves out |
@@ -195,7 +208,7 @@ both post on the pinned #291 and only propose.
 - **Long jobs pin their checkout** (a rebuild, a fetch, a check run reads the files as they are): work on
   another issue meanwhile in its own worktree (`git worktree add ../<repo>-N -b N-name origin/main`, then
   `python -I tools/snapshot.py data-fetch`, from the machine cache in seconds), removed when done.
-- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, DEVELOPING.md), `?bot`, `?keepgeo`, `?nofine`, `?nospread`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
+- Dev switches: `?line=N`, `?inspect`, `?review` (findings on the map, DEVELOPING.md), `?bot`, `?keepgeo`, `?nofine`, `?notunnels`, `?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N, replayed up to route s and handed over paused: a stuck scene as it was, #157).
 - A regression check compares a run with main's stored baseline (`headless.py … --compare`, seeds 1-5 by
   default, the table goes into the PR). Seeded counts are judged by the branch's mean against the min-max
   of main's seeds: a change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside
@@ -205,6 +218,9 @@ both post on the pinned #291 and only propose.
   merge that changes the game, the checks, the data or `data/truth.json` (`tools/autodeploy.py`, 2 pages at
   once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base. A PR does not
   refresh the baseline.
+- **A seeded compare against a checkpoint is not a compare with main.** When `--compare` says the seeded runs compare
+  with a checkpoint (main has no baseline at the merge base), run the same seeds on main at the merge base back to
+  back before reading any move. #582's stops moved by up to 50 late seconds against W2 and were identical to main's.
 - **Which baseline each tier compares with** (#282): a checkpoint's run stores itself under its name
   (`--baseline --publish --checkpoint W1`: every check, seeds 1-5). Seedless checks (the world and drawn-geometry tiers)
   compare with main at the merge base: its baseline, else measured there once in a pinned worktree through the
@@ -216,10 +232,8 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
-| crossing | 17 | 1 unexplained pedestrian obstruction | #146 |
-| crossing | 9 | 2 unexplained pedestrian obstructions: a surveyed sidewalk 0.40 m over the rails at s 3672 (since its survey, #125) | #146 |
-| `tools/test_audio_pause.py` `test_shift_lifecycle` | 23 | the master gain is 0 after the shift starts (wants over 0.01) | #381 |
-| `tools/test_headless_timeout.py` `test_stuck_and_scheduled_wait` | (its own page) | `KeyError: 'stuck'` in both modes | #381 |
+| traffic, seed 1 | 23 | does not finish (stop 6, 7200 s): a car held behind a walker jams the tram 253 m before Malostranská; slide ≈207 000 | #496 |
+| u3, seed 1 | 23 | stuck at s 3350: the same jam (since #480's heights; seeds 2 and 3 drive clean) | #496 |
 
 ## Code style
 
@@ -227,6 +241,8 @@ both post on the pinned #291 and only propose.
   changes). Match the surrounding code: plain modules, short names in hot loops, comments that say why (the data
   quirk, the measured case), not what. Units are metres, seconds, m/s unless named otherwise.
 - Docs say what is and what was measured, briefly: no disclaimers or hedges, no restating.
+- A new source file in `src/` or `tools/` starts with `SPDX-License-Identifier: AGPL-3.0-or-later` in a
+  comment (after a shebang, `<?php` or doctype; #518).
 - No new dependencies or build steps without an issue that decides it. Tests and benches: Python +
   Playwright (headless Chromium); Node / Deno only once the simulation core is split out.
 - Randomness must be reproducible: today the benches override `Math.random` with a seeded one; new

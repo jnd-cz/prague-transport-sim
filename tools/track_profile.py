@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vertical track profile: the smallest change to the selected rail heights that keeps every change of grade
 within the design radius (#188).
 
@@ -95,9 +96,10 @@ def _solve(s, z, w, lam):
 
 
 class _D:
-    """The second-difference operator of an uneven s as its three diagonals (numpy), and the inverse of
-    diag(w) + D^T diag(lam) D: the same system for every ADMM step, solved by one product (#205: the list loops of
-    _back and the row sums were 52 % of line_heights.py)."""
+    """The second-difference operator of an uneven s as its three diagonals (numpy), and diag(w) + D^T diag(lam) D, the
+    same system for every ADMM step, by its banded Cholesky factor (#205: the list loops of _back and the row sums were
+    52 % of line_heights.py; #516: the product with the dense inverse that replaced them, 1.66 ms a step on 3303 points,
+    against LAPACK's banded solve, 50 us; docs/decisions/2026-11-13-scipy-banded-solve.md)."""
 
     def __init__(self, s):
         s = np.asarray(s, dtype=float)
@@ -115,12 +117,24 @@ class _D:
         b[2:] += self.r*q
         return b
 
-    def inverse(self, w, lam):
-        m = self.n-2
-        D = np.zeros((m, self.n))
-        i = np.arange(m)
-        D[i, i], D[i, i+1], D[i, i+2] = self.l, self.c, self.r
-        return np.linalg.inv(np.diag(np.asarray(w, dtype=float))+(D.T*np.asarray(lam, dtype=float))@D)
+    def system(self, w, lam):
+        """diag(w) + D^T diag(lam) D (pentadiagonal): a function solving it for b, by LAPACK's banded Cholesky factor
+        (dpbtrf once, dpbtrs a step; O(n) each). Its answers lie within 3e-12 m of the dense inverse's, and the heights
+        came out byte-identical (#516)."""
+        from scipy.linalg.lapack import dpbtrf, dpbtrs
+        lam = np.asarray(lam, dtype=float)
+        ab = np.zeros((3, self.n))  # (upper band storage: ab[2] the diagonal, ab[1][j] = A[j-1, j], ab[0][j] = A[j-2, j])
+        ab[2] = w
+        ab[2, :-2] += lam*self.l*self.l
+        ab[2, 1:-1] += lam*self.c*self.c
+        ab[2, 2:] += lam*self.r*self.r
+        ab[1, 1:-1] += lam*self.l*self.c
+        ab[1, 2:] += lam*self.c*self.r
+        ab[0, 2:] += lam*self.l*self.r
+        cb, info = dpbtrf(ab)
+        if info:
+            raise np.linalg.LinAlgError(f"the profile's system is not positive definite (dpbtrf: {info})")
+        return lambda b: dpbtrs(cb, b)[0]
 
 
 def _capped(s, z, w, cap, rows, f=None, u=None, y=None):
@@ -129,14 +143,14 @@ def _capped(s, z, w, cap, rows, f=None, u=None, y=None):
     h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
     rho = max(h,.5)**4  # (D's entries ~ 1/h^2: rho D^T D ~ the data weights)
     D = _D(s)
-    Ai = D.inverse(w,[rho]*m)
+    Ai = D.system(w,[rho]*m)
     z, w, cap = (np.asarray(a, dtype=float) for a in (z, w, cap))
     f = np.array(f if f is not None else z, dtype=float)
     u = np.array(u, dtype=float) if u is not None else np.clip(D(f),-cap,cap)
     y = np.array(y, dtype=float) if y is not None else np.zeros(m)
     wz = w*z
     for it in range(ITERATIONS):
-        f = Ai@(wz+rho*D.T(u-y))
+        f = Ai(wz+rho*D.T(u-y))
         d = D(f)
         u = np.clip(d+y,-cap,cap)
         y = y+d-u
@@ -202,7 +216,7 @@ def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
     h = sorted(b-a for a,b in zip(s,s[1:]))[(n-1)//2]
     rho1, rho2 = max(h,.5)**4, 1.0
     D = _D(s)
-    Ai = D.inverse([wi+rho2 for wi in w],[(smooth+1)*rho1]*(n-2))
+    Ai = D.system([wi+rho2 for wi in w],[(smooth+1)*rho1]*(n-2))
     z = np.asarray(z, dtype=float)
     free = np.array([t is None for t in tol])
     t = np.array([0.0 if t is None else t for t in tol])
@@ -213,7 +227,7 @@ def banded_profile(s, z, rmin, tol, weight=None, smooth=SMOOTH):
     y1, y2 = np.zeros(n-2), np.zeros(n)
     for it in range(ITERATIONS):
         last = f
-        f = Ai@(wz+rho2*(v-y2)+rho1*D.T(u-y1))
+        f = Ai(wz+rho2*(v-y2)+rho1*D.T(u-y1))
         d = D(f)
         u = np.clip(d+y1,-cap,cap)
         v = np.clip(f+y2,lo,hi)

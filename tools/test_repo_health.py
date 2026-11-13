@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The housekeeping report's parts (#290): dates issues wait for, the known-failures table, the sizes and
 their change since the last pass: python -I tools/test_repo_health.py"""
 import datetime

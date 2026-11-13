@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The repository's health, for the weekly housekeeping pass (#290, docs/housekeeping.md): sizes, work in
 flight, review sets, leftovers, known failures, dated issues, CI. Read-only apart from --post.
 

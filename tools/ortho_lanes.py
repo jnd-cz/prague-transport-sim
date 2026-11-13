@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Pilot: lane markings from the IPR Praha orthophoto along a stretch of a line.
 
 Orthofoto Prahy, leaf-off flight 7-8 April 2026, 7 cm/px, CC BY 4.0 (IPR Praha), ArcGIS ImageServer

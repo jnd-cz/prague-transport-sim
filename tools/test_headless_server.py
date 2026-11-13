@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Server ownership regressions (#116): python -P -E tools/test_headless_server.py."""
 from contextlib import contextmanager, redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import headless
 import os
 os.environ["TRAM_HEAVY_NOWAIT"] = "1"  # (headless.main() here runs mocked workers: no turn among the real heavy jobs, #280)
+headless.TIMINGS = None  # (nor do their made-up times join this machine's run times, #413)
 
 SERVE = Path(__file__).with_name('serve.py')
 
@@ -55,8 +57,9 @@ class Ownership(unittest.TestCase):
     def checkout(self, name, body):
         root = self.root / name
         (root/'tools').mkdir(parents=True)
-        # (serve.py imports reviews.py since #136: without it every server in these checkouts died at start)
-        for name in ('serve.py','reviews.py'):
+        # (serve.py imports reviews.py since #136 and feedback.py since #350: without them every server in these
+        # checkouts died at start)
+        for name in ('serve.py','reviews.py','feedback.py'):
             shutil.copyfile(SERVE.with_name(name),root/'tools'/name)
         (root/'index.html').write_text(body,encoding='utf-8')
         return root

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Independent DI-minus-survey calibration, split by construction evidence (#106).
 
     python -P -E tools/calibrate_track_heights.py --input reports/track-heights.json

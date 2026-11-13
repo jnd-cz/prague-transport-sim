@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Schema-migration checks: python -I tools/test_dtm_schema.py."""
 import hashlib
 from contextlib import closing

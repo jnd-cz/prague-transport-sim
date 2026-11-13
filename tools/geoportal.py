@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Import Geoportál Praha (IPR Praha) open data for a built line: LOD2 3D buildings, retaining
 walls and individual trees along the route.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The kerb review list: what is not a kerb leaves it (#142): python -P -E tools/test_kerbs.py"""
 import os
 import sys

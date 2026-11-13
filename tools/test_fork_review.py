@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests of the switch-tip review: the forks an orthophoto track ends at. python -P -E tools/test_fork_review.py"""
 from pathlib import Path
 import sys

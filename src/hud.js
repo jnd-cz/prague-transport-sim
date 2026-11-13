@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Cab instruments and overlays (DOM/SVG), plus the minimap.
 import { fmtTime, fmtDev, demandAt } from './game.js';
 import { t, onLangChange } from './i18n.js';
@@ -202,7 +203,7 @@ export class Hud {
       `${K('info.climate')} ${t('info.temps', { o: Math.round(game.climate.tout), i: Math.round(game.climate.tin), c: Math.round(game.climate.tcab) })}`,
       `${K('info.heating')} ${t('info.heatState', { s: game.climate.saloon, c: game.climate.cab, f: t(game.climate.flap ? 'flap.open' : 'flap.closed') })}`,
       `${K('info.doors')} ${t(`doors.${game.doorState}`)}`,
-      `${K('info.speed')} max ${lim} km/h${nl ? ` · ${t('info.limitAhead', { v: nl.v, d: nl.d })}` : ''}`,
+      `${K('info.speed')} max ${lim} km/h${nl ? ` · ${t('info.limitAhead', { v: nl.v, d: Math.round(nl.d) })}` : ''}`,
       `${K('info.power')} ${Math.round(tram.voltage)} V${tram.supply.ref ? ` (${tram.supply.ref} ${tram.supply.km.toFixed(1)} km)` : ''} · ${tram.eq.aux.U.toFixed(1)} V · ${Math.round(tram.eq.mg.rpm)} ${t('info.rpm')}`,
       `${K('info.accel')} ${tram.a.toFixed(2)} · ${t('info.lateral')} ${(game.latAcc || 0).toFixed(1)} m/s²`,
       `${K('info.grade')} ${(tram.grade * 1000 >= 0 ? '+' : '') + Math.round(tram.grade * 1000)} ‰ · ${Math.round(game.profile.height(tram.s))} ${t('info.altitude')}`,
@@ -236,7 +237,7 @@ export class Hud {
           : t('chip.signal', { d, state: t(`sig.${sig.state}`) });
         chips.push(`<div class="chip ${sig.state === 'go' ? 'ok' : 'bad'}">${text}</div>`);
       }
-      if (nl && nl.d < 150) chips.push(`<div class="chip">${t('chip.limit', { v: nl.v, d: nl.d })}</div>`);
+      if (nl && nl.d < 150) chips.push(`<div class="chip">${t('chip.limit', { v: nl.v, d: Math.round(nl.d) })}</div>`);
       const gap = game.tramAheadGap();
       if (gap !== null && gap < 150) chips.push(`<div class="chip ${gap < 25 ? 'bad' : ''}">${t('chip.tramAhead', { d: Math.max(0, Math.round(gap)) })}</div>`);
       if (st && st.request && st.target - tram.s < 300 && st.target - tram.s > 0) {

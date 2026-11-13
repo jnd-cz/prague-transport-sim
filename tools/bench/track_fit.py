@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The curve fit alone, on a line's tracks or the whole network, without a build (#237):
     python -P -E tools/bench/track_fit.py --lines 9,17,22,23,37 [--top 15] [--min 0.05] [--json out.json]
     python -P -E tools/bench/track_fit.py --all

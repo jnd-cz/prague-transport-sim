@@ -42,7 +42,9 @@ queries.
    Test: `sftp tramdata` then `ls store` lists `sources` and `builds`.
 3. **Git identity** in the clone: `git config user.email "2506000+jnd-cz@users.noreply.github.com"`.
 4. **Python** 3.12+; the OSM tools need pyosmium (`python -m pip install --user osmium`) and run with
-   `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, Pillow;
+   `python -P -E` (`-I` hides the user site-packages); the build tools need pyproj, shapely, numpy, SciPy
+   (`python -m pip install --user scipy`), Pillow,
+   and `tools/city_terrain.py` pydelatin 0.4.0 (`python -m pip install --user pydelatin==0.4.0`);
    the headless checks need Playwright (`python -m pip install --user playwright`, then
    `python -m playwright install chromium`).
 5. **Machine cache** (optional; worth it from the second checkout on, e.g. several agents or worktrees):
@@ -118,7 +120,11 @@ it was published. Don't restore the whole snapshot into a fresh checkout to chec
 
 Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`, unpacked `.gpkg`) are
 not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query
-and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes).
+and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any of them changes). So are the
+extract's index beside the machine cache (`TRAMDATA_CACHE/osm-index/<extract>-<code>/`, DEVELOPING.md), DI's and the
+archive's parsed tracks and DI's network (`TRAMDATA_CACHE/kept/`, keyed by the sources' provenance hashes and the code
+that reads them; `tools/dtmp_tracks.py` `kept`) and the rebuild's step records with the outputs they name
+(`reports/rebuild/cache/`).
 
 ## Regional DTM monthly downloads and JVF transition (#63)
 

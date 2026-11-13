@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Independently audit a rebuilt two-line timetable against its pinned GTFS and build log.
 
     python -I tools/audit_run_timetable.py --line 9 --log reports/issue96-pairs.log

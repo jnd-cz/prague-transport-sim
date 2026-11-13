@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev tool: lints for the loaded line. Each check counts one kind of problem over the
 // whole line and lists the worst places, so a fix is judged by the count, not by one spot.
 // In the browser console on a running shift (load the page with ?keepgeo, start a shift first):
@@ -21,6 +22,20 @@ const TOP = 12; // places listed per check
 // (x, y0, z) and `far`: every hit, nearest first ({ point, distance, object, faceIndex }), faces culled by their
 // material's side as three.js does. The triangles are put in a grid in plan once, so a ray tests only those
 // of its cell (#205: the lint's rays tested every triangle of the merged street meshes, 95 % of its time).
+// Whether triangle t (ax, az, bx, bz, cx, cz) overlaps the rectangle [x0, x1] x [z0, z1] in plan (separating axes:
+// the rectangle's two and the triangle's three edge normals)
+function triInRect(t, x0, z0, x1, z1) {
+  const P = [[t.ax, t.az], [t.bx, t.bz], [t.cx, t.cz]], R = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  if (Math.max(t.ax, t.bx, t.cx) < x0 || Math.min(t.ax, t.bx, t.cx) > x1) return false;
+  if (Math.max(t.az, t.bz, t.cz) < z0 || Math.min(t.az, t.bz, t.cz) > z1) return false;
+  for (let i = 0; i < 3; i++) {
+    const [px, pz] = P[i], [qx, qz] = P[(i + 1) % 3], nx = qz - pz, nz = px - qx;
+    const tri = P.map(([x, z]) => x * nx + z * nz), rect = R.map(([x, z]) => x * nx + z * nz);
+    if (Math.max(...tri) < Math.min(...rect) || Math.min(...tri) > Math.max(...rect)) return false;
+  }
+  return true;
+}
+
 export class DownRays {
   constructor(meshes, cell = 4) {
     this.cell = cell;
@@ -49,7 +64,11 @@ export class DownRays {
         const k = this.tris.push(t) - 1;
         const x0 = Math.floor(Math.min(a.x, b.x, c.x) / cell), x1 = Math.floor(Math.max(a.x, b.x, c.x) / cell);
         const z0 = Math.floor(Math.min(a.z, b.z, c.z) / cell), z1 = Math.floor(Math.max(a.z, b.z, c.z) / cell);
+        // (a triangle over more than 4 cells only in the cells it overlaps: the survey's long slivers spanned
+        // thousands of cells by their box, and sampling every drawn track ran for half an hour on line 17, #548)
+        const big = (x1 - x0 + 1) * (z1 - z0 + 1) > 4;
         for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++) {
+          if (big && !triInRect(t, gx * cell, gz * cell, (gx + 1) * cell, (gz + 1) * cell)) continue;
           const key = gx * 65536 + gz;
           let list = this.grid.get(key);
           if (!list) this.grid.set(key, list = []);
@@ -92,7 +111,7 @@ function check(rule, of, items, key = (p) => p.mag) {
 // with no track behind it (the second car was drawn inside the first at Sídliště Řepy).
 function consistAtStops(g) {
   const route = g.route, prof = g.route.ground?.profile;
-  const model = window.tramModel?.userData.cars.length >= 2 ? window.tramModel : makeT3({ line: g.data.line, cars: 2, detailed: false });
+  const model = window.tramModel?.userData.cars.length >= 2 ? window.tramModel : makeT3({ line: g.data.line, cars: 2, vehicle: 't3simple' });
   const keep = model === window.tramModel ? model.userData.cars.map((c) => [c.position.clone(), c.rotation.clone()]) : null;
   const at = (q) => { const p = route.at(q); return [p.x, p.y, prof ? prof.height(q) : 0]; };
   // distance from a point to the route curve near s (the route includes the run-in / run-out)
@@ -336,6 +355,127 @@ function railSupport(g, world) {
   return check('rails-supported', n, [...bad.values()]);
 }
 
+// The ground-level survey over the rails (#444): every 2 m, across the tram's width (1.25 m either side of the route,
+// every 0.25 m), the highest ground-level surveyed surface over the rail top. railSupport's rays start 2.5 m over the
+// bed: they missed the ridge of an 800 m tram area on Krejcárek's ramp (line 37 s 2566-2746), up to 6 m over the
+// rails where earcut joined its outline's points far apart.
+function surveyOverTrack(g) {
+  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm;
+  if (!dtm) return check('survey-over-track', 0, []);
+  const ix = dtm.grid;
+  let n = 0;
+  const bad = new Map();
+  for (let s = 0; s < r.length; s += 2) {
+    if (pr.onBridge(s)) continue;
+    const zr = pr.height(s);
+    for (let lat = -1.25; lat <= 1.25; lat += 0.25) {
+      const o = r.offset(s, lat), k = ix.at(o.x, o.y);
+      n++;
+      if (k < 0) continue;
+      let top = -Infinity;
+      for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
+        const [p, q, u] = ix.tris[ix.ids[m]];
+        const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
+        if (Math.abs(d) < 1e-9) continue;
+        const w1 = ((q[1] - u[1]) * (o.x - u[0]) + (u[0] - q[0]) * (o.y - u[1])) / d;
+        const w2 = ((u[1] - p[1]) * (o.x - u[0]) + (p[0] - u[0]) * (o.y - u[1])) / d, w3 = 1 - w1 - w2;
+        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+        top = Math.max(top, w1 * p[2] + w2 * q[2] + w3 * u[2]);
+      }
+      const mag = top - zr, key = Math.round(s / 20);
+      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `survey ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
+    }
+  }
+  return check('survey-over-track', n, [...bad.values()]);
+}
+
+// The track a hit face was drawn for (the bed and rail meshes keep each track's face ranges with ?keepgeo)
+function trackOf(hit) {
+  const ranges = hit.object.userData.trackRanges || [];
+  let lo = 0, hi = ranges.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (ranges[mid][0] <= hit.faceIndex) lo = mid + 1; else hi = mid; }
+  const range = ranges[lo - 1];
+  return range && hit.faceIndex < range[1] ? range[2] : null;
+}
+
+// The survey area a hit face was drawn for: [class, level, area] (buildDtm keeps them with ?keepgeo)
+function surveyOf(hit) {
+  const ranges = hit.object.userData.surfaceRanges || [];
+  const r = ranges.find(([a, b]) => hit.faceIndex >= a && hit.faceIndex < b);
+  return r ? r.slice(2) : null;
+}
+
+// Every drawn track's rails against the ground over them, and the trough beside its bed (#548): every 2 m of every
+// track off our bridges, each rail head (the rail mesh, cast down) against the surfaces over it: the terrain, the
+// survey, roads, the track support and other tracks' beds. Over it by more than 1 mm buries it (the user, line 17
+// s 2366: "Canted tracked, lower rail disappears"). Beside each bed, the ground 1 m past its edge lower than both the
+// edge and the ground 4 m past it by more than SUNK m is a sunken ring (line 37 s 6315: "sunken ground around tram
+// tracks"); deeper than DEEP m it is another level (a retaining wall, an embankment). Counted per sample; places per
+// track and 20 m, the deepest.
+export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
+  const rails = [], surfaces = [];
+  world.traverse((m) => {
+    if (!m.isMesh) return;
+    const s = m.userData.surface;
+    if (s === 'rail') rails.push(m);
+    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(s)) surfaces.push(m);
+  });
+  const t0 = performance.now();
+  // (one index of the surfaces, the beds left out by the hit where the ground is asked: two copies of line 17's survey
+  // and terrain ran the page out of memory)
+  const railRays = new DownRays(rails), surfaceRays = new DownRays(surfaces), notBed = (h) => h.object.userData.surface === 'bed';
+  const t1 = performance.now(), step = g.data.heights?.step ?? 2;
+  let samples = 0, missing = 0, sides = 0, sunk = 0;
+  const bad = new Map(), troughs = new Map();
+  const top = (rays, x, y, z0, skip = () => false) => rays.cast(x, z0, -y, 40).find((h) => !skip(h));
+  for (const [id, t] of g.data.tracks.entries()) {
+    if (t.b || !t.smooth || t.smooth.length < 2 || !t.z) continue;
+    const L = t.smooth;
+    let acc = 0, next = 0;
+    for (let i = 0; i < L.length; i++) {
+      if (i) acc += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]);
+      if (acc < next) continue;
+      next = acc + 2;
+      const n = g.route.nearest(L[i][0], L[i][1]);
+      if (n && n.d < 6 && g.route.ground.profile.onBridge(n.s)) continue;
+      const a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = -(b[1] - a[1]) / l, ny = (b[0] - a[0]) / l, z0 = t.z[i] + 3;
+      for (const side of [-1, 1]) {
+        const x = L[i][0] + nx * side * 0.72, y = L[i][1] + ny * side * 0.72;
+        const head = top(railRays, x, y, z0, (h) => trackOf(h) !== id);
+        if (!head) { missing++; continue; }
+        samples++;
+        const over = top(surfaceRays, x, y, z0, (h) => h.object.userData.surface === 'bed' && trackOf(h) === id);
+        const mag = over ? over.point.y - head.point.y : -Infinity, key = `${id}:${Math.round(acc / 20)}`;
+        if (mag > 0.001 && !(bad.get(key)?.mag >= mag))
+          bad.set(key, { track: id, x, y, mag, info: `${over.object.userData.surface}${surveyOf(over) ? ` ${surveyOf(over).slice(0, 2).join(' ')}` : ''} ${(mag * 1000).toFixed(0)} mm over the rail head` });
+        // (the trough beside the bed: its edge, the ground 1 m and 4 m past it)
+        const k = Math.min((t.bed?.l.length ?? 1) - 1, Math.round(acc / step)), w = t.bed ? t.bed[side > 0 ? 'l' : 'r'][k] / 100 : 1.35;
+        if (t.bed && t.bed.meet[k] & (side > 0 ? 1 : 2)) continue;
+        const at = (o) => [L[i][0] + nx * side * o, L[i][1] + ny * side * o];
+        const e = top(surfaceRays, ...at(w - 0.1), z0, (h) => h.object.userData.surface !== 'bed' || trackOf(h) !== id);
+        const near = top(surfaceRays, ...at(w + 1), z0, notBed), far = top(surfaceRays, ...at(w + 4), z0, notBed);
+        if (!e || !near || !far) continue;
+        sides++;
+        const depth = Math.min(e.point.y, far.point.y) - near.point.y;
+        // (deeper than DEEP the ground beyond is another level: a wall, an embankment's foot, a cutting)
+        if (depth > SUNK && depth <= DEEP) {
+          sunk++;
+          if (!(troughs.get(key)?.mag >= depth)) troughs.set(key, { track: id, x: at(w + 1)[0], y: at(w + 1)[1], mag: depth, rise: far.point.y - e.point.y, info: `ground ${(depth * 100).toFixed(0)} cm under the bed's edge and the ground beyond` });
+        }
+      }
+    }
+  }
+  const by = (f) => { const o = {}; for (const p of bad.values()) { const k = f(p); o[k] = (o[k] || 0) + 1; } return o; };
+  const depth = by((p) => (p.mag > 0.2 ? 'over 20 cm' : p.mag > 0.05 ? '5-20 cm' : p.mag > 0.01 ? '1-5 cm' : 'under 1 cm'));
+  const kinds = by((p) => p.info.split(' ').slice(0, p.info.startsWith('dtm') ? 2 : 1).join(' '));
+  return { ...check('rail-under-ground', samples, [...bad.values()]), depth, kinds, ms: [Math.round(t1 - t0), Math.round(performance.now() - t1)], missing, buriedSamples: [...bad.values()].length,
+           sunken: { ...check('sunken-beside-bed', sides, [...troughs.values()]), samples: sunk, metres: sunk * 2,
+                     // (every place: x, y, its depth, the track, the ground 4 m out over the bed's edge; the review set,
+                     // tools/bed_troughs.py)
+                     all: [...troughs.values()].map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.mag * 100) / 100, p.track, Math.round(p.rise * 100) / 100]) } };
+}
+
 // Compare the drawn rail heads with actual bed and street triangles on each canted curve.
 // A separate missing-ray count makes registration gaps visible instead of calling them clear.
 export function cantedRailVisibility(g, world) {
@@ -348,13 +488,7 @@ export function cantedRailVisibility(g, world) {
   const railRays = new DownRays(rails), surfaceRays = new DownRays(surfaces);
   // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
   // ribbon is a separate obstruction, not a cant error on this one.
-  const owner = (hit) => {
-    const ranges = hit.object.userData.trackRanges || [];
-    let lo = 0, hi = ranges.length;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (ranges[mid][0] <= hit.faceIndex) lo = mid + 1; else hi = mid; }
-    const range = ranges[lo - 1];
-    return range && hit.faceIndex < range[1] ? range[2] : null;
-  };
+  const owner = trackOf;
   let samples = 0, missing = 0, missingBed = 0, curve = -1, inCurve = false;
   const bad = new Map(), other = new Map(), covered = new Map();
   for (let s = 0; s < r.length; s += 2) {
@@ -519,6 +653,40 @@ function steppedCurves(g) {
 // least-squares parabola's through them: three points whose first step was 0.17 m read a smooth 21 m curve's
 // joint at a crossing as a 1.2° break (0.2° fitted over 2-3 m).
 const JOIN_REACH = 2.0;
+
+// Corners (#491): a vertex of the built track turning more than CORNER while its neighbours turn under CORNER_NEXT, its
+// segments both at most CORNER_SEG (the build keeps every 1 m sample near a node, tools/track_curve.py KEEP). trackRadius
+// leaves out 2.5 m at each end and reads a corner over its 5 m window as a gentle bend: a branch held tangent at a switch
+// turned 4.5° in its first metre (line 9 s 15958) and neither saw it.
+const CORNER = 1.5, CORNER_NEXT = 1.0, CORNER_SEG = 1.5;
+function trackCorners(g) {
+  const d = g.data, lines = [['our', d.path], ['opposite', d.pathBack], ...(d.tracks || []).map((t) => [t.src || 'osm', t.smooth || t.p])];
+  const bad = [], kinds = {};
+  let n = 0;
+  const turn = (a, b, c) => {
+    const t = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return Math.abs(((t + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * 180 / Math.PI;
+  };
+  for (const [kind, p] of lines) {
+    if (!p || p.length < 3) continue;
+    const t = [0];
+    for (let i = 1; i < p.length - 1; i++) t.push(turn(p[i - 1], p[i], p[i + 1]));
+    t.push(0);
+    const cum = [0];
+    for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    for (let i = 1; i < p.length - 1; i++) {
+      n++;
+      if (t[i] <= CORNER || t[i - 1] >= CORNER_NEXT || t[i + 1] >= CORNER_NEXT) continue;
+      if (cum[i] - cum[i - 1] > CORNER_SEG || cum[i + 1] - cum[i] > CORNER_SEG) continue;
+      kinds[kind] = (kinds[kind] || 0) + 1;
+      bad.push({ kind, x: p[i][0], y: p[i][1], ...(kind === 'our' || kind === 'opposite' ? { s: Math.round(cum[i]) } : {}), mag: t[i] / CORNER, info: `${kind} track turns ${t[i].toFixed(2)}° at one vertex` });
+    }
+  }
+  const c = check('track-corners', n, bad);
+  c.kinds = kinds;
+  return c;
+}
+
 function trackJoins(g) {
   const ends = [];
   for (const t of g.data.tracks || []) {
@@ -630,7 +798,7 @@ function trackSpacing(g) {
   const r = g.route, b = g.backRoute, sw = (g.data.switches || []).map((w) => w.s ?? w), bad = new Map();
   let n = 0;
   if (!b) return check('tracks-apart', 0, []);
-  // (interlaced track, under 1.8 m apart, and 40 m around it: as src/trackfix.js)
+  // (interlaced track, under 1.8 m apart, and 40 m around it: a gauntlet, not two tracks too close)
   const gaunt = [];
   for (let s = 0; s < r.length; s += 2) { const p = r.at(s), q = b.nearest(p.x, p.y); if (q && q.d < 1.8) gaunt.push([s - 40, s + 40]); }
   for (let s = 0; s < r.length; s += 2) {
@@ -916,6 +1084,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     streetWaviness: streetWaviness(g),
     terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
+    surveyOverTrack: surveyOverTrack(g),
     cantedRailVisibility: cantedRailVisibility(g, world),
     verticalCurves: verticalCurves(g, geometryFact(truth, 'vertical-radius-street')),
     steppedCurves: steppedCurves(g),
@@ -923,6 +1092,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     trackSpacing: trackSpacing(g),
     trackRadius: trackRadius(g, geometryFact(truth, 'min-radius-network'), geometryFact(truth, 'min-radius-passenger')),
     trackJoins: trackJoins(g),
+    trackCorners: trackCorners(g),
     trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """data/truth.json: every section names its reader, and the facts the code reads are there (#224):
 python -I tools/test_truth.py"""
 import json

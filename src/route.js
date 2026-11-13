@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Route geometry along the line: arc-length parameterised polyline in local metres
 // (x = east, y = north). Three.js world uses (x, height, -y).
+import { SMALL_RADIUS } from './speedSigns.js';
 
 // Resample a polyline every `step` metres of its arc length and smooth it with a Gaussian
 // window (the window shrinks symmetrically at the ends, so end points stay put). OSM draws
-// curves as straight segments; this turns them into continuous curves. Returns the points
-// and their arc-length positions along the ORIGINAL polyline. `radius` may be a function of that
-// arc length: surveyed track (DI, the archived DTMP axes; #20) is already curved and is only resampled.
-// A radius of 0 resamples only (a window under one step still averaged three points).
+// streets as straight segments; this turns them into continuous curves (the cars' and walkers'
+// paths). Returns the points and their arc-length positions along the ORIGINAL polyline. `radius`
+// may be a function of that arc length. A radius of 0 resamples only (a window under one step
+// still averaged three points). The track is not smoothed: the build draws it as curves (#204, #477).
 export function smoothPolyline(pts, step = 1, radius = 6) {
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
@@ -39,96 +41,38 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
   return { pts: out, s: ss };
 }
 
-// The track beyond the ends of a route: the GTFS path starts and ends at the terminus stops, but a
-// two-car set standing there reaches 30 m further back. Walk the OSM track chains from each end
-// (continuing across chain joints in the most aligned direction) for `len` metres; where no track
-// continues, go straight on. Returns {before, after} point lists (before runs towards the start).
-export function extendAlongTracks(tracks, pts, len = 60) {
-  const walk = (p, dx, dy) => {
-    const out = [];
-    let cur = [p[0], p[1]], hx = dx, hy = dy, left = len, guard = 0;
-    while (left > 0 && guard++ < 20) {
-      // the chain segment through cur that heads our way
-      let best = null;
-      for (const t of tracks) {
-        const q = t.p;
-        for (let i = 0; i < q.length - 1; i++) {
-          const ax = q[i][0], ay = q[i][1], bx = q[i + 1][0], by = q[i + 1][1];
-          const sx = bx - ax, sy = by - ay, l2 = sx * sx + sy * sy;
-          if (!l2) continue;
-          const u = Math.max(0, Math.min(1, ((cur[0] - ax) * sx + (cur[1] - ay) * sy) / l2));
-          const d = Math.hypot(ax + sx * u - cur[0], ay + sy * u - cur[1]);
-          if (d > 1.5) continue;
-          const l = Math.sqrt(l2), dot = (sx * hx + sy * hy) / l;
-          if (Math.abs(dot) < 0.6) continue;
-          // forward along the chain = increasing index if the segment points our way
-          const score = d - Math.abs(dot);
-          if (!best || score < best.score) best = { score, q, i, u, fwd: dot > 0 };
-        }
-      }
-      if (!best) break;
-      const { q, fwd } = best;
-      let i = best.i;
-      const seq = [];
-      if (fwd) for (let k = i + 1; k < q.length; k++) seq.push(q[k]);
-      else for (let k = i; k >= 0; k--) seq.push(q[k]);
-      let moved = false;
-      for (const n of seq) {
-        const l = Math.hypot(n[0] - cur[0], n[1] - cur[1]);
-        if (l < 0.05) continue;
-        if (l >= left) { cur = [cur[0] + (n[0] - cur[0]) * left / l, cur[1] + (n[1] - cur[1]) * left / l]; out.push(cur); left = 0; moved = true; break; }
-        hx = (n[0] - cur[0]) / l; hy = (n[1] - cur[1]) / l;
-        cur = [n[0], n[1]]; out.push(cur); left -= l; moved = true;
-      }
-      if (!moved) break;
-    }
-    if (left > 0) out.push([cur[0] + hx * left, cur[1] + hy * left]); // no track: straight on
-    return out;
-  };
-  const n = pts.length;
-  const h0 = [pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]], l0 = Math.hypot(...h0) || 1;
-  const h1 = [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1]], l1 = Math.hypot(...h1) || 1;
-  return { before: walk(pts[0], h0[0] / l0, h0[1] / l0).reverse(), after: walk(pts[n - 1], h1[0] / l1, h1[1] / l1) };
+// The line data is built with its track drawn as curves (`trackCurve`, tools/track_curve.py, #204), the run past
+// both termini (`pathExt`, tools/route.py, #477) and the route's radius and cant (`curvature`, `cant`, tools/cant.py,
+// #478), its track styles with the rails' height over the bed (`styles`, `lift`, tools/track_styles.py, #479, #480),
+// its top of rail (`heights`, tools/line_heights.py), its structures (`spans`, `realDecks`, `underpasses`,
+// tools/line_structures.py, #480) and its paved track's cross level (`crossLevel`, tools/cross_level.py, #538): the page smooths no track, walks none and works out no curve, style or profile
+// (#276 step 2). Data built before them does not load.
+export function checkBuiltRoute(data) {
+  const missing = ['trackCurve', 'pathExt', 'curvature', 'cant', 'styles', 'lift', 'heights', 'spans', 'realDecks', 'underpasses', 'crossLevel'].filter((k) => !data[k]);
+  if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(', ')}: built before #480, rebuild it (tools/rebuild.py)`);
 }
 
-// Track geometry from a survey (the line data's trackSource ranges and track chains' `src`, #20) is drawn
-// as it is: smoothing it would pull a tight curve inside the real one (an 18 m curve: 0.2 m with the 6 m
-// window). OSM fill keeps the window, unless the build already drew all of it as smooth curves (the line
-// data's `trackCurve`, tools/track_curve.py, #204): those are resampled only (AS_CURVED). Averaging three
-// points 1.5 m apart turned a 0.9° joint of the build at Strossmayerovo náměstí into 3.7° at the end of a 4.6 m
-// piece.
-export const SURVEYED = new Set(['di', 'dtmp']);
-export const SMOOTH = 6, AS_SURVEYED = 0.1, AS_CURVED = 0;
-function radiusAlong(ranges, offset = 0, curved = false) {
-  if (curved) return AS_CURVED;
-  if (!ranges?.length) return SMOOTH;
-  return (s) => {
-    const x = s - offset;
-    const r = ranges.find(([a, b]) => x >= a && x <= b) || (x < ranges[0][0] ? ranges[0] : ranges[ranges.length - 1]);
-    return SURVEYED.has(r[2]) ? AS_SURVEYED : SMOOTH;
-  };
-}
-
-// curve speeds: comfortable unbalanced lateral acceleration (m/s2) and the largest cant (m)
-const A_LAT = 0.8, CANT_MAX = 0.1;
+// the unbalanced lateral acceleration (m/s2) a curve's limit takes where the route has no `curveAccel` (_designSpeed)
+const A_LAT = 0.8;
 // m a curve's limit starts before the radius asks for it: the 16 m estimate reads a curve's start late (its full radius
 // about 12 m in, where the transition is short), and the limit is for the front going in
 const CURVE_AHEAD = 5;
 
 export class Route {
-  // `ext` = {before, after}: track beyond the ends (extendAlongTracks), at negative s / past length
-  constructor(pts, ext = null, sources = null, curved = false) {
-    // smooth curves but keep the original arc-length parameter (stops, switches and
-    // signals were measured along the unsmoothed OSM path)
+  // `ext` = {before, after}: the track past the ends (the line data's `pathExt`), at negative s / past length
+  constructor(pts, ext = null) {
+    // the build's points as they are, s along them (stops, switches and signals are measured along the path).
+    // (Resampled every metre, the chords cut each point of a curve by about a quarter of its turn: 1.0-1.9 cm on
+    // lines 9, 22 and 23, over the 1 cm the build is held to, #477)
     const before = ext?.before || [], after = ext?.after || [];
     const all = [...before, ...pts, ...after];
-    let s0 = 0; // arc length of the run-in = where the original path starts
-    for (let i = 1; i <= before.length; i++) s0 += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
+    const s = new Float64Array(all.length);
+    for (let i = 1; i < all.length; i++) s[i] = s[i - 1] + Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
+    const s0 = s[before.length]; // arc length of the run-in = where the path starts
     let L = 0;
     for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    const sm = smoothPolyline(all, 1, radiusAlong(sources, s0, curved));
-    this.pts = sm.pts;
-    this.s = Array.from(sm.s, (v) => v - s0);
+    this.pts = all.map((p) => [p[0], p[1]]);
+    this.s = Array.from(s, (v) => v - s0);
     this.length = L; // the route itself ends here; the run-out continues past it
     this.coarse = this.pts.filter((_, i) => i % 8 === 0); // for the minimap
     this._buildSamples();
@@ -251,11 +195,22 @@ export class Route {
     return out;
   }
 
-  // Curve radius (m) at s itself, from heading change over 16 m.
+  // The radius and the cant the build worked out for this route (tools/cant.py, #478): `curv` the line data's
+  // `curvature` (K / r every metre, 0 where straight) for this path, `cant` the line data's `cant` (our route only);
+  // `cross` this path's cross level in paved track where the road tilts across it (tools/cross_level.py, #538:
+  // `crossLevel.path` or `.pathBack`, in `unit`): it adds to the lean and the rails' tilt, not to the curves' speed.
+  useBuilt(curv, unit, cant = null, cross = null) {
+    this.curv = curv;
+    this.curvUnit = unit;
+    this.radii = null;
+    if (cant) this.cant = { step: cant.step, c: Float32Array.from(cant.c, (v) => v * cant.unit) };
+    if (cross?.c) this.cross = { step: cross.step, c: Float32Array.from(cross.c, (v) => v * cross.unit) };
+  }
+
+  // Curve radius (m) at s: the heading change over 16 m around the nearest metre, as the build read it
   _radius(s) {
-    const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
-    const dTheta = Math.acos(Math.max(-1, Math.min(1, a.hx * b.hx + a.hy * b.hy)));
-    return dTheta > 1e-4 ? 16 / dTheta : 1e6;
+    const k = this.curv[Math.max(0, Math.min(this.curv.length - 1, Math.round(s)))];
+    return k ? 1 / (k * this.curvUnit) : 1e6;
   }
 
   // The same at the nearest 5 m, for what is read many times a frame.
@@ -277,43 +232,9 @@ export class Route {
     return { osm: I.osm[k], dedicated: !!I.dedicated[k] };
   }
 
-  // Cant (superelevation) profile along the route, every 2 m, signed (+ = the left rail lower, the
-  // tram leans left). Only on dedicated track, which has no road surface to keep level, and not at
-  // stops (a platform edge stays level with the doors) nor near the ends of the route (terminus
-  // loops, depots). The cant a curve gets is 60 % of the balanced cant v² / (g R) · 1.5 m at the
-  // speed the curve allows with full cant, at most 100 mm; it runs in and out linearly at most
-  // 100 mm per 30 m (a transition curve), then is smoothed, so the tram and the view roll gently.
-  // `stops`: [{p0, p1}] platform stretches along the route.
-  prepareCant(stops = []) {
-    const step = 2, n = Math.ceil(this.length / step) + 1;
-    const c = new Float32Array(n);
-    const level = (s) => s < 150 || s > this.length - 150 || stops.some((st) => s > st.p0 - 25 && s < st.p1 + 25);
-    for (let i = 0; i < n; i++) {
-      const s = i * step;
-      if (!this._speedInfo(s).dedicated || level(s)) continue;
-      const a = this.heading(s - 8, 4), b = this.heading(s + 8, 4);
-      const turn = Math.atan2(a.hx * b.hy - a.hy * b.hx, a.hx * b.hx + a.hy * b.hy); // over 16 m
-      const r = Math.abs(turn) > 1e-4 ? 16 / Math.abs(turn) : 1e6;
-      if (r > 1500) continue;
-      const v = this._designSpeed(s, r, true) / 3.6;
-      c[i] = Math.sign(turn) * Math.min(CANT_MAX, 0.6 * 1.5 * v * v / (9.81 * r));
-    }
-    // run-in / run-out ramps: at most CANT_MAX per 30 m, both ways, towards zero first
-    const d = (CANT_MAX / 30) * step;
-    for (let pass = 0; pass < 2; pass++) {
-      for (let i = 1; i < n; i++) c[i] = Math.sign(c[i]) * Math.min(Math.abs(c[i]), Math.abs(c[i - 1]) + d) * (Math.sign(c[i]) === Math.sign(c[i - 1]) || !c[i - 1] ? 1 : 0);
-      for (let i = n - 2; i >= 0; i--) c[i] = Math.sign(c[i]) * Math.min(Math.abs(c[i]), Math.abs(c[i + 1]) + d) * (Math.sign(c[i]) === Math.sign(c[i + 1]) || !c[i + 1] ? 1 : 0);
-    }
-    // smooth over ±6 m (the ramp corners)
-    const out = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      let sum = 0, w = 0;
-      for (let k = -3; k <= 3; k++) { const j = i + k; if (j < 0 || j >= n) continue; const ww = 4 - Math.abs(k); sum += c[j] * ww; w += ww; }
-      out[i] = sum / w;
-    }
-    this.cant = { step, c: out };
-  }
-
+  // Cant (superelevation) along the route, every 2 m, signed (+ = the left rail lower, the tram leans left): the build's
+  // (tools/cant.py, `useBuilt`). Only on dedicated track, level at stops and near the route's ends, ramps of at most
+  // 100 mm per 30 m.
   _cantSigned(s) {
     const C = this.cant;
     if (!C) return 0;
@@ -324,34 +245,44 @@ export class Route {
   // cant (m) at s
   cantAt(s) { return Math.abs(this._cantSigned(s)); }
 
-  // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
-  rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
+  // cross level (m, signed as the cant) at s: the road's tilt across paved track (useBuilt)
+  crossAt(s) {
+    const C = this.cross;
+    if (!C) return 0;
+    const f = Math.max(0, Math.min(C.c.length - 1.001, s / C.step)), i = Math.floor(f), u = f - i;
+    return C.c[i] * (1 - u) + C.c[i + 1] * u;
+  }
 
-  // Speed a curve of radius r allows (km/h) with the given cant credit: unbalanced lateral acceleration A_LAT plus what
-  // the cant takes. With full cant, the speed the track was laid out for (prepareCant): 50 in streets, 60 on dedicated
-  // track, however it is signed. Otherwise the limit: never above the posted speed, which stands for the sign, nor
-  // the car's top speed (`speedTop`), and 50 without a posted speed (`max-speed`: more needs a Rychlostník, also off the
-  // road). No curve alone asks for less than `curveFloor`: 15 km/h over the whole of a curve under 25 m
-  // (`small-radius-speed`), while the formula gave 10 at R 20.
-  _designSpeed(s, r, fullCant, cant = 0) {
-    const { osm, dedicated } = this._speedInfo(s);
-    const a = A_LAT + (fullCant ? (dedicated ? CANT_MAX : 0) : cant) * 9.81 / 1.5;
-    const v = Math.floor((Math.sqrt(a * r) * 3.6) / 5) * 5;
-    if (fullCant) return Math.max(10, Math.min(Math.min(60, osm || (dedicated ? 60 : 50)), v));
+  // signed lean of a tram at s (rad, + = towards the left): the curve's cant and the road's cross level (at most the
+  // cant's 100 mm together, tools/cant.py CANT_MAX)
+  rollAt(s) { return Math.atan2(Math.max(-0.1, Math.min(0.1, this._cantSigned(s) + this.crossAt(s))), 1.5); }
+
+  // Speed a curve of radius r allows (km/h) with the given cant credit (the cant's own design speed is the build's,
+  // tools/cant.py): the limit, in whole km/h, as no sign stands at such a curve: unbalanced `curveAccel`
+  // (`curve-lateral-acceleration`) plus what the cant takes. The drivers of two line 23 rides took the unsigned curves of
+  // R 30-60 m at 1.2-1.6 m/s², where 0.8 and the 5 km/h steps held the autopilot 6-14 km/h under them (#451). Never above
+  // the posted speed, which stands for the sign, nor the car's top speed (`speedTop`), and 50 without a posted speed
+  // (`max-speed`: more needs a Rychlostník, also off the road). A curve under SMALL_RADIUS has its sign: `curveFloor`,
+  // 15 km/h over the whole of it (`small-radius-speed`).
+  _designSpeed(s, r, cant = 0, accel = this.curveAccel) {
+    const { osm } = this._speedInfo(s);
+    const floor = this.curveFloor ?? 10;
+    const v = r < SMALL_RADIUS ? floor : Math.max(floor, Math.floor(Math.sqrt(((accel ?? A_LAT) + cant * 9.81 / 1.5) * r) * 3.6));
     const cap = osm ? Math.min(osm, this.speedTop ?? osm) : 50;
-    return Math.min(cap, Math.max(this.curveFloor ?? 10, v));
+    return Math.min(cap, v);
   }
 
   // speed the curve at s allows (km/h), with the cant actually built there
-  curveSpeed(s) { return this._designSpeed(s, this._radius(s), false, this.cantAt(s)); }
+  curveSpeed(s, accel = this.curveAccel) { return this._designSpeed(s, this._radius(s), this.cantAt(s), accel); }
 
   // Speed limits (km/h) to the metre: the curve and the posted speed (curveSpeed), `past` metres on from where they ask
   // for it (`restriction-past`: 15 m on until #211, from 5 m bins) and CURVE_AHEAD before, plus the extra restrictions,
-  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs).
-  speedLimits(extra = [], past = 0) {
+  // which bring their own ends. `values` is the same every 5 m, each bin its lowest (the signs). `accel`: the curves' unbalanced
+  // lateral acceleration, the route's own unless the autopilot asks for its milder curves (#242).
+  speedLimits(extra = [], past = 0, accel = this.curveAccel) {
     const step = 5, metres = Math.ceil(this.length) + 1;
     const curve = new Float32Array(metres);
-    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m);
+    for (let m = 0; m < metres; m++) curve[m] = this.curveSpeed(m, accel);
     const base = new Float32Array(metres);
     for (let m = 0; m < metres; m++) {
       let v = 99;

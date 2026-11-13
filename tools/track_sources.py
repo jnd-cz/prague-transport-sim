@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Where a line's track did not come from DI (#20, #237).
 
     python -P -E tools/track_sources.py --line 17            # print the findings

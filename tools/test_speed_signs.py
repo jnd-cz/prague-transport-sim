@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The speed signs' placement rule and faces (src/speedSigns.js) and the speeds over trackwork (src/speedRules.js, #211), in headless Chromium:
 
     python -P -E tools/test_speed_signs.py
@@ -8,11 +9,17 @@ import faulthandler
 import functools
 import http.server
 import json
+import math
 import os
 import sys
 import threading
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
+import cant  # noqa: E402
+import route  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
@@ -61,9 +68,21 @@ async () => {
 }
 """
 
+def arc_curvature():
+    """The test arc of SPEED_RULES (a straight, a 30 m quarter turn without transition, a straight) and its curvature as
+    the build works it out (tools/cant.py): the page reads the radius, it no longer computes it (#478)."""
+    arc = [(float(x), 0.0) for x in range(0, 201)]
+    R, turn, t = 30, math.pi / 2, 1 / 30
+    while t < turn:
+        arc.append((200 + R * math.sin(t), R - R * math.cos(t)))
+        t += 1 / R
+    arc += [(200.0 + R, float(R + y)) for y in range(0, 201)]
+    return {"k": cant.curvature(route.Route(arc)), "unit": 1 / cant.K}
+
+
 SPEED_RULES = r"""
-async () => {
-  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, stopPassPoints, FROG } = await import('/src/speedRules.js');
+async (built) => {
+  const { speedFacts, trackworkStretches, withoutOwnPieces, placeStretches, stopPassPoints, FROG, derailRisk, DERAIL } = await import('/src/speedRules.js');
   const { signFacts } = await import('/src/speedSigns.js');
   const { Route } = await import('/src/route.js');
   const truth = await (await fetch('/data/truth.json')).json();
@@ -81,12 +100,14 @@ async () => {
   for (let t = 1 / R; t < turn; t += 1 / R) arc.push([200 + R * Math.sin(t), R - R * Math.cos(t)]);
   for (let y = 0; y <= 200; y += 1) arc.push([200 + R, R + y]);
   const route = new Route(arc);
+  route.useBuilt(built.k, built.unit); // (the radius as tools/cant.py builds it for this arc: test_arc_curvature)
   const end = 200 + curveLen;
   const window = (past) => {
     const lim = route.speedLimits([], past);
     let lowest = 99, last = 0, top = 0;
     for (let m = 150; m < 330; m++) lowest = Math.min(lowest, lim.at(m));
-    for (let m = 150; m < 330; m++) { if (lim.at(m) === lowest) last = m; if (lim.at(m) < 50) top = m; }
+    // (the curve's own speed to within 1 km/h: in whole km/h since #451, the 16 m estimate eases it off over the curve's last metres)
+    for (let m = 150; m < 330; m++) { if (lim.at(m) <= lowest + 1) last = m; if (lim.at(m) < 50) top = m; }
     return { lowest, last, top };
   };
   const ladder = route.speedLimits([{ from: 100, to: 110, v: 15 }], 2);
@@ -108,6 +129,21 @@ async () => {
     ownDropped: own(fill([50, 19], [15, 4], [50, 5]), work),
     farKept: own(fill([50, 40], [15, 2], [50, 5]), { trailing: [], crossings: [] }),
     withoutWork: own(fill([50, 19], [15, 4], [50, 5]), null),
+    // a curve's limit by its radius as the game sets the route up (#451) (the speed a curve's cant is laid out for: tools/test_cant.py)
+    curve: (() => {
+      const ds = (r, osm = 0, cant = 0) => Route.prototype._designSpeed.call({ _speedInfo: () => ({ osm, dedicated: false }), curveFloor: facts.smallRadius,
+        curveAccel: facts.curveAccel, speedTop: 65 }, 0, r, cant);
+      return { r54: ds(54), r30: ds(30), r25: ds(25), r24: ds(24), posted20: ds(54, 20), canted: ds(54, 0, 0.05), open: ds(1000), posted60: ds(1000, 60) };
+    })(),
+    // derailment: R 54 m at 39 and 40 km/h, the same with 100 mm of cant, a 15 km/h switch at 100-110 m under the front or the rear
+    derail: (() => {
+      const lim = { restriction: (x) => (x >= 100 && x <= 110 ? 15 : 99) };
+      const curve = (R, cant = 0) => ({ radiusAt: () => R, cantAt: () => cant }), straight = curve(1e6);
+      return { at39: derailRisk(curve(54), lim, 500, 15, 39 / 3.6), at40: derailRisk(curve(54), lim, 500, 15, 40 / 3.6),
+        canted: derailRisk(curve(54, 0.1), lim, 500, 15, 40 / 3.6), switch22: derailRisk(straight, lim, 105, 15, 22 / 3.6),
+        switch23: derailRisk(straight, lim, 105, 15, 23 / 3.6), rear: derailRisk(straight, lim, 120, 15, 23 / 3.6),
+        past: derailRisk(straight, lim, 130, 15, 23 / 3.6), DERAIL };
+    })(),
   };
 }
 """
@@ -260,7 +296,7 @@ def check_rules(r):
     want("R07 at the press release's speeds", [(w["straight"], w["diverging"]) for w in r["signs"]["speedSwitches"]][:1], [(50, 35)])
     want("Trojská's dangerous gradient", [(g["from"], g["to"], g["descending"], g["permille"]) for g in r["signs"]["gradients"]], [("Hercovka", "Nad Trojou", True, 80)])
     want("the facts by id", r["facts"], {"facing": 15, "trailingDiverging": 15, "trailingStraight": 30, "crossing": 15, "general": 50, "smallRadius": 15,
-                                         "past": 0, "loop": 15, "stopPass": 30, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
+                                         "past": 0, "loop": 15, "stopPass": 30, "curveAccel": 1.0, "places": [{"from": "Hercovka", "to": "Nad Trojou", "v": 25}]})
     if "no value" not in (r["missing"] or ""):
         f.append(f"a missing fact must stop the game: {r['missing']}")
     want("switches from the blades to the frog, 15 km/h, whichever way they are set", r["noData"], [{"from": 96, "to": 100 + r["FROG"], "v": 15}])
@@ -291,6 +327,13 @@ def check_rules(r):
     want("OSM's 15 at a switch is the switch's own", r["ownDropped"], [50] * 19 + [0] * 4 + [50] * 5)
     want("a 15 elsewhere stays", r["farKept"], [50] * 40 + [15] * 2 + [50] * 5)
     want("without the line's trackwork OSM's 15 stays", r["withoutWork"], [50] * 19 + [15] * 4 + [50] * 5)
+    c = r["curve"]
+    want("an unsigned curve at 1.0 m/s² in whole km/h, 15 under R 25 m, under the posted speed and the cant's credit (#451)",
+         [c["r54"], c["r30"], c["r25"], c["r24"], c["posted20"], c["canted"], c["open"], c["posted60"]], [26, 19, 18, 15, 20, 30, 50, 60])
+    d = r["derail"]
+    want("derailment: over 2.25 m/s² in a curve, less the cant, or 1.5 times a switch's 15 under any part of the tram",
+         [d["at39"], d["at40"], d["canted"], d["switch22"], d["switch23"], d["rear"], d["past"]], [None, "curve", None, None, "trackwork", "trackwork", None])
+    want("for a second on end", d["DERAIL"]["secs"], 1)
     return f
 
 
@@ -304,14 +347,14 @@ def main():
     base = f"http://127.0.0.1:{server.server_port}"
     errors = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = gpu.launch(p)[0]
         page = browser.new_page(viewport={"width": 1180, "height": 800}, device_scale_factor=2)
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.route(base + "/__signs.html", lambda route: route.fulfill(content_type="text/html", body="<!doctype html><html><body></body></html>"))
         page.goto(base + "/__signs.html")
         rules = page.evaluate(RULES)
         pixels = page.evaluate(PIXELS)
-        speed_rules = page.evaluate(SPEED_RULES) if os.path.exists(os.path.join(ROOT, "data", "truth.json")) else None
+        speed_rules = page.evaluate(SPEED_RULES, arc_curvature()) if os.path.exists(os.path.join(ROOT, "data", "truth.json")) else None
         if a.sheet:
             page.evaluate(SHEET)
             page.screenshot(path=a.sheet, full_page=True)

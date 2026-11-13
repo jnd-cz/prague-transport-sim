@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Compare working data with published cache blobs, per class and place (#158).
 
     python -I tools/datadiff.py --line 17 dtm

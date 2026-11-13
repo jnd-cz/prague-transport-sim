@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Import the Prague Digital Technical Map (DTM, open part: ZPS) along a built line.
 
 DTM Praha open data, "Základní prostorová situace" per city district (městská část), GeoPackage,
@@ -10,7 +11,8 @@ are documented in docs/decisions/2026-10-27-track-source.md. This tool imports Z
 Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<district KR dir> ...
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)
 Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes],
-"k": kerb edges (raised areas)}]}; kerbs: tools/kerbs.py
+"k": kerb edges (raised areas)}], "shelters": [shelter footprints filled in the platforms]}; kerbs: tools/kerbs.py;
+shelters: tools/zps_shelters.py
 """
 import json
 import math
@@ -28,6 +30,8 @@ from dtm_packages import DTM, select_packages  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
+import heavy  # noqa: E402
+heavy.turn(f"dtm {LINE}")  # (a heavy job run alone, ~60 s; under rebuild.py in its turn, #536)
 
 # area classes by the DTM object type code at the end of the layer name
 CLASSES = {
@@ -94,28 +98,32 @@ zgrid = defaultdict(list)
 wall_lines = []  # the survey's walls and terrain edges (tools/kerbs.py: an edge along one is not a kerb)
 WALLS = ("Hranice_zdi", "Zeď", "Terénní_hrana")
 packages = select_packages(ROOT, sources=SOURCES) if SOURCES else select_packages(ROOT, districts=DTM[LINE])
-for package in packages:
-    kr = package.kr
-    print(f"district: {package.district}, month {package.date}")
-    for t, info in gpkg.layers(kr).items():
-        wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
-        if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
-            continue
-        for f in gpkg.features(kr, t):
-            g = f["geom"]
-            if not g:
+
+
+def read_lines(keep):
+    """The 3D lines' heights (zkey, zgrid) and the walls (wall_lines), of the lines keep() lets through (gpkg.features)."""
+    for package in packages:
+        kr = package.kr
+        print(f"district: {package.district}, month {package.date}")
+        for t, info in gpkg.layers(kr).items():
+            wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
+            if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
                 continue
-            parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
-            lvl = f.get("UrovenUmisteniObjektuZPS") or 0
-            if wall:
-                wall_lines += [[local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1]
-            if "Hranice" not in t:
-                continue
-            for pts in parts:
-                for x, y, z in pts:
-                    if z:
-                        zkey[(round(x, 2), round(y, 2))].add((z, lvl))
-                        zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
+            for f in gpkg.features(kr, t, keep=keep):
+                g = f["geom"]
+                if not g:
+                    continue
+                parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
+                lvl = f.get("UrovenUmisteniObjektuZPS") or 0
+                if wall:
+                    wall_lines.extend([local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1)
+                if "Hranice" not in t:
+                    continue
+                for pts in parts:
+                    for x, y, z in pts:
+                        if z:
+                            zkey[(round(x, 2), round(y, 2))].add((z, lvl))
+                            zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
 
 def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
@@ -200,8 +208,10 @@ def fill_along(r, zs):
 # few cm, a ramp a slope; stairs and walls are their own classes)
 SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "platform", "paved"}
 n_spikes = defaultdict(int)
+import numpy as np  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
-_ipr = IprDtm()  # (the IPR 1 m terrain: the spikes' judge here, the kerbs' reference below)
+import zps_ground  # noqa: E402
+_ipr = IprDtm()  # (the IPR 1 m terrain: the ground level's reference, the spikes' judge, the kerbs' reference below)
 
 
 def terrain(x, y):
@@ -244,14 +254,44 @@ def despike(r, zs, cls):
     return fill_along(r, out)
 
 
+DECK_OVER = 2.0  # m over a ground-level area's own ground: a deck's height on a shared line, not a kerb or a step
+n_deck = 0
+
+
+def ground_refs(r):
+    """IPR's ground 1 m inside the area from each vertex of a ring (S-JTSK), the line's coarse grid where IPR has none.
+    Not the coarse grid first: under Divadelní's deck it reads the deck (192.99 m, DMR 5G), which threw out the road
+    5 m below it and the area with it (#446)."""
+    xy = np.array([q[:2] for q in r], float)
+    closed = len(xy) > 1 and (xy[0] == xy[-1]).all()
+    body = xy[:-1] if closed else xy
+    pin = zps_ground.inner_points(body)[0] if len(body) >= 3 else body
+    g = np.asarray(_ipr.sample(pin[:, 0], pin[:, 1]), float)
+    out = [float(z) if math.isfinite(z) else lidar(*local(x, y)) for z, (x, y) in zip(g, body)]
+    return out + out[:1] if closed else out
+
+
 def ring(r, level, cls=None):
     """Local coordinates and heights of a ring, and how many vertices had no surveyed height."""
     loc = [local(x, y) for x, y, *_ in r]
     cands = [candidates(x, y, level) for x, y, *_ in r]
     if level == 0:
+        ref = ground_refs(r)
         # (and nothing at ground level stands 8 m above the bare earth: source typos, a corner at
         # 298.9 m for 198.9 m beside the Modřany estakáda, a group of streets ~75 m too high)
-        cands = [[z for z in c if lidar(*q) - 5 < z < lidar(*q) + 8] for c, q in zip(cands, loc)]
+        cands = [[z for z in c if g - 5 < z < g + 8] for c, g in zip(cands, ref)]
+    if level == 0 and cls not in zps_ground.NOT_GROUND:  # (a wall's or a stair's outline has its top and foot by design)
+        # a ground-level outline that shares its lines with a deck carries the deck's heights with them: under Divadelní's
+        # deck the road's outline reads 193.2-193.3 m at 11 of its 16 corners, 5.3 m over its floor (IPR 187.95), and the
+        # floor's 187.6-187.8 at the rest (#446). A height a line of an upper level has at the same place, over DECK_OVER
+        # above the area's own ground, is the deck's; a corner left with none takes that ground.
+        global n_deck
+        deck = [{z for z, lv in zkey.get((round(x, 2), round(y, 2)), ()) if lv >= 1} for x, y, *_ in r]
+        kept = [[z for z in c if not (z > g + DECK_OVER and z in dz)] for c, g, dz in zip(cands, ref, deck)]
+        n_deck += sum(1 for c, k in zip(cands, kept) if c and not k)
+        cands = [k if k or not c else [round(g, 2)] for c, k, g in zip(cands, kept, ref)]
+        # where lines share the place (a wall's top and foot), the height at the area's own ground
+        cands = [[min(c, key=lambda z: abs(z - g))] if len(c) > 1 else c for c, g in zip(cands, ref)]
     zs = ring_heights(cands)
     missing = sum(1 for z in zs if z is None)
     zs = fill_along(r, zs)
@@ -270,13 +310,18 @@ def ring(r, level, cls=None):
 
 
 seen_areas, n_copies = set(), 0  # (an area on a district border is in both districts' packages, #316)
+# the corridor's areas first (only those whose box reaches a corridor cell are decoded), then the 3D lines and walls whose
+# boxes reach theirs (a vertex's heights come from lines within 10 m of it, the kerbs' walls lie within 3 m of an
+# outline): the 1.9 million lines of line 17's districts decoded and put in the grids were most of its reading (#517)
+found = []
+corridor = gpkg.near(cells, 40, (F.E0, F.N0))
 for package in packages:
     opl = package.opl
     for t in gpkg.layers(opl):
         cls = CLASSES.get(t.split("#")[-1].split("_")[0])
         if not cls:
             continue
-        for f in gpkg.features(opl, t):
+        for f in gpkg.features(opl, t, keep=corridor):
             if not f["geom"]:
                 continue
             for rings in walk(f["geom"]):
@@ -290,15 +335,113 @@ for package in packages:
                     n_copies += 1
                     continue
                 seen_areas.add(same)
-                r0, miss = ring(outer, level, cls)
-                if miss / max(1, len(r0)) > 0.3:
-                    dropped += 1
-                    continue  # mostly unknown heights: would be a flat sheet at a guessed level
-                a = {"c": cls, "l": level, "r": r0}
-                holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
-                if holes:
-                    a["h"] = holes
-                areas.append(a)
+                found.append((cls, level, rings))
+read_lines(gpkg.near_boxes([(min(p[0] for p in r), min(p[1] for p in r), max(p[0] for p in r), max(p[1] for p in r))
+                            for _, _, rings in found for r in rings if r], 5))
+for cls, level, rings in found:
+    outer = rings[0]
+    r0, miss = ring(outer, level, cls)
+    if miss / max(1, len(r0)) > 0.3:
+        dropped += 1
+        continue  # mostly unknown heights: would be a flat sheet at a guessed level
+    a = {"c": cls, "l": level, "r": r0}
+    holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
+    if holes:
+        a["h"] = holes
+    areas.append(a)
+
+# the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
+# stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
+import dmr5g  # noqa: E402
+import zps_decks  # noqa: E402
+_truth_path = os.path.join(ROOT, "data", "truth.json")
+_facts = json.load(open(_truth_path, encoding="utf-8")) if os.path.exists(_truth_path) else {}
+_osm_cover, _changing, _buildings, _under_ways = [], [], [], []
+try:
+    import osm_local
+    if osm_local.available():
+        _pts = line["path"] + line.get("pathBack", [])
+        _osm_cover = zps_ground.osm_covers(osm_local.ways(zps_ground.is_cover, bbox=F.bbox(_pts, 150)), F)
+        _changing = zps_ground.osm_covers(osm_local.ways(zps_ground.is_changing, bbox=F.bbox(_pts, 150)), F)
+        _buildings = zps_ground.osm_covers(osm_local.ways(lambda t: "building" in t, bbox=F.bbox(_pts, 220)), F)
+        _under_ways = osm_local.ways(zps_decks.is_under, bbox=F.bbox(_pts, 150))
+except ImportError:
+    pass
+if not _osm_cover:
+    print("survey ground: no OSM covers read (no extract, or no pyosmium): only the survey's upper levels cover")
+_dem = dmr5g.Tiles(directory=os.path.join(ROOT, "raw", "dem"))
+
+
+def _older(E, N):
+    try:
+        return _dem.sample(E, N)
+    except (OSError, ValueError, SystemExit) as e:  # (a tile not in the snapshot: the area goes to review)
+        print(f"survey ground: DMR 5G missing ({e})")
+        return np.full(len(E), np.nan)
+
+
+try:  # (DI's and DTMP's surveyed tracks from raw/: without them the rails decide nothing, and the build says so)
+    from dtmp_tracks import archive_data, di_data
+    _rails = zps_ground.rail_points(di_data()[1] + archive_data()[2])
+except (ImportError, OSError) as e:
+    print(f"survey ground: no surveyed rails ({e}): only DMR 5G decides")
+    _rails = zps_ground.rail_points([])
+ground_verdicts = zps_ground.judge(areas, lambda E, N: _ipr.sample(E, N), _older, zps_ground.cover_union(areas, _osm_cover),
+                                   _rails, F, _facts.get("surveyGround", {}).get("places", []),
+                                   zps_ground.cover_union([], _changing), _facts.get("surveyGround", {}).get("heldRule"),
+                                   zps_ground.cover_union([], _buildings))
+ground_moved = zps_ground.apply(areas, ground_verdicts)
+ground_report = zps_ground.summary(ground_verdicts, ground_moved)
+print("survey ground:", ground_report["areas"], ground_report["m2"], f"{ground_moved} vertices moved")
+_review = zps_ground.review_set(LINE, ground_verdicts)
+_review_path = os.path.join(ROOT, "reports", "review", f"survey-ground-{LINE}.json")
+if _review:
+    with replacing(_review_path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(_review, fh, ensure_ascii=False, indent=1)
+elif os.path.exists(_review_path):
+    os.remove(_review_path)  # (nothing held any more: the set is this build's own)
+
+# the decks (level 1 and up): heights checked against the structure that carries them, flat over the way under them,
+# and their thickness (tools/zps_decks.py, #445)
+from mosty3d import Bridges  # noqa: E402
+_city_ground = lambda x, y: _ipr.sample(np.asarray(x, float) + F.E0, np.asarray(y, float) + F.N0)  # noqa: E731
+_model = zps_decks.Model(Bridges())
+if _model.tree is None:
+    print("decks: no Mosty 3D models (raw/geoportal/mosty3d): only the surveyed rails check the decks")
+_ramps_before = zps_decks.ramps(areas, _city_ground)
+deck_checked = zps_decks.check(areas, _model, zps_decks.Rails(_rails, _city_ground))
+deck_checked["split"] = zps_decks.split(areas, _model, deck_checked["checked"])
+deck_opens = zps_decks.openings(_under_ways, areas, F)
+deck_flat = zps_decks.flatten(areas, deck_opens, _city_ground, deck_checked["checked"])
+deck_report = zps_decks.summary(deck_checked, deck_flat, zps_decks.ramps(areas, _city_ground),
+                                zps_decks.thickness(areas, _model, deck_flat))
+for _h in deck_report["heldAreas"]:
+    _h["lat"], _h["lon"] = (round(float(v), 6) for v in F.ll(_h.pop("x"), _h.pop("y")))
+print("decks:", deck_report["vertices"], f"vertices moved; {deck_report['held']} vertices held under a structure their",
+      f"deck is not on ({len(deck_report['heldAreas'])} areas); {deck_report['over']} over their structure;",
+      f"ramps {_ramps_before} -> {deck_report['ramps']}; decks by thickness {deck_report['decks']};",
+      f"split over decks of several levels {deck_report['split']}")
+for _o in deck_report["openings"]:
+    print(f"  opening: way {_o['way']} {_o['name'] or ''}: {_o.get('sagging', 0)} vertices on the deck's plane, gap",
+          f"{_o.get('gap')} m, maxheight {_o['maxheight']}, deck {_o.get('t')} m ({_o.get('src')}), clearance {_o.get('clearance')} m",
+          "(SHORT)" if zps_decks.is_short(_o) else "")
+
+# the ground level under the decks: in an opening whose floor IPR shows, the streets take IPR's ground; and the classes
+# with heights only on their outline take the lidar inside where they lie on IPR's ground (tools/zps_inside.py, #444)
+import zps_inside  # noqa: E402
+under_report = zps_inside.under_decks(areas, deck_opens, deck_flat, _city_ground)
+inside_report = zps_inside.inside(areas, ground_verdicts, _city_ground)
+print("under decks:", under_report)
+print("lidar inside:", inside_report["classes"], "their sheet fits:", inside_report["fit"], "kept their sheet:",
+      inside_report["kept"])
+
+# the street outlines where the survey alone sets a vertex off and the lidar beside it runs smooth (tools/zps_outline.py,
+# #470); before the kerbs, which read the outline's heights
+import zps_outline  # noqa: E402
+outline_report = zps_outline.correct(
+    areas, _city_ground, [i for i, v in ground_verdicts.items() if v.get("verdict") in zps_outline.HELD],
+    zps_ground.cover_union(areas, _osm_cover))
+print("street outlines:", outline_report["places"], "places moved", outline_report["vertices"], outline_report["sizes"])
 
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
@@ -337,20 +480,34 @@ print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSte
       f"({sum('osmKerb' in e for e in kerb_report['review'])} with an OSM lowered or flush kerb);",
       "not kerbs:", {k: len(v) for k, v in kerb_report["notKerb"].items()})
 
+# the holes shelters leave in the platforms are filled, their footprints kept for the street furniture
+# (tools/zps_shelters.py, #523); after the kerbs, which read a platform's step from the terrain 1 m inside its edge: filled
+# first, three probes over Hloubětín B's shelter tipped its step from the top line to the foot and raised the road 0.235 m
+import zps_shelters  # noqa: E402
+shelter_report = zps_shelters.fill(areas, line.get("platforms", []))
+print("shelters:", shelter_report["filled"], "holes filled", shelter_report["byKind"], shelter_report["kept"],
+      "holes kept (an area of their own in them)")
+
 counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
 print("areas:", dict(sorted(counts.items())))
 print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of an area")
-print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing")
+print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing, "
+      f"{n_deck} ground-level corners on a deck's line given the ground")
 print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
-out = {"areas": areas}
+out = {"areas": areas, "shelters": shelter_report["shelters"]}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
-vertex = {"exact": n_z, "near": n_near, "missing": n_none, "droppedAreas": dropped, "spikes": dict(sorted(n_spikes.items()))}
+vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_deck, "droppedAreas": dropped,
+          "spikes": dict(sorted(n_spikes.items()))}
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
-    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0], checks={"vertexHeights": vertex, "kerbs": kerb_report}),
+    "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
+                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
+                                   "decks": deck_report, "underDecks": under_report, "inside": inside_report,
+                                   "outlines": outline_report,
+                                   "shelters": {k: v for k, v in shelter_report.items() if k != "shelters"}}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])

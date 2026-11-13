@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The validation report's limits and table (#23): python -I tools/test_validation.py"""
 import json
 import os

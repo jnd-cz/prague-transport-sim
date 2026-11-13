@@ -1,6 +1,6 @@
 # Tatra T3 — Prague trams
 
-**English** · [Česky](README.md) · [For developers](DEVELOPING.md)
+**English** · [Česky](README.md) · [For developers](DEVELOPING.md) · [Your own vehicles](docs/vehicles.md)
 
 Tram driving on a Tatra T3 in a 3D Prague built from real data, on lines 9, 17, 22, 23 and 37 (lines 17
 and 22 with their surveyed streets): OpenStreetMap (track network, roads, greenery), the Prague Digital
@@ -64,11 +64,14 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
 | `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |
 | `Z` | right mirror on and off |
+| `,` / `.` | indicators left / right (again: off); given before a turn at a junction and at a stop where passengers cross a car lane (right, from braking into it until pulling away) |
+| `/` (on a Czech keyboard `-`) | hazard lights |
+| `L` | high beams: held, a flash; with `Shift`, on and off |
 | `V` | cab or outside view |
 | `O` | autopilot on and off |
 | `M` | sound on and off |
 | `P` / `Esc` | pause |
-| `F9` | report a problem |
+| `F9` | write to us (feedback) |
 
 The dead-man pedal, when it is on in the menu, is `Shift` held.
 
@@ -191,24 +194,41 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 ### Menu options
 
 - Automatic switches (the onboard computer sets every switch by radio instead of the overhead contacts);
-  performance overlay (FPS, frame time, draw calls, triangles, JS heap).
+  performance overlay (FPS, frame time, draw calls, triangles, JS heap); Performance test and Reference test (a minute
+  of the autopilot on a fixed stretch, [Testing](#testing)).
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic
-  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one.
+  (conflig's model alone, CC BY-NC 4.0, downloaded when picked); or the built-in simple one, with the
+  dimensions and livery of the T3's general-arrangement drawing, no saloon and no moving parts, the lightest
+  to draw. With it the other trams run as T3 (a silver bumper with red stripes), T3SUCS and T3M sets (the T3M
+  with the resistors' box on its roof and its green route display), each type as often as its range of fleet
+  numbers is long.
+- Fleet number: the set you drive, such as the historic 6892 + 6921, 7269 + 7290 or 8080 + 8074, or one number
+  (the second car gets a number of the same type); the game remembers it for each model. "Any" deals yours
+  like the others'. No number runs twice on the street, and no other set is dealt yours.
+- Livery: only for a model with liveries besides its own (none yet): its own, one of them, or "Any", dealt like the
+  others'; the game remembers it for each model. Some of the other sets wear the liveries too.
 
 ### On a phone or tablet
 
 On-screen buttons, shown on a touch screen by default and switched by 🎮 in the menu (remembered per
-device). They send the keyboard's keys:
+device; switched off, 🎮 brings them back during a shift too). They send the keyboard's keys:
 
-- the row above the dashboard: ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
+- the row above the dashboard (sideways, a column at the right): ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
-- ⋯ for the rest: park (advanced controls), switch contact, switch iron, heating cut-out, heating,
-  autopilot, sound, ⚑ report.
+- ⋯ for the rest: indicators ⇦ ⇨, hazard lights ⚠, high beams (a flash held, on and off), park (advanced controls), switch contact, switch iron, heating cut-out, heating,
+  autopilot, sound, ✉ feedback.
 
-On a small screen the dashboard and the top bar are smaller and the minimap is hidden.
+On a small screen the dashboard and the top bar are smaller and the minimap is hidden. A phone held sideways has the
+controller as a column at the right thumb (▲ at the top, STOP at the bottom), the other buttons in two columns at the
+left and the dashboard between them.
+
+**Full screen:** a phone asks once in the menu; with "Full screen", every shift starts in full screen, turned
+sideways where the browser allows it (Chrome on Android), elsewhere the game asks you to turn the phone. ⛶ in the
+menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
+full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
 
 ## Autopilot
 
@@ -218,7 +238,8 @@ equipment work the pedals as a careful driver (the advanced model: pulls away on
 step by step, into a stop on one curve and without going back to the drive pedal unless a tram stands ahead,
 parks while standing, steps 1–4 only within 2.5 s of driving), works the doors, departs on time, rings the bell, sands on
 slippery rail, and under contacts draws current for a turn (the switch button when slow enough, otherwise a short pulse of
-the drive pedal) or coasts (straight). Press **V** for
+the drive pedal) or coasts (straight), and indicates before a turn at a junction and at stops where passengers cross a car
+lane. Press **V** for
 the outside view. Any controller or door key (W/S/Space/N/D/R, 0–5) takes over, in the controls chosen in the
 menu; O hands back to the autopilot.
 
@@ -227,11 +248,34 @@ menu; O hands back to the autopilot.
 The interface and this help are in Czech or English (Settings → Language in the menu; remembered in the
 browser).
 
-<!-- /help -->
+## Testing
+
+The game is in alpha: it can be driven end to end, but the world and the driving are still being built. What
+helps most is how driving and the traffic feel to you.
+
+- **What we ask:** how the controller, pulling away, coasting and braking feel; stops and the timetable;
+  signals, switches and the rules; which terms don't sound like tram drivers'; what breaks the spell.
+- **How to write:** ✉ Feedback (**F9**, on a phone under ⋯) pauses the game and opens a note. It adds the place
+  on the line, the tram's state, the game's version and, if you like, a screenshot, so it's enough to write what
+  you see and how it should be. When the game doesn't start or the graphics stop, the "Send the error to the
+  authors" button sends what happened.
+- **Smoothness:** a performance test in the menu drives a fixed stretch of a line by autopilot for a minute and
+  shows how the game keeps up; you can send the result. Please run the Reference test at least once: always
+  line 17 with the detailed model, so machines compare; the Performance test measures the line you have
+  loaded. After a shift the game asks whether to send its performance summary.
+- **Leave for now:** the ground and kerbs, buildings and street furniture (they come with the next layers of the
+  world), the simplified cars and pedestrians, the synthesised sound, power in steps instead of current through
+  the accelerator, driving in one direction only and the missing depots.
+- **What is sent:** only what you send: the note and with it the place, the game's settings and version, the
+  browser, graphics card, screen size and errors. No name, account or address.
 
 ## Licences
 
-Code: GNU GPL v3 ([LICENSE](LICENSE)). Assets: [ASSETS.md](ASSETS.md) (the detailed T3 model is CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](NOTICE.md).
+The game runs at [sim.8b.cz](https://sim.8b.cz/); its source code is on [GitHub](https://github.com/jnd-cz/prague-transport-sim).
+
+Code and the project's own models (the built-in tram, the pedestrians): GNU AGPL v3 ([LICENSE](https://github.com/jnd-cz/prague-transport-sim/blob/main/LICENSE)). Whoever changes the game and offers it to people over a network must offer them its source code too. Other models and textures: [ASSETS.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/ASSETS.md) (the detailed T3 models are CC BY-NC 4.0). Data sources and attribution: [NOTICE.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/NOTICE.md).
 
 Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
 terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).
+
+<!-- /help -->

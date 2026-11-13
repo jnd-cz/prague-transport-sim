@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Height priority for #20: numeric DI, matched archive, surveyed deck + truth fact (#106).
 
 Flags retain disagreements even when DI wins. Local reviewed evidence resolves flagged fallback

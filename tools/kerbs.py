@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Kerbs for the surveyed street areas (#21): one height becomes two.
 
 The ZPS survey records a kerb as one 3D line (the boundary of the traffic area) with one height, and

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Construction-sensitive survey guards: python -P -E tools/test_track_context.py."""
 import unittest
 from pathlib import Path

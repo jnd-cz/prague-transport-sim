@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The surveyed street surfaces as drawn (#21): waves along the street, seams between neighbouring
 // areas, kerbs between road and sidewalk. Run from the command line:
 //   python -P -E tools/headless.py --lines 17,22 --checks surfaces

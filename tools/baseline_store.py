@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Main's regression baseline in the data store, and the machine's heavy-job lock (#157). Stdlib only:
 tools/headless.py (--baseline --publish, --compare) and tools/autodeploy.py (the nightly measurement)
 use it.
@@ -41,7 +42,7 @@ LOCKS = os.path.join(tempfile.gettempdir(), "tram-heavy")
 
 
 def git(*args, root=ROOT):
-    r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+    r = subprocess.run(["git", *args], cwd=root, capture_output=True, encoding="utf-8")
     return r.stdout.strip() if r.returncode == 0 else None
 
 
@@ -331,7 +332,7 @@ def queue():
 
 def describe(j, now=None):
     """'headless in transport-game-268, running 12 min'"""
-    mins = ((now or time.time()) - j["since"]) / 60
+    mins = max(0.0, ((now or time.time()) - j["since"]) / 60)  # (a ticket written after `now` was read: "-0 min")
     return f"{j['what']} in {os.path.basename(os.path.normpath(j['root']))}, {j['state']} {mins:.0f} min"
 
 

@@ -1,6 +1,6 @@
 # Tatra T3 — pražské tramvaje
 
-**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md)
+**Česky** · [English](README.en.md) · [Pro vývojáře](DEVELOPING.md) · [Vlastní vozidla](docs/vehicles.cs.md)
 
 Řízení tramvaje Tatra T3 v 3D Praze postavené ze skutečných dat, na linkách 9, 17, 22, 23 a 37 (linky 17
 a 22 se zaměřenými ulicemi): OpenStreetMap (kolejová síť, silnice, zeleň), Digitální technická mapa Prahy
@@ -63,11 +63,14 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
+| `,` / `.` | směrovky vlevo / vpravo (znovu: vypnout); dávají se před odbočením na křižovatce a v zastávce, kde cestující přecházejí jízdní pruh (vpravo, od brzdění do rozjezdu) |
+| `/` (na české klávesnici `-`) | výstražná světla |
+| `L` | dálková světla: držením problik, se `Shift` zapnout a vypnout |
 | `V` | pohled ze stanoviště řidiče nebo zvenku |
 | `O` | autopilot zapnout a vypnout |
 | `M` | zvuk zapnout a vypnout |
 | `P` / `Esc` | pauza |
-| `F9` | nahlásit problém |
+| `F9` | napsat nám (zpětná vazba) |
 
 Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
 
@@ -186,24 +189,40 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 ### Volby v menu
 
 - Automatické výhybky (palubní počítač staví každou výhybku rádiem místo trolejových kontaktů); přehled výkonu
-  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS).
+  (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS); Test výkonu a Referenční test (minuta autopilotu na pevném
+  úseku, [Testování](#testování)).
 - Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model
-  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý.
+  od conflig, CC BY-NC 4.0, stáhne se při výběru); nebo vestavěný jednoduchý, s rozměry a nátěrem podle
+  typového výkresu T3, bez interiéru a nehybný, nejlehčí na výkon. S ním jezdí cizí soupravy jako T3 (stříbrný
+  nárazník s červenými proužky), T3SUCS i T3M (T3M s bednou odporníků na střeše a zeleným číslem linky), každý typ
+  tak často, jak dlouhá je jeho řada evidenčních čísel.
+- Evidenční číslo: souprava, kterou jezdíte vy, třeba historické 6892 + 6921, 7269 + 7290 nebo 8080 + 8074,
+  nebo jedno číslo (druhý vůz dostane číslo stejného typu); hra si volbu pamatuje pro každý model.
+  „Libovolné“ přidělí číslo jako ostatním. Žádné číslo nejezdí po ulici dvakrát a vaše nedostane žádná cizí
+  souprava.
+- Nátěr: jen u modelu, který má kromě původního i jiné nátěry (zatím žádný): původní, některý z nich, nebo
+  „Libovolný“, přidělený jako ostatním; hra si volbu pamatuje pro každý model. Nátěry nosí i část cizích souprav.
 
 ### Na telefonu nebo tabletu
 
 Tlačítka na obrazovce, na dotykové obrazovce zobrazená automaticky, přepínaná 🎮 v menu (pamatuje si je
-zařízení). Posílají klávesy klávesnice:
+zařízení; vypnutá je 🎮 vrátí i za jízdy). Posílají klávesy klávesnice:
 
-- řada nad panelem řidiče: ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
+- řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
-  zvuk, ⚑ hlášení.
+- ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
+  zvuk, ✉ zpětná vazba.
 
-Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá.
+Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá. Telefon na šířku má ovládač jako
+sloupec u pravého palce (▲ nahoře, STOP dole), ostatní tlačítka ve dvou sloupcích vlevo a panel řidiče mezi nimi.
+
+**Celá obrazovka:** telefon se jednou zeptá v menu; s „Celá obrazovka“ se každá směna spustí na celé obrazovce,
+otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu ji
+kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí: hra jednou poradí
+Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na celé obrazovce.
 
 ## Autopilot
 
@@ -212,7 +231,8 @@ omezení, zastávek, návěstidel, překážek a tramvaje před sebou, volí sí
 ovládat šlapky jako pečlivý řidič (pokročilý model: na rovině rozjíždí na stupních 1–3, brzdí po stupních, do zastávky
 jednou křivkou a bez návratu na jízdní šlapku, pokud před ním nestojí tramvaj, ve stání zabrzdí zajišťovací brzdou, stupně
 1–4 jen do 2,5 s po jízdě), obsluhuje dveře, odjíždí včas, zvoní, pískuje na kluzké koleji a pod kontakty odebírá proud
-pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně).
+pro odbočení (přepínačem výhybek, když jede dost pomalu, jinak krátkým impulsem jízdní šlapky) nebo jede bez proudu (rovně),
+dává směrovky před odbočením na křižovatce a v zastávkách, kde cestující přecházejí jízdní pruh.
 Klávesou **V** přepnete na pohled zvenku. Řízení převezme
 kterákoli klávesa kontroléru nebo dveří (W/S/mezerník/N/D/R, 0–5), v ovládání zvoleném v menu; O je předá zpět
 autopilotu.
@@ -221,11 +241,33 @@ autopilotu.
 
 Rozhraní i tato nápověda jsou česky nebo anglicky (Nastavení → Jazyk v menu; prohlížeč si volbu pamatuje).
 
-<!-- /help -->
+## Testování
+
+Hra je v alfa verzi: celá jde projet, ale svět i jízda se teprve dodělávají. Nejvíc nám pomůže, jak na vás
+působí řízení a provoz.
+
+- **Na co se ptáme:** jak se ovládá kontrolér, rozjezd, výběh a brzdění; zastávky a jízdní řád; návěsti,
+  výhybky a pravidla; které pojmy nezní jako u řidičů tramvají; co vás při jízdě vytrhne.
+- **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v ⋯) zastaví hru a otevře poznámku. Přiloží místo na
+  lince, stav tramvaje, verzi hry a případně obrázek obrazovky, takže stačí napsat, co vidíte a jak by to mělo
+  být. Když se hra nespustí nebo grafika přestane pracovat, tlačítko „Poslat chybu autorům“ pošle, co se stalo.
+- **Plynulost:** test výkonu v menu minutu jede autopilotem pevný úsek linky a ukáže, jak hra stíhá; výsledek
+  můžete poslat. Prosíme aspoň jednou o Referenční test: vždy linka 17 s podrobným modelem, takže jde porovnat
+  mezi počítači; Test výkonu změří linku, kterou právě máte. Po směně se hra zeptá, jestli poslat její souhrn
+  výkonu.
+- **Zatím nehodnoťte:** terén a obrubníky, budovy a mobiliář (přijdou v dalších vrstvách světa), zjednodušená
+  auta a chodce, syntetizovaný zvuk, výkon po stupních místo proudu přes zrychlovač, jízdu jen jedním směrem a
+  chybějící vozovny.
+- **Co se odesílá:** jen to, co odešlete vy: poznámka a k ní místo, nastavení a verze hry, prohlížeč, grafická
+  karta, velikost obrazovky a chyby. Žádné jméno, účet ani adresa.
 
 ## Licence
 
-Kód: GNU GPL v3 ([LICENSE](LICENSE)). Modely a textury: [ASSETS.md](ASSETS.md) (podrobný model T3 je CC BY-NC 4.0). Zdroje dat a jejich uvedení: [NOTICE.md](NOTICE.md).
+Hra běží na [sim.8b.cz](https://sim.8b.cz/), její zdrojový kód je na [GitHubu](https://github.com/jnd-cz/prague-transport-sim).
+
+Kód a vlastní modely projektu (vestavěná tramvaj, chodci): GNU AGPL v3 ([LICENSE](https://github.com/jnd-cz/prague-transport-sim/blob/main/LICENSE)). Kdo hru upraví a nabídne ji lidem přes síť, musí jim nabídnout i svůj zdrojový kód. Ostatní modely a textury: [ASSETS.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/ASSETS.md) (podrobné modely T3 jsou CC BY-NC 4.0). Zdroje dat a jejich uvedení: [NOTICE.md](https://github.com/jnd-cz/prague-transport-sim/blob/main/NOTICE.md).
 
 Data © přispěvatelé OpenStreetMap (ODbL); jízdní řád PID GTFS, data.pid.cz (CC BY 4.0);
 terén ČÚZK DMR 5G (CC BY 4.0); 3D budovy, opěrné zdi a stromy: datový podklad © IPR Praha (CC BY 4.0).
+
+<!-- /help -->

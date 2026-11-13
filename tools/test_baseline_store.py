@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The nightly baseline's key, inputs, lock and decision (#157, #126): python -I tools/test_baseline_store.py"""
 import datetime
 import glob
@@ -204,6 +205,8 @@ class Queue(unittest.TestCase):
         j, = baseline_store.queue()
         self.assertEqual((j["what"], j["state"], j["root"]), ("headless", "running", "C:/x/transport-game-268"))
         self.assertEqual(baseline_store.describe(j, j["since"] + 600), "headless in transport-game-268, running 10 min")
+        # (a ticket written just after the board read the clock)
+        self.assertEqual(baseline_store.describe(j, j["since"] - 1), "headless in transport-game-268, running 0 min")
 
 
 class Inputs(unittest.TestCase):
