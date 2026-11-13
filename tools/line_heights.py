@@ -1145,6 +1145,7 @@ def write_line(line, lookup, chs):
     """The line's heights: path and pathBack every 2 m, each drawn track's `zs`, with provenance."""
     import sources
     from atomic import replacing
+    t0 = time.time()
     dst = ROOT / 'data' / f'line{line}.json'
     data = json.loads(dst.read_text(encoding='utf-8'))
     heights, src_ranges, metres = {'step': OUT_STEP}, {}, Counter()
@@ -1189,7 +1190,7 @@ def write_line(line, lookup, chs):
              + sum(1 for t in data['tracks'] if len(t['p']) > 1 for z in (t.get('zs') or [None]) if z is None))
     print(f'line {line}: path and pathBack {total:.0f} m: ' + ', '.join(f'{k} {metres[k]:.0f} m' for k in LEVELS if metres[k])
           + f'; {covered} of {len(data["tracks"])} tracks with heights, {track_filled:.0f} m of them the surface; '
-          + f'{nulls} samples without a height; wrote {dst.name}', flush=True)
+          + f'{nulls} samples without a height; wrote {dst.name} ({time.time() - t0:.0f} s)', flush=True)
     data['_nulls'] = nulls
     return heights, src_ranges, data
 
@@ -1388,6 +1389,8 @@ def main():
     nulls = 0
     if len(args.lines) > 1:  # (each line's writing reads only the chains: side by side, ~30 s a line, #511)
         with _pool(len(args.lines), chs) as ex:
+            list(ex.map(int, [0] * len(args.lines)))
+            took('the writing workers started')
             written = list(ex.map(_write, args.lines))
     else:
         written = [write_line(line, lookup, chs)[2] for line in args.lines]
