@@ -190,10 +190,8 @@ def _decide_all(todo, decks, context, guard, pool=None):
 def _pool(decks, context, current, archive):
     """Worker processes with the decks, OSM's tracks and DI's and the archive's segments (#516: one process matched and
     decided the 285 000 DI samples and the lines' 60 000 in most of the heights' 97 s staging)."""
-    from concurrent.futures import ProcessPoolExecutor
     import sysinfo
-    return ProcessPoolExecutor(sysinfo.workers(1.0, most=12), initializer=_worker,
-                               initargs=(decks, context, current, archive))
+    return sysinfo.pool(sysinfo.workers(1.0, most=12), _worker, decks, context, current, archive)
 
 
 def decide(rows, guard, structures, decks, tunnels, context, terrain, pool=None):

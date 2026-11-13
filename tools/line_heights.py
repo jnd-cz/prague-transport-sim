@@ -679,11 +679,10 @@ BLAS = 4  # numpy's BLAS threads per worker: a long chain's solve on one thread 
 def _pool(n, chs=None):
     """Worker processes, n at most: a core per BLAS thread, 1 GB apiece of free memory (tools/sysinfo.py). Their numpy runs
     BLAS threads as this process's do, when rebuild.py gave it 4 (the environment is read at their start, #511)."""
-    from concurrent.futures import ProcessPoolExecutor
     import sysinfo
     os.environ['OPENBLAS_NUM_THREADS'] = str(BLAS)
-    return ProcessPoolExecutor(min(n, sysinfo.workers(1.0, most=max(1, (os.cpu_count() or 4) // BLAS))), initializer=_worker,
-                               initargs=({k: getattr(ha, k) for k in ANSWERS}, chs))
+    return sysinfo.pool(min(n, sysinfo.workers(1.0, most=max(1, (os.cpu_count() or 4) // BLAS))), _worker,
+                        {k: getattr(ha, k) for k in ANSWERS}, chs)
 
 
 def presolve(chs, order, r, pool=None, kept=None):
