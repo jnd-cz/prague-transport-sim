@@ -210,6 +210,9 @@ def decide(rows, guard, structures, decks, tunnels, context, terrain, pool=None)
 
 
 def stage(review):
+    import time
+    t0 = time.time()
+    took = lambda what: print(f'  (staging: {what}, {time.time() - t0:.0f} s)', flush=True)  # noqa: E731
     districts, paths = di_data()
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
@@ -218,19 +221,23 @@ def stage(review):
     terrain = Terrain()
     structures, structure_ids, bridge_pieces = bridge_structures(structures, structure_ids, paths, current, archive,
                                                                  terrain)
+    took('sources, structures and bridges')
     decks = load_decks(ROOT)
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])
+    took('decks and OSM tracks')
     print(f'Matching {len(paths)} DI paths for guarded height staging', flush=True)
     rows = list(samples(current, area))
     pool = _pool(decks, context, current, archive) if len(rows) >= POOL else None
     try:
         for obs, m in zip(rows, _archive_matches([(o['x'], o['y'], o['ux'], o['uy']) for o in rows], archive, pool)):
             obs['archive'] = m
+        took(f'{len(rows)} DI samples matched to the archive')
         conflicts = conflict_records(rows)
         guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
                             review.get('span_reviews', []))
         decide(rows, guard, structures, decks, tunnels, context, terrain, pool)
+        took('DI samples decided')
         # the lines' route samples: each matched to DI here, then decided as DI's samples are (in the workers)
         lines, route_samples, along, hits = [], [], [], []
         for line in (9, 17, 22, 23, 37):
@@ -266,11 +273,13 @@ def stage(review):
         ground = terrain([h['x'] for _, h, _, _ in hits], [h['y'] for _, h, _, _ in hits]) if hits else []
         todo = [(h['x'], h['y'], h['id'], h['z'], t['ux'], t['uy'], m, bool(a), bool(b), g)
                 for (_, h, t, m), a, b, g in zip(hits, on, under, ground)]
+        took(f'{len(todo)} route samples on DI')
         for (row, hit, _, match), t, (surfaces, construction, decision) in zip(
                 hits, todo, _decide_all(todo, decks, context, guard, pool)):
             row['choice'] = ({'id': hit['id'], 'z': hit['z']}, match, hit['x'], hit['y'], t[7], surfaces, t[8],
                              construction, t[9])
             row['decision'] = decision
+        took('route samples decided')
     finally:
         if pool is not None:
             pool.shutdown()
@@ -283,6 +292,7 @@ def stage(review):
                                   'raw_di_z':row.get('raw_di_z'), **row['decision']})
         lines.append({'line': line, **lengths(selected)})
         print(f'line {line}: {json.dumps(lines[-1])}', flush=True)
+    took('holds extended')
     # Geometry and raw source Z are separate from decisions; no archived alignment is added.
     geometry = [
         {
