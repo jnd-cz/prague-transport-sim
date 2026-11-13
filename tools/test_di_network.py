@@ -236,6 +236,11 @@ class Matching(unittest.TestCase):
 
 
 class Drawing(unittest.TestCase):
+    def test_a_stretch_loses_its_2_mm_segment(self):
+        # Národní divadlo, #514: a stretch's end node and its first sample 2 mm apart, read by lint as a 6.8 deg corner
+        pts = [(-675.954, -552.49), (-675.954, -552.488), (-675.858, -551.679), (-675.752, -550.871)]
+        self.assertEqual(dn._clean(pts), [pts[0], pts[2], pts[3]])
+
     def test_a_facing_switch_on_the_route_and_its_other_leg(self):
         net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50))
         m = dn.Match(net, [(0, 0.4), (50, 0.4), (120, 0.4)])
