@@ -529,10 +529,23 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const bedCg = new ChunkedGeometry(flatMat('#77736a', '#5f5c56'), { color: true });
   const bed = new THREE.Color('#77736a').toArray();
   // the bed by the route's track style (#52; colours until #308's textures): on our route's tracks (within 6 m of it)
-  // the style at the nearest route point, elsewhere the plain bed
+  // the style at the nearest route point, elsewhere the track's own sections (`styles`, tools/track_styles.py
+  // track_sections, #546: embedded at its junctions and road crossings), else panels
   const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a' })
     .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
   const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? ground.styles.at(n.s) : null; };
+  // (a track's own style at each drawn point: its sections run along t.p, the drawn points along t.smooth, scaled as
+  // ownHeights does)
+  const ownStyles = (t) => {
+    const len = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
+    const k = len(t.p) / (len(t.smooth) || 1);
+    let acc = 0;
+    return t.smooth.map((p, i) => {
+      if (i) acc += Math.hypot(p[0] - t.smooth[i - 1][0], p[1] - t.smooth[i - 1][1]);
+      const s = acc * k;
+      return t.styles?.find(([a, b]) => s >= a && s <= b)?.[2] ?? 'panels';
+    });
+  };
   // (rails: glossy when wet, roughness set by the weather; trams keep them clear of snow)
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.6, roughness: 0.4 });
   const railCg = new ChunkedGeometry(railMat);
@@ -548,7 +561,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // on a canted curve of our route the outer rail is higher, the inner one lower
     const tilt = tiltOf(t);
     // The bed is the same canted plane as the rails, including its transition ramps.
-    const cols = t.smooth.map(([x, y]) => STYLE_BED[styleAt(x, y)] || bed);
+    const own = ownStyles(t);
+    const cols = t.smooth.map(([x, y], i) => STYLE_BED[styleAt(x, y) ?? own[i]] || bed);
     addRibbon(bedCg, t.smooth, 2.7, zBed, 0, (i) => cols[i], 0, 1, tilt.map((z) => z / 0.72));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
