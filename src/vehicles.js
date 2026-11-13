@@ -4,11 +4,14 @@
 // assets/vehicles.json. The index's order is the menu's and the fallback's: a vehicle that is not loaded
 // gives way to the first loaded one before it or after it in that order (src/models.js pickVehicle). The
 // manifest's fields: docs/vehicles.md, "The manifest"; tools/test_vehicles.py checks them.
+import { EVENTS, LOOPS } from './audio.js';
+
 export const INDEX = 'assets/vehicles.json';
 export const LOADERS = ['builtin', 'gltf', 'gltf-classic', 'gltf-rigged'];
 export const vehicles = [];   // the manifests in the index's order
 export const byId = new Map();
 export const liveries = new Map();   // id -> a livery's manifest (#529), only those that fit their vehicle
+export const soundPacks = new Map(); // id -> a sound pack's manifest (#528), only those that fit their vehicle
 
 const dir = (id) => `assets/${id}/`;
 export const fileUrl = (v, path) => dir(v.id) + path;
@@ -37,7 +40,52 @@ export async function loadRegistry(get = (u) => fetch(u)) {
     } catch (e) { console.warn(`livery ${id} left out:`, e); return null; }
   }));
   for (const l of looks) if (l) liveries.set(l.id, l);
+  // the sound packs (#528): assets/<id>/sounds.json, each for the vehicle its `requires` names
+  const packs = await Promise.all((index.sounds || []).map(async (id) => {
+    try {
+      const p = await (await get(`${dir(id)}sounds.json`)).json();
+      const bad = [...(p.id !== id ? [`its id ${p.id} is not its folder's ${id}`] : []), ...(p.kind !== 'sounds' ? [`kind ${p.kind} is not sounds`] : []),
+        ...soundProblems(p, byId.get(liveryVehicle(p)))];
+      if (bad.length) { console.warn(`sound pack ${id} left out:`, bad.join('; ')); return null; }
+      return p;
+    } catch (e) { console.warn(`sound pack ${id} left out:`, e); return null; }
+  }));
+  for (const p of packs) if (p) soundPacks.set(p.id, p);
+  for (const v of vehicles) if (v.sounds) {
+    const bad = soundProblems({ ...v.sounds, files: v.files }, v);
+    if (bad.length) { console.warn(`vehicle ${v.id}'s sounds left out:`, bad.join('; ')); delete v.sounds; }
+  }
   return vehicles;
+}
+
+// A sound pack (#528; docs/decisions/2026-11-10-vehicle-packages.md, section 5): `events`, an event's file or a list
+// (one picked at random each time), and `loops`, a loop's `file` with its reference (`refSpeed` m/s for motor and
+// rolling, `refRpm` for mg) and `gain`; files in WAV or MP3. A vehicle's manifest may hold one as `sounds` (its
+// files among the vehicle's), or a package (kind `sounds`) adds one; the events and loops it leaves out keep the
+// built-in sounds (src/audio.js).
+export function soundProblems(p, v) {
+  const out = [];
+  if (!v) return [`its vehicle ${liveryVehicle(p)} is not loaded`];
+  const files = new Set((p.files || []).map((f) => f.path)), sound = /\.(wav|mp3)$/i;
+  const file = (what, f) => { if (!files.has(f)) out.push(`${what}: ${f} is not among its files`); else if (!sound.test(f)) out.push(`${what}: ${f} is not WAV or MP3`); };
+  for (const [e, f] of Object.entries(p.events || {})) {
+    if (!(e in EVENTS)) out.push(`event ${e}: the game raises no such event`);
+    for (const x of [f].flat()) file(`event ${e}`, x);
+  }
+  for (const [name, l] of Object.entries(p.loops || {})) {
+    if (!(name in LOOPS)) { out.push(`loop ${name}: the game has no such loop`); continue; }
+    file(`loop ${name}`, l.file);
+    const ref = name === 'mg' ? 'refRpm' : name === 'flange' ? null : 'refSpeed';
+    if (ref && !(l[ref] > 0)) out.push(`loop ${name}: ${ref} is not a positive number`);
+  }
+  return out;
+}
+// the sound pack a set of vehicle v sounds with: the first package for it, else its manifest's own, else none (the
+// built-in sounds); { id, events, loops, url(path) }
+export function soundsFor(v) {
+  const p = [...soundPacks.values()].find((x) => liveryVehicle(x) === v?.id);
+  if (p) return { ...p, url: (f) => dir(p.id) + f };
+  return v?.sounds ? { ...v.sounds, id: `${v.id}:own`, url: (f) => dir(v.id) + f } : null;
 }
 
 // A livery (#529; docs/decisions/2026-11-10-vehicle-packages.md, section 3): `textures` and `colours` by the slots

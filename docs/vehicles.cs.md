@@ -73,6 +73,16 @@ jménem slotu (`livery x left out: texture slot roof: t3h has no such slot`). Hr
 skrytý (uživatel, 2026-11-13: „For now I would keep only the default liveries, with future possibility to add more
 variety“); `tools/test_liveries.py` podává dva vlastní ukázkové, texturu a barvu na hybridu a tři barvy vestavěného vozu.
 
+## Zvukové balíčky
+
+Zvuky hry jsou události a smyčky (#528; rozhodnutí, oddíl 5): hra vyvolá událost (`bell`, `door.close`, `points`,
+když náprava přejede srdcovku) a nastaví veličiny, kterými se řídí smyčky; `src/audio.js` přehraje každou nahrávkou
+zvukového balíčku, kde ji má, jinak vestavěným zvukem, který syntetizuje (zvuky, které hra měla před balíčky). Balíček
+je `sounds` v popisu vozidla (jeho soubory mezi soubory vozidla), nebo složka `assets/<id>/` se souborem `sounds.json`
+(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`.
+Hra zatím žádný nemá; `tools/test_sounds.py` podává vlastní ukázkový. Pole, seznam událostí, smyček a veličin a pravidla
+srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
+
 ## Soubor pohyblivých dílů (rig)
 
 Vozidlo, které se hýbe bez vlastního kódu (loader `gltf-rigged`, `src/rigged.js`), jmenuje své díly v souboru

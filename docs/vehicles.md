@@ -74,6 +74,72 @@ row stays hidden (the user, 2026-11-13: "For now I would keep only the default l
 add more variety"); `tools/test_liveries.py` serves two samples of its own, a texture and a colour on the hybrid and
 the built-in car's three colours.
 
+## Sound packs
+
+The game's sounds are events and loops (#528; the decision record, section 5): the game raises an event (`bell`,
+`door.close`, `points` as an axle passes a frog) and sets the parameters the loops follow; `src/audio.js` plays each
+with a sound pack's recording where the pack has one, else with the built-in sound it synthesises (the sounds the game
+had before the packs). A pack is a vehicle manifest's `sounds` (its files among the vehicle's) or a folder
+`assets/<id>/` with a `sounds.json` (`kind` `sounds`, `requires` its vehicle, `names`, `licence`, `files`), listed under
+`sounds` in `assets/vehicles.json`; a vehicle sounds with the first package for it, else its own. The game ships none
+yet: every vehicle has the built-in sounds; `tools/test_sounds.py` serves a sample pack of its own.
+
+| field | what |
+|---|---|
+| `events` | event → a file, or a list of files (one picked at random each time); WAV or MP3 |
+| `loops` | loop → `{ "file", "refSpeed" (m/s, motor and rolling) or "refRpm" (mg), "gain" }`: the recording plays pitched by its parameter over the reference, as loud as the built-in loop's share of its loudest, times `gain` (default 1) |
+| `gain` | the pack's events' loudness (default 1); an event over a joint or a frog plays louder with speed |
+
+A pack naming an event or a loop the game does not have, a file it does not list, or a loop without its reference is
+left out with the name (`sound pack x left out: event gong: the game raises no such event`). The frogs: a facing
+switch's `frog` m past its fork, a trailing switch's before it (11.5 m where the build found none, `src/speedRules.js`
+`FROG`), a diamond crossing's two rails 0.72 m either side of its place; each axle of the set sounds as it passes
+(`src/audio.js` `axlesBehind`: the T3's pivots 6.4 m apart, a bogie's wheelbase 1.9 m).
+
+<!-- sound-lists -->
+(written by `tools/sound_lists.py` from `src/audio.js`)
+
+| event | when |
+|---|---|
+| `door.open` | the doors start opening (their clip starts) |
+| `door.close` | the doors start closing (their clip starts) |
+| `door.buzzer` | the door alert before the doors close |
+| `bell` | the main bell |
+| `joint` | a bogie over a rail joint (every 18 m) |
+| `points` | an axle over a switch's frog |
+| `crossing` | an axle over a rail of a diamond crossing |
+| `notch.up` | the controller moved to a higher command |
+| `notch.down` | the controller moved to a lower command |
+| `lineContactor` | the line contactor closes or opens |
+| `contactor` | a field-weakening stage of the accelerator |
+| `trackBrake.on` | the track brakes' magnets drop |
+| `trackBrake.off` | the track brakes' magnets lift |
+| `indicator.tick` | the indicators' relay, lamps on |
+| `indicator.tock` | the indicators' relay, lamps off |
+| `switch.radio` | a switch set by the radio control (IRC) |
+| `switch.contact` | a switch set by the overhead contact |
+| `switch.iron` | a switch set by hand with the switch iron |
+| `heating` | a heating switch |
+| `warning` | the cab's warning beep |
+| `crash` | a collision |
+
+| loop | what |
+|---|---|
+| `motor` | traction motors and gears: pitched by speed, loud by the motor current |
+| `rolling` | rolling noise: pitched and loud by speed |
+| `flange` | flange squeal in curves under 20 m radius and on sliding wheels: not pitched |
+| `mg` | the motor-generator and its fans: pitched by mgRpm |
+
+| parameter | unit |
+|---|---|
+| `speed` | m/s |
+| `motorCurrent` | A |
+| `curveRadius` | m (the curve's speed limit standing in for it: under 20 m radius squeals) |
+| `mgRpm` | rpm |
+| `slide` | 0/1: wheels locked and sliding |
+| `trackBrake` | 0/1: the track brakes on |
+<!-- /sound-lists -->
+
 ## The rig
 
 A vehicle that moves without code of its own (loader `gltf-rigged`, `src/rigged.js`) names its parts in a rig file
