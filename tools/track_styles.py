@@ -33,6 +33,7 @@ one whose surface lay nearest the lidar ground, then the rank (src/terrain.js Dt
 the two agree at every sample (21,641, #479).
 """
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -52,6 +53,12 @@ HOLE = {"footway": 3, "road": 8, "node": 5, "platform": 3}
 PLATFORM_NEAR = 6      # m from our axis: our platform and the other direction's beside the other track
 MIN_PIECE = MIN_GRASS  # m: a shorter piece left between two holes is not laid (OSM maps none of the 12-14 m ones)
 MIN_EMBEDDED = 5       # m: a street's hole the section's end cuts shorter is not an embedded section of its own
+# Junctions and road crossings in paved track (#546): embedded over the junction and the carriageway's width
+SWITCH_PAD = 3         # m before a switch's start and past its frog: the switch's own length beyond the two points
+DIAMOND_MIN = 20       # degrees: another track crossing ours more shallowly is a turnout leaving it, not a diamond
+BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond covers on ours
+CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
+CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
 RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its section; `lift` every LIFT_STEP m
 RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
@@ -89,6 +96,19 @@ class Survey:
             return None
         return self.areas[max(hits, key=lambda k: RANK.get(self.areas[k], 1))]
 
+    def classes_at(self, x, y):
+        if self.tree is None:
+            return set()
+        pt = Point(x, y)
+        return {self.areas[int(k)] for k in self.tree.query(pt) if self.polys[int(k)].covers(pt)}
+
+    def carriageway(self, x, y):
+        """Only a carriageway at the point: a road or parking area and no track or green area over it. Read where a way
+        crosses the route, not along it: the survey's road areas run over grass track it does not map (line 22 at
+        Pohořelec, 522 m of the user's grass with no green or tram area within 4 m of the axis)."""
+        c = self.classes_at(x, y)
+        return bool(c & set(CARRIAGEWAY)) and not c & {"tram", "green", "rail"}
+
 
 def passes(stops, a, b):
     """Each pass of the route between stop names a and b, either way: (s0, s1), no other stop of either name between."""
@@ -105,7 +125,7 @@ def minus(s0, s1, cover):
     return out
 
 
-def holes(data):
+def holes(data, survey=None):
     """Where grass and ballast track stop along the route (#503): [{s0, s1, kind, grass}], `grass` the holes only grass
     track has (platforms). The route is walked every metre, so a place passed twice (an out-and-back line) has a hole
     on each pass."""
@@ -138,7 +158,9 @@ def holes(data):
     for r in data.get("roads", []):
         if r.get("t") or r.get("b"):
             continue
-        kind = "road" if r.get("c") and not r.get("f") else "footway"
+        # (a way that is no footway is a road where OSM lets cars on it, or where the survey has carriageway where it
+        # crosses: a service road, #546)
+        kind = "road" if r.get("c") and not r.get("f") else "footway" if r.get("f") else "way"
         for a, b in zip(r["p"], r["p"][1:]):
             segs.append(LineString([a[:2], b[:2]]))
             kinds.append((kind, r.get("w") or 3))
@@ -155,7 +177,10 @@ def holes(data):
                 cos = abs(((bx - ax) * hx + (by - ay) * hy) / (L * hl))
                 if cos >= 0.95:   # (a street along the track, not across it)
                     continue
-                c = s + step.project(seg.intersection(step).representative_point())
+                at = seg.intersection(step).representative_point()
+                c = s + step.project(at)
+                if kind == "way":
+                    kind = "road" if survey is not None and survey.carriageway(at.x, at.y) else "footway"
                 half = w / 2 / max(0.3, (1 - cos * cos) ** 0.5)
                 out.append({"s0": c - half - HOLE[kind], "s1": c + half + HOLE[kind], "kind": kind, "grass": False})
     for s in data.get("crossings", []):   # (OSM's crossing nodes on the track)
@@ -164,6 +189,106 @@ def holes(data):
     # diamonds, the branch to depo hostivař loop has open ballast including switches. They are covered if they lie
     # on paved surface", which the streets' holes already are)
     return sorted(out, key=lambda h: h["s0"])
+
+
+def crossing_roads(data, rt):
+    """Ways across the route at street level that may be carriageways (not footways; as `holes` finds them):
+    [(s, half, w, cars)], `half` the half length a way of width w covers along the route at its angle, `cars` OSM's
+    car road flag."""
+    segs, ws = [], []
+    for r in data.get("roads", []):
+        if r.get("t") or r.get("b") or r.get("f"):
+            continue
+        for a, b in zip(r["p"], r["p"][1:]):
+            segs.append(LineString([a[:2], b[:2]]))
+            ws.append((r.get("w") or 3, bool(r.get("c"))))
+    out = []
+    if not segs:
+        return out
+    tree = shapely.STRtree(segs)
+    n = int(rt.length) + 1
+    pts = [rt.at(min(s, rt.length))[:2] for s in range(n + 1)]
+    for s in range(n):
+        step = LineString([pts[s], pts[s + 1]])
+        for k in tree.query(step, predicate="intersects"):
+            seg, (w, cars) = segs[int(k)], ws[int(k)]
+            (ax, ay), (bx, by) = seg.coords
+            hx, hy = pts[s + 1][0] - pts[s][0], pts[s + 1][1] - pts[s][1]
+            cos = abs(((bx - ax) * hx + (by - ay) * hy) / ((seg.length or 1e-9) * ((hx * hx + hy * hy) ** 0.5 or 1e-9)))
+            if cos >= 0.95:
+                continue
+            c = s + step.project(seg.intersection(step).representative_point())
+            out.append((c, w / 2 / max(0.3, (1 - cos * cos) ** 0.5), w, cars))
+    return out
+
+
+def junctions(data, survey):
+    """Where paved track is embedded (#546; the user, 2026-11-13: "the track styles don't switch at the expected places
+    like in junctions (expected embedded asphalt color) and crossing roadway across track isn't displayed in full
+    width"): [{s0, s1, kind}].
+    - a road crossing: a car road of OSM's, or another way (a service road; not a footway) where the survey has
+      carriageway at the crossing point (line 9 s 360, Řepy). Over the survey's carriageway at our axis around it (its
+      run through the crossing point, within CROSS_REACH m past OSM's half-width), else OSM's width at its angle;
+    - a switch: from SWITCH_PAD m before it to SWITCH_PAD m past its frog;
+    - a diamond: another drawn track crossing ours at DIAMOND_MIN° or more, over where the two beds overlap."""
+    rt = Route(data["path"], data.get("pathExt"))
+    out = []
+    road = (lambda s: survey.class_at(*rt.at(min(max(s, 0), rt.length))[:2]) in CARRIAGEWAY) if survey else None
+    for c, half, _, cars in crossing_roads(data, rt):
+        if not cars and not (road and road(c)):
+            continue
+        s0, s1 = c - half, c + half
+        if road:
+            if road(c):
+                a = c
+                while a > c - half - CROSS_REACH and road(a - 1):
+                    a -= 1
+                b = c
+                while b < c + half + CROSS_REACH and road(b + 1):
+                    b += 1
+                s0, s1 = min(s0, a), max(s1, b)
+        out.append({"s0": s0, "s1": s1, "kind": "road"})
+    for w in data.get("switches") or []:
+        out.append({"s0": w["s"] - SWITCH_PAD, "s1": w["s"] + (w.get("frog") or 0) + SWITCH_PAD, "kind": "switch"})
+    path = LineString([p[:2] for p in data["path"]])
+    for tr in data.get("tracks") or []:
+        if len(tr.get("p") or []) < 2:
+            continue
+        tl = LineString([q[:2] for q in tr["p"]])
+        x = path.intersection(tl)
+        for g in [g for g in getattr(x, "geoms", [x]) if g.geom_type == "Point"] if not x.is_empty else []:
+            s = path.project(g)
+            h = rt.at(min(max(s, 0), rt.length))[2:]
+            d = tl.project(g)
+            a, b = tl.interpolate(max(0, d - 1)), tl.interpolate(min(tl.length, d + 1))
+            v = (b.x - a.x, b.y - a.y)
+            vl = (v[0] ** 2 + v[1] ** 2) ** 0.5 or 1e-9
+            sin = abs(h[0] * v[1] - h[1] * v[0]) / vl
+            if sin < math.sin(math.radians(DIAMOND_MIN)):
+                continue
+            half = BED / 2 / sin + BED / 2 * (1 - sin * sin) ** 0.5 / sin
+            out.append({"s0": s - half, "s1": s + half, "kind": "diamond"})
+    return sorted(out, key=lambda j: j["s0"])
+
+
+def embed(secs, js):
+    """Paved track (no section) embedded over the junctions `js`: where a section says otherwise (the user's marks,
+    grass, ballast, their holes) it wins. Embedded pieces less than MIN_PIECE apart join over the panels between."""
+    free = []
+    for j in js:
+        free += [(a, b, j["kind"]) for a, b in minus(j["s0"], j["s1"], secs)]
+    free.sort()
+    merged = []
+    for a, b, k in free:
+        if merged and a - merged[-1][1] < MIN_PIECE and not any(
+                x["s1"] > merged[-1][1] and x["s0"] < a and x.get("source") != "hole" for x in secs):
+            merged[-1][1] = max(merged[-1][1], b)
+            merged[-1][2].add(k)
+        else:
+            merged.append([a, b, {k}])
+    add = [{"s0": a, "s1": b, "style": "embedded", "source": "junction", "junction": sorted(k)} for a, b, k in merged
+           if b - a >= 1]
+    return sorted(secs + add, key=lambda x: x["s0"])
 
 
 def cut(secs, hs):
@@ -175,7 +300,7 @@ def cut(secs, hs):
             continue
         mine = [h for h in hs if (x["style"] == "grass" or not h["grass"]) and h["s1"] > x["s0"] and h["s0"] < x["s1"]]
         out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], mine) if b - a >= MIN_PIECE]
-        out += [{"s0": max(h["s0"], x["s0"]), "s1": min(h["s1"], x["s1"]), "style": "embedded", "source": "hole", "hole": "road"}
+        out += [{"s0": max(h["s0"], x["s0"]), "s1": min(h["s1"], x["s1"]), "style": "embedded", "source": "hole", "hole": h["kind"]}
                 for h in mine if h["kind"] == "road" and min(h["s1"], x["s1"]) - max(h["s0"], x["s0"]) >= MIN_EMBEDDED]
     out.sort(key=lambda x: x["s0"])
     merged = []   # (road holes overlapping one another: one section)
@@ -205,8 +330,9 @@ def reviewed(data, truth):
 
 
 def sections(data, truth, survey):
-    """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479)."""
-    return cut(spans(data, truth, survey), holes(data))
+    """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479) and the
+    paved track embedded at junctions and road crossings (#546)."""
+    return embed(cut(spans(data, truth, survey), holes(data, survey)), junctions(data, survey))
 
 
 def spans(data, truth, survey):

@@ -68,6 +68,38 @@ class Styles(unittest.TestCase):
         self.assertIsNone(sv.class_at(300, 0))   # (a wall is not ground)
 
 
+class Junctions(unittest.TestCase):
+    """#546: paved track embedded at junctions and over road crossings' full width."""
+
+    def paved(self, survey=None, **extra):
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                **extra}
+        return T.sections(data, {}, survey)
+
+    def test_a_car_road_across_is_embedded_over_its_width(self):
+        secs = self.paved(roads=[{"p": [[200, -20], [200, 20]], "w": 8, "c": 1}])
+        self.assertEqual(spans_of(secs), [(196, 204, "embedded")])
+
+    def test_the_surveys_carriageway_widens_it_and_admits_a_service_road(self):
+        sv = T.Survey({"areas": [rect(192, 209, -10, 10, "road"), rect(382, 393.5, -10, 10, "road"),
+                                 rect(0, 600, -0.5, 0.5, "cycle")]})
+        secs = self.paved(sv, roads=[{"p": [[200, -20], [200, 20]], "w": 8, "c": 1},
+                                     {"p": [[388, -20], [388, 20]], "w": 4},            # (service: no car flag)
+                                     {"p": [[500, -20], [500, 20]], "w": 5}])           # (a cycleway: no carriageway)
+        self.assertEqual(spans_of(secs), [(192, 209, "embedded"), (382, 393, "embedded")])
+
+    def test_a_switch_to_its_frog_and_a_diamond_over_the_beds(self):
+        secs = self.paved(switches=[{"s": 100.0, "frog": 12.0}],
+                          tracks=[{"p": [[300, -20], [300, 20]]}, {"p": [[400, 0.2], [500, 0.2]]}])   # (across; along)
+        self.assertEqual(spans_of(secs), [(97, 115, "embedded"), (299, 301, "embedded")])
+
+    def test_close_pieces_join_and_grass_keeps_its_switch(self):
+        secs = self.paved(switches=[{"s": 100.0, "frog": 12.0}], roads=[{"p": [[125, -20], [125, 20]], "w": 6, "c": 1}])
+        self.assertEqual(spans_of(secs), [(97, 128, "embedded")])
+        tw = {"switches": [{"s": 100, "frog": 12}], "tracks": [{"p": [[300, -20], [300, 20]]}]}
+        self.assertEqual(spans_of(styled("grass", **tw)), [(0, 600, "grass")])
+
+
 def styled(style, **extra):
     """A 600 m straight route, one mark of `style` over all of it, and what crosses it."""
     data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **extra}
