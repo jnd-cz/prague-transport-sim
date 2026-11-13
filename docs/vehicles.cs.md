@@ -70,9 +70,17 @@ materiály jsou sklo. Lehčí úroveň pro vzdálené cizí tramvaje vznikne př
 vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrobí vzorové vozidlo se všemi díly a zkontroluje,
 že se každý hýbe.
 
-Rig se generuje, needituje se ručně. Podrobný model se udržuje v repozitáři (projektová dílna na modely, ze které
-pochází, už se nepoužívá); jeho rig má generovat `tools/export_t3h_rig.py` z `tools/t3h_rig_roles.json` s kontrolou
-proti GLB (#471), do té doby je osm jeho polí dopsaných ručně (`handWritten` v rigu).
+Podrobný model se udržuje v repozitáři: projektová dílna na modely, ze které pochází, už se nepoužívá (uživatel,
+12. 11. 2026: dílna je jen web na prohlížení modelu a jeho animací, sama nic neexportuje a nejspíš se už používat
+nebude). Jeho rig generuje [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) z
+[`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) a základního rigu s kontrolou vazeb proti
+GLB (#471). Při změně modelu uprav přiřazení částí v souboru rolí a podle potřeby základní rig.
+Pak znovu vygeneruj `assets/t3h/rig.json` a aktualizuj jeho velikost v bajtech v `vehicle.json`.
+`revision` označuje revizi modelu a `rigRevision` revizi vygenerovaného rigu.
+
+```sh
+python -I tools/export_t3h_rig.py --out assets/t3h/rig.json
+```
 
 ## Co musí souprava splňovat
 
