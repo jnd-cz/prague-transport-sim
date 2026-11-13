@@ -21,7 +21,7 @@
 // Per stretch, the way to each stop (stretches: drive presses, brake applications, seconds from moving off the stop before it to standing
 // served at this one), as the user counted them on a ride, "drive + braking" (#396); held, the seconds of it standing or under 1.5 m/s
 // by what the autopilot stopped for (signal, gauntlet for a single track's signal, car, tram, walker, junction, obstacle, none), the
-// last 30 m into the stop left out (#431).
+// last 30 m into the stop left out, and tt, the timetable's time there (departure to departure, so with this stop's dwell; #431).
 // Energy a km (kWh/km, the traction only): lineKWh drawn from the wire, wasteKWh of it not turned into the motors' work (the starting
 // resistors above all: a press held at a low step keeps them in the circuit), brakeKWh burnt in the brake resistors.
 
@@ -51,7 +51,11 @@ export function stopsWatch(game) {
       // (the stretch to a stop begins once the stop before it is served, so the pull-away counts toward the next one)
       const to = st && st.served ? game.stops[game.nextStop + 1] : st;
       if (to) {
-        if (to !== curTo) { curTo = to; R.stretches.push({ to: to.name, drive: 0, brake: 0, t0: game.clock, tMove: null, held: {} }); }
+        if (to !== curTo) {
+          curTo = to;
+          const k = game.stops.indexOf(to), fr = game.stops[k - 1];
+          R.stretches.push({ to: to.name, drive: 0, brake: 0, t0: game.clock, tMove: null, held: {}, tt: fr && fr.sched != null && to.sched != null ? to.sched - fr.sched : null });
+        }
         const q = R.stretches[R.stretches.length - 1];
         // (and, moving off, the quickest run there at the line's limits and the time in hand the autopilot saw, #242)
         if (q.tMove === null && tr.v > 0.3) { q.tMove = game.clock; q.quick = game.pilot?._run ? game.pilot._run(to.target) - game.pilot._run(tr.s) : null; q.hand = game.pilot?.inHand ?? null; q.sched = to.sched - game.clock; }
@@ -154,7 +158,7 @@ export function stopsWatch(game) {
         // reached more than 30 s before it, where the tram then stands, arrMean in s; #242. The terminus is left out)
         ...((A) => ({ arrOnTime: A.length ? +(A.filter((x) => Math.abs(x) <= 30).length / A.length).toFixed(2) : null, arrEarly: A.filter((x) => x < -30).length,
           arrMean: A.length ? Math.round(A.reduce((t, x) => t + x, 0) / A.length) : null, arrs: A }))(S.slice(0, -1).map((x) => x.arr)),
-        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)), quick: q.quick == null ? null : Math.round(q.quick), hand: q.hand == null ? null : Math.round(q.hand), sched: q.sched == null ? null : Math.round(q.sched), held: Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
+        stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)), quick: q.quick == null ? null : Math.round(q.quick), hand: q.hand == null ? null : Math.round(q.hand), sched: q.sched == null ? null : Math.round(q.sched), tt: q.tt == null ? null : Math.round(q.tt), held:Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
     },
   };
 }
