@@ -462,6 +462,20 @@ Sections:
   - Versions: the GPKG `user_version` 10301 is GeoPackage 1.3.1, not the JVF version. The GPKG ZIPs
     carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
     `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
+- **The survey under the track beds** (#547, #548, 2026-11-13):
+  - Beds are as wide as the survey's area of their style (tram, green, rail), else the style's median width
+    measured there: embedded 1.7, panels 1.9, grass 2.0, ballast 2.5 m (`tools/track_beds.py --calibrate`).
+  - The survey's raised areas (platforms, sidewalks, islands) lie inside the bed outlines over 1 800-4 200 m² per
+    line. Laid under the beds with the street, they flattened 4-5 times the kerbs (line 9 345 → 1 571 flat kerbs).
+    They keep their height: a sidewalk inside a bed's outline means the bed is too wide there, and the raised area
+    is drawn over it anyway.
+  - The survey's street triangles, split to 5 m, rose over a bed between their corners even with every corner
+    laid under it (Spojovací's loop, line 17 s 2350). Near every drawn track they are meshed to 2 m
+    (`terrain.js` `nearTracks`); each 4 m outline piece is split by its own midpoint, the same for both
+    neighbours, so no shared edge gains a point on one side only.
+  - Where the band past a bed's edge caps one area's vertices and its neighbour meets it along a longer edge with
+    no vertex there, a 3.3 cm seam opens (line 23 s 2332-2460, a track 2.4 m away): +18 and +20 `seams3` on lines
+    22 and 23.
 
 ### Buildings and structures (Geoportál, Mosty 3D)
 
@@ -878,6 +892,17 @@ Review these when realism matters; most move into the build in M2.
 
   What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
   only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
+- **Rails under the ground** (`tools/lint.js` `buriedRails`, in `--checks canted`, #548): every 2 m of every drawn
+  track, each rail head against the surfaces over it. Before #548: 372-837 places per line, 295-741 of them the
+  survey; after: 86-133, mostly another track's bed between a switch's rails (1-5 cm) and OSM road ribbons.
+  Its trough measure (the ground 1 m past a bed's edge lower than the edge and the ground 4 m out) is not
+  calibrated: its deepest places are real ditches and cuttings (`reports/review/bed-troughs-N.json`).
+- **`DownRays` and long slivers:** indexed by its bounding box, a survey sliver lands in thousands of 4 m cells, and
+  sampling every drawn track ran for 30 minutes on line 17. A triangle over more than four cells goes only into
+  the cells it overlaps (`triInRect`); two indexes of line 17's survey and terrain ran the page out of memory.
+- **Probes and screenshots:** `shot.py --view review` colours the surfaces by class and hides the track styles, so
+  appearance is judged in `chase` or `cab`. Platforms, stop signs and shelters are added to the scene, not to the
+  world group (`window.world`): a probe that walks only the world misses them.
 
 ## Czech tram terms
 
