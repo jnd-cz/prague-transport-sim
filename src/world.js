@@ -1264,10 +1264,26 @@ function flushDtm(ground) {
       const zr = ownAt(a, ai, n.s, q.x, q.y, zt) ?? dtm.deckAt(q.x, q.y, zt, 2.5);
       if (zr === null) continue;
       const k = Math.max(0, Math.min(1, (n.d - 8) / 7));
-      deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k))]);
+      deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k)), n, a.c]);
     }
   });
-  for (const [p, dz] of deckMoves) p[2] += dz;
+  // A tram area of the deck lies at the rails' level: a vertex of one within 8 m that still stands more than DECK_OVER m
+  // over the rail heads at its place is the parapet's or the railing's top taken as the surface, laid to the deck's
+  // surface there. (On line 37's Krejcárek viaduct the survey's tram areas along the deck's edge, 1.5-4.4 m right of our
+  // track, stepped up to 0.9-1.3 m over the rails half a metre out from it: their triangles stood over the deck as grey
+  // slabs, #549. Sidewalks and paved areas higher than that on line 17's bridges, 0.4-1.0 m, keep the survey until the
+  // user says what they are.)
+  const DECK_OVER = 0.3;
+  dtm.deckLaid = [];
+  for (const [p, dz, n, c] of deckMoves) {
+    p[2] += dz;
+    if (c !== 'tram' || n.d > 8) continue;
+    const q = route.at(n.s), l = (p[1] - q.y) * q.hx - (p[0] - q.x) * q.hy, zr = profile.heightAt(n.s, l);
+    if (p[2] - zr <= DECK_OVER) continue;
+    const z = zr - profile.lift(n.s) - STREET_BELOW;
+    dtm.deckLaid.push({ x: p[0], y: p[1], s: Math.round(n.s), c, dz: Math.round((z - p[2]) * 100) / 100 });
+    p[2] = z;
+  }
 }
 
 // (by weather: carriageways get slush, footways and the rest trodden snow, lawns all of it; all but

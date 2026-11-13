@@ -1009,6 +1009,51 @@ function deckClip(g, world) {
   return check('bridge-model-clear-of-deck', n, [...bad.values()]);
 }
 
+// Our bridges' decks as drawn (#549): every 2 m inside each span of our route, every metre across the deck (4 m past
+// both tracks), cast down from over the rails. Two ways the deck is broken: the ground under it (the terrain, the
+// level-0 survey, the OSM roads) above its underside (the bed less UNDER_DECK m) more than 8 m inside the span, and the
+// deck's own survey (level 1+) more than OVER_RAILS m over the rail heads: line 37's Krejcárek viaduct, "terrain spikes
+// above bridge deck", was the survey's tram areas along the deck's edge rising to the parapet's top. Counted per
+// triangle; places per span and 10 m, the highest.
+const UNDER_DECK = 1.0, OVER_RAILS = 0.3;
+export function groundUnderDecks(g, world) {
+  const r = g.route, pr = r.ground?.profile;
+  if (!pr) return check('deck-surfaces', 0, []);
+  const meshes = [];
+  world.traverse((m) => { if (m.isMesh && ['terrain', 'dtm', 'road'].includes(m.userData.surface)) meshes.push(m); });
+  const rays = new DownRays(meshes), levelOf = (h) => (h.object.userData.surface === 'dtm' ? surveyOf(h)?.[1] ?? 0 : 0);
+  const bad = new Map(), spans = [], tris = { ground: new Set(), deck: new Set() };
+  let n = 0;
+  for (const [a, b] of pr.bridges) {
+    const span = { s0: Math.round(a), s1: Math.round(b), samples: 0, ground: { over: 0, tris: 0, max: 0 }, deck: { over: 0, tris: 0, max: 0 }, kinds: {} };
+    const seen = new Set();
+    const count = (what, hit, mag, s, l, p, kind) => {
+      const c = span[what], id = `${hit.object.uuid}:${hit.faceIndex}`;
+      c.over++;
+      if (!seen.has(id)) { seen.add(id); c.tris++; span.kinds[`${what}: ${kind}`] = (span.kinds[`${what}: ${kind}`] || 0) + 1; }
+      tris[what].add(id);
+      c.max = Math.max(c.max, Math.round(mag * 100) / 100);
+      const key = `${span.s0}:${Math.round(s / 10)}`;
+      if (!(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: p.x, y: p.y, mag, info: `${kind} ${mag.toFixed(2)} m ${what === 'deck' ? 'over the rail heads' : "over the deck's underside"}, ${l} m across` });
+    };
+    for (let s = Math.ceil(a / 2) * 2; s <= b; s += 2) {
+      const o = pr.backOff?.[Math.round(s / pr.step)], off = Math.abs(o) > 0.5 ? o : 0;
+      for (let l = Math.min(0, off) - 4; l <= Math.max(0, off) + 4; l += 1) {
+        const p = r.offset(s, l), zt = pr.heightAt(s, l), zu = zt - pr.lift(s) - UNDER_DECK;
+        const hits = rays.cast(p.x, zt + 3, -p.y, 60);
+        n++; span.samples++;
+        const kind = (h) => (h.object.userData.surface === 'dtm' ? `survey ${surveyOf(h)?.[0] ?? '?'}` : h.object.userData.surface);
+        const deck = hits.find((h) => levelOf(h) > 0), ground = hits.find((h) => levelOf(h) === 0);
+        if (deck && deck.point.y - zt > OVER_RAILS) count('deck', deck, deck.point.y - zt, s, l, p, kind(deck));
+        // (the ground meets the deck at the abutments: counted more than 8 m inside the span, as Profile.overBridge)
+        if (ground && ground.point.y > zu && s > a + 8 && s < b - 8) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));
+      }
+    }
+    spans.push(span);
+  }
+  return { ...check('deck-surfaces', n, [...bad.values()]), triangles: { ground: tris.ground.size, deck: tris.deck.size }, spans };
+}
+
 // Roads passing under our route (OSM maxheight, tools/clearances.py; the profile keeps them as floors):
 // the track at least the clearance + 0.8 m over the road surface. Short by more than 0.1 m is listed.
 function underpassClearance(g) {
@@ -1096,6 +1141,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     trackInBuildings: trackInBuildings(g),
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),
+    groundUnderDecks: groundUnderDecks(g, world),
     underpassClearance: underpassClearance(g),
   };
   if (bot && g.route.ground?.dtm) {
