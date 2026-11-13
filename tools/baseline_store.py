@@ -332,7 +332,7 @@ def queue():
 
 def describe(j, now=None):
     """'headless in transport-game-268, running 12 min'"""
-    mins = ((now or time.time()) - j["since"]) / 60
+    mins = max(0.0, ((now or time.time()) - j["since"]) / 60)  # (a ticket written after `now` was read: "-0 min")
     return f"{j['what']} in {os.path.basename(os.path.normpath(j['root']))}, {j['state']} {mins:.0f} min"
 
 
