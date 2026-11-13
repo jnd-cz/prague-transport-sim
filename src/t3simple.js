@@ -206,10 +206,18 @@ function atU(u) {
   return R[R.length - 1];
 }
 
-// --- the livery: one canvas for every car
-let LIVERY = null;
-function livery() {
-  if (LIVERY) return LIVERY;
+// --- the livery: one canvas for every car that wears the same colours
+// (#529: a livery's `colours` for the manifest's painted slots, body the red, band the cream, roof the roof's grey;
+// with another body colour its edges and the louvres are its shades, as the red's are on the T3's)
+const LIVERIES = new Map();
+const shade = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+function livery(paint = {}) {
+  const key = JSON.stringify(paint);
+  if (LIVERIES.has(key)) return LIVERIES.get(key);
+  const red = paint.body || COL.red, own = !paint.body;
+  const C = { ...COL, red, cream: paint.band || COL.cream, roof: paint.roof || COL.roof,
+    redLow: own ? '#6a1a14' : shade(red, 0.59), redTop: own ? '#5a1410' : shade(red, 0.5), louvre: own ? COL.louvre : shade(red, 0.61),
+    flapFront: own ? '#7c3a2c' : shade(red, 0.69), flapRear: own ? '#7a1812' : shade(red, 0.68) };
   const { L } = reference(), du = (m) => m / L;
   const cv = document.createElement('canvas');
   cv.width = TW; cv.height = TH;
@@ -224,7 +232,7 @@ function livery() {
   };
   // glass: the sky's reflection at the top fading into the dark inside
   const glass = (h0, h1) => { const gr = g.createLinearGradient(0, Y(h1), 0, Y(h0)); gr.addColorStop(0, COL.sky); gr.addColorStop(0.45, COL.glass); gr.addColorStop(1, COL.glass); return gr; };
-  g.fillStyle = COL.cream;
+  g.fillStyle = C.cream;
   g.fillRect(0, 0, TW, TH);
   // the bands, column by column: where the outline is at that u decides the red's top and the caps
   const redTop = (x, z) => {
@@ -239,13 +247,13 @@ function livery() {
     const u = (c + 0.5) / TW, { x, z } = atU(u), az = Math.abs(z), end = z > SPLIT.f || z < SPLIT.r;
     const col = (h0, h1, color) => { g.fillStyle = color; g.fillRect(c, Y(h1), 1, Y(h0) - Y(h1)); };
     const top = redTop(x, z);
-    col(LIV.red[0], top, COL.red);
-    col(LIV.red[0] - 0.008, LIV.red[0], '#6a1a14'); // the red's lower edge
-    col(top, top + 0.008, '#5a1410');
+    col(LIV.red[0], top, C.red);
+    col(LIV.red[0] - 0.008, LIV.red[0], C.redLow); // the red's lower edge
+    col(top, top + 0.008, C.redTop);
     // the roof grey over the middle; the ends' caps cream
     if (!end) {
-      col(LIV.gutter, TOP_H, az < LIV.capTop ? COL.roof : COL.cream);
-      col(LIV.eave, LIV.gutter, az < LIV.capSide ? COL.roof : COL.cream);
+      col(LIV.gutter, TOP_H, az < LIV.capTop ? C.roof : C.cream);
+      col(LIV.eave, LIV.gutter, az < LIV.capSide ? C.roof : C.cream);
       if (az > 3.3 && az < 5.9) col(LIV.gutter - 0.012, LIV.gutter + 0.004, '#3a3c3e');
     }
   }
@@ -260,7 +268,7 @@ function livery() {
   // the doors (right side): four cream leaves, each with a tall pane over a lower one, a dark gap in the middle
   for (const [z0, z1] of DOORS) {
     const [a, b] = along(-1, z0, z1), w = (b - a) / 4;
-    span(a, b, BOT_H, 2.6, COL.cream);
+    span(a, b, BOT_H, 2.6, C.cream);
     for (let k = 0; k < 4; k++) {
       const l0 = a + k * w, l1 = l0 + w, m = w * 0.12;
       rrect(l0 + m, l1 - m, 1.68, 2.50, 10, glass(1.68, 2.50), COL.rubber, 2);
@@ -306,8 +314,8 @@ function livery() {
     g.strokeStyle = color; g.lineWidth = 2;
     g.beginPath(); g.roundRect(X(u0), Y(h1), X(u1) - X(u0), Y(h0) - Y(h1), 5); g.stroke();
   };
-  flap(1, 1.40, 1.555, '#7c3a2c');
-  flap(-1, 1.36, 1.50, '#7a1812');
+  flap(1, 1.40, 1.555, C.flapFront);
+  flap(-1, 1.36, 1.50, C.flapRear);
   wrapped(-1, -6.29, -6.09, 1.70, 2.53, 0.07);
   for (const x of [-0.6, 0.6]) { const u = uAt(x, onFace(-1, x, REF_H).z); span(u - du(0.014), u + du(0.014), 1.70, 2.53, '#c9c3b2'); }
   for (const sign of [-1, 1]) { const c = atCorner(-1, sign, CORNER.r[0] - 0.06), u = uAt(c.x, c.z); span(u - du(0.012), u + du(0.012), 1.70, 2.53, '#c9c3b2'); }
@@ -335,19 +343,19 @@ function livery() {
   // the louvres of the motor-generator's air intake, left side
   for (let k = 0; k < 3; k++) {
     const [a, b] = along(1, -1.37 + k * 0.41, -1.37 + k * 0.41 + 0.38);
-    for (let h = 0.87; h < 1.29; h += 0.035) span(a, b, h, h + 0.016, COL.louvre);
+    for (let h = 0.87; h < 1.29; h += 0.035) span(a, b, h, h + 0.016, C.louvre);
   }
   // the roof's top: grey, the caps cream at the ends
   const rz = (z) => (z + ROOF_LEN) / (2 * ROOF_LEN) * TW;
-  g.fillStyle = COL.roof; g.fillRect(0, SIDE_ROWS, TW, TH - SIDE_ROWS);
-  g.fillStyle = COL.cream;
+  g.fillStyle = C.roof; g.fillRect(0, SIDE_ROWS, TW, TH - SIDE_ROWS);
+  g.fillStyle = C.cream;
   g.fillRect(0, SIDE_ROWS, rz(-LIV.capTop), TH - SIDE_ROWS);
   g.fillRect(rz(LIV.capTop), SIDE_ROWS, TW - rz(LIV.capTop), TH - SIDE_ROWS);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   tex.userData.shared = true;
-  LIVERY = tex;
+  LIVERIES.set(key, tex);
   return tex;
 }
 
@@ -746,15 +754,15 @@ function onFlank(sign, z, h, w, hh) {
 const FLEET = { h: 0.14, front: HEADLIGHT.h, rear: 1.105, side: { z: 4.17, h: 1.43 } };
 // the canvas: the digits FLEET_PX.h px tall in a 512 x 160 px texture, so the quads are FLEET.h * 160 / 120 tall
 const FLEET_PX = { w: 480, h: 120 }, FLEET_QH = (FLEET.h * 160) / FLEET_PX.h, FLEET_QW = (FLEET_QH * 512) / 160;
-function fleetTexture(n) {
+function fleetTexture(n, numbers = null) {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 160;
   const g = cv.getContext('2d'), s = n == null ? '' : String(n);
   if (!s) return new THREE.CanvasTexture(cv); // (a vehicle without fleet numbers for this type)
   // (the hybrid's font and colour, src/rigged.js fleetTexture: the user, 2026-11-10, "the new model uses different font
   // from the hybrid model and my photos")
-  g.fillStyle = '#e3b625';
-  g.font = 'bold 100px Arial, sans-serif';
+  g.fillStyle = numbers?.colour || '#e3b625';
+  g.font = `bold 100px ${numbers?.font ? `"${numbers.font}", ` : ''}Arial, sans-serif`;
   // the digits' own box scaled to FLEET_PX.h, whichever font the system has (squeezed only past FLEET_PX.w)
   const m = g.measureText(s), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
   const k = FLEET_PX.h / (A + D), kx = Math.min(k, FLEET_PX.w / (L + R));
@@ -884,13 +892,14 @@ export function poseSimple(model, { collector, braking, signals, highBeam } = {}
 
 // A set of `cars` built-in T3s in `root` (src/models.js makeT3): `mats` holds the plates' materials
 // (route box, mirror plate, rear plate, destination and run cards), which setConsistLine swaps; `variant`
-// 'T3', 'T3SUCS' or 'T3M' (its manifest's variants, assets/t3simple/vehicle.json), `fleet` the cars' numbers; the
-// collector on the wire `wire` m over the rail.
-export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = Array(cars).fill(null) } = {}) {
+// 'T3', 'T3SUCS' or 'T3M' (its manifest's fleet types, assets/t3simple/vehicle.json), `fleet` the cars' numbers; the
+// collector on the wire `wire` m over the rail; `paint` a livery's painted colours (#529), `numbers` its fleet
+// numbers' font and colour.
+export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = Array(cars).fill(null), paint = null, numbers = null } = {}) {
   const P = shapes(variant);
   // each set owns its materials (traffic fades them one set at a time); the shapes and the livery are shared
   Object.assign(mats, {
-    body: new THREE.MeshLambertMaterial({ map: P.livery, alphaTest: 0.5 }), // (the alpha: the skirt's cutouts)
+    body: new THREE.MeshLambertMaterial({ map: paint ? livery(paint) : P.livery, alphaTest: 0.5 }), // (the alpha: the skirt's cutouts)
     parts: new THREE.MeshLambertMaterial({ vertexColors: true }),
     lamps: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
   });
@@ -912,7 +921,7 @@ export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS'
       car.add(car.userData.beams);
     }
     // (a decal blended at its edges: traffic's fade keeps a blended material blended)
-    const fm = new THREE.MeshLambertMaterial({ map: fleetTexture(fleet[k]), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    const fm = new THREE.MeshLambertMaterial({ map: fleetTexture(fleet[k], numbers), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
     mesh(P.fleet, fm, 'fleet');
     const gm = { bogies: instanced(P.gear.bogie, mats.parts, 2, 'bogies'), wheels: instanced(P.gear.wheels, mats.parts, 4, 'wheels'),
       couplers: instanced(P.gear.coupler, mats.parts, 2, 'couplers'), panto: instanced(P.gear.bar, mats.parts, PANTO_BARS, 'pantograph') };

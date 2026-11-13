@@ -33,12 +33,13 @@ cells = {(int(p[0] // 40) + dx, int(p[1] // 40) + dy) for p in line["path"] + li
          for dx in range(-2, 3) for dy in range(-2, 3)}
 
 kinds, out, seen = [], [], set()
+near = gpkg.near(cells, 40, (F.E0, F.N0))  # (a line's box can reach a corridor cell: decoded and asked vertex by vertex)
 for package in select_packages(ROOT, districts=DTM[LINE]):
     for t, info in gpkg.layers(package.kr).items():
         name = t.split("#")[-1].split("_", 1)[-1]
         if info["type"] not in ("LINESTRING", "MULTILINESTRING") or not name.startswith(KEEP):
             continue
-        for f in gpkg.features(package.kr, t):
+        for f in gpkg.features(package.kr, t, keep=near):
             g = f["geom"]
             if not g:
                 continue

@@ -2,7 +2,7 @@
 // Static 3D scenery built from the preprocessed OSM data, draped on the DMR 5G terrain.
 import * as THREE from 'three';
 import { rng } from './random.js';
-import { DTM_LIFT, FLUSH, STREET } from './terrain.js';
+import { DTM_LIFT, FLUSH, STREET, TRACK_ZONE } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
 import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
@@ -948,6 +948,17 @@ function flushDtm(ground) {
         if (v != null) { e[k] = v; break; }
       }
     }
+    // where the rails tilt with the street (#538), the street past the track zone keeps the survey's own shape (its
+    // fall to the gutter, its kerbs), shifted by the correction at the zone's edge: laid to the tracks' level there, it
+    // overshot the lidar by up to 15 cm at Klárov and flattened three kerbs
+    const tl = Math.min(1, Math.abs(profile.tiltAt(s)) / 0.005), o = profile.backOff?.[Math.min(profile.n - 1, i)];
+    if (tl > 0 && Math.abs(o) > 0.5 && e[15] !== null) {
+      const lo = Math.max(-15, Math.ceil(Math.min(0, o) - TRACK_ZONE)), hi = Math.min(15, Math.floor(Math.max(0, o) + TRACK_ZONE));
+      for (let k = 0; k < e.length; k++) {
+        const l = k - 15, edge = l < lo ? e[lo + 15] : l > hi ? e[hi + 15] : null;
+        if (edge !== null) e[k] = edge * tl + e[k] * (1 - tl);
+      }
+    }
     rows.set(i, e);
     return e;
   };
@@ -980,6 +991,11 @@ function flushDtm(ground) {
     const f = Math.max(0, Math.min(30, lat + 15)), k = Math.min(29, Math.floor(f)), u = f - k;
     return e[k] * (1 - u) + e[k + 1] * u;
   };
+  // (past the track zone where the rails tilt with the street, #538)
+  const pastZone = (s, lat) => {
+    const o = profile.backOff?.[Math.min(profile.n - 1, Math.round(s / 2))];
+    return Math.abs(profile.tiltAt(s)) > 0 && Math.abs(o) > 0.5 && (lat < Math.min(0, o) - TRACK_ZONE || lat > Math.max(0, o) + TRACK_ZONE);
+  };
   // (vertex i of pts, its nearest route point measured before anything moved: ns, nd)
   const shift = (i) => {
     const p = pts[i], n = { s: ns[i], d: nd[i] };
@@ -987,12 +1003,21 @@ function flushDtm(ground) {
     const q = route.at(n.s), lat = q.hx * (p[1] - q.y) - q.hy * (p[0] - q.x);
     // in the track corridor (3 m from our tracks) a carriageway or tram bed is the bed, whatever
     // the survey says there (a 2 m bump at s 2420 stood 3.6 m over the rails); a structure well above
-    // the track (over 4.5 m) is another level
-    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackWithin(p[0], p[1], 3) && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
+    // the track (over 4.5 m) is another level. Where the rails tilt with the street, only the track zone (#538):
+    // the street past it keeps the survey's shape (rows above)
+    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackWithin(p[0], p[1], 3) && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5 && !pastZone(n.s, lat)) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
-    p[2] += dz * (1 - k * k * (3 - 2 * k));
+    const z = p[2] + dz * (1 - k * k * (3 - 2 * k));
+    // (past the track zone but within the track corridor, the survey's own shape only while it stays near the tracks'
+    // level: its outlines stack points metres apart in height beside the tracks, and freed they lifted the street up
+    // to 0.33 m over the bed, line 17 s 17862)
+    if (bed.has(p) && ground.trackWithin(p[0], p[1], 3) && pastZone(n.s, lat) && !profile.onBridge(n.s)) {
+      const zt = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW;
+      if (z > zt + 0.05 || z < zt - 0.15) { p[2] = zt; return; }
+    }
+    p[2] = z;
   };
   // measure everything first, then move
   // (bed: vertices of carriageway and tram areas, laid flush with the tracks; green ones too where the

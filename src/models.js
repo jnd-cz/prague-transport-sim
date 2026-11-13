@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { riggedReady, riggedIds, loadRigged, makeRiggedSet, setRiggedLine, poseRigged } from './rigged.js';
 import { makeSimpleSet, poseSimple, ROUTE_BOX } from './t3simple.js';
-import { vehicles, byId, fileUrl, variantOf, fleetNumbers } from './vehicles.js';
+import { vehicles, byId, fileUrl, variantOf, fleetNumbers, liveries, liveryVehicle, liveryUrl } from './vehicles.js';
 import { hangConsist } from './consist.js';
 import { signalsAt } from './lamps.js';
 import { CAR_PITCH, VEHICLE_TYPES } from './tram.js';
@@ -172,19 +172,56 @@ function destinationTexture(name) {
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
 // vehicle: a vehicle's id (assets/vehicles.json); one not loaded gives way to the first loaded one in the index
-// (pickVehicle). variant: one of the vehicle's types ('T3', 'T3SUCS', 'T3M' for the built-in car); none: one from
-// the run number (src/vehicles.js variantOf); the cars' fleet numbers from its range.
-export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run = '', variant = null } = {}) {
+// (pickVehicle). dealt: { type, numbers, livery } from the run's FleetDealer (src/vehicles.js), the set's type, its
+// cars' fleet numbers and the livery it wears (its id, null for the vehicle's own). Without it (a test page, a
+// picture): variant, one of the vehicle's types ('T3', 'T3SUCS', 'T3M' for the built-in car), else one from the run
+// number (variantOf), the numbers from the run number too; `livery` an id.
+export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run = '', variant = null, dealt = null, livery = null } = {}) {
   const root = new THREE.Group(), v = pickVehicle(vehicle), loader = v?.loader ?? loadedLoader();
-  const type = variant ?? variantOf(v, run) ?? 'T3SUCS', fleet = fleetNumbers(v, type, run, cars);
+  const type = dealt?.type ?? variant ?? variantOf(v, run) ?? 'T3SUCS', fleet = dealt?.numbers ?? fleetNumbers(v, type, run, cars);
+  const look = lookOf(v, dealt ? dealt.livery : livery);
   root.userData.line = line;
   root.userData.vehicle = v?.id ?? null;
+  root.userData.fleet = fleet;   // (given back to the dealer when an AI tram leaves)
+  root.userData.livery = look?.id ?? null;
   if (loader === 'gltf-classic') { makeDetailedSet(root, detailedProto, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
   if (loader === 'gltf') { makeDetailedSet(root, gltfProtos.get(v.id), line, cars, dest, run); root.userData.kind = 'gltf'; return root; }
-  if (loader === 'gltf-rigged') { makeRiggedSet(v?.id ?? riggedIds()[0], root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet); root.userData.kind = 'rigged'; return root; }
-  makeSimpleSet(root, cars, dest, plateMats(line, dest, run, type), CONTACT_WIRE - RAIL_TOP, { variant: type, fleet });
+  if (loader === 'gltf-rigged') { makeRiggedSet(v?.id ?? riggedIds()[0], root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet, look); root.userData.kind = 'rigged'; return root; }
+  makeSimpleSet(root, cars, dest, plateMats(line, dest, run, type), CONTACT_WIRE - RAIL_TOP, { variant: type, fleet, paint: look?.colours, numbers: look?.numbers });
   Object.assign(root.userData, { kind: 'simple', dest, run });
   return root;
+}
+
+// A livery's look on vehicle v (#529; src/vehicles.js liveryProblems has checked its slots): by each slot material's
+// name, its texture (loaded once, shared by every set that wears it) and colour; the built-in car's painted
+// colours; the fleet numbers' font and colour. null: the vehicle's own (an id that is not v's livery too).
+const LOOKS = new Map(), LIVERY_MAPS = new Map();
+function lookOf(v, id) {
+  const l = id && liveries.get(id);
+  if (!l || liveryVehicle(l) !== v?.id) return null;
+  if (LOOKS.has(id)) return LOOKS.get(id);
+  const bySlot = new Map(), colours = {};
+  const slotOf = (s) => [v.slots?.[s] || []].flat();
+  for (const [s, path] of Object.entries(l.textures || {})) for (const m of slotOf(s)) bySlot.set(m, { ...bySlot.get(m), map: liveryMap(liveryUrl(l, path)) });
+  for (const [s, c] of Object.entries(l.colours || {})) {
+    if (v.colours?.includes(s)) colours[s] = c;
+    for (const m of slotOf(s)) bySlot.set(m, { ...bySlot.get(m), colour: c });
+  }
+  const look = { id, bySlot, colours, numbers: l.numbers || null };
+  LOOKS.set(id, look);
+  return look;
+}
+function liveryMap(url) {
+  if (!LIVERY_MAPS.has(url)) {
+    const t = new THREE.TextureLoader().load(url);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.flipY = false;   // (glTF's uv: v down the image)
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    t.userData.shared = true;
+    LIVERY_MAPS.set(url, t);
+  }
+  return LIVERY_MAPS.get(url);
 }
 
 // The vehicle a set is built as: the one asked for when it is loaded, else the first loaded one in the index's order

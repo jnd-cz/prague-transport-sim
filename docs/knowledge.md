@@ -282,6 +282,14 @@ Sections:
   Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
   Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
   are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
+- **A DI track crossing ours measures the street's tilt there** (#538): its heights where it meets our left and
+  right rail, each taken against our own rail profile at that point (on a 30° crossing the two lie 3 m apart
+  along ours), differ by the cross level. Where one DI track crosses both of ours the two values agree within 2 mm
+  (median), 6 mm (p90). On the five lines' 120 crossings on paved double track this is the only independent check
+  of a street's crossfall: the median of IPR's plane, the survey's plane and our two tracks' slope errs 6 mm
+  (median), IPR alone 10 mm and with a +7 mm bias, though the three-cornered hat gives IPR the smallest spread
+  (0.2 %, the survey 0.8-1.1 %, the tracks 0.4-0.5 %): IPR agrees with the others most and with DI least.
+  Sokolovská: DI 2.6-2.9 % over the gauge, IPR 5.2 %. `tools/cross_level.py` takes DI's value where it exists.
 
 ### Terrain and the street survey (IPR, ČÚZK, ZPS)
 
@@ -444,7 +452,10 @@ Sections:
     `shape`).
   - Geometry: OPL polygons / multipolygons (XY); KR line strings with Z (boundary heights) and points
     (registration). `gpkg.py`'s WKB reader takes base types 1–7 with ISO / EWKB Z and M (M dropped) and
-    envelope codes 0–4: curved types would need work.
+    envelope codes 0–4: curved types would need work. The blobs carry no envelope (flags 0) and the packages
+    no R-tree index, so a reader that wants only the features near the line reads every box through GEOS
+    (`gpkg.features(keep=)`, #517): of line 17's districts' 1 891 580 line and 199 246 area features, 8.7 % and
+    9.4 % have a box that reaches its corridor's 40 m cells.
   - CRS: everything is EPSG:5514 metres, M = 0, and no tool reprojects or rejects another CRS.
   - Per district (OPL polygon / KR line / KR point layers): Praha 1 50/28/61, 2 43/26/52, 4 49/28/60,
     7 45/28/56, 8 53/29/63, 10 49/27/62, 12 50/29/58, 17 43/26/47.
@@ -907,14 +918,32 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   4 threads and 24 run about as fast. The thread count changes BLAS results in their last bits (sums split
   differently); the line heights came out byte-identical at 4 and at 24. `tools/rebuild.py` sets
   `OPENBLAS_NUM_THREADS` per step.
+- numpy has no banded or triangular solver; SciPy's LAPACK wrappers do: `scipy.linalg.lapack.dpbtrf` factors a
+  symmetric positive definite band matrix (upper storage, `ab[u+i-j, j] = A[i, j]`) and `dpbtrs` solves with the
+  factor, a 1-d right-hand side included. On the vertical profile's pentadiagonal system (n 3303) a solve took 50 us
+  against 1.66 ms for a product with the dense inverse (4 BLAS threads), the factor 0.3 ms against the inverse's 0.87
+  s; the answers 2.6e-12 apart, the residual smaller; the heights byte-identical (#516).
+- A warm start is not a free speed-up for an iterative solve whose results feed one another: ADMM started from where
+  the same solve ended last time stops at another point within its tolerance, and the rounds of meeting half way (one
+  chain's heights are another's pins) then ended after 4 rounds instead of 6 and moved one junction's heights by up to
+  16 mm (#516).
 - Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
   rewritten within the same second at the same size runs the old code (a test that edits a module must
   change its size).
+- `np.hypot` and `math.hypot` differ in the last bit in ~17 % of pairs (2 000 000 random pairs, #517), and so does
+  `np.sqrt(x*x + y*y)`; numpy's `+ - * /` and Python's floats agree to the bit. A loop moved to numpy keeps its
+  results only where it keeps `math.hypot` (`tools/track_curve.py` `misses`: numpy picks, `math.hypot` measures).
+  shapely's array functions (`distance`, `line_locate_point`, `line_interpolate_point`, `buffer`, an `STRtree`
+  query of many geometries, which lists each one's hits in the order a query of it alone gives) run the same GEOS
+  operations as its scalar methods: the same bits.
 - `os.replace` onto a file another handle holds open fails on Windows (`PermissionError`, WinError 5), and
   so does opening a file while it is being replaced; POSIX lets both through. Python's `open` does not share
   delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
   stopped a parallel rebuild (#521). A file several threads or processes write needs one writer at a
   time and a retry for the readers (`tools/stepcache.py` `_waiting`).
+- A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
+  in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
+  faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
 
 ## The test host
 

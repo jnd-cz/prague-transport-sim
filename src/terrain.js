@@ -240,6 +240,12 @@ function chainWays(roads, flag) {
   return n;
 }
 
+// m past each track's centre that the track zone reaches (#538): where the rails tilt with the street, the street
+// within it is their plane; beyond it the street keeps the survey's own shape, shifted to meet it (src/world.js
+// flushDtm). Half the track bed (2.7 m): carried 3 m out, the plane dropped the street 10 cm where the lidar drops 5
+// (Klárov, line 23 s 2856).
+export const TRACK_ZONE = 1.4;
+
 export class Profile {
   // The track profile is the top of rail (src/heights.js), built offline (#480, #276 step 2): the line data's
   // `heights` every 2 m (tools/line_heights.py: every sample has one, the surface plus the style's lift where no
@@ -277,6 +283,17 @@ export class Profile {
       }
       this.backOff = off;
       this.backDz = dz;
+      // where the build tilts the rails with the street (`crossLevel`, tools/cross_level.py, #538), the street past
+      // the outer track continues the rails' tilt to the edge of the track zone (TRACK_ZONE); elsewhere it is level
+      const C = data.crossLevel;
+      if (C?.path) {
+        const t = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const k = Math.round(i * step / C.step);
+          t[i] = k < C.path.length ? C.path[k] * C.unit / 1.5 : 0; // (the fall to the left, + = the left lower)
+        }
+        this.tilt = t;
+      }
     }
     this.z = z;
     this.grades = new Float32Array(n);
@@ -294,15 +311,23 @@ export class Profile {
 
   height(s) { return this._interp(this.z, s); }
   // top of rail `lateral` m across from our track (left > 0): ours, the opposite track's where the build gave its
-  // cross-section, linear between the two and level beyond (#197)
+  // cross-section, linear between the two (#197), level beyond, or the rails' tilt to the edge of the track zone
+  // where they tilt with the street (#538)
   heightAt(s, lateral = 0) {
     const z = this._interp(this.z, s);
     if (!this.backOff || !lateral) return z;
     const o = this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))];
     if (!(Math.abs(o) > 0.5)) return z;
-    return z + this._interp(this.backDz, s) * Math.max(0, Math.min(1, lateral / o));
+    const dz = this._interp(this.backDz, s), u = lateral / o;
+    const t = this.tilt ? this._interp(this.tilt, s) : 0;
+    // (past the outer track: level, or the rails' tilt up to TRACK_ZONE m where they tilt with the street)
+    const past = u < 0 ? lateral : u > 1 ? lateral - o : 0;
+    const beyond = t && past ? -t * Math.sign(past) * Math.min(Math.abs(past), TRACK_ZONE) : 0;
+    return z + dz * Math.max(0, Math.min(1, u)) + beyond;
   }
   grade(s) { return this._interp(this.grades, s); }
+  // the street's fall to the left in the track zone where the rails tilt with it (#538), else 0
+  tiltAt(s) { return this.tilt ? this._interp(this.tilt, s) : 0; }
 
   onBridge(s) {
     return this.bridges.some(([a, b]) => s > a - 4 && s < b + 4);
