@@ -93,11 +93,13 @@ class Junctions(unittest.TestCase):
                           tracks=[{"p": [[300, -20], [300, 20]]}, {"p": [[400, 0.2], [500, 0.2]]}])   # (across; along)
         self.assertEqual(spans_of(secs), [(97, 115, "embedded"), (299, 301, "embedded")])
 
-    def test_close_pieces_join_and_grass_keeps_its_switch(self):
+    def test_close_pieces_join_grass_yields_and_ballast_keeps_its_switch(self):
         secs = self.paved(switches=[{"s": 100.0, "frog": 12.0}], roads=[{"p": [[125, -20], [125, 20]], "w": 6, "c": 1}])
         self.assertEqual(spans_of(secs), [(97, 128, "embedded")])
         tw = {"switches": [{"s": 100, "frog": 12}], "tracks": [{"p": [[300, -20], [300, 20]]}]}
-        self.assertEqual(spans_of(styled("grass", **tw)), [(0, 600, "grass")])
+        self.assertEqual(spans_of(styled("grass", **tw)), [(0, 97, "grass"), (97, 115, "embedded"), (115, 299, "grass"),
+                                                          (299, 301, "embedded"), (301, 600, "grass")])
+        self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through them)
 
 
 def styled(style, **extra):

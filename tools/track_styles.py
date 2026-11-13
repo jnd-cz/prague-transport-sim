@@ -25,14 +25,16 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
   OSM's grass areas inside the known spans (tools/grass_review.py prints how near). A street across the track is an
   `embedded` section; pieces under MIN_PIECE between two holes are left out.
 
-- **Junctions and road crossings in paved track** (#546; the user, 2026-11-13: "the track styles don't switch at the
+- **Junctions and road crossings** (#546; the user, 2026-11-13: "the track styles don't switch at the
   expected places like in junctions (expected embedded asphalt color) and crossing roadway across track isn't
   displayed in full width"): where no section says otherwise, the track is `embedded` over a carriageway crossing it
   (the survey's carriageway at our axis through the crossing point, CROSS_REACH m past OSM's width at most, else
   OSM's width at its angle; a way without OSM's car flag counts where the survey has carriageway at the crossing
   point, a service road at Řepy), a switch (SWITCH_PAD m before it to SWITCH_PAD past its frog) and a diamond (a drawn
   track crossing ours at DIAMOND_MIN° or more, where the two beds overlap). Pieces less than MIN_PIECE apart join.
-  Grass and ballast keep #503's rule (open ballast through switches). The survey's carriageway is read at crossing
+  Grass yields to them too (the user, 2026-11-13: "for the roads crossing tracks and junctions I would default to
+  embedded asphalt style"); open ballast keeps its switches (#503) and the user's marks of another style win. The
+  survey's carriageway is read at crossing
   points only: along the route its road areas run over grass track it does not map (line 22 at Pohořelec). Embedded
   and panels stand the same height over the bed (`railAboveDeck`), so this moves no height.
 
@@ -283,23 +285,37 @@ def junctions(data, survey):
 
 
 def embed(secs, js):
-    """Paved track (no section) embedded over the junctions `js`: where a section says otherwise (the user's marks,
-    grass, ballast, their holes) it wins. Embedded pieces less than MIN_PIECE apart join over the panels between."""
+    """Embedded over the junctions `js`, whatever the section there, but open ballast (the user, #503: "the branch to
+    depo hostivař loop has open ballast including switches") and the user's own marks of another style than grass.
+    Grass yields to them (the user, 2026-11-13: "for the roads crossing tracks and junctions I would default to
+    embedded asphalt style which will be also easier to judge if the transition happens at the correct place").
+    Embedded pieces less than MIN_PIECE apart join over the panels between."""
+    wins = [x for x in secs if x["style"] in ("ballast", "embedded") or (x["source"] == "user" and x["style"] != "grass")]
     free = []
     for j in js:
-        free += [(a, b, j["kind"]) for a, b in minus(j["s0"], j["s1"], secs)]
+        free += [(a, b, j["kind"]) for a, b in minus(j["s0"], j["s1"], wins)]
     free.sort()
     merged = []
     for a, b, k in free:
         if merged and a - merged[-1][1] < MIN_PIECE and not any(
-                x["s1"] > merged[-1][1] and x["s0"] < a and x.get("source") != "hole" for x in secs):
+                x["s1"] > merged[-1][1] and x["s0"] < a and x.get("source") != "hole" and x["style"] != "embedded"
+                for x in secs):
             merged[-1][1] = max(merged[-1][1], b)
             merged[-1][2].add(k)
         else:
             merged.append([a, b, {k}])
     add = [{"s0": a, "s1": b, "style": "embedded", "source": "junction", "junction": sorted(k)} for a, b, k in merged
            if b - a >= 1]
-    return sorted(secs + add, key=lambda x: x["s0"])
+    # (the grass around them keeps what is left, MIN_PIECE or longer; the holes they cover go)
+    out = []
+    for x in secs:
+        if x["style"] == "grass":
+            out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], add) if b - a >= MIN_PIECE]
+        elif x.get("source") == "hole" and any(y["s0"] <= x["s0"] and x["s1"] <= y["s1"] for y in add):
+            continue
+        else:
+            out.append(x)
+    return sorted(out + add, key=lambda x: x["s0"])
 
 
 def cut(secs, hs):
