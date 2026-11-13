@@ -910,6 +910,15 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   4 threads and 24 run about as fast. The thread count changes BLAS results in their last bits (sums split
   differently); the line heights came out byte-identical at 4 and at 24. `tools/rebuild.py` sets
   `OPENBLAS_NUM_THREADS` per step.
+- numpy has no banded or triangular solver; SciPy's LAPACK wrappers do: `scipy.linalg.lapack.dpbtrf` factors a
+  symmetric positive definite band matrix (upper storage, `ab[u+i-j, j] = A[i, j]`) and `dpbtrs` solves with the
+  factor, a 1-d right-hand side included. On the vertical profile's pentadiagonal system (n 3303) a solve took 50 us
+  against 1.66 ms for a product with the dense inverse (4 BLAS threads), the factor 0.3 ms against the inverse's 0.87
+  s; the answers 2.6e-12 apart, the residual smaller; the heights byte-identical (#516).
+- A warm start is not a free speed-up for an iterative solve whose results feed one another: ADMM started from where
+  the same solve ended last time stops at another point within its tolerance, and the rounds of meeting half way (one
+  chain's heights are another's pins) then ended after 4 rounds instead of 6 and moved one junction's heights by up to
+  16 mm (#516).
 - Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
   rewritten within the same second at the same size runs the old code (a test that edits a module must
   change its size).
@@ -924,6 +933,9 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
   stopped a parallel rebuild (#521). A file several threads or processes write needs one writer at a
   time and a retry for the readers (`tools/stepcache.py` `_waiting`).
+- A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
+  in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
+  faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
 
 ## The test host
 

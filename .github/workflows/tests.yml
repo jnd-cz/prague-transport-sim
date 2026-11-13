@@ -20,6 +20,6 @@ jobs:
           python-version: "3.12"
       # the versions on the development PCs; playwright only as a module (headless.py imports it),
       # the browser tests are not run here
-      - run: python -m pip install ruff==0.17.3 numpy~=2.5 shapely~=2.2 pyproj~=3.8 osmium~=4.3 Pillow~=13.0 playwright~=1.64 brotli~=1.2 pydelatin==0.4.0
+      - run: python -m pip install ruff==0.17.3 numpy~=2.5 scipy~=1.18 shapely~=2.2 pyproj~=3.8 osmium~=4.3 Pillow~=13.0 playwright~=1.64 brotli~=1.2 pydelatin==0.4.0
       - run: ruff check tools
       - run: python -I tools/test_all.py
