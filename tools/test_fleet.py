@@ -60,6 +60,9 @@ DEALER = r"""async () => {
     }
   }
   Object.assign(out, { twice, oursDealt, setSplit, singleSet, typeMix, historic: [...historic].sort() });
+  // (the type and numbers: the livery a set is dealt is tools/test_liveries.py's)
+  const tn = (x) => x && { type: x.type, numbers: x.numbers };
+  out.ours = tn(out.ours);
   // our single car from a pair (line 23): its partner runs alone on AI single cars, the pair is never dealt whole
   const o = new V.FleetDealer(v3, rng(5)), one = o.ours(1, V.preferredSet(v3, '6892+6921'));
   let partner = 0, oursSingle = 0, pairWhole = 0;
@@ -70,11 +73,11 @@ DEALER = r"""async () => {
     if (s.numbers.length === 2 && s.numbers.includes(6921)) pairWhole++;
     o.give(s.numbers);
   }
-  out.single = { one, partner, oursSingle, pairWhole };
+  out.single = { one: tn(one), partner, oursSingle, pairWhole };
   // the preferred set's forms; the hybrid's own fleet
   out.prefer = { lone: V.preferredSet(v3, '7269'), setText: V.preferredSet(v3, '6892+6921'), mixed: V.preferredSet(v3, '6892+7001'), none: V.preferredSet(v3, '1') };
   const lone = new V.FleetDealer(v3, rng(3)).ours(2, V.preferredSet(v3, '7005'));
-  out.prefer.loneFree = lone;
+  out.prefer.loneFree = tn(lone);
   out.prefer.dealtNoPrefer = new V.FleetDealer(v3, rng(3)).ours(2).type;
   out.hybrid = [...new Set(Array.from({ length: 500 }, () => new V.FleetDealer(vh, rng(4)).deal(2).type))];
   // replay: the same stream deals the same

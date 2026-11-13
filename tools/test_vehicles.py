@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The vehicle registry's manifests (#455): assets/vehicles.json and each assets/<id>/vehicle.json.
+"""The vehicle registry's manifests (#455): assets/vehicles.json, each assets/<id>/vehicle.json and livery.json.
 
     python -I tools/test_vehicles.py
 
 Checks every manifest the index lists: the fields the game reads (src/vehicles.js), the files present with the sizes
 it states, the licence (a redistributable SPDX id, its LICENSE.txt, authors, sources, a credit line), a row in
 ASSETS.md for its files, its fleet (types, ranges, sets), and that src/ names none of its files or its credit (the
-manifest is the one place). Docs: docs/vehicles.md, "The manifest". Exit code 1 on a failure.
+manifest is the one place), its livery slots (#529: a glTF vehicle's slots name materials its model has). Each livery
+the index lists (#529): its vehicle, the slots it paints among those the vehicle declares, its images WebP, PNG or JPEG
+with power-of-two sides up to 2048 px, its licence, its files' rows in ASSETS.md. Docs: docs/vehicles.md, "The
+manifest" and "Liveries". Exit code 1 on a failure.
 """
 import json
 import os
 import re
+import struct
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +25,7 @@ LICENCES = {"CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-NC-SA
             "GPL-3.0-or-later", "AGPL-3.0-or-later", "MIT"}
 MOVES = {"bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"}
 MODEL_EXT = {".gltf", ".glb"}
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 
@@ -76,6 +81,94 @@ def fleet_problems(fleet):
     for n in fleet.get("liveries", {}):
         need(n.isdigit() and int(n) in type_of, f"fleet livery for {n}: not one of the fleet's numbers")
     return bad
+
+def model_materials(path):
+    """The material names of a .glb or .gltf model (its JSON)."""
+    raw = open(path, "rb").read()
+    if raw[:4] == b"glTF":
+        n = struct.unpack_from("<I", raw, 12)[0]
+        raw = raw[20:20 + n]
+    return {m.get("name") for m in json.loads(raw).get("materials", [])}
+
+
+def image_size(path):
+    """(kind, width, height) of a PNG, JPEG or WebP file, or (None, 0, 0)."""
+    b = open(path, "rb").read()
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return ("png", *struct.unpack(">II", b[16:24]))
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        c = b[12:16]
+        if c == b"VP8X":
+            return ("webp", 1 + int.from_bytes(b[24:27], "little"), 1 + int.from_bytes(b[27:30], "little"))
+        if c == b"VP8L":
+            v = int.from_bytes(b[21:25], "little")
+            return ("webp", 1 + (v & 0x3FFF), 1 + ((v >> 14) & 0x3FFF))
+        if c == b"VP8 ":
+            w, h = struct.unpack("<HH", b[26:30])
+            return ("webp", w & 0x3FFF, h & 0x3FFF)
+    if b[:2] == b"\xff\xd8":
+        i = 2
+        while i + 9 < len(b):
+            if b[i] != 0xFF:
+                i += 1
+                continue
+            mark, size = b[i + 1], struct.unpack(">H", b[i + 2:i + 4])[0]
+            if mark in (0xC0, 0xC1, 0xC2):
+                h, w = struct.unpack(">HH", b[i + 5:i + 9])
+                return ("jpeg", w, h)
+            i += 2 + size
+    return (None, 0, 0)
+
+
+def livery_problems(lv, lid, vehicles, files_on_disk=None, assets_md=""):
+    """A livery's problems (docs/vehicles.md, Liveries; the game refuses it the same way: src/vehicles.js
+    liveryProblems). vehicles: id -> its manifest. files_on_disk: its folder, None for a sample without files."""
+    bad = []
+    need = lambda cond, msg: cond or bad.append(msg)  # noqa: E731
+    need(lv.get("schema") == 1, "schema is not 1")
+    need(lv.get("kind") == "livery", f"kind {lv.get('kind')!r} is not livery")
+    need(lv.get("id") == lid, f"id {lv.get('id')!r} is not its folder's {lid!r}")
+    names = lv.get("names") or {}
+    need(all(isinstance(names.get(k), str) and names[k].strip() for k in ("cs", "en")), "names in cs and en")
+    req = list((lv.get("requires") or {}).keys())
+    need(len(req) == 1, f"requires names {len(req)} vehicles, wants one")
+    v = vehicles.get(req[0]) if req else None
+    if not v:
+        bad.append(f"its vehicle {req[0] if req else None} is not in assets/vehicles.json")
+        return bad
+    slots, paints = v.get("slots") or {}, v.get("colours") or []
+    paths = [f.get("path") for f in lv.get("files", [])]
+    for s, p in (lv.get("textures") or {}).items():
+        need(s in slots, f"texture slot {s}: {v['id']} has no such slot")
+        need(p in paths, f"texture {p} is not among its files")
+    for s, c in (lv.get("colours") or {}).items():
+        need(s in slots or s in paints, f"colour slot {s}: {v['id']} has no such slot")
+        need(isinstance(c, str) and HEX.match(c), f"colour {s} {c!r} is not #rrggbb")
+    num = lv.get("numbers") or {}
+    need(not num.get("colour") or HEX.match(num["colour"]), f"numbers.colour {num.get('colour')!r} is not #rrggbb")
+    ftypes = set((v.get("fleet") or {}).get("types", {}))
+    for t in lv.get("types") or []:
+        need(t in ftypes, f"type {t}: {v['id']}'s fleet has no such type")
+    share = lv.get("share", 0)
+    need(isinstance(share, (int, float)) and 0 <= share <= 1, f"share {share!r} is not between 0 and 1")
+    lic = lv.get("licence") or {}
+    need(lic.get("spdx") in LICENCES, f"licence {lic.get('spdx')!r} is none of the redistributable ones")
+    need(bool(lic.get("authors")) and bool(lic.get("sources")), "licence without authors or sources")
+    if files_on_disk is not None:
+        rows = [r for r in assets_md.splitlines() if r.startswith("|") and f"assets/{lid}/" in r]
+        for f in lv.get("files", []):
+            p = os.path.join(files_on_disk, f.get("path", ""))
+            if not os.path.isfile(p):
+                bad.append(f"file {f.get('path')} missing")
+                continue
+            need(os.path.getsize(p) == f.get("bytes"), f"file {f['path']} is {os.path.getsize(p)} bytes, the manifest says {f.get('bytes')}")
+            kind, w, h = image_size(p)
+            need(kind is not None, f"file {f['path']} is no WebP, PNG or JPEG")
+            if kind:
+                need(all(0 < x <= 2048 and x & (x - 1) == 0 for x in (w, h)), f"image {f['path']} is {w} x {h} px, wants power-of-two sides up to 2048")
+            need(any(f["path"] in r for r in rows), f"file {f['path']} has no row in ASSETS.md")
+    return bad
+
 
 def vehicle_types():
     """The types src/tram.js offers (VEHICLE_TYPES)."""
@@ -134,6 +227,17 @@ def check(v, vid, types, assets_md, src):
     need(set(moves) <= MOVES, f"moves {sorted(set(moves) - MOVES)} unknown (docs/vehicles.md, Tiers of movement)")
     need(isinstance(v.get("levels"), int) and v["levels"] >= 1, "levels is not a count")
     bad += fleet_problems(v.get("fleet"))
+    # the livery slots (#529): a glTF vehicle's name its model's materials; a built-in one's painted colours by name
+    slots = v.get("slots") or {}
+    need(isinstance(slots, dict) and all(isinstance(m, str) or isinstance(m, list) and all(isinstance(x, str) for x in m) for m in slots.values()),
+         "slots is not slot -> material names")
+    model = os.path.join(ASSETS, vid, v.get("model") or "")
+    if slots and loader != "builtin" and os.path.isfile(model):
+        have = model_materials(model)
+        for s, ms in slots.items():
+            for m in [ms] if isinstance(ms, str) else ms:
+                need(m in have, f"slot {s}: its model has no material {m}")
+    need(isinstance(v.get("colours", []), list), "colours is not a list of slot names")
     # the manifest is the one place for its files and its credit (#455)
     for p in paths:
         need(p not in src, f"src/ names its file {p}")
@@ -160,6 +264,7 @@ def main():
     src = "\n".join(open(os.path.join(ROOT, "src", f), encoding="utf-8").read()
                     for f in sorted(os.listdir(os.path.join(ROOT, "src"))) if f.endswith(".js"))
     src += open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
+    manifests = {}
     for vid in ids:
         p = os.path.join(ASSETS, vid, "vehicle.json")
         if not os.path.isfile(p):
@@ -170,10 +275,43 @@ def main():
         except ValueError as e:
             fails.append(f"{vid}: vehicle.json is not JSON: {e}")
             continue
+        manifests[vid] = v
         bad = check(v, vid, types, assets_md, src)
         fails += [f"{vid}: {b}" for b in bad]
         print(f"{vid}: {v.get('loader')}, tier {v.get('tier')}, {len(v.get('files', []))} files, "
               f"{v.get('licence', {}).get('spdx')}{'' if bad else ', ok'}")
+    # the liveries (#529)
+    lids = index.get("liveries", [])
+    need_l = {d for d in os.listdir(ASSETS) if os.path.isfile(os.path.join(ASSETS, d, "livery.json"))}
+    for d in sorted(need_l - set(lids)):
+        fails.append(f"assets/{d}/livery.json is not in assets/vehicles.json")
+    for lid in lids:
+        p = os.path.join(ASSETS, lid, "livery.json")
+        if not os.path.isfile(p):
+            fails.append(f"{lid}: assets/{lid}/livery.json missing")
+            continue
+        lv = json.load(open(p, encoding="utf-8"))
+        bad = livery_problems(lv, lid, manifests, os.path.join(ASSETS, lid), assets_md)
+        fails += [f"{lid}: {b}" for b in bad]
+        print(f"{lid}: a livery of {next(iter(lv.get('requires', {})), None)}, {len(lv.get('files', []))} files{'' if bad else ', ok'}")
+    # (none listed yet, the user, 2026-11-13: "For now I would keep only the default liveries"; the samples below and
+    # tools/test_liveries.py's check the rules)
+    # the livery check refuses what it should: a slot the vehicle lacks by its name
+    vh = {"t3h": {"id": "t3h", "slots": {"body": ["Red_Hull"]}, "fleet": {"types": {"T3SUCS": {}}}}}
+    base = {"schema": 1, "kind": "livery", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},
+            "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.png"}]}
+    lsamples = [
+        ({**base, "textures": {"body": "a.png"}}, None),
+        ({**base, "textures": {"roof": "a.png"}}, "texture slot roof: t3h has no such slot"),
+        ({**base, "colours": {"wheels": "#000000"}}, "colour slot wheels: t3h has no such slot"),
+        ({**base, "colours": {"body": "red"}}, "colour body 'red' is not"),
+        ({**base, "types": ["T3M"]}, "type T3M: t3h's fleet has no such type"),
+        ({**base, "requires": {"t9": ">=1"}}, "its vehicle t9 is not"),
+    ]
+    for lv, want in lsamples:
+        got = livery_problems(lv, "x", vh)
+        if want is None and got or want is not None and not any(g.startswith(want) for g in got):
+            fails.append(f"livery check on a sample: wanted {want or 'no problem'}, got {got}")
     # the fleet check refuses what it should (each sample one fault, its sentence's start)
     good = {"types": {"T3": {"ranges": [[6400, 6410]], "except": [6405]}, "T3M": {"list": [8080, 8074]}},
             "sets": [[6401, 6402], [8080, 8074]], "liveries": {"6401": "wrap"}}
@@ -193,7 +331,7 @@ def main():
             fails.append(f"fleet check on a sample: wanted {want or 'no problem'}, got {got}")
     for f in fails:
         print("FAIL", f)
-    print(f"{len(ids)} vehicles, {len(samples)} fleet samples, {len(fails)} failures")
+    print(f"{len(ids)} vehicles, {len(lids)} liveries, {len(samples)} fleet and {len(lsamples)} livery samples, {len(fails)} failures")
     return 1 if fails else 0
 
 
