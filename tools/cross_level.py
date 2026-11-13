@@ -35,8 +35,11 @@ Every STEP m along our route (`path`, s from 0 as tools/route.py and the page co
 - **Only at junctions and in curves** (`where`): within JUNCTION m of a DI crossing, a switch or a road crossing, and
   where the radius is under CURVE_R; straight track outside them stays level, the ramps running out of them. Measured
   before: of 14.9 km tilted on the five lines, 4.8 km was straight track outside junctions (up to 43 mm); levelled,
-  a rail head stands 8-11 mm (median) off the street between the two tracks, as on main. `places` say whether a curve's
-  tilt falls to its outside (`against the curve`).
+  a rail head stands 8-11 mm (median) off the street between the two tracks, as on main. In a curve away from
+  junctions the tilt falls only to the curve's centre (the user, 2026-11-13: "I would allow the outward tilt only near
+  crossings and junctions, elsewhere like throughout a street I would forbid outward tilt"); within a junction the
+  street decides (DI sets half of those places). `places` say whether a tilt falls to a curve's outside
+  (`against the curve`).
 - **Where a DI track crosses ours** (`crossings`: the other lines' tracks surveyed by DI, at the rails of our track
   or of the opposite one), its heights at our two rails set the cross level there (`anchor`), whatever the rule says:
   the track network is the fixed base the surfaces meet (the user, 2026-11-13: "where there is a junction with
@@ -210,10 +213,11 @@ def fuse(falls, method=FUSE, sig=None):
     return np.where(fin.sum(axis=0) >= 2, out, np.nan)
 
 
-def cross_level(fall, res, street, pair, allow=None):
+def cross_level(fall, res, street, pair, allow=None, inward=None):
     """Signed cross level (m, + = the left rail lower) from the street's fall across both tracks (left up > 0; the
     sources' compromise, `fuse`) where IPR's plane through the band is clean (`res`): smoothed, level under LEVEL,
-    ramped, capped; only where `allow` (junctions and curves), the ramps running out of them. Returns (c, ok)."""
+    ramped, capped; only where `allow` (junctions and curves), the ramps running out of them; where `inward` (+1 a left
+    curve, -1 a right one, 0 free) only to the curve's centre. Returns (c, ok)."""
     ok = street & pair & np.isfinite(fall) & (res < RESID)
     sm = smooth(fall, ok, street & pair)
     # (a stretch falling LEVEL or more keeps the fall's own flanks down to FLANK on either side: the road's tilt comes
@@ -236,6 +240,9 @@ def cross_level(fall, res, street, pair, allow=None):
     sm = np.where(keep, sm, 0.0)
     if allow is not None:
         sm = np.where(allow, sm, 0.0)
+    if inward is not None:
+        # (a left curve's centre on the left: the left rail lower, c = -sm * GAUGE > 0, the street falling left)
+        sm = np.where((inward != 0) & (np.sign(-sm) == -inward), 0.0, sm)
     c = np.clip(-sm * GAUGE, -CANT_MAX, CANT_MAX)
     c = extend(c, CANT_MAX / 30 * STEP)
     return np.where(np.abs(c) < 0.002, 0.0, c), ok
@@ -449,7 +456,9 @@ def build(data, sample, truth=None, survey=None, method=FUSE):
     # the fixed base the surfaces meet)
     di = [q for q in crossings(data, rt, s, z, zb, off) if street[q["k"]]]
     junc, curve, turn = where(data, s, rt, di)
-    c, ok = cross_level(fused, res, street, pair, junc | curve)
+    # (in a curve away from junctions only to its centre: the user, 2026-11-13, "I would allow the outward tilt only
+    # near crossings and junctions, elsewhere like throughout a street I would forbid outward tilt")
+    c, ok = cross_level(fused, res, street, pair, junc | curve, np.where(curve & ~junc, turn, 0))
     # (the tracks' slope off the compromise by LEVEL or more: a track's height is off, #539)
     disagree = ok & np.isfinite(fall) & (np.abs(fall - fused) >= DISAGREE)
     c = anchor(c, [q["k"] for q in di], [q["c"] for q in di], CANT_MAX / 30 * STEP)

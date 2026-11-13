@@ -122,6 +122,17 @@ class Where(unittest.TestCase):
         self.assertAlmostEqual(c[35], 0.045, delta=0.002)
         self.assertFalse(c[:10].any() or c[70:].any())  # (beyond the ramps out of the junction)
 
+    def test_a_curve_away_from_junctions_tilts_only_inwards(self):
+        fall = np.full(80, -0.03)  # (left up > 0: the street falls 3 % to the left, c > 0, the left rail lower)
+        ones = np.ones(80, bool)
+        left, right = np.ones(80), -np.ones(80)
+        c_in, _ = cl.cross_level(fall, np.zeros(80), ones, ones, ones, left)
+        c_out, _ = cl.cross_level(fall, np.zeros(80), ones, ones, ones, right)
+        c_free, _ = cl.cross_level(fall, np.zeros(80), ones, ones, ones, np.zeros(80))
+        self.assertGreater(c_in[40], 0.04)    # a left curve: falling left, to its centre
+        self.assertFalse(c_out.any())         # a right curve: falling left is outwards
+        self.assertGreater(c_free[40], 0.04)  # a junction: whichever way the street falls
+
     def test_junctions_curves_and_their_turn(self):
         from route import Route
         # straight 100 m east, then a left curve of radius 100 m
