@@ -1271,4 +1271,6 @@ def main():
 
 
 if __name__ == "__main__":
+    import heavy
+    heavy.turn(f"build_line {LINE}")  # (a heavy job run alone, 60-77 s; under rebuild.py in its turn, #536)
     main()

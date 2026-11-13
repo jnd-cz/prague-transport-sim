@@ -29,6 +29,8 @@ from dtm_packages import DTM, select_packages  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
+import heavy  # noqa: E402
+heavy.turn(f"dtm {LINE}")  # (a heavy job run alone, ~60 s; under rebuild.py in its turn, #536)
 
 # area classes by the DTM object type code at the end of the layer name
 CLASSES = {

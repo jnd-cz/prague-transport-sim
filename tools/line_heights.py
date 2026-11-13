@@ -1328,6 +1328,8 @@ def main():
     ap.add_argument('--staged', help='an import of this checkout (tools/import_track_heights.py --evidence ...)')
     ap.add_argument('--smooth', choices=('wh3', 'none'), default='wh3', help='the smoother in front of the band rule (#358)')
     args = ap.parse_args()
+    import heavy
+    heavy.turn('line_heights')  # (a heavy job run alone, ~2 min on up to 12 workers; under rebuild.py in its turn, #536)
     sys.stdout.reconfigure(encoding='utf-8')
     truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
     ha.load(truth)
