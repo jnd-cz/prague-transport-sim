@@ -16,10 +16,14 @@
   "tier": 2,
   "moves": ["bogies", "wheels", "couplers", "collector", "lamps"],
   "levels": 1,
-  "variants_source": "the user, 2026-11-10: \"Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106\"; a type's share of AI trams follows its range's size (\"roughly related to their range sizes\")",
-  "variants": [
-    { "type": "T3", "fleet": [[6400, 6992]] },
-    { "type": "T3SUCS", "fleet": [[7001, 7292]] },
-    { "type": "T3M", "fleet": [[8005, 8106]] }
-  ]
+  "fleet_source": "the user, 2026-11-10: \"Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106\"; a type's share of AI trams follows its range's size (\"roughly related to their range sizes\"); the sets: the historic cars still kept, paired as the user gave them (2026-11-11, PR #462: \"pair them like: 6892+6921, 7269+7290, 8080+8074\")",
+  "fleet": {
+    "operator": "DPP",
+    "types": {
+      "T3": { "ranges": [[6400, 6992]] },
+      "T3SUCS": { "ranges": [[7001, 7292]] },
+      "T3M": { "ranges": [[8005, 8106]] }
+    },
+    "sets": [[6892, 6921], [7269, 7290], [8080, 8074]]
+  }
 }

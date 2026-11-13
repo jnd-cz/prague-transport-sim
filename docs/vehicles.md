@@ -41,7 +41,7 @@ credits from the manifests (`src/vehicles.js`, `src/main.js`); `tools/test_vehic
 | `preload` | `true`: downloaded with the line; else when the player picks it |
 | `licence` | `spdx` (a licence that allows redistribution), `commercial` (false for NC), `file` (its `LICENSE.txt`), `authors`, `sources` (URLs), `credit` (the line the game shows) |
 | `tier` | its tier of movement (below), `moves` the parts it moves, `levels` its distance levels |
-| `variants` | the types it can be (`type`, e.g. `T3SUCS`) and their fleet numbers (`fleet`: ranges `[first, last]`); an AI tram's type and its cars' numbers come from its run number (`src/vehicles.js`), each type as often as it has numbers |
+| `fleet` | the numbers its sets run as (#527): `types`, per type (e.g. `T3SUCS`) its `ranges` `[first, last]` with `except` (holes), or a `list`; `sets`, the pairs that run together and only together (a set not listed is two numbers of one type); `liveries`, number → livery id (#529). The run deals them (`src/vehicles.js` `FleetDealer`): a deck of every number shuffled by the run's seed, so each type comes up as often as it has numbers, none twice on the street, given back when a set leaves; our tram runs as the player's preferred set from the menu, else as a T3SUCS dealt the same way, and no AI tram is dealt its numbers. `tools/test_fleet.py` checks the dealing |
 
 A **tier-1 glTF** needs no code: a still model in metres, its origin on the rail plane midway between the bogie
 pivots, +Y up, facing `forward`; its pivots are its type's. The menu offers it, it loads when picked and the
@@ -160,7 +160,7 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
   (`NOSE`, `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), each with where it comes from; the livery is
   painted in `livery()`, the fixed parts in `partsGeometry()`, the moving ones in `bogie()`, `wheelset()`,
   `coupler()` and `pantoBars()` (the pantograph's frame for a contact height), the types and their fleet numbers in
-  its manifest's `variants` (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` checks it against those numbers.
+  its manifest's `fleet` (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` checks it against those numbers.
 - **The plates and cards** for every model: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, the T3M's dot-matrix `ledFace`).
 - **The hybrid:** maintained in the repo (its asset lab is retired): a change to the model is made by a repo tool and

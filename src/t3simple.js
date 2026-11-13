@@ -884,7 +884,7 @@ export function poseSimple(model, { collector, braking, signals, highBeam } = {}
 
 // A set of `cars` built-in T3s in `root` (src/models.js makeT3): `mats` holds the plates' materials
 // (route box, mirror plate, rear plate, destination and run cards), which setConsistLine swaps; `variant`
-// 'T3', 'T3SUCS' or 'T3M' (its manifest's variants, assets/t3simple/vehicle.json), `fleet` the cars' numbers; the
+// 'T3', 'T3SUCS' or 'T3M' (its manifest's fleet types, assets/t3simple/vehicle.json), `fleet` the cars' numbers; the
 // collector on the wire `wire` m over the rail.
 export function makeSimpleSet(root, cars, dest, mats, wire, { variant = 'T3SUCS', fleet = Array(cars).fill(null) } = {}) {
   const P = shapes(variant);
