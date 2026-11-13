@@ -685,15 +685,36 @@ def _pool(n, chs=None):
                         {k: getattr(ha, k) for k in ANSWERS}, chs)
 
 
-def presolve(chs, order, r, pool=None, kept=None):
+BIG_RUN, BIG_BLAS = 1500, 12  # points, threads: a run this long is solved in a worker of its own with BIG_BLAS BLAS threads
+
+
+def _big_pool(chs):
+    """The worker for the largest runs: the heights' 16.5 km run (n 3303) is solved again in each of the 6 rounds of
+    meeting half way, ~20 s each with 4 BLAS threads, while the other workers wait; with 12 one ADMM step on it took 1.27
+    ms instead of 2.06 and its inverse 0.43 s instead of 0.63 (#516). The threads are read at the worker's start."""
+    import sysinfo
+    was = os.environ.get('OPENBLAS_NUM_THREADS')
+    os.environ['OPENBLAS_NUM_THREADS'] = str(BIG_BLAS)
+    try:
+        ex = sysinfo.pool(1, _worker, {k: getattr(ha, k) for k in ANSWERS}, chs)
+        ex.submit(int, 0).result()  # (its worker starts now)
+    finally:
+        if was is None:
+            os.environ.pop('OPENBLAS_NUM_THREADS', None)
+        else:
+            os.environ['OPENBLAS_NUM_THREADS'] = was
+    return ex
+
+
+def presolve(chs, order, r, pool=None, kept=None, big=None):
     """Every chain's first solve, without pins: each reads only its own chain, so they run side by side in the workers,
     the longest first (one process solved a line's chains in 192 s, these first solves about half of it, #511).
     {chain: (runs, held, steps, review, dropped, apart)}."""
-    in_turn(chs, order, {i: () for i in order}, lambda i: {}, r, pool, kept)
+    in_turn(chs, order, {i: () for i in order}, lambda i: {}, r, pool, kept, big)
     return {i: (chs[i].runs, chs[i].held, chs[i].steps, chs[i].review, chs[i].dropped, chs[i].apart) for i in order}
 
 
-def in_turn(chs, order, waits, prepare, r, pool, kept=None):
+def in_turn(chs, order, waits, prepare, r, pool, kept=None, big=None):
     """Each chain of `order` once the chains it waits for (before it in the order) are done: prepare(i) gives its pins, or
     None where it is not solved (again). A chain's runs are solved in the pool when there is one, side by side with the
     others' whose waits are over (the longest chain's first solve set the pace of all the first solves, ~20 s of 26, #516);
@@ -745,7 +766,8 @@ def in_turn(chs, order, waits, prepare, r, pool, kept=None):
                 done(i)
             else:
                 for n in sorted(todo, key=lambda n: -len(runs[n])):
-                    running[pool.submit(_run, i, runs[n], r)] = (i, n)
+                    ex = big if big is not None and len(runs[n]) >= BIG_RUN else pool
+                    running[ex.submit(_run, i, runs[n], r)] = (i, n)
         if running:
             over, _ = wait(running, return_when=FIRST_COMPLETED)
             for f in over:
@@ -799,8 +821,9 @@ def assemble(chs):
     pinned, used, apart, t0 = 0, [], {}, time.time()
     order = sorted(range(len(chs)), key=lambda i: -chs[i].length)
     pool = _pool(len(order), chs) if len(order) >= POOL else None
+    big = _big_pool(chs) if pool is not None and any(len(c.bins) >= BIG_RUN for c in chs) else None
     kept = {}  # (each chain's runs and what they found: a run as it was at an earlier solve keeps it, in_turn)
-    unpinned = presolve(chs, order, r, pool, kept)
+    unpinned = presolve(chs, order, r, pool, kept, big)
     print(f'  every chain solved without pins, {time.time() - t0:.0f} s', flush=True)
     pos = {i: n for n, i in enumerate(order)}
 
@@ -840,7 +863,7 @@ def assemble(chs):
                   f'{time.time() - t0:.0f} s', flush=True)
         return got[i][0] or None
 
-    in_turn(chs, order, {i: {j for _, j, _, _ in meets[i] if pos[j] < pos[i]} for i in order}, pinned_pass, r, pool, kept)
+    in_turn(chs, order, {i: {j for _, j, _, _ in meets[i] if pos[j] < pos[i]} for i in order}, pinned_pass, r, pool, kept, big)
     last = {}
     for i in order:
         pins, mine, gone = got[i]
@@ -877,9 +900,10 @@ def assemble(chs):
         if not gap:
             break
         # (a chain's pins come from the chains it is pinned to, before it in the order: it waits for them this round)
-        in_turn(chs, order, {i: {u[2] for u in by_chain[i]} for i in order}, meet, r, pool, kept)
-    if pool is not None:
-        pool.shutdown()
+        in_turn(chs, order, {i: {u[2] for u in by_chain[i]} for i in order}, meet, r, pool, kept, big)
+    for ex in (pool, big):
+        if ex is not None:
+            ex.shutdown()
     met = met[0]
     if met:
         print(f'junctions held at the floor: the tracks met half way, {met} chains solved again; the widest gap by round, m: '
