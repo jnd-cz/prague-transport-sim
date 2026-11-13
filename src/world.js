@@ -308,8 +308,8 @@ function bedZ(row, o) {
 }
 
 // The survey under every drawn track's bed (#548): a ground-level street, green or rail vertex within a bed's outline lies
-// under its surface (by STREET_BELOW, as next to our route's tracks); within EDGE_BAND m past its edge no higher than
-// EDGE_RISE m over the edge. The route's flush (flushDtm) laid the street to our tracks' profile; this lays it to
+// under its surface (by STREET_BELOW, as next to our route's tracks); past its edge rising to at most EDGE_RISE m over
+// it at EDGE_BAND m (a vertex on the edge allowed 0.2 m stood over the bed in jags, line 17 s 2350). The route's flush (flushDtm) laid the street to our tracks' profile; this lays it to
 // every drawn track's own top of rail and tilt (other lines' tracks crossing and leaving ours, loops: the user, line 37
 // s 1: "Spojovací rails hidden", and line 17 s 2366: "Canted tracked, lower rail disappears"). Only lowers, and only
 // what lies within LEVEL m of the bed (else another level: a bridge, an underpass).
@@ -333,7 +333,7 @@ function layUnderBeds(dtm, near) {
       if (zs !== null) cap = Math.min(cap, zs - STREET_BELOW);
       else {
         const e = o < 0 ? 0 : 3, past = Math.abs(o - row[4][e]);
-        if (past <= EDGE_BAND) cap = Math.min(cap, row[5][e] - STREET_BELOW + EDGE_RISE);
+        if (past <= EDGE_BAND) cap = Math.min(cap, row[5][e] - STREET_BELOW + (EDGE_RISE * past) / EDGE_BAND);
       }
     }
     if (p[2] > cap && p[2] - cap < LEVEL) { p[2] = cap; moved++; }
@@ -598,10 +598,22 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
       const [, A, B, v] = best, mix = (a, b) => a.map((q, j) => q * (1 - v) + b[j] * v);
       const row = [A[0] * (1 - v) + B[0] * v, A[1] * (1 - v) + B[1] * v, A[2] * (1 - v) + B[2] * v, A[3] * (1 - v) + B[3] * v, mix(A[4], B[4]), mix(A[5], B[5])];
       const nl = Math.hypot(row[2], row[3]) || 1, o = ((x - row[0]) * row[2] + (y - row[1]) * row[3]) / nl / nl;
-      out.push([row, o]);
+      out.push([row, o, k]);
     }
     return out;
   };
+  // (where beds overlap, a junction or a switch, a bed's edge no higher than the other bed under it: an edge over the
+  // other track's rail heads buried them, #165, #548; another level, over 0.3 m apart, is left)
+  const edges = data.tracks.map((t, k) => beds[k].rows.map(([x, y, nx, ny, off, z]) => [0, 3].map((j) => {
+    let m = z[j];
+    for (const [row, o, kk] of bedsNear(x + nx * off[j], y + ny * off[j])) {
+      if (kk === k) continue;
+      const zs = bedZ(row, o);
+      if (zs !== null && m > zs && m - zs < 0.3) m = zs;
+    }
+    return m;
+  })));
+  data.tracks.forEach((t, k) => beds[k].rows.forEach((row, i) => { row[5][0] = edges[k][i][0]; row[5][3] = edges[k][i][1]; }));
   if (ground.dtm) layUnderBeds(ground.dtm, bedsNear);
   const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
     (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);

@@ -518,8 +518,36 @@ export function delaunayFlips(pts, tris) {
   }
   return tris;
 }
+// Near a drawn track (#548): the survey's ground is meshed finer there (FINE m edges within NEAR m of a track's axis), so
+// its vertices lie on and beside the beds and world.js layUnderBeds can lay them under the beds: a 5 m triangle spanning
+// a bed rose over it between its corners (line 17 s 2366, line 37's Spojovací loop)
+const FINE = 2, NEAR = 4.5;
+export function nearTracks(tracks) {
+  const cell = 4, grid = new Map();
+  for (const t of tracks) {
+    const p = t.p || [];
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i], b = p[i + 1];
+      const x0 = Math.floor((Math.min(a[0], b[0]) - NEAR) / cell), x1 = Math.floor((Math.max(a[0], b[0]) + NEAR) / cell);
+      const y0 = Math.floor((Math.min(a[1], b[1]) - NEAR) / cell), y1 = Math.floor((Math.max(a[1], b[1]) + NEAR) / cell);
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+        const k = x * 65536 + y;
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push([a[0], a[1], b[0], b[1]]);
+      }
+    }
+  }
+  return (x, y) => {
+    for (const [ax, ay, bx, by] of grid.get(Math.floor(x / cell) * 65536 + Math.floor(y / cell)) || []) {
+      const ex = bx - ax, ey = by - ay, l = ex * ex + ey * ey || 1, u = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / l));
+      if (Math.hypot(x - ax - ex * u, y - ay - ey * u) <= NEAR) return true;
+    }
+    return false;
+  };
+}
+
 export class DtmSurface {
-  constructor(dtm, terrain, THREE) {
+  constructor(dtm, terrain, THREE, nearTrack = () => false) {
     this.terrain = terrain;
     this.grid = new TriIndex();
     this.deckGrid = new TriIndex(); // level 1: bridge decks and the streets on them
@@ -544,12 +572,17 @@ export class DtmSurface {
       // (one area's midpoint, moved to the track profile by flushDtm, opened a seam to the other:
       // line 17's street seams over 3 cm 415 with the street model's shared 4 m grid, 675 without, #21)
       // (each piece keeps its edge's kerb flag, tools/kerbs.py)
+      // (near a drawn track each 4 m piece in FINE m ones, decided by the piece's midpoint: the same for both neighbours)
       const cut = (ring, k) => {
         if (a.l !== 0) return [ring, k];
         const out = [], ko = [];
         ring.forEach((p, i) => {
-          const q = ring[(i + 1) % ring.length], n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 4);
-          for (let j = 0; j < Math.max(1, n); j++) { out.push(j ? [p[0] + (q[0] - p[0]) * j / n, p[1] + (q[1] - p[1]) * j / n, p[2] + (q[2] - p[2]) * j / n] : p); ko.push(k?.[i] ?? 0); }
+          const q = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 4));
+          const at = (u) => [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u, p[2] + (q[2] - p[2]) * u];
+          for (let j = 0; j < n; j++) {
+            const m = at((j + 0.5) / n), f = nearTrack(m[0], m[1]) ? Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / n / FINE)) : 1;
+            for (let h = 0; h < f; h++) { out.push(j || h ? at((j + h / f) / n) : p); ko.push(k?.[i] ?? 0); }
+          }
         });
         return [out, k ? ko : null];
       };
@@ -589,8 +622,9 @@ export class DtmSurface {
         // ground (`g`, tools/zps_inside.py), it takes the lidar inside (a flat sheet between the edges ran up
         // to 8.7 m under the Letná slope; Krejcárek's yard crossed the terrain in wedges, #444); the outline,
         // cut to 4 m above, is never split and keeps the survey's heights
-        if (a.l === 0 && a.g) this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, DRAPE_EDGE);
-        else if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh);
+        if (a.l === 0 && a.g) this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, DRAPE_EDGE, nearTrack);
+        else if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh, 0, 5, nearTrack);
+        else if (a.l === 0 && ground) this._split(p, q, r, false, area.mesh, 0, Infinity, nearTrack);
         else if (a.l >= 1 && a.c !== 'roof') this._split(p, q, r, ringZ, area.mesh);
         else area.mesh.push([p, q, r]);
         // the height lookup uses exactly the drawn triangles, so cars stand on what is drawn
@@ -669,11 +703,16 @@ export class DtmSurface {
     }
     return best < 0 ? null : { z: bestZ, c: ix.classOf(best) };
   }
-  // longest-edge bisection down to 5 m edges (thin carriageway slivers stay cheap)
-  _split(p, q, r, ground, out, depth = 0, maxEdge = 5) {
-    const l0 = Math.hypot(p[0] - q[0], p[1] - q[1]), l1 = Math.hypot(q[0] - r[0], q[1] - r[1]), l2 = Math.hypot(r[0] - p[0], r[1] - p[1]);
+  // longest-edge bisection down to 5 m edges (thin carriageway slivers stay cheap); an edge whose midpoint is near a
+  // drawn track down to FINE m (#548: the ring was cut the same way, so no edge on an outline is split on one side only)
+  _split(p, q, r, ground, out, depth = 0, maxEdge = 5, near = null) {
+    const len = (a, b) => {
+      const l = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      return l > (near && near((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) ? FINE : maxEdge) ? l : 0;
+    };
+    const l0 = len(p, q), l1 = len(q, r), l2 = len(r, p);
     const e = Math.max(l0, l1, l2);
-    if (e <= maxEdge || depth >= 16) { out.push([p, q, r]); return; }
+    if (e === 0 || depth >= 16) { out.push([p, q, r]); return; }
     if (l1 === e) [p, q, r] = [q, r, p];
     else if (l2 === e) [p, q, r] = [r, p, q];
     // now p-q is the longest edge
@@ -681,8 +720,8 @@ export class DtmSurface {
     const zl = (p[2] + q[2]) / 2;
     // (ground: a function = its height, false = linear)
     const m = [x, y, (typeof ground === 'function' ? ground(x, y) : null) ?? zl];
-    this._split(p, m, r, ground, out, depth + 1, maxEdge);
-    this._split(m, q, r, ground, out, depth + 1, maxEdge);
+    this._split(p, m, r, ground, out, depth + 1, maxEdge, near);
+    this._split(m, q, r, ground, out, depth + 1, maxEdge, near);
   }
   // top of a surveyed surface on a structure (bridge deck, level 1+) over (x, y), or null: the one
   // nearest to `ref` (within `tol`) when given, else the highest level-1 surface (then any level)
