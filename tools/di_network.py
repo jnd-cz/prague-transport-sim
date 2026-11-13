@@ -31,6 +31,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 import shapely
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
@@ -1017,11 +1018,16 @@ class Network:
             skip = {e} | {f for end in (0, 1) for f, _ in self.passes.get((e, end), ())}
             line = ed['line']
             n = max(1, int(line.length))
-            inside = []
-            for i in range(n + 1):
-                p = line.interpolate(line.length * i / n)
-                near = [self.eids[int(j)] for j in self.tree.query(p.buffer(ZONE))]
-                inside.append(any(f not in skip and self.edges[f]['line'].distance(p) < ZONE for f in near))
+            # (a point every metre and the edges near it, asked of GEOS at once: one call per point was most of a line's
+            # matching, #517)
+            ps = shapely.line_interpolate_point(line, line.length * np.arange(n + 1) / n)
+            k, j = self.tree.query(shapely.buffer(ps, ZONE))
+            others = [self.eids[int(x)] for x in j]
+            ok = np.array([f not in skip for f in others], bool)
+            inside = np.zeros(n + 1, bool)
+            if ok.any():
+                near = shapely.distance(np.asarray([self.edges[f]['line'] for f in others], object)[ok], ps[k[ok]]) < ZONE
+                inside[k[ok][near]] = True
             z = []
             for i, v in enumerate(inside):
                 if v:
@@ -1099,7 +1105,7 @@ class Match:
             a, b = samples[max(0, k - 1)], samples[min(len(samples) - 1, k + 1)]
             heads.append(_unit((b[0] - a[0], b[1] - a[1])))
         steps = [0.0] + [math.dist(a, b) for a, b in zip(samples, samples[1:])]
-        cands = [self._candidates(p, h) for p, h in zip(samples, heads)]
+        cands = self._candidates(samples, heads)
         # Viterbi: state = (edge, dir, t) or None (off the network)
         prev = {None: (OFF_COST + OFF_SWITCH, None)}
         for c, (e, dr, t, cost) in cands[0].items():
@@ -1133,25 +1139,33 @@ class Match:
         self.states = [(cands[k][c][:3] if c is not None else None) for k, c in enumerate(seq)]
         self._pieces(owner, clean)
 
-    def _candidates(self, p, h):
-        """{key: (edge, dir, t, emission cost)} of the edges within RADIUS of p running within HEADING of h."""
-        out = {}
-        pt = Point(p)
-        cos = math.cos(math.radians(HEADING))
-        for i in self.net.tree.query(pt.buffer(RADIUS)):
-            e = self.net.eids[int(i)]
-            line = self.net.edges[e]['line']
-            d = line.distance(pt)
-            if d > RADIUS:
-                continue
-            t = line.project(pt)
-            v = _unit(Network._dir(line, t))
+    def _candidates(self, samples, heads):
+        """Per sample, {key: (edge, dir, t, emission cost)} of the edges within RADIUS of it running within HEADING of its
+        heading. GEOS answers for all the samples at once (one call each was 37 of build_line's 111 s under cProfile,
+        #517): the same operations, and the arithmetic after them as it was, in the order the tree gives the edges."""
+        net, cos = self.net, math.cos(math.radians(HEADING))
+        pts = shapely.points(np.asarray(samples, float))
+        k, i = net.tree.query(shapely.buffer(pts, RADIUS))
+        lines = np.asarray([net.edges[net.eids[int(x)]]['line'] for x in i], object)
+        d = shapely.distance(lines, pts[k])
+        ok = d <= RADIUS
+        k, i, lines, d = k[ok], i[ok], lines[ok], d[ok]
+        t = shapely.line_locate_point(lines, pts[k])
+        length = shapely.length(lines)
+        a = shapely.line_interpolate_point(lines, np.maximum(0.0, t - 0.5))  # (Network._dir, at once)
+        b = shapely.line_interpolate_point(lines, np.minimum(length, t + 0.5))
+        out = [{} for _ in samples]
+        for s, x, dist, tt, dx, dy in zip(k.tolist(), i.tolist(), d.tolist(), t.tolist(),
+                                          (shapely.get_x(b) - shapely.get_x(a)).tolist(),
+                                          (shapely.get_y(b) - shapely.get_y(a)).tolist()):
+            e, h = net.eids[x], heads[s]
+            v = _unit((dx, dy))
             c = v[0] * h[0] + v[1] * h[1]
             if abs(c) < cos:
                 continue
             dr = 1 if c > 0 else -1
-            w = ZONE_WEIGHT if self.net.in_zone(e, t) else 1.0
-            out[(e, dr)] = (e, dr, t, w * (0.5 * (d / SIGMA) ** 2 + TURN_COST * (1 - abs(c))))
+            w = ZONE_WEIGHT if net.in_zone(e, tt) else 1.0
+            out[s][(e, dr)] = (e, dr, tt, w * (0.5 * (dist / SIGMA) ** 2 + TURN_COST * (1 - abs(c))))
         return out
 
     def _transition(self, pc, pinfo, c, info, step):
