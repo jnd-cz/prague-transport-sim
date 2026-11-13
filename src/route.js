@@ -44,11 +44,11 @@ export function smoothPolyline(pts, step = 1, radius = 6) {
 // The line data is built with its track drawn as curves (`trackCurve`, tools/track_curve.py, #204), the run past
 // both termini (`pathExt`, tools/route.py, #477) and the route's radius and cant (`curvature`, `cant`, tools/cant.py,
 // #478), its track styles with the rails' height over the bed (`styles`, `lift`, tools/track_styles.py, #479, #480),
-// its top of rail (`heights`, tools/line_heights.py) and its structures (`spans`, `realDecks`, `underpasses`,
-// tools/line_structures.py, #480): the page smooths no track, walks none and works out no curve, style or profile
+// its top of rail (`heights`, tools/line_heights.py), its structures (`spans`, `realDecks`, `underpasses`,
+// tools/line_structures.py, #480) and its paved track's cross level (`crossLevel`, tools/cross_level.py, #538): the page smooths no track, walks none and works out no curve, style or profile
 // (#276 step 2). Data built before them does not load.
 export function checkBuiltRoute(data) {
-  const missing = ['trackCurve', 'pathExt', 'curvature', 'cant', 'styles', 'lift', 'heights', 'spans', 'realDecks', 'underpasses'].filter((k) => !data[k]);
+  const missing = ['trackCurve', 'pathExt', 'curvature', 'cant', 'styles', 'lift', 'heights', 'spans', 'realDecks', 'underpasses', 'crossLevel'].filter((k) => !data[k]);
   if (missing.length) throw new Error(`line ${data.line} data lacks ${missing.join(', ')}: built before #480, rebuild it (tools/rebuild.py)`);
 }
 
@@ -196,12 +196,15 @@ export class Route {
   }
 
   // The radius and the cant the build worked out for this route (tools/cant.py, #478): `curv` the line data's
-  // `curvature` (K / r every metre, 0 where straight) for this path, `cant` the line data's `cant` (our route only).
-  useBuilt(curv, unit, cant = null) {
+  // `curvature` (K / r every metre, 0 where straight) for this path, `cant` the line data's `cant` (our route only);
+  // `cross` this path's cross level in paved track where the road tilts across it (tools/cross_level.py, #538:
+  // `crossLevel.path` or `.pathBack`, in `unit`): it adds to the lean and the rails' tilt, not to the curves' speed.
+  useBuilt(curv, unit, cant = null, cross = null) {
     this.curv = curv;
     this.curvUnit = unit;
     this.radii = null;
     if (cant) this.cant = { step: cant.step, c: Float32Array.from(cant.c, (v) => v * cant.unit) };
+    if (cross?.c) this.cross = { step: cross.step, c: Float32Array.from(cross.c, (v) => v * cross.unit) };
   }
 
   // Curve radius (m) at s: the heading change over 16 m around the nearest metre, as the build read it
@@ -242,8 +245,17 @@ export class Route {
   // cant (m) at s
   cantAt(s) { return Math.abs(this._cantSigned(s)); }
 
-  // signed lean of a tram into the curve at s (rad, + = towards the left), from the cant
-  rollAt(s) { return Math.atan2(this._cantSigned(s), 1.5); }
+  // cross level (m, signed as the cant) at s: the road's tilt across paved track (useBuilt)
+  crossAt(s) {
+    const C = this.cross;
+    if (!C) return 0;
+    const f = Math.max(0, Math.min(C.c.length - 1.001, s / C.step)), i = Math.floor(f), u = f - i;
+    return C.c[i] * (1 - u) + C.c[i + 1] * u;
+  }
+
+  // signed lean of a tram at s (rad, + = towards the left): the curve's cant and the road's cross level (at most the
+  // cant's 100 mm together, tools/cant.py CANT_MAX)
+  rollAt(s) { return Math.atan2(Math.max(-0.1, Math.min(0.1, this._cantSigned(s) + this.crossAt(s))), 1.5); }
 
   // Speed a curve of radius r allows (km/h) with the given cant credit (the cant's own design speed is the build's,
   // tools/cant.py): the limit, in whole km/h, as no sign stands at such a curve: unbalanced `curveAccel`

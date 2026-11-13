@@ -18,7 +18,8 @@ then track_styles (the user's marks, the grassed-track list and the survey's gra
 rails' height over the bed, #479, #503, #480: it reads the survey's areas and writes data/lineN.json), then line_heights
 once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's survey sidecar and the
 lines' lift, so it runs after them all), then line_structures per line (the spans, decks and underpasses: they read the
-built top of rail, #480), then the validation report (tools/validation.py, #23).
+built top of rail, #480) and cross_level (the cross level of paved track where the road tilts across it: it reads the
+opposite track's offset and the spans, #538), then the validation report (tools/validation.py, #23).
 
 A step whose tool, the modules it imports and the files it read hash as in one of its recorded runs is skipped, and
 its outputs and log are put back as that run left them (tools/stepcache.py, #511): a rebuild after a change to one
@@ -84,7 +85,7 @@ def steps(line):
 
 def names():
     """Every step's name (for --from)."""
-    out = {"build_line", "geoportal", "fine_terrain", "dtm", "zps_source", "track_styles", "line_heights", "line_structures"}
+    out = {"build_line", "geoportal", "fine_terrain", "dtm", "zps_source", "track_styles", "line_heights", "line_structures", "cross_level"}
     return out | {st[0][:-3] for st in writers("17")}
 
 
@@ -196,6 +197,11 @@ def heights(lines):
         times.append(run_step(f"line{line}", ["line_structures.py", "--line", line], log, phase="heights"))
         if times[-1][2] not in (0, "skip"):
             return f"structures of line {line}: FAILED, see reports/rebuild/line{line}.line_structures.log"
+        # (the cross level of paved track reads the opposite track's offset and the spans: tools/cross_level.py, #538)
+        log = os.path.join(ROOT, "reports", "rebuild", f"line{line}.cross_level.log")
+        times.append(run_step(f"line{line}", ["cross_level.py", "--line", line], log, phase="heights"))
+        if times[-1][2] not in (0, "skip"):
+            return f"cross level of line {line}: FAILED, see reports/rebuild/line{line}.cross_level.log"
     with open(os.path.join(ROOT, "reports", "rebuild", "heights.summary.log"), "w", encoding="utf-8") as f:
         f.write(summary(times))
     ran = [t[0][:-3] for t in times if t[6]]
