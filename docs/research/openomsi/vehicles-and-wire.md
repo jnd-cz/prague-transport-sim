@@ -14,7 +14,7 @@ gearbox, doors, brakes, electrics, IBIS) is a script. The engine reads `M_Wheel`
 `Axle_Brakeforce_*` and writes `Velocity`, `n_Wheel`, wheel and suspension variables back (`omsi-sim/src/physics.rs`
 head); the host supplies system variables, callbacks and sound triggers (`omsi-sim/src/host/mod.rs`). `compat.rs`
 patches known mod scripts by their text. Scenery objects may run sandboxed Lua with events (`docs/OBJECT_SCRIPTS.md`).
-A model animates meshes by variables: `[newanim]` `anim_rot`/`anim_trans` on a variable times a factor (`anim.rs`).
+A model animates meshes by variables: `[newanim]` `anim_rot`/`anim_trans` on a variable times a factor (`omsi-sim/src/anim.rs`).
 
 **Rail dynamics** (`omsi-sim/src/rail/dynamics.rs`, `class.rs`), one mass per consist, sub-steps of 10 ms:
 - adhesion: Curtius–Kniffler `0.161 + 7.5 / (v + 44)` (km/h) as an absolute value, 0.33 dry at a stand; ×0.7 wet,
@@ -157,7 +157,7 @@ roughness; `collision.rs` tests oriented boxes in the ground plane.
 10. **A fixed-name vehicle snapshot with `null` for what a vehicle lacks** (`vehicle_api.rs`). **Take the rule for
     #528**: parameters a type lacks (a T3M has no accelerator position) read `null`, never missing, so a sound pack
     or panel written for one type runs on another.
-11. **Animation bound to a variable by a factor** (`[newanim]`, `anim.rs`). **Idea for #456's tier 3** when the cab
+11. **Animation bound to a variable by a factor** (`[newanim]`, `omsi-sim/src/anim.rs`). **Idea for #456's tier 3** when the cab
     gets a 3D panel (#68, #246): needles, pedals and the controller as nodes turned by a published parameter times a
     factor, with no code in the package.
 12. **Sound events of the wire**: add `arc` and `insulator` to #528's event list with issue A; a collector hiss by
@@ -178,7 +178,7 @@ roughness; `collision.rs` tests oriented boxes in the ground plane.
 
 **A. Section insulators in the game: the dead gap, the arc, the buzzer, a car stopped on one** (`lane:sim`,
 Backlog, blocked by #277).
-- Now: no insulators; `Feeding` takes the nearest substation (`src/electric.js:24-58`); no arcs.
+- Now: no insulators; `Feeding` takes the feed of least resistance (`src/electric.js:24-58`); no arcs.
 - What: each insulator from #277 is a dead gap (its length from the source); the feed changes there; 0 V at the
   pantograph over it; an arc flash at the collector and a crack sized by the current broken; the buzzer as the
   T3SUCS's SN contact gives it; a car stopped in the gap rolls off as T3-E2 says; Advanced scores drawing current

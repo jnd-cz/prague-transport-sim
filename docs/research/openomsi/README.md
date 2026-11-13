@@ -17,6 +17,7 @@ commit `b2dc640b` (2026-11-12): about 500,000 lines in 47 crates. Our side at `m
 | [traffic-and-people.md](traffic-and-people.md) | paths, junctions and their right of way, light programs, car following, deadlocks, walkers | #33, #450, #496, #304, #16, #367 |
 | [vehicles-and-wire.md](vehicles-and-wire.md) | scripted vehicle systems, rail dynamics, the body on its springs, the pantograph, sections and insulators, trolleybus gear | #71, #277, #500, #528, #456 |
 | [transit-sound-render.md](transit-sound-render.md) | duties and passengers, the sound engine and city ambience, rendering and frame time, weather, multiplayer | #40, #249, #550, #251, #308, #31 |
+| [trolleybus-wires.md](trolleybus-wires.md) | how its trolleybus wires are authored, built and drawn; Prague's trolleybus wires in OSM (asked by the user) | #572, #39 |
 
 ## Answers to #520's questions
 
@@ -104,30 +105,41 @@ bears on our check tiers:
 For us, a golden set over all lines would make the drawing tier's "screenshots main vs branch" one command
 (proposal 11). The layer guard is a check for #422's split of `world.js`.
 
-## Proposed issues (the user picks)
+## Issues opened (the user, 2026-11-13: "Open issues as proposed and comment on the existing ones")
 
-| # | issue | lane | milestone | blocked by | details |
-|---|---|---|---|---|---|
-| 1 | One waits-for graph for cars, AI trams and walkers: circles broken by their holds, chain heads in the stuck report | sim | M4 | — | traffic-and-people.md A |
-| 2 | Right of way at unsignalled junctions: signs and road class from OSM, turns across the oncoming give way, gaps in time, meeting stretches | sim | M4 | — | traffic-and-people.md B |
-| 3 | Section insulators in the game: the dead gap, the arc, the buzzer, a car stopped on one | sim | Backlog | #277 | vehicles-and-wire.md A |
-| 4 | The car body on its springs: heave, pitch and roll for the cab view and the cars | assets | Backlog | — | vehicles-and-wire.md B |
-| 5 | Flat things on the ground at their true height: a depth pull instead of lifts | world | W4 | #509 | map-and-streaming.md |
-| 6 | Car following by the Intelligent Driver Model, drivers of their own, brake lamps | sim | Backlog | — | traffic-and-people.md C |
-| 7 | Traffic scene tests: small junctions built in code, run headless | sim | M5 | #228 | traffic-and-people.md D |
-| 8 | City ambience chosen by place, hour, season and weather | assets | Backlog | #528 | transit-sound-render.md P1 |
-| 9 | Weather that changes during a shift: the rail wet from the first drops, drying after | sim | Backlog | #266 | transit-sound-render.md P2 |
-| 10 | Fogged windows from the cabin climate | sim | Backlog | 9 | transit-sound-render.md P3 |
-| 11 | Golden scenes: a fixed seeded set over every line, compared pixel by pixel with allowances | tooling | Backlog | — | this README |
+| # | issue | lane | milestone | blocked by |
+|---|---|---|---|---|
+| 1 | #560 One waits-for graph for cars, AI trams and walkers | sim | M4 | — |
+| 2 | #561 Right of way at unsignalled junctions | sim | M4 | — |
+| 3 | #562 Section insulators in the game | sim | Backlog | #277 |
+| 4 | #563 The car body on its springs | assets | Backlog | — |
+| 5 | #564 Flat things on the ground at their true height: a depth pull | world | W4 | #509 |
+| 6 | #565 Car following by the Intelligent Driver Model | sim | Backlog | — |
+| 7 | #566 Traffic scene tests | sim | M5 | #228 |
+| 8 | #567 City ambience | assets | Backlog | #528 |
+| 9 | #568 Weather that changes during a shift | sim | Backlog | #266 |
+| 10 | #569 Fogged windows from the cabin climate | sim | Backlog | #568 |
+| 11 | #570 Golden scenes over every line | tooling | Backlog | — |
 
-Points for existing issues (#31, #71, #301, #309, #16, #500, #528, #456, #550, #40, #249, #251, #308, #367, #33,
-#450) go as one comment each, citing the note.
+The points for existing issues went to them as comments: #31, #71, #301, #309, #16, #500, #528, #456, #550, #40,
+#249, #251, #308, #367, #33, #450.
 
-## Questions for the user
+From the user's answers and the trolleybus note:
+- #558 Stop announcements (research);
+- #559 A driver's record across shifts;
+- #572 Trolleybus wires drawn from OSM `trolley_wire`;
+- #571 The tram span wire drawn at 6.34 m while its comment says 6.74 m (found in passing).
 
-1. Which of proposals 1–11 to open? 1, 2 and 3 do the most for what we have open.
-2. May the points for existing issues go to them as comments?
-3. Do the T3s the game models announce stops? (a) No. (b) A recording ("Příští zastávka …" on leaving, the name at
-   the stop), and on which cars. (c) The driver by microphone. With (b), a sound pack gets an event per stop.
-4. A driver's record across shifts (distance, stops on time, comfort, kept in the browser): for the closed alpha
-   (#350), later, or not at all?
+## The user's answers (2026-11-13)
+
+1. "Open issues as proposed and comment on the existing ones."
+2. **Right of way:** the user asked whether we use it at junctions without signs. We don't. At a signal the cars
+   obey it. Elsewhere a car waits for one already on a crossing connector, and between two approaching, the
+   nearer to the junction goes first (`src/traffic.js` :867-890): no signs, no road class, no right-before-left.
+   #561 brings all three, with the tram's rules at unmarked junctions from the user.
+3. **Stop announcements:** "Out trams don't have yet stop announcements, my idea would also require some research
+   and preparation if synthesized voice is feasible besides player loading pre recorded set for some line". The
+   playback "should come from recording, not microphone", the driver hears it too, "plus couple more system
+   recording like warning 1 minute before departure from the starting stop". This is #558.
+4. **The driver's record:** "yes eventually we should keep driver's record, not sure when it can be implemented but
+   I would like to have it". This is #559.
