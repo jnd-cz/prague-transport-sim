@@ -76,8 +76,8 @@ def geometry(blob):
 def features(path, table, where="", params=(), keep=None):
     """Yield dicts of attributes with the decoded geometry under 'geom'. keep(boxes): which features to yield, from an
     (n, 4) array of their boxes (min x, min y, max x, max y) as GEOS reads them; one GEOS cannot read (NaN) is yielded
-    (dtm.py and zps_source.py decode only what can reach the line, #517: decoding a district's 300 000 features in
-    Python was most of their reading)."""
+    (dtm.py and zps_source.py decode only what can reach the line, #517: of line 17's districts' 1.9 million line
+    features, 8.7 % reach its corridor's cells, and decoding them all in Python was most of their reading)."""
     c = sqlite3.connect(path)
     gcol = c.execute("select column_name from gpkg_geometry_columns where table_name=?", (table,)).fetchone()[0]
     cols = [r[1] for r in c.execute(f'pragma table_info("{table}")')]

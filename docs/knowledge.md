@@ -446,7 +446,8 @@ Sections:
     (registration). `gpkg.py`'s WKB reader takes base types 1–7 with ISO / EWKB Z and M (M dropped) and
     envelope codes 0–4: curved types would need work. The blobs carry no envelope (flags 0) and the packages
     no R-tree index, so a reader that wants only the features near the line reads every box through GEOS
-    (`gpkg.features(keep=)`, #517): a district holds ~300 000 features, line 17's corridor a few per cent.
+    (`gpkg.features(keep=)`, #517): of line 17's districts' 1 891 580 line and 199 246 area features, 8.7 % and
+    9.4 % have a box that reaches its corridor's 40 m cells.
   - CRS: everything is EPSG:5514 metres, M = 0, and no tool reprojects or rejects another CRS.
   - Per district (OPL polygon / KR line / KR point layers): Praha 1 50/28/61, 2 43/26/52, 4 49/28/60,
     7 45/28/56, 8 53/29/63, 10 49/27/62, 12 50/29/58, 17 43/26/47.

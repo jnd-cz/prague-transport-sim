@@ -309,7 +309,7 @@ def ring(r, level, cls=None):
 seen_areas, n_copies = set(), 0  # (an area on a district border is in both districts' packages, #316)
 # the corridor's areas first (only those whose box reaches a corridor cell are decoded), then the 3D lines and walls whose
 # boxes reach theirs (a vertex's heights come from lines within 10 m of it, the kerbs' walls lie within 3 m of an
-# outline): a district's 300 000 lines decoded and put in the grids were most of dtm.py's reading (#517)
+# outline): the 1.9 million lines of line 17's districts decoded and put in the grids were most of its reading (#517)
 found = []
 corridor = gpkg.near(cells, 40, (F.E0, F.N0))
 for package in packages:
