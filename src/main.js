@@ -30,6 +30,8 @@ import { loadFigureFont, signFacts } from './speedSigns.js';
 const figureFont = loadFigureFont();
 import { credits, logProvenance, fallbacks } from './provenance.js';
 import { initHelp } from './help.js';
+import { initPackages } from './packagesMenu.js';
+import { loadInstalled } from './packages.js';
 import { Mirror } from './mirror.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
@@ -49,6 +51,8 @@ for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtm
 if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
 // the tram models (assets/vehicles.json, #455): the ones loaded at start downloaded with the line
 const vehicles = await loadRegistry((u) => load.get(u));
+// the packages the player installed (#530, src/packages.js): checked and added after the repository's
+try { await loadInstalled(); } catch (e) { console.warn('installed packages not read', e); }
 for (const v of vehicles) if (v.preload) for (const f of v.files) load.prefetch(fileUrl(v, f.path), f.bytes);
 // the pedestrians' figures (#251); ?boxpeople keeps the box figures
 const figures = !params.has('boxpeople');
@@ -331,7 +335,7 @@ window.people = people;
 function modelMenu() {
   const sel = $('optModel'), was = sel.value;
   sel.replaceChildren(...vehicles.map((v) => new Option(vehicleName(v, getLang()), v.id)));
-  sel.value = was || vehicles[0]?.id;
+  sel.value = vehicles.some((v) => v.id === was) ? was : vehicles[0]?.id;   // (a package removed: the first again)
 }
 modelMenu();
 // The player's preferred set (#527; the user, 2026-11-11: "I would add optinal preferred set for the player"): the
@@ -452,6 +456,7 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
+initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); } });
 onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });

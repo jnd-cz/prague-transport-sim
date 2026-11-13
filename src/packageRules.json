@@ -1,0 +1,28 @@
+{
+  "about": "What a vehicle package may hold (#530; docs/vehicles.md, Packages). Read by the game's check at install and at startup (src/packages.js) and by tools/test_vehicles.py for the repository's vehicles: one description for both.",
+  "schema": 1,
+  "interface": "1.0",
+  "interface_about": "The vehicle interface's version (docs/vehicles.md): what a package's `game` is compared with. The major number grows when a field, slot, event or rig name a package uses changes its meaning or goes; the minor when one is added.",
+  "kinds": ["vehicle", "livery", "sounds", "fleet"],
+  "id": "^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9.-]*$",
+  "id_about": "author.package, in lower case: two authors never collide",
+  "types": {
+    "glb": "model", "gltf": "model", "bin": "model",
+    "webp": "image", "png": "image", "jpg": "image", "jpeg": "image",
+    "wav": "sound", "mp3": "sound", "ogg": "sound",
+    "json": "data", "txt": "text", "md": "text"
+  },
+  "caps": { "package": 67108864, "model": 33554432, "image": 8388608, "sound": 16777216, "data": 1048576, "text": 262144 },
+  "caps_about": "bytes: a package's files together, and one file of each class",
+  "licences": ["CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-NC-SA-4.0", "GPL-3.0", "GPL-3.0-only",
+               "GPL-3.0-or-later", "AGPL-3.0-or-later", "MIT"],
+  "licences_about": "licences that allow the files to be redistributed with the game (ASSETS.md); NC ones not in a commercial release",
+  "loaders": ["gltf", "gltf-rigged"],
+  "loaders_about": "the loaders an installed vehicle may name: the built-in car and the classic model are the game's own",
+  "moves": ["bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"],
+  "moves_about": "what a vehicle's `moves` may claim (docs/vehicles.md, Tiers of movement); the rig's names each needs: src/rigged.js rigProblems",
+  "budget": { "triangles": 60000, "drawCalls": 70 },
+  "budget_about": "one car at its full level, as the game draws it: the hybrid T3 (assets/t3h/) at about 44,000 triangles and 70 draw calls (tools/test_t3h.py) as the first",
+  "fit": { "lengthOver": 0.15, "widthOver": 0.7, "railLow": 0.05, "railHigh": 0.02 },
+  "fit_about": "m: one car's box against its type (src/tram.js VEHICLE_TYPES): its length over the coupler faces plus lengthOver, its width plus widthOver (mirrors), its lowest point within railLow below and railHigh above the rail plane (the wheels' flanges reach below it)"
+}
