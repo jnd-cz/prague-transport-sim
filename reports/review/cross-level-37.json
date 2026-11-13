@@ -1,0 +1,56 @@
+{
+ "schema": 1,
+ "issue": 538,
+ "line": "37",
+ "title": "Cross level: rails tilted with the road",
+ "findings": [
+  {
+   "kind": "cross level",
+   "id": "cross-50.1036-14.4739",
+   "line": "37",
+   "x": 3970.1,
+   "y": 1280.6,
+   "s0": 3978,
+   "s1": 3998,
+   "mag": 33.3,
+   "status": "review",
+   "place": [
+    50.103632,
+    14.473865
+   ],
+   "between": [
+    [
+     50.10359,
+     14.4737749
+    ],
+    [
+     50.1036893,
+     14.4740075
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3963.1,
+     "y": 1276.9,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3981.1,
+     "y": 1285.5,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Palmovka: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 33 mm lower (2.2 % across the gauge) for 20 m (s 3978-3998). Do the rails tilt across here in reality?",
+   "lines": [
+    "37"
+   ]
+  }
+ ]
+}

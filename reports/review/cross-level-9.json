@@ -1,0 +1,493 @@
+{
+ "schema": 1,
+ "issue": 538,
+ "line": "9",
+ "title": "Cross level: rails tilted with the road",
+ "findings": [
+  {
+   "kind": "cross level",
+   "id": "cross-50.0791-14.4219",
+   "line": "9",
+   "x": -81.7,
+   "y": -914.1,
+   "s0": 10392,
+   "s1": 10510,
+   "mag": 43.0,
+   "status": "review",
+   "place": [
+    50.079129,
+    14.421935
+   ],
+   "between": [
+    [
+     50.0791049,
+     14.4214373
+    ],
+    [
+     50.0795943,
+     14.4228164
+    ]
+   ],
+   "marks": [
+    {
+     "x": -117.3,
+     "y": -911.9,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -12.1,
+     "y": -871.4,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Lazarská: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 43 mm lower (2.9 % across the gauge) for 118 m (s 10392-10510). Do the rails tilt across here in reality?",
+   "lines": [
+    "9",
+    "23"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0815-14.4252",
+   "line": "9",
+   "x": 184.7,
+   "y": -684.0,
+   "s0": 10662,
+   "s1": 10796,
+   "mag": 43.5,
+   "status": "review",
+   "place": [
+    50.081505,
+    14.425184
+   ],
+   "between": [
+    [
+     50.0806657,
+     14.4241317
+    ],
+    [
+     50.0816063,
+     14.4252998
+    ]
+   ],
+   "marks": [
+    {
+     "x": 97.4,
+     "y": -766.2,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 194.4,
+     "y": -673.9,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Vodičkova: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 44 mm lower (2.9 % across the gauge) for 134 m (s 10662-10796). Do the rails tilt across here in reality?",
+   "lines": [
+    "9",
+    "23"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0851-14.4439",
+   "line": "9",
+   "x": 1564.0,
+   "y": -469.1,
+   "s0": 12324,
+   "s1": 12426,
+   "mag": 32.2,
+   "status": "review",
+   "place": [
+    50.085107,
+    14.443869
+   ],
+   "between": [
+    [
+     50.0851584,
+     14.4429786
+    ],
+    [
+     50.0850575,
+     14.4443945
+    ]
+   ],
+   "marks": [
+    {
+     "x": 1501.6,
+     "y": -454.8,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 1600.5,
+     "y": -479.7,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Viktoria Žižkov: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 32 mm lower (2.1 % across the gauge) for 102 m (s 12324-12426). Do the rails tilt across here in reality?",
+   "lines": [
+    "9"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0827-14.4551",
+   "line": "9",
+   "x": 2320.7,
+   "y": -847.4,
+   "s0": 13244,
+   "s1": 13390,
+   "mag": 31.1,
+   "status": "review",
+   "place": [
+    50.082663,
+    14.455063
+   ],
+   "between": [
+    [
+     50.0828568,
+     14.4548157
+    ],
+    [
+     50.0824254,
+     14.4566638
+    ]
+   ],
+   "marks": [
+    {
+     "x": 2306.1,
+     "y": -823.6,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2430.6,
+     "y": -889.1,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Lipanská: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 31 mm lower (2.1 % across the gauge) for 146 m (s 13244-13390). Do the rails tilt across here in reality?",
+   "lines": [
+    "9"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0826-14.4591",
+   "line": "9",
+   "x": 2604.0,
+   "y": -889.9,
+   "s0": 13534,
+   "s1": 13576,
+   "mag": 37.6,
+   "status": "review",
+   "place": [
+    50.08263,
+    14.459066
+   ],
+   "between": [
+    [
+     50.0825795,
+     14.4586547
+    ],
+    [
+     50.0826504,
+     14.4592311
+    ]
+   ],
+   "marks": [
+    {
+     "x": 2574.1,
+     "y": -891.5,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2616.0,
+     "y": -889.3,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Olšanské náměstí: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 38 mm lower (2.5 % across the gauge) for 42 m (s 13534-13576). Do the rails tilt across here in reality?",
+   "lines": [
+    "9"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0779-14.4612",
+   "line": "9",
+   "x": 2682.3,
+   "y": -1434.6,
+   "s0": 15912,
+   "s1": 15950,
+   "mag": 29.0,
+   "status": "review",
+   "place": [
+    50.077873,
+    14.461184
+   ],
+   "between": [
+    [
+     50.0778803,
+     14.4612941
+    ],
+    [
+     50.077685,
+     14.4609344
+    ]
+   ],
+   "marks": [
+    {
+     "x": 2690.2,
+     "y": -1434.9,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2661.8,
+     "y": -1452.9,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Flora: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 29 mm lower (1.9 % across the gauge) for 38 m (s 15912-15950). Do the rails tilt across here in reality?",
+   "lines": [
+    "9"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0744-14.4389",
+   "line": "9",
+   "x": 1046.7,
+   "y": -1601.8,
+   "s0": 17806,
+   "s1": 17902,
+   "mag": 42.0,
+   "status": "review",
+   "place": [
+    50.074385,
+    14.438862
+   ],
+   "between": [
+    [
+     50.075013,
+     14.4390172
+    ],
+    [
+     50.0743945,
+     14.4385686
+    ]
+   ],
+   "marks": [
+    {
+     "x": 1067.2,
+     "y": -1534.1,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 1026.0,
+     "y": -1597.9,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Náměstí Míru: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 42 mm lower (2.8 % across the gauge) for 96 m (s 17806-17902). Do the rails tilt across here in reality?",
+   "lines": [
+    "9"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0750-14.4371",
+   "line": "9",
+   "x": 933.8,
+   "y": -1521.6,
+   "s0": 17996,
+   "s1": 18038,
+   "mag": 35.7,
+   "status": "review",
+   "place": [
+    50.074961,
+    14.437147
+   ],
+   "between": [
+    [
+     50.0748575,
+     14.4374703
+    ],
+    [
+     50.0749774,
+     14.4369253
+    ]
+   ],
+   "marks": [
+    {
+     "x": 955.2,
+     "y": -1536.2,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 918.3,
+     "y": -1517.6,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Náměstí Míru: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 36 mm lower (2.4 % across the gauge) for 42 m (s 17996-18038). Do the rails tilt across here in reality?",
+   "lines": [
+    "9",
+    "22"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0750-14.4357",
+   "line": "9",
+   "x": 833.6,
+   "y": -1498.8,
+   "s0": 18114,
+   "s1": 18142,
+   "mag": 46.7,
+   "status": "review",
+   "place": [
+    50.075042,
+    14.435717
+   ],
+   "between": [
+    [
+     50.0749938,
+     14.4358644
+    ],
+    [
+     50.0751598,
+     14.435592
+    ]
+   ],
+   "marks": [
+    {
+     "x": 843.4,
+     "y": -1505.5,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 826.6,
+     "y": -1484.6,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Náměstí Míru: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 47 mm lower (3.1 % across the gauge) for 28 m (s 18114-18142). Do the rails tilt across here in reality?",
+   "lines": [
+    "9",
+    "22"
+   ]
+  },
+  {
+   "kind": "cross level",
+   "id": "cross-50.0757-14.4219",
+   "line": "9",
+   "x": -133.1,
+   "y": -1294.6,
+   "s0": 19104,
+   "s1": 19236,
+   "mag": 34.2,
+   "status": "review",
+   "place": [
+    50.075676,
+    14.421948
+   ],
+   "between": [
+    [
+     50.0756666,
+     14.4223673
+    ],
+    [
+     50.0757794,
+     14.4205339
+    ]
+   ],
+   "marks": [
+    {
+     "x": -103.5,
+     "y": -1299.8,
+     "label": "the tilt starts",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -231.8,
+     "y": -1269.5,
+     "label": "the tilt ends",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the rails tilt across like this",
+    "level: the road tilts, the rails do not",
+    "unsure"
+   ],
+   "info": "near Štěpánská: the road falls across both tracks here and the build tilts the rails with it, the right rail up to 34 mm lower (2.3 % across the gauge) for 132 m (s 19104-19236). Do the rails tilt across here in reality?",
+   "lines": [
+    "9",
+    "22"
+   ]
+  }
+ ]
+}
