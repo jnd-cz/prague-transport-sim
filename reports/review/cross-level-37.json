@@ -8,36 +8,36 @@
    "kind": "cross level",
    "id": "cross-50.1036-14.4739",
    "line": "37",
-   "x": 3970.1,
-   "y": 1280.6,
-   "s0": 3968,
-   "s1": 4014,
-   "mag": 41.9,
+   "x": 3971.9,
+   "y": 1281.6,
+   "s0": 3970,
+   "s1": 4008,
+   "mag": 31.2,
    "status": "review",
    "place": [
-    50.103632,
-    14.473865
+    50.103643,
+    14.473888
    ],
    "between": [
     [
-     50.1035374,
-     14.4736616
+     50.1035479,
+     14.4736842
     ],
     [
-     50.1037523,
-     14.4742086
+     50.1037287,
+     14.4741332
     ]
    ],
    "marks": [
     {
-     "x": 3954.3,
-     "y": 1272.2,
+     "x": 3956.0,
+     "y": 1273.1,
      "label": "the tilt starts",
      "color": "#3e9dff"
     },
     {
-     "x": 3996.3,
-     "y": 1290.5,
+     "x": 3990.6,
+     "y": 1288.7,
      "label": "the tilt ends",
      "color": "#ffffff"
     }
@@ -47,7 +47,7 @@
     "level: the road tilts, the rails do not",
     "unsure"
    ],
-   "info": "near Palmovka: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 42 mm lower (2.8 % across the gauge) for 46 m (s 3968-4014). Do the rails tilt across here in reality?<a href=\"reports/review/cross-level/37-3968.svg\" target=\"_blank\" rel=\"noopener\"><img src=\"reports/review/cross-level/37-3968.svg\" alt=\"the cross-section\" style=\"display:block;width:100%;margin:6px 0\"></a>",
+   "info": "near Palmovka: the road falls across both tracks here and the build tilts the rails with it, the left rail up to 31 mm lower (2.1 % across the gauge) for 38 m (s 3970-4008). Do the rails tilt across here in reality?<a href=\"reports/review/cross-level/37-3970.svg\" target=\"_blank\" rel=\"noopener\"><img src=\"reports/review/cross-level/37-3970.svg\" alt=\"the cross-section\" style=\"display:block;width:100%;margin:6px 0\"></a>",
    "lines": [
     "37"
    ]

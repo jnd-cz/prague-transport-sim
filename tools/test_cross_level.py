@@ -42,7 +42,7 @@ class Level(unittest.TestCase):
         n = len(fall)
         res = np.zeros(n) if res is None else res
         street_ = np.ones(n, bool) if street_ is None else street_
-        c, _ = cl.cross_level(np.asarray(fall, float), res, street_, np.ones(n, bool))
+        c, _, _ = cl.cross_level(np.asarray(fall, float), res, street_, np.ones(n, bool))
         return c
 
     def test_the_fall_becomes_cross_level_with_its_flanks(self):

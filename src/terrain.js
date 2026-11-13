@@ -240,6 +240,10 @@ function chainWays(roads, flag) {
   return n;
 }
 
+// m past the outer track that the street continues the tracks' plane where the rails tilt with it (#538): the flush
+// with the track bed is full within 5 m of the route (src/world.js flushDtm) and fades out by 15 m
+const PLANE_BEYOND = 5;
+
 export class Profile {
   // The track profile is the top of rail (src/heights.js), built offline (#480, #276 step 2): the line data's
   // `heights` every 2 m (tools/line_heights.py: every sample has one, the surface plus the style's lift where no
@@ -277,6 +281,19 @@ export class Profile {
       }
       this.backOff = off;
       this.backDz = dz;
+      // where the build tilts the rails with the street (`crossLevel`, tools/cross_level.py, #538: the two tracks' own
+      // slope), the street continues the tracks' plane PLANE_BEYOND m past the outer track, by how much of the slope
+      // the rails take (the ramps); elsewhere it is level beyond them
+      const C = data.crossLevel;
+      if (C?.path) {
+        const w = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const k = Math.round(i * step / C.step), c = k < C.path.length ? Math.abs(C.path[k] * C.unit) : 0;
+          const slope = Math.abs(off[i]) > 0.5 ? Math.abs(dz[i] / off[i]) : 0;
+          w[i] = c && slope > 1e-4 ? Math.min(1, c / (slope * 1.5)) : 0;
+        }
+        this.planeW = w;
+      }
     }
     this.z = z;
     this.grades = new Float32Array(n);
@@ -294,13 +311,18 @@ export class Profile {
 
   height(s) { return this._interp(this.z, s); }
   // top of rail `lateral` m across from our track (left > 0): ours, the opposite track's where the build gave its
-  // cross-section, linear between the two and level beyond (#197)
+  // cross-section, linear between the two (#197), level beyond, or the same plane where the rails tilt with it (#538)
   heightAt(s, lateral = 0) {
     const z = this._interp(this.z, s);
     if (!this.backOff || !lateral) return z;
     const o = this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))];
     if (!(Math.abs(o) > 0.5)) return z;
-    return z + this._interp(this.backDz, s) * Math.max(0, Math.min(1, lateral / o));
+    const dz = this._interp(this.backDz, s), u = lateral / o;
+    const w = this.planeW ? this._interp(this.planeW, s) : 0;
+    // (past the outer track: level, or the tracks' plane up to PLANE_BEYOND m where the rails tilt with it)
+    const past = u < 0 ? -u * Math.abs(o) : u > 1 ? (u - 1) * Math.abs(o) : 0;
+    const beyond = w && past ? Math.sign(u) * Math.min(past, PLANE_BEYOND) / Math.abs(o) * dz * w : 0;
+    return z + dz * Math.max(0, Math.min(1, u)) + beyond;
   }
   grade(s) { return this._interp(this.grades, s); }
 
