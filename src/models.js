@@ -172,13 +172,15 @@ function destinationTexture(name) {
 // Each set owns its materials (traffic fades them individually).
 // dest: the destination card's text (none: no card); run: the run number card
 // vehicle: a vehicle's id (assets/vehicles.json); one not loaded gives way to the first loaded one in the index
-// (pickVehicle). variant: one of the vehicle's types ('T3', 'T3SUCS', 'T3M' for the built-in car); none: one from
-// the run number (src/vehicles.js variantOf); the cars' fleet numbers from its range.
-export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run = '', variant = null } = {}) {
+// (pickVehicle). dealt: { type, numbers } from the run's FleetDealer (src/vehicles.js), the set's type and its cars'
+// fleet numbers. Without it (a test page, a picture): variant, one of the vehicle's types ('T3', 'T3SUCS', 'T3M' for
+// the built-in car), else one from the run number (variantOf), the numbers from the run number too.
+export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run = '', variant = null, dealt = null } = {}) {
   const root = new THREE.Group(), v = pickVehicle(vehicle), loader = v?.loader ?? loadedLoader();
-  const type = variant ?? variantOf(v, run) ?? 'T3SUCS', fleet = fleetNumbers(v, type, run, cars);
+  const type = dealt?.type ?? variant ?? variantOf(v, run) ?? 'T3SUCS', fleet = dealt?.numbers ?? fleetNumbers(v, type, run, cars);
   root.userData.line = line;
   root.userData.vehicle = v?.id ?? null;
+  root.userData.fleet = fleet;   // (given back to the dealer when an AI tram leaves)
   if (loader === 'gltf-classic') { makeDetailedSet(root, detailedProto, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
   if (loader === 'gltf') { makeDetailedSet(root, gltfProtos.get(v.id), line, cars, dest, run); root.userData.kind = 'gltf'; return root; }
   if (loader === 'gltf-rigged') { makeRiggedSet(v?.id ?? riggedIds()[0], root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet); root.userData.kind = 'rigged'; return root; }

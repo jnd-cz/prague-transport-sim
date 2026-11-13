@@ -41,7 +41,7 @@ načte ve hře, i se vzorkem přidaným jen jako složka.
 | `preload` | `true`: stáhne se s linkou; jinak až když ho hráč vybere |
 | `licence` | `spdx` (licence, která dovoluje šíření), `commercial` (u NC false), `file` (jeho `LICENSE.txt`), `authors`, `sources` (adresy), `credit` (řádek, který hra ukazuje) |
 | `tier` | úroveň pohybu (níže), `moves` díly, které hýbe, `levels` počet úrovní podle vzdálenosti |
-| `variants` | typy, kterými může být (`type`, např. `T3SUCS`), a jejich evidenční čísla (`fleet`: rozsahy `[první, poslední]`); typ cizí tramvaje a čísla jejích vozů plynou z čísla pořadí (`src/vehicles.js`), každý typ tak často, kolik má čísel |
+| `fleet` | evidenční čísla, pod kterými jeho soupravy jezdí (#527): `types`, pro každý typ (např. `T3SUCS`) jeho `ranges` `[první, poslední]` s `except` (díry), nebo `list`; `sets`, dvojice, které jezdí spolu a s žádným jiným vozem, ale každý z vozů může jezdit sám, kde linka jezdí sólo vozy, a jeho druhý vůz je pak volný pro jiný sólo vůz (souprava mimo seznam jsou dvě čísla jednoho typu); `liveries`, číslo → id nátěru (#529). Jízda je rozdává (`src/vehicles.js` `FleetDealer`): balíček všech čísel zamíchaný semínkem jízdy, takže každý typ přijde na řadu tak často, kolik má čísel, žádné dvakrát na ulici, a vrací se, když souprava odjede; naše tramvaj jezdí jako hráčova oblíbená souprava z menu, jinak jako T3SUCS rozdaná stejně, a žádná cizí tramvaj její čísla nedostane. Rozdávání kontroluje `tools/test_fleet.py` |
 
 **glTF úrovně 1** nepotřebuje kód: nehybný model v metrech, počátek v rovině kolejnic uprostřed mezi čepy
 podvozků, +Y nahoru, čelem k `forward`; čepy má podle svého typu. Menu ho nabídne, při výběru se načte a
@@ -159,7 +159,7 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
 - **Vestavěná T3** (`src/t3simple.js`): rozměry jsou pojmenované konstanty na začátku souboru (`NOSE`,
   `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), každá s uvedeným zdrojem; nátěr maluje `livery()`,
   pevné díly `partsGeometry()`, pohyblivé `bogie()`, `wheelset()`, `coupler()` a `pantoBars()` (rám sběrače
-  pro danou výšku drátu), typy a jejich evidenční čísla v `variants` jejího popisu (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` ji
+  pro danou výšku drátu), typy a jejich evidenční čísla v `fleet` jejího popisu (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` ji
   kontroluje proti těmto číslům.
 - **Tabule a cedule** všech modelů: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, bodový displej T3M `ledFace`).

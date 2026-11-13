@@ -1627,10 +1627,17 @@ export class Traffic {
     // (a run number from a counter, not this.rand: the seeded traffic runs stay as they were; no
     // destination card: where another line's tram goes is not in our data)
     this.tramCount = (this.tramCount || 0) + 1;
-    const mesh = makeT3({ line, cars, vehicle: this.game.opts.vehicle, run: `8${String(1 + ((this.tramCount * 17) % 40)).padStart(2, '0')}` });
+    // (its type and fleet numbers dealt from the run's fleet, src/vehicles.js FleetDealer: none twice on the street)
+    const mesh = makeT3({ line, cars, vehicle: this.game.opts.vehicle, run: `8${String(1 + ((this.tramCount * 17) % 40)).padStart(2, '0')}`,
+      dealt: this.game.opts.dealer?.deal(cars) });
     setOpacity(mesh, 0);
     this.group.add(mesh);
     return { id: this.tramCount, mesh, length: T3.length * cars + COUPLING_GAP * (cars - 1) };
+  }
+
+  _tramGone(t) {
+    this.game.opts.dealer?.give(t.mesh.userData.fleet);
+    this.group.remove(t.mesh); disposeModel(t.mesh);
   }
 
   _tramFade(t, dt, leaving) {
@@ -1749,7 +1756,7 @@ export class Traffic {
       this._placeTram(t, this.route, t.s, (s) => profile.height(s), dt);
     }
     this.ahead = this.ahead.filter((t) => {
-      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
+      if (t.leaving && t.alpha <= 0) { this._tramGone(t); return false; }
       return true;
     });
     g.aiTrams = this.ahead;
@@ -1852,7 +1859,7 @@ export class Traffic {
       this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y), dt);
     }
     this.oncoming = this.oncoming.filter((t) => {
-      if (t.leaving && t.alpha <= 0) { this.group.remove(t.mesh); disposeModel(t.mesh); return false; }
+      if (t.leaving && t.alpha <= 0) { this._tramGone(t); return false; }
       return true;
     });
   }

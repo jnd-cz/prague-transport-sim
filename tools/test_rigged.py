@@ -100,7 +100,7 @@ def sample_rig(page, base, imap):
         "loader": "gltf-rigged", "model": "model.glb", "rig": "rig.json", "forward": "+Z",
         "files": [{"path": "model.glb", "bytes": len(glb)}, {"path": "rig.json", "bytes": len(rig_bytes)}],
         "preload": False, "tier": 3, "moves": ["bogies", "wheels", "couplers", "collector", "lamps", "doors"], "levels": 2,
-        "variants": [{"type": "T3SUCS", "fleet": [[7001, 7010]]}],
+        "fleet": {"types": {"T3SUCS": {"ranges": [[7001, 7010]]}}},
         "licence": {"spdx": "CC0-1.0", "commercial": True, "file": "LICENSE.txt", "authors": ["the test"],
                     "sources": ["tools/test_rigged.py"], "credit": "Rigged sample tram: boxes from the vehicle test."},
     }

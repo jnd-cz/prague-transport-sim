@@ -8,7 +8,7 @@ import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { loadRegistry, fileUrl, vehicleName } from './vehicles.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
@@ -334,7 +334,32 @@ function modelMenu() {
   sel.value = was || vehicles[0]?.id;
 }
 modelMenu();
-$('optModel').addEventListener('change', () => useVehicle($('optModel').value));
+// The player's preferred set (#527; the user, 2026-11-11: "I would add optinal preferred set for the player"): the
+// vehicle's listed sets, then its numbers by type (a lone number: the second car dealt of its type); remembered per
+// vehicle. Our tram runs as it and no AI tram is dealt it; "any" deals ours like the others.
+const FLEET_KEY = 'tram.fleet';
+let fleetPicks = {};
+try { fleetPicks = JSON.parse(localStorage.getItem(FLEET_KEY) || '{}'); } catch { /* storage unavailable */ }
+function fleetMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), c = fleetChoices(v), sel = $('optFleet');
+  $('fleetRow').hidden = !c;
+  if (!c) { sel.replaceChildren(); return; }
+  const group = (label, opts) => { const g = document.createElement('optgroup'); g.label = label; g.append(...opts); return g; };
+  sel.replaceChildren(new Option(t('fleet.dealt'), ''),
+    ...(c.sets.length ? [group(t('fleet.sets'), c.sets.map((s) => new Option(`${s.value.replace('+', ' + ')} (${s.type})`, s.value)))] : []),
+    ...c.types.map((x) => group(x.type, x.numbers.map((n) => new Option(String(n), String(n))))));
+  sel.value = preferredSet(v, fleetPicks[v.id]) ? fleetPicks[v.id] : '';
+}
+fleetMenu();
+$('optModel').addEventListener('change', () => { fleetMenu(); useVehicle($('optModel').value); });
+$('optFleet').addEventListener('change', () => {
+  fleetPicks[$('optModel').value] = $('optFleet').value;
+  try { localStorage.setItem(FLEET_KEY, JSON.stringify(fleetPicks)); } catch { /* storage unavailable */ }
+});
+// the run's fleet: its own stream from the run's seed (src/random.js), so dealing draws nothing from the traffic's
+// and a replay deals the same
+const fleetDealer = (vehicle, seed) => new FleetDealer(pickVehicle(vehicle), rng((seed ^ 0x6a09e667) >>> 0));
+const ourSet = (dealer, vehicle, cars) => dealer.ours(cars, preferredSet(pickVehicle(vehicle), $('optFleet').value));
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -350,9 +375,10 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-// (a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are of the types their vehicle has, by
-// their run numbers: assets/*/vehicle.json `variants`)
-let tramModel = makeT3({ line: data.line, cars: lineCars, vehicle: $('optModel').value, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
+// (a T3SUCS, the tram the simulation drives with its TR 37 equipment, or the player's preferred set; AI trams are
+// dealt the types and numbers of their vehicle's fleet: assets/*/vehicle.json `fleet`, src/vehicles.js FleetDealer)
+let tramModel = makeT3({ line: data.line, cars: lineCars, vehicle: $('optModel').value, dest: lastStop, run: runNumber(0),
+  dealt: ourSet(fleetDealer($('optModel').value, 0), $('optModel').value, lineCars) });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -401,7 +427,7 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-onLangChange(() => { menuTexts(); modelMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
@@ -435,15 +461,17 @@ async function start(extra = {}) {
   zoom = zoomTarget = 1;
   tram.eq.mode = controlMode();
   const vehicle = $('optModel').value;
-  if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id) {
+  // one seeded stream for the whole run (rules and traffic), apart from Math.random
+  const seed = runSeed(), random = rng(seed);
+  const dealer = fleetDealer(vehicle, seed), ours = ourSet(dealer, vehicle, cars);
+  if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
+    || String(tramModel.userData.fleet) !== String(ours.numbers)) {
     scene.remove(tramModel);
     disposeModel(tramModel);
-    tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
+    tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), dealt: ours });
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  // one seeded stream for the whole run (rules and traffic), apart from Math.random
-  const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
   applyWeather(weather);
   game = new Game(scene, data, route, tram, audio, {
@@ -458,6 +486,7 @@ async function start(extra = {}) {
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
     vehicle: $('optModel').value,
+    dealer,
     seed: Math.floor(random() * 1e9),
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
