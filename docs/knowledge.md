@@ -910,6 +910,11 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 - Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
   rewritten within the same second at the same size runs the old code (a test that edits a module must
   change its size).
+- `os.replace` onto a file another handle holds open fails on Windows (`PermissionError`, WinError 5), and
+  so does opening a file while it is being replaced; POSIX lets both through. Python's `open` does not share
+  delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
+  stopped a parallel rebuild (#521). A file several threads or processes write needs one writer at a
+  time and a retry for the readers (`tools/stepcache.py` `_waiting`).
 
 ## The test host
 

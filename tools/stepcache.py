@@ -31,6 +31,37 @@ KEEP = 2  # records kept per step: a branch switched back finds its own
 # (the threads of numpy's BLAS: its sums are split by them, so results differ in the last bits with their number)
 ENV = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")
 _stat, _replace = os.stat, os.replace  # (the tracer wraps os.stat; its own reads must not count)
+WAIT = 10.0  # s: how long a file another thread or process holds open is waited for
+
+
+def _waiting(f, *a):
+    """f(*a), again while it fails with PermissionError, for up to WAIT s. On Windows a file open elsewhere cannot be
+    replaced, nor opened while it is being replaced: a step's tracer reading hashes.json as the parallel rebuild's
+    threads replaced it, or two threads replacing it at once (WinError 5, #521). POSIX lets both through."""
+    end, d = time.monotonic() + WAIT, 0.005
+    while True:
+        try:
+            return f(*a)
+        except PermissionError:
+            if time.monotonic() > end:
+                raise
+            time.sleep(d)
+            d = min(2 * d, 0.05)
+
+
+def replace(tmp, path):
+    """tmp renamed over path, waited for while path is held (_waiting)."""
+    try:
+        _waiting(_replace, tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
+
+
+def _load(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def relpath(root, p):
@@ -74,11 +105,11 @@ class Hashes:
 
     def __init__(self, root, path=None):
         self.root, self.path, self.lock, self.new = root, path, threading.Lock(), {}
+        self.saving = threading.Lock()  # (one writer of path at a time, the latest state last)
         try:
-            with open(path, encoding="utf-8") as f:
-                self.known = json.load(f)
-        except (TypeError, FileNotFoundError, ValueError):
-            self.known = {}
+            self.known = _waiting(_load, path)
+        except (TypeError, FileNotFoundError, ValueError, PermissionError):
+            self.known = {}  # (hashed again as files are met)
 
     def state(self, r):
         p = os.path.join(self.root, r)
@@ -119,16 +150,19 @@ class Hashes:
             self.new.update(known)
 
     def save(self):
-        with self.lock:
-            if not self.new or not self.path:
-                return
-            data = json.dumps(self.known, separators=(",", ":"))
-            self.new = {}
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-        tmp = f"{self.path}.{os.getpid()}.{threading.get_ident()}.part"
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(data)
-        _replace(tmp, self.path)
+        """The known hashes written to path, if any are new. Threads take turns (rebuild.py's lines each save as their
+        steps are kept): each writes what was known when its turn came, so the last write holds every hash noted."""
+        with self.saving:
+            with self.lock:
+                if not self.new or not self.path:
+                    return
+                data = json.dumps(self.known, separators=(",", ":"))
+                self.new = {}
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            tmp = f"{self.path}.{os.getpid()}.part"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(data)
+            replace(tmp, self.path)
 
 
 def versions(names):
@@ -298,7 +332,7 @@ class _Tracer:
                        "written": sorted(self.written), "removed": sorted(self.removed), "moved": sorted(self.moved),
                        "modules": sorted(modules), "packages": sorted(pkgs), "cpu": cpu, "missing": missing,
                        "hashes": self.hashes.new}, f)
-        _replace(tmp, path)
+        replace(tmp, path)
 
 
 def trace(root, record, tool, args):
@@ -347,7 +381,7 @@ def trace(root, record, tool, args):
     tmp = f"{record}.part"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(rec, f)
-    _replace(tmp, record)
+    replace(tmp, record)
 
 
 def child(root, part, argv):
@@ -382,8 +416,7 @@ class Cache:
 
     def records(self, name):
         try:
-            with open(os.path.join(self.dir, "steps", f"{name}.json"), encoding="utf-8") as f:
-                return json.load(f)
+            return _waiting(_load, os.path.join(self.dir, "steps", f"{name}.json"))
         except (FileNotFoundError, ValueError):
             return []
 
@@ -460,7 +493,7 @@ class Cache:
         os.makedirs(os.path.dirname(b), exist_ok=True)
         tmp = f"{b}.{os.getpid()}.{threading.get_ident()}.part"
         shutil.copyfile(os.path.join(self.root, r), tmp)
-        _replace(tmp, b)
+        replace(tmp, b)
 
     def restore(self, rec, log=None):
         """rec's outputs (and its log at log) as its run left them, each file written whole."""
@@ -478,7 +511,7 @@ class Cache:
             os.makedirs(os.path.dirname(p), exist_ok=True)
             tmp = f"{p}.{os.getpid()}.{threading.get_ident()}.part"
             shutil.copyfile(self.blob(h), tmp)
-            _replace(tmp, p)
+            replace(tmp, p)
             self.hashes.note(r, h)
 
     def command(self, py, tool, args, record):
@@ -520,7 +553,7 @@ class Cache:
             tmp = f"{p}.{os.getpid()}.{threading.get_ident()}.part"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(recs[:KEEP], f, indent=0)
-            _replace(tmp, p)
+            replace(tmp, p)
         self.hashes.save()
 
     def amend(self, name, rec):
