@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "c6476bc",
- "published": "2026-11-13 16:05",
- "note": "#514: drawn tracks cleaned of 2 mm end segments, on main d293388 (#538's crossLevel)",
+ "built_at_commit": "246fadc",
+ "published": "2026-11-13 16:16",
+ "note": "#523: shelter footprints in the survey, on main 0d85dd8 (#538, #514)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "5e200065a38933b48a37f7985836fe47f20ba459d3ddef56e16f73296b8cd8ba"
   },
   "line17.dtm.json": {
-   "size": 9376511,
-   "sha256": "cd6f7d503fece1df01d435bdec3d6ae9c8cc62c7fd90e196181bf6eb4f74fd8d"
+   "size": 9376915,
+   "sha256": "b2ac1124106be6009c1348ddc26fcf539e1b9fc14ee60b1a10133b31f4c26e2a"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -57,8 +57,8 @@
    "sha256": "aa25d6461aca296d22661d8044764df4e9b34a342840abff582c6c3bc7c01dfe"
   },
   "line22.dtm.json": {
-   "size": 9571571,
-   "sha256": "ea6298afbb6e4008385274bbf10429cf1bcaf49c00768b5cfff1d6c3feeaceff"
+   "size": 9572421,
+   "sha256": "a6e1f95fcff982d9a82064e382ca5b66e5ba1049e1666f9317882edd543e4227"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -97,8 +97,8 @@
    "sha256": "06c53f3b6020a0e047fc18afee00683f9e4708e8fabe35e92f7a53f3c3362902"
   },
   "line23.dtm.json": {
-   "size": 4353177,
-   "sha256": "d64195c4caf8c781d3296011d8139c3c887a8ba911de567ec8d4e7294f6c9c1c"
+   "size": 4353679,
+   "sha256": "b747597e5d0f1b6705556d3cf805a4b3cf6838f43e26927c9b70d66240ca6e01"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -137,8 +137,8 @@
    "sha256": "5804b06c5a9104287594c32e56ccb73d68499d9cebb1417f134558c7afc892d8"
   },
   "line37.dtm.json": {
-   "size": 4702626,
-   "sha256": "f32a720bd76a83060940083a2234cf2d953a4af7281659b03287ce29f01f925e"
+   "size": 4702736,
+   "sha256": "6432e0d6a65e615f1c54b849d7a01a3b84b9375348302f3294d1536a714719b3"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -177,8 +177,8 @@
    "sha256": "d53e05de667e67e70b19c122f226ae3a98b7a7e3d66c34fddce92ddcd1b63b72"
   },
   "line9.dtm.json": {
-   "size": 9609754,
-   "sha256": "016d29288cb607a6c321b3447e80e6e107ae4f223648b93b144d0310e6fc064a"
+   "size": 9610708,
+   "sha256": "0d72fa3210baa75f7b04c67c2c7ec369f6dc4c0f3d5147179be1706b01a14a2e"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
