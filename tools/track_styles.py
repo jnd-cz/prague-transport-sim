@@ -63,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from route import Route  # noqa: E402
+import track_beds  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE, MIN_GRASS, JOIN = 4, 20, 30   # m (src/heights.js trackStyles until #479)
@@ -544,7 +545,8 @@ def main():
     data = json.loads(p.read_text(encoding="utf-8"))
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
     dp = ROOT / "data" / f"line{line}.dtm.json"
-    survey = Survey(json.loads(dp.read_text(encoding="utf-8"))) if dp.exists() else None
+    dtm = json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else None
+    survey = Survey(dtm) if dtm else None
     data["styles"] = sections(data, truth, survey)
     own = track_sections(data, survey)
     for i, tr in enumerate(data.get("tracks") or []):
@@ -552,12 +554,20 @@ def main():
             tr["styles"] = own[i]
         else:
             tr.pop("styles", None)
+    # (every drawn track's bed width by its style, #547: tools/track_beds.py)
+    bs = track_beds.beds(data, dtm)
+    for i, tr in enumerate(data.get("tracks") or []):
+        if i in bs:
+            tr["bed"] = bs[i]
+        else:
+            tr.pop("bed", None)
     data["lift"] = lift_series(data, data["styles"], offsets(truth))
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"line {line}: " + ", ".join(f"{x['style']} {x['s0']:.0f}-{x['s1']:.0f} ({x['source']})" for x in data["styles"]) or "none")
     print(f"line {line}: other tracks: " + ", ".join(f"{st} {sum(b - a for v in own.values() for a, b, s in v if s == st):.0f} m"
                                                     for st in ("grass", "embedded")) + f" on {len(own)} tracks")
+    print(f"line {line}: beds: " + json.dumps(track_beds.report(data, dtm, bs)))
 
 
 if __name__ == "__main__":
