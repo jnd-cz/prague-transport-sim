@@ -104,7 +104,7 @@ class _D:
         s = np.asarray(s, dtype=float)
         h0, h1 = s[1:-1]-s[:-2], s[2:]-s[1:-1]
         c = 2/(h0+h1)
-        self.n, self.l, self.c, self.r = len(s), c/h0, -c*(1/h0+1/h1), c/h1
+        self.n, self.l, self.c, self.r, self.key = len(s), c/h0, -c*(1/h0+1/h1), c/h1, s.tobytes()
 
     def __call__(self, f):
         return self.l*f[:-2]+self.c*f[1:-1]+self.r*f[2:]
@@ -117,11 +117,25 @@ class _D:
         return b
 
     def inverse(self, w, lam):
-        m = self.n-2
-        D = np.zeros((m, self.n))
-        i = np.arange(m)
-        D[i, i], D[i, i+1], D[i, i+2] = self.l, self.c, self.r
-        return np.linalg.inv(np.diag(np.asarray(w, dtype=float))+(D.T*np.asarray(lam, dtype=float))@D)
+        lam = np.asarray(lam, dtype=float)
+        # (D^T diag(lam) D is the same for every robust round of vertical_profile and every banded_profile call on these
+        # points: only the weights on the diagonal change. Its dense product, O(n^3), was 24 of the solves' 188 s under
+        # cProfile; the last ones are kept, the same product to its last bit, #516)
+        key = (self.key, lam.tobytes())
+        DtD = _PRODUCTS.get(key)
+        if DtD is None:
+            m = self.n-2
+            D = np.zeros((m, self.n))
+            i = np.arange(m)
+            D[i, i], D[i, i+1], D[i, i+2] = self.l, self.c, self.r
+            DtD = (D.T*lam)@D
+            if len(_PRODUCTS) >= 2:
+                del _PRODUCTS[next(iter(_PRODUCTS))]
+            _PRODUCTS[key] = DtD
+        return np.linalg.inv(np.diag(np.asarray(w, dtype=float))+DtD)
+
+
+_PRODUCTS = {}  # (_D.inverse's last products D^T diag(lam) D, by points and lam)
 
 
 def _capped(s, z, w, cap, rows, f=None, u=None, y=None):
