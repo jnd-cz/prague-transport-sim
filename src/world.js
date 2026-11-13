@@ -1009,7 +1009,15 @@ function flushDtm(ground) {
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
-    p[2] += dz * (1 - k * k * (3 - 2 * k));
+    const z = p[2] + dz * (1 - k * k * (3 - 2 * k));
+    // (past the track zone but within the track corridor, the survey's own shape only while it stays near the tracks'
+    // level: its outlines stack points metres apart in height beside the tracks, and freed they lifted the street up
+    // to 0.33 m over the bed, line 17 s 17862)
+    if (bed.has(p) && ground.trackWithin(p[0], p[1], 3) && pastZone(n.s, lat) && !profile.onBridge(n.s)) {
+      const zt = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW;
+      if (z > zt + 0.05 || z < zt - 0.15) { p[2] = zt; return; }
+    }
+    p[2] = z;
   };
   // measure everything first, then move
   // (bed: vertices of carriageway and tram areas, laid flush with the tracks; green ones too where the

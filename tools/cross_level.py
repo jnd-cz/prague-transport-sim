@@ -32,6 +32,11 @@ Every STEP m along our route (`path`, s from 0 as tools/route.py and the page co
   the survey's own shape (its fall to the gutter, its kerbs) shifted to meet it (src/world.js flushDtm). The user,
   2026-11-13: "the tracks should lie on single plane with the road/street".
 - **Level** where the fall is less than LEVEL. A stretch that reaches LEVEL keeps its flanks down to FLANK.
+- **Only at junctions and in curves** (`where`): within JUNCTION m of a DI crossing, a switch or a road crossing, and
+  where the radius is under CURVE_R; straight track outside them stays level, the ramps running out of them. Measured
+  before: of 14.9 km tilted on the five lines, 4.8 km was straight track outside junctions (up to 43 mm); levelled,
+  a rail head stands 8-11 mm (median) off the street between the two tracks, as on main. `places` say whether a curve's
+  tilt falls to its outside (`against the curve`).
 - **Where a DI track crosses ours** (`crossings`: the other lines' tracks surveyed by DI, at the rails of our track
   or of the opposite one), its heights at our two rails set the cross level there (`anchor`), whatever the rule says:
   the track network is the fixed base the surfaces meet (the user, 2026-11-13: "where there is a junction with
@@ -93,6 +98,8 @@ SOURCES = ("IPR", "survey", "tracks")
 FUSE = "median"          # how the three slopes make one: "median", or "weighted" by each one's spread (`hat`)
 MIN_ANGLE = 20           # degrees: a DI track crossing ours more shallowly is a turnout leaving it, not a crossing
 JOIN = 12.0              # m: DI crossings this close along ours are one junction, its cross level linear between them
+JUNCTION = 15.0          # m around a DI crossing, a switch (to its frog) or a road crossing: a junction
+CURVE_R = 500.0          # m: a radius under this (within ±5 m) is a curve
 SIG_MIN = 0.002          # a source's spread is never taken under this (the three-cornered hat can give 0 or less)
 TILTS, LEVEL_ANSWER, UNSURE = ("the rails tilt across like this", "level: the road tilts, the rails do not", "unsure")
 ANSWER = {TILTS: "tilts", LEVEL_ANSWER: "level"}
@@ -203,10 +210,10 @@ def fuse(falls, method=FUSE, sig=None):
     return np.where(fin.sum(axis=0) >= 2, out, np.nan)
 
 
-def cross_level(fall, res, street, pair):
+def cross_level(fall, res, street, pair, allow=None):
     """Signed cross level (m, + = the left rail lower) from the street's fall across both tracks (left up > 0; the
     sources' compromise, `fuse`) where IPR's plane through the band is clean (`res`): smoothed, level under LEVEL,
-    ramped, capped. Returns (c, ok)."""
+    ramped, capped; only where `allow` (junctions and curves), the ramps running out of them. Returns (c, ok)."""
     ok = street & pair & np.isfinite(fall) & (res < RESID)
     sm = smooth(fall, ok, street & pair)
     # (a stretch falling LEVEL or more keeps the fall's own flanks down to FLANK on either side: the road's tilt comes
@@ -227,6 +234,8 @@ def cross_level(fall, res, street, pair):
                 keep[i:j + 1] = True
             i = j + 1
     sm = np.where(keep, sm, 0.0)
+    if allow is not None:
+        sm = np.where(allow, sm, 0.0)
     c = np.clip(-sm * GAUGE, -CANT_MAX, CANT_MAX)
     c = extend(c, CANT_MAX / 30 * STEP)
     return np.where(np.abs(c) < 0.002, 0.0, c), ok
@@ -396,6 +405,29 @@ def anchor(c, ks, vals, d):
     return np.where(np.abs(out) < 0.002, 0.0, np.where(fixed, val, out))
 
 
+def where(data, s, rt, di):
+    """Where the rails may tilt: junctions (within JUNCTION m of a DI crossing `di`, a switch to its frog, or a road
+    crossing, the line's `crossings`) and curves (a radius under CURVE_R within ±5 m, the line's `curvature`). And
+    each sample's turn: +1 left, -1 right, 0 straight. The user, 2026-11-13: "I would limit the track tilt to junctions
+    and curves, there shouldn't be a reason to have tilted straight track outside of junction"."""
+    junc = np.zeros(len(s), bool)
+    for q in di:
+        junc |= np.abs(s - s[q["k"]]) <= JUNCTION
+    for w in data.get("switches") or []:
+        junc |= (s >= w["s"] - JUNCTION) & (s <= w["s"] + (w.get("frog") or 0) + JUNCTION)
+    for x in data.get("crossings") or []:
+        junc |= np.abs(s - x) <= JUNCTION
+    cu = data["curvature"]
+    k = np.interp(s, np.arange(len(cu["path"])) * cu["step"], np.abs(np.asarray(cu["path"], float)) * cu["unit"])
+    w = int(round(5 / STEP))
+    curve = np.array([k[max(0, i - w):i + w + 1].max() for i in range(len(s))]) >= 1 / CURVE_R
+    turn = np.zeros(len(s))
+    for i, v in enumerate(s):
+        a, b = rt.heading(v - 8, 4), rt.heading(v + 8, 4)
+        turn[i] = np.sign(a[0] * b[1] - a[1] * b[0]) if curve[i] else 0
+    return junc, curve, turn
+
+
 def build(data, sample, truth=None, survey=None, method=FUSE):
     rt = Route(data["path"])
     H = data["heights"]
@@ -413,12 +445,13 @@ def build(data, sample, truth=None, survey=None, method=FUSE):
     clean = street & pair & (res < RESID)
     sig = hat(falls, clean)
     fused = fuse(falls, method, sig)
-    c, ok = cross_level(fused, res, street, pair)
-    # (the tracks' slope off the compromise by LEVEL or more: a track's height is off, #539)
-    disagree = ok & np.isfinite(fall) & (np.abs(fall - fused) >= DISAGREE)
     # (where DI-surveyed tracks cross ours on paved track, their heights at our rails set it: the track network is
     # the fixed base the surfaces meet)
     di = [q for q in crossings(data, rt, s, z, zb, off) if street[q["k"]]]
+    junc, curve, turn = where(data, s, rt, di)
+    c, ok = cross_level(fused, res, street, pair, junc | curve)
+    # (the tracks' slope off the compromise by LEVEL or more: a track's height is off, #539)
+    disagree = ok & np.isfinite(fall) & (np.abs(fall - fused) >= DISAGREE)
     c = anchor(c, [q["k"] for q in di], [q["c"] for q in di], CANT_MAX / 30 * STEP)
     c = ramp(answered(c, xy, truth or {}), CANT_MAX / 30 * STEP)  # (a level answer's ends ramp too)
     out = {"step": STEP, "unit": 1e-5, "path": [int(round(v * 1e5)) for v in c],
@@ -433,6 +466,11 @@ def build(data, sample, truth=None, survey=None, method=FUSE):
     out["places"] = places(s, xy, c, show)
     for q in out["places"]:
         q["di"] = sum(1 for d in out["di"] if q["s"] <= d["s"] <= q["s"] + q["length"])
+        k = int(round(q["s"] / STEP)), int(round((q["s"] + q["length"]) / STEP))
+        q["junction"], q["curve"] = bool(junc[k[0]:k[1]].any()), bool(curve[k[0]:k[1]].any())
+        # (a curve's tilt falling to its outside: + = the left rail lower, a left turn's centre on the left)
+        tt = turn[k[0]:k[1]]
+        q["against the curve"] = bool(tt.any() and np.sign(q["mm"]) == -np.sign(tt[np.abs(tt) > 0].sum()))
     # (where IPR's plane and the two tracks' heights disagree on a tilt of LEVEL or more: a track's height is off, #539)
     out["disagree"] = places(s, xy, np.where(disagree, fall - fused, 0.0), show)
     for q in out["disagree"]:

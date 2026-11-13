@@ -113,6 +113,31 @@ class Fuse(unittest.TestCase):
         self.assertLess(np.std(w - truth), 0.005)
 
 
+class Where(unittest.TestCase):
+    def test_straight_track_outside_junctions_stays_level(self):
+        fall = np.full(80, -0.03)
+        allow = np.zeros(80, bool)
+        allow[30:40] = True
+        c, _ = cl.cross_level(fall, np.zeros(80), np.ones(80, bool), np.ones(80, bool), allow)
+        self.assertAlmostEqual(c[35], 0.045, delta=0.002)
+        self.assertFalse(c[:10].any() or c[70:].any())  # (beyond the ramps out of the junction)
+
+    def test_junctions_curves_and_their_turn(self):
+        from route import Route
+        # straight 100 m east, then a left curve of radius 100 m
+        pts = [[float(x), 0.0] for x in range(0, 101)]
+        pts += [[100 + 100 * math.sin(a), 100 - 100 * math.cos(a)] for a in np.linspace(0.01, 1.2, 120)]
+        data = {"switches": [{"s": 20.0, "frog": 12.0}], "crossings": [60.0],
+                "curvature": {"step": 1, "unit": 1e-9, "path": [0] * 101 + [10_000_000] * 120}}
+        rt = Route(pts)
+        s = np.arange(0, 200.0, cl.STEP)
+        junc, curve, turn = cl.where(data, s, rt, [])
+        self.assertTrue(junc[(s >= 10) & (s <= 45)].all() and junc[(s >= 46) & (s <= 74)].all())
+        self.assertFalse(junc[(s > 80) & (s < 90)].any())
+        self.assertTrue(curve[s > 110].all())
+        self.assertTrue((turn[s > 110] == 1).all())  # (left: its centre on the left, where + cross level is lower)
+
+
 class Crossings(unittest.TestCase):
     def line(self, track):
         # our route along x at 200 m (rising 2 % along), the opposite track 3.7 m to the left, one DI track crossing
