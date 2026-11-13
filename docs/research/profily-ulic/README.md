@@ -128,18 +128,18 @@ A build step after #512, whose stations along each car axis give the carriageway
 At each station it writes the carriageway's strips from kerb to kerb, in profily-ulic's order but on our data:
 1. **The extent.** The survey's kerbs: `road`, `tram` and `parking` areas, with medians and associated areas read
    (the class table above). A median splits the carriageway.
-2. **The tram space.** DI's track axes ± a tram envelope. profily-ulic uses ±1.75 m (IPR's manual: 6.5 m for
-   two tracks 3 m apart); we would take the value as a user fact in `data/truth.json`. From the envelope and the
-   counted lanes, the kind: a separate bed (the survey's `tram`), a reserved lane (every counted lane fits beside
-   it), or shared (cars drive on the rails).
+2. **The tram space.** DI's track axes ± a tram envelope of ±1.75 m (IPR's manual: 6.5 m for two tracks 3 m
+   apart), where the tracks are not on a separate bed (the user's answer 3 below; a fact for `data/truth.json`).
+   From the envelope and the counted lanes, the kind: a separate bed (the survey's `tram`), a reserved lane
+   (every counted lane fits beside it), or shared (cars drive on the rails).
 
    Today this is one test in `laneOffset`: a band under 3.2 m puts the car on its own track.
 3. **Parking strips,** from these sources in turn:
    1. TSK's sections where one meets the station's cross line: the side, the depth, the orientation from the
       depth and the stall count, and the kind (deliveries, disabled, special);
    2. OSM's parking areas and `parking:<side>` tags;
-   3. only if the user wants it, profily-ulic's § 25 estimate outside the zones, logged as a heuristic
-      (AGENTS.md: heuristics log what they decided).
+   3. profily-ulic's § 25 estimate outside the zones, logged as a heuristic (AGENTS.md: heuristics log what they
+      decided) and measured on the calibration sample (the user's answer 2 below).
 
    Cars on the kerb take their strip out of the sidewalk.
 4. **Cycle and bus lanes** from OSM: `cycleway:<side>=lane`, `busway`, and `bus:lanes` / `psv:lanes` only where
@@ -163,8 +163,8 @@ At each station it writes the carriageway's strips from kerb to kerb, in profily
 **Who reads it:**
 - **The drawing:**
   - the road paint (#309): solid and dashed lines from the strip boundaries, hatched shoulders;
-  - parked cars on the parking rows, a seeded share of the stalls filled;
-  - the bays.
+  - the parking strips and bays as strips, with no cars, shown apart in `?review` and the F8 overlay (the
+    user's answer 1 below).
 - **The traffic** (#304, #32):
   - cars drive the built lane centrelines instead of `laneOffset`;
   - turn lanes come from `turn:lanes`;
@@ -186,26 +186,23 @@ measure each change as an A/B on the same sample.
   photo is one moment anyway; TSK's stalls say where cars may stand.
 - **The cut's per-click geometry fixes** (snapping the cut, reach, edges). Our division is along the street.
 
-## Proposed issues (the user picks)
+## The user's answers (2026-11-13)
 
-| # | issue | lane | milestone | blocked by |
-|---|---|---|---|---|
-| 1 | Survey: read medians and associated road areas (`tools/dtm.py` `CLASSES`); the carriageway split at a median | world | W3 | — |
-| 2 | Snapshot TSK's open data: parking sections, reserved stalls, no-parking, street sections with class; `tools/sources.py` layers `parking` (tsk, osm) and `roadclass` (tsk, osm) | world | W3 | — |
-| 3 | The carriageway's division: `data/lineN.lanes.json`, strips per station (tram space and kind, parking, cycle and bus, lanes with class caps, shoulders); a `?review` calibration sample per line | world | W3 | #512, 1, 2 |
-| 4 | Parked cars on TSK's stalls: drawn, and static obstacles for the traffic | assets + sim | M4 | 3 |
-| 5 | The traffic drives the built lanes: `lanesOf` / `laneOffset` replaced; turn lanes join #304 | sim | M4 | 3, #304 |
-| 6 | Lane paint from the orthophoto: `ortho_lanes.py` with set selection, a labelled sample, the summer flight against the leaf-off one | world | W4 | 3; feeds #309, #46 |
+1. Parking: "only draw the strips and perhaps show them differently in review mode or debug overlay". There are
+   no parked cars.
+2. The § 25 estimate: "we can try to apply this rule and see how it holds up". It is measured on the calibration
+   sample.
+3. The tram envelope ±1.75 m: "if not sitting on separate track bed then we can go with that figure".
+4. Where: "this can go to the issue and milestone where we start working with the network graph, which will be
+   for trams, trains, cars+buses, pedestrians". That is #16 in M4.
 
-## Questions for the user
+## What became of the proposals
 
-1. **Parked cars.** Should the division fill TSK's stalls with parked cars, drawn and in the cars' way? Or only
-   the strips and their paint?
-2. **Outside the paid zones,** neither TSK nor OSM says where cars park. Should we take profily-ulic's § 25
-   estimate (residential streets, 3 m left per direction, 3.5 m from a rail), logged as a heuristic? Or draw
-   parking only where the data has it?
-3. **The tram envelope.** profily-ulic gives each track ±1.75 m: a car beside it keeps that far from the axis. Is
-   that how a T3 in a Prague street is given room, or is there a better figure, for example the clearance profile
-   or the 3.5 m that § 25 keeps between a parked car and the rail?
-4. **The order.** The division (3) as a W3 step, so the street is drawn with its lanes and parking before the
-   traffic uses them (5, M4)? Or both together in M4?
+| proposal | where |
+|---|---|
+| Survey: medians and associated road areas read; a median splits the carriageway | #555 (W3) |
+| Snapshot TSK's open data (parking sections, reserved stalls, no-parking, street classes) | in #556 |
+| The carriageway's division: `data/lineN.lanes.json`, strips per station, the § 25 trial, the strips in `?review` and F8, a calibration sample | #556 (M4). Blocked by #512 and #555; blocks #16 |
+| Parked cars on TSK's stalls | dropped (answer 1): strips only |
+| The traffic drives the built lanes | #16's road lane graph, with #304's turn lanes |
+| Lane paint from the orthophoto: set selection, the summer flight against the leaf-off one | a comment on #309 |
