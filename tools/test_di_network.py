@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """DI's track network and routes matched over it (#237): python -P -E tools/test_di_network.py."""
 import math
+import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import di_network as dn  # noqa: E402
@@ -451,6 +454,48 @@ class Chords(unittest.TestCase):
         # (the fork in reach, on the edge it ends; not the crossing in reach, nor nodes elsewhere)
         self.assertEqual(sorted(loose), [(1, (1, 4))])
         self.assertEqual(set(loose.values()), {0.0})
+
+@unittest.skipUnless((Path(__file__).resolve().parent.parent / 'raw' / 'dtm-di' / 'provenance.json').exists(),
+                     'needs raw/dtm-di and raw/dtmp-tracks: python -I tools/snapshot.py fetch')
+class Kept(unittest.TestCase):
+    def test_kept_network_is_the_built_one(self):
+        """DI's network kept per machine (#517): read back, it is the network built, to its last byte."""
+        smoothed = dn.SMOOTHED
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'TRAMDATA_CACHE': d}):
+            try:
+                dn.SMOOTHED = smoothed
+                built = dn.load_network()
+                kept = sorted(p.name.split('-')[0] for p in Path(d, 'kept').iterdir())
+                read = dn.load_network()
+            finally:
+                dn.SMOOTHED = []
+        self.assertIn('network', kept)
+        self.assertIsNot(read, built)
+        self.assertEqual(same(vars(read), vars(built)), [])
+        self.assertEqual(read.summary(), built.summary())
+
+
+def same(a, b, at='net'):
+    """Where a and b differ in value (geometries to their last coordinate bit), [] where nowhere."""
+    import numpy as np
+    import shapely
+    if type(a) is not type(b):
+        return [at]
+    if isinstance(a, dict):
+        if list(a) != list(b):
+            return [at]
+        return [d for k in a for d in same(a[k], b[k], f'{at}[{k!r}]')]
+    if isinstance(a, (list, tuple)):
+        return [at] if len(a) != len(b) else [d for i, (x, y) in enumerate(zip(a, b)) for d in same(x, y, f'{at}[{i}]')]
+    if isinstance(a, shapely.Geometry):
+        return [] if a.wkb == b.wkb else [at]
+    if isinstance(a, shapely.STRtree):
+        return same(list(a.geometries), list(b.geometries), at)
+    if isinstance(a, np.ndarray):
+        return [] if a.dtype == b.dtype and np.array_equal(a, b) else [at]
+    if hasattr(a, '__dict__') and not isinstance(a, type):
+        return same(vars(a), vars(b), at)
+    return [] if a == b or (a != a and b != b) else [at]
 
 
 if __name__ == '__main__':

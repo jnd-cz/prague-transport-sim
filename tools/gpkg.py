@@ -27,7 +27,10 @@ def _wkb(buf, off):
     dim = 2 + flags_z + flags_m
 
     def pts(n, off):
-        vals = struct.unpack_from(bo + "d" * (n * dim), buf, off)
+        vals = struct.unpack_from(f"{bo}{n * dim}d", buf, off)
+        if not flags_m:  # (the points' tuples zipped from the values: a slice per point was most of a survey's read, #517)
+            it = iter(vals)
+            return list(zip(it, it, it) if flags_z else zip(it, it)), off + n * dim * 8
         return [tuple(vals[i * dim:i * dim + (3 if flags_z else 2)]) for i in range(n)], off + n * dim * 8
 
     if base == 1:

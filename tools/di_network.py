@@ -1331,9 +1331,20 @@ def _frog(leg, on_route):
 
 
 def load_network():
-    """DI's network with the user's switch tips and orthophoto tracks (data/truth.json trackSources)."""
-    di, archive = di_tracks.load_sources()
-    return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive)
+    """DI's network with the user's switch tips and orthophoto tracks (data/truth.json trackSources), built once per machine
+    for its sources and this code (tools/dtmp_tracks.py `kept`: ~20 s in each build_line, #517)."""
+    import json
+    from dtmp_tracks import DI, RAW, archive_checked, di_checked, kept, sha
+    di_checked()
+    archive_checked()
+    truth = Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    tracks = json.loads(truth.read_text(encoding='utf-8'))['trackSources']
+    key = [sha(DI / 'provenance.json'), sha(RAW / 'provenance.json'), json.dumps(tracks, sort_keys=True)]
+
+    def build():
+        di, archive = di_tracks.load_sources()
+        return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive)
+    return kept('network', key, build, code=('di_network.py', 'di_tracks.py'))
 
 
 def dense(coords, step=DENSE):
