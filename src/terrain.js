@@ -109,9 +109,10 @@ export class Terrain extends Grid {
   // lower the surface at (x, y) to at most zmax in every grid (cap: deeper is not ours to dig; on a
   // fine block at least 15 m: a 2 m cell lowered stays local, where a coarse 10 x 15 m triangle
   // dragged its surroundings down; quay walls stood 8-9 m over the surveyed river)
-  lowerAt(x, y, zmax, cap = Infinity) {
+  // (`coarse` false: the fine blocks only; a coarse triangle lowered for a bed's edge sank 10-15 m around it, #548)
+  lowerAt(x, y, zmax, cap = Infinity, coarse = true) {
     const c = this.coarse();
-    if (c.contains(x, y)) c.lowerAt(x, y, zmax, cap);
+    if (coarse && c.contains(x, y)) c.lowerAt(x, y, zmax, cap);
     const m = this.fineMeta;
     if (!m) return;
     // (as finesAt, inline: millions of calls under the streets at load, #205)

@@ -249,18 +249,17 @@ function addRibbon(cg, line, width, hfn, lift, col, offset = 0, strips = 1, cros
 // track: there the edge lies at the mean of the two near rails, as the street between them (terrain.js heightAt).
 // Without `t.bed` (data built before #547) the 2.7 m ribbon.
 const GAUGE_HALF = 0.72;
-function addBed(cg, t, step, zBed, tilt, col, otherRail) {
-  const line = t.smooth;
-  if (line.length < 2) return;
-  if (!t.bed) { addRibbon(cg, line, 2.7, zBed, 0, col, 0, 1, tilt.map((z) => z / GAUGE_HALF)); return; }
+// (the bed across at each drawn point: [x, y, nx, ny, offsets, heights] with the offsets (m, + left) and heights of its
+// right edge, right rail, left rail and left edge; the edges 1.35 m out without `t.bed`)
+function bedRows(t, step, zBed, tilt, otherRail) {
+  const line = t.smooth, rows = [];
   const len = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
-  const k = len(t.p) / (len(line) || 1), n = t.bed.l.length;
-  const rows = [];
+  const k = len(t.p) / (len(line) || 1), n = t.bed?.l.length ?? 0;
   let acc = 0;
   for (let i = 0; i < line.length; i++) {
     const p = line[i];
     if (i) acc += Math.hypot(p[0] - line[i - 1][0], p[1] - line[i - 1][1]);
-    const f = Math.min(n - 1, (acc * k) / step), i0 = Math.min(Math.floor(f), n - 1), i1 = Math.min(i0 + 1, n - 1), u = f - i0;
+    const f = n ? Math.min(n - 1, (acc * k) / step) : 0, i0 = Math.min(Math.floor(f), Math.max(0, n - 1)), i1 = Math.min(i0 + 1, Math.max(0, n - 1)), u = f - i0;
     const near = u < 0.5 ? i0 : i1;
     const prev = line[Math.max(0, i - 1)], next = line[Math.min(line.length - 1, i + 1)];
     let dx = next[0] - prev[0], dy = next[1] - prev[1];
@@ -271,26 +270,75 @@ function addBed(cg, t, step, zBed, tilt, col, otherRail) {
       const ax = p[0] - prev[0], ay = p[1] - prev[1], al = Math.hypot(ax, ay) || 1;
       scale = Math.min(2, 1 / Math.max(0.5, (ax / al) * dx + (ay / al) * dy));
     }
-    const nx = -dy, ny = dx, slope = tilt[i] / GAUGE_HALF;
-    const at = (o) => [p[0] + nx * o * scale, p[1] + ny * o * scale];
-    const row = [];
-    for (const [side, key, bit] of [[-1, 'r', 2], [1, 'l', 1]]) {
-      const w = (t.bed[key][i0] * (1 - u) + t.bed[key][i1] * u) / 100, e = at(side * w);
-      let z = zBed[i] + slope * side * w;
-      if (t.bed.meet[near] & bit) {
-        const o = otherRail(e[0], e[1]);
-        if (o !== null) z = (zBed[i] + tilt[i] * side + o) / 2;
+    const nx = -dy * scale, ny = dx * scale, slope = tilt[i] / GAUGE_HALF;
+    const off = [0, -GAUGE_HALF, GAUGE_HALF, 0], z = [0, zBed[i] - tilt[i], zBed[i] + tilt[i], 0];
+    for (const [side, key, bit, j] of [[-1, 'r', 2, 0], [1, 'l', 1, 3]]) {
+      const w = t.bed ? (t.bed[key][i0] * (1 - u) + t.bed[key][i1] * u) / 100 : 1.35;
+      off[j] = side * w;
+      z[j] = zBed[i] + slope * side * w;
+      if (t.bed?.meet[near] & bit) {
+        const o = otherRail(p[0] + nx * side * w, p[1] + ny * side * w);
+        if (o !== null) z[j] = (zBed[i] + tilt[i] * side + o) / 2;
       }
-      row.push(W(e[0], e[1], z));
-      if (side < 0) { const r = at(-GAUGE_HALF), q = at(GAUGE_HALF); row.push(W(r[0], r[1], zBed[i] - tilt[i]), W(q[0], q[1], zBed[i] + tilt[i])); }
     }
-    rows.push(row); // right edge, right rail, left rail, left edge
+    rows.push([p[0], p[1], nx, ny, off, z]);
   }
-  const c = cg._chunk(line[0][0], line[0][1]);
-  for (let i = 0; i < line.length - 1; i++) {
-    const A = rows[i], B = rows[i + 1], cc = typeof col === 'function' ? col(i) : col;
+  return rows;
+}
+
+// A track's bed (#547): out to its width each side (`t.bed`, tools/track_beds.py: the survey's area of its style, the
+// middle of the strip to a paired track), the rails' plane between them and beyond, except where it meets the paired
+// track: there the edge lies at the mean of the two near rails, as the street between them (terrain.js heightAt).
+function addBed(cg, rows, col) {
+  if (rows.length < 2) return;
+  const V = rows.map(([x, y, nx, ny, off, z]) => off.map((o, j) => W(x + nx * o, y + ny * o, z[j])));
+  const c = cg._chunk(rows[0][0], rows[0][1]);
+  for (let i = 0; i < V.length - 1; i++) {
+    const A = V[i], B = V[i + 1], cc = typeof col === 'function' ? col(i) : col;
     for (let j = 0; j < 3; j++) cg.quad(c, A[j], B[j], B[j + 1], A[j + 1], cc);
   }
+}
+
+// The bed's surface at offset o (m, + left) of one of its rows (the rows of bedRows); null past its edges
+function bedZ(row, o) {
+  const off = row[4], z = row[5];
+  if (o < off[0] || o > off[3]) return null;
+  for (let j = 0; j < 3; j++) if (o <= off[j + 1]) return z[j] + ((z[j + 1] - z[j]) * (o - off[j])) / ((off[j + 1] - off[j]) || 1);
+  return z[3];
+}
+
+// The survey under every drawn track's bed (#548): a ground-level street, green or rail vertex within a bed's outline lies
+// under its surface (by STREET_BELOW, as next to our route's tracks); within EDGE_BAND m past its edge no higher than
+// EDGE_RISE m over the edge. The route's flush (flushDtm) laid the street to our tracks' profile; this lays it to
+// every drawn track's own top of rail and tilt (other lines' tracks crossing and leaving ours, loops: the user, line 37
+// s 1: "Spojovací rails hidden", and line 17 s 2366: "Canted tracked, lower rail disappears"). Only lowers, and only
+// what lies within LEVEL m of the bed (else another level: a bridge, an underpass).
+// A raised area (a platform, a sidewalk, an island) keeps its height: where one lies within a bed's outline, the bed is
+// too wide there, not the kerb too high (laid under the beds, they flattened 4-5 times the kerbs, line 9 345 -> 1571).
+const EDGE_BAND = 1.5, EDGE_RISE = 0.2, LEVEL = 2.5;
+const RAISED = new Set(['sidewalk', 'island', 'platform']);
+function layUnderBeds(dtm, near) {
+  let moved = 0;
+  // (a vertex shared by a raised area and the street beside it, a kerb's foot, is raised: it keeps the kerb)
+  const raised = new Map();
+  for (const a of dtm.areas) {
+    if (a.l !== 0 || !(STREET.has(a.c) || a.c === 'green' || a.c === 'rail')) continue;
+    for (const p of [...a.ring, ...a.holes.flat(), ...a.mesh.flat()]) raised.set(p, raised.get(p) || RAISED.has(a.c));
+  }
+  for (const [p, up] of raised) {
+    if (up) continue;
+    let cap = Infinity;
+    for (const [row, o] of near(p[0], p[1])) {
+      const zs = bedZ(row, o);
+      if (zs !== null) cap = Math.min(cap, zs - STREET_BELOW);
+      else {
+        const e = o < 0 ? 0 : 3, past = Math.abs(o - row[4][e]);
+        if (past <= EDGE_BAND) cap = Math.min(cap, row[5][e] - STREET_BELOW + EDGE_RISE);
+      }
+    }
+    if (p[2] > cap && p[2] - cap < LEVEL) { p[2] = cap; moved++; }
+  }
+  dtm.underBeds = moved;
 }
 
 // A vertical strip along `line` at `offset` m to its left, from zBot up to zTop (arrays per point):
@@ -496,6 +544,65 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     });
     tiltCache.set(t, tilt); return tilt;
   };
+  // (how far a track's bed lies under its top of rail, by the route's track styles: src/heights.js)
+  const liftAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 ? ground.profile.lift(n.s) : 0; };
+  // (each track's bed and tilt: a bed meeting its paired track's lays its edge at the mean of their near rails; the
+  // survey and the terrain are laid under the same cross-section, #548)
+  const beds = data.tracks.map((t) => {
+    const lift = t.smooth.map(([x, y]) => liftAt(x, y));
+    return { lift, zBed: t.z.map((z, i) => z - lift[i] - BED_BELOW), tilt: tiltOf(t) };
+  });
+  const bedGrid = new Map(), cell = (x, y) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
+  data.tracks.forEach((t, k) => t.smooth.forEach(([x, y], i) => {
+    const key = cell(x, y);
+    if (!bedGrid.has(key)) bedGrid.set(key, []);
+    bedGrid.get(key).push([k, i]);
+  }));
+  // (each track's nearest drawn point to (x, y) within 4 m: [track, index, distance])
+  const nearPoints = (x, y, skip = -1) => {
+    const best = new Map(), cx = Math.floor(x / 4), cy = Math.floor(y / 4);
+    for (let a = cx - 1; a <= cx + 1; a++) for (let b = cy - 1; b <= cy + 1; b++) for (const [k, i] of bedGrid.get(`${a},${b}`) || []) {
+      if (k === skip) continue;
+      const p = data.tracks[k].smooth[i], d = Math.hypot(p[0] - x, p[1] - y);
+      if (d < 4 && !(best.get(k)?.[1] <= d)) best.set(k, [i, d]);
+    }
+    return [...best].map(([k, [i, d]]) => [k, i, d]);
+  };
+  // (the near rail of the nearest other track at (x, y): its height there)
+  const otherRail = (own, x, y) => {
+    let best = null;
+    for (const h of nearPoints(x, y, own)) if (!best || h[2] < best[2]) best = h;
+    if (!best) return null;
+    const [k, i] = best, L = data.tracks[k].smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
+    const side = (b[0] - a[0]) * (y - L[i][1]) - (b[1] - a[1]) * (x - L[i][0]) >= 0 ? 1 : -1;
+    return beds[k].zBed[i] + beds[k].tilt[i] * side;
+  };
+  data.tracks.forEach((t, k) => { beds[k].rows = bedRows(t, data.heights.step, beds[k].zBed, beds[k].tilt, (x, y) => otherRail(k, x, y)); });
+  // (the rows of the beds near (x, y), each with the point's offset across it: [row, offset])
+  const bedsNear = (x, y) => {
+    const out = [];
+    for (const [k, i] of nearPoints(x, y)) {
+      if (data.tracks[k].b) continue;
+      const rows = beds[k].rows;
+      // (the nearer of the two segments around the point: the offset across and the share along)
+      let best = null;
+      for (const j of [i - 1, i]) {
+        if (j < 0 || j + 1 >= rows.length) continue;
+        const A = rows[j], B = rows[j + 1], ex = B[0] - A[0], ey = B[1] - A[1], el = ex * ex + ey * ey || 1;
+        const u = ((x - A[0]) * ex + (y - A[1]) * ey) / el;
+        if (u < -0.01 || u > 1.01) continue;
+        const v = Math.max(0, Math.min(1, u)), px = A[0] + ex * v, py = A[1] + ey * v, d = Math.hypot(x - px, y - py);
+        if (!best || d < best[0]) best = [d, A, B, v];
+      }
+      if (!best) continue;
+      const [, A, B, v] = best, mix = (a, b) => a.map((q, j) => q * (1 - v) + b[j] * v);
+      const row = [A[0] * (1 - v) + B[0] * v, A[1] * (1 - v) + B[1] * v, A[2] * (1 - v) + B[2] * v, A[3] * (1 - v) + B[3] * v, mix(A[4], B[4]), mix(A[5], B[5])];
+      const nl = Math.hypot(row[2], row[3]) || 1, o = ((x - row[0]) * row[2] + (y - row[1]) * row[3]) / nl / nl;
+      out.push([row, o]);
+    }
+    return out;
+  };
+  if (ground.dtm) layUnderBeds(ground.dtm, bedsNear);
   const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
     (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);
   // our tunnels through rock (terrain.js carveCorridor): the hill stays whole above the track; its
@@ -522,9 +629,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   }
   const mouths = roadPortalMouths(tunnelPortals);
   await mark('tracks + tunnel roads');
-  // (how far a track's bed lies under its top of rail, by the route's track styles: src/heights.js)
-  const liftAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 ? ground.profile.lift(n.s) : 0; };
-  lowerTerrainUnderTracks(data, ground.terrain, inTunnel, liftAt);
+  lowerTerrainUnderTracks(data, ground.terrain, inTunnel, beds);
   await mark('terrain under tracks');
   if (ground.dtm) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); await mark('terrain under DTM'); lowerFineUnderDtm(ground.dtm, ground.terrain); await mark('fine under DTM'); }
   const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
@@ -601,31 +706,6 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (src/heights.js: t.z is the top of rail; the bed lies the track style's offset under it, the
   // rail heads stand just over it, and where the bed is well below, the rails get their sides)
   const keepTrackRanges = /[?&](keepgeo|bot)\b/.test(location.search);
-  // (each track's bed and tilt first: a bed meeting its paired track's lays its edge at the mean of their near rails)
-  const beds = data.tracks.map((t) => {
-    const lift = t.smooth.map(([x, y]) => liftAt(x, y));
-    return { lift, zBed: t.z.map((z, i) => z - lift[i] - BED_BELOW), tilt: tiltOf(t) };
-  });
-  const bedGrid = new Map(), cell = (x, y) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
-  data.tracks.forEach((t, k) => t.smooth.forEach(([x, y], i) => {
-    const key = cell(x, y);
-    if (!bedGrid.has(key)) bedGrid.set(key, []);
-    bedGrid.get(key).push([k, i]);
-  }));
-  // (the near rail of the nearest other track at (x, y): its height there)
-  const otherRail = (own, x, y) => {
-    let best = null, bd = Infinity;
-    const cx = Math.floor(x / 4), cy = Math.floor(y / 4);
-    for (let a = cx - 1; a <= cx + 1; a++) for (let b = cy - 1; b <= cy + 1; b++) for (const [k, i] of bedGrid.get(`${a},${b}`) || []) {
-      if (k === own) continue;
-      const p = data.tracks[k].smooth[i], d = Math.hypot(p[0] - x, p[1] - y);
-      if (d < bd) { bd = d; best = [k, i]; }
-    }
-    if (!best) return null;
-    const [k, i] = best, L = data.tracks[k].smooth, a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
-    const side = (b[0] - a[0]) * (y - L[i][1]) - (b[1] - a[1]) * (x - L[i][0]) >= 0 ? 1 : -1;
-    return beds[k].zBed[i] + beds[k].tilt[i] * side;
-  };
   for (const [trackId, t] of data.tracks.entries()) {
     const bc = keepTrackRanges && t.smooth.length > 1 ? bedCg._chunk(...t.smooth[0]) : null;
     const rc = keepTrackRanges && t.smooth.length > 1 ? railCg._chunk(...t.smooth[0]) : null;
@@ -635,7 +715,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // The bed is the same canted plane as the rails, including its transition ramps.
     const own = ownStyles(t);
     const cols = t.smooth.map(([x, y], i) => STYLE_BED[styleAt(x, y) ?? own[i]] || bed);
-    addBed(bedCg, t, data.heights.step, zBed, tilt, (i) => cols[i], (x, y) => otherRail(trackId, x, y));
+    addBed(bedCg, beds[trackId].rows, (i) => cols[i]);
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
@@ -1525,24 +1605,26 @@ function buildDtmSteps(cg, ground, col) {
   console.log(`DTM steps: ${faces} wall faces`);
 }
 
-// Keep the terrain at or below every track's bed: for samples along each track (centre and
-// both bed edges) find the mesh triangle underneath (same split as Terrain.height) and lower
-// its three vertices by the excess. Bridges are skipped. (t.z is top of rail; the bed lies
-// `liftAt` under it, and the terrain 0.06 m under that: src/heights.js)
-function lowerTerrainUnderTracks(data, T, inTunnel = () => false, liftAt = () => 0) {
-  for (let pass = 0; pass < 2; pass++) for (const t of data.tracks) {
-    if (t.b) continue;
-    const L = t.smooth, Z = t.z;
-    for (let i = 0; i < L.length; i++) {
-      const a = L[Math.max(0, i - 1)], b = L[Math.min(L.length - 1, i + 1)];
-      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
-      if (inTunnel(L[i][0], L[i][1])) continue; // (in a rock tunnel the hill stays above)
-      for (const off of [0, 1.4, -1.4]) {
-        const x = L[i][0] - (dy / l) * off, y = L[i][1] + (dx / l) * off;
-        T.lowerAt(x, y, Z[i] - liftAt(x, y) - 0.06);
+// Keep the terrain at or below every track's bed: for samples across each bed's whole cross-section (its tilt and
+// width included, #548: every ~0.7 m from edge to edge; before #548 the axis and 1.4 m out at the top of rail) find the
+// mesh triangle underneath (same split as Terrain.height) and lower its three vertices by the excess; the coarse grid
+// only under the rails. Bridges are skipped. (the bed surface: bedRows; the terrain 0.06 m under it)
+function lowerTerrainUnderTracks(data, T, inTunnel = () => false, beds) {
+  for (let pass = 0; pass < 2; pass++) data.tracks.forEach((t, k) => {
+    if (t.b) return;
+    for (const row of beds[k].rows) {
+      const [x, y, nx, ny, off] = row;
+      if (inTunnel(x, y)) continue; // (in a rock tunnel the hill stays above)
+      const n = Math.max(2, Math.ceil((off[3] - off[0]) / 0.7));
+      for (let j = 0; j <= n; j++) {
+        const o = off[0] + ((off[3] - off[0]) * j) / n;
+        T.lowerAt(x + nx * o, y + ny * o, bedZ(row, o) - 0.06, Infinity, false);
       }
+      // (the coarse grid at the axis and the rails only: its 10 x 15 m triangles lowered for a bed's edge sink the ground
+      // around it)
+      for (const o of [0, -GAUGE_HALF, GAUGE_HALF]) T.lowerAt(x + nx * o, y + ny * o, bedZ(row, o) - 0.06);
     }
-  }
+  });
 }
 
 // Terrain mesh in chunks near the route, coloured by land cover (parks, woods, water).
