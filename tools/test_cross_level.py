@@ -42,7 +42,7 @@ class Level(unittest.TestCase):
         n = len(fall)
         res = np.zeros(n) if res is None else res
         street_ = np.ones(n, bool) if street_ is None else street_
-        c, _, _ = cl.cross_level(np.asarray(fall, float), res, street_, np.ones(n, bool))
+        c, _ = cl.cross_level(np.asarray(fall, float), res, street_, np.ones(n, bool))
         return c
 
     def test_the_fall_becomes_cross_level_with_its_flanks(self):
@@ -86,6 +86,30 @@ class Level(unittest.TestCase):
         self.assertFalse(m[(s >= 20) & (s <= 40)].any())
         self.assertTrue(m[(s > 40) & (s < 80)].all())
         self.assertFalse(m[s > 80].any())  # within NEAR_SPAN of the span
+
+
+class Fuse(unittest.TestCase):
+    def test_the_median_outvotes_one_source(self):
+        # Sokolovská: tracks 2.7 %, survey 2.7 %, IPR 5.2 %
+        f = cl.fuse({"IPR": [-0.052], "survey": [-0.027], "tracks": [-0.027]}, "median")
+        self.assertAlmostEqual(f[0], -0.027)
+
+    def test_two_sources_make_their_mean_and_one_none(self):
+        f = cl.fuse({"IPR": [0.02, 0.02], "survey": [np.nan, np.nan], "tracks": [0.04, np.nan]}, "median")
+        self.assertAlmostEqual(f[0], 0.03)
+        self.assertTrue(np.isnan(f[1]))
+
+    def test_the_hat_finds_each_sources_spread_and_weights_by_it(self):
+        rng = np.random.default_rng(1)
+        truth = rng.normal(0, 0.03, 4000)
+        falls = {"IPR": truth + rng.normal(0, 0.005, 4000), "survey": truth + rng.normal(0, 0.01, 4000),
+                 "tracks": truth + rng.normal(0, 0.02, 4000)}
+        sig = cl.hat(falls, np.ones(4000, bool))
+        self.assertAlmostEqual(sig["IPR"], 0.005, delta=0.0015)
+        self.assertAlmostEqual(sig["survey"], 0.01, delta=0.0015)
+        self.assertAlmostEqual(sig["tracks"], 0.02, delta=0.002)
+        w = cl.fuse(falls, "weighted", sig)
+        self.assertLess(np.std(w - truth), 0.005)
 
 
 class Opposite(unittest.TestCase):

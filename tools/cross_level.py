@@ -2,7 +2,7 @@
 """Cross level of street track from the road's crossfall (#538): the rails of a track in a sloping street junction
 lie in the road and tilt with it, one rail above the other.
 
-    python -P -E tools/cross_level.py --line 37      # writes `crossLevel` into data/line37.json
+    python -P -E tools/cross_level.py --line 37 [--fuse median|weighted]  # writes `crossLevel` into data/line37.json
     python -P -E tools/cross_level.py --cards        # the review cards, reports/review/cross-level-N.json
     python -P -E tools/cross_level.py --import       # the answers (tools/deploy.py --pull-reviews) into truth.json
 
@@ -17,14 +17,23 @@ Every STEP m along our route (`path`, s from 0 as tools/route.py and the page co
 - **Where it tilts:** IPR says so. A plane fitted to IPR across both tracks (from BEYOND m outside ours to BEYOND m
   outside the opposite one, ±ALONG m along) with a residual under RESID that falls LEVEL or more. A crown between the
   tracks, a kerb or a platform in the band make the residual larger: such a street is not one plane.
-- **How much:** the slope between our two tracks' own tops of rail (`heights.path` and `backZ` across `backOff`),
-  where it tilts the same way. The tracks lead (DI's survey and the vertical-curve fit along each): the rails, the
-  street between them (the page's `heightAt`, linear between the two) and the road laid flush to them (src/world.js
-  flushDtm) are then one plane (the user, 2026-11-13: "the tracks should lie on single plane with the road/street").
-  At the first review's 58 places the two tracks' slope differed from IPR's plane by 0.5 % (median), the survey's by
-  1.1 %; at Sokolovská the tracks and the survey say 2.7 %, IPR 5.2 %. Elsewhere the two tracks often differ by
-  3-7 % where IPR says 0-2 % (line 22): a track's height is off there, so where the two disagree on a tilt of LEVEL
-  or more the track stays level, listed in `disagree` (#539).
+- **How much:** a compromise of three slopes across the band (left up > 0): IPR's plane, the survey's plane (the
+  same fit on the street areas of `lineN.dtm.json`) and the two tracks' own tops of rail (`heights.path` and `backZ`
+  across `backOff`). Each is wrong its own way: IPR reads parked cars and patches, the survey is offset by 5-25 cm
+  and tilted by up to a few %, a track's height error of 0.1-0.25 m becomes a 3-7 % "tilt" between the two (line
+  22). FUSE "median" takes the middle one, so one wrong source is outvoted (Sokolovská: tracks 2.7 %, survey 2.7 %,
+  IPR 5.2 % make 2.7 %); "weighted" their mean weighted by 1/spread², the spreads from the three pairs' differences
+  on the line (the three-cornered hat, `hat`; robust: MAD). Measured on the five lines' clean planes: IPR 0.2 % (at
+  SIG_MIN), the tracks 0.42-0.53 %, the survey 0.77-1.07 %; correlated errors of the survey and the tracks would only
+  make IPR's look larger. "weighted" is the default: IPR leads, the others pull it where it is noisy; the median let
+  the survey and the tracks outvote a clean lidar plane (line 9 s 17862: IPR 1.7 %, survey 5.7 %, tracks 4.1 % made
+  4.1 %). The user, 2026-11-13: "if we should pick compromise
+  between available data rather than trusting one more than the others". Where the tracks' slope differs from the
+  compromise by LEVEL or more a track's height is off: listed in `disagree` (#539).
+- **One plane:** the rails tilt by the compromise; the street between the two tracks is linear between their tops
+  (the page's `heightAt`), past the outer track it continues the rails' tilt to TRACK_ZONE m, and beyond that it keeps
+  the survey's own shape (its fall to the gutter, its kerbs) shifted to meet it (src/world.js flushDtm). The user,
+  2026-11-13: "the tracks should lie on single plane with the road/street".
 - **Level** where the fall is less than LEVEL. The norm's road crossfall is 2.5 %, but the tracks' band is laid
   level across a crowned street; measured on the five lines' clean planes the fall is 0.3-0.7 % (p50), 1-2.4 % (p90).
   A stretch that reaches LEVEL keeps its flanks down to FLANK.
@@ -71,6 +80,9 @@ OPEN_BED = {"grass", "ballast"}  # styles whose rails stand on sleepers, not in 
 CARD_MM = 20             # mm: a stretch this tilted gets a review card
 SAME = 20                # m: two lines' stretches whose largest values lie this close are one card
 LINES = "9,17,22,23,37"
+SOURCES = ("IPR", "survey", "tracks")
+FUSE = "weighted"        # how the three slopes make one: "median", or "weighted" by each one's spread (`hat`)
+SIG_MIN = 0.002          # a source's spread is never taken under this (the three-cornered hat can give 0 or less)
 TILTS, LEVEL_ANSWER, UNSURE = ("the rails tilt across like this", "level: the road tilts, the rails do not", "unsure")
 ANSWER = {TILTS: "tilts", LEVEL_ANSWER: "level"}
 
@@ -146,11 +158,44 @@ def smooth(v, ok, around):
     return np.where(around & (den > 0), num / np.maximum(den, 1e-9), 0.0)
 
 
-def cross_level(fall, res, street, pair, tracks=None):
-    """Signed cross level (m, + = the left rail lower): IPR's plane (`fall`, `res`) says where the street tilts, the
-    two tracks' own slope (`tracks`, when given) how much, where it tilts the same way; smoothed, level under LEVEL,
-    ramped, capped. Returns (c, ok, disagree): `disagree` the samples where IPR tilts and the tracks do not, or the
-    other way."""
+def hat(falls, ok):
+    """Each source's spread (std of its slope's error) from the three pairs' differences where all read: var(a - b) =
+    sa² + sb², so sa² = (V(a-b) + V(a-c) - V(b-c)) / 2 (the three-cornered hat). Robust (1.4826 MAD), at least
+    SIG_MIN."""
+    f = [np.asarray(falls[k], float) for k in SOURCES]
+    m = ok & np.isfinite(f[0]) & np.isfinite(f[1]) & np.isfinite(f[2])
+    if m.sum() < 20:
+        return {k: 0.01 for k in SOURCES}
+    def var(a, b):
+        d = f[a][m] - f[b][m]
+        return (1.4826 * np.median(np.abs(d - np.median(d)))) ** 2
+    V = {(a, b): var(a, b) for a in range(3) for b in range(3) if a < b}
+    v = lambda a, b: V[(min(a, b), max(a, b))]  # noqa: E731
+    out = {}
+    for i, k in enumerate(SOURCES):
+        j, l = (x for x in range(3) if x != i)
+        out[k] = float(max(SIG_MIN, math.sqrt(max(0.0, (v(i, j) + v(i, l) - v(j, l)) / 2))))
+    return out
+
+
+def fuse(falls, method=FUSE, sig=None):
+    """One slope from the sources that read (NaN where fewer than two): the middle one ("median"; of two, their
+    mean), or their mean weighted by 1/sig² ("weighted")."""
+    F = np.vstack([np.asarray(falls[k], float) for k in SOURCES])
+    fin = np.isfinite(F)
+    if method == "weighted":
+        w = np.array([1 / sig[k] ** 2 for k in SOURCES])[:, None] * fin
+        out = np.nansum(np.where(fin, F, 0.0) * w, axis=0) / np.maximum(w.sum(axis=0), 1e-12)
+    else:
+        with np.errstate(all="ignore"):
+            out = np.nanmedian(np.where(fin, F, np.nan), axis=0) if fin.any() else np.full(F.shape[1], np.nan)
+    return np.where(fin.sum(axis=0) >= 2, out, np.nan)
+
+
+def cross_level(fall, res, street, pair):
+    """Signed cross level (m, + = the left rail lower) from the street's fall across both tracks (left up > 0; the
+    sources' compromise, `fuse`) where IPR's plane through the band is clean (`res`): smoothed, level under LEVEL,
+    ramped, capped. Returns (c, ok)."""
     ok = street & pair & np.isfinite(fall) & (res < RESID)
     sm = smooth(fall, ok, street & pair)
     # (a stretch falling LEVEL or more keeps the fall's own flanks down to FLANK on either side: the road's tilt comes
@@ -171,18 +216,9 @@ def cross_level(fall, res, street, pair, tracks=None):
                 keep[i:j + 1] = True
             i = j + 1
     sm = np.where(keep, sm, 0.0)
-    disagree = np.zeros(len(sm), bool)
-    if tracks is not None:
-        okt = street & pair & np.isfinite(tracks)
-        st = smooth(tracks, okt, street & pair)
-        # (the tracks' slope where IPR's plane tilts and theirs the same way; where one tilts LEVEL or more and the
-        # other not, or the other way, a track's height is off: level, and listed)
-        same = keep & (np.sign(st) == np.sign(sm)) & (np.abs(st) >= FLANK)
-        disagree = ok & ((np.abs(sm) >= LEVEL) | (np.abs(st) >= LEVEL)) & ~same
-        sm = np.where(same, st, 0.0)
     c = np.clip(-sm * GAUGE, -CANT_MAX, CANT_MAX)
     c = extend(c, CANT_MAX / 30 * STEP)
-    return np.where(np.abs(c) < 0.002, 0.0, c), ok, disagree
+    return np.where(np.abs(c) < 0.002, 0.0, c), ok
 
 
 def extend(c, d):
@@ -214,8 +250,9 @@ def opposite(c, xy, h, xyb, hb):
     return out
 
 
-def places(s, xy, c):
-    """Each stretch with cross level: where it starts, its length, its largest value (mm) and where."""
+def places(s, xy, c, extra=None):
+    """Each stretch with cross level: where it starts, its length, its largest value (mm) and where (and there the
+    arrays of `extra`, in %)."""
     out, i, n = [], 0, len(c)
     while i < n:
         if not c[i]:
@@ -227,6 +264,8 @@ def places(s, xy, c):
         k = i + int(np.argmax(np.abs(c[i:j + 1])))
         out.append({"s": round(float(s[i])), "length": round(float(s[j] - s[i] + STEP)), "x": round(float(xy[k, 0]), 1),
                     "y": round(float(xy[k, 1]), 1), "mm": round(float(c[k]) * 1000, 1)})
+        for name, v in (extra or {}).items():
+            out[-1][f"{name} %"] = None if not np.isfinite(v[k]) else round(float(v[k]) * 100, 1)
         i = j + 1
     return out
 
@@ -250,7 +289,7 @@ def answered(c, xy, truth):
     return c
 
 
-def build(data, sample, truth=None):
+def build(data, sample, truth=None, survey=None, method=FUSE):
     rt = Route(data["path"])
     H = data["heights"]
     n = int(math.floor(rt.length / STEP)) + 1
@@ -262,37 +301,43 @@ def build(data, sample, truth=None):
     z = np.array([np.nan if v is None else v for v in H["path"]][:n] + [np.nan] * max(0, n - len(H["path"])), float)
     zb = np.array([np.nan if v is None else v for v in (H.get("backZ") or [])][:n] + [np.nan] * max(0, n - len(H.get("backZ") or [])), float)
     fall = np.where(pair, (zb - z) / np.where(pair, off, 1.0), np.nan)  # (left up > 0, as the plane's)
-    c, _, disagree = cross_level(fall_ipr, res, street, pair, tracks=fall)
+    fall_sv = planes(survey, xy, h, np.where(pair, off, 0.0))[0] if survey else np.full(n, np.nan)
+    falls = {"IPR": fall_ipr, "survey": fall_sv, "tracks": fall}
+    clean = street & pair & (res < RESID)
+    sig = hat(falls, clean)
+    fused = fuse(falls, method, sig)
+    c, ok = cross_level(fused, res, street, pair)
+    # (the tracks' slope off the compromise by LEVEL or more: a track's height is off, #539)
+    disagree = ok & np.isfinite(fall) & (np.abs(fall - fused) >= LEVEL)
     c = ramp(answered(c, xy, truth or {}), CANT_MAX / 30 * STEP)  # (a level answer's ends ramp too)
-    out = {"step": STEP, "unit": 1e-5, "path": [int(round(v * 1e5)) for v in c]}
+    out = {"step": STEP, "unit": 1e-5, "path": [int(round(v * 1e5)) for v in c],
+           "fuse": {"method": method, "spread %": {k: round(v * 100, 2) for k, v in sig.items()}}}
     if len(data.get("pathBack") or []) > 1:
         rb = Route(data["pathBack"])
         _, xyb, hb = stations(rb, int(math.floor(rb.length / STEP)) + 1)
         out["pathBack"] = [int(round(v * 1e5)) for v in opposite(c, xy, h, xyb, hb)]
-    out["places"] = places(s, xy, c)
+    show = {**falls, "fused": fused}
+    out["places"] = places(s, xy, c, show)
     # (where IPR's plane and the two tracks' heights disagree on a tilt of LEVEL or more: a track's height is off, #539)
-    out["disagree"] = places(s, xy, np.where(disagree, fall - fall_ipr, 0.0) * 1000 / 1000)
+    out["disagree"] = places(s, xy, np.where(disagree, fall - fused, 0.0), show)
     for q in out["disagree"]:
-        k = int(round(q["s"] / STEP))
         q.pop("mm")
-        j = min(range(k, min(n, k + int(q["length"] / STEP))), key=lambda i: -abs(fall[i] - fall_ipr[i])) if q["length"] > STEP else k
-        q.update({"tracks %": round(float(fall[j]) * 100, 1), "IPR %": round(float(fall_ipr[j]) * 100, 1)})
     return out
 
 
-def survey_tris(areas, near, r=30.0):
-    """The survey's level-0 areas within r m of the points `near` as triangles with heights ((k, 3, 3)): the page
-    fills an area linearly from its outline."""
+def survey_tris(areas, near=None, r=30.0):
+    """The survey's level-0 areas (within r m of the points `near`, when given) as triangles with heights ((k, 3, 3)):
+    the page fills an area linearly from its outline."""
     import shapely
     from shapely.geometry import Polygon
-    pts = shapely.points(np.asarray(near, float))
+    pts = None if near is None else shapely.points(np.asarray(near, float))
     tris = []
     for a in areas:
         if a.get("l") != 0 or len(a.get("r") or []) < 3:
             continue
         xyz = [(q[0], q[1], np.nan if q[2] is None else q[2]) for q in a["r"]]
         g = Polygon(xyz, [[(q[0], q[1], np.nan if q[2] is None else q[2]) for q in hh] for hh in a.get("h", []) if len(hh) >= 3])
-        if not g.is_valid or not shapely.dwithin(g, pts, r).any():
+        if not g.is_valid or (pts is not None and not shapely.dwithin(g, pts, r).any()):
             continue
         for t in shapely.get_parts(shapely.constrained_delaunay_triangles(g)):
             c = np.asarray(t.exterior.coords)[:3]
@@ -319,31 +364,41 @@ def sample_tris(tris, x, y):
     return z
 
 
-PLANE_BEYOND = 5.0       # m past the outer track that the street continues the tracks' plane (src/terrain.js)
+TRACK_ZONE = 1.4         # m past each track's centre: the track zone, the rails' plane (src/terrain.js TRACK_ZONE)
 STREET_BELOW = 0.052     # m: a surveyed street vertex next to the track under its surface level (src/heights.js)
 
 
-def street_line(u, z0, off, zb, zs, lift, w):
+def street_line(u, z0, off, zb, zs, lift, tilt=None):
     """The street as the game lays it across the route (src/terrain.js heightAt, src/world.js flushDtm), approximately:
-    the tracks' surface level (linear between the two tracks; past the outer one level, or the tracks' plane for
-    PLANE_BEYOND m by w) less STREET_BELOW, fully within 5 m of our track, faded into the survey by 15 m."""
-    if np.isfinite(off) and np.isfinite(zb) and abs(off) > 0.5:
-        q = u / off
-        past = np.where(q < 0, -q, np.where(q > 1, q - 1, 0)) * abs(off)
-        h = z0 + (zb - z0) * np.clip(q, 0, 1) + np.sign(q) * np.minimum(past, PLANE_BEYOND) / abs(off) * (zb - z0) * w
-    else:
-        h = np.full(len(u), z0)
-    flush = h - lift - STREET_BELOW
+    the tracks' surface level less STREET_BELOW (linear between the two tracks), applied to the survey fully within
+    5 m of our track and faded out by 15 m. Past the outer track main's is level; where the rails tilt (`tilt`, the
+    fall to the left) it continues their tilt to TRACK_ZONE m, and beyond that the survey keeps its own shape, shifted
+    by the correction at the zone's edge."""
+    has_b = np.isfinite(off) and np.isfinite(zb) and abs(off) > 0.5
+    o = off if has_b else 0.0
+    q = u / o if has_b else np.zeros(len(u))
+    h = z0 + ((zb - z0) * np.clip(q, 0, 1) if has_b else 0.0)
+    if tilt:
+        past = np.where(q < 0, u, np.where(q > 1, u - o, 0.0)) if has_b else u
+        h = h - tilt * np.sign(past) * np.minimum(np.abs(past), TRACK_ZONE)
+    corr = h - lift - STREET_BELOW - zs
+    if tilt:
+        lo, hi = min(0.0, o) - TRACK_ZONE, max(0.0, o) + TRACK_ZONE
+        fin = np.isfinite(corr)
+        for side, edge in ((u < lo, lo), (u > hi, hi)):
+            near = fin & (u >= lo) & (u <= hi)
+            if near.any():
+                corr = np.where(side, corr[near][np.argmin(np.abs(u[near] - edge))], corr)
     k = np.clip((np.abs(u) - 5) / 10, 0, 1)
     f = 1 - k * k * (3 - 2 * k)
-    return np.where(np.isfinite(zs), zs + (flush - zs) * f, np.where(f > 0.999, flush, np.nan))
+    return np.where(np.isfinite(zs), zs + corr * f, np.where(f > 0.999, h - lift - STREET_BELOW, np.nan))
 
 
-def section_svg(line, s, p, hd, z0, off, zb, c, ipr_at, tris, lift=0.0, w=0.0):
+def section_svg(line, s, p, hd, z0, off, zb, c, ipr_at, tris, lift=0.0, src=None):
     """A cross-section across the tracks at route position s (point p, heading hd), seen along the line: IPR, the
-    survey's own surface, the street as the game lays it before (level past the tracks, as main) and after (the tracks'
-    plane past them by w), and each track's rails before (level) and after (the cross level c, + = the left rail
-    lower). Heights exaggerated."""
+    survey's own surface, the street as the game lays it before (level past the tracks, as main) and after (`street_line`),
+    and each track's rails before (level) and after (the cross level c, + = the left rail lower); `src` the sources'
+    slopes there (%). Heights exaggerated."""
     nl = np.array([-hd[1], hd[0]])
     has_b = np.isfinite(off) and np.isfinite(zb)
     lo = (min(0.0, off) if has_b else 0.0) - 8.0
@@ -357,7 +412,7 @@ def section_svg(line, s, p, hd, z0, off, zb, c, ipr_at, tris, lift=0.0, w=0.0):
     tracks = [(0.0, z0)] + ([(off, zb)] if has_b else [])
     allz = np.concatenate([zi[np.isfinite(zi)], zs[np.isfinite(zs)], [t[1] for t in tracks]]) - z0
     zr = math.ceil(min(1.6, max(0.2, float(np.percentile(np.abs(allz), 98)) + 0.05)) * 5) / 5  # (grid every 5 cm multiple)
-    W, H, L, R, T, B = 640, 300, 46, 14, 34, 54
+    W, H, L, R, T, B = 640, 318, 46, 14, 34, 72
     px = lambda v: L + (hi - v) / (hi - lo) * (W - L - R)  # noqa: E731  (seen along the line: its left on the left)
     py = lambda z: T + (zr - (z - z0)) / (2 * zr) * (H - T - B)  # noqa: E731
     ex = ((H - T - B) / (2 * zr)) / ((W - L - R) / (hi - lo))
@@ -383,8 +438,8 @@ def section_svg(line, s, p, hd, z0, off, zb, c, ipr_at, tris, lift=0.0, w=0.0):
         out.append(f'<text x="{px(v):.1f}" y="{H - B + 16}" fill="#8a94a3" text-anchor="middle">{abs(v)}</text>')
     out.append(poly(zs, "#8d8d8d", 1, ' stroke-dasharray="4 3"'))
     out.append(poly(zi, "#3e9dff", 2))
-    out.append(poly(street_line(u, z0, off, zb, zs, lift, 0.0), "#ff9e31", 1.5, ' stroke-dasharray="6 4"'))
-    out.append(poly(street_line(u, z0, off, zb, zs, lift, w), "#ff4d4d", 1.5))
+    out.append(poly(street_line(u, z0, off, zb, zs, lift), "#ff9e31", 1.5, ' stroke-dasharray="6 4"'))
+    out.append(poly(street_line(u, z0, off, zb, zs, lift, c / GAUGE), "#ff4d4d", 1.5))
     for k, (uc, zc) in enumerate(tracks):
         name = "our track" if k == 0 else "the opposite track"
         out.append(f'<line x1="{px(uc):.1f}" x2="{px(uc):.1f}" y1="{T}" y2="{H - B}" stroke="#555" stroke-dasharray="3 3"/>'
@@ -398,7 +453,12 @@ def section_svg(line, s, p, hd, z0, off, zb, c, ipr_at, tris, lift=0.0, w=0.0):
                f'<tspan fill="#ff9e31">●- - main: rails and street</tspan>  '
                f'<tspan fill="#ff4d4d">●— now: rails ({abs(c) * 1000:.0f} mm) and street</tspan></text>'
                f'<text x="{L}" y="{H - 6}" fill="#8a94a3">line {line}, s {s:.0f}, seen along the line: m left | right, '
-               f'cm from our rail top (×{ex:.0f})</text></svg>')
+               f'cm from our rail top (×{ex:.0f})</text>')
+    if src:
+        # (the rise to the left (as the chart shows it) as each source reads it, and the compromise the rails take)
+        txt = "  ".join(f"{k} {'-' if v is None else f'{v:+.1f} %'}" for k, v in src.items())
+        out.append(f'<text x="{L}" y="{H - B + 50}" fill="#cfd6df">rises to the left: {txt}</text>')
+    out.append('</svg>')
     return "".join(out)
 
 
@@ -434,14 +494,12 @@ def cards(lines):
             pt = rt.at(k * STEP)
             val = lambda arr, k=k: np.nan if k >= len(arr) or arr[k] is None else float(arr[k])  # noqa: E731
             pic = f"{line}-{q['s']}.svg"
-            o_k, zb_k, c_k = val(H.get("backOff") or []), val(H.get("backZ") or []), val(CL["path"]) * CL["unit"]
-            slope = abs((zb_k - val(H["path"])) / o_k) if np.isfinite(o_k) and abs(o_k) > 0.5 else 0.0
-            w_k = min(1.0, abs(c_k) / (slope * GAUGE)) if slope > 1e-4 else 0.0
             lv = data["lift"]["v"]
             lift_k = lv[min(int(round(k * STEP / data["lift"]["step"])), len(lv) - 1)] * data["lift"]["unit"]
             (pics / pic).write_text(section_svg(line, k * STEP, pt[:2], pt[2:], val(H["path"]), val(H.get("backOff") or []),
                                                 val(H.get("backZ") or []), val(CL["path"]) * CL["unit"],
-                                                lambda x, y: ipr.sample(x + F.E0, y + F.N0), tris, lift_k, w_k),
+                                                lambda x, y: ipr.sample(x + F.E0, y + F.N0), tris, lift_k,
+                                                {k: q.get(f"{k} %") for k in (*SOURCES, "fused")}),
                                     encoding="utf-8", newline="\n")
             lat, lon = (float(v) for v in F.ll(q["x"], q["y"]))
             near = min(data["stops"], key=lambda st: abs(st["s"] - q["s"]))
@@ -552,12 +610,19 @@ def main():
     p = ROOT / "data" / f"line{line}.json"
     data = json.loads(p.read_text(encoding="utf-8"))
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
-    data["crossLevel"] = build(data, lambda x, y: ipr.sample(x + F.E0, y + F.N0), truth)
+    dtm_p = ROOT / "data" / f"line{line}.dtm.json"
+    survey = None
+    if dtm_p.exists():
+        tris = survey_tris(json.loads(dtm_p.read_text(encoding="utf-8"))["areas"])
+        survey = lambda x, y: sample_tris(tris, np.asarray(x, float), np.asarray(y, float))  # noqa: E731
+    method = sys.argv[sys.argv.index("--fuse") + 1] if "--fuse" in sys.argv else FUSE
+    data["crossLevel"] = build(data, lambda x, y: ipr.sample(x + F.E0, y + F.N0), truth, survey, method)
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     pl = data["crossLevel"]["places"]
     big = sorted(pl, key=lambda q: -abs(q["mm"]))[:5]
-    print(f"line {line}: cross level on {sum(q['length'] for q in pl)} m in {len(pl)} stretches"
+    print(f"line {line} ({method}, spread % {data['crossLevel']['fuse']['spread %']}): "
+          f"cross level on {sum(q['length'] for q in pl)} m in {len(pl)} stretches"
           + (", the largest " + "; ".join(f"{q['mm']:+.0f} mm at ({q['x']:.0f}, {q['y']:.0f})" for q in big) if big else ""))
 
 
