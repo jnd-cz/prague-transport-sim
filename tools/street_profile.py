@@ -3,7 +3,8 @@
 vertical curves, with IPR's lidar as the weighted target (#512).
 
     python -P -E tools/street_profile.py --calibrate [--lines 9,17,22,23,37] [--json PATH]
-    python -P -E tools/street_profile.py --pilot 4040,1290 [--line 37] [--radius 150] [--out DIR]   # Palmovka
+    python -P -E tools/street_profile.py --pilot 3945,1270 [--line 37] [--radius 160] [--out DIR]   # Palmovka
+    python -P -E tools/street_profile.py --wide 300 [--lines 9,17,22,23,37] [--out DIR]   # every line, in squares
 
 --calibrate measures, on the clean streets of the lines' corridors (OSM carriageways of a car class, not a bridge,
 tunnel or other layer, whose 1 m samples lie on the survey's level-0 road or tram areas), what a street's profile is:
@@ -241,6 +242,8 @@ R_STREET = 150.0  # m: the other classes' (residential, unclassified)
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
+PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it, runs beside it (pilot)
+STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a wall, a kerb), not a slope
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 
 
@@ -308,7 +311,10 @@ def crossfall(F, ipr, p, t, road, s):
     X = p[:, None, 0] + n[:, None, 0] * off[None]
     Y = p[:, None, 1] + n[:, None, 1] * off[None]
     inside = shapely.contains_xy(road, X, Y)
-    # (the road's extent: the run of road samples through the centreline)
+    Z = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
+    # (the road's extent: the run of road samples through the centreline, up to a step in IPR over STEP_CUT within 0.5 m:
+    # the survey's road areas of two levels touch at a wall, and a crown across it set Palmovka's bus terminal 2 m off)
+    cut = np.abs(np.diff(Z, axis=1)) > STEP_CUT
     mid = len(off) // 2
     width = np.zeros((len(p), 2))
     for k in range(len(p)):
@@ -316,13 +322,12 @@ def crossfall(F, ipr, p, t, road, s):
         if not row[mid]:
             continue
         lo = mid
-        while lo > 0 and row[lo - 1]:
+        while lo > 0 and row[lo - 1] and not cut[k, lo - 1]:
             lo -= 1
         hi = mid
-        while hi < len(off) - 1 and row[hi + 1]:
+        while hi < len(off) - 1 and row[hi + 1] and not cut[k, hi]:
             hi += 1
         width[k] = (-off[lo], off[hi])
-    Z = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
     z0 = Z[:, mid]
     fall = np.full((len(p), 2), np.nan)
     for side, sel in ((0, off < -0.25), (1, off > 0.25)):
@@ -392,18 +397,14 @@ def track_streets(L, road, box):
     return out
 
 
-def pilot(at, radius, ln, out_dir):
+def pilot(at, radius, ln, out_dir, ctx=None):
     """Palmovka's streets (or any place): profiles and cross-sections built from the tracks and IPR, against the
     survey's surface. The tracks govern first (their own profile and tilt), then the OSM streets by class and length:
     each later street's samples inside an earlier one's road width take that one's surface and are pinned there (its
     profile ends at the governing street's edge and takes the height there)."""
     import shapely
-    from ipr_dtm import IprDtm
-    F, ipr = Frame(), IprDtm()
-    dtm = json.load(open(os.path.join(ROOT, "data", f"line{ln}.dtm.json"), encoding="utf-8"))
-    L = json.load(open(os.path.join(ROOT, "data", f"line{ln}.json"), encoding="utf-8"))
-    road, cover = street_areas(dtm)
-    shapely.prepare(road)
+    ctx = ctx or context(ln)
+    F, ipr, dtm, L, road, cover = (ctx[k] for k in ("F", "ipr", "dtm", "L", "road", "cover"))
     box = [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)]
     tracks = track_streets(L, road, box)
     cs = []
@@ -420,11 +421,10 @@ def pilot(at, radius, ln, out_dir):
                 cs.append({"name": c["name"], "highway": c["highway"], "s": s[a:b] - s[a], "p": p[a:b], "t": t[a:b]})
     cs.sort(key=lambda c: (RANK.get(c["highway"].replace("_link", ""), 9), -c["s"][-1]))
     cs = tracks + cs
-    for k, c in enumerate(cs):
+    for c in cs:
         c["ipr"] = np.asarray(ipr.sample(c["p"][:, 0] + F.E0, c["p"][:, 1] + F.N0), float)
         c["fall"], c["width"] = crossfall(F, ipr, c["p"], c["t"], road, c["s"])
         if "track_z" in c:
-            c["pins"] = []
             c["z"] = c["track_z"]
             ok = np.isfinite(c["tilt"])
             c["fall"][ok, 1] = c["tilt"][ok]
@@ -432,10 +432,32 @@ def pilot(at, radius, ln, out_dir):
             # (only the bed is the tracks': carried across a 15 m junction, their tilt (cant included) set the fill up
             # to 0.4 m off IPR and met the side streets in a seam; the road beside it is junctions()' fill)
             c["width"] = np.minimum(c["width"], (c["half"] + BED)[:, None])
+    # a street's width ends half way to a centreline running beside it (the other carriageway of a dual one, the tracks
+    # on their own bed, a parallel street): Hartigova's first carriageway reached over the median and held the second
+    # one to its crown for 71 m (jumps of 0.4-0.7 m on line 37)
+    par = {}
+    for k, c in enumerate(cs):
+        n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
+        par[k] = {}
+        for j, g in enumerate(cs):
+            if j == k:
+                continue
+            d = c["p"][:, None, :] - g["p"][None, :, :]
+            m = np.argmin((d ** 2).sum(-1), axis=1)
+            rel = g["p"][m] - c["p"]
+            o, along = (rel * n).sum(-1), (rel * c["t"]).sum(-1)
+            beside = (np.abs((c["t"] * g["t"][m]).sum(-1)) > math.cos(math.radians(PARALLEL))) & (np.abs(along) < 3)                 & (np.abs(o) > 0.5)
+            par[k][j] = beside
+            for side, sel in ((1, beside & (o > 0)), (0, beside & (o < 0))):
+                c["width"][sel, side] = np.minimum(c["width"][sel, side], np.abs(o[sel]) / 2)
+    for k, c in enumerate(cs):
+        if "track_z" in c:
+            c["pins"] = []
             continue
         pins, pz, by = [], [], {}
         for j, g in enumerate(cs[:k]):
             zg = governing_height(g, c["p"])
+            zg[par[k][j]] = np.nan  # (held only by a street it meets, not one beside it)
             for i in np.flatnonzero(np.isfinite(zg)):
                 if i not in pins:
                     pins.append(int(i))
@@ -492,15 +514,21 @@ def fill_2d(known, free, data, lam, iters=3000, tol=1e-7):
     (the graph Laplacian squared over the free and known cells), meeting the `known` cells (finite: held). Conjugate
     gradients, matrix-free (no scipy here)."""
     act = free | np.isfinite(known)
+    # (neighbours across a step in IPR over STEP_CUT are not joined: a wall between the bus terminal by Palmovka and the
+    # street under it, smeared, set the terminal's edge 2.5 m off)
+    ref = np.where(np.isfinite(known), known, data)
+
+    pairs = []
+    for sl_a, sl_b in (((slice(1, None), slice(None)), (slice(None, -1), slice(None))),
+                       ((slice(None, -1), slice(None)), (slice(1, None), slice(None))),
+                       ((slice(None), slice(1, None)), (slice(None), slice(None, -1))),
+                       ((slice(None), slice(None, -1)), (slice(None), slice(1, None)))):
+        pairs.append((sl_a, sl_b, act[sl_a] & act[sl_b] & ~(np.abs(ref[sl_a] - ref[sl_b]) > STEP_CUT)))
 
     def lap(v):
         out = np.zeros_like(v)
         deg = np.zeros_like(v)
-        for sl_a, sl_b in (((slice(1, None), slice(None)), (slice(None, -1), slice(None))),
-                           ((slice(None, -1), slice(None)), (slice(1, None), slice(None))),
-                           ((slice(None), slice(1, None)), (slice(None), slice(None, -1))),
-                           ((slice(None), slice(None, -1)), (slice(None), slice(1, None)))):
-            both = act[sl_a] & act[sl_b]
+        for sl_a, sl_b, both in pairs:
             out[sl_a] += np.where(both, v[sl_b], 0)
             deg[sl_a] += both
         return np.where(act, out - deg * v, 0)
@@ -556,11 +584,12 @@ def junctions(cs, F, ipr, road, box, cell=1.0):
     data = np.asarray(ipr.sample(x + F.E0, y + F.N0), float).reshape(X.shape)
     lam = (JUNCTION_WAVE / (2 * math.pi)) ** 4 / cell ** 4
     grid = fill_2d(known, free, data, lam)
-    return xs[0], ys[0], cell, grid  # (the streets' heights too: the lookup at the fill's edge reads them)
+    # (the streets' heights too: the lookup at the fill's edge reads them; and IPR, for a cell across a step)
+    return xs[0], ys[0], cell, grid, lambda a, b: np.asarray(ipr.sample(np.asarray(a) + F.E0, np.asarray(b) + F.N0), float)
 
 
 def bilinear(field, x, y):
-    x0, y1, cell, g = field
+    x0, y1, cell, g = field[:4]
     fx, fy = (np.asarray(x) - x0) / cell, (y1 - np.asarray(y)) / cell
     i, j = np.floor(fy).astype(int), np.floor(fx).astype(int)
     ok = (i >= 0) & (j >= 0) & (i < g.shape[0] - 1) & (j < g.shape[1] - 1)
@@ -572,6 +601,15 @@ def bilinear(field, x, y):
     edge = ~np.isfinite(z) & np.isfinite(c4).any(0)
     if edge.any():
         z[edge] = np.nanmean(c4[:, edge], axis=0)
+    # (a cell whose corners lie either side of a step (a wall by the bus terminal at Palmovka, 2 m): interpolated, the
+    # edge hung between the two; the corner nearest IPR at the point instead)
+    spread = np.nanmax(c4, axis=0, initial=-np.inf) - np.nanmin(c4, axis=0, initial=np.inf) if c4.size else c4
+    step = ok & (spread > STEP_CUT)
+    if len(field) > 4 and step.any():
+        zp = field[4](np.asarray(x)[step], np.asarray(y)[step])
+        c = c4[:, step]
+        k = np.nanargmin(np.where(np.isfinite(c), np.abs(c - np.where(np.isfinite(zp), zp, z[step])), np.inf), axis=0)
+        z[step] = c[k, np.arange(c.shape[1])]
     return np.where(ok, z, np.nan)
 
 
@@ -594,7 +632,7 @@ def generated(cs, x, y, road=None, field=None):
     return z
 
 
-def drive_measures(zfun, cs):
+def drive_measures(zfun, cs, raw=False):
     """The street bot's measures on a surface (zfun(x, y) -> z) along every street's two drive lines (LANE m either
     side of its centreline, every metre): jumps over JUMP within 1 m, the change of grade over a car, the wheels'
     left-to-right difference (roll) and the 1 m bend (bumpy)."""
@@ -623,9 +661,11 @@ def drive_measures(zfun, cs):
             if ok.sum() > 3:
                 b = np.abs(z[2:] - 2 * z[1:-1] + z[:-2])
                 bend.extend(b[np.isfinite(b)].tolist())
-    return {"jumps": jumps, "change of grade over 4.5 m p50/99/100 %": [round(v * 100, 2) for v in pct(dgrade, (50, 99, 100))],
+    nan3 = [float("nan")] * 3
+    return {"jumps": jumps, "change of grade over 4.5 m p50/99/100 %": [round(v * 100, 2) for v in pct(dgrade, (50, 99, 100)) or nan3],
             "roll p50/99/100 deg": pct(roll, (50, 99, 100)), "rolls over 7 deg": int(np.sum(np.asarray(roll) > 7)),
-            "bend in 1 m p50/99/100 m": pct(bend, (50, 99, 100)), "places": places[:40]}
+            "bend in 1 m p50/99/100 m": pct(bend, (50, 99, 100)), "places": places[:40],
+            **({"_raw": {"dgrade": dgrade, "roll": roll, "bend": bend}} if raw else {})}
 
 
 def hillshade(z, cell):
@@ -739,9 +779,10 @@ def contours(cs, F, ipr, svy, road, field, at, radius, out_dir, cell=0.25, step=
 
 
 def pilot_report(at, radius, ln, out_dir):
-    cs, dtm, F, ipr, road = pilot(at, radius, ln, out_dir)
+    ctx = context(ln)
+    cs, dtm, F, ipr, road = pilot(at, radius, ln, out_dir, ctx)
     field = junctions(cs, F, ipr, road, [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)])
-    tris, _ = surface_tris(dtm["areas"], {"road", "tram"})
+    tris = ctx["tris"]
 
     def svy(x, y):
         return sample_tris(tris, np.asarray(x, float), np.asarray(y, float))
@@ -761,11 +802,15 @@ def pilot_report(at, radius, ln, out_dir):
                         "moved from IPR p50/99 m": pct(np.abs(c["z"] - c["ipr"])[np.isfinite(c["ipr"])], (50, 99)),
                         "crossfall left/right median %": [round(float(np.median(c["fall"][:, k])) * 100, 2) for k in (0, 1)],
                         "grade max %": round(float(np.max(np.abs(np.diff(c["z"])))) * 100, 2)} for c in cs]}
+    import shapely
     m = mask & np.isfinite(zi)
+    xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5), np.arange(at[1] + radius, at[1] - radius, -0.5))
+    inner = shapely.contains_xy(road.buffer(-1.0), xg.ravel(), yg.ravel())  # (IPR's 1 m raster rounds the kerbs)
     for name, z in (("survey", zs), ("generated", zg)):
-        d = (z - zi)[m & np.isfinite(z)]
-        rep[f"{name} - IPR on the streets' surface (mean, p99 |.|, m)"] = [round(float(np.mean(d)), 3),
-                                                                            round(float(np.percentile(np.abs(d), 99)), 3)]
+        for where, mm in (("on the streets' surface", m), ("1 m inside their edge", m & inner)):
+            d = (z - zi)[mm & np.isfinite(z)]
+            rep[f"{name} - IPR {where} (mean, p99 |.|, m)"] = [round(float(np.mean(d)), 3),
+                                                              round(float(np.percentile(np.abs(d), 99)), 3)]
     d = np.where(m & np.isfinite(zg), np.abs(zg - zi), 0).reshape(-1)
     xs_, ys_ = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5), np.arange(at[1] + radius, at[1] - radius, -0.5))
     far = []
@@ -786,6 +831,79 @@ def pilot_report(at, radius, ln, out_dir):
     return rep
 
 
+def context(ln):
+    """What every square of a line reads: the frame, IPR, the line's survey and data, its road, covers and triangles."""
+    import shapely
+    from ipr_dtm import IprDtm
+    dtm = json.load(open(os.path.join(ROOT, "data", f"line{ln}.dtm.json"), encoding="utf-8"))
+    L = json.load(open(os.path.join(ROOT, "data", f"line{ln}.json"), encoding="utf-8"))
+    road, cover = street_areas(dtm)
+    shapely.prepare(road)
+    if cover is not None:
+        shapely.prepare(cover)
+    tris, _ = surface_tris(dtm["areas"], {"road", "tram"})
+    return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris}
+
+
+def line_wide(lines, cell, out_path):
+    """Every line's corridor in squares of `cell` m (each square holding the line's track), built as the pilot builds
+    Palmovka and measured: the surface against IPR 1 m inside the road's edge, and the drive lines, survey against
+    generated, summed per line."""
+    import shapely
+    out = {}
+    for ln in lines:
+        ctx = context(ln)
+        L = ctx["L"]
+        pts = np.asarray(L["path"] + L.get("pathBack", []), float)
+        sq = sorted({(int(math.floor(x / cell)), int(math.floor(y / cell))) for x, y in pts})
+        acc = {k: {"dev": [], "jumps": 0, "rolls": 0, "dgrade": [], "roll": [], "bend": []} for k in ("survey", "generated")}
+        places = []
+        for n, (i, j) in enumerate(sq):
+            at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
+            cs, _, F, ipr, road = pilot(at, radius, ln, None, ctx)
+            if not cs:
+                continue
+            field = junctions(cs, F, ipr, road, [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)])
+            xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5),
+                                 np.arange(at[1] + radius, at[1] - radius, -0.5))
+            x, y = xg.ravel(), yg.ravel()
+            inner = shapely.contains_xy(road.buffer(-1.0), x, y)
+            zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
+            zs = sample_tris(ctx["tris"], x[inner], y[inner])
+            zg = generated(cs, x[inner], y[inner], road, field)
+            fns = {"survey": lambda a, b, tris=ctx["tris"]: sample_tris(tris, np.asarray(a, float), np.asarray(b, float)),
+                   "generated": lambda a, b, cs=cs, road=road, field=field: generated(
+                       cs, np.asarray(a, float), np.asarray(b, float), road, field)}
+            for k, z in (("survey", zs), ("generated", zg)):
+                d = z - zi
+                acc[k]["dev"].extend(d[np.isfinite(d)].tolist())
+                m = drive_measures(fns[k], [c for c in cs if c["highway"] != "tracks"], raw=True)
+                acc[k]["jumps"] += m["jumps"]
+                acc[k]["rolls"] += m["rolls over 7 deg"]
+                for q in ("dgrade", "roll", "bend"):
+                    acc[k][q].extend(m["_raw"][q])
+                if k == "generated":
+                    places.extend(m["places"])
+            print(f"line {ln}: square {n + 1}/{len(sq)}", flush=True)
+        res = {}
+        for k, a in acc.items():
+            d = np.asarray(a["dev"])
+            res[k] = {"off IPR 1 m inside the edge, mean / p99 |.| m": [round(float(d.mean()), 3),
+                                                                        round(float(np.percentile(np.abs(d), 99)), 3)],
+                      "jumps": a["jumps"], "rolls over 7 deg": a["rolls"],
+                      "change of grade over 4.5 m p99 / max %": [round(v * 100, 2) for v in pct(a["dgrade"], (99, 100))],
+                      "roll p99 / max deg": pct(a["roll"], (99, 100)), "bend in 1 m p99 m": pct(a["bend"], (99,))[0]}
+        res["squares"] = len(sq)
+        res["generated jumps, places"] = places[:30]
+        out[ln] = res
+        print(ln, json.dumps({k: v for k, v in res.items() if k != "generated jumps, places"}, ensure_ascii=False))
+    if out_path:
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(out, fh, ensure_ascii=False, indent=1)
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--calibrate", action="store_true")
@@ -795,8 +913,13 @@ def main(argv=None):
     ap.add_argument("--line", type=int, default=37, help="--pilot: the line whose survey data to read")
     ap.add_argument("--radius", type=float, default=150.0, help="--pilot: half the square's side, m")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "street_profile"))
+    ap.add_argument("--wide", type=float, metavar="CELL", help="every line of --lines in squares of CELL m (300)")
     a = ap.parse_args(argv)
-    if a.pilot:
+    if a.wide:
+        from baseline_store import HeavyJob
+        with HeavyJob("street_profile"):
+            line_wide([int(v) for v in a.lines.split(",")], a.wide, os.path.join(a.out, "lines.json"))
+    elif a.pilot:
         from baseline_store import HeavyJob
         with HeavyJob("street_profile"):
             pilot_report(tuple(float(v) for v in a.pilot.split(",")), a.radius, a.line, a.out)
