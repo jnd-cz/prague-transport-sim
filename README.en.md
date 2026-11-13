@@ -204,6 +204,9 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   to draw. With it the other trams run as T3 (a silver bumper with red stripes), T3SUCS and T3M sets (the T3M
   with the resistors' box on its roof and its green route display), each type as often as its range of fleet
   numbers is long.
+- Fleet number: the set you drive, such as the historic 6892 + 6921, 7269 + 7290 or 8080 + 8074, or one number
+  (the second car gets a number of the same type); the game remembers it for each model. "Any" deals yours
+  like the others'. No number runs twice on the street, and no other set is dealt yours.
 
 ### On a phone or tablet
 

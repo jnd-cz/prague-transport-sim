@@ -5,7 +5,7 @@
 
 Checks every manifest the index lists: the fields the game reads (src/vehicles.js), the files present with the sizes
 it states, the licence (a redistributable SPDX id, its LICENSE.txt, authors, sources, a credit line), a row in
-ASSETS.md for its files, its variants' fleet ranges, and that src/ names none of its files or its credit (the
+ASSETS.md for its files, its fleet (types, ranges, sets), and that src/ names none of its files or its credit (the
 manifest is the one place). Docs: docs/vehicles.md, "The manifest". Exit code 1 on a failure.
 """
 import json
@@ -22,6 +22,60 @@ LICENCES = {"CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-NC-SA
 MOVES = {"bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"}
 MODEL_EXT = {".gltf", ".glb"}
 
+
+
+def fleet_problems(fleet):
+    """The fleet (#527, docs/vehicles.md): each type's ranges or list, exceptions inside their ranges, no number in two
+    types, each set's numbers of one type and in no other set, liveries keyed by the fleet's numbers."""
+    if fleet is None:
+        return []
+    bad = []
+
+    def need(ok, why):
+        if not ok:
+            bad.append(why)
+
+    types = fleet.get("types")
+    need(isinstance(types, dict) and types, "fleet without types")
+    if not isinstance(types, dict):
+        return bad
+    type_of = {}
+    for name, t in types.items():
+        numbers = []
+        if "list" in t:
+            need("ranges" not in t, f"fleet type {name}: both a list and ranges")
+            ok = isinstance(t["list"], list) and t["list"] and all(isinstance(n, int) and n > 0 for n in t["list"])
+            need(ok, f"fleet type {name}: list {t['list']!r} is not fleet numbers")
+            numbers = t["list"] if ok else []
+        else:
+            rs = t.get("ranges")
+            need(isinstance(rs, list) and rs, f"fleet type {name}: no ranges or list")
+            for r in rs or []:
+                ok = isinstance(r, list) and len(r) == 2 and all(isinstance(n, int) for n in r) and 0 < r[0] <= r[1]
+                need(ok, f"fleet type {name}: range {r!r} is not [first, last]")
+                if ok:
+                    numbers += range(r[0], r[1] + 1)
+            for n in t.get("except", []):
+                need(n in numbers, f"fleet type {name}: except {n} is outside its ranges")
+            numbers = [n for n in numbers if n not in set(t.get("except", []))]
+        need(len(set(numbers)) == len(numbers), f"fleet type {name}: a number twice")
+        for n in numbers:
+            need(n not in type_of, f"fleet number {n} in types {type_of.get(n)} and {name}")
+            type_of.setdefault(n, name)
+    in_set = {}
+    for st in fleet.get("sets", []):
+        ok = isinstance(st, list) and len(st) >= 2 and all(isinstance(n, int) for n in st)
+        need(ok, f"fleet set {st!r} is not two or more numbers")
+        if not ok:
+            continue
+        for n in st:
+            need(n in type_of, f"fleet set {st}: {n} is in none of the types")
+            need(n not in in_set, f"fleet number {n} in sets {in_set.get(n)} and {st}")
+            in_set.setdefault(n, st)
+        need(len({type_of.get(n) for n in st}) == 1, f"fleet set {st}: numbers of different types")
+    for n in fleet.get("liveries", {}):
+        need(n.isdigit() and int(n) in type_of, f"fleet livery for {n}: not one of the fleet's numbers")
+    return bad
 
 def vehicle_types():
     """The types src/tram.js offers (VEHICLE_TYPES)."""
@@ -79,17 +133,7 @@ def check(v, vid, types, assets_md, src):
     moves = v.get("moves", [])
     need(set(moves) <= MOVES, f"moves {sorted(set(moves) - MOVES)} unknown (docs/vehicles.md, Tiers of movement)")
     need(isinstance(v.get("levels"), int) and v["levels"] >= 1, "levels is not a count")
-    seen = []
-    for x in v.get("variants", []):
-        need(isinstance(x.get("type"), str) and x["type"], "a variant without a type")
-        for r in x.get("fleet", []):
-            ok = isinstance(r, list) and len(r) == 2 and all(isinstance(n, int) for n in r) and r[0] <= r[1]
-            need(ok, f"variant {x.get('type')}: fleet range {r!r} is not [first, last]")
-            if ok:
-                for o in seen:
-                    need(r[1] < o[0] or r[0] > o[1], f"variant {x.get('type')}: fleet range {r} overlaps {o}")
-                seen.append(r)
-        need(bool(x.get("fleet")), f"variant {x.get('type')}: no fleet range")
+    bad += fleet_problems(v.get("fleet"))
     # the manifest is the one place for its files and its credit (#455)
     for p in paths:
         need(p not in src, f"src/ names its file {p}")
@@ -130,9 +174,26 @@ def main():
         fails += [f"{vid}: {b}" for b in bad]
         print(f"{vid}: {v.get('loader')}, tier {v.get('tier')}, {len(v.get('files', []))} files, "
               f"{v.get('licence', {}).get('spdx')}{'' if bad else ', ok'}")
+    # the fleet check refuses what it should (each sample one fault, its sentence's start)
+    good = {"types": {"T3": {"ranges": [[6400, 6410]], "except": [6405]}, "T3M": {"list": [8080, 8074]}},
+            "sets": [[6401, 6402], [8080, 8074]], "liveries": {"6401": "wrap"}}
+    samples = [
+        (good, None),
+        ({**good, "types": {**good["types"], "T3": {"ranges": [[6400, 6410]], "except": [6999]}}}, "fleet type T3: except"),
+        ({**good, "types": {**good["types"], "X": {"ranges": [[6409, 6420]]}}}, "fleet number 6409 in types"),
+        ({**good, "sets": [[6401, 8080]]}, "fleet set [6401, 8080]: numbers of different types"),
+        ({**good, "sets": [[6401, 6402], [6402, 6403]]}, "fleet number 6402 in sets"),
+        ({**good, "sets": [[6401, 7000]]}, "fleet set [6401, 7000]: 7000 is in none"),
+        ({**good, "liveries": {"7000": "wrap"}}, "fleet livery for 7000"),
+        ({**good, "types": {"T3": {"ranges": [[6410, 6400]]}}}, "fleet type T3: range"),
+    ]
+    for fleet, want in samples:
+        got = fleet_problems(fleet)
+        if want is None and got or want is not None and not any(g.startswith(want) for g in got):
+            fails.append(f"fleet check on a sample: wanted {want or 'no problem'}, got {got}")
     for f in fails:
         print("FAIL", f)
-    print(f"{len(ids)} vehicles, {len(fails)} failures")
+    print(f"{len(ids)} vehicles, {len(samples)} fleet samples, {len(fails)} failures")
     return 1 if fails else 0
 
 

@@ -3,12 +3,12 @@ import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
-import { Tram } from './tram.js';
+import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { loadRegistry, fileUrl, vehicleName } from './vehicles.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
@@ -334,7 +334,32 @@ function modelMenu() {
   sel.value = was || vehicles[0]?.id;
 }
 modelMenu();
-$('optModel').addEventListener('change', () => useVehicle($('optModel').value));
+// The player's preferred set (#527; the user, 2026-11-11: "I would add optinal preferred set for the player"): the
+// vehicle's listed sets, then its numbers by type (a lone number: the second car dealt of its type); remembered per
+// vehicle. Our tram runs as it and no AI tram is dealt it; "any" deals ours like the others.
+const FLEET_KEY = 'tram.fleet';
+let fleetPicks = {};
+try { fleetPicks = JSON.parse(localStorage.getItem(FLEET_KEY) || '{}'); } catch { /* storage unavailable */ }
+function fleetMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), c = fleetChoices(v), sel = $('optFleet');
+  $('fleetRow').hidden = !c;
+  if (!c) { sel.replaceChildren(); return; }
+  const group = (label, opts) => { const g = document.createElement('optgroup'); g.label = label; g.append(...opts); return g; };
+  sel.replaceChildren(new Option(t('fleet.dealt'), ''),
+    ...(c.sets.length ? [group(t('fleet.sets'), c.sets.map((s) => new Option(`${s.value.replace('+', ' + ')} (${s.type})`, s.value)))] : []),
+    ...c.types.map((x) => group(x.type, x.numbers.map((n) => new Option(String(n), String(n))))));
+  sel.value = preferredSet(v, fleetPicks[v.id]) ? fleetPicks[v.id] : '';
+}
+fleetMenu();
+$('optModel').addEventListener('change', () => { fleetMenu(); useVehicle($('optModel').value); });
+$('optFleet').addEventListener('change', () => {
+  fleetPicks[$('optModel').value] = $('optFleet').value;
+  try { localStorage.setItem(FLEET_KEY, JSON.stringify(fleetPicks)); } catch { /* storage unavailable */ }
+});
+// the run's fleet: its own stream from the run's seed (src/random.js), so dealing draws nothing from the traffic's
+// and a replay deals the same
+const fleetDealer = (vehicle, seed) => new FleetDealer(pickVehicle(vehicle), rng((seed ^ 0x6a09e667) >>> 0));
+const ourSet = (dealer, vehicle, cars) => dealer.ours(cars, preferredSet(pickVehicle(vehicle), $('optFleet').value));
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
 // The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
@@ -350,9 +375,10 @@ function runNumber(trip) {
 }
 // (the destination card: the last stop until a shift says otherwise)
 const lastStop = data.stops[data.stops.length - 1].name;
-// (a T3SUCS: the tram the simulation drives, its TR 37 equipment; AI trams are of the types their vehicle has, by
-// their run numbers: assets/*/vehicle.json `variants`)
-let tramModel = makeT3({ line: data.line, cars: lineCars, vehicle: $('optModel').value, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
+// (a T3SUCS, the tram the simulation drives with its TR 37 equipment, or the player's preferred set; AI trams are
+// dealt the types and numbers of their vehicle's fleet: assets/*/vehicle.json `fleet`, src/vehicles.js FleetDealer)
+let tramModel = makeT3({ line: data.line, cars: lineCars, vehicle: $('optModel').value, dest: lastStop, run: runNumber(0),
+  dealt: ourSet(fleetDealer($('optModel').value, 0), $('optModel').value, lineCars) });
 scene.add(tramModel);
 
 const hud = new Hud();
@@ -401,7 +427,7 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-onLangChange(() => { menuTexts(); modelMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
@@ -435,15 +461,17 @@ async function start(extra = {}) {
   zoom = zoomTarget = 1;
   tram.eq.mode = controlMode();
   const vehicle = $('optModel').value;
-  if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id) {
+  // one seeded stream for the whole run (rules and traffic), apart from Math.random
+  const seed = runSeed(), random = rng(seed);
+  const dealer = fleetDealer(vehicle, seed), ours = ourSet(dealer, vehicle, cars);
+  if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
+    || String(tramModel.userData.fleet) !== String(ours.numbers)) {
     scene.remove(tramModel);
     disposeModel(tramModel);
-    tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), variant: 'T3SUCS' });
+    tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), dealt: ours });
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  // one seeded stream for the whole run (rules and traffic), apart from Math.random
-  const seed = runSeed(), random = rng(seed);
   const weather = $('optWeather').value;
   applyWeather(weather);
   game = new Game(scene, data, route, tram, audio, {
@@ -458,6 +486,7 @@ async function start(extra = {}) {
     obstacles: $('optObst').value,
     toutAt: outdoorTemperature($('optTemp').value),
     vehicle: $('optModel').value,
+    dealer,
     seed: Math.floor(random() * 1e9),
     substations: truth.substations?.list,
     speedFacts: speedFacts(truth),
@@ -796,8 +825,10 @@ window.addEventListener('blur', () => {
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = null;
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
-// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342)
-const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
+// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
+// It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
+// set's rear and 17 degrees up (pitch is added to that)
+const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 }, ORBIT_EL = 0.3;
 {
   const ptr = new Map();
   let pinch = null;
@@ -814,7 +845,7 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
       pinch = d1;
     } else {
       orbit.yaw -= (e.clientX - p.x) * 0.006;
-      orbit.pitch = Math.max(-0.35, Math.min(1.1, orbit.pitch + (e.clientY - p.y) * 0.004));
+      orbit.pitch = Math.max(0.03 - ORBIT_EL, Math.min(1.45 - ORBIT_EL, orbit.pitch + (e.clientY - p.y) * 0.004));
       p.x = e.clientX; p.y = e.clientY;
     }
     orbit.drag = 0.3;
@@ -863,12 +894,11 @@ function updateCamera(dt, t) {
   const fov = zoomFov(zoom);
   if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (chase) {
-    // behind and above the tram body (works also at the very start of the route)
-    // (around the point 10 m ahead of the front: by default behind and above the set, as before)
-    const lead = tramModel.userData.cars[0], back = 30 + (tramModel.userData.cars.length - 1) * 8;
-    const q = route.at(s + 10);
-    camLook.set(q.x, profile.height(s + 10) + 1.5, -q.y);
-    const a = lead.rotation.y + orbit.yaw, el = Math.atan2(7, back) + orbit.pitch, R = Math.hypot(back, 7) * orbit.k;
+    // around the lead car's centre (#541; it turned about a point 10 m ahead of the front before)
+    const lead = tramModel.userData.cars[0], c = lead.position;
+    camLook.set(c.x, c.y + 2, c.z);
+    const back = T3.length / 2 + (tramModel.userData.cars.length - 1) * CAR_PITCH + 16, el = ORBIT_EL + orbit.pitch;
+    const a = lead.rotation.y + orbit.yaw, R = back / Math.cos(ORBIT_EL) * orbit.k;
     camPos.set(camLook.x - Math.sin(a) * Math.cos(el) * R, camLook.y + Math.sin(el) * R, camLook.z - Math.cos(a) * Math.cos(el) * R);
     // (while the reviewer turns it, the camera follows at once; else it trails the tram smoothly)
     orbit.drag -= dt;
@@ -1025,12 +1055,19 @@ world.traverse(o => {
 });
 const mirror = new Mirror(renderer, scene, $('mirror'), mirrorHidden);
 window.mirror = mirror; // cadence, target and excluded geometry are inspectable without changing the simulation
+// It is fixed to the lead car's body (#541): in a curve the body is the chord between its bogies, its front over
+// the outside of the track, and it leans in a canted one, so a camera posed from the track turned against it.
+const mirrorTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.04, 0.1, 0, 'YXZ'));
 function poseMirror(mirrorCam) {
-  const s = tram.s, p = route.offset(s - 0.6, -1.55), h = route.heading(s - 6, 6), z = profile.height(s);
-  mirrorCam.position.set(p.x, z + 2.09, -p.y);
-  // looking back, turned a little outwards so the side of the tram fills the inner edge
-  mirrorCam.rotation.order = 'YXZ';
-  mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.1, 0);
+  const u = tramModel.userData, lead = u.cars[0];
+  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front: 0.6 m behind the coupler's face
+  // (the car's frame: x left, y up, z forward from its centre between the bogies, src/consist.js)
+  const front = u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+  lead.updateWorldMatrix(true, false);
+  mirrorCam.position.set(-1.55, 2.09, front).applyMatrix4(lead.matrixWorld);
+  // looking back (a camera looks down its -z, the car's rear), turned a little outwards so the side of the tram
+  // fills the inner edge, and a little down
+  lead.getWorldQuaternion(mirrorCam.quaternion).multiply(mirrorTurn);
 }
 
 load.finish();

@@ -102,7 +102,7 @@ MEASURE = r"""async () => {
   out.fleet.auto = [...auto].sort();
   // the types' shares among 3000 run numbers, against their fleet ranges' lengths
   // (the types and their ranges: the built-in car's manifest, assets/t3simple/vehicle.json)
-  const v3 = vehicles.byId.get('t3simple'), T3_TYPES = Object.fromEntries(v3.variants.map((x) => [x.type, x.fleet[0]])), n = {};
+  const v3 = vehicles.byId.get('t3simple'), T3_TYPES = Object.fromEntries(Object.entries(v3.fleet.types).map(([k, x]) => [k, x.ranges[0]])), n = {};
   for (let r = 1; r <= 3000; r++) { const v = vehicles.variantOf(v3, String(r)); n[v] = (n[v] || 0) + 1; }
   const total = Object.values(T3_TYPES).reduce((s, [lo, hi]) => s + hi - lo + 1, 0);
   out.fleet.shares = Object.fromEntries(Object.entries(T3_TYPES).map(([k, [lo, hi]]) => [k, [(n[k] || 0) / 3000, (hi - lo + 1) / total]]));
