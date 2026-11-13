@@ -176,10 +176,12 @@ above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liver
 - every file listed: a type the game reads (`types`), present, of its `bytes` and `sha256`, within the caps (`caps`:
   the package, a model, an image, a sound);
 - a vehicle's model, loaded by the game's own loader: its rig's names for the `moves` it claims
-  (`src/rigged.js` `rigProblems`), and one car as the game draws it (`src/models.js` `vehicleFit`) against its type
-  (`VEHICLE_TYPES` in `src/tram.js`: within the length over the coupler faces and the width, plus `fit`'s margins;
-  its lowest point on the rail plane) and the budget (`budget`: triangles and draw calls of a car at its full level).
-  The model is measured at install; at a start the hashes stand for it;
+  (`src/rigged.js` `rigProblems`), and one car as the game draws it (`src/models.js` `vehicleFit`): at most `fit`'s
+  `maxLength` (33 m) long, at most its type's width (`VEHICLE_TYPES` in `src/tram.js`) plus `widthOver` wide, its
+  lowest point on the rail plane, within the budget (`budget`: 100,000 triangles and 100 draw calls a car at its full
+  level, wide for now to see what authors bring: the user, 2026-11-13). A car longer than its type's length over the
+  coupler faces is offered with a warning: it runs on its type's two pivots until it has a type of its own
+  (articulated vehicles: #579). The model is measured at install; at a start the hashes stand for it;
 - a livery's slots, a sound pack's events and loops, a fleet's types: among those its vehicle and the game declare.
 
 A package that fails is listed with its reasons and not offered; one with warnings is offered with them. The
@@ -193,7 +195,8 @@ ones join the registry after the repository's (`src/packages.js` `loadInstalled`
 package installed from a `package.json` address offers *Update* when a newer version is there.
 
 **The curated list** (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
-`assets/catalogue.json`, shown under the installed ones with an *Install* button. To submit a package, open an issue
+`assets/catalogue.json`, shown under the installed ones with an *Install* button. Submitting through the game's
+website, the pack or its address, is #580. Until then, to submit a package, open an issue
 with its address (an https `package.json` or `.zip` on your own host, which must allow the game's page to fetch it:
 CORS), its licence, and the check's report from installing it. Once it is reviewed, an entry goes into the list:
 `id`, `names` (cs, en), `author`, `licence`, `kind`, `url`, `home` (its page). The project hosts no package it did not

@@ -21,8 +21,8 @@
   "loaders_about": "the loaders an installed vehicle may name: the built-in car and the classic model are the game's own",
   "moves": ["bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"],
   "moves_about": "what a vehicle's `moves` may claim (docs/vehicles.md, Tiers of movement); the rig's names each needs: src/rigged.js rigProblems",
-  "budget": { "triangles": 60000, "drawCalls": 70 },
-  "budget_about": "one car at its full level, as the game draws it: the hybrid T3 (assets/t3h/) at about 44,000 triangles and 70 draw calls (tools/test_t3h.py) as the first",
-  "fit": { "lengthOver": 0.15, "widthOver": 0.7, "railLow": 0.05, "railHigh": 0.02 },
-  "fit_about": "m: one car's box against its type (src/tram.js VEHICLE_TYPES): its length over the coupler faces plus lengthOver, its width plus widthOver (mirrors), its lowest point within railLow below and railHigh above the rail plane (the wheels' flanges reach below it)"
+  "budget": { "triangles": 100000, "drawCalls": 100 },
+  "budget_about": "one car at its full level, as the game draws it (the hybrid T3, assets/t3h/: 43,612 triangles and 62 draw calls). Wide for now, to see what authors bring (the user, 2026-11-13: \"I would allow higher limits for now, 100k triangles, 100 draw calls and see what we get\")",
+  "fit": { "maxLength": 33, "lengthOver": 0.15, "widthOver": 0.7, "railLow": 0.05, "railHigh": 0.02 },
+  "fit_about": "m: one car's box. Refused: longer than maxLength (the user, 2026-11-13: \"length I would cap at 33m because longer single midel trams can be submitted\"), wider than its type (src/tram.js VEHICLE_TYPES) plus widthOver (mirrors), its lowest point more than railLow below or railHigh above the rail plane (the wheels' flanges reach below it). Warned: longer than its type's length over the coupler faces plus lengthOver (it runs on its type's pivots until a type of its own exists, #579)"
 }

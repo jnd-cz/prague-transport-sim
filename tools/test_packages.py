@@ -7,9 +7,10 @@ Makes the sample packages here (a box the size of a T3 car as a tier-1 glTF vehi
 - a bundle .zip holding three packages in their folders, the vehicle, a sound pack and a fleet for it, installed
   through the page's .zip input. The vehicle shows in the model menu after its check, credits itself when picked, and
   our tram runs as it with the fleet's numbers; all three survive a reload (the browser's origin private file system).
-- six broken ones, each refused with its reason: a bad manifest (no names), a missing file, a wrong hash, wrong axes
+- seven broken ones, each refused with its reason: a bad manifest (no names), a missing file, a wrong hash, wrong axes
   (the box lying across the track), a claimed tier without its nodes (a rig naming bogies the model lacks), over the
-  triangle budget.
+  triangle budget, longer than a vehicle may be (34 m: the cap is 33 m).
+- a 25 m box installs with a warning: longer than its type, it runs on the type's pivots (articulated types: #579).
 - removing the vehicle takes it out of the menu, and its sound pack and fleet out of the registry.
 - each glTF vehicle of the repository loads and measures within src/packageRules.json's fit and budget (the rules' calibration).
 Needs the line's data (python -I tools/snapshot.py data-fetch); skips without it.
@@ -147,7 +148,10 @@ def samples():
     cells = math.ceil(math.sqrt(RULES["budget"]["triangles"] / 12)) + 1
     m, f = vehicle("sample.heavy", model=glb(cells=cells))
     broken["over budget"] = (zipped([("", m, f)]), "triangles a car, over the budget")
-    return good, broken
+    m, f = vehicle("sample.too-long", model=glb(size=(2.4, 3.2, 34.0)))
+    broken["too long"] = (zipped([("", m, f)]), f"over the {RULES['fit']['maxLength']} m a vehicle may be")
+    m, f = vehicle("sample.long", model=glb(size=(2.4, 3.2, 25.0)))
+    return good, broken, zipped([("", m, f)])
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -198,7 +202,7 @@ def main():
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
-    good, broken = samples()
+    good, broken, long = samples()
     fails = []
 
     def need(ok, why):
@@ -247,6 +251,10 @@ def main():
                 rep = put(page, f"{what}.zip", data)
                 print(f"{what}: {rep}")
                 need(len(rep) == 1 and rep[0].startswith("✕") and want in rep[0], f"{what}: wants refused with '{want}', got {rep}")
+            rep = put(page, "long.zip", long)
+            print("long:", rep)
+            need(len(rep) == 1 and rep[0].startswith("✓") and "runs on T3's bogie pivots" in rep[0], f"the 25 m box: wants installed with a warning, got {rep}")
+            page.evaluate("async () => (await import('/src/packages.js')).remove('sample.long')")
             s = page.evaluate(STATE)
             need(sorted(x["id"] for x in s["state"]) == sorted([VID, "sample.box-sounds", "sample.box-fleet"]),
                  f"installed after the broken ones: {[x['id'] for x in s['state']]}")
@@ -279,7 +287,7 @@ def main():
             browser.close()
     finally:
         server.shutdown()
-    print("vehicle packages: bundle installed, 6 broken refused, reload, credit, drive, removal: " + ("pass" if not fails else f"{len(fails)} failures"))
+    print("vehicle packages: bundle installed, 7 broken refused, a long one warned, reload, credit, drive, removal: " + ("pass" if not fails else f"{len(fails)} failures"))
     return 1 if fails else 0
 
 

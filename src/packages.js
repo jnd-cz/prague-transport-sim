@@ -169,13 +169,14 @@ async function kindProblems(p, r, stored) {
     catch (e) { return { problems: [String(e.message || e).replace(`vehicle ${p.id}: `, '')] }; }
     finally { if (had) byId.set(p.id, had); else byId.delete(p.id); }
   }
-  const L = T.length + r.fit.lengthOver, W = T.width + r.fit.widthOver, f2 = (x) => x.toFixed(2);
-  if (fit.size[2] > L) bad.push(`one car is ${f2(fit.size[2])} m long, over its type's ${f2(L)} m: is its forward axis right?`);
+  const L = T.length + r.fit.lengthOver, W = T.width + r.fit.widthOver, f2 = (x) => x.toFixed(2), warn = [];
+  if (fit.size[2] > r.fit.maxLength) bad.push(`one car is ${f2(fit.size[2])} m long, over the ${r.fit.maxLength} m a vehicle may be: is its forward axis right?`);
+  else if (fit.size[2] > L) warn.push(`one car is ${f2(fit.size[2])} m long, over its type ${p.type}'s ${f2(L)} m: it runs on ${p.type}'s bogie pivots`);
   if (fit.size[0] > W) bad.push(`one car is ${f2(fit.size[0])} m wide, over its type's ${f2(W)} m: is its forward axis right?`);
   if (fit.low < -r.fit.railLow || fit.low > r.fit.railHigh) bad.push(`its lowest point is ${f2(fit.low)} m from the rail plane: its wheels stand on y = 0`);
   if (fit.triangles > r.budget.triangles) bad.push(`${fit.triangles} triangles a car, over the budget of ${r.budget.triangles}`);
   if (fit.drawCalls > r.budget.drawCalls) bad.push(`${fit.drawCalls} draw calls a car, over the budget of ${r.budget.drawCalls}`);
-  return { problems: bad, fit };
+  return { problems: bad, warnings: warn, fit };
 }
 
 // the whole check of one package (its files in memory): its manifest, files, then its kind
@@ -192,7 +193,7 @@ export async function checkPackage(pkg, stored = null) {
   installed.add(p.id);
   const k = await kindProblems(p, r, stored);
   if (k.problems.length) { forget(p); return { problems: k.problems, warnings: [...m.warnings, ...f.warnings] }; }
-  return { problems: [], warnings: [...m.warnings, ...f.warnings], fit: k.fit };
+  return { problems: [], warnings: [...m.warnings, ...f.warnings, ...(k.warnings || [])], fit: k.fit };
 }
 
 // a package's files at their addresses (blob URLs), and taken away again
