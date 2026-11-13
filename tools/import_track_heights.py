@@ -68,10 +68,10 @@ def conflict_records(observations):
     return conflicts
 
 
-def observations(current, archive, area):
+def observations(current, archive, area, pool=None):
     rows = list(samples(current, area))
-    for obs in rows:
-        obs['archive'] = archive.match(obs['x'], obs['y'], obs['ux'], obs['uy'], details=True)
+    for obs, m in zip(rows, _archive_matches([(o['x'], o['y'], o['ux'], o['uy']) for o in rows], archive, pool)):
+        obs['archive'] = m
     return rows
 
 
@@ -131,15 +131,45 @@ CHUNK = 5000  # samples a worker decides at a time
 _W = {}
 
 
-def _worker(decks, context, guard):
-    _W.update(decks=decks, context=context, guard=guard)
+def _worker(decks, context, current, archive):
+    _W.update(decks=decks, context=context, current=current, archive=archive)
 
 
-def _decide(todo, decks=None, context=None, guard=None):
+def _chunks(todo):
+    return [todo[k:k + CHUNK] for k in range(0, len(todo), CHUNK)]
+
+
+def _matches(todo, archive=None):
+    """The archive's match at (x, y, ux, uy) samples (observations)."""
+    archive = _W['archive'] if archive is None else archive
+    return [archive.match(x, y, ux, uy, details=True) for x, y, ux, uy in todo]
+
+
+def _archive_matches(todo, archive, pool=None):
+    return _matches(todo, archive) if pool is None else [m for part in pool.map(_matches, _chunks(todo)) for m in part]
+
+
+def _hits(todo, current=None, archive=None):
+    """A line's route samples (x, y, ux, uy) on DI: the hit and, where it has a height or none, its tangent and the
+    archive's match there (stage)."""
+    if current is None:
+        current, archive = _W['current'], _W['archive']
+    out = []
+    for x, y, ux, uy in todo:
+        hit = current.match(x, y, ux, uy, radius=2, details=True)
+        if hit['status'] in ('numeric', 'missing_z'):
+            tangent = hit['candidates'][0]
+            out.append((hit, tangent, archive.match(hit['x'], hit['y'], tangent['ux'], tangent['uy'], details=True)))
+        else:
+            out.append((hit, None, None))
+    return out
+
+
+def _decide(todo, guard, decks=None, context=None):
     """decide's loop over (x, y, DI id, DI z, ux, uy, archive match, structure hint, tunnel hint, terrain) samples: each
     one's (surfaces, construction, decision). Each sample reads only its own place, so the workers share them out."""
     if decks is None:
-        decks, context, guard = _W['decks'], _W['context'], _W['guard']
+        decks, context = _W['decks'], _W['context']
     out = []
     for x, y, i, z, ux, uy, match, hint, tunnel, ground in todo:
         surfaces = decks.candidates(x, y, i, hint, z)
@@ -152,16 +182,18 @@ def _decide(todo, decks=None, context=None, guard=None):
 def _decide_all(todo, decks, context, guard, pool=None):
     """_decide over todo, in the pool's workers (in order) when there is one."""
     if pool is None:
-        return _decide(todo, decks, context, guard)
-    return [g for part in pool.map(_decide, [todo[k:k + CHUNK] for k in range(0, len(todo), CHUNK)]) for g in part]
+        return _decide(todo, guard, decks, context)
+    parts = _chunks(todo)
+    return [g for part in pool.map(_decide, parts, [guard] * len(parts)) for g in part]
 
 
-def _pool(decks, context, guard):
-    """Worker processes with the decks, OSM's tracks and the guard (#516: one process decided the 285 000 DI samples and
-    the lines' 60 000 in ~70 s of the heights' 97 s staging)."""
+def _pool(decks, context, current, archive):
+    """Worker processes with the decks, OSM's tracks and DI's and the archive's segments (#516: one process matched and
+    decided the 285 000 DI samples and the lines' 60 000 in most of the heights' 97 s staging)."""
     from concurrent.futures import ProcessPoolExecutor
     import sysinfo
-    return ProcessPoolExecutor(sysinfo.workers(1.0, most=12), initializer=_worker, initargs=(decks, context, guard))
+    return ProcessPoolExecutor(sysinfo.workers(1.0, most=12), initializer=_worker,
+                               initargs=(decks, context, current, archive))
 
 
 def decide(rows, guard, structures, decks, tunnels, context, terrain, pool=None):
@@ -190,12 +222,14 @@ def stage(review):
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])
     print(f'Matching {len(paths)} DI paths for guarded height staging', flush=True)
-    rows = observations(current, archive, area)
-    conflicts = conflict_records(rows)
-    guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
-                        review.get('span_reviews', []))
-    pool = _pool(decks, context, guard) if len(rows) >= POOL else None
+    rows = list(samples(current, area))
+    pool = _pool(decks, context, current, archive) if len(rows) >= POOL else None
     try:
+        for obs, m in zip(rows, _archive_matches([(o['x'], o['y'], o['ux'], o['uy']) for o in rows], archive, pool)):
+            obs['archive'] = m
+        conflicts = conflict_records(rows)
+        guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
+                            review.get('span_reviews', []))
         decide(rows, guard, structures, decks, tunnels, context, terrain, pool)
         # the lines' route samples: each matched to DI here, then decided as DI's samples are (in the workers)
         lines, route_samples, along, hits = [], [], [], []
@@ -213,16 +247,19 @@ def stage(review):
             for row in samples(route, None):
                 row['s'] = positions[row['id']] + row['weight']/2
                 positions[row['id']] += row['weight']
-                hit = current.match(row['x'], row['y'], row['ux'], row['uy'], radius=2, details=True)
-                if hit['status'] in ('numeric', 'missing_z'):
-                    tangent = hit['candidates'][0]
-                    match = archive.match(hit['x'], hit['y'], tangent['ux'], tangent['uy'], details=True)
+                selected.append(row)
+            along.append((line, selected))
+        todo = [(row['x'], row['y'], row['ux'], row['uy']) for _, selected in along for row in selected]
+        found = iter(_hits(todo, current, archive) if pool is None else
+                     [h for part in pool.map(_hits, _chunks(todo)) for h in part])
+        for _, selected in along:
+            for row in selected:
+                hit, tangent, match = next(found)
+                if tangent is not None:
                     hits.append((row, hit, tangent, match))
                     row['di_id'], row['raw_di_z'], row['di_xy'] = hit['id'], hit['z'], [hit['x'],hit['y']]
                 else:
                     row['decision'] = {'status': 'review', 'review_flags': ['no_unambiguous_current_geometry']}
-                selected.append(row)
-            along.append((line, selected))
         at = shapely.points([(h['x'], h['y']) for _, h, _, _ in hits] or [(0.0, 0.0)])[:len(hits)]
         on = shapely.intersects(structures, at)
         under = shapely.intersects(tunnels, at)

@@ -286,11 +286,18 @@ class Workers(unittest.TestCase):
         archived = match(path(1, 200), path(2, 201, .1))
         todo = [(x / 7, (k % 5 - 2) / 2, 'di-1', None if k % 3 else 200.0 + k / 100, 1.0, 0.0, archived, bool(k % 2),
                  k % 4 == 0, 199.0 + k / 50) for k, x in enumerate(range(0, 70))]
-        here = stage._decide_all(todo, decks, context, guard)
-        with patch.object(stage, 'CHUNK', 9), stage._pool(decks, context, guard) as pool:
-            there = stage._decide_all(todo, decks, context, guard, pool)
+        current = Segments([path('di-1', 200), path('di-2', 0, .5)])
+        archive = Segments([path(1, 200), path(2, 201, .1), path(3, 205, 1.2)])
+        at = [(x / 7, (k % 7 - 3) * .5, 1.0 if k % 3 else -1.0, 0.0) for k, x in enumerate(range(0, 70))]
+        here = (stage._decide_all(todo, decks, context, guard), stage._archive_matches(at, archive),
+                stage._hits(at, current, archive))
+        with patch.object(stage, 'CHUNK', 9), stage._pool(decks, context, current, archive) as pool:
+            there = (stage._decide_all(todo, decks, context, guard, pool), stage._archive_matches(at, archive, pool),
+                     [h for part in pool.map(stage._hits, stage._chunks(at)) for h in part])
         self.assertEqual(there, here)
-        self.assertGreater(len({json.dumps(d, sort_keys=True, default=str) for _, _, d in here}), 3)
+        self.assertGreater(len({json.dumps(d, sort_keys=True, default=str) for _, _, d in here[0]}), 3)
+        self.assertGreater(len({m['status'] for m in here[1]}), 1)
+        self.assertGreater(sum(t is not None for _, t, _ in here[2]), 10)
 
 
 class DeckFallback(unittest.TestCase):
