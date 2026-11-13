@@ -209,10 +209,10 @@ def at_true_places(series, line):
     what the rails waved by (#358). A sample further from its centre than the bin is the chain passing it twice: it
     stays. A bin with no sample within 2 BIN either side keeps its own height."""
     pts = []
-    for x in series:
-        if x['z'] is not None and x['xy'] is not None:
-            t = line.project(Point(x['xy']))
-            pts.append((t if abs(t - x['s']) <= BIN else x['s'], x['z']))
+    have = [x for x in series if x['z'] is not None and x['xy'] is not None]
+    at = shapely.line_locate_point(line, shapely.points([x['xy'] for x in have])).tolist() if have else []  # (at once, #516)
+    for x, t in zip(have, at):
+        pts.append((t if abs(t - x['s']) <= BIN else x['s'], x['z']))
     pts.sort()
     ts, zs = [], []
     for t, z in pts:
