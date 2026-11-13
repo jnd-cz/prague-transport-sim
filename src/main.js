@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -127,7 +127,8 @@ if (!params.has('nofine')) try {
 } catch { /* not made for this line */ }
 data.attribution = credits(built);
 logProvenance(built);
-const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
+// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548)
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, nearTracks(data.tracks)) : null;
 await load.begin('profile');
 const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
 const profile = new Profile(route, data, styles.lift, dtm, terrain); // (the built top of rail and structures, #197, #480)
