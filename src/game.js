@@ -67,6 +67,49 @@ function place(obj, route, s, lateral, h = 0, faceBack = false) {
   obj.rotation.y = Math.atan2(fx, -fy);
 }
 
+// A platform strip along rt from s0 to s1 (`side` +1 left), from `inner` to `outer` m off the axis, its top 0.18 m over
+// the top of rail (src/heights.js), kerb faces where it starts, ends and breaks: triangles into pos/col. A cross-section
+// within STRIP_CLEAR m of a drawn track's axis is left out with the segments beside it (#581: at Bílá Hora's loop the
+// first stop's own platform ran as one straight box across the loop's tracks, at Spojovací OSM's platform A crossed
+// one). Returns the metres left out.
+const STRIP_CLEAR = 0.8;
+export function platformStrip(rt, s0, s1, side, inner, outer, ground, pos, col, cTop, cKerb) {
+  const V = (o, z) => [o.x, z, -o.y];
+  const tri = (a, b, c, k) => { pos.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) col.push(k.r, k.g, k.b); };
+  const quad = (a, b, c, d, k) => { tri(a, b, c, k); tri(a, c, d, k); };
+  const clear = (s) => {
+    if (!ground?.trackWithin) return true;
+    for (let o = inner + STRIP_CLEAR; o <= outer + 1e-6; o += 0.5) {
+      const p = rt.offset(s, side * o);
+      if (ground.trackWithin(p.x, p.y, STRIP_CLEAR)) return false;
+    }
+    return true;
+  };
+  const end = (c) => quad(V(c.I, c.zt - 0.06), V(c.O, c.zg), V(c.O, c.top), V(c.I, c.top), cKerb);
+  let prev = null, left = 0;
+  const n = Math.max(2, Math.ceil((s1 - s0) / 2));
+  for (let k = 0; k <= n; k++) {
+    const s = s0 + ((s1 - s0) * k) / n;
+    if (!clear(s)) {
+      if (prev) end(prev);
+      if (k) left += (s1 - s0) / n;
+      prev = null;
+      continue;
+    }
+    const c = rt.at(s), I = rt.offset(s, side * inner), O = rt.offset(s, side * outer);
+    const zt = ground.trackAt(c.x, c.y), top = zt + 0.18, zg = Math.min(top - 0.05, ground.surface(O.x, O.y) - 0.05);
+    const cur = { I, O, zt, top, zg };
+    if (prev) {
+      quad(V(prev.I, prev.top), V(I, top), V(O, top), V(prev.O, prev.top), cTop);
+      quad(V(prev.I, prev.zt - 0.06), V(I, zt - 0.06), V(I, top), V(prev.I, prev.top), cKerb);
+      quad(V(prev.O, prev.zg), V(O, zg), V(O, top), V(prev.O, prev.top), cKerb);
+    } else end(cur);
+    prev = cur;
+  }
+  if (prev) end(prev);
+  return left;
+}
+
 export class Game {
   constructor(scene, data, route, tram, audio, opts) {
     this.scene = scene;
@@ -237,9 +280,6 @@ export class Game {
     const routes = [this.route, this.backRoute].filter(Boolean), ground = this.route.ground, dtm = ground.dtm;
     const pos = [], col = [];
     const cTop = new THREE.Color(0xa7a197), cKerb = new THREE.Color(0x8e8a82);
-    const V = (o, z) => [o.x, z, -o.y];
-    const tri = (a, b, c, k) => { pos.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) col.push(k.r, k.g, k.b); };
-    const quad = (a, b, c, d, k) => { tri(a, b, c, k); tri(a, c, d, k); };
     this.platforms = [];
     for (const pl of this.data.platforms || []) {
       let best = null, ours = null;
@@ -282,28 +322,17 @@ export class Game {
       const mid = rt.offset((s0 + s1) / 2, side * (inner + outer) / 2), cls = dtm?.classAt(mid.x, mid.y);
       plat.surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
       if (plat.surveyed) continue;
-      let prev = null;
-      const n = Math.max(2, Math.ceil((s1 - s0) / 2));
-      for (let k = 0; k <= n; k++) {
-        const s = s0 + ((s1 - s0) * k) / n, c = rt.at(s);
-        const I = rt.offset(s, side * inner), O = rt.offset(s, side * outer);
-        const zt = ground.trackAt(c.x, c.y), top = zt + 0.18, zg = Math.min(top - 0.05, ground.surface(O.x, O.y) - 0.05);
-        const cur = { I, O, zt, top, zg };
-        if (prev) {
-          quad(V(prev.I, prev.top), V(I, top), V(O, top), V(prev.O, prev.top), cTop);
-          quad(V(prev.I, prev.zt - 0.06), V(I, zt - 0.06), V(I, top), V(prev.I, prev.top), cKerb);
-          quad(V(prev.O, prev.zg), V(O, zg), V(O, top), V(prev.O, prev.top), cKerb);
-        } else quad(V(I, zt - 0.06), V(O, zg), V(O, top), V(I, top), cKerb);
-        prev = cur;
-      }
-      quad(V(prev.I, prev.zt + 0.2), V(prev.O, prev.zg), V(prev.O, prev.top), V(prev.I, prev.top), cKerb);
+      const left = platformStrip(rt, s0, s1, side, inner, outer, ground, pos, col, cTop, cKerb);
+      if (left) (this.platformGaps ||= []).push(`${pl.name} ${pl.code ?? ''}: ${left.toFixed(0)} m over a track left out`);
     }
     if (pos.length) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
       g.computeVertexNormals();
-      this.objects.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+      m.userData.surface = 'platform'; // (the checks find it: tools/lint.js)
+      this.objects.add(m);
     }
     // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
     // their driving direction is along the back route), shelter where OSM has one. Not on our own platforms (`ours`:
@@ -341,23 +370,31 @@ export class Game {
     const pls = this.platforms || [];
     const osm = pls.find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20)
       || pls.find((p) => p.back && p.ours && p.ours.s0 < stop.target - 8 && p.ours.s1 > stop.target - 20);
-    const len = 30, mid = stop.target - len / 2 - 1;
+    const len = 30;
     // (a Vienna-type stop: boarding from the sidewalk; sign and shelter stand at the kerb)
     const kerb = osm ? osm.kerb : this._stopType(this.data.stops[stop.i].vienna, () => this._vienna(route, stop.target - len - 1, stop.target - 1), `stop ${stop.name}`);
     stop.vienna = kerb !== null;
-    const plat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, len), new THREE.MeshLambertMaterial({ color: 0xa7a197 }));
-    plat.visible = !osm && !stop.vienna;
-    place(plat, route, mid, -3.0, -0.15); // (0.26 under the old street-level reference: top of rail now)
-    // curved platforms: approximate with a straight box oriented along the chord
-    const a = route.offset(stop.target - len - 1, -3.0), b = route.offset(stop.target - 1, -3.0);
-    const za = this.profile.height(stop.target - len - 1), zb = this.profile.height(stop.target - 1);
-    const chord = Math.hypot(b.x - a.x, b.y - a.y);
-    plat.position.set((a.x + b.x) / 2, (za + zb) / 2 + 0.33, -(a.y + b.y) / 2);
-    plat.rotation.order = 'YXZ';
-    plat.rotation.y = Math.atan2(b.x - a.x, -(b.y - a.y));
-    plat.rotation.x = -Math.atan2(zb - za, chord);
-    plat.scale.z = chord / len;
-    g.add(plat);
+    // (a strip along the route as the OSM platforms, 1.5-4.1 m to the right, 0.18 m over the top of rail; before #581 a
+    // straight box along the chord, its top 0.44 m over the rails, which at a first stop in a loop (Bílá Hora) ran
+    // across the loop's tracks)
+    // (not where the survey draws a platform, an island or a sidewalk there, as the OSM ones: _buildPlatforms)
+    const at = route.offset(stop.target - len / 2 - 1, -2.8), cls = route.ground.dtm?.classAt(at.x, at.y);
+    const surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
+    if (!osm && !stop.vienna && !surveyed) {
+      const pos = [], col = [];
+      const left = platformStrip(route, stop.target - len - 1, stop.target - 1, -1, 1.5, 4.1, route.ground, pos, col,
+        new THREE.Color(0xa7a197), new THREE.Color(0x8e8a82));
+      if (left) (this.platformGaps ||= []).push(`stop ${stop.name}: ${left.toFixed(0)} m over a track left out`);
+      if (pos.length) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        geo.computeVertexNormals();
+        const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+        m.userData.surface = 'platform'; // (the checks find it: tools/lint.js)
+        g.add(m);
+      }
+    }
     // the classic red Prague stop sign (zastávkový označník) where the tram front stops
     const sign = makeStopSign(stop.name, stop.request, this.data.stops[stop.i].lines || [String(this.data.line)]);
     // (on the sidewalk's height, not the track's)
