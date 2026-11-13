@@ -69,9 +69,10 @@ tram's; AI trams are dealt one (`src/vehicles.js` `liveryOf`). `tools/test_vehic
 | `share` | the part of AI sets of those types that wear it, 0 to 1 (default 0: only our tram's, or a number's in the fleet's `liveries`) |
 
 Every slot it leaves out keeps the vehicle's own. A livery naming a slot or a type its vehicle lacks is left out with
-the slot's name (`livery x left out: texture slot roof: t3h has no such slot`). The two samples: `sample.t3h-blue` (the
-hybrid's body a texture, its band a colour) and `sample.t3simple-green` (the built-in car's three colours), each on
-15 % of the AI sets.
+the slot's name (`livery x left out: texture slot roof: t3h has no such slot`). The game ships none yet, so the menu
+row stays hidden (the user, 2026-11-13: "For now I would keep only the default liveries, with future possibility to
+add more variety"); `tools/test_liveries.py` serves two samples of its own, a texture and a colour on the hybrid and
+the built-in car's three colours.
 
 ## The rig
 

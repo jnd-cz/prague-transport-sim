@@ -69,8 +69,9 @@ cizím tramvajím; cizím tramvajím se přiděluje (`src/vehicles.js` `liveryOf
 | `share` | podíl cizích souprav těch typů, které jej nosí, 0 až 1 (výchozí 0: jen naše, nebo čísla ve `liveries` vozového parku) |
 
 Sloty, které vynechá, si nechají vzhled vozidla. Nátěr, který jmenuje slot nebo typ, jejž vozidlo nemá, je vynechán se
-jménem slotu (`livery x left out: texture slot roof: t3h has no such slot`). Dva ukázkové: `sample.t3h-blue` (hybridova
-skříň texturou, pás barvou) a `sample.t3simple-green` (tři barvy vestavěného vozu), každý na 15 % cizích souprav.
+jménem slotu (`livery x left out: texture slot roof: t3h has no such slot`). Hra zatím žádný nemá, řádek menu je
+skrytý (uživatel, 2026-11-13: „For now I would keep only the default liveries, with future possibility to add more
+variety“); `tools/test_liveries.py` podává dva vlastní ukázkové, texturu a barvu na hybridu a tři barvy vestavěného vozu.
 
 ## Soubor pohyblivých dílů (rig)
 

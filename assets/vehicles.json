@@ -1,5 +1,5 @@
 {
   "about": "The tram models the game offers, in the menu's order; a vehicle not loaded falls back to the first loaded one in this order. Each is a folder assets/<id>/ with its vehicle.json (docs/vehicles.md, The manifest).",
   "vehicles": ["t3h", "t3", "t3simple"],
-  "liveries": ["sample.t3h-blue", "sample.t3simple-green"]
+  "liveries": []
 }

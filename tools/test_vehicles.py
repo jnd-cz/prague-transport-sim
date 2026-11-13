@@ -294,6 +294,8 @@ def main():
         bad = livery_problems(lv, lid, manifests, os.path.join(ASSETS, lid), assets_md)
         fails += [f"{lid}: {b}" for b in bad]
         print(f"{lid}: a livery of {next(iter(lv.get('requires', {})), None)}, {len(lv.get('files', []))} files{'' if bad else ', ok'}")
+    # (none listed yet, the user, 2026-11-13: "For now I would keep only the default liveries"; the samples below and
+    # tools/test_liveries.py's check the rules)
     # the livery check refuses what it should: a slot the vehicle lacks by its name
     vh = {"t3h": {"id": "t3h", "slots": {"body": ["Red_Hull"]}, "fleet": {"types": {"T3SUCS": {}}}}}
     base = {"schema": 1, "kind": "livery", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},

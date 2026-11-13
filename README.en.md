@@ -207,9 +207,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 - Fleet number: the set you drive, such as the historic 6892 + 6921, 7269 + 7290 or 8080 + 8074, or one number
   (the second car gets a number of the same type); the game remembers it for each model. "Any" deals yours
   like the others'. No number runs twice on the street, and no other set is dealt yours.
-- Livery: the model's own, one of its liveries (for now a sample blue for the detailed model and a green one for
-  the simple one), or "Any", dealt like the others'; the game remembers it for each model. Some of the other sets
-  wear the liveries too.
+- Livery: only for a model with liveries besides its own (none yet): its own, one of them, or "Any", dealt like the
+  others'; the game remembers it for each model. Some of the other sets wear the liveries too.
 
 ### On a phone or tablet
 

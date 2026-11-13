@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Liveries (#529) in headless Chromium: the sample liveries on our tram and on AI trams.
+"""Liveries (#529) in headless Chromium: two sample liveries on our tram and on AI trams.
 
 Usage: python -P -E tools/test_liveries.py [--line 17] [--seed 3] [--secs 600]
 
@@ -11,7 +11,9 @@ The dealer (FleetDealer) gives each sample to about its `share` of the AI sets o
 wrap (the fleet's `liveries`) to that number. Then the game (line --line, seed --seed, the built-in car, the green
 sample remembered in the menu), driven by the autopilot for --secs simulated seconds with the traffic on: our tram
 wears it, and the AI trams that are dealt it wear it. Needs the line's data (python -I tools/snapshot.py
-data-fetch); skips without it.
+data-fetch); skips without it. The game ships no livery yet (the user, 2026-11-13: "For now I would keep only the
+default liveries, with future possibility to add more variety"): the samples are made here and served to the page
+as folders listed in assets/vehicles.json.
 """
 import argparse
 import faulthandler
@@ -19,8 +21,10 @@ import functools
 import http.server
 import json
 import os
+import struct
 import sys
 import threading
+import zlib
 
 from playwright.sync_api import sync_playwright
 
@@ -29,6 +33,30 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))  # (python -P leaves it out)
 import gpu  # noqa: E402
 
 BLUE, GREEN = "sample.t3h-blue", "sample.t3simple-green"
+LICENCE = {"spdx": "CC0-1.0", "commercial": True, "authors": ["the test"], "sources": ["tools/test_liveries.py"], "credit": ""}
+
+
+def body_png():
+    """The hybrid sample's body texture, 1024 x 64 px: navy with light stripes towards both ends (the hull's u runs
+    along the car, its v carries nothing)."""
+    w, h = 1024, 64
+    row = [(29, 53, 87)] * w
+    for k, x in enumerate((40, 92, 136)):
+        for c in (x, w - x - (26 - 6 * k)):
+            row[c:c + 27 - 6 * k] = [(124, 178, 222)] * (27 - 6 * k)
+    raw = b"".join(b"\0" + bytes(v for px in row for v in px) for _ in range(h))
+    chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))  # noqa: E731
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+def samples(png):
+    blue = {"schema": 1, "kind": "livery", "id": BLUE, "requires": {"t3h": ">=1"}, "names": {"cs": "Ukázkový: modrý", "en": "Sample: blue"},
+            "licence": LICENCE, "files": [{"path": "body.png", "bytes": len(png)}], "textures": {"body": "body.png"},
+            "colours": {"band": "#e4e9ee"}, "numbers": {"colour": "#ffffff"}, "types": ["T3SUCS"], "share": 0.15}
+    green = {"schema": 1, "kind": "livery", "id": GREEN, "requires": {"t3simple": ">=1"}, "names": {"cs": "Ukázkový: zelený", "en": "Sample: green"},
+             "licence": LICENCE, "files": [], "colours": {"body": "#2f6b3a", "band": "#efe9d6", "roof": "#5d6266"},
+             "numbers": {"colour": "#f2f2f2"}, "share": 0.15}
+    return blue, green
 
 LOOKS = r"""async () => {
   const THREE = await import('three');
@@ -157,6 +185,15 @@ def main():
         with sync_playwright() as p:
             browser = gpu.launch(p)[0]
             ctx = browser.new_context(viewport={"width": 960, "height": 540})
+            index = json.load(open(os.path.join(ROOT, "assets", "vehicles.json"), encoding="utf-8"))
+            png = body_png()
+            blue, green = samples(png)
+            served = {"/assets/vehicles.json": ("application/json", json.dumps({**index, "liveries": [BLUE, GREEN]})),
+                      f"/assets/{BLUE}/livery.json": ("application/json", json.dumps(blue)),
+                      f"/assets/{GREEN}/livery.json": ("application/json", json.dumps(green)),
+                      f"/assets/{BLUE}/body.png": ("image/png", png)}
+            for path, (kind, body) in served.items():
+                ctx.route(base + path, lambda route, request, kind=kind, body=body: route.fulfill(content_type=kind, body=body))
             ctx.add_init_script(f"try {{ localStorage.setItem('tram.livery', JSON.stringify({{ t3simple: '{GREEN}' }})); }} catch {{}}")
             page = ctx.new_page()
             errors = []
