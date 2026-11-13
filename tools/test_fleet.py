@@ -4,7 +4,7 @@
 Usage: python -P -E tools/test_fleet.py [--line 17] [--seed 3] [--secs 900]
 
 The dealer alone (src/vehicles.js FleetDealer on the built-in car's and the hybrid's manifests): each type dealt as
-often as it has numbers, the listed sets only together and never to a single car, no number twice on a street of
+often as it has numbers, the listed sets only together or one car alone, no number twice on a street of
 sets coming and going, the player's preferred set never dealt to anybody else, the same stream deals the same.
 Then the game (line --line, seed --seed, the built-in car, the preferred set 6892+6921 remembered in the menu),
 driven by the autopilot for --secs simulated seconds with the traffic on, twice: our tram runs as the preferred set,
@@ -50,16 +50,27 @@ DEALER = r"""async () => {
       const cars = r() < 0.2 ? 1 : 2, s = e.deal(cars);
       street.push(s);
       const set = f.setOf.get(s.numbers[0]);
-      if (set) { if (String(set) !== String(s.numbers)) setSplit++; else historic.add(String(set)); }
+      if (set && cars > 1) { if (String(set) !== String(s.numbers)) setSplit++; else historic.add(String(set)); }
       if (cars === 1 && set) singleSet++;
       if (s.numbers.some((x) => ours.numbers.includes(x))) oursDealt++;
       if (s.numbers.some((x) => f.typeOf.get(x) !== s.type)) typeMix++;
-      if (s.numbers.some((x) => f.setOf.has(x) && String(f.setOf.get(x)) !== String(s.numbers))) setSplit++;
+      if (cars > 1 && s.numbers.some((x) => f.setOf.has(x) && String(f.setOf.get(x)) !== String(s.numbers))) setSplit++;
       const on = street.flatMap((x) => x.numbers);
       if (new Set(on).size !== on.length) twice++;
     }
   }
   Object.assign(out, { twice, oursDealt, setSplit, singleSet, typeMix, historic: [...historic].sort() });
+  // our single car from a pair (line 23): its partner runs alone on AI single cars, the pair is never dealt whole
+  const o = new V.FleetDealer(v3, rng(5)), one = o.ours(1, V.preferredSet(v3, '6892+6921'));
+  let partner = 0, oursSingle = 0, pairWhole = 0;
+  for (let i = 0; i < 4000; i++) {
+    const s = o.deal(i % 2 ? 2 : 1);
+    if (s.numbers.includes(6921) && s.numbers.length === 1) partner++;
+    if (s.numbers.includes(6892)) oursSingle++;
+    if (s.numbers.length === 2 && s.numbers.includes(6921)) pairWhole++;
+    o.give(s.numbers);
+  }
+  out.single = { one, partner, oursSingle, pairWhole };
   // the preferred set's forms; the hybrid's own fleet
   out.prefer = { lone: V.preferredSet(v3, '7269'), setText: V.preferredSet(v3, '6892+6921'), mixed: V.preferredSet(v3, '6892+7001'), none: V.preferredSet(v3, '1') };
   const lone = new V.FleetDealer(v3, rng(3)).ours(2, V.preferredSet(v3, '7005'));
@@ -156,7 +167,11 @@ def main():
         need(abs(got - want) < 0.02, f"type {t} dealt {got:.3f} of the sets, its numbers are {want:.3f} of the fleet")
     need(d["twice"] == 0, f"a number twice on the street {d['twice']} times")
     need(d["oursDealt"] == 0, f"the preferred set dealt to another tram {d['oursDealt']} times")
-    need(d["setSplit"] == 0 and d["singleSet"] == 0, f"listed sets split {d['setSplit']} times, dealt to a single car {d['singleSet']} times")
+    need(d["setSplit"] == 0, f"listed sets split or mixed with another car {d['setSplit']} times")
+    need(d["singleSet"] > 0, "a single car is never dealt a listed set's car")
+    sg = d["single"]
+    need(sg["one"] == {"type": "T3", "numbers": [6892]} and sg["partner"] > 0 and sg["oursSingle"] == 0 and sg["pairWhole"] == 0,
+         f"our single car from 6892+6921: {sg}; wants 6892 ours, 6921 dealt alone, the pair never whole")
     need(d["typeMix"] == 0, f"sets of mixed types {d['typeMix']} times")
     others = [s for s in HISTORIC if s != [8080, 8074]]   # (8080+8074 is the street's preferred set: never dealt)
     need(d["historic"] == sorted(",".join(map(str, s)) for s in others), f"historic sets dealt: {d['historic']}, wants all of {others}")

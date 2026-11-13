@@ -45,7 +45,9 @@ export const vehicleName = (v, lang) => v.names[lang] || v.names.en;
 
 // The fleet (#527; docs/decisions/2026-11-10-vehicle-packages.md, section 4): the manifest's
 // `fleet: { types: { <type>: { ranges: [[first, last], …], except: […] } | { list: […] } }, sets: [[lead, second], …] }`.
-// A set listed runs together and only together; a set not listed is numbers of one type dealt together.
+// A set listed runs together and with no other car; one of its cars may run alone as a single car (the user,
+// 2026-11-13: "if the player gets single car of the pair then the other number is free to be used by ai tram"),
+// and the set is then not dealt whole while it is out. A set not listed is numbers of one type dealt together.
 const FLEETS = new WeakMap();
 export function fleetOf(v) {
   if (!v?.fleet?.types) return null;
@@ -115,7 +117,8 @@ export class FleetDealer {
         if (type && t !== type) continue;
         if (free && this.out.get(n)) continue;
         let numbers;
-        if (set) {
+        if (set && cars === 1) numbers = [n];   // (a set's car runs alone on a single-car line: its partner stays free)
+        else if (set) {
           if (set.length !== cars || (free && set.some((m) => this.out.get(m)))) continue;
           numbers = [...set];
         } else {
