@@ -461,7 +461,7 @@ export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
         // (deeper than DEEP the ground beyond is another level: a wall, an embankment's foot, a cutting)
         if (depth > SUNK && depth <= DEEP) {
           sunk++;
-          if (!(troughs.get(key)?.mag >= depth)) troughs.set(key, { track: id, x: at(w + 1)[0], y: at(w + 1)[1], mag: depth, info: `ground ${(depth * 100).toFixed(0)} cm under the bed's edge and the ground beyond` });
+          if (!(troughs.get(key)?.mag >= depth)) troughs.set(key, { track: id, x: at(w + 1)[0], y: at(w + 1)[1], mag: depth, rise: far.point.y - e.point.y, info: `ground ${(depth * 100).toFixed(0)} cm under the bed's edge and the ground beyond` });
         }
       }
     }
@@ -470,7 +470,10 @@ export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
   const depth = by((p) => (p.mag > 0.2 ? 'over 20 cm' : p.mag > 0.05 ? '5-20 cm' : p.mag > 0.01 ? '1-5 cm' : 'under 1 cm'));
   const kinds = by((p) => p.info.split(' ').slice(0, p.info.startsWith('dtm') ? 2 : 1).join(' '));
   return { ...check('rail-under-ground', samples, [...bad.values()]), depth, kinds, ms: [Math.round(t1 - t0), Math.round(performance.now() - t1)], missing, buriedSamples: [...bad.values()].length,
-           sunken: { ...check('sunken-beside-bed', sides, [...troughs.values()]), samples: sunk, metres: sunk * 2 } };
+           sunken: { ...check('sunken-beside-bed', sides, [...troughs.values()]), samples: sunk, metres: sunk * 2,
+                     // (every place: x, y, its depth, the track, the ground 4 m out over the bed's edge; the review set,
+                     // tools/bed_troughs.py)
+                     all: [...troughs.values()].map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.mag * 100) / 100, p.track, Math.round(p.rise * 100) / 100]) } };
 }
 
 // Compare the drawn rail heads with actual bed and street triangles on each canted curve.
