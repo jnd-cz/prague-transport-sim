@@ -276,6 +276,23 @@ def offset_fact(value=.2, **updates):
     return {'id':'offset-1','metres':value,'scope':'all','source':'test fixture','date':'2026-10-30',**updates}
 
 
+class Workers(unittest.TestCase):
+    def test_samples_decided_in_workers_as_here(self):
+        """decide's samples shared out to worker processes (#516): each sample's surfaces, construction and decision as
+        this process decides them, in order."""
+        decks = Decks([deck_record(), deck_record('deck-2', 203)], [offset_fact()])
+        context = __import__('track_context').TrackContext()
+        guard = HeightGuard([evidence(kind='deck', level=1)])
+        archived = match(path(1, 200), path(2, 201, .1))
+        todo = [(x / 7, (k % 5 - 2) / 2, 'di-1', None if k % 3 else 200.0 + k / 100, 1.0, 0.0, archived, bool(k % 2),
+                 k % 4 == 0, 199.0 + k / 50) for k, x in enumerate(range(0, 70))]
+        here = stage._decide_all(todo, decks, context, guard)
+        with patch.object(stage, 'CHUNK', 9), stage._pool(decks, context, guard) as pool:
+            there = stage._decide_all(todo, decks, context, guard, pool)
+        self.assertEqual(there, here)
+        self.assertGreater(len({json.dumps(d, sort_keys=True, default=str) for _, _, d in here}), 3)
+
+
 class DeckFallback(unittest.TestCase):
     def test_independent_rail_observation_can_resolve_an_unclassified_deck(self):
         decks = Decks([deck_record()],[offset_fact(0)])

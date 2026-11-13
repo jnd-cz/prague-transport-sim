@@ -250,6 +250,114 @@ class Lines(unittest.TestCase):
                          [[0, 3.0, 'di'], [3.0, 7.0, 'dtmp'], [7.0, 8, 'surface']])
 
 
+class AtOnce(unittest.TestCase):
+    """Lookup.along, across and staged_along ask GEOS for every point at once (#516): the same output, to its last bit,
+    as asking one point at a time (the code before, here)."""
+
+    def setUp(self):
+        import random
+        rng = random.Random(7)
+        self.chs = []
+        for k in range(14):  # (tracks side by side, crossing and forking, with runs of heights and steps)
+            y0, bend = 3.5 * (k % 5), rng.uniform(-.004, .004)
+            xy = [(x, y0 + bend * (x - 150) ** 2 / 10 + (k // 5) * x * .2) for x in range(0, 301, 7)]
+            self.chs.append(chain(xy, lambda s, k=k: 200 + .01 * s + k * .1))
+        quiet(lh.assemble, self.chs)
+        for c in self.chs[::3]:
+            for run in c.runs:
+                run['step'] = [False] * len(run['s'])
+        self.path = [(x, y + .05 + ((x % 13) - 6) * .02) for x, y in self.chs[0].xy]  # (along one track, wavering)
+        self.back = [(x, y - .05) for x, y in reversed(self.chs[1].xy)]  # (the track beside it, the other way)
+
+    def along_one_by_one(self, lookup, pts, step=lh.OUT_STEP):
+        from shapely.geometry import LineString
+        line = LineString(pts)
+        L = line.length
+        n = max(1, math.ceil(L / step - 1e-9))
+        zs, srcs = [], []
+        for k in range(n + 1):
+            s = min(L, k * step)
+            over = k * step - s
+            p, a, b = line.interpolate(s), line.interpolate(max(0.0, s - 1)), line.interpolate(min(L, s + 1))
+            d = math.hypot(b.x - a.x, b.y - a.y) or 1
+            ux, uy = (b.x - a.x) / d, (b.y - a.y) / d
+            cands = []
+            for j in lookup.tree.query(p.buffer(lh.MATCH)):
+                c = lookup.chs[int(j)]
+                dist = c.line.distance(p)
+                if dist > lh.MATCH:
+                    continue
+                t = c.line.project(p)
+                vx, vy = c.direction(t)
+                cos = ux * vx + uy * vy
+                if abs(cos) >= math.cos(math.radians(lh.ANGLE)):
+                    cands.append((dist, int(j), t + (over if cos > 0 else -over)))
+            acc = wsum = 0.0
+            src = None
+            for dist, j, t in sorted(cands):
+                z, sj = lookup.chs[j].z_at(t)
+                if z is None:
+                    continue
+                w = (1 - dist / lh.MATCH) / (dist + .02) ** 2
+                acc, wsum, src = acc + w * z, wsum + w, src or sj
+            zs.append(round(acc / wsum, 3) if wsum else None)
+            srcs.append(src if wsum else 'surface')
+        return zs, srcs, L
+
+    def across_one_by_one(self, path, back, back_z, step=lh.OUT_STEP):
+        from shapely.geometry import LineString
+        a, b = LineString(path), LineString(back)
+        n = max(1, math.ceil(a.length / step - 1e-9))
+        off, zs = [], []
+        for k in range(n + 1):
+            s = min(a.length, k * step)
+            p, u0, u1 = a.interpolate(s), a.interpolate(max(0.0, s - 1)), a.interpolate(min(a.length, s + 1))
+            d = math.hypot(u1.x - u0.x, u1.y - u0.y) or 1
+            ux, uy = (u1.x - u0.x) / d, (u1.y - u0.y) / d
+            t = b.project(p)
+            q, v0, v1 = b.interpolate(t), b.interpolate(max(0.0, t - 1)), b.interpolate(min(b.length, t + 1))
+            e = math.hypot(v1.x - v0.x, v1.y - v0.y) or 1
+            lat = (q.y - p.y) * ux - (q.x - p.x) * uy
+            i = min(int(t / step), len(back_z) - 2)
+            z0, z1 = back_z[i], back_z[i + 1]
+            if (not lh.ACROSS_MIN <= abs(lat) <= lh.ACROSS_MAX or p.distance(q) > lh.ACROSS_MAX or z0 is None or z1 is None
+                    or abs(ux * (v1.x - v0.x) + uy * (v1.y - v0.y)) / e < math.cos(math.radians(lh.ANGLE))):
+                off.append(None)
+                zs.append(None)
+                continue
+            off.append(round(lat, 2))
+            zs.append(round(z0 + (z1 - z0) * (t / step - i), 3))
+        return off, zs
+
+    def staged_one_by_one(self, pts, lookup):
+        from shapely.geometry import LineString
+        line_, out = LineString(pts), []
+        for j in lookup.tree.query(line_, predicate='dwithin', distance=lh.MATCH):
+            c = lookup.chs[int(j)]
+            for run in c.runs:
+                if any(run['step']):
+                    continue
+                for s, raw in zip(run['s'], run['raw']):
+                    if raw is None:
+                        continue
+                    p = c.line.interpolate(s)
+                    if line_.distance(p) <= .3:
+                        out.append([round(line_.project(p), 1), round(raw, 3)])
+        return sorted(out)
+
+    def test_as_one_point_at_a_time(self):
+        lookup = lh.Lookup(self.chs)
+        got = lookup.along(self.path)
+        self.assertEqual(got, self.along_one_by_one(lookup, self.path))
+        self.assertGreater(sum(z is not None for z in got[0]), 50)
+        back_z = lookup.along(self.back)[0]
+        self.assertEqual(lh.across(self.path, self.back, back_z), self.across_one_by_one(self.path, self.back, back_z))
+        self.assertGreater(sum(o is not None for o in lh.across(self.path, self.back, back_z)[0]), 5)
+        got = lh.staged_along(self.path, lookup)
+        self.assertEqual(got, self.staged_one_by_one(self.path, lookup))
+        self.assertGreater(len(got), 10)
+
+
 class TruePlaces(unittest.TestCase):
     def bins(self, grade=0.05):
         # a straight 5 % grade, each bin's sample up to 2.4 m off its centre and its height true to where it lies

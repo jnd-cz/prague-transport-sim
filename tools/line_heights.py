@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 import sys
 
+import numpy as np
 import shapely
 from shapely.geometry import LineString, Point
 
@@ -855,37 +856,48 @@ class Lookup:
         self.chs, self.tree = chs, shapely.STRtree([c.line for c in chs])
 
     def along(self, pts, step=OUT_STEP):
-        """(heights, sources) every `step` m along a polyline, and its length."""
+        """(heights, sources) every `step` m along a polyline, and its length. GEOS answers for all the samples at once
+        (the same operations; one call each was most of writing a line, #516), the arithmetic after it as it was."""
         line = LineString(pts)
         L = line.length
         n = max(1, math.ceil(L / step - 1e-9))
+        ks = np.arange(n + 1) * step
+        # (the last sample sits at n * step, past the line's end along its chain: the game reads every sample
+        # at k * step, and the end read there stood 4 cm off on an 8 % grade)
+        s = np.minimum(L, ks)
+        p = shapely.line_interpolate_point(line, s)
+        a, b = shapely.line_interpolate_point(line, np.maximum(0.0, s - 1)), shapely.line_interpolate_point(line, np.minimum(L, s + 1))
+        ax, ay, bx, by = (shapely.get_x(a).tolist(), shapely.get_y(a).tolist(), shapely.get_x(b).tolist(),
+                          shapely.get_y(b).tolist())
+        k, j = self.tree.query(shapely.buffer(p, MATCH))
+        lines = np.asarray([self.chs[int(x)].line for x in j], object)
+        dist = shapely.distance(lines, p[k])
+        ok = dist <= MATCH
+        k, j, lines, dist = k[ok], j[ok], lines[ok], dist[ok]
+        t = shapely.line_locate_point(lines, p[k])
+        length = np.asarray([self.chs[int(x)].length for x in j], float)
+        c0 = shapely.line_interpolate_point(lines, np.maximum(0.0, t - 1))  # (Chain.direction, at once)
+        c1 = shapely.line_interpolate_point(lines, np.minimum(length, t + 1))
+        cands = [[] for _ in range(n + 1)]
+        for i, jj, dd, tt, x0, y0, x1, y1 in zip(k.tolist(), j.tolist(), dist.tolist(), t.tolist(),
+                                                 shapely.get_x(c0).tolist(), shapely.get_y(c0).tolist(),
+                                                 shapely.get_x(c1).tolist(), shapely.get_y(c1).tolist()):
+            d = math.hypot(bx[i] - ax[i], by[i] - ay[i]) or 1
+            ux, uy = (bx[i] - ax[i]) / d, (by[i] - ay[i]) / d
+            e = math.hypot(x1 - x0, y1 - y0) or 1
+            cos = ux * ((x1 - x0) / e) + uy * ((y1 - y0) / e)
+            if abs(cos) >= math.cos(math.radians(ANGLE)):
+                over = i * step - min(L, i * step)
+                cands[i].append((dd, jj, tt + (over if cos > 0 else -over)))
         zs, srcs = [], []
-        for k in range(n + 1):
-            # (the last sample sits at n * step, past the line's end along its chain: the game reads every sample
-            # at k * step, and the end read there stood 4 cm off on an 8 % grade)
-            s = min(L, k * step)
-            over = k * step - s
-            p, a, b = line.interpolate(s), line.interpolate(max(0.0, s - 1)), line.interpolate(min(L, s + 1))
-            d = math.hypot(b.x - a.x, b.y - a.y) or 1
-            ux, uy = (b.x - a.x) / d, (b.y - a.y) / d
-            cands = []
-            for j in self.tree.query(p.buffer(MATCH)):
-                c = self.chs[int(j)]
-                dist = c.line.distance(p)
-                if dist > MATCH:
-                    continue
-                t = c.line.project(p)
-                vx, vy = c.direction(t)
-                cos = ux * vx + uy * vy
-                if abs(cos) >= math.cos(math.radians(ANGLE)):
-                    cands.append((dist, int(j), t + (over if cos > 0 else -over)))
+        for c in cands:
             acc = wsum = 0.0
             src = None
-            for dist, j, t in sorted(cands):
-                z, sj = self.chs[j].z_at(t)
+            for dd, jj, tt in sorted(c):
+                z, sj = self.chs[jj].z_at(tt)
                 if z is None:
                     continue
-                w = (1 - dist / MATCH) / (dist + .02) ** 2
+                w = (1 - dd / MATCH) / (dd + .02) ** 2
                 acc, wsum, src = acc + w * z, wsum + w, src or sj
             zs.append(round(acc / wsum, 3) if wsum else None)
             srcs.append(src if wsum else 'surface')
@@ -915,19 +927,24 @@ def across(path, back, back_z, step=OUT_STEP):
     a, b = LineString(path), LineString(back)
     n = max(1, math.ceil(a.length / step - 1e-9))
     off, zs = [], []
-    for k in range(n + 1):
-        s = min(a.length, k * step)
-        p, u0, u1 = a.interpolate(s), a.interpolate(max(0.0, s - 1)), a.interpolate(min(a.length, s + 1))
-        d = math.hypot(u1.x - u0.x, u1.y - u0.y) or 1
-        ux, uy = (u1.x - u0.x) / d, (u1.y - u0.y) / d
-        t = b.project(p)
-        q, v0, v1 = b.interpolate(t), b.interpolate(max(0.0, t - 1)), b.interpolate(min(b.length, t + 1))
-        e = math.hypot(v1.x - v0.x, v1.y - v0.y) or 1
-        lat = (q.y - p.y) * ux - (q.x - p.x) * uy
+    # (GEOS for every sample at once, the arithmetic after it as it was, #516)
+    s = np.minimum(a.length, np.arange(n + 1) * step)
+    P = shapely.line_interpolate_point(a, s)
+    U0, U1 = shapely.line_interpolate_point(a, np.maximum(0.0, s - 1)), shapely.line_interpolate_point(a, np.minimum(a.length, s + 1))
+    T = shapely.line_locate_point(b, P)
+    Q = shapely.line_interpolate_point(b, T)
+    V0, V1 = shapely.line_interpolate_point(b, np.maximum(0.0, T - 1)), shapely.line_interpolate_point(b, np.minimum(b.length, T + 1))
+    xy = lambda g: zip(shapely.get_x(g).tolist(), shapely.get_y(g).tolist())  # noqa: E731
+    for (px, py), (u0x, u0y), (u1x, u1y), t, (qx, qy), (v0x, v0y), (v1x, v1y), pq in zip(
+            xy(P), xy(U0), xy(U1), T.tolist(), xy(Q), xy(V0), xy(V1), shapely.distance(P, Q).tolist()):
+        d = math.hypot(u1x - u0x, u1y - u0y) or 1
+        ux, uy = (u1x - u0x) / d, (u1y - u0y) / d
+        e = math.hypot(v1x - v0x, v1y - v0y) or 1
+        lat = (qy - py) * ux - (qx - px) * uy
         i = min(int(t / step), len(back_z) - 2)
         z0, z1 = back_z[i], back_z[i + 1]
-        if (not ACROSS_MIN <= abs(lat) <= ACROSS_MAX or p.distance(q) > ACROSS_MAX or z0 is None or z1 is None
-                or abs(ux * (v1.x - v0.x) + uy * (v1.y - v0.y)) / e < math.cos(math.radians(ANGLE))):
+        if (not ACROSS_MIN <= abs(lat) <= ACROSS_MAX or pq > ACROSS_MAX or z0 is None or z1 is None
+                or abs(ux * (v1x - v0x) + uy * (v1y - v0y)) / e < math.cos(math.radians(ANGLE))):
             off.append(None)
             zs.append(None)
             continue
@@ -942,15 +959,13 @@ def staged_along(pts, lookup):
     line_, out = LineString(pts), []
     for j in lookup.tree.query(line_, predicate='dwithin', distance=MATCH):
         c = lookup.chs[int(j)]
-        for run in c.runs:
-            if any(run['step']):
-                continue
-            for s, raw in zip(run['s'], run['raw']):
-                if raw is None:
-                    continue
-                p = c.line.interpolate(s)
-                if line_.distance(p) <= .3:
-                    out.append([round(line_.project(p), 1), round(raw, 3)])
+        bins = [(s, raw) for run in c.runs if not any(run['step']) for s, raw in zip(run['s'], run['raw']) if raw is not None]
+        if not bins:
+            continue
+        p = shapely.line_interpolate_point(c.line, np.asarray([s for s, _ in bins], float))  # (at once, #516)
+        near = shapely.distance(line_, p) <= .3
+        for (_, raw), at in zip([x for x, ok in zip(bins, near.tolist()) if ok], shapely.line_locate_point(line_, p[near]).tolist()):
+            out.append([round(at, 1), round(raw, 3)])
     return sorted(out)
 
 
