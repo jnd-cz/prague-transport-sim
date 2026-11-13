@@ -168,8 +168,9 @@ class IprDtm:
         fi, fj = E - self.e0, self.n0 - N
         i0, j0 = np.floor(fi).astype(np.int64), np.floor(fj).astype(np.int64)
         tx, ty = (fi - i0).astype(np.float32), (fj - j0).astype(np.float32)
-        a, b = self.cells(i0, j0), self.cells(i0 + 1, j0)
-        c, d = self.cells(i0, j0 + 1), self.cells(i0 + 1, j0 + 1)
+        # (the four corners in one call: dtm.py asks a few points at a time, 85 000 times on line 17, and four calls'
+        # overhead was most of it, #517; each cell is read as before)
+        a, b, c, d = self.cells(np.stack([i0, i0 + 1, i0, i0 + 1]), np.stack([j0, j0, j0 + 1, j0 + 1]))
         return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
 
 
