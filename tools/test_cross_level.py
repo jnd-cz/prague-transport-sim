@@ -3,6 +3,7 @@
 
     python -P -E tools/test_cross_level.py
 """
+import math
 import os
 import sys
 import unittest
@@ -54,7 +55,7 @@ class Level(unittest.TestCase):
         self.assertEqual(c[:15].any(), False)
 
     def test_a_crossfall_under_level_stays_level(self):
-        self.assertFalse(self.run_rule(np.full(60, 0.015)).any())
+        self.assertFalse(self.run_rule(np.full(60, 0.008)).any())
 
     def test_ramps_and_the_cap(self):
         fall = np.zeros(60)
@@ -110,6 +111,59 @@ class Fuse(unittest.TestCase):
         self.assertAlmostEqual(sig["tracks"], 0.02, delta=0.002)
         w = cl.fuse(falls, "weighted", sig)
         self.assertLess(np.std(w - truth), 0.005)
+
+
+class Crossings(unittest.TestCase):
+    def line(self, track):
+        # our route along x at 200 m (rising 2 % along), the opposite track 3.7 m to the left, one DI track crossing
+        from route import Route
+        n = 101
+        xs = np.arange(n) * cl.STEP
+        data = {"path": [[float(x), 0.0] for x in xs],
+                "heights": {"step": cl.STEP, "path": list(200 + 0.02 * xs), "backZ": list(200 + 0.02 * xs),
+                            "backOff": [3.7] * n},
+                "tracks": [track]}
+        rt = Route(data["path"])
+        s = np.arange(n) * cl.STEP
+        H = data["heights"]
+        return cl.crossings(data, rt, s, np.array(H["path"]), np.array(H["backZ"]), np.array(H["backOff"]))
+
+    def di(self, p, z):
+        p = np.asarray(p, float)
+        a = np.r_[0, np.cumsum(np.hypot(*np.diff(p, axis=0).T))]
+        zs = np.interp(np.arange(0, a[-1] + 1e-9, cl.STEP), a, z)
+        return {"p": p.tolist(), "src": "di", "zs": list(zs)}
+
+    def test_a_square_crossing_gives_the_street_s_tilt(self):
+        # a DI track crossing at x 100, its rails rising 3 % to the left (+y): our left rail 45 mm higher, c = -45 mm
+        q = self.line(self.di([[100, -10], [100, 15]], [202 - 0.3, 202 + 0.45]))
+        self.assertEqual({h["which"] for h in q}, {"ours", "opposite"})
+        for h in q:
+            self.assertAlmostEqual(h["c"], -0.045, delta=0.002)
+
+    def test_a_shallow_crossing_reads_no_grade_as_tilt(self):
+        # 30° across ours, level across, rising 2 % along x as ours does: no tilt (the two hits lie 2.6 m apart along)
+        d = np.array([math.cos(math.radians(30)), math.sin(math.radians(30))])
+        a, b = np.array([100, 0]) - 12 * d, np.array([100, 0]) + 12 * d
+        q = self.line(self.di([a, b], [202 + 0.02 * (a[0] - 100), 202 + 0.02 * (b[0] - 100)]))
+        self.assertTrue(q)
+        for h in q:
+            self.assertAlmostEqual(h["c"], 0.0, delta=0.002)
+
+    def test_a_turnout_is_no_crossing(self):
+        d = np.array([math.cos(math.radians(10)), math.sin(math.radians(10))])
+        self.assertFalse(self.line(self.di([np.array([100, 0]) - 20 * d, np.array([100, 0]) + 20 * d], [202, 202])))
+
+    def test_anchors_set_their_values_and_ramp_out(self):
+        c = np.zeros(60)
+        c[40:] = 0.05
+        out = cl.anchor(c, [20, 23, 23], [0.04, 0.03, 0.05], 0.004)
+        self.assertAlmostEqual(out[20], 0.04)
+        self.assertAlmostEqual(out[23], 0.04)  # (two at one sample: their mean)
+        self.assertAlmostEqual(out[21], 0.04)  # (within JOIN: linear between)
+        self.assertAlmostEqual(out[15], 0.04 - 5 * 0.004)
+        self.assertAlmostEqual(out[45], 0.05)  # (the rule's own value beyond the ramps)
+        self.assertLessEqual(np.abs(np.diff(out[:40])).max(), 0.004 + 1e-9)
 
 
 class Opposite(unittest.TestCase):
