@@ -128,5 +128,22 @@ class Chains(unittest.TestCase):
         self.assertIn([('c', False)], out)
 
 
+class KeptProduct(unittest.TestCase):
+    def test_inverse_from_the_kept_product_as_from_a_new_one(self):
+        """#516: the product D^T diag(lam) D kept for the same points and lam gives the inverse to its last bit."""
+        import numpy as np
+        import track_profile as tp
+        rng = np.random.default_rng(2)
+        s = np.cumsum(rng.uniform(0.5, 1.5, 400))
+        D, lam = tp._D(s), [0.7] * 398
+        w1, w2 = rng.uniform(0, 2, 400), rng.uniform(0, 2, 400)
+        tp._PRODUCTS.clear()
+        D.inverse(w1, lam)
+        kept = D.inverse(w2, lam)
+        self.assertEqual(len(tp._PRODUCTS), 1)
+        tp._PRODUCTS.clear()
+        self.assertTrue(np.array_equal(kept, D.inverse(w2, lam)))
+
+
 if __name__=='__main__':
     unittest.main(verbosity=2)
