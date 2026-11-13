@@ -134,6 +134,8 @@ export class Game {
     this.limits = route.speedLimits(extra, facts.past);
     // (the turning loops the build found on the route, for F8 and window.game: tools/track_loops.py's rule, #211)
     this.loops = trackwork?.loops || [];
+    // the frogs the axles sound over (src/audio.js setTrack, #528): the facing switches', the trailing ones', the crossings'
+    audio.setTrack({ switches: this.switches, trailing: trackwork?.trailing, crossings: trackwork?.crossings }, FROG);
     this.points = stopPassPoints(this.stops, facts);
     this._frontWas = null;
     this._initSigns();
@@ -878,7 +880,7 @@ export class Game {
     const sw = inRange.find((w) => !w.ircSet) || inRange[inRange.length - 1];
     if (!sw) {
       const locked = this.switches.some((w) => w.auto && !w.passed && w.locked);
-      this.audio.warning();
+      this.audio.emit('warning');
       this.msg(t(locked ? 'msg.ircLocked' : 'msg.ircNone'), 'warn', 2.5);
       return;
     }
@@ -886,10 +888,10 @@ export class Game {
     let pos = null;
     if (dir === 'straight') pos = 'straight';
     else if (dir === sw.divSide) pos = 'diverging';
-    if (!pos) { this.audio.warning(); this.msg(t('msg.ircNoBranch', { dir: t(`dirShort.${dir}`) }), 'warn'); return; }
+    if (!pos) { this.audio.emit('warning'); this.msg(t('msg.ircNoBranch', { dir: t(`dirShort.${dir}`) }), 'warn'); return; }
     sw.pos = pos;
     this._showSwitch(sw);
-    this.audio.click(0.2, 2600);
+    this.audio.emit('switch.radio');
     this.ircLast = dir;
   }
 
@@ -1126,7 +1128,7 @@ export class Game {
   toggleDoors() {
     if (this.finished) return;
     if (this.doorState === 'closed' || this.doorState === 'closing') {
-      if (Math.abs(this.tram.v) > 0.3) { this.audio.warning(); this.msg(t('msg.noOpenMoving'), 'warn'); return; }
+      if (Math.abs(this.tram.v) > 0.3) { this.audio.emit('warning'); this.msg(t('msg.noOpenMoving'), 'warn'); return; }
       // tell the driver why nothing happens when the doors open away from the platform
       const st = this.stops[this.nextStop];
       if (st && !this._atStop(st)) {
@@ -1136,11 +1138,12 @@ export class Game {
       }
       this.doorState = 'opening';
       this.doorTimer = DOOR_OPEN_TIME;
-      this.audio.doors(false);
+      this.audio.emit('door.open');
     } else {
       this.doorState = 'closing';
       this.doorTimer = DOOR_CLOSE_TIME;
-      this.audio.doors(true);
+      this.audio.emit('door.buzzer');
+      this.audio.emit('door.close');
       const st = this.stops[this.nextStop];
       if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
         this.penalty('leftBehind', st.waiting * 15, t('msg.closedOn', { n: st.waiting }));
@@ -1150,7 +1153,7 @@ export class Game {
   }
 
   ringBell() {
-    this.audio.bell();
+    this.audio.emit('bell');
     for (const ob of this.obstacles) {
       const d = ob.s - this.tram.s;
       if (d > 0 && d < 120) ob.rung = true;
@@ -1175,7 +1178,7 @@ export class Game {
         this.objects.remove(driver);
         sw.pos = sw.pos === 'straight' ? 'diverging' : 'straight';
         this._showSwitch(sw);
-        this.audio.click(0.3, 400);
+        this.audio.emit('switch.iron');
         this.msg(t('msg.switchManual', { dir: t(`dirShort.${sw.pos === 'straight' ? 'straight' : sw.divSide}`) }), 'info');
       },
     };
@@ -1253,7 +1256,7 @@ export class Game {
       if (input.deadman || !needs) this.deadmanTimer = 0;
       else {
         this.deadmanTimer += dt;
-        if (this.deadmanTimer > 0.2 && Math.floor(this.deadmanTimer * 4) !== Math.floor((this.deadmanTimer - dt) * 4)) this.audio.warning();
+        if (this.deadmanTimer > 0.2 && Math.floor(this.deadmanTimer * 4) !== Math.floor((this.deadmanTimer - dt) * 4)) this.audio.emit('warning');
         if (this.deadmanTimer > 2.0) deadmanTrip = true;
       }
       if (deadmanTrip && !this.deadmanTripped) { this.deadmanTripped = true; this.penalty('deadman', 50, t('msg.deadman')); }
@@ -1427,7 +1430,7 @@ export class Game {
         if (!sw.auto) {
           sw.pos = this.contactCurrent() ? 'diverging' : 'straight';
           this._showSwitch(sw);
-          this.audio.click(0.25, 2000);
+          this.audio.emit('switch.contact');
         }
       }
       if (prevS < sw.s && tram.s >= sw.s) {
@@ -1440,7 +1443,7 @@ export class Game {
           this.clock += 30;
           sw.pos = sw.required;
           this._showSwitch(sw);
-          this.audio.crash();
+          this.audio.emit('crash');
           this.penalty('switch', 150, t('msg.wrongSwitch'));
         }
       }
@@ -1462,7 +1465,7 @@ export class Game {
     if (which === 'saloon') c.saloon = (c.saloon + 1) % 3;
     if (which === 'cab') c.cab = (c.cab + 1) % 4;
     if (which === 'flap') c.flap = !c.flap;
-    this.audio.click(0.15, 900);
+    this.audio.emit('heating');
     const key = { saloon: `msg.heatSaloon${c.saloon}`, cab: `msg.heatCab${c.cab}`, flap: c.flap ? 'msg.flapOpen' : 'msg.flapClosed' }[which];
     this.msg(t(key), 'info', 2.5);
   }
@@ -1746,7 +1749,7 @@ export class Game {
 
   _collision(what, pts = 300) {
     const tram = this.tram;
-    this.audio.crash();
+    this.audio.emit('crash');
     this.penalty('collision', pts, t('msg.collision', { what }));
     tram.v = 0;
     tram.force = 0;
@@ -1769,7 +1772,7 @@ export class Game {
     this.derailT = derailRisk(this.route, this.limits, tram.s, tram.length, tram.v) ? (this.derailT || 0) + dt : 0;
     if (this.derailT >= DERAIL.secs && !this.derailed) {
       this.derailed = true;
-      this.audio.crash();
+      this.audio.emit('crash');
       this.penalty('derail', 1000, t('msg.derailed'));
       this._end(true);
     }
