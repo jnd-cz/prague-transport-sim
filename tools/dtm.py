@@ -11,7 +11,8 @@ are documented in docs/decisions/2026-10-27-track-source.md. This tool imports Z
 Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<district KR dir> ...
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)
 Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes],
-"k": kerb edges (raised areas)}]}; kerbs: tools/kerbs.py
+"k": kerb edges (raised areas)}], "shelters": [shelter footprints filled in the platforms]}; kerbs: tools/kerbs.py;
+shelters: tools/zps_shelters.py
 """
 import json
 import math
@@ -479,6 +480,14 @@ print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSte
       f"({sum('osmKerb' in e for e in kerb_report['review'])} with an OSM lowered or flush kerb);",
       "not kerbs:", {k: len(v) for k, v in kerb_report["notKerb"].items()})
 
+# the holes shelters leave in the platforms are filled, their footprints kept for the street furniture
+# (tools/zps_shelters.py, #523); after the kerbs, which read a platform's step from the terrain 1 m inside its edge: filled
+# first, three probes over Hloubětín B's shelter tipped its step from the top line to the foot and raised the road 0.235 m
+import zps_shelters  # noqa: E402
+shelter_report = zps_shelters.fill(areas, line.get("platforms", []))
+print("shelters:", shelter_report["filled"], "holes filled", shelter_report["byKind"], shelter_report["kept"],
+      "holes kept (an area of their own in them)")
+
 counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
@@ -487,7 +496,7 @@ print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing, "
       f"{n_deck} ground-level corners on a deck's line given the ground")
 print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
-out = {"areas": areas}
+out = {"areas": areas, "shelters": shelter_report["shelters"]}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
 vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_deck, "droppedAreas": dropped,
@@ -497,7 +506,8 @@ out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
                            checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
                                    "decks": deck_report, "underDecks": under_report, "inside": inside_report,
-                                   "outlines": outline_report}),
+                                   "outlines": outline_report,
+                                   "shelters": {k: v for k, v in shelter_report.items() if k != "shelters"}}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])

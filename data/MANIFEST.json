@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "0002159",
- "published": "2026-11-13 13:44",
- "note": "#538: crossLevel on lines 9, 17, 22, 23, 37 (DI crossings, junctions and curves)",
+ "built_at_commit": "246fadc",
+ "published": "2026-11-13 16:16",
+ "note": "#523: shelter footprints in the survey, on main 0d85dd8 (#538, #514)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "5e200065a38933b48a37f7985836fe47f20ba459d3ddef56e16f73296b8cd8ba"
   },
   "line17.dtm.json": {
-   "size": 9376511,
-   "sha256": "cd6f7d503fece1df01d435bdec3d6ae9c8cc62c7fd90e196181bf6eb4f74fd8d"
+   "size": 9376915,
+   "sha256": "b2ac1124106be6009c1348ddc26fcf539e1b9fc14ee60b1a10133b31f4c26e2a"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -33,8 +33,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6698587,
-   "sha256": "7b68fb7145156945c87e905f729fdbd120709c502c37ebc9b7714454201bfe57"
+   "size": 6698546,
+   "sha256": "18926e43128f2bf8861f83a2b67aa69fafe12b9d45edd4e14256e64dd00fcada"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -57,8 +57,8 @@
    "sha256": "aa25d6461aca296d22661d8044764df4e9b34a342840abff582c6c3bc7c01dfe"
   },
   "line22.dtm.json": {
-   "size": 9571571,
-   "sha256": "ea6298afbb6e4008385274bbf10429cf1bcaf49c00768b5cfff1d6c3feeaceff"
+   "size": 9572421,
+   "sha256": "a6e1f95fcff982d9a82064e382ca5b66e5ba1049e1666f9317882edd543e4227"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6679113,
-   "sha256": "839e16b0e689506eda85cd89f047b2fb95d9b82eff2fc41153ea146f584f44e2"
+   "size": 6679032,
+   "sha256": "19f64b208676f1fe5e870de4ab61718cc5cbbe7c2e05289e35b1956842b36057"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -97,8 +97,8 @@
    "sha256": "06c53f3b6020a0e047fc18afee00683f9e4708e8fabe35e92f7a53f3c3362902"
   },
   "line23.dtm.json": {
-   "size": 4353177,
-   "sha256": "d64195c4caf8c781d3296011d8139c3c887a8ba911de567ec8d4e7294f6c9c1c"
+   "size": 4353679,
+   "sha256": "b747597e5d0f1b6705556d3cf805a4b3cf6838f43e26927c9b70d66240ca6e01"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -117,8 +117,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2533047,
-   "sha256": "92423374f6be9f539d5e86b97ea9670ce26417e5f269b8eb21ffc3994e86f10b"
+   "size": 2533008,
+   "sha256": "06b0777f49cc73320b24e0520396611b5d14ddc665d41ea9ea9b004ba4d4c7d1"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -137,8 +137,8 @@
    "sha256": "5804b06c5a9104287594c32e56ccb73d68499d9cebb1417f134558c7afc892d8"
   },
   "line37.dtm.json": {
-   "size": 4702626,
-   "sha256": "f32a720bd76a83060940083a2234cf2d953a4af7281659b03287ce29f01f925e"
+   "size": 4702736,
+   "sha256": "6432e0d6a65e615f1c54b849d7a01a3b84b9375348302f3294d1536a714719b3"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -157,8 +157,8 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.json": {
-   "size": 2331847,
-   "sha256": "2fb8d2e95e251779c63778ada5ce2f515768328e517876324e7c8e9bbbd66eb3"
+   "size": 2331808,
+   "sha256": "bf88d27c66c4eaca7320548ad4ea7a312755d03c00727365e2f7f2168e65867b"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -177,8 +177,8 @@
    "sha256": "d53e05de667e67e70b19c122f226ae3a98b7a7e3d66c34fddce92ddcd1b63b72"
   },
   "line9.dtm.json": {
-   "size": 9609754,
-   "sha256": "016d29288cb607a6c321b3447e80e6e107ae4f223648b93b144d0310e6fc064a"
+   "size": 9610708,
+   "sha256": "0d72fa3210baa75f7b04c67c2c7ec369f6dc4c0f3d5147179be1706b01a14a2e"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
@@ -197,8 +197,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5889913,
-   "sha256": "314464e907256ec4593c0e5911f3a2ce000c6bc8447bf06b2f12c043bad682ad"
+   "size": 5889874,
+   "sha256": "2f89e7c96c0563e863816c69f7db0739eaf291ab1b95177b73de399e1ac34dcd"
   },
   "line9.validate.json": {
    "size": 6596,
