@@ -673,7 +673,7 @@ def _key(run):
     return hashlib.sha1(pickle.dumps(run, protocol=pickle.HIGHEST_PROTOCOL)).digest()
 
 
-BLAS = 4  # numpy's BLAS threads per worker: a long chain's solve on one thread took twice as long, and the longest set the pace
+BLAS = 4  # numpy's BLAS threads per worker (6 workers on 24 cores): with the banded solve 1 x 12 took as long (#516)
 
 
 def _pool(n, chs=None):

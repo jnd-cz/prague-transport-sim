@@ -59,17 +59,19 @@ python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, contin
 python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
 ```
 
-`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~5 min: it stages the network's heights
+`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~2.5 min: it stages the network's heights
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
 stage ended (`(staged: 97 s from the start)` …), and the staging's parts. The staging matches and decides its samples
 in worker processes (#516). The chains' runs are solved in worker processes (#511, #516): every chain's first solve
 side by side, then each chain pinned as soon as the chains before it that it meets are final, and the lines written
-side by side. A run whose points are as at its chain's earlier solve keeps what it found, and runs of 1500 points or
-more go to a worker with 12 BLAS threads. With under 16 chains (the tests) all of it runs in one process, strictly in
-the order. The workers load what they are given from one pickle (`tools/sysinfo.py` `pool`). The rounds of meeting half
-way re-solve one 16.5 km chain (3303 points) six times, one after another: most of the solves' time.
+side by side. A run whose points are as at its chain's earlier solve keeps what it found. With under 16 chains (the
+tests) all of it runs in one process, strictly in the order. The workers load what they are given from one pickle
+(`tools/sysinfo.py` `pool`). Each ADMM step solves its pentadiagonal system by LAPACK's banded Cholesky factor (SciPy,
+docs/decisions/2026-11-13-scipy-banded-solve.md). Of `line_heights`' ~125 s the staging takes ~55, the chains and
+answers ~17, the solves ~19 (chains waiting for the chains they are pinned to, not the workers: 4 BLAS threads x 6
+workers and 1 x 12 took the same) and the writing ~31 (five lines, 24 cores).
 Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
 of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
 curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.
@@ -106,7 +108,7 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
+pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
 
 | step | writes | what |
 |---|---|---|
