@@ -386,6 +386,8 @@ def main():
     parser.add_argument('--evidence', type=Path)
     parser.add_argument('--output', type=Path, default=ROOT / 'reports/track-heights.json')
     args = parser.parse_args()
+    import heavy
+    heavy.turn('import_track_heights')  # (its staging runs workers: a heavy job run alone, #536)
     review = json.loads(args.evidence.read_text(encoding='utf-8')) if args.evidence else {}
     HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []),
                 span_reviews=review.get('span_reviews', []))  # fail before the expensive scan

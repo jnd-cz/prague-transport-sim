@@ -108,7 +108,10 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
+pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages).
+Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait their turn among the heavy jobs, as
+`rebuild.py` does; under it they run in its turn. Any other long run (a profile, a bench, a comparison) goes through
+`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536):
 
 | step | writes | what |
 |---|---|---|

@@ -164,10 +164,19 @@ both post on the pinned #291 and only propose.
   --seeds 1-3` (headless Chromium, its own server; exit code 1 on a failed threshold, the thresholds being
   `judge` in that tool; `--jobs N` pages at once, by default as many as cores and free memory allow). Rebuilds: `python -P -E tools/rebuild.py 17`
   (`--parallel` for several lines).
-- **Heavy jobs take turns:** `headless.py`, `rebuild.py` and `frametime.py` queue for the machine
-  (`baseline_store.HeavyJob`, first come first served, #280), print whom they wait for, and size their
-  pages and builds by the memory free when their turn comes (`tools/sysinfo.py`). Start one in the
-  background and let it wait; `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- **Heavy jobs take turns:** every job that keeps several cores or GBs busy for over a minute waits for the
+  machine's other heavy jobs (`baseline_store.HeavyJob`, first come first served, #280) and holds its turn
+  while it runs, so that it neither slows nor spoils another's measurement (the user, 2026-11-12, #516:
+  "Make sure to run any comparison or heavy job in a queue to not affect other work").
+  - These take their turn themselves: `headless.py`, `rebuild.py`, `frametime.py` and `city_terrain.py`;
+    `build_line.py`, `dtm.py`, `line_heights.py` and `import_track_heights.py` when run alone; `test_all.py`
+    for the whole suite (#536).
+  - Anything else runs through `python -I tools/heavy.py "what" -- CMD ...`: a profile, a bench, a
+    comparison, a script of several runs. What it starts runs in its turn without waiting again.
+  - Each prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
+    (`tools/sysinfo.py`).
+  - Start one in the background and let it wait. `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it
+    slows both).
 - **Which checks a change needs** (`/regress` picks them from the diff; a change of two kinds runs both):
 
   | change | runs | leaves out |
