@@ -25,6 +25,17 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
   OSM's grass areas inside the known spans (tools/grass_review.py prints how near). A street across the track is an
   `embedded` section; pieces under MIN_PIECE between two holes are left out.
 
+- **Junctions and road crossings in paved track** (#546; the user, 2026-11-13: "the track styles don't switch at the
+  expected places like in junctions (expected embedded asphalt color) and crossing roadway across track isn't
+  displayed in full width"): where no section says otherwise, the track is `embedded` over a carriageway crossing it
+  (the survey's carriageway at our axis through the crossing point, CROSS_REACH m past OSM's width at most, else
+  OSM's width at its angle; a way without OSM's car flag counts where the survey has carriageway at the crossing
+  point, a service road at Řepy), a switch (SWITCH_PAD m before it to SWITCH_PAD past its frog) and a diamond (a drawn
+  track crossing ours at DIAMOND_MIN° or more, where the two beds overlap). Pieces less than MIN_PIECE apart join.
+  Grass and ballast keep #503's rule (open ballast through switches). The survey's carriageway is read at crossing
+  points only: along the route its road areas run over grass track it does not map (line 22 at Pohořelec). Embedded
+  and panels stand the same height over the bed (`railAboveDeck`), so this moves no height.
+
 `styles` is a list of {s0, s1, style, source, mark | stretch | card | hole}, by s0: `source` 'user', 'review', 'list',
 'survey' or 'hole'; `mark` is the index of the user's mark in truth.json `trackStyles`, `stretch` the index in
 `grassTrack.stretches`, `card` the review card's id. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
