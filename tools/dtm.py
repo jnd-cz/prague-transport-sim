@@ -427,13 +427,6 @@ outline_report = zps_outline.correct(
     zps_ground.cover_union(areas, _osm_cover))
 print("street outlines:", outline_report["places"], "places moved", outline_report["vertices"], outline_report["sizes"])
 
-# the holes shelters leave in the platforms are filled, their footprints kept for the street furniture
-# (tools/zps_shelters.py, #523); before the kerbs, which would take a hole's edge for a kerb
-import zps_shelters  # noqa: E402
-shelter_report = zps_shelters.fill(areas, line.get("platforms", []))
-print("shelters:", shelter_report["filled"], "holes filled", shelter_report["byKind"], shelter_report["kept"],
-      "holes kept (an area of their own in them)")
-
 # one kerb line, two heights: the sidewalk or the road edge moves by the step (tools/kerbs.py, #21)
 import kerbs  # noqa: E402
 kerb_structures, kerb_low = [], []
@@ -470,6 +463,14 @@ print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSte
       f"{len(kerb_report['review'])} areas where the terrain disagrees",
       f"({sum('osmKerb' in e for e in kerb_report['review'])} with an OSM lowered or flush kerb);",
       "not kerbs:", {k: len(v) for k, v in kerb_report["notKerb"].items()})
+
+# the holes shelters leave in the platforms are filled, their footprints kept for the street furniture
+# (tools/zps_shelters.py, #523); after the kerbs, which read a platform's step from the terrain 1 m inside its edge: filled
+# first, three probes over Hloubětín B's shelter tipped its step from the top line to the foot and raised the road 0.235 m
+import zps_shelters  # noqa: E402
+shelter_report = zps_shelters.fill(areas, line.get("platforms", []))
+print("shelters:", shelter_report["filled"], "holes filled", shelter_report["byKind"], shelter_report["kept"],
+      "holes kept (an area of their own in them)")
 
 counts = defaultdict(int)
 for a in areas:

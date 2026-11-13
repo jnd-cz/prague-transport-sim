@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Shelter footprints in the survey's platforms: the hole a shelter leaves is filled, and its place and size kept for
-the street furniture (#523). Read by tools/dtm.py, before the kerbs.
+the street furniture (#523). Read by tools/dtm.py, after the kerbs.
 
 The survey (ZPS) draws a stop's shelter as a hole in the platform area. Nothing filled it, so the game drew a gap in the
 platform. The user, 2026-11-12: "I would fill the hole to keep our ground flat there, however store it's dimensions and
@@ -48,14 +48,16 @@ def fill(areas, platforms=()):
             continue
         body = Polygon([p[:2] for p in a["r"]], [[p[:2] for p in h] for h in a["h"]])
         body = body if body.is_valid else body.buffer(0)
-        stay = []
-        for h in a["h"]:
+        stay, flags = [], []
+        for n, h in enumerate(a["h"]):
             hole = Polygon([p[:2] for p in h])
             hole = hole if hole.is_valid else hole.buffer(0)
             full = any(others[j][0] != i and others[j][1].intersection(hole).area > INSIDE
                        and others[j][1].intersection(body).area <= INSIDE for j in tree.query(hole))
             if full or hole.area <= 0:
                 stay.append(h)
+                if "k" in a:  # (tools/kerbs.py's edge flags, one list per ring: the outline's, then the holes')
+                    flags.append(a["k"][n + 1])
                 kept += 1
                 continue
             ln, wd, brg = _rect(hole)
@@ -74,5 +76,7 @@ def fill(areas, platforms=()):
             a["h"] = stay
         else:
             del a["h"]
+        if "k" in a:
+            a["k"] = a["k"][:1] + flags
     shelters.sort(key=lambda s: (s["x"], s["y"]))
     return {"filled": len(shelters), "kept": kept, "byKind": dict(sorted(by.items())), "shelters": shelters}

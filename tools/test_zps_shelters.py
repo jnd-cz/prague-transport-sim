@@ -52,6 +52,13 @@ class Shelters(unittest.TestCase):
         self.assertNotIn("h", areas[0])
         self.assertEqual(rep["filled"], 1)
 
+    def test_kerb_flags_follow_the_holes(self):
+        stair = {"c": "stairs", "l": 0, "r": ring(10, 0.6, 14, 2.4, 199.0)}
+        a = platform([SINGLE, DOUBLE])
+        a["k"] = [[1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]
+        zs.fill([a, stair])
+        self.assertEqual(a["k"], [[1, 0, 0, 0], [0, 0, 0, 1]])
+
     def test_only_level_0_platforms(self):
         areas = [platform([SINGLE], level=1), {"c": "sidewalk", "l": 0, "r": ring(0, 0, 60, 3, 200), "h": [SINGLE]}]
         rep = zs.fill(areas)
