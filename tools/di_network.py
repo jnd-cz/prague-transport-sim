@@ -1508,6 +1508,16 @@ def without_chords(coords):
     return [p for i, p in enumerate(coords) if i not in drop]
 
 
+def _clean(pts, gap=0.1):
+    """A polyline without points within `gap` m of the one before (a chain's joints, a stretch's end node and its first
+    sample)."""
+    out = []
+    for q in pts:
+        if not out or math.dist(out[-1], q) > gap:
+            out.append(q)
+    return out
+
+
 class Drawn:
     """The edges a line draws, fitted as smooth curves (tools/track_curve.py `Network`, #204).
     pts[e]: the fitted points of edge e from its node a to b."""
@@ -1692,7 +1702,9 @@ class Drawn:
         out = []
         for e in sorted(part):
             a, b = spans[e]
-            c = self.piece(e, 1, a, b)
+            # (cleaned as the chains below: a stretch's first sample lay 2 mm from its end node at Národní divadlo, and
+            # lint read the 2 mm segment's heading as a 6.8 deg corner, #514)
+            c = _clean(self.piece(e, 1, a, b))
             if len(c) > 1:
                 t = {'p': [[round(x, xy), round(y, xy)] for x, y in c], 'src': net.edges[e]['src']}
                 if flags.get(e):
@@ -1737,10 +1749,7 @@ class Drawn:
             for f, n in fwd:
                 p = self.pts[f]
                 pts += p if net.edges[f]['a'] == n else p[::-1]
-            clean = []
-            for q in pts:
-                if not clean or math.dist(clean[-1], q) > 0.1:
-                    clean.append(q)
+            clean = _clean(pts)
             if len(clean) < 2:
                 continue
             t = {'p': [[round(x, xy), round(y, xy)] for x, y in clean], 'src': ed['src']}
