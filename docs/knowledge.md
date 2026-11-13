@@ -282,6 +282,14 @@ Sections:
   Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
   Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
   are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
+- **A DI track crossing ours measures the street's tilt there** (#538): its heights where it meets our left and
+  right rail, each taken against our own rail profile at that point (on a 30° crossing the two lie 3 m apart
+  along ours), differ by the cross level. Where one DI track crosses both of ours the two values agree within 2 mm
+  (median), 6 mm (p90). On the five lines' 120 crossings on paved double track this is the only independent check
+  of a street's crossfall: the median of IPR's plane, the survey's plane and our two tracks' slope errs 6 mm
+  (median), IPR alone 10 mm and with a +7 mm bias, though the three-cornered hat gives IPR the smallest spread
+  (0.2 %, the survey 0.8-1.1 %, the tracks 0.4-0.5 %): IPR agrees with the others most and with DI least.
+  Sokolovská: DI 2.6-2.9 % over the gauge, IPR 5.2 %. `tools/cross_level.py` takes DI's value where it exists.
 
 ### Terrain and the street survey (IPR, ČÚZK, ZPS)
 
