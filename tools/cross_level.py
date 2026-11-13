@@ -134,7 +134,9 @@ def cross_level(fall, res, street, pair):
     k = int(round(SMOOTH / STEP))
     ker = np.ones(2 * k + 1)
     num, den = np.convolve(f, ker, "same"), np.convolve(w, ker, "same")
-    sm = np.where(ok & (den > 0), num / np.maximum(den, 1e-9), 0.0)
+    # (a sample whose own plane was not clean takes its clean neighbours' within SMOOTH: one rejected fit in the middle
+    # of Sokolovská's tilt, at s 3746, made it level there and the ramps pulled the 75 mm down to a 67 mm peak)
+    sm = np.where(street & pair & (den > 0), num / np.maximum(den, 1e-9), 0.0)
     # (a stretch falling LEVEL or more keeps the fall's own flanks down to FLANK on either side: the road's tilt comes
     # and goes over them, and a cut at LEVEL would leave a step for the ramp to spread inwards, 47 of Sokolovská's
     # 78 mm)
