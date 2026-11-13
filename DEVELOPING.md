@@ -60,9 +60,13 @@ python -P -E tools/line_heights.py 17 22           # top of rail (#197), after t
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
-stage ended (`(staged: 97 s from the start)` …). The chains are solved in worker processes (#511): every chain's
-first solve side by side, then each chain pinned as soon as the chains before it that it meets are final, and the
-lines written side by side; with under 16 chains (the tests) all of it runs in one process, strictly in the order.
+stage ended (`(staged: 97 s from the start)` …), and the staging's parts. The staging matches and decides its samples
+in worker processes (#516). The chains' runs are solved in worker processes (#511, #516): every chain's first solve
+side by side, then each chain pinned as soon as the chains before it that it meets are final, and the lines written
+side by side. A run whose points are as at its chain's earlier solve keeps what it found, and runs of 1500 points or
+more go to a worker with 12 BLAS threads. With under 16 chains (the tests) all of it runs in one process, strictly in
+the order. The workers load what they are given from one pickle (`tools/sysinfo.py` `pool`). The rounds of meeting half
+way re-solve one 16.5 km chain (3303 points) six times, one after another: most of the solves' time.
 Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
 of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
 curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.

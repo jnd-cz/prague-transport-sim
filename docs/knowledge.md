@@ -915,6 +915,9 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
   stopped a parallel rebuild (#521). A file several threads or processes write needs one writer at a
   time and a retry for the readers (`tools/stepcache.py` `_waiting`).
+- A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
+  in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
+  faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
 
 ## The test host
 
