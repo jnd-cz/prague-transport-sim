@@ -9,7 +9,9 @@ ASSETS.md for its files, its fleet (types, ranges, sets), and that src/ names no
 manifest is the one place), its livery slots (#529: a glTF vehicle's slots name materials its model has). Each livery
 the index lists (#529): its vehicle, the slots it paints among those the vehicle declares, its images WebP, PNG or JPEG
 with power-of-two sides up to 2048 px, its licence, its files' rows in ASSETS.md. Docs: docs/vehicles.md, "The
-manifest" and "Liveries". Exit code 1 on a failure.
+manifest" and "Liveries". Each sound pack (#528), a package or a vehicle's `sounds`: its events and loops among the
+game's (src/audio.js, read by tools/sound_lists.py), its files listed, present, WAV or MP3, a loop's reference. Exit
+code 1 on a failure.
 """
 import json
 import os
@@ -26,6 +28,8 @@ LICENCES = {"CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-NC-SA
 MOVES = {"bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"}
 MODEL_EXT = {".gltf", ".glb"}
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sound_lists  # noqa: E402
 
 
 
@@ -170,6 +174,51 @@ def livery_problems(lv, lid, vehicles, files_on_disk=None, assets_md=""):
     return bad
 
 
+def sound_problems(p, vehicles, files_on_disk=None, own=False):
+    """A sound pack's problems (docs/vehicles.md, Sound packs; the game refuses it the same way: src/vehicles.js
+    soundProblems). own: a vehicle's `sounds` (its files the vehicle's, no manifest fields of its own)."""
+    bad = []
+    need = lambda cond, msg: cond or bad.append(msg)  # noqa: E731
+    ls = sound_lists.lists()
+    events, loops = {a for a, _ in ls["EVENTS"]}, {a for a, _ in ls["LOOPS"]}
+    if not own:
+        need(p.get("schema") == 1, "schema is not 1")
+        need(p.get("kind") == "sounds", f"kind {p.get('kind')!r} is not sounds")
+        names = p.get("names") or {}
+        need(all(isinstance(names.get(k), str) and names[k].strip() for k in ("cs", "en")), "names in cs and en")
+        req = list((p.get("requires") or {}).keys())
+        need(len(req) == 1 and req[0] in vehicles, f"requires {req}: wants one vehicle of assets/vehicles.json")
+        lic = p.get("licence") or {}
+        need(lic.get("spdx") in LICENCES, f"licence {lic.get('spdx')!r} is none of the redistributable ones")
+        need(bool(lic.get("authors")) and bool(lic.get("sources")), "licence without authors or sources")
+    paths = {f.get("path") for f in p.get("files", [])}
+
+    def file(what, f):
+        need(f in paths, f"{what}: {f} is not among its files")
+        need(isinstance(f, str) and f.lower().endswith((".wav", ".mp3")), f"{what}: {f} is not WAV or MP3")
+    for e, f in (p.get("events") or {}).items():
+        need(e in events, f"event {e}: the game raises no such event")
+        for x in f if isinstance(f, list) else [f]:
+            file(f"event {e}", x)
+    for name, lp in (p.get("loops") or {}).items():
+        if name not in loops:
+            bad.append(f"loop {name}: the game has no such loop")
+            continue
+        file(f"loop {name}", lp.get("file"))
+        ref = {"mg": "refRpm", "flange": None}.get(name, "refSpeed")
+        need(not ref or isinstance(lp.get(ref), (int, float)) and lp[ref] > 0, f"loop {name}: {ref} is not a positive number")
+    if files_on_disk is not None:
+        for f in p.get("files", []):
+            q = os.path.join(files_on_disk, f.get("path", ""))
+            if not os.path.isfile(q):
+                bad.append(f"file {f.get('path')} missing")
+                continue
+            head = open(q, "rb").read(12)
+            kind = "wav" if head[:4] == b"RIFF" and head[8:12] == b"WAVE" else "mp3" if head[:3] == b"ID3" or head[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2") else None
+            need(kind is not None or not f["path"].lower().endswith((".wav", ".mp3")), f"file {f['path']} is no WAV or MP3")
+    return bad
+
+
 def vehicle_types():
     """The types src/tram.js offers (VEHICLE_TYPES)."""
     s = open(os.path.join(ROOT, "src", "tram.js"), encoding="utf-8").read()
@@ -238,6 +287,8 @@ def check(v, vid, types, assets_md, src):
             for m in [ms] if isinstance(ms, str) else ms:
                 need(m in have, f"slot {s}: its model has no material {m}")
     need(isinstance(v.get("colours", []), list), "colours is not a list of slot names")
+    if v.get("sounds"):
+        bad += [f"sounds: {b}" for b in sound_problems({**v["sounds"], "files": files}, {vid: v}, os.path.join(ASSETS, vid), own=True)]
     # the manifest is the one place for its files and its credit (#455)
     for p in paths:
         need(p not in src, f"src/ names its file {p}")
@@ -296,6 +347,35 @@ def main():
         print(f"{lid}: a livery of {next(iter(lv.get('requires', {})), None)}, {len(lv.get('files', []))} files{'' if bad else ', ok'}")
     # (none listed yet, the user, 2026-11-13: "For now I would keep only the default liveries"; the samples below and
     # tools/test_liveries.py's check the rules)
+    # the sound packs (#528)
+    sids = index.get("sounds", [])
+    for d in sorted({d for d in os.listdir(ASSETS) if os.path.isfile(os.path.join(ASSETS, d, "sounds.json"))} - set(sids)):
+        fails.append(f"assets/{d}/sounds.json is not in assets/vehicles.json")
+    for sid in sids:
+        p = os.path.join(ASSETS, sid, "sounds.json")
+        if not os.path.isfile(p):
+            fails.append(f"{sid}: assets/{sid}/sounds.json missing")
+            continue
+        sp = json.load(open(p, encoding="utf-8"))
+        bad = sound_problems(sp, manifests, os.path.join(ASSETS, sid))
+        need_id = [] if sp.get("id") == sid else [f"id {sp.get('id')!r} is not its folder's {sid!r}"]
+        fails += [f"{sid}: {b}" for b in need_id + bad]
+    # (none listed yet: the built-in sounds; tools/test_sounds.py serves a sample pack) the check refuses what it should
+    sbase = {"schema": 1, "kind": "sounds", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},
+             "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.wav"}, {"path": "b.ogg"}]}
+    ssamples = [
+        ({**sbase, "events": {"bell": "a.wav", "points": ["a.wav", "a.wav"]}, "loops": {"motor": {"file": "a.wav", "refSpeed": 8.3}}}, None),
+        ({**sbase, "events": {"gong": "a.wav"}}, "event gong: the game raises no such event"),
+        ({**sbase, "events": {"bell": "c.wav"}}, "event bell: c.wav is not among its files"),
+        ({**sbase, "events": {"bell": "b.ogg"}}, "event bell: b.ogg is not WAV or MP3"),
+        ({**sbase, "loops": {"compressor": {"file": "a.wav"}}}, "loop compressor: the game has no such loop"),
+        ({**sbase, "loops": {"mg": {"file": "a.wav"}}}, "loop mg: refRpm is not"),
+        ({**sbase, "requires": {"t9": ">=1"}}, "requires ['t9']"),
+    ]
+    for sp, want in ssamples:
+        got = sound_problems(sp, {"t3h": {}})
+        if want is None and got or want is not None and not any(g.startswith(want) for g in got):
+            fails.append(f"sound pack check on a sample: wanted {want or 'no problem'}, got {got}")
     # the livery check refuses what it should: a slot the vehicle lacks by its name
     vh = {"t3h": {"id": "t3h", "slots": {"body": ["Red_Hull"]}, "fleet": {"types": {"T3SUCS": {}}}}}
     base = {"schema": 1, "kind": "livery", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},
@@ -331,7 +411,8 @@ def main():
             fails.append(f"fleet check on a sample: wanted {want or 'no problem'}, got {got}")
     for f in fails:
         print("FAIL", f)
-    print(f"{len(ids)} vehicles, {len(lids)} liveries, {len(samples)} fleet and {len(lsamples)} livery samples, {len(fails)} failures")
+    print(f"{len(ids)} vehicles, {len(lids)} liveries, {len(sids)} sound packs, {len(samples)} fleet, {len(lsamples)} livery "
+          f"and {len(ssamples)} sound pack samples, {len(fails)} failures")
     return 1 if fails else 0
 
 

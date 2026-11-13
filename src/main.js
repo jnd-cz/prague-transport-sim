@@ -8,7 +8,7 @@ import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor } from './vehicles.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
@@ -481,6 +481,8 @@ async function start(extra = {}) {
   await useVehicle($('optModel').value);
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
+  // the vehicle's sound pack (#528), the built-in sounds where it has none
+  try { await audio.usePack(soundsFor(pickVehicle($('optModel').value))); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   zoom = zoomTarget = 1;
@@ -803,9 +805,9 @@ window.addEventListener('keydown', (e) => {
   if (side) { lamps.indicate = lamps.indicate === side ? null : side; game.msg(t(`msg.ind.${lamps.indicate ?? 'off'}`), 'info', 2); }
   if (command() > 0 && prev <= 0 && game.doorState !== 'closed') {
     if (arcade()) tram.eq.lever = 0;
-    audio.warning(); game.msg(t('msg.closeDoors'), 'warn');
+    audio.emit('warning'); game.msg(t('msg.closeDoors'), 'warn');
   }
-  if (command() !== prev) audio.click(0.12, 1600);
+  if (command() !== prev) audio.emit(command() > prev ? 'notch.up' : 'notch.down');
 });
 // a held key whose keyup never comes (the window lost focus) lets the view go back
 window.addEventListener('blur', () => { zoomTarget = 1; });
@@ -904,7 +906,7 @@ function placeTram(s) {
     indicate: lamps.indicate, clock, highBeam: lamps.high || lamps.held });
   // the indicators' relay ticks in the cab as they go on and off
   const sig = signalsAt(lamps.indicate, clock), lit = sig.left || sig.right;
-  if (lamps.indicate && lit !== lamps.lit) audio.click(0.05, lit ? 1250 : 950);
+  if (lamps.indicate && lit !== lamps.lit) audio.emit(lit ? 'indicator.tick' : 'indicator.tock');
   lamps.lit = lit;
 }
 

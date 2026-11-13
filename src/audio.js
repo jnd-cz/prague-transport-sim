@@ -1,6 +1,59 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Synthesised tram sounds (Web Audio): traction motor whine, rolling noise, rail joints,
-// flange squeal, the T3 bell, door buzzer and controller clicks.
+// The tram's sounds (Web Audio). The game raises named events and sets parameters; the loops follow the parameters.
+// A sound pack (#528; docs/vehicles.md, Sound packs) gives an event a recording (or a list, one picked at random)
+// and a loop a recording pitched by its parameter; every event and loop it leaves out keeps the built-in sound,
+// synthesised here: traction motor whine, rolling noise, rail joints, the frogs, flange squeal, the T3 bell, door
+// buzzer and the clicks of the controller, the contactors and the relays.
+import { T3, CAR_PITCH } from './tram.js';
+
+// The events the game raises (one entry a line: tools/sound_lists.py writes them into docs/vehicles.md).
+export const EVENTS = {
+  'door.open': 'the doors start opening (their clip starts)',
+  'door.close': 'the doors start closing (their clip starts)',
+  'door.buzzer': 'the door alert before the doors close',
+  'bell': 'the main bell',
+  'joint': 'a bogie over a rail joint (every 18 m)',
+  'points': 'an axle over a switch\'s frog',
+  'crossing': 'an axle over a rail of a diamond crossing',
+  'notch.up': 'the controller moved to a higher command',
+  'notch.down': 'the controller moved to a lower command',
+  'lineContactor': 'the line contactor closes or opens',
+  'contactor': 'a field-weakening stage of the accelerator',
+  'trackBrake.on': 'the track brakes\' magnets drop',
+  'trackBrake.off': 'the track brakes\' magnets lift',
+  'indicator.tick': 'the indicators\' relay, lamps on',
+  'indicator.tock': 'the indicators\' relay, lamps off',
+  'switch.radio': 'a switch set by the radio control (IRC)',
+  'switch.contact': 'a switch set by the overhead contact',
+  'switch.iron': 'a switch set by hand with the switch iron',
+  'heating': 'a heating switch',
+  'warning': 'the cab\'s warning beep',
+  'crash': 'a collision',
+};
+// The loops a pack may replace and the parameter that pitches each (its reference: `refSpeed` m/s or `refRpm`).
+export const LOOPS = {
+  'motor': 'traction motors and gears: pitched by speed, loud by the motor current',
+  'rolling': 'rolling noise: pitched and loud by speed',
+  'flange': 'flange squeal in curves under 20 m radius and on sliding wheels: not pitched',
+  'mg': 'the motor-generator and its fans: pitched by mgRpm',
+};
+// The parameters the loops follow (TramAudio.params).
+export const PARAMS = {
+  'speed': 'm/s',
+  'motorCurrent': 'A',
+  'curveRadius': 'm (the curve\'s speed limit standing in for it: under 20 m radius squeals)',
+  'mgRpm': 'rpm',
+  'slide': '0/1: wheels locked and sliding',
+  'trackBrake': '0/1: the track brakes on',
+};
+// a loop's built-in loudness at its loudest (the synthesis below): a pack's recording plays at its share of it
+const LOOP_MAX = { motor: 0.145, rolling: 0.4, flange: 0.07, mg: 0.05 };
+// a T3 set's axles behind its front, m (src/tram.js T3: the pivots 6.4 m apart, a bogie's wheelbase 1.9 m)
+const WHEELBASE = 1.9;
+export const axlesBehind = (cars) => Array.from({ length: cars }, (_, k) => k * CAR_PITCH + T3.length / 2)
+  .flatMap((c) => [c - T3.bogies / 2, c + T3.bogies / 2]).flatMap((p) => [p - WHEELBASE / 2, p + WHEELBASE / 2]);
+// a diamond crossing's two rails of the other track, either side of where the data puts it (the angle is not known)
+const RAILS = [-0.7175, 0.7175];
 
 export class TramAudio {
   constructor() {
@@ -10,6 +63,10 @@ export class TramAudio {
     this.finishing = false;
     this.epoch = 0;
     this.lastJoint = 0;
+    this.pack = null;      // the sound pack in use: { events: Map(event -> [AudioBuffer]), loops: { name: {...} } }
+    this.frogs = [];       // [{ s, e: 'points' | 'crossing' }] by s: the route's frogs (setTrack)
+    this.params = {};
+    this.trace = null;     // an array to log each event into ({ e, by, s, x }: a test's)
   }
 
   start() {
@@ -43,7 +100,9 @@ export class TramAudio {
       o.start();
       return o;
     });
-    lp.connect(this.motorGain).connect(this.master);
+    // (each loop's voices through an output a pack's recording mutes: _synth)
+    [this.motorOut, this.rollOut, this.squealOut, this.mgOut] = [0, 1, 2, 3].map(() => { const g = ctx.createGain(); g.connect(this.master); return g; });
+    lp.connect(this.motorGain).connect(this.motorOut);
 
     // rolling noise
     this.rollGain = ctx.createGain();
@@ -55,14 +114,14 @@ export class TramAudio {
     this.rollFilter.type = 'bandpass';
     this.rollFilter.frequency.value = 300;
     this.rollFilter.Q.value = 0.7;
-    src.connect(this.rollFilter).connect(this.rollGain).connect(this.master);
+    src.connect(this.rollFilter).connect(this.rollGain).connect(this.rollOut);
     src.start();
 
     // the motor-generator and its two fans (src/electric.js): always running, its speed following the wire, so its
     // tone falls when the tram draws current. A hum at twice the shaft speed, the blades' tone, the air.
     this.mgGain = ctx.createGain();
     this.mgGain.gain.value = 0.05;
-    this.mgGain.connect(this.master);
+    this.mgGain.connect(this.mgOut);
     this.mgOsc = [['triangle', 0.5], ['sawtooth', 0.12]].map(([type, level]) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = type;
@@ -107,7 +166,7 @@ export class TramAudio {
     sqg.gain.value = 0.5;
     this.squeal.connect(this.squealGain);
     sq2.connect(sqg).connect(this.squealGain);
-    this.squealGain.connect(this.master);
+    this.squealGain.connect(this.squealOut);
     this.squeal.start();
     sq2.start();
   }
@@ -170,18 +229,109 @@ export class TramAudio {
       const rate = dt > 0 ? Math.abs(moved) / dt : 0;
       this.pilotGain.gain.setTargetAtTime(Math.min(0.012, rate * 0.0007), t, 0.04);
       this.pilotOsc.frequency.setTargetAtTime(150 + rate * 12, t, 0.05);
-      if (eq.ls !== this.lastLs) { if (this.lastLs !== undefined) this.click(0.12, 420); this.lastLs = eq.ls; }
-      if (eq.ls) for (const q of [75, 80, 85, 90, 95]) if ((eq.p - q) * (eq.p - moved - q) < 0) this.click(0.05, 650);
-      if (eq.shoe !== this.lastShoe) { if (this.lastShoe !== undefined) this.click(0.1, 260); this.lastShoe = eq.shoe; }
+      if (eq.ls !== this.lastLs) { if (this.lastLs !== undefined) this.emit('lineContactor'); this.lastLs = eq.ls; }
+      if (eq.ls) for (const q of [75, 80, 85, 90, 95]) if ((eq.p - q) * (eq.p - moved - q) < 0) this.emit('contactor');
+      if (eq.shoe !== this.lastShoe) { if (this.lastShoe !== undefined) this.emit(eq.shoe ? 'trackBrake.on' : 'trackBrake.off'); this.lastShoe = eq.shoe; }
     }
+    Object.assign(this.params, { speed: v, motorCurrent: Math.abs(tram.current), curveRadius: curvatureLimit, mgRpm: eq.mg?.rpm ?? 0,
+      slide: tram.slide ? 1 : 0, trackBrake: tram.trackBrake ? 1 : 0 });
+    this._loops(t, { motor, rolling: tram.trackBrake ? 0.4 : Math.min(0.32, v * 0.022), flange: squeal, mg: eq.mg ? 0.05 * Math.min(1, eq.mg.rpm / 60 / 25) : 0.05 });
 
     // rail joints every 18 m: a bogie "ta-dum"
     const joint = Math.floor(tram.s / 18);
     if (joint !== this.lastJoint && v > 1 && !tram.slide) {
       this.lastJoint = joint;
-      this.click(0.06 + Math.min(v / 18, 1) * 0.1, 140);
+      const k = Math.min(v / 18, 1);
+      this.emit('joint', { level: k, gain: 0.06 + k * 0.1, freq: 140 });
       const epoch = this.epoch;
-      setTimeout(() => { if (epoch === this.epoch) this.click(0.05 + Math.min(v / 18, 1) * 0.08, 120); }, (2.0 / Math.max(v, 1)) * 1000);
+      setTimeout(() => { if (epoch === this.epoch) this.emit('joint', { level: k, gain: 0.05 + k * 0.08, freq: 120 }); }, (2.0 / Math.max(v, 1)) * 1000);
+    }
+    // the frogs: each axle as it passes one, either way
+    const last = this.lastS ?? tram.s;
+    this.lastS = tram.s;
+    if (tram.s !== last && v > 0.3 && this.frogs.length) {
+      const lo = Math.min(last, tram.s), hi = Math.max(last, tram.s), k = Math.min(v / 12, 1);
+      for (const a of axlesBehind(tram.cars || 1)) {
+        for (const f of this.frogs) {
+          const x = f.s + a;   // the front's s when this axle is on the frog
+          if (x > lo && x <= hi) this.emit(f.e, { level: 0.4 + 0.6 * k, gain: 0.05 + k * 0.12, s: tram.s, x: f.s });
+        }
+      }
+    }
+  }
+
+  // The route's frogs (src/game.js): a facing switch's `frog` m past its fork, a trailing one's before it, a diamond
+  // crossing's two rails.
+  setTrack({ switches = [], trailing = [], crossings = [] } = {}, frog = 11.5) {
+    this.frogs = [...switches.map((w) => ({ s: w.s + (w.frog ?? frog), e: 'points' })),
+      ...trailing.map((w) => ({ s: w.s - (w.frog ?? frog), e: 'points' })),
+      ...crossings.flatMap((s) => RAILS.map((d) => ({ s: s + d, e: 'crossing' })))].sort((a, b) => a.s - b.s);
+    this.lastS = undefined;
+  }
+
+  // An event: the pack's recording where it has one, else the built-in sound. o: { level 0..1 (a recording's
+  // loudness), gain, freq (a click's), s, x (the trace's) }.
+  emit(e, o = {}) {
+    if (!this.ctx || !this.active) return;
+    const files = this.pack?.events.get(e);
+    if (files?.length) this._play(files[Math.floor(Math.random() * files.length)], o.level ?? 1);
+    else BUILT_IN[e]?.(this, o);
+    this.trace?.push({ e, by: files?.length ? 'pack' : 'built-in', s: o.s, x: o.x, t: this.ctx.currentTime });
+  }
+
+  _play(buffer, level) {
+    const ctx = this.ctx, src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buffer;
+    g.gain.value = level * (this.pack.gain ?? 1);
+    src.connect(g).connect(this.master);
+    src.start();
+  }
+
+  // A sound pack (src/vehicles.js soundsFor): its recordings fetched and decoded (url(path) their address); null, the
+  // built-in sounds. Resolves when the pack plays.
+  async usePack(pack, url = pack?.url ?? ((p) => p)) {
+    if (!this.ctx) this.start();
+    if ((this.pack?.id ?? null) === (pack?.id ?? null)) return;
+    for (const l of Object.values(this.pack?.loops || {})) { l.src.stop(); l.out.disconnect(); }
+    this.pack = null;
+    for (const name of Object.keys(LOOPS)) this._synth(name, true);
+    if (!pack) return;
+    const ctx = this.ctx, cache = new Map();
+    const decode = (p) => {
+      if (!cache.has(p)) cache.set(p, fetch(url(p)).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)));
+      return cache.get(p);
+    };
+    const events = new Map();
+    for (const [e, f] of Object.entries(pack.events || {})) events.set(e, await Promise.all([f].flat().map(decode)));
+    const loops = {};
+    for (const [name, l] of Object.entries(pack.loops || {})) {
+      const src = ctx.createBufferSource(), out = ctx.createGain();
+      src.buffer = await decode(l.file);
+      src.loop = true;
+      out.gain.value = 0;
+      src.connect(out).connect(this.master);
+      src.start();
+      loops[name] = { ...l, src, out };
+      this._synth(name, false);
+    }
+    this.pack = { id: pack.id, gain: pack.gain, events, loops };
+  }
+
+  // a built-in loop's voices on or off (a pack's recording plays in its place)
+  _synth(name, on) {
+    const node = { motor: this.motorOut, rolling: this.rollOut, flange: this.squealOut, mg: this.mgOut }[name];
+    if (node) node.gain.value = on ? 1 : 0;
+  }
+
+  // the pack's loops: their loudness the built-in one's share of its loudest, their pitch their parameter over its
+  // reference
+  _loops(t, level) {
+    const P = this.params;
+    for (const [name, l] of Object.entries(this.pack?.loops || {})) {
+      const rate = name === 'mg' ? P.mgRpm / (l.refRpm || 1800) : name === 'flange' ? 1 : P.speed / (l.refSpeed || 10);
+      l.src.playbackRate.setTargetAtTime(Math.max(0.05, rate), t, 0.05);
+      l.level = (level[name] / LOOP_MAX[name]) * (l.gain ?? 1);
+      l.out.gain.setTargetAtTime(l.level, t, 0.08);
     }
   }
 
@@ -222,29 +372,36 @@ export class TramAudio {
 
   // door closing buzzer + pneumatic hiss
   doors(closing) {
+    if (closing) this.buzzer();
+    this.doorHiss(closing ? 1.3 : 0);
+  }
+  buzzer() {
     if (!this.ctx || !this.active) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    if (closing) {
-      const o = ctx.createOscillator();
-      o.type = 'square';
-      o.frequency.value = 620;
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      for (let i = 0; i < 6; i++) {
-        g.gain.setValueAtTime(0.05, t + i * 0.25);
-        g.gain.setValueAtTime(0, t + i * 0.25 + 0.15);
-      }
-      o.connect(g).connect(this.master);
-      o.start(t);
-      o.stop(t + 1.6);
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = 620;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    for (let i = 0; i < 6; i++) {
+      g.gain.setValueAtTime(0.05, t + i * 0.25);
+      g.gain.setValueAtTime(0, t + i * 0.25 + 0.15);
     }
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + 1.6);
+  }
+  // the doors' pneumatic hiss, `after` s from now
+  doorHiss(after = 0) {
+    if (!this.ctx || !this.active) return;
+    const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     const f = ctx.createBiquadFilter();
     f.type = 'highpass';
     f.frequency.value = 2500;
     const g = ctx.createGain();
-    const start = t + (closing ? 1.3 : 0);
+    const start = t + after;
     g.gain.setValueAtTime(0, t);
     g.gain.setValueAtTime(0.12, start);
     g.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
@@ -283,3 +440,29 @@ export class TramAudio {
     src.stop(t + 1.3);
   }
 }
+
+// The built-in sounds by event (each as the game sounded before #528).
+const click = (gain, freq) => (a, o) => a.click(o.gain ?? gain, o.freq ?? freq);
+const BUILT_IN = {
+  'door.open': (a) => a.doors(false),
+  'door.close': (a) => a.doorHiss(1.3),      // (the hiss as the buzzer ends)
+  'door.buzzer': (a) => a.buzzer(),
+  'bell': (a) => a.bell(),
+  'joint': click(0.1, 140),
+  'points': click(0.12, 220),
+  'crossing': click(0.12, 180),
+  'notch.up': click(0.12, 1600),
+  'notch.down': click(0.12, 1600),
+  'lineContactor': click(0.12, 420),
+  'contactor': click(0.05, 650),
+  'trackBrake.on': click(0.1, 260),
+  'trackBrake.off': click(0.1, 260),
+  'indicator.tick': click(0.05, 1250),
+  'indicator.tock': click(0.05, 950),
+  'switch.radio': click(0.2, 2600),
+  'switch.contact': click(0.25, 2000),
+  'switch.iron': click(0.3, 400),
+  'heating': click(0.15, 900),
+  'warning': (a) => a.warning(),
+  'crash': (a) => a.crash(),
+};
