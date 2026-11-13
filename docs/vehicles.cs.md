@@ -41,11 +41,37 @@ načte ve hře, i se vzorkem přidaným jen jako složka.
 | `preload` | `true`: stáhne se s linkou; jinak až když ho hráč vybere |
 | `licence` | `spdx` (licence, která dovoluje šíření), `commercial` (u NC false), `file` (jeho `LICENSE.txt`), `authors`, `sources` (adresy), `credit` (řádek, který hra ukazuje) |
 | `tier` | úroveň pohybu (níže), `moves` díly, které hýbe, `levels` počet úrovní podle vzdálenosti |
-| `variants` | typy, kterými může být (`type`, např. `T3SUCS`), a jejich evidenční čísla (`fleet`: rozsahy `[první, poslední]`); typ cizí tramvaje a čísla jejích vozů plynou z čísla pořadí (`src/vehicles.js`), každý typ tak často, kolik má čísel |
+| `fleet` | evidenční čísla, pod kterými jeho soupravy jezdí (#527): `types`, pro každý typ (např. `T3SUCS`) jeho `ranges` `[první, poslední]` s `except` (díry), nebo `list`; `sets`, dvojice, které jezdí spolu a s žádným jiným vozem, ale každý z vozů může jezdit sám, kde linka jezdí sólo vozy, a jeho druhý vůz je pak volný pro jiný sólo vůz (souprava mimo seznam jsou dvě čísla jednoho typu); `liveries`, číslo → id nátěru (#529). Jízda je rozdává (`src/vehicles.js` `FleetDealer`): balíček všech čísel zamíchaný semínkem jízdy, takže každý typ přijde na řadu tak často, kolik má čísel, žádné dvakrát na ulici, a vrací se, když souprava odjede; naše tramvaj jezdí jako hráčova oblíbená souprava z menu, jinak jako T3SUCS rozdaná stejně, a žádná cizí tramvaj její čísla nedostane. Rozdávání kontroluje `tools/test_fleet.py` |
+| `slots` | sloty nátěru vozidla z glTF (#529): jméno slotu a materiály, které barví, např. hybridovy `body` (`Red_Hull`) a `band` (`Beige`, `Beige_wbackface`); načítač s rigem nechává jejich díly zvlášť (i s uv), aby jim nátěr mohl dát texturu nebo barvu |
+| `colours` | model barvený barvami: jména barev, které nátěr smí nahradit (vestavěného vozu `body`, `band`, `roof`) |
 
 **glTF úrovně 1** nepotřebuje kód: nehybný model v metrech, počátek v rovině kolejnic uprostřed mezi čepy
 podvozků, +Y nahoru, čelem k `forward`; čepy má podle svého typu. Menu ho nabídne, při výběru se načte a
 poděkování ho uvede.
+
+## Nátěry
+
+Nátěr (#529; rozhodnutí `docs/decisions/2026-11-10-vehicle-packages.md`, oddíl 3) je složka `assets/<id>/` se souborem
+`livery.json`, uvedená pod `liveries` v `assets/vehicles.json`; jeho id je jméno autora a jeho vlastní
+(`sample.t3h-blue`). Menu nabízí naší tramvaji původní vzhled vozidla, jeden z jeho nátěrů, nebo nátěr přidělený jako
+cizím tramvajím; cizím tramvajím se přiděluje (`src/vehicles.js` `liveryOf`). Popisy kontroluje
+`tools/test_vehicles.py`, vzhled a přidělování ve hře `tools/test_liveries.py`.
+
+| pole | co |
+|---|---|
+| `schema`, `id`, `names`, `licence`, `files` | jako u vozidla |
+| `kind` | `livery` |
+| `requires` | `{ "<id vozidla>": ">=1" }`: vozidlo, které barví |
+| `textures` | slot → obrázek mezi jeho soubory: nahradí texturu i barvu materiálů slotu; WebP, PNG nebo JPEG, strany mocniny dvou do 2048 px |
+| `colours` | slot nebo barva → `#rrggbb`: nahradí barvu materiálů slotu, nebo barvu vestavěného vozu |
+| `numbers` | evidenčních čísel `font` (rodina písma CSS, kde chybí, Arial) a `colour` |
+| `types` | typy vozového parku, na které se hodí (výchozí: všechny) |
+| `share` | podíl cizích souprav těch typů, které jej nosí, 0 až 1 (výchozí 0: jen naše, nebo čísla ve `liveries` vozového parku) |
+
+Sloty, které vynechá, si nechají vzhled vozidla. Nátěr, který jmenuje slot nebo typ, jejž vozidlo nemá, je vynechán se
+jménem slotu (`livery x left out: texture slot roof: t3h has no such slot`). Hra zatím žádný nemá, řádek menu je
+skrytý (uživatel, 2026-11-13: „For now I would keep only the default liveries, with future possibility to add more
+variety“); `tools/test_liveries.py` podává dva vlastní ukázkové, texturu a barvu na hybridu a tři barvy vestavěného vozu.
 
 ## Soubor pohyblivých dílů (rig)
 
@@ -70,9 +96,17 @@ materiály jsou sklo. Lehčí úroveň pro vzdálené cizí tramvaje vznikne př
 vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrobí vzorové vozidlo se všemi díly a zkontroluje,
 že se každý hýbe.
 
-Rig se generuje, needituje se ručně. Podrobný model se udržuje v repozitáři (projektová dílna na modely, ze které
-pochází, už se nepoužívá); jeho rig má generovat `tools/export_t3h_rig.py` z `tools/t3h_rig_roles.json` s kontrolou
-proti GLB (#471), do té doby je osm jeho polí dopsaných ručně (`handWritten` v rigu).
+Podrobný model se udržuje v repozitáři: projektová dílna na modely, ze které pochází, už se nepoužívá (uživatel,
+12. 11. 2026: dílna je jen web na prohlížení modelu a jeho animací, sama nic neexportuje a nejspíš se už používat
+nebude). Jeho rig generuje [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) z
+[`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) a základního rigu s kontrolou vazeb proti
+GLB (#471). Při změně modelu uprav přiřazení částí v souboru rolí a podle potřeby základní rig.
+Pak znovu vygeneruj `assets/t3h/rig.json` a aktualizuj jeho velikost v bajtech v `vehicle.json`.
+`revision` označuje revizi modelu a `rigRevision` revizi vygenerovaného rigu.
+
+```sh
+python -I tools/export_t3h_rig.py --out assets/t3h/rig.json
+```
 
 ## Co musí souprava splňovat
 
@@ -151,7 +185,7 @@ interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
 - **Vestavěná T3** (`src/t3simple.js`): rozměry jsou pojmenované konstanty na začátku souboru (`NOSE`,
   `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), každá s uvedeným zdrojem; nátěr maluje `livery()`,
   pevné díly `partsGeometry()`, pohyblivé `bogie()`, `wheelset()`, `coupler()` a `pantoBars()` (rám sběrače
-  pro danou výšku drátu), typy a jejich evidenční čísla v `variants` jejího popisu (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` ji
+  pro danou výšku drátu), typy a jejich evidenční čísla v `fleet` jejího popisu (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` ji
   kontroluje proti těmto číslům.
 - **Tabule a cedule** všech modelů: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, bodový displej T3M `ledFace`).

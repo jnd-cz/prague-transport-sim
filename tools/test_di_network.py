@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """DI's track network and routes matched over it (#237): python -P -E tools/test_di_network.py."""
 import math
+import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import di_network as dn  # noqa: E402
@@ -456,6 +459,107 @@ class Chords(unittest.TestCase):
         # (the fork in reach, on the edge it ends; not the crossing in reach, nor nodes elsewhere)
         self.assertEqual(sorted(loose), [(1, (1, 4))])
         self.assertEqual(set(loose.values()), {0.0})
+
+@unittest.skipUnless((Path(__file__).resolve().parent.parent / 'raw' / 'dtm-di' / 'provenance.json').exists(),
+                     'needs raw/dtm-di and raw/dtmp-tracks: python -I tools/snapshot.py fetch')
+class Kept(unittest.TestCase):
+    def test_kept_network_is_the_built_one(self):
+        """DI's network kept per machine (#517): read back, it is the network built, to its last byte."""
+        smoothed = dn.SMOOTHED
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'TRAMDATA_CACHE': d}):
+            try:
+                dn.SMOOTHED = smoothed
+                built = dn.load_network()
+                kept = sorted(p.name.split('-')[0] for p in Path(d, 'kept').iterdir())
+                read = dn.load_network()
+            finally:
+                dn.SMOOTHED = []
+        self.assertIn('network', kept)
+        self.assertIsNot(read, built)
+        self.assertEqual(same(vars(read), vars(built)), [])
+        self.assertEqual(read.summary(), built.summary())
+
+    @unittest.skipUnless((Path(__file__).resolve().parent.parent / 'data' / 'line17.json').exists(),
+                         'needs data/: python -I tools/snapshot.py data-fetch')
+    def test_candidates_at_once_as_one_by_one(self):
+        """A route's candidate edges asked of GEOS for all its samples at once (#517): the same edges, in the same order,
+        with the same costs as asked one sample at a time (line 17's route over DI's network)."""
+        import json
+        from types import SimpleNamespace
+        from shapely.geometry import Point
+        net = dn.load_network()
+        line = json.loads((Path(__file__).resolve().parent.parent / 'data' / 'line17.json').read_text(encoding='utf-8'))
+        pts = [tuple(p[:2]) for p in line['path'][::8]]
+        heads = [dn._unit((b[0] - a[0], b[1] - a[1])) for a, b in zip(pts, pts[1:] + pts[-1:])]
+        heads[-1] = heads[-2]
+        zones = {}
+
+        def in_zone(e, t):  # (Network.in_zone, one point at a time)
+            if e not in zones:
+                skip = {e} | {f for end in (0, 1) for f, _ in net.passes.get((e, end), ())}
+                ln = net.edges[e]['line']
+                n = max(1, int(ln.length))
+                inside = []
+                for i in range(n + 1):
+                    p = ln.interpolate(ln.length * i / n)
+                    near = [net.eids[int(j)] for j in net.tree.query(p.buffer(dn.ZONE))]
+                    inside.append(any(f not in skip and net.edges[f]['line'].distance(p) < dn.ZONE for f in near))
+                z = []
+                for i, v in enumerate(inside):
+                    if v:
+                        a, b = ln.length * max(0, i - 1) / n, ln.length * min(n, i + 1) / n
+                        if z and a <= z[-1][1]:
+                            z[-1] = (z[-1][0], b)
+                        else:
+                            z.append((a, b))
+                zones[e] = z
+            return any(a <= t <= b for a, b in zones[e])
+
+        def one(p, h):  # (Match._candidates, one sample at a time)
+            out, pt, cos = {}, Point(p), math.cos(math.radians(dn.HEADING))
+            for i in net.tree.query(pt.buffer(dn.RADIUS)):
+                e = net.eids[int(i)]
+                ln = net.edges[e]['line']
+                d = ln.distance(pt)
+                if d > dn.RADIUS:
+                    continue
+                t = ln.project(pt)
+                v = dn._unit(dn.Network._dir(ln, t))
+                c = v[0] * h[0] + v[1] * h[1]
+                if abs(c) < cos:
+                    continue
+                dr = 1 if c > 0 else -1
+                w = dn.ZONE_WEIGHT if in_zone(e, t) else 1.0
+                out[(e, dr)] = (e, dr, t, w * (0.5 * (d / dn.SIGMA) ** 2 + dn.TURN_COST * (1 - abs(c))))
+            return out
+        got = dn.Match._candidates(SimpleNamespace(net=net), pts, heads)
+        want = [one(p, h) for p, h in zip(pts, heads)]
+        self.assertGreater(sum(map(len, want)), len(pts))
+        self.assertEqual([list(c.items()) for c in got], [list(c.items()) for c in want])
+        self.assertEqual({e: net._zones[e] for e in zones}, zones)
+
+
+def same(a, b, at='net'):
+    """Where a and b differ in value (geometries to their last coordinate bit), [] where nowhere."""
+    import numpy as np
+    import shapely
+    if type(a) is not type(b):
+        return [at]
+    if isinstance(a, dict):
+        if list(a) != list(b):
+            return [at]
+        return [d for k in a for d in same(a[k], b[k], f'{at}[{k!r}]')]
+    if isinstance(a, (list, tuple)):
+        return [at] if len(a) != len(b) else [d for i, (x, y) in enumerate(zip(a, b)) for d in same(x, y, f'{at}[{i}]')]
+    if isinstance(a, shapely.Geometry):
+        return [] if a.wkb == b.wkb else [at]
+    if isinstance(a, shapely.STRtree):
+        return same(list(a.geometries), list(b.geometries), at)
+    if isinstance(a, np.ndarray):
+        return [] if a.dtype == b.dtype and np.array_equal(a, b) else [at]
+    if hasattr(a, '__dict__') and not isinstance(a, type):
+        return same(vars(a), vars(b), at)
+    return [] if a == b or (a != a and b != b) else [at]
 
 
 if __name__ == '__main__':

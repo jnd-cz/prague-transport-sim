@@ -29,6 +29,8 @@ from dtm_packages import DTM, select_packages  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
+import heavy  # noqa: E402
+heavy.turn(f"dtm {LINE}")  # (a heavy job run alone, ~60 s; under rebuild.py in its turn, #536)
 
 # area classes by the DTM object type code at the end of the layer name
 CLASSES = {
@@ -95,28 +97,32 @@ zgrid = defaultdict(list)
 wall_lines = []  # the survey's walls and terrain edges (tools/kerbs.py: an edge along one is not a kerb)
 WALLS = ("Hranice_zdi", "Zeď", "Terénní_hrana")
 packages = select_packages(ROOT, sources=SOURCES) if SOURCES else select_packages(ROOT, districts=DTM[LINE])
-for package in packages:
-    kr = package.kr
-    print(f"district: {package.district}, month {package.date}")
-    for t, info in gpkg.layers(kr).items():
-        wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
-        if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
-            continue
-        for f in gpkg.features(kr, t):
-            g = f["geom"]
-            if not g:
+
+
+def read_lines(keep):
+    """The 3D lines' heights (zkey, zgrid) and the walls (wall_lines), of the lines keep() lets through (gpkg.features)."""
+    for package in packages:
+        kr = package.kr
+        print(f"district: {package.district}, month {package.date}")
+        for t, info in gpkg.layers(kr).items():
+            wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
+            if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
                 continue
-            parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
-            lvl = f.get("UrovenUmisteniObjektuZPS") or 0
-            if wall:
-                wall_lines += [[local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1]
-            if "Hranice" not in t:
-                continue
-            for pts in parts:
-                for x, y, z in pts:
-                    if z:
-                        zkey[(round(x, 2), round(y, 2))].add((z, lvl))
-                        zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
+            for f in gpkg.features(kr, t, keep=keep):
+                g = f["geom"]
+                if not g:
+                    continue
+                parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
+                lvl = f.get("UrovenUmisteniObjektuZPS") or 0
+                if wall:
+                    wall_lines.extend([local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1)
+                if "Hranice" not in t:
+                    continue
+                for pts in parts:
+                    for x, y, z in pts:
+                        if z:
+                            zkey[(round(x, 2), round(y, 2))].add((z, lvl))
+                            zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
 
 def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
@@ -303,13 +309,18 @@ def ring(r, level, cls=None):
 
 
 seen_areas, n_copies = set(), 0  # (an area on a district border is in both districts' packages, #316)
+# the corridor's areas first (only those whose box reaches a corridor cell are decoded), then the 3D lines and walls whose
+# boxes reach theirs (a vertex's heights come from lines within 10 m of it, the kerbs' walls lie within 3 m of an
+# outline): the 1.9 million lines of line 17's districts decoded and put in the grids were most of its reading (#517)
+found = []
+corridor = gpkg.near(cells, 40, (F.E0, F.N0))
 for package in packages:
     opl = package.opl
     for t in gpkg.layers(opl):
         cls = CLASSES.get(t.split("#")[-1].split("_")[0])
         if not cls:
             continue
-        for f in gpkg.features(opl, t):
+        for f in gpkg.features(opl, t, keep=corridor):
             if not f["geom"]:
                 continue
             for rings in walk(f["geom"]):
@@ -323,15 +334,20 @@ for package in packages:
                     n_copies += 1
                     continue
                 seen_areas.add(same)
-                r0, miss = ring(outer, level, cls)
-                if miss / max(1, len(r0)) > 0.3:
-                    dropped += 1
-                    continue  # mostly unknown heights: would be a flat sheet at a guessed level
-                a = {"c": cls, "l": level, "r": r0}
-                holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
-                if holes:
-                    a["h"] = holes
-                areas.append(a)
+                found.append((cls, level, rings))
+read_lines(gpkg.near_boxes([(min(p[0] for p in r), min(p[1] for p in r), max(p[0] for p in r), max(p[1] for p in r))
+                            for _, _, rings in found for r in rings if r], 5))
+for cls, level, rings in found:
+    outer = rings[0]
+    r0, miss = ring(outer, level, cls)
+    if miss / max(1, len(r0)) > 0.3:
+        dropped += 1
+        continue  # mostly unknown heights: would be a flat sheet at a guessed level
+    a = {"c": cls, "l": level, "r": r0}
+    holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
+    if holes:
+        a["h"] = holes
+    areas.append(a)
 
 # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
 # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)

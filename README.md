@@ -198,6 +198,12 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
   typového výkresu T3, bez interiéru a nehybný, nejlehčí na výkon. S ním jezdí cizí soupravy jako T3 (stříbrný
   nárazník s červenými proužky), T3SUCS i T3M (T3M s bednou odporníků na střeše a zeleným číslem linky), každý typ
   tak často, jak dlouhá je jeho řada evidenčních čísel.
+- Evidenční číslo: souprava, kterou jezdíte vy, třeba historické 6892 + 6921, 7269 + 7290 nebo 8080 + 8074,
+  nebo jedno číslo (druhý vůz dostane číslo stejného typu); hra si volbu pamatuje pro každý model.
+  „Libovolné“ přidělí číslo jako ostatním. Žádné číslo nejezdí po ulici dvakrát a vaše nedostane žádná cizí
+  souprava.
+- Nátěr: jen u modelu, který má kromě původního i jiné nátěry (zatím žádný): původní, některý z nich, nebo
+  „Libovolný“, přidělený jako ostatním; hra si volbu pamatuje pro každý model. Nátěry nosí i část cizích souprav.
 
 ### Na telefonu nebo tabletu
 

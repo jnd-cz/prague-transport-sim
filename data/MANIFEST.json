@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "2cb6700",
- "published": "2026-11-12 21:43",
- "note": "#470: street outlines where survey and lidar disagree — the survey's lone errors and runs take IPR (lines 9, 17, 22, 23, 37)",
+ "built_at_commit": "0002159",
+ "published": "2026-11-13 13:44",
+ "note": "#538: crossLevel on lines 9, 17, 22, 23, 37 (DI crossings, junctions and curves)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -33,8 +33,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 6626749,
-   "sha256": "9abf0b56efeae86985165f86ba693fb3b1aa9c8703ad3d972981f9f7b4bad098"
+   "size": 6698587,
+   "sha256": "7b68fb7145156945c87e905f729fdbd120709c502c37ebc9b7714454201bfe57"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6614222,
-   "sha256": "047ca2640871a21f6bf53eba1b66b566790fb1ec0f1fa4c5a3d4755c6437d283"
+   "size": 6679113,
+   "sha256": "839e16b0e689506eda85cd89f047b2fb95d9b82eff2fc41153ea146f584f44e2"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -117,8 +117,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2502951,
-   "sha256": "cc79b0417c64bd48db01d3676b66a52bf74aa2a2b43163770a51392d8a34978a"
+   "size": 2533047,
+   "sha256": "92423374f6be9f539d5e86b97ea9670ce26417e5f269b8eb21ffc3994e86f10b"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -157,8 +157,8 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.json": {
-   "size": 2305874,
-   "sha256": "c3f96dbbcaeeb338017ad72c401b3f59ac58196cb22b5e6c2e2db0195b5ee4c4"
+   "size": 2331847,
+   "sha256": "2fb8d2e95e251779c63778ada5ce2f515768328e517876324e7c8e9bbbd66eb3"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -197,8 +197,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 5810156,
-   "sha256": "e8dd11d9b0c931a022ca2d277c69abd327922e8404deaa15d8e15ee760bdb0c5"
+   "size": 5889913,
+   "sha256": "314464e907256ec4593c0e5911f3a2ce000c6bc8447bf06b2f12c043bad682ad"
   },
   "line9.validate.json": {
    "size": 6596,

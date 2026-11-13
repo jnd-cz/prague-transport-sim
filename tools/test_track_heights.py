@@ -276,6 +276,30 @@ def offset_fact(value=.2, **updates):
     return {'id':'offset-1','metres':value,'scope':'all','source':'test fixture','date':'2026-10-30',**updates}
 
 
+class Workers(unittest.TestCase):
+    def test_samples_decided_in_workers_as_here(self):
+        """decide's samples shared out to worker processes (#516): each sample's surfaces, construction and decision as
+        this process decides them, in order."""
+        decks = Decks([deck_record(), deck_record('deck-2', 203)], [offset_fact()])
+        context = __import__('track_context').TrackContext()
+        guard = HeightGuard([evidence(kind='deck', level=1)])
+        archived = match(path(1, 200), path(2, 201, .1))
+        todo = [(x / 7, (k % 5 - 2) / 2, 'di-1', None if k % 3 else 200.0 + k / 100, 1.0, 0.0, archived, bool(k % 2),
+                 k % 4 == 0, 199.0 + k / 50) for k, x in enumerate(range(0, 70))]
+        current = Segments([path('di-1', 200), path('di-2', 0, .5)])
+        archive = Segments([path(1, 200), path(2, 201, .1), path(3, 205, 1.2)])
+        at = [(x / 7, (k % 7 - 3) * .5, 1.0 if k % 3 else -1.0, 0.0) for k, x in enumerate(range(0, 70))]
+        here = (stage._decide_all(todo, decks, context, guard), stage._archive_matches(at, archive),
+                stage._hits(at, current, archive))
+        with patch.object(stage, 'CHUNK', 9), stage._pool(decks, context, current, archive) as pool:
+            there = (stage._decide_all(todo, decks, context, guard, pool), stage._archive_matches(at, archive, pool),
+                     [h for part in pool.map(stage._hits, stage._chunks(at)) for h in part])
+        self.assertEqual(there, here)
+        self.assertGreater(len({json.dumps(d, sort_keys=True, default=str) for _, _, d in here[0]}), 3)
+        self.assertGreater(len({m['status'] for m in here[1]}), 1)
+        self.assertGreater(sum(t is not None for _, t, _ in here[2]), 10)
+
+
 class DeckFallback(unittest.TestCase):
     def test_independent_rail_observation_can_resolve_an_unclassified_deck(self):
         decks = Decks([deck_record()],[offset_fact(0)])

@@ -4,6 +4,7 @@
     python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main
     python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
     python -P -E tools/shot.py --line 17 --s 0 --view review --at 3185.9,3756.8 --dist 25   # a place off the route
+    python -P -E tools/shot.py --line 17 --s 5064 --view chase --vehicle t3simple --livery sample.t3simple-green
 
 Writes individual PNGs, a labelled side-by-side PNG, and camera/data hashes to reports/shots/.
 Git references are exported temporarily and use verified published files from TRAMDATA_CACHE.
@@ -80,7 +81,7 @@ def font(size=20):
     return ImageFont.load_default(size)
 
 
-def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45):
+def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=()):
     context = browser.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1)
     context.add_init_script('''window.headless = true;
       let state = 158; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);''')
@@ -105,6 +106,11 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                 page.select_option('#selTrip', index=0)
             if page.locator('#optTemp').count():
                 page.select_option('#optTemp', 'autumn')
+            # the menu's vehicle and livery, where this checkout offers them (a reference before #529 has no liveries)
+            for sel, value in picks:
+                if value and page.locator(f'{sel} option[value="{value}"]').count():
+                    page.select_option(sel, value)
+                    page.dispatch_event(sel, 'change')
             page.click('#btnStart', timeout=remaining())
             page.wait_for_function('window.game && window.camera', timeout=remaining())
             require(page, 'game')
@@ -199,6 +205,8 @@ def main(argv=None, root=ROOT):
     ap.add_argument('--dist', type=float, default=60, help='review: the camera\'s distance in m (default 60)')
     ap.add_argument('--pitch', type=float, default=45, help='review: degrees down from level (default 45)')
     ap.add_argument('--yaw', type=float, default=0, help='review with --at: the heading looked along, degrees')
+    ap.add_argument('--vehicle', help='the tram model picked in the menu (assets/vehicles.json; default the first)')
+    ap.add_argument('--livery', help='the livery picked in the menu (#529; default the vehicle\'s own)')
     a = ap.parse_args(argv)
     at = None
     if a.at:
@@ -210,7 +218,8 @@ def main(argv=None, root=ROOT):
     if a.line <= 0 or not math.isfinite(a.s) or a.s < 0 or not math.isfinite(a.timeout) or a.timeout <= 0:
         ap.error('s must be finite and nonnegative; timeout must be finite and positive')
     a.out.mkdir(parents=True, exist_ok=True)
-    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '')
+    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery) if x)
+    picks = (('#optModel', a.vehicle), ('#optLivery', a.livery or ''))
     try:
         reference_rev = (git(root, 'rev-parse', '--verify', a.ref + '^{commit}')
                          if a.ref and not Path(a.ref).is_dir() else None)
@@ -220,7 +229,7 @@ def main(argv=None, root=ROOT):
             # (both pictures drawn the same way, on the GPU where there is one, #411)
             browser, renderer = gpu.launch(pw)
             try:
-                now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch)
+                now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch, picks=picks)
                 report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
@@ -228,7 +237,7 @@ def main(argv=None, root=ROOT):
                     reference = work / f'{stem}-reference.png'
                     with checkout(root, reference_rev or a.ref, a.cache, a.line) as other:
                         report['reference'] = capture(browser, other, a.line, a.s, a.view, reference, a.timeout,
-                                                      pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch)
+                                                      pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch, picks=picks)
                         if reference_rev is None:
                             try:
                                 report['reference_commit'] = git(other, 'rev-parse', 'HEAD')

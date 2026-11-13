@@ -8,7 +8,8 @@
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
   "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
-  "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
+  "kerbFacts": "tools/dtm.py, tools/kerbs.py",
+  "trackStyleKinds": "src/heights.js",
   "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
   "grassTrack": "tools/track_styles.py, tools/track_decks.py",
   "grassReview": "tools/track_styles.py (answered grass), tools/grass_review.py (answered places get no card)",
@@ -17,7 +18,8 @@
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
-  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it"
+  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it",
+  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)"
  },
  "stops": [
   {
@@ -3676,6 +3678,30 @@
     "answer": "grass",
     "note": "same span as on line 22 Pohořelec - Brusnice",
     "source": "user, grass track review (reports/review/grass-track-23.json), 2026-11-12 (#503)"
+   }
+  ]
+ },
+ "crossLevelReview": {
+  "note": "The user's answers to the cross level review (reports/review/cross-level-N.json, tools/cross_level.py, #538): `level` makes paved track between the two points level on every line; `tilts` keeps the build's cross level there and takes the place off the review.",
+  "answers": [
+   {
+    "id": "sokolovska-palmovka",
+    "lines": [
+     "37"
+    ],
+    "between": [
+     [
+      50.1012584,
+      14.4734446
+     ],
+     [
+      50.1017563,
+      14.4735561
+     ]
+    ],
+    "answer": "tilts",
+    "quote": "it's noticeable in real ride and I know this as famous, albeit extreme example where single straight track in junction tilts sideways",
+    "source": "user, this session 2026-11-13, on the Sokolovská junction at Palmovka (50.1015651 N, 14.4736156 E), #538"
    }
   ]
  }

@@ -2,6 +2,7 @@
 """The frame time and the draw calls with each tram model (tools/bench/frametime.js), in a headed Chromium.
 
 Usage: python -P -E tools/frametime.py [--line 17] [--models t3h,t3,t3simple] [--fov 62,22.75] [--frames 600] [--headless]
+       python -P -E tools/frametime.py --models t3h,t3h:sample.t3h-blue   # a model wearing a livery (#529)
 
 Its own server on a free port; for each model a fresh page at 1280 x 720 loads the line, starts the first
 trip with that model, adds three more sets ahead and measures `--frames` frames with vsync off (so the
@@ -51,15 +52,18 @@ def measure(line, models, frames, headless, warm=120, fovs=(None,)):
                 browser = gpu.launch(p)[0]
             else:
                 browser = p.chromium.launch(headless=False, args=["--disable-gpu-vsync", "--disable-frame-rate-limit"])
-            for model, fov in [(m, f) for m in models for f in fovs]:
+            for spec, fov in [(m, f) for m in models for f in fovs]:
+                model, _, livery = spec.partition(":")
                 page = browser.new_page(viewport={"width": 1280, "height": 720}, device_scale_factor=1)
                 errors = []
                 page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
                 page.goto(f"{base}/?line={line}", timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
                 r = page.evaluate("async (o) => { const { run } = await import('/tools/bench/frametime.js'); return await run(o); }",
-                                  {"model": model, "frames": frames, "warm": warm, "fov": fov})
+                                  {"model": model, "frames": frames, "warm": warm, "fov": fov, "livery": livery or None})
                 r["errors"] = errors[:3]
+                if livery:
+                    r["model"] = f"{model}:{livery}"
                 out.append(r)
                 page.close()
             browser.close()
@@ -81,7 +85,7 @@ def table(rows):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--line", default="17")
-    ap.add_argument("--models", default="t3h,t3,t3simple", help="vehicle ids (assets/vehicles.json); the old names detailed, classic, simple still work")
+    ap.add_argument("--models", default="t3h,t3,t3simple", help="vehicle ids (assets/vehicles.json), each with :<livery id> to wear one; the old names detailed, classic, simple still work")
     ap.add_argument("--fov", default="", help="vertical fields to measure each model at, e.g. 62,22.75 (default: the camera's)")
     ap.add_argument("--frames", type=int, default=600)
     ap.add_argument("--headless", action="store_true", help="headless, on the GPU where there is one (else SwiftShader): checks the bench runs")

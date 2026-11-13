@@ -23,7 +23,10 @@ Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from
 The extract's tagged ways and nodes and its relations are decoded once per extract and machine into
 `TRAMDATA_CACHE/osm-index/` (else `raw/osm/index/`; ~50 s, keyed by the extract's hash and the code that writes
 it): `tools/osm_local.py`'s `ways()`, `nodes()` and `relations()` answer from it, where each was a pass of
-~15-30 s over the file (#511).
+~15-30 s over the file (#511). DI's and the archive's tracks are parsed, and DI's network built, once per machine
+into `TRAMDATA_CACHE/kept/` (else `reports/cache/kept/`; `tools/dtmp_tracks.py` `kept`, keyed by the sources'
+provenance hashes and the code that reads them, the last 4 of each kind kept): `build_line`, `dtm` and the heights'
+staging read them back, where each spent ~15-25 s on them (#517).
 All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`).
 
 The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
@@ -56,13 +59,19 @@ python -P -E tools/build_line.py --line 9 --then 10   # a vehicle run: 9, contin
 python -P -E tools/line_heights.py 17 22           # top of rail (#197), after the lines' survey sidecars
 ```
 
-`rebuild.py` ends with `line_heights.py` for all the lines it built and `line_structures.py` per line (~5 min: it stages the network's heights
+`rebuild.py` ends with `line_heights.py` for all the lines it built `line_structures.py` and `cross_level.py` per line (~2.5 min: it stages the network's heights
 with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
-stage ended (`(staged: 97 s from the start)` …). The chains are solved in worker processes (#511): every chain's
-first solve side by side, then each chain pinned as soon as the chains before it that it meets are final, and the
-lines written side by side; with under 16 chains (the tests) all of it runs in one process, strictly in the order.
+stage ended (`(staged: 97 s from the start)` …), and the staging's parts. The staging matches and decides its samples
+in worker processes (#516). The chains' runs are solved in worker processes (#511, #516): every chain's first solve
+side by side, then each chain pinned as soon as the chains before it that it meets are final, and the lines written
+side by side. A run whose points are as at its chain's earlier solve keeps what it found. With under 16 chains (the
+tests) all of it runs in one process, strictly in the order. The workers load what they are given from one pickle
+(`tools/sysinfo.py` `pool`). Each ADMM step solves its pentadiagonal system by LAPACK's banded Cholesky factor (SciPy,
+docs/decisions/2026-11-13-scipy-banded-solve.md). Of `line_heights`' ~125 s the staging takes ~55, the chains and
+answers ~17, the solves ~19 (chains waiting for the chains they are pinned to, not the workers: 4 BLAS threads x 6
+workers and 1 x 12 took the same) and the writing ~31 (five lines, 24 cores).
 Where the data does not fit the design radius within 10 cm (15 cm in a junction), the radius gives way down to the floor
 of 500 m (`data/truth.json` trackGeometry `vertical-radius-min`, #358) and no further: there the band gives way and the
 curve holds 500 m as near the data as it can. Only rails that would not meet at a junction take a tighter curve.
@@ -99,7 +108,10 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages):
+pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages).
+Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait their turn among the heavy jobs, as
+`rebuild.py` does; under it they run in its turn. Any other long run (a profile, a bench, a comparison) goes through
+`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536):
 
 | step | writes | what |
 |---|---|---|
@@ -116,6 +128,7 @@ pyosmium, pyproj, shapely, numpy, Pillow, brotli and pydelatin 0.4.0 live in the
 | `track_styles` | `lineN.json` | the track styles (`styles`: the user's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
 | `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
 | `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
+| `cross_level` | `lineN.json` | the cross level of paved track where the road tilts across both tracks: one plane of IPR across them, the rails tilted with it (`crossLevel`, #538) |
 
 The page computes no profile of its own (#480): it reads the built top of rail, the lift and the structures. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
