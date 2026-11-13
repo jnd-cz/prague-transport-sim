@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
-import { Tram } from './tram.js';
+import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
@@ -796,8 +796,10 @@ window.addEventListener('blur', () => {
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = null;
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
-// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342)
-const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
+// click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
+// It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
+// set's rear and 17 degrees up (pitch is added to that)
+const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 }, ORBIT_EL = 0.3;
 {
   const ptr = new Map();
   let pinch = null;
@@ -814,7 +816,7 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 };
       pinch = d1;
     } else {
       orbit.yaw -= (e.clientX - p.x) * 0.006;
-      orbit.pitch = Math.max(-0.35, Math.min(1.1, orbit.pitch + (e.clientY - p.y) * 0.004));
+      orbit.pitch = Math.max(0.03 - ORBIT_EL, Math.min(1.45 - ORBIT_EL, orbit.pitch + (e.clientY - p.y) * 0.004));
       p.x = e.clientX; p.y = e.clientY;
     }
     orbit.drag = 0.3;
@@ -863,12 +865,11 @@ function updateCamera(dt, t) {
   const fov = zoomFov(zoom);
   if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (chase) {
-    // behind and above the tram body (works also at the very start of the route)
-    // (around the point 10 m ahead of the front: by default behind and above the set, as before)
-    const lead = tramModel.userData.cars[0], back = 30 + (tramModel.userData.cars.length - 1) * 8;
-    const q = route.at(s + 10);
-    camLook.set(q.x, profile.height(s + 10) + 1.5, -q.y);
-    const a = lead.rotation.y + orbit.yaw, el = Math.atan2(7, back) + orbit.pitch, R = Math.hypot(back, 7) * orbit.k;
+    // around the lead car's centre (#541; it turned about a point 10 m ahead of the front before)
+    const lead = tramModel.userData.cars[0], c = lead.position;
+    camLook.set(c.x, c.y + 2, c.z);
+    const back = T3.length / 2 + (tramModel.userData.cars.length - 1) * CAR_PITCH + 16, el = ORBIT_EL + orbit.pitch;
+    const a = lead.rotation.y + orbit.yaw, R = back / Math.cos(ORBIT_EL) * orbit.k;
     camPos.set(camLook.x - Math.sin(a) * Math.cos(el) * R, camLook.y + Math.sin(el) * R, camLook.z - Math.cos(a) * Math.cos(el) * R);
     // (while the reviewer turns it, the camera follows at once; else it trails the tram smoothly)
     orbit.drag -= dt;
@@ -1025,12 +1026,19 @@ world.traverse(o => {
 });
 const mirror = new Mirror(renderer, scene, $('mirror'), mirrorHidden);
 window.mirror = mirror; // cadence, target and excluded geometry are inspectable without changing the simulation
+// It is fixed to the lead car's body (#541): in a curve the body is the chord between its bogies, its front over
+// the outside of the track, and it leans in a canted one, so a camera posed from the track turned against it.
+const mirrorTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.04, 0.1, 0, 'YXZ'));
 function poseMirror(mirrorCam) {
-  const s = tram.s, p = route.offset(s - 0.6, -1.55), h = route.heading(s - 6, 6), z = profile.height(s);
-  mirrorCam.position.set(p.x, z + 2.09, -p.y);
-  // looking back, turned a little outwards so the side of the tram fills the inner edge
-  mirrorCam.rotation.order = 'YXZ';
-  mirrorCam.rotation.set(-0.04, Math.atan2(-h.hx, h.hy) + Math.PI + 0.1, 0);
+  const u = tramModel.userData, lead = u.cars[0];
+  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front: 0.6 m behind the coupler's face
+  // (the car's frame: x left, y up, z forward from its centre between the bogies, src/consist.js)
+  const front = u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+  lead.updateWorldMatrix(true, false);
+  mirrorCam.position.set(-1.55, 2.09, front).applyMatrix4(lead.matrixWorld);
+  // looking back (a camera looks down its -z, the car's rear), turned a little outwards so the side of the tram
+  // fills the inner edge, and a little down
+  lead.getWorldQuaternion(mirrorCam.quaternion).multiply(mirrorTurn);
 }
 
 load.finish();
