@@ -129,6 +129,9 @@ From the user's answers and the trolleybus note:
 - #559 A driver's record across shifts;
 - #572 Trolleybus wires drawn from OSM `trolley_wire`;
 - #571 The tram span wire drawn at 6.34 m while its comment says 6.74 m (found in passing).
+- #573 The tram overhead line as built: zigzag, sag, delta suspensions, the cited height, no gaps (the user's plan,
+  with figures from DPP, Yarra Trams' standard, Elektroline and Elzel; the height under structures is #71, the
+  trolleybus figures are on #572).
 
 ## The user's answers (2026-11-13)
 
