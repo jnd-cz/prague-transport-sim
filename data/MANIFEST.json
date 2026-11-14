@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "a96bcbd",
- "published": "2026-11-14 10:16",
- "note": "#419: platforms placed by the build (path, s0, s1, side, far, ours, also); lines 9 17 22 23 37",
+ "built_at_commit": "c3a4750",
+ "published": "2026-11-14 10:26",
+ "note": "#549: line 37 ballast Ohrada-Krejcárek viaduct (user 2026-11-14); roads under our bridges no crossings; lines 17 37",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -33,8 +33,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 7036263,
-   "sha256": "fbc2a0aabb71c7db3f3b66e73dce3f7f198e619068c5e71adafe25535ef17941"
+   "size": 7035618,
+   "sha256": "77ebab98791309871a6590259e61f26110aa21554f925bf2601b2f6736393bf6"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -157,8 +157,8 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.json": {
-   "size": 2534384,
-   "sha256": "f08a41066bc6c1b0be65335515c159e23f04adee872f6e81f13f6ff14023f06f"
+   "size": 2535244,
+   "sha256": "0b101c73e321331a14e4aa2692ece9c5837c8900cd5c83de8ae4e3eab27f2b7e"
   },
   "line37.validate.json": {
    "size": 2514,
