@@ -484,6 +484,27 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
 
+### Tram stops: ČSN 73 6425-1 (2007)
+
+The stops norm (bus, trolleybus and tram stops, part 1: design; `raw/reference/norms/`, the user's upload, #512).
+Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply to it too.
+
+- **Kinds beside an unraised belt** (7.1.1): a boarding island; a raised carriageway, the lane lifted to the
+  sidewalk's level less 20 mm, which cars drive over (pojížděný mys); a stop peninsula (mys), with the cars led
+  over the tracks in a lane at least 3.50 m wide. On C and D1 streets in reconstructions the stop may be at
+  the carriageway's level, guarded by a signal (časový ostrůvek) or humps (7.1.2).
+- **Where** (7.2): after a junction by preference; on grades up to 5 %; not on a curve's outer side
+  unless the driver sees every door; opposite stops facing each other between junctions.
+- **The edge** (7.3.1–7.3.3): the platform runs 0.50 m beyond its boarding edge at either end; the edge is
+  as long as the two longest trains plus 1 m, at most 67 m, or one train where one line stops or at 12 trams
+  an hour or fewer.
+- **Surface** (6.2.2.3, 7.3.4): crossfall 0.5–2 %, the resulting slope at most 5 %; where trams lay over, the
+  track's grade is at most 0.25 %.
+- **Width** (7.3.5): free width 2.20 m (2.50 m recommended), where tight 1.70 m (2.00 m); a shelter's side
+  wall may take 0.50 m of it.
+- **Height** (7.3.6): above the top of rail, to suit the fleet, at most 160 mm under a low floor (a bus edge
+  stands 200 mm over the road, 160 mm in reconstructions, 6.2.2.4).
+
 ### Buildings and structures (Geoportál, Mosty 3D)
 
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
