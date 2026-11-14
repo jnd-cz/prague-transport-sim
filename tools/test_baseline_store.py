@@ -188,6 +188,7 @@ class Queue(unittest.TestCase):
     def test_nowait_runs_beside_and_a_step_runs_in_its_parents_turn(self):
         a, release_a = self.job("a")
         self.assertEqual(a.stdout.readline().strip(), "in")
+        before = os.environ.get(baseline_store.HELD)  # (test_all.py's turn when the suite runs: #585 puts it back)
         with baseline_store.HeavyJob("now", wait=False):
             self.assertEqual(sorted(self.states()), [("a", "running"), ("now", "running")])
             step = subprocess.run([sys.executable, "-I", "-c", "import sys; sys.path.insert(0, sys.argv[1]); "
@@ -195,7 +196,7 @@ class Queue(unittest.TestCase):
                                   env={**self.env, baseline_store.HELD: os.environ[baseline_store.HELD]},
                                   capture_output=True, text=True)
             self.assertEqual(step.stdout.strip(), "False")
-        self.assertNotIn(baseline_store.HELD, os.environ)
+        self.assertEqual(os.environ.get(baseline_store.HELD), before)
         open(release_a, "w").close()
 
     def test_a_nested_jobs_end_keeps_its_parents_turn(self):
