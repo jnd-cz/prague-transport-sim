@@ -77,6 +77,8 @@ MIN_EMBEDDED = 5       # m: a street's hole the section's end cuts shorter is no
 SWITCH_PAD = 3         # m before a switch's start and past its frog: the switch's own length beyond the two points
 DIAMOND_MIN = 20       # degrees: another track crossing ours more shallowly is a turnout leaving it, not a diamond
 BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond covers on ours
+PAVED_IN = ("embedded", "setts")   # the styles a junction's pieces join across (#574: setts as embedded)
+SURFACE_STYLE = {"setts": "setts", "embedded": "embedded", "panels": "panels", "grass": "grass"}  # answer -> style
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
 BRIDGE_HEAD = 6        # m inside a bridge's ends (OSM's) where a way across still meets the track at grade (on_bridge)
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
@@ -392,7 +394,11 @@ def embed(secs, js):
     Grass yields to them (the user, 2026-11-13: "for the roads crossing tracks and junctions I would default to
     embedded asphalt style which will be also easier to judge if the transition happens at the correct place").
     Embedded pieces less than MIN_PIECE apart join over the panels between."""
-    wins = [x for x in secs if x["style"] in ("ballast", "embedded") or (x["source"] == "user" and x["style"] != "grass")]
+    # (an answered asphalt stretch yields to a junction inside it: the junction is one surface from fork to fork, the
+    # user 2026-11-14, #574, and the card's ends are OSM's surface changes, metres off)
+    yields = lambda x: x.get("source") == "surface" and x["style"] == "embedded"  # noqa: E731
+    wins = [x for x in secs if not yields(x) and (x["style"] in ("ballast", "embedded", "setts")
+            or (x["source"] in ("user", "surface") and x["style"] != "grass"))]
     free = []
     for j in js:
         free += [(a, b, j["kind"]) for a, b in minus(j["s0"], j["s1"], wins)]
@@ -400,14 +406,15 @@ def embed(secs, js):
     merged = []
     for a, b, k in free:
         if merged and a - merged[-1][1] < MIN_PIECE and not any(
-                x["s1"] > merged[-1][1] and x["s0"] < a and x.get("source") != "hole" and x["style"] != "embedded"
+                x["s1"] > merged[-1][1] and x["s0"] < a and x.get("source") != "hole" and x["style"] not in PAVED_IN
                 for x in secs):
             merged[-1][1] = max(merged[-1][1], b)
             merged[-1][2].add(k)
         else:
             merged.append([a, b, {k}])
-    add = [{"s0": a, "s1": b, "style": "embedded", "source": "junction", "junction": sorted(k)} for a, b, k in merged
-           if b - a >= 1]
+    # (a piece joined across a section that wins keeps out of it: a setts stretch through a junction, #574)
+    add = [{"s0": p, "s1": q, "style": "embedded", "source": "junction", "junction": sorted(k)} for a, b, k in merged
+           for p, q in minus(a, b, wins) if q - p >= 1]
     # (the grass around them keeps what is left, MIN_PIECE or longer; the holes they cover go)
     out = []
     for x in secs:
@@ -415,6 +422,8 @@ def embed(secs, js):
             out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], add) if b - a >= MIN_PIECE]
         elif x.get("source") == "hole" and any(y["s0"] <= x["s0"] and x["s1"] <= y["s1"] for y in add):
             continue
+        elif yields(x):
+            out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], add) if b - a >= 1]
         else:
             out.append(x)
     return sorted(out + add, key=lambda x: x["s0"])
@@ -459,9 +468,54 @@ def reviewed(data, truth):
 
 
 def sections(data, truth, survey):
-    """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479) and the
-    paved track embedded at junctions and road crossings (#546)."""
-    return embed(cut(spans(data, truth, survey), holes(data, survey)), junctions(data, survey))
+    """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479), the
+    paved track embedded at junctions and road crossings (#546), and the junctions the user's surface answers lay in
+    setts (#574)."""
+    return setts_junctions(embed(cut(spans(data, truth, survey), holes(data, survey)), junctions(data, survey)), data, truth)
+
+
+def surface_places(data, truth):
+    """The user's answers to the track surface review (truth.json `trackSurfaceReview`, tools/surface_review.py, #574)
+    that lie on this line's route, whichever line's card asked: [(s0, s1, what, answer, id)]. A place both of whose
+    ends lie within 15 m of the route."""
+    path = LineString([p[:2] for p in data["path"]])
+    out = []
+    for a in truth.get("trackSurfaceReview", {}).get("answers", []):
+        if a.get("answer") not in SURFACE_STYLE:
+            continue
+        pts = [Point(*map(float, Frame().xy(*e))) for e in a["between"]]
+        if any(path.distance(p) > 15 for p in pts):
+            continue
+        s0, s1 = sorted(path.project(p) for p in pts)
+        out.append((s0, s1, a["what"], SURFACE_STYLE[a["answer"]], a["id"]))
+    return out
+
+
+def surfaced(data, truth):
+    """The answered stretches as sections: the style the user gave between the card's two points (as strong as the
+    user's marks)."""
+    return [{"s0": s0, "s1": s1, "style": st, "source": "surface", "card": i}
+            for s0, s1, what, st, i in surface_places(data, truth) if what == "stretch"]
+
+
+def setts_junctions(secs, data, truth):
+    """A junction the user answered setts is setts over its whole junction section, from the switches' forks to the
+    others' (the user, 2026-11-14, #574: "sett style inside a junction usually means the whole track junction from
+    switch fork to the other switch forks is covered by setts, this is for easy repairs and replacements"); so is a
+    junction section that touches a setts stretch. #546's junction sections already run from SWITCH_PAD before the
+    first switch to past the last frog, its pieces less than MIN_PIECE apart joined."""
+    places = surface_places(data, truth)
+    setts = [(s0, s1, i) for s0, s1, what, st, i in places if what == "junction" and st == "setts"]
+    stretches = [x for x in secs if x["style"] == "setts"]
+    out = []
+    for x in secs:
+        if x.get("source") == "junction" and x["style"] == "embedded":
+            card = next((i for s0, s1, i in setts if s1 >= x["s0"] and s0 <= x["s1"]), None)
+            near = any(y["s1"] >= x["s0"] - 1 and y["s0"] <= x["s1"] + 1 for y in stretches)
+            if card or near:
+                x = {**x, "style": "setts", **({"card": card} if card else {"beside": "setts"})}
+        out.append(x)
+    return out
 
 
 def spans(data, truth, survey):
@@ -492,6 +546,9 @@ def spans(data, truth, survey):
             s0, s1 = data["stops"][a]["s"], data["stops"][b]["s"]
         user.append({"s0": s0, "s1": s1, "style": t["style"], "source": "user", "mark": mark})
     user += reviewed(data, truth)
+    # (the surface answers where no mark or grass answer says otherwise, #574)
+    user += [{**x, "s0": a, "s1": b} for x in surfaced(data, truth) for a, b in minus(x["s0"], x["s1"], user) if b - a >= 1]
+    user.sort(key=lambda x: x["s0"])
     listed = []
     for k, t in enumerate(truth.get("grassTrack", {}).get("stretches", [])):
         if "from" not in t or t.get("removed"):
@@ -524,7 +581,7 @@ def offsets(truth):
     """How high the rails stand over each style's bed, m (truth.json trackHeights.railAboveDeck, scope all), as
     src/heights.js trackStyleOffsets reads them: one value per style, else an error."""
     out = {}
-    for style in ("embedded", "panels", "grass", "ballast"):
+    for style in ("embedded", "setts", "panels", "grass", "ballast"):
         fs = [f for f in truth.get("trackHeights", {}).get("railAboveDeck", [])
               if f.get("scope") == "all" and (not f.get("styles") or style in f["styles"])]
         if not fs or len({f["metres"] for f in fs}) != 1:

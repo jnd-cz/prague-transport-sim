@@ -41,7 +41,7 @@ class Decks:
             if sum(scopes) != 1:
                 raise ValueError('railAboveDeck fact needs exactly one scope: all, di_ids or city-frame bounds')
             if fact.get('styles') and (not isinstance(fact['styles'], list) or
-                                      any(s not in ('embedded','panels','grass','ballast') for s in fact['styles'])):
+                                      any(s not in ('embedded','setts','panels','grass','ballast') for s in fact['styles'])):
                 raise ValueError('unknown railAboveDeck track style')
             if fact.get('bounds'):
                 b = fact['bounds']

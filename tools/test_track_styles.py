@@ -155,6 +155,20 @@ class Holes(unittest.TestCase):
         data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **under}
         self.assertEqual(spans_of(T.sections(data, {}, None)), [])
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
+    def test_the_users_surface_answers_lay_setts_and_a_setts_junction_from_fork_to_fork(self):
+        # (#574, the user 2026-11-14: a setts junction is setts "from switch fork to the other switch forks")
+        ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
+        ans = lambda i, what, a, b, v: {"id": i, "what": what, "line": "x", "between": [ll(a), ll(b)], "answer": v}  # noqa: E731
+        truth = {"trackSurfaceReview": {"answers": [ans("st", "stretch", 100, 200, "setts"),
+                                                    ans("jn", "junction", 395, 405, "setts")]}}
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                "switches": [{"s": 150, "frog": 12}, {"s": 380, "frog": 12}, {"s": 410, "frog": 12}]}
+        got = spans_of(T.sections(data, truth, None))
+        # (the stretch keeps its switch; the answered junction's two switches joined, setts from fork to fork)
+        self.assertEqual(got, [(100, 200, "setts"), (377, 425, "setts")])
+        self.assertEqual(spans_of(T.sections(data, {}, None)), [(147, 165, "embedded"), (377, 425, "embedded")])
+
     def test_switches_do_not_cut_and_short_pieces_go(self):
         tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}
         self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through the switches)
@@ -171,7 +185,7 @@ class Holes(unittest.TestCase):
 
 class Lift(unittest.TestCase):
     TRUTH = {"trackHeights": {"railAboveDeck": [
-        {"id": "a", "metres": 0.0, "styles": ["embedded", "panels"], "scope": "all"},
+        {"id": "a", "metres": 0.0, "styles": ["embedded", "setts", "panels"], "scope": "all"},
         {"id": "g", "metres": 0.04, "styles": ["grass"], "scope": "all"},
         {"id": "b", "metres": 0.17, "styles": ["ballast"], "scope": "all"}]}}
 

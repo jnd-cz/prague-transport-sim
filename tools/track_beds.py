@@ -44,10 +44,10 @@ PAIR = (2.0, 6.0)      # m: a parallel track this far is the paired one (the opp
 PARALLEL = 0.95        # |cos| of the angle between two tracks counted parallel
 STEP_OUT = 0.1         # m: the survey read across the track
 SMOOTH = 5             # samples of the running median
-GROUP = {"embedded": ("tram",), "panels": ("tram",), "grass": ("green", "tram"), "ballast": ("rail", "tram")}
+GROUP = {"embedded": ("tram",), "setts": ("tram",), "panels": ("tram",), "grass": ("green", "tram"), "ballast": ("rail", "tram")}
 # m: the half width where the survey holds no area of the style, the median of its areas' half width measured on lines
 # 9, 17, 22, 23 and 37 (`--calibrate`, 2026-11-13)
-WIDTH = {"embedded": 1.7, "panels": 1.9, "grass": 2.0, "ballast": 2.5}
+WIDTH = {"embedded": 1.7, "setts": 1.7, "panels": 1.9, "grass": 2.0, "ballast": 2.5}   # (setts: as embedded, #574)
 NEAR_ROUTE = 6         # m: a track this near our route takes the route's style (src/world.js styleAt)
 RANK = {"tram": 3, "rail": 3, "green": 2}
 

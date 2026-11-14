@@ -9,7 +9,7 @@
 // rail height in the game. Local deck facts remain importer-only; these are the global style values.
 export function trackStyleOffsets(truth) {
   const offsets = {};
-  for (const style of ['embedded', 'panels', 'grass', 'ballast']) {
+  for (const style of ['embedded', 'setts', 'panels', 'grass', 'ballast']) {
     const facts = (truth?.trackHeights?.railAboveDeck || []).filter((f) => f.scope === 'all' && (!f.styles || f.styles.includes(style)));
     if (!facts.length || facts.some((f) => !Number.isFinite(f.metres) || f.metres < 0 || !f.id) ||
         new Set(facts.map((f) => f.metres)).size !== 1) throw new Error(`Missing or conflicting rail offset facts: ${style}`);
