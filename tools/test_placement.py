@@ -102,6 +102,37 @@ class Rules(unittest.TestCase):
         # line 37 starts at the head of Spojovací's platform, 29 m of it behind the start
         self.assertEqual(pl.ours({'p': [[-29, -3], [1.5, -3]]}, self.R), (1.5, 1.5))
 
+    def test_the_build_places_each_platform_for_the_game(self):
+        # (#419: src/platforms.js draws what this writes, with no rule of its own)
+        RB = pl.Route([[1000, 7], [0, 7]])   # the opposite track, 7 m left, driven the other way
+        mine = pl.place_platform({'p': [[100, -2], [160, -2], [160, -5], [100, -5]], 'area': True}, self.R, RB)
+        self.assertEqual((mine['path'], mine['side'], mine['ours']), ('route', -1, None))
+        self.assertEqual((round(mine['s0']), round(mine['s1']), mine['far']), (100, 160, 5))
+        theirs = pl.place_platform({'p': [[300, 10], [360, 10]]}, self.R, RB)
+        self.assertEqual((theirs['path'], theirs['side'], theirs['ours']), ('back', -1, None))
+        self.assertEqual((round(theirs['s0']), round(theirs['s1'])), (640, 700))   # (along the back path)
+        # farther than 12 m, or shorter than 8 m: not drawn
+        self.assertEqual(pl.place_platform({'p': [[100, -20], [160, -20]]}, self.R, RB), {'path': None})
+        self.assertEqual(pl.place_platform({'p': [[100, -2], [105, -2]]}, self.R, RB), {'path': None})
+
+    def test_two_paths_over_the_same_track_give_the_platform_to_the_back_path(self):
+        # (line 9's round trip, Řepy to Motol: float noise had decided it; the back path's AI trams stop there, our stop
+        # finds it by `ours`)
+        RB = pl.Route([[0, 0], [1000, 0]])
+        at = pl.place_platform({'p': [[100, -3], [160, -3]]}, self.R, RB)
+        self.assertEqual(at['path'], 'back')
+        self.assertEqual([round(v) for v in at['ours']], [100, 160])
+
+    def test_a_gtfs_platform_runs_31_m_back_from_its_stop_position(self):
+        # a platform known only from GTFS: its one point is where the front stops; 1 m past it, 32 m long; on line 9's
+        # round trip the back path takes it by a hair and it is still our stop's
+        RB = pl.Route([[0, -0.01], [1000, -0.01]])
+        at = pl.place_platform({'p': [[500, -2.5]], 'gtfs': True}, self.R, RB)
+        self.assertEqual(at['path'], 'back')
+        self.assertAlmostEqual(at['s1'], 501, places=3)
+        self.assertAlmostEqual(at['s0'], 469, places=3)
+        self.assertEqual([round(v, 3) for v in at['ours']], [469, 501])
+
     def test_the_route_is_the_game_s_metre_by_metre_chords(self):
         R = pl.Route([[0, 0], [10, 0], [10, 10]])
         s, d = R.nearest(10.5, 5)
