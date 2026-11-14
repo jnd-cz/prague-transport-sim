@@ -467,11 +467,12 @@ def reviewed(data, truth):
     return out
 
 
-def sections(data, truth, survey):
+def sections(data, truth, survey, opens=()):
     """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479), the
     paved track embedded at junctions and road crossings (#546), and the junctions the user's surface answers lay in
-    setts (#574)."""
-    return setts_junctions(embed(cut(spans(data, truth, survey), holes(data, survey)), junctions(data, survey)), data, truth)
+    setts (#574). `opens`: the lidar's runs of open ballast (tools/open_track.py `found`, #591)."""
+    return setts_junctions(embed(cut(spans(data, truth, survey, opens), holes(data, survey)), junctions(data, survey)),
+                           data, truth)
 
 
 def surface_places(data, truth):
@@ -518,7 +519,7 @@ def setts_junctions(secs, data, truth):
     return out
 
 
-def spans(data, truth, survey):
+def spans(data, truth, survey, opens=()):
     """The style sections from end to end, before the holes."""
     user = []
     for mark, t in enumerate(truth.get("trackStyles", [])):
@@ -574,7 +575,31 @@ def spans(data, truth, survey):
                     found.append({"s0": start, "s1": s1, "style": "grass", "source": "survey"})
                 start = None
             s += SAMPLE
-    return sorted(facts + found, key=lambda x: x["s0"])
+    # The lidar's open ballast (tools/open_track.py, #591) where nothing above says what the track is: the sure runs,
+    # pieces of MIN_GRASS m and more; a place the user answered on its card decides there (truth.json openTrackReview).
+    have = facts + found
+    ans = open_answers(data, truth)
+    lid = []
+    for r in opens:
+        if not r["sure"] and not any(a["s0"] < r["s1"] and a["s1"] > r["s0"] for a in ans):
+            continue
+        lid += [{"s0": a, "s1": b, "style": "ballast", "source": "lidar", "median": r["median"]}
+                for a, b in minus(r["s0"], r["s1"], have + ans) if b - a >= MIN_GRASS]
+    return sorted(have + lid + [a for a in ans if a["style"] != "paved"], key=lambda x: x["s0"])
+
+
+def open_answers(data, truth):
+    """The user's answers to the open track review (truth.json `openTrackReview`, tools/open_track.py --cards, #591)
+    on this line's route: the style between the card's two points (`paved` leaves the track to the rules)."""
+    path = LineString([p[:2] for p in data["path"]])
+    out = []
+    for a in truth.get("openTrackReview", {}).get("answers", []):
+        pts = [Point(*map(float, Frame().xy(*e))) for e in a["between"]]
+        if any(path.distance(p) > 15 for p in pts):
+            continue
+        s0, s1 = sorted(path.project(p) for p in pts)
+        out.append({"s0": s0, "s1": s1, "style": a["answer"], "source": "review", "card": a["id"]})
+    return out
 
 
 def offsets(truth):
@@ -621,7 +646,8 @@ def main():
     dp = ROOT / "data" / f"line{line}.dtm.json"
     dtm = json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else None
     survey = Survey(dtm) if dtm else None
-    data["styles"] = sections(data, truth, survey)
+    import open_track
+    data["styles"] = sections(data, truth, survey, open_track.found(data))
     own = track_sections(data, survey)
     for i, tr in enumerate(data.get("tracks") or []):
         if i in own:
