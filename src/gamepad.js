@@ -2,7 +2,8 @@
 // A gamepad (#592): the standard layout (Xbox and PlayStation pads), read every frame and sent as the keyboard's
 // key events, as the touch buttons are (src/touch.js), so src/main.js keeps one control path. The triggers set the
 // steps by how far they are pressed (the right one drive, the left one brake, the left over the right); a trigger
-// sends a step only when its step changes, so the keyboard works beside a pad at rest. Its mapping is in README.md.
+// sends a step only when its step changes, so the keyboard works beside a pad at rest. While a pad is connected the
+// dead-man pedal counts as held (src/main.js: a button held all shift tires the hand). Its mapping is in README.md.
 
 // standard-layout button index → [key, code]; every one is held: keydown on press, keyup on release
 const BUTTONS = {
@@ -10,7 +11,7 @@ const BUTTONS = {
   1: ['b', 'KeyB'],          // B / ○: bell
   2: ['a', 'KeyA'],          // X / □: sand
   3: [' ', 'Space'],         // Y / △: emergency brake
-  4: ['Shift', 'ShiftLeft'], // LB / L1: dead-man pedal
+  4: ['r', 'KeyR'],          // LB / L1: the parking brake on and off (advanced controls)
   5: ['g', 'KeyG'],          // RB / R1: look closer
   8: ['v', 'KeyV'],          // Back / Share: cab or outside view
   9: ['p', 'KeyP'],          // Start / Options: pause
@@ -41,6 +42,8 @@ export class Gamepad {
     window.addEventListener('gamepaddisconnected', (e) => this.release(e.gamepad.index));
     if (navigator.getGamepads) requestAnimationFrame((t) => this.frame(t));
   }
+
+  get active() { return this.pads.size > 0; }
 
   send(type, key, code, extra = {}) {
     window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true, ...extra }));

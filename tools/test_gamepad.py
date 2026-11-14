@@ -5,7 +5,7 @@ it is announced when it connects. A closes the doors. The right trigger half pre
 moves. Held just over a step's edge and eased back a little, the trigger keeps its step. The left trigger over it
 brakes at step 5, and both released free the pedals. Y held is the emergency brake, and let go it is brake step 5. A
 held D-pad ↑ repeats. A key pressed beside a pad at rest stays. Start pauses and resumes, and LB, the right stick and
-the D-pad's sides send their keys."""
+the D-pad's sides send their keys; the dead-man pedal counts as held while the pad is connected."""
 import argparse
 import faulthandler
 import functools
@@ -114,6 +114,10 @@ def main():
             pad(buttons={14: 1})
             pad(buttons={})
             r["keys"] = ev("window.keys")
+            pad(buttons={7: 0.1})  # (drive step 1: the dead-man pedal is needed)
+            r["deadman"] = ev("window.game.opts.deadman = true, window.game.deadmanTimer = 0, new Promise((ok) => setTimeout(() => ok(window.game.deadmanTimer), 1500))")
+            r["deadmanNotch"] = ev("window.game.tram.notch")
+            pad(buttons={})
             r["errors"] = errors[:3]
             ctx.close()
             browser.close()
@@ -137,15 +141,17 @@ def main():
         fails.append(f"a held D-pad ↑ repeated {r['repeats']} times in 0.9 s")
     if r["paused"] != [True, False]:
         fails.append(f"Start did not pause and resume: {r['paused']}")
-    want = ["+Shift", "-Shift", "+q", "-q", "+,", "-,"]
+    want = ["+r", "-r", "+q", "-q", "+,", "-,"]
     if r["keys"] != want:
         fails.append(f"LB, the right stick, D-pad ←: {r['keys']} (want {want})")
+    if r["deadman"] != 0 or r["deadmanNotch"] <= 0:
+        fails.append(f"the dead-man pedal not held with a pad connected: its timer {r['deadman']} s on step {r['deadmanNotch']}")
     if r["errors"]:
         fails.append(f"page errors: {r['errors']}")
     if fails:
         sys.exit("; ".join(fails))
     print("gamepad: announced, doors, trigger steps with a margin, brake over drive, emergency brake, repeats, a key beside it, "
-          "pause, dead-man, look, indicators: pass")
+          "pause, parking brake, look, indicators, the dead-man held: pass")
 
 
 if __name__ == "__main__":

@@ -227,7 +227,7 @@ Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na cel
 ### S herním ovladačem
 
 Ovladač Xbox nebo PlayStation v Chrome, Edge nebo Firefoxu; prohlížeč ho hře ukáže po prvním stisknutém tlačítku.
-Ovladač posílá klávesy klávesnice, takže klávesy fungují vedle něj.
+Ovladač posílá klávesy klávesnice, takže klávesy fungují vedle něj. Je-li ovladač připojený, bdělostní pedál se počítá jako držený.
 
 | ovladač | co dělá |
 |---|---|
@@ -239,7 +239,7 @@ Ovladač posílá klávesy klávesnice, takže klávesy fungují vedle něj.
 | B / ○ | zvonec |
 | X / □ | pískování (držet) |
 | Y / △ | nouzová brzda (držet) |
-| LB / L1 | bdělostní pedál (držet) |
+| LB / L1 | zajišťovací brzda zabrzdit a odbrzdit (pokročilé ovládání) |
 | RB / R1 | přiblížit pohled (držet) |
 | pravá páčka ← / → | pohled z levého / pravého okna |
 | Back / Share | pohled ze stanoviště nebo zvenku |
