@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "6559cb4",
- "published": "2026-11-14 14:25",
- "note": "#591: open ballast from the lidar; lines 9 17 22 23 37",
+ "built_at_commit": "a6dbc28",
+ "published": "2026-11-14 15:43",
+ "note": "#584: line 22 per-track styles (Drinopol)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6997930,
-   "sha256": "d135995e41741ff8e417499662c444e8103fc8c7efe5ea429712488a033a3fd2"
+   "size": 7031649,
+   "sha256": "e8d3af2e62fa579f7cd0367ef69122f26ec25fe3d0b8dce375dd475208864966"
   },
   "line22.validate.json": {
    "size": 4761,
