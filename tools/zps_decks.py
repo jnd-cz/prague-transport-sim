@@ -58,7 +58,7 @@ PLANE_REACH = 15.0  # m from the way under: the deck's vertices that give its pl
 WALK = 2.2
 SIDEWALK = 10.0  # m from a street's way under a deck: its sidewalk, not a passage of its own
 SLAB, MARGIN, MIN_SLAB = 1.0, 0.1, 0.3  # m: the default deck, the clearance's margin, the thinnest the page draws
-STREET = {"road", "sidewalk", "tram", "parking", "cycle", "island", "paved", "platform"}
+STREET = {"road", "sidewalk", "tram", "parking", "cycle", "island", "median", "paved", "platform"}
 RAMP_OVER, RAMP_LOW = 4.0, 1.0  # a deck area this far over IPR somewhere and within RAMP_LOW of it elsewhere: a ramp
 
 

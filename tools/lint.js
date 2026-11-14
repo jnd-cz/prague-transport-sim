@@ -284,7 +284,7 @@ function trackLevels(g) {
 // Streets that wave: the drawn survey surface along lines parallel to the route (6-20 m either side,
 // every 1 m), each sample against its 21 m running mean within the same surface class; a sample more
 // than 8 cm off is a bump. Places: where samples deviate more than 15 cm, per 50 m.
-const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'cycle', 'paved', 'platform']);
+const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'median', 'cycle', 'paved', 'platform']);
 function streetWaviness(g) {
   const r = g.route, dtm = r.ground.dtm;
   if (!dtm) return check('streets-smooth', 0, []);
@@ -874,7 +874,7 @@ function trackInBuildings(g) {
 function laneQuality(g) {
   const tr = window.traffic, dtm = g.route.ground?.dtm, r = g.route, bk = g.backRoute;
   if (!tr) return check('lanes-realistic', 0, []);
-  const CARR = new Set(['road', 'parking', 'tram']), OK_WALK = new Set(['sidewalk', 'island', 'platform', 'paved', 'cycle', 'stairs', 'green']);
+  const CARR = new Set(['road', 'parking', 'tram']), OK_WALK = new Set(['sidewalk', 'island', 'median', 'platform', 'paved', 'cycle', 'stairs', 'green']);
   const trackD = (x, y) => Math.min(r.distance(x, y), bk ? bk.distance(x, y) : Infinity);
   const plats = (g.platforms || []).map((p) => ({ p, rt: p.rt }));
   const onPlatform = (x, y) => plats.some(({ p, rt }) => {
@@ -1087,7 +1087,7 @@ function underpassClearance(g) {
 function stopFacts(g, truth) {
   const facts = truth?.stops || [];
   const index = new Map(g.stops.map((st, i) => [st.name, i]));
-  const ACROSS = new Set(['vienna', 'street']), KERB = new Set(['island', 'kerb']);
+  const ACROSS = new Set(['vienna', 'street']), KERB = new Set(['island', 'median', 'kerb']);
   const bad = [], listed = [];
   let of = 0;
   for (const f of facts) {

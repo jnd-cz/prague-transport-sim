@@ -302,6 +302,13 @@ Sections:
 
 - **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
   `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
+- **The survey's medians** (Dělící pás, 010000001503, #555) carry no surface, and some are mapped twice: of line
+  22's 31 within 40 m of the route, 8 lie mostly under a `tram` area (the tram reservation between the
+  carriageways), 6 on `road`, 15 alone. Read since #555 as `median` (raised like an island, green where OSM's grass
+  covers it: `tools/zps_medians.py`), they fill strips the page drew as sunken terrain: Modřanská's middle (line 17
+  s 4370), Bělohorská beside the track (line 22 s 4160). Where OSM maps the divided road as one two-way way, the
+  cars' fit took one carriageway and laid the other direction's lane in the gap or the opposite carriageway; it now
+  spans both and divides at the median (`src/traffic.js` `_fitRoad`, `laneOffset`).
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
   LZW). Its cell centres sit 0.72 m / 0.61 m off the S-JTSK metre grid (sampled bilinear, never copied);
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against

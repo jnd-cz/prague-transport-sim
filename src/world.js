@@ -316,7 +316,7 @@ function bedZ(row, o) {
 // A raised area (a platform, a sidewalk, an island) keeps its height: where one lies within a bed's outline, the bed is
 // too wide there, not the kerb too high (laid under the beds, they flattened 4-5 times the kerbs, line 9 345 -> 1571).
 const EDGE_BAND = 1.5, EDGE_RISE = 0.2, LEVEL = 2.5;
-const RAISED = new Set(['sidewalk', 'island', 'platform']);
+const RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
 function layUnderBeds(dtm, near) {
   let moved = 0;
   // (a vertex shared by a raised area and the street beside it, a kerb's foot, is raised: it keeps the kerb)
@@ -1109,7 +1109,7 @@ function lowerTerrainAt(T, x, y, zmax) {
 // islands and platforms with a kerb face down to the road), level 1 (bridge decks, railway on
 // the bridge, canopies) as slabs with sides and an underside.
 const DTM_COLORS = {
-  road: '#55565a', parking: '#5e5f63', cycle: '#7d5a52', tram: '#6c675d', sidewalk: '#a39d90', island: '#9b968a',
+  road: '#55565a', parking: '#5e5f63', cycle: '#7d5a52', tram: '#6c675d', sidewalk: '#a39d90', island: '#9b968a', median: '#9b968a',
   platform: '#b3ad9f', paved: '#9b968b', stairs: '#aaa59a', green: '#6f8a4e', water: '#5d7f95', deck: '#8f897e',
   rail: '#6a6258', roof: '#5f6266', wall: '#8a8172',
 };
@@ -1394,7 +1394,8 @@ function buildDtm(group, ground) {
   for (const [areaId, a] of dtm.areas.entries()) {
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
-    const col = color[a.c] || color.paved;
+    // (a median under OSM's grass is grass behind its kerbs: `s`, tools/zps_medians.py, #555)
+    const col = (a.c === 'median' && a.s === 'green' ? color.green : color[a.c]) || color.paved;
     const cg = cgs[DTM_KIND[a.c] || 'other'];
     const c = cg._chunk(a.ring[0][0], a.ring[0][1]);
     const startFace = c.pos.length / 9;
@@ -1420,7 +1421,7 @@ function buildDtm(group, ground) {
     }
     if (keepSurfaceRanges) (c.surfaceRanges ||= []).push([startFace, c.pos.length / 9, a.c, a.l, areaId]);
     // kerbs (ground level) or slab sides (level 1) along every ring
-    const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'platform' ? 0.18 : 0);
+    const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'median' || a.c === 'platform' ? 0.18 : 0);
     if (!drop) continue;
     const side = a.l > 0 ? col : new THREE.Color('#8e8a82').toArray();
     [a.ring, ...a.holes].forEach((ring, ri) => {
@@ -1550,7 +1551,7 @@ function roadPortalMouths(list) {
 // area at the Letenský tunel ran 191-206 m: a grey ramp across the opening). Inside a mouth's
 // footprint, street vertices above the tunnel road come down onto it (in place: the height lookup
 // holds the same points). Lawns and the hill over the throat are left alone.
-const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'tram']);
+const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'median', 'tram']);
 function fitDtmToMouths(dtm, mouths) {
   if (!mouths.length || dtm.mouthsFitted) return;
   dtm.mouthsFitted = true;

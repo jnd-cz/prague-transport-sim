@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "edcaefa",
- "published": "2026-11-14 16:20",
- "note": "#584: line 22, Drinopol platform B",
+ "built_at_commit": "827adb7",
+ "published": "2026-11-14 17:49",
+ "note": "#555: survey medians and associated road areas, all lines",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -13,8 +13,8 @@
    "sha256": "5e200065a38933b48a37f7985836fe47f20ba459d3ddef56e16f73296b8cd8ba"
   },
   "line17.dtm.json": {
-   "size": 9376915,
-   "sha256": "b2ac1124106be6009c1348ddc26fcf539e1b9fc14ee60b1a10133b31f4c26e2a"
+   "size": 9393328,
+   "sha256": "c327fa636ab155ce2bc2d013fa6bceb485998a695faadd5347ec11ceb8a3ce50"
   },
   "line17.dtmpoints.json": {
    "size": 841324,
@@ -57,8 +57,8 @@
    "sha256": "aa25d6461aca296d22661d8044764df4e9b34a342840abff582c6c3bc7c01dfe"
   },
   "line22.dtm.json": {
-   "size": 9573219,
-   "sha256": "597b895a45dd3ba1bc8021e8abc7e3858292a85cd4df861930d6affa84afc0bb"
+   "size": 9591105,
+   "sha256": "472c7264c85ae10d0b8224e032c4725e52b69feab731f37f7e6aedc66177e3a0"
   },
   "line22.dtmpoints.json": {
    "size": 917174,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 7031658,
-   "sha256": "543979acbcb000c5655bb161921c15b16473086c67b89dd89991217facc588ec"
+   "size": 7031753,
+   "sha256": "8c64570b357df85a74ed510ba59c6735cf7eda7e73e4675ac402e5f8245b172c"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -97,8 +97,8 @@
    "sha256": "06c53f3b6020a0e047fc18afee00683f9e4708e8fabe35e92f7a53f3c3362902"
   },
   "line23.dtm.json": {
-   "size": 4353679,
-   "sha256": "b747597e5d0f1b6705556d3cf805a4b3cf6838f43e26927c9b70d66240ca6e01"
+   "size": 4365317,
+   "sha256": "9b29fb590075061ceb5490ec0806cd3cb0a7db203414c6af9c632ee38c772457"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -137,8 +137,8 @@
    "sha256": "5804b06c5a9104287594c32e56ccb73d68499d9cebb1417f134558c7afc892d8"
   },
   "line37.dtm.json": {
-   "size": 4702736,
-   "sha256": "6432e0d6a65e615f1c54b849d7a01a3b84b9375348302f3294d1536a714719b3"
+   "size": 4708261,
+   "sha256": "dbd058a3087dc7f739dac3e109ef64c855152cdcc2a961ad0b23fcd16cb5a291"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -177,8 +177,8 @@
    "sha256": "d53e05de667e67e70b19c122f226ae3a98b7a7e3d66c34fddce92ddcd1b63b72"
   },
   "line9.dtm.json": {
-   "size": 9610708,
-   "sha256": "0d72fa3210baa75f7b04c67c2c7ec369f6dc4c0f3d5147179be1706b01a14a2e"
+   "size": 9616157,
+   "sha256": "a057491ce1c0417ac3c23813b4ab2a7848720f354af43022f683676c9eb6ef6c"
   },
   "line9.dtmpoints.json": {
    "size": 1243452,
