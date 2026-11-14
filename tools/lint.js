@@ -1049,6 +1049,15 @@ export function groundUnderDecks(g, world) {
         if (ground && ground.point.y > zu && s > a + 8 && s < b - 8) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));
       }
     }
+    // (the parapets flushDtm drew from the survey on a flat deck, metres per side: what of the deck's edge they cover)
+    const dtm = r.ground?.dtm;
+    span.flat = !!dtm?.flatDeck?.((a + b) / 2);
+    span.parapet = { left: 0, right: 0 };
+    for (const w of dtm?.parapets || []) {
+      if (w.s < a || w.s > b) continue;
+      const q = r.at(w.s), l = (w.p[1] - q.y) * q.hx - (w.p[0] - q.x) * q.hy;
+      span.parapet[l > 0 ? 'left' : 'right'] += Math.round(Math.hypot(w.q[0] - w.p[0], w.q[1] - w.p[1]));
+    }
     spans.push(span);
   }
   return { ...check('deck-surfaces', n, [...bad.values()]), triangles: { ground: tris.ground.size, deck: tris.deck.size }, spans };
