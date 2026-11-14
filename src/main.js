@@ -458,7 +458,10 @@ onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const 
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 // a gamepad (src/gamepad.js): its buttons and triggers send the keys too
-const pad = new Gamepad({ onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4) });
+const pad = new Gamepad({
+  onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4),
+  onLook: (x) => { lookTarget = -LOOK * x; }, // (the right stick: as far as Q / E at its end)
+});
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
 function fillTrips() {
@@ -746,6 +749,7 @@ $('btnToMenu').addEventListener('click', () => {
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
+const LOOK = 1.3; // the head turned out of a side window (rad)
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
@@ -785,7 +789,8 @@ window.addEventListener('keydown', (e) => {
   const prev = command();
   // number keys: a drive step, with Shift a brake step, 0 both pedals released
   const digit = /^Digit[0-5]$/.test(e.code) ? +e.code.slice(5) : null;
-  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit);
+  // (a gamepad's trigger, e.pad: the pedal on the step at once, src/gamepad.js)
+  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit, e.pad);
   switch (k) {
     case 'w': case 'arrowup': control(+1, e.repeat); break;
     case 's': case 'arrowdown': control(-1, e.repeat); break;
@@ -795,8 +800,8 @@ window.addEventListener('keydown', (e) => {
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
-    case 'q': case 'arrowleft': lookTarget = 1.3; break;   // look out of the left window
-    case 'e': case 'arrowright': lookTarget = -1.3; break; // look right, at the doors
+    case 'q': case 'arrowleft': lookTarget = LOOK; break;   // look out of the left window
+    case 'e': case 'arrowright': lookTarget = -LOOK; break; // look right, at the doors
     case 'z': mirrorOn = !mirrorOn; document.body.classList.toggle('nomirror', !mirrorOn); break;
     case 'h': game.setHeating('saloon'); break;
     case 'k': game.setHeating('cab'); break;
@@ -843,10 +848,21 @@ let pedalKey = null; // advanced: a held W / S moves the pedal on after 0.35 s
 function control(dir, repeat) {
   const eq = tram.eq;
   if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
+  if (dir > 0 && eq.parked && eq.pedal.brake === 0) parkedWarn();
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
 }
-function setStep(n) {
+// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the user's own try with
+// a pad were held by it, the user, 2026-11-14: "I would perhaps warn the user that parking brake is engaged")
+function parkedWarn() {
+  const text = t('msg.parked');
+  if (game.messages.some((m) => m.text === text)) return;
+  audio.emit('warning');
+  game.msg(text, 'warn', 4);
+}
+function setStep(n, now = false) {
   if (arcade()) tram.eq.lever = n;
+  else if (n > 0 && tram.eq.parked) parkedWarn();
+  else if (now) tram.eq.pressTo(n);
   else tram.eq.setStep(n);
 }
 window.addEventListener('blur', () => {
