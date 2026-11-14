@@ -2,6 +2,7 @@
 """The game's speed limits against the GPS rides in raw/reference/rides/ (#451).
 
     python -P -E tools/rides_limits.py                      # every ride in RIDES on line 23
+    python -P -E tools/rides_limits.py --lines 37            # T3M 8088 on line 37 (#500)
     python -P -E tools/rides_limits.py --lines 22,23 --json reports/rides_limits.json
 
 It starts its own server on a free port (as tools/headless.py), loads each line and reads the limit the tram's front
@@ -30,7 +31,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RIDES_DIR = os.path.join(ROOT, "raw", "reference", "rides")
 # the rides in a line's direction (raw/reference/SOURCES.md); the others run the opposite way or on a diversion
 RIDES = [("6312, 2026-10-31", "20261031-172412_-_Kr_lovka_b_l__labu__23_6312.gpx"),
-         ("6921, 2026-11-08", "20261108-183144_-_T3_6921_to_Strossmayerovo_T3M_to_Bulovka_52T_to_Palmovka_T3R_PLF_to_str__n_.gpx")]
+         ("6921, 2026-11-08", "20261108-183144_-_T3_6921_to_Strossmayerovo_T3M_to_Bulovka_52T_to_Palmovka_T3R_PLF_to_str__n_.gpx"),
+         ("8088, 2026-11-11", "20261111-081934_-_T3M_8088_2nd_car_Strazni_-_Palmovka.gpx"),  # (line 37: T3M, the second car, #500)
+         ("8088, 2026-11-12", "20261112-081938_-_T3M_8088_Strazni_-_Palmovka_linka_37.gpx")]  # (line 37: the second car's end, #500)
 MAX_OFF = 8      # m from the track for a fix to count
 SMEAR = 5        # m: the ride's speed at a metre is its fastest fix within this
 NEAR = 10        # m: our limit at a metre is the highest within this (the phone rides behind the front)
