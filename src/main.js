@@ -855,7 +855,8 @@ window.addEventListener('blur', () => {
 
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-let yaw = null;
+let yaw = 0; // the lead car's heading (route frame: atan2 of east, north)
+const EYE = new THREE.Vector3(), FWD = new THREE.Vector3();
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
 // click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
 // It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
@@ -938,14 +939,15 @@ function updateCamera(dt, t) {
     camera.lookAt(camLook);
     return;
   }
-  const eye = route.at(s - 1.4);
-  const h = route.heading(s + 4, 8);
-  const target = Math.atan2(h.hx, h.hy);
-  if (yaw === null) yaw = target;
-  let d = target - yaw;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  yaw += d * Math.min(1, dt * 5);
+  // the driver's eye is a point of the lead car (#597): 0.8 m behind the body's front, 2.39 m over the rail, on the centre
+  // line; it turns with the body and swings out with its front in a curve. (It stood on the track's centre line and looked
+  // along the track 4 m ahead of the tram, eased: 33 degrees ahead of the body in a 20 m curve, the user, 2026-11-14:
+  // "starts turning ahead of tram body in curves")
+  const lead = tramModel.userData.cars[0];
+  lead.updateWorldMatrix(true, false);
+  const eye = EYE.set(0, 2.39, leadFront() - 0.8).applyMatrix4(lead.matrixWorld);
+  const fwd = FWD.set(0, 0, 1).transformDirection(lead.matrixWorld);
+  yaw = Math.atan2(fwd.x, -fwd.z);
   const bob = Math.sin(t * 9) * 0.012 * Math.min(1, Math.abs(tram.v) / 8);
   look += (lookTarget - look) * Math.min(1, dt * 6);
   // the cab pitches with the track (bogie-to-bogie slope) plus a little load transfer
@@ -956,7 +958,7 @@ function updateCamera(dt, t) {
   const pitch = -0.035 - camAcc * 0.006 + slope;
   // turning the head also leans towards that side window
   const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
-  camera.position.set(eye.x + lx, profile.height(s - 1.4) + 2.39 + bob, -(eye.y + ly)); // (2.39 over top of rail)
+  camera.position.set(eye.x + lx, eye.y + bob, eye.z - ly);
   camera.rotation.set(0, 0, 0);
   camera.rotation.order = 'YXZ';
   camera.rotation.y = -yaw + look;
@@ -1091,13 +1093,17 @@ window.mirror = mirror; // cadence, target and excluded geometry are inspectable
 // It is fixed to the lead car's body (#541): in a curve the body is the chord between its bogies, its front over
 // the outside of the track, and it leans in a canted one, so a camera posed from the track turned against it.
 const mirrorTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.04, 0.1, 0, 'YXZ'));
+// the lead car's body front in its frame (x left, y up, z forward from its centre between the bogies, src/consist.js):
+// 0.6 m behind the coupler's face
+function leadFront() {
+  const u = tramModel.userData;
+  return u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+}
 function poseMirror(mirrorCam) {
-  const u = tramModel.userData, lead = u.cars[0];
-  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front: 0.6 m behind the coupler's face
-  // (the car's frame: x left, y up, z forward from its centre between the bogies, src/consist.js)
-  const front = u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+  const lead = tramModel.userData.cars[0];
+  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front
   lead.updateWorldMatrix(true, false);
-  mirrorCam.position.set(-1.55, 2.09, front).applyMatrix4(lead.matrixWorld);
+  mirrorCam.position.set(-1.55, 2.09, leadFront()).applyMatrix4(lead.matrixWorld);
   // looking back (a camera looks down its -z, the car's rear), turned a little outwards so the side of the tram
   // fills the inner edge, and a little down
   lead.getWorldQuaternion(mirrorCam.quaternion).multiply(mirrorTurn);
