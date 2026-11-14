@@ -63,6 +63,25 @@ class Junctions(unittest.TestCase):
         self.assertLess(np.sqrt(((g - plane) ** 2).mean()), 0.01)
         self.assertLess(np.abs(g - plane).max(), 0.03)
 
+    def test_a_raised_bed_keeps_its_kerb(self):
+        # a bed 0.15 m over a flat road beside it (Hartigova's raised belt): held, but the road is not drawn up to it
+        n = 40
+        Y, X = np.mgrid[0:n, 0:n].astype(float)
+        data = np.full((n, n), 200.0)
+        known = np.full((n, n), np.nan)
+        known[:, 18:22] = 200.15
+        kerb = np.isfinite(known)
+        lam = (sp.JUNCTION_WAVE / (2 * math.pi)) ** 4
+        free = np.isnan(known)
+        drawn = sp.fill_2d(known, free, data, lam)
+        kept = sp.fill_2d(known, free, data, lam, kerb=kerb)
+        self.assertGreater(drawn[:, 17].mean() - 200, 0.05)  # (without the kerb the road climbs to the bed)
+        self.assertLess(np.abs(kept[:, :18] - 200).max(), 0.005)
+
+    def test_street_geometry_from_truth(self):
+        r, other, belt, fall = sp.street_geometry()
+        self.assertEqual((r["primary"], r["living_street"], other, belt, fall), (500.0, 100.0, 150.0, 0.07, 0.06))
+
     def test_bilinear_reads_the_edge(self):
         g = np.array([[1.0, 2.0], [np.nan, 4.0]])
         z = sp.bilinear((0.0, 1.0, 1.0, g), np.array([0.5]), np.array([0.5]))
@@ -82,6 +101,15 @@ class Measures(unittest.TestCase):
         side = sp.drive_measures(lambda x, y: 200 + 0.2 * np.asarray(y), [c])
         self.assertEqual(side["rolls over 7 deg"], 2 * 40)
         self.assertEqual(side["jumps"], 0)
+
+    def test_drive_lines_off_the_road_are_not_measured(self):
+        # (an island beside a carriageway, 0.3 m up, under one drive line: no car drives it)
+        from shapely.geometry import box
+        c = self.street()
+        z = lambda x, y: np.where((np.asarray(x) > 20) & (np.asarray(y) > 1), 200.3, 200.0)  # noqa: E731
+        self.assertEqual(sp.drive_measures(z, [c])["jumps"], 1)  # (the left drive line)
+        road = box(-1, -3, 41, 1).union(box(-1, 1, 20, 3))
+        self.assertEqual(sp.drive_measures(z, [c], road=road)["jumps"], 0)
 
 
 if __name__ == "__main__":

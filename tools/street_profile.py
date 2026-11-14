@@ -20,6 +20,7 @@ import json
 import math
 import os
 import sys
+import warnings
 from collections import defaultdict
 
 import numpy as np
@@ -233,18 +234,30 @@ LANE = 1.75  # m: a drive line's offset from the centreline (half a lane)
 AXLE = 1.6  # m: a car's track width, over which its wheels' left-to-right difference is read
 JUMP = 0.15  # m within 1 m: the street bot's jump (src/streetbot.js)
 NOISE = 0.03  # m: the lidar's noise along a centreline, Tukey's scale for the fit (calibration: set from --calibrate)
-# m: the vertical radius a street's profile holds, by OSM class: the 5th percentile of the tightest radius the clean
-# streets of the five lines need (--calibrate, 2026-11-13, 384 km in 1864 stretches: primary 490, trunk 350, secondary
-# and tertiary 300, residential 150, living street 100 m)
-R_CLASS = {"motorway": 500.0, "trunk": 350.0, "primary": 500.0, "secondary": 300.0, "tertiary": 300.0,
-           "living_street": 100.0}
-R_STREET = 150.0  # m: the other classes' (residential, unclassified)
+
+
+def street_geometry(truth=None):
+    """data/truth.json streetGeometry: the vertical radius a street's profile holds by OSM class (measured by
+    --calibrate, backed by ČSN 73 6110's tables 13 and 14), the other classes' radius, the raised belt's height and
+    the steepest crossfall."""
+    if truth is None:
+        with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as fh:
+            truth = json.load(fh)
+    f = {x["id"]: x["value"] for x in truth["streetGeometry"]["facts"]}
+    r = {k[len("street-radius-"):].replace("-", "_"): float(v) for k, v in f.items()
+         if k.startswith("street-radius-") and k != "street-radius-other"}
+    return r, float(f["street-radius-other"]), float(f["raised-belt"]), float(f["street-crossfall-max"])
+
+
+# (m: by class, the other classes'; m: a belt raised more is a kerb; rise per m: the steepest crossfall)
+R_CLASS, R_STREET, RAISED_BED, FALL_MAX = street_geometry()
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
 PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it, runs beside it (pilot)
 STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a wall, a kerb), not a slope
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
+OWN_LANES = 3.0  # m either side of a street's centreline where it lies inside the street that governs it (a lane)
 
 
 def surface_tris(areas, classes):
@@ -342,7 +355,7 @@ def crossfall(F, ipr, p, t, road, s):
         ok = np.isfinite(fall[:, side])
         if ok.sum() >= 5:
             v = np.interp(s, s[ok], fall[ok, side])
-            fall[:, side] = tp.whittaker(s, v, 20.0, robust=0.02)
+            fall[:, side] = np.clip(tp.whittaker(s, v, 20.0, robust=0.02), -FALL_MAX, FALL_MAX)
         else:
             fall[:, side] = 0.0
     return fall, width
@@ -399,6 +412,30 @@ def track_streets(L, road, box):
     return out
 
 
+def raised_bed(c, F, ipr, road):
+    """Per sample of a tracks string and side (0: -n, 1: +n), whether its bed stands over RAISED_BED above the road
+    beside it: IPR 1-2 m beyond the bed's edge, where that is road, against the bed's height; held over 5 m runs (a
+    crossing's ramp, where IPR beside the bed is at its level, is a gap in the run)."""
+    import shapely
+    n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
+    out = np.zeros((len(c["p"]), 2), bool)
+    for side, sg in ((0, -1.0), (1, 1.0)):
+        zs = []
+        for d in (1.0, 1.5, 2.0):
+            q = c["p"] + n * (sg * (c["width"][:, side] + d))[:, None]
+            z = np.asarray(ipr.sample(q[:, 0] + F.E0, q[:, 1] + F.N0), float)
+            z[~shapely.contains_xy(road, q[:, 0], q[:, 1])] = np.nan
+            zs.append(z)
+        with warnings.catch_warnings():  # (a sample with no road beside it: all NaN)
+            warnings.simplefilter("ignore", RuntimeWarning)
+            beside = np.nanmedian(np.array(zs), axis=0)
+        up = np.isfinite(beside) & (c["z"] - beside > RAISED_BED)
+        for a, b in runs(up):
+            if c["s"][b - 1] - c["s"][a] >= 5.0:
+                out[a:b, side] = True
+    return out
+
+
 def pilot(at, radius, ln, out_dir, ctx=None):
     """Palmovka's streets (or any place): profiles and cross-sections built from the tracks and IPR, against the
     survey's surface. The tracks govern first (their own profile and tilt), then the OSM streets by class and length:
@@ -434,6 +471,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
             # (only the bed is the tracks': carried across a 15 m junction, their tilt (cant included) set the fill up
             # to 0.4 m off IPR and met the side streets in a seam; the road beside it is junctions()' fill)
             c["width"] = np.minimum(c["width"], (c["half"] + BED)[:, None])
+            c["raised"] = raised_bed(c, F, ipr, road)
     # a street's width ends half way to a centreline running beside it (the other carriageway of a dual one, the tracks
     # on their own bed, a parallel street): Hartigova's first carriageway reached over the median and held the second
     # one to its crown for 71 m (jumps of 0.4-0.7 m on line 37)
@@ -466,6 +504,11 @@ def pilot(at, radius, ln, out_dir, ctx=None):
                     pz.append(float(zg[i]))
                     by[j] = by.get(j, 0) + 1
         c["pins"] = pins
+        # (inside the street that governs it, a street holds its own lanes only, the rest is the governor's or the
+        # fill's: at Hartigova, Buchovcova's 15 m junction mouth carried the bed's height 13 m along the carriageway,
+        # 0.2 m over IPR and a 0.22 m jump on Hartigova's drive line)
+        if pins:
+            c["width"][pins] = np.minimum(c["width"][pins], OWN_LANES)
         if by:
             c["gov"] = cs[max(by, key=by.get)]
             c["pin_s"] = c["s"][pins]
@@ -511,21 +554,39 @@ def governing_height(g, pts, reach=None, own=False):
     return np.where(inside, z, np.nan)
 
 
-def fill_2d(known, free, data, lam, iters=3000, tol=1e-7):
+def bed_kerb(g, pts):
+    """Points on a tracks string's bed where the bed is raised on that side (raised_bed): its cells hold their height
+    but the road beside them is not drawn up to it (a kerb)."""
+    if "raised" not in g:
+        return np.zeros(len(pts), bool)
+    d = pts[:, None, :] - g["p"][None, :, :]
+    k = np.argmin((d ** 2).sum(-1), axis=1)
+    n = np.column_stack([-g["t"][k, 1], g["t"][k, 0]])
+    rel = pts - g["p"][k]
+    o, along = (rel * n).sum(-1), (rel * g["t"][k]).sum(-1)
+    side = (o > 0).astype(int)
+    w = g["width"][k, side]
+    return (np.abs(o) <= w) & (np.abs(along) <= 1.0) & (w > 0) & g["raised"][k, side]
+
+
+def fill_2d(known, free, data, lam, iters=3000, tol=1e-7, kerb=None):
     """A smooth surface over the `free` cells of a grid: nearest `data` (NaN: no pull) under a curvature penalty `lam`
-    (the graph Laplacian squared over the free and known cells), meeting the `known` cells (finite: held). Conjugate
-    gradients, matrix-free (no scipy here)."""
+    (the graph Laplacian squared over the free and known cells), meeting the `known` cells (finite: held), except those
+    behind a kerb (`kerb`: a raised bed's cells, not joined to a free neighbour). Conjugate gradients, matrix-free (no
+    scipy here)."""
     act = free | np.isfinite(known)
     # (neighbours across a step in IPR over STEP_CUT are not joined: a wall between the bus terminal by Palmovka and the
     # street under it, smeared, set the terminal's edge 2.5 m off)
     ref = np.where(np.isfinite(known), known, data)
+    kerb = np.zeros(known.shape, bool) if kerb is None else kerb
 
     pairs = []
     for sl_a, sl_b in (((slice(1, None), slice(None)), (slice(None, -1), slice(None))),
                        ((slice(None, -1), slice(None)), (slice(1, None), slice(None))),
                        ((slice(None), slice(1, None)), (slice(None), slice(None, -1))),
                        ((slice(None), slice(None, -1)), (slice(None), slice(1, None)))):
-        pairs.append((sl_a, sl_b, act[sl_a] & act[sl_b] & ~(np.abs(ref[sl_a] - ref[sl_b]) > STEP_CUT)))
+        apart = (kerb[sl_a] & free[sl_b]) | (free[sl_a] & kerb[sl_b])
+        pairs.append((sl_a, sl_b, act[sl_a] & act[sl_b] & ~(np.abs(ref[sl_a] - ref[sl_b]) > STEP_CUT) & ~apart))
 
     def lap(v):
         out = np.zeros_like(v)
@@ -585,7 +646,18 @@ def junctions(cs, F, ipr, road, box, cell=1.0):
     known = zs.reshape(X.shape)
     data = np.asarray(ipr.sample(x + F.E0, y + F.N0), float).reshape(X.shape)
     lam = (JUNCTION_WAVE / (2 * math.pi)) ** 4 / cell ** 4
-    grid = fill_2d(known, free, data, lam)
+    kerb = np.zeros(len(x), bool)
+    for c in cs:
+        if "raised" in c and c["raised"].any():
+            idx = np.flatnonzero(on & ~kerb)
+            for a in range(0, len(idx), 4000):
+                part = idx[a:a + 4000]
+                kerb[part] = bed_kerb(c, np.column_stack([x[part], y[part]]))
+    kerb = kerb.reshape(X.shape)
+    grid = fill_2d(known, free, data, lam, kerb=kerb)
+    # (the bed's own cells left out of the lookup: generated() reads the bed from its string, and a cell beside the kerb
+    # takes the road's corners, not a slope up to the bed)
+    grid[kerb] = np.nan
     # (the streets' heights too: the lookup at the fill's edge reads them; and IPR, for a cell across a step)
     return xs[0], ys[0], cell, grid, lambda a, b: np.asarray(ipr.sample(np.asarray(a) + F.E0, np.asarray(b) + F.N0), float)
 
@@ -634,16 +706,20 @@ def generated(cs, x, y, road=None, field=None):
     return z
 
 
-def drive_measures(zfun, cs, raw=False):
+def drive_measures(zfun, cs, raw=False, road=None):
     """The street bot's measures on a surface (zfun(x, y) -> z) along every street's two drive lines (LANE m either
     side of its centreline, every metre): jumps over JUMP within 1 m, the change of grade over a car, the wheels'
-    left-to-right difference (roll) and the 1 m bend (bumpy)."""
+    left-to-right difference (roll) and the 1 m bend (bumpy). With `road`, only where a drive line is on it (an OSM
+    centreline 1.75 m off a carriageway's middle crossed Hartigova's island, a 0.32 m "jump" no car drives)."""
+    import shapely
     jumps, dgrade, roll, bend, places = 0, [], [], [], []
     for c in cs:
         n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
         for side in (-1, 1):
             q = c["p"] + n * side * LANE
             z = zfun(q[:, 0], q[:, 1])
+            if road is not None:
+                z = np.where(shapely.contains_xy(road, q[:, 0], q[:, 1]), z, np.nan)
             zl = zfun(*(q + n * AXLE / 2).T)
             zr = zfun(*(q - n * AXLE / 2).T)
             ok = np.isfinite(z)
@@ -823,8 +899,8 @@ def pilot_report(at, radius, ln, out_dir):
         if all(math.dist(q, (f["x"], f["y"])) > 10 for f in far):
             far.append({"x": round(q[0], 1), "y": round(q[1], 1), "off": round(float((zg - zi)[i]), 2)})
     rep["generated over 0.2 m off IPR (largest per 10 m)"] = far[:20]
-    rep["drive lines"] = {"survey": drive_measures(svy, cs), "IPR": drive_measures(lidar, cs),
-                          "generated": drive_measures(gen, cs)}
+    rep["drive lines"] = {"survey": drive_measures(svy, cs, road=road), "IPR": drive_measures(lidar, cs, road=road),
+                          "generated": drive_measures(gen, cs, road=road)}
     with open(os.path.join(out_dir, "pilot.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(rep, fh, ensure_ascii=False, indent=1)
     print(json.dumps({k: v for k, v in rep.items() if k != "drive lines"}, ensure_ascii=False, indent=1))
@@ -879,7 +955,7 @@ def line_wide(lines, cell, out_path):
             for k, z in (("survey", zs), ("generated", zg)):
                 d = z - zi
                 acc[k]["dev"].extend(d[np.isfinite(d)].tolist())
-                m = drive_measures(fns[k], [c for c in cs if c["highway"] != "tracks"], raw=True)
+                m = drive_measures(fns[k], [c for c in cs if c["highway"] != "tracks"], raw=True, road=road)
                 acc[k]["jumps"] += m["jumps"]
                 acc[k]["rolls"] += m["rolls over 7 deg"]
                 for q in ("dgrade", "roll", "bend"):
