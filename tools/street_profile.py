@@ -39,6 +39,7 @@ CAR_LEN = 4.5  # m: a car's length, over which the change of grade is read
 PIECE = 400.0  # m: the longest stretch one fit takes (the solver's system is dense in its points)
 MIN_LEN = 60.0  # m: shorter clean stretches are left out of the calibration
 BAND = 0.05  # m: the profile keeps within this of the smoothed lidar (the noise's 90th percentile is set against it)
+BACK = math.cos(math.radians(120))  # a joint turning more than 120 degrees: the street coming back (Hartigova: 141)
 RADII = (25, 50, 75, 100, 150, 200, 300, 400, 500, 700, 1000, 1500, 2000, 3000)  # m: the radii tried, tightest first
 
 
@@ -66,8 +67,18 @@ def ways(F, pts, margin=150):
     return out
 
 
+def _turn(a, b):
+    """The cosine of the turn where polyline a's end meets polyline b's start (1: straight on, -1: back on itself)."""
+    u, v = a[-1] - a[-2], b[1] - b[0]
+    nu, nv = np.hypot(*u), np.hypot(*v)
+    return float(u @ v / (nu * nv)) if nu > 1e-9 and nv > 1e-9 else 1.0
+
+
 def chains(ws):
-    """Ways of one name and class joined end to end into longer chains (OSM splits a street at every change of tag)."""
+    """Ways of one name and class joined end to end into longer chains (OSM splits a street at every change of tag),
+    never where the street turns back on itself: Hartigova's two one-way carriageways meet at their west end, and joined
+    there in a V (a 141 degree turn), and joined into one U-shaped chain its profile was fitted round the turn, 0.58 m
+    over IPR and a 1.6 m step to the link beside it."""
     left = list(ws)
     out = []
     while left:
@@ -80,15 +91,22 @@ def chains(ws):
                 if w["name"] != c["name"] or w["highway"] != c["highway"] or not c["name"]:
                     continue
                 if w["nodes"][0] == nodes[-1]:
-                    xy, nodes = np.vstack([xy, w["xy"][1:]]), nodes + w["nodes"][1:]
+                    a, b, end = xy, w["xy"], True
                 elif w["nodes"][-1] == nodes[0]:
-                    xy, nodes = np.vstack([w["xy"][:-1], xy]), w["nodes"][:-1] + nodes
+                    a, b, end = w["xy"], xy, False
                 elif w["nodes"][-1] == nodes[-1] and w["oneway"] == "no" and c["oneway"] == "no":
-                    xy, nodes = np.vstack([xy, w["xy"][::-1][1:]]), nodes + w["nodes"][::-1][1:]
+                    a, b, end = xy, w["xy"][::-1], True
                 elif w["nodes"][0] == nodes[0] and w["oneway"] == "no" and c["oneway"] == "no":
-                    xy, nodes = np.vstack([w["xy"][::-1][:-1], xy]), w["nodes"][::-1][:-1] + nodes
+                    a, b, end = w["xy"][::-1], xy, False
                 else:
                     continue
+                if len(a) < 2 or len(b) < 2 or _turn(a, b) < BACK:
+                    continue
+                wn = w["nodes"] if (w["nodes"][0] == nodes[-1] or w["nodes"][-1] == nodes[0]) else w["nodes"][::-1]
+                if end:
+                    xy, nodes = np.vstack([a, b[1:]]), nodes + wn[1:]
+                else:
+                    xy, nodes = np.vstack([a[:-1], b]), wn[:-1] + nodes
                 ids.append(w["id"])
                 left.pop(k)
                 grew = True
@@ -257,6 +275,8 @@ JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of th
 PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it, runs beside it (pilot)
 STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a wall, a kerb), not a slope
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
+USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
+MOUTH = 1.0  # m: the most a street's width reaches beyond its usual width (a widening for a turn, not a side street)
 OWN_LANES = 3.0  # m either side of a street's centreline where it lies inside the street that governs it (a lane)
 
 
@@ -300,6 +320,22 @@ def sample_tris(tris, x, y):
     return z
 
 
+def smooth_pins(s, pins, pin_z, smooth=SMOOTH_M):
+    """The heights a street is held to, smoothed along each run of them (gaps up to 5 m joined): they are another street's
+    surface read along this one's centreline, across that one's crown and edges. Held as read, Hartigova's two
+    carriageways converging (8 cm between neighbouring pins) forced the fit 0.71 m over IPR 25 m before them."""
+    pins = np.asarray(pins, int)
+    out = np.asarray(pin_z, float).copy()
+    order = np.argsort(pins)
+    ps, zs = pins[order], out[order]
+    cut = np.flatnonzero(np.diff(ps) > 5) + 1
+    for idx in np.split(np.arange(len(ps)), cut):
+        if len(idx) >= 3 and smooth:
+            zs[idx] = tp.whittaker(s[ps[idx]], zs[idx], smooth)
+    out[order] = zs
+    return out
+
+
 def profile(s, z, rmin=None, pins=(), pin_z=None, smooth=SMOOTH_M):
     """A centreline's heights: IPR's samples (NaN skipped) fitted by the track's vertical-curve solver at rmin, robust
     to the lidar's noise (NOISE); pins: sample indices held at pin_z (where the street meets its governing one)."""
@@ -310,7 +346,7 @@ def profile(s, z, rmin=None, pins=(), pin_z=None, smooth=SMOOTH_M):
         zz = tp.whittaker(s, zz, smooth)
     if pin_z is not None:
         zz = zz.copy()
-        zz[list(pins)] = pin_z
+        zz[list(pins)] = smooth_pins(s, pins, pin_z, smooth)
     w = np.where(ok, 1.0, 0.0)
     w[list(pins)] = 1.0
     f = tp.vertical_profile(list(s), list(zz), rmin, weight=list(w), pins=list(pins), scale=NOISE)
@@ -436,6 +472,15 @@ def raised_bed(c, F, ipr, road):
     return out
 
 
+def usual_width(width, half=None):
+    """Per sample and side, the running median of a street's half widths over ±USUAL samples (the width a junction's
+    mouth or a short widening does not move)."""
+    from numpy.lib.stride_tricks import sliding_window_view
+    half = half or USUAL
+    w = np.pad(width, ((half, half), (0, 0)), mode="edge")
+    return np.median(sliding_window_view(w, 2 * half + 1, axis=0), axis=-1)
+
+
 def pilot(at, radius, ln, out_dir, ctx=None):
     """Palmovka's streets (or any place): profiles and cross-sections built from the tracks and IPR, against the
     survey's surface. The tracks govern first (their own profile and tilt), then the OSM streets by class and length:
@@ -472,6 +517,12 @@ def pilot(at, radius, ln, out_dir, ctx=None):
             # to 0.4 m off IPR and met the side streets in a seam; the road beside it is junctions()' fill)
             c["width"] = np.minimum(c["width"], (c["half"] + BED)[:, None])
             c["raised"] = raised_bed(c, F, ipr, road)
+    # a street's width at a junction's mouth is held to its width along the street: Bělohorská's mouth reached 22 m up
+    # Liborova (line 23) with its own crossfall, 1 m under IPR where Liborova starts its 15 % climb, which then lagged
+    # 3 m behind it; the mouth is the junctions' fill's
+    for c in cs:
+        if "track_z" not in c:
+            c["width"] = np.minimum(c["width"], usual_width(c["width"]) + MOUTH)
     # a street's width ends half way to a centreline running beside it (the other carriageway of a dual one, the tracks
     # on their own bed, a parallel street): Hartigova's first carriageway reached over the median and held the second
     # one to its crown for 71 m (jumps of 0.4-0.7 m on line 37)
@@ -494,7 +545,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
         if "track_z" in c:
             c["pins"] = []
             continue
-        pins, pz, by = [], [], {}
+        pins, pz, by, pin_by = [], [], {}, []
         for j, g in enumerate(cs[:k]):
             zg = governing_height(g, c["p"])
             zg[par[k][j]] = np.nan  # (held only by a street it meets, not one beside it)
@@ -502,6 +553,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
                 if i not in pins:
                     pins.append(int(i))
                     pz.append(float(zg[i]))
+                    pin_by.append(j)
                     by[j] = by.get(j, 0) + 1
         c["pins"] = pins
         # (inside the street that governs it, a street holds its own lanes only, the rest is the governor's or the
@@ -512,6 +564,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
         if by:
             c["gov"] = cs[max(by, key=by.get)]
             c["pin_s"] = c["s"][pins]
+            c["pin_gov"] = [cs[j] for j in pin_by]
         c["z"] = profile(c["s"], c["ipr"], rmin=R_CLASS.get(c["highway"].replace("_link", ""), R_STREET), pins=pins,
                          pin_z=np.array(pz) if pins else None)
     return cs, dtm, F, ipr, road
@@ -540,16 +593,21 @@ def governing_height(g, pts, reach=None, own=False):
     z = g["z"][k] + g["grade"][k] * along + g["fall"][k, side] * np.abs(o)
     # (a street that meets its governing one takes that one's surface where they meet and blends into its own crown
     # over BLEND m: crowned up to the edge, the two met in a seam, 3 jumps and a 7.7 deg roll at Palmovka)
-    gov = g.get("gov")
-    if gov is not None and not own and len(g.get("pin_s", ())):
-        ds = np.min(np.abs(g["s"][k][:, None] - np.asarray(g["pin_s"])[None, :]), axis=1)
+    # (each point blends into the street of its nearest pin: the link by Hartigova's end, held to Hartigova there and to
+    # Pod Krejcárkem 30 m on, blended into Pod Krejcárkem's surface carried 30 m and came out 0.9 m under IPR)
+    if g.get("gov") is not None and not own and len(g.get("pin_s", ())):
+        dd = np.abs(g["s"][k][:, None] - np.asarray(g["pin_s"])[None, :])
+        nearest, ds = np.argmin(dd, axis=1), np.min(dd, axis=1)
         u = np.clip(ds / BLEND, 0, 1)
         u = u * u * (3 - 2 * u)
         near = inside & (u < 1)
-        if near.any():
-            zg = governing_height(gov, pts[near], reach=1e9)
+        govs = g["pin_gov"]
+        for gid in {id(govs[i]) for i in nearest[near]}:
+            sel = near & np.array([id(govs[i]) == gid for i in nearest])
+            gov = next(govs[i] for i in nearest[sel])
+            zg = governing_height(gov, pts[sel], reach=1e9)
             ok = np.isfinite(zg)
-            idx = np.flatnonzero(near)[ok]
+            idx = np.flatnonzero(sel)[ok]
             z[idx] = u[idx] * z[idx] + (1 - u[idx]) * zg[ok]
     return np.where(inside, z, np.nan)
 

@@ -27,6 +27,13 @@ class Profiles(unittest.TestCase):
         self.assertEqual(a["nodes"], [1, 2, 3])
         self.assertEqual(len(cs), 2)
 
+    def test_a_dual_carriageway_is_not_joined_round_its_end(self):
+        # (Hartigova: the two one-way carriageways share their west end node)
+        ws = [way(1, "H", [1, 2], [(100, 0), (0, 0)], oneway="yes"), way(2, "H", [2, 3], [(0, 0), (100, 40)], oneway="yes"),
+              way(3, "H", [3, 4], [(100, 40), (200, 40)], oneway="yes")]
+        cs = sp.chains(ws)
+        self.assertEqual(sorted(len(c["ids"]) for c in cs), [1, 2])
+
     def test_resample_every_metre(self):
         s, p, t = sp.resample(np.array([(0, 0), (10, 0), (10, 5)], float))
         self.assertEqual(len(s), 15)
