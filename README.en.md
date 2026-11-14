@@ -249,7 +249,7 @@ your finger. The tram starts with the parking brake on: Y releases it before the
 | Y / △ | parking brake on and off (advanced controls) |
 | LB / L1 | emergency and track brakes (held) |
 | RB / R1 | look closer (held) |
-| right stick ← / → | look out of the left / right window |
+| right stick ← / → | turns the head left / right as far as the stick goes, at its end out of the side window |
 | Back / Share | cab or outside view |
 | Start / Options | pause |
 | L3 | mirror |

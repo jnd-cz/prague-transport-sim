@@ -36,9 +36,10 @@ export function trigStep(v, cur) {
 }
 
 export class Gamepad {
-  constructor({ onConnect } = {}) {
+  constructor({ onConnect, onLook } = {}) {
     this.pads = new Map(); // index → { down: Map(button → { h: held s, next: next repeat }), drive, brake, cmd, look }
     this.onConnect = onConnect;
+    this.onLook = onLook; // (x): the right stick across, -1 left to 1 right, 0 in its dead zone
     this.last = null;
     window.addEventListener('gamepadconnected', (e) => { this.onConnect?.(e.gamepad.id); });
     window.addEventListener('gamepaddisconnected', (e) => this.release(e.gamepad.index));
@@ -58,7 +59,7 @@ export class Gamepad {
     const p = this.pads.get(i);
     if (!p) return;
     for (const b of p.down.keys()) this.send('keyup', ...BUTTONS[b]);
-    if (p.look) this.send('keyup', p.look, p.look === 'q' ? 'KeyQ' : 'KeyE');
+    if (p.look) this.onLook?.(0);
     this.pads.delete(i);
   }
 
@@ -71,7 +72,7 @@ export class Gamepad {
     for (const g of list) {
       if (!g || !g.connected || g.mapping !== 'standard') continue;
       let p = this.pads.get(g.index);
-      if (!p) this.pads.set(g.index, (p = { down: new Map(), drive: 0, brake: 0, cmd: 0, look: null }));
+      if (!p) this.pads.set(g.index, (p = { down: new Map(), drive: 0, brake: 0, cmd: 0, look: 0 }));
       this.poll(g, p, dt);
     }
   }
@@ -96,13 +97,9 @@ export class Gamepad {
       this.send('keydown', String(n), `Digit${n}`, ev, true);
       this.send('keyup', String(n), `Digit${n}`, ev);
     }
-    // the right stick across: look out of the left or right window, let go under 0.4
-    const x = g.axes[2] ?? 0;
-    const look = x < -0.6 ? 'q' : x > 0.6 ? 'e' : Math.abs(x) < 0.4 ? null : p.look;
-    if (look !== p.look) {
-      if (p.look) this.send('keyup', p.look, p.look === 'q' ? 'KeyQ' : 'KeyE');
-      if (look) this.send('keydown', look, look === 'q' ? 'KeyQ' : 'KeyE');
-      p.look = look;
-    }
+    // the right stick across: the head turned in proportion (the user, 2026-11-14: "make the right stick movement
+    // proportional to the sideways camera movement"), nothing in a dead zone of 0.15 (a stick at rest drifts)
+    const raw = g.axes[2] ?? 0, x = Math.abs(raw) < 0.15 ? 0 : Math.sign(raw) * (Math.abs(raw) - 0.15) / 0.85;
+    if (x !== p.look) { p.look = x; this.onLook?.(x); }
   }
 }

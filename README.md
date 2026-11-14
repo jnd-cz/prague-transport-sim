@@ -243,7 +243,7 @@ vašem prstu. Vůz stojí na zajišťovací brzdě: Y ji odbrzdí, teprve pak j�
 | Y / △ | zajišťovací brzda zabrzdit a odbrzdit (pokročilé ovládání) |
 | LB / L1 | nouzová a kolejnicové brzdy (držet) |
 | RB / R1 | přiblížit pohled (držet) |
-| pravá páčka ← / → | pohled z levého / pravého okna |
+| pravá páčka ← / → | otáčí hlavou vlevo / vpravo tolik, kolik je vychýlená, na doraz z bočního okna |
 | Back / Share | pohled ze stanoviště nebo zvenku |
 | Start / Options | pauza |
 | L3 | zrcátko |

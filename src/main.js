@@ -458,7 +458,10 @@ onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const 
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 // a gamepad (src/gamepad.js): its buttons and triggers send the keys too
-const pad = new Gamepad({ onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4) });
+const pad = new Gamepad({
+  onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4),
+  onLook: (x) => { lookTarget = -LOOK * x; }, // (the right stick: as far as Q / E at its end)
+});
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
 function fillTrips() {
@@ -746,6 +749,7 @@ $('btnToMenu').addEventListener('click', () => {
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
+const LOOK = 1.3; // the head turned out of a side window (rad)
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
@@ -796,8 +800,8 @@ window.addEventListener('keydown', (e) => {
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
-    case 'q': case 'arrowleft': lookTarget = 1.3; break;   // look out of the left window
-    case 'e': case 'arrowright': lookTarget = -1.3; break; // look right, at the doors
+    case 'q': case 'arrowleft': lookTarget = LOOK; break;   // look out of the left window
+    case 'e': case 'arrowright': lookTarget = -LOOK; break; // look right, at the doors
     case 'z': mirrorOn = !mirrorOn; document.body.classList.toggle('nomirror', !mirrorOn); break;
     case 'h': game.setHeating('saloon'); break;
     case 'k': game.setHeating('cab'); break;
