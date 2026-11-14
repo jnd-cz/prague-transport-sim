@@ -182,6 +182,7 @@ class Holes(unittest.TestCase):
         hs = [(round(h["s0"]), round(h["s1"])) for h in T.holes(data) if h["kind"] == "platform"]
         self.assertEqual(hs, [(197, 243), (960, 1006)])
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_a_mark_for_one_track_keeps_its_grass_beside_a_platform(self):
         # (#584, Drinopol: our track paved along our platform, the other direction's track in grass)
         data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
