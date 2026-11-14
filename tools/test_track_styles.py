@@ -155,6 +155,7 @@ class Holes(unittest.TestCase):
         data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **under}
         self.assertEqual(spans_of(T.sections(data, {}, None)), [])
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_the_users_surface_answers_lay_setts_and_a_setts_junction_from_fork_to_fork(self):
         # (#574, the user 2026-11-14: a setts junction is setts "from switch fork to the other switch forks")
         ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
