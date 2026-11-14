@@ -378,17 +378,19 @@ export class Traffic {
     // (a road tunnel: the underground survey of its floor, where there is one)
     const classAt = road.t ? (x, y) => dtm.classUnder(x, y) : (x, y) => dtm.classAt(x, y);
     const L = road.path.length, n = Math.floor(L / 4) + 1;
-    const lo = new Array(n).fill(null), hi = new Array(n).fill(null);
+    const lo = new Array(n).fill(null), hi = new Array(n).fill(null), med = new Array(n).fill(null);
     let any = false;
     for (let i = 0; i < n; i++) {
       const p = road.path.at(Math.min(L, i * 4));
       if (!road.t && !dtm.covered(p.x, p.y)) continue;
       // (1 carriageway; 2 tram area, part of the street only between carriageway; 3 parking, part of it
-      // but no lane: trimmed at the edges like a tram bed at the side)
+      // but no lane: trimmed at the edges like a tram bed at the side; 4 a median between the two directions'
+      // carriageways of a two-way road mapped as one way, #555: part of the street, each direction on its side.
+      // A one-way road's carriageway ends at it)
       const on = [];
       for (let l = -16; l <= 16; l += 0.5) {
         const c = classAt(p.x + p.hy * l, p.y - p.hx * l);
-        on.push(c === 'road' ? 1 : c === 'tram' ? 2 : c === 'parking' ? 3 : 0);
+        on.push(c === 'road' ? 1 : c === 'tram' ? 2 : c === 'parking' ? 3 : c === 'median' && !road.o ? 4 : 0);
       }
       // the run around the centre (index 32), else the nearest within 8 m
       let k = 32;
@@ -401,10 +403,20 @@ export class Traffic {
       while (a < b && on[a] !== 1) a++; // a track bed or parking at the side is not for cars
       while (b > a && on[b] !== 1) b--;
       if (on[a] !== 1) continue;
-      const width = (b - a) * 0.5 + 0.5;
+      // (the median, the run of 4s nearest the centre between the two edges; it is no carriageway in the width)
+      let m0 = -1, m1 = -1;
+      for (let j = a; j <= b; j++) {
+        if (on[j] !== 4) continue;
+        let e = j;
+        while (e < b && on[e + 1] === 4) e++;
+        if (m0 < 0 || Math.abs((j + e) / 2 - 32) < Math.abs((m0 + m1) / 2 - 32)) { m0 = j; m1 = e; }
+        j = e;
+      }
+      const width = (b - a) * 0.5 + 0.5 - (m0 >= 0 ? (m1 - m0 + 1) * 0.5 : 0);
       if (width > Math.max(road.w * 2.2, road.w + 9) || a === 0 || b === on.length - 1) continue; // junction, plaza
       lo[i] = a * 0.5 - 16.25;
       hi[i] = b * 0.5 - 15.75;
+      if (m0 >= 0) med[i] = [m0 * 0.5 - 16.25, m1 * 0.5 - 15.75];
       // another way running alongside inside the same surveyed carriageway (a divided street mapped
       // as two ways, a slip lane): each takes its own side, split halfway between the centre lines
       for (const o of this._parallelWays(road, p)) {
@@ -434,6 +446,12 @@ export class Traffic {
     };
     road.fitLo = limit(smooth(fill(lo, -road.w / 2)));
     road.fitHi = limit(smooth(fill(hi, road.w / 2)));
+    // the divider of each direction where the survey has a median (#555): its edge on that side, the middle of the
+    // carriageway elsewhere, eased in at 0.4 m per 4 m like the kerbs (no lane jumping sideways at a median's nose)
+    if (med.some((m) => m)) {
+      const mid = road.fitLo.map((v, i) => (v + road.fitHi[i]) / 2);
+      road.fitMed = [limit(med.map((m, i) => m ? m[0] : mid[i])), limit(med.map((m, i) => m ? m[1] : mid[i]))];
+    } else road.fitMed = null;
   }
   // lateral offsets (+ = right) of other vehicle ways running alongside `road` at point p (within 12 m,
   // heading within ~35°), from the centre-line index built in the constructor
@@ -494,16 +512,21 @@ export class Traffic {
   // traffic: 1.8 m in from the right kerb, but never closer than 1.2 m to the middle of a two-way
   // road; one-way roads from 7 m wide have two lanes.
   // Lane k (0 = the right one) of n: 1.7 m in from the right kerb, the others 3 m further each (less
-  // where the band is narrower), never past the divider: the middle of a two-way road, or the line
-  // between the two tracks where both lie in the carriageway (then in a narrow street the lane lies
+  // where the band is narrower), never past the divider: the middle of a two-way road, a surveyed median's edge
+  // (#555), or the line between the two tracks where both lie in the carriageway (then in a narrow street the lane lies
   // on the track of its own direction: the Vyšehrad tunnel), or the left kerb of a one-way road.
   laneOffset(r, s, dir, k = 0) {
     let { lo, hi } = this.kerbs(r, s);
     let tk = this.tracksAt(r, s).filter((t) => t > lo - 0.5 && t < hi + 0.5);
     if (dir < 0) { [lo, hi] = [-hi, -lo]; tk = tk.map((t) => -t); } // the car's own right/left
     const n = lanesOf(r, dir);
+    // (a median between the two directions, #555: its edge on the car's own side is the divider)
     let div;
     if (r.o) div = lo;
+    else if (r.fitMed) {
+      const [mL, mR] = r.fitMed, f = Math.max(0, Math.min(mL.length - 1, s / 4)), i = Math.floor(f), j = Math.min(mL.length - 1, i + 1), u = f - i;
+      div = Math.max(lo, Math.min(hi, dir < 0 ? -(mL[i] * (1 - u) + mL[j] * u) : mR[i] * (1 - u) + mR[j] * u));
+    }
     else if (tk.length >= 2) div = (Math.min(...tk) + Math.max(...tk)) / 2;
     else div = (lo + hi) / 2;
     const band = Math.max(0.1, hi - div), step = n > 1 ? Math.max(2.6, Math.min(3.25, (band - 1.7) / (n - 0.5))) : 0;
