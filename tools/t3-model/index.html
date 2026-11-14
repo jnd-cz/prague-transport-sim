@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tatra T3 · Model studio</title>
+<style>
+  :root{color-scheme:light;font-family:Inter,system-ui,sans-serif;color:#243132;background:#e9e8e3}
+  *{box-sizing:border-box}body{margin:0}canvas{display:block;width:100%;height:100%}
+  #stage{position:fixed;inset:0}header{position:absolute;left:34px;top:26px;pointer-events:none}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#8c463f}
+  h1{font-weight:450;font-size:40px;letter-spacing:-.055em;margin:7px 0 4px}header p{font-size:12px;color:#727b79;margin:0}
+  aside{position:absolute;right:24px;top:24px;width:250px;padding:20px;background:#fafaf6ed;border:1px solid #fff;border-radius:12px;box-shadow:0 6px 32px #303e3410}
+  h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;margin:0 0 17px;color:#747c77}
+  label{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-top:15px;gap:12px}
+  input[type=range]{width:111px;accent-color:#a43337}input[type=checkbox]{accent-color:#a43337}
+  button,a.button{font:inherit;font-size:12px;border:1px solid #d8dcd6;border-radius:6px;background:#fff;color:#35403b;padding:8px 10px;cursor:pointer;text-decoration:none}
+  button:hover,a.button:hover{border-color:#a43337}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #a43337;outline-offset:3px}
+  .views{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:17px 0}.export{width:100%;margin-top:18px!important;background:#a43337!important;color:white!important;border-color:#a43337!important}
+  .small{font-size:10px;line-height:1.6;color:#7b837f;margin:12px 0 0}footer{position:absolute;bottom:22px;left:34px;right:300px;display:flex;justify-content:space-between;gap:20px;pointer-events:none}
+  .spec{font-size:11px;color:#7a817d}.spec strong{display:block;font-size:19px;font-weight:500;color:#35413c;margin-bottom:3px}.status{position:absolute;bottom:20px;right:25px;font-size:10px;color:#7a817d}
+  #error{position:absolute;left:30px;bottom:100px;max-width:500px;color:#a43337}
+  @media(max-width:700px){header{left:18px;top:16px}h1{font-size:28px}aside{top:auto;bottom:0;right:0;width:100%;padding:12px 18px;border-radius:12px 12px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:0 20px}h2,.small{display:none}.views{margin:8px 0;grid-column:1/-1;display:flex}.views button{flex:1}label{margin-top:9px}.export{margin-top:10px!important}footer{left:18px;right:18px;bottom:285px}.spec strong{font-size:15px}.status{display:none}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="stage"></div>
+<header><div class="eyebrow">Prague · Vehicle collection / 01</div><h1>Tatra T3</h1><p>6892 · Drawing dimensions, photographed details</p></header>
+<aside aria-label="Model controls">
+  <h2>Explore the model</h2>
+  <div class="views"><button data-view="hero">Perspective</button><button data-view="front">Front</button><button data-view="side">Door side</button><button data-view="rear">Rear</button></div>
+  <label>Front doors<input id="door1" aria-label="Front doors" type="range" min="0" max="1" step=".01" value="0"></label>
+  <label>Middle doors<input id="door2" aria-label="Middle doors" type="range" min="0" max="1" step=".01" value="0"></label>
+  <label>Rear doors<input id="door3" aria-label="Rear doors" type="range" min="0" max="1" step=".01" value="0"></label>
+  <label>Pantograph<input id="pantograph" aria-label="Pantograph" type="range" min="0" max="1" step=".01" value=".68"></label>
+  <label>Bogie swivel<input id="bogies" aria-label="Bogie swivel" type="range" min="-.3" max=".3" step=".01" value="0"></label>
+  <label>Wiper sweep<input id="wipers" aria-label="Wiper sweep" type="range" min="0" max="1" step=".01" value="0"></label>
+  <label>Turn wheels<input id="wheels" type="checkbox"></label><label>Show wireframe<input id="wireframe" type="checkbox"></label>
+  <button id="export" class="export">Download GLB</button><button id="reset" style="margin-top:8px">Reset pose</button>
+  <p class="small">Drag to orbit · scroll to zoom · right-drag to pan.<br>GLB includes named pivots and current pose.<br>Original geometry · metres · GPL-3.0<br><a href="../../assets/t3photo/README.md">Sources &amp; rig documentation</a></p>
+</aside>
+<footer><div class="spec"><strong>14,000 mm</strong>Body length</div><div class="spec"><strong>2,500 mm</strong>Body width</div><div class="spec"><strong>6,400 mm</strong>Bogie centres</div><div class="spec"><strong>12 leaves</strong>Three folding doors</div></footer>
+<div class="status" id="stats">Building model…</div><div id="error" role="alert"></div>
+<script type="module" src="./studio.js"></script>
+</body></html>
