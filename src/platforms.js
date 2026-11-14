@@ -125,7 +125,7 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
   const ground = route.ground, dtm = ground.dtm;
   const pos = [], col = [];
   const cTop = new THREE.Color(TOP), cKerb = new THREE.Color(KERB);
-  const platforms = [];
+  const platforms = [], also = [];
   for (const pl of data.platforms || []) {
     if (!('path' in pl)) throw new Error(`line ${data.line} data has platforms without their placement: built before #419, rebuild it (tools/rebuild.py)`);
     if (!pl.path) continue;
@@ -138,6 +138,7 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
     const ours = pl.ours ? { s0: pl.ours[0], s1: pl.ours[1] } : null;
     const plat = { rt, back: rt !== route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours, twin: !!pl.twin, unused: !!pl.unused };
     platforms.push(plat);
+    if (pl.also) also.push([plat, pl.also]);
     // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
     plat.kerb = side < 0 ? stopType(pl.vienna, () => vienna(dtm, rt, s0, s1), `platform ${pl.name}`, log.stopTypeDiffs) : null;
     if (plat.kerb !== null) { plat.inner = plat.kerb; plat.outer = plat.kerb + 2; plat.surveyed = true; continue; }
@@ -147,6 +148,13 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
     const left = platformStrip(rt, s0, s1, side, inner, outer, ground, pos, col, cTop, cKerb);
     if (left) log.platformGaps.push(`${pl.name} ${pl.code ?? ''}: ${left.toFixed(0)} m over a track left out`);
   }
+  // A platform both paths tie on (they run over its track the same way: line 9 from Řepy to Motol) serves both: the
+  // other path gets it along its own s, not drawn again and without a sign of its own, its kerb and survey the drawn
+  // one's (the user, 2026-11-14, #419: platforms belong to the track, docs/architecture.md)
+  for (const [plat, list] of also) for (const a of list) {
+    const art = a.path === 'back' ? backRoute : route;
+    if (art) platforms.push({ ...plat, rt: art, back: art !== route, s0: a.s0, s1: a.s1, side: a.side, ours: null, twin: true, shared: true });
+  }
   if (pos.length) group.add(platformMesh(pos, col));
   // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
   // their driving direction is along the back route), shelter where OSM has one. Not on our own platforms (`ours`:
@@ -154,7 +162,7 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
   // others (`twin`, tools/platforms.py) got a blank sign beside its own (Flora, Malostranská). A platform no tram stops
   // at (`unused`) has its sign without the lines' plate (the user, 2026-11-09, #407)
   for (const p of platforms) {
-    if (!p.back || p.ours) continue;
+    if (!p.back || p.ours || p.shared) continue;
     if (!p.twin) {
       const at = p.stop ? p.rt.nearest(p.stop[0], p.stop[1]).s : p.s1 - 0.5;
       const o = p.rt.offset(at, p.side * (p.inner + 0.8)), h = p.rt.at(at);

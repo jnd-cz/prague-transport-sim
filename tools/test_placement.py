@@ -115,13 +115,16 @@ class Rules(unittest.TestCase):
         self.assertEqual(pl.place_platform({'p': [[100, -20], [160, -20]]}, self.R, RB), {'path': None})
         self.assertEqual(pl.place_platform({'p': [[100, -2], [105, -2]]}, self.R, RB), {'path': None})
 
-    def test_two_paths_over_the_same_track_give_the_platform_to_the_back_path(self):
-        # (line 9's round trip, Řepy to Motol: float noise had decided it; the back path's AI trams stop there, our stop
-        # finds it by `ours`)
-        RB = pl.Route([[0, 0], [1000, 0]])
+    def test_two_paths_over_the_same_track_both_get_the_platform(self):
+        # (line 9's round trip, Řepy to Motol: float noise had given each platform to one path only; it belongs to the
+        # track, the user 2026-11-14: the back path draws it, the route has it too, along its own s)
+        RB = pl.Route([[-50, 0], [1000, 0]])
         at = pl.place_platform({'p': [[100, -3], [160, -3]]}, self.R, RB)
-        self.assertEqual(at['path'], 'back')
+        self.assertEqual((at['path'], [round(at['s0']), round(at['s1'])]), ('back', [150, 210]))
+        self.assertEqual([(o['path'], round(o['s0']), round(o['s1']), o['side']) for o in at['also']], [('route', 100, 160, -1)])
         self.assertEqual([round(v) for v in at['ours']], [100, 160])
+        # a platform one path is nearer to by more than TIE: that path's only
+        self.assertIsNone(pl.place_platform({'p': [[100, -3], [160, -3]]}, self.R, pl.Route([[0, -0.01], [1000, -0.01]]))['also'])
 
     def test_a_gtfs_platform_runs_31_m_back_from_its_stop_position(self):
         # a platform known only from GTFS: its one point is where the front stops; 1 m past it, 32 m long; on line 9's
