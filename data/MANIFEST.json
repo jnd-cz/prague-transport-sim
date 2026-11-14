@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "6354f70",
- "published": "2026-11-14 12:25",
- "note": "#539: paved track follows the survey over the archive where the lidar backs it; lines 9 17 22 23 37",
+ "built_at_commit": "de0e251",
+ "published": "2026-11-14 13:17",
+ "note": "#574: setts from the user's surface answers, lines 23 37",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -97,8 +97,8 @@
    "sha256": "06c53f3b6020a0e047fc18afee00683f9e4708e8fabe35e92f7a53f3c3362902"
   },
   "line23.dtm.json": {
-   "size": 4353679,
-   "sha256": "b747597e5d0f1b6705556d3cf805a4b3cf6838f43e26927c9b70d66240ca6e01"
+   "size": 4354154,
+   "sha256": "b0b157f3f2406dc384f37af94b7bb43480579abce790405b97b62d2a1747b801"
   },
   "line23.dtmpoints.json": {
    "size": 468871,
@@ -117,8 +117,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2710164,
-   "sha256": "22ed7deff3c28d9590e9ad1298d880439cd697867fc458a2975372eb0007efeb"
+   "size": 2710788,
+   "sha256": "211e62f70219517cef82ccb5447bf9507e32cebdea7f8edfaac14ccb5ca5ad84"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -137,8 +137,8 @@
    "sha256": "5804b06c5a9104287594c32e56ccb73d68499d9cebb1417f134558c7afc892d8"
   },
   "line37.dtm.json": {
-   "size": 4702736,
-   "sha256": "6432e0d6a65e615f1c54b849d7a01a3b84b9375348302f3294d1536a714719b3"
+   "size": 4702792,
+   "sha256": "6e7b83d6fa9d2b26a85bde93102254a439e0c2440a3ddd9b33f4ab1e858396d4"
   },
   "line37.dtmpoints.json": {
    "size": 487070,
@@ -157,8 +157,8 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.json": {
-   "size": 2535043,
-   "sha256": "d2feaf57f0c2d80bdcbed0e54a0eb0dd3d514bb33d5f6d85b761942c00ac4dfb"
+   "size": 2536088,
+   "sha256": "7ee4cf09c6af20e90569f19e5594422d7200f480101c786c9336c044e4ad314f"
   },
   "line37.validate.json": {
    "size": 2514,
