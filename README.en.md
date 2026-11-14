@@ -235,7 +235,7 @@ full screen: the game says once to use Share ⬆ → Add to Home Screen, and sta
 An Xbox or PlayStation pad in Chrome, Edge or Firefox; the browser shows it to the game after its first button. The pad sends
 the keyboard's keys, so the keys work beside it. While a pad is connected, the dead-man pedal counts as held.
 In advanced controls a trigger puts the pedal straight on its step: how fast you go from one step to another is up to
-your finger. The tram starts with the parking brake on: LB releases it before the drive trigger moves the pedal.
+your finger. The tram starts with the parking brake on: Y releases it before the drive trigger moves the pedal.
 
 | pad | does |
 |---|---|
@@ -246,8 +246,8 @@ your finger. The tram starts with the parking brake on: LB releases it before th
 | A / ✕ | doors |
 | B / ○ | bell |
 | X / □ | sand (held) |
-| Y / △ | emergency brake (held) |
-| LB / L1 | parking brake on and off (advanced controls) |
+| Y / △ | parking brake on and off (advanced controls) |
+| LB / L1 | emergency and track brakes (held) |
 | RB / R1 | look closer (held) |
 | right stick ← / → | look out of the left / right window |
 | Back / Share | cab or outside view |

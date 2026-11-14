@@ -139,7 +139,7 @@ const DICT = {
     // game messages
     'msg.shiftStart': 'Shift started at {stop}. Doors are open — depart at {time}.',
     'msg.closeDoors': 'Close the doors before driving (D)',
-    'msg.parked': 'Parking brake on: release it with R (gamepad: LB)',
+    'msg.parked': 'Parking brake on: release it with R (gamepad: Y)',
     'msg.ircNone': 'IRC: no radio switch in range', 'msg.ircLocked': 'IRC: switch is locked', 'msg.ircNoBranch': 'IRC: the switch has no {dir} branch',
     'msg.noOpenMoving': 'Cannot open doors while moving',
     'msg.notAtPlatform': 'Not at the platform yet — {go} m to go (stop sign in {d} m)',
@@ -313,7 +313,7 @@ const DICT = {
     'chip.uphill': 'Stoupání {g} ‰', 'chip.downhill': 'Klesání {g} ‰',
     'msg.shiftStart': 'Směna začíná na zastávce {stop}. Dveře jsou otevřené — odjezd v {time}.',
     'msg.closeDoors': 'Před jízdou zavřete dveře (D)',
-    'msg.parked': 'Zabrzděno zajišťovací brzdou: odbrzděte klávesou R (ovladač: LB)',
+    'msg.parked': 'Zabrzděno zajišťovací brzdou: odbrzděte klávesou R (ovladač: Y)',
     'msg.ircNone': 'IRC: v dosahu není rádiová výhybka', 'msg.ircLocked': 'IRC: výhybka je uzamčena', 'msg.ircNoBranch': 'IRC: výhybka nemá směr {dir}',
     'msg.noOpenMoving': 'Za jízdy nelze otevřít dveře',
     'msg.notAtPlatform': 'Ještě nejste u nástupiště — zbývá {go} m (označník za {d} m)',

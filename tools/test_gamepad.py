@@ -3,10 +3,10 @@
 (its own server on a free port). A standard-layout pad, played by a page script in place of navigator.getGamepads():
 it is announced when it connects. A closes the doors. The right trigger half pressed sets drive step 3 and the tram
 moves. Held just over a step's edge and eased back a little, the trigger keeps its step. The left trigger over it
-brakes at step 5, and both released free the pedals. Y held is the emergency brake, and let go it is brake step 5. A
-held D-pad ↑ repeats. A key pressed beside a pad at rest stays. Start pauses and resumes, and LB, the right stick and
+brakes at step 5, and both released free the pedals. LB held is the emergency brake, and let go it is brake step 5. A
+held D-pad ↑ repeats. A key pressed beside a pad at rest stays. Start pauses and resumes, and Y, the right stick and
 the D-pad's sides send their keys. In advanced controls a trigger puts the pedal straight on its step's angle,
-for drive once LB has released the parking brake (before it, a warning says so); the dead-man pedal counts as held while the pad is connected."""
+for drive once Y has released the parking brake (before it, a warning says so); the dead-man pedal counts as held while the pad is connected."""
 import argparse
 import faulthandler
 import functools
@@ -89,7 +89,7 @@ def main():
             r["brake"] = lever()
             pad(buttons={})
             r["free"] = lever()
-            pad(buttons={3: 1})
+            pad(buttons={4: 1})
             r["emergency"] = [lever()]
             pad(buttons={})
             r["emergency"].append(lever())
@@ -109,7 +109,7 @@ def main():
             pad(buttons={})
             r["paused"].append(ev("window.game.paused"))
             ev("window.keys.length = 0")
-            pad(buttons={4: 1})
+            pad(buttons={3: 1})
             pad(buttons={}, axes=[0, 0, -1, 0])
             pad(axes=[0, 0, 0, 0])
             pad(buttons={14: 1})
@@ -121,7 +121,7 @@ def main():
             pad(buttons={})
             r["errors"] = errors[:3]
             ctx.close()
-            # advanced controls: the trigger puts the pedal on the step at once, drive once the ratchet is released (LB)
+            # advanced controls: the trigger puts the pedal on the step at once, drive once the ratchet is released (Y)
             ctx = browser.new_context(viewport={"width": 1280, "height": 720})
             ctx.add_init_script(PAD)
             page = ctx.new_page()
@@ -138,9 +138,9 @@ def main():
             step(6)
             pad(buttons={7: 0.5})
             a["parked"] = pedals()
-            a["warned"] = ev("window.game.messages.some((m) => m.kind === 'warn' && m.text.includes('LB'))")
+            a["warned"] = ev("window.game.messages.some((m) => m.kind === 'warn' && m.text.includes('Y)'))")
             pad(buttons={})
-            pad(buttons={4: 1})
+            pad(buttons={3: 1})
             pad(buttons={})
             # (no game step between a trigger and the reading: the pedal is there at once)
             pad(buttons={7: 0.5})
@@ -179,7 +179,7 @@ def main():
         fails.append(f"Start did not pause and resume: {r['paused']}")
     want = ["+r", "-r", "+q", "-q", "+,", "-,"]
     if r["keys"] != want:
-        fails.append(f"LB, the right stick, D-pad ←: {r['keys']} (want {want})")
+        fails.append(f"Y, the right stick, D-pad ←: {r['keys']} (want {want})")
     if r["deadman"] != 0 or r["deadmanNotch"] <= 0:
         fails.append(f"the dead-man pedal not held with a pad connected: its timer {r['deadman']} s on step {r['deadmanNotch']}")
     a = r["advanced"]

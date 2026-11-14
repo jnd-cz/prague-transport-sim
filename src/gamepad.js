@@ -11,8 +11,9 @@ const BUTTONS = {
   0: ['d', 'KeyD'],          // A / ✕: doors
   1: ['b', 'KeyB'],          // B / ○: bell
   2: ['a', 'KeyA'],          // X / □: sand
-  3: [' ', 'Space'],         // Y / △: emergency brake
-  4: ['r', 'KeyR'],          // LB / L1: the parking brake on and off (advanced controls)
+  3: ['r', 'KeyR'],          // Y / △: the parking brake on and off (advanced controls), away from the brake trigger
+  4: [' ', 'Space'],         // LB / L1: emergency and track brakes, beside the brake trigger for a finger that brakes
+                             // on it (the user, 2026-11-14)
   5: ['g', 'KeyG'],          // RB / R1: look closer
   8: ['v', 'KeyV'],          // Back / Share: cab or outside view
   9: ['p', 'KeyP'],          // Start / Options: pause
