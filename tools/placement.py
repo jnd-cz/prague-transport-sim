@@ -291,9 +291,9 @@ def place(data, osm_tram):
 
 
 # The survey's ground areas (src/terrain.js groundArea) and their rank where they overlap (SURFACE_RANK)
-SURFACE_RANK = {'tram': 9, 'road': 8, 'island': 7, 'platform': 7, 'sidewalk': 6, 'parking': 5, 'cycle': 5, 'paved': 4,
+SURFACE_RANK = {'tram': 9, 'road': 8, 'island': 7, 'median': 7, 'platform': 7, 'sidewalk': 6, 'parking': 5, 'cycle': 5, 'paved': 4,
                 'stairs': 3, 'green': 2, 'water': 1}
-LANE, RAISED = {'road', 'parking'}, {'island', 'platform', 'sidewalk', 'paved'}
+LANE, RAISED = {'road', 'parking'}, {'island', 'median', 'platform', 'sidewalk', 'paved'}
 
 
 class Survey:

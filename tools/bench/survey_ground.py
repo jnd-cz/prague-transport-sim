@@ -30,7 +30,7 @@ from geo import Frame  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
 
 F = Frame()
-PAVED = {"tram", "road", "paved", "parking", "island", "platform", "sidewalk", "cycle"}
+PAVED = {"tram", "road", "paved", "parking", "island", "median", "platform", "sidewalk", "cycle"}
 
 
 def arg(name, default):

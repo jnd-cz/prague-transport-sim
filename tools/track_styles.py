@@ -85,7 +85,7 @@ CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
 NEAR_ROUTE = 6         # m: a drawn track this near our route takes the route's style (src/world.js styleAt)
 BRANCH = 15            # m of a track along where another one leaves it, or it leaves another: the switch
 RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its section; `lift` every LIFT_STEP m
-RANK = {"tram": 9, "road": 8, "island": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
+RANK = {"tram": 9, "road": 8, "island": 7, "median": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
 
 

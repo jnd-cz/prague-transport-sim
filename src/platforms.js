@@ -87,7 +87,7 @@ function platformMesh(pos, col) {
 function vienna(dtm, rt, s0, s1) {
   if (!dtm) return null;
   // (car lanes only, not the tram bed: Hodkovičky on its own corridor read as a Vienna-type stop)
-  const LANE = new Set(['road', 'parking']), RAISED = new Set(['island', 'platform', 'sidewalk', 'paved']);
+  const LANE = new Set(['road', 'parking']), RAISED = new Set(['island', 'median', 'platform', 'sidewalk', 'paved']);
   let lane = 0, raised = 0, kerb = 0, nk = 0;
   for (let s = s0 + 3; s < s1 - 2; s += 4) {
     for (const off of [2.2, 2.8, 3.4]) {
@@ -97,7 +97,7 @@ function vienna(dtm, rt, s0, s1) {
     }
     for (let off = 3.4; off <= 12; off += 0.4) {
       const o = rt.offset(s, -off), c = dtm.classAt(o.x, o.y);
-      if (c === 'sidewalk' || c === 'paved' || c === 'platform' || c === 'island') { kerb += off; nk++; break; }
+      if (c === 'sidewalk' || c === 'paved' || c === 'platform' || c === 'island' || c === 'median') { kerb += off; nk++; break; }
     }
   }
   if (lane + raised < 3 || lane / (lane + raised) <= 0.5) return null;

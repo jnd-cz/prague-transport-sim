@@ -41,6 +41,8 @@ CLASSES = {
     "010000021503": "green", "010000020903": "green", "010000015203": "green", "010000018703": "paved",
     "010000018903": "paved", "010000005503": "paved", "010000016603": "stairs", "010000031503": "roof",
     "010000016803": "wall", "010000020303": "water",
+    # (#555: the median strip between carriageways, tools/zps_medians.py; the road's associated area, paved)
+    "010000001503": "median", "010000032003": "paved",
 }
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
@@ -206,7 +208,7 @@ def fill_along(r, zs):
 
 # surfaces driven or walked on: they never jump a metre between nearby outline points (a kerb is a
 # few cm, a ramp a slope; stairs and walls are their own classes)
-SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "platform", "paved"}
+SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "median", "platform", "paved"}
 n_spikes = defaultdict(int)
 import numpy as np  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
@@ -349,6 +351,11 @@ for cls, level, rings in found:
     if holes:
         a["h"] = holes
     areas.append(a)
+
+# the medians: a tram reservation mapped twice stays tram, the others are grass or paved (tools/zps_medians.py, #555);
+# before anything keys the areas by index
+import zps_medians  # noqa: E402
+print("medians:", zps_medians.sort(areas, line.get("green") or []))
 
 # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
 # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
