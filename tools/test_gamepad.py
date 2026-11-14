@@ -5,7 +5,8 @@ it is announced when it connects. A closes the doors. The right trigger half pre
 moves. Held just over a step's edge and eased back a little, the trigger keeps its step. The left trigger over it
 brakes at step 5, and both released free the pedals. Y held is the emergency brake, and let go it is brake step 5. A
 held D-pad ↑ repeats. A key pressed beside a pad at rest stays. Start pauses and resumes, and LB, the right stick and
-the D-pad's sides send their keys; the dead-man pedal counts as held while the pad is connected."""
+the D-pad's sides send their keys. In advanced controls a trigger puts the pedal straight on its step's angle,
+for drive once LB has released the parking brake; the dead-man pedal counts as held while the pad is connected."""
 import argparse
 import faulthandler
 import functools
@@ -120,6 +121,40 @@ def main():
             pad(buttons={})
             r["errors"] = errors[:3]
             ctx.close()
+            # advanced controls: the trigger puts the pedal on the step at once, drive once the ratchet is released (LB)
+            ctx = browser.new_context(viewport={"width": 1280, "height": 720})
+            ctx.add_init_script(PAD)
+            page = ctx.new_page()
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{port}/?line={args.line}", timeout=180000)
+            page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
+            page.select_option("#optControls", "advanced")
+            page.click("#btnStart")
+            page.wait_for_function("window.game && document.body.classList.contains('shift')", timeout=60000)
+            pedals = lambda: ev("[window.game.tram.eq.pedal.drive, window.game.tram.eq.pedal.brake]")  # noqa: E731
+            a = r["advanced"] = {"mode": ev("window.game.tram.eq.mode")}
+            pad(buttons={0: 1})
+            pad(buttons={})
+            step(6)
+            pad(buttons={7: 0.5})
+            a["parked"] = pedals()
+            pad(buttons={})
+            pad(buttons={4: 1})
+            pad(buttons={})
+            # (no game step between a trigger and the reading: the pedal is there at once)
+            pad(buttons={7: 0.5})
+            a["drive3"] = pedals()
+            pad(buttons={7: 1})
+            a["drive5"] = pedals()
+            pad(buttons={})
+            a["free"] = pedals()
+            pad(buttons={6: 1})
+            a["brake5"] = pedals()
+            pad(buttons={6: 0.1})
+            a["brake1"] = pedals()
+            pad(buttons={})
+            a["errors"] = errors[:3]
+            ctx.close()
             browser.close()
     finally:
         server.shutdown()
@@ -146,12 +181,16 @@ def main():
         fails.append(f"LB, the right stick, D-pad ←: {r['keys']} (want {want})")
     if r["deadman"] != 0 or r["deadmanNotch"] <= 0:
         fails.append(f"the dead-man pedal not held with a pad connected: its timer {r['deadman']} s on step {r['deadmanNotch']}")
+    a = r["advanced"]
+    want = {"mode": "advanced", "parked": [0, 0], "drive3": [21, 0], "drive5": [36, 0], "free": [0, 0], "brake5": [0, 23.5], "brake1": [0, 3.5]}
+    if {k: a[k] for k in want} != want or a["errors"]:
+        fails.append(f"advanced controls: the pedals {a} (want {want})")
     if r["errors"]:
         fails.append(f"page errors: {r['errors']}")
     if fails:
         sys.exit("; ".join(fails))
     print("gamepad: announced, doors, trigger steps with a margin, brake over drive, emergency brake, repeats, a key beside it, "
-          "pause, parking brake, look, indicators, the dead-man held: pass")
+          "pause, parking brake, look, indicators, the dead-man held, advanced controls' pedals at once: pass")
 
 
 if __name__ == "__main__":

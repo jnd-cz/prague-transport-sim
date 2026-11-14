@@ -228,6 +228,8 @@ Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na cel
 
 Ovladač Xbox nebo PlayStation v Chrome, Edge nebo Firefoxu; prohlížeč ho hře ukáže po prvním stisknutém tlačítku.
 Ovladač posílá klávesy klávesnice, takže klávesy fungují vedle něj. Je-li ovladač připojený, bdělostní pedál se počítá jako držený.
+V pokročilém ovládání spoušť dá šlapku rovnou na svůj stupeň: jak rychle přejdete z jednoho stupně na druhý, je na
+vašem prstu. Vůz stojí na zajišťovací brzdě: LB ji odbrzdí, teprve pak jízdní spoušť pohne šlapkou.
 
 | ovladač | co dělá |
 |---|---|

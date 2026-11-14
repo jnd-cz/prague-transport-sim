@@ -785,7 +785,8 @@ window.addEventListener('keydown', (e) => {
   const prev = command();
   // number keys: a drive step, with Shift a brake step, 0 both pedals released
   const digit = /^Digit[0-5]$/.test(e.code) ? +e.code.slice(5) : null;
-  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit);
+  // (a gamepad's trigger, e.pad: the pedal on the step at once, src/gamepad.js)
+  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit, e.pad);
   switch (k) {
     case 'w': case 'arrowup': control(+1, e.repeat); break;
     case 's': case 'arrowdown': control(-1, e.repeat); break;
@@ -845,8 +846,9 @@ function control(dir, repeat) {
   if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
 }
-function setStep(n) {
+function setStep(n, now = false) {
   if (arcade()) tram.eq.lever = n;
+  else if (now) tram.eq.pressTo(n);
   else tram.eq.setStep(n);
 }
 window.addEventListener('blur', () => {

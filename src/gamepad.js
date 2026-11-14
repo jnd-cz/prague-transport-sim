@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // A gamepad (#592): the standard layout (Xbox and PlayStation pads), read every frame and sent as the keyboard's
 // key events, as the touch buttons are (src/touch.js), so src/main.js keeps one control path. The triggers set the
-// steps by how far they are pressed (the right one drive, the left one brake, the left over the right); a trigger
+// steps by how far they are pressed (the right one drive, the left one brake, the left over the right), in advanced
+// controls the pedal on the step at once (tr37.js pressTo); a trigger
 // sends a step only when its step changes, so the keyboard works beside a pad at rest. While a pad is connected the
 // dead-man pedal counts as held (src/main.js: a button held all shift tires the hand). Its mapping is in README.md.
 
@@ -45,8 +46,10 @@ export class Gamepad {
 
   get active() { return this.pads.size > 0; }
 
-  send(type, key, code, extra = {}) {
-    window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true, ...extra }));
+  send(type, key, code, extra = {}, pad = false) {
+    const e = new KeyboardEvent(type, { key, code, bubbles: true, ...extra });
+    if (pad) e.pad = true; // (a trigger: advanced controls put the pedal on the step at once, src/main.js)
+    window.dispatchEvent(e);
   }
 
   // a pad gone: whatever it held is let go
@@ -89,7 +92,7 @@ export class Gamepad {
     if (cmd !== p.cmd) {
       p.cmd = cmd;
       const n = Math.abs(cmd), ev = { shiftKey: cmd < 0 };
-      this.send('keydown', String(n), `Digit${n}`, ev);
+      this.send('keydown', String(n), `Digit${n}`, ev, true);
       this.send('keyup', String(n), `Digit${n}`, ev);
     }
     // the right stick across: look out of the left or right window, let go under 0.4
