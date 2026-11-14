@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-11r",
- "built_at_commit": "a96bcbd",
- "published": "2026-11-14 10:16",
- "note": "#419: platforms placed by the build (path, s0, s1, side, far, ours, also); lines 9 17 22 23 37",
+ "built_at_commit": "6109d6f",
+ "published": "2026-11-14 11:15",
+ "note": "#549: bridges per the user's answers (ramps, walkways, parapets), line 37 ballast; lines 9 17 22 23 37",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -33,8 +33,8 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.json": {
-   "size": 7036263,
-   "sha256": "fbc2a0aabb71c7db3f3b66e73dce3f7f198e619068c5e71adafe25535ef17941"
+   "size": 7035780,
+   "sha256": "ebd2233501da28f8e00f28fd6be6dc54f7c9178c69584f6ca2a4267126ecefc9"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -77,8 +77,8 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.json": {
-   "size": 6995733,
-   "sha256": "5085b5f4bd85d35a313caef530e3347b904b8226d49f01a98b53502d72e61692"
+   "size": 6995757,
+   "sha256": "1d046af893f78f582d219e9ba576912ccd51aad582dca5e814bf258855908800"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -117,8 +117,8 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.json": {
-   "size": 2709320,
-   "sha256": "d87f3f49d03fc6128990cad37d5f2e7a1fd1a28bfeb7e0b362a17a043855e933"
+   "size": 2709344,
+   "sha256": "973b68aac975b3227cbadfb38d80cb04e6931e72d2e7459bb8a6fa0ecb39316a"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -157,8 +157,8 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.json": {
-   "size": 2534384,
-   "sha256": "f08a41066bc6c1b0be65335515c159e23f04adee872f6e81f13f6ff14023f06f"
+   "size": 2535292,
+   "sha256": "9329d2bf9cf1675e26131a536141b798f7c9e5520e2f7a9834e965285d459f6e"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -197,8 +197,8 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.json": {
-   "size": 6262377,
-   "sha256": "f2a6fda567c9f075ad10c2e60ca7f7ada992744175aee599ed44bbdd762c21f4"
+   "size": 6262388,
+   "sha256": "201a8b60eb3b7b014f8e9e34f5710fe3f4ec47035a02df3e73f4e1ad314ca9bd"
   },
   "line9.validate.json": {
    "size": 6596,

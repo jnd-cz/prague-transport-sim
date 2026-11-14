@@ -983,6 +983,16 @@ function buildLod2(group, data, route, ground) {
             const zr = ground.profile.height(n.s), mz = (az + bz + cz) / 3; // (top of rail)
             if (mz > zr + 0.02 && mz < zr + 5.8) continue;
           }
+          // (over a flat deck, flushDtm, the deck and its parapets are the survey's: the model's top showed between the
+          // survey's areas as grey bars across the ballast, and its edge beam as teeth along the deck's edge, #549)
+          if (n && n.d < 8 && ground.dtm?.flatDeck?.(n.s)) {
+            // (by its highest corner: by the centre, the corners of the split triangles poked through the ballast)
+            const zd = ground.profile.height(n.s) - ground.profile.lift(n.s) - STREET_BELOW, hz = Math.max(az, bz, cz);
+            // (and only wholly over the survey's deck: past its end the model is the deck, and cut it left a hole under
+            // the track before the abutment, s 3032-3038)
+            const onDeck = (x, y) => ground.dtm.deckAt(x, y, zd, 0.5) !== null;
+            if (hz > zd - 0.1 && Math.min(az, bz, cz) < zd + 5.8 && onDeck(ax, ay) && onDeck(bx, by) && onDeck(cx, cy)) continue;
+          }
           const rd = roadUnder(mx, my);
           if (rd) {
             const zr = rd.hf(mx, my), mz = (az + bz + cz) / 3;
@@ -1264,10 +1274,96 @@ function flushDtm(ground) {
       const zr = ownAt(a, ai, n.s, q.x, q.y, zt) ?? dtm.deckAt(q.x, q.y, zt, 2.5);
       if (zr === null) continue;
       const k = Math.max(0, Math.min(1, (n.d - 8) / 7));
-      deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k))]);
+      deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k)), n, a.c]);
     }
   });
-  for (const [p, dz] of deckMoves) p[2] += dz;
+  // A tram area of the deck lies at the rails' level: a vertex of one within 8 m that still stands more than DECK_OVER m
+  // over the rail heads at its place is the parapet's or the railing's top taken as the surface, laid to the deck's
+  // surface there. (On line 37's Krejcárek viaduct the survey's tram areas along the deck's edge, 1.5-4.4 m right of our
+  // track, stepped up to 0.9-1.3 m over the rails half a metre out from it: their triangles stood over the deck as grey
+  // slabs, #549.) The same holds for the walkways on the deck: on line 17's track-only bridge at Modřanská škola the
+  // survey's paved strip 0.61 m over the rails is the parapet wall (the user, 2026-11-14, #549: "looks like bridge
+  // parapet wall"). On a deck with a carriageway a sidewalk standing more than DECK_OVER m over the rails is laid to an
+  // ordinary kerb, KERB m over the deck: Čechův most's, 0.66-0.73 m in the survey, is "normal sidewalk slightly higher
+  // than road plus rails, there's railing on the edge" (the user, 2026-11-14).
+  // A deck that carries only track (no level-1 carriageway of the survey within 8 m of the route on that span) is flat at
+  // the track's level: every vertex of its tram areas within 8 m is laid there, the walkways beside the bed with them (the
+  // user, 2026-11-14, #549, on the Krejcárek viaduct: "There is open ballast track in the middle, walkway a bit lower and
+  // a parapet on the side. We can simplify it to flat deck at track's level and model the parapet by what's left on top").
+  const DECK_OVER = 0.3, PARAPET_MIN = 0.5, PARAPET_H = [0.6, 1.3], KERB = 0.15;
+  const WALK = new Set(['tram', 'paved', 'sidewalk']); // (the deck's own areas a flat deck lays and takes its parapets from)
+  const spanOf = (s) => (profile.bridges || []).findIndex(([a, b]) => s >= a && s <= b);
+  const roaded = new Set();
+  for (const [, , n, c] of deckMoves) if (c === 'road' && n.d <= 8) roaded.add(spanOf(n.s));
+  // (read by the bridge models: nothing of one stands over a flat deck)
+  dtm.flatDeck = (s) => { const sp = spanOf(s); return sp >= 0 && !roaded.has(sp); };
+  dtm.deckLaid = [];
+  const over = new Map(), laid = new Set(); // (a laid vertex: how far its survey height stood over the deck)
+  for (const [p, dz, n, c] of deckMoves) {
+    p[2] += dz;
+    if (!WALK.has(c) || n.d > 8) continue;
+    const q = route.at(n.s), l = (p[1] - q.y) * q.hx - (p[0] - q.x) * q.hy, zr = profile.heightAt(n.s, l);
+    const sp = spanOf(n.s), flat = sp >= 0 && !roaded.has(sp);
+    if (!flat && (c === 'paved' || p[2] - zr <= DECK_OVER)) continue;
+    const z = zr - profile.lift(n.s) - STREET_BELOW + (!flat && c === 'sidewalk' ? KERB : 0);
+    if (p[2] - zr > DECK_OVER) {
+      dtm.deckLaid.push({ x: p[0], y: p[1], s: Math.round(n.s), c, dz: Math.round((z - p[2]) * 100) / 100 });
+      over.set(p, p[2] - z);
+    }
+    laid.add(p);
+    p[2] = z;
+  }
+  // The parapet is what the survey had on top: a ring edge of a tram area along the route, both its ends laid from
+  // PARAPET_MIN m or more over the deck and 2.5 m or more from our track, is the deck's edge under the parapet's top. It is
+  // drawn as a wall that high (PARAPET_H), 0.3 m thick towards the track (the photos: a concrete parapet with a railing).
+  // A deck has a parapet on both edges (the photos): where the survey kept no top on one side (Krejcárek's left, its
+  // walkway flat out to the edge), that side's outermost ring edges of the laid areas get one as high as the span's
+  // parapets from the survey (their median). (Edges: along the route, within 0.6 m of the outermost laid vertex in their
+  // 4 m stretch and side.)
+  dtm.parapets = [];
+  const edges = [], outer = new Map();
+  const latOf = (p) => { const n = route.nearest(p[0], p[1]); if (!n) return null; const q = route.at(n.s); return { n, l: (p[1] - q.y) * q.hx - (p[0] - q.x) * q.hy }; };
+  for (const a of dtm.areas) {
+    if (a.l < 1 || !WALK.has(a.c)) continue;
+    for (const ring of [a.ring, ...a.holes]) for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q2 = ring[(i + 1) % ring.length];
+      if (!laid.has(p) || !laid.has(q2)) continue;
+      const mx = (p[0] + q2[0]) / 2, my = (p[1] + q2[1]) / 2, n = route.nearest(mx, my);
+      if (!n || n.d < 2.5 || !dtm.flatDeck(n.s)) continue;
+      const r = route.at(n.s), ex = q2[0] - p[0], ey = q2[1] - p[1], el = Math.hypot(ex, ey) || 1e-9;
+      if (Math.abs(ex * r.hx + ey * r.hy) / el < 0.9) continue; // (across the deck: an area's end, not its edge)
+      const lp = latOf(p), lq = latOf(q2), side = lp.l + lq.l > 0 ? 1 : -1;
+      for (const L of [lp, lq]) {
+        const k = `${side}:${Math.floor(L.n.s / 4)}`;
+        outer.set(k, Math.max(outer.get(k) ?? 0, Math.abs(L.l)));
+      }
+      edges.push({ p, q: q2, n, side, lp, lq, ix: (r.x - mx) / n.d, iy: (r.y - my) / n.d });
+    }
+  }
+  const surveyed = [];
+  for (const e of edges) if (over.get(e.p) >= PARAPET_MIN && over.get(e.q) >= PARAPET_MIN) surveyed.push(Math.min(over.get(e.p), over.get(e.q)));
+  surveyed.sort((x, y) => x - y);
+  const usual = surveyed.length ? surveyed[surveyed.length >> 1] : null;
+  for (const e of edges) {
+    const own = over.get(e.p) >= PARAPET_MIN && over.get(e.q) >= PARAPET_MIN;
+    const edge = [e.lp, e.lq].every((L) => Math.abs(L.l) >= (outer.get(`${e.side}:${Math.floor(L.n.s / 4)}`) ?? 0) - 0.6);
+    if (!own && !(edge && usual !== null)) continue;
+    const h = Math.max(PARAPET_H[0], Math.min(PARAPET_H[1], own ? Math.min(over.get(e.p), over.get(e.q)) : usual));
+    dtm.parapets.push({ p: e.p, q: e.q, h, ix: e.ix, iy: e.iy, s: Math.round(e.n.s), from: own ? 'survey' : 'other side' });
+  }
+}
+
+// The parapets flushDtm found on our flat decks: a wall from the deck up to the survey's top, 0.3 m thick towards the
+// track, its outer face down to the slab's underside.
+function buildParapets(cg, parapets, col) {
+  const T = 0.3;
+  for (const { p, q, h, ix, iy } of parapets) {
+    const c = cg._chunk(p[0], p[1]);
+    const P = (v, k, dz) => W(v[0] + ix * T * k, v[1] + iy * T * k, v[2] + dz);
+    cg.quad(c, P(p, 0, -1), P(q, 0, -1), P(q, 0, h), P(p, 0, h), col);   // (outer face)
+    cg.quad(c, P(q, 1, 0), P(p, 1, 0), P(p, 1, h), P(q, 1, h), col);     // (inner face)
+    cg.quad(c, P(p, 0, h), P(q, 0, h), P(q, 1, h), P(p, 1, h), col);     // (top)
+  }
 }
 
 // (by weather: carriageways get slush, footways and the rest trodden snow, lawns all of it; all but
@@ -1326,6 +1422,7 @@ function buildDtm(group, ground) {
     });
   }
   buildDtmSteps(cgs.other, ground, color.wall);
+  buildParapets(cgs.other, dtm.parapets || [], color.wall);
   for (const [kind, cg] of Object.entries(cgs)) cg.build(group, 'dtm', kind);
 }
 
