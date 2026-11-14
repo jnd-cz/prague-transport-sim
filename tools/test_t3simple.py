@@ -38,7 +38,7 @@ MEASURE = r"""async () => {
   const models = await import('/src/models.js');
   const vehicles = await import('/src/vehicles.js');
   await vehicles.loadRegistry();
-  const { CAR_PITCH } = await import('/src/tram.js');
+  const { CAR_PITCH, T3: { length: T3_LEN } } = await import('/src/tram.js');
   const m = models.makeT3({ line: '17', cars: 2, vehicle: 't3simple', dest: 'Vozovna Kobylisy', run: '801', variant: 'T3SUCS' });
   new THREE.Scene().add(m);
   const [a, b] = m.userData.cars, out = { kind: m.userData.kind, bogie: m.userData.bogie };
@@ -64,6 +64,25 @@ MEASURE = r"""async () => {
     // the route box's corner: square on a T3, clear outside the rounded corners of the others (tested away)
     corners: [t3, m, t3m].map((s) => px(rbOf(s), 1, 1)[3]), alphaTest: [t3, m, t3m].map((s) => rbOf(s).alphaTest),
     aspect: [t3, m, t3m].map((s) => { const i = rbOf(s).map.image; return i.width / i.height; }) };
+  // #600: the T3M's rear number on its green display, lit as its front's, swapped with the line; the others' a navy-on-white
+  // card. The mirror camera at the mirror's glass: the car's own parts within 1.5 m in its view (src/mirror.js: 30 degrees,
+  // 150 x 190; src/main.js mirrorTurn), against the body's front where it stood
+  const rearOf = (s) => s.userData.mats.rearMat, rm0 = rearOf(t3m).map;
+  const greens = (mat) => { const i = mat.map.image, d = i.getContext('2d').getImageData(0, 0, i.width, i.height).data; let n = 0; for (let k = 0; k < d.length; k += 4) if (d[k + 1] > 200 && d[k] < 200 && d[k + 2] < 150) n++; return n; };
+  out.rear = { mCorner: px(rearOf(t3m), 1, 1), t3Corner: px(rearOf(t3), 1, 1), mGreen: greens(rearOf(t3m)), t3Green: greens(rearOf(t3)),
+    lit: [rearOf(t3m).type, rearOf(t3).type] };
+  models.setConsistLine(t3m, '22');
+  out.rear.swapped = rearOf(t3m).map !== rm0 && greens(rearOf(t3m)) > 0;
+  const inView = (eye) => {
+    const cam = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 50);
+    cam.position.set(...eye); cam.quaternion.setFromEuler(new THREE.Euler(-0.04, 0.1, 0, 'YXZ')); cam.updateMatrixWorld(true);
+    const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    const P = named(t3m.userData.cars[0], 'parts').geometry.attributes.position, v = new THREE.Vector3();
+    let n = 0;
+    for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); if (v.distanceTo(cam.position) < 1.5 && fr.containsPoint(v)) n++; }
+    return n;
+  };
+  out.mirror = { eye: t3m.userData.mirrorEye, near: inView(t3m.userData.mirrorEye), old: inView([-1.55, 2.09, T3_LEN / 2 - 0.6]) };
   // the bumpers: the colours across the front's middle between 0.7 and 0.9 m, and their heights
   const bumper = (set) => {
     const g = named(set.userData.cars[0], 'parts').geometry, P = g.attributes.position, C = g.attributes.color, cols = {};
@@ -418,6 +437,13 @@ def judge(r):
         "the T3M's display dark, the T3SUCS's and the T3's plates blue": sum(r["variants"]["mDisplay"][:3]) < 90
         and r["variants"]["sucDisplay"][2] > 120 and r["variants"]["t3Display"][2] > 120,
         # the user, 2026-11-10: the route box square on a T3, rounded on a T3SUCS and round a T3M's display (6892, 7290)
+        # #600, a tester's note of 2026-11-14: "The end panel with line number on T3M type should be same led dot style as in front"
+        "the T3M's rear number on its green display, lit and swapped with the line; the T3's a white card": r["rear"]["mGreen"] > 200
+        and sum(r["rear"]["mCorner"][:3]) < 90 and r["rear"]["t3Green"] == 0 and min(r["rear"]["t3Corner"][:3]) > 200
+        and r["rear"]["lit"] == ["MeshBasicMaterial", "MeshLambertMaterial"] and r["rear"]["swapped"],
+        # #600, the same note: "the armature is blocking view in the mirror"
+        "the mirror camera at the mirror's glass: none of the car's own parts within 1.5 m in its view": r["mirror"]["near"] == 0
+        and r["mirror"]["old"] > 0,
         "the route box's corners: square on the T3, rounded on the T3SUCS and the T3M": r["variants"]["corners"] == [255, 0, 0]
         and r["variants"]["alphaTest"] == [0.5, 0.5, 0.5] and all(near(a, 0.49 / 0.30, 0.02) for a in r["variants"]["aspect"]),
         # the bumper 0.76-0.86 m (6892 head on): silver with two red stripes on a T3, brown on the others

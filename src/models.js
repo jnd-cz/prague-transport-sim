@@ -3,7 +3,7 @@
 // in src/t3simple.js, rigged glTF vehicles as the hybrid in src/rigged.js, conflig's classic loaded here).
 import * as THREE from 'three';
 import { riggedReady, riggedIds, loadRigged, makeRiggedSet, setRiggedLine, poseRigged } from './rigged.js';
-import { makeSimpleSet, poseSimple, ROUTE_BOX } from './t3simple.js';
+import { makeSimpleSet, poseSimple, ROUTE_BOX, MIRROR_EYE } from './t3simple.js';
 import { vehicles, byId, fileUrl, variantOf, fleetNumbers, liveries, liveryVehicle, liveryUrl } from './vehicles.js';
 import { hangConsist } from './consist.js';
 import { signalsAt } from './lamps.js';
@@ -135,7 +135,11 @@ function ledPanelTexture(line, dest, next) {
   });
 }
 const mirrorPlateTexture = (line) => numberTexture(line, 104, 128, '#ffffff', DPP_BLUE, 0.85);
-const rearPlateTexture = (line) => numberTexture(line, 144, 128, '#1d3f86', '#f4f4f0', 1.0);
+// in the rear window: navy on white, or a T3M's green display as on its front (#600, a tester's note of 2026-11-14:
+// "The end panel with line number on T3M type should be same led dot style as in front")
+const rearPlateTexture = (line, variant) => variant === 'T3M'
+  ? ledFace(144, 128, 5, (s, w, h) => { s.font = `bold ${h * 0.8}px "Arial Narrow", Arial, sans-serif`; s.textAlign = 'center'; s.fillText(String(line), w / 2, h / 2 + 4); })
+  : numberTexture(line, 144, 128, '#1d3f86', '#f4f4f0', 1.0);
 const runCardTexture = (run) => numberTexture(run, 112, 72, '#f4f4f0', '#151515', 0.8);
 // the destination in capitals on two lines when it is more than one word (split nearest the middle)
 function destinationTexture(name) {
@@ -188,7 +192,7 @@ export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run
   if (loader === 'gltf') { makeDetailedSet(root, gltfProtos.get(v.id), line, cars, dest, run); root.userData.kind = 'gltf'; return root; }
   if (loader === 'gltf-rigged') { makeRiggedSet(v?.id ?? riggedIds()[0], root, line, cars, dest, run, CONTACT_WIRE - RAIL_TOP, fleet, look); root.userData.kind = 'rigged'; return root; }
   makeSimpleSet(root, cars, dest, plateMats(line, dest, run, type), CONTACT_WIRE - RAIL_TOP, { variant: type, fleet, paint: look?.colours, numbers: look?.numbers });
-  Object.assign(root.userData, { kind: 'simple', dest, run });
+  Object.assign(root.userData, { kind: 'simple', dest, run, mirrorEye: MIRROR_EYE });
   return root;
 }
 
@@ -291,7 +295,7 @@ function plateMats(line, dest, run, variant) {
   const plate = (map, extra) => new THREE.MeshBasicMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2, ...extra });
   const card = (map) => new THREE.MeshLambertMaterial({ map, polygonOffset: true, polygonOffsetFactor: -2 });
   return {
-    rbMat: plate(routeBoxTexture(line, variant), { alphaTest: 0.5 }), mirMat: plate(mirrorPlateTexture(line)), rearMat: card(rearPlateTexture(line)),
+    rbMat: plate(routeBoxTexture(line, variant), { alphaTest: 0.5 }), mirMat: plate(mirrorPlateTexture(line)), rearMat: (variant === 'T3M' ? plate : card)(rearPlateTexture(line, variant)),
     destMat: card(destinationTexture(dest)), runMat: card(runCardTexture(run)),
     ...(variant === 'T3M' ? { ledMat: plate(ledPanelTexture(line, dest, null)) } : {}),
   };
@@ -513,7 +517,7 @@ export function setConsistLine(model, line, dest = model.userData.dest, run = mo
   if (u.line !== line) {
     swap(mats.rbMat, routeBoxTexture(line, u.variant));
     swap(mats.mirMat, mirrorPlateTexture(line));
-    swap(mats.rearMat, rearPlateTexture(line));
+    swap(mats.rearMat, rearPlateTexture(line, u.variant));
   }
   if (u.dest !== dest) swap(mats.destMat, destinationTexture(dest));
   if (u.run !== run) swap(mats.runMat, runCardTexture(run));
