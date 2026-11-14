@@ -140,6 +140,70 @@ switch's `frog` m past its fork, a trailing switch's before it (11.5 m where the
 | `trackBrake` | 0/1: the track brakes on |
 <!-- /sound-lists -->
 
+## Packages
+
+A player installs packages in the menu's *Vehicles…* (#530; the decision record
+[2026-11-10-vehicle-packages.md](decisions/2026-11-10-vehicle-packages.md), sections 1, 6 and 7). A package is a
+folder with `package.json` at its root, of one of four kinds: a `vehicle`, a `livery`, a `sounds` pack or a `fleet`.
+The page installs from a .zip, a folder or an address (a `package.json`, whose files are fetched from beside it, or a
+`.zip`). One archive may hold several packages, each in its own folder with its own `package.json` (a complete
+vehicle pack: the user, 2026-11-11, "separate with possibility to bundle them together in a single archive"). Each is
+checked, installed, switched off and removed on its own.
+
+`package.json` holds the fields every kind has, then its kind's own:
+
+| field | what |
+|---|---|
+| `schema` | 1 |
+| `kind` | `vehicle`, `livery`, `sounds` or `fleet` |
+| `id` | `author.package` in lower case (`jnd.t3-dpp-1990s`), so two authors never collide; not one of the game's own ids |
+| `version` | `major.minor.patch`; installing another version of an installed id replaces it, and the installed one stays if the new one is refused |
+| `game` | the vehicle interface versions it fits, comparators separated by spaces (`">=1.0 <2"`), against `interface` in `src/packageRules.json` |
+| `requires` | a livery, sound pack or fleet: `{ "<vehicle id>": ">=1.0" }`, the vehicle it is for and its versions (a vehicle without a `version` counts as 1.0.0); a vehicle requires nothing |
+| `names`, `description` | `cs` and `en`; the description is optional (a warning without it) |
+| `thumbnail` | optional: one of its images, shown in the list |
+| `licence` | `spdx` (one of `licences` in `src/packageRules.json`), `authors`, `credit` (the line the game shows), `sources`, `commercial` (false: listed with a warning) |
+| `files` | every file with its `path`, `bytes` and `sha256`; files in the archive not listed are not kept |
+
+The kinds' own fields are those of the repository's manifests: a `vehicle` has `vehicle.json`'s (*The manifest*,
+above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liveries*), a `sounds` pack
+`sounds.json`'s (*Sound packs*). A `fleet` has a vehicle's `fleet` fields (`operator`, `types`, `sets`,
+`liveries`), and while it is switched on it replaces that vehicle's fleet in the dealing and the menu.
+
+**The check** (the record's section 7), at install and at every start, from `src/packageRules.json`, which
+`tools/test_vehicles.py` reads too:
+- the manifest's fields above, `game` and `requires` met, the vehicle installed and switched on;
+- every file listed: a type the game reads (`types`), present, of its `bytes` and `sha256`, within the caps (`caps`:
+  the package, a model, an image, a sound);
+- a vehicle's model, loaded by the game's own loader: its rig's names for the `moves` it claims
+  (`src/rigged.js` `rigProblems`), and one car as the game draws it (`src/models.js` `vehicleFit`): at most `fit`'s
+  `maxLength` (33 m) long, at most its type's width (`VEHICLE_TYPES` in `src/tram.js`) plus `widthOver` wide, its
+  lowest point on the rail plane, within the budget (`budget`: 100,000 triangles and 100 draw calls a car at its full
+  level, wide for now to see what authors bring: the user, 2026-11-13). A car longer than its type's length over the
+  coupler faces is offered with a warning: it runs on its type's two pivots until it has a type of its own
+  (articulated vehicles: #579). The model is measured at install; at a start the hashes stand for it;
+- a livery's slots, a sound pack's events and loops, a fleet's types: among those its vehicle and the game declare.
+
+A package that fails is listed with its reasons and not offered; one with warnings is offered with them. The
+repository's glTF vehicles measure within the rules (`tools/test_packages.py` prints them: the hybrid 43,612
+triangles and 62 draw calls a car, the classic model 19,896 and 41).
+
+**Where they live:** the browser's origin private file system (OPFS), `packages/<id>/` and `packages/index.json`
+(switched on or off, where it came from, its model's measures). Nothing leaves the browser. At a start the switched-on
+ones join the registry after the repository's (`src/packages.js` `loadInstalled`); their files answer at
+`packages/<id>/<path>` through blob URLs (`src/localFiles.js`), so every loader reads them as it reads `assets/`. A
+package installed from a `package.json` address offers *Update* when a newer version is there.
+
+**The curated list** (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
+`assets/catalogue.json`, shown under the installed ones with an *Install* button. Submitting through the game's
+website, the pack or its address, is #580. Until then, to submit a package, open an issue
+with its address (an https `package.json` or `.zip` on your own host, which must allow the game's page to fetch it:
+CORS), its licence, and the check's report from installing it. Once it is reviewed, an entry goes into the list:
+`id`, `names` (cs, en), `author`, `licence`, `kind`, `url`, `home` (its page). The project hosts no package it did not
+make. `tools/test_vehicles.py` checks the entries.
+
+`tools/test_packages.py` installs a sample bundle and six broken packages in headless Chromium (docs at its top).
+
 ## The rig
 
 A vehicle that moves without code of its own (loader `gltf-rigged`, `src/rigged.js`) names its parts in a rig file
@@ -240,8 +304,8 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
    `src/consist.js`, as `src/t3simple.js` does with instanced meshes (a car of it draws 8 meshes besides its
    plates).
 4. **The manifest:** `assets/<id>/vehicle.json` (above) and the id in `assets/vehicles.json`. A still model
-   (tier 1, loader `gltf`) needs nothing more, nor does one that moves by its rig (loader `gltf-rigged`). Vehicles
-   found and checked at startup and installed by the player are planned (#456).
+   (tier 1, loader `gltf`) needs nothing more, nor does one that moves by its rig (loader `gltf-rigged`). A player
+   installs one without the repository as a package (*Packages*, above).
 5. **The checks:** `python -I tools/test_vehicles.py` (the manifest), `tools/test_vehicles_game.py`, `tools/test_rigged.py`, a test like `tools/test_t3h.py` (levels, coupling, bogies, doors, cards, the fade), the
    frame time with `tools/frametime.py --models …`, and pictures of every model from the same views with
    `python -P -E tools/test_t3simple.py --shots DIR` (side, three-quarter, front, top, the bogie, the coupler; a

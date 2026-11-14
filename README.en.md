@@ -209,6 +209,11 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   like the others'. No number runs twice on the street, and no other set is dealt yours.
 - Livery: only for a model with liveries besides its own (none yet): its own, one of them, or "Any", dealt like the
   others'; the game remembers it for each model. Some of the other sets wear the liveries too.
+- Vehicles…: packages made by others (a tram, a livery, sounds or a fleet), installed from a .zip, a folder or an
+  address, a complete set in one archive too. The game checks each before it offers it (its files, its licence,
+  the model's size and how heavy it is to draw) and shows a refused one with its reasons. Installed packages stay
+  in this browser only and can be switched off or removed; a new tram appears in the Tram model menu. Below them
+  is the list of submitted packages.
 
 ### On a phone or tablet
 

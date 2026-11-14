@@ -83,6 +83,17 @@ je `sounds` v popisu vozidla (jeho soubory mezi soubory vozidla), nebo složka `
 Hra zatím žádný nemá; `tools/test_sounds.py` podává vlastní ukázkový. Pole, seznam událostí, smyček a veličin a pravidla
 srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
 
+## Balíčky
+
+Hráč si instaluje balíčky v menu *Vozidla…* (#530; rozhodnutí, oddíly 1, 6 a 7): složku se souborem `package.json`
+(vozidlo, nátěr, zvuky nebo vozový park), ze souboru .zip, ze složky nebo z adresy; jeden archiv může nést několik
+balíčků, každý ve své složce. Hra každý zkontroluje podle `src/packageRules.json` (stejná pravidla čte
+`tools/test_vehicles.py`): pole, typy souborů, velikosti a otisky SHA-256, licenci; model vozidla načte vlastním
+loaderem a změří vůz proti jeho typu a rozpočtu trojúhelníků a volání kreslení; pohyblivé díly podle `moves`.
+Balíček, který neprojde, odmítne s důvody. Instalované leží v úložišti prohlížeče (OPFS) a hra je při startu
+kontroluje znovu. Pole, kontrola a jak balíček přihlásit do seznamu `assets/catalogue.json`: anglická verze,
+[Packages](vehicles.md#packages).
+
 ## Soubor pohyblivých dílů (rig)
 
 Vozidlo, které se hýbe bez vlastního kódu (loader `gltf-rigged`, `src/rigged.js`), jmenuje své díly v souboru

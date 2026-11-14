@@ -2,7 +2,8 @@
 // Low-poly models built from primitives: cars, pedestrians, signals and signs; the T3 sets (the built-in car
 // in src/t3simple.js, rigged glTF vehicles as the hybrid in src/rigged.js, conflig's classic loaded here).
 import * as THREE from 'three';
-import { riggedReady, riggedIds, loadRigged, makeRiggedSet, setRiggedLine, poseRigged } from './rigged.js';
+import { riggedReady, riggedIds, loadRigged, makeRiggedSet, setRiggedLine, poseRigged, forgetRigged } from './rigged.js';
+import { localUrl } from './localFiles.js';
 import { makeSimpleSet, poseSimple, ROUTE_BOX } from './t3simple.js';
 import { vehicles, byId, fileUrl, variantOf, fleetNumbers, liveries, liveryVehicle, liveryUrl } from './vehicles.js';
 import { hangConsist } from './consist.js';
@@ -213,7 +214,7 @@ function lookOf(v, id) {
 }
 function liveryMap(url) {
   if (!LIVERY_MAPS.has(url)) {
-    const t = new THREE.TextureLoader().load(url);
+    const t = new THREE.TextureLoader().load(localUrl(url));
     t.colorSpace = THREE.SRGBColorSpace;
     t.flipY = false;   // (glTF's uv: v down the image)
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -239,7 +240,12 @@ const loadedLoader = () => (riggedIds().length ? 'gltf-rigged' : detailedProto ?
 // Loader.get counts its bytes): the files first, all of them, then the loader its manifest names.
 const loads = new Map();
 const MIME = { gltf: 'model/gltf+json', glb: 'model/gltf-binary', bin: 'application/octet-stream', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json' };
-export function loadVehicle(v, get = (u) => fetch(u)) {
+// (without the loading screen: a fetch-like body as its Loader.get gives, an installed package's file from its blob)
+const fetchBody = async (u) => {
+  const r = await fetch(localUrl(u)), buf = r.ok ? await r.arrayBuffer() : null;
+  return { ok: r.ok, url: u, arrayBuffer: async () => buf, json: async () => JSON.parse(new TextDecoder().decode(buf)), blobUrl: (type) => URL.createObjectURL(new Blob([buf], { type })) };
+};
+export function loadVehicle(v, get = fetchBody) {
   if (!loads.has(v.id)) loads.set(v.id, (async () => {
     const res = await Promise.all((v.files || []).map((f) => get(fileUrl(v, f.path))));
     const missing = v.files.filter((f, i) => !res[i].ok).map((f) => f.path);
@@ -255,6 +261,30 @@ export function loadVehicle(v, get = (u) => fetch(u)) {
   return loads.get(v.id);
 }
 
+// A vehicle's template forgotten (an installed package removed, or refused by its check: src/packages.js)
+export function forgetVehicle(id) { loads.delete(id); gltfProtos.delete(id); forgetRigged(id); }
+
+// One car of vehicle v as the game draws it at its full level (#530, the package check: src/packages.js): its
+// triangles and draw calls, and its box in the car's frame (x across, y up from the rail plane, z along).
+export function vehicleFit(v) {
+  const set = makeT3({ vehicle: v.id, cars: 1, line: '22', run: '801', dest: 'Test' });
+  set.updateMatrixWorld(true);
+  const box = new THREE.Box3(), b = new THREE.Box3();
+  let triangles = 0, drawCalls = 0;
+  set.traverseVisible((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry, groups = Array.isArray(o.material) ? Math.max(1, g.groups.length) : 1;
+    drawCalls += groups;
+    triangles += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    if (!g.boundingBox) g.computeBoundingBox();
+    box.union(b.copy(g.boundingBox).applyMatrix4(o.matrixWorld));
+  });
+  set.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(set.matrixWorld).invert();
+  box.applyMatrix4(inv);
+  return { triangles: Math.round(triangles), drawCalls, size: box.getSize(new THREE.Vector3()).toArray(), low: box.min.y, kind: set.userData.kind };
+}
+
 // A tier-1 glTF vehicle (loader 'gltf', docs/vehicles.md): a still model in metres, its origin on the rail plane
 // midway between the bogie pivots, +Y up, facing the manifest's `forward` ('+Z', the game's, unless it says '+X',
 // '-X' or '-Z'). Its meshes are baked into the game's axes once; its pivots are its type's (src/tram.js).
@@ -263,7 +293,7 @@ const TURN = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
 async function loadGltfVehicle(v, files) {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const manager = new THREE.LoadingManager();
-  manager.setURLModifier((u) => files[u] || u);
+  manager.setURLModifier((u) => files[u] || localUrl(u));
   const gl = await new GLTFLoader(manager).loadAsync(fileUrl(v, v.model));
   const turn = new THREE.Matrix4().makeRotationY(TURN[v.forward ?? '+Z'] ?? 0);
   gl.scene.updateMatrixWorld(true);
@@ -310,7 +340,7 @@ export const RAIL_TOP = 0;         // the wheels stand on the profile: it is the
 export async function loadDetailedT3(url, files = {}) {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const manager = new THREE.LoadingManager();
-  manager.setURLModifier((u) => files[u] || u);
+  manager.setURLModifier((u) => files[u] || localUrl(u));
   const gl = await new GLTFLoader(manager).loadAsync(url);
   const src = gl.scene;
   src.updateMatrixWorld(true);

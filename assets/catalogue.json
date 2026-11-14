@@ -1,0 +1,4 @@
+{
+  "about": "Vehicle packages their authors submitted and the project reviewed (#530; docs/vehicles.md, Packages: how to submit one). The menu's Vehicles… lists them; the player installs one from its url (a package.json or a .zip on its author's host). The project hosts none it did not make.",
+  "packages": []
+}

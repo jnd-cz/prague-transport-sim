@@ -10,8 +10,11 @@ manifest is the one place), its livery slots (#529: a glTF vehicle's slots name 
 the index lists (#529): its vehicle, the slots it paints among those the vehicle declares, its images WebP, PNG or JPEG
 with power-of-two sides up to 2048 px, its licence, its files' rows in ASSETS.md. Docs: docs/vehicles.md, "The
 manifest" and "Liveries". Each sound pack (#528), a package or a vehicle's `sounds`: its events and loops among the
-game's (src/audio.js, read by tools/sound_lists.py), its files listed, present, WAV or MP3, a loop's reference. Exit
-code 1 on a failure.
+game's (src/audio.js, read by tools/sound_lists.py), its files listed, present, WAV or MP3, a loop's reference. The
+licences, movements and file types come from src/packageRules.json, the rules the game checks an installed package by
+(#530, src/packages.js); every vehicle's files are of those types. The curated list of submitted packages
+(assets/catalogue.json): each entry's id, names, author, licence and its package's https address. Exit code 1 on a
+failure.
 """
 import json
 import os
@@ -22,10 +25,11 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "assets")
 LOADERS = {"builtin", "gltf", "gltf-classic", "gltf-rigged"}
+# what a package may hold, shared with the game's check of installed packages (#530)
+RULES = json.load(open(os.path.join(ROOT, "src", "packageRules.json"), encoding="utf-8"))
 # licences that allow the files to be redistributed with the game (ASSETS.md); NC ones not in a commercial release
-LICENCES = {"CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-NC-SA-4.0", "GPL-3.0", "GPL-3.0-only",
-            "GPL-3.0-or-later", "AGPL-3.0-or-later", "MIT"}
-MOVES = {"bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes", "wipers", "mirror", "springs"}
+LICENCES = set(RULES["licences"])
+MOVES = set(RULES["moves"])
 MODEL_EXT = {".gltf", ".glb"}
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -327,6 +331,10 @@ def main():
             fails.append(f"{vid}: vehicle.json is not JSON: {e}")
             continue
         manifests[vid] = v
+        for f in v.get("files", []):
+            e = f.get("path", "").rsplit(".", 1)[-1].lower()
+            if e not in RULES["types"]:
+                fails.append(f"{vid}: file {f.get('path')}: .{e} is not a file type the game reads (src/packageRules.json)")
         bad = check(v, vid, types, assets_md, src)
         fails += [f"{vid}: {b}" for b in bad]
         print(f"{vid}: {v.get('loader')}, tier {v.get('tier')}, {len(v.get('files', []))} files, "
@@ -347,6 +355,20 @@ def main():
         print(f"{lid}: a livery of {next(iter(lv.get('requires', {})), None)}, {len(lv.get('files', []))} files{'' if bad else ', ok'}")
     # (none listed yet, the user, 2026-11-13: "For now I would keep only the default liveries"; the samples below and
     # tools/test_liveries.py's check the rules)
+    # the curated list of submitted packages (#530)
+    cat = json.load(open(os.path.join(ASSETS, "catalogue.json"), encoding="utf-8"))
+    for i, c in enumerate(cat.get("packages", [])):
+        what = c.get("id", f"entry {i}")
+        if not re.match(RULES["id"], c.get("id", "")):
+            fails.append(f"catalogue {what}: id is not author.package")
+        if not all(isinstance((c.get("names") or {}).get(k), str) for k in ("cs", "en")):
+            fails.append(f"catalogue {what}: names in cs and en")
+        if c.get("licence") not in LICENCES:
+            fails.append(f"catalogue {what}: licence {c.get('licence')!r} is none of the redistributable ones")
+        if not str(c.get("url", "")).startswith("https://") or not re.search(r"(package\.json|\.zip)$", c.get("url", "")):
+            fails.append(f"catalogue {what}: url is not an https address of a package.json or a .zip")
+        if not c.get("author"):
+            fails.append(f"catalogue {what}: no author")
     # the sound packs (#528)
     sids = index.get("sounds", [])
     for d in sorted({d for d in os.listdir(ASSETS) if os.path.isfile(os.path.join(ASSETS, d, "sounds.json"))} - set(sids)):

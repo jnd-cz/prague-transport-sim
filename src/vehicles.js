@@ -5,6 +5,7 @@
 // gives way to the first loaded one before it or after it in that order (src/models.js pickVehicle). The
 // manifest's fields: docs/vehicles.md, "The manifest"; tools/test_vehicles.py checks them.
 import { EVENTS, LOOPS } from './audio.js';
+import { localUrl } from './localFiles.js';
 
 export const INDEX = 'assets/vehicles.json';
 export const LOADERS = ['builtin', 'gltf', 'gltf-classic', 'gltf-rigged'];
@@ -13,7 +14,8 @@ export const byId = new Map();
 export const liveries = new Map();   // id -> a livery's manifest (#529), only those that fit their vehicle
 export const soundPacks = new Map(); // id -> a sound pack's manifest (#528), only those that fit their vehicle
 
-const dir = (id) => `assets/${id}/`;
+export const installed = new Set();  // ids of the packages the player installed (src/packages.js), their files at packages/<id>/
+const dir = (id) => (installed.has(id) ? `packages/${id}/` : `assets/${id}/`);
 export const fileUrl = (v, path) => dir(v.id) + path;
 
 // get(url) -> a fetch-like body ({ ok, json() }): the loading screen's Loader.get, or fetch. A manifest that cannot
@@ -84,8 +86,32 @@ export function soundProblems(p, v) {
 // built-in sounds); { id, events, loops, url(path) }
 export function soundsFor(v) {
   const p = [...soundPacks.values()].find((x) => liveryVehicle(x) === v?.id);
-  if (p) return { ...p, url: (f) => dir(p.id) + f };
-  return v?.sounds ? { ...v.sounds, id: `${v.id}:own`, url: (f) => dir(v.id) + f } : null;
+  if (p) return { ...p, url: (f) => localUrl(dir(p.id) + f) };
+  return v?.sounds ? { ...v.sounds, id: `${v.id}:own`, url: (f) => localUrl(dir(v.id) + f) } : null;
+}
+
+// An installed package (#530, src/packages.js; checked there) into the registry: a vehicle after the repository's,
+// a livery or a sound pack beside theirs, a fleet in place of its vehicle's own (until it is switched off).
+export function registerPackage(p) {
+  installed.add(p.id);
+  if (p.kind === 'vehicle') { const v = { ...p, preload: false, installed: true }; vehicles.push(v); byId.set(v.id, v); }
+  else if (p.kind === 'livery') liveries.set(p.id, p);
+  else if (p.kind === 'sounds') soundPacks.set(p.id, p);
+  else if (p.kind === 'fleet') {
+    const v = byId.get(liveryVehicle(p));
+    if (!v) return;
+    if (!('ownFleet' in v)) v.ownFleet = v.fleet ?? null;
+    v.fleet = { operator: p.operator, types: p.types, sets: p.sets || [], liveries: p.liveries, package: p.id };
+    FLEETS.delete(v);
+  }
+}
+export function unregisterPackage(id) {
+  installed.delete(id);
+  const i = vehicles.findIndex((v) => v.id === id);
+  if (i >= 0) { vehicles.splice(i, 1); byId.delete(id); }
+  liveries.delete(id);
+  soundPacks.delete(id);
+  for (const v of vehicles) if (v.fleet?.package === id) { v.fleet = v.ownFleet; delete v.ownFleet; FLEETS.delete(v); }
 }
 
 // A livery (#529; docs/decisions/2026-11-10-vehicle-packages.md, section 3): `textures` and `colours` by the slots
