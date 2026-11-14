@@ -24,7 +24,8 @@ const until = async (ok, ms = 120000) => {
 const count = (o) => { let n = 0; o.traverse(() => n++); return n; };
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
-export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null } = {}) {
+// livery: a livery id (#529) our set and the sets ahead wear; none, the vehicle's own
+export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null, livery = null } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = 1; // (the run's seeded stream: the same traffic for every model)
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
@@ -32,6 +33,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   $('optAuto').checked = false;
   const sel = $('optModel');
   sel.value = model; sel.dispatchEvent(new Event('change'));
+  if (livery && $('optLivery')) { $('optLivery').value = livery; $('optLivery').dispatchEvent(new Event('change')); }
   await startShift({ timeout: 120 });
   await until(() => window.tramModel?.userData.vehicle === model && window.camera);
   const { makeT3, placeConsist } = await import('/src/models.js');
@@ -46,7 +48,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   if (fov) { window.camera.fov = fov; window.camera.updateProjectionMatrix(); }
   window.camera.updateMatrixWorld();
   const sets = ai.map((d) => {
-    const m = makeT3({ line: g.line, cars: 2, vehicle: model, run: '899' });
+    const m = makeT3({ line: g.line, cars: 2, vehicle: model, run: '899', variant: livery ? 'T3SUCS' : null, livery });
     placeConsist(m, s0 + d, at);
     window.scene.add(m);
     const p = m.userData.cars[0].position, far = Math.hypot(p.x - window.camera.position.x, p.z - window.camera.position.z);

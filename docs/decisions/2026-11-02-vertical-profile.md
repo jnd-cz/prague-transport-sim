@@ -20,7 +20,8 @@ A tram track is built of grades joined by vertical curves. The design minimum ra
 by Hradil 2020; `data/truth.json` `trackGeometry.facts`). `vertical_profile` finds the heights that change the
 data least (weighted least squares) while no point's change of grade is tighter than its radius:
 
-- solved exactly, by ADMM on the second differences with one banded factorisation (no SciPy);
+- solved exactly, by ADMM on the second differences with one banded factorisation (since 2026-11-13 LAPACK's,
+  through SciPy: [its record](2026-11-13-scipy-banded-solve.md));
 - robust: after each round a point the curve misses by more than 4.685 × 0.05 m stops pulling it (Tukey), so a
   lone bump is dropped instead of spread over its neighbours;
 - `rmin` per point (street, open track, switch), `pins` hold a point fixed: a junction's height shared by the

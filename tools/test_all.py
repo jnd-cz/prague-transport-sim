@@ -34,6 +34,8 @@ NEEDS = {
     "test_report.py": "data/line17.json",
     "test_review.py": "data/line17.json",
     "test_touch.py": "data/line17.json",
+    "test_cab_view.py": "data/line17.json",
+    "test_gamepad.py": "data/line17.json",
 }
 
 
@@ -107,6 +109,10 @@ def main():
             need = NEEDS.get(t)
             print(f"{t:40} {kind:8} {', '.join(ext) or '-'}{f'  (needs {need})' if need else ''}")
         return 0
+    if not a.pattern:  # (the whole suite, ~6 min: a heavy job; -k picks a few tests, #536)
+        sys.path.insert(0, TOOLS)
+        import heavy
+        heavy.turn("test_all" + (" --browser" if a.browser else ""))
     failed, skipped, t0 = [], [], time.time()
     for t, kind, _ext in rows:
         if kind == "browser" and not a.browser:

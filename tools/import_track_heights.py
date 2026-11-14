@@ -16,7 +16,6 @@ from pathlib import Path
 import sys
 
 import shapely
-from shapely.geometry import Point
 from shapely.ops import unary_union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -69,10 +68,10 @@ def conflict_records(observations):
     return conflicts
 
 
-def observations(current, archive, area):
+def observations(current, archive, area, pool=None):
     rows = list(samples(current, area))
-    for obs in rows:
-        obs['archive'] = archive.match(obs['x'], obs['y'], obs['ux'], obs['uy'], details=True)
+    for obs, m in zip(rows, _archive_matches([(o['x'], o['y'], o['ux'], o['uy']) for o in rows], archive, pool)):
+        obs['archive'] = m
     return rows
 
 
@@ -127,28 +126,91 @@ def bridge_structures(structures, ids, paths, current, archive, terrain):
     return (unary_union([structures, geom]) if found else structures), ids + found, pieces
 
 
-def decide(rows, guard, structures, decks, tunnels, context, terrain):
+POOL = 20000  # samples: fewer are decided in this process (a worker takes a few seconds to start with the decks)
+CHUNK = 5000  # samples a worker decides at a time
+_W = {}
+
+
+def _worker(decks, context, current, archive):
+    _W.update(decks=decks, context=context, current=current, archive=archive)
+
+
+def _chunks(todo):
+    return [todo[k:k + CHUNK] for k in range(0, len(todo), CHUNK)]
+
+
+def _matches(todo, archive=None):
+    """The archive's match at (x, y, ux, uy) samples (observations)."""
+    archive = _W['archive'] if archive is None else archive
+    return [archive.match(x, y, ux, uy, details=True) for x, y, ux, uy in todo]
+
+
+def _archive_matches(todo, archive, pool=None):
+    return _matches(todo, archive) if pool is None else [m for part in pool.map(_matches, _chunks(todo)) for m in part]
+
+
+def _hits(todo, current=None, archive=None):
+    """A line's route samples (x, y, ux, uy) on DI: the hit and, where it has a height or none, its tangent and the
+    archive's match there (stage)."""
+    if current is None:
+        current, archive = _W['current'], _W['archive']
+    out = []
+    for x, y, ux, uy in todo:
+        hit = current.match(x, y, ux, uy, radius=2, details=True)
+        if hit['status'] in ('numeric', 'missing_z'):
+            tangent = hit['candidates'][0]
+            out.append((hit, tangent, archive.match(hit['x'], hit['y'], tangent['ux'], tangent['uy'], details=True)))
+        else:
+            out.append((hit, None, None))
+    return out
+
+
+def _decide(todo, guard, decks=None, context=None):
+    """decide's loop over (x, y, DI id, DI z, ux, uy, archive match, structure hint, tunnel hint, terrain) samples: each
+    one's (surfaces, construction, decision). Each sample reads only its own place, so the workers share them out."""
+    if decks is None:
+        decks, context = _W['decks'], _W['context']
+    out = []
+    for x, y, i, z, ux, uy, match, hint, tunnel, ground in todo:
+        surfaces = decks.candidates(x, y, i, hint, z)
+        construction = context.classify(x, y, ux, uy, surfaces)
+        out.append((surfaces, construction, guard.choose({'id': i, 'z': z}, match, x, y, hint, surfaces, tunnel,
+                                                         construction, ground)))
+    return out
+
+
+def _decide_all(todo, decks, context, guard, pool=None):
+    """_decide over todo, in the pool's workers (in order) when there is one."""
+    if pool is None:
+        return _decide(todo, guard, decks, context)
+    parts = _chunks(todo)
+    return [g for part in pool.map(_decide, parts, [guard] * len(parts)) for g in part]
+
+
+def _pool(decks, context, current, archive):
+    """Worker processes with the decks, OSM's tracks and DI's and the archive's segments (#516: one process matched and
+    decided the 285 000 DI samples and the lines' 60 000 in most of the heights' 97 s staging)."""
+    import sysinfo
+    return sysinfo.pool(sysinfo.workers(1.0, most=12), _worker, decks, context, current, archive)
+
+
+def decide(rows, guard, structures, decks, tunnels, context, terrain, pool=None):
     hints = shapely.intersects(structures, shapely.points([(r['x'], r['y']) for r in rows]))
     tunnel_hints = shapely.intersects(tunnels, shapely.points([(r['x'], r['y']) for r in rows]))
     ground = terrain([r['x'] for r in rows], [r['y'] for r in rows])
-    for row, hint, tunnel, z in zip(rows, hints, tunnel_hints, ground):
-        surfaces = decks.candidates(row['x'], row['y'], row['id'], bool(hint), row['z'])
-        row['choice'] = (
-            {'id': row['id'], 'z': row['z']},
-            row['archive'],
-            row['x'],
-            row['y'],
-            bool(hint),
-            surfaces,
-            bool(tunnel),
-            context.classify(row['x'], row['y'], row['ux'], row['uy'], surfaces),
-            z,
-        )
-        row['decision'] = guard.choose(*row['choice'])
+    todo = [(r['x'], r['y'], r['id'], r['z'], r['ux'], r['uy'], r['archive'], bool(h), bool(t), z)
+            for r, h, t, z in zip(rows, hints, tunnel_hints, ground)]
+    for row, t, (surfaces, construction, decision) in zip(rows, todo, _decide_all(todo, decks, context, guard, pool)):
+        row['choice'] = ({'id': row['id'], 'z': row['z']}, row['archive'], row['x'], row['y'], t[7], surfaces, t[8],
+                         construction, t[9])
+        row['decision'] = decision
     return extend_holds(rows, guard)
 
 
 def stage(review):
+    import time
+    t0 = time.time()
+    took = lambda what: print(f'  (staging: {what}, {time.time() - t0:.0f} s)', flush=True)  # noqa: E731
     districts, paths = di_data()
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
@@ -157,52 +219,69 @@ def stage(review):
     terrain = Terrain()
     structures, structure_ids, bridge_pieces = bridge_structures(structures, structure_ids, paths, current, archive,
                                                                  terrain)
+    took('sources, structures and bridges')
     decks = load_decks(ROOT)
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])
+    took('decks and OSM tracks')
     print(f'Matching {len(paths)} DI paths for guarded height staging', flush=True)
-    rows = observations(current, archive, area)
-    conflicts = conflict_records(rows)
-    guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
-                        review.get('span_reviews', []))
-    decide(rows, guard, structures, decks, tunnels, context, terrain)
-    lines, route_samples = [], []
-    for line in (9, 17, 22, 23, 37):
-        data = load_line(line)
-        route = Segments(
-            [
-                {'id': key, 'coords': [(p[0], p[1], None) for p in data[key]], 'attrs': {}}
-                for key in ('path', 'pathBack')
-                if data.get(key)
-            ]
-        )
-        selected = []
-        positions = Counter()
-        for row in samples(route, None):
-            row['s'] = positions[row['id']] + row['weight']/2
-            positions[row['id']] += row['weight']
-            hit = current.match(row['x'], row['y'], row['ux'], row['uy'], radius=2, details=True)
-            if hit['status'] in ('numeric', 'missing_z'):
-                tangent = hit['candidates'][0]
-                match = archive.match(hit['x'], hit['y'], tangent['ux'], tangent['uy'], details=True)
-                hint = structures.intersects(Point(hit['x'], hit['y']))
-                surfaces = decks.candidates(hit['x'], hit['y'], hit['id'], hint, hit['z'])
-                row['choice'] = (
-                    {'id': hit['id'], 'z': hit['z']},
-                    match,
-                    hit['x'],
-                    hit['y'],
-                    hint,
-                    surfaces,
-                    tunnels.intersects(Point(hit['x'], hit['y'])),
-                    context.classify(hit['x'], hit['y'], tangent['ux'], tangent['uy'], surfaces),
-                    terrain([hit['x']], [hit['y']])[0],
-                )
-                row['decision'] = guard.choose(*row['choice'])
-                row['di_id'], row['raw_di_z'], row['di_xy'] = hit['id'], hit['z'], [hit['x'],hit['y']]
-            else:
-                row['decision'] = {'status': 'review', 'review_flags': ['no_unambiguous_current_geometry']}
-            selected.append(row)
+    rows = list(samples(current, area))
+    pool = _pool(decks, context, current, archive) if len(rows) >= POOL else None
+    try:
+        for obs, m in zip(rows, _archive_matches([(o['x'], o['y'], o['ux'], o['uy']) for o in rows], archive, pool)):
+            obs['archive'] = m
+        took(f'{len(rows)} DI samples matched to the archive')
+        conflicts = conflict_records(rows)
+        guard = HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []), conflicts,
+                            review.get('span_reviews', []))
+        decide(rows, guard, structures, decks, tunnels, context, terrain, pool)
+        took('DI samples decided')
+        # the lines' route samples: each matched to DI here, then decided as DI's samples are (in the workers)
+        lines, route_samples, along, hits = [], [], [], []
+        for line in (9, 17, 22, 23, 37):
+            data = load_line(line)
+            route = Segments(
+                [
+                    {'id': key, 'coords': [(p[0], p[1], None) for p in data[key]], 'attrs': {}}
+                    for key in ('path', 'pathBack')
+                    if data.get(key)
+                ]
+            )
+            selected = []
+            positions = Counter()
+            for row in samples(route, None):
+                row['s'] = positions[row['id']] + row['weight']/2
+                positions[row['id']] += row['weight']
+                selected.append(row)
+            along.append((line, selected))
+        todo = [(row['x'], row['y'], row['ux'], row['uy']) for _, selected in along for row in selected]
+        found = iter(_hits(todo, current, archive) if pool is None else
+                     [h for part in pool.map(_hits, _chunks(todo)) for h in part])
+        for _, selected in along:
+            for row in selected:
+                hit, tangent, match = next(found)
+                if tangent is not None:
+                    hits.append((row, hit, tangent, match))
+                    row['di_id'], row['raw_di_z'], row['di_xy'] = hit['id'], hit['z'], [hit['x'],hit['y']]
+                else:
+                    row['decision'] = {'status': 'review', 'review_flags': ['no_unambiguous_current_geometry']}
+        at = shapely.points([(h['x'], h['y']) for _, h, _, _ in hits] or [(0.0, 0.0)])[:len(hits)]
+        on = shapely.intersects(structures, at)
+        under = shapely.intersects(tunnels, at)
+        ground = terrain([h['x'] for _, h, _, _ in hits], [h['y'] for _, h, _, _ in hits]) if hits else []
+        todo = [(h['x'], h['y'], h['id'], h['z'], t['ux'], t['uy'], m, bool(a), bool(b), g)
+                for (_, h, t, m), a, b, g in zip(hits, on, under, ground)]
+        took(f'{len(todo)} route samples on DI')
+        for (row, hit, _, match), t, (surfaces, construction, decision) in zip(
+                hits, todo, _decide_all(todo, decks, context, guard, pool)):
+            row['choice'] = ({'id': hit['id'], 'z': hit['z']}, match, hit['x'], hit['y'], t[7], surfaces, t[8],
+                             construction, t[9])
+            row['decision'] = decision
+        took('route samples decided')
+    finally:
+        if pool is not None:
+            pool.shutdown()
+    for line, selected in along:
         for row in extend_holds(selected, guard):
             route_samples.append({'line':line, 'direction':row['id'], 's':row['s'],
                                   'xy':[row['x'],row['y']], 'tangent':[row['ux'],row['uy']],
@@ -211,6 +290,7 @@ def stage(review):
                                   'raw_di_z':row.get('raw_di_z'), **row['decision']})
         lines.append({'line': line, **lengths(selected)})
         print(f'line {line}: {json.dumps(lines[-1])}', flush=True)
+    took('holds extended')
     # Geometry and raw source Z are separate from decisions; no archived alignment is added.
     geometry = [
         {
@@ -306,6 +386,8 @@ def main():
     parser.add_argument('--evidence', type=Path)
     parser.add_argument('--output', type=Path, default=ROOT / 'reports/track-heights.json')
     args = parser.parse_args()
+    import heavy
+    heavy.turn('import_track_heights')  # (its staging runs workers: a heavy job run alone, #536)
     review = json.loads(args.evidence.read_text(encoding='utf-8')) if args.evidence else {}
     HeightGuard(review.get('evidence', []), review.get('alignment_reviews', []),
                 span_reviews=review.get('span_reviews', []))  # fail before the expensive scan

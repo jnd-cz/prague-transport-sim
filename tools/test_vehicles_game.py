@@ -117,7 +117,7 @@ def main():
             sample = {
                 "schema": 1, "id": "sample", "names": {"cs": "Vzorek (test)", "en": "Sample (test)"}, "type": "T3",
                 "loader": "gltf", "model": "sample.glb", "forward": "+X", "files": [{"path": "sample.glb", "bytes": len(glb)}],
-                "preload": False, "tier": 1, "moves": [], "levels": 1, "variants": [],
+                "preload": False, "tier": 1, "moves": [], "levels": 1,
                 "licence": {"spdx": "CC0-1.0", "commercial": True, "file": "LICENSE.txt", "authors": ["the test"],
                             "sources": ["tools/test_vehicles_game.py"], "credit": "Sample tram: a box from the vehicle test."},
             }

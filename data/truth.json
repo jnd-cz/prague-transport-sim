@@ -8,7 +8,8 @@
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
   "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
-  "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
+  "kerbFacts": "tools/dtm.py, tools/kerbs.py",
+  "trackStyleKinds": "src/heights.js",
   "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
   "grassTrack": "tools/track_styles.py, tools/track_decks.py",
   "grassReview": "tools/track_styles.py (answered grass), tools/grass_review.py (answered places get no card)",
@@ -17,7 +18,10 @@
   "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
-  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it"
+  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it",
+  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)",
+  "trackSurfaceReview": "tools/surface_review.py (an answered place gets no card); tools/track_styles.py's setts (#574) once it reads them",
+  "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it"
  },
  "stops": [
   {
@@ -416,7 +420,7 @@
   "railAboveDeck": [
    {
     "id": "rail-above-deck-embedded",
-    "styles": ["embedded"],
+    "styles": ["embedded", "setts"],
     "scope": "all",
     "metres": 0,
     "basis": "surface and rail heads flush",
@@ -660,6 +664,29 @@
    "style": "ballast",
    "extent": "between the grass review card's pins (grass-50.0027-14.4144)",
    "source": "user 2026-11-12, grass track review (#503), answered not grass: \"there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast\""
+  },
+  {
+   "line": "37",
+   "between": [[50.0906055, 14.4679162], [50.0994264, 14.4732075]],
+   "style": "ballast",
+   "extent": "from the end of the Ohrada junction to the north end of the Krejcárek viaduct (line 37 s 2238-3496 in the 2026-11-14 build)",
+   "source": "user 2026-11-14, #549, with two photos of the viaduct: \"There is open ballast track in the middle, walkway a bit lower and a parapet on the side. [...] Btw the track from ohrada junction to the viaduct is open ballast too.\""
+  },
+  {
+   "line": "22",
+   "between": [[50.0839577, 14.3700293], [50.0839329, 14.3705729]],
+   "track": "back",
+   "style": "grass",
+   "extent": "the other direction's track along Drinopol's platform A (U103Z1P) and 3 m past its ends (line 22 s 3570-3609 in the 2026-11-14 build); our track beside the platform stays paved",
+   "source": "user 2026-11-13, #584, with a street photo: \"I found also special case of one track paved and another grassy (second picture), like at Drinopol which makes it more complicated\"; which track is which from the ČÚZK orthophoto (2026-11-14): the track beside platform A paved, the other in grass; why, the user 2026-11-14, #584: \"It's the only place like this that I saw so far and now it's clear why: it's also bus stop, usually for replacement bus, so the asphalt has to run from the road and back.\""
+  },
+  {
+   "line": "22",
+   "between": [[50.0839241, 14.3715501], [50.0839601, 14.372078]],
+   "track": "ours",
+   "style": "grass",
+   "extent": "our track along Drinopol's platform B (U103Z2P) and 3 m past its ends (line 22 s 3679-3717 in the 2026-11-14 build); the other direction's track beside the platform stays paved",
+   "source": "user 2026-11-14, #584, with a Street View picture of platform B: \"Other platform is similar. It's the only place like this that I saw so far and now it's clear why: it's also bus stop, usually for replacement bus, so the asphalt has to run from the road and back.\""
   }
  ],
  "grassTrack": {
@@ -3676,6 +3703,554 @@
     "answer": "grass",
     "note": "same span as on line 22 Pohořelec - Brusnice",
     "source": "user, grass track review (reports/review/grass-track-23.json), 2026-11-12 (#503)"
+   }
+  ]
+ },
+ "crossLevelReview": {
+  "note": "The user's answers to the cross level review (reports/review/cross-level-N.json, tools/cross_level.py, #538): `level` makes paved track between the two points level on every line; `tilts` keeps the build's cross level there and takes the place off the review.",
+  "answers": [
+   {
+    "id": "sokolovska-palmovka",
+    "lines": [
+     "37"
+    ],
+    "between": [
+     [
+      50.1012584,
+      14.4734446
+     ],
+     [
+      50.1017563,
+      14.4735561
+     ]
+    ],
+    "answer": "tilts",
+    "quote": "it's noticeable in real ride and I know this as famous, albeit extreme example where single straight track in junction tilts sideways",
+    "source": "user, this session 2026-11-13, on the Sokolovská junction at Palmovka (50.1015651 N, 14.4736156 E), #538"
+   }
+  ]
+ },
+ "trackSurfaceReview": {
+  "note": "The user's answers to the track surface review (reports/review/track-surface-N.json, tools/surface_review.py, #574): what the track is laid in between two points (`setts`, `embedded`, `panels`, `grass`), and at OSM's surface changes whether it changes there (`changes`, `same`). The setts style and the OSM rule's calibration read them.",
+  "answers": [
+   {
+    "id": "surface-junction-50.08598-14.43187",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0858353,
+      14.431817
+     ],
+     [
+      50.0861264,
+      14.4319268
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08845-14.43253",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0883622,
+      14.4325348
+     ],
+     [
+      50.0885475,
+      14.4325209
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08874-14.38748",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0887755,
+      14.3870476
+     ],
+     [
+      50.0888117,
+      14.3878774
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08942-14.43246",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0893395,
+      14.4324616
+     ],
+     [
+      50.0894921,
+      14.4324556
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10149-14.47350",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1011845,
+      14.473397
+     ],
+     [
+      50.1018106,
+      14.4735559
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10320-14.47337",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1031149,
+      14.473372
+     ],
+     [
+      50.1032803,
+      14.4733818
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10371-14.47957",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1038755,
+      14.4793925
+     ],
+     [
+      50.1036828,
+      14.4798745
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08587-14.43183",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0855557,
+      14.4314443
+     ],
+     [
+      50.0862702,
+      14.4319818
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08874-14.38753",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.088765,
+      14.3871792
+     ],
+     [
+      50.0887971,
+      14.3878524
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08887-14.43250",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0883624,
+      14.4325348
+     ],
+     [
+      50.0893682,
+      14.4324593
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08955-14.43248",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0893862,
+      14.4324577
+     ],
+     [
+      50.0896788,
+      14.432656
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10222-14.47350",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1013639,
+      14.4734784
+     ],
+     [
+      50.1030817,
+      14.4733767
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10322-14.47337",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1030997,
+      14.4733741
+     ],
+     [
+      50.1033303,
+      14.4734043
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10360-14.47380",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1035374,
+      14.4736616
+     ],
+     [
+      50.103663,
+      14.4739344
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10373-14.47954",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1037904,
+      14.4794592
+     ],
+     [
+      50.1036892,
+      14.4796494
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10432-14.47904",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1048344,
+      14.478643
+     ],
+     [
+      50.1038061,
+      14.4794456
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10494-14.47846",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1049513,
+      14.4782429
+     ],
+     [
+      50.10485,
+      14.4786292
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08627-14.43198",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0861829,
+      14.4319481
+     ],
+     [
+      50.0863574,
+      14.4320157
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08834-14.43254",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0882546,
+      14.4325429
+     ],
+     [
+      50.0884342,
+      14.4325294
+     ]
+    ],
+    "answer": "same",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08880-14.38785",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0887521,
+      14.3877322
+     ],
+     [
+      50.088865,
+      14.387943
+     ]
+    ],
+    "answer": "same",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08937-14.43246",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0892784,
+      14.4324663
+     ],
+     [
+      50.089458,
+      14.4324526
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08968-14.43266",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0896229,
+      14.4325474
+     ],
+     [
+      50.0897143,
+      14.4327842
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10308-14.47338",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1029922,
+      14.4733893
+     ],
+     [
+      50.1031713,
+      14.4733654
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10366-14.47393",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1036112,
+      14.4738202
+     ],
+     [
+      50.103705,
+      14.4740578
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10381-14.47945",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1038867,
+      14.4793839
+     ],
+     [
+      50.1037352,
+      14.4795302
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10485-14.47863",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1049159,
+      14.4785354
+     ],
+     [
+      50.1047691,
+      14.47869
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10495-14.47822",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1049111,
+      14.4780875
+     ],
+     [
+      50.1049581,
+      14.4783537
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   }
+  ]
+ },
+ "bedTroughReview": {
+  "note": "The user's answers to the bed trough review (reports/review/bed-troughs-N.json, tools/bed_troughs.py, #548), by the place's lat/lon: `real` is a ditch or a cutting (the trough measure leaves it), `wall` a retaining wall missing there, `ours` our ground sunk around the bed.",
+  "answers": [
+   {
+    "id": "trough-50.09070-14.47586",
+    "line": "37",
+    "place": [
+     50.090699,
+     14.475857
+    ],
+    "answer": "ours",
+    "note": "green grassy area which is level with sidewalk around it",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   },
+   {
+    "id": "trough-50.09262-14.38928",
+    "line": "23",
+    "place": [
+     50.09262,
+     14.389282
+    ],
+    "answer": "ours",
+    "note": "Grass around track and kerb next to road, no ditch",
+    "source": "user, bed trough review (reports/review/bed-troughs-23.json), 2026-11-13 (#548)"
+   },
+   {
+    "id": "trough-50.09428-14.40497",
+    "line": "23",
+    "place": [
+     50.094284,
+     14.404971
+    ],
+    "answer": "ours",
+    "note": "Grass but no ditch",
+    "source": "user, bed trough review (reports/review/bed-troughs-23.json), 2026-11-13 (#548)"
+   },
+   {
+    "id": "trough-50.10245-14.47607",
+    "line": "37",
+    "place": [
+     50.102453,
+     14.476074
+    ],
+    "answer": "ours",
+    "note": "road surface next to kerb of stop platform",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   },
+   {
+    "id": "trough-50.10512-14.47301",
+    "line": "37",
+    "place": [
+     50.10512,
+     14.473008
+    ],
+    "answer": "ours",
+    "note": "sunk island around zebra crossing",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
    }
   ]
  }

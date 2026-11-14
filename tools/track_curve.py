@@ -144,6 +144,38 @@ def nearest(px, py, lo, hi, q):
     return best
 
 
+def misses(px, py, xs, ys, ss, reach=3):
+    """nearest(px, py, s - reach, s + reach, (xs[s], ys[s]))[0] for every s of ss, at once: numpy finds each point's
+    nearest segment by the squared distance, then math.hypot measures it and any segment that close behind it, in
+    nearest's order, so the first strictly nearest wins as there (np.hypot differs from math.hypot in the last bit; one
+    call per point was 18 of build_line's 111 s under cProfile, #517)."""
+    import numpy as np
+    if not len(ss):
+        return []
+    X, Y = np.asarray(px, float), np.asarray(py, float)
+    S = np.asarray(ss)
+    seg = S[:, None] + np.arange(-reach, reach)[None, :]
+    ok = (seg >= 0) & (seg < len(px) - 1)
+    g = np.where(ok, seg, 0)
+    qx, qy = np.asarray(xs, float)[S][:, None], np.asarray(ys, float)[S][:, None]
+    dx, dy = X[g + 1] - X[g], Y[g + 1] - Y[g]
+    den = dx * dx + dy * dy
+    t = np.maximum(0.0, np.minimum(1.0, ((qx - X[g]) * dx + (qy - Y[g]) * dy) / np.where(den == 0.0, 1e-12, den)))
+    ex, ey = X[g] + t * dx - qx, Y[g] + t * dy - qy
+    sq = np.where(ok, ex * ex + ey * ey, np.inf)
+    near = ok & (sq <= sq.min(axis=1, keepdims=True) * (1 + 1e-9) + 1e-300)
+    out = []
+    for row, exr, eyr in zip(near.tolist(), ex.tolist(), ey.tolist()):
+        best = math.inf
+        for k, on in enumerate(row):
+            if on:
+                d = math.hypot(exr[k], eyr[k])
+                if d < best:
+                    best = d
+        out.append(best)
+    return out
+
+
 def radii(px, py, half=2.5):
     """The radius at every sample over a 5 m window: the circle through the curve's points `half` either side (as
     tools/lint.js trackRadius measures the drawn track)."""
@@ -300,9 +332,9 @@ def fit(pts, tol, fixed=None, heading=None, step=STEP, limit=None, behind=None):
     for _ in range(WIDEN):
         for _ in range(ROUNDS):
             worst = 1.0
-            for i in data:
+            for i, d in zip(data, misses(px, py, xs, ys, [at[i] for i in data])):
                 s = at[i]
-                miss = nearest(px, py, s - 3, s + 3, (xs[s], ys[s]))[0] / tol[i]
+                miss = d / tol[i]
                 if miss > 1.0:
                     weight[s] *= min(100.0, miss * miss)
                     worst = max(worst, miss)

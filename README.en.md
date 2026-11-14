@@ -204,6 +204,11 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   to draw. With it the other trams run as T3 (a silver bumper with red stripes), T3SUCS and T3M sets (the T3M
   with the resistors' box on its roof and its green route display), each type as often as its range of fleet
   numbers is long.
+- Fleet number: the set you drive, such as the historic 6892 + 6921, 7269 + 7290 or 8080 + 8074, or one number
+  (the second car gets a number of the same type); the game remembers it for each model. "Any" deals yours
+  like the others'. No number runs twice on the street, and no other set is dealt yours.
+- Livery: only for a model with liveries besides its own (none yet): its own, one of them, or "Any", dealt like the
+  others'; the game remembers it for each model. Some of the other sets wear the liveries too.
 
 ### On a phone or tablet
 
@@ -224,6 +229,30 @@ left and the dashboard between them.
 sideways where the browser allows it (Chrome on Android), elsewhere the game asks you to turn the phone. ⛶ in the
 menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
 full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
+
+### With a gamepad
+
+An Xbox or PlayStation pad in Chrome, Edge or Firefox; the browser shows it to the game after its first button. The pad sends
+the keyboard's keys, so the keys work beside it. While a pad is connected, the dead-man pedal counts as held.
+In advanced controls a trigger puts the pedal straight on its step: how fast you go from one step to another is up to
+your finger. The tram starts with the parking brake on: Y releases it before the drive trigger moves the pedal.
+
+| pad | does |
+|---|---|
+| right trigger | drive step 1–5, by how far it is pressed |
+| left trigger | brake step 1–5, by how far it is pressed (over the right one); both released: both pedals free |
+| D-pad ↑ / ↓ | a step towards drive / brake (as `W` / `S`) |
+| D-pad ← / → | indicators left / right |
+| A / ✕ | doors |
+| B / ○ | bell |
+| X / □ | sand (held) |
+| Y / △ | parking brake on and off (advanced controls) |
+| LB / L1 | emergency and track brakes (held) |
+| RB / R1 | look closer (held) |
+| right stick ← / → | turns the head left / right as far as the stick goes, at its end out of the side window |
+| Back / Share | cab or outside view |
+| Start / Options | pause |
+| L3 | mirror |
 
 ## Autopilot
 

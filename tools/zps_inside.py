@@ -217,6 +217,12 @@ def under_decks(areas, opens, flat, ground):
     seen = {o["way"] for o in flat["openings"] if o.get("gap") is not None and o.get("src") != "unseen"}
     out = {"openings": 0, "areas": 0, "vertices": 0, "moved": []}
     moves, touched = [], set()
+    # (each ground-level area's outline once, and per opening only those whose box meets it: the rest meet it in less
+    # than 1 m². Built per opening and area, they were 13 of dtm.py's 189 s under cProfile on line 17, #517; the
+    # outlines' plan stays as it is here, only heights move)
+    ids = [ai for ai, a in enumerate(areas) if not (a["l"] != 0 or a["c"] in ("wall", "roof", "water") or len(a["r"]) < 3)]
+    polys = [shapely.Polygon([q[:2] for q in areas[ai]["r"]]).buffer(0) for ai in ids]
+    tree = shapely.STRtree(polys)
     for o in opens:
         if o["way"] not in seen or o["poly"].is_empty or o["axis"].length < MIN_AXIS:
             continue
@@ -224,10 +230,8 @@ def under_decks(areas, opens, flat, ground):
         cover = o["poly"].buffer(REACH)
         way_dir, _ = _bearing(o["axis"].buffer(0.5))
         top = _deck_top(areas, o["decks"])
-        for ai, a in enumerate(areas):
-            if a["l"] != 0 or a["c"] in ("wall", "roof", "water") or len(a["r"]) < 3:
-                continue
-            poly = shapely.Polygon([q[:2] for q in a["r"]]).buffer(0)
+        for k in sorted(tree.query(cover).tolist()):
+            ai, a, poly = ids[k], areas[ids[k]], polys[k]
             if poly.intersection(cover).area < 1:
                 continue
             # (its direction round the way, not within the opening: a piece cut by a strip along the way runs along it)

@@ -9,7 +9,7 @@
 // rail height in the game. Local deck facts remain importer-only; these are the global style values.
 export function trackStyleOffsets(truth) {
   const offsets = {};
-  for (const style of ['embedded', 'panels', 'grass', 'ballast']) {
+  for (const style of ['embedded', 'setts', 'panels', 'grass', 'ballast']) {
     const facts = (truth?.trackHeights?.railAboveDeck || []).filter((f) => f.scope === 'all' && (!f.styles || f.styles.includes(style)));
     if (!facts.length || facts.some((f) => !Number.isFinite(f.metres) || f.metres < 0 || !f.id) ||
         new Set(facts.map((f) => f.metres)).size !== 1) throw new Error(`Missing or conflicting rail offset facts: ${style}`);
@@ -71,20 +71,26 @@ export function meetHeights(d, base) {
 // otherwise), `lift(s)` its top of rail over the surface, blended inside the section ends. The sections and the lift
 // are the build's (the line data's `styles` and `lift`, tools/track_styles.py, #479, #480: the user's marks in
 // data/truth.json, the grassed-track list and the survey's grass track); how high the rails stand over each style
-// is truth.json's `railAboveDeck`.
+// is truth.json's `railAboveDeck`. `atBack(s)`, `liftBack(s)`: the other direction's track beside the route, by
+// route s (`stylesBack`, `liftBack`, written where the two tracks differ: a platform paves only the track it serves,
+// #584), else ours.
 export function trackStyles(truth, data) {
   const offsets = trackStyleOffsets(truth);
-  const secs = (data.styles || []).map((x) => {
+  const read = (list) => (list || []).map((x) => {
     const offset = offsets[x.style];
     if (!offset) throw new Error(`Unknown track style: ${x.style}`);
     return { ...x, d: offset.metres, offsetFactIds: offset.factIds };
   });
-  const at = (s) => secs.find((x) => s >= x.s0 && s <= x.s1)?.style ?? 'panels';
-  const L = data.lift, n = L ? L.v.length : 0;
-  const lift = (s) => {
-    if (!n) return 0;
-    const f = Math.max(0, Math.min(n - 1.001, s / L.step)), i = Math.floor(f), t = f - i;
-    return (L.v[i] * (1 - t) + L.v[i + 1] * t) * L.unit;
+  const series = (L) => {
+    const n = L ? L.v.length : 0;
+    return (s) => {
+      if (!n) return 0;
+      const f = Math.max(0, Math.min(n - 1.001, s / L.step)), i = Math.floor(f), t = f - i;
+      return (L.v[i] * (1 - t) + L.v[i + 1] * t) * L.unit;
+    };
   };
-  return { sections: secs, at, lift };
+  const secs = read(data.styles), back = data.stylesBack ? read(data.stylesBack) : secs;
+  const styleOf = (list) => (s) => list.find((x) => s >= x.s0 && s <= x.s1)?.style ?? 'panels';
+  const lift = series(data.lift), liftBack = data.liftBack ? series(data.liftBack) : lift;
+  return { sections: secs, sectionsBack: back, at: styleOf(secs), atBack: styleOf(back), lift, liftBack };
 }

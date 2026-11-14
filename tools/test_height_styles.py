@@ -60,6 +60,25 @@ class HeightStyles(unittest.TestCase):
         self.assertAlmostEqual(result['inferred'][1], 0.04)
         self.assertEqual(result['ids'], ['rail-above-deck-grass'])
 
+    def test_the_other_track_takes_its_own_where_the_build_gives_it(self):
+        # (#584: `stylesBack` and `liftBack` where the two tracks differ; ours elsewhere)
+        result = self.page.evaluate(
+            """async (truth) => {
+          const {trackStyles} = await import('/src/heights.js');
+          const lift = {step: 2, unit: 0.001, v: [0, 0, 0, 0]}, liftBack = {step: 2, unit: 0.001, v: [40, 40, 40, 40]};
+          const both = trackStyles(truth, {line: 'test', styles: [], stylesBack: [{s0: 0, s1: 6, style: 'grass', source: 'list'}],
+                                           lift, liftBack});
+          const one = trackStyles(truth, {line: 'test', styles: [{s0: 0, s1: 6, style: 'grass', source: 'list'}], lift: liftBack});
+          return [both.at(3), both.atBack(3), both.lift(3), both.liftBack(3), one.atBack(3), one.liftBack(3)];
+        }""",
+            self.truth,
+        )
+        self.assertEqual(result[:2], ['panels', 'grass'])
+        self.assertAlmostEqual(result[2], 0.0)
+        self.assertAlmostEqual(result[3], 0.04)
+        self.assertEqual(result[4], 'grass')
+        self.assertAlmostEqual(result[5], 0.04)
+
     def test_missing_and_conflicting_facts_fail_instead_of_guessing(self):
         errors = self.page.evaluate(
             """async (truth) => {

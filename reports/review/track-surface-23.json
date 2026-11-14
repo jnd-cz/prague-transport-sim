@@ -1,0 +1,699 @@
+{
+ "schema": 1,
+ "issue": 574,
+ "line": "23",
+ "title": "Track surface: setts, asphalt or panels (OSM's surface checked)",
+ "findings": [
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.08874-14.38753",
+   "line": "23",
+   "x": -2375.1,
+   "y": 480.8,
+   "s0": 752,
+   "s1": 802,
+   "status": "review",
+   "place": [
+    50.088737,
+    14.387526
+   ],
+   "between": [
+    [
+     50.088765,
+     14.3871792
+    ],
+    [
+     50.0887971,
+     14.3878524
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2399.3,
+     "y": 487.3,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2351.1,
+     "y": 484.2,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Hládkov near Hládkov (s 752-802, 50 m): OSM says setts here, the game draws embedded. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.08587-14.43183",
+   "line": "23",
+   "x": 722.1,
+   "y": -268.0,
+   "s0": 7522,
+   "s1": 7614,
+   "status": "review",
+   "place": [
+    50.085868,
+    14.431832
+   ],
+   "between": [
+    [
+     50.0855557,
+     14.4314443
+    ],
+    [
+     50.0862702,
+     14.4319818
+    ]
+   ],
+   "marks": [
+    {
+     "x": 689.9,
+     "y": -298.7,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 738.8,
+     "y": -225.2,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Dlážděná, Senovážné náměstí near Jindřišská (s 7522-7614, 92 m): OSM says setts here, the game draws embedded. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.08887-14.43250",
+   "line": "23",
+   "x": 814.7,
+   "y": 55.7,
+   "s0": 7856,
+   "s1": 7968,
+   "status": "review",
+   "place": [
+    50.088865,
+    14.432497
+   ],
+   "between": [
+    [
+     50.0883624,
+     14.4325348
+    ],
+    [
+     50.0893682,
+     14.4324593
+    ]
+   ],
+   "marks": [
+    {
+     "x": 809.7,
+     "y": -0.1,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 819.6,
+     "y": 111.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Havlíčkova near Masarykovo nádraží (s 7856-7968, 112 m): OSM says concrete (panels?) here, the game draws panels. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.08955-14.43248",
+   "line": "23",
+   "x": 824.0,
+   "y": 131.8,
+   "s0": 7970,
+   "s1": 8008,
+   "status": "review",
+   "place": [
+    50.089554,
+    14.432481
+   ],
+   "between": [
+    [
+     50.0893862,
+     14.4324577
+    ],
+    [
+     50.0896788,
+     14.432656
+    ]
+   ],
+   "marks": [
+    {
+     "x": 819.8,
+     "y": 113.5,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 838.2,
+     "y": 143.8,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Havlíčkova, Na Poříčí near Masarykovo nádraží (s 7970-8008, 38 m): OSM says setts here, the game draws panels. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08634-14.38442",
+   "line": "23",
+   "x": -2631.9,
+   "y": 246.6,
+   "s0": 334,
+   "s1": 354,
+   "status": "review",
+   "place": [
+    50.086336,
+    14.38442
+   ],
+   "between": [
+    [
+     50.0862458,
+     14.3844148
+    ],
+    [
+     50.0864255,
+     14.3844255
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2633.6,
+     "y": 236.8,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2630.1,
+     "y": 256.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Malovanka (s 344): OSM's surface changes here from setts (Myslbekova) to asphalt (Hládkov, Myslbekova). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08877-14.38715",
+   "line": "23",
+   "x": -2401.2,
+   "y": 487.8,
+   "s0": 740,
+   "s1": 760,
+   "status": "review",
+   "place": [
+    50.088767,
+    14.387151
+   ],
+   "between": [
+    [
+     50.0887783,
+     14.3870128
+    ],
+    [
+     50.0887562,
+     14.3872902
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2410.9,
+     "y": 490.4,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2391.6,
+     "y": 485.2,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Hládkov (s 750): OSM's surface changes here from asphalt (Hládkov, Myslbekova) to setts (Hládkov). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08880-14.38785",
+   "line": "23",
+   "x": -2351.1,
+   "y": 484.2,
+   "s0": 792,
+   "s1": 812,
+   "status": "review",
+   "place": [
+    50.088797,
+    14.387852
+   ],
+   "between": [
+    [
+     50.0887521,
+     14.3877322
+    ],
+    [
+     50.088865,
+     14.387943
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2360.3,
+     "y": 480.4,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2343.6,
+     "y": 490.8,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Hládkov (s 802): OSM's surface changes here from setts (Hládkov) to nothing (unnamed). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08627-14.43198",
+   "line": "23",
+   "x": 738.8,
+   "y": -225.2,
+   "s0": 7604,
+   "s1": 7624,
+   "status": "review",
+   "place": [
+    50.08627,
+    14.431982
+   ],
+   "between": [
+    [
+     50.0861829,
+     14.4319481
+    ],
+    [
+     50.0863574,
+     14.4320157
+    ]
+   ],
+   "marks": [
+    {
+     "x": 735.1,
+     "y": -234.5,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 742.6,
+     "y": -215.9,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Jindřišská (s 7614): OSM's surface changes here from setts (Dlážděná, Senovážné náměstí) to asphalt (Dlážděná, Havlíčkova). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08834-14.43254",
+   "line": "23",
+   "x": 809.5,
+   "y": -2.1,
+   "s0": 7844,
+   "s1": 7864,
+   "status": "review",
+   "place": [
+    50.088344,
+    14.432536
+   ],
+   "between": [
+    [
+     50.0882546,
+     14.4325429
+    ],
+    [
+     50.0884342,
+     14.4325294
+    ]
+   ],
+   "marks": [
+    {
+     "x": 808.7,
+     "y": -12.0,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 810.4,
+     "y": 7.9,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Masarykovo nádraží (s 7854): OSM's surface changes here from asphalt (Dlážděná, Havlíčkova) to concrete (Havlíčkova). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08937-14.43246",
+   "line": "23",
+   "x": 819.6,
+   "y": 111.5,
+   "s0": 7958,
+   "s1": 7978,
+   "status": "review",
+   "place": [
+    50.089368,
+    14.432459
+   ],
+   "between": [
+    [
+     50.0892784,
+     14.4324663
+    ],
+    [
+     50.089458,
+     14.4324526
+    ]
+   ],
+   "marks": [
+    {
+     "x": 818.7,
+     "y": 101.5,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 820.5,
+     "y": 121.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Masarykovo nádraží (s 7968): OSM's surface changes here from concrete (Havlíčkova) to setts (Havlíčkova, Na Poříčí). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.08968-14.43266",
+   "line": "23",
+   "x": 838.2,
+   "y": 143.8,
+   "s0": 7998,
+   "s1": 8018,
+   "status": "review",
+   "place": [
+    50.089679,
+    14.432656
+   ],
+   "between": [
+    [
+     50.0896229,
+     14.4325474
+    ],
+    [
+     50.0897143,
+     14.4327842
+    ]
+   ],
+   "marks": [
+    {
+     "x": 829.7,
+     "y": 138.7,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 847.9,
+     "y": 146.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Masarykovo nádraží (s 8008): OSM's surface changes here from setts (Havlíčkova, Na Poříčí) to asphalt (Na Poříčí). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.08874-14.38748",
+   "line": "23",
+   "x": -2378.6,
+   "y": 481.7,
+   "s0": 743,
+   "s1": 804,
+   "status": "review",
+   "place": [
+    50.088741,
+    14.387477
+   ],
+   "between": [
+    [
+     50.0887755,
+     14.3870476
+    ],
+    [
+     50.0888117,
+     14.3878774
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2408.5,
+     "y": 489.7,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2349.1,
+     "y": 485.6,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (road) near Hládkov (s 743-804), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.08598-14.43187",
+   "line": "23",
+   "x": 726.7,
+   "y": -256.0,
+   "s0": 7564,
+   "s1": 7598,
+   "status": "review",
+   "place": [
+    50.085981,
+    14.431873
+   ],
+   "between": [
+    [
+     50.0858353,
+     14.431817
+    ],
+    [
+     50.0861264,
+     14.4319268
+    ]
+   ],
+   "marks": [
+    {
+     "x": 720.6,
+     "y": -271.5,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 732.8,
+     "y": -240.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (diamond, road) near Jindřišská (s 7564-7598), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.08845-14.43253",
+   "line": "23",
+   "x": 810.6,
+   "y": 10.2,
+   "s0": 7856,
+   "s1": 7877,
+   "status": "review",
+   "place": [
+    50.088455,
+    14.432528
+   ],
+   "between": [
+    [
+     50.0883622,
+     14.4325348
+    ],
+    [
+     50.0885475,
+     14.4325209
+    ]
+   ],
+   "marks": [
+    {
+     "x": 809.7,
+     "y": -0.1,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 811.5,
+     "y": 20.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (road) near Masarykovo nádraží (s 7856-7877), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.08942-14.43246",
+   "line": "23",
+   "x": 820.0,
+   "y": 116.8,
+   "s0": 7965,
+   "s1": 7982,
+   "status": "review",
+   "place": [
+    50.089416,
+    14.432455
+   ],
+   "between": [
+    [
+     50.0893395,
+     14.4324616
+    ],
+    [
+     50.0894921,
+     14.4324556
+    ]
+   ],
+   "marks": [
+    {
+     "x": 819.3,
+     "y": 108.3,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 821.2,
+     "y": 125.2,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (switch) near Masarykovo nádraží (s 7965-7982), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  }
+ ]
+}

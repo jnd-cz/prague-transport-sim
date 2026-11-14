@@ -75,6 +75,13 @@ Sections:
   (the Depo Hostivař branch, the user 2026-11-12), and one in a street lies in the street's hole. They miss 6 km of the known grass
   (Sídliště Řepy - Slánská, most of Malý Břevnov - Obora Hvězda), and some lie under our bridges (Střelecký ostrov's
   park under line 22 at Újezd), so OSM's grass outside the facts goes to the user's review (`tools/grass_review.py`).
+- **A platform paves both tracks at most stops in grass track**, the two directions' platforms staggered or not
+  (#584, 2026-11-14 orthophoto: line 37 at Českomoravská, line 9 at s 15500). Holes on the platform's track alone
+  would have drawn 1.3 km of grass on the other one, most of it the grassed-track list's stop-to-stop extent where
+  both tracks are paved. Drinopol (line 22) is the exception the user named, the only one they know: each platform is
+  also a (replacement) bus stop, so the asphalt runs from the road across the near track to the platform, and the
+  far track stays grass. Nothing in the data tells them apart (the survey maps both as `tram` there, OSM's tram ways carry
+  no surface), so a track differs only where a mark says so (`trackStyles` with `track`, data `stylesBack`/`liftBack`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 
@@ -282,11 +289,26 @@ Sections:
   Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
   Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
   are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
+- **A DI track crossing ours measures the street's tilt there** (#538): its heights where it meets our left and
+  right rail, each taken against our own rail profile at that point (on a 30° crossing the two lie 3 m apart
+  along ours), differ by the cross level. Where one DI track crosses both of ours the two values agree within 2 mm
+  (median), 6 mm (p90). On the five lines' 120 crossings on paved double track this is the only independent check
+  of a street's crossfall: the median of IPR's plane, the survey's plane and our two tracks' slope errs 6 mm
+  (median), IPR alone 10 mm and with a +7 mm bias, though the three-cornered hat gives IPR the smallest spread
+  (0.2 %, the survey 0.8-1.1 %, the tracks 0.4-0.5 %): IPR agrees with the others most and with DI least.
+  Sokolovská: DI 2.6-2.9 % over the gauge, IPR 5.2 %. `tools/cross_level.py` takes DI's value where it exists.
 
 ### Terrain and the street survey (IPR, ČÚZK, ZPS)
 
 - **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
   `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
+- **The survey's medians** (Dělící pás, 010000001503, #555) carry no surface, and some are mapped twice: of line
+  22's 31 within 40 m of the route, 8 lie mostly under a `tram` area (the tram reservation between the
+  carriageways), 6 on `road`, 15 alone. Read since #555 as `median` (raised like an island, green where OSM's grass
+  covers it: `tools/zps_medians.py`), they fill strips the page drew as sunken terrain: Modřanská's middle (line 17
+  s 4370), Bělohorská beside the track (line 22 s 4160). Where OSM maps the divided road as one two-way way, the
+  cars' fit took one carriageway and laid the other direction's lane in the gap or the opposite carriageway; it now
+  spans both and divides at the median (`src/traffic.js` `_fitRoad`, `laneOffset`).
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
   LZW). Its cell centres sit 0.72 m / 0.61 m off the S-JTSK metre grid (sampled bilinear, never copied);
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
@@ -444,13 +466,41 @@ Sections:
     `shape`).
   - Geometry: OPL polygons / multipolygons (XY); KR line strings with Z (boundary heights) and points
     (registration). `gpkg.py`'s WKB reader takes base types 1–7 with ISO / EWKB Z and M (M dropped) and
-    envelope codes 0–4: curved types would need work.
+    envelope codes 0–4: curved types would need work. The blobs carry no envelope (flags 0) and the packages
+    no R-tree index, so a reader that wants only the features near the line reads every box through GEOS
+    (`gpkg.features(keep=)`, #517): of line 17's districts' 1 891 580 line and 199 246 area features, 8.7 % and
+    9.4 % have a box that reaches its corridor's 40 m cells.
   - CRS: everything is EPSG:5514 metres, M = 0, and no tool reprojects or rejects another CRS.
   - Per district (OPL polygon / KR line / KR point layers): Praha 1 50/28/61, 2 43/26/52, 4 49/28/60,
     7 45/28/56, 8 53/29/63, 10 49/27/62, 12 50/29/58, 17 43/26/47.
   - Versions: the GPKG `user_version` 10301 is GeoPackage 1.3.1, not the JVF version. The GPKG ZIPs
     carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
     `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
+- **The survey under the track beds** (#547, #548, 2026-11-13):
+  - Beds are as wide as the survey's area of their style (tram, green, rail), else the style's median width
+    measured there: embedded 1.7, panels 1.9, grass 2.0, ballast 2.5 m (`tools/track_beds.py --calibrate`).
+  - The survey's raised areas (platforms, sidewalks, islands) lie inside the bed outlines over 1 800-4 200 m² per
+    line. Laid under the beds with the street, they flattened 4-5 times the kerbs (line 9 345 → 1 571 flat kerbs).
+    They keep their height: a sidewalk inside a bed's outline means the bed is too wide there, and the raised area
+    is drawn over it anyway.
+  - The survey's street triangles, split to 5 m, rose over a bed between their corners even with every corner
+    laid under it (Spojovací's loop, line 17 s 2350). Near every drawn track they are meshed to 2 m
+    (`terrain.js` `nearTracks`); each 4 m outline piece is split by its own midpoint, the same for both
+    neighbours, so no shared edge gains a point on one side only.
+  - Where the band past a bed's edge caps one area's vertices and its neighbour meets it along a longer edge with
+    no vertex there, a 3.3 cm seam opens (line 23 s 2332-2460, a track 2.4 m away): +18 and +20 `seams3` on lines
+    22 and 23.
+- **The survey on our bridges** (#549, the user's photos and Street View, 2026-11-14):
+  - Level-1 walkway areas sometimes carry the parapet's top as their surface: Krejcárek's tram areas 0.9-1.3 m over
+    the rails, the strip at Modřanská škola (line 17) 0.61 m, Čechův most's sidewalks 0.66-0.73 m (really a kerb
+    over the road). `flushDtm` lays them; a flat deck takes its parapets from them.
+  - A span from OSM's bridge or the survey's level-1 bed includes the walled ramps up to the bridge: IPR's bare
+    earth lies 0.0-0.4 m under the rails there and 2.3-14 m under the spans' bridges (`line_structures.py`
+    `ramps`). The ramps stay spans: off a span, the street flush pulls the street beside a walled ramp up to the
+    track (Modřanská, 40 kerbs).
+- **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
+  (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
+  measure is circular). It does not tell ballast from grass.
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
@@ -920,6 +970,17 @@ Review these when realism matters; most move into the build in M2.
 
   What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
   only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
+- **Rails under the ground** (`tools/lint.js` `buriedRails`, in `--checks canted`, #548): every 2 m of every drawn
+  track, each rail head against the surfaces over it. Before #548: 372-837 places per line, 295-741 of them the
+  survey; after: 86-133, mostly another track's bed between a switch's rails (1-5 cm) and OSM road ribbons.
+  Its trough measure (the ground 1 m past a bed's edge lower than the edge and the ground 4 m out) is not
+  calibrated: its deepest places are real ditches and cuttings (`reports/review/bed-troughs-N.json`).
+- **`DownRays` and long slivers:** indexed by its bounding box, a survey sliver lands in thousands of 4 m cells, and
+  sampling every drawn track ran for 30 minutes on line 17. A triangle over more than four cells goes only into
+  the cells it overlaps (`triInRect`); two indexes of line 17's survey and terrain ran the page out of memory.
+- **Probes and screenshots:** `shot.py --view review` colours the surfaces by class and hides the track styles, so
+  appearance is judged in `chase` or `cab`. Platforms, stop signs and shelters are added to the scene, not to the
+  world group (`window.world`): a probe that walks only the world misses them.
 
 ## Czech tram terms
 
@@ -960,14 +1021,32 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   4 threads and 24 run about as fast. The thread count changes BLAS results in their last bits (sums split
   differently); the line heights came out byte-identical at 4 and at 24. `tools/rebuild.py` sets
   `OPENBLAS_NUM_THREADS` per step.
+- numpy has no banded or triangular solver; SciPy's LAPACK wrappers do: `scipy.linalg.lapack.dpbtrf` factors a
+  symmetric positive definite band matrix (upper storage, `ab[u+i-j, j] = A[i, j]`) and `dpbtrs` solves with the
+  factor, a 1-d right-hand side included. On the vertical profile's pentadiagonal system (n 3303) a solve took 50 us
+  against 1.66 ms for a product with the dense inverse (4 BLAS threads), the factor 0.3 ms against the inverse's 0.87
+  s; the answers 2.6e-12 apart, the residual smaller; the heights byte-identical (#516).
+- A warm start is not a free speed-up for an iterative solve whose results feed one another: ADMM started from where
+  the same solve ended last time stops at another point within its tolerance, and the rounds of meeting half way (one
+  chain's heights are another's pins) then ended after 4 rounds instead of 6 and moved one junction's heights by up to
+  16 mm (#516).
 - Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
   rewritten within the same second at the same size runs the old code (a test that edits a module must
   change its size).
+- `np.hypot` and `math.hypot` differ in the last bit in ~17 % of pairs (2 000 000 random pairs, #517), and so does
+  `np.sqrt(x*x + y*y)`; numpy's `+ - * /` and Python's floats agree to the bit. A loop moved to numpy keeps its
+  results only where it keeps `math.hypot` (`tools/track_curve.py` `misses`: numpy picks, `math.hypot` measures).
+  shapely's array functions (`distance`, `line_locate_point`, `line_interpolate_point`, `buffer`, an `STRtree`
+  query of many geometries, which lists each one's hits in the order a query of it alone gives) run the same GEOS
+  operations as its scalar methods: the same bits.
 - `os.replace` onto a file another handle holds open fails on Windows (`PermissionError`, WinError 5), and
   so does opening a file while it is being replaced; POSIX lets both through. Python's `open` does not share
   delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
   stopped a parallel rebuild (#521). A file several threads or processes write needs one writer at a
   time and a retry for the readers (`tools/stepcache.py` `_waiting`).
+- A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
+  in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
+  faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
 
 ## The test host
 

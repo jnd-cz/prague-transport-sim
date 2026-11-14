@@ -18,7 +18,7 @@ import { Verdicts, readLineAnswers } from './verdicts.js';
 import { heightProfile } from './trackHeightProfile.js';
 import { fid, loadFindings, answerOf } from './reviewFindings.js';
 
-const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'platform']);
+const CARR = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
 const STREETS = new Set([...CARR, ...RAISED, 'paved', 'cycle']);
 const CLASS_COLORS = {
   road: '#5b6cff', tram: '#b04bff', parking: '#4fb3ff', sidewalk: '#ffb02e', island: '#ff7a2e', platform: '#ff3e6c',

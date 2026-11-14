@@ -11,7 +11,8 @@ are documented in docs/decisions/2026-10-27-track-source.md. This tool imports Z
 Usage:  python tools/dtm.py --line 22 raw/dtm/<district OPL dir> raw/dtm/<district KR dir> ...
         (pass the unzipped *_ZPS_OPL.gpkg and *_ZPS_KR.gpkg folders of every district on the line)
 Writes data/lineN.dtm.json: {"attribution", "areas": [{"c": class, "l": level, "r": [[x,y,z]...], "h": [holes],
-"k": kerb edges (raised areas)}]}; kerbs: tools/kerbs.py
+"k": kerb edges (raised areas)}], "shelters": [shelter footprints filled in the platforms]}; kerbs: tools/kerbs.py;
+shelters: tools/zps_shelters.py
 """
 import json
 import math
@@ -29,6 +30,8 @@ from dtm_packages import DTM, select_packages  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
 SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
+import heavy  # noqa: E402
+heavy.turn(f"dtm {LINE}")  # (a heavy job run alone, ~60 s; under rebuild.py in its turn, #536)
 
 # area classes by the DTM object type code at the end of the layer name
 CLASSES = {
@@ -38,6 +41,8 @@ CLASSES = {
     "010000021503": "green", "010000020903": "green", "010000015203": "green", "010000018703": "paved",
     "010000018903": "paved", "010000005503": "paved", "010000016603": "stairs", "010000031503": "roof",
     "010000016803": "wall", "010000020303": "water",
+    # (#555: the median strip between carriageways, tools/zps_medians.py; the road's associated area, paved)
+    "010000001503": "median", "010000032003": "paved",
 }
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
@@ -95,28 +100,32 @@ zgrid = defaultdict(list)
 wall_lines = []  # the survey's walls and terrain edges (tools/kerbs.py: an edge along one is not a kerb)
 WALLS = ("Hranice_zdi", "Zeď", "Terénní_hrana")
 packages = select_packages(ROOT, sources=SOURCES) if SOURCES else select_packages(ROOT, districts=DTM[LINE])
-for package in packages:
-    kr = package.kr
-    print(f"district: {package.district}, month {package.date}")
-    for t, info in gpkg.layers(kr).items():
-        wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
-        if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
-            continue
-        for f in gpkg.features(kr, t):
-            g = f["geom"]
-            if not g:
+
+
+def read_lines(keep):
+    """The 3D lines' heights (zkey, zgrid) and the walls (wall_lines), of the lines keep() lets through (gpkg.features)."""
+    for package in packages:
+        kr = package.kr
+        print(f"district: {package.district}, month {package.date}")
+        for t, info in gpkg.layers(kr).items():
+            wall = t.split("#")[-1].split("_", 1)[-1].startswith(WALLS)
+            if info["type"] not in ("LINESTRING", "MULTILINESTRING") or ("Hranice" not in t and not wall):
                 continue
-            parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
-            lvl = f.get("UrovenUmisteniObjektuZPS") or 0
-            if wall:
-                wall_lines += [[local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1]
-            if "Hranice" not in t:
-                continue
-            for pts in parts:
-                for x, y, z in pts:
-                    if z:
-                        zkey[(round(x, 2), round(y, 2))].add((z, lvl))
-                        zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
+            for f in gpkg.features(kr, t, keep=keep):
+                g = f["geom"]
+                if not g:
+                    continue
+                parts = [g[1]] if g[0] == "LineString" else [p[1] for p in g[1]]
+                lvl = f.get("UrovenUmisteniObjektuZPS") or 0
+                if wall:
+                    wall_lines.extend([local(x, y) for x, y, _ in pts] for pts in parts if len(pts) > 1)
+                if "Hranice" not in t:
+                    continue
+                for pts in parts:
+                    for x, y, z in pts:
+                        if z:
+                            zkey[(round(x, 2), round(y, 2))].add((z, lvl))
+                            zgrid[(int(x // 5), int(y // 5))].append((x, y, z, lvl))
 
 def candidates(x, y, level):
     """Possible heights of a polygon vertex: the 3D line vertices at the same position, else
@@ -199,7 +208,7 @@ def fill_along(r, zs):
 
 # surfaces driven or walked on: they never jump a metre between nearby outline points (a kerb is a
 # few cm, a ramp a slope; stairs and walls are their own classes)
-SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "platform", "paved"}
+SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "median", "platform", "paved"}
 n_spikes = defaultdict(int)
 import numpy as np  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
@@ -303,13 +312,18 @@ def ring(r, level, cls=None):
 
 
 seen_areas, n_copies = set(), 0  # (an area on a district border is in both districts' packages, #316)
+# the corridor's areas first (only those whose box reaches a corridor cell are decoded), then the 3D lines and walls whose
+# boxes reach theirs (a vertex's heights come from lines within 10 m of it, the kerbs' walls lie within 3 m of an
+# outline): the 1.9 million lines of line 17's districts decoded and put in the grids were most of its reading (#517)
+found = []
+corridor = gpkg.near(cells, 40, (F.E0, F.N0))
 for package in packages:
     opl = package.opl
     for t in gpkg.layers(opl):
         cls = CLASSES.get(t.split("#")[-1].split("_")[0])
         if not cls:
             continue
-        for f in gpkg.features(opl, t):
+        for f in gpkg.features(opl, t, keep=corridor):
             if not f["geom"]:
                 continue
             for rings in walk(f["geom"]):
@@ -323,15 +337,25 @@ for package in packages:
                     n_copies += 1
                     continue
                 seen_areas.add(same)
-                r0, miss = ring(outer, level, cls)
-                if miss / max(1, len(r0)) > 0.3:
-                    dropped += 1
-                    continue  # mostly unknown heights: would be a flat sheet at a guessed level
-                a = {"c": cls, "l": level, "r": r0}
-                holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
-                if holes:
-                    a["h"] = holes
-                areas.append(a)
+                found.append((cls, level, rings))
+read_lines(gpkg.near_boxes([(min(p[0] for p in r), min(p[1] for p in r), max(p[0] for p in r), max(p[1] for p in r))
+                            for _, _, rings in found for r in rings if r], 5))
+for cls, level, rings in found:
+    outer = rings[0]
+    r0, miss = ring(outer, level, cls)
+    if miss / max(1, len(r0)) > 0.3:
+        dropped += 1
+        continue  # mostly unknown heights: would be a flat sheet at a guessed level
+    a = {"c": cls, "l": level, "r": r0}
+    holes = [ring(h, level, cls)[0] for h in rings[1:] if len(h) > 3]
+    if holes:
+        a["h"] = holes
+    areas.append(a)
+
+# the medians: a tram reservation mapped twice stays tram, the others are grass or paved (tools/zps_medians.py, #555);
+# before anything keys the areas by index
+import zps_medians  # noqa: E402
+print("medians:", zps_medians.sort(areas, line.get("green") or []))
 
 # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
 # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
@@ -463,6 +487,14 @@ print("kerbs:", kerb_report["areas"], f"platform steps {kerb_report['platformSte
       f"({sum('osmKerb' in e for e in kerb_report['review'])} with an OSM lowered or flush kerb);",
       "not kerbs:", {k: len(v) for k, v in kerb_report["notKerb"].items()})
 
+# the holes shelters leave in the platforms are filled, their footprints kept for the street furniture
+# (tools/zps_shelters.py, #523); after the kerbs, which read a platform's step from the terrain 1 m inside its edge: filled
+# first, three probes over Hloubětín B's shelter tipped its step from the top line to the foot and raised the road 0.235 m
+import zps_shelters  # noqa: E402
+shelter_report = zps_shelters.fill(areas, line.get("platforms", []))
+print("shelters:", shelter_report["filled"], "holes filled", shelter_report["byKind"], shelter_report["kept"],
+      "holes kept (an area of their own in them)")
+
 counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
@@ -471,7 +503,7 @@ print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing, "
       f"{n_deck} ground-level corners on a deck's line given the ground")
 print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
-out = {"areas": areas}
+out = {"areas": areas, "shelters": shelter_report["shelters"]}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
 vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_deck, "droppedAreas": dropped,
@@ -481,7 +513,8 @@ out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
                            checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
                                    "decks": deck_report, "underDecks": under_report, "inside": inside_report,
-                                   "outlines": outline_report}),
+                                   "outlines": outline_report,
+                                   "shelters": {k: v for k, v in shelter_report.items() if k != "shelters"}}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
     "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
 out["attribution"] = sources.attribution(out["provenance"])

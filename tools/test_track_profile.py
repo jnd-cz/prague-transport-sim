@@ -128,5 +128,24 @@ class Chains(unittest.TestCase):
         self.assertIn([('c', False)], out)
 
 
+class BandedSystem(unittest.TestCase):
+    def test_banded_system_solves_as_a_dense_one(self):
+        """#516: the ADMM steps' system solved by its banded Cholesky factor (LAPACK) as a dense solve of it, pins and all."""
+        import numpy as np
+        import track_profile as tp
+        rng = np.random.default_rng(3)
+        s = np.cumsum(rng.uniform(3, 7, 400))
+        D = tp._D(s)
+        w = rng.uniform(0, 1, 400)
+        w[::50] = 1e6
+        lam = np.full(398, 2*np.median(np.diff(s))**4)
+        b = rng.normal(0, 1, 400)*w
+        m = np.zeros((398, 400))
+        i = np.arange(398)
+        m[i, i], m[i, i+1], m[i, i+2] = D.l, D.c, D.r
+        dense = np.linalg.solve(np.diag(w)+(m.T*lam)@m, b)
+        self.assertLess(np.max(np.abs(D.system(w, lam)(b)-dense)), 1e-9)
+
+
 if __name__=='__main__':
     unittest.main(verbosity=2)

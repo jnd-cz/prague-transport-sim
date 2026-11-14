@@ -226,5 +226,23 @@ class Network(unittest.TestCase):
         self.assertEqual(net.pos[2], net.pos[3])
 
 
+class Misses(unittest.TestCase):
+    def test_misses_at_once_as_nearest(self):
+        """misses (numpy picks, math.hypot measures, #517) gives nearest's distance to its last bit: curves with repeated
+        points, ties, zero-length segments and windows cut by the ends."""
+        rng = random.Random(3)
+        for trial in range(40):
+            n = rng.choice([2, 3, 5, 40, 300])
+            px = [rng.uniform(-50, 50) for _ in range(n)]
+            py = [rng.uniform(-50, 50) * (trial % 3) for _ in range(n)]
+            if n > 3:
+                px[2], py[2] = px[1], py[1]  # (a zero-length segment)
+            xs = [x + rng.choice([0.0, 0.1, -1e-9]) for x in px]
+            ys = [y + rng.choice([0.0, 0.2]) for y in py]
+            ss = list(range(n))
+            self.assertEqual(tc.misses(px, py, xs, ys, ss), [tc.nearest(px, py, s - 3, s + 3, (xs[s], ys[s]))[0] for s in ss])
+        self.assertEqual(tc.misses([0.0, 1.0], [0.0, 0.0], [0.5], [1.0], []), [])
+
+
 if __name__ == '__main__':
     unittest.main()

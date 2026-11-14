@@ -41,11 +41,104 @@ credits from the manifests (`src/vehicles.js`, `src/main.js`); `tools/test_vehic
 | `preload` | `true`: downloaded with the line; else when the player picks it |
 | `licence` | `spdx` (a licence that allows redistribution), `commercial` (false for NC), `file` (its `LICENSE.txt`), `authors`, `sources` (URLs), `credit` (the line the game shows) |
 | `tier` | its tier of movement (below), `moves` the parts it moves, `levels` its distance levels |
-| `variants` | the types it can be (`type`, e.g. `T3SUCS`) and their fleet numbers (`fleet`: ranges `[first, last]`); an AI tram's type and its cars' numbers come from its run number (`src/vehicles.js`), each type as often as it has numbers |
+| `fleet` | the numbers its sets run as (#527): `types`, per type (e.g. `T3SUCS`) its `ranges` `[first, last]` with `except` (holes), or a `list`; `sets`, the pairs that run together and with no other car, though either car may run alone where a line runs single cars, its partner then free for another single car (a set not listed is two numbers of one type); `liveries`, number → livery id (#529). The run deals them (`src/vehicles.js` `FleetDealer`): a deck of every number shuffled by the run's seed, so each type comes up as often as it has numbers, none twice on the street, given back when a set leaves; our tram runs as the player's preferred set from the menu, else as a T3SUCS dealt the same way, and no AI tram is dealt its numbers. `tools/test_fleet.py` checks the dealing |
+| `slots` | a glTF vehicle's livery slots (#529): a slot's name and the materials it paints, e.g. the hybrid's `body` (`Red_Hull`) and `band` (`Beige`, `Beige_wbackface`); the rigged loader keeps their parts apart (with their uv) so a livery can give them a texture or a colour |
+| `colours` | a model painted by colour: the names of the colours a livery may replace (the built-in car's `body`, `band`, `roof`) |
 
 A **tier-1 glTF** needs no code: a still model in metres, its origin on the rail plane midway between the bogie
 pivots, +Y up, facing `forward`; its pivots are its type's. The menu offers it, it loads when picked and the
 credits name it.
+
+## Liveries
+
+A livery (#529; the decision record `docs/decisions/2026-11-10-vehicle-packages.md`, section 3) is a folder
+`assets/<id>/` with a `livery.json`, listed under `liveries` in `assets/vehicles.json`; its id is its author's name and
+its own (`sample.t3h-blue`). The menu offers our tram the vehicle's own look, one of its liveries, or one dealt as an AI
+tram's; AI trams are dealt one (`src/vehicles.js` `liveryOf`). `tools/test_vehicles.py` checks the manifests,
+`tools/test_liveries.py` the looks and the dealing in the game.
+
+| field | what |
+|---|---|
+| `schema`, `id`, `names`, `licence`, `files` | as a vehicle's |
+| `kind` | `livery` |
+| `requires` | `{ "<vehicle id>": ">=1" }`: the vehicle it paints |
+| `textures` | slot → an image among its files: replaces the slot's materials' texture and colour; WebP, PNG or JPEG, power-of-two sides up to 2048 px |
+| `colours` | slot or painted colour → `#rrggbb`: replaces the slot's materials' colour, or the built-in car's colour |
+| `numbers` | the fleet numbers' `font` (a CSS font family, Arial where it is missing) and `colour` |
+| `types` | the fleet types it fits (default: all) |
+| `share` | the part of AI sets of those types that wear it, 0 to 1 (default 0: only our tram's, or a number's in the fleet's `liveries`) |
+
+Every slot it leaves out keeps the vehicle's own. A livery naming a slot or a type its vehicle lacks is left out with
+the slot's name (`livery x left out: texture slot roof: t3h has no such slot`). The game ships none yet, so the menu
+row stays hidden (the user, 2026-11-13: "For now I would keep only the default liveries, with future possibility to
+add more variety"); `tools/test_liveries.py` serves two samples of its own, a texture and a colour on the hybrid and
+the built-in car's three colours.
+
+## Sound packs
+
+The game's sounds are events and loops (#528; the decision record, section 5): the game raises an event (`bell`,
+`door.close`, `points` as an axle passes a frog) and sets the parameters the loops follow; `src/audio.js` plays each
+with a sound pack's recording where the pack has one, else with the built-in sound it synthesises (the sounds the game
+had before the packs). A pack is a vehicle manifest's `sounds` (its files among the vehicle's) or a folder
+`assets/<id>/` with a `sounds.json` (`kind` `sounds`, `requires` its vehicle, `names`, `licence`, `files`), listed under
+`sounds` in `assets/vehicles.json`; a vehicle sounds with the first package for it, else its own. The game ships none
+yet: every vehicle has the built-in sounds; `tools/test_sounds.py` serves a sample pack of its own.
+
+| field | what |
+|---|---|
+| `events` | event → a file, or a list of files (one picked at random each time); WAV or MP3 |
+| `loops` | loop → `{ "file", "refSpeed" (m/s, motor and rolling) or "refRpm" (mg), "gain" }`: the recording plays pitched by its parameter over the reference, as loud as the built-in loop's share of its loudest, times `gain` (default 1) |
+| `gain` | the pack's events' loudness (default 1); an event over a joint or a frog plays louder with speed |
+
+A pack naming an event or a loop the game does not have, a file it does not list, or a loop without its reference is
+left out with the name (`sound pack x left out: event gong: the game raises no such event`). The frogs: a facing
+switch's `frog` m past its fork, a trailing switch's before it (11.5 m where the build found none, `src/speedRules.js`
+`FROG`), a diamond crossing's two rails 0.72 m either side of its place; each axle of the set sounds as it passes
+(`src/audio.js` `axlesBehind`: the T3's pivots 6.4 m apart, a bogie's wheelbase 1.9 m).
+
+<!-- sound-lists -->
+(written by `tools/sound_lists.py` from `src/audio.js`)
+
+| event | when |
+|---|---|
+| `door.open` | the doors start opening (their clip starts) |
+| `door.close` | the doors start closing (their clip starts) |
+| `door.buzzer` | the door alert before the doors close |
+| `bell` | the main bell |
+| `joint` | a bogie over a rail joint (every 18 m) |
+| `points` | an axle over a switch's frog |
+| `crossing` | an axle over a rail of a diamond crossing |
+| `notch.up` | the controller moved to a higher command |
+| `notch.down` | the controller moved to a lower command |
+| `lineContactor` | the line contactor closes or opens |
+| `contactor` | a field-weakening stage of the accelerator |
+| `trackBrake.on` | the track brakes' magnets drop |
+| `trackBrake.off` | the track brakes' magnets lift |
+| `indicator.tick` | the indicators' relay, lamps on |
+| `indicator.tock` | the indicators' relay, lamps off |
+| `switch.radio` | a switch set by the radio control (IRC) |
+| `switch.contact` | a switch set by the overhead contact |
+| `switch.iron` | a switch set by hand with the switch iron |
+| `heating` | a heating switch |
+| `warning` | the cab's warning beep |
+| `crash` | a collision |
+
+| loop | what |
+|---|---|
+| `motor` | traction motors and gears: pitched by speed, loud by the motor current |
+| `rolling` | rolling noise: pitched and loud by speed |
+| `flange` | flange squeal in curves under 20 m radius and on sliding wheels: not pitched |
+| `mg` | the motor-generator and its fans: pitched by mgRpm |
+
+| parameter | unit |
+|---|---|
+| `speed` | m/s |
+| `motorCurrent` | A |
+| `curveRadius` | m (the curve's speed limit standing in for it: under 20 m radius squeals) |
+| `mgRpm` | rpm |
+| `slide` | 0/1: wheels locked and sliding |
+| `trackBrake` | 0/1: the track brakes on |
+<!-- /sound-lists -->
 
 ## The rig
 
@@ -70,9 +163,17 @@ left out far away), `numberPlates` (drawn with the fleet number, its digits `fle
 doors shut, the collector at the wire, everything but the saloon merged by material. `tools/test_rigged.py` makes a
 sample vehicle with every part and checks each of them moves.
 
-A rig is generated, not edited by hand. The hybrid's is maintained in the repo: the asset lab it came from is retired
-(the user, 2026-11-12: the lab "is just website for viewing the model and it's animations, it doesn't export anything on its own and most likely won't be used anymore"), and its rig is to be generated by `tools/export_t3h_rig.py` from `tools/t3h_rig_roles.json` and checked
-against the GLB (#471); until then eight of its fields are hand-written (the rig's `handWritten`).
+The hybrid is maintained in the repo: the asset lab it came from is retired (the user, 2026-11-12: the lab "is
+just website for viewing the model and it's animations, it doesn't export anything on its own and most likely won't
+be used anymore"). Its rig is generated by [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) from
+[`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) and the base rig, with its bindings checked
+against the GLB (#471). When the model changes, update the part assignments in the roles file and the
+base rig as needed, then regenerate `assets/t3h/rig.json` and update its byte count in `vehicle.json`.
+`revision` records the asset revision and `rigRevision` versions the generated rig.
+
+```sh
+python -I tools/export_t3h_rig.py --out assets/t3h/rig.json
+```
 
 ## What a set must be
 
@@ -152,7 +253,7 @@ Apart from the tiers, a model can have **distance levels**: the full one near th
   (`NOSE`, `CORNER`, `LIV`, `CUTOUT`, `HEADLIGHT`, `FLEET`, …), each with where it comes from; the livery is
   painted in `livery()`, the fixed parts in `partsGeometry()`, the moving ones in `bogie()`, `wheelset()`,
   `coupler()` and `pantoBars()` (the pantograph's frame for a contact height), the types and their fleet numbers in
-  its manifest's `variants` (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` checks it against those numbers.
+  its manifest's `fleet` (`assets/t3simple/vehicle.json`). `tools/test_t3simple.py` checks it against those numbers.
 - **The plates and cards** for every model: `src/models.js` (`routeBoxTexture`, `destinationTexture`,
   `numberTexture`, the T3M's dot-matrix `ledFace`).
 - **The hybrid:** maintained in the repo (its asset lab is retired): a change to the model is made by a repo tool and

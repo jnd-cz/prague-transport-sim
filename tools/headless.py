@@ -97,8 +97,10 @@ CALLS = {
     "lint": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
             "const { lint } = await import('/tools/lint.js'); return await lint({ save: false });",
     "canted": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
-              "const { cantedRailVisibility } = await import('/tools/lint.js'); "
-              "return { checks: { cantedRailVisibility: cantedRailVisibility(window.game, window.world) } };",
+              "const { cantedRailVisibility, buriedRails } = await import('/tools/lint.js'); "
+              "const b = buriedRails(window.game, window.world); "
+              "return { checks: { cantedRailVisibility: cantedRailVisibility(window.game, window.world), buriedRails: b, "
+              "sunkenBesideBed: b.sunken } };",
     "crossing": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
                 "const { run } = await import('/tools/bench/crossingSlab.js'); return run();",
     "surfaces": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
@@ -166,6 +168,11 @@ def judge(check, r):
         if c.get("missingBed"):
             bad.append(f"{c['missingBed']} rail samples without their own bed")
         more = f"curves {c.get('curves')}, samples {c.get('of')}, missing samples {c.get('missing')}"
+        # (every drawn track's rails under the ground and the trough beside its bed, #548: measured, not judged)
+        b = (r.get("checks") or {}).get("buriedRails")
+        if b:
+            more += (f"; every track: {b.get('buriedSamples')} places with a rail under the ground of {b.get('of')} rail samples, "
+                     f"sunken beside the bed {(b.get('sunken') or {}).get('metres')} m; by depth {b.get('depth')}, by surface {b.get('kinds')}")
     elif check == "crossing":
         c = (r.get("checks") or {}).get("crossingSlab", {})
         if not c.get("of"):

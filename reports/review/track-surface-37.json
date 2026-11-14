@@ -1,0 +1,839 @@
+{
+ "schema": 1,
+ "issue": 574,
+ "line": "37",
+ "title": "Track surface: setts, asphalt or panels (OSM's surface checked)",
+ "findings": [
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.10222-14.47350",
+   "line": "37",
+   "x": 3922.8,
+   "y": 1128.8,
+   "s0": 3718,
+   "s1": 3910,
+   "status": "review",
+   "place": [
+    50.102222,
+    14.473498
+   ],
+   "between": [
+    [
+     50.1013639,
+     14.4734784
+    ],
+    [
+     50.1030817,
+     14.4733767
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3908.5,
+     "y": 1034.4,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3927.2,
+     "y": 1224.7,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Zenklova near Palmovka (s 3718-3910, 192 m): OSM says concrete (panels?) here, the game draws panels. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.10322-14.47337",
+   "line": "37",
+   "x": 3928.5,
+   "y": 1239.6,
+   "s0": 3912,
+   "s1": 3938,
+   "status": "review",
+   "place": [
+    50.103216,
+    14.473367
+   ],
+   "between": [
+    [
+     50.1030997,
+     14.4733741
+    ],
+    [
+     50.1033303,
+     14.4734043
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3927.3,
+     "y": 1226.7,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3932.9,
+     "y": 1251.8,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Zenklova near Palmovka (s 3912-3938, 26 m): OSM says setts here, the game draws embedded. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.10360-14.47380",
+   "line": "37",
+   "x": 3964.8,
+   "y": 1277.8,
+   "s0": 3968,
+   "s1": 3992,
+   "status": "review",
+   "place": [
+    50.103601,
+    14.473797
+   ],
+   "between": [
+    [
+     50.1035374,
+     14.4736616
+    ],
+    [
+     50.103663,
+     14.4739344
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3954.3,
+     "y": 1272.2,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3975.5,
+     "y": 1283.4,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Na Žertvách near Palmovka (s 3968-3992, 24 m): OSM says setts here, the game draws panels. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.10494-14.47846",
+   "line": "37",
+   "x": 4315.7,
+   "y": 1380.4,
+   "s0": 4332,
+   "s1": 4364,
+   "status": "review",
+   "place": [
+    50.104942,
+    14.478462
+   ],
+   "between": [
+    [
+     50.1049513,
+     14.4782429
+    ],
+    [
+     50.10485,
+     14.4786292
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4300.3,
+     "y": 1383.5,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4326.1,
+     "y": 1368.6,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "Na Žertvách, U Balabenky near Palmovka (s 4332-4364, 32 m): OSM says setts here, the game draws panels. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.10432-14.47904",
+   "line": "37",
+   "x": 4347.0,
+   "y": 1306.0,
+   "s0": 4366,
+   "s1": 4494,
+   "status": "review",
+   "place": [
+    50.104318,
+    14.479037
+   ],
+   "between": [
+    [
+     50.1048344,
+     14.478643
+    ],
+    [
+     50.1038061,
+     14.4794456
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4326.9,
+     "y": 1366.8,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4368.2,
+     "y": 1245.7,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "U Balabenky near Balabenka (s 4366-4494, 128 m): OSM says concrete (panels?) here, the game draws panels. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "stretch",
+   "id": "surface-stretch-50.10373-14.47954",
+   "line": "37",
+   "x": 4373.8,
+   "y": 1236.3,
+   "s0": 4496,
+   "s1": 4514,
+   "status": "review",
+   "place": [
+    50.103729,
+    14.479541
+   ],
+   "between": [
+    [
+     50.1037904,
+     14.4794592
+    ],
+    [
+     50.1036892,
+     14.4796494
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4369.0,
+     "y": 1243.8,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4380.9,
+     "y": 1230.8,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "grass",
+    "each track differently (say which in the note)",
+    "unsure"
+   ],
+   "info": "U Balabenky near Balabenka (s 4496-4514, 18 m): OSM says setts here, the game draws embedded. What is the track laid in between the two marks? (Where one track differs from the other, as at Drinopol, say which in the note: that answer is kept for per-track styles, not imported.)"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10135-14.47347",
+   "line": "37",
+   "x": 3908.0,
+   "y": 1032.5,
+   "s0": 3706,
+   "s1": 3726,
+   "status": "review",
+   "place": [
+    50.101346,
+    14.473475
+   ],
+   "between": [
+    [
+     50.1012584,
+     14.4734446
+    ],
+    [
+     50.1014352,
+     14.4734927
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3904.5,
+     "y": 1023.1,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3910.6,
+     "y": 1042.2,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 3716): OSM's surface changes here from nothing (unnamed) to concrete (Zenklova). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10308-14.47338",
+   "line": "37",
+   "x": 3927.2,
+   "y": 1224.7,
+   "s0": 3900,
+   "s1": 3920,
+   "status": "review",
+   "place": [
+    50.103082,
+    14.473377
+   ],
+   "between": [
+    [
+     50.1029922,
+     14.4733893
+    ],
+    [
+     50.1031713,
+     14.4733654
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3926.7,
+     "y": 1214.7,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3927.7,
+     "y": 1234.7,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 3910): OSM's surface changes here from concrete (Zenklova) to setts (Zenklova). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10333-14.47340",
+   "line": "37",
+   "x": 3932.9,
+   "y": 1251.8,
+   "s0": 3928,
+   "s1": 3948,
+   "status": "review",
+   "place": [
+    50.10333,
+    14.473404
+   ],
+   "between": [
+    [
+     50.1032431,
+     14.4733714
+    ],
+    [
+     50.1034109,
+     14.4734657
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3929.3,
+     "y": 1242.6,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3938.5,
+     "y": 1260.1,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 3938): OSM's surface changes here from setts (Zenklova) to nothing (unnamed). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10353-14.47364",
+   "line": "37",
+   "x": 3952.5,
+   "y": 1271.2,
+   "s0": 3956,
+   "s1": 3976,
+   "status": "review",
+   "place": [
+    50.103527,
+    14.473639
+   ],
+   "between": [
+    [
+     50.1034678,
+     14.4735338
+    ],
+    [
+     50.1035795,
+     14.4737523
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3944.1,
+     "y": 1265.7,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3961.3,
+     "y": 1275.9,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 3966): OSM's surface changes here from nothing (unnamed) to setts (Na Žertvách). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10366-14.47393",
+   "line": "37",
+   "x": 3975.5,
+   "y": 1283.4,
+   "s0": 3982,
+   "s1": 4002,
+   "status": "review",
+   "place": [
+    50.103663,
+    14.473934
+   ],
+   "between": [
+    [
+     50.1036112,
+     14.4738202
+    ],
+    [
+     50.103705,
+     14.4740578
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3966.6,
+     "y": 1278.8,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3984.9,
+     "y": 1286.8,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 3992): OSM's surface changes here from setts (Na Žertvách) to asphalt (Na Žertvách). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10495-14.47822",
+   "line": "37",
+   "x": 4298.3,
+   "y": 1383.2,
+   "s0": 4320,
+   "s1": 4340,
+   "status": "review",
+   "place": [
+    50.104946,
+    14.478216
+   ],
+   "between": [
+    [
+     50.1049111,
+     14.4780875
+    ],
+    [
+     50.1049581,
+     14.4783537
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4288.7,
+     "y": 1380.6,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4308.2,
+     "y": 1383.2,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 4330): OSM's surface changes here from asphalt (Na Žertvách) to setts (Na Žertvách, U Balabenky). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10485-14.47863",
+   "line": "37",
+   "x": 4326.1,
+   "y": 1368.6,
+   "s0": 4354,
+   "s1": 4374,
+   "status": "review",
+   "place": [
+    50.10485,
+    14.478629
+   ],
+   "between": [
+    [
+     50.1049159,
+     14.4785354
+    ],
+    [
+     50.1047691,
+     14.47869
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4320.5,
+     "y": 1376.8,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4329.2,
+     "y": 1359.1,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Palmovka (s 4364): OSM's surface changes here from setts (Na Žertvách, U Balabenky) to concrete (U Balabenky). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10381-14.47945",
+   "line": "37",
+   "x": 4368.2,
+   "y": 1245.7,
+   "s0": 4484,
+   "s1": 4504,
+   "status": "review",
+   "place": [
+    50.103806,
+    14.479446
+   ],
+   "between": [
+    [
+     50.1038867,
+     14.4793839
+    ],
+    [
+     50.1037352,
+     14.4795302
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4365.1,
+     "y": 1255.2,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4373.2,
+     "y": 1237.0,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Balabenka (s 4494): OSM's surface changes here from concrete (U Balabenky) to setts (U Balabenky). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "switch",
+   "id": "surface-switch-50.10369-14.47965",
+   "line": "37",
+   "x": 4380.9,
+   "y": 1230.8,
+   "s0": 4504,
+   "s1": 4524,
+   "status": "review",
+   "place": [
+    50.103689,
+    14.479649
+   ],
+   "between": [
+    [
+     50.1037352,
+     14.4795302
+    ],
+    [
+     50.1036745,
+     14.4797864
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4373.2,
+     "y": 1237.0,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4390.4,
+     "y": 1227.9,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "the surface changes here",
+    "no change here",
+    "unsure"
+   ],
+   "info": "near Balabenka (s 4514): OSM's surface changes here from setts (U Balabenky) to nothing (Čerpadlová). Does the track's surface change within these 20 m?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.10149-14.47350",
+   "line": "37",
+   "x": 3912.3,
+   "y": 1048.5,
+   "s0": 3697,
+   "s1": 3768,
+   "status": "review",
+   "place": [
+    50.101494,
+    14.473505
+   ],
+   "between": [
+    [
+     50.1011845,
+     14.473397
+    ],
+    [
+     50.1018106,
+     14.4735559
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3900.0,
+     "y": 1015.5,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3920.7,
+     "y": 1082.9,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (diamond, road, switch) near Palmovka (s 3697-3768), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.10320-14.47337",
+   "line": "37",
+   "x": 3928.2,
+   "y": 1237.6,
+   "s0": 3914,
+   "s1": 3932,
+   "status": "review",
+   "place": [
+    50.103198,
+    14.473365
+   ],
+   "between": [
+    [
+     50.1031149,
+     14.473372
+    ],
+    [
+     50.1032803,
+     14.4733818
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3927.4,
+     "y": 1228.4,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3930.5,
+     "y": 1246.5,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (switch) near Palmovka (s 3914-3932), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  },
+  {
+   "kind": "track surface",
+   "what": "junction",
+   "id": "surface-junction-50.10371-14.47957",
+   "line": "37",
+   "x": 4375.9,
+   "y": 1234.3,
+   "s0": 4485,
+   "s1": 4530,
+   "status": "review",
+   "place": [
+    50.103714,
+    14.479573
+   ],
+   "between": [
+    [
+     50.1038755,
+     14.4793925
+    ],
+    [
+     50.1036828,
+     14.4798745
+    ]
+   ],
+   "marks": [
+    {
+     "x": 4365.5,
+     "y": 1253.8,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4396.8,
+     "y": 1227.9,
+     "label": "to",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "setts",
+    "asphalt (embedded)",
+    "panels",
+    "unsure"
+   ],
+   "info": "a junction (diamond, road, switch) near Balabenka (s 4485-4530), in or beside OSM's setts or where OSM's surface changes. The game draws it asphalt (#546). What is it laid in?"
+  }
+ ]
+}

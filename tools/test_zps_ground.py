@@ -164,5 +164,28 @@ class Rails(unittest.TestCase):
         self.assertAlmostEqual(z[-1], 200.8)
 
 
+class CoversAsUnion(unittest.TestCase):
+    """zps_ground.Covers answers as the union of its polygons would (#517)."""
+
+    def test_points_and_lines_as_the_union(self):
+        rng = np.random.default_rng(5)
+        polys = [shapely.box(0, 0, 10, 10), shapely.box(10, 0, 20, 10),  # (sharing an edge: inside the union along it)
+                 shapely.box(20, 0, 30, 5),  # (sharing half an edge with the one before)
+                 shapely.box(5, 5, 15, 15),  # (overlapping two)
+                 shapely.Polygon([(40, 0), (50, 0), (45, 8)]), shapely.Polygon([(45, 8), (50, 0), (55, 8)]),  # (a vertex)
+                 shapely.box(60, 0, 70, 10), shapely.box(70, 10, 80, 20)]  # (meeting at a corner only)
+        xs = np.r_[rng.uniform(-5, 85, 3000), [10, 10, 10, 20, 20, 25, 45, 47.5, 50, 70, 70, 0, 30, 15, 5, 10]]
+        ys = np.r_[rng.uniform(-5, 25, 3000), [0, 5, 10, 2, 5, 5, 8, 4, 0, 10, 5, 0, 5, 15, 15, 12]]
+        grid = np.array([(x, y) for x in np.arange(-1, 82, 2.5) for y in np.arange(-1, 22, 2.5)])
+        xs, ys = np.r_[xs, grid[:, 0]], np.r_[ys, grid[:, 1]]
+        union, covers = shapely.union_all(polys), zg.Covers(polys)
+        self.assertEqual(covers.contains_xy(xs, ys).tolist(), shapely.contains_xy(union, xs, ys).tolist())
+        lines = [shapely.LineString([(x, y), (x + 9 * np.cos(t), y + 9 * np.sin(t))])
+                 for x, y, t in zip(rng.uniform(-10, 90, 400), rng.uniform(-10, 30, 400), rng.uniform(0, 6.3, 400))]
+        self.assertEqual([covers.intersects(g) for g in lines], [union.intersects(g) for g in lines])
+        self.assertTrue(zg.Covers([]).is_empty)
+        self.assertEqual(zg.Covers([]).contains_xy([1.0], [1.0]).tolist(), [False])
+
+
 if __name__ == "__main__":
     unittest.main()

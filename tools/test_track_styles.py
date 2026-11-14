@@ -68,6 +68,62 @@ class Styles(unittest.TestCase):
         self.assertIsNone(sv.class_at(300, 0))   # (a wall is not ground)
 
 
+class Junctions(unittest.TestCase):
+    """#546: paved track embedded at junctions and over road crossings' full width."""
+
+    def paved(self, survey=None, **extra):
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                **extra}
+        return T.sections(data, {}, survey)
+
+    def test_a_car_road_across_is_embedded_over_its_width(self):
+        secs = self.paved(roads=[{"p": [[200, -20], [200, 20]], "w": 8, "c": 1}])
+        self.assertEqual(spans_of(secs), [(196, 204, "embedded")])
+
+    def test_the_surveys_carriageway_widens_it_and_admits_a_service_road(self):
+        sv = T.Survey({"areas": [rect(192, 209, -10, 10, "road"), rect(382, 393.5, -10, 10, "road"),
+                                 rect(0, 600, -0.5, 0.5, "cycle")]})
+        secs = self.paved(sv, roads=[{"p": [[200, -20], [200, 20]], "w": 8, "c": 1},
+                                     {"p": [[388, -20], [388, 20]], "w": 4},            # (service: no car flag)
+                                     {"p": [[500, -20], [500, 20]], "w": 5}])           # (a cycleway: no carriageway)
+        self.assertEqual(spans_of(secs), [(192, 209, "embedded"), (382, 393, "embedded")])
+
+    def test_a_switch_to_its_frog_and_a_diamond_over_the_beds(self):
+        secs = self.paved(switches=[{"s": 100.0, "frog": 12.0}],
+                          tracks=[{"p": [[300, -20], [300, 20]]}, {"p": [[400, 0.2], [500, 0.2]]}])   # (across; along)
+        self.assertEqual(spans_of(secs), [(97, 115, "embedded"), (299, 301, "embedded")])
+
+    def test_close_pieces_join_grass_yields_and_ballast_keeps_its_switch(self):
+        secs = self.paved(switches=[{"s": 100.0, "frog": 12.0}], roads=[{"p": [[125, -20], [125, 20]], "w": 6, "c": 1}])
+        self.assertEqual(spans_of(secs), [(97, 128, "embedded")])
+        tw = {"switches": [{"s": 100, "frog": 12}], "tracks": [{"p": [[300, -20], [300, 20]]}]}
+        self.assertEqual(spans_of(styled("grass", **tw)), [(0, 97, "grass"), (97, 115, "embedded"), (115, 299, "grass"),
+                                                          (299, 301, "embedded"), (301, 600, "grass")])
+        self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through them)
+
+
+class OtherTracks(unittest.TestCase):
+    """#546: every drawn track's own sections beyond our route."""
+
+    def test_a_side_track_gets_its_crossings_diamond_and_switch(self):
+        side = {"p": [[300.0, 20.0], [300.0, 220.0]]}                        # (40 m off our route at its nearest)
+        branch = {"p": [[300.0, 120.0], [400.0, 160.0]]}                     # (leaves the side track at its y 120)
+        across = {"p": [[250.0, 180.0], [350.0, 180.0]]}                     # (crosses it square at y 180)
+        near = {"p": [[0.0, 3.0], [600.0, 3.0]]}                             # (the opposite track: the route's style)
+        data = {"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [side, branch, across, near],
+                "roads": [{"p": [[280, 60], [320, 60]], "w": 8, "c": 1}]}
+        own = T.track_sections(data, None)
+        self.assertNotIn(3, own)
+        s = [(round(a), round(b), st) for a, b, st in own[0]]
+        self.assertEqual(s, [(36, 44, "embedded"), (92, 108, "embedded"), (159, 161, "embedded")])   # (the road, the switch, the diamond)
+        self.assertEqual([(round(a), round(b)) for a, b, _ in own[1]], [(0, 15)])   # (it leaves the side track)
+
+    def test_green_under_a_side_track_is_grass(self):
+        sv = T.Survey({"areas": [rect(290, 310, 40, 120, "green")]})
+        own = T.track_sections({"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [{"p": [[300.0, 20.0], [300.0, 220.0]]}]}, sv)
+        self.assertEqual([(a, b, st) for a, b, st in own[0]], [(20.0, 100.0, "grass")])
+
+
 def styled(style, **extra):
     """A 600 m straight route, one mark of `style` over all of it, and what crosses it."""
     data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **extra}
@@ -93,6 +149,26 @@ class Holes(unittest.TestCase):
         for style in ("grass", "ballast"):
             self.assertEqual(spans_of(styled(style, **self.STREETS)), [(a, b, s.format(style)) for a, b, s in want])
 
+    def test_a_street_under_our_bridge_neither_cuts_nor_embeds(self):
+        under = {"roads": [{"p": [[400, -20], [400, 20]], "w": 8, "c": 1}], "bridges": [[350.0, 450.0]]}
+        self.assertEqual(spans_of(styled("ballast", **under)), [(0, 600, "ballast")])
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **under}
+        self.assertEqual(spans_of(T.sections(data, {}, None)), [])
+
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
+    def test_the_users_surface_answers_lay_setts_and_a_setts_junction_from_fork_to_fork(self):
+        # (#574, the user 2026-11-14: a setts junction is setts "from switch fork to the other switch forks")
+        ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
+        ans = lambda i, what, a, b, v: {"id": i, "what": what, "line": "x", "between": [ll(a), ll(b)], "answer": v}  # noqa: E731
+        truth = {"trackSurfaceReview": {"answers": [ans("st", "stretch", 100, 200, "setts"),
+                                                    ans("jn", "junction", 395, 405, "setts")]}}
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                "switches": [{"s": 150, "frog": 12}, {"s": 380, "frog": 12}, {"s": 410, "frog": 12}]}
+        got = spans_of(T.sections(data, truth, None))
+        # (the stretch keeps its switch; the answered junction's two switches joined, setts from fork to fork)
+        self.assertEqual(got, [(100, 200, "setts"), (377, 425, "setts")])
+        self.assertEqual(spans_of(T.sections(data, {}, None)), [(147, 165, "embedded"), (377, 425, "embedded")])
+
     def test_switches_do_not_cut_and_short_pieces_go(self):
         tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}
         self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through the switches)
@@ -106,10 +182,33 @@ class Holes(unittest.TestCase):
         hs = [(round(h["s0"]), round(h["s1"])) for h in T.holes(data) if h["kind"] == "platform"]
         self.assertEqual(hs, [(197, 243), (960, 1006)])
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
+    def test_a_mark_for_one_track_keeps_its_grass_beside_a_platform(self):
+        # (#584, Drinopol: our track paved along our platform, the other direction's track in grass)
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                **self.PLATFORM}
+        truth = {"trackStyles": [{"line": "x", "from": "A", "to": "B", "style": "grass"},
+                                 {"line": "x", "between": [[0.0, 0.0], [0.0, 0.0]], "style": "grass", "track": "back"}]}
+        frame = T.Frame()
+        truth["trackStyles"][1]["between"] = [list(frame.ll(190.0, 0.0)), list(frame.ll(250.0, 0.0))]
+        ours, back = (spans_of(T.sections(data, truth, None, track=t)) for t in ("ours", "back"))
+        self.assertEqual(ours, [(0, 197, "grass"), (243, 600, "grass")])
+        self.assertEqual(back, [(0, 190, "grass"), (190, 250, "grass"), (250, 600, "grass")])
+
+    def test_a_mark_for_one_track_and_where_they_differ(self):
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "pathBack": [[600.0, 3.0], [0.0, 3.0]],
+                "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}]}
+        truth = {"trackStyles": [{"line": "x", "from": "A", "to": "B", "style": "grass", "track": "back"}]}
+        data["styles"] = T.sections(data, truth, None)
+        data["stylesBack"] = T.sections(data, truth, None, track="back")
+        self.assertEqual((data["styles"], spans_of(data["stylesBack"])), ([], [(0, 600, "grass")]))
+        self.assertEqual(T.differ(data), 601.0)
+        self.assertEqual(T.differ(data, True), [(0, 600, "panels", "grass")])
+
 
 class Lift(unittest.TestCase):
     TRUTH = {"trackHeights": {"railAboveDeck": [
-        {"id": "a", "metres": 0.0, "styles": ["embedded", "panels"], "scope": "all"},
+        {"id": "a", "metres": 0.0, "styles": ["embedded", "setts", "panels"], "scope": "all"},
         {"id": "g", "metres": 0.04, "styles": ["grass"], "scope": "all"},
         {"id": "b", "metres": 0.17, "styles": ["ballast"], "scope": "all"}]}}
 

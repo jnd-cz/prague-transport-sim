@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { CAR_PITCH } from './tram.js';
 import { beamsMesh } from './lamps.js';
+import { liveriesFor } from './vehicles.js';
 
 const PLANE = CAR_PITCH / 2;    // the plane two coupled heads meet in, from the car centre
 const GLASS_FAR = 0.85;         // the glass's opacity on the lighter level (no saloon behind it)
@@ -22,6 +23,9 @@ const GLASS_FAR = 0.85;         // the glass's opacity on the lighter level (no 
 const TURN = { '+Z': 0, '+X': -Math.PI / 2, '-Z': Math.PI, '-X': Math.PI / 2 };
 
 const protos = new Map();       // vehicle id -> its template
+// vehicle id -> its template with the livery slots' parts apart (#529), for the sets that wear a livery: kept apart
+// they cost the hybrid 7 draws a car on the full level and 2 on the lighter one, so the vehicle's own look stays merged
+const slotted = new Map();
 export const riggedReady = (id) => protos.has(id);
 export const riggedIds = () => [...protos.keys()];
 export const riggedProto = (id) => protos.get(id);
@@ -72,12 +76,12 @@ export function rigProblems(rig, moves, has, clips) {
 // The vehicle `v` (its manifest) from its model's and rig's bodies (the loading screen's); type: its vehicle type
 // (src/tram.js: pivots, track-brake gap, coupler pin); contact: the contact wire over the rail (the lighter level's
 // collector). Throws with the rig's missing names when it lacks what its `moves` claim.
-export async function loadRigged(v, glbR, rigR, type, contact) {
+export async function loadRigged(v, glbR, rigR, type, contact, slots = false) {
   if (!glbR?.ok || !rigR?.ok) throw new Error(`vehicle ${v.id}: model or rig missing`);
   const [{ GLTFLoader }, { mergeGeometries }] = await Promise.all([
     import('three/addons/loaders/GLTFLoader.js'), import('three/addons/utils/BufferGeometryUtils.js')]);
-  const rig = await rigR.json();
-  const gl = await new GLTFLoader().parseAsync(await glbR.arrayBuffer(), '');
+  const rig = await rigR.json(), glb = await glbR.arrayBuffer();
+  const gl = await new GLTFLoader().parseAsync(glb, '');
   const src = gl.scene;
   src.updateMatrixWorld(true);
   const clipNames = gl.animations.map((a) => a.name);
@@ -137,6 +141,13 @@ export async function loadRigged(v, glbR, rigR, type, contact) {
     buckets.get(f)[kind].push(g);
   };
   const kept = new Map(); // the textured parts by frame and material (a plate keeps its name)
+  // a livery's slots (#529, the manifest's `slots`): their parts kept apart with their uv, so a livery can give them a
+  // texture or a colour, each slot material a copy painted as the merged parts are (as rough, both faces)
+  const slotNames = new Set(slots ? Object.values(v.slots || {}).flat() : []), slotMats = new Map();
+  const asPaint = (m) => {
+    if (!slotMats.has(m)) slotMats.set(m, Object.assign(m.clone(), { roughness: paint.roughness, metalness: 0, side: THREE.DoubleSide }));
+    return slotMats.get(m);
+  };
   const stats = { kept: 0, merged: 0, dropped: 0, shoes: 0, couplers: 0 };
   const shoes = [], couplers = [];
   const cardOf = (name) => info.frontDestination && name.startsWith(info.frontDestination) ? 'dest' : info.runNumber && name.startsWith(info.runNumber) ? 'run' : null;
@@ -145,9 +156,10 @@ export async function loadRigged(v, glbR, rigR, type, contact) {
     const m = o.material, f = frameOf(o), M = rel(o, f);
     if (m.opacity === 0) { stats.dropped++; return; } // (an invisible helper)
     const textured = m.map || m.normalMap || m.emissiveMap || (m.emissive && m.emissive.getHex() !== 0);
-    if (textured || cards.has(o.name)) {
+    const slot = slotNames.has(m.name) && !m.transparent && !cardOf(o.name);
+    if (textured || slot || cards.has(o.name)) {
       const key = `${f.uuid}|${m.uuid}`;
-      if (!kept.has(key)) kept.set(key, { f, m, geos: [], name: o.name });
+      if (!kept.has(key)) kept.set(key, { f, m: slot ? asPaint(m) : m, geos: [], name: o.name });
       const g = o.geometry.clone().applyMatrix4(M);
       if (rig.fleetDigits && numberPlates.includes(o.name)) fleetSize(g, rig.fleetDigits);
       kept.get(key).geos.push(g);
@@ -288,7 +300,13 @@ export async function loadRigged(v, glbR, rigR, type, contact) {
     tails.userData.shared = true;
   }
   const proto = { template, light, rig, clips: gl.animations, bogie: type.bogies / 2, axle, bogies, ax, sg, turn: TURN[fwd] ?? 0, stats, heads, tails };
+  if (slots) { slotted.set(v.id, proto); return proto; }
   protos.set(v.id, proto);
+  // the slotted template too where the vehicle has liveries (a second parse of the same files)
+  if (v.slots && liveriesFor(v).length) {
+    const again = (body) => ({ ok: true, json: async () => structuredClone(body), arrayBuffer: async () => body });
+    await loadRigged(v, again(glb), again(rig), type, contact, true);
+  }
   return proto;
 }
 
@@ -376,10 +394,10 @@ function fleetSize(g, h) {
   const b = g.boundingBox, c = b.getCenter(new THREE.Vector3()), k = h / FLEET_FILL / (b.max.y - b.min.y);
   g.translate(-c.x, -c.y, -c.z).scale(k, k, k).translate(c.x, c.y, c.z);
 }
-function fleetTexture(n) {
+function fleetTexture(n, numbers = null) {
   const [c, x] = canvas(512, 192);
   const t = String(n);
-  x.fillStyle = '#e3b625'; x.font = 'bold 100px Arial, sans-serif';
+  x.fillStyle = numbers?.colour || '#e3b625'; x.font = `bold 100px ${numbers?.font ? `"${numbers.font}", ` : ''}Arial, sans-serif`;
   const m = x.measureText(t), L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
   const k = (FLEET_FILL * 192) / (A + D), kx = Math.min(k, 480 / (L + R));
   x.setTransform(kx, 0, 0, k, 256 - (kx * (R - L)) / 2, 96 - (k * (D - A)) / 2);
@@ -391,8 +409,8 @@ const setMap = (m, tex) => { if (!m || m.map === tex) return; if (m.map && !m.ma
 // ---------------------------------------------------------------------------------------------- sets
 // A set of `cars` cars of vehicle `id` on `root`, `fleet` their numbers (src/vehicles.js fleetNumbers: the manifest's
 // range picked by the run number, a placeholder as the run number is until the data has them).
-export function makeRiggedSet(id, root, line, cars, dest, run, collector, fleet = Array(cars).fill(null)) {
-  const proto = protos.get(id), { template, rig, clips } = proto;
+export function makeRiggedSet(id, root, line, cars, dest, run, collector, fleet = Array(cars).fill(null), look = null) {
+  const proto = (look?.bySlot.size && slotted.get(id)) || protos.get(id), { template, rig, clips } = proto;
   const own = new Map();
   const mat = (m) => { let c = own.get(m); if (!c) { c = m.clone(); own.set(m, c); } return c; };
   Object.assign(root.userData, { rigged: true, proto, cars: [], bogie: proto.bogie, mats: { body: true }, line, dest, run, level: 'full' });
@@ -408,7 +426,7 @@ export function makeRiggedSet(id, root, line, cars, dest, run, collector, fleet 
       x.traverse((o) => {
         if (!o.material) return;
         if ((rig.numberPlates || []).includes(o.name)) {
-          if (!fleetMat.has(o.material)) { const c = o.material.clone(); c.map = fleetTexture(fleet[k] ?? ''); c.userData.own = true; fleetMat.set(o.material, c); }
+          if (!fleetMat.has(o.material)) { const c = o.material.clone(); c.map = fleetTexture(fleet[k] ?? '', look?.numbers); c.userData.own = true; fleetMat.set(o.material, c); }
           o.material = fleetMat.get(o.material);
         } else o.material = mat(o.material);
       });
@@ -454,9 +472,19 @@ export function makeRiggedSet(id, root, line, cars, dest, run, collector, fleet 
     root.add(car);
     root.userData.cars.push(car);
   }
+  if (look) for (const m of own.values()) wear(m, look);
   setRiggedLine(root, line, dest, run, true);
   poseRigged(root, { doors: 0, collector });
   return root;
+}
+
+// a livery on one of the set's materials (look: src/models.js lookOf's { bySlot, numbers }): a texture replaces the
+// map and the material's own colour, a colour replaces its colour; a material in no slot it names keeps its own
+function wear(m, look) {
+  const s = look.bySlot.get(m.name);
+  if (!s) return;
+  if (s.map) { m.map = s.map; m.color.set(0xffffff); m.needsUpdate = true; }
+  if (s.colour) m.color.set(s.colour);
 }
 
 export function setRiggedLine(model, line, dest = model.userData.dest, run = model.userData.run, force = false) {
