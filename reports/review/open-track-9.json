@@ -1,0 +1,308 @@
+{
+ "schema": 1,
+ "issue": 591,
+ "line": "9",
+ "title": "Open track from the lidar: ballast, grass or paved",
+ "findings": [
+  {
+   "kind": "open track",
+   "id": "open-50.06536-14.32433",
+   "line": "9",
+   "x": -7212.547393398002,
+   "y": -1474.3887068529884,
+   "mag": 64,
+   "status": "review",
+   "place": [
+    50.065357,
+    14.324327
+   ],
+   "between": [
+    [
+     50.065212,
+     14.323564
+    ],
+    [
+     50.065579,
+     14.325043
+    ]
+   ],
+   "marks": [
+    {
+     "x": -7268.854001556195,
+     "y": -1482.8369409952118,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -7158.3483212196215,
+     "y": -1456.9552548466786,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.065357,14.324327"
+    }
+   ],
+   "info": "near Krematorium Motol, route s 1948-2062 (114 m): the rails stand 64 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  },
+  {
+   "kind": "open track",
+   "id": "open-50.07214-14.39185",
+   "line": "9",
+   "x": -2320.6824279226817,
+   "y": -1389.729234367416,
+   "mag": 43,
+   "status": "review",
+   "place": [
+    50.072144,
+    14.391854
+   ],
+   "between": [
+    [
+     50.071977,
+     14.390368
+    ],
+    [
+     50.072261,
+     14.393352
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2428.5986201796127,
+     "y": -1393.5746289254064,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2212.7010509795136,
+     "y": -1391.482057257478,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.072144,14.391854"
+    }
+   ],
+   "info": "near Bertramka, route s 6844-7060 (216 m): the rails stand 43 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  },
+  {
+   "kind": "open track",
+   "id": "open-50.07837-14.47134",
+   "line": "9",
+   "x": 3409.8176903272893,
+   "y": -1478.9189158561792,
+   "mag": 30,
+   "status": "review",
+   "place": [
+    50.078367,
+    14.471338
+   ],
+   "between": [
+    [
+     50.078426,
+     14.472494
+    ],
+    [
+     50.078309,
+     14.470182
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3492.6868789856267,
+     "y": -1483.574404657435,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3326.958979611573,
+     "y": -1474.0780649119752,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.078367,14.471338"
+    }
+   ],
+   "info": "near Želivského, route s 15108-15274 (166 m): the rails stand 30 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  },
+  {
+   "kind": "open track",
+   "id": "open-50.07825-14.46897",
+   "line": "9",
+   "x": 3240.106484798958,
+   "y": -1469.014066181468,
+   "mag": 30,
+   "status": "review",
+   "place": [
+    50.078248,
+    14.46897
+   ],
+   "between": [
+    [
+     50.078292,
+     14.469848
+    ],
+    [
+     50.078204,
+     14.468093
+    ]
+   ],
+   "marks": [
+    {
+     "x": 3302.9996388686095,
+     "y": -1472.681645894151,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 3177.213358194712,
+     "y": -1465.3460567287077,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.078248,14.46897"
+    }
+   ],
+   "info": "near Želivského, route s 15298-15424 (126 m): the rails stand 30 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  },
+  {
+   "kind": "open track",
+   "id": "open-50.07803-14.46474",
+   "line": "9",
+   "x": 2936.5914394714714,
+   "y": -1451.882748932285,
+   "mag": 30,
+   "status": "review",
+   "place": [
+    50.07803,
+    14.464736
+   ],
+   "between": [
+    [
+     50.078077,
+     14.465585
+    ],
+    [
+     50.077982,
+     14.463887
+    ]
+   ],
+   "marks": [
+    {
+     "x": 2997.516210047173,
+     "y": -1454.9102899054476,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 2875.665892157973,
+     "y": -1448.8698748095296,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.07803,14.464736"
+    }
+   ],
+   "info": "near Olšanské hřbitovy, route s 15604-15726 (122 m): the rails stand 30 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  },
+  {
+   "kind": "open track",
+   "id": "open-50.07217-14.39187",
+   "line": "9",
+   "x": -2319.1762459379215,
+   "y": -1386.670764390907,
+   "mag": 41,
+   "status": "review",
+   "place": [
+    50.072173,
+    14.391869
+   ],
+   "between": [
+    [
+     50.072308,
+     14.393617
+    ],
+    [
+     50.071975,
+     14.390136
+    ]
+   ],
+   "marks": [
+    {
+     "x": -2193.1995760086907,
+     "y": -1388.8840818954404,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2445.0641804925513,
+     "y": -1391.5018118971002,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.072173,14.391869"
+    }
+   ],
+   "info": "near Bertramka, route s 21390-21642 (252 m): the rails stand 41 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  }
+ ]
+}
