@@ -376,18 +376,26 @@ def side_of(pl, rt, proj):
     return 1 if lat > 0 else -1
 
 
+TIE = 0.001  # (m: two paths this close to a platform run over the same track, `assign`)
+
+
 def assign(pl, R, RB):
-    """The path a platform is drawn along, (route, projections, mean distance) or None: the nearer of the two
-    (src/game.js _buildPlatforms)."""
-    best = None
+    """The path a platform is drawn along, (route, projections, mean distance, tied) or None: the nearer of the two, the
+    back path where they tie within TIE, `tied` the other path's (route, projections) then, else None. Two paths that
+    tie run over the same track the same way, and the platform serves both (the user, 2026-11-14, #419: platforms
+    belong to the track, as the city network will place them, docs/architecture.md). On line 9's round trip both run so
+    from Řepy to Motol: nine platforms there were 1e-13 m apart, and float noise had given each to one path only."""
+    cands = []
     for rt in [R] + ([RB] if RB else []):
         proj = [rt.nearest(x, y) for x, y in (q[:2] for q in pl['p'])]
         if any(s is None for s, _ in proj):
             continue
-        d = sum(q[1] for q in proj) / len(proj)
-        if best is None or d < best[2]:
-            best = (rt, proj, d)
-    return best
+        cands.append((rt, proj, sum(q[1] for q in proj) / len(proj)))
+    if not cands:
+        return None
+    if len(cands) == 2 and abs(cands[0][2] - cands[1][2]) <= TIE:
+        return (*cands[1], cands[0][:2])   # (the back path draws it, the route is served too)
+    return (*min(cands, key=lambda c: c[2]), None)
 
 
 def ours(pl, R):
@@ -404,30 +412,63 @@ def ours(pl, R):
     return min(proj[i][0] for i in ins), max(proj[i][0] for i in ins)
 
 
+PLATFORM_KEYS = ('path', 's0', 's1', 'side', 'far', 'ours', 'also')
+
+
+def place_platform(pl, R, RB):
+    """Where the game draws an OSM platform (src/platforms.js reads it, #419): {'path': 'route' or 'back' (the nearer
+    of the two, within 12 m on average), 's0', 's1' along it (a platform known only from GTFS: 31 m back from 1 m
+    past its stop position, room for a two-car set), 'side' (-1 right, the doors' side), 'far' (its farthest point's
+    offset on that side, m), 'ours' ((s0, s1) on the route where a back-path platform is our stop's, else None),
+    'also' (where the other path ties: [{'path', 's0', 's1', 'side', 'far'}] along it, the platform not drawn again)},
+    or {'path': None} where it is not drawn (farther, shorter than 8 m or longer than 120 m)."""
+    best = assign(pl, R, RB)
+    if best is None or best[2] > 12:
+        return {'path': None}
+    rt, proj, _, tied = best
+    at = along(pl, rt, proj, R)
+    if at is None:
+        return {'path': None}
+    other = along(pl, *tied, R) if tied else None
+    return {**at, 'ours': ours(pl, R) if rt is not R else None, 'also': [other] if other else None}
+
+
+def along(pl, rt, proj, R):
+    """{'path', 's0', 's1', 'side', 'far'} of a platform along path `rt` (its points' projections `proj`), or None where
+    it is not drawn (shorter than 8 m or longer than 120 m)."""
+    s0, s1 = min(q[0] for q in proj), max(q[0] for q in proj)
+    if pl.get('gtfs'):
+        s1 = proj[0][0] + 1
+        s0 = s1 - 32
+    if s1 - s0 < 8 or s1 - s0 > 120:
+        return None
+    side = side_of(pl, rt, proj)
+    lats = []
+    for (x, y), (s, _) in zip((q[:2] for q in pl['p']), proj):
+        qx, qy, hx, hy = rt.at(s)
+        lats.append(hx * (y - qy) - hy * (x - qx))
+    return {'path': 'route' if rt is R else 'back', 's0': s0, 's1': s1, 'side': side, 'far': max(l * side for l in lats)}
+
+
 def stop_types(data, survey, targets, R, RB):
-    """The stop type of each OSM platform on the doors' side (`kerb` per data.platforms index, src/game.js
-    _buildPlatforms) and of each stop without such a platform over the 30 m before its point (_buildStop):
+    """The stop type of each OSM platform on the doors' side (`kerb` per data.platforms index, src/platforms.js
+    buildPlatforms) and of each stop without such a platform over the 30 m before its point (buildStop):
     ({platform index: kerb}, {stop index: kerb}), kerb None for an ordinary stop."""
     plats, mine, theirs = {}, [], []
     for k, pl in enumerate(data.get('platforms') or []):
-        best = assign(pl, R, RB)
-        if best is None or best[2] > 12:
+        at = place_platform(pl, R, RB)
+        if at['path'] is None:
             continue
-        rt, proj, _ = best
-        s0, s1 = min(q[0] for q in proj), max(q[0] for q in proj)
-        if pl.get('gtfs'):
-            s1 = proj[0][0] + 1
-            s0 = s1 - 32
-        if s1 - s0 < 8 or s1 - s0 > 120:
-            continue
-        side = side_of(pl, rt, proj)
-        if side < 0:
+        rt, s0, s1 = R if at['path'] == 'route' else RB, at['s0'], at['s1']
+        if at['side'] < 0:
             plats[k] = vienna(rt, survey, s0, s1)
             if rt is R:
                 mine.append((s0, s1, k))
-        o = ours(pl, R) if rt is not R else None
-        if o:
-            theirs.append((*o, k))
+        for o in at.get('also') or []:   # (a platform both paths tie on is the route's own too)
+            if o['path'] == 'route' and o['side'] < 0:
+                mine.append((o['s0'], o['s1'], k))
+        if at['ours']:
+            theirs.append((*at['ours'], k))
     stops = {}
     for i, t in enumerate(targets):
         # (the route's own platforms first, then those the back path took that the route passes, as the game)
@@ -496,7 +537,13 @@ def main():
     # (unrounded: the game's own rules keep full precision, and a 5 cm shift of signals and stop points reshuffled every
     # seeded drive like a new seed)
     data['signals'] = [{k: v for k, v in d.items() if k in SIGNAL_KEYS} for d in placed]
-    # the stop types from the survey (stage 2): `vienna` the kerb's offset or null, on the platforms judged and on the stops
+    # where each platform is drawn (#419: the game reads it, unrounded as the signals), then the stop types from the
+    # survey (stage 2): `vienna` the kerb's offset or null, on the platforms judged and on the stops
+    RB = Route(data['pathBack']) if len(data.get('pathBack') or []) > 1 else None
+    for pl_ in data.get('platforms') or []:
+        for k in PLATFORM_KEYS:
+            pl_.pop(k, None)
+        pl_.update({k: v for k, v in place_platform(pl_, R, RB).items() if v is not None or k == 'path'})
     dtm = ROOT / 'data' / f'line{a.line}.dtm.json'
     for pl_ in data.get('platforms') or []:
         pl_.pop('vienna', None)
@@ -504,7 +551,6 @@ def main():
         st.pop('vienna', None)
     if dtm.exists():
         survey = Survey(json.loads(dtm.read_text(encoding='utf-8'))['areas'])
-        RB = Route(data['pathBack']) if len(data.get('pathBack') or []) > 1 else None
         plats, stops = stop_types(data, survey, stop_points(data['stops'], R.length), R, RB)
         for k, kerb in plats.items():
             data['platforms'][k]['vienna'] = kerb
