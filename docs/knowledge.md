@@ -75,6 +75,13 @@ Sections:
   (the Depo Hostivař branch, the user 2026-11-12), and one in a street lies in the street's hole. They miss 6 km of the known grass
   (Sídliště Řepy - Slánská, most of Malý Břevnov - Obora Hvězda), and some lie under our bridges (Střelecký ostrov's
   park under line 22 at Újezd), so OSM's grass outside the facts goes to the user's review (`tools/grass_review.py`).
+- **A platform paves both tracks at most stops in grass track**, the two directions' platforms staggered or not
+  (#584, 2026-11-14 orthophoto: line 37 at Českomoravská, line 9 at s 15500). Holes on the platform's track alone
+  would have drawn 1.3 km of grass on the other one, most of it the grassed-track list's stop-to-stop extent where
+  both tracks are paved. Drinopol (line 22) is the exception the user named, the only one they know: each platform is
+  also a (replacement) bus stop, so the asphalt runs from the road across the near track to the platform, and the
+  far track stays grass. Nothing in the data tells them apart (the survey maps both as `tram` there, OSM's tram ways carry
+  no surface), so a track differs only where a mark says so (`trackStyles` with `track`, data `stylesBack`/`liftBack`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 

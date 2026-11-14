@@ -251,12 +251,15 @@ export class Profile {
   // The track profile is the top of rail (src/heights.js), built offline (#480, #276 step 2): the line data's
   // `heights` every 2 m (tools/line_heights.py: every sample has one, the surface plus the style's lift where no
   // source does), the spans the route runs on a bridge, those with a deck (`spans`, `realDecks`) and the roads under it
-  // (`underpasses`, tools/line_structures.py). `lift(s)`: the rails' height over the bed (`lift`, tools/track_styles.py).
+  // (`underpasses`, tools/line_structures.py). `lift(s, lateral)`: the rails' height over the bed (`lift`,
+  // tools/track_styles.py), `lateral` m across from our track: the other track's own (`liftBack`, #584) on it, linear
+  // between the two as heightAt.
   // Until #480 the page computed a surface profile here at every load (166-505 ms) and threw it away wherever the build
   // had a height, over 99 % of the route.
-  constructor(route, data, lift = () => 0, dtm = null, terrain = null) {
+  constructor(route, data, lift = () => 0, dtm = null, terrain = null, liftBack = lift) {
     const step = (this.step = 2);
-    this.lift = lift;
+    this._lift = lift;
+    this._liftBack = liftBack;
     const n = (this.n = Math.ceil(route.length / step) + 1);
     Object.assign(this, { route, terrain, dtm, tunnels: data.tunnels || [] });
     const h = data.heights;
@@ -326,6 +329,19 @@ export class Profile {
     const past = u < 0 ? lateral : u > 1 ? lateral - o : 0;
     const beyond = t && past ? -t * Math.sign(past) * Math.min(Math.abs(past), TRACK_ZONE) : 0;
     return z + dz * Math.max(0, Math.min(1, u)) + beyond;
+  }
+  lift(s, lateral = 0) {
+    const a = this._lift(s);
+    if (!lateral || !this.backOff || this._liftBack === this._lift) return a;
+    const o = this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))];
+    if (!(Math.abs(o) > 0.5)) return a;
+    return a + (this._liftBack(s) - a) * Math.max(0, Math.min(1, lateral / o));
+  }
+  // which track `lateral` m across from ours lies nearer: the other direction's (true) or ours (#584)
+  onBack(s, lateral) {
+    if (!this.backOff || !lateral) return false;
+    const o = this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))];
+    return Math.abs(o) > 0.5 && lateral / o > 0.5;
   }
   grade(s) { return this._interp(this.grades, s); }
   // the street's fall to the left in the track zone where the rails tilt with it (#538), else 0
@@ -900,7 +916,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
     // (next to the track: the ground under the OSM road ribbons, which are drawn 0.12 m over it, so the
     // road meets the rail heads at the track's surface level: src/heights.js)
     at(x, y, deck = false) {
-      const n = near(x, y), under = (n) => profile.heightAt(n.s, n.l) - profile.lift(n.s) - ROAD_BELOW;
+      const n = near(x, y), under = (n) => profile.heightAt(n.s, n.l) - profile.lift(n.s, n.l) - ROAD_BELOW;
       if (n && profile.onBridge(n.s)) {
         if (deck && n.d < 22) return under(n);
         return (dtm ? dtm.heightAt(x, y) : null) ?? terrain.height(x, y);
@@ -926,7 +942,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const n = route.nearest(x, y);
       if (!n || n.d > 12 || profile.onBridge(n.s)) return z; // (under our bridge: the road below)
       const q = route.at(n.s), l = (y - q.y) * q.hx - (x - q.x) * q.hy; // (left > 0: the opposite track's side, #197)
-      const zt = profile.heightAt(n.s, l) - profile.lift(n.s) - STREET_BELOW; // the surface the track lies in
+      const zt = profile.heightAt(n.s, l) - profile.lift(n.s, l) - STREET_BELOW; // the surface the track lies in
       if (d >= 3 ? Math.abs(z - zt) > 2.5 : z - zt > 4.5) return z; // a street above or below the tracks' level (in the track corridor: only a structure well above)
       const k = Math.max(0, Math.min(1, (d - 3) / 3));
       return zt + (z - zt) * k * k * (3 - 2 * k);
@@ -947,7 +963,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const z = dtm ? dtm.deckAt(x, y, ref, ref === null ? Infinity : 4) : null;
       if (z !== null) return z + 0.02;
       const n = near(x, y);
-      return n && n.d < 22 && profile.onBridge(n.s) ? profile.heightAt(n.s, n.l) - profile.lift(n.s) - 0.012 : null;
+      return n && n.d < 22 && profile.onBridge(n.s) ? profile.heightAt(n.s, n.l) - profile.lift(n.s, n.l) - 0.012 : null;
     },
     // height function of an OSM way (its ribbon is drawn 0.12 above): ground level, or on a bridge
     // the deck it lies on, else a straight span between the ground at its two ends
