@@ -1281,13 +1281,17 @@ function flushDtm(ground) {
   // over the rail heads at its place is the parapet's or the railing's top taken as the surface, laid to the deck's
   // surface there. (On line 37's Krejcárek viaduct the survey's tram areas along the deck's edge, 1.5-4.4 m right of our
   // track, stepped up to 0.9-1.3 m over the rails half a metre out from it: their triangles stood over the deck as grey
-  // slabs, #549. Sidewalks and paved areas higher than that on line 17's bridges, 0.4-1.0 m, keep the survey until the
-  // user says what they are.)
+  // slabs, #549.) The same holds for the walkways on the deck: on line 17's track-only bridge at Modřanská škola the
+  // survey's paved strip 0.61 m over the rails is the parapet wall (the user, 2026-11-14, #549: "looks like bridge
+  // parapet wall"). On a deck with a carriageway a sidewalk standing more than DECK_OVER m over the rails is laid to an
+  // ordinary kerb, KERB m over the deck: Čechův most's, 0.66-0.73 m in the survey, is "normal sidewalk slightly higher
+  // than road plus rails, there's railing on the edge" (the user, 2026-11-14).
   // A deck that carries only track (no level-1 carriageway of the survey within 8 m of the route on that span) is flat at
   // the track's level: every vertex of its tram areas within 8 m is laid there, the walkways beside the bed with them (the
   // user, 2026-11-14, #549, on the Krejcárek viaduct: "There is open ballast track in the middle, walkway a bit lower and
   // a parapet on the side. We can simplify it to flat deck at track's level and model the parapet by what's left on top").
-  const DECK_OVER = 0.3, PARAPET_MIN = 0.5, PARAPET_H = [0.6, 1.3];
+  const DECK_OVER = 0.3, PARAPET_MIN = 0.5, PARAPET_H = [0.6, 1.3], KERB = 0.15;
+  const WALK = new Set(['tram', 'paved', 'sidewalk']); // (the deck's own areas a flat deck lays and takes its parapets from)
   const spanOf = (s) => (profile.bridges || []).findIndex(([a, b]) => s >= a && s <= b);
   const roaded = new Set();
   for (const [, , n, c] of deckMoves) if (c === 'road' && n.d <= 8) roaded.add(spanOf(n.s));
@@ -1297,11 +1301,11 @@ function flushDtm(ground) {
   const over = new Map(), laid = new Set(); // (a laid vertex: how far its survey height stood over the deck)
   for (const [p, dz, n, c] of deckMoves) {
     p[2] += dz;
-    if (c !== 'tram' || n.d > 8) continue;
+    if (!WALK.has(c) || n.d > 8) continue;
     const q = route.at(n.s), l = (p[1] - q.y) * q.hx - (p[0] - q.x) * q.hy, zr = profile.heightAt(n.s, l);
     const sp = spanOf(n.s), flat = sp >= 0 && !roaded.has(sp);
-    if (!flat && p[2] - zr <= DECK_OVER) continue;
-    const z = zr - profile.lift(n.s) - STREET_BELOW;
+    if (!flat && (c === 'paved' || p[2] - zr <= DECK_OVER)) continue;
+    const z = zr - profile.lift(n.s) - STREET_BELOW + (!flat && c === 'sidewalk' ? KERB : 0);
     if (p[2] - zr > DECK_OVER) {
       dtm.deckLaid.push({ x: p[0], y: p[1], s: Math.round(n.s), c, dz: Math.round((z - p[2]) * 100) / 100 });
       over.set(p, p[2] - z);
@@ -1320,7 +1324,7 @@ function flushDtm(ground) {
   const edges = [], outer = new Map();
   const latOf = (p) => { const n = route.nearest(p[0], p[1]); if (!n) return null; const q = route.at(n.s); return { n, l: (p[1] - q.y) * q.hx - (p[0] - q.x) * q.hy }; };
   for (const a of dtm.areas) {
-    if (a.l < 1 || a.c !== 'tram') continue;
+    if (a.l < 1 || !WALK.has(a.c)) continue;
     for (const ring of [a.ring, ...a.holes]) for (let i = 0; i < ring.length; i++) {
       const p = ring[i], q2 = ring[(i + 1) % ring.length];
       if (!laid.has(p) || !laid.has(q2)) continue;

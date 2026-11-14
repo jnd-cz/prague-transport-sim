@@ -1037,13 +1037,16 @@ export function groundUnderDecks(g, world) {
       if (!(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: p.x, y: p.y, mag, info: `${kind} ${mag.toFixed(2)} m ${what === 'deck' ? 'over the rail heads' : "over the deck's underside"}, ${l} m across` });
     };
     for (let s = Math.ceil(a / 2) * 2; s <= b; s += 2) {
+      if (pr.onRamp?.(s)) continue; // (a walled ramp up to the bridge: the ground at the rails is right there, #549)
       const o = pr.backOff?.[Math.round(s / pr.step)], off = Math.abs(o) > 0.5 ? o : 0;
       for (let l = Math.min(0, off) - 4; l <= Math.max(0, off) + 4; l += 1) {
         const p = r.offset(s, l), zt = pr.heightAt(s, l), zu = zt - pr.lift(s) - UNDER_DECK;
         const hits = rays.cast(p.x, zt + 3, -p.y, 60);
         n++; span.samples++;
         const kind = (h) => (h.object.userData.surface === 'dtm' ? `survey ${surveyOf(h)?.[0] ?? '?'}` : h.object.userData.surface);
-        const deck = hits.find((h) => levelOf(h) > 0), ground = hits.find((h) => levelOf(h) === 0);
+        // (faces of the survey's meshes that are no surveyed area, the parapets world.js draws on a flat deck, are neither)
+        const ours = (h) => h.object.userData.surface === 'dtm' && !surveyOf(h);
+        const deck = hits.find((h) => !ours(h) && levelOf(h) > 0), ground = hits.find((h) => !ours(h) && levelOf(h) === 0);
         if (deck && deck.point.y - zt > OVER_RAILS) count('deck', deck, deck.point.y - zt, s, l, p, kind(deck));
         // (the ground meets the deck at the abutments: counted more than 8 m inside the span, as Profile.overBridge)
         if (ground && ground.point.y > zu && s > a + 8 && s < b - 8) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));

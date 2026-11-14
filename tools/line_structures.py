@@ -10,6 +10,13 @@ Every PROFILE_STEP m of the route (the page's profile step):
 - **spans**: OSM's bridges of the route (`bridges`, tools/build_line.py) and the runs of at least BED_RUN m where the
   survey's tram bed on a structure (data/lineN.dtm.json, an area of class `tram` at level 1 or more) lies under the
   axis, not within TUNNEL_NEAR m of a tunnel; spans less than MERGE m apart are one.
+- **ramps**: the parts of the spans where IPR's bare-earth lidar (tools/ipr_dtm.py: under a bridge it shows the ground
+  or the passage beneath, on a ramp between walls the fill) lies within RAMP_GAP m of the rails: no void under the
+  track, a walled ramp up to the bridge; pieces shorter than MIN_SPAN m are left out. They stay spans (the street beside
+  a walled ramp keeps its own level); the deck checks leave them out (lint groundUnderDecks; the user, 2026-11-14, #549, with Street View: line 17 s 3971-4152
+  and 7344-7504 are "ramp leading towards bridge with sharp wall like edge", s 4308-4359 has a pedestrian underpass
+  "and the bridge over street is further back"; the Krejcárek viaduct's span begins 6 m on its ramp). Where the lidar has
+  no ground, no ramp.
 - **realDecks**: the spans the track lies on a deck in: the survey's bed under more than half of the span, or the
   bridge model (Geoportál Mosty 3D, data/lineN.geo.json buildings of kind 1) under more than DECK_SHARE of it. On
   OSM's bridges a sample without the model under the axis takes it 3.3 m to either side: the Krejcárek viaduct's
@@ -41,6 +48,10 @@ TUNNEL_NEAR = 10      # m: no bed is taken this near a tunnel (the deck over the
 DECK_SHARE = 0.3      # of a span: the bridge model under this much of it makes it a deck
 SIDE = 3.3            # m: on an OSM bridge, the model this far to either side (the other track's half)
 AT_GRADE, STRUCTURE = 2.0, 0.8  # m: under this the road is at grade; the deck's depth over the clearance
+# m: the bare earth this near the rails is no void under a deck: no deck (1 m) over a passage fits (measured
+# 2026-11-14: ramps 0.0-0.4 m, the spans' bridges 2.3-14 m, Krejcárek's first 4 m 0.2-1.0 m)
+RAMP_GAP = 1.5
+MIN_SPAN = 4          # m: a shorter ramp is not one
 
 
 def polys(areas):
@@ -143,7 +154,7 @@ def bridge_triangles(data, root=ROOT):
     return out
 
 
-def structures(data, dtm, tris, surface_at, lidar_at):
+def structures(data, dtm, tris, surface_at, lidar_at, bare_at=None):
     rt = Route(data["path"], data.get("pathExt"))
     n = math.ceil(rt.length / PROFILE_STEP) + 1
     tunnels, bridges = data.get("tunnels") or [], data.get("bridges") or []
@@ -186,6 +197,11 @@ def structures(data, dtm, tris, surface_at, lidar_at):
         else:
             merged.append(list(sp))
 
+    ramps = []
+    if bare_at is not None:
+        decks = off_ramps(merged, rt, data["heights"], bare_at)
+        ramps = [[a, b] for a, b in gaps(merged, decks) if b - a >= MIN_SPAN]
+
     def share(flags, a, b):
         ks = [k for k in range(math.ceil(a / PROFILE_STEP), int(b / PROFILE_STEP) + 1) if k < n]
         return sum(flags[k] for k in ks) / max(1, len(ks))
@@ -209,7 +225,54 @@ def structures(data, dtm, tris, surface_at, lidar_at):
             continue
         clear.append({**c, "zr": round(zr, 3), "need": round(zr + c["mh"] + STRUCTURE, 3)})
     r1 = lambda v: round(v, 1)  # noqa: E731
-    return [[r1(a), r1(b)] for a, b in merged], [[r1(a), r1(b)] for a, b in real], clear
+    return [[r1(a), r1(b)] for a, b in merged], [[r1(a), r1(b)] for a, b in real], clear, [[r1(a), r1(b)] for a, b in ramps]
+
+
+def gaps(spans, pieces):
+    """What of `spans` the `pieces` (inside them, sorted) leave uncovered."""
+    out = []
+    for a, b in spans:
+        at = a
+        for x, y in pieces:
+            if y <= a or x >= b:
+                continue
+            if x > at:
+                out.append([at, x])
+            at = max(at, y)
+        if at < b:
+            out.append([at, b])
+    return out
+
+
+def off_ramps(spans, rt, heights, bare_at):
+    """The spans without their samples on ramps (RAMP_GAP, above): [[a, b], ...]."""
+    zs, step = heights["path"], heights["step"]
+
+    def rail(s):
+        k = min(max(s / step, 0), len(zs) - 1.000001)
+        i = int(k)
+        a, b = zs[i], zs[min(i + 1, len(zs) - 1)]
+        return None if a is None or b is None else a + (b - a) * (k - i)
+
+    out = []
+    for a, b in spans:
+        run = None
+        ks = list(range(math.ceil(a / PROFILE_STEP), int(b / PROFILE_STEP) + 1))
+        for j, k in enumerate(ks):
+            s = k * PROFILE_STEP
+            x, y = rt.at(min(s, rt.length))[:2]
+            g, z = bare_at(x, y), rail(s)
+            void = g is None or z is None or not math.isfinite(g) or z - g >= RAMP_GAP
+            if void and run is None:
+                run = s
+            if run is not None and (not void or j == len(ks) - 1):
+                end = s if void else s - PROFILE_STEP
+                # (a piece reaching the span's own ends keeps them)
+                lo, hi = (a if run == ks[0] * PROFILE_STEP else run), (b if void and j == len(ks) - 1 else end)
+                if hi - lo >= MIN_SPAN:
+                    out.append([lo, hi])
+                run = None
+    return out
 
 
 def main():
@@ -223,12 +286,19 @@ def main():
     surf = Surface(dtm) if dtm else None
     from import_track_heights import Terrain
     T = Terrain()
-    spans, real, clear = structures(data, dtm, bridge_triangles(data), surf.at if surf else (lambda x, y: None),
-                                    lambda x, y: T([x], [y])[0])
-    data["spans"], data["realDecks"], data["underpasses"] = spans, real, clear
+    from geo import Frame
+    from ipr_dtm import IprDtm
+    D, F = IprDtm(), Frame()
+
+    def bare(x, y):
+        v = float(D.sample(*F.to_jtsk(x, y)))
+        return v if math.isfinite(v) else None
+    spans, real, clear, ramps = structures(data, dtm, bridge_triangles(data), surf.at if surf else (lambda x, y: None),
+                                    lambda x, y: T([x], [y])[0], bare)
+    data["spans"], data["realDecks"], data["underpasses"], data["ramps"] = spans, real, clear, ramps
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"line {line}: spans {spans}; decks {real}; {len(clear)} clearances over the road")
+    print(f"line {line}: spans {spans}; decks {real}; ramps {ramps}; {len(clear)} clearances over the road")
 
 
 if __name__ == "__main__":
