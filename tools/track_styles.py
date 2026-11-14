@@ -158,7 +158,10 @@ def holes(data, survey=None):
     n = int(rt.length) + 1
     pts = [rt.at(min(s, rt.length))[:2] for s in range(n + 1)]
     out = []
-    # platforms beside either track: both directions' (PLATFORM_NEAR of the axis), and our stops' own extents
+    # platforms beside either track: both directions' (PLATFORM_NEAR of the axis), and our stops' own extents. Both
+    # tracks: at most stops in grass track both are paved, the platforms staggered or not (#584: line 37 at
+    # Českomoravská and line 9 at s 15500 in the orthophoto); where one track stays grass (Drinopol) a mark for that
+    # track says so (spans, cut)
     plats = [Polygon([q[:2] for q in pl["p"]]) for pl in data.get("platforms", []) if len(pl["p"]) >= 3]
     plats = [p if p.is_valid else p.buffer(0) for p in plats]
     if plats:
@@ -436,7 +439,9 @@ def cut(secs, hs):
         if x["style"] not in ("grass", "ballast"):
             out.append(x)
             continue
-        mine = [h for h in hs if (x["style"] == "grass" or not h["grass"]) and h["s1"] > x["s0"] and h["s0"] < x["s1"]]
+        # (a mark for one track says what that track is beside a platform: Drinopol, #584)
+        mine = [h for h in hs if (x["style"] == "grass" or not h["grass"]) and h["s1"] > x["s0"] and h["s0"] < x["s1"]
+                and not (h["kind"] == "platform" and x.get("track"))]
         out += [{**x, "s0": a, "s1": b} for a, b in minus(x["s0"], x["s1"], mine) if b - a >= MIN_PIECE]
         out += [{"s0": max(h["s0"], x["s0"]), "s1": min(h["s1"], x["s1"]), "style": "embedded", "source": "hole", "hole": h["kind"]}
                 for h in mine if h["kind"] == "road" and min(h["s1"], x["s1"]) - max(h["s0"], x["s0"]) >= MIN_EMBEDDED]
@@ -467,12 +472,13 @@ def reviewed(data, truth):
     return out
 
 
-def sections(data, truth, survey, opens=()):
+def sections(data, truth, survey, opens=(), track="ours"):
     """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479), the
     paved track embedded at junctions and road crossings (#546), and the junctions the user's surface answers lay in
-    setts (#574). `opens`: the lidar's runs of open ballast (tools/open_track.py `found`, #591)."""
-    return setts_junctions(embed(cut(spans(data, truth, survey, opens), holes(data, survey)), junctions(data, survey)),
-                           data, truth)
+    setts (#574). `opens`: the lidar's runs of open ballast (tools/open_track.py `found`, #591). `track`: ours, or
+    back for the other direction's track beside the route (#584), by route s: the user's marks for that track."""
+    return setts_junctions(embed(cut(spans(data, truth, survey, opens, track), holes(data, survey)),
+                                 junctions(data, survey)), data, truth)
 
 
 def surface_places(data, truth):
@@ -519,11 +525,12 @@ def setts_junctions(secs, data, truth):
     return out
 
 
-def spans(data, truth, survey, opens=()):
-    """The style sections from end to end, before the holes."""
+def spans(data, truth, survey, opens=(), track="ours"):
+    """The style sections from end to end, before the holes. A mark with a `track` (ours, back) is that track's only
+    (#584)."""
     user = []
     for mark, t in enumerate(truth.get("trackStyles", [])):
-        if str(t["line"]) != str(data["line"]):
+        if str(t["line"]) != str(data["line"]) or t.get("track", track) != track:
             continue
         if "between" in t:   # (two ends, each a lat, lon point or a stop: points within 15 m of the route, by position)
             path = LineString([p[:2] for p in data["path"]])
@@ -545,7 +552,12 @@ def spans(data, truth, survey, opens=()):
             if a < 0 or b < 0:
                 continue
             s0, s1 = data["stops"][a]["s"], data["stops"][b]["s"]
-        user.append({"s0": s0, "s1": s1, "style": t["style"], "source": "user", "mark": mark})
+        user.append({"s0": s0, "s1": s1, "style": t["style"], "source": "user", "mark": mark,
+                     **({"track": t["track"]} if "track" in t else {})})
+    # (a mark for one track wins over the marks for both under it)
+    one = [x for x in user if x.get("track")]
+    user = one + [{**x, "s0": a, "s1": b} for x in user if not x.get("track") for a, b in minus(x["s0"], x["s1"], one)
+                  if b - a >= 1]
     user += reviewed(data, truth)
     # (the surface answers where no mark or grass answer says otherwise, #574)
     user += [{**x, "s0": a, "s1": b} for x in surfaced(data, truth) for a, b in minus(x["s0"], x["s1"], user) if b - a >= 1]
@@ -636,6 +648,25 @@ def lift_series(data, secs, off):
     return {"step": LIFT_STEP, "unit": 0.001, "v": [round(lift(secs, off, k * LIFT_STEP) * 1000) for k in range(n)]}
 
 
+def differ(data, runs=False):
+    """Where our track's style and the other direction's differ (#584): metres, or with `runs` the pieces
+    [(s0, s1, ours, back)] (every metre, panels where no section is)."""
+    if "stylesBack" not in data:
+        return [] if runs else 0.0
+    at = lambda secs, s: next((x["style"] for x in secs if x["s0"] <= s <= x["s1"]), "panels")  # noqa: E731
+    L = int(Route(data["path"], data.get("pathExt")).length)
+    out = []
+    for s in range(L + 1):
+        a, b = at(data["styles"], s), at(data["stylesBack"], s)
+        if a == b:
+            continue
+        if out and out[-1][1] == s - 1 and out[-1][2:] == [a, b]:
+            out[-1][1] = s
+        else:
+            out.append([s, s, a, b])
+    return [tuple(r) for r in out] if runs else float(sum(r[1] - r[0] + 1 for r in out))
+
+
 def main():
     if "--line" not in sys.argv:
         sys.exit(__doc__)
@@ -647,7 +678,14 @@ def main():
     dtm = json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else None
     survey = Survey(dtm) if dtm else None
     import open_track
-    data["styles"] = sections(data, truth, survey, open_track.found(data))
+    opens = open_track.found(data)
+    data["styles"] = sections(data, truth, survey, opens)
+    # (the other direction's track beside the route, by route s, where it differs from ours: #584)
+    back = sections(data, truth, survey, opens, "back") if len(data.get("pathBack") or []) > 1 else data["styles"]
+    if back != data["styles"]:
+        data["stylesBack"] = back
+    else:
+        data.pop("stylesBack", None)
     own = track_sections(data, survey)
     for i, tr in enumerate(data.get("tracks") or []):
         if i in own:
@@ -662,9 +700,15 @@ def main():
         else:
             tr.pop("bed", None)
     data["lift"] = lift_series(data, data["styles"], offsets(truth))
+    if "stylesBack" in data:
+        data["liftBack"] = lift_series(data, data["stylesBack"], offsets(truth))
+    else:
+        data.pop("liftBack", None)
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"line {line}: " + ", ".join(f"{x['style']} {x['s0']:.0f}-{x['s1']:.0f} ({x['source']})" for x in data["styles"]) or "none")
+    print(f"line {line}: the tracks differ over {differ(data):.0f} m: " + ", ".join(
+        f"{a:.0f}-{b:.0f} {x}/{y}" for a, b, x, y in differ(data, True)))
     print(f"line {line}: other tracks: " + ", ".join(f"{st} {sum(b - a for v in own.values() for a, b, s in v if s == st):.0f} m"
                                                     for st in ("grass", "embedded")) + f" on {len(own)} tracks")
     print(f"line {line}: beds: " + json.dumps(track_beds.report(data, dtm, bs)))

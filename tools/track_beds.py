@@ -88,17 +88,24 @@ class Areas:
 
 
 def styles_along(data, i, ss, xy):
-    """The style at each sample of track i: the route's within NEAR_ROUTE m of it, else the track's own sections."""
+    """The style at each sample of track i: the route's within NEAR_ROUTE m of it (the other direction's track's own
+    where it lies nearer that track, `stylesBack`, #584), else the track's own sections."""
     route = LineString([q[:2] for q in data["path"]])
     secs = data.get("styles") or []
     own = data["tracks"][i].get("styles") or []
     pts = shapely.points(xy)
-    near = shapely.distance(pts, route) < NEAR_ROUTE
+    dr = shapely.distance(pts, route)
+    near = dr < NEAR_ROUTE
     rs = shapely.line_locate_point(route, pts)
+    if data.get("stylesBack") and len(data.get("pathBack") or []) > 1:
+        on_back = shapely.distance(pts, LineString([q[:2] for q in data["pathBack"]])) < dr
+    else:
+        on_back = [False] * len(ss)
     out = []
     for k, s in enumerate(ss):
         if near[k]:
-            out.append(next((q["style"] for q in secs if q["s0"] <= rs[k] <= q["s1"]), "panels"))
+            sec = data["stylesBack"] if on_back[k] else secs
+            out.append(next((q["style"] for q in sec if q["s0"] <= rs[k] <= q["s1"]), "panels"))
         else:
             out.append(next((c for a, b, c in own if a <= s <= b), "panels"))
     return out

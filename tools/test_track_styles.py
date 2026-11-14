@@ -182,6 +182,28 @@ class Holes(unittest.TestCase):
         hs = [(round(h["s0"]), round(h["s1"])) for h in T.holes(data) if h["kind"] == "platform"]
         self.assertEqual(hs, [(197, 243), (960, 1006)])
 
+    def test_a_mark_for_one_track_keeps_its_grass_beside_a_platform(self):
+        # (#584, Drinopol: our track paved along our platform, the other direction's track in grass)
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                **self.PLATFORM}
+        truth = {"trackStyles": [{"line": "x", "from": "A", "to": "B", "style": "grass"},
+                                 {"line": "x", "between": [[0.0, 0.0], [0.0, 0.0]], "style": "grass", "track": "back"}]}
+        frame = T.Frame()
+        truth["trackStyles"][1]["between"] = [list(frame.ll(190.0, 0.0)), list(frame.ll(250.0, 0.0))]
+        ours, back = (spans_of(T.sections(data, truth, None, track=t)) for t in ("ours", "back"))
+        self.assertEqual(ours, [(0, 197, "grass"), (243, 600, "grass")])
+        self.assertEqual(back, [(0, 190, "grass"), (190, 250, "grass"), (250, 600, "grass")])
+
+    def test_a_mark_for_one_track_and_where_they_differ(self):
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "pathBack": [[600.0, 3.0], [0.0, 3.0]],
+                "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}]}
+        truth = {"trackStyles": [{"line": "x", "from": "A", "to": "B", "style": "grass", "track": "back"}]}
+        data["styles"] = T.sections(data, truth, None)
+        data["stylesBack"] = T.sections(data, truth, None, track="back")
+        self.assertEqual((data["styles"], spans_of(data["stylesBack"])), ([], [(0, 600, "grass")]))
+        self.assertEqual(T.differ(data), 601.0)
+        self.assertEqual(T.differ(data, True), [(0, 600, "panels", "grass")])
+
 
 class Lift(unittest.TestCase):
     TRUTH = {"trackHeights": {"railAboveDeck": [

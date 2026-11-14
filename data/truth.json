@@ -671,6 +671,14 @@
    "style": "ballast",
    "extent": "from the end of the Ohrada junction to the north end of the Krejcárek viaduct (line 37 s 2238-3496 in the 2026-11-14 build)",
    "source": "user 2026-11-14, #549, with two photos of the viaduct: \"There is open ballast track in the middle, walkway a bit lower and a parapet on the side. [...] Btw the track from ohrada junction to the viaduct is open ballast too.\""
+  },
+  {
+   "line": "22",
+   "between": [[50.0839577, 14.3700293], [50.0839329, 14.3705729]],
+   "track": "back",
+   "style": "grass",
+   "extent": "the other direction's track along Drinopol's platform A (U103Z1P) and 3 m past its ends (line 22 s 3570-3609 in the 2026-11-14 build); our track beside the platform stays paved",
+   "source": "user 2026-11-13, #584, with a street photo: \"I found also special case of one track paved and another grassy (second picture), like at Drinopol which makes it more complicated\"; which track is which from the ČÚZK orthophoto (2026-11-14): the track beside platform A paved, the other in grass"
   }
  ],
  "grassTrack": {

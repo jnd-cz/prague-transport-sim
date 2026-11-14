@@ -487,6 +487,14 @@ export const WORLD_PARTS = [
 
 // onPart(name): called (and awaited) after each part, so a loading screen can show the progress.
 // The world is the same in every weather: group.userData.setWeather(w) sets it (src/weather.js).
+// (x, y)'s offset across from our track, left > 0, at its nearest route point n (Profile.heightAt's `lateral`)
+function lateralOf(route, n, x, y) { const q = route.at(n.s); return q.hx * (y - q.y) - q.hy * (x - q.x); }
+// the track style at (x, y) beside the route: the other direction's track takes its own (`stylesBack`, #584)
+function styleOn(route, ground, n, x, y) {
+  if (!ground.styles) return undefined;
+  return ground.profile.onBack(n.s, lateralOf(route, n, x, y)) ? ground.styles.atBack(n.s) : ground.styles.at(n.s);
+}
+
 export async function buildWorld(scene, data, route, ground, onPart = null) {
   const group = new THREE.Group();
   group.matrixAutoUpdate = false;
@@ -545,7 +553,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     tiltCache.set(t, tilt); return tilt;
   };
   // (how far a track's bed lies under its top of rail, by the route's track styles: src/heights.js)
-  const liftAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 ? ground.profile.lift(n.s) : 0; };
+  // (each track its own: the other direction's beside the route takes its `liftBack`, #584)
+  const liftAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 ? ground.profile.lift(n.s, lateralOf(route, n, x, y)) : 0; };
   // (each track's bed and tilt: a bed meeting its paired track's lays its edge at the mean of their near rails; the
   // survey and the terrain are laid under the same cross-section, #548)
   const beds = data.tracks.map((t) => {
@@ -700,7 +709,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (setts, #574: a grey-brown stone until #308's texture)
   const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' })
     .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
-  const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? ground.styles.at(n.s) : null; };
+  const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? styleOn(route, ground, n, x, y) : null; };
   // (a track's own style at each drawn point: its sections run along t.p, the drawn points along t.smooth, scaled as
   // ownHeights does)
   const ownStyles = (t) => {
@@ -1128,7 +1137,7 @@ function flushDtm(ground) {
     // measured; at the north end of Čechův most the embankment road 5.6 m below lifted the street)
     // (the tracks' surface level across the street: ours, the opposite track's beyond it, #197)
     for (let l = -15; l <= 15; l++) {
-      const zt = profile.heightAt(s, l) - profile.lift(s) - STREET_BELOW, o = route.offset(s, l), t = dtm.surfaceAt(o.x, o.y, zt);
+      const zt = profile.heightAt(s, l) - profile.lift(s, l) - STREET_BELOW, o = route.offset(s, l), t = dtm.surfaceAt(o.x, o.y, zt);
       e.push(t && FLUSH.has(t.c) && Math.abs(zt - t.z) < 1.5 ? zt - t.z : null);
     }
     for (let k = 0; k < e.length; k++) if (e[k] === null) {
@@ -1194,7 +1203,7 @@ function flushDtm(ground) {
     // the survey says there (a 2 m bump at s 2420 stood 3.6 m over the rails); a structure well above
     // the track (over 4.5 m) is another level. Where the rails tilt with the street, only the track zone (#538):
     // the street past it keeps the survey's shape (rows above)
-    if (bed.has(p) && (!green.has(p) || ground.styles?.at(n.s) === 'grass') && ground.trackWithin(p[0], p[1], 3) && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5 && !pastZone(n.s, lat)) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW; return; }
+    if (bed.has(p) && (!green.has(p) || styleOn(route, ground, n, p[0], p[1]) === 'grass') && ground.trackWithin(p[0], p[1], 3) && !profile.onBridge(n.s) && p[2] - profile.height(n.s) < 4.5 && !pastZone(n.s, lat)) { p[2] = profile.heightAt(n.s, lat) - profile.lift(n.s, lat) - STREET_BELOW; return; }
     const dz = corr(n.s, lat);
     if (dz === null || Math.abs(p[2] - profile.height(n.s)) > 2.5 + Math.abs(dz)) return; // (another level)
     const k = Math.max(0, Math.min(1, (n.d - 5) / 10));
@@ -1203,7 +1212,7 @@ function flushDtm(ground) {
     // level: its outlines stack points metres apart in height beside the tracks, and freed they lifted the street up
     // to 0.33 m over the bed, line 17 s 17862)
     if (bed.has(p) && ground.trackWithin(p[0], p[1], 3) && pastZone(n.s, lat) && !profile.onBridge(n.s)) {
-      const zt = profile.heightAt(n.s, lat) - profile.lift(n.s) - STREET_BELOW;
+      const zt = profile.heightAt(n.s, lat) - profile.lift(n.s, lat) - STREET_BELOW;
       if (z > zt + 0.05 || z < zt - 0.15) { p[2] = zt; return; }
     }
     p[2] = z;
@@ -1237,7 +1246,7 @@ function flushDtm(ground) {
     if (a.l !== 0 || !(FLUSH.has(a.c) || a.c === 'green')) continue;
     for (const tri of a.mesh) for (const p of tri) {
       if (done.has(p)) continue;
-      if (a.c === 'green') { const n = route.nearest(p[0], p[1]); if (!n || n.d > 8 || ground.styles?.at(n.s) !== 'grass') continue; }
+      if (a.c === 'green') { const n = route.nearest(p[0], p[1]); if (!n || n.d > 8 || styleOn(route, ground, n, p[0], p[1]) !== 'grass') continue; }
       done.add(p);
       p[2] = ground.flush(p[0], p[1], p[2]);
     }
@@ -1306,7 +1315,7 @@ function flushDtm(ground) {
     const q = route.at(n.s), l = (p[1] - q.y) * q.hx - (p[0] - q.x) * q.hy, zr = profile.heightAt(n.s, l);
     const sp = spanOf(n.s), flat = sp >= 0 && !roaded.has(sp);
     if (!flat && (c === 'paved' || p[2] - zr <= DECK_OVER)) continue;
-    const z = zr - profile.lift(n.s) - STREET_BELOW + (!flat && c === 'sidewalk' ? KERB : 0);
+    const z = zr - profile.lift(n.s, l) - STREET_BELOW + (!flat && c === 'sidewalk' ? KERB : 0);
     if (p[2] - zr > DECK_OVER) {
       dtm.deckLaid.push({ x: p[0], y: p[1], s: Math.round(n.s), c, dz: Math.round((z - p[2]) * 100) / 100 });
       over.set(p, p[2] - z);
@@ -1653,7 +1662,7 @@ function buildTrackSupport(group, route, ground) {
   let prev = null, walls = 0;
   for (let s = 0; s <= route.length; s += 2) {
     const [lo, hi] = edges(s), bridge = profile.onBridge(s), zb = profile.height(s) - profile.lift(s);
-    const zL = profile.heightAt(s, hi) - profile.lift(s), zR = profile.heightAt(s, lo) - profile.lift(s); // (each edge at its track's level, #197)
+    const zL = profile.heightAt(s, hi) - profile.lift(s, hi), zR = profile.heightAt(s, lo) - profile.lift(s, lo); // (each edge at its track's level, #197)
     const L = route.offset(s, hi), R = route.offset(s, lo);
     const gL = below(L.x, L.y), gR = below(R.x, R.y), C = route.at(s), gC = below(C.x, C.y);
     const cur = { s, zb, zL, zR, L, R, gL, gR, bridge, need: bridge ? Math.max(zL, zR) - Math.min(gL, gR, gC) > 1 : Math.max(zL - gL, zR - gR) > 0.6 };
