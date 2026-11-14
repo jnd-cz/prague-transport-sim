@@ -230,6 +230,28 @@ sideways where the browser allows it (Chrome on Android), elsewhere the game ask
 menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
 full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
 
+### With a gamepad
+
+An Xbox or PlayStation pad in Chrome, Edge or Firefox; the browser shows it to the game after its first button. The pad sends
+the keyboard's keys, so the keys work beside it. While a pad is connected, the dead-man pedal counts as held.
+
+| pad | does |
+|---|---|
+| right trigger | drive step 1–5, by how far it is pressed |
+| left trigger | brake step 1–5, by how far it is pressed (over the right one); both released: both pedals free |
+| D-pad ↑ / ↓ | a step towards drive / brake (as `W` / `S`) |
+| D-pad ← / → | indicators left / right |
+| A / ✕ | doors |
+| B / ○ | bell |
+| X / □ | sand (held) |
+| Y / △ | emergency brake (held) |
+| LB / L1 | parking brake on and off (advanced controls) |
+| RB / R1 | look closer (held) |
+| right stick ← / → | look out of the left / right window |
+| Back / Share | cab or outside view |
+| Start / Options | pause |
+| L3 | mirror |
+
 ## Autopilot
 
 Tick "Autopilot — just watch the ride" in the menu, or press **O** during a shift. It plans speed from
