@@ -149,6 +149,12 @@ class Holes(unittest.TestCase):
         for style in ("grass", "ballast"):
             self.assertEqual(spans_of(styled(style, **self.STREETS)), [(a, b, s.format(style)) for a, b, s in want])
 
+    def test_a_street_under_our_bridge_neither_cuts_nor_embeds(self):
+        under = {"roads": [{"p": [[400, -20], [400, 20]], "w": 8, "c": 1}], "bridges": [[350.0, 450.0]]}
+        self.assertEqual(spans_of(styled("ballast", **under)), [(0, 600, "ballast")])
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}], **under}
+        self.assertEqual(spans_of(T.sections(data, {}, None)), [])
+
     def test_switches_do_not_cut_and_short_pieces_go(self):
         tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}
         self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through the switches)

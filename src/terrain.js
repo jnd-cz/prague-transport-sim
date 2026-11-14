@@ -266,6 +266,7 @@ export class Profile {
     this.source = Array.from(z, (_, i) => ranges.find((r) => i * step >= r[0] && i * step <= r[1])?.[2] ?? 'data');
     this.bridges = data.spans;
     this.realDecks = data.realDecks;
+    this.ramps = data.ramps || []; // (the parts of the spans on a walled ramp, no void under the track, #549)
     this.clearances = data.underpasses;
     this.backOff = null;
     // the opposite track across the street (its offset, left > 0, and height at each sample, from the build): the
@@ -332,6 +333,10 @@ export class Profile {
 
   onBridge(s) {
     return this.bridges.some(([a, b]) => s > a - 4 && s < b + 4);
+  }
+  // on a ramp of a span (onBridge's 4 m past a span's end included where the ramp reaches it)
+  onRamp(s) {
+    return this.ramps.some(([a, b]) => s > a - (this.bridges.some(([x]) => Math.abs(x - a) < 0.5) ? 4 : 0) && s < b + (this.bridges.some(([, y]) => Math.abs(y - b) < 0.5) ? 4 : 0));
   }
   // well inside a bridge span (more than 8 m from its ends) and at least 3 m above the ground under
   // it: what lies here in 2D is on the road underneath (a junction at a bridge end is a real one for

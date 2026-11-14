@@ -476,6 +476,17 @@ Sections:
   - Where the band past a bed's edge caps one area's vertices and its neighbour meets it along a longer edge with
     no vertex there, a 3.3 cm seam opens (line 23 s 2332-2460, a track 2.4 m away): +18 and +20 `seams3` on lines
     22 and 23.
+- **The survey on our bridges** (#549, the user's photos and Street View, 2026-11-14):
+  - Level-1 walkway areas sometimes carry the parapet's top as their surface: Krejcárek's tram areas 0.9-1.3 m over
+    the rails, the strip at Modřanská škola (line 17) 0.61 m, Čechův most's sidewalks 0.66-0.73 m (really a kerb
+    over the road). `flushDtm` lays them; a flat deck takes its parapets from them.
+  - A span from OSM's bridge or the survey's level-1 bed includes the walled ramps up to the bridge: IPR's bare
+    earth lies 0.0-0.4 m under the rails there and 2.3-14 m under the spans' bridges (`line_structures.py`
+    `ramps`). The ramps stay spans: off a span, the street flush pulls the street beside a walled ramp up to the
+    track (Modřanská, 40 kerbs).
+- **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
+  (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
+  measure is circular). It does not tell ballast from grass.
 
 ### Buildings and structures (Geoportál, Mosty 3D)
 

@@ -224,6 +224,28 @@ otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde h
 kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí: hra jednou poradí
 Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na celé obrazovce.
 
+### S herním ovladačem
+
+Ovladač Xbox nebo PlayStation v Chrome, Edge nebo Firefoxu; prohlížeč ho hře ukáže po prvním stisknutém tlačítku.
+Ovladač posílá klávesy klávesnice, takže klávesy fungují vedle něj. Je-li ovladač připojený, bdělostní pedál se počítá jako držený.
+
+| ovladač | co dělá |
+|---|---|
+| pravá spoušť | jízdní stupeň 1–5 podle toho, jak hluboko je stisknutá |
+| levá spoušť | brzdný stupeň 1–5 podle toho, jak hluboko je stisknutá (přebije pravou); obě puštěné: obě šlapky volné |
+| křížový ovladač ↑ / ↓ | o stupeň k jízdě / k brzdě (jako `W` / `S`) |
+| křížový ovladač ← / → | směrovky vlevo / vpravo |
+| A / ✕ | dveře |
+| B / ○ | zvonec |
+| X / □ | pískování (držet) |
+| Y / △ | nouzová brzda (držet) |
+| LB / L1 | zajišťovací brzda zabrzdit a odbrzdit (pokročilé ovládání) |
+| RB / R1 | přiblížit pohled (držet) |
+| pravá páčka ← / → | pohled z levého / pravého okna |
+| Back / Share | pohled ze stanoviště nebo zvenku |
+| Start / Options | pauza |
+| L3 | zrcátko |
+
 ## Autopilot
 
 Zaškrtněte v menu „Autopilot — jen se dívat na jízdu“ nebo během směny stiskněte **O**. Plánuje rychlost podle

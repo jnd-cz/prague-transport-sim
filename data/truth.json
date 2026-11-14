@@ -662,6 +662,13 @@
    "style": "ballast",
    "extent": "between the grass review card's pins (grass-50.0027-14.4144)",
    "source": "user 2026-11-12, grass track review (#503), answered not grass: \"there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast\""
+  },
+  {
+   "line": "37",
+   "between": [[50.0906055, 14.4679162], [50.0994264, 14.4732075]],
+   "style": "ballast",
+   "extent": "from the end of the Ohrada junction to the north end of the Krejcárek viaduct (line 37 s 2238-3496 in the 2026-11-14 build)",
+   "source": "user 2026-11-14, #549, with two photos of the viaduct: \"There is open ballast track in the middle, walkway a bit lower and a parapet on the side. [...] Btw the track from ohrada junction to the viaduct is open ballast too.\""
   }
  ],
  "grassTrack": {

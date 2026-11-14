@@ -78,6 +78,7 @@ SWITCH_PAD = 3         # m before a switch's start and past its frog: the switch
 DIAMOND_MIN = 20       # degrees: another track crossing ours more shallowly is a turnout leaving it, not a diamond
 BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond covers on ours
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
+BRIDGE_HEAD = 6        # m inside a bridge's ends (OSM's) where a way across still meets the track at grade (on_bridge)
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
 NEAR_ROUTE = 6         # m: a drawn track this near our route takes the route's style (src/world.js styleAt)
 BRANCH = 15            # m of a track along where another one leaves it, or it leaves another: the switch
@@ -186,6 +187,7 @@ def holes(data, survey=None):
         for a, b in zip(r["p"], r["p"][1:]):
             segs.append(LineString([a[:2], b[:2]]))
             kinds.append((kind, r.get("w") or 3))
+    bridged = on_bridge(data)
     if segs:
         tree = shapely.STRtree(segs)
         for s in range(n):
@@ -201,6 +203,8 @@ def holes(data, survey=None):
                     continue
                 at = seg.intersection(step).representative_point()
                 c = s + step.project(at)
+                if bridged(c):
+                    continue
                 if kind == "way":
                     kind = "road" if survey is not None and survey.carriageway(at.x, at.y) else "footway"
                 half = w / 2 / max(0.3, (1 - cos * cos) ** 0.5)
@@ -227,6 +231,7 @@ def crossing_roads(data, rt):
     out = []
     if not segs:
         return out
+    bridged = on_bridge(data)
     tree = shapely.STRtree(segs)
     n = int(rt.length) + 1
     pts = [rt.at(min(s, rt.length))[:2] for s in range(n + 1)]
@@ -240,8 +245,20 @@ def crossing_roads(data, rt):
             if cos >= 0.95:
                 continue
             c = s + step.project(seg.intersection(step).representative_point())
+            if bridged(c):
+                continue
             out.append((c, w / 2 / max(0.3, (1 - cos * cos) ** 0.5), w, cars))
     return out
+
+
+def on_bridge(data):
+    """Whether route position s lies on one of the route's bridges (`bridges`, OSM's, build_line.py) more than BRIDGE_HEAD
+    m inside its ends: a way the route crosses there runs under the deck, not across the track (line 37's Krejcárek
+    viaduct: two streets under it, 25 and 53 m inside, were embedded sections and would cut holes in its ballast; line
+    17's bridges in Modřany, 8-18 m inside, #549). Nearer the ends the street meets the bridge's head at grade (line 9 at
+    Jiráskovo náměstí 1.6 m inside, Janáčkovo nábřeží 3.9 m)."""
+    spans = data.get("bridges") or []
+    return lambda s: any(a + BRIDGE_HEAD < s < b - BRIDGE_HEAD for a, b in spans)
 
 
 def junctions(data, survey):

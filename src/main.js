@@ -18,6 +18,7 @@ import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
+import { Gamepad } from './gamepad.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 import { Loader } from './loading.js';
@@ -456,6 +457,8 @@ initHelp();
 onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
+// a gamepad (src/gamepad.js): its buttons and triggers send the keys too
+const pad = new Gamepad({ onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4) });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
 function fillTrips() {
@@ -742,6 +745,7 @@ $('btnToMenu').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
+let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
@@ -766,7 +770,7 @@ window.addEventListener('keydown', (e) => {
     takeOver();
     game.msg(t('msg.autoOff'), 'info', 4);
   }
-  if (e.key === 'Shift') input.deadman = true;
+  if (e.key === 'Shift') shiftHeld = true;
   if (k === 'a') input.sand = true;
   if (k === 'c') input.cutout = true;     // heating cut-out button (pass a contact coasting in winter)
   if (k === 'y') input.switchBtn = true;  // "Výhybka" button: current through the contact
@@ -813,7 +817,7 @@ window.addEventListener('keydown', (e) => {
 // a held key whose keyup never comes (the window lost focus) lets the view go back
 window.addEventListener('blur', () => { zoomTarget = 1; });
 window.addEventListener('keyup', (e) => {
-  if (e.key === 'Shift') input.deadman = false;
+  if (e.key === 'Shift') shiftHeld = false;
   const ku = e.key.toLowerCase();
   if (ku === 'a') input.sand = false;
   if (ku === 'c') input.cutout = false;
@@ -1019,6 +1023,7 @@ function frame(now) {
     audio.setActive(sounding, !inMenu && !game.paused && game.finished && !(inspect.active && inspect.paused));
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(dt) : [dt];
+    input.deadman = shiftHeld || pad.active;
     steps.forEach((h, i) => {
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
