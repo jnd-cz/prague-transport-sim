@@ -1117,9 +1117,11 @@ function leadFront() {
 }
 function poseMirror(mirrorCam) {
   const lead = tramModel.userData.cars[0];
-  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front
+  // at the model's mirror where it says (the built-in car: its glass, #600), else 1.55 m right of the centre line, 2.09 m
+  // over the rail, at the body's front
+  const e = tramModel.userData.mirrorEye;
   lead.updateWorldMatrix(true, false);
-  mirrorCam.position.set(-1.55, 2.09, leadFront()).applyMatrix4(lead.matrixWorld);
+  (e ? mirrorCam.position.set(...e) : mirrorCam.position.set(-1.55, 2.09, leadFront())).applyMatrix4(lead.matrixWorld);
   // looking back (a camera looks down its -z, the car's rear), turned a little outwards so the side of the tram
   // fills the inner edge, and a little down
   lead.getWorldQuaternion(mirrorCam.quaternion).multiply(mirrorTurn);
