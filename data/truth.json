@@ -19,7 +19,8 @@
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
   "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it",
-  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)"
+  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)",
+  "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it"
  },
  "stops": [
   {
@@ -3709,6 +3710,66 @@
     "answer": "tilts",
     "quote": "it's noticeable in real ride and I know this as famous, albeit extreme example where single straight track in junction tilts sideways",
     "source": "user, this session 2026-11-13, on the Sokolovská junction at Palmovka (50.1015651 N, 14.4736156 E), #538"
+   }
+  ]
+ },
+ "bedTroughReview": {
+  "note": "The user's answers to the bed trough review (reports/review/bed-troughs-N.json, tools/bed_troughs.py, #548), by the place's lat/lon: `real` is a ditch or a cutting (the trough measure leaves it), `wall` a retaining wall missing there, `ours` our ground sunk around the bed.",
+  "answers": [
+   {
+    "id": "trough-50.09070-14.47586",
+    "line": "37",
+    "place": [
+     50.090699,
+     14.475857
+    ],
+    "answer": "ours",
+    "note": "green grassy area which is level with sidewalk around it",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   },
+   {
+    "id": "trough-50.09262-14.38928",
+    "line": "23",
+    "place": [
+     50.09262,
+     14.389282
+    ],
+    "answer": "ours",
+    "note": "Grass around track and kerb next to road, no ditch",
+    "source": "user, bed trough review (reports/review/bed-troughs-23.json), 2026-11-13 (#548)"
+   },
+   {
+    "id": "trough-50.09428-14.40497",
+    "line": "23",
+    "place": [
+     50.094284,
+     14.404971
+    ],
+    "answer": "ours",
+    "note": "Grass but no ditch",
+    "source": "user, bed trough review (reports/review/bed-troughs-23.json), 2026-11-13 (#548)"
+   },
+   {
+    "id": "trough-50.10245-14.47607",
+    "line": "37",
+    "place": [
+     50.102453,
+     14.476074
+    ],
+    "answer": "ours",
+    "note": "road surface next to kerb of stop platform",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   },
+   {
+    "id": "trough-50.10512-14.47301",
+    "line": "37",
+    "place": [
+     50.10512,
+     14.473008
+    ],
+    "answer": "ours",
+    "note": "sunk island around zebra crossing",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
    }
   ]
  }
