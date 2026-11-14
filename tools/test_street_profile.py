@@ -108,6 +108,8 @@ class Measures(unittest.TestCase):
         side = sp.drive_measures(lambda x, y: 200 + 0.2 * np.asarray(y), [c])
         self.assertEqual(side["rolls over 7 deg"], 2 * 40)
         self.assertEqual(side["jumps"], 0)
+        steep = sp.drive_measures(lambda x, y: 200 + 0.16 * np.asarray(x), [c])  # (a 16 % street: a slope, not a step)
+        self.assertEqual(steep["jumps"], 0)
 
     def test_drive_lines_off_the_road_are_not_measured(self):
         # (an island beside a carriageway, 0.3 m up, under one drive line: no car drives it)

@@ -277,6 +277,9 @@ STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
 MOUTH = 1.0  # m: the most a street's width reaches beyond its usual width (a widening for a turn, not a side street)
+OFF_LIDAR = 0.10  # m: a fit further than this off the smoothed lidar is held by its radius, not noise (BAND 5 cm)
+LOOSEN = 20.0  # m either side of such a place over which the radius is halved
+R_FLOOR = 25.0  # m: the tightest radius a street is given (the calibration's tightest, RADII[0])
 OWN_LANES = 3.0  # m either side of a street's centreline where it lies inside the street that governs it (a lane)
 
 
@@ -349,8 +352,21 @@ def profile(s, z, rmin=None, pins=(), pin_z=None, smooth=SMOOTH_M):
         zz[list(pins)] = smooth_pins(s, pins, pin_z, smooth)
     w = np.where(ok, 1.0, 0.0)
     w[list(pins)] = 1.0
-    f = tp.vertical_profile(list(s), list(zz), rmin, weight=list(w), pins=list(pins), scale=NOISE)
-    return np.asarray(f["z"])
+    # (where the fit stays off the smoothed lidar, the street bends tighter than its class: the radius is halved within
+    # LOOSEN m of it and the fit run again. At the class radius Goldscheiderova (line 9) could not turn from Plzeňská
+    # into its 11 % climb in 5 m; behind by more than the noise, the lidar's points stopped pulling (Tukey) and it fell
+    # 1.4 m under IPR, then climbed at 18 % to meet it. 5 % of the calibration's stretches need a tighter radius)
+    r = np.full(len(s), float(rmin))
+    for _ in range(4):
+        f = np.asarray(tp.vertical_profile(list(s), list(zz), list(r), weight=list(w), pins=list(pins), scale=NOISE)["z"])
+        off = ok & (np.abs(f - zz) > OFF_LIDAR)
+        if not off.any() or r.min() <= R_FLOOR:
+            break
+        near = np.zeros(len(s), bool)
+        for i in np.flatnonzero(off):
+            near |= np.abs(s - s[i]) <= LOOSEN
+        r = np.where(near, np.maximum(r / 2, R_FLOOR), r)
+    return f
 
 
 def crossfall(F, ipr, p, t, road, s):
@@ -766,7 +782,7 @@ def generated(cs, x, y, road=None, field=None):
 
 def drive_measures(zfun, cs, raw=False, road=None):
     """The street bot's measures on a surface (zfun(x, y) -> z) along every street's two drive lines (LANE m either
-    side of its centreline, every metre): jumps over JUMP within 1 m, the change of grade over a car, the wheels'
+    side of its centreline, every metre): jumps over JUMP within 1 m against the slope so far, the change of grade over a car, the wheels'
     left-to-right difference (roll) and the 1 m bend (bumpy). With `road`, only where a drive line is on it (an OSM
     centreline 1.75 m off a carriageway's middle crossed Hartigova's island, a 0.32 m "jump" no car drives)."""
     import shapely
@@ -781,7 +797,21 @@ def drive_measures(zfun, cs, raw=False, road=None):
             zl = zfun(*(q + n * AXLE / 2).T)
             zr = zfun(*(q - n * AXLE / 2).T)
             ok = np.isfinite(z)
-            dz = np.abs(np.diff(z))
+            # (against the slope so far, as src/streetbot.js: a 15 % street rises 0.15 m in every metre and is no step.
+            # A metre is a jump when it breaks both the last metre that was none and the metre before it: a step counts
+            # once, and a street turning into a steep climb at most once)
+            d1 = np.diff(z)
+            dz = np.full(len(d1), np.nan)
+            g = dp = None
+            for i, d in enumerate(d1):
+                if not np.isfinite(d):
+                    g = dp = None
+                    continue
+                if g is not None:
+                    dz[i] = min(abs(d - g), abs(d - dp))
+                if g is None or dz[i] <= JUMP:
+                    g = d
+                dp = d
             big = np.flatnonzero(np.isfinite(dz) & (dz > JUMP))
             jumps += len(big)
             for i in big:
