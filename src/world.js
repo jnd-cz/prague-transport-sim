@@ -697,7 +697,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // the bed by the route's track style (#52; colours until #308's textures): on our route's tracks (within 6 m of it)
   // the style at the nearest route point, elsewhere the track's own sections (`styles`, tools/track_styles.py
   // track_sections, #546: embedded at its junctions and road crossings), else panels
-  const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a' })
+  // (setts, #574: a grey-brown stone until #308's texture)
+  const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' })
     .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
   const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? ground.styles.at(n.s) : null; };
   // (a track's own style at each drawn point: its sections run along t.p, the drawn points along t.smooth, scaled as

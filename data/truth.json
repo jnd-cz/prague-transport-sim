@@ -19,7 +19,8 @@
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
   "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
   "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it",
-  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)"
+  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)",
+  "trackSurfaceReview": "tools/surface_review.py (an answered place gets no card); tools/track_styles.py's setts (#574) once it reads them"
  },
  "stops": [
   {
@@ -418,7 +419,7 @@
   "railAboveDeck": [
    {
     "id": "rail-above-deck-embedded",
-    "styles": ["embedded"],
+    "styles": ["embedded", "setts"],
     "scope": "all",
     "metres": 0,
     "basis": "surface and rail heads flush",
@@ -3709,6 +3710,470 @@
     "answer": "tilts",
     "quote": "it's noticeable in real ride and I know this as famous, albeit extreme example where single straight track in junction tilts sideways",
     "source": "user, this session 2026-11-13, on the Sokolovská junction at Palmovka (50.1015651 N, 14.4736156 E), #538"
+   }
+  ]
+ },
+ "trackSurfaceReview": {
+  "note": "The user's answers to the track surface review (reports/review/track-surface-N.json, tools/surface_review.py, #574): what the track is laid in between two points (`setts`, `embedded`, `panels`, `grass`), and at OSM's surface changes whether it changes there (`changes`, `same`). The setts style and the OSM rule's calibration read them.",
+  "answers": [
+   {
+    "id": "surface-junction-50.08598-14.43187",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0858353,
+      14.431817
+     ],
+     [
+      50.0861264,
+      14.4319268
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08845-14.43253",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0883622,
+      14.4325348
+     ],
+     [
+      50.0885475,
+      14.4325209
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08874-14.38748",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0887755,
+      14.3870476
+     ],
+     [
+      50.0888117,
+      14.3878774
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08942-14.43246",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0893395,
+      14.4324616
+     ],
+     [
+      50.0894921,
+      14.4324556
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10149-14.47350",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1011845,
+      14.473397
+     ],
+     [
+      50.1018106,
+      14.4735559
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10320-14.47337",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1031149,
+      14.473372
+     ],
+     [
+      50.1032803,
+      14.4733818
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10371-14.47957",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1038755,
+      14.4793925
+     ],
+     [
+      50.1036828,
+      14.4798745
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08587-14.43183",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0855557,
+      14.4314443
+     ],
+     [
+      50.0862702,
+      14.4319818
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08874-14.38753",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.088765,
+      14.3871792
+     ],
+     [
+      50.0887971,
+      14.3878524
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08887-14.43250",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0883624,
+      14.4325348
+     ],
+     [
+      50.0893682,
+      14.4324593
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08955-14.43248",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0893862,
+      14.4324577
+     ],
+     [
+      50.0896788,
+      14.432656
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10222-14.47350",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1013639,
+      14.4734784
+     ],
+     [
+      50.1030817,
+      14.4733767
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10322-14.47337",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1030997,
+      14.4733741
+     ],
+     [
+      50.1033303,
+      14.4734043
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10360-14.47380",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1035374,
+      14.4736616
+     ],
+     [
+      50.103663,
+      14.4739344
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10373-14.47954",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1037904,
+      14.4794592
+     ],
+     [
+      50.1036892,
+      14.4796494
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10432-14.47904",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1048344,
+      14.478643
+     ],
+     [
+      50.1038061,
+      14.4794456
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10494-14.47846",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1049513,
+      14.4782429
+     ],
+     [
+      50.10485,
+      14.4786292
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08627-14.43198",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0861829,
+      14.4319481
+     ],
+     [
+      50.0863574,
+      14.4320157
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08834-14.43254",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0882546,
+      14.4325429
+     ],
+     [
+      50.0884342,
+      14.4325294
+     ]
+    ],
+    "answer": "same",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08880-14.38785",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0887521,
+      14.3877322
+     ],
+     [
+      50.088865,
+      14.387943
+     ]
+    ],
+    "answer": "same",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08937-14.43246",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0892784,
+      14.4324663
+     ],
+     [
+      50.089458,
+      14.4324526
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08968-14.43266",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0896229,
+      14.4325474
+     ],
+     [
+      50.0897143,
+      14.4327842
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10308-14.47338",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1029922,
+      14.4733893
+     ],
+     [
+      50.1031713,
+      14.4733654
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10366-14.47393",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1036112,
+      14.4738202
+     ],
+     [
+      50.103705,
+      14.4740578
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10381-14.47945",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1038867,
+      14.4793839
+     ],
+     [
+      50.1037352,
+      14.4795302
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10485-14.47863",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1049159,
+      14.4785354
+     ],
+     [
+      50.1047691,
+      14.47869
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10495-14.47822",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1049111,
+      14.4780875
+     ],
+     [
+      50.1049581,
+      14.4783537
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
    }
   ]
  }
