@@ -844,10 +844,20 @@ let pedalKey = null; // advanced: a held W / S moves the pedal on after 0.35 s
 function control(dir, repeat) {
   const eq = tram.eq;
   if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
+  if (dir > 0 && eq.parked && eq.pedal.brake === 0) parkedWarn();
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
+}
+// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the user's own try with
+// a pad were held by it, the user, 2026-11-14: "I would perhaps warn the user that parking brake is engaged")
+function parkedWarn() {
+  const text = t('msg.parked');
+  if (game.messages.some((m) => m.text === text)) return;
+  audio.emit('warning');
+  game.msg(text, 'warn', 4);
 }
 function setStep(n, now = false) {
   if (arcade()) tram.eq.lever = n;
+  else if (n > 0 && tram.eq.parked) parkedWarn();
   else if (now) tram.eq.pressTo(n);
   else tram.eq.setStep(n);
 }

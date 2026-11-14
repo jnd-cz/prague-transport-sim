@@ -6,7 +6,7 @@ moves. Held just over a step's edge and eased back a little, the trigger keeps i
 brakes at step 5, and both released free the pedals. Y held is the emergency brake, and let go it is brake step 5. A
 held D-pad ↑ repeats. A key pressed beside a pad at rest stays. Start pauses and resumes, and LB, the right stick and
 the D-pad's sides send their keys. In advanced controls a trigger puts the pedal straight on its step's angle,
-for drive once LB has released the parking brake; the dead-man pedal counts as held while the pad is connected."""
+for drive once LB has released the parking brake (before it, a warning says so); the dead-man pedal counts as held while the pad is connected."""
 import argparse
 import faulthandler
 import functools
@@ -138,6 +138,7 @@ def main():
             step(6)
             pad(buttons={7: 0.5})
             a["parked"] = pedals()
+            a["warned"] = ev("window.game.messages.some((m) => m.kind === 'warn' && m.text.includes('LB'))")
             pad(buttons={})
             pad(buttons={4: 1})
             pad(buttons={})
@@ -183,7 +184,7 @@ def main():
         fails.append(f"the dead-man pedal not held with a pad connected: its timer {r['deadman']} s on step {r['deadmanNotch']}")
     a = r["advanced"]
     want = {"mode": "advanced", "parked": [0, 0], "drive3": [21, 0], "drive5": [36, 0], "free": [0, 0], "brake5": [0, 23.5], "brake1": [0, 3.5]}
-    if {k: a[k] for k in want} != want or a["errors"]:
+    if {k: a[k] for k in want} != want or not a["warned"] or a["errors"]:
         fails.append(f"advanced controls: the pedals {a} (want {want})")
     if r["errors"]:
         fails.append(f"page errors: {r['errors']}")
