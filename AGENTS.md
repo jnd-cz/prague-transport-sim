@@ -176,7 +176,10 @@ both post on the pinned #291 and only propose.
     `build_line.py`, `dtm.py`, `line_heights.py` and `import_track_heights.py` when run alone; `test_all.py`
     for the whole suite (#536).
   - Anything else runs through `python -I tools/heavy.py "what" -- CMD ...`: a profile, a bench, a
-    comparison, a script of several runs. What it starts runs in its turn without waiting again.
+    comparison, a script of several runs. What it starts runs in its turn without waiting again, even
+    when that is a tool that queues itself or a process started with a clean environment: a job never
+    waits for a process that started it (#585). A job that waits for a while with nothing running ahead
+    of it but its own wrapper is a bug in the queue: stop it and open an issue.
   - Each prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
     (`tools/sysinfo.py`).
   - Start one in the background and let it wait. `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it

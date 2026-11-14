@@ -198,6 +198,29 @@ class Queue(unittest.TestCase):
         self.assertNotIn(baseline_store.HELD, os.environ)
         open(release_a, "w").close()
 
+    def test_a_nested_jobs_end_keeps_its_parents_turn(self):
+        # (#585: headless.py ends its turn before measuring main's baseline; inside heavy.py its end deleted HELD, and
+        # the measuring child queued behind its own grandparent for 8 h)
+        old = os.environ.get(baseline_store.HELD)
+        self.addCleanup(lambda: os.environ.pop(baseline_store.HELD, None) if old is None
+                        else os.environ.__setitem__(baseline_store.HELD, old))
+        os.environ[baseline_store.HELD] = str(os.getppid())  # (a live process's turn: the one that started the test)
+        with baseline_store.HeavyJob("inner") as j:
+            self.assertFalse(j.wait)
+            self.assertEqual(os.environ[baseline_store.HELD], str(os.getpid()))
+        self.assertEqual(os.environ[baseline_store.HELD], str(os.getppid()))
+
+    def test_a_job_never_waits_for_a_process_that_started_it(self):
+        self.assertIn(os.getppid(), baseline_store.ancestors())
+        with baseline_store.HeavyJob("outer", wait=False):
+            # (the child's environment has lost HELD, as a tool starting it with a clean one would)
+            inner, release = self.job("inner")
+            self.wait_for(lambda: sorted(self.states()) == [("inner", "running"), ("outer", "running")])
+            self.assertEqual(inner.stdout.readline().strip(), "in")
+            open(release, "w").close()
+            self.assertEqual(inner.wait(10), 0)
+        self.assertIn("inner runs in the turn of outer", inner.stderr.read())
+
     def test_an_older_tools_lock_counts_as_running(self):
         os.makedirs(baseline_store.LOCKS)
         with open(os.path.join(baseline_store.LOCKS, f"{os.getpid()}.lock"), "w", encoding="utf-8") as f:
