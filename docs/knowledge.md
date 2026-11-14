@@ -452,6 +452,38 @@ Sections:
     carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
     `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
 
+### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
+
+The norm for city streets is public: ÚNMZ publishes it with the ministry's consent (`raw/reference/norms/`, with
+its text; the user's link and upload, #512). Its minima are for new design; Prague's streets are older.
+Grades and vertical curves of streets with a tram in the carriageway follow ČSN 73 6405 instead (not public).
+
+- **Design speed** (table 2): A (rychlostní) 80 km/h, 60 in difficult conditions; B (sběrné) 50, 40;
+  C (obslužné) 30–50, 30; D1 (obytné zóny) 20 (the tables' lowest column).
+- **Vertical curves** (tables 13 and 14), the least crest / sag radius by design speed: 80 km/h 4,000 / 2,100 m;
+  60 1,800 / 1,000; 50 1,000 / 700; 40 450 / 350; 30 200 / 180; 20 100 / 110. Measured on the clean
+  streets (#512 calibration, p5): primary 490, trunk 350, secondary and tertiary 300, residential 150,
+  living street 100 m. So Prague's streets reach the minima of the difficult-conditions speed (40 km/h on the
+  main streets, 20–30 on residential ones); their p25 (700–1,000 m on main streets) is at the 50 km/h minima.
+- **Crossfall** (9.5): 2.5 % (2.0 % only in reconstructions), crowned or one-sided on an undivided street,
+  one-sided per carriageway on a divided one; sidewalks 0.5–2.0 % falling to the kerb. The change of
+  crossfall rises along the edge at most 1.2 % (design speed ≤ 50 km/h). The resulting slope
+  √(grade² + crossfall²) is at most 9 % (A, B) or 15 % (C), and at least 0.5 %.
+- **Grades** (table 12): B 6 %, 8 % where justified, 9 % over at most 150 m; C 9 %, 12 %, 15 % over at most 50 m;
+  D1 5 %, 8.33 %, 12.5 %. At least 0.5 %. Measured p99: primary 6.4 %, residential 12 %, living street 14 %.
+- **The tram belt** (3.1.18, 7.3, figures 2–4, 13):
+  - a belt raised at most 7 cm counts as unraised;
+  - the separating kerb (tvarovka) stands at most 9 cm over the carriageway, its inner edge 1.50 m from the
+    track's axis (1.30 m in reconstructions);
+  - a raised kerb stands 1.75 m from the axis (ČSN 28 0318);
+  - the belt is 7.00 m wide (6.00 m in reconstructions, 5.70 m where tight; 8.00 m with a mast between the
+    tracks); the track centres move to 3.50 m apart with buses on the belt, 4.00 m with a mast between them
+    (the base distance is drawn in the figures only).
+- **Kerbs** (Z1): a lowered kerb is under 80 mm; at driveways 2–5 cm (7 cm where justified).
+- **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
+  crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
+  street; a crossing street ramps up to the bed.
+
 ### Buildings and structures (Geoportál, Mosty 3D)
 
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:
