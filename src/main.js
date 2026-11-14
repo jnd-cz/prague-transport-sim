@@ -18,6 +18,7 @@ import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
+import { Gamepad } from './gamepad.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 import { Loader } from './loading.js';
@@ -456,6 +457,8 @@ initHelp();
 onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
+// a gamepad (src/gamepad.js): its buttons and triggers send the keys too
+new Gamepad({ onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4) });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
 function fillTrips() {
