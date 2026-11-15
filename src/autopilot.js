@@ -28,7 +28,7 @@ const COAST_T = 8;
 // curves at the limit, brake step 1 held down a descent only to HOLD_LATE under. (At a 15 km/h limit 0.4 and 1 m/s under held it at
 // 10-14.5 km/h, where the drivers of two line 23 rides held 14-16 down Chotkova; with these and the curves at 1.0 m/s², line 23's moving
 // time fell 1448 -> 1363 s and its drive presses 99 -> 83, energy the same, #431.) From there it grows milder, fully so MILD_SPAN s later:
-// UNDER and HOLD, the curves as at GENTLE_A, the target down to 10 km/h under the limit (never under 70 % of it), the coasting into
+// UNDER and HOLD, the curves as at GENTLE_A, the target down to 10 km/h under the limit (never under 70 % of it nor MILD_FLOOR), the coasting into
 // stops and lower limits up to twice as long, the planned braking a quarter softer.
 const MILD_FROM = 10, MILD_SPAN = 30;
 const MILD_FLOOR = 20 / 3.6;         // m/s: the lowest target time in hand takes it to (#502)

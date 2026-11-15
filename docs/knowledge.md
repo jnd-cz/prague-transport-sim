@@ -616,6 +616,13 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     | to Jindřišská | 94 s, 2 + 2 | 55–60 s, 1–4 + 1–3 |
     | Jindřišská to Masarykovo nádraží | 76 s, 4 + 4 | 91–155 s, 8–9 + 3–4 |
     | to Bílá labuť | 95 s, 4 + 4 (6003: 81 s, 1 + 3) | 73–79 s, 6–7 + 4–5 |
+  - **Jindřišská to Masarykovo nádraží, traced** (#502, seeds 1–3 on main at 609a4bc): our limits allow 74 s. The time
+    over that is a red at the junction 237 m out (21–27 s held in two seeds of three) and the timetable's 180 s stop to stop:
+    with 110–165 s in hand, the mild driving took the 15 km/h limit after the stop to 9 km/h and the 20 before Masarykovo to 15.
+    The presses came from holding those speeds up 5–13 ‰: a press each time it sagged 0.35–0.5 m/s, 3–4 in each zone. 6004
+    pressed once in each and let 15 sag to 12 and 20 to 16. Since #502 the mild driving keeps 20 km/h (a lower limit its own
+    target) and the hold sags a fifth of the speed (0.35–1 m/s): 6–7 presses there where traffic leaves it alone, and a car on
+    the track or a stand at the red adds a press each.
   - **The T3M on line 37** (front 23 m ahead of the phone):
     - **The trip:** it left Vozovna Žižkov 50 s after the game timetable's 08:20 (trip 17; the user: "always assume same or delayed
       trip, never earlier"), Ohrada +107 s, Krejcárek +171 s.
@@ -644,7 +651,7 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     down Chotkova (#431). Within reach of a turn's contact the target keeps 0.4: 0.2 under Anděl's 20 km/h put the accelerator
     at 31 coasting, over the switch button's 30.
   - **Over the next 30 s it grows milder:** curves as at 0.8 m/s², 0.4 under the limit, the 1 m/s hold, the target up to
-    10 km/h under, coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
+    10 km/h under but never under 20 km/h (#502), coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
     autopilot doesn't go as hard into curves and uses less pedal presses to conserve power. If he's late then he uses the
     probe's plan to catch up").
   - **Against main at 973726c** (with #451's curves; stops check, seeds 1-5):
