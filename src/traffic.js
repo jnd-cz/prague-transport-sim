@@ -1053,9 +1053,12 @@ export class Traffic {
   // and a car only enters when its exit lane has room: it never stops inside the junction)
   // (nor does one in the exit's mouth that waits for this one: car 1299 stood on the track there
   // waiting for 1290, which waited for the exit to clear, line 9 s 18394 seed 1, #259)
+  // (nor one whose chain of waits comes back to c through other cars, any length: car 875 stood on a connector waiting
+  // for 851, held at the junction by 882, held by 875; line 17 seed 5 s 17693, #607. Of such a circle the car held at a
+  // junction with the lowest id goes, the others keep waiting: all of them going drove them into each other)
   _junctionHeld(c, plan, dist, look, live) {
     const J = plan.at;
-    const exitFull = live.find((o) => o !== c && o.path === plan.to.path && o.s < 7 && o.seen?.car !== c && o.lead !== c);
+    const exitFull = live.find((o) => o !== c && o.path === plan.to.path && o.s < 7 && o.seen?.car !== c && o.lead !== c && !this._circleGoes(c, o));
     const blocker = live.find((o) => o !== c && (
       (o.conn && o.conn.at === J && this._conflict(o.conn, plan) && o.seen?.car !== c)
       || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, plan)
@@ -1064,8 +1067,20 @@ export class Traffic {
         && !(o.seen && (o.seen.gap < 4 || ((o.vNow ?? 0) < 0.3 && o.seen.v < 0.3)))
         && (o.toEnd < dist - 0.05 || (Math.abs(o.toEnd - dist) <= 0.05 && o.id < c.id)))
       || (!o.conn && o.lane !== plan.from && o.lane.to === J && o.toEnd < 5 && !(o.plan && o.plan.at === J) && this._nearLaneEnd(plan, o.lane, true))
-      || (!o.conn && o.lane !== plan.to && o.lane.from === J && o.s < 5 && o.seen?.car !== c && this._nearLaneEnd(plan, o.lane, false))));
+      || (!o.conn && o.lane !== plan.to && o.lane.from === J && o.s < 5 && o.seen?.car !== c && this._nearLaneEnd(plan, o.lane, false))) && !this._circleGoes(c, o));
     return { exitFull, blocker };
+  }
+
+  // does o wait for c through a chain of waitFor (as the last step left them), and is c the one of that circle to go: the
+  // lowest id among its cars held at a junction (#607)
+  _circleGoes(c, o) {
+    const ring = [c, o];
+    for (let x = o.waitFor; x; x = x.waitFor) {
+      if (x === c) return ring.every((y) => y === c || y.why !== 'junction' || y.id > c.id);
+      if (ring.includes(x) || ring.length > 12) return false;
+      ring.push(x);
+    }
+    return false;
   }
 
   // Where a car path crosses a track, ours or the opposite one (cached per path): [{ sIn, sOut, sx, rt, sOurs }], sIn along
