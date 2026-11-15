@@ -176,7 +176,8 @@ function treesInBuildings(world) {
   const trunkIn = [], crownIn = [];
   const M = new crown[0].matrix.constructor();
   let n = 0;
-  for (const mesh of crown) for (let i = 0; i < mesh.count; i++) {
+  // (userData.total: every tree, also those not drawn from where the camera is, src/nearbatch.js)
+  for (const mesh of crown) for (let i = 0; i < (mesh.userData.total ?? mesh.count); i++) {
     mesh.getMatrixAt(i, M);
     const e = M.elements, x = e[12], y = -e[14], zc = e[13];
     const sx = Math.hypot(e[0], e[1], e[2]), r = 2.6 * sx, bottom = zc - 2.6 * Math.hypot(e[4], e[5], e[6]);

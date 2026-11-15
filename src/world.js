@@ -6,6 +6,7 @@ import { DTM_LIFT, FLUSH, STREET, TRACK_ZONE } from './terrain.js';
 import { CONTACT_WIRE } from './models.js';
 import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
+import { NearBatches } from './nearbatch.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
 const CELL = 350; // spatial chunk size (m) for merged meshes, so frustum culling can skip far chunks
@@ -498,6 +499,7 @@ function styleOn(route, ground, n, x, y) {
 export async function buildWorld(scene, data, route, ground, onPart = null) {
   const group = new THREE.Group();
   group.matrixAutoUpdate = false;
+  group.userData.near = new NearBatches(); // the small things drawn near the camera only (src/nearbatch.js, #610)
   scene.add(group);
   // time of each part (window.worldTimes, logged at the end: what to optimize)
   const times = {};
@@ -1981,7 +1983,7 @@ function buildZebras(group, data, ground, trackDist) {
 // datový podklad © IPR Praha): manhole covers and valve caps as flat discs on the drawn ground, gutter
 // inlets as grates turned along the nearest street, above-ground hydrants as small red posts. One
 // instanced mesh per kind for the whole line (a few thousand instances: a few draw calls).
-export function buildStreetDetail(data, ground) {
+export function buildStreetDetail(data, ground, near = null) {
   const group = new THREE.Group();
   const pts = data.dtmPoints || [];
   // street directions for the grates: road segments in 20 m cells
@@ -2006,12 +2008,13 @@ export function buildStreetDetail(data, ground) {
   const flat = (geo) => geo.rotateX(-Math.PI / 2);
   const iron = (c) => weatherize(new THREE.MeshLambertMaterial({ color: c, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), { wet: 0.6 });
   const kinds = {
-    manhole: { geo: flat(new THREE.CircleGeometry(0.32, 14)), mat: iron(0x3a3a3c), turn: false },
+    // (size: the width of a flat one, the height of the hydrant, for the distance it is drawn to, src/nearbatch.js)
+    manhole: { geo: flat(new THREE.CircleGeometry(0.32, 14)), mat: iron(0x3a3a3c), turn: false, size: 0.64 },
     // (caps smaller than first drawn, user 2026-10-24; reference photos of all the covers to come)
-    hydrant_cap: { geo: flat(new THREE.CircleGeometry(0.1, 10)), mat: iron(0x4a3a30), turn: false },
-    valve_cap: { geo: flat(new THREE.CircleGeometry(0.06, 8)), mat: iron(0x3d3d3d), turn: false },
-    gutter_inlet: { geo: flat(new THREE.PlaneGeometry(0.62, 0.36)), mat: iron(0x242424), turn: true },
-    hydrant: { geo: new THREE.CylinderGeometry(0.11, 0.14, 0.85, 8).translate(0, 0.42, 0), mat: new THREE.MeshLambertMaterial({ color: 0x9c1d16 }), turn: false },
+    hydrant_cap: { geo: flat(new THREE.CircleGeometry(0.1, 10)), mat: iron(0x4a3a30), turn: false, size: 0.2 },
+    valve_cap: { geo: flat(new THREE.CircleGeometry(0.06, 8)), mat: iron(0x3d3d3d), turn: false, size: 0.12 },
+    gutter_inlet: { geo: flat(new THREE.PlaneGeometry(0.62, 0.36)), mat: iron(0x242424), turn: true, size: 0.5 },
+    hydrant: { geo: new THREE.CylinderGeometry(0.11, 0.14, 0.85, 8).translate(0, 0.42, 0), mat: new THREE.MeshLambertMaterial({ color: 0x9c1d16 }), turn: false, size: 0.85, upright: true },
   };
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   for (const [k, def] of Object.entries(kinds)) {
@@ -2031,6 +2034,7 @@ export function buildStreetDetail(data, ground) {
       mesh.setMatrixAt(i, m);
     });
     mesh.computeBoundingSphere();
+    if (near) near.add(mesh, k, def.size, !def.upright);
     group.add(mesh);
   }
   group.userData.counts = Object.fromEntries(Object.keys(kinds).map((k) => [k, pts.filter((o) => o.k === k).length]));
@@ -2151,6 +2155,7 @@ function buildTrees(group, data, ground, trackDist) {
   // (a little snow settles on the tops of the crowns: bare twigs hold little)
   const leafMat = () => weatherize(new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), { snow: 0.15 });
   const sets = []; // [mesh, plants, summer colours, first colour index, place(i, thinning)]
+  const nearList = []; // [mesh, name, height at scale 1 (m)]
   if (trees.length) {
     const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(CROWN, 0), leafMat(), trees.length);
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 5), new THREE.MeshLambertMaterial({ color: 0x5b4632 }), trees.length);
@@ -2169,6 +2174,7 @@ function buildTrees(group, data, ground, trackDist) {
       trunk.setMatrixAt(i, m);
     });
     sets.push([crown, trees, trees.map(summer), 0, place]);
+    nearList.push([crown, 'crowns', CROWN * 2.8], [trunk, 'trunks', 3]);
     group.add(crown, trunk);
   }
   // bushes and hedges: a low shrub on the ground
@@ -2181,6 +2187,7 @@ function buildTrees(group, data, ground, trackDist) {
       bush.setMatrixAt(i, m);
     });
     sets.push([bush, bushes, bushes.map(summer), 100000, null]);
+    nearList.push([bush, 'bushes', 1.6]);
     group.add(bush);
   }
   // plants in containers: a concrete planter with a small shrub
@@ -2196,6 +2203,7 @@ function buildTrees(group, data, ground, trackDist) {
       shrub.setMatrixAt(i, m);
     });
     sets.push([shrub, pots, pots.map(summer), 200000, null]);
+    nearList.push([pot, 'planters', 0.6], [shrub, 'planter shrubs', 1.1]);
     group.add(pot, shrub);
   }
   const litter = buildLeafLitter(group, trees, ground, trackDist, onRoad);
@@ -2212,6 +2220,10 @@ function buildTrees(group, data, ground, trackDist) {
     for (const l of litter) l.visible = w === 'leaves';
   };
   setWeather('dry');
+  // drawn near the camera only, by their height at a crown of scale 1 (src/nearbatch.js, #610); after the first
+  // colouring, so the kept instances carry it
+  const near = group.userData.near;
+  if (near) for (const [o, name, size] of nearList) near.add(o, name, size);
   return { setWeather };
 }
 
