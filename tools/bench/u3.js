@@ -10,6 +10,19 @@ import { stuckWatch, stuckScene } from './stuck.js';
 import { startShift } from './shift.js';
 
 const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
+// #602: a car's body (src/models.js: 1.8 x 4.3 m) against both tracks. FOUL: a tram's half width (1.25 m) with its swing in a
+// tight curve's overhang (about 0.45 m) and 0.3 m; a body corner nearer a track's centre fouls the tram passing there
+const CAR_HW = 0.9, CAR_HL = 2.15, FOUL = 2.0;
+// the car's corners' least distance to a route's centre line, and the route position there: { d, s } or null
+function bodyTo(route, p) {
+  let best = null;
+  const nx = -p.hy, ny = p.hx;
+  for (const [a, b] of [[CAR_HL, CAR_HW], [CAR_HL, -CAR_HW], [-CAR_HL, CAR_HW], [-CAR_HL, -CAR_HW]]) {
+    const n = route.nearest(p.x + p.hx * a + nx * b, p.y + p.hy * a + ny * b);
+    if (n && (!best || n.d < best.d)) best = { d: n.d, s: n.s };
+  }
+  return best;
+}
 
 export async function run(seed = 1, opts = {}) {
   const { trip = 40, chunk = 400, weather = 'dry' } = opts;
@@ -84,7 +97,7 @@ export async function run(seed = 1, opts = {}) {
             if (!c.active) continue;
             const p = c.path.at(c.s);
             if (Math.hypot(p.x - W.x, p.y - W.y) > 40) continue;
-            (R.watch ||= []).push(`${(game.clock % 1000).toFixed(1)} tram${Math.round(opts.watch - tr.s)} #${c.id} ${c.conn ? 'conn' : 'lane' + c.lane.id} toEnd${(c.toEnd ?? 0).toFixed(1)} next${c.next ? c.next.id : '-'} v${(c.vNow ?? 0).toFixed(1)} xing${c.xing ? `${Math.round(c.xing.sx)}@${(c.xing.dC - 2.2).toFixed(1)}` : '-'}${c.yielding ? ' Y' : ''}`);
+            (R.watch ||= []).push(`${(game.clock % 1000).toFixed(1)} tram${Math.round(opts.watch - tr.s)} #${c.id} ${c.conn ? 'conn' : 'lane' + c.lane.id} toEnd${(c.toEnd ?? 0).toFixed(1)} next${c.next ? c.next.id : '-'} v${(c.vNow ?? 0).toFixed(1)} xing${c.xing ? `${Math.round(c.xing.sx)}@${(c.xing.dC - 2.2).toFixed(1)}` : '-'}${c.yielding ? ' Y' : ''} why${c.why ?? '-'}${c.jBlock != null ? ' jb' + c.jBlock : ''} lead${c.lead?.id ?? '-'}`);
           }
         }
         // (a trail of crossing cars ahead of the tram, every 0.5 s: for the collision scene)
@@ -98,6 +111,28 @@ export async function run(seed = 1, opts = {}) {
         if (R.steps % 15 === 0) {
           const nx = game.signals.find((x) => x.s > tr.s - 1);
           if (nx && nx.s - tr.s < 120) { (R.trail ||= []).push(`${Math.round(game.clock)} s${Math.round(tr.s)} v${tr.v.toFixed(1)} ${Math.round(nx.s)}:${nx.state} t${nx.t?.toFixed(1) ?? (nx.gauntlet ? "gauntlet" : "-")} x${nx.ext?.toFixed(1) ?? "-"}${nx.backCommitted ? ' B' : ''} P${game.pilot?.goThrough === nx ? 'go' : game.pilot?.stopFor === nx ? 'stop' : '-'}:${game.pilot?.stopWhy ?? '-'}@${game.pilot?.stopAtS == null ? '-' : Math.round(game.pilot.stopAtS)} n${tr.notch} a${tr.a.toFixed(2)}${nx.aheadCommitted ? ' A' : ''}`); if (R.trail.length > 40) R.trail.shift(); }
+        }
+        // #602: every 0.5 s, the standing cars across a track (not along it, as a car in a lane on the rails) whose body
+        // fouls it with a tram there or coming (its front within 40 m before, or its body over the place); and where each
+        // yielding car stands against both tracks (its body's nearest corner)
+        if (R.steps % 15 === 0) {
+          const tracks = [[game.route, [tr, ...traffic.ahead], 'ours'], [traffic.back, traffic.oncoming, 'back']];
+          for (const c of traffic.cars) {
+            if (!c.active || (c.vNow ?? 1) > 0.3 || (c.alpha ?? 1) < 0.5 || !c.path) continue;
+            const p = c.path.at(c.s);
+            for (const [route, trams, k] of tracks) {
+              if (!route) continue;
+              const b = bodyTo(route, p);
+              if (!b || b.d > 8) continue;
+              const h = route.at(b.s);
+              if (Math.abs(p.hx * h.hx + p.hy * h.hy) > 0.7) continue;
+              if (c.yielding && !(R.stance ||= new Map()).has(`${k}${c.id}`)) R.stance.set(`${k}${c.id}`, +b.d.toFixed(2));
+              const tram = trams.find((t) => t && b.s - t.s < 40 && b.s > t.s - (t.length ?? 0) - 1);
+              if (b.d < FOUL && tram && !(R.foul ||= new Map()).has(`${k}${c.id}`)) {
+                R.foul.set(`${k}${c.id}`, { track: k, s: Math.round(b.s), d: +b.d.toFixed(2), tram: tram === tr ? 'ours' : 'ai', ahead: Math.round(b.s - tram.s), yielding: !!c.yielding, why: c.why ?? null, conn: !!c.conn });
+              }
+            }
+          }
         }
         for (const c of traffic.cars) if (c.active && c.yielding && c.xing && Math.abs(c.xing.sx - tr.s) < 150) {
           yielded.add(c.id);
@@ -127,7 +162,11 @@ export async function run(seed = 1, opts = {}) {
   });
   const bump = [...(R.bumper || new Map()).values()].sort((a, b) => a - b);
   const q = (p) => (bump.length ? +bump[Math.min(bump.length - 1, Math.floor(p * bump.length))].toFixed(1) : null);
-  return { seed, watch: R.watch || [], stuck: R.stuck ?? null, carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) }, yielded: yielded.size, crossedAhead: crossed.size, closeCuts: R.cuts.length, closeCutsBold: R.cuts.filter((c) => c.bold).length,
+  return { seed, watch: R.watch || [], stuck: R.stuck ?? null, carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) },
+    // #602: yielding cars' nearest body corner to each track (stood within FOUL of it: on it); the fouls by track and tram
+    stance: (() => { const out = {}; for (const k of ['ours', 'back']) { const v = [...(R.stance || new Map())].filter(([key]) => key.startsWith(k)).map(([, d]) => d).sort((a, b) => a - b); out[k] = { n: v.length, min: v[0] ?? null, median: v[Math.floor(v.length / 2)] ?? null, within: v.filter((d) => d < FOUL).length }; } return out; })(),
+    fouls: { ours: [...(R.foul || new Map()).values()].filter((f) => f.track === 'ours').length, back: [...(R.foul || new Map()).values()].filter((f) => f.track === 'back').length,
+      places: [...(R.foul || new Map()).values()].slice(0, 30) }, yielded: yielded.size, crossedAhead: crossed.size, closeCuts: R.cuts.length, closeCutsBold: R.cuts.filter((c) => c.bold).length,
     bells: R.bells, hits: R.hits.length, collisions: R.hits, cuts: R.cuts, signalPenalty: game.penalties.signal || 0, signalEvents: R.sig || [], collisionPenalty: Math.round(game.penalties.collision || 0),
     also: also.map((w) => w.result(seed, R.stuck ?? null, R.stuckScene || null)) };
 }

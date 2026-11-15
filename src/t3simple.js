@@ -557,6 +557,10 @@ const SIDE_DISPLAY = { z: 2.29, h: 2.31, w: 1.05, hh: 0.33 };
 export const ROUTE_BOX = { w: 0.49, h: 0.30, r: 0.05 };
 const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.62, 2.94, 6.28], [-1.62, 2.3, 6.28]];
 const MIRROR_PLATE = [-1.62, 2.52, 6.31];
+// the mirror under the plate (partsGeometry: a 0.22 x 0.38 x 0.05 m box at -1.66, 2.2, 6.24, its glass to the rear): the
+// mirror camera's eye 1 cm behind the glass, so the mirror and its arm stay out of its view (#600, a tester's note of
+// 2026-11-14: "the armature is blocking view in the mirror")
+export const MIRROR_EYE = [-1.66, 2.2, 6.205];
 
 // the parts that never move (the running gear and the pantograph's frame are posed: gearShapes)
 function partsGeometry(variant) {

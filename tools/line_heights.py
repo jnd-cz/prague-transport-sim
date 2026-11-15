@@ -94,7 +94,8 @@ DROP_MAX = 12     # rounds: where an answer holds the radius and discards the ou
 
 class LiftMap:
     """The rails' height over the bed at a point (the line data's `lift`, tools/track_styles.py): that of the nearest
-    line route within LIFT_REACH m, else 0 (panels, the default style)."""
+    line route within LIFT_REACH m, else 0 (panels, the default style). A point nearer the line's opposite track
+    (`pathBack`) than its route takes that track's own (`liftBack`, by route s, where the two differ: #584)."""
 
     def __init__(self, root=ROOT):
         self.items = []
@@ -103,18 +104,19 @@ class LiftMap:
                 continue
             d = json.loads(p.read_text(encoding='utf-8'))
             if d.get('lift') and len(d.get('path') or []) > 1:
-                self.items.append((LineString([q[:2] for q in d['path']]), d['lift']))
-        self.tree = shapely.STRtree([g for g, _ in self.items]) if self.items else None
+                back = LineString([q[:2] for q in d['pathBack']]) if d.get('liftBack') and len(d.get('pathBack') or []) > 1 else None
+                self.items.append((LineString([q[:2] for q in d['path']]), d['lift'], back, d.get('liftBack')))
+        self.tree = shapely.STRtree([it[0] for it in self.items]) if self.items else None
 
     def at(self, xy):
         if self.tree is None or xy is None:
             return 0.0
         p, best = Point(xy), None
         for k in self.tree.query(p, predicate='dwithin', distance=LIFT_REACH):
-            g, L = self.items[int(k)]
+            g, L, back, LB = self.items[int(k)]
             d = g.distance(p)
             if best is None or d < best[0]:
-                best = (d, g.project(p), L)
+                best = (d, g.project(p), LB if back is not None and back.distance(p) < d else L)
         if best is None:
             return 0.0
         _, s, L = best

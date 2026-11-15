@@ -41,7 +41,7 @@ KERB = 0.10  # m: sidewalk over the kerb foot (measured median, #21)
 PLATFORM = (0.08, 0.40)  # m: a platform's measured step is kept within this
 CHECK, CHECK_LEN = 0.05, 10.0  # m: terrain disagreeing by more than this, along at least this
 CARR = {"road", "tram", "parking"}
-RAISED = {"sidewalk", "island", "platform"}
+RAISED = {"sidewalk", "island", "median", "platform"}
 SIDE = 1.0  # m: where the terrain is read on either side of the kerb line
 # m: the terrain agrees with a kerb line within this (a platform's largest step, PLATFORM). On the user's
 # 19 answers (#142) the five cases where the terrain was the wrong reference and nothing stands near are off by

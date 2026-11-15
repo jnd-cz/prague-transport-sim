@@ -389,6 +389,21 @@ class DeckFallback(unittest.TestCase):
             )
             self.assertIn(flag, result['review_flags'])
 
+    def test_on_paved_track_the_survey_over_the_archive_wins_where_the_lidar_backs_it(self):
+        # (#539, the user 2026-11-14: Bělohorská "doesn't sit lower", Plzeňská "about the same level as the road")
+        road = {**deck_record('road', 200.2), 'class': 'road', 'level': 0}
+        cands = Decks([road], [offset_fact(0)]).candidates(5, 0, 'di-1')
+        choose = lambda arch, terrain, di=None: HeightGuard().choose(  # noqa: E731
+            {'id': 'di-1', 'z': di}, match(path(1, arch)), 5, 0, decks=cands, construction={'kind': 'paved'},
+            terrain=terrain)
+        won = choose(200.0, 200.25)
+        self.assertEqual((won['z'], won['height_source']['dataset'], won['confidence']),
+                         (200.2, 'survey', 'surveyed_paved_surface_over_archive'))
+        self.assertIn('archive_under_survey_and_terrain', won['review_flags'])
+        self.assertEqual(choose(200.15, 200.3)['z'], 200.15)    # (the survey within 10 cm: the archive stays)
+        self.assertEqual(choose(200.0, 200.05)['z'], 200.0)     # (the lidar under the survey: the archive stays)
+        self.assertEqual(choose(200.0, 200.25, di=199.9)['z'], 199.9)   # (numeric DI is never replaced)
+
     def test_ground_road_and_water_under_bridge_never_validate_archived_ground_z(self):
         ground = {**deck_record('road-under', 180), 'class': 'road', 'level': 0}
         water = {**deck_record('river', 180), 'class': 'water', 'level': 0}

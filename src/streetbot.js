@@ -19,7 +19,7 @@ import { carPose } from './traffic.js';
 //           but a pedestrian crossing should have a dropped kerb)
 // Findings of a kind within 15 m are merged into one place, ranked by size and count.
 
-const CAR_BAD = new Set(['sidewalk', 'island', 'platform', 'green', 'stairs', 'water']);
+const CAR_BAD = new Set(['sidewalk', 'island', 'median', 'platform', 'green', 'stairs', 'water']);
 const WALK_BAD = new Set(['road', 'tram', 'parking']);
 const BOT_COLORS = {
   kerb: '#ff3b30', sidewalk: '#ff9500', jump: '#af52de', tilt: '#ffcc00', float: '#34c759', sunk: '#007aff',

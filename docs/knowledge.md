@@ -75,6 +75,13 @@ Sections:
   (the Depo Hostivař branch, the user 2026-11-12), and one in a street lies in the street's hole. They miss 6 km of the known grass
   (Sídliště Řepy - Slánská, most of Malý Břevnov - Obora Hvězda), and some lie under our bridges (Střelecký ostrov's
   park under line 22 at Újezd), so OSM's grass outside the facts goes to the user's review (`tools/grass_review.py`).
+- **A platform paves both tracks at most stops in grass track**, the two directions' platforms staggered or not
+  (#584, 2026-11-14 orthophoto: line 37 at Českomoravská, line 9 at s 15500). Holes on the platform's track alone
+  would have drawn 1.3 km of grass on the other one, most of it the grassed-track list's stop-to-stop extent where
+  both tracks are paved. Drinopol (line 22) is the exception the user named, the only one they know: each platform is
+  also a (replacement) bus stop, so the asphalt runs from the road across the near track to the platform, and the
+  far track stays grass. Nothing in the data tells them apart (the survey maps both as `tram` there, OSM's tram ways carry
+  no surface), so a track differs only where a mark says so (`trackStyles` with `track`, data `stylesBack`/`liftBack`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 
@@ -295,6 +302,13 @@ Sections:
 
 - **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
   `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
+- **The survey's medians** (Dělící pás, 010000001503, #555) carry no surface, and some are mapped twice: of line
+  22's 31 within 40 m of the route, 8 lie mostly under a `tram` area (the tram reservation between the
+  carriageways), 6 on `road`, 15 alone. Read since #555 as `median` (raised like an island, green where OSM's grass
+  covers it: `tools/zps_medians.py`), they fill strips the page drew as sunken terrain: Modřanská's middle (line 17
+  s 4370), Bělohorská beside the track (line 22 s 4160). Where OSM maps the divided road as one two-way way, the
+  cars' fit took one carriageway and laid the other direction's lane in the gap or the opposite carriageway; it now
+  spans both and divides at the median (`src/traffic.js` `_fitRoad`, `laneOffset`).
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
   LZW). Its cell centres sit 0.72 m / 0.61 m off the S-JTSK metre grid (sampled bilinear, never copied);
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
@@ -462,6 +476,31 @@ Sections:
   - Versions: the GPKG `user_version` 10301 is GeoPackage 1.3.1, not the JVF version. The GPKG ZIPs
     carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
     `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
+- **The survey under the track beds** (#547, #548, 2026-11-13):
+  - Beds are as wide as the survey's area of their style (tram, green, rail), else the style's median width
+    measured there: embedded 1.7, panels 1.9, grass 2.0, ballast 2.5 m (`tools/track_beds.py --calibrate`).
+  - The survey's raised areas (platforms, sidewalks, islands) lie inside the bed outlines over 1 800-4 200 m² per
+    line. Laid under the beds with the street, they flattened 4-5 times the kerbs (line 9 345 → 1 571 flat kerbs).
+    They keep their height: a sidewalk inside a bed's outline means the bed is too wide there, and the raised area
+    is drawn over it anyway.
+  - The survey's street triangles, split to 5 m, rose over a bed between their corners even with every corner
+    laid under it (Spojovací's loop, line 17 s 2350). Near every drawn track they are meshed to 2 m
+    (`terrain.js` `nearTracks`); each 4 m outline piece is split by its own midpoint, the same for both
+    neighbours, so no shared edge gains a point on one side only.
+  - Where the band past a bed's edge caps one area's vertices and its neighbour meets it along a longer edge with
+    no vertex there, a 3.3 cm seam opens (line 23 s 2332-2460, a track 2.4 m away): +18 and +20 `seams3` on lines
+    22 and 23.
+- **The survey on our bridges** (#549, the user's photos and Street View, 2026-11-14):
+  - Level-1 walkway areas sometimes carry the parapet's top as their surface: Krejcárek's tram areas 0.9-1.3 m over
+    the rails, the strip at Modřanská škola (line 17) 0.61 m, Čechův most's sidewalks 0.66-0.73 m (really a kerb
+    over the road). `flushDtm` lays them; a flat deck takes its parapets from them.
+  - A span from OSM's bridge or the survey's level-1 bed includes the walled ramps up to the bridge: IPR's bare
+    earth lies 0.0-0.4 m under the rails there and 2.3-14 m under the spans' bridges (`line_structures.py`
+    `ramps`). The ramps stay spans: off a span, the street flush pulls the street beside a walled ramp up to the
+    track (Modřanská, 40 kerbs).
+- **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
+  (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
+  measure is circular). It does not tell ballast from grass.
 
 ### Buildings and structures (Geoportál, Mosty 3D)
 
@@ -878,6 +917,17 @@ Review these when realism matters; most move into the build in M2.
 
   What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
   only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
+- **Rails under the ground** (`tools/lint.js` `buriedRails`, in `--checks canted`, #548): every 2 m of every drawn
+  track, each rail head against the surfaces over it. Before #548: 372-837 places per line, 295-741 of them the
+  survey; after: 86-133, mostly another track's bed between a switch's rails (1-5 cm) and OSM road ribbons.
+  Its trough measure (the ground 1 m past a bed's edge lower than the edge and the ground 4 m out) is not
+  calibrated: its deepest places are real ditches and cuttings (`reports/review/bed-troughs-N.json`).
+- **`DownRays` and long slivers:** indexed by its bounding box, a survey sliver lands in thousands of 4 m cells, and
+  sampling every drawn track ran for 30 minutes on line 17. A triangle over more than four cells goes only into
+  the cells it overlaps (`triInRect`); two indexes of line 17's survey and terrain ran the page out of memory.
+- **Probes and screenshots:** `shot.py --view review` colours the surfaces by class and hides the track styles, so
+  appearance is judged in `chase` or `cab`. Platforms, stop signs and shelters are added to the scene, not to the
+  world group (`window.world`): a probe that walks only the world misses them.
 
 ## Czech tram terms
 

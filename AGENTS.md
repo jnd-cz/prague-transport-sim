@@ -63,6 +63,10 @@ both post on the pinned #291 and only propose.
   that belongs to another issue moves there (a comment, a blocked-by link), so an open issue holds only
   its own open points. Only the PR that finishes it says `Closes #N`. A reviewer who finds an open point changes the keyword before the
   merge (#146 was nearly closed with six places still awaiting the user's answers).
+- **Stacked work:** an issue that needs another branch's unmerged work branches from it, and its PR is opened with
+  `--base` on that branch. Once the base squash-merges, merge main into the stacked branch (no force-push). A
+  conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and merge
+  (#578 on #575).
 - Review findings: a reviewer posts them as a PR comment ("To fix before merge", "Smaller"); the author
   answers point by point in a comment and pushes. A PR is marked ready and merged on the user's word only.
 - **Merge windows:** the user merges ready PRs in batches. A session whose checks are done says so and
@@ -172,7 +176,10 @@ both post on the pinned #291 and only propose.
     `build_line.py`, `dtm.py`, `line_heights.py` and `import_track_heights.py` when run alone; `test_all.py`
     for the whole suite (#536).
   - Anything else runs through `python -I tools/heavy.py "what" -- CMD ...`: a profile, a bench, a
-    comparison, a script of several runs. What it starts runs in its turn without waiting again.
+    comparison, a script of several runs. What it starts runs in its turn without waiting again, even
+    when that is a tool that queues itself or a process started with a clean environment: a job never
+    waits for a process that started it (#585). A job that waits for a while with nothing running ahead
+    of it but its own wrapper is a bug in the queue: stop it and open an issue.
   - Each prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
     (`tools/sysinfo.py`).
   - Start one in the background and let it wait. `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it
@@ -214,6 +221,9 @@ both post on the pinned #291 and only propose.
   merge that changes the game, the checks, the data or `data/truth.json` (`tools/autodeploy.py`, 2 pages at
   once, not while a heavy job runs) and published to the data store; `--compare` takes the one of the branch's merge base. A PR does not
   refresh the baseline.
+- **A seeded compare against a checkpoint is not a compare with main.** When `--compare` says the seeded runs compare
+  with a checkpoint (main has no baseline at the merge base), run the same seeds on main at the merge base back to
+  back before reading any move. #582's stops moved by up to 50 late seconds against W2 and were identical to main's.
 - **Which baseline each tier compares with** (#282): a checkpoint's run stores itself under its name
   (`--baseline --publish --checkpoint W1`: every check, seeds 1-5). Seedless checks (the world and drawn-geometry tiers)
   compare with main at the merge base: its baseline, else measured there once in a pinned worktree through the
@@ -225,8 +235,6 @@ both post on the pinned #291 and only propose.
 | check | line | symptom | issue |
 |---|---|---|---|
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
-| traffic, seed 1 | 23 | does not finish (stop 6, 7200 s): a car held behind a walker jams the tram 253 m before Malostranská; slide ≈207 000 | #496 |
-| u3, seed 1 | 23 | stuck at s 3350: the same jam (since #480's heights; seeds 2 and 3 drive clean) | #496 |
 
 ## Code style
 

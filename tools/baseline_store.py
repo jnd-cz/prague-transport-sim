@@ -228,6 +228,49 @@ def alive(pid):
 HELD = "TRAM_HEAVY_HELD"  # (set for a job's children: a step of a heavy job runs in its parent's turn)
 
 
+def ancestors(pid=None):
+    """The pids of this process's parent, its parent and so on (#585). A job whose ancestor holds a ticket runs in that
+    turn even when HELD did not reach it (a child started with a clean environment): waiting would wait for itself."""
+    pid = os.getpid() if pid is None else pid
+    parent = {}
+    if os.name == "nt":
+        class Entry(ctypes.Structure):  # (PROCESSENTRY32W)
+            _fields_ = [("dwSize", ctypes.c_ulong), ("cntUsage", ctypes.c_ulong), ("th32ProcessID", ctypes.c_ulong),
+                        ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", ctypes.c_ulong),
+                        ("cntThreads", ctypes.c_ulong), ("th32ParentProcessID", ctypes.c_ulong),
+                        ("pcPriClassBase", ctypes.c_long), ("dwFlags", ctypes.c_ulong), ("szExeFile", ctypes.c_wchar * 260)]
+        k = ctypes.windll.kernel32
+        k.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+        snap = k.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
+        if snap in (None, ctypes.c_void_p(-1).value):
+            return []
+        try:
+            e = Entry()
+            e.dwSize = ctypes.sizeof(Entry)
+            ok = k.Process32FirstW(ctypes.c_void_p(snap), ctypes.byref(e))
+            while ok:
+                parent[e.th32ProcessID] = e.th32ParentProcessID
+                ok = k.Process32NextW(ctypes.c_void_p(snap), ctypes.byref(e))
+        finally:
+            k.CloseHandle(ctypes.c_void_p(snap))
+    else:
+        def ppid(p):
+            try:
+                with open(f"/proc/{p}/stat", encoding="ascii") as f:
+                    return int(f.read().rsplit(")", 1)[1].split()[1])
+            except (OSError, ValueError, IndexError):
+                return os.getppid() if p == os.getpid() else None
+        q = pid
+        while q and q not in parent and len(parent) < 64:
+            parent[q] = ppid(q)
+            q = parent[q]
+    out, q = [], parent.get(pid)
+    while q and q not in out and q != pid and len(out) < 64:  # (Windows keeps a dead parent's pid, which may be reused)
+        out.append(q)
+        q = parent.get(q)
+    return out
+
+
 class HeavyJob:
     """with HeavyJob('headless'): ... waits its turn among the machine's heavy jobs, then runs (#280).
 
@@ -246,6 +289,7 @@ class HeavyJob:
         self.wait = (os.environ.get("TRAM_HEAVY_NOWAIT") != "1" and not nested) if wait is None else wait
         self.out = out or sys.stderr
         self.t = None
+        self.held = None  # (HELD as __enter__ found it, put back by __exit__: a nested job's end must not end its parent's turn)
 
     def _write(self, state):
         tmp = f"{self.path}.{state}.tmp"
@@ -269,6 +313,10 @@ class HeavyJob:
     def __enter__(self):
         os.makedirs(LOCKS, exist_ok=True)
         self.t = time.time()
+        if self.wait and (up := set(ancestors())) and (mine := [j for j in queue() if j["pid"] in up]):
+            print(f"heavy jobs: {self.what} runs in the turn of {describe(mine[0])}, a process that started it",
+                  file=self.out, flush=True)
+            self.wait = False
         self._write("waiting" if self.wait else "running")
         told, last = None, 0.0
         while self.wait and (ahead := self.ahead()):
@@ -282,12 +330,16 @@ class HeavyJob:
         if self.wait and told:
             print(f"heavy jobs: {self.what} starts after {time.time() - self.t:.0f} s", file=self.out, flush=True)
         self._write("running")
+        self.held = os.environ.get(HELD)
         os.environ[HELD] = str(os.getpid())
         return self
 
     def __exit__(self, *exc):
         if os.environ.get(HELD) == str(os.getpid()):
-            del os.environ[HELD]
+            if self.held is None:
+                del os.environ[HELD]
+            else:
+                os.environ[HELD] = self.held
         try:
             os.remove(self.path)
         except OSError:

@@ -1,0 +1,58 @@
+{
+ "schema": 1,
+ "issue": 591,
+ "line": "22",
+ "title": "Open track from the lidar: ballast, grass or paved",
+ "findings": [
+  {
+   "kind": "open track",
+   "id": "open-50.09339-14.39906",
+   "line": "22",
+   "x": -1487.007589600407,
+   "y": 880.4259253927007,
+   "mag": 32,
+   "status": "review",
+   "place": [
+    50.093388,
+    14.399058
+   ],
+   "between": [
+    [
+     50.093307,
+     14.398485
+    ],
+    [
+     50.093476,
+     14.399629
+    ]
+   ],
+   "marks": [
+    {
+     "x": -1528.8730563018844,
+     "y": 877.0710603020609,
+     "label": "from",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -1445.2144559854812,
+     "y": 884.5485755669945,
+     "label": "to",
+     "color": "#3e9dff"
+    }
+   ],
+   "options": [
+    "open ballast",
+    "grass",
+    "paved: embedded, panels or setts",
+    "unsure"
+   ],
+   "links": [
+    {
+     "label": "Street View",
+     "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=50.093388,14.399058"
+    }
+   ],
+   "info": "near Pražský hrad, route s 6230-6314 (84 m): the rails stand 32 cm over the lidar's ground, more than on open ballast elsewhere (13-18 cm). What is the track laid in here? (A cutting or a ditch beside the track can read this deep.)"
+  }
+ ]
+}

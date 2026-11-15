@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
+import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -18,6 +18,7 @@ import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
 import { TouchControls } from './touch.js';
+import { Gamepad } from './gamepad.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
 import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.js';
 import { Loader } from './loading.js';
@@ -131,10 +132,11 @@ if (!params.has('nofine')) try {
 } catch { /* not made for this line */ }
 data.attribution = credits(built);
 logProvenance(built);
-const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE) : null;
+// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548)
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, nearTracks(data.tracks)) : null;
 await load.begin('profile');
 const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
-const profile = new Profile(route, data, styles.lift, dtm, terrain); // (the built top of rail and structures, #197, #480)
+const profile = new Profile(route, data, styles.lift, dtm, terrain, styles.liftBack); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
@@ -460,6 +462,11 @@ initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); } });
 onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
+// a gamepad (src/gamepad.js): its buttons and triggers send the keys too
+const pad = new Gamepad({
+  onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4),
+  onLook: (x) => { lookTarget = -LOOK * x; }, // (the right stick: as far as Q / E at its end)
+});
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
 function fillTrips() {
@@ -746,6 +753,8 @@ $('btnToMenu').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
+let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
+const LOOK = 1.3; // the head turned out of a side window (rad)
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
@@ -770,7 +779,7 @@ window.addEventListener('keydown', (e) => {
     takeOver();
     game.msg(t('msg.autoOff'), 'info', 4);
   }
-  if (e.key === 'Shift') input.deadman = true;
+  if (e.key === 'Shift') shiftHeld = true;
   if (k === 'a') input.sand = true;
   if (k === 'c') input.cutout = true;     // heating cut-out button (pass a contact coasting in winter)
   if (k === 'y') input.switchBtn = true;  // "Výhybka" button: current through the contact
@@ -785,7 +794,8 @@ window.addEventListener('keydown', (e) => {
   const prev = command();
   // number keys: a drive step, with Shift a brake step, 0 both pedals released
   const digit = /^Digit[0-5]$/.test(e.code) ? +e.code.slice(5) : null;
-  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit);
+  // (a gamepad's trigger, e.pad: the pedal on the step at once, src/gamepad.js)
+  if (digit !== null && !e.repeat) setStep(e.shiftKey ? -digit : digit, e.pad);
   switch (k) {
     case 'w': case 'arrowup': control(+1, e.repeat); break;
     case 's': case 'arrowdown': control(-1, e.repeat); break;
@@ -795,8 +805,8 @@ window.addEventListener('keydown', (e) => {
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
-    case 'q': case 'arrowleft': lookTarget = 1.3; break;   // look out of the left window
-    case 'e': case 'arrowright': lookTarget = -1.3; break; // look right, at the doors
+    case 'q': case 'arrowleft': lookTarget = LOOK; break;   // look out of the left window
+    case 'e': case 'arrowright': lookTarget = -LOOK; break; // look right, at the doors
     case 'z': mirrorOn = !mirrorOn; document.body.classList.toggle('nomirror', !mirrorOn); break;
     case 'h': game.setHeating('saloon'); break;
     case 'k': game.setHeating('cab'); break;
@@ -817,7 +827,7 @@ window.addEventListener('keydown', (e) => {
 // a held key whose keyup never comes (the window lost focus) lets the view go back
 window.addEventListener('blur', () => { zoomTarget = 1; });
 window.addEventListener('keyup', (e) => {
-  if (e.key === 'Shift') input.deadman = false;
+  if (e.key === 'Shift') shiftHeld = false;
   const ku = e.key.toLowerCase();
   if (ku === 'a') input.sand = false;
   if (ku === 'c') input.cutout = false;
@@ -843,10 +853,21 @@ let pedalKey = null; // advanced: a held W / S moves the pedal on after 0.35 s
 function control(dir, repeat) {
   const eq = tram.eq;
   if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
+  if (dir > 0 && eq.parked && eq.pedal.brake === 0) parkedWarn();
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
 }
-function setStep(n) {
+// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the user's own try with
+// a pad were held by it, the user, 2026-11-14: "I would perhaps warn the user that parking brake is engaged")
+function parkedWarn() {
+  const text = t('msg.parked');
+  if (game.messages.some((m) => m.text === text)) return;
+  audio.emit('warning');
+  game.msg(text, 'warn', 4);
+}
+function setStep(n, now = false) {
   if (arcade()) tram.eq.lever = n;
+  else if (n > 0 && tram.eq.parked) parkedWarn();
+  else if (now) tram.eq.pressTo(n);
   else tram.eq.setStep(n);
 }
 window.addEventListener('blur', () => {
@@ -855,7 +876,8 @@ window.addEventListener('blur', () => {
 
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-let yaw = null;
+let yaw = 0; // the lead car's heading (route frame: atan2 of east, north)
+const EYE = new THREE.Vector3(), FWD = new THREE.Vector3();
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
 // click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
 // It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
@@ -938,14 +960,15 @@ function updateCamera(dt, t) {
     camera.lookAt(camLook);
     return;
   }
-  const eye = route.at(s - 1.4);
-  const h = route.heading(s + 4, 8);
-  const target = Math.atan2(h.hx, h.hy);
-  if (yaw === null) yaw = target;
-  let d = target - yaw;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  yaw += d * Math.min(1, dt * 5);
+  // the driver's eye is a point of the lead car (#597): 0.8 m behind the body's front, 2.39 m over the rail, on the centre
+  // line; it turns with the body and swings out with its front in a curve. (It stood on the track's centre line and looked
+  // along the track 4 m ahead of the tram, eased: 33 degrees ahead of the body in a 20 m curve, the user, 2026-11-14:
+  // "starts turning ahead of tram body in curves")
+  const lead = tramModel.userData.cars[0];
+  lead.updateWorldMatrix(true, false);
+  const eye = EYE.set(0, 2.39, leadFront() - 0.8).applyMatrix4(lead.matrixWorld);
+  const fwd = FWD.set(0, 0, 1).transformDirection(lead.matrixWorld);
+  yaw = Math.atan2(fwd.x, -fwd.z);
   const bob = Math.sin(t * 9) * 0.012 * Math.min(1, Math.abs(tram.v) / 8);
   look += (lookTarget - look) * Math.min(1, dt * 6);
   // the cab pitches with the track (bogie-to-bogie slope) plus a little load transfer
@@ -956,7 +979,7 @@ function updateCamera(dt, t) {
   const pitch = -0.035 - camAcc * 0.006 + slope;
   // turning the head also leans towards that side window
   const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
-  camera.position.set(eye.x + lx, profile.height(s - 1.4) + 2.39 + bob, -(eye.y + ly)); // (2.39 over top of rail)
+  camera.position.set(eye.x + lx, eye.y + bob, eye.z - ly);
   camera.rotation.set(0, 0, 0);
   camera.rotation.order = 'YXZ';
   camera.rotation.y = -yaw + look;
@@ -1023,6 +1046,7 @@ function frame(now) {
     audio.setActive(sounding, !inMenu && !game.paused && game.finished && !(inspect.active && inspect.paused));
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(dt) : [dt];
+    input.deadman = shiftHeld || pad.active;
     steps.forEach((h, i) => {
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
@@ -1090,13 +1114,19 @@ window.mirror = mirror; // cadence, target and excluded geometry are inspectable
 // It is fixed to the lead car's body (#541): in a curve the body is the chord between its bogies, its front over
 // the outside of the track, and it leans in a canted one, so a camera posed from the track turned against it.
 const mirrorTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.04, 0.1, 0, 'YXZ'));
+// the lead car's body front in its frame (x left, y up, z forward from its centre between the bogies, src/consist.js):
+// 0.6 m behind the coupler's face
+function leadFront() {
+  const u = tramModel.userData;
+  return u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+}
 function poseMirror(mirrorCam) {
-  const u = tramModel.userData, lead = u.cars[0];
-  // 1.55 m right of the centre line, 2.09 m over the rail, at the body's front: 0.6 m behind the coupler's face
-  // (the car's frame: x left, y up, z forward from its centre between the bogies, src/consist.js)
-  const front = u.kind === 'classic' || u.kind === 'gltf' ? u.bodyFront : T3.length / 2 - 0.6;
+  const lead = tramModel.userData.cars[0];
+  // at the model's mirror where it says (the built-in car: its glass, #600), else 1.55 m right of the centre line, 2.09 m
+  // over the rail, at the body's front
+  const e = tramModel.userData.mirrorEye;
   lead.updateWorldMatrix(true, false);
-  mirrorCam.position.set(-1.55, 2.09, front).applyMatrix4(lead.matrixWorld);
+  (e ? mirrorCam.position.set(...e) : mirrorCam.position.set(-1.55, 2.09, leadFront())).applyMatrix4(lead.matrixWorld);
   // looking back (a camera looks down its -z, the car's rear), turned a little outwards so the side of the tram
   // fills the inner edge, and a little down
   lead.getWorldQuaternion(mirrorCam.quaternion).multiply(mirrorTurn);

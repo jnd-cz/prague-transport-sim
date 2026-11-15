@@ -41,7 +41,7 @@ from geo import Frame  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
 
 F = Frame()
-STREETS = ("road", "tram", "parking", "sidewalk", "island", "cycle", "paved", "platform")
+STREETS = ("road", "tram", "parking", "sidewalk", "island", "median", "cycle", "paved", "platform")
 HALF, CHORD, OVER, FAR = 10, 19.5, 0.08, 0.15  # samples either side; m
 FACE, FACE_NEAR, PLACE = 0.5, 2.0, 50.0  # m
 RAIL = 4.0  # m: a sample this near a DI track point is compared with the rail

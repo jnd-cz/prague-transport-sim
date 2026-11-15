@@ -276,6 +276,16 @@ export class TR37 {
     else if (n < 0) this.goal = { drive: 0, brake: C.brakeAngles[-n - 1] + 0.5 };
     else this.goal = { drive: 0, brake: 0 };
   }
+  // a gamepad's trigger (#592): the pedal straight on step n's angle, as setStep's, the other one released; how fast it
+  // goes from one step to another is the player's foot on the trigger (the user, 2026-11-14: "it's up to their skill to
+  // vary the rate of change themselves"). Drive waits for the ratchet released, as a tap does.
+  pressTo(n) {
+    const P = this.pedal;
+    this.goal = null;
+    if (n > 0) { if (this.parked) return; P.brake = 0; P.drive = C.driveAngles[n - 1] + 1; }
+    else if (n < 0) { P.drive = 0; P.brake = n <= -6 ? C.pedalMax : C.brakeAngles[-n - 1] + 0.5; }
+    else { P.drive = 0; P.brake = 0; }
+  }
   _foot(dt) {
     const g = this.goal, P = this.pedal;
     if (!g) return;

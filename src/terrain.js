@@ -109,9 +109,10 @@ export class Terrain extends Grid {
   // lower the surface at (x, y) to at most zmax in every grid (cap: deeper is not ours to dig; on a
   // fine block at least 15 m: a 2 m cell lowered stays local, where a coarse 10 x 15 m triangle
   // dragged its surroundings down; quay walls stood 8-9 m over the surveyed river)
-  lowerAt(x, y, zmax, cap = Infinity) {
+  // (`coarse` false: the fine blocks only; a coarse triangle lowered for a bed's edge sank 10-15 m around it, #548)
+  lowerAt(x, y, zmax, cap = Infinity, coarse = true) {
     const c = this.coarse();
-    if (c.contains(x, y)) c.lowerAt(x, y, zmax, cap);
+    if (coarse && c.contains(x, y)) c.lowerAt(x, y, zmax, cap);
     const m = this.fineMeta;
     if (!m) return;
     // (as finesAt, inline: millions of calls under the streets at load, #205)
@@ -250,12 +251,15 @@ export class Profile {
   // The track profile is the top of rail (src/heights.js), built offline (#480, #276 step 2): the line data's
   // `heights` every 2 m (tools/line_heights.py: every sample has one, the surface plus the style's lift where no
   // source does), the spans the route runs on a bridge, those with a deck (`spans`, `realDecks`) and the roads under it
-  // (`underpasses`, tools/line_structures.py). `lift(s)`: the rails' height over the bed (`lift`, tools/track_styles.py).
+  // (`underpasses`, tools/line_structures.py). `lift(s, lateral)`: the rails' height over the bed (`lift`,
+  // tools/track_styles.py), `lateral` m across from our track: the other track's own (`liftBack`, #584) on it, linear
+  // between the two as heightAt.
   // Until #480 the page computed a surface profile here at every load (166-505 ms) and threw it away wherever the build
   // had a height, over 99 % of the route.
-  constructor(route, data, lift = () => 0, dtm = null, terrain = null) {
+  constructor(route, data, lift = () => 0, dtm = null, terrain = null, liftBack = lift) {
     const step = (this.step = 2);
-    this.lift = lift;
+    this._lift = lift;
+    this._liftBack = liftBack;
     const n = (this.n = Math.ceil(route.length / step) + 1);
     Object.assign(this, { route, terrain, dtm, tunnels: data.tunnels || [] });
     const h = data.heights;
@@ -265,6 +269,7 @@ export class Profile {
     this.source = Array.from(z, (_, i) => ranges.find((r) => i * step >= r[0] && i * step <= r[1])?.[2] ?? 'data');
     this.bridges = data.spans;
     this.realDecks = data.realDecks;
+    this.ramps = data.ramps || []; // (the parts of the spans on a walled ramp, no void under the track, #549)
     this.clearances = data.underpasses;
     this.backOff = null;
     // the opposite track across the street (its offset, left > 0, and height at each sample, from the build): the
@@ -325,12 +330,29 @@ export class Profile {
     const beyond = t && past ? -t * Math.sign(past) * Math.min(Math.abs(past), TRACK_ZONE) : 0;
     return z + dz * Math.max(0, Math.min(1, u)) + beyond;
   }
+  lift(s, lateral = 0) {
+    const a = this._lift(s);
+    if (!lateral || !this.backOff || this._liftBack === this._lift) return a;
+    const o = this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))];
+    if (!(Math.abs(o) > 0.5)) return a;
+    return a + (this._liftBack(s) - a) * Math.max(0, Math.min(1, lateral / o));
+  }
+  // which track `lateral` m across from ours lies nearer: the other direction's (true) or ours (#584)
+  onBack(s, lateral) {
+    if (!this.backOff || !lateral) return false;
+    const o = this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))];
+    return Math.abs(o) > 0.5 && lateral / o > 0.5;
+  }
   grade(s) { return this._interp(this.grades, s); }
   // the street's fall to the left in the track zone where the rails tilt with it (#538), else 0
   tiltAt(s) { return this.tilt ? this._interp(this.tilt, s) : 0; }
 
   onBridge(s) {
     return this.bridges.some(([a, b]) => s > a - 4 && s < b + 4);
+  }
+  // on a ramp of a span (onBridge's 4 m past a span's end included where the ramp reaches it)
+  onRamp(s) {
+    return this.ramps.some(([a, b]) => s > a - (this.bridges.some(([x]) => Math.abs(x - a) < 0.5) ? 4 : 0) && s < b + (this.bridges.some(([, y]) => Math.abs(y - b) < 0.5) ? 4 : 0));
   }
   // well inside a bridge span (more than 8 m from its ends) and at least 3 m above the ground under
   // it: what lies here in 2D is on the road underneath (a junction at a bridge end is a real one for
@@ -461,13 +483,14 @@ export function carveCorridor(T, route, profile, dtm = null) {
 // drawn DTM surfaces stand this much above their surveyed height (no z-fighting between classes)
 import { STREET_BELOW, ROAD_BELOW, resampleHeights } from './heights.js';
 
-export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, rail: 0.02, water: 0.01 };
+export const DTM_LIFT = { road: 0.03, parking: 0.03, cycle: 0.035, tram: 0.035, sidewalk: 0.05, island: 0.05, median: 0.05, platform: 0.06, paved: 0.04, stairs: 0.05, green: 0.02, rail: 0.02, water: 0.01 };
 export const FLUSH = new Set(['road', 'tram', 'parking', 'paved']); // surfaces the tracks are laid in
-export const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'platform', 'cycle']);
+export const STREET = new Set(['road', 'tram', 'parking', 'paved', 'sidewalk', 'island', 'median', 'platform', 'cycle']);
 // level 1+ surfaces that carry traffic: what cars and walkers on a bridge stand on
 const DECK = new Set(['deck', 'road', 'tram', 'paved', 'sidewalk', 'cycle', 'island', 'parking']);
 const DRAPE_EDGE = 5; // m: the longest edge of a draped area's triangles (its inside on the lidar: green p95 0.14-0.18 m against 0.38-0.44 at 10 m, #444)
-const SURFACE_RANK = { tram: 9, road: 8, island: 7, platform: 7, sidewalk: 6, parking: 5, cycle: 5, paved: 4, stairs: 3, green: 2, water: 1 };
+// (a median, #555: as an island, raised between carriageways; one under the tram area is dropped in the build)
+const SURFACE_RANK = { tram: 9, road: 8, island: 7, median: 7, platform: 7, sidewalk: 6, parking: 5, cycle: 5, paved: 4, stairs: 3, green: 2, water: 1 };
 // (a railway yard on the lidar ground, `g`, is ground; one standing off it keeps its sheet and stays out)
 const groundArea = (a) => a.l === 0 && a.c !== 'wall' && a.c !== 'roof' && a.c !== 'deck' && (a.c !== 'rail' || a.g);
 // Lawson's edge flips on a triangulation of a polygon (earcut's, from THREE.ShapeUtils): each inner edge whose
@@ -517,8 +540,36 @@ export function delaunayFlips(pts, tris) {
   }
   return tris;
 }
+// Near a drawn track (#548): the survey's ground is meshed finer there (FINE m edges within NEAR m of a track's axis), so
+// its vertices lie on and beside the beds and world.js layUnderBeds can lay them under the beds: a 5 m triangle spanning
+// a bed rose over it between its corners (line 17 s 2366, line 37's Spojovací loop)
+const FINE = 2, NEAR = 4.5;
+export function nearTracks(tracks) {
+  const cell = 4, grid = new Map();
+  for (const t of tracks) {
+    const p = t.p || [];
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i], b = p[i + 1];
+      const x0 = Math.floor((Math.min(a[0], b[0]) - NEAR) / cell), x1 = Math.floor((Math.max(a[0], b[0]) + NEAR) / cell);
+      const y0 = Math.floor((Math.min(a[1], b[1]) - NEAR) / cell), y1 = Math.floor((Math.max(a[1], b[1]) + NEAR) / cell);
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+        const k = x * 65536 + y;
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push([a[0], a[1], b[0], b[1]]);
+      }
+    }
+  }
+  return (x, y) => {
+    for (const [ax, ay, bx, by] of grid.get(Math.floor(x / cell) * 65536 + Math.floor(y / cell)) || []) {
+      const ex = bx - ax, ey = by - ay, l = ex * ex + ey * ey || 1, u = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / l));
+      if (Math.hypot(x - ax - ex * u, y - ay - ey * u) <= NEAR) return true;
+    }
+    return false;
+  };
+}
+
 export class DtmSurface {
-  constructor(dtm, terrain, THREE) {
+  constructor(dtm, terrain, THREE, nearTrack = () => false) {
     this.terrain = terrain;
     this.grid = new TriIndex();
     this.deckGrid = new TriIndex(); // level 1: bridge decks and the streets on them
@@ -543,12 +594,17 @@ export class DtmSurface {
       // (one area's midpoint, moved to the track profile by flushDtm, opened a seam to the other:
       // line 17's street seams over 3 cm 415 with the street model's shared 4 m grid, 675 without, #21)
       // (each piece keeps its edge's kerb flag, tools/kerbs.py)
+      // (near a drawn track each 4 m piece in FINE m ones, decided by the piece's midpoint: the same for both neighbours)
       const cut = (ring, k) => {
         if (a.l !== 0) return [ring, k];
         const out = [], ko = [];
         ring.forEach((p, i) => {
-          const q = ring[(i + 1) % ring.length], n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 4);
-          for (let j = 0; j < Math.max(1, n); j++) { out.push(j ? [p[0] + (q[0] - p[0]) * j / n, p[1] + (q[1] - p[1]) * j / n, p[2] + (q[2] - p[2]) * j / n] : p); ko.push(k?.[i] ?? 0); }
+          const q = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 4));
+          const at = (u) => [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u, p[2] + (q[2] - p[2]) * u];
+          for (let j = 0; j < n; j++) {
+            const m = at((j + 0.5) / n), f = nearTrack(m[0], m[1]) ? Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / n / FINE)) : 1;
+            for (let h = 0; h < f; h++) { out.push(j || h ? at((j + h / f) / n) : p); ko.push(k?.[i] ?? 0); }
+          }
         });
         return [out, k ? ko : null];
       };
@@ -568,7 +624,7 @@ export class DtmSurface {
       // long strip joined points far apart, and their linear heights left a ridge up to 6 m over the rails on
       // Krejcárek's ramp (line 37 s 2566-2746: the tram area's outline within 0.3 m of the rails, #444)
       if (a.l === 0) delaunayFlips(all, tri);
-      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId, t: a.t, g: a.g };
+      const area = { c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId, t: a.t, g: a.g, s: a.s };
       // on a structure: a long deck outline (the Modřany estakáda's track bed runs from the foot of
       // one ramp to the other) must not be spanned by long triangles; inner points take the height
       // of the outline's own corners nearby
@@ -588,8 +644,9 @@ export class DtmSurface {
         // ground (`g`, tools/zps_inside.py), it takes the lidar inside (a flat sheet between the edges ran up
         // to 8.7 m under the Letná slope; Krejcárek's yard crossed the terrain in wedges, #444); the outline,
         // cut to 4 m above, is never split and keeps the survey's heights
-        if (a.l === 0 && a.g) this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, DRAPE_EDGE);
-        else if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh);
+        if (a.l === 0 && a.g) this._split(p, q, r, (x, y) => terrain.height(x, y), area.mesh, 0, DRAPE_EDGE, nearTrack);
+        else if (a.l === 0 && STREET.has(a.c)) this._split(p, q, r, false, area.mesh, 0, 5, nearTrack);
+        else if (a.l === 0 && ground) this._split(p, q, r, false, area.mesh, 0, Infinity, nearTrack);
         else if (a.l >= 1 && a.c !== 'roof') this._split(p, q, r, ringZ, area.mesh);
         else area.mesh.push([p, q, r]);
         // the height lookup uses exactly the drawn triangles, so cars stand on what is drawn
@@ -668,11 +725,16 @@ export class DtmSurface {
     }
     return best < 0 ? null : { z: bestZ, c: ix.classOf(best) };
   }
-  // longest-edge bisection down to 5 m edges (thin carriageway slivers stay cheap)
-  _split(p, q, r, ground, out, depth = 0, maxEdge = 5) {
-    const l0 = Math.hypot(p[0] - q[0], p[1] - q[1]), l1 = Math.hypot(q[0] - r[0], q[1] - r[1]), l2 = Math.hypot(r[0] - p[0], r[1] - p[1]);
+  // longest-edge bisection down to 5 m edges (thin carriageway slivers stay cheap); an edge whose midpoint is near a
+  // drawn track down to FINE m (#548: the ring was cut the same way, so no edge on an outline is split on one side only)
+  _split(p, q, r, ground, out, depth = 0, maxEdge = 5, near = null) {
+    const len = (a, b) => {
+      const l = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      return l > (near && near((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) ? FINE : maxEdge) ? l : 0;
+    };
+    const l0 = len(p, q), l1 = len(q, r), l2 = len(r, p);
     const e = Math.max(l0, l1, l2);
-    if (e <= maxEdge || depth >= 16) { out.push([p, q, r]); return; }
+    if (e === 0 || depth >= 16) { out.push([p, q, r]); return; }
     if (l1 === e) [p, q, r] = [q, r, p];
     else if (l2 === e) [p, q, r] = [r, p, q];
     // now p-q is the longest edge
@@ -680,8 +742,8 @@ export class DtmSurface {
     const zl = (p[2] + q[2]) / 2;
     // (ground: a function = its height, false = linear)
     const m = [x, y, (typeof ground === 'function' ? ground(x, y) : null) ?? zl];
-    this._split(p, m, r, ground, out, depth + 1, maxEdge);
-    this._split(m, q, r, ground, out, depth + 1, maxEdge);
+    this._split(p, m, r, ground, out, depth + 1, maxEdge, near);
+    this._split(m, q, r, ground, out, depth + 1, maxEdge, near);
   }
   // top of a surveyed surface on a structure (bridge deck, level 1+) over (x, y), or null: the one
   // nearest to `ref` (within `tol`) when given, else the highest level-1 surface (then any level)
@@ -855,7 +917,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
     // (next to the track: the ground under the OSM road ribbons, which are drawn 0.12 m over it, so the
     // road meets the rail heads at the track's surface level: src/heights.js)
     at(x, y, deck = false) {
-      const n = near(x, y), under = (n) => profile.heightAt(n.s, n.l) - profile.lift(n.s) - ROAD_BELOW;
+      const n = near(x, y), under = (n) => profile.heightAt(n.s, n.l) - profile.lift(n.s, n.l) - ROAD_BELOW;
       if (n && profile.onBridge(n.s)) {
         if (deck && n.d < 22) return under(n);
         return (dtm ? dtm.heightAt(x, y) : null) ?? terrain.height(x, y);
@@ -881,7 +943,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const n = route.nearest(x, y);
       if (!n || n.d > 12 || profile.onBridge(n.s)) return z; // (under our bridge: the road below)
       const q = route.at(n.s), l = (y - q.y) * q.hx - (x - q.x) * q.hy; // (left > 0: the opposite track's side, #197)
-      const zt = profile.heightAt(n.s, l) - profile.lift(n.s) - STREET_BELOW; // the surface the track lies in
+      const zt = profile.heightAt(n.s, l) - profile.lift(n.s, l) - STREET_BELOW; // the surface the track lies in
       if (d >= 3 ? Math.abs(z - zt) > 2.5 : z - zt > 4.5) return z; // a street above or below the tracks' level (in the track corridor: only a structure well above)
       const k = Math.max(0, Math.min(1, (d - 3) / 3));
       return zt + (z - zt) * k * k * (3 - 2 * k);
@@ -902,7 +964,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const z = dtm ? dtm.deckAt(x, y, ref, ref === null ? Infinity : 4) : null;
       if (z !== null) return z + 0.02;
       const n = near(x, y);
-      return n && n.d < 22 && profile.onBridge(n.s) ? profile.heightAt(n.s, n.l) - profile.lift(n.s) - 0.012 : null;
+      return n && n.d < 22 && profile.onBridge(n.s) ? profile.heightAt(n.s, n.l) - profile.lift(n.s, n.l) - 0.012 : null;
     },
     // height function of an OSM way (its ribbon is drawn 0.12 above): ground level, or on a bridge
     // the deck it lies on, else a straight span between the ground at its two ends

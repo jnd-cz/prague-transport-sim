@@ -18,7 +18,7 @@ def data(**extra):
 
 
 def run(d, dtm=None, tris=(), road=None, lidar=200.0):
-    return S.structures(d, dtm, list(tris), lambda x, y: road, lambda x, y: lidar)
+    return S.structures(d, dtm, list(tris), lambda x, y: road, lambda x, y: lidar)[:3]
 
 
 class Spans(unittest.TestCase):
@@ -41,6 +41,22 @@ class Spans(unittest.TestCase):
         spans, _, _ = run(data(tunnels=[[335.0, 400.0], [505.0, 600.0]]), dtm)
         # (the bed stops 10 m before a tunnel: 300-324 m stays a span, 500-494 m none)
         self.assertEqual(spans, [[300, 324]])
+
+
+class Ramps(unittest.TestCase):
+    def test_a_span_is_cut_back_where_the_bare_earth_reaches_the_rails(self):
+        # (the rails at 210 m; the ground 209.8 on the ramps, 203 under the bridge at 140-170 m and under a passage at
+        # 260-262 m: line 17 s 3971-4152, Krejcárek's ends, Nádraží Modřany's pedestrian underpass, #549)
+        def bare(x, y):
+            return 203.0 if 140 <= x <= 170 or 300 <= x <= 330 else 209.8
+        spans, _, _, ramps = S.structures(data(bridges=[[100.0, 200.0], [298.0, 340.0], [400.0, 402.0]]), None, [],
+                                          lambda x, y: None, lambda x, y: 200.0, bare)
+        self.assertEqual(spans, [[100.0, 200.0], [298.0, 340.0], [400.0, 402.0]])   # (they stay spans)
+        self.assertEqual(ramps, [[100.0, 140.0], [170.0, 200.0], [330.0, 340.0]])    # (the 2 m at 298 and 400: too short)
+        # (no lidar there: no ramp)
+        *_, ramps = S.structures(data(bridges=[[100.0, 200.0]]), None, [], lambda x, y: None, lambda x, y: 200.0,
+                                 lambda x, y: None)
+        self.assertEqual(ramps, [])
 
 
 class Underpasses(unittest.TestCase):

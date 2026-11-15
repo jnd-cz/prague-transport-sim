@@ -15,6 +15,14 @@ TERRAIN = 1.0
 # A terrain hold extends to the next samples while they stay this far off (p99 0.19-0.37 m where a survey confirms
 # the archive): the remnant of a wrong record just inside 1 m (Troja, 0.94 m between held stretches; #190).
 TERRAIN_EXTEND = 0.5
+# On paved track, the survey's surface (plus the style's offset) standing more than SURVEY_OVER m over the archive, with
+# the 2023 lidar at it or above (within LIDAR_AT m under it), is the track's height: two measurements against one (#539;
+# the user, 2026-11-14: on Bělohorská the track "doesn't sit lower", on Plzeňská it lies "embedded in asphalt on about
+# the same level as the road nearby"). Measured on main 030b48f (tools/bench/paved_ipr.py): the archive 0.21-0.33 m under
+# the lidar there, the survey 0.02-0.16 m under it. Where the survey and the archive agree (within SURVEY_OVER), the
+# archive stays, the lidar 10-30 cm higher reading a crown or a kerb; numeric DI is never replaced.
+SURVEY_OVER = 0.10
+LIDAR_AT = 0.05
 
 
 def usable(z):
@@ -252,6 +260,12 @@ class HeightGuard:
             out['review_flags'].append('no_usable_height')
             return out
         selected = next((c for c in available if c['dataset'] == 'archive'), available[0])
+        surveys = [c for c in available if c in rail_surveys]
+        if (paved and selected['dataset'] == 'archive' and surveys and usable(terrain)
+                and min(c['z'] for c in surveys) - selected['z'] > SURVEY_OVER
+                and terrain >= max(c['z'] for c in surveys) - LIDAR_AT):
+            out['review_flags'] = sorted(set(out['review_flags'] + ['archive_under_survey_and_terrain']))
+            return select(max(surveys, key=lambda c: c['z']), 'surveyed_paved_surface_over_archive')
         return select(
             selected, 'archive_plan_match' if selected['dataset'] == 'archive' else 'surveyed_paved_surface_plus_fact'
         )
