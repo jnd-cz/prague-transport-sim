@@ -380,6 +380,7 @@ R_CLASS, R_STREET, RAISED_BED, FALL_MAX, SW_FALL = street_geometry()
 with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as _fh:
     RAISED_PLACES = next(x["value"] for x in json.load(_fh)["streetGeometry"]["facts"] if x["id"] == "raised-corridors")
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
+SEAM = 1.0  # m: the samples within this of a point's nearest one's distance weigh in its height (governing_height)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
 PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it, runs beside it (pilot)
@@ -755,27 +756,40 @@ def pilot(at, radius, ln, out_dir, ctx=None):
     return cs, dtm, F, ipr, road
 
 
-def governing_height(g, pts, reach=None, own=False):
-    """The surface of street g (its profile and crown) at points within its road width (or `reach` m of its centreline),
-    NaN elsewhere: the nearest sample's height carried along by its grade and across by its crossfall. own: g's own
-    surface only, without its blend into the street that governs it (below)."""
+def governing_height(g, pts, reach=None, own=False, ahead=1.0):
+    """The surface of street g (its profile and crown) at points within its road width (or `reach` m of its centreline)
+    and `ahead` m along past its nearest sample, NaN elsewhere: the nearest samples' heights carried along by their
+    grade and across by their crossfall, weighted across SEAM m. own: g's own surface only, without its blend into the
+    street that governs it (below)."""
     if "z" not in g:
         return np.full(len(pts), np.nan)
-    d = pts[:, None, :] - g["p"][None, :, :]
-    k = np.argmin((d ** 2).sum(-1), axis=1)
-    n = np.column_stack([-g["t"][k, 1], g["t"][k, 0]])
-    rel = pts - g["p"][k]
-    o = (rel * n).sum(-1)
-    along = (rel * g["t"][k]).sum(-1)
-    side = (o > 0).astype(int)
-    w = g["width"][k, side]
-    if reach is None:
-        inside = (np.abs(o) <= w) & (np.abs(along) <= 1.0) & (w > 0)
-    else:
-        inside = (np.abs(o) <= reach) & (np.abs(along) <= 1.0)
     if "grade" not in g:
         g["grade"] = np.gradient(g["z"], g["s"]) if len(g["s"]) > 1 else np.zeros(len(g["s"]))
-    z = g["z"][k] + g["grade"][k] * along + g["fall"][k, side] * np.abs(o)
+    d2 = ((pts[:, None, :] - g["p"][None, :, :]) ** 2).sum(-1)
+    k = np.argmin(d2, axis=1)
+
+    def at(r, kk):  # (points r read from samples kk: offset, along, side, inside, height)
+        rel = pts[r] - g["p"][kk]
+        o = (rel * np.column_stack([-g["t"][kk, 1], g["t"][kk, 0]])).sum(-1)
+        along = (rel * g["t"][kk]).sum(-1)
+        side = (o > 0).astype(int)
+        w = g["width"][kk, side]
+        ok = (np.abs(o) <= (w if reach is None else reach)) & (np.abs(along) <= ahead) & ((w > 0) if reach is None else True)
+        return o, along, side, ok, g["z"][kk] + g["grade"][kk] * along + g["fall"][kk, side] * np.abs(o)
+
+    r0 = np.arange(len(pts))
+    o, along, side, inside, z = at(r0, k)
+    # (every sample within SEAM m of the nearest one's distance weighs in, the nearest most: where the nearest sample
+    # changes legs at a sharp corner, each leg's crossfall tilts the other way; U Lesoparku's 117 deg corner (line 9)
+    # stepped 0.2 m across that seam)
+    d0 = np.sqrt(d2[r0, k])
+    pr, pk = np.nonzero(d2 <= (d0[:, None] + SEAM) ** 2)
+    if len(pr) > len(pts):
+        _, _, _, ok, zc = at(pr, pk)
+        wt = np.where(ok, np.clip(1.0 - (np.sqrt(d2[pr, pk]) - d0[pr]) / SEAM, 0.0, 1.0), 0.0)
+        ws = np.bincount(pr, wt, len(pts))
+        zw = np.bincount(pr, wt * np.where(ok, zc, 0.0), len(pts))
+        z = np.where(ws > 0, zw / np.where(ws > 0, ws, 1.0), z)
     # (a street that meets its governing one takes that one's surface where they meet and blends into its own crown
     # over BLEND m: crowned up to the edge, the two met in a seam, 3 jumps and a 7.7 deg roll at Palmovka)
     # (each point blends into the street of its nearest pin: the link by Hartigova's end, held to Hartigova there and to
@@ -790,7 +804,9 @@ def governing_height(g, pts, reach=None, own=False):
         for gid in {id(govs[i]) for i in nearest[near]}:
             sel = near & np.array([id(govs[i]) == gid for i in nearest])
             gov = next(govs[i] for i in nearest[sel])
-            zg = governing_height(gov, pts[sel], reach=1e9)
+            # (carried up to BLEND past the governing street's end: held to 1 m, the blend stopped 5 m into Pohořelec
+            # where Strahovská ends, a 0.6 m drop (line 23))
+            zg = governing_height(gov, pts[sel], reach=1e9, ahead=BLEND + 1.0)
             ok = np.isfinite(zg)
             idx = np.flatnonzero(sel)[ok]
             z[idx] = u[idx] * z[idx] + (1 - u[idx]) * zg[ok]
@@ -949,6 +965,22 @@ def generated(cs, x, y, road=None, field=None):
     return z
 
 
+def surface_source(cs, x, y, road=None, field=None):
+    """Which surface generated() takes at points: the index in cs of the first street whose width holds a point, -1
+    the junctions' fill, -2 none."""
+    pts = np.column_stack([x, y])
+    src = np.full(len(x), -2)
+    for k, c in enumerate(cs):
+        left = np.flatnonzero(src == -2)
+        if not len(left):
+            break
+        src[left[np.isfinite(governing_height(c, pts[left]))]] = k
+    if field is not None:
+        left = src == -2
+        src[left & np.isfinite(bilinear(field, x, y))] = -1
+    return src
+
+
 def drive_measures(zfun, cs, raw=False, road=None):
     """The street bot's measures on a surface (zfun(x, y) -> z) along every street's two drive lines (LANE m either
     side of its centreline, every metre): jumps over JUMP within 1 m against the slope so far, the change of grade over a car, the wheels'
@@ -985,7 +1017,7 @@ def drive_measures(zfun, cs, raw=False, road=None):
             jumps += len(big)
             for i in big:
                 places.append({"street": c["name"], "x": round(float(q[i, 0]), 1), "y": round(float(q[i, 1]), 1),
-                               "jump": round(float(dz[i]), 2)})
+                               "jump": round(float(dz[i]), 2), "t": [round(float(v), 3) for v in c["t"][i]]})
             k = int(round(CAR_LEN / STEP))
             if len(z) > k + 1:
                 g = np.diff(z) / STEP
@@ -999,7 +1031,7 @@ def drive_measures(zfun, cs, raw=False, road=None):
     nan3 = [float("nan")] * 3
     return {"jumps": jumps, "change of grade over 4.5 m p50/99/100 %": [round(v * 100, 2) for v in pct(dgrade, (50, 99, 100)) or nan3],
             "roll p50/99/100 deg": pct(roll, (50, 99, 100)), "rolls over 7 deg": int(np.sum(np.asarray(roll) > 7)),
-            "bend in 1 m p50/99/100 m": pct(bend, (50, 99, 100)), "places": places[:40],
+            "bend in 1 m p50/99/100 m": pct(bend, (50, 99, 100)), "places": places if raw else places[:40],
             **({"_raw": {"dgrade": dgrade, "roll": roll, "bend": bend}} if raw else {})}
 
 
@@ -1395,6 +1427,17 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
         out["acc"][k] = {"dev": d[np.isfinite(d)].tolist(), "jumps": m["jumps"], "rolls": m["rolls over 7 deg"],
                          **{q: m["_raw"][q] for q in ("dgrade", "roll", "bend")}}
         if k == "generated":
+            # (each jump with what holds the road either side of it and IPR's own jump there: a seam between two
+            # surfaces, or the ground's own step)
+            for pl in m["places"]:
+                t = np.array(pl.pop("t"))
+                q = np.array([[pl["x"], pl["y"]]]) + np.array([[-1.0], [0.0], [1.0], [2.0]]) * t
+                src = surface_source(cs, q[:, 0], q[:, 1], road, field)
+                zq = np.asarray(ipr.sample(q[:, 0] + F.E0, q[:, 1] + F.N0), float)
+                names = ["fill" if v == -1 else "none" if v == -2 else
+                         ("tracks" if cs[v]["highway"] == "tracks" else cs[v]["name"] or "unnamed") for v in src]
+                pl["from"], pl["to"] = names[1], names[2]
+                pl["ipr jump"] = round(float(min(abs((zq[2] - zq[1]) - (zq[1] - zq[0])), abs((zq[3] - zq[2]) - (zq[2] - zq[1])))), 2)
             out["places"] = m["places"]
     swf = sidewalks(ctx, fns["generated"], box)
     for k, wz in (("survey", lambda a, b, t=ctx["sw_tris"]: sample_tris(t, np.asarray(a, float), np.asarray(b, float))),
@@ -1481,7 +1524,7 @@ def line_wide(lines, cell, out_path, jobs=None):
         res["squares"] = len(sq)
         res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
             r["place"]: round(r["raised"] / r["n"], 2) if r["n"] else None for r in raised_at}
-        res["generated jumps, places"] = places[:30]
+        res["generated jumps, places"] = places
         out[ln] = res
         print(ln, json.dumps({k: v for k, v in res.items() if k != "generated jumps, places"}, ensure_ascii=False))
     if out_path:
