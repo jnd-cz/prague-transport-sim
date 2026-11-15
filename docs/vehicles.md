@@ -89,6 +89,18 @@ yet: every vehicle has the built-in sounds; `tools/test_sounds.py` serves a samp
 | `events` | event → a file, or a list of files (one picked at random each time); WAV or MP3 |
 | `loops` | loop → `{ "file", "refSpeed" (m/s, motor and rolling) or "refRpm" (mg), "gain" }`: the recording plays pitched by its parameter over the reference, as loud as the built-in loop's share of its loudest, times `gain` (default 1) |
 | `gain` | the pack's events' loudness (default 1); an event over a joint or a frog plays louder with speed |
+| `lineContactorRelease` | optional `{ "minGain": 0.25, "maxGain": 1, "refCurrent": 480 }`; opening gain rises linearly from the minimum at 0 A to the maximum at the reference current, clamped there. Requires `0 < minGain <= maxGain <= 1`, `refCurrent > 0` A. Listening settings, not physical constants. |
+
+`lineContactor.close` and `lineContactor.open` replace the generic `lineContactor` for their respective edge.
+Each edge plays once: directional recording, else generic recording, else synthesis. Opening carries traction
+current from immediately before the equipment opens (the maximum relay uses the current that tripped it),
+captured at simulation-step resolution. The gain floor is below the pack and master gains; mute and pause still
+silence it. Reapplying power before LS opens cancels the pending release without another start sound.
+
+The optional CC0 pack in `assets/jnd.t2r6004/package.json` installs through *Vehicles…* by address or ZIP.
+It supplies both trimmed startup variants, the first release, the medium bell and full door alert. The other
+bell lengths and door-alert loop are retained as alternatives; the loop awaits a warning start/stop lifecycle.
+See its `README.txt` for source provenance and installation. Other events and loops retain built-in synthesis.
 
 A pack naming an event or a loop the game does not have, a file it does not list, or a loop without its reference is
 left out with the name (`sound pack x left out: event gong: the game raises no such event`). The frogs: a facing
@@ -111,6 +123,8 @@ switch's `frog` m past its fork, a trailing switch's before it (11.5 m where the
 | `notch.up` | the controller moved to a higher command |
 | `notch.down` | the controller moved to a lower command |
 | `lineContactor` | the line contactor closes or opens |
+| `lineContactor.close` | the line contactor closes; falls back to lineContactor |
+| `lineContactor.open` | the line contactor opens; level follows interrupted traction current, falls back to lineContactor |
 | `contactor` | a field-weakening stage of the accelerator |
 | `trackBrake.on` | the track brakes' magnets drop |
 | `trackBrake.off` | the track brakes' magnets lift |

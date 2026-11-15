@@ -18,6 +18,8 @@ export const EVENTS = {
   'notch.up': 'the controller moved to a higher command',
   'notch.down': 'the controller moved to a lower command',
   'lineContactor': 'the line contactor closes or opens',
+  'lineContactor.close': 'the line contactor closes; falls back to lineContactor',
+  'lineContactor.open': 'the line contactor opens; level follows interrupted traction current, falls back to lineContactor',
   'contactor': 'a field-weakening stage of the accelerator',
   'trackBrake.on': 'the track brakes\' magnets drop',
   'trackBrake.off': 'the track brakes\' magnets lift',
@@ -48,6 +50,10 @@ export const PARAMS = {
 };
 // a loop's built-in loudness at its loudest (the synthesis below): a pack's recording plays at its share of it
 const LOOP_MAX = { motor: 0.145, rolling: 0.4, flange: 0.07, mg: 0.05 };
+// Listening settings, not measured physical constants (#590). The master still controls mute and pause.
+export function lineContactorReleaseLevel(current, { minGain = 0.25, maxGain = 1, refCurrent = 480 } = {}) {
+  return minGain + (maxGain - minGain) * Math.min(1, Math.max(0, current || 0) / refCurrent);
+}
 // a T3 set's axles behind its front, m (src/tram.js T3: the pivots 6.4 m apart, a bogie's wheelbase 1.9 m)
 const WHEELBASE = 1.9;
 export const axlesBehind = (cars) => Array.from({ length: cars }, (_, k) => k * CAR_PITCH + T3.length / 2)
@@ -67,6 +73,7 @@ export class TramAudio {
     this.frogs = [];       // [{ s, e: 'points' | 'crossing' }] by s: the route's frogs (setTrack)
     this.params = {};
     this.trace = null;     // an array to log each event into ({ e, by, s, x }: a test's)
+    this.contactorEvents = [];
   }
 
   start() {
@@ -184,6 +191,7 @@ export class TramAudio {
     if (this.active && !on) this.epoch++;
     this.active = on;
     this.finishing = finishing;
+    if (!on) this.contactorEvents.length = 0;
     this._fade(on && !this.muted ? 0.6 : 0, finishing && !this.muted ? 1.3 : 0.05);
   }
 
@@ -195,8 +203,21 @@ export class TramAudio {
     g.linearRampToValueAtTime(target, t + seconds);
   }
 
+  watchEquipment(eq) {
+    if (this.equipment === eq) return;
+    if (this.equipment) this.equipment.onLineContactor = null;
+    this.equipment = eq;
+    this.contactorEvents.length = 0;
+    // Observe every simulation substep, including a close and protection opening in the same step.
+    eq.onLineContactor = (edge) => { if (this.active) this.contactorEvents.push(edge); };
+    this.lastP = this.lastShoe = undefined;
+  }
+
   update(tram, curvatureLimit, dt) {
+    this.watchEquipment(tram.eq);
+    const edges = this.contactorEvents.splice(0);
     if (!this.ctx || !this.active) return;
+    for (const edge of edges) this.emit(edge.closed ? 'lineContactor.close' : 'lineContactor.open', { current: edge.current });
     const t = this.ctx.currentTime;
     const v = Math.abs(tram.v);
     const load = Math.min(1, Math.abs(tram.current) / 450);
@@ -229,7 +250,6 @@ export class TramAudio {
       const rate = dt > 0 ? Math.abs(moved) / dt : 0;
       this.pilotGain.gain.setTargetAtTime(Math.min(0.012, rate * 0.0007), t, 0.04);
       this.pilotOsc.frequency.setTargetAtTime(150 + rate * 12, t, 0.05);
-      if (eq.ls !== this.lastLs) { if (this.lastLs !== undefined) this.emit('lineContactor'); this.lastLs = eq.ls; }
       if (eq.ls) for (const q of [75, 80, 85, 90, 95]) if ((eq.p - q) * (eq.p - moved - q) < 0) this.emit('contactor');
       if (eq.shoe !== this.lastShoe) { if (this.lastShoe !== undefined) this.emit(eq.shoe ? 'trackBrake.on' : 'trackBrake.off'); this.lastShoe = eq.shoe; }
     }
@@ -273,10 +293,14 @@ export class TramAudio {
   // loudness), gain, freq (a click's), s, x (the trace's) }.
   emit(e, o = {}) {
     if (!this.ctx || !this.active) return;
-    const files = this.pack?.events.get(e);
-    if (files?.length) this._play(files[Math.floor(Math.random() * files.length)], o.level ?? 1);
-    else BUILT_IN[e]?.(this, o);
-    this.trace?.push({ e, by: files?.length ? 'pack' : 'built-in', s: o.s, x: o.x, t: this.ctx.currentTime });
+    const directional = e === 'lineContactor.close' || e === 'lineContactor.open';
+    const sampleEvent = directional && !this.pack?.events.get(e)?.length ? 'lineContactor' : e;
+    const files = this.pack?.events.get(sampleEvent);
+    const level = e === 'lineContactor.open' ? lineContactorReleaseLevel(o.current, this.pack?.lineContactorRelease) : o.level ?? 1;
+    if (files?.length) this._play(files[Math.floor(Math.random() * files.length)], level);
+    else BUILT_IN[e]?.(this, { ...o, level });
+    this.trace?.push({ e, by: files?.length ? 'pack' : 'built-in', sampleEvent: files?.length ? sampleEvent : null,
+      current: o.current, level, s: o.s, x: o.x, t: this.ctx.currentTime });
   }
 
   _play(buffer, level) {
@@ -314,7 +338,7 @@ export class TramAudio {
       loops[name] = { ...l, src, out };
       this._synth(name, false);
     }
-    this.pack = { id: pack.id, gain: pack.gain, events, loops };
+    this.pack = { id: pack.id, gain: pack.gain, lineContactorRelease: pack.lineContactorRelease, events, loops };
   }
 
   // a built-in loop's voices on or off (a pack's recording plays in its place)
@@ -454,6 +478,8 @@ const BUILT_IN = {
   'notch.up': click(0.12, 1600),
   'notch.down': click(0.12, 1600),
   'lineContactor': click(0.12, 420),
+  'lineContactor.close': click(0.12, 420),
+  'lineContactor.open': (a, o) => a.click(0.12 * o.level, 420),
   'contactor': click(0.05, 650),
   'trackBrake.on': click(0.1, 260),
   'trackBrake.off': click(0.1, 260),

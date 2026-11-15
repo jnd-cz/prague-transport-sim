@@ -1,0 +1,6 @@
+SPDX-License-Identifier: CC0-1.0
+
+T2R 6004 recordings and synthesized bell/door-alert samples, Jenda / jnd-cz.
+Dedicated to the public domain under CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+Licence selection authorized in the Codex session of 2026-11-16; see provenance.json.

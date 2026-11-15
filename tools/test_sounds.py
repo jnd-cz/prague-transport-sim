@@ -157,6 +157,10 @@ def main():
                 page.on("console", lambda m: m.type == "warning" and "sound pack" in m.text and warns.append(m.text))
                 page.goto(f"{base}/?line={args.line}", timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                if model == "t3h":
+                    contactors = page.evaluate("async () => (await import('/tools/bench/contactors.js')).contactors()")
+                    print("contactors:", json.dumps(contactors), flush=True)
+                    fails.extend(contactors["failures"])
                 runs[model] = page.evaluate(GAME, {"model": model, "secs": args.secs, "stop": args.stop})
                 runs[model]["errors"] = errors
                 ctx.close()

@@ -17,6 +17,7 @@ licences, movements and file types come from src/packageRules.json, the rules th
 failure.
 """
 import json
+import math
 import os
 import re
 import struct
@@ -196,6 +197,13 @@ def sound_problems(p, vehicles, files_on_disk=None, own=False):
         need(lic.get("spdx") in LICENCES, f"licence {lic.get('spdx')!r} is none of the redistributable ones")
         need(bool(lic.get("authors")) and bool(lic.get("sources")), "licence without authors or sources")
     paths = {f.get("path") for f in p.get("files", [])}
+
+    if p.get("lineContactorRelease") is not None:
+        curve = p["lineContactorRelease"]
+        values = [curve.get(k, default) for k, default in (("minGain", 0.25), ("maxGain", 1), ("refCurrent", 480))] if isinstance(curve, dict) else []
+        valid = len(values) == 3 and all(type(x) in (int, float) and math.isfinite(x) for x in values)
+        need(valid and 0 < values[0] <= values[1] <= 1 and values[2] > 0,
+             "lineContactorRelease: wants 0 < minGain <= maxGain <= 1 and refCurrent > 0 A")
 
     def file(what, f):
         need(f in paths, f"{what}: {f} is not among its files")
@@ -386,6 +394,9 @@ def main():
     sbase = {"schema": 1, "kind": "sounds", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},
              "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.wav"}, {"path": "b.ogg"}]}
     ssamples = [
+        ({**sbase, "events": {"lineContactor.close": ["a.wav"], "lineContactor.open": "a.wav"}, "lineContactorRelease": {"minGain": 0.3}}, None),
+        *[({**sbase, "lineContactorRelease": curve}, "lineContactorRelease:") for curve in
+          ({"minGain": 0}, {"maxGain": 2}, {"minGain": 0.8, "maxGain": 0.2}, {"refCurrent": 0}, {"refCurrent": float("inf")}, False)],
         ({**sbase, "events": {"bell": "a.wav", "points": ["a.wav", "a.wav"]}, "loops": {"motor": {"file": "a.wav", "refSpeed": 8.3}}}, None),
         ({**sbase, "events": {"gong": "a.wav"}}, "event gong: the game raises no such event"),
         ({**sbase, "events": {"bell": "c.wav"}}, "event bell: c.wav is not among its files"),

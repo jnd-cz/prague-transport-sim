@@ -1,6 +1,7 @@
 {
  "note": "Facts from the user and from sources, each citing where it came from: what checks score the game against and what the build obeys. Add facts here, not special cases in code. Every section has a reader, or says in `readers` that it is reference only (AGENTS.md, #224).",
  "readers": {
+  "contactorSound": "reference: user listening observations for src/audio.js and src/tr37.js, #590",
   "stops": "tools/lint.js stopFacts: the stop detector (src/game.js _vienna) scored against the facts of the loaded line",
   "stopTypes": "reference: what the types in stops mean",
   "rules": "reference: signal-not-in-platform is checked by tools/lint.js signalsInPlatforms, consist-coupled by consistAtStops; the facts themselves are not read",
@@ -4292,5 +4293,18 @@
     "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
    }
   ]
+ },
+ "contactorSound": [
+ {
+  "id": "tr37-6004-contactor-sound",
+  "source": "https://github.com/jnd-cz/prague-transport-sim/issues/590; Codex session 2026-11-14",
+  "quotes": [
+   "The other mechanical elements can't be heard so just start the sound directly on the event.",
+   "I've narrowed it down to two startup samples cut down to the contactor noises, attached. And upon further listening the first end clack is the cleanest so I would choose that one"
+  ],
+  "behavior": "Whole startup sequence once on LS closing. Single selected release once on actual opening. Higher interrupted traction current is louder; gradual release through drive 1 is quieter. Keep a minimum audible gain, subordinate to mute/pause/master.",
+  "capture": "T2R 6004 with TR37, near middle of saloon.",
+  "mechanism": "The suggested arcing explanation and exact contactor identification are unconfirmed; no physics changes based on them."
  }
+]
 }
