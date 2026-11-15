@@ -556,6 +556,17 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
+- **The generated street surface on the five lines** (`street_profile.py --wide 300`, #512, 2026-11-15):
+  - **Inside the road** (1 m in from its edge) it lies within 0.18-0.25 m of IPR at p99, the survey's surface within
+    0.47-0.83 m; sidewalks 0.18-0.21 m against 1.4-2.1 m.
+  - **Along the survey's straight outlines** (#470's statistic, 0.3 m inside) it scatters more than the survey's
+    outline and less than IPR: roads over 8 cm off their 21 m mean 1.7-2.7 % against the survey's 1.2-1.6 % and
+    IPR's 1.9-3.4 %. At the edge it follows what the lidar sees there (walls, ramps, the bed's edge): of Palmovka's
+    157 samples over 8 cm, 102 have IPR over 8 cm too.
+  - **Triangles** (pydelatin on a 0.5 m raster, both filled off the streets from their nearest street cell): at 2 cm
+    22-31 % fewer than IPR's own raster; at 5 cm 6-24 % more, its kerbs kept as 10 cm steps where IPR rounds them.
+    The survey's outline triangulation has a tenth as many, linear between noisy vertices. With the terrain beside
+    the streets in the raster, the edge between the two drew most of the triangles.
 
 ### Tram stops: ČSN 73 6425-1 (2007)
 

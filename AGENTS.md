@@ -173,8 +173,8 @@ both post on the pinned #291 and only propose.
   while it runs, so that it neither slows nor spoils another's measurement (the user, 2026-11-12, #516:
   "Make sure to run any comparison or heavy job in a queue to not affect other work").
   - These take their turn themselves: `headless.py`, `rebuild.py`, `frametime.py` and `city_terrain.py`;
-    `build_line.py`, `dtm.py`, `line_heights.py` and `import_track_heights.py` when run alone; `test_all.py`
-    for the whole suite (#536).
+    `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py` and `street_profile.py` when run
+    alone; `test_all.py` for the whole suite (#536).
   - Anything else runs through `python -I tools/heavy.py "what" -- CMD ...`: a profile, a bench, a
     comparison, a script of several runs. What it starts runs in its turn without waiting again, even
     when that is a tool that queues itself or a process started with a clean environment: a job never

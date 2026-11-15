@@ -1674,13 +1674,14 @@ def line_wide(lines, cell, out_path, jobs=None):
     return out
 
 
-STREETS_SCALE = 0.002  # m per unit of lineN.streets.bin's heights (int16 over each square's lowest: 65 m of range)
+STREETS_SCALE = 0.002  # m per unit of lineN.streets.bin's heights (int16 over each square's lowest: 65 m of range,
+# doubled for a square that spans more: line 9's at Petřín, 191-256 m)
 
 
 def build_square(ln, cell, ij, ctx=None):
     """One square of build(): the generated surface's raster (surface_raster) with its masks packed: (ij, base, road
-    mask bits, sidewalk mask bits, int16 heights of the road cells then the sidewalk cells, row by row), or None where
-    the square holds no street."""
+    mask bits, sidewalk mask bits, int16 heights of the road cells then the sidewalk cells, row by row, the counts and
+    the scale), or None where the square holds no street."""
     ctx = ctx or (_WIDE["ctx"] if _WIDE.get("ln") == ln else context(ln))
     i, j = ij
     at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
@@ -1695,19 +1696,20 @@ def build_square(ln, cell, ij, ctx=None):
     if not sr["street"].any():
         return None
     z = sr["z"]
-    base = float(np.floor(np.nanmin(z)))
-    q = np.round((np.concatenate([z[on_road], z[on_walk]]) - base) / STREETS_SCALE)
-    if q.max() > 32767:
-        raise ValueError(f"line {ln} square {ij}: the streets span over {32767 * STREETS_SCALE:.0f} m")
+    base, scale = float(np.floor(np.nanmin(z))), STREETS_SCALE
+    while (np.nanmax(z) - base) / scale > 32767:
+        scale *= 2
+    q = np.round((np.concatenate([z[on_road], z[on_walk]]) - base) / scale)
     return (ij, base, np.packbits(on_road.ravel()), np.packbits(on_walk.ravel()), q.astype(np.int16),
-            int(on_road.sum()), int(on_walk.sum()))
+            int(on_road.sum()), int(on_walk.sum()), scale)
 
 
 def build(ln, cell=300.0, jobs=None, root=ROOT):
     """data/lineN.streets.bin and .json: the generated street surface (#512) of every square of `cell` m holding the
-    line's track, on a SW_CELL grid. The .bin: per square in the .json's order, its road mask (road and tram areas)
-    and sidewalk mask as bits (rows north to south from the square's north-west corner, np.packbits), then the int16
-    heights of the road cells and the sidewalk cells in row order, STREETS_SCALE m over the square's `base`. Read by
+    line's track, on a SW_CELL grid. The .bin: per square in the .json's order a zlib block holding its road mask
+    (road and tram areas) and sidewalk mask as bits (rows north to south from the square's north-west corner,
+    np.packbits), then the int16 heights of the road cells and the sidewalk cells in row order, each the difference to
+    the one before, in units of the square's `scale` m over its `base`. Read by
     #507 and #508 (the ground partition and the weld), not by the game."""
     import sources
     import sysinfo
@@ -1726,22 +1728,29 @@ def build(ln, cell=300.0, jobs=None, root=ROOT):
     else:
         _wide_init(ln)
         results = [build_square(ln, cell, ij) for ij in sq]
+    import zlib
     parts, meta_sq, off, n_road, n_walk = [], [], 0, 0, 0
     for r in results:
         if r is None:
             continue
-        ij, base, mr, mw, q, nr, nw = r
-        parts += [mr.tobytes(), mw.tobytes(), q.tobytes()]
-        meta_sq.append({"i": ij[0], "j": ij[1], "base": base, "offset": off, "road": nr, "sidewalk": nw})
-        off += mr.nbytes + mw.nbytes + q.nbytes
+        ij, base, mr, mw, q, nr, nw, scale = r
+        # (each height as the difference to the one before it: a smooth surface's are small, and deflated a fifth of
+        # the heights' size on line 37, 1.9 against 9.3 MB; the data store keeps files as they are)
+        d = np.diff(q.astype(np.int32), prepend=0).astype(np.int16)
+        blob = zlib.compress(mr.tobytes() + mw.tobytes() + d.tobytes(), 9)
+        parts.append(blob)
+        meta_sq.append({"i": ij[0], "j": ij[1], "base": base, "scale": scale, "offset": off, "bytes": len(blob),
+                        "road": nr, "sidewalk": nw})
+        off += len(blob)
         n_road, n_walk = n_road + nr, n_walk + nw
     with replacing(os.path.join(root, "data", f"line{ln}.streets.bin"), "wb") as fh:
         fh.write(b"".join(parts))
     side = int(round(cell / SW_CELL))
-    meta = {"cell": cell, "grid": SW_CELL, "side": side, "scale": STREETS_SCALE, "squares": meta_sq,
-            "layout": "per square: road mask bits, sidewalk mask bits (side x side, rows north to south from the "
-                      "square's north-west corner (i * cell, (j + 1) * cell), cell centres half a grid in), then int16 "
-                      "heights of the road cells and the sidewalk cells in row order, scale m over base"}
+    meta = {"cell": cell, "grid": SW_CELL, "side": side, "squares": meta_sq,
+            "layout": "per square a zlib block of `bytes` at `offset`: road mask bits, sidewalk mask bits (side x side, "
+                      "rows north to south from the square's north-west corner (i * cell, (j + 1) * cell), cell centres "
+                      "half a grid in), then the int16 heights of the road cells and the sidewalk cells in row order, "
+                      "each as the difference to the one before (the first to 0), the square's scale m over its base"}
     meta["provenance"] = sources.stamp("street_profile.py", {
         "road": sources.entry("streets", [n_road, 0, 0], "cells (0.5 m, the survey's road and tram areas)"),
         "sidewalk": sources.entry("streets", [n_walk, 0, 0], "cells (0.5 m, the survey's sidewalks)"),
@@ -1758,13 +1767,15 @@ def read_streets(ln, root=ROOT):
     """data/lineN.streets.*: {(i, j): (x0, y1, road heights, sidewalk heights)} as side x side arrays (NaN off the class)
     over the square from its north-west corner (x0, y1), and the .json."""
     meta = json.load(open(os.path.join(root, "data", f"line{ln}.streets.json"), encoding="utf-8"))
+    import zlib
     buf = open(os.path.join(root, "data", f"line{ln}.streets.bin"), "rb").read()
     n, nb, out = meta["side"], (meta["side"] ** 2 + 7) // 8, {}
     for sq in meta["squares"]:
-        o = sq["offset"]
-        mr = np.unpackbits(np.frombuffer(buf, np.uint8, nb, o))[:n * n].astype(bool)
-        mw = np.unpackbits(np.frombuffer(buf, np.uint8, nb, o + nb))[:n * n].astype(bool)
-        q = np.frombuffer(buf, np.int16, sq["road"] + sq["sidewalk"], o + 2 * nb).astype(float) * meta["scale"] + sq["base"]
+        b = zlib.decompress(buf[sq["offset"]:sq["offset"] + sq["bytes"]])
+        mr = np.unpackbits(np.frombuffer(b, np.uint8, nb, 0))[:n * n].astype(bool)
+        mw = np.unpackbits(np.frombuffer(b, np.uint8, nb, nb))[:n * n].astype(bool)
+        d = np.frombuffer(b, np.int16, sq["road"] + sq["sidewalk"], 2 * nb).astype(np.int64)
+        q = np.cumsum(d).astype(float) * sq["scale"] + sq["base"]
         zr, zw = np.full(n * n, np.nan), np.full(n * n, np.nan)
         zr[mr], zw[mw] = q[:sq["road"]], q[sq["road"]:]
         out[(sq["i"], sq["j"])] = (sq["i"] * meta["cell"], (sq["j"] + 1) * meta["cell"], zr.reshape(n, n), zw.reshape(n, n))

@@ -210,7 +210,8 @@ class Build(unittest.TestCase):
             on_r, on_w = np.isfinite(zr), np.isfinite(zw)
             base = float(np.floor(min(np.nanmin(zr), np.nanmin(zw))))
             q = np.round((np.concatenate([zr[on_r], zw[on_w]]) - base) / sp.STREETS_SCALE).astype(np.int16)
-            return ij, base, np.packbits(on_r.ravel()), np.packbits(on_w.ravel()), q, int(on_r.sum()), int(on_w.sum())
+            return (ij, base, np.packbits(on_r.ravel()), np.packbits(on_w.ravel()), q, int(on_r.sum()), int(on_w.sum()),
+                    sp.STREETS_SCALE)
 
         with tempfile.TemporaryDirectory() as root:
             os.makedirs(os.path.join(root, "data"))
