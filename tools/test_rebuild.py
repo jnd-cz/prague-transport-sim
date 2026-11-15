@@ -196,7 +196,7 @@ class StepCacheTest(unittest.TestCase):
         """c beside b (b rewrites data/x.json while c reads it): c's key holds x.json as a left it."""
         def phase():
             fail, times = rebuild.run_steps("9", [["a.py", "--line", "9"]])
-            res = rebuild.side_by_side("9", [[["b.py", "--line", "9"]], [["c.py", "--line", "9"]]], times[0])
+            res = rebuild.side_by_side("9", [[["b.py", "--line", "9"]], [["c.py", "--line", "9"]]], times)
             return [t[2] for _, ts in res for t in ts]
         self.assertEqual(phase(), [0, 0])
         name = rebuild.CACHE.name("line9", "c.py", ["--line", "9"])
@@ -204,6 +204,21 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(phase(), ["skip", "skip"])
         self.write("tools/b.py", B.replace("B_ADD", "10"))
         self.assertEqual(phase(), [0, "skip"])  # (b's new output is not what c read)
+
+    def test_reader_after_the_steps_before_reads_and_keys_their_output(self):
+        """d after a and b, beside nothing that writes x.json (as dtm after build_line and platforms, #617): it reads
+        b's output every time, and a change to b runs d again."""
+        self.write("tools/d.py", C.replace('d["src"]', 'd["b"]').replace("c.json", "d.json"))
+
+        def phase():
+            fail, times = rebuild.run_steps("9", [["a.py", "--line", "9"], ["b.py", "--line", "9"]])
+            res = rebuild.side_by_side("9", [[["d.py", "--line", "9"]]], times)
+            with open(os.path.join(self.root, "data", "d.json"), encoding="utf-8") as f:
+                return [t[2] for t in times] + [t[2] for _, ts in res for t in ts], json.load(f)
+        self.assertEqual(phase(), ([0, 0, 0], 1))
+        self.assertEqual(phase(), (["skip", "skip", "skip"], 1))
+        self.write("tools/b.py", B.replace("B_ADD", "10"))
+        self.assertEqual(phase(), (["skip", 0, 0], 10))
 
     def test_child_processes_traced(self):
         """A step whose work runs in multiprocessing children: what they read and write is in its record."""
@@ -236,6 +251,21 @@ class StepCacheTest(unittest.TestCase):
         n, _ = rebuild.CACHE.prune()
         self.assertGreater(n, 0)
         self.assertEqual(self.build(), ["skip", "skip"])
+
+
+class StepsTest(unittest.TestCase):
+    def test_platforms_before_the_survey(self):
+        """dtm reads the platforms platforms.py writes (the shelters' stops, #617): it runs before the groups, and no
+        group beside dtm's writes them."""
+        with mock.patch.dict(rebuild.DTM, {"17": ["x"]}), mock.patch.object(rebuild, "select_packages", lambda *a, **k: []):
+            first, groups = rebuild.steps("17")
+        self.assertEqual([st[0] for st in first], ["build_line.py", "platforms.py"])
+        flat = [st[0] for g in groups for st in g]
+        self.assertNotIn("platforms.py", flat)
+        self.assertIn("dtm.py", flat)
+        self.assertEqual({st[0] for st in first} | set(flat),
+                         {"build_line.py", "geoportal.py", "fine_terrain.py", "dtm.py", "zps_source.py"}
+                         | {w[0] for w in rebuild.writers("17")})
 
 
 class ArgsTest(unittest.TestCase):

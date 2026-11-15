@@ -7,9 +7,9 @@
                                                         # line_heights), the others as their inputs say
     python -P -E tools/rebuild.py --force        # every step runs
 
-build_line first; then, side by side (each step reads only build_line's output, and only the first
-group writes data/lineN.json, each writer whole and renamed):
-  platforms → osm_speeds → cant → clearances → survey points (→ for line 17: OSM signals) → the OSM validation
+build_line first, then platforms (dtm names the shelters' stops from them, #617); then, side by side (each step
+reads only what those two wrote, and only the first group writes data/lineN.json, each writer whole and renamed):
+  osm_speeds → cant → clearances → survey points (→ for line 17: OSM signals) → the OSM validation
   geoportal
   fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
@@ -62,6 +62,9 @@ def step_env(phase):
     return env
 
 
+BEFORE = ("platforms.py",)  # (the writers that run before the groups: a step beside them reads what they write, #617)
+
+
 def writers(line):
     """The steps that read build_line's output and write beside it, in order."""
     out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["cant.py", "--line", line], ["clearances.py", "--line", line],
@@ -74,9 +77,13 @@ def writers(line):
 
 
 def steps(line):
-    """build_line, then the groups that run side by side (each group's steps in order)."""
-    first = ["build_line.py", *BUILD.get(line, ["--line", line])]
-    groups = [writers(line), [["geoportal.py", "--line", line]], [["fine_terrain.py", "--line", line]]]
+    """The steps in order before the groups (build_line, then the platforms), then the groups that run side by side
+    (each group's steps in order). The platforms go before: dtm names each shelter's stop from their polygons, and
+    beside them it read whichever lineN.json was there first (#617: #512's rebuild wrote no shelter's stop)."""
+    w = writers(line)
+    first = [["build_line.py", *BUILD.get(line, ["--line", line])], *[st for st in w if st[0] in BEFORE]]
+    groups = [[st for st in w if st[0] not in BEFORE], [["geoportal.py", "--line", line]],
+              [["fine_terrain.py", "--line", line]]]
     if line in HOLD:
         print(f"line {line}: survey held, not built ({HOLD[line]}; tools/dtm_packages.py HOLD)", flush=True)
     elif line in DTM:
@@ -121,10 +128,11 @@ def run_steps(line, sts, phase0=None):
     return None, times
 
 
-def side_by_side(line, groups, first):
-    """The groups side by side. A file one group rewrites while another reads it (data/lineN.json) enters the
-    reader's key as it was before the groups started: phase0, those files' states then."""
-    paths = set(first[5]["outputs"] if first[5] else ())
+def side_by_side(line, groups, before):
+    """The groups side by side, after the steps `before` (their run_step results). A file one group rewrites while
+    another reads it (data/lineN.json) enters the reader's key as it was before the groups started: phase0, those
+    files' states then."""
+    paths = {r for t in before for r in (t[5]["outputs"] if t[5] else ())}
     for g in groups:
         for st in g:
             recs = CACHE.records(CACHE.name(f"line{line}", st[0], st[1:]))
@@ -155,9 +163,9 @@ def rebuild(line):
     os.makedirs(os.path.join(ROOT, "reports", "rebuild"), exist_ok=True)
     t0 = time.time()
     first, groups = steps(line)
-    fail, times = run_steps(line, [first])
+    fail, times = run_steps(line, first)
     if not fail:
-        for f, ts in side_by_side(line, groups, times[0]):
+        for f, ts in side_by_side(line, groups, list(times)):
             times += ts
             fail = fail or f
     if not fail:   # (the track styles read the survey's areas, and the heights read the styles: #479)
