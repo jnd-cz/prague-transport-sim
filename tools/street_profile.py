@@ -412,14 +412,47 @@ def surface_tris(areas, classes):
     return np.array(tris), np.array(cls)
 
 
+_TREES = {}
+
+
+def inside_edge(ctx, key):
+    """ctx[key] (the road, the sidewalks) 1 m in from its edge, where IPR's 1 m raster no longer rounds the kerbs:
+    made and prepared once per line, not per square."""
+    import shapely
+    k = key + " inside"
+    if k not in ctx:
+        ctx[k] = ctx[key].buffer(-1.0)
+        shapely.prepare(ctx[k])
+    return ctx[k]
+
+
+def near_box(ctx, key, box, margin=15.0):
+    """ctx[key] (or inside_edge's, key ending ' inside') cut to a square's box and `margin` m round it, prepared:
+    every point tested against it lies within the margin (a walkway reaches SW_WALK from a kerb SW_WALK outside the box),
+    and point tests on the whole line's sidewalks took 18 of three squares' 49 s."""
+    import shapely
+    k = (key, tuple(map(tuple, box)))
+    hit = ctx.get("near box", {}).get(k)
+    if hit is None:
+        g = inside_edge(ctx, key[:-len(" inside")]) if key.endswith(" inside") else ctx[key]
+        hit = g.intersection(shapely.box(box[0][0] - margin, box[0][1] - margin, box[1][0] + margin, box[1][1] + margin))
+        shapely.prepare(hit)
+        ctx["near box"] = {k: hit, **{q: v for q, v in ctx.get("near box", {}).items() if q[1] == k[1]}}
+    return hit
+
+
 def sample_tris(tris, x, y):
     """Heights of triangles at points (NaN outside every one): barycentric, the first triangle that holds a point."""
     import shapely
     z = np.full(len(x), np.nan)
     if not len(tris):
         return z
-    tree = shapely.STRtree(shapely.polygons(tris[:, :, :2]))
-    pi, ti = tree.query(shapely.points(x, y), predicate="intersects")
+    # (the tree is built once per triangle set: rebuilt per call, a line's survey triangles took 137 of three 300 m
+    # squares' 194 s on line 9)
+    hit = _TREES.get(id(tris))
+    if hit is None or hit[0] is not tris:
+        hit = _TREES[id(tris)] = (tris, shapely.STRtree(shapely.polygons(tris[:, :, :2])))
+    pi, ti = hit[1].query(shapely.points(x, y), predicate="intersects")
     a, b, c = tris[ti, 0], tris[ti, 1], tris[ti, 2]
     d = (b[:, 1] - c[:, 1]) * (a[:, 0] - c[:, 0]) + (c[:, 0] - b[:, 0]) * (a[:, 1] - c[:, 1])
     ok = np.abs(d) > 1e-9
@@ -533,6 +566,29 @@ def track_streets(L, road, box):
     tilted by the straight Sokolovská slope, roads lie flush besides tracks"). Where one track runs alone, crossfall()
     reads it from IPR."""
     import shapely
+    # (the whole line's centre is worked out once per line: per 300 m square it took 5.5 of three squares' 49 s)
+    hit = _TRACKS.get(id(L))
+    if hit is None or hit[0] is not L:
+        hit = _TRACKS[id(L)] = (L, _track_centre(L))
+    s, c, t, zc, g, half = hit[1]
+    inbox = (c[:, 0] >= box[0][0]) & (c[:, 0] <= box[1][0]) & (c[:, 1] >= box[0][1]) & (c[:, 1] <= box[1][1])
+    on = inbox & np.isfinite(zc)
+    on[on] = shapely.contains_xy(road, c[on, 0], c[on, 1])
+    out = []
+    for a, b in runs(on):
+        if b - a >= 10:
+            out.append({"name": f"tracks of line {L['line']}", "highway": "tracks", "s": s[a:b] - s[a], "p": c[a:b],
+                        "t": t[a:b], "track_z": zc[a:b], "tilt": g[a:b], "half": np.abs(half[a:b])})
+    return out
+
+
+_TRACKS = {}
+
+
+def _track_centre(L):
+    """track_streets()' whole line: every STEP along the route, the centre between the tracks, its tangent, surface
+    height and tilt, and the half distance between the tracks."""
+    import shapely
     from shapely.geometry import LineString
     path = np.asarray(L["path"], float)
     cs = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(path, axis=0).T))])
@@ -561,14 +617,7 @@ def track_streets(L, road, box):
     c = p + n * half[:, None]
     zc = np.where(two, (zr + zb) / 2, zr) - lf
     g = np.where(two, side * (zb - zr) / np.where(two, off, 1), np.nan)  # rise per metre towards +n
-    inbox = (c[:, 0] >= box[0][0]) & (c[:, 0] <= box[1][0]) & (c[:, 1] >= box[0][1]) & (c[:, 1] <= box[1][1])
-    on = inbox & shapely.contains_xy(road, c[:, 0], c[:, 1]) & np.isfinite(zc)
-    out = []
-    for a, b in runs(on):
-        if b - a >= 10:
-            out.append({"name": f"tracks of line {L['line']}", "highway": "tracks", "s": s[a:b] - s[a], "p": c[a:b],
-                        "t": t[a:b], "track_z": zc[a:b], "tilt": g[a:b], "half": np.abs(half[a:b])})
-    return out
+    return s, c, t, zc, g, half
 
 
 def raised_bed(c, F, ipr, road):
@@ -1156,6 +1205,8 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     import shapely
     from kerbs import KERB
     F, ipr, walk = ctx["F"], ctx["ipr"], ctx["walk"]
+    if walk is not None:
+        walk = near_box(ctx, "walk", box)
     xs = np.arange(box[0][0], box[1][0] + cell, cell)
     ys = np.arange(box[1][1], box[0][1] - cell, -cell)
     X, Y = np.meshgrid(xs, ys)
@@ -1217,7 +1268,8 @@ def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
         return {}
     xg, yg = np.meshgrid(np.arange(box[0][0], box[1][0], 0.5), np.arange(box[1][1], box[0][1], -0.5))
     x, y = xg.ravel(), yg.ravel()
-    inner = shapely.contains_xy(walk.buffer(-1.0), x, y)
+    inner = shapely.contains_xy(near_box(ctx, "walk inside", box), x, y)
+    walk = near_box(ctx, "walk", box)
     zw = np.asarray(walk_z(x[inner], y[inner]), float)
     zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
     d = (zw - zi)[np.isfinite(zw) & np.isfinite(zi)]
@@ -1296,7 +1348,8 @@ def line_wide(lines, cell, out_path):
             xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5),
                                  np.arange(at[1] + radius, at[1] - radius, -0.5))
             x, y = xg.ravel(), yg.ravel()
-            inner = shapely.contains_xy(road.buffer(-1.0), x, y)
+            inner = shapely.contains_xy(near_box(ctx, "road inside", [(at[0] - radius, at[1] - radius),
+                                                                       (at[0] + radius, at[1] + radius)]), x, y)
             zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
             zs = sample_tris(ctx["tris"], x[inner], y[inner])
             zg = generated(cs, x[inner], y[inner], road, field)
