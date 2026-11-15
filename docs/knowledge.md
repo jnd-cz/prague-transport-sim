@@ -529,8 +529,8 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   the coast as for the curve; no crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py
   --checks stops`, `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make. It pulls away at up to
   1.0 m/s², on step 3 below 20 km/h on the level unless step 3 cannot make it (a full car), and at up to 1.2 m/s² above 20 km/h (step 4).
-  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (0.12 of the speed in slow streets, 0.35 m/s on a
-  climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
+  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (a fifth of the speed in slow streets, #502;
+  0.35 m/s on a climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
   point on its curve; only where the limits have it pass the contact faster than the button works coasting (≈19 km/h).
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way.
@@ -541,6 +541,14 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   The crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
+  **One brake press into a stop** (#502; the user, 2026-11-15: "consistently stop in a single pedal press"). The fade below ≈9 km/h
+  (steps 1–2 to nothing, step 5 handing over to the shoes) was handled by the last metres' rule, but only while the pedal was down.
+  Where the plan found it would roll in by itself it asked to coast, and the foot came off: 2–3 m out at 3–6 km/h and on again to
+  stand, or off at 11–12 km/h after step 5 and on again 6 m out. Now, braking with a stop or a signal ahead, where it would only
+  coast, the foot stays on step 1 (spent below 9 km/h, so it rolls as if coasting), where step 1 does not stand it short and the stop's
+  braking begins within ≈3 s. The brake let off and pressed again inside an approach (`stops` pulses, seeds 1–5, against main at
+  609a4bc): line 9 15 → 2.6, 17 9 → 1.6, 22 10 → 1, 23 1.8 → 0.6, 37 7 → 1, the stops as precise. A separate braking for a tram, a car
+  or a lower limit 75–150 m out, then a coast, stays: the drivers coast there too.
 - **Real rides, and how far to follow them** (#351, PR #363): GPS of four rides on line 23 from the user, read from the speed with the
   gradient and the running resistance taken out: car 6921 Lazarská to Královka and car 6312 Královka to Bílá labuť on 2026-10-31,
   T2R 6004 and T3SUCS 7290 on the diverted route on 2026-11-07, the last with a phone's accelerometer for 11 minutes. The drivers
