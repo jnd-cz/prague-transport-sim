@@ -1160,8 +1160,11 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     ys = np.arange(box[1][1], box[0][1] - cell, -cell)
     X, Y = np.meshgrid(xs, ys)
     on = shapely.contains_xy(walk, X.ravel(), Y.ravel()).reshape(X.shape) if walk is not None else np.zeros(X.shape, bool)
-    known = np.full(X.shape, np.nan)
-    dist = np.full(X.shape, np.inf)
+    # (every kerb's plane reaching a cell, weighted by 1 / its distance: between two kerbs, a strip between two
+    # carriageways, a straight line from one kerb's top to the other's; at a corner, the two blended. The nearest kerb
+    # alone set a 13-15 cm step down the middle of Vinohradská's 3 m strip, its two roads at other heights)
+    acc = np.zeros(X.shape)
+    wsum = np.zeros(X.shape)
     lo, hi = SW_FALL
     for q, n in ctx["kerb_edges"]:
         ok = (q[:, 0] >= box[0][0] - SW_WALK) & (q[:, 0] <= box[1][0] + SW_WALK) \
@@ -1176,11 +1179,15 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         inside = shapely.contains_xy(walk, P[..., 0], P[..., 1])
         w = np.where(inside.all(1), SW_WALK, d[np.argmin(inside, axis=1)] - 0.25)
         Z = np.asarray(ipr.sample(P[..., 0].ravel() + F.E0, P[..., 1].ravel() + F.N0), float).reshape(P.shape[:2])
-        c = np.full(len(q), np.nan)
-        for k in range(len(q)):
-            m = (d >= SW_KERB_SMEAR) & (d <= min(w[k] - 1.0, SW_WALK)) & np.isfinite(Z[k])
-            if m.sum() >= 4:
-                c[k] = np.polyfit(d[m], Z[k, m], 1)[0]
+        # (a least-squares line per kerb point over its walkway, all at once)
+        m = (d[None] >= SW_KERB_SMEAR) & (d[None] <= np.minimum(w - 1.0, SW_WALK)[:, None]) & np.isfinite(Z)
+        cnt = m.sum(1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            dm = (m * d[None]).sum(1) / cnt
+            zm = np.where(m, Z, 0).sum(1) / cnt
+            dd_ = np.where(m, d[None] - dm[:, None], 0)
+            c = (dd_ * np.where(m, Z - zm[:, None], 0)).sum(1) / (dd_ ** 2).sum(1)
+        c = np.where(cnt >= 4, c, np.nan)
         c = np.clip(c, lo, hi)
         c = np.where(np.isfinite(c), c, np.nanmedian(c) if np.isfinite(c).any() else (lo + hi) / 2)
         for kd, dk in enumerate(d):
@@ -1188,9 +1195,11 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             i = np.round((ys[0] - p[:, 1]) / cell).astype(int)
             j = np.round((p[:, 0] - xs[0]) / cell).astype(int)
             good = np.isfinite(zr) & (dk <= w) & (i >= 0) & (j >= 0) & (i < X.shape[0]) & (j < X.shape[1])
-            good[good] &= on[i[good], j[good]] & (dist[i[good], j[good]] > dk)
-            known[i[good], j[good]] = zr[good] + KERB + c[good] * dk
-            dist[i[good], j[good]] = dk
+            good[good] &= on[i[good], j[good]]
+            np.add.at(acc, (i[good], j[good]), (zr[good] + KERB + c[good] * dk) / dk)
+            np.add.at(wsum, (i[good], j[good]), 1.0 / dk)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        known = np.where(wsum > 0, acc / wsum, np.nan)
     free = on & np.isnan(known)
     data = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
     lam = (SW_WAVE / (2 * math.pi)) ** 4 / cell ** 4
