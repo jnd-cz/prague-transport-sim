@@ -86,8 +86,9 @@ class Junctions(unittest.TestCase):
         self.assertLess(np.abs(kept[:, :18] - 200).max(), 0.005)
 
     def test_street_geometry_from_truth(self):
-        r, other, belt, fall = sp.street_geometry()
-        self.assertEqual((r["primary"], r["living_street"], other, belt, fall), (500.0, 100.0, 150.0, 0.07, 0.06))
+        r, other, belt, fall, walk = sp.street_geometry()
+        self.assertEqual((r["primary"], r["living_street"], other, belt, fall, walk),
+                         (500.0, 100.0, 150.0, 0.07, 0.06, (0.005, 0.02)))
 
     def test_bilinear_reads_the_edge(self):
         g = np.array([[1.0, 2.0], [np.nan, 4.0]])
@@ -97,7 +98,8 @@ class Junctions(unittest.TestCase):
 
 class Sidewalks(unittest.TestCase):
     def test_held_at_the_kerb_and_rising_with_the_ground(self):
-        # a 20 m by 4 m sidewalk beside a flat road at 200 m, the ground rising 2 % away from the kerb
+        # a 20 m by 4 m sidewalk beside a flat road at 200 m, the ground rising 2 % away from the kerb: within the
+        # sidewalks' range, the walkway takes it
         from types import SimpleNamespace
         from shapely.geometry import box
         u = np.arange(0.125, 20, 0.25)
@@ -106,8 +108,20 @@ class Sidewalks(unittest.TestCase):
                "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))]}
         f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.0), [(0, 0), (20, 4)])
         z = sp.bilinear(f, np.array([10.0, 10.0]), np.array([0.25, 3.0]))
-        self.assertAlmostEqual(z[0], 200.10, places=2)  # (the road and the measured kerb, kerbs.KERB)
+        self.assertAlmostEqual(z[0], 200.105, delta=0.006)  # (the road, the measured kerb (kerbs.KERB) and 0.25 m at 2 %)
         self.assertAlmostEqual(z[1], 200.16, delta=0.015)  # (the ground's 2 %)
+
+    def test_a_steep_ground_gives_a_walkway_at_the_norm(self):
+        # the ground rising 6 % across a 4 m sidewalk: the walkway rises 2 % (data/truth.json sidewalk-crossfall)
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: 200.10 + 0.06 * np.asarray(y, float))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 4),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))]}
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.0), [(0, 0), (20, 4)])
+        z = sp.bilinear(f, np.array([10.0]), np.array([3.0]))
+        self.assertAlmostEqual(z[0], 200.16, delta=0.01)
 
 
 class Measures(unittest.TestCase):

@@ -43,6 +43,8 @@ BAND = 0.05  # m: the profile keeps within this of the smoothed lidar (the noise
 BACK = math.cos(math.radians(120))  # a joint turning more than 120 degrees: the street coming back (Hartigova: 141)
 SW_STEP = 2.0  # m between a sidewalk's samples along its kerb (--sidewalks)
 SW_REACH = 15.0  # m: the widest sidewalk read across
+SW_KERB_SMEAR = 1.5  # m: how far into a sidewalk IPR's 1 m raster still carries the kerb
+SW_WALK = 5.0  # m from the kerb: the walkway, a plane at the norm's crossfall; a wider area follows the ground
 SW_CELL = 0.5  # m: the sidewalks' fill grid (a 3 m sidewalk is 6 cells across)
 SW_WAVE = 4.0  # m: the sidewalks' fill halves IPR's waves of this length (the junctions' 10 m flattened a 4 m
 # sidewalk rising 2 %: 3 cm under the ground 3 m from the kerb)
@@ -253,12 +255,12 @@ def calibrate(lines, out_path):
     return rep
 
 
-def calibrate_sidewalks(lines, out_path, margin=1.0):
+def calibrate_sidewalks(lines, out_path, margin=SW_KERB_SMEAR):
     """The survey's level-0 sidewalks against IPR, from every kerb edge (an edge shared with a carriageway, `k`) every
-    SW_STEP m, where the sidewalk is 3 m wide or more: the width (inwards to the area's far side, up to SW_REACH), the
-    crossfall (a line through IPR from 1 m off the kerb to 1 m before the far side; + rises away from the kerb) and the
-    kerb step (IPR 1 m into the
-    sidewalk less 1.5 m into the road, as #21). What ČSN 73 6110's 0.5-2 % (9.5.5) is held against."""
+    SW_STEP m, where the walkway is 1 m wide or more past the margins: the width (inwards to the area's far side, up to
+    SW_REACH), the crossfall (a line through IPR from `margin` off the kerb to 1 m before the far side or SW_WALK from
+    the kerb, the nearer; + rises away from the kerb) and the kerb step (IPR 1 m into the sidewalk less 1.5 m into the
+    road, as #21). What ČSN 73 6110's 0.5-2 % (9.5.5) is held against."""
     import shapely
     from shapely.geometry import Polygon
     from ipr_dtm import IprDtm
@@ -299,11 +301,14 @@ def calibrate_sidewalks(lines, out_path, margin=1.0):
                         pts = q[None] + n[None] * d[:, None]
                         inside = shapely.contains_xy(g, pts[:, 0], pts[:, 1])
                         w = float(d[np.argmin(inside)] - 0.25) if not inside.all() else SW_REACH
-                        if w < 2 * margin + 1.0 or (cover is not None and shapely.contains_xy(cover, q[0], q[1])):
+                        end = min(w - 1.0, SW_WALK)
+                        if end - margin < 1.0 or (cover is not None and shapely.contains_xy(cover, q[0], q[1])):
                             continue
-                        # (the crossfall: a line through IPR from 1 m off the kerb to 1 m before the far side, every
-                        # 0.25 m; IPR's 1 m raster rounds both edges, a kerb and a wall's foot or a front garden)
-                        dd = np.arange(margin, w - margin + 1e-6, 0.25)
+                        # (the crossfall: a line through IPR across the walkway, every 0.25 m. IPR's 1 m raster smears
+                        # the kerb 1-1.5 m into the sidewalk and a wall's foot or a front garden 1 m into its far side;
+                        # a wider area beyond the walkway is a forecourt or a slope: at Hartigova (3687, -70) the first
+                        # 5 m rise 1.2 %, the 10 m behind them 0.8 m, and the whole width read 7 %)
+                        dd = np.arange(margin, end + 1e-6, 0.25)
                         xs = np.concatenate([q[0] + n[0] * dd, [q[0] - n[0] * 1.5]])
                         ys = np.concatenate([q[1] + n[1] * dd, [q[1] - n[1] * 1.5]])
                         zz = np.asarray(ipr.sample(xs + F.E0, ys + F.N0), float)
@@ -358,18 +363,19 @@ NOISE = 0.03  # m: the lidar's noise along a centreline, Tukey's scale for the f
 def street_geometry(truth=None):
     """data/truth.json streetGeometry: the vertical radius a street's profile holds by OSM class (measured by
     --calibrate, backed by ČSN 73 6110's tables 13 and 14), the other classes' radius, the raised belt's height and
-    the steepest crossfall."""
+    the steepest crossfall, and a sidewalk's crossfall range."""
     if truth is None:
         with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as fh:
             truth = json.load(fh)
     f = {x["id"]: x["value"] for x in truth["streetGeometry"]["facts"]}
     r = {k[len("street-radius-"):].replace("-", "_"): float(v) for k, v in f.items()
          if k.startswith("street-radius-") and k != "street-radius-other"}
-    return r, float(f["street-radius-other"]), float(f["raised-belt"]), float(f["street-crossfall-max"])
+    return (r, float(f["street-radius-other"]), float(f["raised-belt"]), float(f["street-crossfall-max"]),
+            tuple(float(v) for v in f["sidewalk-crossfall"]))
 
 
-# (m: by class, the other classes'; m: a belt raised more is a kerb; rise per m: the steepest crossfall)
-R_CLASS, R_STREET, RAISED_BED, FALL_MAX = street_geometry()
+# (m: by class, the other classes'; m: a belt raised more is a kerb; rise per m: the steepest crossfall, a sidewalk's)
+R_CLASS, R_STREET, RAISED_BED, FALL_MAX, SW_FALL = street_geometry()
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
@@ -1141,10 +1147,12 @@ def kerb_edges(dtm):
 
 
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
-    """The sidewalks around the generated road: each held at its kerb to the road's surface 0.5 m beyond the kerb
-    plus KERB (tools/kerbs.py, the measured step), and a smooth fill to IPR across (the junctions' fill_2d): their
-    crossfall comes from the ground, which ČSN 73 6110's 0.5-2 % does not hold (docs/knowledge.md: Prague's median
-    rises 2.5 % from the kerb, 22 % within the norm). Returns a field for bilinear()."""
+    """The sidewalks around the generated road. The walkway, up to SW_WALK from the kerb, is a plane: at the kerb the
+    road's surface 0.5 m beyond it plus KERB (tools/kerbs.py, the measured step), rising across at IPR's crossfall held
+    to SW_FALL (data/truth.json sidewalk-crossfall: ČSN 73 6110's 0.5-2 % and the user's "small angle is good for
+    draining water but shouldn't be noticeably too much"); where it cannot be read (a walkway under 1 m past the
+    kerb's smear), the edge's median. Beyond the walkway a wider area (a forecourt, a slope) is a fill to IPR held to
+    the walkway's edge. Returns a field for bilinear()."""
     import shapely
     from kerbs import KERB
     F, ipr, walk = ctx["F"], ctx["ipr"], ctx["walk"]
@@ -1153,19 +1161,36 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     X, Y = np.meshgrid(xs, ys)
     on = shapely.contains_xy(walk, X.ravel(), Y.ravel()).reshape(X.shape) if walk is not None else np.zeros(X.shape, bool)
     known = np.full(X.shape, np.nan)
+    dist = np.full(X.shape, np.inf)
+    lo, hi = SW_FALL
     for q, n in ctx["kerb_edges"]:
-        ok = (q[:, 0] >= box[0][0]) & (q[:, 0] <= box[1][0]) & (q[:, 1] >= box[0][1]) & (q[:, 1] <= box[1][1])
+        ok = (q[:, 0] >= box[0][0] - SW_WALK) & (q[:, 0] <= box[1][0] + SW_WALK) \
+            & (q[:, 1] >= box[0][1] - SW_WALK) & (q[:, 1] <= box[1][1] + SW_WALK)
         if not ok.any():
             continue
         q, n = q[ok], n[ok]
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
-        for d in (0.25, 0.5):
-            p = q + n * d
+        # (each kerb point's walkway: its width inwards and IPR's crossfall across it, past the kerb's smear)
+        d = np.arange(0.25, SW_WALK + 1e-6, 0.25)
+        P = q[:, None, :] + n[:, None, :] * d[None, :, None]
+        inside = shapely.contains_xy(walk, P[..., 0], P[..., 1])
+        w = np.where(inside.all(1), SW_WALK, d[np.argmin(inside, axis=1)] - 0.25)
+        Z = np.asarray(ipr.sample(P[..., 0].ravel() + F.E0, P[..., 1].ravel() + F.N0), float).reshape(P.shape[:2])
+        c = np.full(len(q), np.nan)
+        for k in range(len(q)):
+            m = (d >= SW_KERB_SMEAR) & (d <= min(w[k] - 1.0, SW_WALK)) & np.isfinite(Z[k])
+            if m.sum() >= 4:
+                c[k] = np.polyfit(d[m], Z[k, m], 1)[0]
+        c = np.clip(c, lo, hi)
+        c = np.where(np.isfinite(c), c, np.nanmedian(c) if np.isfinite(c).any() else (lo + hi) / 2)
+        for kd, dk in enumerate(d):
+            p = P[:, kd]
             i = np.round((ys[0] - p[:, 1]) / cell).astype(int)
             j = np.round((p[:, 0] - xs[0]) / cell).astype(int)
-            good = np.isfinite(zr) & (i >= 0) & (j >= 0) & (i < X.shape[0]) & (j < X.shape[1])
-            good[good] &= on[i[good], j[good]]
-            known[i[good], j[good]] = zr[good] + KERB
+            good = np.isfinite(zr) & (dk <= w) & (i >= 0) & (j >= 0) & (i < X.shape[0]) & (j < X.shape[1])
+            good[good] &= on[i[good], j[good]] & (dist[i[good], j[good]] > dk)
+            known[i[good], j[good]] = zr[good] + KERB + c[good] * dk
+            dist[i[good], j[good]] = dk
     free = on & np.isnan(known)
     data = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
     lam = (SW_WAVE / (2 * math.pi)) ** 4 / cell ** 4
