@@ -236,80 +236,33 @@
     "upperRouteBodyMinimumGapMetres": 0.008000000000000007,
     "dashboardDestinationPlaneClearanceMetres": 0.012
   },
-  "rigRevision": 1,
-  "saloon": {
-    "materials": [
-      "Handles",
-      "Control_Panel",
-      "Red_Seat",
-      "Blue_Seat",
-      "Leather",
-      "Material",
-      "Inner_Plastic_Glass",
-      "Interior_Walls",
-      "White_Ceiling"
-    ],
-    "within": [
-      [
-        -6.95,
-        0.84,
-        -1.25
-      ],
-      [
-        6.95,
-        3.1,
-        1.25
-      ]
-    ]
-  },
+  "rigRevision": 2,
+  "saloon": "Saloon",
   "shoes": {
     "Bogie_Rear": [
-      "Black_Metal_116",
-      "Black_Metal_117"
+      "Track_Brake_Shoe_Rear_Right",
+      "Track_Brake_Shoe_Rear_Left"
     ],
     "Bogie_Front": [
-      "Black_Metal_123",
-      "Black_Metal_124"
+      "Track_Brake_Shoe_Front_Right",
+      "Track_Brake_Shoe_Front_Left"
     ]
   },
   "couplers": {
     "front": [
-      "Black_Metal_109"
+      "Coupler_Front"
     ],
     "rear": [
-      "Black_Metal_111"
+      "Coupler_Rear"
     ]
   },
-  "beams": [
-    [
-      7.0624,
-      1.2191,
-      -0.4919
-    ],
-    [
-      7.0624,
-      1.2191,
-      0.4857
-    ]
+  "headlights": [
+    "Headlight_Left",
+    "Headlight_Right"
   ],
-  "tailLamps": {
-    "size": [
-      0.02,
-      0.07,
-      0.2
-    ],
-    "at": [
-      [
-        -7.0204,
-        0.995,
-        -0.47
-      ],
-      [
-        -7.0204,
-        0.995,
-        0.47
-      ]
-    ]
-  },
+  "tailLamps": [
+    "Tail_left_Glow",
+    "Tail_right_Glow"
+  ],
   "fleetDigits": 0.14
 }

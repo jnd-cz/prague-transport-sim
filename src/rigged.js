@@ -65,7 +65,11 @@ export function rigProblems(rig, moves, has, clips) {
     need('pantograph', p.root); need('pantograph head', p.head); clip('pantograph', p.clip);
     if (!(p.maxContactHeight > p.minContactHeight)) out.push('pantograph: no contact range');
   }
-  if (moves.includes('lamps')) for (const s of ['left', 'right']) { if (!rig.signals?.[s]?.length) out.push(`indicators ${s}: none`); for (const n of rig.signals?.[s] || []) need(`indicator ${s}`, n); }
+  if (moves.includes('lamps')) {
+    for (const s of ['left', 'right']) { if (!rig.signals?.[s]?.length) out.push(`indicators ${s}: none`); for (const n of rig.signals?.[s] || []) need(`indicator ${s}`, n); }
+    for (const n of rig.headlights || []) need('headlight', n);
+    if (Array.isArray(rig.tailLamps)) for (const n of rig.tailLamps) need('tail lamp', n);
+  }
   if (moves.includes('doors')) for (const d of rig.doors || []) { clip(`door ${d.name}`, d.clip); for (const l of d.leaves) { need(`door ${d.name}`, l.outer); need(`door ${d.name}`, l.inner); } }
   if (moves.includes('trackBrakes')) {
     if (!Object.keys(rig.shoes || {}).length) out.push('shoes: none');
@@ -101,8 +105,13 @@ export async function loadRigged(v, glbR, rigR, type, contact, slots = false) {
   const cards = new Set([...numberPlates, ...Object.keys(routeStyles), info.frontDestination, info.runNumber, ...(info.sideBoards || [])].filter(Boolean));
   const shoeOf = new Map(Object.entries(rig.shoes || {}).flatMap(([b, ns]) => ns.map((n) => [n, b])));
   const couplerEnd = new Map(['front', 'rear'].flatMap((e) => (rig.couplers?.[e] || []).map((n) => [n, e])));
+  // the saloon: its node's parts (#525), or (rig interface 1.0) its materials and a box
+  const saloonNode = typeof rig.saloon === 'string' ? src.getObjectByName(rig.saloon) : null;
   const saloonMats = new Set(rig.saloon?.materials || []);
   const within = rig.saloon?.within ? new THREE.Box3(new THREE.Vector3(...rig.saloon.within[0]), new THREE.Vector3(...rig.saloon.within[1])) : null;
+  const under = (o, a) => { for (let q = o.parent; q; q = q.parent) if (q === a) return true; return false; };
+  // the tail lamps' glows: the model's own (#525), lit on every car
+  const tailNames = new Set(Array.isArray(rig.tailLamps) ? rig.tailLamps : []), tailGlows = [];
 
   // the template: every node that is not a plain mesh (keeping the asset's hierarchy and transforms, so
   // its clips drive the copies by name), the moving meshes as they are
@@ -154,6 +163,7 @@ export async function loadRigged(v, glbR, rigR, type, contact, slots = false) {
   const cardOf = (name) => info.frontDestination && name.startsWith(info.frontDestination) ? 'dest' : info.runNumber && name.startsWith(info.runNumber) ? 'run' : null;
   top.traverse((o) => {
     if (!o.isMesh || movers.has(o.name)) return;
+    if (tailNames.has(o.name)) { tailGlows.push(o.geometry.clone().applyMatrix4(rel(o, top))); return; }
     const m = o.material, f = frameOf(o), M = rel(o, f);
     if (m.opacity === 0) { stats.dropped++; return; } // (an invisible helper)
     const textured = m.map || m.normalMap || m.emissiveMap || (m.emissive && m.emissive.getHex() !== 0);
@@ -173,7 +183,7 @@ export async function loadRigged(v, glbR, rigR, type, contact, slots = false) {
     const b = box(o.geometry, M);
     if (shoeOf.has(o.name)) { shoes.push({ f, g: painted(o.geometry, M, m.color), b }); stats.shoes++; return; }
     if (couplerEnd.has(o.name)) { couplers.push({ e: couplerEnd.get(o.name) === 'front' ? 1 : -1, g: painted(o.geometry, M, m.color), b }); stats.couplers++; return; }
-    const saloon = f === top && (saloonMats.has(m.name) || (within && within.containsBox(b)));
+    const saloon = f === top && (saloonNode ? under(o, saloonNode) : saloonMats.has(m.name) || (within && within.containsBox(b)));
     put(f, m.transparent ? 'glass' : saloon ? 'in' : 'out', painted(o.geometry, M, m.color));
     stats.merged++;
   });
@@ -289,13 +299,17 @@ export async function loadRigged(v, glbR, rigR, type, contact, slots = false) {
     }
   }
   mixer.stopAllAction(); mixer.uncacheRoot(template);
-  // the rig's places in the asset's frame onto the car's: the high beams' glow over the headlights, the tail lamps
-  // added where the asset has none (the hybrid's: the user, 2026-11-10, #436, on the rear panel 0.47 m either side)
+  // the asset's frame onto the car's: the high beams' glow over the headlights (their nodes, #525, or rig interface
+  // 1.0's `beams`), the tail lamps' glow (their meshes, or 1.0's boxes `tailLamps.at`, for an asset that lacks them)
   const turn = new THREE.Matrix4().makeRotationY(TURN[fwd] ?? 0);
   const toCar = (q) => new THREE.Vector3(...q).applyMatrix4(turn);
-  const heads = (rig.beams || []).map((q) => toCar(q).toArray());
+  const at = (n) => { const q = new THREE.Vector3(); src.getObjectByName(n).getWorldPosition(q); return q.applyMatrix4(inv.get(top) ?? new THREE.Matrix4().copy(top.matrixWorld).invert()).toArray(); };
+  const heads = (rig.headlights ? rig.headlights.map(at) : rig.beams || []).map((q) => toCar(q).toArray());
   let tails = null;
-  if (rig.tailLamps?.at?.length) {
+  if (tailGlows.length) {
+    tails = mergeGeometries(tailGlows.map((g) => { for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k); return g.applyMatrix4(turn); }));
+    tails.userData.shared = true;
+  } else if (rig.tailLamps?.at?.length) {
     const [sx, sy, sz] = rig.tailLamps.size;
     tails = mergeGeometries(rig.tailLamps.at.map((q) => new THREE.BoxGeometry(sx, sy, sz).applyMatrix4(turn).translate(...toCar(q).toArray())));
     tails.userData.shared = true;
