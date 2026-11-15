@@ -95,6 +95,21 @@ class Junctions(unittest.TestCase):
         self.assertTrue(np.isfinite(z[0]))
 
 
+class Sidewalks(unittest.TestCase):
+    def test_held_at_the_kerb_and_rising_with_the_ground(self):
+        # a 20 m by 4 m sidewalk beside a flat road at 200 m, the ground rising 2 % away from the kerb
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: 200.10 + 0.02 * np.asarray(y, float))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 4),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))]}
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.0), [(0, 0), (20, 4)])
+        z = sp.bilinear(f, np.array([10.0, 10.0]), np.array([0.25, 3.0]))
+        self.assertAlmostEqual(z[0], 200.10, places=2)  # (the road and the measured kerb, kerbs.KERB)
+        self.assertAlmostEqual(z[1], 200.16, delta=0.015)  # (the ground's 2 %)
+
+
 class Measures(unittest.TestCase):
     def street(self, n=40):
         s = np.arange(0, float(n))

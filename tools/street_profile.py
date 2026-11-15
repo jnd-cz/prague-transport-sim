@@ -4,6 +4,7 @@ vertical curves, with IPR's lidar as the weighted target (#512).
 
     python -P -E tools/street_profile.py --calibrate [--lines 9,17,22,23,37] [--json PATH]
     python -P -E tools/street_profile.py --pilot 3945,1270 [--line 37] [--radius 160] [--out DIR]   # Palmovka
+    python -P -E tools/street_profile.py --sidewalks [--lines ...] [--out DIR]   # the survey's sidewalks against IPR
     python -P -E tools/street_profile.py --wide 300 [--lines 9,17,22,23,37] [--out DIR]   # every line, in squares
 
 --calibrate measures, on the clean streets of the lines' corridors (OSM carriageways of a car class, not a bridge,
@@ -40,6 +41,13 @@ PIECE = 400.0  # m: the longest stretch one fit takes (the solver's system is de
 MIN_LEN = 60.0  # m: shorter clean stretches are left out of the calibration
 BAND = 0.05  # m: the profile keeps within this of the smoothed lidar (the noise's 90th percentile is set against it)
 BACK = math.cos(math.radians(120))  # a joint turning more than 120 degrees: the street coming back (Hartigova: 141)
+SW_STEP = 2.0  # m between a sidewalk's samples along its kerb (--sidewalks)
+SW_REACH = 15.0  # m: the widest sidewalk read across
+SW_CELL = 0.5  # m: the sidewalks' fill grid (a 3 m sidewalk is 6 cells across)
+SW_WAVE = 4.0  # m: the sidewalks' fill halves IPR's waves of this length (the junctions' 10 m flattened a 4 m
+# sidewalk rising 2 %: 3 cm under the ground 3 m from the kerb)
+WALK_STEP = 0.12  # m within 1 m against the slope so far: a walker's step (src/streetbot.js walk-kerb)
+WALK_BUMP = 0.06  # m: a walker's 1 m bend (src/streetbot.js bumpy)
 RADII = (25, 50, 75, 100, 150, 200, 300, 400, 500, 700, 1000, 1500, 2000, 3000)  # m: the radii tried, tightest first
 
 
@@ -238,6 +246,99 @@ def calibrate(lines, out_path):
     for cls, d in sorted(rep["classes"].items(), key=lambda kv: -kv[1]["km"]):
         print(cls, json.dumps(d, ensure_ascii=False))
     print(len(rep["tight"]), "stretches need a radius of 100 m or less")
+    if out_path:
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(rep, fh, ensure_ascii=False, indent=1)
+    return rep
+
+
+def calibrate_sidewalks(lines, out_path, margin=1.0):
+    """The survey's level-0 sidewalks against IPR, from every kerb edge (an edge shared with a carriageway, `k`) every
+    SW_STEP m, where the sidewalk is 3 m wide or more: the width (inwards to the area's far side, up to SW_REACH), the
+    crossfall (a line through IPR from 1 m off the kerb to 1 m before the far side; + rises away from the kerb) and the
+    kerb step (IPR 1 m into the
+    sidewalk less 1.5 m into the road, as #21). What ČSN 73 6110's 0.5-2 % (9.5.5) is held against."""
+    import shapely
+    from shapely.geometry import Polygon
+    from ipr_dtm import IprDtm
+    F, ipr = Frame(), IprDtm()
+    seen = set()
+    rows = []
+    for ln in lines:
+        dtm = json.load(open(os.path.join(ROOT, "data", f"line{ln}.dtm.json"), encoding="utf-8"))
+        _, cover = street_areas(dtm)
+        for a in dtm["areas"]:
+            if a["c"] != "sidewalk" or a["l"] != 0 or "k" not in a or len(a["r"]) < 3:
+                continue
+            g = Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+            if not g.is_valid:
+                continue
+            for ring, ks in zip([a["r"]] + a.get("h", []), a["k"]):
+                xy = np.asarray([q[:2] for q in ring], float)
+                for i, k in enumerate(ks):
+                    if not k:
+                        continue
+                    p0, p1 = xy[i], xy[(i + 1) % len(xy)]
+                    L = float(np.hypot(*(p1 - p0)))
+                    if L < 1.0:
+                        continue
+                    t = (p1 - p0) / L
+                    n = np.array([-t[1], t[0]])
+                    for u in np.arange(SW_STEP / 2, L, SW_STEP):
+                        q = p0 + t * u
+                        key = (round(float(q[0])), round(float(q[1])))
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        if not g.contains(shapely.Point(*(q + n * 0.5))):
+                            n = -n
+                            if not g.contains(shapely.Point(*(q + n * 0.5))):
+                                continue
+                        d = np.arange(0.25, SW_REACH, 0.25)
+                        pts = q[None] + n[None] * d[:, None]
+                        inside = shapely.contains_xy(g, pts[:, 0], pts[:, 1])
+                        w = float(d[np.argmin(inside)] - 0.25) if not inside.all() else SW_REACH
+                        if w < 2 * margin + 1.0 or (cover is not None and shapely.contains_xy(cover, q[0], q[1])):
+                            continue
+                        # (the crossfall: a line through IPR from 1 m off the kerb to 1 m before the far side, every
+                        # 0.25 m; IPR's 1 m raster rounds both edges, a kerb and a wall's foot or a front garden)
+                        dd = np.arange(margin, w - margin + 1e-6, 0.25)
+                        xs = np.concatenate([q[0] + n[0] * dd, [q[0] - n[0] * 1.5]])
+                        ys = np.concatenate([q[1] + n[1] * dd, [q[1] - n[1] * 1.5]])
+                        zz = np.asarray(ipr.sample(xs + F.E0, ys + F.N0), float)
+                        if not np.all(np.isfinite(zz)):
+                            continue
+                        fall = float(np.polyfit(dd, zz[:-1], 1)[0])
+                        rows.append((ln, float(q[0]), float(q[1]), w, fall, float(zz[0] - zz[-1])))
+    if not rows:
+        return {}
+    A = np.array([r[1:] for r in rows])
+    w, fall, step = A[:, 2], A[:, 3], A[:, 4]
+
+    def summary(m):
+        f = fall[m]
+        return {"samples": int(m.sum()), "crossfall p5/25/50/75/95 %": [round(v * 100, 2) for v in pct(f, (5, 25, 50, 75, 95))],
+                "within the norm's 0.5-2 % rising from the kerb": round(float(np.mean((f >= 0.005) & (f <= 0.02))), 3),
+                "falling away from the kerb": round(float(np.mean(f < 0)), 3),
+                "flatter than 0.5 %": round(float(np.mean((f >= 0) & (f < 0.005))), 3),
+                "steeper than 2 % / 4 %": [round(float(np.mean(f > 0.02)), 3), round(float(np.mean(f > 0.04)), 3)],
+                "kerb step p25/50/75 m": pct(step[m], (25, 50, 75))}
+    rep = {"samples": len(rows), "all": summary(np.ones(len(rows), bool)),
+           "by width": {k: summary(m) for k, m in (("3-3.5 m", (w >= 3.0) & (w < 3.5)), ("3.5-5 m", (w >= 3.5) & (w < 5)),
+                                                    ("5-8 m", (w >= 5) & (w < 8)), (">= 8 m", w >= 8)) if m.any()},
+           "by line": {str(ln): summary(np.array([r[0] == ln for r in rows])) for ln in lines}}
+    big = sorted(rows, key=lambda r: -abs(r[4]))
+    far = []
+    for r in big:
+        if len(far) >= 25:
+            break
+        if all(math.hypot(r[1] - f["x"], r[2] - f["y"]) > 30 for f in far):
+            lat, lon = F.ll(r[1], r[2])
+            far.append({"line": r[0], "x": round(r[1], 1), "y": round(r[2], 1), "width": r[3],
+                        "crossfall %": round(r[4] * 100, 1), "lat": round(float(lat), 5), "lon": round(float(lon), 5)})
+    rep["steepest (one per 30 m)"] = far
+    print(json.dumps({k: v for k, v in rep.items() if k != "steepest (one per 30 m)"}, ensure_ascii=False, indent=1))
     if out_path:
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
@@ -989,12 +1090,136 @@ def pilot_report(at, radius, ln, out_dir):
     rep["generated over 0.2 m off IPR (largest per 10 m)"] = far[:20]
     rep["drive lines"] = {"survey": drive_measures(svy, cs, road=road), "IPR": drive_measures(lidar, cs, road=road),
                           "generated": drive_measures(gen, cs, road=road)}
+    box = [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)]
+    swf = sidewalks(ctx, gen, box)
+    sw_tris = ctx["sw_tris"]
+    rep["sidewalks"] = {
+        "survey": sidewalk_measures(ctx, lambda x, y: sample_tris(sw_tris, np.asarray(x, float), np.asarray(y, float)), svy, box),
+        "IPR": sidewalk_measures(ctx, lidar, lidar, box),
+        "generated": sidewalk_measures(ctx, lambda x, y: bilinear(swf, x, y), gen, box)}
     with open(os.path.join(out_dir, "pilot.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(rep, fh, ensure_ascii=False, indent=1)
-    print(json.dumps({k: v for k, v in rep.items() if k != "drive lines"}, ensure_ascii=False, indent=1))
+    print(json.dumps({k: v for k, v in rep.items() if k not in ("drive lines", "sidewalks")}, ensure_ascii=False, indent=1))
     for k, v in rep["drive lines"].items():
         print(k, {a: b for a, b in v.items() if a != "places"})
+    for k, v in rep["sidewalks"].items():
+        print("sidewalks", k, {a: b for a, b in v.items() if a != "places"})
     return rep
+
+
+def kerb_edges(dtm):
+    """The survey's level-0 sidewalks' kerb edges (`k`, shared with a carriageway) 3 m or longer, as (points every
+    0.25 m, unit normals into the sidewalk), and the sidewalks as one geometry."""
+    import shapely
+    from shapely.geometry import Polygon
+    out, polys = [], []
+    for a in dtm["areas"]:
+        if a["c"] != "sidewalk" or a["l"] != 0 or len(a["r"]) < 3:
+            continue
+        g = Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+        if not g.is_valid:
+            g = g.buffer(0)
+        polys.append(g)
+        for ring, ks in zip([a["r"]] + a.get("h", []), a.get("k", [])):
+            xy = np.asarray([q[:2] for q in ring], float)
+            for i, k in enumerate(ks):
+                p0, p1 = xy[i], xy[(i + 1) % len(xy)]
+                L = float(np.hypot(*(p1 - p0)))
+                if not k or L < 3.0:
+                    continue
+                t = (p1 - p0) / L
+                n = np.array([-t[1], t[0]])
+                mid = (p0 + p1) / 2
+                if not g.contains(shapely.Point(*(mid + n * 0.5))):
+                    n = -n
+                u = np.arange(0.125, L, 0.25)
+                out.append((p0[None] + t[None] * u[:, None], np.tile(n, (len(u), 1))))
+    walk = shapely.union_all(polys) if polys else None
+    if walk is not None:
+        shapely.prepare(walk)
+    return out, walk
+
+
+def sidewalks(ctx, road_z, box, cell=SW_CELL):
+    """The sidewalks around the generated road: each held at its kerb to the road's surface 0.5 m beyond the kerb
+    plus KERB (tools/kerbs.py, the measured step), and a smooth fill to IPR across (the junctions' fill_2d): their
+    crossfall comes from the ground, which ČSN 73 6110's 0.5-2 % does not hold (docs/knowledge.md: Prague's median
+    rises 2.5 % from the kerb, 22 % within the norm). Returns a field for bilinear()."""
+    import shapely
+    from kerbs import KERB
+    F, ipr, walk = ctx["F"], ctx["ipr"], ctx["walk"]
+    xs = np.arange(box[0][0], box[1][0] + cell, cell)
+    ys = np.arange(box[1][1], box[0][1] - cell, -cell)
+    X, Y = np.meshgrid(xs, ys)
+    on = shapely.contains_xy(walk, X.ravel(), Y.ravel()).reshape(X.shape) if walk is not None else np.zeros(X.shape, bool)
+    known = np.full(X.shape, np.nan)
+    for q, n in ctx["kerb_edges"]:
+        ok = (q[:, 0] >= box[0][0]) & (q[:, 0] <= box[1][0]) & (q[:, 1] >= box[0][1]) & (q[:, 1] <= box[1][1])
+        if not ok.any():
+            continue
+        q, n = q[ok], n[ok]
+        zr = np.asarray(road_z(*(q - n * 0.5).T), float)
+        for d in (0.25, 0.5):
+            p = q + n * d
+            i = np.round((ys[0] - p[:, 1]) / cell).astype(int)
+            j = np.round((p[:, 0] - xs[0]) / cell).astype(int)
+            good = np.isfinite(zr) & (i >= 0) & (j >= 0) & (i < X.shape[0]) & (j < X.shape[1])
+            good[good] &= on[i[good], j[good]]
+            known[i[good], j[good]] = zr[good] + KERB
+    free = on & np.isnan(known)
+    data = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
+    lam = (SW_WAVE / (2 * math.pi)) ** 4 / cell ** 4
+    grid = fill_2d(known, free, data, lam)
+    return xs[0], ys[0], cell, np.where(on, grid, np.nan)
+
+
+def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
+    """A sidewalk surface (walk_z) against IPR and the road beside it (road_z): off IPR 1 m inside the sidewalks
+    (IPR's raster rounds the kerb), the kerb step (0.5 m in less 0.5 m out, every metre along the kerbs), and a walker's
+    line 1.5 m in from each kerb: steps over WALK_STEP within 1 m against the slope so far, and the 1 m bend."""
+    import shapely
+    F, ipr, walk = ctx["F"], ctx["ipr"], ctx["walk"]
+    if walk is None:
+        return {}
+    xg, yg = np.meshgrid(np.arange(box[0][0], box[1][0], 0.5), np.arange(box[1][1], box[0][1], -0.5))
+    x, y = xg.ravel(), yg.ravel()
+    inner = shapely.contains_xy(walk.buffer(-1.0), x, y)
+    zw = np.asarray(walk_z(x[inner], y[inner]), float)
+    zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
+    d = (zw - zi)[np.isfinite(zw) & np.isfinite(zi)]
+    steps, bend, kerb, places = 0, [], [], []
+    for q, n in ctx["kerb_edges"]:
+        q, n = q[::4], n[::4]  # (every metre)
+        ok = (q[:, 0] >= box[0][0]) & (q[:, 0] <= box[1][0]) & (q[:, 1] >= box[0][1]) & (q[:, 1] <= box[1][1])
+        if ok.sum() < 3:
+            continue
+        q, n = q[ok], n[ok]
+        k = np.asarray(walk_z(*(q + n * 0.5).T), float) - np.asarray(road_z(*(q - n * 0.5).T), float)
+        kerb.extend(k[np.isfinite(k)].tolist())
+        p = q + n * 1.5
+        z = np.asarray(walk_z(p[:, 0], p[:, 1]), float)
+        z[~shapely.contains_xy(walk, p[:, 0], p[:, 1])] = np.nan
+        g = dp = None
+        for i, dz in enumerate(np.diff(z)):
+            if not np.isfinite(dz):
+                g = dp = None
+                continue
+            off = 0.0 if g is None else min(abs(dz - g), abs(dz - dp))
+            if off > WALK_STEP:
+                steps += 1
+                if len(places) < 30:
+                    places.append({"x": round(float(p[i + 1, 0]), 1), "y": round(float(p[i + 1, 1]), 1), "step": round(off, 2)})
+            else:
+                g = dz
+            dp = dz
+        b = np.abs(z[2:] - 2 * z[1:-1] + z[:-2])
+        bend.extend(b[np.isfinite(b)].tolist())
+    bend = np.asarray(bend)
+    return {"off IPR 1 m inside, mean / p99 |.| m": [round(float(np.mean(d)), 3), round(float(np.percentile(np.abs(d), 99)), 3)] if len(d) else None,
+            "kerb step p5/50/95 m": pct(kerb, (5, 50, 95)), "walker's steps": steps,
+            "bumps (bend in 1 m over WALK_BUMP)": int((bend > WALK_BUMP).sum()),
+            "bend in 1 m p50/99 m": pct(bend.tolist(), (50, 99)), "places": places,
+            **({"_raw": {"dev": d.tolist(), "kerb": kerb, "bend": bend.tolist()}} if raw else {})}
 
 
 def context(ln):
@@ -1008,7 +1233,10 @@ def context(ln):
     if cover is not None:
         shapely.prepare(cover)
     tris, _ = surface_tris(dtm["areas"], {"road", "tram"})
-    return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris}
+    sw_tris, _ = surface_tris(dtm["areas"], {"sidewalk"})
+    edges, walk = kerb_edges(dtm)
+    return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
+            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk}
 
 
 def line_wide(lines, cell, out_path):
@@ -1023,6 +1251,7 @@ def line_wide(lines, cell, out_path):
         pts = np.asarray(L["path"] + L.get("pathBack", []), float)
         sq = sorted({(int(math.floor(x / cell)), int(math.floor(y / cell))) for x, y in pts})
         acc = {k: {"dev": [], "jumps": 0, "rolls": 0, "dgrade": [], "roll": [], "bend": []} for k in ("survey", "generated")}
+        sw = {k: {"dev": [], "kerb": [], "bend": [], "steps": 0, "bumps": 0} for k in ("survey", "generated")}
         places = []
         for n, (i, j) in enumerate(sq):
             at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
@@ -1050,6 +1279,16 @@ def line_wide(lines, cell, out_path):
                     acc[k][q].extend(m["_raw"][q])
                 if k == "generated":
                     places.extend(m["places"])
+            box = [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)]
+            swf = sidewalks(ctx, fns["generated"], box)
+            for k, wz in (("survey", lambda a, b, t=ctx["sw_tris"]: sample_tris(t, np.asarray(a, float), np.asarray(b, float))),
+                          ("generated", lambda a, b, f=swf: bilinear(f, a, b))):
+                m = sidewalk_measures(ctx, wz, fns[k], box, raw=True)
+                if m:
+                    for q in ("dev", "kerb", "bend"):
+                        sw[k][q].extend(m["_raw"][q])
+                    sw[k]["steps"] += m["walker's steps"]
+                    sw[k]["bumps"] += m["bumps (bend in 1 m over WALK_BUMP)"]
             print(f"line {ln}: square {n + 1}/{len(sq)}", flush=True)
         res = {}
         for k, a in acc.items():
@@ -1059,6 +1298,13 @@ def line_wide(lines, cell, out_path):
                       "jumps": a["jumps"], "rolls over 7 deg": a["rolls"],
                       "change of grade over 4.5 m p99 / max %": [round(v * 100, 2) for v in pct(a["dgrade"], (99, 100))],
                       "roll p99 / max deg": pct(a["roll"], (99, 100)), "bend in 1 m p99 m": pct(a["bend"], (99,))[0]}
+        for k, a in sw.items():
+            d = np.asarray(a["dev"])
+            res[k]["sidewalks"] = {
+                "off IPR 1 m inside, mean / p99 |.| m": [round(float(d.mean()), 3), round(float(np.percentile(np.abs(d), 99)), 3)]
+                if len(d) else None,
+                "kerb step p5/50/95 m": pct(a["kerb"], (5, 50, 95)), "walker's steps": a["steps"], "bumps": a["bumps"],
+                "bend in 1 m p99 m": pct(a["bend"], (99,))[0] if a["bend"] else None}
         res["squares"] = len(sq)
         res["generated jumps, places"] = places[:30]
         out[ln] = res
@@ -1079,9 +1325,14 @@ def main(argv=None):
     ap.add_argument("--line", type=int, default=37, help="--pilot: the line whose survey data to read")
     ap.add_argument("--radius", type=float, default=150.0, help="--pilot: half the square's side, m")
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "street_profile"))
+    ap.add_argument("--sidewalks", action="store_true", help="the survey's sidewalks against IPR: crossfall, kerb")
     ap.add_argument("--wide", type=float, metavar="CELL", help="every line of --lines in squares of CELL m (300)")
     a = ap.parse_args(argv)
-    if a.wide:
+    if a.sidewalks:
+        from baseline_store import HeavyJob
+        with HeavyJob("street_profile"):
+            calibrate_sidewalks([int(v) for v in a.lines.split(",")], os.path.join(a.out, "sidewalks.json"))
+    elif a.wide:
         from baseline_store import HeavyJob
         with HeavyJob("street_profile"):
             line_wide([int(v) for v in a.lines.split(",")], a.wide, os.path.join(a.out, "lines.json"))

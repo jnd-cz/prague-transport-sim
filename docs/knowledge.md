@@ -530,6 +530,16 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     tracks); the track centres move to 3.50 m apart with buses on the belt, 4.00 m with a mast between them
     (the base distance is drawn in the figures only).
 - **Kerbs** (Z1): a lowered kerb is under 80 mm; at driveways 2–5 cm (7 cm where justified).
+- **Prague's sidewalks against the norm** (`street_profile.py --sidewalks`, 2026-11-15, the five lines' level-0
+  sidewalks 3 m wide or more, every 2 m along their kerbs, 122,624 samples):
+  - **Crossfall** (a line through IPR from 1 m off the kerb to 1 m before the far side): the median rises 2.5 % away
+    from the kerb, p25–p75 1.1–3.9 %, p5 −2.5 %, p95 7.0 %. Only 22 % are within the norm's 0.5–2 %; 59 % are
+    steeper and 15 % fall away from the kerb.
+  - **By width:** 3–3.5 m 3.0 %, 5–8 m 2.2 %, 8 m and over 1.1 % (squares and forecourts following the ground).
+    Read 2 m from the edges instead of 1 m, the 5–8 m median is 2.1 %: not IPR's raster at the edges.
+  - **The kerb step** (IPR 1 m into the sidewalk less 1.5 m into the road): p25/50/75 5.9 / 10.4 / 14.8 cm, the
+    median `tools/kerbs.py`'s `KERB` 0.10 m.
+  - So the norm's range does not hold the old streets' sidewalks: their crossfall comes from the ground.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
