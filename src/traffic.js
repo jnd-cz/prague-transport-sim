@@ -306,6 +306,7 @@ export class Traffic {
 
     this.cars = [];
     this.walkers = [];
+    this.walkLoops = new Map(); // place "x,y" -> times a walker turned back there rather than round a loop (#496)
     this.crowd = makeCrowd(MAX_WALKERS);
     this.group.add(this.crowd);
 
@@ -1599,8 +1600,18 @@ export class Traffic {
           const scored = links.filter((o) => o.walk !== w.prev).map((o) => [o, score(o)]);
           const best = scored.reduce((a, b) => Math.max(a, b[1]), -Infinity);
           const good = scored.filter(([, sc]) => sc > 0.3 && sc >= best - 0.4);
-          const pick = good.length ? good[Math.floor(this.rand() * good.length)][0] : best > -0.3 ? scored.find(([, sc]) => sc === best)[0] : null;
+          let pick = good.length ? good[Math.floor(this.rand() * good.length)][0] : best > -0.3 ? scored.find(([, sc]) => sc === best)[0] : null;
+          // nor round a loop: onto a walk it entered less than 15 m ago it turns back instead, as at a dead end. (Four
+          // short pieces joined 1 m from each other's ends made a 7 m ring across a driveway; each end's least bad way
+          // on led round it, and six walkers circled there for good in front of a car, whose queue stood on our
+          // track: line 23 s 3349, seed 1, #496.) Counted per place in walkLoops (window.traffic).
+          if (pick && w.trail?.some((o) => o.walk === pick.walk && w.walked - o.at < 15)) {
+            const k = `${Math.round(here.x)},${Math.round(here.y)}`;
+            this.walkLoops.set(k, (this.walkLoops.get(k) || 0) + 1);
+            pick = null;
+          }
           if (pick) {
+            w.trail = [...(w.trail || []).slice(-5), { walk: pick.walk, at: w.walked }];
             const nq = pick.walk.path.at(pick.s), len = pick.walk.path.length;
             w.prev = w.walk; w.walk = pick.walk; w.s = pick.s; w.travel = H;
             w.dir = pick.s < 0.5 ? 1 : pick.s > len - 0.5 ? -1 : nq.hx * H.x + nq.hy * H.y >= 0 ? 1 : -1;
@@ -1611,7 +1622,7 @@ export class Traffic {
             w.side = -w.side;
             const pb = pos(w.s);
             if (Math.hypot(pa.x - here.x, pa.y - here.y) < Math.hypot(pb.x - here.x, pb.y - here.y)) w.side = -w.side;
-          } else { w.dir = -w.dir; w.commit = 4; w.travel = null; w.prev = null; } // a dead end: back
+          } else { w.dir = -w.dir; w.commit = 4; w.travel = null; w.prev = null; w.trail = null; } // a dead end: back
         } else if (!w.commit && this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR && !this.inLane(here.x, here.y)) w.dir = -w.dir;
         // (B9) at the kerb, about to step into a car lane: wait while a car is coming (it would reach the
         // spot within 4 s); once in the lane, go on (cars stop for walkers on their path)
