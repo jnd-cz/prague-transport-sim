@@ -376,6 +376,9 @@ def street_geometry(truth=None):
 
 # (m: by class, the other classes'; m: a belt raised more is a kerb; rise per m: the steepest crossfall, a sidewalk's)
 R_CLASS, R_STREET, RAISED_BED, FALL_MAX, SW_FALL = street_geometry()
+# (the places the user confirmed as a raised tram corridor: the line-wide report measures raised_bed() on them)
+with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as _fh:
+    RAISED_PLACES = next(x["value"] for x in json.load(_fh)["streetGeometry"]["facts"] if x["id"] == "raised-corridors")
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
@@ -1339,11 +1342,24 @@ def line_wide(lines, cell, out_path):
         acc = {k: {"dev": [], "jumps": 0, "rolls": 0, "dgrade": [], "roll": [], "bend": []} for k in ("survey", "generated")}
         sw = {k: {"dev": [], "kerb": [], "bend": [], "steps": 0, "bumps": 0} for k in ("survey", "generated")}
         places = []
+        # (the places the user confirmed raised (data/truth.json raised-corridors): how much of each raised_bed() reads)
+        raised_at = []
+        for r in RAISED_PLACES:
+            if r["line"] == ln:
+                x, y = ctx["F"].xy([r["lat"]], [r["lon"]])
+                raised_at.append({"place": r["place"], "xy": np.array([float(np.ravel(x)[0]), float(np.ravel(y)[0])]),
+                                  "n": 0, "raised": 0})
         for n, (i, j) in enumerate(sq):
             at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
             cs, _, F, ipr, road = pilot(at, radius, ln, None, ctx)
             if not cs:
                 continue
+            for r in raised_at:
+                for c in cs:
+                    if "raised" in c:
+                        near = np.hypot(*(c["p"] - r["xy"]).T) <= 50.0
+                        r["n"] += int(near.sum())
+                        r["raised"] += int(c["raised"][near].any(1).sum())
             field = junctions(cs, F, ipr, road, [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)])
             xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5),
                                  np.arange(at[1] + radius, at[1] - radius, -0.5))
@@ -1393,6 +1409,8 @@ def line_wide(lines, cell, out_path):
                 "kerb step p5/50/95 m": pct(a["kerb"], (5, 50, 95)), "walker's steps": a["steps"], "bumps": a["bumps"],
                 "bend in 1 m p99 m": pct(a["bend"], (99,))[0] if a["bend"] else None}
         res["squares"] = len(sq)
+        res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
+            r["place"]: round(r["raised"] / r["n"], 2) if r["n"] else None for r in raised_at}
         res["generated jumps, places"] = places[:30]
         out[ln] = res
         print(ln, json.dumps({k: v for k, v in res.items() if k != "generated jumps, places"}, ensure_ascii=False))
