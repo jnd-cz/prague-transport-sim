@@ -1076,9 +1076,12 @@ export class Traffic {
   _circleGoes(c, o) {
     const ring = [c, o];
     for (let x = o.waitFor; x; x = x.waitFor) {
-      if (x === c) return ring.every((y) => y === c || y.why !== 'junction' || y.id > c.id);
-      if (ring.includes(x) || ring.length > 12) return false;
-      ring.push(x);
+      if (x !== c) { if (ring.includes(x) || ring.length > 12) return false; ring.push(x); continue; }
+      if (!ring.every((y) => y === c || y.why !== 'junction' || y.id > c.id)) return false;
+      // (counted once a hold: the traffic check's junctionCircles)
+      if (!(this.game.clock - (c.circleAt ?? -Infinity) < 5)) this.junctionCircles = (this.junctionCircles || 0) + 1;
+      c.circleAt = this.game.clock;
+      return true;
     }
     return false;
   }
