@@ -1019,6 +1019,15 @@ const inspect = new Inspect({
 window.inspect = inspect; // (the console and tools/test_free_camera.py, as window.game)
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
+// The game's steps per frame (#609): no step longer than STEP_MAX, as many as the real time since the last frame
+// needs, so the game keeps real time below 20 fps. Up to SPAN_MAX of it: past that (a stall, a hidden tab
+// coming back, a breakpoint) the game slows rather than run seconds at once. The cap alone (one step of at
+// most 50 ms) ran the user's 16 fps perftests of 2026-11-15 at 74-80 % of real time, unevenly on the tablet.
+const STEP_MAX = 0.05, SPAN_MAX = 0.25;
+function realSteps(span) {
+  const n = Math.max(1, Math.ceil(span / STEP_MAX - 1e-6));
+  return new Array(n).fill(span / n);
+}
 // An idle page draws 4 frames a second (#149): the menu, a pause, the results, and review mode with its
 // camera at rest. Driving, inspect mode and a moving review camera draw every frame; a hidden tab draws
 // nothing (requestAnimationFrame stops). The GPU was busy on an idle tab at full frame rate.
@@ -1032,7 +1041,9 @@ window.drawCount = 0; // (draws so far: tools/test_idle.py)
 
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const span = Math.max(0, Math.min(SPAN_MAX, (now - last) / 1000));
+  const dt = Math.min(STEP_MAX, span); // (the camera, weather, sound and HUD: one step a frame)
+  let simmed = 0;
   last = now;
   // window.headless: a dev tool steps the game itself (tools/traffic_lint.js); only draw
   if (game && !window.headless) {
@@ -1040,21 +1051,24 @@ function frame(now) {
     const sounding = !inMenu && !game.paused && !game.finished && !(inspect.active && inspect.paused);
     audio.setActive(sounding, !inMenu && !game.paused && game.finished && !(inspect.active && inspect.paused));
     // (inspecting: several game steps per frame, or none while paused)
-    const steps = inspect.active ? inspect.steps(dt) : [dt];
+    const steps = inspect.active ? inspect.steps(span) : realSteps(span);
     input.deadman = shiftHeld || pad.active;
     steps.forEach((h, i) => {
+      const lastStep = i === steps.length - 1;
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
+      if (!game.paused && !game.finished) simmed += h;
       game.update(h, pilot ? pilot.input : input);
-      // (the traffic is posed for drawing on the frame's last step only)
-      if (inspect.active && !game.paused && !game.finished) traffic.update(h, camera, i === steps.length - 1);
+      // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last step only,
+      // which outside inspect mode runs after the camera has moved, below)
+      if ((inspect.active || !lastStep) && !game.paused && !game.finished) traffic.update(h, camera, inspect.active && lastStep);
     });
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
     updateSnow(dt, now / 1000);
-    if (!inspect.active && !game.paused && !game.finished) traffic.update(dt, camera);
+    if (!inspect.active && !game.paused && !game.finished && steps.length) traffic.update(steps[steps.length - 1], camera);
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
     audio.update(tram, game.currentLimit, dt);
@@ -1087,7 +1101,7 @@ function frame(now) {
     }
     lastDraw = now; window.drawCount++;
     // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
-    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render);
+    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render, simmed);
   }
   if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);

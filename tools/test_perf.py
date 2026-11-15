@@ -6,6 +6,7 @@
 tools/serve.py's handler on a free port, the notes in a temp folder, Chromium on the GPU (tools/gpu.py). Checks:
 - a feedback note sent after some driving carries the machine (its GPU), the load times and the frame-time log;
 - the menu's performance test (shortened to 8 s) drives, shows its result card, and Send stores a perftest note;
+- with every frame held to 68 ms, the game keeps real time: several 50 ms steps a frame (#609);
 - the reference test started on line 9 opens line 17, runs there with the detailed model, and goes back to line 9.
 --runs N: N full one-minute tests instead (headed, so the GPU draws as it does for a player), and the spread of
 their numbers: how comparable two runs on one machine are.
@@ -154,6 +155,14 @@ def switch(page, url, lines, times, address=False):
             page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=20000)
 
 
+# every frame of the page made to take MS ms at least (a busy wait before it runs), as on a slow machine
+SLOW = """(() => { window.slowFrameMs = MS;
+  if (window.slowRaf) return;
+  const raf = window.slowRaf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = (cb) => raf(() => { const end = performance.now() + (window.slowFrameMs || 0); while (performance.now() < end); cb(performance.now()); });
+})()"""
+
+
 def perf_test(page, timeout):
     page.evaluate("delete window.perfTestResult")  # (the last run's)
     page.click("#btnPerfTest")
@@ -248,6 +257,11 @@ def main():
             card = page.text_content("#resultsCard")
             page.click("#ptSend")
             page.wait_for_function("document.getElementById('ptSend').textContent.includes('Sent')", timeout=20000)
+            # frames held to 68 ms each (the user's N100 nettop, 2026-11-15): the game still keeps real time (#609)
+            page.click("#ptMenu")
+            page.evaluate(SLOW.replace("MS", "68"))
+            slow = perf_test(page, 120000)
+            page.evaluate("window.slowFrameMs = 0")
             # the reference run from another line: line 17 with the detailed model, then back to the line left
             page.click("#ptMenu")
             page.goto(url.split("?")[0] + "?line=9", timeout=180000)
@@ -278,6 +292,12 @@ def main():
             fails.append("the note has no load times")
         if not ((note.get("perf") or {}).get("frames") or 0) > 10:
             fails.append(f"the note's frame log is empty: {note.get('perf')}")
+    print(f"68 ms frames: {slow.get('fps')} fps, game time per real second {slow.get('gameRate')}, frames of several steps {slow.get('multiStep')} %; "
+          f"unslowed: {res.get('gameRate')}, {res.get('multiStep')} %")
+    if not (0.97 <= (slow.get("gameRate") or 0) <= 1.01 and (slow.get("multiStep") or 0) > 90):
+        fails.append(f"68 ms frames do not keep real time: {slow.get('gameRate')}, several steps in {slow.get('multiStep')} % of frames")
+    if not (0.97 <= (res.get("gameRate") or 0) <= 1.01):
+        fails.append(f"the game's time against real time {res.get('gameRate')}")
     if not (res.get("frames", 0) > 10 and res.get("fps", 0) > 0 and res.get("test")):
         fails.append(f"the test measured nothing: {res}")
     if "Performance test" not in (card or "") or "Frames per second" not in card:

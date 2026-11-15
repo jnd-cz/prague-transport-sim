@@ -17,19 +17,21 @@ export class PerfLog {
   reset(meta = {}) {
     this.meta = meta;
     this.hist = new Uint32Array(BINS);
-    this.n = 0; this.sum = 0;
+    this.n = 0; this.sum = 0; this.sim = 0; this.multi = 0;
     this.slowAt = new Map(); // route bin -> frames over 33 ms
     this.calls = { sum: 0, max: 0 }; this.tris = { sum: 0, max: 0 };
     this.last = 0;
   }
 
-  // one drawn frame while driving: now (ms), the tram's route position, the renderer's counts
-  frame(now, s, info) {
+  // one drawn frame while driving: now (ms), the tram's route position, the renderer's counts, the game time it
+  // stepped (s; several steps when the frame took over 50 ms, #609)
+  frame(now, s, info, sim = null) {
     const dt = now - this.last;
     this.last = now;
     if (!(dt > 0 && dt < GAP) || document.hidden) return;
     this.hist[Math.min(BINS - 1, Math.round(dt))]++;
     this.n++; this.sum += dt;
+    if (sim !== null) { this.sim += sim * 1000; if (sim > 0.0505) this.multi++; }
     if (dt > 33.4 && Number.isFinite(s)) {
       const k = Math.floor(s / STRETCH);
       this.slowAt.set(k, (this.slowAt.get(k) || 0) + 1);
@@ -63,6 +65,8 @@ export class PerfLog {
       ...this.meta, frames: this.n, seconds: Math.round(this.sum / 100) / 10, fps: Math.round((this.n * 10000) / this.sum) / 10,
       ms: { p50: this.pct(0.5), p90: this.pct(0.9), p99: this.pct(0.99) },
       over: { 20: this.over(20.5), 33: this.over(33.4), 50: this.over(50) },
+      // (the game's time against the frames' real time: 1 when it keeps real time; the frames that took several steps, %)
+      gameRate: Math.round((this.sim / this.sum) * 1000) / 1000, multiStep: Math.round((this.multi / this.n) * 1000) / 10,
       worst, calls: { mean: Math.round(this.calls.sum / this.n), max: this.calls.max },
       triangles: { mean: Math.round(this.tris.sum / this.n), max: this.tris.max },
       ...(mem ? { heapMB: Math.round(mem.usedJSHeapSize / 1e6) } : {}),
