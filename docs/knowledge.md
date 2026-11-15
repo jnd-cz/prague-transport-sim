@@ -444,6 +444,13 @@ Sections:
   crossing ends on a survey kerb, so a rule that lowers only tagged kerbs leaves most raised (#303). The kerb review
   list is not enriched in them (16 % / 33 % of listed areas, 18 % / 36 % of all kerbed areas), so its cards name them
   and they change no list (#142).
+- **The survey does not show a lowered kerb; untagged crossing ends read lowered** (#303, lines 17 / 22, the survey's
+  traffic-area edges against OSM's nodes on a kerbed edge): the kerb line at `kerb=lowered` nodes carries the same code
+  (`TypDopravniStavbyNeboPlochy` 1, as 88-91 % of them) and sits level with its neighbours (its height against a line
+  fitted 2-10 m either way: median 0.000 / -0.004 m, plain kerb 0.000 / +0.001 m); no inner-division line or second edge
+  marks the crossing. IPR's step at crossing ends with no `kerb=*` tag, +5.7 / +6.3 cm, is the lowered kerbs' (+5.8 /
+  +6.2 cm), not plain kerb's (+12.0 / +11.0 cm). So `tools/kerbs.py` lowers every crossing end to ČSN 73 6110's 2 cm
+  unless OSM tags it otherwise (`data/truth.json` kerbFacts.crossing).
 - **Street surfaces from the survey**: smoothing fits through the outline vertices (on straight kerbs only
   the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
   is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street

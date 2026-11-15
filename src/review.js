@@ -54,7 +54,7 @@ const options = (f) => f.options || (f.kind === 'trackheight' ? OPTIONS.trackhei
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 // the kerb review list in the survey's provenance: wherever the stamp put it
-function findKerbs(o) {
+export function findKerbs(o) {
   if (!o || typeof o !== 'object') return null;
   if (Array.isArray(o.review) && 'platformSteps' in o) return o;
   for (const v of Object.values(o)) { const r = findKerbs(v); if (r) return r; }
