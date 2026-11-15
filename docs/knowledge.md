@@ -509,6 +509,86 @@ Sections:
   (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
   measure is circular). It does not tell ballast from grass.
 
+### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
+
+The norm for city streets is public: ÚNMZ publishes it with the ministry's consent (`raw/reference/norms/`, with
+its text; the user's link and upload, #512). Its minima are for new design; Prague's streets are older.
+Grades and vertical curves of streets with a tram in the carriageway follow ČSN 73 6405 instead (not public).
+
+- **Design speed** (table 2): A (rychlostní) 80 km/h, 60 in difficult conditions; B (sběrné) 50, 40;
+  C (obslužné) 30–50, 30; D1 (obytné zóny) 20 (the tables' lowest column).
+- **Vertical curves** (tables 13 and 14), the least crest / sag radius by design speed: 80 km/h 4,000 / 2,100 m;
+  60 1,800 / 1,000; 50 1,000 / 700; 40 450 / 350; 30 200 / 180; 20 100 / 110. Measured on the clean
+  streets (#512 calibration, p5): primary 490, trunk 350, secondary and tertiary 300, residential 150,
+  living street 100 m. So Prague's streets reach the minima of the difficult-conditions speed (40 km/h on the
+  main streets, 20–30 on residential ones); their p25 (700–1,000 m on main streets) is at the 50 km/h minima.
+- **Crossfall** (9.5): 2.5 % (2.0 % only in reconstructions), crowned or one-sided on an undivided street,
+  one-sided per carriageway on a divided one; sidewalks 0.5–2.0 % falling to the kerb. The change of
+  crossfall rises along the edge at most 1.2 % (design speed ≤ 50 km/h). The resulting slope
+  √(grade² + crossfall²) is at most 9 % (A, B) or 15 % (C), and at least 0.5 %.
+- **Grades** (table 12): B 6 %, 8 % where justified, 9 % over at most 150 m; C 9 %, 12 %, 15 % over at most 50 m;
+  D1 5 %, 8.33 %, 12.5 %. At least 0.5 %. Measured p99: primary 6.4 %, residential 12 %, living street 14 %.
+- **The tram belt** (3.1.18, 7.3, figures 2–4, 13):
+  - a belt raised at most 7 cm counts as unraised;
+  - the separating kerb (tvarovka) stands at most 9 cm over the carriageway, its inner edge 1.50 m from the
+    track's axis (1.30 m in reconstructions);
+  - a raised kerb stands 1.75 m from the axis (ČSN 28 0318);
+  - the belt is 7.00 m wide (6.00 m in reconstructions, 5.70 m where tight; 8.00 m with a mast between the
+    tracks); the track centres move to 3.50 m apart with buses on the belt, 4.00 m with a mast between them
+    (the base distance is drawn in the figures only).
+- **Kerbs** (Z1): a lowered kerb is under 80 mm; at driveways 2–5 cm (7 cm where justified).
+- **Prague's sidewalks in IPR** (`street_profile.py --sidewalks`, 2026-11-15, the five lines' level-0 sidewalks,
+  every 2 m along their kerbs):
+  - **IPR's raster smears the kerb** 1–1.5 m into the sidewalk: at Hartigova IPR rises 7–9 cm in the first 1.5 m,
+    then 1–1.5 % across. A survey "sidewalk" can also be a wider area: at Hartigova (3687, −70) the first 5 m rise
+    1.2 %, the 10 m behind them 0.8 m (a forecourt or a slope).
+  - **Crossfall across the walkway** (a line through IPR from 1.5 m off the kerb to 1 m before the far side or 5 m
+    from the kerb, 94,689 samples): the median rises 2.3 %, p25–p75 0.9–3.7 %; 24 % are within the norm's 0.5–2 %.
+    Hartigova reads 1.8 %. (A first read from 1 m off the kerb across the whole width gave 2.5 %.)
+  - **The kerb step** (IPR 1 m into the sidewalk less 1.5 m into the road): p25/50/75 5.9 / 10.4 / 14.8 cm, the
+    median `tools/kerbs.py`'s `KERB` 0.10 m.
+  - **The user** (#512, 2026-11-15): "Hartigova sidewalks should be pretty flat overall, not sure where that steep
+    angle comes from. Small angle is good for draining water but shouldn't be noticeably too much." So the generated
+    walkway takes IPR's crossfall held to the norm's 0.5–2 % (data/truth.json `sidewalk-crossfall`); IPR reads the
+    sidewalks steeper than they are.
+  - **Today's survey surface at Hartigova falls away from the kerb** (median −2.2 %): `kerbs.py`'s +0.10 m may land on
+    a line that is already the kerb's top there.
+- **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
+  crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
+  street; a crossing street ramps up to the bed.
+- **The generated street surface on the five lines** (`street_profile.py --wide 300`, #512, 2026-11-15):
+  - **Inside the road** (1 m in from its edge) it lies within 0.18-0.25 m of IPR at p99, the survey's surface within
+    0.47-0.83 m; sidewalks 0.18-0.21 m against 1.4-2.1 m.
+  - **Along the survey's straight outlines** (#470's statistic, 0.3 m inside) it scatters more than the survey's
+    outline and less than IPR: roads over 8 cm off their 21 m mean 1.7-2.7 % against the survey's 1.2-1.6 % and
+    IPR's 1.9-3.4 %. At the edge it follows what the lidar sees there (walls, ramps, the bed's edge): of Palmovka's
+    157 samples over 8 cm, 102 have IPR over 8 cm too.
+  - **Triangles** (pydelatin on a 0.5 m raster, both filled off the streets from their nearest street cell): at 2 cm
+    22-31 % fewer than IPR's own raster; at 5 cm 6-24 % more, its kerbs kept as 10 cm steps where IPR rounds them.
+    The survey's outline triangulation has a tenth as many, linear between noisy vertices. With the terrain beside
+    the streets in the raster, the edge between the two drew most of the triangles.
+
+### Tram stops: ČSN 73 6425-1 (2007)
+
+The stops norm (bus, trolleybus and tram stops, part 1: design; `raw/reference/norms/`, the user's upload, #512).
+Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply to it too.
+
+- **Kinds beside an unraised belt** (7.1.1): a boarding island; a raised carriageway, the lane lifted to the
+  sidewalk's level less 20 mm, which cars drive over (pojížděný mys); a stop peninsula (mys), with the cars led
+  over the tracks in a lane at least 3.50 m wide. On C and D1 streets in reconstructions the stop may be at
+  the carriageway's level, guarded by a signal (časový ostrůvek) or humps (7.1.2).
+- **Where** (7.2): after a junction by preference; on grades up to 5 %; not on a curve's outer side
+  unless the driver sees every door; opposite stops facing each other between junctions.
+- **The edge** (7.3.1–7.3.3): the platform runs 0.50 m beyond its boarding edge at either end; the edge is
+  as long as the two longest trains plus 1 m, at most 67 m, or one train where one line stops or at 12 trams
+  an hour or fewer.
+- **Surface** (6.2.2.3, 7.3.4): crossfall 0.5–2 %, the resulting slope at most 5 %; where trams lay over, the
+  track's grade is at most 0.25 %.
+- **Width** (7.3.5): free width 2.20 m (2.50 m recommended), where tight 1.70 m (2.00 m); a shelter's side
+  wall may take 0.50 m of it.
+- **Height** (7.3.6): above the top of rail, to suit the fleet, at most 160 mm under a low floor (a bus edge
+  stands 200 mm over the road, 160 mm in reconstructions, 6.2.2.4).
+
 ### Buildings and structures (Geoportál, Mosty 3D)
 
 - **IPR Geoportál** (CC BY 4.0): LOD2 buildings (untextured, gzipped I3S, we read the non-Draco buffer:

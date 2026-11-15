@@ -1,8 +1,8 @@
 {
- "snapshot": "2026-11-11r",
- "built_at_commit": "3b21a7e",
- "published": "2026-11-15 18:24",
- "note": "#303: kerbs lowered at crossings (lines 9, 17, 22, 23, 37 rebuilt at 3b21a7e)",
+ "snapshot": "2026-11-15",
+ "built_at_commit": "a54ff27",
+ "published": "2026-11-15 20:58",
+ "note": "#512: street surfaces (lineN.streets.*), lines 9, 17, 22, 23, 37, on snapshot 2026-11-15",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -39,6 +39,14 @@
   "line17.signals.json": {
    "size": 36582,
    "sha256": "8698ef0e19017bcdd84848c74c82e24cd7635419e107f36365ec6858bf64dc59"
+  },
+  "line17.streets.bin": {
+   "size": 4152867,
+   "sha256": "9af16098af9ccbef4a2f9a86fb05f8bd97d795284339882b3a93faaad57efda4"
+  },
+  "line17.streets.json": {
+   "size": 10973,
+   "sha256": "aea0c5650374c6bd979aa1277f039b8983e21f567fee5e27401b99a04bd65221"
   },
   "line17.validate.json": {
    "size": 4663,
@@ -80,6 +88,14 @@
    "size": 7032010,
    "sha256": "5d698fbdb2c869ec6307d2a7dcaf919c19e4c354759a331299634b5dfe806847"
   },
+  "line22.streets.bin": {
+   "size": 4163721,
+   "sha256": "7eeacc28b2008dedff8b52922d3cabf16957ef99dc34b1d71b5ae4b5f89d038e"
+  },
+  "line22.streets.json": {
+   "size": 9316,
+   "sha256": "56c0e82f0d3bfe1e8931873abceef07949d2142860bf709981ae14957d6d1f98"
+  },
   "line22.validate.json": {
    "size": 4761,
    "sha256": "a53e7a9dd1e387e814a6e1b73a856234c04a462fceb1536565dc48291b2f7cde"
@@ -119,6 +135,14 @@
   "line23.json": {
    "size": 2711135,
    "sha256": "d6fbfb5eb652ca27af7a52b46901ed664901e1b0e987b1372cbbf74c09be6f83"
+  },
+  "line23.streets.bin": {
+   "size": 1831132,
+   "sha256": "1475df6c65c25181bf69a4ab1e8090499641b0c16bca1511b9883ecd2d5cb05a"
+  },
+  "line23.streets.json": {
+   "size": 5249,
+   "sha256": "bd70304cf88c4f3955438eb9b50cc915d91b77b2b8ff69838dbe3a648cf3494e"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -160,6 +184,14 @@
    "size": 2538818,
    "sha256": "542da8c8eb920d20469273c701a6486db42b44577025482eb31a01ba44f919ea"
   },
+  "line37.streets.bin": {
+   "size": 1826191,
+   "sha256": "d9d38123f406fc826887486e1fa1e5b72f91a91420cc6a6c2e22a4c363f60697"
+  },
+  "line37.streets.json": {
+   "size": 5457,
+   "sha256": "b9ff81e55efcf6f5a08654a46ac91e2fa660d7bd2bd7609ddea339a42c5fd5bc"
+  },
   "line37.validate.json": {
    "size": 2514,
    "sha256": "de3cc9272e81c688da3e914974ab6533e34bb9d346803b632decf72383f75cb3"
@@ -199,6 +231,14 @@
   "line9.json": {
    "size": 6274216,
    "sha256": "1ba4b0d41766a258f0c5198d02e2c7985540f2ca61db7decef826a8ce6da5b64"
+  },
+  "line9.streets.bin": {
+   "size": 4356696,
+   "sha256": "127da5c01cce73ba2193aa9f1f2fd5c88cbb0ba1409c8fb48747f3a2dad6c5ad"
+  },
+  "line9.streets.json": {
+   "size": 9750,
+   "sha256": "8602e873e14deb16a30c96594b9aaf95dd3e459b30e2b749b4bcdd810e360cb4"
   },
   "line9.validate.json": {
    "size": 6596,

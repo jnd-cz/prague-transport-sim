@@ -323,5 +323,15 @@ class DeployTest(unittest.TestCase):
         self.assertEqual(out, {"meta": {"a": 1, "b": 2}, "items": {"k": {"v": 1, "t": 5}, "j": {"v": 3, "t": 1}}})
 
 
+class SiteFiles(unittest.TestCase):
+    def test_build_only_files_stay_home(self):
+        import make_dist
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "data"))
+            for f in ("line17.json", "line17.streets.bin", "line17.streets.json"):
+                open(os.path.join(root, "data", f), "w").close()
+            self.assertEqual(list(make_dist.files(root)), ["data/line17.json"])
+
+
 if __name__ == "__main__":
     unittest.main()
