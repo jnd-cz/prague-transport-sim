@@ -247,6 +247,12 @@
    "quote": "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm (openrailwaymap) track info."
   },
   {
+   "id": "user-ohrada-krejcarek-65",
+   "text": "Down from Ohrada toward Krejcárek (line 37's direction) the posted speed is 65 km/h, where OSM's 60 is: OSM way 412908226 tags 60 (its other direction, way 334167230, 65). Reference until #612 has tools/osm_speeds.py read it.",
+   "source": "user 2026-11-15 (#500, PR #501), with a photo of the sign",
+   "quote": "I watched the section between ohrada and Krejcárek and found there is actually 65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong."
+  },
+  {
    "id": "user-t3-controls",
    "text": "The T3 controls are placeholders without pedals; the pedals and the accelerator (zrychlovač) are to be researched and simulated.",
    "source": "user 2026-11-03 (#215)",

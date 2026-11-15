@@ -558,9 +558,12 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   - **T3M 8088 again on 2026-11-12** (the phone at the end of the second car, the front 31 m ahead; snapshot 2026-11-12s), to compare:
     - **The trip:** the same one (trip 17): +50 s at Vozovna Žižkov, +110 s at Ohrada, +201 s at Krejcárek. To Krejcárek 197 s, 87 of
       them standing at the junction past Ohrada.
-    - **Down the posted 60 toward Krejcárek:** top 60.7 km/h, against 67.2 the day before. That driver's 63–67 was their own pace.
-    - **Where the posted limit rises from 50 to 60:** both rides ran 53–57 km/h (medians 53–54) where our limit is still 50, 50–100 m
-      before our 60 begins. Either the sign stands earlier than OSM has it, or the drivers pick up speed as it comes into view.
+    - **Down toward Krejcárek the sign says 65, not OSM's 60** (the user, 2026-11-15, with a photo of the sign: "there is actually
+      65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong"). OSM tags this track
+      (way 412908226) 60 and the other direction (way 334167230) 65. This ride's top was 60.7 km/h; the day before's 63–67 was
+      within the 65 but for 67.2.
+    - **Where the limit rises from 50:** both rides ran 53–57 km/h (medians 53–54) 50–100 m before the sign, where 50 still holds:
+      the drivers pick up speed as the sign comes into view.
     - **The rest:** 21.4 km/h over Ohrada's crossings (our 15; 1.43×, under the derailment's 1.5×), 46.4 in the 43 curve, 28 where 25
       is posted before Palmovka, and 18.4 over the 15 restriction 38 m before Palmovka.
 - **Driving to the timetable** (#242): the time in hand to the next stop sets how it drives. That is the stop's timetable
