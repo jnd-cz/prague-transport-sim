@@ -195,14 +195,23 @@ ones join the registry after the repository's (`src/packages.js` `loadInstalled`
 package installed from a `package.json` address offers *Update* when a newer version is there.
 
 **The curated list** (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
-`assets/catalogue.json`, shown under the installed ones with an *Install* button. Submitting through the game's
-website, the pack or its address, is #580. Until then, to submit a package, open an issue
-with its address (an https `package.json` or `.zip` on your own host, which must allow the game's page to fetch it:
-CORS), its licence, and the check's report from installing it. Once it is reviewed, an entry goes into the list:
-`id`, `names` (cs, en), `author`, `licence`, `kind`, `url`, `home` (its page). The project hosts no package it did not
-make. `tools/test_vehicles.py` checks the entries.
+`assets/catalogue.json`, shown under the installed ones with an *Install* button. An entry: `id`, `names` (cs, en),
+`author`, `licence`, `url`, `home` (its page), `packages` (a bundle's), `submission`. `tools/test_vehicles.py` checks
+the entries.
 
-`tools/test_packages.py` installs a sample bundle and six broken packages in headless Chromium (docs at its top).
+**Submitting a package** (#580; the user, 2026-11-13: "submit the pack or link to the asset through our website where
+we can pick it up and review"): the Vehicles… page's *Submit a package to the project* takes a .zip or its address
+(an https `package.json` or `.zip` on the author's host, which must let the game's page fetch it: CORS), an optional
+contact for the verdict (an email or a Discord name) and a note. A box says whether the project may host the files on
+its server and offer them to everyone from the menu; unticked, they stay on the author's host and the list links
+them (the user, 2026-11-15). The page checks the package as an install does, keeping nothing (`src/packages.js`
+`dryCheck`), and sends only one that passes, with the check's report, to the host's `submit.php`
+(`tools/submit.php`: 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull; only the file types of
+`src/packageRules.json`; no IP address stored). The review (DEVELOPING.md, Deploy) adds an accepted one to the list.
+A GitHub issue with the same facts stays a way in.
+
+`tools/test_packages.py` installs a sample bundle and broken packages in headless Chromium (docs at its top);
+`tools/test_submission_check.py` submits one, checks it, accepts it and installs it from the list.
 
 ## The rig
 
