@@ -22,14 +22,14 @@ class ExportHybridRig(unittest.TestCase):
         original = json.dumps(self.base)
         rig = export_rig(self.glb, self.base, self.roles)
         self.assertEqual(rig["revision"], self.base["revision"])
-        self.assertEqual(rig["rigRevision"], 1)
+        self.assertEqual(rig["rigRevision"], 2)
         self.assertNotIn("handWritten", rig)
         self.assertEqual(rig["bogies"], self.base["bogies"])
         self.assertEqual(rig["infoPlates"], self.base["infoPlates"])
         self.assertEqual(rig["pantograph"]["clip"], "Pantograph_Lower")
         self.assertEqual([d["clip"] for d in rig["doors"]],
                          ["Door_Middle_Open", "Door_Rear_Open", "Door_Front_Open"])
-        for key in ("saloon", "shoes", "couplers", "beams", "tailLamps", "fleetDigits"):
+        for key in ("saloon", "shoes", "couplers", "headlights", "tailLamps", "fleetDigits"):
             self.assertEqual(rig[key], self.roles[key])
         self.assertEqual(json.dumps(self.base), original)
 
@@ -39,15 +39,29 @@ class ExportHybridRig(unittest.TestCase):
             export_rig(self.glb, self.base, self.roles)
 
     def test_rejects_shoe_under_wrong_bogie(self):
-        self.roles["shoes"]["Bogie_Front"][0] = "Black_Metal_116"
-        with self.assertRaisesRegex(ValueError, "shoe under Bogie_Front.*Black_Metal_116"):
+        self.roles["shoes"]["Bogie_Front"][0] = "Track_Brake_Shoe_Rear_Right"
+        with self.assertRaisesRegex(ValueError, "shoe under Bogie_Front.*Track_Brake_Shoe_Rear_Right"):
             export_rig(self.glb, self.base, self.roles)
 
-    def test_rejects_stale_beam_after_headlight_moves(self):
-        mesh = next(n for n in self.glb["nodes"] if n.get("name") == self.roles["headlightMesh"])
-        mesh["translation"] = [0, 0, 0.2]
+    def test_rejects_headlight_node_off_the_lamp(self):
+        lamp = next(n for n in self.glb["nodes"] if n.get("name") == "Headlight_Left")
+        lamp["translation"] = [6.9, 1.2191, -0.4919]  # (behind the lamp's face)
         with self.assertRaisesRegex(ValueError, "beam 1.*outside the headlight bounds"):
             export_rig(self.glb, self.base, self.roles)
+
+    def test_names_only(self):
+        # (#525: the model names its parts; the roles hold no coordinates)
+        numbers = []
+        walk = lambda v: numbers.append(v) if type(v) is float else [walk(x) for x in (v.values() if isinstance(v, dict) else v if isinstance(v, list) else [])]  # noqa: E731
+        walk({k: v for k, v in self.roles.items() if k != "fleetDigits"})
+        self.assertEqual(numbers, [])
+
+    def test_rejects_missing_saloon_and_tail(self):
+        for key, value, message in (("saloon", "No_Saloon", "saloon"), ("tailLamps", ["Tail_left_Glow", "Nope"], "tail lamp")):
+            roles = json.loads(ROLES.read_bytes())
+            roles[key] = value
+            with self.assertRaisesRegex(ValueError, message):
+                export_rig(self.glb, self.base, roles)
 
     def test_cli_is_repeatable_and_leaves_output_on_failure(self):
         tool = Path(__file__).with_name("export_t3h_rig.py")
