@@ -414,6 +414,19 @@ export class TR37 {
       if (s < -4 && (this.ls || this.coastT < C.coastSettle)) s = -4;
       if (s > 0 && this.brakeT < C.coastSettle && w.power !== true) s = 0;
     }
+    // (braking with a stop or a signal ahead, the foot stays on where it would only coast: down to step 1 rather than off, where step 1
+    // held from here does not stand it short of the point. Below ≈9 km/h steps 1–2 fade to nothing, so there it rolls in as if coasting
+    // with the pedal held, as far as coasting reaches, and the last metres' rule below takes over without a new press. Let off where the
+    // plan found it ahead of its curve, it was off at 12.7 m and 11.5 km/h and on again at 6 m, or off 2–3 m out at 3–6 km/h and on
+    // again to stand, or off after braking for a lower limit 70-130 m out and on again for the stop: 27 of 45 stops on line 9 took two
+    // brake presses or more, seed 2; the user, 2026-11-15: "consistently stop in a single pedal press", #502)
+    // (only where the stop's own braking would begin within ≈3 s at 0.9 m/s²: held from further out, step 1 took away speed that the drive
+    // pedal had to give back)
+    if (w.holdBrake && now < 0 && s === 0 && w.power !== true && !w.stand && v > 0.05 && w.stopDist != null) {
+      const a1 = F(1) / (w.inertia || 2e4) + (w.aCoast ?? 0), aC = Math.max(0.03, w.aCoast ?? 0), vf = 2.5;
+      const reach = v > vf ? (a1 > 0 ? (v * v - vf * vf) / (2 * a1) + (vf * vf) / (2 * aC) : Infinity) : (v * v) / (2 * aC);
+      if (reach >= w.stopDist - 2 && (v <= vf || w.stopDist - (v * v) / 1.8 < 3 * v)) s = -1;
+    }
     if (w.fixed && w.aNeed != null && s < 0 && v < 1.6 && !w.stand) {
       // the last metres to a stop or a signal. The electric brake is out below ≈6 km/h; from step 3 on it hands over to the
       // shoes, partly (BR1 at position 3) or fully on step 5 (LO), and partly is as far as they let go again without the

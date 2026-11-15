@@ -28,11 +28,13 @@ const COAST_T = 8;
 // curves at the limit, brake step 1 held down a descent only to HOLD_LATE under. (At a 15 km/h limit 0.4 and 1 m/s under held it at
 // 10-14.5 km/h, where the drivers of two line 23 rides held 14-16 down Chotkova; with these and the curves at 1.0 m/s², line 23's moving
 // time fell 1448 -> 1363 s and its drive presses 99 -> 83, energy the same, #431.) From there it grows milder, fully so MILD_SPAN s later:
-// UNDER and HOLD, the curves as at GENTLE_A, the target down to 10 km/h under the limit (never under 70 % of it), the coasting into
+// UNDER and HOLD, the curves as at GENTLE_A, the target down to 10 km/h under the limit (never under 70 % of it nor MILD_FLOOR), the coasting into
 // stops and lower limits up to twice as long, the planned braking a quarter softer.
 const MILD_FROM = 10, MILD_SPAN = 30;
+const MILD_FLOOR = 20 / 3.6;         // m/s: the lowest target time in hand takes it to (#502)
 const UNDER_LATE = 0.2, UNDER = 0.4; // m/s: where the target sits under the limit
 const HOLD_LATE = 0.6, HOLD = 1.0;   // m/s under the target that brake step 1 holds down a descent (src/tr37.js holdUnder)
+const HOLD_SAG = 0.2;                // of the target speed: how far it sags coasting before the next drive press (0.35-1.0 m/s; src/tr37.js holdSag)
 const GENTLE_A = 0.8;                // m/s²: the curves' unbalanced lateral acceleration with time in hand (src/route.js A_LAT, the cant's comfort)
 const DWELL = 15; // s at a stop, doors open to closed [assumed]
 const RUN_A = 0.8, RUN_D = 0.9; // m/s²: the quickest run's start and braking, for the run time to the next stop
@@ -107,7 +109,11 @@ export class Autopilot {
     // (a turn's contact within reach keeps UNDER: UNDER_LATE under the 20 km/h street at Anděl is 19.3 km/h, where the accelerator
     // stands at 31 coasting, over the switch button's 30, and the drive pedal turned between two brakings, line 9 seed 4)
     const under = cd && cd.contact - tr.panto < Math.max(60, tr.v * 12) ? UNDER : UNDER_LATE + (UNDER - UNDER_LATE) * mild;
-    let vt = vLim / 3.6 - under - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6);
+    // (time in hand never takes it under MILD_FLOOR, nor a lower limit under its own target: at 70 % of a 15 km/h limit it crawled at 9 km/h
+    // up 9-13 ‰ after Jindřišská on a press every 2 s, where T2R 6004 let it sag to 12 on one; and at 15 in the 20 before Masarykovo
+    // nádraží on three, where 6004 pressed once to 19 and the driver of 6921 ran 24, #502)
+    const vFull = vLim / 3.6 - under;
+    let vt = Math.max(Math.min(vFull, MILD_FLOOR), vFull - mild * Math.min(10 / 3.6, 0.3 * vLim / 3.6));
     const lowMu = (g.muBase ?? 0.3) < 0.2;
     // (and on slippery rail, coasting to it about the button's speed, under that with the speed hold's band: down to Anděl in rain it
     // gathered to 18.8 km/h over its 18.6, braked on step 1 22 m before the stop, the accelerator rose over 30 and the drive pedal turned,
@@ -482,12 +488,15 @@ export class Autopilot {
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+      holdBrake: fixed && !shortUphill && !this.patchCoast,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn || this.patchCoast) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       railA: mu < 0.2 ? railA(tr.sanding || this.input.sand) : null,
       aService: (tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia,
       // (on a climb the old 0.35: coasting loses the speed there in seconds, and each new press steps up through 1-4 again)
-      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, 0.12 * vt)), holdUnder: HOLD_LATE + (HOLD - HOLD_LATE) * mild });
+      // (a fifth of the speed in the low limits: T2R 6004 let 15 km/h sag to 12 up 5-13 ‰ after Jindřišská and 20 to 16 before Masarykovo
+      // nádraží, one press each, where 0.12 of it (0.46-0.65 m/s) took 3-4, #502)
+      speedErr: onCurve ? null : tr.v - vt, holdSag: gradeHere > 0.02 ? 0.35 : Math.min(1.0, Math.max(0.35, HOLD_SAG * vt)), holdUnder: HOLD_LATE + (HOLD - HOLD_LATE) * mild });
     this.stopWhy = stopAt === null ? null : stopWhy; this.stopAtS = stopAt;
     return { vt, vtDrive, stopAt, notch: tr.notch, fixed, aNeed, inApproach };
   }

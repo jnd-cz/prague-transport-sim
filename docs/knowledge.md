@@ -616,8 +616,8 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   the coast as for the curve; no crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py
   --checks stops`, `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make. It pulls away at up to
   1.0 m/s², on step 3 below 20 km/h on the level unless step 3 cannot make it (a full car), and at up to 1.2 m/s² above 20 km/h (step 4).
-  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (0.12 of the speed in slow streets, 0.35 m/s on a
-  climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
+  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (a fifth of the speed in slow streets, #502;
+  0.35 m/s on a climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
   point on its curve; only where the limits have it pass the contact faster than the button works coasting (≈19 km/h).
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way.
@@ -628,6 +628,14 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   The crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
+  **One brake press into a stop** (#502; the user, 2026-11-15: "consistently stop in a single pedal press"). The fade below ≈9 km/h
+  (steps 1–2 to nothing, step 5 handing over to the shoes) was handled by the last metres' rule, but only while the pedal was down.
+  Where the plan found it would roll in by itself it asked to coast, and the foot came off: 2–3 m out at 3–6 km/h and on again to
+  stand, or off at 11–12 km/h after step 5 and on again 6 m out. Now, braking with a stop or a signal ahead, where it would only
+  coast, the foot stays on step 1 (spent below 9 km/h, so it rolls as if coasting), where step 1 does not stand it short and the stop's
+  braking begins within ≈3 s. The brake let off and pressed again inside an approach (`stops` pulses, seeds 1–5, against main at
+  609a4bc): line 9 15 → 2.6, 17 9 → 1.6, 22 10 → 1, 23 1.8 → 0.6, 37 7 → 1, the stops as precise. A separate braking for a tram, a car
+  or a lower limit 75–150 m out, then a coast, stays: the drivers coast there too.
 - **Real rides, and how far to follow them** (#351, PR #363): GPS of four rides on line 23 from the user, read from the speed with the
   gradient and the running resistance taken out: car 6921 Lazarská to Královka and car 6312 Královka to Bílá labuť on 2026-10-31,
   T2R 6004 and T3SUCS 7290 on the diverted route on 2026-11-07, the last with a phone's accelerometer for 11 minutes. The drivers
@@ -703,6 +711,13 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     | to Jindřišská | 94 s, 2 + 2 | 55–60 s, 1–4 + 1–3 |
     | Jindřišská to Masarykovo nádraží | 76 s, 4 + 4 | 91–155 s, 8–9 + 3–4 |
     | to Bílá labuť | 95 s, 4 + 4 (6003: 81 s, 1 + 3) | 73–79 s, 6–7 + 4–5 |
+  - **Jindřišská to Masarykovo nádraží, traced** (#502, seeds 1–3 on main at 609a4bc): our limits allow 74 s. The time
+    over that is a red at the junction 237 m out (21–27 s held in two seeds of three) and the timetable's 180 s stop to stop:
+    with 110–165 s in hand, the mild driving took the 15 km/h limit after the stop to 9 km/h and the 20 before Masarykovo to 15.
+    The presses came from holding those speeds up 5–13 ‰: a press each time it sagged 0.35–0.5 m/s, 3–4 in each zone. 6004
+    pressed once in each and let 15 sag to 12 and 20 to 16. Since #502 the mild driving keeps 20 km/h (a lower limit its own
+    target) and the hold sags a fifth of the speed (0.35–1 m/s): 6–7 presses there where traffic leaves it alone, and a car on
+    the track or a stand at the red adds a press each.
   - **The T3M on line 37** (front 23 m ahead of the phone):
     - **The trip:** it left Vozovna Žižkov 50 s after the game timetable's 08:20 (trip 17; the user: "always assume same or delayed
       trip, never earlier"), Ohrada +107 s, Krejcárek +171 s.
@@ -731,7 +746,7 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     down Chotkova (#431). Within reach of a turn's contact the target keeps 0.4: 0.2 under Anděl's 20 km/h put the accelerator
     at 31 coasting, over the switch button's 30.
   - **Over the next 30 s it grows milder:** curves as at 0.8 m/s², 0.4 under the limit, the 1 m/s hold, the target up to
-    10 km/h under, coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
+    10 km/h under but never under 20 km/h (#502), coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
     autopilot doesn't go as hard into curves and uses less pedal presses to conserve power. If he's late then he uses the
     probe's plan to catch up").
   - **Against main at 973726c** (with #451's curves; stops check, seeds 1-5):
