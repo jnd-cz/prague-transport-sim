@@ -284,7 +284,7 @@ def main():
         fails.append("no result card")
     if not test or test["perftest"].get("frames") != res.get("frames"):
         fails.append("Send stored no perftest note with the result")
-    if not (ref.get("reference") and str(ref.get("line")) == "17" and ref.get("model") == "hybrid" and ref.get("frames", 0) > 10):
+    if not (ref.get("reference") and str(ref.get("line")) == "17" and ref.get("model") == "t3h" and ref.get("frames", 0) > 10):
         fails.append(f"the reference run is not line 17 with the detailed model: {ref}")
     if ref.get("stop") != "Palackého náměstí":
         fails.append(f"the reference run starts at {ref.get('stop')!r}, not Palackého náměstí")
