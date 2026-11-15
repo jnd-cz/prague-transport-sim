@@ -625,11 +625,21 @@ def _track_centre(L):
 
 def raised_bed(c, F, ipr, road):
     """Per sample of a tracks string and side (0: -n, 1: +n), whether its bed stands over RAISED_BED above the road
-    beside it: IPR 1-2 m beyond the bed's edge, where that is road, against the bed's height; held over 5 m runs (a
-    crossing's ramp, where IPR beside the bed is at its level, is a gap in the run)."""
+    beside it in IPR: IPR on the tracks (between them and at each) against IPR 1-2 m beyond the bed's edge, where that
+    is road; held over 5 m runs (a crossing's ramp, where IPR beside the bed is at its level, is a gap in the run).
+    (IPR against itself, not against the tracks' heights: those stood 0.13 m under IPR's corridor at Hartigova, which
+    the user confirmed raised, and read it unraised (2 % of its samples); 0.25 m over IPR's level corridor at
+    Olšanské hřbitovy (#606) read it raised behind a 0.25 m kerb)"""
     import shapely
     n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
     out = np.zeros((len(c["p"]), 2), bool)
+    on = []
+    for o in (-1.0, 0.0, 1.0):
+        q = c["p"] + n * (o * c["half"])[:, None]
+        on.append(np.asarray(ipr.sample(q[:, 0] + F.E0, q[:, 1] + F.N0), float))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        bed = np.nanmedian(np.array(on), axis=0)
     for side, sg in ((0, -1.0), (1, 1.0)):
         zs = []
         for d in (1.0, 1.5, 2.0):
@@ -640,7 +650,7 @@ def raised_bed(c, F, ipr, road):
         with warnings.catch_warnings():  # (a sample with no road beside it: all NaN)
             warnings.simplefilter("ignore", RuntimeWarning)
             beside = np.nanmedian(np.array(zs), axis=0)
-        up = np.isfinite(beside) & (c["z"] - beside > RAISED_BED)
+        up = np.isfinite(beside) & (bed - beside > RAISED_BED)
         for a, b in runs(up):
             if c["s"][b - 1] - c["s"][a] >= 5.0:
                 out[a:b, side] = True
@@ -1244,6 +1254,11 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         c = np.where(cnt >= 4, c, np.nan)
         c = np.clip(c, lo, hi)
         c = np.where(np.isfinite(c), c, np.nanmedian(c) if np.isfinite(c).any() else (lo + hi) / 2)
+        # (a walkway ends where its plane leaves IPR by over STEP_CUT, a wall: on line 17 by (-2493, -8477) one survey
+        # sidewalk spans a 4 m wall between two roads, and the two kerbs' planes blended across it made 116 walker's
+        # steps of 0.5-1 m in a square where the survey has 9; beyond, the fill follows IPR and does not join the step)
+        wall = (np.abs(zr[:, None] + KERB + c[:, None] * d[None] - Z) > STEP_CUT) & (d[None] >= 0.5) & np.isfinite(Z)
+        w = np.where(wall.any(1), np.minimum(w, d[np.argmax(wall, axis=1)] - 0.25), w)
         for kd, dk in enumerate(d):
             p = P[:, kd]
             i = np.round((ys[0] - p[:, 1]) / cell).astype(int)
@@ -1276,7 +1291,7 @@ def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
     zw = np.asarray(walk_z(x[inner], y[inner]), float)
     zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
     d = (zw - zi)[np.isfinite(zw) & np.isfinite(zi)]
-    steps, bend, kerb, places = 0, [], [], []
+    steps, bend, kerb, places, walls = 0, [], [], [], 0
     for q, n in ctx["kerb_edges"]:
         q, n = q[::4], n[::4]  # (every metre)
         ok = (q[:, 0] >= box[0][0]) & (q[:, 0] <= box[1][0]) & (q[:, 1] >= box[0][1]) & (q[:, 1] <= box[1][1])
@@ -1288,6 +1303,13 @@ def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
         p = q + n * 1.5
         z = np.asarray(walk_z(p[:, 0], p[:, 1]), float)
         z[~shapely.contains_xy(walk, p[:, 0], p[:, 1])] = np.nan
+        # (no walker's line on a wall: where IPR rises over STEP_CUT across 1 m, a survey sidewalk along a wall's top
+        # (line 17 by (-1734, -5567): 1.5 m wide over a 6 m wall), for every surface alike)
+        a_, b_ = p + n * 0.5, p - n * 0.5
+        on_wall = np.abs(np.asarray(ipr.sample(a_[:, 0] + F.E0, a_[:, 1] + F.N0), float)
+                         - np.asarray(ipr.sample(b_[:, 0] + F.E0, b_[:, 1] + F.N0), float)) > STEP_CUT
+        walls += int((on_wall & np.isfinite(z)).sum())
+        z[on_wall] = np.nan
         g = dp = None
         for i, dz in enumerate(np.diff(z)):
             if not np.isfinite(dz):
@@ -1306,6 +1328,7 @@ def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
     bend = np.asarray(bend)
     return {"off IPR 1 m inside, mean / p99 |.| m": [round(float(np.mean(d)), 3), round(float(np.percentile(np.abs(d), 99)), 3)] if len(d) else None,
             "kerb step p5/50/95 m": pct(kerb, (5, 50, 95)), "walker's steps": steps,
+            "walker's metres on a wall, left out": walls,
             "bumps (bend in 1 m over WALK_BUMP)": int((bend > WALK_BUMP).sum()),
             "bend in 1 m p50/99 m": pct(bend.tolist(), (50, 99)), "places": places,
             **({"_raw": {"dev": d.tolist(), "kerb": kerb, "bend": bend.tolist()}} if raw else {})}
@@ -1328,71 +1351,117 @@ def context(ln):
             "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk}
 
 
-def line_wide(lines, cell, out_path):
+_WIDE = {}  # (a pool worker's line: its context, loaded once)
+
+
+def _wide_init(ln):
+    _WIDE["ln"], _WIDE["ctx"] = ln, context(ln)
+
+
+def wide_square(ln, cell, ij, raised_xy, ctx=None):
+    """One square of line_wide: the line's streets built in it and measured, as sums and samples to merge in square
+    order (survey and generated: the road 1 m inside its edge against IPR, the drive lines, the sidewalks), the
+    generated jumps' places, and per confirmed raised corridor (raised_xy) its tracks' samples within 50 m and how many
+    read raised. None where the square holds no street."""
+    import shapely
+    ctx = ctx or (_WIDE["ctx"] if _WIDE.get("ln") == ln else context(ln))
+    i, j = ij
+    at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
+    box = [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)]
+    cs, _, F, ipr, road = pilot(at, radius, ln, None, ctx)
+    if not cs:
+        return None
+    out = {"acc": {}, "sw": {}, "places": [], "raised": []}
+    for xy in raised_xy:
+        n = r = 0
+        for c in cs:
+            if "raised" in c:
+                near = np.hypot(*(c["p"] - xy).T) <= 50.0
+                n += int(near.sum())
+                r += int(c["raised"][near].any(1).sum())
+        out["raised"].append((n, r))
+    field = junctions(cs, F, ipr, road, box)
+    xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5), np.arange(at[1] + radius, at[1] - radius, -0.5))
+    x, y = xg.ravel(), yg.ravel()
+    inner = shapely.contains_xy(near_box(ctx, "road inside", box), x, y)
+    zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
+    zs = sample_tris(ctx["tris"], x[inner], y[inner])
+    zg = generated(cs, x[inner], y[inner], road, field)
+    fns = {"survey": lambda a, b, tris=ctx["tris"]: sample_tris(tris, np.asarray(a, float), np.asarray(b, float)),
+           "generated": lambda a, b: generated(cs, np.asarray(a, float), np.asarray(b, float), road, field)}
+    for k, z in (("survey", zs), ("generated", zg)):
+        d = z - zi
+        m = drive_measures(fns[k], [c for c in cs if c["highway"] != "tracks"], raw=True, road=road)
+        out["acc"][k] = {"dev": d[np.isfinite(d)].tolist(), "jumps": m["jumps"], "rolls": m["rolls over 7 deg"],
+                         **{q: m["_raw"][q] for q in ("dgrade", "roll", "bend")}}
+        if k == "generated":
+            out["places"] = m["places"]
+    swf = sidewalks(ctx, fns["generated"], box)
+    for k, wz in (("survey", lambda a, b, t=ctx["sw_tris"]: sample_tris(t, np.asarray(a, float), np.asarray(b, float))),
+                  ("generated", lambda a, b, f=swf: bilinear(f, a, b))):
+        m = sidewalk_measures(ctx, wz, fns[k], box, raw=True)
+        if m:
+            out["sw"][k] = {**{q: m["_raw"][q] for q in ("dev", "kerb", "bend")}, "steps": m["walker's steps"],
+                            "bumps": m["bumps (bend in 1 m over WALK_BUMP)"],
+                            "walls": m["walker's metres on a wall, left out"]}
+    return out
+
+
+def line_wide(lines, cell, out_path, jobs=None):
     """Every line's corridor in squares of `cell` m (each square holding the line's track), built as the pilot builds
     Palmovka and measured: the surface against IPR 1 m inside the road's edge, and the drive lines, survey against
-    generated, summed per line."""
-    import shapely
+    generated, summed per line. The squares run in `jobs` processes (sysinfo.workers by free memory, a line's context
+    about 0.7 GB in each), merged in square order: the result is the serial one's."""
+    import sysinfo
+    # (one thread each for the solvers' BLAS: the workers are the parallelism; read when a worker imports numpy)
+    for v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ.setdefault(v, "1")
+    jobs = jobs or sysinfo.workers(1.0, most=os.cpu_count() or 4)
     out = {}
     for ln in lines:
-        ctx = context(ln)
-        L = ctx["L"]
+        F = Frame()
+        L = json.load(open(os.path.join(ROOT, "data", f"line{ln}.json"), encoding="utf-8"))
         pts = np.asarray(L["path"] + L.get("pathBack", []), float)
         sq = sorted({(int(math.floor(x / cell)), int(math.floor(y / cell))) for x, y in pts})
         acc = {k: {"dev": [], "jumps": 0, "rolls": 0, "dgrade": [], "roll": [], "bend": []} for k in ("survey", "generated")}
-        sw = {k: {"dev": [], "kerb": [], "bend": [], "steps": 0, "bumps": 0} for k in ("survey", "generated")}
+        sw = {k: {"dev": [], "kerb": [], "bend": [], "steps": 0, "bumps": 0, "walls": 0} for k in ("survey", "generated")}
         places = []
         # (the places the user confirmed raised (data/truth.json raised-corridors): how much of each raised_bed() reads)
         raised_at = []
         for r in RAISED_PLACES:
             if r["line"] == ln:
-                x, y = ctx["F"].xy([r["lat"]], [r["lon"]])
+                x, y = F.xy([r["lat"]], [r["lon"]])
                 raised_at.append({"place": r["place"], "xy": np.array([float(np.ravel(x)[0]), float(np.ravel(y)[0])]),
                                   "n": 0, "raised": 0})
-        for n, (i, j) in enumerate(sq):
-            at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
-            cs, _, F, ipr, road = pilot(at, radius, ln, None, ctx)
-            if not cs:
-                continue
-            for r in raised_at:
-                for c in cs:
-                    if "raised" in c:
-                        near = np.hypot(*(c["p"] - r["xy"]).T) <= 50.0
-                        r["n"] += int(near.sum())
-                        r["raised"] += int(c["raised"][near].any(1).sum())
-            field = junctions(cs, F, ipr, road, [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)])
-            xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5),
-                                 np.arange(at[1] + radius, at[1] - radius, -0.5))
-            x, y = xg.ravel(), yg.ravel()
-            inner = shapely.contains_xy(near_box(ctx, "road inside", [(at[0] - radius, at[1] - radius),
-                                                                       (at[0] + radius, at[1] + radius)]), x, y)
-            zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
-            zs = sample_tris(ctx["tris"], x[inner], y[inner])
-            zg = generated(cs, x[inner], y[inner], road, field)
-            fns = {"survey": lambda a, b, tris=ctx["tris"]: sample_tris(tris, np.asarray(a, float), np.asarray(b, float)),
-                   "generated": lambda a, b, cs=cs, road=road, field=field: generated(
-                       cs, np.asarray(a, float), np.asarray(b, float), road, field)}
-            for k, z in (("survey", zs), ("generated", zg)):
-                d = z - zi
-                acc[k]["dev"].extend(d[np.isfinite(d)].tolist())
-                m = drive_measures(fns[k], [c for c in cs if c["highway"] != "tracks"], raw=True, road=road)
-                acc[k]["jumps"] += m["jumps"]
-                acc[k]["rolls"] += m["rolls over 7 deg"]
-                for q in ("dgrade", "roll", "bend"):
-                    acc[k][q].extend(m["_raw"][q])
-                if k == "generated":
-                    places.extend(m["places"])
-            box = [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)]
-            swf = sidewalks(ctx, fns["generated"], box)
-            for k, wz in (("survey", lambda a, b, t=ctx["sw_tris"]: sample_tris(t, np.asarray(a, float), np.asarray(b, float))),
-                          ("generated", lambda a, b, f=swf: bilinear(f, a, b))):
-                m = sidewalk_measures(ctx, wz, fns[k], box, raw=True)
-                if m:
+        xy = [r["xy"] for r in raised_at]
+        if jobs > 1:
+            ex = sysinfo.pool(min(jobs, len(sq)), _wide_init, ln)
+            results = ex.map(wide_square, *zip(*[(ln, cell, ij, xy) for ij in sq]))
+        else:
+            ex, ctx = None, context(ln)
+            results = (wide_square(ln, cell, ij, xy, ctx) for ij in sq)
+        try:
+            for n, part in enumerate(results):
+                print(f"line {ln}: square {n + 1}/{len(sq)}", flush=True)
+                if part is None:
+                    continue
+                for r, (k, q) in zip(raised_at, part["raised"]):
+                    r["n"] += k
+                    r["raised"] += q
+                for k, m in part["acc"].items():
+                    for q in ("dev", "dgrade", "roll", "bend"):
+                        acc[k][q].extend(m[q])
+                    acc[k]["jumps"] += m["jumps"]
+                    acc[k]["rolls"] += m["rolls"]
+                places.extend(part["places"])
+                for k, m in part["sw"].items():
                     for q in ("dev", "kerb", "bend"):
-                        sw[k][q].extend(m["_raw"][q])
-                    sw[k]["steps"] += m["walker's steps"]
-                    sw[k]["bumps"] += m["bumps (bend in 1 m over WALK_BUMP)"]
-            print(f"line {ln}: square {n + 1}/{len(sq)}", flush=True)
+                        sw[k][q].extend(m[q])
+                    for q in ("steps", "bumps", "walls"):
+                        sw[k][q] += m[q]
+        finally:
+            if ex is not None:
+                ex.shutdown()
         res = {}
         for k, a in acc.items():
             d = np.asarray(a["dev"])
@@ -1407,6 +1476,7 @@ def line_wide(lines, cell, out_path):
                 "off IPR 1 m inside, mean / p99 |.| m": [round(float(d.mean()), 3), round(float(np.percentile(np.abs(d), 99)), 3)]
                 if len(d) else None,
                 "kerb step p5/50/95 m": pct(a["kerb"], (5, 50, 95)), "walker's steps": a["steps"], "bumps": a["bumps"],
+                "walker's metres on a wall, left out": a["walls"],
                 "bend in 1 m p99 m": pct(a["bend"], (99,))[0] if a["bend"] else None}
         res["squares"] = len(sq)
         res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
@@ -1432,6 +1502,7 @@ def main(argv=None):
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "street_profile"))
     ap.add_argument("--sidewalks", action="store_true", help="the survey's sidewalks against IPR: crossfall, kerb")
     ap.add_argument("--wide", type=float, metavar="CELL", help="every line of --lines in squares of CELL m (300)")
+    ap.add_argument("--jobs", type=int, help="--wide: squares at once (default: by cores and free memory)")
     a = ap.parse_args(argv)
     if a.sidewalks:
         from baseline_store import HeavyJob
@@ -1440,7 +1511,7 @@ def main(argv=None):
     elif a.wide:
         from baseline_store import HeavyJob
         with HeavyJob("street_profile"):
-            line_wide([int(v) for v in a.lines.split(",")], a.wide, os.path.join(a.out, "lines.json"))
+            line_wide([int(v) for v in a.lines.split(",")], a.wide, os.path.join(a.out, "lines.json"), a.jobs)
     elif a.pilot:
         from baseline_store import HeavyJob
         with HeavyJob("street_profile"):

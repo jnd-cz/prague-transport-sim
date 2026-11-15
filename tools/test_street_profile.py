@@ -85,6 +85,21 @@ class Junctions(unittest.TestCase):
         self.assertGreater(drawn[:, 17].mean() - 200, 0.05)  # (without the kerb the road climbs to the bed)
         self.assertLess(np.abs(kept[:, :18] - 200).max(), 0.005)
 
+    def test_raised_reads_ipr_not_the_track_heights(self):
+        # a 3 m corridor 0.2 m over the road in IPR, the tracks' heights 0.13 m under its top (Hartigova): raised; a
+        # level corridor, the tracks' heights 0.25 m over it (Olšanské hřbitovy, #606): not
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        s = np.arange(0, 40.0)
+        c = {"s": s, "p": np.column_stack([s, np.zeros(len(s))]), "t": np.tile([1.0, 0.0], (len(s), 1)),
+             "half": np.full(len(s), 0.8), "width": np.full((len(s), 2), 1.5)}
+        road = box(-5, -10, 45, 10)
+        F = SimpleNamespace(E0=0.0, N0=0.0)
+        raised = SimpleNamespace(sample=lambda x, y: np.where(np.abs(np.asarray(y, float)) <= 1.5, 200.2, 200.0))
+        level = SimpleNamespace(sample=lambda x, y: np.full(len(np.atleast_1d(x)), 200.0))
+        self.assertTrue(sp.raised_bed(dict(c, z=np.full(len(s), 200.07)), F, raised, road).all())
+        self.assertFalse(sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road).any())
+
     def test_street_geometry_from_truth(self):
         r, other, belt, fall, walk = sp.street_geometry()
         self.assertEqual((r["primary"], r["living_street"], other, belt, fall, walk),
@@ -122,6 +137,34 @@ class Sidewalks(unittest.TestCase):
         f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.0), [(0, 0), (20, 4)])
         z = sp.bilinear(f, np.array([10.0]), np.array([3.0]))
         self.assertAlmostEqual(z[0], 200.16, delta=0.01)
+
+    def test_a_walkway_ends_at_a_wall(self):
+        # a 6 m sidewalk whose ground steps up 2 m at 3 m from the kerb (a wall inside the survey's area): the walkway
+        # holds the kerb's plane up to the wall, and beyond it the ground, not the plane
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: np.where(np.asarray(y, float) > 3.0, 202.10, 200.10))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 6),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))]}
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.0), [(0, 0), (20, 6)])
+        z = sp.bilinear(f, np.array([10.0, 10.0]), np.array([1.5, 5.0]))
+        self.assertLess(abs(z[0] - 200.12), 0.03)
+        self.assertGreater(z[1], 201.8)
+
+    def test_no_walkers_line_on_a_wall(self):
+        # the walker's line 1.5 m in runs along a wall's face (IPR rising 3 m across it): left out of the steps, for
+        # every surface, and counted
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: 200.0 + 3.0 * np.clip(np.asarray(y, float) - 1.0, 0, 1))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 4),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))]}
+        rough = sp.sidewalk_measures(ctx, lambda x, y: 200.0 + 0.5 * (np.floor(np.asarray(x, float)) % 2),
+                                     lambda x, y: np.full(len(np.atleast_1d(x)), 199.9), [(0, 0), (20, 4)])
+        self.assertEqual(rough["walker's steps"], 0)
+        self.assertGreater(rough["walker's metres on a wall, left out"], 10)
 
 
 class Measures(unittest.TestCase):
