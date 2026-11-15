@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
+import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
@@ -182,8 +183,10 @@ scene.fog = new THREE.Fog(sky, 180, 950);
 // figures (8 px at 1080p) 75 m ahead, as an eye reads the real ones (docs/decisions/2026-11-07-speed-limits-and-signs.md,
 // the size experiment).
 const CAB_FOV = 62, ZOOM = 3;
+const FAR_MARGIN = 1.02; // (the far plane a little past the fog's end: a face crossing it is wholly fogged there)
 const zoomFov = (z) => (2 * Math.atan(Math.tan((CAB_FOV / 2) * Math.PI / 180) / z) * 180) / Math.PI;
-const camera = new THREE.PerspectiveCamera(CAB_FOV, 1, 0.3, 1600);
+// (its far plane follows the fog's end, applyWeather: past it everything is the sky's colour, #610)
+const camera = new THREE.PerspectiveCamera(CAB_FOV, 1, 0.3, 950 * FAR_MARGIN);
 const hemi = new THREE.HemisphereLight(0xdfe9f5, 0x6b6a5c, 1.6);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1dc, 1.6);
@@ -206,7 +209,7 @@ const WEATHER = {
   leaves: { sky: '#a9b2b5', fog: [120, 700], sun: 0.9, hemi: 1.35 },
   snow: { sky: '#c3c9cf', fog: [70, 480], sun: 0.6, hemi: 1.45 },
 };
-let world = null;
+let world = null, landmarks = null;
 const rain = makeRain(), snow = makeSnow();
 scene.add(rain, snow);
 
@@ -240,7 +243,10 @@ function uploadWorld() {
 async function buildCity() {
   await load.parts(WORLD_PARTS);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
-  if (data.dtmPoints) world.add(buildStreetDetail(data, ground));
+  if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
+  window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
+  const lm = world.userData.landmarks;
+  if (lm) landmarks = window.landmarks = new Landmarks(lm.pos, lm.nor, lm.col, [hemi, sun], lm.list);
   ground.dtm?.seal(); // (the survey's heights are final now: faster lookups for the simulation, #245)
   window.world = world; // read by the lints (tools/lint.js)
 }
@@ -250,6 +256,11 @@ function applyWeather(w) {
   sky.set(cfg.sky);
   scene.fog.color.set(cfg.sky);
   [scene.fog.near, scene.fog.far] = cfg.fog;
+  // nothing past the fog's end is seen: the far plane there (1600 m before, half the triangles looking along the
+  // track at Spojovací lay past 950 m, #610)
+  camera.far = cfg.fog[1] * FAR_MARGIN;
+  camera.updateProjectionMatrix();
+  LANDMARK_UNIFORMS.uLandmarkFar.value = cfg.fog[1] * LANDMARK_STRETCH; // (the landmarks' lighter haze, src/landmarks.js)
   sun.intensity = cfg.sun;
   hemi.intensity = cfg.hemi;
   rain.visible = w === 'rain';
@@ -990,7 +1001,7 @@ function updateCamera(dt, t) {
 
 // ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php
 const reporter = new Reporter({
-  shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
+  shot: () => canvasShot(canvas, drawWorld),
   pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },
   state: () => {
     const g = game, p = route.at(tram.s), d = new THREE.Vector3(), c = camera.position, r = (v, k = 1) => Math.round(v * k) / k;
@@ -1022,6 +1033,16 @@ const inspect = new Inspect({
   },
 });
 window.inspect = inspect; // (the console and tools/test_free_camera.py, as window.game)
+
+// The landmarks past the far plane first (with the sky), then the world over them without clearing the colour (#610)
+function drawWorld() {
+  if (!landmarks) { renderer.render(scene, camera); return; }
+  landmarks.render(renderer, scene, camera);
+  const bg = scene.background;
+  scene.background = null;
+  renderer.autoClearColor = false;
+  try { renderer.render(scene, camera); } finally { renderer.autoClearColor = true; scene.background = bg; }
+}
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
 // The game's steps per frame (#609): no step longer than STEP_MAX, as many as the real time since the last frame
@@ -1100,8 +1121,11 @@ function frame(now) {
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
     else {
       const timing = perfTest?.phase === 'run' && perfTest.timer;
+      // (a refill redraws the mirror's cached picture too: paused at a shift's start it kept the first frame's, without
+      // the trees then around the cab)
+      if (world?.userData.near?.update(camera, renderer.domElement.height, scene.fog.far) && window.mirror) window.mirror.last = null;
       if (timing) timing.begin();
-      renderer.render(scene, camera);
+      drawWorld();
       if (timing) timing.end();
     }
     lastDraw = now; window.drawCount++;

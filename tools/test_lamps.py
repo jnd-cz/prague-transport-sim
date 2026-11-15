@@ -39,6 +39,9 @@ LIT = """(car) => {
 # tools/gpu.py finds no GPU, a frame of the city takes about a second and moves the clock 0.1 s): every state the two
 # cars showed
 SEEN = """async () => {
+  // (two frames first: a key pressed just before takes effect in the next frame's update, and a sample before it saw
+  // the last state; frames short enough lost that race, #610)
+  for (let i = 0; i < 2; i++) await new Promise((r) => requestAnimationFrame(r));
   const lit = %s, seen = new Set(), t0 = performance.now(), c0 = window.game.clock;
   while (window.game.clock - c0 < 1.5 && performance.now() - t0 < 90000) {
     seen.add(window.tramModel.userData.cars.map(lit).join(' | '));
