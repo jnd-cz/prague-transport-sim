@@ -5,6 +5,7 @@
 // its label. The bar is shared by expected time: the downloads by their speed so far, the build
 // steps by their usual milliseconds (the weights).
 import { t } from './i18n.js';
+import { localUrl } from './localFiles.js';
 
 const DL_SHARE_MIN = 0.05;
 const $ = (id) => document.getElementById(id);
@@ -32,7 +33,7 @@ class Download {
 
   async run() {
     try {
-      const res = await fetch(this.url);
+      const res = await fetch(localUrl(this.url));   // (an installed package's file: its blob, #530)
       if (!res.ok) { this.state = 'missing'; this.onChange(); return null; }
       const len = +res.headers.get('Content-Length') || 0;
       // a compressed body counts decompressed bytes, so its length is no use as the total: on the test host
