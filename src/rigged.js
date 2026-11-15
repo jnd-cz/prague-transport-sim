@@ -29,6 +29,7 @@ const slotted = new Map();
 export const riggedReady = (id) => protos.has(id);
 export const riggedIds = () => [...protos.keys()];
 export const riggedProto = (id) => protos.get(id);
+export const forgetRigged = (id) => protos.delete(id);   // (a package removed or refused, src/packages.js)
 
 const box = (g, m) => { const b = new THREE.Box3().setFromBufferAttribute(g.attributes.position); return m ? b.applyMatrix4(m) : b; };
 

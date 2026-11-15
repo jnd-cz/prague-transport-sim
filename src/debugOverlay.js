@@ -11,7 +11,10 @@
 //   cyan / blue / yellow route height not measured on it (#197): the curve across a short hold / the user's reviewed
 //     / red line,         span / the lidar where nothing else had a height (#202) / the game's surface profile (no
 //     0.6 m up            assembled height: fill, a hold over 60 m)
+//   cyan / green / blue  kerb lowered at a crossing (tools/kerbs.py, #303): an untagged crossing end (the norm's 2 cm) /
+//     / orange dot        OSM kerb=lowered / kerb=flush / a crossing end OSM tags kerb=raised (kept)
 import * as THREE from 'three';
+import { findKerbs } from './review.js';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
 // In S-JTSK (EPSG:5514): game metres plus the city origin (data.frame, docs/decisions/2026-10-29-city-frame-and-tiles.md).
@@ -105,6 +108,10 @@ export function createDebugOverlay(scene) {
       const heads = traffic.lights?.group.children[0], M = new THREE.Matrix4(), v = new THREE.Vector3();
       for (let i = 0; heads && i < heads.count; i++) { heads.getMatrixAt(i, M); v.setFromMatrixPosition(M); add('ball', 0xffee00, v.x, v.y + 3.2, v.z); }
       for (const o of game.data.osmSignals?.stop || []) add('dot', 0xff2020, o.x, surf(o.x, o.y) + 1, -o.y);
+      // the lowered kerbs and where their height came from (the survey's kerb report, tools/kerbs.py)
+      const LOW = { crossing: 0x00e5ff, 'osm kerb=lowered': 0x22cc55, 'osm kerb=rolled': 0x22cc55, 'osm kerb=flush': 0x3a6cff,
+        'osm kerb=no': 0x3a6cff, 'osm kerb=raised': 0xff8c00 };
+      for (const k of findKerbs(game.data.dtm?.provenance)?.lowered?.stretches || []) add('dot', LOW[k.src] ?? 0xffffff, k.x, surf(k.x, k.y) + 0.8, -k.y);
     }
     return g;
   }

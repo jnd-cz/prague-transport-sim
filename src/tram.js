@@ -11,6 +11,7 @@ const G = 9.81;
 // the Tatra T3's body (per car); a vehicle's manifest names its type (assets/*/vehicle.json `type`, VEHICLE_TYPES)
 export const T3 = {
   length: 15.2,              // over couplers (body 14.0 m), DPP training manual: the head's face to the other's
+  width: 2.5,                // the body (tramClearance's 1.25 m a side); a package's car is measured against it (#530)
   // (#248, the sources in the issue's research comment of 2026-11-04)
   bogies: 6.4,               // bogie pivots apart (J. Dynybyl, ČVUT FS bachelor thesis 2018, Table 3: 3.8 m from each frame end)
   trackBrakeGap: 0.012,      // the released magnet's pole pieces over the rail, new wheels (ČKD T-50496 p. 1: 8-12 mm)
