@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
+import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
@@ -204,7 +205,7 @@ const WEATHER = {
   leaves: { sky: '#a9b2b5', fog: [120, 700], sun: 0.9, hemi: 1.35 },
   snow: { sky: '#c3c9cf', fog: [70, 480], sun: 0.6, hemi: 1.45 },
 };
-let world = null;
+let world = null, landmarks = null;
 const rain = makeRain(), snow = makeSnow();
 scene.add(rain, snow);
 
@@ -240,6 +241,8 @@ async function buildCity() {
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
+  const lm = world.userData.landmarks;
+  if (lm) landmarks = window.landmarks = new Landmarks(lm.pos, lm.nor, lm.col, [hemi, sun], lm.list);
   ground.dtm?.seal(); // (the survey's heights are final now: faster lookups for the simulation, #245)
   window.world = world; // read by the lints (tools/lint.js)
 }
@@ -253,6 +256,7 @@ function applyWeather(w) {
   // track at Spojovací lay past 950 m, #610)
   camera.far = cfg.fog[1] * FAR_MARGIN;
   camera.updateProjectionMatrix();
+  LANDMARK_UNIFORMS.uLandmarkFar.value = cfg.fog[1] * LANDMARK_STRETCH; // (the landmarks' lighter haze, src/landmarks.js)
   sun.intensity = cfg.sun;
   hemi.intensity = cfg.hemi;
   rain.visible = w === 'rain';
@@ -992,7 +996,7 @@ function updateCamera(dt, t) {
 
 // ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php
 const reporter = new Reporter({
-  shot: () => canvasShot(canvas, () => renderer.render(scene, camera)),
+  shot: () => canvasShot(canvas, drawWorld),
   pause: (on) => { if (on !== undefined) { game.paused = on; return on; } const was = game.paused; game.paused = true; return was; },
   state: () => {
     const g = game, p = route.at(tram.s), d = new THREE.Vector3(), c = camera.position, r = (v, k = 1) => Math.round(v * k) / k;
@@ -1024,6 +1028,16 @@ const inspect = new Inspect({
   },
 });
 window.inspect = inspect; // (the console and tools/test_free_camera.py, as window.game)
+
+// The landmarks past the far plane first (with the sky), then the world over them without clearing the colour (#610)
+function drawWorld() {
+  if (!landmarks) { renderer.render(scene, camera); return; }
+  landmarks.render(renderer, scene, camera);
+  const bg = scene.background;
+  scene.background = null;
+  renderer.autoClearColor = false;
+  try { renderer.render(scene, camera); } finally { renderer.autoClearColor = true; scene.background = bg; }
+}
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
 // An idle page draws 4 frames a second (#149): the menu, a pause, the results, and review mode with its
@@ -1092,7 +1106,7 @@ function frame(now) {
       // the trees then around the cab)
       if (world?.userData.near?.update(camera, renderer.domElement.height, scene.fog.far) && window.mirror) window.mirror.last = null;
       if (timing) timing.begin();
-      renderer.render(scene, camera);
+      drawWorld();
       if (timing) timing.end();
     }
     lastDraw = now; window.drawCount++;

@@ -7,6 +7,7 @@ import { CONTACT_WIRE } from './models.js';
 import { RAIL_HEAD, BED_BELOW, STREET_BELOW } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { NearBatches } from './nearbatch.js';
+import { LANDMARK_TALL, LANDMARK_HIGH, LANDMARK_RISE, landmarkHaze, textureMean } from './landmarks.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK, crownColor, crownThinning, leafTexture } from './weather.js';
 
 const CELL = 350; // spatial chunk size (m) for merged meshes, so frustum culling can skip far chunks
@@ -911,11 +912,24 @@ function buildLod2(group, data, route, ground) {
     }
     return null;
   };
+  // landmarks (src/landmarks.js): in meshes of their own with a lighter haze, and their triangles copied for the pass
+  // past the far plane; "high ground" over the line's typical ground, the median along its route
+  const along = [];
+  for (let s = 0; s < route.length; s += 50) { const p = route.at(s); along.push(ground.at(p.x, p.y)); }
+  along.sort((a, b) => a - b);
+  const baseMed = along[along.length >> 1] ?? 0;
+  const lmPos = [], lmNor = [], lmCol = [], lmMats = new Map();
+  let lmCount = 0;
+  const lmList = []; // [x, y, height, base]: which buildings the rule picked (window.landmarks.list)
+  const lmMat = (m) => {
+    if (!lmMats.has(m)) lmMats.set(m, landmarkHaze(weatherize(m.clone(), m.userData.weather)));
+    return lmMats.get(m);
+  };
   for (const ch of geo.chunks) {
     const [ox, oy, oz] = ch.o;
-    const walls = {};
-    for (const k in CLASSES) walls[k] = { pos: [], nor: [], uv: [], col: [] };
-    const rPos = [], rNor = [], rCol = [];
+    const walls = {}, wallsL = {};
+    for (const k in CLASSES) { walls[k] = { pos: [], nor: [], uv: [], col: [] }; wallsL[k] = { pos: [], nor: [], uv: [], col: [] }; }
+    const rPos = [], rNor = [], rCol = [], lrPos = [], lrNor = [], lrCol = [];
     let v = ch.v;
     for (const [bi, count] of ch.b.entries()) {
       const isBridge = ch.k?.[bi] === 1; // Mosty 3D: concrete, never lifted or sunk
@@ -981,7 +995,10 @@ function buildLod2(group, data, route, ground) {
       }
       const cls = buildingClass(kindAt(cxs / n3, cys / n3), roof ? flat / roof : 0, zmax - zmin, (maxX - minX) * (maxY - minY) * 0.6);
       counts[isBridge ? 'bridge' : cls] = (counts[isBridge ? 'bridge' : cls] || 0) + 1;
-      const C = CLASSES[cls], W = walls[cls], pal = CLASS_COLORS[cls];
+      const lm = !isBridge && (zmax - zmin >= LANDMARK_TALL || (zmax - zmin >= LANDMARK_HIGH && zmin >= baseMed + LANDMARK_RISE));
+      if (lm) { lmCount++; lmList.push([Math.round(cxs / n3), Math.round(cys / n3), Math.round(zmax - zmin), Math.round(zmin)]); }
+      const C = CLASSES[cls], W = (lm ? wallsL : walls)[cls], pal = CLASS_COLORS[cls];
+      const RP = lm ? lrPos : rPos, RN = lm ? lrNor : rNor, RC2 = lm ? lrCol : rCol;
       const facade = pal ? new THREE.Color(pal[Math.floor(r() * pal.length)]) : FACADE_COLORS[Math.floor(r() * FACADE_COLORS.length)];
       const roofTile = ROOF_COLORS[Math.floor(r() * 3)], roofFlat = new THREE.Color('#77736d');
       for (let t = 0; t < n3; t += 3) {
@@ -1027,19 +1044,24 @@ function buildLod2(group, data, route, ground) {
           for (const [x, y, z] of tri) { rPos.push(x, z, -y); rNor.push(nx, nz, -ny); rCol.push(0.62 * k, 0.61 * k, 0.58 * k); }
         } else if (Math.abs(nz) > 0.3) {
           const col = Math.abs(nz) > 0.97 ? roofFlat : roofTile;
-          for (const [x, y, z] of tri) { rPos.push(x, z, -y); rNor.push(nx, nz, -ny); rCol.push(col.r, col.g, col.b); }
+          for (const [x, y, z] of tri) { RP.push(x, z, -y); RN.push(nx, nz, -ny); RC2.push(col.r, col.g, col.b); }
+          if (lm) for (const [x, y, z] of tri) { lmPos.push(x, z, -y); lmNor.push(nx, nz, -ny); lmCol.push(col.r, col.g, col.b); }
         } else {
           const hl = Math.hypot(nx, ny) || 1, tx = -ny / hl, ty = nx / hl;
           for (const [x, y, z] of tri) {
             W.pos.push(x, z, -y); W.nor.push(nx, nz, -ny); W.col.push(facade.r, facade.g, facade.b);
             W.uv.push((x * tx + y * ty) / C.w, (z - zmin - 0.4) / C.h);
           }
+          if (lm) {
+            const t = textureMean(C.mat.map); // (the copy has no texture: its mean)
+            for (const [x, y, z] of tri) { lmPos.push(x, z, -y); lmNor.push(nx, nz, -ny); lmCol.push(facade.r * t, facade.g * t, facade.b * t); }
+          }
         }
       }
       bIndex++;
       total++;
     }
-    const mk = (pos, nor, col, uv, mat) => {
+    const mk = (pos, nor, col, uv, mat, landmark = false) => {
       if (!pos.length) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -1050,11 +1072,16 @@ function buildLod2(group, data, route, ground) {
       const m = new THREE.Mesh(g, mat);
       m.matrixAutoUpdate = false;
       m.userData.building = true; // read by the lints (trees in buildings)
+      if (landmark) m.userData.landmark = true;
       group.add(m);
     };
     for (const k in walls) mk(walls[k].pos, walls[k].nor, walls[k].col, walls[k].uv, CLASSES[k].mat);
     mk(rPos, rNor, rCol, null, roofMat);
+    for (const k in wallsL) mk(wallsL[k].pos, wallsL[k].nor, wallsL[k].col, wallsL[k].uv, lmMat(CLASSES[k].mat), true);
+    mk(lrPos, lrNor, lrCol, null, lmMat(roofMat), true);
   }
+  if (lmPos.length) group.userData.landmarks = { pos: lmPos, nor: lmNor, col: lmCol, list: lmList, baseMed: Math.round(baseMed) };
+  console.log(`landmarks: ${lmCount} buildings, ${lmPos.length / 9} triangles (line's ground ${Math.round(baseMed)} m)`);
   console.log(`LOD2 buildings: ${total} (${lifted} spanning the track)`, counts);
 }
 
