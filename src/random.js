@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Random numbers (issue #6). The simulation draws from one seeded stream per run, so a seed gives the
 // same run every time: rules, traffic, walkers and obstacles alike. Math.random is left to what does not
 // change the run (Three.js object ids, rain and snow particles, audio noise); before, those shared the

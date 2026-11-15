@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Help in the menu (#330): the player's guide from README.md (Czech) or README.en.md (English), one source for
 // the repository and the game. Shown is what stands between the two markers; the renderer knows only the
 // Markdown those files use: headings, paragraphs, lists with one nested level, tables, bold, italics, code, links.

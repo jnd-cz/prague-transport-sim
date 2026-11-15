@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Browser geometry tests of Route.nearestOnHeading: python -P -E tools/test_route_direction.py
 (serves the checkout itself on a free port)."""
 import functools
@@ -6,6 +7,10 @@ import os
 import threading
 
 from playwright.sync_api import sync_playwright
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -19,7 +24,7 @@ server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Qui
 threading.Thread(target=server.serve_forever, daemon=True).start()
 try:
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = gpu.launch(p)[0]
         page = browser.new_page()
         page.goto(f'http://127.0.0.1:{server.server_port}/README.md')
         print(page.evaluate('''async () => {

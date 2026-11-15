@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The places where the rail as built steps, for the user's review (#344): reports/review/track-steps.json.
 
     python -P -E tools/track_steps.py [--checkpoint W1]
@@ -210,10 +211,10 @@ def main():
     from atomic import replacing
     from ipr_dtm import IprDtm
     from geo import Frame
-    import line_heights
+    import height_answers
     truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
-    line_heights.RADIUS_ANSWERS = line_heights.load_radius_answers(truth)
-    staged = line_heights.staged_heights()
+    height_answers.RADIUS_ANSWERS = height_answers.load_radius_answers(truth)
+    staged = height_answers.staged_heights()
     lines_data = {n: json.loads((ROOT / f'data/line{n}.json').read_text(encoding='utf-8')) for n in LINES}
     places = [p for n, d in lines_data.items() for p in line_steps(n, d)]
     from shapely import STRtree
@@ -221,7 +222,7 @@ def main():
     routes = [LineString([p[:2] for p in d[k]]) for d in lines_data.values() for k in ('path', 'pathBack')]
     tree = STRtree(routes)
     # (a DI jump is listed where the rail as built still steps near it: the build drops what is steeper than any track,
-    # line_heights MAX_GRADE, and a jump it smoothed away is no question)
+    # height_answers MAX_GRADE, and a jump it smoothed away is no question)
     steps = list(places)
     places += [p for p in di_jumps(staged['geometry']) if len(tree.query(Point(p['x'], p['y']).buffer(ROUTE_NEAR), predicate='intersects'))
                and any(math.dist((p['x'], p['y']), (q['x'], q['y'])) <= REACH for q in steps)]

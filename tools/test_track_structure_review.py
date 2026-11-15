@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Structure grouping and explicit approvals: python -P -E tools/test_track_structure_review.py."""
 import unittest
 import json

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Archived DTMP tram axes and height fallback assessment for the DI districts (#61).
 
     python -P -E tools/dtmp_tracks.py --fetch --acquire-only  # explicit upstream acquisition
@@ -129,13 +130,67 @@ def xyz(values):
             for a, b, v in zip(x, y, values)]
 
 
-def di_data():
+KEPT_FORMAT = 1
+KEPT = 4  # results kept per kind: a branch switched back finds its own
+
+
+def kept(what, key, build, code=()):
+    """build()'s result, kept per machine in TRAMDATA_CACHE/kept/ (else reports/cache/kept/) under `key` (the hashes of
+    what it reads: a source's provenance holds every file's hash, checked before this) and the source of the modules that
+    decide it (`code`, file names in tools/, with this one, geo.py and dtm_di.py). Parsing DI's XML and the archive's pages
+    and building DI's network took ~15-25 s in each build_line, dtm and the heights' staging (#517). The pickle holds the
+    result's values in their order, the objects it shares shared."""
+    import hashlib
+    import os
+    import pickle
+    import numpy
+    import pyproj
+    h = hashlib.sha256()
+    for f in ('dtmp_tracks.py', 'geo.py', 'dtm_di.py', *code):
+        h.update(Path(__file__).with_name(f).read_bytes())
+    versions = [sys.version, shapely.__version__, numpy.__version__, pyproj.__version__, pyproj.proj_version_str]
+    name = hashlib.sha256(json.dumps([KEPT_FORMAT, what, versions, h.hexdigest(), key]).encode('utf-8')).hexdigest()[:16]
+    cache = os.environ.get('TRAMDATA_CACHE')
+    folder = Path(cache) / 'kept' if cache else ROOT / 'reports' / 'cache' / 'kept'
+    path = folder / f'{what}-{name}.pickle'
+    try:
+        with path.open('rb') as f:
+            return pickle.load(f)
+    except (OSError, EOFError, pickle.UnpicklingError):
+        pass
+    out = build()
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.part')
+    try:
+        with tmp.open('wb') as f:
+            pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)
+        for old in sorted(folder.glob(f'{what}-*.pickle'), key=lambda p: -p.stat().st_mtime)[KEPT:]:
+            old.unlink()
+    except OSError:  # (another build wrote it at the same time, or a reader holds it: the next build reads it)
+        tmp.unlink(missing_ok=True)
+    return out
+
+
+def di_checked():
+    """DI's provenance, each package checked against its hash there."""
     provenance = json.loads((DI / 'provenance.json').read_text(encoding='utf-8'))
-    districts, paths, seen = [], [], {}
     for entry in provenance['packages']:
         file = DI / entry['file']
         if sha(file) != entry['sha256']:
             raise ValueError(f'{file}: source hash mismatch')
+    return provenance
+
+
+def di_data():
+    provenance = di_checked()
+    return kept('di', [sha(DI / 'provenance.json')], lambda: _di_parse(provenance))
+
+
+def _di_parse(provenance):
+    districts, paths, seen = [], [], {}
+    for entry in provenance['packages']:
+        file = DI / entry['file']
         with zipfile.ZipFile(file) as z:
             root = ET.fromstring(z.read(next(n for n in z.namelist() if n.endswith('.xml'))))
         rings = []
@@ -166,16 +221,28 @@ def di_data():
     return districts, paths
 
 
-def archive_data():
+def archive_checked():
+    """The archive's provenance and ID list, each page checked against its hash there."""
     provenance = json.loads((RAW / 'provenance.json').read_text(encoding='utf-8'))
     ids = json.loads((RAW / 'ids.json').read_text(encoding='utf-8'))
     if sha(RAW / 'ids.json') != provenance['ids_sha256']:
         raise ValueError('archive ID manifest hash mismatch')
-    features, paths = {}, []
     for page in provenance['pages']:
         file = RAW / page['file']
         if sha(file) != page['sha256']:
             raise ValueError(f'{file}: source hash mismatch')
+    return provenance, ids
+
+
+def archive_data():
+    provenance, ids = archive_checked()
+    return kept('archive', [sha(RAW / 'provenance.json')], lambda: _archive_parse(provenance, ids))
+
+
+def _archive_parse(provenance, ids):
+    features, paths = {}, []
+    for page in provenance['pages']:
+        file = RAW / page['file']
         for feature in json.loads(file.read_text(encoding='utf-8'))['features']:
             attrs = feature['attributes']
             identity = attrs['OBJECTID']

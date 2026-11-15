@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Test drives of the T3's electric system (#351, #355, src/tr37.js, src/electric.js through src/tram.js), without the game:
 python -P -E tools/test_electric.py [--report FILE]
 (its own server on a free port; a blank page imports the modules through sync_playwright; --report saves the drives' time series).
@@ -25,6 +26,9 @@ import sys
 import threading
 
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -252,7 +256,7 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = gpu.launch(p)[0]
             page = browser.new_page()
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))

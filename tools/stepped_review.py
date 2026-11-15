@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Review cards for the curves drawn in steps (#368): every place tools/lint.js `steppedCurves` flags on a line's path or
 opposite path, the places of one curve on several lines and both tracks merged, with how large each step is.
 

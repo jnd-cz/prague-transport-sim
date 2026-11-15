@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Review verdicts (#136): what the reviewer decided per finding, kept in the browser and sent to the server,
 // which merges them per finding (the newer "t" wins: tools/reviews.py). On the web host that is
 // review.php (tools/review.php, uploaded by tools/deploy.py); without it (tools/serve.py) POST
@@ -20,18 +21,6 @@ export async function readLineAnswers(name) {
   const items = { ...(remote || {}) };
   for (const [k, v] of Object.entries(local)) if (!items[k] || (v.t || 0) > (items[k].t || 0)) items[k] = v;
   return { items, available: remote !== null };
-}
-
-// one record file to the store (src/report.js): review.php, else tools/serve.py; true when stored
-export async function postRecord(name, body) {
-  const opts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Review': '1' }, body: JSON.stringify(body) };
-  for (const url of [`review.php?f=${name}`, `review/${name}.json`]) {
-    try {
-      const r = await fetch(url, opts);
-      if (r.ok && (r.headers.get('content-type') || '').includes('json')) return true;
-    } catch { /* (offline) */ }
-  }
-  return false;
 }
 
 export class Verdicts {

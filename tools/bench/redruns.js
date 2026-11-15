@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check (not part of the game): drive a whole line headless with the autopilot and count the
 // oncoming AI trams that pass their stop line on red. In the page (after loading):
 //   const { run } = await import('/tools/bench/redruns.js'); await run(seed);   then read window._res

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """IPR Mosty 3D (3D bridges) for the whole city: the layer's every mesh node, for the track-height import (#192).
 
 Usage:  python -I tools/mosty3d.py fetch      # downloads into raw/geoportal/mosty3d/ (then snapshot publish)

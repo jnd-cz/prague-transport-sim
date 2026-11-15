@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tile container: GLB with KHR_mesh_quantization against integer differences, on terrain_mesh.py's greedy mesh (#307).
 
 Encodes one tile's mesh both ways and measures the bytes (raw, gzip, brotli), the error of the quantized positions

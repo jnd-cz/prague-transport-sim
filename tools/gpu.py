@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Chromium's WebGL on the machine's GPU where it has one, else in software (#411).
 
     from gpu import launch

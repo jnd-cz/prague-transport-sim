@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Posted speeds and dedicated track along a built line, from the OSM tram ways (the data
 OpenRailwayMap shows: `maxspeed` on railway=tram ways).
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The game's speed limits along the route and what sets them (#211). Seedless.
 // On a loaded page, with a shift started: (await import('/tools/bench/speedLimits.js')).run()
 //
@@ -149,7 +150,7 @@ function curveEnds(game) {
   const shortSpeed = (m) => {
     const a = route.heading(m - SHORT, SHORT), b = route.heading(m + SHORT, SHORT);
     const t = Math.acos(Math.max(-1, Math.min(1, a.hx * b.hx + a.hy * b.hy)));
-    return route._designSpeed(m, t > 1e-4 ? 2 * SHORT / t : 1e6, false, route.cantAt(m));
+    return route._designSpeed(m, t > 1e-4 ? 2 * SHORT / t : 1e6, route.cantAt(m));
   };
   const posted = (m) => { const o = route._speedInfo(m).osm; return o ? Math.min(o, route.speedTop) : 50; };
   for (let m = 1; m < L; m++) {

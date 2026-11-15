@@ -20,7 +20,8 @@
       ],
       "openAngle": 1.4311699866353502,
       "leafWidth": 0.3538948634828115,
-      "openingWidth": 1.439579453931246
+      "openingWidth": 1.439579453931246,
+      "clip": "Door_Middle_Open"
     },
     {
       "name": "Rear",
@@ -40,7 +41,8 @@
       ],
       "openAngle": 1.4311699866353502,
       "leafWidth": 0.3538950073136813,
-      "openingWidth": 1.4395800292547252
+      "openingWidth": 1.4395800292547252,
+      "clip": "Door_Rear_Open"
     },
     {
       "name": "Front",
@@ -60,7 +62,8 @@
       ],
       "openAngle": 1.4311699866353502,
       "leafWidth": 0.3538947103195036,
-      "openingWidth": 1.4395788412780144
+      "openingWidth": 1.4395788412780144,
+      "clip": "Door_Front_Open"
     }
   ],
   "bogies": [
@@ -170,7 +173,8 @@
     "contactHeadOffset": 0.2044359326431855,
     "minContactHeight": 3.88905392617287,
     "maxContactHeight": 6.369053926172871,
-    "defaultContactHeight": 6.0
+    "defaultContactHeight": 6.0,
+    "clip": "Pantograph_Lower"
   },
   "triangleCount": 43792,
   "animationCount": 13,
@@ -231,5 +235,81 @@
     "upperRouteBodyClearanceSamples": 81,
     "upperRouteBodyMinimumGapMetres": 0.008000000000000007,
     "dashboardDestinationPlaneClearanceMetres": 0.012
-  }
+  },
+  "rigRevision": 1,
+  "saloon": {
+    "materials": [
+      "Handles",
+      "Control_Panel",
+      "Red_Seat",
+      "Blue_Seat",
+      "Leather",
+      "Material",
+      "Inner_Plastic_Glass",
+      "Interior_Walls",
+      "White_Ceiling"
+    ],
+    "within": [
+      [
+        -6.95,
+        0.84,
+        -1.25
+      ],
+      [
+        6.95,
+        3.1,
+        1.25
+      ]
+    ]
+  },
+  "shoes": {
+    "Bogie_Rear": [
+      "Black_Metal_116",
+      "Black_Metal_117"
+    ],
+    "Bogie_Front": [
+      "Black_Metal_123",
+      "Black_Metal_124"
+    ]
+  },
+  "couplers": {
+    "front": [
+      "Black_Metal_109"
+    ],
+    "rear": [
+      "Black_Metal_111"
+    ]
+  },
+  "beams": [
+    [
+      7.0624,
+      1.2191,
+      -0.4919
+    ],
+    [
+      7.0624,
+      1.2191,
+      0.4857
+    ]
+  ],
+  "tailLamps": {
+    "size": [
+      0.02,
+      0.07,
+      0.2
+    ],
+    "at": [
+      [
+        -7.0204,
+        0.995,
+        -0.47
+      ],
+      [
+        -7.0204,
+        0.995,
+        0.47
+      ]
+    ]
+  },
+  "fleetDigits": 0.14
 }

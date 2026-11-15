@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """What the OSM tram ways say about speed along each built line, for the speed limits and signs (#211).
 
     python -P -E tools/speed_survey.py [--lines 9,17,22,23,37] [--json reports/speed_survey.json]

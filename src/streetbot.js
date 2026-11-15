@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
 import { carPose } from './traffic.js';
 
@@ -7,7 +8,8 @@ import { carPose } from './traffic.js';
 //   car   - (every lane and junction connector of the lane graph, Traffic._buildLanes)
 //           kerb: the drawn surface steps under the car (it drives over a kerb)
 //           sidewalk: two or more wheels on a sidewalk, island, platform, greenery or steps
-//           jump: the car's own height steps by more than 0.15 m within 1 m
+//           jump: the car's own height steps by more than 0.15 m within 1 m against the slope so far (a 15 %
+//           street is a slope, not a jump; #512)
 //           tilt: rolled more than 7° (one side up a kerb)
 //           float / sunk: the car hovers above / sinks into what is drawn under it
 //           gap: no DTM area under the car inside the surveyed streets
@@ -18,7 +20,7 @@ import { carPose } from './traffic.js';
 //           but a pedestrian crossing should have a dropped kerb)
 // Findings of a kind within 15 m are merged into one place, ranked by size and count.
 
-const CAR_BAD = new Set(['sidewalk', 'island', 'platform', 'green', 'stairs', 'water']);
+const CAR_BAD = new Set(['sidewalk', 'island', 'median', 'platform', 'green', 'stairs', 'water']);
 const WALK_BAD = new Set(['road', 'tram', 'parking']);
 const BOT_COLORS = {
   kerb: '#ff3b30', sidewalk: '#ff9500', jump: '#af52de', tilt: '#ffcc00', float: '#34c759', sunk: '#007aff',
@@ -131,7 +133,7 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
   let carM = 0, walkM = 0;
   for (let pi = 0; pi < paths.length; pi++) {
     const { kind, pts, hf, deck } = paths[pi];
-    let prev = null, prevD = null, prev2D = null, roadRun = 0, prevC = null, prev2C = null;
+    let prev = null, grade = null, lastDz = 0, prevD = null, prev2D = null, roadRun = 0, prevC = null, prev2C = null;
     for (const p of pts) {
       const { x, y, hx, hy } = p;
       if (kind === 'car') {
@@ -154,7 +156,14 @@ export async function runStreetBot({ world, traffic, ground, route, progress = (
           if (gap > 0.15) flag('float', p, z, gap, `${gap.toFixed(2)} m above`);
           if (gap < -0.1) flag('sunk', p, z, -gap, `${(-gap).toFixed(2)} m below`);
         }
-        if (prev !== null && Math.abs(z - prev) > 0.15) flag('jump', p, z, Math.abs(z - prev), `${(z - prev).toFixed(2)} m in 1 m`);
+        // (a metre is a jump when it breaks both the last metre that was none and the metre before it: a step counts
+        // once, and a street turning into a steep climb at most once)
+        if (prev !== null) {
+          const dz = z - prev, off = grade === null ? 0 : Math.min(Math.abs(dz - grade), Math.abs(dz - lastDz));
+          if (off > 0.15) flag('jump', p, z, off, `${dz.toFixed(2)} m in 1 m`);
+          else grade = dz;
+          lastDz = dz;
+        }
         // a step is a sudden change against the slope so far (steep streets are not steps)
         const slope = prevD !== null && prev2D !== null ? prevD - prev2D : 0;
         if (zd !== null && prevD !== null && Math.abs(zd - prevD - slope) > 0.12) flag('kerb', p, z, Math.abs(zd - prevD - slope), `${(zd - prevD).toFixed(2)} m drawn step`);

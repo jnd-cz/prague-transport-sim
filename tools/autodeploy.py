@@ -1,9 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Deploy each new main to the test host (#131): python -I tools/autodeploy.py [--install [MIN] | --uninstall]
 
 Runs in a checkout kept for deploys (a worktree with deploy.local.json and its HEAD detached, as
 ../tg-deploy): fetches origin/main and, when it moved since the last deploy, checks it out, fetches
 the data its manifest names (tools/snapshot.py data-fetch) and runs tools/deploy.py. Every run then
-pulls the review verdicts from the host into reports/reviews/ (deploy.py --pull-reviews, #136). A failed deploy is retried after an hour, not on every run (the host bans
+pulls the review verdicts from the host into reports/reviews/ (#136) and the feedback notes of every target in
+deploy.local.json into the feedback folder (tools/feedback.py, #350); it never deploys any target but
+the test site. A failed deploy is retried after an hour, not on every run (the host bans
 repeated failed logins). The password comes from ~/.netrc (machine <host> login <user> password …)
 or TRAM_DEPLOY_PASSWORD: there is nobody to ask.
 
@@ -50,7 +53,7 @@ def run(log, *cmd):
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+    return subprocess.run(["git", *args], cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
                           check=True, **QUIET).stdout.strip()
 
 
@@ -85,9 +88,9 @@ def once(log):
     st = load_state()
     code = deploy(log, st)
     if time.time() - st.get("pull_failed_at", 0) >= RETRY:
-        if run(log, python(), "-P", "-E", "tools/deploy.py", "--pull-reviews"):
+        if run(log, python(), "-P", "-E", "tools/deploy.py", "--pull"):
             st["pull_failed_at"] = time.time()
-            print(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} pulling the reviews failed; next try in {RETRY // 60} min", file=log)
+            print(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} pulling the reviews and feedback failed; next try in {RETRY // 60} min", file=log)
             code = code or 1
         else:
             st.pop("pull_failed_at", None)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Weather as a state of the materials, not of the geometry: the world is built once in its dry
 // colours, and the weather sets a few shared shader uniforms (wet, snow, autumn) and recolours the
 // instanced trees. Changing it costs nothing and could happen during a shift.

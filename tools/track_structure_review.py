@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Group held heights into structure decisions, without approving a height (#106).
 
     python -P -E tools/track_structure_review.py --input reports/track-heights.json

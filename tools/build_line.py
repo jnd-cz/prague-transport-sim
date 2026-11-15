@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Build a compact game data file for one Prague tram line.
 
 Sources:
@@ -81,6 +82,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from gtfs_runs import pair_continuations  # noqa: E402
+from route import path_ext  # noqa: E402
 import sources  # noqa: E402
 try:
     import osm_local
@@ -415,8 +417,8 @@ def fetch_terrain(P, x_min, x_max, y_min, y_max):
     h, w = len(grid), len(grid[0])
     de = (ext["xmax"] - ext["xmin"]) / w
     dn = (ext["ymax"] - ext["ymin"]) / h
-    # fill nodata cells from their neighbours
-    valid = [[v > -1000 for v in row] for row in grid]
+    # fill no-data cells (the export's -9999, and anything under the floor: sources.TERRAIN_FLOOR) from their neighbours
+    valid = [[v >= sources.TERRAIN_FLOOR for v in row] for row in grid]
     for _ in range(100):
         holes = 0
         for y in range(h):
@@ -1201,12 +1203,15 @@ def main():
     terrain = fetch_terrain(P, min(x for x, _ in pts) - DEM_MARGIN, max(x for x, _ in pts) + DEM_MARGIN,
                             min(y for _, y in pts) - DEM_MARGIN, max(y for _, y in pts) + DEM_MARGIN)
 
+    path_xy = [[round(x, XY), round(y, XY)] for x, y in pts]
     out = {
         "line": LINE,
         "name": rel["tags"].get("name"),
         "origin": [round(float(v), 7) for v in P.origin_ll()],  # the city origin (the Marian column)
         "frame": {"crs": "EPSG:5514", "origin": [P.E0, P.N0]},  # game metres = S-JTSK minus this
-        "path": [[round(x, XY), round(y, XY)] for x, y in pts],
+        "path": path_xy,
+        # the track past both termini, which the game's route includes (tools/route.py, #477)
+        "pathExt": path_ext({"tracks": track_lines, "path": path_xy}, XY),
         "bridges": bridges,
         "tunnels": tunnels,
         "terrain": terrain,
@@ -1266,4 +1271,6 @@ def main():
 
 
 if __name__ == "__main__":
+    import heavy
+    heavy.turn(f"build_line {LINE}")  # (a heavy job run alone, 60-77 s; under rebuild.py in its turn, #536)
     main()

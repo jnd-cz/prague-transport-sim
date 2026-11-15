@@ -6,7 +6,7 @@ read through the GitHub API (file tree, `README.md`, `COPYING.txt`, `standard.pr
 catalogues' headers, per-file commit history) at commit `3d82b2e97ae924b8e6599ed6664e407e9fe5ed30`
 (2026-10-25). Nothing was downloaded beyond those text files. Our rules: `ASSETS.md` (register, only
 licences that allow redistribution) and `docs/decisions/2026-10-29-tests-and-licences.md` (our code is
-GPL-3.0; MIT code may be included with its notice; each OSM2World asset checked before use).
+AGPL-3.0; MIT code may be included with its notice; each OSM2World asset checked before use).
 
 ## What is where
 

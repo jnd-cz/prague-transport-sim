@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """DI's records as chains, their forks (#20, #237): python -P -E tools/test_di_tracks.py."""
 import math
 from pathlib import Path

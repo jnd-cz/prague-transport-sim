@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev bench (not part of the game): the frame time and the draw calls with a tram model (#248, #250).
 // In a page with the menu up (tools/frametime.py drives it in a headed browser; headless draws in software):
-//   const { run } = await import('/tools/bench/frametime.js'); await run({ model: 'detailed' })
+//   const { run } = await import('/tools/bench/frametime.js'); await run({ model: 't3h' })
 // The scene: the first stop of the line's first trip, our set standing with its doors open, three more
 // sets of the same model on the track ahead (fronts AI m ahead of ours: the nearest at its full level, the
 // two others at the lighter one, as traffic sets them), the camera fixed 14 m off the platform side. The
@@ -23,7 +24,8 @@ const until = async (ok, ms = 120000) => {
 const count = (o) => { let n = 0; o.traverse(() => n++); return n; };
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
-export async function run({ model = 'detailed', frames = 600, warm = 120, ai = AI, fov = null } = {}) {
+// livery: a livery id (#529) our set and the sets ahead wear; none, the vehicle's own
+export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null, livery = null } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = 1; // (the run's seeded stream: the same traffic for every model)
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
@@ -31,11 +33,11 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
   $('optAuto').checked = false;
   const sel = $('optModel');
   sel.value = model; sel.dispatchEvent(new Event('change'));
-  const kind = model === 'simple' ? 'simple' : model === 'classic' ? 'classic' : 'hybrid';
+  if (livery && $('optLivery')) { $('optLivery').value = livery; $('optLivery').dispatchEvent(new Event('change')); }
   await startShift({ timeout: 120 });
-  await until(() => window.tramModel?.userData.kind === kind && window.camera);
+  await until(() => window.tramModel?.userData.vehicle === model && window.camera);
   const { makeT3, placeConsist } = await import('/src/models.js');
-  const { setHybridLevel, FULL_OUT } = await import('/src/t3h.js');
+  const { setRiggedLevel, FULL_OUT } = await import('/src/rigged.js');
   const g = window.game, route = g.route, s0 = g.tram.s;
   const at = (q) => { const p = route.at(q); return [p.x, p.y, g.profile.height(q), route.rollAt(q)]; };
   // the camera: 14 m off the platform (right) side of our set's middle, 3 m up, looking 40 m ahead
@@ -46,11 +48,11 @@ export async function run({ model = 'detailed', frames = 600, warm = 120, ai = A
   if (fov) { window.camera.fov = fov; window.camera.updateProjectionMatrix(); }
   window.camera.updateMatrixWorld();
   const sets = ai.map((d) => {
-    const m = makeT3({ line: g.line, cars: 2, detailed: model === 'simple' ? false : kind, run: '899' });
+    const m = makeT3({ line: g.line, cars: 2, vehicle: model, run: '899', variant: livery ? 'T3SUCS' : null, livery });
     placeConsist(m, s0 + d, at);
     window.scene.add(m);
     const p = m.userData.cars[0].position, far = Math.hypot(p.x - window.camera.position.x, p.z - window.camera.position.z);
-    setHybridLevel(m, far < FULL_OUT ? 'full' : 'light');
+    setRiggedLevel(m, far < FULL_OUT ? 'full' : 'light');
     return { m, far: Math.round(far) };
   });
   // the CPU time of each render (the GPU's work shows in the frame interval)

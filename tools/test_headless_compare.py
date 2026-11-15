@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Seed-spread comparison of headless runs (#156): python -P -E tools/test_headless_compare.py"""
 import os
 import sys

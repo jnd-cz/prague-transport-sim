@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Pedestrians drawn with the asset lab's figures (#251) at three levels: the full figure near the camera,
 // the simplified one (no nose, ears or eyes) still animated further out, and one instanced batch of the
 // static far figure beyond; each person with a hair colour and style of their own. Drawing only: it reads where the game and the

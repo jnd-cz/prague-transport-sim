@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Data comparison and reference regressions: python -I tools/test_datadiff.py."""
 from contextlib import redirect_stdout
 from copy import deepcopy

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Help in the game's menu (#330): python -P -E tools/test_help.py [--line 37] [--shots DIR]
 The real game on a phone and a desktop page, Czech and English: the entry opens the player's guide in the
 language of the setting, the language can change while it is open, nothing runs off the side, Esc and the
@@ -7,15 +8,26 @@ import faulthandler
 import functools
 import http.server
 import os
+import re
 import sys
 import threading
 import unittest
 
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 LINE, SHOTS = "37", None
+
+
+def table_rows(readme):
+    """The body rows of the guide's tables (the help shows them all): its table lines less a header and a separator each."""
+    lines = [x for x in open(os.path.join(ROOT, readme), encoding="utf-8").read().split("\n") if x.startswith("|")]
+    return len(lines) - 2 * sum(1 for x in lines if re.match(r"^\|[\s:|-]+\|\s*$", x))
+
+
 SIZES = {"phone": ((390, 844), True), "desktop": ((1280, 800), False)}
 WORDS = {"cs": ("Vaše směna", "Zavřít"), "en": ("Your shift", "Close")}
 
@@ -33,7 +45,7 @@ class Help(unittest.TestCase):
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
         cls.url = f"http://127.0.0.1:{cls.server.server_port}"
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch(headless=True, args=ARGS)
+        cls.browser = gpu.launch(cls.pw)[0]
 
     @classmethod
     def tearDownClass(cls):
@@ -86,7 +98,7 @@ class Help(unittest.TestCase):
                         heads: t.querySelectorAll('h3').length, raw: /<!--|\\*\\*|^##/m.test(t.textContent), run: t.textContent.includes('serve.py') }; }""")
                     self.assertLessEqual(r["over"], 0, f"{name} {lang}: wider than its card")
                     self.assertTrue(r["scrolls"])
-                    self.assertEqual(r["rows"], 20)
+                    self.assertEqual(r["rows"], table_rows("README.md" if lang == "cs" else "README.en.md"))
                     self.assertEqual(r["nested"], 3)
                     self.assertGreater(r["heads"], 8)
                     self.assertFalse(r["raw"], "Markdown left in the text")

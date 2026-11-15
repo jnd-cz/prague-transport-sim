@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The T3's electric system outside the motors (#351, #355): the wire it runs under, and the motor-generator with
 // its fans, dynamo, regulator and battery. Sources: raw/reference/ckd-t3su/ (T3SU-15 motor-generator, T3SU-23
 // regulator, T3SU-13 battery, T3SU-05 shoe brakes, T3SU-24 § 2.1, T3SU-26), notes in

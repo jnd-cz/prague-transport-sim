@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/frametime.py: the bench runs for a model and reports what it measured (headless, a few frames), also at the
 zoom key's narrower field (#382).
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/gpu.py: WebGL on the GPU where there is one, else SwiftShader: python -P -E tools/test_gpu.py."""
 import faulthandler
 from pathlib import Path

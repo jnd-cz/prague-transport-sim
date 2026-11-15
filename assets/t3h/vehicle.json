@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "t3h",
+  "names": { "cs": "Podrobný, pohyblivý (Sketchfab, CC BY-NC)", "en": "Detailed, animated (Sketchfab, CC BY-NC)" },
+  "type": "T3",
+  "loader": "gltf-rigged",
+  "model": "tatra-t3-hybrid-nc.glb",
+  "rig": "rig.json",
+  "files": [
+    { "path": "tatra-t3-hybrid-nc.glb", "bytes": 2925460 },
+    { "path": "rig.json", "bytes": 7121 }
+  ],
+  "preload": true,
+  "licence": {
+    "spdx": "CC-BY-NC-4.0",
+    "commercial": false,
+    "file": "LICENSE.txt",
+    "authors": ["SimonStrikesBack", "Jakub Vaja (conflig)"],
+    "sources": [
+      "https://sketchfab.com/3d-models/tatra-t3-2c08e2e39ace45569c45a2fdbb4052c0",
+      "https://sketchfab.com/3d-models/tatra-t3-76aa08d7c06340fc89229551c45e3c3a"
+    ],
+    "credit": "Tatra T3 3D model: hybrid of \"Tatra T3\" by SimonStrikesBack (sketchfab.com, CC BY 4.0) and \"Tatra T3\" by Jakub Vaja (conflig) (sketchfab.com, CC BY-NC 4.0), modified; CC BY-NC 4.0."
+  },
+  "tier": 2,
+  "moves": ["bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes"],
+  "levels": 2,
+  "slots": { "body": ["Red_Hull"], "band": ["Beige", "Beige_wbackface"] },
+  "fleet_source": "the user, 2026-11-10: \"Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106\"; a type's share of AI trams follows its range's size (\"roughly related to their range sizes\"); the sets: the historic cars still kept, paired as the user gave them (2026-11-11, PR #462: \"pair them like: 6892+6921, 7269+7290, 8080+8074\")",
+  "fleet": {
+    "operator": "DPP",
+    "types": {
+      "T3SUCS": { "ranges": [[7001, 7292]] }
+    },
+    "sets": [[7269, 7290]]
+  }
+}

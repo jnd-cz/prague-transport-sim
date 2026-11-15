@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The tram network's traction substations from the local OSM extract, for the wire in src/electric.js (#351, #355):
 python -P -E tools/substations.py            lists them
 python -P -E tools/substations.py --write    sets data/truth.json's substations from them

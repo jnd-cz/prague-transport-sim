@@ -4,7 +4,7 @@ Source: the project's own asset lab "street-life-boarding" v14 (2026-10-27), mad
         ChatGPT agent working for the project owner; parametric figures prepared offline by the lab's
         recipe (tools/prepare-traffic-assets.mjs, Node with three.js r160; not in this repository).
         Inventory and provenance: docs/assets-inventory.md (#247). Not based on a third-party model.
-Licence: GNU GPL v3, like the code (the project owner's choice, 2026-11-04;
+Licence: GNU AGPL v3, like the code (the project owner's choice: GPL v3 on 2026-11-04, AGPL v3 on 2026-11-12, #518;
          docs/decisions/2026-10-29-tests-and-licences.md).
 
 person-near.glb  258,800 B  sha256 fa5680c9b161a7cf42c3fcf90da65668c8d7a9dff60fbf97174e306214e523d4

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Inspect and compare DTM download schemas without changing the sources (#63).
 
     python -I tools/dtm_schema.py raw/dtm/*500089*.gpkg.zip

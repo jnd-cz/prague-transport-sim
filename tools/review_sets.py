@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The review directory's index (#288): every review set in reports/review/, the issue that waits for it, its
 lines, and the open PRs' questions for the user, for reviews.html.
 
@@ -37,7 +38,7 @@ KNOWN = {
 # sets a build reads, by the tools that read them: the user's answers become evidence through them, so they stay when
 # their issue closes (deleting one breaks the build, #416). track-heights.json maps data/truth.json's
 # trackHeights.reviewAnswers onto its decisions.
-READ_BY = {"track-heights.json": ["tools/line_heights.py", "tools/track_profile.py"]}
+READ_BY = {"track-heights.json": ["tools/height_answers.py", "tools/track_profile.py"]}
 # issues closed into another, whose sets wait for that one now (the issue's closing comment says so)
 MOVED = {20: 237}
 KERB_ISSUE = 142  # (the kerb review lists wait for it)

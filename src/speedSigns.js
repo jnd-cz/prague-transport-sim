@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The speed signs of D 1/2 § 49.13-22, their faces and where they stand (#211). Pure: no Three.js, no game state, so a
 // page can draw them and a test can read the rules. docs/decisions/2026-11-07-speed-limits-and-signs.md says why.
 //

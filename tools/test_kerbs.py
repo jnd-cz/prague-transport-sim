@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The kerb review list: what is not a kerb leaves it (#142): python -P -E tools/test_kerbs.py"""
 import os
 import sys
@@ -75,6 +76,82 @@ class OsmNote(unittest.TestCase):
         self.assertEqual(plain, tagged)
         del b["review"][0]["osmKerb"]
         self.assertEqual(a, b)
+
+
+class Lowered(unittest.TestCase):
+    """#303: OSM's crossings and kerb nodes lower the kerb over the norm's width, with ramps; the survey shows none."""
+    CROSS = LineString([(20.0, -6.0), (20.0, 3.0)])
+
+    def run_it(self, crossings=(), nodes=(), inside=0.10, road=0.0):
+        road_a, walk = street()
+        r = kerbs.apply([road_a, walk], terrain(inside, road), crossings=crossings, kerb_nodes=nodes)
+        return r, {round(p[0], 2): p[2] for p in walk["r"] if p[1] == 0.0}, {round(p[0], 2): p[2] for p in road_a["r"] if p[1] == 0.0}
+
+    def ramp(self, h=kerbs.LOW_H):
+        return kerbs.LOW_W / 2 + (kerbs.KERB - h) / kerbs.LOW_RAMP
+
+    def test_a_crossing_lowers_its_width_and_ramps_up_beyond(self):
+        r, walk, road = self.run_it([self.CROSS])
+        half, end = kerbs.LOW_W / 2, self.ramp()
+        self.assertAlmostEqual(walk[20.0], Z + kerbs.LOW_H)
+        self.assertAlmostEqual(walk[20.0 + half], Z + kerbs.LOW_H)
+        self.assertAlmostEqual(walk[round(20.0 - end, 2)], Z + kerbs.KERB)
+        self.assertAlmostEqual(walk[16.0], Z + kerbs.KERB)
+        self.assertEqual(r["lowered"]["bySource"], {"crossing": 1})
+        # (the road's ring has the same points, at its own height)
+        self.assertEqual(sorted(walk), sorted(road))
+        self.assertTrue(all(z == Z for z in road.values()))
+
+    def test_the_points_keep_the_kerb_faces(self):
+        road_a, walk = street()
+        kerbs.apply([road_a, walk], terrain(0.10, 0.0), crossings=[self.CROSS])
+        self.assertEqual(sum(walk["k"][0]), 10 + 4)
+
+    def test_a_crossing_ending_short_of_the_kerb_meets_it(self):
+        _, walk, _ = self.run_it([LineString([(20.0, -6.0), (20.0, -2.0)])])
+        self.assertAlmostEqual(walk[20.0], Z + kerbs.LOW_H)
+
+    def test_a_raised_tag_at_the_crossing_keeps_the_kerb(self):
+        r, walk, _ = self.run_it([self.CROSS], [(20.3, 0.2, "raised")])
+        self.assertAlmostEqual(walk[20.0], Z + kerbs.KERB)
+        self.assertEqual(r["lowered"]["bySource"], {"osm kerb=raised": 1})
+
+    def test_a_flush_tag_takes_the_road_level(self):
+        r, walk, _ = self.run_it([self.CROSS], [(20.0, 0.0, "flush")])
+        self.assertAlmostEqual(walk[20.0], Z)
+        self.assertIn(round(20.0 + self.ramp(0.0), 2), walk)
+        self.assertEqual(r["lowered"]["bySource"], {"osm kerb=flush": 1})
+
+    def test_a_lowered_node_away_from_crossings(self):
+        r, walk, _ = self.run_it(nodes=[(8.0, 0.5, "lowered")])
+        self.assertAlmostEqual(walk[8.0], Z + kerbs.LOW_H)
+        self.assertEqual(r["lowered"]["bySource"], {"osm kerb=lowered": 1})
+        _, walk, _ = self.run_it(nodes=[(8.0, 1.5, "lowered")])
+        self.assertAlmostEqual(walk[8.0], Z + kerbs.KERB)
+
+    def test_a_top_line_lowers_the_road_less(self):
+        _, walk, road = self.run_it([self.CROSS], inside=0.0, road=-0.10)
+        self.assertAlmostEqual(walk[20.0], Z)
+        self.assertAlmostEqual(road[20.0], Z - kerbs.LOW_H)
+        self.assertAlmostEqual(road[0.0], Z - kerbs.KERB)
+
+    def test_none_given_changes_nothing(self):
+        plain, given = list(street()), list(street())
+        kerbs.apply(plain, terrain(0.10, 0.0))
+        r = kerbs.apply(given, terrain(0.10, 0.0), crossings=[], kerb_nodes=[(20.0, 9.0, "lowered")])
+        self.assertEqual(plain, given)
+        self.assertEqual(r["lowered"]["stretches"], [])
+
+    def test_the_check_reads_plain_kerb(self):
+        # (terrain level with a plain kerb along the street: the lowered stretch is not judged by it)
+        a, _, _ = self.run_it([self.CROSS], inside=0.10)
+        self.assertEqual(a["review"], [])
+
+    def test_crossing_tags(self):
+        self.assertTrue(kerbs.is_crossing({"highway": "footway", "footway": "crossing"}))
+        self.assertTrue(kerbs.is_crossing({"highway": "path", "crossing": "uncontrolled"}))
+        self.assertFalse(kerbs.is_crossing({"highway": "footway", "footway": "sidewalk"}))
+        self.assertFalse(kerbs.is_crossing({"highway": "footway", "crossing": "no"}))
 
 
 class Decision(unittest.TestCase):

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Track-height decision profile (#162). Distances are measured along the longest reviewed span.
 const valid = (z) => Number.isFinite(z) && z > 100 && z < 500;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

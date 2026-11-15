@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Explicitly reviewed structure profiles; no proposal is applied automatically (#106)."""
 import argparse
 import bisect

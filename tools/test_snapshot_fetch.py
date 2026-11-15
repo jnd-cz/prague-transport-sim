@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """fetch removes what the snapshot replaced, and nothing else (#332): python -I tools/test_snapshot_fetch.py"""
 import contextlib
 import hashlib

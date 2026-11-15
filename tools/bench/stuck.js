@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check helpers (not part of the game) for the benches that drive a whole line (u3, redruns): when
 // our tram counts as stuck, and what stood in front of it then.
 

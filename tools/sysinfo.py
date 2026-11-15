@@ -1,8 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """How many things to run at once: by cores and by free memory (the parallel tools cap themselves by it).
 
     from sysinfo import workers
     n = workers(gb_each=2.0, most=4)   # e.g. headless pages (~2 GB for line 17)
+    with pool(n, initializer, big, data) as ex: ...   # each worker calls initializer(big, data) at its start
 """
+from concurrent.futures import ProcessPoolExecutor
 import ctypes
 import os
 
@@ -35,6 +38,41 @@ def workers(gb_each, most=4):
     if free is not None:
         n = min(n, int((free - 2) // gb_each))
     return max(1, n)
+
+
+def pool(n, initializer, *payload):
+    """A process pool of n workers, each calling initializer(*payload) at its start, the payload pickled once into a
+    temporary file (outside the checkout) that they load. A spawned worker gets its arguments pickled for it alone: the
+    heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, one after another (#516). The file goes
+    when the pool shuts down."""
+    import pickle
+    import tempfile
+    fd, path = tempfile.mkstemp(prefix="pool-", suffix=".pickle")
+    with os.fdopen(fd, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    return Pool(path, n, initializer=_load, initargs=(path, initializer))
+
+
+def _load(path, initializer):
+    import pickle
+    with open(path, "rb") as f:
+        payload = pickle.load(f)
+    initializer(*payload)
+
+
+class Pool(ProcessPoolExecutor):
+    """pool()'s executor: it removes its payload's file when it shuts down."""
+
+    def __init__(self, path, *a, **k):
+        super().__init__(*a, **k)
+        self.path = path
+
+    def shutdown(self, *a, **k):
+        super().shutdown(*a, **k)
+        try:
+            os.remove(self.path)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests of the graph cross-check: python -P -E tools/test_track_topology.py"""
 from pathlib import Path
 import sys

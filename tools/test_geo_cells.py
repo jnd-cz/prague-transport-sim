@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tests of the cell lattice: python -I tools/test_geo_cells.py"""
 from pathlib import Path
 import sys

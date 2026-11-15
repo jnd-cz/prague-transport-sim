@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Writing a file whole: to a temporary name next to it, then renamed over it (#77).
 
     from atomic import replacing

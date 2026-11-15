@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Check the DI report's units, missing heights and layer separation.
 
     python -P -E tools/test_dtm_di.py

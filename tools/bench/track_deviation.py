@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """How far a line's drawn tracks lie from DI's own records, where DI has the track (#237):
     python -P -E tools/bench/track_deviation.py --lines 17,37 [--top 10] [--json reports/track-deviation.json]
 

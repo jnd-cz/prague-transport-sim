@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Source registry and provenance stamps: python -I tools/test_sources.py."""
 import json
 from pathlib import Path

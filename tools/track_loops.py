@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Turning loops on DI's track network, found by rule, for the loop speed (D 1/2 § 25.4 e; data/truth.json operation
 `loop-speed`; #211):
 

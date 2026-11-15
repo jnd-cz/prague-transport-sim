@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OSM from a local extract instead of the public Overpass servers (user, 2026-10-23: build the whole city
 network and keep the servers less loaded).
 
@@ -99,7 +100,8 @@ def cut(src=None):
 
 def ways(match, bbox=None, src=None):
     """Ways whose tags satisfy match(tags: dict) and that touch bbox (s, w, n, e), as Overpass elements."""
-    src = src or PRAHA
+    if src in (None, PRAHA):
+        return _ix_ways(match, bbox)
     out = []
     # (the nodes are read too, for the location cache; only tagged ways get past the filter)
     fp = osmium.FileProcessor(src, osmium.osm.NODE | osmium.osm.WAY).with_locations()
@@ -118,14 +120,23 @@ def ways(match, bbox=None, src=None):
 
 def relations(match, src=None):
     """Relations whose tags satisfy match(tags), with their members (type n/w/r as node/way/relation)."""
+    if src in (None, PRAHA):
+        import json
+        return [r for r in json.loads(_index()["relations"]) if match(r["tags"])]
+    return _relations_pass(match, src)
+
+
+def _relations_pass(match, src):
     kinds = {"n": "node", "w": "way", "r": "relation"}
     return [{"type": "relation", "id": o.id, "tags": dict(o.tags),
              "members": [{"type": kinds[m.type], "ref": m.ref, "role": m.role} for m in o.members]}
-            for o in osmium.FileProcessor(src or PRAHA, osmium.osm.RELATION) if match(dict(o.tags))]
+            for o in osmium.FileProcessor(src, osmium.osm.RELATION) if match(dict(o.tags))]
 
 
 def nodes(match, src=None):
     """Tagged nodes whose tags satisfy match(tags), as Overpass `out body` nodes."""
+    if src in (None, PRAHA):
+        return _ix_nodes(match)
     out = []
     for o in osmium.FileProcessor(src or PRAHA, osmium.osm.NODE).with_filter(osmium.filter.EmptyTagFilter()):
         tags = dict(o.tags)
@@ -139,6 +150,162 @@ def node_coords(ids, src=None):
     for o in osmium.FileProcessor(src or PRAHA, osmium.osm.NODE):
         if o.id in want and o.location.valid():
             out[o.id] = (o.location.lat, o.location.lon)
+    return out
+
+
+# ---------------------------------------------------------------- the extract decoded once per machine (#511)
+# A pass over the extract with the node locations takes ~30 s, and a line's build made about ten (tools/dtm.py six:
+# five way queries and one of nodes; build_line's store ~70 s). Its tagged ways (those with two located nodes or
+# more) and located tagged nodes, in file order, and its relations are kept decoded beside the machine's data cache
+# (TRAMDATA_CACHE/osm-index/, else raw/osm/index/), under the extract's hash and a hash of the code that wrote them.
+# ways(), nodes(), relations() and build_line's store answer from them: the same elements in the same order as a pass.
+INDEX_FORMAT = 1
+_INDEX = None
+
+
+def _index_dir():
+    import hashlib
+    import inspect
+    code = hashlib.sha256(f"{INDEX_FORMAT}\n{inspect.getsource(_build_index)}".encode("utf-8")).hexdigest()[:8]
+    cache = os.environ.get("TRAMDATA_CACHE")
+    return os.path.join(os.path.join(cache, "osm-index") if cache else os.path.join(DIR, "index"), f"{base_id()}-{code}")
+
+
+def _build_index(dst):
+    """One pass with the node locations (tagged nodes and ways) and one over the relations, written to dst."""
+    import json
+    from array import array
+
+    import numpy as np
+    w_id, w_seq, w_ro, w_refs, w_co, w_c, w_to = (array("q"), array("q"), array("q", [0]), array("q"), array("q", [0]),
+                                                  array("d"), array("q", [0]))
+    n_id, n_ll, n_to, w_tags, n_tags = array("q"), array("d"), array("q", [0]), bytearray(), bytearray()
+    seq = 0  # (a tagged way's place among all of them, as build_line's store counts: its answers keep file order)
+    fp = osmium.FileProcessor(PRAHA, osmium.osm.NODE | osmium.osm.WAY).with_locations()
+    for o in fp.with_filter(osmium.filter.EmptyTagFilter()):
+        if o.is_node():
+            if o.location.valid():
+                n_id.append(o.id)
+                n_ll.append(o.location.lat)
+                n_ll.append(o.location.lon)
+                n_tags += json.dumps(dict(o.tags)).encode("utf-8")
+                n_to.append(len(n_tags))
+            continue
+        seq += 1
+        c = array("d")
+        for q in o.nodes:
+            if q.location.valid():
+                c.append(q.location.lat)
+                c.append(q.location.lon)
+        if len(c) < 4:
+            continue
+        w_id.append(o.id)
+        w_seq.append(seq)
+        w_refs.extend(q.ref for q in o.nodes)
+        w_ro.append(len(w_refs))
+        w_c.extend(c)
+        w_co.append(len(w_c) // 2)
+        w_tags += json.dumps(dict(o.tags)).encode("utf-8")
+        w_to.append(len(w_tags))
+    arrays = {"w_id": (w_id, "<i8"), "w_seq": (w_seq, "<i8"), "w_ro": (w_ro, "<i8"), "w_refs": (w_refs, "<i8"),
+              "w_co": (w_co, "<i8"), "w_c": (w_c, "<f8"), "w_to": (w_to, "<i8"), "w_tags": (w_tags, "u1"),
+              "n_id": (n_id, "<i8"), "n_ll": (n_ll, "<f8"), "n_to": (n_to, "<i8"), "n_tags": (n_tags, "u1")}
+    for name, (a, dt) in arrays.items():
+        v = np.frombuffer(a, dtype=dt) if len(a) else np.zeros(0, dtype=dt)
+        np.save(os.path.join(dst, f"{name}.npy"), v.reshape(-1, 2) if name in ("w_c", "n_ll") else v)
+    with open(os.path.join(dst, "relations.json"), "w", encoding="utf-8") as f:
+        json.dump(_relations_pass(lambda t: True, PRAHA), f)
+    return len(w_id), len(n_id)
+
+
+def _make_index(d):
+    """The index at d, written by one process at a time (the others wait for it), whole: a folder renamed in."""
+    import shutil
+    os.makedirs(os.path.dirname(d), exist_ok=True)
+    lock, done = f"{d}.lock", os.path.join(d, "done")
+    while True:
+        try:
+            os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except FileExistsError:
+            if os.path.exists(done):
+                return
+            try:
+                if time.time() - os.path.getmtime(lock) > 900:  # (a writer that died)
+                    os.remove(lock)
+            except FileNotFoundError:
+                pass
+            time.sleep(1)
+    try:
+        if os.path.exists(done):
+            return
+        t0, tmp = time.time(), f"{d}.{os.getpid()}.part"
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp)
+        nw, nn = _build_index(tmp)
+        open(os.path.join(tmp, "done"), "w").close()
+        shutil.rmtree(d, ignore_errors=True)  # (one left without its "done" by a writer that died)
+        os.rename(tmp, d)
+        print(f"  local extract indexed for this machine: {nw} tagged ways, {nn} tagged nodes, {time.time() - t0:.0f} s ({d})")
+    finally:
+        os.remove(lock)
+
+
+def _index():
+    global _INDEX
+    if _INDEX is None:
+        import numpy as np
+        d = _index_dir()
+        if not os.path.exists(os.path.join(d, "done")):
+            _make_index(d)
+        ix = {n[:-4]: np.load(os.path.join(d, n), mmap_mode="r") for n in os.listdir(d) if n.endswith(".npy")}
+        with open(os.path.join(d, "relations.json"), encoding="utf-8") as f:
+            ix["relations"] = f.read()
+        _INDEX = ix
+    return _INDEX
+
+
+def _ix_text(ix, kind):
+    """(the tags' JSON as one bytes, the offsets as a list): slicing those is ~10× quicker than the mapped arrays."""
+    k = f"{kind}_text"
+    if k not in ix:
+        ix[k] = (ix[f"{kind}_tags"].tobytes(), ix[f"{kind}_to"].tolist())
+    return ix[k]
+
+
+def _ix_tags(ix, kind, i):
+    import json
+    b, t = _ix_text(ix, kind)
+    return json.loads(b[t[i]:t[i + 1]])
+
+
+def _ix_ways(match, bbox):
+    """ways() from the index: the ways with a node in bbox (all of them without one), then their tags."""
+    import numpy as np
+    ix = _index()
+    co, c = ix["w_co"], ix["w_c"]
+    if bbox:
+        inside = (c[:, 0] >= bbox[0]) & (c[:, 0] <= bbox[2]) & (c[:, 1] >= bbox[1]) & (c[:, 1] <= bbox[3])
+        sel = np.flatnonzero(np.logical_or.reduceat(inside, co[:-1])) if len(co) > 1 else []
+    else:
+        sel = range(len(ix["w_id"]))
+    out, ro, refs, ids = [], ix["w_ro"], ix["w_refs"], ix["w_id"]
+    for i in sel:
+        tags = _ix_tags(ix, "w", i)
+        if not match(tags):
+            continue
+        out.append({"type": "way", "id": int(ids[i]), "tags": tags, "nodes": refs[ro[i]:ro[i + 1]].tolist(),
+                    "geometry": [{"lat": a, "lon": b} for a, b in c[co[i]:co[i + 1]].tolist()]})
+    return out
+
+
+def _ix_nodes(match):
+    ix = _index()
+    out, ids, ll = [], ix["n_id"], ix["n_ll"]
+    for i in range(len(ids)):
+        tags = _ix_tags(ix, "n", i)
+        if match(tags):
+            out.append({"type": "node", "id": int(ids[i]), "lat": float(ll[i, 0]), "lon": float(ll[i, 1]), "tags": tags})
     return out
 
 
@@ -183,8 +350,8 @@ def is_stop_position(t):
 
 
 def _store():
-    """Everything build_line's queries read, from one pass over the extract (once per process; a line's
-    build asked for ~25 passes before): relations, tagged nodes, and the tagged ways any query can return,
+    """Everything build_line's queries read, from the index (once per process; a line's build asked for ~25
+    passes before): relations, tagged nodes, and the tagged ways any query can return,
     each list in file order, so the answers are the same as from the separate passes. Kept compact (the
     store is per build process, and lines build side by side): a way is (file sequence, id, tags as JSON
     text, node refs, lat/lon pairs) in arrays, and tags are decoded only for what a query returns
@@ -193,42 +360,33 @@ def _store():
     if _STORE is not None:
         return _STORE
     import json
-    from array import array
     t0 = time.time()
     rels = relations(lambda t: True)
     ways_, by_kind = {}, {k: [] for k in ("tracks", "platforms", "buildings", "roads", "green", "water")}
     node_tags, points, stoppos = {}, [], []
     member_ways = {m["ref"] for r in rels for m in r["members"] if m["type"] == "way"}
-    seq = 0
-    fp = osmium.FileProcessor(PRAHA, osmium.osm.NODE | osmium.osm.WAY).with_locations()
-    for o in fp.with_filter(osmium.filter.EmptyTagFilter()):
-        if o.is_node():
-            if o.location.valid():
-                tags = dict(o.tags)
-                node_tags[o.id] = json.dumps(tags)
-                if any(f(tags) for f, _ in POINT_RULES):
-                    points.append({"type": "node", "id": o.id, "lat": o.location.lat, "lon": o.location.lon, "tags": tags})
-                if is_stop_position(tags):
-                    stoppos.append({"type": "node", "id": o.id, "lat": o.location.lat, "lon": o.location.lon, "tags": tags})
+    ix = _index()  # (the tagged nodes and ways in file order, as the pass gave them)
+    nb, nt = _ix_text(ix, "n")
+    for i, (nid, (lat, lon)) in enumerate(zip(ix["n_id"].tolist(), ix["n_ll"].tolist())):
+        s = nb[nt[i]:nt[i + 1]].decode("ascii")
+        node_tags[nid] = s
+        tags = json.loads(s)
+        if any(f(tags) for f, _ in POINT_RULES):
+            points.append({"type": "node", "id": nid, "lat": lat, "lon": lon, "tags": tags})
+        if is_stop_position(tags):
+            stoppos.append({"type": "node", "id": nid, "lat": lat, "lon": lon, "tags": tags})
+    wb, wt = _ix_text(ix, "w")
+    for i, wid in enumerate(ix["w_id"].tolist()):
+        s = wb[wt[i]:wt[i + 1]].decode("ascii")
+        kinds = _kinds(json.loads(s))
+        if not kinds and wid not in member_ways:
             continue
-        seq += 1
-        tags = dict(o.tags)
-        kinds = _kinds(tags)
-        if not kinds and o.id not in member_ways:
-            continue
-        c = array("d")
-        for q in o.nodes:
-            if q.location.valid():
-                c.append(q.location.lat)
-                c.append(q.location.lon)
-        if len(c) < 4:
-            continue
-        w = (seq, o.id, json.dumps(tags), array("q", (q.ref for q in o.nodes)), c)
-        ways_[o.id] = w
+        w = _ix_stored(ix, i, s)
+        ways_[wid] = w
         for k in kinds:
             by_kind[k].append(w)
     _STORE = {"rels": rels, "node_tags": node_tags, "points": points, "stoppos": stoppos, "ways": ways_, "kinds": by_kind}
-    print(f"  local extract read once: {len(rels)} relations, {len(node_tags)} tagged nodes, {len(ways_)} ways, "
+    print(f"  local extract's store: {len(rels)} relations, {len(node_tags)} tagged nodes, {len(ways_)} ways, "
           f"{time.time() - t0:.0f} s")
     return _STORE
 
@@ -243,23 +401,30 @@ def _way(w):
 
 def _ways_by_id(ids):
     """The tagged ways with these ids, in file order (as `ways(lambda t: True)` filtered by id); a way
-    the store did not keep (not a relation member, no query's tags) costs one more pass."""
-    from array import array
+    the store did not keep (not a relation member, no query's tags) from the index."""
     st = _store()
     got = [st["ways"][i] for i in ids if i in st["ways"]]
     missing = set(ids) - set(st["ways"])
     if missing:
-        import json
-        seq = 0
-        fp = osmium.FileProcessor(PRAHA, osmium.osm.NODE | osmium.osm.WAY).with_locations()
-        for o in fp.with_filter(osmium.filter.EntityFilter(osmium.osm.WAY)).with_filter(osmium.filter.EmptyTagFilter()):
-            seq += 1
-            if o.id not in missing:
-                continue
-            c = array("d", (v for q in o.nodes if q.location.valid() for v in (q.location.lat, q.location.lon)))
-            if len(c) >= 4:
-                got.append((seq, o.id, json.dumps(dict(o.tags)), array("q", (q.ref for q in o.nodes)), c))
+        ix = _index()
+        if "w_at" not in ix:
+            ix["w_at"] = {w: i for i, w in enumerate(ix["w_id"].tolist())}
+        wb, wt = _ix_text(ix, "w")
+        for w in missing:
+            i = ix["w_at"].get(w)
+            if i is not None:
+                got.append(_ix_stored(ix, i, wb[wt[i]:wt[i + 1]].decode("ascii")))
     return [_way(w) for w in sorted(got, key=lambda w: w[0])]
+
+
+def _ix_stored(ix, i, tags):
+    """The index's way i as the store keeps a way: (file sequence, id, tags as JSON text, refs, lat/lon pairs)."""
+    from array import array
+    ro, co = ix["w_ro"], ix["w_co"]
+    refs, c = array("q"), array("d")
+    refs.frombytes(ix["w_refs"][ro[i]:ro[i + 1]].tobytes())
+    c.frombytes(ix["w_c"][co[i]:co[i + 1]].tobytes())
+    return int(ix["w_seq"][i]), int(ix["w_id"][i]), tags, refs, c
 
 
 def emulate(name, query):

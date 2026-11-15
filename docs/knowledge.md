@@ -68,6 +68,20 @@ Sections:
   over the rails); a road tunnel under 60 m is drawn open at its portals' grade, so an underpass under the tram lies across
   the rails (50.0755 N 14.4303 E, 28 cm; 50.0884 N 14.4325 E, 15 cm); a road crossing the track between two of its nodes
   is linear between them (50.0707 N 14.3802 E, 7 cm). W3's ground surface (#276, #301) replaces this drawing.
+- **OSM has no grassed-track tag on the tram ways**; mappers draw the grass as areas over the track (`landuse=grass`,
+  `village_green`, `leisure=park`: 2026-11 extract, #503). Inside the known grass spans (the user's marks and
+  prazsketramvaje.cz's list) they cover 3.7 km and stop 2-5 m short of a footway crossing, 5-15 m of a street's edge
+  and 3-4 m of a platform: `tools/track_styles.py` `HOLE`. Switches get no hole: open ballast runs through them
+  (the Depo Hostivař branch, the user 2026-11-12), and one in a street lies in the street's hole. They miss 6 km of the known grass
+  (Sídliště Řepy - Slánská, most of Malý Břevnov - Obora Hvězda), and some lie under our bridges (Střelecký ostrov's
+  park under line 22 at Újezd), so OSM's grass outside the facts goes to the user's review (`tools/grass_review.py`).
+- **A platform paves both tracks at most stops in grass track**, the two directions' platforms staggered or not
+  (#584, 2026-11-14 orthophoto: line 37 at Českomoravská, line 9 at s 15500). Holes on the platform's track alone
+  would have drawn 1.3 km of grass on the other one, most of it the grassed-track list's stop-to-stop extent where
+  both tracks are paved. Drinopol (line 22) is the exception the user named, the only one they know: each platform is
+  also a (replacement) bus stop, so the asphalt runs from the road across the near track to the platform, and the
+  far track stays grass. Nothing in the data tells them apart (the survey maps both as `tram` there, OSM's tram ways carry
+  no surface), so a track differs only where a mark says so (`trackStyles` with `track`, data `stylesBack`/`liftBack`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 
@@ -160,6 +174,22 @@ Sections:
   (Právnická fakulta), and the game's three-point average with a 1.5 m resample turned a 0.9° joint into 3.7°
   at a short piece's end. Rounded to the centimetre, points 0.4 m apart read a 19 m curve as 15.5 m over 2 m.
   Radii and joins are measured on the build's own points, written to the millimetre.
+- **The route the game drives is built** (#477, #276 step 2): the path and the run 60 m past both termini
+  (`pathExt`, `tools/route.py`), its points as they are. Resampled every metre (until #477), the chords cut each
+  point of a curve drawn every ~1 m by about a quarter of its turn: 1.0-1.1 cm on 23-24 m curves of lines 22 and
+  23, 1.9 cm at a 4.5° turn on line 9 (s 15958). Read as built, the speed limits moved 1 km/h in 0-2 bins of our
+  route per line and 0-8 of the opposite one, the cant at most 0.16 mm, and placement's junction edges
+  (`tools/placement.py` shares the sampling) 0.3-0.5 m at three signals, 2.9 m on line 23 (s 4920) and 15 m on
+  line 22 (s 14351), where a conflict sits at the rule's threshold. The run follows the drawn
+  chains in the most aligned direction and goes straight on where none continues, also where a chain ends
+  exactly at the path's end (it wins the walk's choice and has nothing ahead). Built against the page's walk it lies within 0.65 mm on every line (the
+  millimetre rounding). The opposite track's spread to 3 m (`trackfix.js`) went with it: since the DI track it
+  moved no point on any line.
+- **The route's radius and cant are built** (#478, `tools/cant.py`): the radius at every metre (the heading change
+  over 16 m, written as 1e9 / r) for our route and the opposite one, the cant every 2 m for ours (0.01 mm). Against
+  the page's own computation the speed limits are identical on every line and the cant within 0.005 mm. At 1e6 / r
+  the radius was 0.07 % off near 1500 m and three 5 m bins moved 1 km/h (lines 17 and 23), where a whole km/h sat on
+  the edge; 1e9 costs 365 KB on line 9. The page keeps `radiusAt`, `cantAt` and `rollAt` as lookups.
 - **DI re-enters records and keeps the old ones** (#209): the state 2026-10-31 has 1,112 records of 2025-01-30
   and 2026-05-27 (30 km) lying on records entered 2026-10-07 under new IDs, within 8.8 cm (median 0-1 cm), some
   split at other places. 967 of the old ones had zero Z, their re-entries have heights (height class 3), equal to
@@ -259,17 +289,47 @@ Sections:
   Railway-bridge surfaces can be above the tram and are excluded. Numeric DI calibration, the
   Koh-i-noor – Slavia green-surface sample sites, and the separate drawing/survey height meanings
   are recorded in [the height fallback decision](decisions/2026-10-30-track-height-fallback.md#calibration-and-review-response-2026-11-01).
+- **A DI track crossing ours measures the street's tilt there** (#538): its heights where it meets our left and
+  right rail, each taken against our own rail profile at that point (on a 30° crossing the two lie 3 m apart
+  along ours), differ by the cross level. Where one DI track crosses both of ours the two values agree within 2 mm
+  (median), 6 mm (p90). On the five lines' 120 crossings on paved double track this is the only independent check
+  of a street's crossfall: the median of IPR's plane, the survey's plane and our two tracks' slope errs 6 mm
+  (median), IPR alone 10 mm and with a +7 mm bias, though the three-cornered hat gives IPR the smallest spread
+  (0.2 %, the survey 0.8-1.1 %, the tracks 0.4-0.5 %): IPR agrees with the others most and with DI least.
+  Sokolovská: DI 2.6-2.9 % over the gauge, IPR 5.2 %. `tools/cross_level.py` takes DI's value where it exists.
 
 ### Terrain and the street survey (IPR, ČÚZK, ZPS)
 
 - **Sources per layer** ([decision](decisions/2026-10-30-source-per-layer.md)): the order and dates are in
   `tools/sources.py`; every built file says per list where its features came from (`provenance`, `fb`).
+- **The survey's medians** (Dělící pás, 010000001503, #555) carry no surface, and some are mapped twice: of line
+  22's 31 within 40 m of the route, 8 lie mostly under a `tram` area (the tram reservation between the
+  carriageways), 6 on `road`, 15 alone. Read since #555 as `median` (raised like an island, green where OSM's grass
+  covers it: `tools/zps_medians.py`), they fill strips the page drew as sunken terrain: Modřanská's middle (line 17
+  s 4370), Bělohorská beside the track (line 22 s 4160). Where OSM maps the divided road as one two-way way, the
+  cars' fit took one carriageway and laid the other direction's lane in the gap or the opposite carriageway; it now
+  spans both and divides at the median (`src/traffic.js` `_fitRoad`, `laneOffset`).
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
   LZW). Its cell centres sit 0.72 m / 0.61 m off the S-JTSK metre grid (sampled bilinear, never copied);
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
   DMR 5G per line; a Bpv / EVRF2007 mix-up is 0.13 m). The fine 2 m blocks within 120 m of the tracks
   come from it (`tools/fine_terrain.py`, `?nofine`). It has no covers over passages (underpasses,
-  culverts: bare earth shows the passage); near OSM passages DMR 5G, which kept them, takes over.
+  culverts: bare earth shows the passage). Near OSM passages, the lines' fine blocks take DMR 5G, which kept the covers.
+  The city mesh keeps IPR (#428): a street or track over a passage is a deck in #276's partition. The rule also took
+  roofs, garages, building interiors and proposed tunnels (decision record 2026-11-05, "No passages rule").
+- **Terrain under 170 m is no ground** (`sources.TERRAIN_FLOOR`, read by every terrain source; the user,
+  2026-11-09: "I would put lower limit to 170 metres height which is well below lowest point of Prague"). IPR's
+  image (35,001 x 26,001 cells) holds 660,025,394 cells of 170.73-421.15 m and 250,035,607 of its declared
+  no-data, -3.4e38 (GDAL_NODATA tag 42113, `NoDataValue` in `dtm_1m.tif.xml`): the counts of its own statistics
+  (`.aux.xml`), no cell of 0.00 m, none under the floor. The 5,739,063 cells of 0.00 m found in #325 are the padding
+  of its 128 m tiles past the image's south and east edges (274 x 204 tiles hold 35,072 x 26,112 cells): a reader
+  that decodes whole tiles crops them (`IprDtm.cells` checks the bounds, `tools/bench/terrain_city.py` and
+  `tools/city_terrain.py` crop). IPR has ground over the whole of Prague (OSM relation 435514, 496.2 km²) and
+  164 km² beyond, its no-data no nearer the limits than 47 m (a 10 m sample; 1.5 km in the median): the city
+  terrain needs no fallback (#428). DMR 5G has real cells under the floor: line 17's 10 m grid holds 57 cells of
+  163.1-169.8 m at Troja (50.1139 N, 14.4290 E, 334 m from the track), a pit in the 2009-2013 lidar (Trojský most
+  and the Blanka tunnel were built there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills
+  them from their neighbours at line 17's next `build_line.py`.
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the fine blocks' fallback where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
@@ -291,6 +351,87 @@ Sections:
   the street wall) keeps the points the terrain confirms. Without the terrain check the rule lifted
   Novoměstská náplavka's walk 6 m to the street. Line 17: 1,595 points, line 22: 693
   (`provenance … vertexHeights.spikes`).
+- **The survey's ground level against the lidar** (#446, `tools/bench/survey_ground.py` on main's data of
+  2026-11-08r): at the 2 m stations of DI's and DTMP's tracks under open sky in paved level-0 areas, IPR lies within
+  0.3 m of the top of rail at 96.8-99.3 % per line, the survey at 81.9-91.8 %. Whole areas steadily off IPR are few but
+  can be large: Kabešova's street block on line 37, 14,600 m², 1.75 m under IPR, DMR 5G and DI's rails, from its own
+  ZPS lines (#446). `dtm.py` checks level 0 against IPR 1 m inside the outline: the line's coarse 10 m grid read
+  Divadelní's deck (192.99 m) over the road 5 m below it and threw that road out. What tells survey from lidar
+  (`tools/zps_ground.py`):
+  - **Bare earth leaves out small things.** Planters, raised beds, light wells and short flights of steps sit off
+    the lidar but are surveyed right: on line 37, 94 of the 158 areas DMR 5G would have moved were under 10 m². Only
+    areas of 100 m² or more, with a point 1 m inside at two thirds of their corners, are judged.
+  - **The survey's dates say nothing about change**: line 37's areas that fit IPR mostly carry `DatumZmeny` of
+    2025 (3,777 of 4,522), from bulk edits. OSM's construction sites (`landuse` / `building` / `highway` =
+    `construction`) mark ground that changed since the lidar: three lawns at 50.0906 N 14.4666 E sit 1.5-1.75 m over
+    both lidars.
+  - **A ground-level outline that shares its lines with a deck carries the deck's heights**: under Divadelní's
+    deck the road's corners read 193.2-193.3 m at 11 of 16, the floor's 187.6-187.8 at the rest, both levels on the
+    same line; a height an upper level's line has at the same place, over 2 m above the area's ground, is the deck's.
+  - **What neither the rails nor DMR 5G decide** (19 areas on the five lines, the user's answers of 2026-11-10 in
+    `data/truth.json` `surveyGround`): mostly courtyards, where the orthophoto shows little and there is no street
+    view, given to the lidar (13), and greenery outside, raised beds and shrubs, given to the survey (6). Their rule
+    (`heldRule`): a courtyard (OSM buildings within 60 m in 12 of 16 directions) to the lidar, greenery outside to the
+    survey, paved outside to the lidar; it matches 14 of the 19 answers.
+- **The survey's decks take the heights of the lines they share with the ground** (#445, `tools/zps_decks.py`,
+  `tools/bench/decks.py`). A level-1 outline that runs along a wall or a portal takes the wall's foot or the
+  underpass's floor from the same 3D line: on the Krejcárek viaduct (line 37) 53 % of the level-1 vertices within
+  12 m of the route lay over 2 m under the rails, a tram area ran from 208.19 to 228.41 m; at Divadelní five of the nine
+  pieces over the underpass sagged to its floor at the portals. Where the rails, Mosty 3D and the survey all exist,
+  2 m under the structure parts them: of the vertices within 1.5 m of DI's and DTMP's raised rails (1,033) three lie
+  over 2 m under the model's top, of those over 2 m under the rails (612) one lies within 2 m of it. Under the rails
+  the deck's own vertices sit -1.0 to +0.5 m (the surveyed bed under the ballast on Krejcárek, 0.73 m), the model's
+  top up to 1.7 m over the deck (parapets). A deck's vertex more than 2 m under its structure takes the structure's
+  height and the offset the deck's own vertices keep from it. Where no vertex of a deck is on its structure, the area
+  lies inside the model with the ground's heights (Výtoň: the railway and its walkway on Železniční most's land span
+  carry the street's 192 m under the model's 197.5 m; the user: three levels, the railway and its walkway on top) and
+  takes the model's top. Mosty 3D's edges and the survey's outlines part by up to a metre: of the vertices left on the
+  ground beside a model's edge on line 37, 223 of 246 lie within 1 m of a face. Under a deck the floor is the lidar's
+  (the user, 2026-11-10: smoother and believable; the survey's level 0 runs 1-2 m under it in a 64 m covered passage on
+  line 9, too few cases for a rule). Walkways keep 2.2-2.3 m clear (the user, from street view of the passages).
+  One survey area can span several structures: Libeň's railway areas (line 37) lie over separate viaducts side by
+  side at about 205.7 and 212 m and sloped 7 m across the gap. Between the nearest vertices of two levels Libeň's
+  rise 62-1404 %, a deck sloping along one structure 2-7 % (Most Legií's road: 2.9 m over 139 m, vertices only at
+  its ends); over 25 % the area is cut along the model, one piece per deck. Mosty 3D models a slab's top and its
+  underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
+  the nearest face flipped between the two.
+  The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
+- **Along a kerb the survey and IPR's lidar are equally noisy** (#470, `tools/bench/street_scatter.py` on the five lines'
+  data of 2026-11-12). Straight street outline over 8 cm off its 21 m mean, survey / IPR read 1 m inside the area:
+  road 1.8-2.7 / 1.6-2.3 %, tram 1.7-3.3 / 0.4-2.1 %, sidewalk 4.0-5.1 / 3.6-5.9 %, parking 1.5-4.3 / 4.5-9.6 %, paved
+  6-11 / 22-33 % (IPR read on the outline itself, or 0.5 m in, rounds the kerb and is worse). Against DI's rails the
+  noise left in each is alike: median 1.5 cm, 90th percentile 5-10 cm. Of the road samples over 15 cm off, 0.4-0.7 %
+  are the survey's alone, as many IPR's alone, 0.1 % both. So IPR does not replace the survey's heights; the survey's
+  own large errors are runs of vertices on another line's height (a road edge on a wall's top line, a sawtooth of
+  1.2 m by Jižní spojka on line 22; Náhorní's sidewalk 1.40 m low on line 17, #315) and lone vertices off their kerb.
+  `tools/zps_outline.py` moves those where IPR runs calm, on road, tram and sidewalk, a run of them whole or not at all
+  (moved in part, a stretch 1-3 m off became a sawtooth): over 0.3 m off, 1,135-3,540 vertices per line → 90-260; over
+  8 cm off the mean, roads 1.8-2.7 → 1.3-1.6 %, sidewalks 4.0-5.1 → 3.1-4.0 %. A vertex one outline agrees with IPR
+  at and another not is a step (a track bed under its kerb on line 9), not an error. 79 % of straight street outline lies in
+  gaps over 5 m between vertices (line 22). A platform's edge shared with the tram area is its top (#21), not the
+  tram's foot: its vertices stay out of the rule.
+- **Railway yards, lawns and paved yards have heights only on their outline** (#444, `tools/zps_inside.py`,
+  `tools/bench/ground_inside.py`). A street is dense with surveyed lines; these are not, and the linear sheet between
+  their outline vertices left 5-53 % of `rail`'s inside, 7-19 % of `paved`'s and 22-29 % of `green`'s more than 1 m off
+  IPR (the street classes 0-4 %). Those lying open on IPR's ground (#446's verdict within 0.5 m, moved there, or off
+  it unevenly along walls and slopes) take the lidar inside: the page drapes them on its terrain, 5 m triangles (10 m
+  left `green`'s p95 at 0.38-0.44 m, 5 m at 0.13-0.18 m). For the uneven ones a sheet left 30-54 % of the inside
+  beyond 1 m, draped 2-17 %; the small ones (planters, raised beds), the covered ones and those held off IPR keep
+  their sheet. Cut from the city
+  mesh and written as triangles, line 37's were 750,000 triangles, 24 MB more JSON: prebuilt, they wait for #276's
+  ground format. Under the decks IPR is not the floor everywhere: of 14,235 ground-level outline vertices under level-1
+  areas the middle half lie within -0.25 / +0.12 m of it. Hlavní nádraží has three levels:
+  - the tram in its tunnel (s 11801-11867 on line 9) at 197.4-199 m, which is where IPR lies;
+  - the forecourt's paving at 205 m, at level 0, over the tunnel;
+  - the deck at 208.7 m.
+
+  The survey's tram area there shares the forecourt's line along the tunnel's side, so its sheet stands 1.5-3 m over
+  the track. On line 17, IPR reads a deck's cover over stairs going down. In an opening whose floor IPR shows, only the
+  vertices of the passage's own street that stand at the deck move: those within 0.5 m under its underside (top less
+  slab) or higher. Divadelní's west kerb at 193.3 m goes to the floor at 187.7 m. At Modřany the pair 0.1 m apart, 0.98
+  and 1.03 m under the deck's top, moves together, where a fixed 1 m under the top had split it. A level between the
+  floor and the deck stays (the forecourt over the tram's tunnel, #449), and so does an area across the way: the tram
+  over a footway's underpass at line 37's east end lies at its rails' top, IPR 2.3-4.2 m under them.
 - **A kerb is one 3D line in the ZPS survey**, with one height, shared by the road's and the sidewalk's
   outlines (`Hranice dopravní stavby nebo plochy`; a second line one kerb higher lies within 0.6 m at 4 %
   of them). Measured with IPR 1.5 m to either side (#21): along sidewalks it is the kerb's **foot**
@@ -303,6 +444,13 @@ Sections:
   crossing ends on a survey kerb, so a rule that lowers only tagged kerbs leaves most raised (#303). The kerb review
   list is not enriched in them (16 % / 33 % of listed areas, 18 % / 36 % of all kerbed areas), so its cards name them
   and they change no list (#142).
+- **The survey does not show a lowered kerb; untagged crossing ends read lowered** (#303, lines 17 / 22, the survey's
+  traffic-area edges against OSM's nodes on a kerbed edge): the kerb line at `kerb=lowered` nodes carries the same code
+  (`TypDopravniStavbyNeboPlochy` 1, as 88-91 % of them) and sits level with its neighbours (its height against a line
+  fitted 2-10 m either way: median 0.000 / -0.004 m, plain kerb 0.000 / +0.001 m); no inner-division line or second edge
+  marks the crossing. IPR's step at crossing ends with no `kerb=*` tag, +5.7 / +6.3 cm, is the lowered kerbs' (+5.8 /
+  +6.2 cm), not plain kerb's (+12.0 / +11.0 cm). So `tools/kerbs.py` lowers every crossing end to ČSN 73 6110's 2 cm
+  unless OSM tags it otherwise (`data/truth.json` kerbFacts.crossing).
 - **Street surfaces from the survey**: smoothing fits through the outline vertices (on straight kerbs only
   the corners, tens of metres apart) wave by ±0.5–1 m over 15–30 m; linear between the surveyed vertices
   is the smoothest surface (line 17: 3.6 % of samples over 8 cm against 7.3 % for the old street
@@ -325,13 +473,121 @@ Sections:
     `shape`).
   - Geometry: OPL polygons / multipolygons (XY); KR line strings with Z (boundary heights) and points
     (registration). `gpkg.py`'s WKB reader takes base types 1–7 with ISO / EWKB Z and M (M dropped) and
-    envelope codes 0–4: curved types would need work.
+    envelope codes 0–4: curved types would need work. The blobs carry no envelope (flags 0) and the packages
+    no R-tree index, so a reader that wants only the features near the line reads every box through GEOS
+    (`gpkg.features(keep=)`, #517): of line 17's districts' 1 891 580 line and 199 246 area features, 8.7 % and
+    9.4 % have a box that reaches its corridor's 40 m cells.
   - CRS: everything is EPSG:5514 metres, M = 0, and no tool reprojects or rejects another CRS.
   - Per district (OPL polygon / KR line / KR point layers): Praha 1 50/28/61, 2 43/26/52, 4 49/28/60,
     7 45/28/56, 8 53/29/63, 10 49/27/62, 12 50/29/58, 17 43/26/47.
   - Versions: the GPKG `user_version` 10301 is GeoPackage 1.3.1, not the JVF version. The GPKG ZIPs
     carry no JVF header; the matching Praha 2 JVF packages say `VerzeJVFDTM=1.4.3`,
     `DatumZapisu=2026-10-01` (OPL SHA-256 `ba86e8f6…`, KR `3384bf02…`; not in the snapshot).
+- **The survey under the track beds** (#547, #548, 2026-11-13):
+  - Beds are as wide as the survey's area of their style (tram, green, rail), else the style's median width
+    measured there: embedded 1.7, panels 1.9, grass 2.0, ballast 2.5 m (`tools/track_beds.py --calibrate`).
+  - The survey's raised areas (platforms, sidewalks, islands) lie inside the bed outlines over 1 800-4 200 m² per
+    line. Laid under the beds with the street, they flattened 4-5 times the kerbs (line 9 345 → 1 571 flat kerbs).
+    They keep their height: a sidewalk inside a bed's outline means the bed is too wide there, and the raised area
+    is drawn over it anyway.
+  - The survey's street triangles, split to 5 m, rose over a bed between their corners even with every corner
+    laid under it (Spojovací's loop, line 17 s 2350). Near every drawn track they are meshed to 2 m
+    (`terrain.js` `nearTracks`); each 4 m outline piece is split by its own midpoint, the same for both
+    neighbours, so no shared edge gains a point on one side only.
+  - Where the band past a bed's edge caps one area's vertices and its neighbour meets it along a longer edge with
+    no vertex there, a 3.3 cm seam opens (line 23 s 2332-2460, a track 2.4 m away): +18 and +20 `seams3` on lines
+    22 and 23.
+- **The survey on our bridges** (#549, the user's photos and Street View, 2026-11-14):
+  - Level-1 walkway areas sometimes carry the parapet's top as their surface: Krejcárek's tram areas 0.9-1.3 m over
+    the rails, the strip at Modřanská škola (line 17) 0.61 m, Čechův most's sidewalks 0.66-0.73 m (really a kerb
+    over the road). `flushDtm` lays them; a flat deck takes its parapets from them.
+  - A span from OSM's bridge or the survey's level-1 bed includes the walled ramps up to the bridge: IPR's bare
+    earth lies 0.0-0.4 m under the rails there and 2.3-14 m under the spans' bridges (`line_structures.py`
+    `ramps`). The ramps stay spans: off a span, the street flush pulls the street beside a walled ramp up to the
+    track (Modřanská, 40 kerbs).
+- **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
+  (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
+  measure is circular). It does not tell ballast from grass.
+
+### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
+
+The norm for city streets is public: ÚNMZ publishes it with the ministry's consent (`raw/reference/norms/`, with
+its text; the user's link and upload, #512). Its minima are for new design; Prague's streets are older.
+Grades and vertical curves of streets with a tram in the carriageway follow ČSN 73 6405 instead (not public).
+
+- **Design speed** (table 2): A (rychlostní) 80 km/h, 60 in difficult conditions; B (sběrné) 50, 40;
+  C (obslužné) 30–50, 30; D1 (obytné zóny) 20 (the tables' lowest column).
+- **Vertical curves** (tables 13 and 14), the least crest / sag radius by design speed: 80 km/h 4,000 / 2,100 m;
+  60 1,800 / 1,000; 50 1,000 / 700; 40 450 / 350; 30 200 / 180; 20 100 / 110. Measured on the clean
+  streets (#512 calibration, p5): primary 490, trunk 350, secondary and tertiary 300, residential 150,
+  living street 100 m. So Prague's streets reach the minima of the difficult-conditions speed (40 km/h on the
+  main streets, 20–30 on residential ones); their p25 (700–1,000 m on main streets) is at the 50 km/h minima.
+- **Crossfall** (9.5): 2.5 % (2.0 % only in reconstructions), crowned or one-sided on an undivided street,
+  one-sided per carriageway on a divided one; sidewalks 0.5–2.0 % falling to the kerb. The change of
+  crossfall rises along the edge at most 1.2 % (design speed ≤ 50 km/h). The resulting slope
+  √(grade² + crossfall²) is at most 9 % (A, B) or 15 % (C), and at least 0.5 %.
+- **Grades** (table 12): B 6 %, 8 % where justified, 9 % over at most 150 m; C 9 %, 12 %, 15 % over at most 50 m;
+  D1 5 %, 8.33 %, 12.5 %. At least 0.5 %. Measured p99: primary 6.4 %, residential 12 %, living street 14 %.
+- **The tram belt** (3.1.18, 7.3, figures 2–4, 13):
+  - a belt raised at most 7 cm counts as unraised;
+  - the separating kerb (tvarovka) stands at most 9 cm over the carriageway, its inner edge 1.50 m from the
+    track's axis (1.30 m in reconstructions);
+  - a raised kerb stands 1.75 m from the axis (ČSN 28 0318);
+  - the belt is 7.00 m wide (6.00 m in reconstructions, 5.70 m where tight; 8.00 m with a mast between the
+    tracks); the track centres move to 3.50 m apart with buses on the belt, 4.00 m with a mast between them
+    (the base distance is drawn in the figures only).
+- **Kerbs** (Z1): a lowered kerb is under 80 mm; at driveways 2–5 cm (7 cm where justified).
+- **Prague's sidewalks in IPR** (`street_profile.py --sidewalks`, 2026-11-15, the five lines' level-0 sidewalks,
+  every 2 m along their kerbs):
+  - **IPR's raster smears the kerb** 1–1.5 m into the sidewalk: at Hartigova IPR rises 7–9 cm in the first 1.5 m,
+    then 1–1.5 % across. A survey "sidewalk" can also be a wider area: at Hartigova (3687, −70) the first 5 m rise
+    1.2 %, the 10 m behind them 0.8 m (a forecourt or a slope).
+  - **Crossfall across the walkway** (a line through IPR from 1.5 m off the kerb to 1 m before the far side or 5 m
+    from the kerb, 94,689 samples): the median rises 2.3 %, p25–p75 0.9–3.7 %; 24 % are within the norm's 0.5–2 %.
+    Hartigova reads 1.8 %. (A first read from 1 m off the kerb across the whole width gave 2.5 %.)
+  - **The kerb step** (IPR 1 m into the sidewalk less 1.5 m into the road): p25/50/75 5.9 / 10.4 / 14.8 cm, the
+    median `tools/kerbs.py`'s `KERB` 0.10 m.
+  - **The user** (#512, 2026-11-15): "Hartigova sidewalks should be pretty flat overall, not sure where that steep
+    angle comes from. Small angle is good for draining water but shouldn't be noticeably too much." So the generated
+    walkway takes IPR's crossfall held to the norm's 0.5–2 % (data/truth.json `sidewalk-crossfall`); IPR reads the
+    sidewalks steeper than they are.
+  - **Today's survey surface at Hartigova falls away from the kerb** (median −2.2 %): `kerbs.py`'s +0.10 m may land on
+    a line that is already the kerb's top there.
+- **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
+  crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
+  street; a crossing street ramps up to the bed.
+- **The generated street surface on the five lines** (`street_profile.py --wide 300`, #512, 2026-11-15):
+  - **Inside the road** (1 m in from its edge) it lies within 0.18-0.25 m of IPR at p99, the survey's surface within
+    0.47-0.83 m; sidewalks 0.18-0.21 m against 1.4-2.1 m.
+  - **Along the survey's straight outlines** (#470's statistic, 0.3 m inside) it scatters more than the survey's
+    outline and less than IPR: roads over 8 cm off their 21 m mean 1.7-2.7 % against the survey's 1.2-1.6 % and
+    IPR's 1.9-3.4 %. At the edge it follows what the lidar sees there (walls, ramps, the bed's edge): of Palmovka's
+    157 samples over 8 cm, 102 have IPR over 8 cm too.
+  - **Triangles** (pydelatin on a 0.5 m raster, both filled off the streets from their nearest street cell): at 2 cm
+    22-31 % fewer than IPR's own raster; at 5 cm 6-24 % more, its kerbs kept as 10 cm steps where IPR rounds them.
+    The survey's outline triangulation has a tenth as many, linear between noisy vertices. With the terrain beside
+    the streets in the raster, the edge between the two drew most of the triangles.
+
+### Tram stops: ČSN 73 6425-1 (2007)
+
+The stops norm (bus, trolleybus and tram stops, part 1: design; `raw/reference/norms/`, the user's upload, #512).
+Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply to it too.
+
+- **Kinds beside an unraised belt** (7.1.1): a boarding island; a raised carriageway, the lane lifted to the
+  sidewalk's level less 20 mm, which cars drive over (pojížděný mys); a stop peninsula (mys), with the cars led
+  over the tracks in a lane at least 3.50 m wide. On C and D1 streets in reconstructions the stop may be at
+  the carriageway's level, guarded by a signal (časový ostrůvek) or humps (7.1.2).
+- **Where** (7.2): after a junction by preference; on grades up to 5 %; not on a curve's outer side
+  unless the driver sees every door; opposite stops facing each other between junctions.
+- **The edge** (7.3.1–7.3.3): the platform runs 0.50 m beyond its boarding edge at either end; the edge is
+  as long as the two longest trains plus 1 m, at most 67 m, or one train where one line stops or at 12 trams
+  an hour or fewer.
+- **Surface** (6.2.2.3, 7.3.4): crossfall 0.5–2 %, the resulting slope at most 5 %; where trams lay over, the
+  track's grade is at most 0.25 %.
+- **Width** (7.3.5): free width 2.20 m (2.50 m recommended), where tight 1.70 m (2.00 m); a shelter's side
+  wall may take 0.50 m of it.
+- **Height** (7.3.6): above the top of rail, to suit the fleet, at most 160 mm under a low floor (a bus edge
+  stands 200 mm over the road, 160 mm in reconstructions, 6.2.2.4).
 
 ### Buildings and structures (Geoportál, Mosty 3D)
 
@@ -360,8 +616,8 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   the coast as for the curve; no crawl and no drive pedal once braking or while coasting in over the drive's target (`tools/headless.py
   --checks stops`, `tools/test_drives.py`). The pedal to the floor only past what step 5 and the gradient make. It pulls away at up to
   1.0 m/s², on step 3 below 20 km/h on the level unless step 3 cannot make it (a full car), and at up to 1.2 m/s² above 20 km/h (step 4).
-  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (0.12 of the speed in slow streets, 0.35 m/s on a
-  climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
+  Once it let go it coasts down 1 m/s under the speed it holds before pressing again (a fifth of the speed in slow streets, #502;
+  0.35 m/s on a climb). A turn the drive pedal must make before a point is a limit of its own, from which the 1.5 s without the brake still leaves the
   point on its curve; only where the limits have it pass the contact faster than the button works coasting (≈19 km/h).
   Smoothness costs the timetable quickly: 4 % slower took line 22's late penalty from 17 to 509, so `stops` counts it too. The button works only
   below ≈19 km/h, so a turn under a contact just before a stop or inside a switch's braking is a limit of its own, 15 km/h, or the tram goes the wrong way.
@@ -372,6 +628,14 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   The crawl on main was held by drive pulses 1–2 m short. Behind something that moves it may drive and crawl, under that curve
   all the same: a car crossing just past a stop puts its stopping point 6 m short of the stop, and forgetting the stop for that
   second brought the drive pedal back uphill.
+  **One brake press into a stop** (#502; the user, 2026-11-15: "consistently stop in a single pedal press"). The fade below ≈9 km/h
+  (steps 1–2 to nothing, step 5 handing over to the shoes) was handled by the last metres' rule, but only while the pedal was down.
+  Where the plan found it would roll in by itself it asked to coast, and the foot came off: 2–3 m out at 3–6 km/h and on again to
+  stand, or off at 11–12 km/h after step 5 and on again 6 m out. Now, braking with a stop or a signal ahead, where it would only
+  coast, the foot stays on step 1 (spent below 9 km/h, so it rolls as if coasting), where step 1 does not stand it short and the stop's
+  braking begins within ≈3 s. The brake let off and pressed again inside an approach (`stops` pulses, seeds 1–5, against main at
+  609a4bc): line 9 15 → 2.6, 17 9 → 1.6, 22 10 → 1, 23 1.8 → 0.6, 37 7 → 1, the stops as precise. A separate braking for a tram, a car
+  or a lower limit 75–150 m out, then a coast, stays: the drivers coast there too.
 - **Real rides, and how far to follow them** (#351, PR #363): GPS of four rides on line 23 from the user, read from the speed with the
   gradient and the running resistance taken out: car 6921 Lazarská to Královka and car 6312 Královka to Bílá labuť on 2026-10-31,
   T2R 6004 and T3SUCS 7290 on the diverted route on 2026-11-07, the last with a phone's accelerometer for 11 minutes. The drivers
@@ -420,6 +684,84 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   down every descent to 1 m/s under ran line 23 40 s later. On W2's data (73c2a32): brake applications −6 to −18 %, the wire's energy
   −4 to −11 %, the late penalty outside main's spread only on line 23 (11 → 63); the user took the fewer presses for that
   (2026-11-09), the timetable's part being #242.
+- **The rides of 2026-11-11** (#500; `raw/reference/rides/`, snapshot 2026-11-12r):
+  - **The recordings:**
+    - T2R 6003 (5.7 km) and T2R 6004 (5.1 km), TR37, on line 23's diverted loop (Václavské náměstí, Masarykovo nádraží, Těšnov,
+      Vltavská, Dlouhá třída), each with a phone lying still for the whole ride.
+    - T3M 8088 on line 37 from Strážní toward Palmovka, the phone in the second car.
+  - **Reading the phone:**
+    - The phone's clock is the file's save time less its length; the GPS acceleration fits it within 3–13 s.
+    - The forward axis is fitted per part where the gravity vector holds still, which catches the phone moved once mid ride
+      (r 0.80–0.97 against the GPS; 6003's first 207 s 0.44, left out). The zero is taken at each stand.
+    - Phases: drive over 0.20 m/s², brake under −0.25, for 1.5 s or more.
+  - **The two T2R drivers** (6003 / 6004):
+    - presses: 5.8 / 7.6 a km;
+    - coasting: 67 / 54 % of the distance;
+    - drive level up to 30 km/h: 1.0 / 1.2–1.3 m/s² (the model's steps 3 / 4 with 40 passengers);
+    - braking below 20 km/h: 0.5 / 0.9 m/s² (steps 2 / 4);
+    - approach to a stop (medians):
+      - the drive off 163 / 97 m out, at 26 / 27 km/h;
+      - the last braking 30 / 54 m from 21 / 32 km/h, at 0.54 / 0.68 m/s² (GPS).
+    - A drive of 0.8 m/s² or more ends within 0.25–0.3 s at this 0.5 s smoothing, as in #396.
+  - **Against the autopilot on the four stretches line 23 shares, Vodičkova to Bílá labuť** (dry, seeds 1–3):
+
+    | | 6004's run, presses (drive + brake) | autopilot's |
+    |---|---|---|
+    | Vodičkova to Václavské náměstí | 67 s, 1 + 2 | 39–70 s, 2–4 + 1–4 |
+    | to Jindřišská | 94 s, 2 + 2 | 55–60 s, 1–4 + 1–3 |
+    | Jindřišská to Masarykovo nádraží | 76 s, 4 + 4 | 91–155 s, 8–9 + 3–4 |
+    | to Bílá labuť | 95 s, 4 + 4 (6003: 81 s, 1 + 3) | 73–79 s, 6–7 + 4–5 |
+  - **Jindřišská to Masarykovo nádraží, traced** (#502, seeds 1–3 on main at 609a4bc): our limits allow 74 s. The time
+    over that is a red at the junction 237 m out (21–27 s held in two seeds of three) and the timetable's 180 s stop to stop:
+    with 110–165 s in hand, the mild driving took the 15 km/h limit after the stop to 9 km/h and the 20 before Masarykovo to 15.
+    The presses came from holding those speeds up 5–13 ‰: a press each time it sagged 0.35–0.5 m/s, 3–4 in each zone. 6004
+    pressed once in each and let 15 sag to 12 and 20 to 16. Since #502 the mild driving keeps 20 km/h (a lower limit its own
+    target) and the hold sags a fifth of the speed (0.35–1 m/s): 6–7 presses there where traffic leaves it alone, and a car on
+    the track or a stand at the red adds a press each.
+  - **The T3M on line 37** (front 23 m ahead of the phone):
+    - **The trip:** it left Vozovna Žižkov 50 s after the game timetable's 08:20 (trip 17; the user: "always assume same or delayed
+      trip, never earlier"), Ohrada +107 s, Krejcárek +171 s.
+    - **Running times:** 84 s to Ohrada (timetable 60, the autopilot 60–62). To Krejcárek 164 s, 68 of them standing at the
+      junction past Ohrada (timetable 120, the autopilot 103–110 with 7–8 brake applications).
+    - **Over our limits:**
+      - 19.7 km/h over Ohrada's crossings (15; 1.31 times, under the derailment's 1.5);
+      - 46.9 in a 43 curve;
+      - 54–58 where 50 is posted and 63–67 where 60 is posted, about 200 m down toward Krejcárek;
+      - 29.4 where 25 is posted before Palmovka.
+  - **T3M 8088 again on 2026-11-12** (the phone at the end of the second car, the front 31 m ahead; snapshot 2026-11-12s), to compare:
+    - **The trip:** the same one (trip 17): +50 s at Vozovna Žižkov, +110 s at Ohrada, +201 s at Krejcárek. To Krejcárek 197 s, 87 of
+      them standing at the junction past Ohrada.
+    - **Down toward Krejcárek the sign says 65, not OSM's 60** (the user, 2026-11-15, with a photo of the sign: "there is actually
+      65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong"). OSM tags this track
+      (way 412908226) 60 and the other direction (way 334167230) 65. This ride's top was 60.7 km/h; the day before's 63–67 was
+      within the 65 but for 67.2.
+    - **Where the limit rises from 50:** both rides ran 53–57 km/h (medians 53–54) 50–100 m before the sign, where 50 still holds:
+      the drivers pick up speed as the sign comes into view.
+    - **The rest:** 21.4 km/h over Ohrada's crossings (our 15; 1.43×, under the derailment's 1.5×), 46.4 in the 43 curve, 28 where 25
+      is posted before Palmovka, and 18.4 over the 15 restriction 38 m before Palmovka.
+- **Driving to the timetable** (#242): the time in hand to the next stop sets how it drives. That is the stop's timetable
+  time, less now, less 1.3 times the quickest run there at the limits, less a 15 s dwell.
+  - **Up to 10 s in hand it catches up.** The target is 0.2 m/s under the limit, and brake step 1 holds down a descent only to
+    0.6 m/s under. At a 15 km/h limit, 0.4 and 1 m/s held it at 10-14.5 km/h, where the drivers of two line 23 rides held 14-16
+    down Chotkova (#431). Within reach of a turn's contact the target keeps 0.4: 0.2 under Anděl's 20 km/h put the accelerator
+    at 31 coasting, over the switch button's 30.
+  - **Over the next 30 s it grows milder:** curves as at 0.8 m/s², 0.4 under the limit, the 1 m/s hold, the target up to
+    10 km/h under but never under 20 km/h (#502), coasting up to twice as long, braking a quarter softer (the user, 2026-11-10: "if there's enough time the
+    autopilot doesn't go as hard into curves and uses less pedal presses to conserve power. If he's late then he uses the
+    probe's plan to catch up").
+  - **Against main at 973726c** (with #451's curves; stops check, seeds 1-5):
+
+    | line | arrivals within ±30 s | mean delay | drive presses |
+    |---|---|---|---|
+    | 9 | 40 → 47 % | 52 → 44 s | +7 % |
+    | 17 | 6 % → unchanged | 116 → 96 s | −7 % |
+    | 22 | 4 → 29 % | 160 → 75 s | −6 % |
+    | 23 | 8 → 19 % | 116 → 74 s | −15 % |
+    | 37 | 54 → 61 % | 44 → 37 s | unchanged |
+
+    Energy from the wire is 0-2 % lower on every line.
+  - **In other weathers** (`--checks autumn,rain,winter`): wheel spin, slides and sand stay within a few per cent of main's,
+    and the delay falls in all three.
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /
@@ -451,7 +793,7 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   minutes if not more"). That is a tram box's least, 17 dm³ by ČSN 28 1300, at a sander's 400–500 g per 30 s (Matečka 2015, VUT Brno,
   `raw/reference/adhesion/`, #266); the T3's own box is not known. 90 s ran dry on every line 9 run; the
   track brakes sand too. On a leaf patch (0.06) every step slips from a stand (step 1 pulls 0.60 m/s², the grip is 0.59), and
-  slipping wheels pull 0.7 of the grip, 0.41 m/s²: with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
+  slipping wheels pull 0.7 of the grip, 0.41 m/s² (main's on/off model; #265's creep curve, half the grip): with the box empty a patch up more than ≈ 38 ‰ cannot be left (line 17 s 18663
   at 58 ‰ and line 9 after Bertramka, on main as with #351's autopilot). With 90 s, sanding at every slip and slide ran the box dry half way
   along lines 9, 17 and 22; sanding only where it decides something, it still ran dry there, while 23 and 37 kept a third to two
   thirds. Pulling away the autopilot sands only where slipping wheels would not climb with 0.15 m/s² to spare, then up to 3 m/s;
@@ -459,17 +801,127 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   20 km/h down 55 ‰ without sand and came in at 35; the autumn runs' speed penalty was 495, main's 53, and 38 with sand on every slide
   and the plan less the downhill's pull (`--checks autumn`, all lines, seeds 1–5). With the box empty the track brakes take a slide toward a
   point and let go once the rail under the tram gives what is still needed: held past a patch's end they stood the tram 13 m short
-  of Mezi Hřbitovy up 25 ‰. A slip takes a step less for 6 s, lower only if it still
-  slips 0.8 s on (the equipment lags the pedal). A slide over 1.2 s above 3 m/s costs the flats penalty (`src/game.js`).
+  of Mezi Hřbitovy up 25 ‰. How it reacts to a spin and a slide on the wheels' own speed: the next entry. A slide over 1.2 s above
+  3 m/s costs the flats penalty (`src/game.js`).
+- **Driving on slippery rail, the wheels turning on their own** (#265; `--checks autumn,rain,winter`, all lines, seeds 1–5, against
+  main's on/off model):
+  - **A step's force is fixed by its current** and does not fall with speed until the accelerator has run out
+    (`TR37.driveForceAt`). On a two-car set it is 23, 34, 46 and 59 kN on steps 1–4, up to 20 km/h. At 40 km/h steps 3 and 4 pull
+    35 and 41 kN.
+  - **Snow's 0.12 holds 42 kN standing and 32 kN at 40 km/h** (Curtius–Kniffler, `muSpeed`). Step 3 never stays within it.
+    - Let back onto step 3 every 4 s after a spin, it spun again: 270 spins on line 9 in snow.
+    - Capped at the grip at the speed, slipping fell to 0–4 s a run (main 29–125 s), and the presses and comfort came to about main's.
+    - The cap stops at the lowest step that still climbs the grade. Up Trojská's 80 ‰ in snow that step is at the grip, and only
+      sand holds it.
+  - **A locked wheel stays locked:**
+    - it gets half the grip;
+    - the equipment sees it standing, so the shoes come in.
+    Stepping off one step at a time, it slid 5–8 s from 25 km/h. Released at once, it grips again within a second.
+  - **At 57 km/h down Modřanská rokle in snow the rail gives 0.25 m/s²** after the descent's pull. A signal 272 m ahead then took the
+    tram over three limits. Down a descent it now keeps to what stops within 200 m.
+  - **Any step spins on a leaf patch (0.06).**
+    - Each spin is the pedal off and a press again: autumn's presses were 1.2–1.4 times main's.
+    - Sanding while the first axle crosses a patch on the drive pedal brings them within a few per cent of main's, at 2.5–3 times
+      main's sand: 270–400 s of the 25-minute box per run (#265's PR).
+  - **The trade-offs kept, to re-evaluate once the leaf patches' amount is tuned** (the user, 2026-11-12, PR #426: "that's enough, we
+    will tune the amount of slippery patches later"; "I wouldn't sand preemptively on every patch, just where the grip is needed").
+    `--checks autumn,rain,winter`, all lines, seeds 1–5, against main's on/off model at 96537a5:
+    - **Speed.** It drives within the grip, and it slows only down a descent, to what stops within 200 m; on the level it keeps the limit.
+      Autumn runs 3 % longer: line 17's mean delay 170 → 239 s, spread 5–11 s over each stretch, where main spun 139 s a run. Snow's
+      delay stays within main's seed spread except line 37's late penalty (36 → 67).
+    - **Sand only where the grip is needed:**
+      - pulling away over a patch (under 6 m/s);
+      - a patch up a climb over 20 ‰, or a climb the bare rail cannot take;
+      - before the track brakes where the rail cannot give a stop;
+      - on a slide.
+      At speed it eases off over a patch instead.
+
+      In autumn this is about twice main's sand: 93–329 s a run, 6–22 % of the box. Rain uses 1–2 %, snow 2–11 %, and the box is
+      refilled at each terminus (`data/truth.json` t3-sand-refill).
+
+      The alternatives measured on line 9, 17 and 22, seed 1:
+
+      | patch rule | sand a run | presses | line 9's mean delay |
+      |---|---|---|---|
+      | sand over every patch it drives onto | 270–400 s | within 5 % of main's | 63 s |
+      | ease off over every patch, pulling away too | | | 302 s: it rolled to a stand on the patch and drove again |
+    - **Presses** in autumn are 7–33 % over main's: a spin on a patch it did not see coming, or a press after easing off over one.
+    - **Slides last longer than main's** (autumn 4–15 s a run, snow 8–32 s, main 1–6 s): on the creep curve a slide lasts until the brake
+      is eased, where main's model cut it at once. Most of it is emergency stops for walkers and cars on step 6 with the track brakes.
+      Slides begun within 30 m of a stop: line 17 in autumn 17.8 → 4 a run, in snow 9.2 → 4.6.
 - T3s can meet anywhere in the Prague network, tight curves included (user, 2026-10-30): a tram/tram
   overlap between T3s is a geometry error (track spacing), not a place where they must not meet. A few
   tight places forbid KT8 and T3R.PLF from meeting; that matters once those models exist.
 - Prague signals: 4 white lamps on a white plate (stop = outer two), call box with three orange LED bars,
   distant signal with a yellow "P"; switch indicator a red LED chevron on the span wire.
+- **The T3's outline** (#427, `src/t3simple.js`): drawingdatabase.com's general arrangement (`Tatra-T3-1.gif`, side and
+  plan, dimensioned at 20 mm a pixel) and its colour elevation (`trams_t3_01.png`, 12.66 mm a pixel) agree with each other
+  and with Dynybyl's table 3, Wikipedia and the 1977 Soviet manual: body 14 000 × 2 500 mm, 3 060 mm high, pivots 3 800 / 6 400
+  / 3 800 mm. In plan the ends taper from the doors (4.5 m ahead of and 4.8 m behind the centre); the front and rear doors
+  stand on the taper. The drawing's plan view ends in corners 0.73–0.78 m off the centreline, too narrow against the user's
+  head-on photos of 6892 (below): the model's corners are 1.0 m off it, rounded with 0.32 m, the face bulging 0.21 m (the
+  user, 2026-11-10: "Let's try widening"); from above its ends are ±0.97 m wide, the hybrid's ±1.0 m, conflig's ±0.88 m. The
+  plan view on p. 10 of Dynybyl's thesis is narrower still (the user, 2026-11-09: "looks more narrow, like t1 or early
+  prototype than t3"). Laid over the colour elevation at its scale, the built model's windows, doors, bands and ends fall on
+  its lines, except the brows over the windscreen and the rear window: the side view leans them back 0.17 and 0.12 m, the
+  photo of 7290 has them upright to 2.86 m, then rolling into the roof over 0.5 m (the user, 2026-11-10: "make the front
+  brow less slanted, perhaps even perpendicular? The back should be similar", "a bit thinner, like running a bit down
+  towards the front and back"), the route box low on the front one, 3 cm over its lower edge. The windows wrapping round
+  the ends meet the sides in upright edges with rounded corners; the livery's u follows the outline's points, which move
+  back with the leaning end, so those edges are drawn through each height's own u (`ringU`), not straight in the texture.
+- **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
+  round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
+  from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between
+  the first and second windows on the right, the second and third on the left; fleet numbers golden yellow (#e3b625) in
+  bold Arial on both models (2026-11-10: "the new model uses different font from the hybrid model and my photos": it
+  had Bahnschrift), their digits 0.14 m tall
+  on every side (2026-11-10: "same size in all sides"; on the photos 0.13–0.15 m against the red band's heights, conflig's
+  model 0.13–0.146 m; the hybrid's quads were 0.19 m tall on the ends and 0.23 m on the sides under one texture, so 0.106
+  and 0.13 m digits): on the front centred on the headlights, on the rear over the white lamp just above the lamps, on the
+  sides 1.36–1.50 m up and 4.17 m ahead of the centre (behind the front door on the right, behind the cab window on the left).
+- **The T3 head on** (the user's photo of 6892, 2026-11-10, a telephoto from about 25 m): scaled by the skirt's foot (0.35 m),
+  the red's top (1.48 m) and the roof (3.02 m), which agree to 3 %, the headlights' centres are 1.11 m up and 1.11 m apart
+  (the colour elevation: 1.03 m, 1.06 m apart; the model has them 1.08 m apart, the user finding 1.11 m "a tad to far
+  apart"), pointing straight ahead in black rubber surrounds with a chrome rim; the bumper 0.76–0.86 m (the elevation:
+  0.70–0.80), the corner units 0.98–1.30 m with the clear lamp's centre (1.06 m) just under the headlights' line, round the
+  corners ±0.93–0.99 m off the centreline (the rear's ±0.96 m), the windscreen's posts ±0.71 m, the route box 0.49 × 0.30 m
+  with its top 7 cm under the roof's. The ends are open under the bumper between the skirt's corners, which reach in to the
+  headlights' outer edges, ±0.65 m (front and rear, "front and back is open under the bumper").
+- **The T3's bogie from the side** (the user's photo, 2026-11-10; one over the pit, 2026-11-09): the skirt is cut out in arches
+  over the wheels, hugging their treads and level with their tops between them (the colour elevation and conflig's model have
+  a lower, square cutout); grey wheel discs with a big hex nut on the hub inside rust-brown tyres; a curved guard inside each
+  wheel; the track-brake shoe over the rail with a row of nuts on its upper bar; the ribbed rubber spring in the middle up to
+  the skirt with the gearbox's housing beside it, coil springs by the wheels; everything a dusty warm grey. The coupler (the
+  user's picture, "only dark"): a round bar from the yoke's pin to a clamp, the cast head with two jaws, the coupling pin
+  down through them with its handle on top. Its height over the rail is the other models': conflig's classic has the bar
+  at 0.594 m (0.563-0.625), the hybrid at 0.584 m (bar and head 0.527-0.641), so the built-in car's is 0.59 m (the user,
+  2026-11-10: "I don't know proper figures so you might as well take it from the others"; it was 0.552 m, no source).
+- **The three T3 types in Prague** (the user, 2026-11-10): the T3, fleet numbers 6400–6992, a silver bumper with two thin
+  red stripes (6892: 12 mm, a quarter of the bumper in from its edges), the route box square; the T3SUCS, 7001–7292, the
+  bumper brown, the route box with rounded corners; the T3M, 8005–8106, as the T3SUCS with the resistors' box on the roof
+  towards the rear, short but wide ("Box on top with resistors towards back only for t3m, which has green top number
+  plate"), and green dot-matrix displays: the route on the front in the rounded box, and inside the right side's second
+  window the route with the destination and the next stop. AI sets take each type as often as its range is long ("their
+  proportion in service (probability to appear as AI tram) roughly related to their range sizes"): 60, 30 and 10 %.
+- **A T3's lamps in service** (the user, 2026-11-10, #436): "Trams run regular beams by default, off only when the car is
+  turned off. High beams can be flashed as warnings or used at night on dark stretches of line." So the dipped
+  headlights and the tail lamps are on by day too. The rear: the corner units' lower red lamps are the brake lamps, the
+  rear panel's two red lamps the tail lamps, the white one between them the reversing lamp. The indicators: "Turning at
+  junction and stopping at street level stop across car lane", at such a stop the right ones from braking into it until
+  it pulls away. Between coupled cars "only the rear red lights light up" (the user's photo of 8088 coupled behind
+  another, 2026-11-10): the game lights a set's front on its leading car only, the rear red lamps on every car, and
+  blinks the indicators on every car, 1.5 times a second (`src/lamps.js`). The hybrid's glows (indicators, brake lamps)
+  are stored at scale 0 in its asset: copied by its matrix decomposed they had a NaN rotation and never drew. Its
+  asset has no tail lamps: they are added at load, 2 cm over its bumper (found by rays from behind), 0.47 m out.
 
 ## Heuristics that stand in for missing data
 
 Review these when realism matters; most move into the build in M2.
+- **Junction turns** (`src/indicators.js`, #436), where the autopilot and AI trams indicate: a switch on the route after
+  which the route's heading turns more than 30° within 40 m (a crossover's S-bend comes back); on from 50 m before the
+  switch until the heading has turned 80 % of the way. On the five lines: 12 on line 9 (Anděl, Újezd, Lazarská, Flora,
+  Karlovo náměstí …), 3 on 17 (Výstaviště, Ke Stírce, Vozovna Kobylisy), 6 on 22, 8 on 23, 3 on 37; two switches of
+  one junction a few metres apart make overlapping turns. `game.lamps.turns` lists them.
 - **Turning loops** (`tools/track_loops.py`, #211): a path from a switch entered by its toe to one left by its toe,
   turning 170°+ street to street, its switches within 150 m, mean radius 18 m+. It finds 47 loops on DI's network,
   all real by the user's review (2026-11-09); it names each by its nearest GTFS stop, so Špejchar's loop shows as
@@ -499,10 +951,15 @@ Review these when realism matters; most move into the build in M2.
   miss a vertical kerb: the crossing check intersects its drawn top edge with rail-head chords too.
   Decisions are in `window.game.route.ground.pedestrianCrossings`.
   `--checks crossing` retains raw hits and source IDs, and fails on unexplained crossing obstructions.
-  Geometric side-surface classes have separate counts and places for rebuild comparisons. Held
-  patches go through `tools/crossing_review.py` into `reports/review/pedestrian-crossings.json`, opened
-  with `?line=17&review=reports/review/pedestrian-crossings.json`; answers stay held until reviewed
-  evidence supplies a place-based fact. Overlapping survey slab sides remain #166.
+  Geometric side-surface classes have separate counts and places for rebuild comparisons. A walkable
+  patch over the rail head within 6 m of a track, with no crossing evidence and not spanning the track,
+  keeps its survey height (`crossingSurveyReview`). Since #444 (PR #466: the survey's ground-level
+  triangles flipped to constrained Delaunay) none of them covers a rail head: on 2026-11-11, line 17 had
+  four beside the route's rails (U Libušského potoka, Pobřežní cesta, Nad Trojou twice), line 9 four
+  18–22 m from the route on Vozovna Motol's depot track, and the other lines none. #146's queue of six such
+  places on line 17 was dropped unanswered: four had stopped being candidates and two cover no rail. A
+  patch that covers a rail fails the check as an unexplained section. Overlapping survey slab sides
+  remain #166.
 - **Vienna-type stops**: carriageway on the doors' side 2.2–3.4 m from the track along the stop (the
   tram bed is not a car lane); facts per stop and direction in `truth.json` `stopTypes`.
 - **Bridges on the model deck**: on tagged spans with model samples, the model deck is fixed like a
@@ -517,10 +974,27 @@ Review these when realism matters; most move into the build in M2.
   switch before the car's end, so no margin). The rear still has to leave each restriction. The radius is read over
   16 m of heading, which smears a sharp curve's end by about 12 m each way; most curves here have transitions, so the
   limit climbs along them.
+- **A curve's speed** (#451): no sign stands at most curves, and D 1/2 only asks for a speed that suits the curvature (§ 25.7),
+  so the limit is √((a + cant · g / 1.5) · R) in whole km/h at a = 1.0 m/s² unbalanced (`curve-lateral-acceleration`), and 15
+  under R 25 m, where the "r" sign stands (§ 49.19). Two line 23 rides mapped on our track (6312 on 2026-10-31, 6921 on
+  2026-11-08; GPS within 0–3 m of the track there) took the unsigned curves of R 30–60 m at 1.2–1.6 m/s² without cant
+  (R 54 m past Pražský hrad and above Chotkova's hairpin at 26–34 km/h), and the signed hairpin at Chotkovy sady (R 24 m, 15)
+  at 12–17 km/h, so the drivers keep a signed limit. The old 0.8 m/s² was a design value (0.65 comfortable, about 1.0 the
+  upper bound) in 5 km/h steps: 20 km/h for R 45–60 m. At 1.0 the rides go over our limit in no curve on 6312's ride and in
+  three on 6921's (4–8 km/h). With it the autopilot's moving time in the stops check fell by 95 s on line 22 and 55 s on line 23,
+  with fewer presses and the same energy. Derailment (`src/speedRules.js` `derailRisk`): a second over 2.25 m/s² in a curve, 1.5
+  times its limit's speed, or 1.5 times a switch's, crossing's or loop's 15 (the user, 2026-11-10: "40-50% over speed limit or
+  something over 2-2.5 m/s² for at least one second").
 - Stop zone −20…+12 m; adhesion dry 0.30, rain 0.17, leaves 0.15; demand peaks 7–9:30 and 15:30–17:30.
 - **Traffic**: cars wait at the track only while the tram's body is on the crossing or it is about to
-  arrive (16 m / 4 s); AI trams ahead run at the limit, spawned 700–1300 m ahead, board 6–8 s when ours
+  arrive (16 m / 4 s); AI trams both ways run 0.2 m/s under the limit (the oncoming ones ran at 0.85 of it until
+  #242), spawned 700–1300 m ahead, board 6–8 s when ours
   is within 300 m; oncoming trams stop at the far end of their own platform.
+  An AI tram ahead goes on at a blinking GO only if its front gets there while the GO lasts: the blinking left plus the hold
+  the controller can still give it (10 s, `PHASE_HOLD`), less a second, on its braking curve to its speed at the signal.
+  Otherwise, able to stop on full service braking, it stops. Before, it went on at any blinking GO first seen inside its
+  comfortable stopping distance; slowing for a junction's 15 km/h past the signal it outlasted the hold and ran the red 1.4 s
+  late (line 17 seed 5, line 22 s 4211; #394). A longer hold was turned down (the user, 2026-11-10: "that would slow up the cycle and cause potential jams").
 - **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
   car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
   immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
@@ -545,13 +1019,15 @@ Review these when realism matters; most move into the build in M2.
   `deckClip` (ray down against drawn buildings and bridges), `underpassClearance`, lanes, street bot,
   `trackRadius` (over 5 m through the build's points, under 18 m; 18-20 m listed as exceptions) and `trackJoins`
   (through tracks breaking over 1° where chains meet, diverging start angles listed; direction from the parabola
-  through the first three drawn points).
+  through the first three drawn points),
+  `trackCorners` (a vertex turning over 1.5° between neighbours under 1°, segments up to 1.5 m: the corner a held
+  heading leaves where the points begin, which `trackRadius` cannot see within 2.5 m of a track's end, #491).
 - `lint({ traffic: true })` / `tools/traffic_lint.js`: slide, jump, overlap, walker hits, red runs;
   averages seeds 22, 7, 1234; a run that does not finish is a jam (follow `car.seen.car`).
 - `tools/bench/`: u3 (signals, junctions, collisions), redruns, walkers, heads; `batch.html` runs them.
 - `--checks stops` counts the drive pedal's presses from 0 (*našlápnutí*), those made rolling (over 1 m/s), the brake's applies
-  and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide, sand and
-  the emergency brake. A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
+  and coasting of 20 m or more; `--checks autumn` is the same drive on wet leaves (0.15, patches 0.06) with slip, slide (seconds, episodes, and slides
+  begun within 30 m of a stop: `slidesAtStops`, #265), sand and the emergency brake, `rain` in rain (0.17 ± 0.02) and `winter` in snow (ice, 0.08, ±4 m at the pedestrian crossings). A press from a stand is one per stand for any driver; the rolling ones tell pulsing from driving and
   coasting. Dry, main pressed 19–24 times a km (70 % rolling), the #351 autopilot 8.4–13 (lines 37 and 23).
 - Line 17's full lint after the merge was the pre-rebuild reference (`reports/line17.json`, a local
   report, not in git); regressions compare with main's baseline in the data store.
@@ -591,6 +1067,17 @@ Review these when realism matters; most move into the build in M2.
 
   What is left is the number of calls, and the simulation decides that: fewer pose lookups (a car's pitch and roll
   only when it moves a metre) would change the counts, so it is a decision for the traffic work, not a speed-up.
+- **Rails under the ground** (`tools/lint.js` `buriedRails`, in `--checks canted`, #548): every 2 m of every drawn
+  track, each rail head against the surfaces over it. Before #548: 372-837 places per line, 295-741 of them the
+  survey; after: 86-133, mostly another track's bed between a switch's rails (1-5 cm) and OSM road ribbons.
+  Its trough measure (the ground 1 m past a bed's edge lower than the edge and the ground 4 m out) is not
+  calibrated: its deepest places are real ditches and cuttings (`reports/review/bed-troughs-N.json`).
+- **`DownRays` and long slivers:** indexed by its bounding box, a survey sliver lands in thousands of 4 m cells, and
+  sampling every drawn track ran for 30 minutes on line 17. A triangle over more than four cells goes only into
+  the cells it overlaps (`triInRect`); two indexes of line 17's survey and terrain ran the page out of memory.
+- **Probes and screenshots:** `shot.py --view review` colours the surfaces by class and hides the track styles, so
+  appearance is judged in `chase` or `cab`. Platforms, stop signs and shelters are added to the scene, not to the
+  world group (`window.world`): a probe that walks only the world misses them.
 
 ## Czech tram terms
 
@@ -625,6 +1112,38 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   simulation in JS (`window.headless`) rather than waiting in real time.
 - Memory: the whole line is built at load (no streaming); fine terrain adds ~0.15–0.2 GB.
 - The `gh` CLI lives in `C:\Program Files\GitHub CLI` (not always on the Bash PATH).
+- numpy's OpenBLAS starts a thread per core in every process. Several processes side by side (a rebuild's
+  steps, two jobs at once) then fight over the cores: an ADMM-sized inverse and 300 products (n 1200) took
+  5.1 s with the default 24 threads beside a rebuild, 0.14 s with one and 0.08 s with four (#511). Alone,
+  4 threads and 24 run about as fast. The thread count changes BLAS results in their last bits (sums split
+  differently); the line heights came out byte-identical at 4 and at 24. `tools/rebuild.py` sets
+  `OPENBLAS_NUM_THREADS` per step.
+- numpy has no banded or triangular solver; SciPy's LAPACK wrappers do: `scipy.linalg.lapack.dpbtrf` factors a
+  symmetric positive definite band matrix (upper storage, `ab[u+i-j, j] = A[i, j]`) and `dpbtrs` solves with the
+  factor, a 1-d right-hand side included. On the vertical profile's pentadiagonal system (n 3303) a solve took 50 us
+  against 1.66 ms for a product with the dense inverse (4 BLAS threads), the factor 0.3 ms against the inverse's 0.87
+  s; the answers 2.6e-12 apart, the residual smaller; the heights byte-identical (#516).
+- A warm start is not a free speed-up for an iterative solve whose results feed one another: ADMM started from where
+  the same solve ended last time stops at another point within its tolerance, and the rounds of meeting half way (one
+  chain's heights are another's pins) then ended after 4 rounds instead of 6 and moved one junction's heights by up to
+  16 mm (#516).
+- Python reuses a module's bytecode while the source keeps its size and the second of its date: a file
+  rewritten within the same second at the same size runs the old code (a test that edits a module must
+  change its size).
+- `np.hypot` and `math.hypot` differ in the last bit in ~17 % of pairs (2 000 000 random pairs, #517), and so does
+  `np.sqrt(x*x + y*y)`; numpy's `+ - * /` and Python's floats agree to the bit. A loop moved to numpy keeps its
+  results only where it keeps `math.hypot` (`tools/track_curve.py` `misses`: numpy picks, `math.hypot` measures).
+  shapely's array functions (`distance`, `line_locate_point`, `line_interpolate_point`, `buffer`, an `STRtree`
+  query of many geometries, which lists each one's hits in the order a query of it alone gives) run the same GEOS
+  operations as its scalar methods: the same bits.
+- `os.replace` onto a file another handle holds open fails on Windows (`PermissionError`, WinError 5), and
+  so does opening a file while it is being replaced; POSIX lets both through. Python's `open` does not share
+  delete access. Two threads replacing one file at once, or one replacing it while a process reads it,
+  stopped a parallel rebuild (#521). A file several threads or processes write needs one writer at a
+  time and a retry for the readers (`tools/stepcache.py` `_waiting`).
+- A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
+  in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
+  faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
 
 ## The test host
 

@@ -6,15 +6,23 @@
   "rules": "reference: signal-not-in-platform is checked by tools/lint.js signalsInPlatforms, consist-coupled by consistAtStops; the facts themselves are not read",
   "places": "reference: places the user described, for the scenery and structure work",
   "notes": "reference",
-  "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, line_heights.py",
-  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
-  "kerbFacts": "tools/dtm.py, tools/kerbs.py", "trackStyleKinds": "src/heights.js",
-  "trackStyles": "src/heights.js",
+  "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
+  "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
+  "streetGeometry": "tools/street_profile.py (the radii by OSM class, the raised belt, the steepest crossfall, the sidewalks' crossfall, the raised corridors the user confirmed)",
+  "kerbFacts": "tools/dtm.py, tools/kerbs.py",
+  "trackStyleKinds": "src/heights.js",
+  "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
+  "grassTrack": "tools/track_styles.py, tools/track_decks.py",
+  "grassReview": "tools/track_styles.py (answered grass), tools/grass_review.py (answered places get no card)",
   "trackSources": "tools/di_tracks.py, track_sources.py; steppedAnswers: tools/di_network.py, stepped_review.py",
   "sourceAccuracy": "tools/track_curve.py class_errors (the classes, also for tools/di_network.py); the sources' stated accuracies are reference",
-  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed and stop-pass-speed; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
+  "operation": "src/speedRules.js reads the speeds over switches and crossings, max-speed, small-radius-speed, restriction-past, trojska-descent, loop-speed, stop-pass-speed and curve-lateral-acceleration; src/speedSigns.js (signFacts) reads dangerous-gradients and the speed-switches with an OSM node's lat, lon; the rest is reference: #211 (stop speeds, the lists) and #221 (the T3SUCS traction) are to read it",
   "substations": "src/electric.js Feeding, through src/main.js and src/game.js (#351): the wire's feeds; tools/substations.py writes it",
-  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it"
+  "stopSigns": "tools/build_line.py: each stop's sign, the point the tram front stops at (#258); tools/stop_signs_review.py --import writes it",
+  "surveyGround": "tools/dtm.py (tools/zps_ground.py judge): an answered place decides whether the survey's ground-level area there keeps its heights or moves to IPR's lidar (#446); tools/survey_ground_answers.py writes it",
+  "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)",
+  "trackSurfaceReview": "tools/surface_review.py (an answered place gets no card); tools/track_styles.py's setts (#574) once it reads them",
+  "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it"
  },
  "stops": [
   {
@@ -246,6 +254,12 @@
    "quote": "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm (openrailwaymap) track info."
   },
   {
+   "id": "user-ohrada-krejcarek-65",
+   "text": "Down from Ohrada toward Krejcárek (line 37's direction) the posted speed is 65 km/h, where OSM's 60 is: OSM way 412908226 tags 60 (its other direction, way 334167230, 65). Reference until #612 has tools/osm_speeds.py read it.",
+   "source": "user 2026-11-15 (#500, PR #501), with a photo of the sign",
+   "quote": "I watched the section between ohrada and Krejcárek and found there is actually 65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong."
+  },
+  {
    "id": "user-t3-controls",
    "text": "The T3 controls are placeholders without pedals; the pedals and the accelerator (zrychlovač) are to be researched and simulated.",
    "source": "user 2026-11-03 (#215)",
@@ -268,6 +282,24 @@
    "text": "A two-car T3 set runs with both cars' pantographs up, as in real operation.",
    "source": "user 2026-11-03 (#215)",
    "quote": "for t3 we use both cars pantographs as it is in real operation"
+  },
+  {
+   "id": "user-deck-walk-clearance",
+   "text": "A deck over a walkway without maxheight leaves at least 2.2-2.3 m clear and is as thick as that allows, up to 1 m (tools/zps_decks.py WALK 2.2 + MARGIN 0.1); the passages on lines 9, 17, 22, 23 and 37 have enough clearance.",
+   "source": "user 2026-11-10 from street view of the passages, #445 session (PR #452)",
+   "quote": "The underpasses have enough clearance, for walkway I would keep lower lower limit of 2.2-2.3 and then whatever slab it leaves, even though the 0.5m in your measurements could be just fine."
+  },
+  {
+   "id": "user-deck-floor-lidar",
+   "text": "Under a deck the floor is IPR's lidar, not the survey's level 0 (tools/zps_decks.py flatten); the survey's floor may be the better one only where it lies well under the lidar outside a tunnel, not yet seen enough to make a rule.",
+   "source": "user 2026-11-10 on the sections of the passages, #445 session (PR #452)",
+   "quote": "The lidar floor generally looks better and sits lower, have smooth believable curve, so I would prefer that one. Survey floor could be even lower but it's wavy and hard to asses where it's more accurate. If lidar has big difference and survey is quite a bit lower (while not being downright in tunnel then it might be the better one but I haven't seen enough examples."
+  },
+  {
+   "id": "user-deck-model-simplified",
+   "text": "Mosty 3D's solid models are much simplified: a bridge's track and walkway run at one level, which the model's top stands for.",
+   "source": "user 2026-11-10 with a photo from Železniční most's walkway, #445 session (PR #452)",
+   "quote": "In reality the bridge has rail track continuing in the same level as outside of river area and sidewalk is next to it at about the same level too. The solid 3D model is very siplified."
   }
  ],
  "places": [
@@ -325,6 +357,34 @@
    "name": "Letenský tunel",
    "text": "Car tunnel: cars come out of the tube, not down the hill",
    "source": "user 2026-10-23"
+  },
+  {
+   "name": "Výtoň, Železniční most (line 17)",
+   "text": "Three levels: the railway bridge with the walkway beside the track on top, level with the track over the river; our tram tracks, the road and the sidewalk towards the river in the middle; the riverside walk at the water at the bottom. The survey's level-1 railway and walkway areas there carry the street's heights; tools/zps_decks.py lifts an area lying inside a model onto it (#445)",
+   "source": "user 2026-11-10, #445 session (PR #452), with a photo from the walkway",
+   "quote": "Výtoň case is more difficult one, there are really three levels: the highest is the railway bridge and walkway alongside. Middle level is the one with our tram tracks and car rode, sidewalk towards the river. And finally there's the lowest level right next to the water."
+  },
+  {
+   "name": "Divadelní underpass under Národní",
+   "text": "No sidewalk in the passage, only a thin kerb along each side (OSM's footway=sidewalk tunnel 805407405 there is the kerb)",
+   "source": "user 2026-11-10 from street view, #445 session (PR #452)",
+   "quote": "At Divadelní there's not really any sidealk from what I can see, only thin kerb alongside each side."
+  },
+  {
+   "name": "Bridge with two arches, line 22 at 50.0850 N 14.3835 E",
+   "text": "A road bridge on two arches over a parking place: the survey's level-1 road on it carries the heights of the ground under the arches (#445)",
+   "source": "user 2026-11-10, street view photo, #445 session (PR #452)"
+  },
+  {
+   "name": "Footbridge over the tram by Gymnastická (line 22, 50.0845 N 14.3805 E)",
+   "text": "A footbridge over the tram area with stairs down to both platforms, going on over Gymnastická",
+   "source": "user 2026-11-10, orthophoto, #445 session (PR #452)"
+  },
+  {
+   "name": "Libeň railway viaducts (line 37, 50.104-50.106 N 14.480 E)",
+   "text": "Several separate railway viaducts side by side (about 205.7, 210 and 212 m), each level straight across its spans. The survey's railway areas span two of them; tools/zps_decks.py splits such an area along the model, one piece per viaduct (#445)",
+   "source": "user 2026-11-10 with an orthophoto and four photos, #445 session (PR #452)",
+   "quote": "Libeň viaduct's are several different one but they should all hold straight across the spans"
   }
  ],
  "stopTypes": {
@@ -367,7 +427,7 @@
   "railAboveDeck": [
    {
     "id": "rail-above-deck-embedded",
-    "styles": ["embedded"],
+    "styles": ["embedded", "setts"],
     "scope": "all",
     "metres": 0,
     "basis": "surface and rail heads flush",
@@ -534,6 +594,29 @@
    {"id": "min-radius-network", "value": 18, "unit": "m", "scope": "the smallest horizontal radius anywhere on Prague's network: 18-20 m are exceptions, under 18 m none", "basis": "the user; measured at Podolská vodárna: DI reads 14.6 m over 5 m, the rails in the orthophoto 18.3-20.1 m over 6 m, DI's line up to 0.31 m off them", "quote": "18m and over could be some exceptions, 19.9m looks like rounding error but under 18m there shouldn't be anything like that. [...] At which cost can we snap it to 18m curve? Because that should be the ultimate limit of the network.", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"}
   ]
  },
+ "streetGeometry": {
+  "note": "Street geometry for the generated streets (#512): the norm's limits for city streets and what Prague's streets measure. The norm's minima are for new design; the limits held are the measured ones where the streets are tighter.",
+  "facts": [
+   {"id": "street-radius-motorway", "value": 500, "unit": "m", "scope": "the vertical radius a generated motorway street's profile holds (OSM highway=motorway)", "basis": "the norm's least crest/sag radius by design speed (tables 13, 14): as primary: no motorway in the corridors", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-trunk", "value": 350, "unit": "m", "scope": "the vertical radius a generated trunk street's profile holds (OSM highway=trunk)", "basis": "measured (tools/street_profile.py --calibrate, 2026-11-13: the 5th percentile of the tightest vertical radius the clean streets of lines 9, 17, 22, 23 and 37 need (384 km, 1864 stretches): 350 m); the norm's least crest/sag radius by design speed (tables 13, 14): 40 km/h sag 350 m", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-primary", "value": 500, "unit": "m", "scope": "the vertical radius a generated primary street's profile holds (OSM highway=primary)", "basis": "measured (tools/street_profile.py --calibrate, 2026-11-13: the 5th percentile of the tightest vertical radius the clean streets of lines 9, 17, 22, 23 and 37 need (384 km, 1864 stretches): 490 m); the norm's least crest/sag radius by design speed (tables 13, 14): 40 km/h crest 450 m", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-secondary", "value": 300, "unit": "m", "scope": "the vertical radius a generated secondary street's profile holds (OSM highway=secondary)", "basis": "measured (tools/street_profile.py --calibrate, 2026-11-13: the 5th percentile of the tightest vertical radius the clean streets of lines 9, 17, 22, 23 and 37 need (384 km, 1864 stretches): 300 m); the norm's least crest/sag radius by design speed (tables 13, 14): between 30 km/h (200 m) and 40 km/h (450 m)", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-tertiary", "value": 300, "unit": "m", "scope": "the vertical radius a generated tertiary street's profile holds (OSM highway=tertiary)", "basis": "measured (tools/street_profile.py --calibrate, 2026-11-13: the 5th percentile of the tightest vertical radius the clean streets of lines 9, 17, 22, 23 and 37 need (384 km, 1864 stretches): 300 m); the norm's least crest/sag radius by design speed (tables 13, 14): between 30 km/h (200 m) and 40 km/h (450 m)", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-residential", "value": 150, "unit": "m", "scope": "the vertical radius a generated residential street's profile holds (OSM highway=residential)", "basis": "measured (tools/street_profile.py --calibrate, 2026-11-13: the 5th percentile of the tightest vertical radius the clean streets of lines 9, 17, 22, 23 and 37 need (384 km, 1864 stretches): 150 m); the norm's least crest/sag radius by design speed (tables 13, 14): between 20 km/h (100 m) and 30 km/h (200 m)", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-living-street", "value": 100, "unit": "m", "scope": "the vertical radius a generated living street street's profile holds (OSM highway=living_street)", "basis": "measured (tools/street_profile.py --calibrate, 2026-11-13: the 5th percentile of the tightest vertical radius the clean streets of lines 9, 17, 22, 23 and 37 need (384 km, 1864 stretches): 100 m); the norm's least crest/sag radius by design speed (tables 13, 14): 20 km/h crest 100 m", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-radius-other", "value": 150, "unit": "m", "scope": "the vertical radius of the other car classes (unclassified, links)", "basis": "as residential", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 53}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-crossfall", "value": 0.025, "unit": "rise per m", "scope": "a carriageway's crossfall, crowned or one-sided; 0.020 only in reconstructions", "basis": "the norm, 9.5.1", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 52}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-crossfall-max", "value": 0.06, "unit": "rise per m", "scope": "the steepest crossfall a carriageway takes (superelevation in a curve included); a steeper reading of IPR across a road is a wall, a kerb or noise", "basis": "the norm, table 10 (the least radii by crossfall, which lists crossfalls up to 6 %)", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 51}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "street-crossfall-change", "value": 0.012, "unit": "rise per m", "scope": "the steepest rise of a carriageway's edge against its axis where its crossfall changes, design speed up to 50 km/h", "basis": "the norm, 9.8.3", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 55}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "sidewalk-crossfall", "value": [0.005, 0.02], "unit": "rise per m", "scope": "a sidewalk's crossfall, falling to the kerb: the generated walkway's, read from IPR and held to this range (IPR reads Prague's sidewalks steeper: the median rises 2.3 % 1.5-5 m off the kerb, docs/knowledge.md)", "basis": "the norm, 9.5.5", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 52}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\"", "user": "Hartigova sidewalks should be pretty flat overall, not sure where that steep angle comes from. Small angle is good for draining water but shouldn't be noticeably too much.", "userSource": "#512 session, 2026-11-15"},
+   {"id": "street-resulting-slope", "value": {"A": 0.09, "B": 0.09, "C": 0.15, "min": 0.005}, "unit": "rise per m", "scope": "the largest resulting slope sqrt(grade^2 + crossfall^2) by functional group (A, B main; C service), and the least", "basis": "the norm, 9.8.1", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 54}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""},
+   {"id": "raised-belt", "value": 0.07, "unit": "m", "scope": "a tram belt raised at most this over the carriageway counts as unraised; above it the belt's edge is a kerb", "basis": "the norm, 7.3 table 3 note g and figure 2's notes", "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent), with amendment Z1 (2010)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf", "page": 33}, "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\"", "user": "hartigova has central tram corridor which is on topside of kerb. Roads crossing it come up to the track level.", "userSource": "#512 session, 2026-11-14"},
+   {"id": "raised-corridors", "value": [
+     {"place": "Hartigova", "line": 37, "lat": 50.090931, "lon": 14.471911, "user": "hartigova has central tram corridor which is on topside of kerb. Roads crossing it come up to the track level.", "userSource": "#512 session, 2026-11-14"},
+     {"place": "Vinohradská at Olšanské hřbitovy", "line": 9, "lat": 50.07835, "lon": 14.47109, "user": "Don't know how high but there seems to be raised corridor similar to Hartigova but with different track style", "userSource": "#512 session, 2026-11-15"}],
+    "unit": "places", "scope": "places where the tram corridor stands above the carriageways beside it, behind a kerb: the line-wide report (--wide) gives the share of the tracks' samples within 50 m of each that raised_bed() reads as raised (the rule reads IPR beside the bed against raised-belt)", "basis": "the user's word; the height is IPR's", "source": {"document": "the user's answers in the #512 session"}}
+  ]
+ },
  "trackStyleKinds": {
   "embedded": "rails laid in the street surface (asphalt, setts), cars drive on the track",
   "panels": "large concrete panels on a track body of its own, flush with the rail heads",
@@ -545,9 +628,10 @@
    "line": "22",
    "from": "Malý Břevnov",
    "to": "Obora Hvězda",
-   "style": "ballast",
-   "extent": "mostly",
-   "source": "user 2026-10-29"
+   "between": [[50.0765432, 14.3347445], [50.0778945, 14.3399846]],
+   "style": "grass",
+   "extent": "between the two points",
+   "source": "user 2026-11-12, #479: \"I looked at ortophoto and steer view and now confirm there is grass between 50.0765432N, 14.3347445E and 50.0778945N, 14.3399846E. It looked dry so got confused with open ballast earlier.\" (was ballast, mostly: user 2026-10-29)"
   },
   {
    "line": "22",
@@ -587,8 +671,92 @@
    "extent": "all",
    "note": "panels in the street, separated from the car lanes; survey: the lanes 4.5 m off are level with the axis (+0.008 m)",
    "source": "user 2026-10-29"
+  },
+  {
+   "line": "17",
+   "from": "Výstaviště",
+   "between": [[50.10526, 14.43336], [50.10617, 14.43473]],
+   "style": "grass",
+   "extent": "between the two points",
+   "source": "user 2026-11-12, #479: \"The newly rebuild street beyond Výstaviště stop has now grass cover, between 50.10526°, 14.43336° and 50.10617°, 14.43473°. Osm viewer shows green patch there\""
+  },
+  {
+   "line": "37",
+   "to": "Podkovářská",
+   "between": [[50.1021863, 14.5062906], "Podkovářská"],
+   "style": "grass",
+   "extent": "from the point to the stop",
+   "source": "user 2026-11-12, #479: \"Another green span is on line 37 between 50.1021863N, 14.5062906E and podkovářská stop.\""
+  },
+  {
+   "line": "17",
+   "between": [[50.0038606, 14.4170011], [50.002275, 14.4112849]],
+   "style": "ballast",
+   "extent": "between the grass review card's pins (grass-50.0027-14.4144)",
+   "source": "user 2026-11-12, grass track review (#503), answered not grass: \"there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast\""
+  },
+  {
+   "line": "37",
+   "between": [[50.0906055, 14.4679162], [50.0994264, 14.4732075]],
+   "style": "ballast",
+   "extent": "from the end of the Ohrada junction to the north end of the Krejcárek viaduct (line 37 s 2238-3496 in the 2026-11-14 build)",
+   "source": "user 2026-11-14, #549, with two photos of the viaduct: \"There is open ballast track in the middle, walkway a bit lower and a parapet on the side. [...] Btw the track from ohrada junction to the viaduct is open ballast too.\""
+  },
+  {
+   "line": "22",
+   "between": [[50.0839577, 14.3700293], [50.0839329, 14.3705729]],
+   "track": "back",
+   "style": "grass",
+   "extent": "the other direction's track along Drinopol's platform A (U103Z1P) and 3 m past its ends (line 22 s 3570-3609 in the 2026-11-14 build); our track beside the platform stays paved",
+   "source": "user 2026-11-13, #584, with a street photo: \"I found also special case of one track paved and another grassy (second picture), like at Drinopol which makes it more complicated\"; which track is which from the ČÚZK orthophoto (2026-11-14): the track beside platform A paved, the other in grass; why, the user 2026-11-14, #584: \"It's the only place like this that I saw so far and now it's clear why: it's also bus stop, usually for replacement bus, so the asphalt has to run from the road and back.\""
+  },
+  {
+   "line": "22",
+   "between": [[50.0839241, 14.3715501], [50.0839601, 14.372078]],
+   "track": "ours",
+   "style": "grass",
+   "extent": "our track along Drinopol's platform B (U103Z2P) and 3 m past its ends (line 22 s 3679-3717 in the 2026-11-14 build); the other direction's track beside the platform stays paved",
+   "source": "user 2026-11-14, #584, with a Street View picture of platform B: \"Other platform is similar. It's the only place like this that I saw so far and now it's clear why: it's also bus stop, usually for replacement bus, so the asphalt has to run from the road and back.\""
   }
  ],
+ "grassTrack": {
+  "document": "prazsketramvaje.cz: Zatravněný svršek tramvajové tratě",
+  "url": "https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041490",
+  "read": "2026-11-12",
+  "note": "DP Praha's grassed track by the year it was laid, from stop to stop; found by the user (#479, 2026-11-12). A '?' in the article marks only an unknown year (the user, 2026-11-12: \"The article has question mark only because the year of construction if the grass cover is unknown\"): `yearKnown` false. Stop names as our data spells them (the article: 'Pražský Hrad', 'Obora Hvěda'). Every line passing both stops takes the stretch between them; the user's trackStyles marks win where they overlap (tools/track_styles.py).",
+  "stretches": [
+   {"from": "Brusnice", "to": "Pražský hrad", "year": 1995},
+   {"from": "Pohořelec", "to": "Brusnice", "year": 2000},
+   {"from": "Prašný most", "to": "Hradčanská", "year": 2002, "removed": 2009},
+   {"from": "Černokostelecká", "to": "Vinice", "year": 2002},
+   {"from": "Nádraží Libeň", "to": "Balabenka", "year": 2004},
+   {"from": "Sídliště Barrandov", "to": "Hlubočepy", "year": 2004, "removed": 2020, "note": "watering added 2006; removed 2020 except a short piece around Chaplinovo náměstí"},
+   {"from": "Balabenka", "to": "Poliklinika Vysočany", "year": 2005},
+   {"from": "Hradčanská", "to": "Špejchar", "year": 2010},
+   {"from": "Sídliště Řepy", "to": "Slánská", "year": 2010},
+   {"from": "Vítězné náměstí", "to": "Podbaba", "year": 2011},
+   {"from": "Sparta", "to": "Korunovační", "year": 2012},
+   {"from": "Harfa", "to": "Podkovářská", "year": 2013, "yearKnown": false},
+   {"from": "Prašný most", "to": "Hradčanská", "year": 2013},
+   {"from": "Nad Džbánem", "to": "Červený Vrch", "year": 2013, "yearKnown": false},
+   {"from": "Červený Vrch", "to": "Thákurova", "year": 2013, "yearKnown": false},
+   {"from": "Na Padesátém", "to": "Průběžná", "year": 2014, "yearKnown": false},
+   {"from": "Průběžná", "to": "Kubánské náměstí", "year": 2014, "yearKnown": false},
+   {"from": "Malý Břevnov", "to": "Obora Hvězda", "year": 2014, "yearKnown": false},
+   {"from": "Břevnovský klášter", "to": "Malovanka", "year": 2014, "yearKnown": false},
+   {"from": "Sídliště Petřiny", "to": "Octárna", "year": 2015, "yearKnown": false},
+   {"from": "Kubánské náměstí", "to": "Koh-i-noor", "year": 2015, "yearKnown": false},
+   {"from": "Koh-i-noor", "to": "Otakarova", "year": 2015, "yearKnown": false},
+   {"from": "Invalidovna", "to": "Urxova", "year": 2016, "yearKnown": false},
+   {"from": "Flora", "to": "Želivského", "year": 2018},
+   {"from": "Špitálská", "to": "Nový Hloubětín", "year": 2018},
+   {"from": "Strašnická", "to": "Průběžná", "year": 2020},
+   {"at": "Depo Hostivař", "year": 2022},
+   {"from": "Náměstí Olgy Scheinpflugové", "to": "Sídliště Barrandov", "year": 2022},
+   {"from": "Libuš", "to": "Sídliště Libuš", "year": 2023},
+   {"from": "Ciolkovského", "to": "Vlastina", "year": 2023, "yearKnown": false}
+  ]
+ },
  "trackSources": {
   "note": "Answers to the track sources review (tools/track_sources.py, #20): 'matches reality' without a note takes the finding of its kind within 3 m off the list. Answers with a note stay held there.",
   "reviewAnswers": [
@@ -960,6 +1128,21 @@
       ]
      }
     ]
+   },
+   {
+    "id": "curve-lateral-acceleration",
+    "value": 1.0,
+    "unit": "m/s²",
+    "scope": "the limit in a curve no sign sets: √((a + cant · g / 1.5) · R), in whole km/h; D 1/2 § 25.7 only asks for a speed that suits the curvature, and a curve under 25 m has small-radius-speed",
+    "basis": "the drivers' speeds on two GPS rides, chosen by the user",
+    "source": {
+     "document": "GPS rides on line 23: T3 6312 Královka to Bílá labuť, 2026-10-31; T3 6921 Pražský hrad to Bílá labuť, 2026-11-08 (raw/reference/rides/), mapped on the game's track: the unsigned curves of R 30-60 m taken at 1.2-1.6 m/s² without cant; the signed hairpin at Chotkovy sady (R 24 m, 15 km/h) at 12-17 km/h (#451)",
+     "year": 2026
+    },
+    "user": {
+     "source": "Claude Code session 2026-11-10 (#451)",
+     "quote": "If it's not defined in D1/2 then I guess it's only up to the driver to keep reasonable speed. [...] The 1.0m/s² would fit real world recording better together with less granular limit for unsigned curves."
+    }
    },
    {
     "id": "stop-pass-speed",
@@ -1865,6 +2048,18 @@
     }
    },
    {
+    "id": "t3-sand-refill",
+    "value": "at each terminus",
+    "unit": null,
+    "scope": "the sand box starts full from the depot and is refilled at each terminus of a run (src/game.js _changeLine); its size is src/tram.js sandSecs",
+    "basis": "user",
+    "source": "user 2026-11-04 (#265), confirmed 2026-11-12 (PR #426)",
+    "user": {
+     "source": "Claude Code session 2026-11-04 (#265), confirmed in session 2026-11-12 (PR #426)",
+     "quote": "Sand can be refilled at each terminus, starts with full from the depot. [2026-11-12, on refilling at each terminus:] Yes that would be correct."
+    }
+   },
+   {
     "id": "t3-dimensions",
     "value": {
      "length": 15.2,
@@ -2272,7 +2467,16 @@
   ]
  },
  "kerbFacts": {
-  "note": "Places on the kerb review list the user judged a real ramp or incline: they stay on the list whatever stands near them (tools/kerbs.py). The other answers of that review are rules in the tool (#142).",
+  "note": "Places on the kerb review list the user judged a real ramp or incline: they stay on the list whatever stands near them (tools/kerbs.py). The other answers of that review are rules in the tool (#142). crossing: the norm's lowered kerb at a pedestrian crossing, the height tools/kerbs.py gives an untagged crossing end and OSM's kerb=lowered (#303).",
+  "crossing": {
+   "kerb": 0.02,
+   "width": 4.0,
+   "ramp": 0.125,
+   "unit": "m over the road; m along the kerb; rise per m",
+   "basis": "ČSN 73 6110: at crossings and footway crossings the kerb is lowered to 0.02 m over the road, with ramps of at most 12.5 % (1:8) along it (10.1.2.12, p. 58); a crossing is 4.00 m wide as standard, 3.00 m the least (10.1.3.10, p. 63)",
+   "source": {"document": "ČSN 73 6110 Projektování místních komunikací (ÚNMZ, published with the ministry's consent)", "year": 2006, "url": "https://unmz.gov.cz/files/normalizace/%C4%8CSN%2073%206110/74506.pdf", "file": "raw/reference/norms/CSN_73_6110_2006.pdf"},
+   "given": "the user linked the norm (#512, 2026-11-14): \"for research and facts extraction\""
+  },
   "places": [
    {
     "x": -1015.1,
@@ -3164,6 +3368,929 @@
    {"osm": "way/679597859", "ref": "TS8170", "e": -742281, "n": -1043819},
    {"osm": "way/88598700", "ref": "TS7760", "e": -751045, "n": -1044498},
    {"osm": "way/90662133", "ref": "TS3110", "e": -738391, "n": -1045720}
+  ]
+ },
+ "surveyGround": {
+  "note": "The user's answers to the survey-ground review cards (reports/review/survey-ground-N.json): a ground-level survey area that sits steadily off IPR's 2023 lidar where neither DI's rails nor DMR 5G decide. verdict survey: the area keeps the survey's heights (the ground changed); lidar: it moves to IPR. Keyed by a point in the area; tools/survey_ground_answers.py writes the places from review mode's answers. heldRule decides such an area without an answer (tools/zps_ground.py held_verdict: a courtyard is OSM buildings within 60 m in 12 of 16 directions).",
+  "heldRule": {
+   "courtyard": "lidar",
+   "outsideGreen": "survey",
+   "outside": "lidar",
+   "said": "I went over them and most cases is courtyard where I can't see much detail in ortophoto, ground view is missing, I would go with lidar in these cases. Outside it's often elecated greenery and we can go with the survey there, so just two general rules.",
+   "where": "the user, #446 session of 2026-11-10 (PR #448), after answering the 19 cards; outside paved areas go to the lidar as all 3 of the user's answers did"
+  },
+  "places": [
+   {
+    "lat": 50.006752,
+    "lon": 14.450276,
+    "c": "green",
+    "m2": 119.0,
+    "verdict": "survey",
+    "line": "17",
+    "said": "The survey is right: the ground changed since the lidar",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "green, 119 m²: the survey +0.64 m off IPR (2023); DMR 5G +0.75 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.065443,
+    "lon": 14.302005,
+    "c": "green",
+    "m2": 108.0,
+    "verdict": "survey",
+    "line": "9",
+    "said": "The survey is right: the ground changed since the lidar (elevated greenery)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "green, 108 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.47 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.068174,
+    "lon": 14.354775,
+    "c": "paved",
+    "m2": 355.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it (unpaved mini island in the water)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "paved, 355 m²: the survey -0.98 m off IPR (2023); DMR 5G +1.04 m off IPR"
+   },
+   {
+    "lat": 50.069059,
+    "lon": 14.362801,
+    "c": "green",
+    "m2": 202.0,
+    "verdict": "survey",
+    "line": "9",
+    "said": "The survey is right: the ground changed since the lidar (elevated shrubbery)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "green, 202 m²: the survey -1.05 m off IPR (2023); DMR 5G +0.33 m off IPR"
+   },
+   {
+    "lat": 50.069645,
+    "lon": 14.467699,
+    "c": "sidewalk",
+    "m2": 107.0,
+    "verdict": "survey",
+    "line": "22",
+    "said": "The survey is right: the ground changed since the lidar",
+    "where": "review mode, 2026-11-10 (reports/reviews/line22.json, #446)",
+    "card": "sidewalk, 107 m²: the survey +1.59 m off IPR (2023); DMR 5G +0.88 m off IPR"
+   },
+   {
+    "lat": 50.071668,
+    "lon": 14.485149,
+    "c": "green",
+    "m2": 303.0,
+    "verdict": "survey",
+    "line": "22",
+    "said": "The survey is right: the ground changed since the lidar (bushes and general overgrown greenery)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line22.json, #446)",
+    "card": "green, 303 m²: the survey -0.66 m off IPR (2023); DMR 5G -0.38 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.07619,
+    "lon": 14.455622,
+    "c": "green",
+    "m2": 104.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line9.json, #446)",
+    "card": "green, 104 m²: the survey -0.71 m off IPR (2023); DMR 5G -0.41 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.079526,
+    "lon": 14.423559,
+    "c": "paved",
+    "m2": 471.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 471 m²: the survey +0.62 m off IPR (2023); DMR 5G +0.47 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.083255,
+    "lon": 14.41486,
+    "c": "green",
+    "m2": 307.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "green, 307 m²: the survey -0.52 m off IPR (2023); DMR 5G -0.33 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.08541,
+    "lon": 14.433227,
+    "c": "paved",
+    "m2": 289.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it (structure above ground can be seen in ortophoto)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 289 m²: the survey +1.28 m off IPR (2023); DMR 5G +1.82 m off IPR"
+   },
+   {
+    "lat": 50.086259,
+    "lon": 14.43016,
+    "c": "paved",
+    "m2": 197.0,
+    "verdict": "lidar",
+    "line": "9",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 197 m²: the survey -0.70 m off IPR (2023); DMR 5G -0.56 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.086612,
+    "lon": 14.414167,
+    "c": "paved",
+    "m2": 148.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "paved, 148 m²: the survey -0.91 m off IPR (2023); DMR 5G -0.94 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.089899,
+    "lon": 14.436984,
+    "c": "paved",
+    "m2": 132.0,
+    "verdict": "lidar",
+    "line": "23",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line23.json, #446)",
+    "card": "paved, 132 m²: the survey -0.86 m off IPR (2023); DMR 5G -0.43 m off IPR"
+   },
+   {
+    "lat": 50.091148,
+    "lon": 14.418973,
+    "c": "green",
+    "m2": 530.0,
+    "verdict": "survey",
+    "line": "17",
+    "said": "The survey is right: the ground changed since the lidar (elevated greenery and shrubs)",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "green, 530 m²: the survey +1.20 m off IPR (2023); DMR 5G +0.65 m off IPR"
+   },
+   {
+    "lat": 50.097449,
+    "lon": 14.434373,
+    "c": "paved",
+    "m2": 474.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "paved, 474 m²: the survey +6.07 m off IPR (2023); DMR 5G +0.70 m off IPR"
+   },
+   {
+    "lat": 50.099351,
+    "lon": 14.433835,
+    "c": "paved",
+    "m2": 116.0,
+    "verdict": "lidar",
+    "line": "17",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line17.json, #446)",
+    "card": "paved, 116 m²: the survey +0.81 m off IPR (2023); DMR 5G +0.70 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.1017,
+    "lon": 14.473353,
+    "c": "green",
+    "m2": 463.0,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
+    "card": "green, 463 m²: the survey -0.50 m off IPR (2023); DMR 5G -0.40 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.10172,
+    "lon": 14.504463,
+    "c": "green",
+    "m2": 108.0,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
+    "card": "green, 108 m²: the survey +0.85 m off IPR (2023); DMR 5G +0.63 m off IPR, with the survey"
+   },
+   {
+    "lat": 50.105578,
+    "lon": 14.535314,
+    "c": "green",
+    "m2": 102.0,
+    "verdict": "lidar",
+    "line": "37",
+    "said": "The lidar is right: move the survey to it",
+    "where": "review mode, 2026-11-10 (reports/reviews/line37.json, #446)",
+    "card": "green, 102 m²: the survey -0.58 m off IPR (2023); DMR 5G -0.58 m off IPR, with the survey"
+   }
+  ]
+ },
+ "grassReview": {
+  "note": "The user's answers to the grass track review (reports/review/grass-track-N.json, tools/grass_review.py, #503): OSM's grass over our track. `answer` grass lays grass track between the two points on the card's lines (tools/track_styles.py, its holes cut); not grass and other level keep the place as it is and off the review.",
+  "answers": [
+   {
+    "id": "grass-50.0027-14.4144",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0038606,
+      14.4170011
+     ],
+     [
+      50.002275,
+      14.4112849
+     ]
+    ],
+    "answer": "not grass",
+    "note": "there is grass around track which our game already shows, however there is no grass on the tracks from any source I checked, it's open ballast",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0043-14.4180",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0045159,
+      14.4185998
+     ],
+     [
+      50.00403,
+      14.417362
+     ]
+    ],
+    "answer": "not grass",
+    "note": "grass is around the tracks, not on or between them",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0050-14.4200",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0050565,
+      14.4204301
+     ],
+     [
+      50.0048635,
+      14.4196086
+     ]
+    ],
+    "answer": "not grass",
+    "note": "grass is around the tracks, not on or between them",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0071-14.4558",
+    "lines": [
+     "17"
+    ],
+    "between": [
+     [
+      50.0078867,
+      14.4558588
+     ],
+     [
+      50.006218,
+      14.4557291
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-17.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0662-14.4982",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.0666083,
+      14.4969686
+     ],
+     [
+      50.065902,
+      14.4994736
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0670-14.4957",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.067082,
+      14.4954007
+     ],
+     [
+      50.06691,
+      14.4959696
+     ]
+    ],
+    "answer": "grass",
+    "note": "correct, grass between pins and switch at the end is paved",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0692-14.4909",
+    "lines": [
+     "22"
+    ],
+    "between": [
+     [
+      50.0697367,
+      14.4897409
+     ],
+     [
+      50.0687097,
+      14.491998
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, grass track review (reports/review/grass-track-22.json), 2026-11-12 (#503)"
+   },
+   {
+    "id": "grass-50.0914-14.3889",
+    "lines": [
+     "23"
+    ],
+    "between": [
+     [
+      50.0890646,
+      14.3880018
+     ],
+     [
+      50.0929174,
+      14.3909781
+     ]
+    ],
+    "answer": "grass",
+    "note": "same span as on line 22 Pohořelec - Brusnice",
+    "source": "user, grass track review (reports/review/grass-track-23.json), 2026-11-12 (#503)"
+   }
+  ]
+ },
+ "crossLevelReview": {
+  "note": "The user's answers to the cross level review (reports/review/cross-level-N.json, tools/cross_level.py, #538): `level` makes paved track between the two points level on every line; `tilts` keeps the build's cross level there and takes the place off the review.",
+  "answers": [
+   {
+    "id": "sokolovska-palmovka",
+    "lines": [
+     "37"
+    ],
+    "between": [
+     [
+      50.1012584,
+      14.4734446
+     ],
+     [
+      50.1017563,
+      14.4735561
+     ]
+    ],
+    "answer": "tilts",
+    "quote": "it's noticeable in real ride and I know this as famous, albeit extreme example where single straight track in junction tilts sideways",
+    "source": "user, this session 2026-11-13, on the Sokolovská junction at Palmovka (50.1015651 N, 14.4736156 E), #538"
+   }
+  ]
+ },
+ "trackSurfaceReview": {
+  "note": "The user's answers to the track surface review (reports/review/track-surface-N.json, tools/surface_review.py, #574): what the track is laid in between two points (`setts`, `embedded`, `panels`, `grass`), and at OSM's surface changes whether it changes there (`changes`, `same`). The setts style and the OSM rule's calibration read them.",
+  "answers": [
+   {
+    "id": "surface-junction-50.08598-14.43187",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0858353,
+      14.431817
+     ],
+     [
+      50.0861264,
+      14.4319268
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08845-14.43253",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0883622,
+      14.4325348
+     ],
+     [
+      50.0885475,
+      14.4325209
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08874-14.38748",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0887755,
+      14.3870476
+     ],
+     [
+      50.0888117,
+      14.3878774
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.08942-14.43246",
+    "what": "junction",
+    "line": "23",
+    "between": [
+     [
+      50.0893395,
+      14.4324616
+     ],
+     [
+      50.0894921,
+      14.4324556
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10149-14.47350",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1011845,
+      14.473397
+     ],
+     [
+      50.1018106,
+      14.4735559
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10320-14.47337",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1031149,
+      14.473372
+     ],
+     [
+      50.1032803,
+      14.4733818
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-junction-50.10371-14.47957",
+    "what": "junction",
+    "line": "37",
+    "between": [
+     [
+      50.1038755,
+      14.4793925
+     ],
+     [
+      50.1036828,
+      14.4798745
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08587-14.43183",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0855557,
+      14.4314443
+     ],
+     [
+      50.0862702,
+      14.4319818
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08874-14.38753",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.088765,
+      14.3871792
+     ],
+     [
+      50.0887971,
+      14.3878524
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08887-14.43250",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0883624,
+      14.4325348
+     ],
+     [
+      50.0893682,
+      14.4324593
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.08955-14.43248",
+    "what": "stretch",
+    "line": "23",
+    "between": [
+     [
+      50.0893862,
+      14.4324577
+     ],
+     [
+      50.0896788,
+      14.432656
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10222-14.47350",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1013639,
+      14.4734784
+     ],
+     [
+      50.1030817,
+      14.4733767
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10322-14.47337",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1030997,
+      14.4733741
+     ],
+     [
+      50.1033303,
+      14.4734043
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10360-14.47380",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1035374,
+      14.4736616
+     ],
+     [
+      50.103663,
+      14.4739344
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10373-14.47954",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1037904,
+      14.4794592
+     ],
+     [
+      50.1036892,
+      14.4796494
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10432-14.47904",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1048344,
+      14.478643
+     ],
+     [
+      50.1038061,
+      14.4794456
+     ]
+    ],
+    "answer": "embedded",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-stretch-50.10494-14.47846",
+    "what": "stretch",
+    "line": "37",
+    "between": [
+     [
+      50.1049513,
+      14.4782429
+     ],
+     [
+      50.10485,
+      14.4786292
+     ]
+    ],
+    "answer": "setts",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08627-14.43198",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0861829,
+      14.4319481
+     ],
+     [
+      50.0863574,
+      14.4320157
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08834-14.43254",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0882546,
+      14.4325429
+     ],
+     [
+      50.0884342,
+      14.4325294
+     ]
+    ],
+    "answer": "same",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08880-14.38785",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0887521,
+      14.3877322
+     ],
+     [
+      50.088865,
+      14.387943
+     ]
+    ],
+    "answer": "same",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08937-14.43246",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0892784,
+      14.4324663
+     ],
+     [
+      50.089458,
+      14.4324526
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.08968-14.43266",
+    "what": "switch",
+    "line": "23",
+    "between": [
+     [
+      50.0896229,
+      14.4325474
+     ],
+     [
+      50.0897143,
+      14.4327842
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-23.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10308-14.47338",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1029922,
+      14.4733893
+     ],
+     [
+      50.1031713,
+      14.4733654
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10366-14.47393",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1036112,
+      14.4738202
+     ],
+     [
+      50.103705,
+      14.4740578
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10381-14.47945",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1038867,
+      14.4793839
+     ],
+     [
+      50.1037352,
+      14.4795302
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10485-14.47863",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1049159,
+      14.4785354
+     ],
+     [
+      50.1047691,
+      14.47869
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   },
+   {
+    "id": "surface-switch-50.10495-14.47822",
+    "what": "switch",
+    "line": "37",
+    "between": [
+     [
+      50.1049111,
+      14.4780875
+     ],
+     [
+      50.1049581,
+      14.4783537
+     ]
+    ],
+    "answer": "changes",
+    "source": "user, track surface review (reports/review/track-surface-37.json), 2026-11-14 (#574)"
+   }
+  ]
+ },
+ "bedTroughReview": {
+  "note": "The user's answers to the bed trough review (reports/review/bed-troughs-N.json, tools/bed_troughs.py, #548), by the place's lat/lon: `real` is a ditch or a cutting (the trough measure leaves it), `wall` a retaining wall missing there, `ours` our ground sunk around the bed.",
+  "answers": [
+   {
+    "id": "trough-50.09070-14.47586",
+    "line": "37",
+    "place": [
+     50.090699,
+     14.475857
+    ],
+    "answer": "ours",
+    "note": "green grassy area which is level with sidewalk around it",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   },
+   {
+    "id": "trough-50.09262-14.38928",
+    "line": "23",
+    "place": [
+     50.09262,
+     14.389282
+    ],
+    "answer": "ours",
+    "note": "Grass around track and kerb next to road, no ditch",
+    "source": "user, bed trough review (reports/review/bed-troughs-23.json), 2026-11-13 (#548)"
+   },
+   {
+    "id": "trough-50.09428-14.40497",
+    "line": "23",
+    "place": [
+     50.094284,
+     14.404971
+    ],
+    "answer": "ours",
+    "note": "Grass but no ditch",
+    "source": "user, bed trough review (reports/review/bed-troughs-23.json), 2026-11-13 (#548)"
+   },
+   {
+    "id": "trough-50.10245-14.47607",
+    "line": "37",
+    "place": [
+     50.102453,
+     14.476074
+    ],
+    "answer": "ours",
+    "note": "road surface next to kerb of stop platform",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   },
+   {
+    "id": "trough-50.10512-14.47301",
+    "line": "37",
+    "place": [
+     50.10512,
+     14.473008
+    ],
+    "answer": "ours",
+    "note": "sunk island around zebra crossing",
+    "source": "user, bed trough review (reports/review/bed-troughs-37.json), 2026-11-14 (#548)"
+   }
   ]
  }
 }

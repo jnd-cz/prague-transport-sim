@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check (not part of the game): pedestrians on the footway network. In the page, after a shift
 // has started: const { run } = await import('/tools/bench/walkers.js'); run(seconds)
 // The tram stands; only the traffic is stepped, with the camera over the tram. Counts: doors walked

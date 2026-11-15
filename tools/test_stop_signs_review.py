@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The stop-sign answers' import into data/truth.json: python -P -E tools/test_stop_signs_review.py."""
 from pathlib import Path
 import json

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Track construction evidence for height checks; a default panel drawing is not survey proof."""
 from shapely.geometry import Point
 

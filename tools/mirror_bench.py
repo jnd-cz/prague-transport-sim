@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Measure the real mirror on a focused browser page (#79).
 
     python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed --output reports/mirror-before.json

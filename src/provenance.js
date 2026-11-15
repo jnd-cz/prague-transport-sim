@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // What the built files say they were made from (tools/sources.py, #10): each file's `provenance` names,
 // per list, the layer, its sources in fallback order and how many features came from each. The credits
 // line is made from the sources actually used, and the fallbacks are logged for review

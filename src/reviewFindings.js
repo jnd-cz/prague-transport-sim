@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // A review set's findings and their identity, shared by review mode (src/review.js) and the review
 // directory (reviews.html, src/reviewIndex.js, #288), so both count the same findings and answers.
 // No three.js here: the directory loads only this and src/verdicts.js.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev helper (not part of the game): a shift started from the menu, as the player starts it. src/main.js start()
 // is async (it awaits the classic model and the figure font before it makes the game, since #383), so a bench
 // waits for the new game: one read straight after the click is the previous game, or none (#400).

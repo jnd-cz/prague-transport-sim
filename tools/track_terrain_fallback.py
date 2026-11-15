@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Last no-data proposal for #20: ordinary track's IPR terrain plus the approved drawing offset."""
 from track_heights import usable
 

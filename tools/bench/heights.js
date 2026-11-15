@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Top of rail in the game against the staged heights (#197): our route as driven (the profile) and the opposite track
 // as its trams and drawn rails take it (trackAt), at every staged 5 m bin on runs without a step (the line data's
 // `heights.staged`, tools/line_heights.py), and the drawn tracks where they meet: no junction with two heights.

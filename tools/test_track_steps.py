@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The step review's rules (tools/track_steps.py): python -I tools/test_track_steps.py"""
 import math
 import os

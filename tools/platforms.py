@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tram platforms of both directions along a built line, from the cached OSM platforms.
 
 build_line.py keeps only where our stops' platforms begin and end (p0/p1). This adds every tram

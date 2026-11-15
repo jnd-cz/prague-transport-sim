@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The rules tools/platforms.py builds the tram platforms by (#407): which OSM platforms are tram platforms, which
 stops are tram stops, which PID stop stands on which OSM platform, and what is left without one.
 

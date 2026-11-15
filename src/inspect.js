@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev tool: inspect mode (?inspect, or the I key during a shift). The autopilot drives while the
 // simulation runs faster or slower than real time (several game steps per frame); pause it any time
 // and look around with the mouse. Two cameras:

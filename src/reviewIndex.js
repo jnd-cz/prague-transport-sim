@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The review directory (reviews.html, #288): every review set (reports/review/index.json, built by
 // tools/review_sets.py at each deploy), the issue that waits for it, and how many of its findings are
 // answered, counted live from the answer store (src/verdicts.js) with the findings read and keyed as review

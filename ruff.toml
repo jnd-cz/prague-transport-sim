@@ -24,6 +24,7 @@ ignore = ["E501", "E731", "E741", "E701", "E702", "B905", "B007"]
 "tools/dtmp_tracks.py" = ["F401"]
 "tools/geoportal.py" = ["F841"]
 "tools/headless.py" = ["B023"]
+"tools/height_answers.py" = ["B023"]  # (moved from line_heights.py with its entry, #418)
 "tools/line_heights.py" = ["B023"]
 "tools/osm_local.py" = ["F401"]
 "tools/test_track_profile.py" = ["F401"]

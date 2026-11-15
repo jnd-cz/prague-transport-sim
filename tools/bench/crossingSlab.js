@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Rendered pedestrian surfaces above rail heads, grouped in 20 m route sections (#146).
 // On a running shift loaded with ?keepgeo: (await import('/tools/bench/crossingSlab.js')).run()
 import * as THREE from 'three';
@@ -22,7 +23,7 @@ export function crossingEdgeHits(game, heads) {
   const ground = game.route.ground;
   for (const { area: id } of ground.pedestrianCrossings?.survey || []) {
     const area = ground.dtm.areas[id];
-    if (!['sidewalk', 'island'].includes(area.c)) continue;
+    if (!['sidewalk', 'island', 'median'].includes(area.c)) continue;
     [area.ring, ...area.holes].forEach((ring, ri) => {
       for (let i = 0; i < ring.length; i++) {
         if (area.kerbs && !area.kerbs[ri]?.[i]) continue;
@@ -121,7 +122,7 @@ export async function run({ unfiltered = false } = {}) {
   const route = game.route, profile = route.ground.profile, ray = new THREE.Raycaster();
   const origin = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0), bad = new Map();
   ray.far = 4;
-  const walkway = new Set(['sidewalk', 'island', 'paved', 'cycle']);
+  const walkway = new Set(['sidewalk', 'island', 'median', 'paved', 'cycle']);
   const area = (mesh, face) => {
     if (mesh.userData.walkAreas) return mesh.userData.walkAreas[face] || null;
     const ranges = mesh.userData.surfaceRanges || [];

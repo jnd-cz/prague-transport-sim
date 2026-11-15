@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev prototype (not part of the game): what the surveyed traffic signal heads of Prague's technical map
 // (data/lineN.dtmpoints.json, tools/dtm_points.py) are for, and how they stand relative to what
 // they serve, against where the game puts its heads. In the page, after a shift has started:

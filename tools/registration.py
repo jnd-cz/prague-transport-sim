@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Layer registration check (#8): how far each built layer sits from the survey, as an offset per layer.
 
     python -P -E tools/registration.py --line 17          # lines with surveyed streets (DTM ZPS): 17, 22

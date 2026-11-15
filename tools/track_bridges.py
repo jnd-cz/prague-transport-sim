@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Track on a Mosty 3D bridge: the structures OSM does not tag, for the track-height structure mask (#192).
 
     python -P -E tools/track_bridges.py               # calibration: OSM tram bridges (on) vs bridges over trams (under)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The board's rules (#280): which files rebuild, what clashes, what a PR asks, the lanes, the rebuild
 label, what is ready to start: python -I tools/test_board.py"""
 import io

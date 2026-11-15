@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Street furniture points from Prague's technical map (archived DTMP, state as of 30 June 2024, CC BY,
 # "datový podklad © IPR Praha") along a line: traffic signals, public transport stop signs, poles and
 # masts, street lights, traffic sign carriers, ground covers.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """DI's network graph against OSM's track graph, junction by junction (#237):
     python -P -E tools/bench/track_topology.py [--lines 9,17,22,23,37] [--json out.json] [--latest]
 
