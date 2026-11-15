@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Pack the playable static site into dist/tatra-t3-prague.zip (no build tools, caches or tests).
 The same files are what tools/deploy.py uploads."""
+import fnmatch
 import os
 import zipfile
 
@@ -9,6 +10,8 @@ DST = os.path.join(ROOT, "dist", "tatra-t3-prague.zip")
 # (reports/review: the findings lists for review mode, ?review=reports/review/track-sources-17.json; reviews.html:
 # the directory of them, #288)
 INCLUDE = ["index.html", "app.webmanifest", "reviews.html", "README.md", "README.en.md", "src", "assets", "data", "reports/review"]
+# (built files only later build steps read, not the page: the street surfaces for the ground's partition and weld, #512)
+BUILD_ONLY = ["data/line*.streets.*"]
 
 
 def files(root=ROOT):
@@ -20,7 +23,9 @@ def files(root=ROOT):
             continue
         for base, _, names in os.walk(path):
             for f in sorted(names):
-                yield os.path.relpath(os.path.join(base, f), root).replace(os.sep, "/")
+                rel = os.path.relpath(os.path.join(base, f), root).replace(os.sep, "/")
+                if not any(fnmatch.fnmatch(rel, g) for g in BUILD_ONLY):
+                    yield rel
 
 
 def main():

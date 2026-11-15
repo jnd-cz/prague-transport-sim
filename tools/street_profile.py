@@ -21,6 +21,7 @@ import json
 import math
 import os
 import sys
+import time
 import warnings
 from collections import defaultdict
 
@@ -46,6 +47,11 @@ SW_REACH = 15.0  # m: the widest sidewalk read across
 SW_KERB_SMEAR = 1.5  # m: how far into a sidewalk IPR's 1 m raster still carries the kerb
 SW_WALK = 5.0  # m from the kerb: the walkway, a plane at the norm's crossfall; a wider area follows the ground
 SW_CELL = 0.5  # m: the sidewalks' fill grid (a 3 m sidewalk is 6 cells across)
+SCATTER_CLASSES = ("road", "tram", "sidewalk")  # (the classes the generated surface covers)
+SCATTER_IN = 0.3  # m inside an outline where the generated surface is read for the scatter table (on it, a point can
+# fall just outside the road the surface covers)
+MESH_TOL = (0.02, 0.05)  # m: the triangles' error tolerances, the generated surface's and the lidar's alike (IPR's
+# noise p90 on clean streets 0.7-1.7 cm, the calibration)
 SW_WAVE = 4.0  # m: the sidewalks' fill halves IPR's waves of this length (the junctions' 10 m flattened a 4 m
 # sidewalk rising 2 %: 3 cm under the ground 3 m from the kerb)
 WALK_STEP = 0.12  # m within 1 m against the slope so far: a walker's step (src/streetbot.js walk-kerb)
@@ -1380,7 +1386,80 @@ def context(ln):
     sw_tris, _ = surface_tris(dtm["areas"], {"sidewalk"})
     edges, walk = kerb_edges(dtm)
     return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
-            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk}
+            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
+            "rings": outlines(dtm)}
+
+
+def class_area(dtm, classes):
+    """The survey's level-0 areas of `classes` as one geometry."""
+    import shapely
+    from shapely.geometry import Polygon
+    g = []
+    for a in dtm["areas"]:
+        if a["l"] == 0 and a["c"] in classes and len(a["r"]) >= 3:
+            q = Polygon([p[:2] for p in a["r"]], [[p[:2] for p in h] for h in a.get("h", []) if len(h) >= 3])
+            g.append(q if q.is_valid else q.buffer(0))
+    return shapely.union_all(g) if g else shapely.Polygon()
+
+
+def outlines(dtm):
+    """The level-0 road, tram and sidewalk outlines with heights on every vertex, for the scatter table (#470's
+    statistic, tools/bench/street_scatter.py): (class, (n, 3) ring, its inside on the left, its box)."""
+    out = []
+    for a in dtm["areas"]:
+        if a["l"] != 0 or a["c"] not in SCATTER_CLASSES:
+            continue
+        for ring, outer in [(a["r"], True)] + [(h, False) for h in a.get("h", [])]:
+            if len(ring) < 3 or any(q[2] is None for q in ring):
+                continue
+            r = np.asarray(ring, float)
+            ccw = np.sum(r[:, 0] * np.roll(r[:, 1], -1) - np.roll(r[:, 0], -1) * r[:, 1]) > 0
+            out.append((a["c"], r, ccw == outer, (r[:, 0].min(), r[:, 1].min(), r[:, 0].max(), r[:, 1].max())))
+    return out
+
+
+def scatter(ctx, box, heights):
+    """#470's scatter on one square: each straight outline sample (straight over +-10 m) against its 21 m running mean,
+    survey (the outline's heights), generated (heights(class, x, y) SCATTER_IN m inside the area) and IPR at that point
+    (the shapes the lidar sees there too: a wall, a ramp), at the samples of the square where all three have a window.
+    {class: {"survey": |residual|..., "ipr": ..., "generated": ...}}."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "bench"))
+    import street_scatter as ss
+    (x0, y0), (x1, y1) = box
+    out = {}
+    for cls, r, left, bb in ctx["rings"]:
+        if bb[2] < x0 - ss.HALF or bb[0] > x1 + ss.HALF or bb[3] < y0 - ss.HALF or bb[1] > y1 + ss.HALF:
+            continue
+        p, nin = ss.samples(r)
+        if p is None:
+            continue
+        if not left:
+            nin = -nin
+        own = (p[:, 0] >= x0) & (p[:, 0] < x1) & (p[:, 1] >= y0) & (p[:, 1] < y1)
+        ok = ss.straight(p) & own
+        if not ok.any():
+            continue
+        q = p[:, :2] + nin * SCATTER_IN
+        zg = heights(cls, q[:, 0], q[:, 1])
+        zi = np.asarray(ctx["ipr"].sample(q[:, 0] + ctx["F"].E0, q[:, 1] + ctx["F"].N0), float)
+        rs, ri, rg = ss.resid(p[:, 2]), ss.resid(zi), ss.resid(zg)
+        both = ok & np.isfinite(rs) & np.isfinite(ri) & np.isfinite(rg)
+        o = out.setdefault(cls, {"survey": [], "ipr": [], "generated": []})
+        for k, v in (("survey", rs), ("ipr", ri), ("generated", rg)):
+            o[k] += np.abs(v[both]).tolist()
+    return out
+
+
+def triangles(z, mask, tol):
+    """Triangles a mesh of the raster z (rows north to south) within `tol` m keeps over `mask` (their centroid on it):
+    pydelatin's greedy refinement, as tools/city_terrain.py meshes the lidar."""
+    from pydelatin import Delatin
+    h, w = z.shape
+    t = Delatin(np.ascontiguousarray(z, np.float32), width=w, height=h, max_error=tol)
+    v, f = t.vertices, t.triangles
+    cx = np.clip(np.round(v[f, 0].mean(1)).astype(int), 0, w - 1)
+    cy = np.clip(np.round((h - 1) - v[f, 1].mean(1)).astype(int), 0, h - 1)
+    return int(mask[cy, cx].sum())
 
 
 _WIDE = {}  # (a pool worker's line: its context, loaded once)
@@ -1439,6 +1518,9 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
                 pl["from"], pl["to"] = names[1], names[2]
                 pl["ipr jump"] = round(float(min(abs((zq[2] - zq[1]) - (zq[1] - zq[0])), abs((zq[3] - zq[2]) - (zq[2] - zq[1])))), 2)
             out["places"] = m["places"]
+    # (the road's deviation split by class: the tram areas, the rest)
+    tram = shapely.contains_xy(near_box(ctx, "tram", box), x[inner], y[inner])
+    out["tram"] = {k: (z - zi)[tram & np.isfinite(z - zi)].tolist() for k, z in (("survey", zs), ("generated", zg))}
     swf = sidewalks(ctx, fns["generated"], box)
     for k, wz in (("survey", lambda a, b, t=ctx["sw_tris"]: sample_tris(t, np.asarray(a, float), np.asarray(b, float))),
                   ("generated", lambda a, b, f=swf: bilinear(f, a, b))):
@@ -1447,7 +1529,47 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
             out["sw"][k] = {**{q: m["_raw"][q] for q in ("dev", "kerb", "bend")}, "steps": m["walker's steps"],
                             "bumps": m["bumps (bend in 1 m over WALK_BUMP)"],
                             "walls": m["walker's metres on a wall, left out"]}
+    out["scatter"] = scatter(ctx, box, lambda c, a, b: bilinear(swf, a, b) if c == "sidewalk" else fns["generated"](a, b))
+    # triangles over the streets (road, tram, sidewalks) at MESH_TOL: the generated surface, the lidar, the survey's
+    sr = surface_raster(ctx, cs, road, field, swf, box, F, ipr)
+    st = np.vstack([ctx["tris"], ctx["sw_tris"]]) if len(ctx["sw_tris"]) else ctx["tris"]
+    cen = st[:, :, :2].mean(1)
+    on = (cen[:, 0] >= box[0][0]) & (cen[:, 0] < box[1][0]) & (cen[:, 1] >= box[0][1]) & (cen[:, 1] < box[1][1])
+    # (off the streets each raster takes its nearest street cell: with the terrain there, the edge between the two drew
+    # most of the triangles, at Palmovka 23,731 against 17,774 at 2 cm)
+    from scipy import ndimage
+    near = tuple(ndimage.distance_transform_edt(~sr["street"], return_distances=False, return_indices=True))
+    zg_f, zi_f = sr["z"][near], np.where(sr["street"], sr["ipr"], sr["ipr"][near])
+    out["triangles"] = {f"{k} at {t} m": triangles(z, sr["street"], t) for t in MESH_TOL
+                        for k, z in (("generated", zg_f), ("lidar", zi_f))}
+    out["triangles"]["survey"] = int(on.sum())
     return out
+
+
+def surface_raster(ctx, cs, road, field, swf, box, F, ipr, cell=SW_CELL):
+    """The generated street surface on a `cell` m grid over a square (rows north to south, from its north-west
+    corner): heights where the road (road and tram areas) or a sidewalk is, NaN elsewhere; IPR on every cell (NaN
+    where it has none, filled with the street's or the square's mean for a mesher)."""
+    import shapely
+    (x0, y0), (x1, y1) = box
+    xs, ys = np.arange(x0 + cell / 2, x1, cell), np.arange(y1 - cell / 2, y0, -cell)
+    xg, yg = np.meshgrid(xs, ys)
+    x, y = xg.ravel(), yg.ravel()
+    on_road = shapely.contains_xy(near_box(ctx, "road", box), x, y)
+    walk = near_box(ctx, "walk", box) if ctx.get("walk") is not None else None
+    on_walk = shapely.contains_xy(walk, x, y) & ~on_road if walk is not None else np.zeros(len(x), bool)
+    z = np.full(len(x), np.nan)
+    if on_road.any():
+        z[on_road] = generated(cs, x[on_road], y[on_road], road, field)
+    if on_walk.any():
+        z[on_walk] = bilinear(swf, x[on_walk], y[on_walk])
+    zi = np.asarray(ipr.sample(x + F.E0, y + F.N0), float)
+    fill = np.nanmean(zi) if np.isfinite(zi).any() else 0.0
+    zi = np.where(np.isfinite(zi), zi, fill)
+    street = np.isfinite(z)
+    shape = xg.shape
+    return {"x0": float(x0), "y1": float(y1), "cell": cell, "z": z.reshape(shape), "ipr": zi.reshape(shape),
+            "street": street.reshape(shape), "road": (on_road & street).reshape(shape)}
 
 
 def line_wide(lines, cell, out_path, jobs=None):
@@ -1468,7 +1590,8 @@ def line_wide(lines, cell, out_path, jobs=None):
         sq = sorted({(int(math.floor(x / cell)), int(math.floor(y / cell))) for x, y in pts})
         acc = {k: {"dev": [], "jumps": 0, "rolls": 0, "dgrade": [], "roll": [], "bend": []} for k in ("survey", "generated")}
         sw = {k: {"dev": [], "kerb": [], "bend": [], "steps": 0, "bumps": 0, "walls": 0} for k in ("survey", "generated")}
-        places = []
+        places, tram = [], {"survey": [], "generated": []}
+        scat, tri = {}, {}
         # (the places the user confirmed raised (data/truth.json raised-corridors): how much of each raised_bed() reads)
         raised_at = []
         for r in RAISED_PLACES:
@@ -1497,6 +1620,13 @@ def line_wide(lines, cell, out_path, jobs=None):
                     acc[k]["jumps"] += m["jumps"]
                     acc[k]["rolls"] += m["rolls"]
                 places.extend(part["places"])
+                for k in tram:
+                    tram[k].extend(part["tram"][k])
+                for c, v in part["scatter"].items():
+                    for k, q in v.items():
+                        scat.setdefault(c, {"survey": [], "ipr": [], "generated": []})[k].extend(q)
+                for k, v in part["triangles"].items():
+                    tri[k] = tri.get(k, 0) + v
                 for k, m in part["sw"].items():
                     for q in ("dev", "kerb", "bend"):
                         sw[k][q].extend(m[q])
@@ -1521,6 +1651,16 @@ def line_wide(lines, cell, out_path, jobs=None):
                 "kerb step p5/50/95 m": pct(a["kerb"], (5, 50, 95)), "walker's steps": a["steps"], "bumps": a["bumps"],
                 "walker's metres on a wall, left out": a["walls"],
                 "bend in 1 m p99 m": pct(a["bend"], (99,))[0] if a["bend"] else None}
+        for k in ("survey", "generated"):
+            d = np.asarray(tram[k])
+            res[k]["tram areas, off IPR 1 m inside the edge, mean / p99 |.| m"] = (
+                [round(float(d.mean()), 3), round(float(np.percentile(np.abs(d), 99)), 3)] if len(d) else None)
+        # (#470's table: straight outline samples over 8 / 15 cm off their 21 m running mean, %)
+        res["scatter, % over 8 / 15 cm: survey, IPR, generated"] = {
+            c: {"km": round(len(v["survey"]) / 1000, 1),
+                **{k: [round(float((np.asarray(v[k]) > t).mean() * 100), 2) for t in (0.08, 0.15)] for k in v}}
+            for c, v in sorted(scat.items()) if v["survey"]}
+        res["triangles over the streets (road, tram, sidewalks)"] = tri
         res["squares"] = len(sq)
         res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
             r["place"]: round(r["raised"] / r["n"], 2) if r["n"] else None for r in raised_at}
@@ -1534,6 +1674,103 @@ def line_wide(lines, cell, out_path, jobs=None):
     return out
 
 
+STREETS_SCALE = 0.002  # m per unit of lineN.streets.bin's heights (int16 over each square's lowest: 65 m of range)
+
+
+def build_square(ln, cell, ij, ctx=None):
+    """One square of build(): the generated surface's raster (surface_raster) with its masks packed: (ij, base, road
+    mask bits, sidewalk mask bits, int16 heights of the road cells then the sidewalk cells, row by row), or None where
+    the square holds no street."""
+    ctx = ctx or (_WIDE["ctx"] if _WIDE.get("ln") == ln else context(ln))
+    i, j = ij
+    at, radius = ((i + 0.5) * cell, (j + 0.5) * cell), cell / 2
+    box = [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)]
+    cs, _, F, ipr, road = pilot(at, radius, ln, None, ctx)
+    if not cs:
+        return None
+    field = junctions(cs, F, ipr, road, box)
+    swf = sidewalks(ctx, lambda a, b: generated(cs, np.asarray(a, float), np.asarray(b, float), road, field), box)
+    sr = surface_raster(ctx, cs, road, field, swf, box, F, ipr)
+    on_road, on_walk = sr["road"], sr["street"] & ~sr["road"]
+    if not sr["street"].any():
+        return None
+    z = sr["z"]
+    base = float(np.floor(np.nanmin(z)))
+    q = np.round((np.concatenate([z[on_road], z[on_walk]]) - base) / STREETS_SCALE)
+    if q.max() > 32767:
+        raise ValueError(f"line {ln} square {ij}: the streets span over {32767 * STREETS_SCALE:.0f} m")
+    return (ij, base, np.packbits(on_road.ravel()), np.packbits(on_walk.ravel()), q.astype(np.int16),
+            int(on_road.sum()), int(on_walk.sum()))
+
+
+def build(ln, cell=300.0, jobs=None, root=ROOT):
+    """data/lineN.streets.bin and .json: the generated street surface (#512) of every square of `cell` m holding the
+    line's track, on a SW_CELL grid. The .bin: per square in the .json's order, its road mask (road and tram areas)
+    and sidewalk mask as bits (rows north to south from the square's north-west corner, np.packbits), then the int16
+    heights of the road cells and the sidewalk cells in row order, STREETS_SCALE m over the square's `base`. Read by
+    #507 and #508 (the ground partition and the weld), not by the game."""
+    import sources
+    import sysinfo
+    from atomic import replacing
+    for v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ.setdefault(v, "1")
+    t0 = time.time()
+    L = json.load(open(os.path.join(root, "data", f"line{ln}.json"), encoding="utf-8"))
+    pts = np.asarray(L["path"] + L.get("pathBack", []), float)
+    sq = sorted({(int(math.floor(x / cell)), int(math.floor(y / cell))) for x, y in pts})
+    jobs = jobs or sysinfo.workers(1.0, most=os.cpu_count() or 4)
+    if jobs > 1:
+        ex = sysinfo.pool(min(jobs, len(sq)), _wide_init, ln)
+        results = list(ex.map(build_square, [ln] * len(sq), [cell] * len(sq), sq))
+        ex.shutdown()
+    else:
+        _wide_init(ln)
+        results = [build_square(ln, cell, ij) for ij in sq]
+    parts, meta_sq, off, n_road, n_walk = [], [], 0, 0, 0
+    for r in results:
+        if r is None:
+            continue
+        ij, base, mr, mw, q, nr, nw = r
+        parts += [mr.tobytes(), mw.tobytes(), q.tobytes()]
+        meta_sq.append({"i": ij[0], "j": ij[1], "base": base, "offset": off, "road": nr, "sidewalk": nw})
+        off += mr.nbytes + mw.nbytes + q.nbytes
+        n_road, n_walk = n_road + nr, n_walk + nw
+    with replacing(os.path.join(root, "data", f"line{ln}.streets.bin"), "wb") as fh:
+        fh.write(b"".join(parts))
+    side = int(round(cell / SW_CELL))
+    meta = {"cell": cell, "grid": SW_CELL, "side": side, "scale": STREETS_SCALE, "squares": meta_sq,
+            "layout": "per square: road mask bits, sidewalk mask bits (side x side, rows north to south from the "
+                      "square's north-west corner (i * cell, (j + 1) * cell), cell centres half a grid in), then int16 "
+                      "heights of the road cells and the sidewalk cells in row order, scale m over base"}
+    meta["provenance"] = sources.stamp("street_profile.py", {
+        "road": sources.entry("streets", [n_road, 0, 0], "cells (0.5 m, the survey's road and tram areas)"),
+        "sidewalk": sources.entry("streets", [n_walk, 0, 0], "cells (0.5 m, the survey's sidewalks)"),
+        "heights": sources.entry("terrain", [n_road + n_walk, 0, 0], "cells (profiles fitted to IPR)")})
+    meta["attribution"] = sources.attribution(meta["provenance"])
+    with replacing(os.path.join(root, "data", f"line{ln}.streets.json"), "w") as fh:
+        json.dump(meta, fh, separators=(",", ":"))
+    print(f"wrote data/line{ln}.streets.bin ({off / 1e6:.1f} MB): {len(meta_sq)} squares, road {n_road}, sidewalk {n_walk} "
+          f"cells, {time.time() - t0:.0f} s")
+    return meta
+
+
+def read_streets(ln, root=ROOT):
+    """data/lineN.streets.*: {(i, j): (x0, y1, road heights, sidewalk heights)} as side x side arrays (NaN off the class)
+    over the square from its north-west corner (x0, y1), and the .json."""
+    meta = json.load(open(os.path.join(root, "data", f"line{ln}.streets.json"), encoding="utf-8"))
+    buf = open(os.path.join(root, "data", f"line{ln}.streets.bin"), "rb").read()
+    n, nb, out = meta["side"], (meta["side"] ** 2 + 7) // 8, {}
+    for sq in meta["squares"]:
+        o = sq["offset"]
+        mr = np.unpackbits(np.frombuffer(buf, np.uint8, nb, o))[:n * n].astype(bool)
+        mw = np.unpackbits(np.frombuffer(buf, np.uint8, nb, o + nb))[:n * n].astype(bool)
+        q = np.frombuffer(buf, np.int16, sq["road"] + sq["sidewalk"], o + 2 * nb).astype(float) * meta["scale"] + sq["base"]
+        zr, zw = np.full(n * n, np.nan), np.full(n * n, np.nan)
+        zr[mr], zw[mw] = q[:sq["road"]], q[sq["road"]:]
+        out[(sq["i"], sq["j"])] = (sq["i"] * meta["cell"], (sq["j"] + 1) * meta["cell"], zr.reshape(n, n), zw.reshape(n, n))
+    return out, meta
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--calibrate", action="store_true")
@@ -1545,9 +1782,14 @@ def main(argv=None):
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "street_profile"))
     ap.add_argument("--sidewalks", action="store_true", help="the survey's sidewalks against IPR: crossfall, kerb")
     ap.add_argument("--wide", type=float, metavar="CELL", help="every line of --lines in squares of CELL m (300)")
-    ap.add_argument("--jobs", type=int, help="--wide: squares at once (default: by cores and free memory)")
+    ap.add_argument("--jobs", type=int, help="--wide, --build: squares at once (default: by cores and free memory)")
+    ap.add_argument("--build", type=int, metavar="LINE", help="write data/lineN.streets.bin and .json (the build step)")
     a = ap.parse_args(argv)
-    if a.sidewalks:
+    if a.build:
+        from baseline_store import HeavyJob
+        with HeavyJob("street_profile"):
+            build(a.build, jobs=a.jobs)
+    elif a.sidewalks:
         from baseline_store import HeavyJob
         with HeavyJob("street_profile"):
             calibrate_sidewalks([int(v) for v in a.lines.split(",")], os.path.join(a.out, "sidewalks.json"))

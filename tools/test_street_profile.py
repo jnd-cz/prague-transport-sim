@@ -193,5 +193,43 @@ class Measures(unittest.TestCase):
         self.assertEqual(sp.drive_measures(z, [c], road=road)["jumps"], 0)
 
 
+class Build(unittest.TestCase):
+    """data/lineN.streets.*: what build_square packs, read back by read_streets (#507 and #508 read it)."""
+
+    def test_written_and_read_back(self):
+        import json
+        import tempfile
+        n = int(round(300.0 / sp.SW_CELL))
+        rng = np.random.default_rng(1)
+        zr = np.full((n, n), np.nan)
+        zw = np.full((n, n), np.nan)
+        zr[10:20, 30:200] = 210.0 + rng.random((10, 170))
+        zw[20:24, 30:200] = 210.1 + rng.random((4, 170))
+
+        def square(ln, cell, ij, ctx=None):
+            on_r, on_w = np.isfinite(zr), np.isfinite(zw)
+            base = float(np.floor(min(np.nanmin(zr), np.nanmin(zw))))
+            q = np.round((np.concatenate([zr[on_r], zw[on_w]]) - base) / sp.STREETS_SCALE).astype(np.int16)
+            return ij, base, np.packbits(on_r.ravel()), np.packbits(on_w.ravel()), q, int(on_r.sum()), int(on_w.sum())
+
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "data"))
+            json.dump({"path": [[10.0, 650.0], [320.0, 645.0], [620.0, 640.0]]}, open(os.path.join(root, "data", "line99.json"), "w"))
+            keep = sp.build_square, sp._wide_init
+            sp.build_square, sp._wide_init = square, lambda ln: None
+            try:
+                meta = sp.build(99, jobs=1, root=root)
+            finally:
+                sp.build_square, sp._wide_init = keep
+            got, _ = sp.read_streets(99, root=root)
+        self.assertEqual(sorted(got), [(0, 2), (1, 2), (2, 2)])
+        self.assertEqual([q["road"] for q in meta["squares"]], [1700] * 3)
+        x0, y1, r, w = got[(1, 2)]
+        self.assertEqual((x0, y1), (300.0, 900.0))
+        self.assertTrue(np.array_equal(np.isfinite(r), np.isfinite(zr)))
+        self.assertLess(np.nanmax(np.abs(r - zr)), sp.STREETS_SCALE)
+        self.assertLess(np.nanmax(np.abs(w - zw)), sp.STREETS_SCALE)
+
+
 if __name__ == "__main__":
     unittest.main()
