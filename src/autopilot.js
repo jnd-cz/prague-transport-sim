@@ -488,6 +488,7 @@ export class Autopilot {
     // (a hazard past the point it stops at anyway rings the bell and changes nothing else: it took the last metres' rule away,
     // step 5 at 4 km/h and 3.6 m short at Nádraží Modřany, line 17 seed 5)
     tr.eq.autoDrive({ trackOk, lowMu: mu < 0.2, maxDrive, minDrive, force: need, stand, coast, power: button ? null : wantPower, urgent: urgent || (hazard && !(fixed && onCurve)), v: tr.v, dt, slip: tr.slip, slide: tr.slide,
+      holdBrake: fixed && !shortUphill && !this.patchCoast,
       stopDist: stopAt === null ? null : stopAt - tr.s, noDrive: (inApproach || (onCurve && tr.v > 0.1) || coastingIn || this.patchCoast) && !needPedal && !shortUphill, fixed, aNeed,
       aSoon: onCurve ? (tr.v * tr.v) / (2 * Math.max(0.3, dLeft - tr.v * 0.5)) : 0, aCoast, inertia: tr.inertia, grade, sandLeft: tr.sand > 0, slideA: 0.75 * 9.81 * g.muAt(tr.s) + 9.81 * gradeHere,
       railA: mu < 0.2 ? railA(tr.sanding || this.input.sand) : null,
