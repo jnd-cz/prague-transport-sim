@@ -5,6 +5,9 @@
 // or in a page started with ?keepgeo: const { run } = await import('/tools/bench/surfaces.js'); await run()
 // Before #21 (main f4cb8ea, line 17 / 22): waves 6.8 / 4.4 % of the samples, seams over 3 cm 13 / 3.9 %,
 // kerb step median 0.06 m (the survey's one kerb line gave both sides one height).
+// Kerbs lowered on purpose (tools/kerbs.py's stretches at crossings, #303) are counted apart: loweredKerbs, and the
+// flat and sunk kerbs are plain kerb's.
+import { findKerbs } from '../../src/review.js';
 const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'median', 'cycle', 'paved', 'platform']);
 const ROAD = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
 
@@ -44,8 +47,22 @@ export async function run() {
       if (Math.abs(zs[i] - sum / 21) > 0.08) waves++;
     }
   }
+  // the lowered stretches: a kerb site within a stretch's half width and ramp (+0.5 m) of its meeting point
+  const low = findKerbs(dtm.provenance || g.data.dtm?.provenance)?.lowered, LC = 10, cells = new Map();
+  const reach = low ? low.rule.width / 2 + 0.1 / low.rule.ramp + 0.5 : 0;
+  for (const t of low?.stretches || []) {
+    if (t.h === null) continue;
+    const k = `${Math.floor(t.x / LC)},${Math.floor(t.y / LC)}`;
+    if (!cells.has(k)) cells.set(k, []);
+    cells.get(k).push(t);
+  }
+  const lowered = (x, y) => {
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++)
+      for (const t of cells.get(`${Math.floor(x / LC) + i},${Math.floor(y / LC) + j}`) || []) if (Math.hypot(t.x - x, t.y - y) <= reach) return true;
+    return false;
+  };
   // seams and kerbs: across the route every 0.25 m, a row every 4 m, where two areas meet
-  const seams = [], kerbs = [], seamSites = [], kerbSites = [];
+  const seams = [], kerbs = [], seamSites = [], kerbSites = [], lowSites = [];
   for (let s = 0; s < r.length; s += 4) {
     let prev = null;
     for (let lat = -25; lat <= 25; lat += 0.25) {
@@ -56,10 +73,10 @@ export async function run() {
         // (street classes only: lawns and water meet at any height; over 1 m apart is another level)
         if (STREETS.has(h.c) && (h.c === prev.c || (ROAD.has(h.c) && ROAD.has(prev.c))) && Math.abs(h.z - prev.z) <= 1) {
           seams.push(Math.abs(h.z - prev.z)); seamSites.push({ ...site, step:Math.abs(h.z - prev.z) });
-        } else if (ROAD.has(h.c) && RAISED.has(prev.c)) {
-          kerbs.push(prev.z - h.z); kerbSites.push({ ...site, step:prev.z - h.z });
-        } else if (RAISED.has(h.c) && ROAD.has(prev.c)) {
-          kerbs.push(h.z - prev.z); kerbSites.push({ ...site, step:h.z - prev.z });
+        } else if ((ROAD.has(h.c) && RAISED.has(prev.c)) || (RAISED.has(h.c) && ROAD.has(prev.c))) {
+          const step = ROAD.has(h.c) ? prev.z - h.z : h.z - prev.z;
+          if (lowered(site.x, site.y)) lowSites.push({ ...site, step });
+          else { kerbs.push(step); kerbSites.push({ ...site, step }); }
         }
       }
       prev = h;
@@ -77,6 +94,8 @@ export async function run() {
       flatKerbs: { count: n(kerbs, (v) => v < 0.05), of: kerbs.length, at:kerbSites.filter((s) => s.step < 0.05).map((s) => [s.x,s.y,s.s]) },
       sunkKerbs: { count: n(kerbs, (v) => v < -0.02), of: kerbs.length, at:kerbSites.filter((s) => s.step < -0.02).map((s) => [s.x,s.y,s.s]) },
       kerbMedianCm: { count: Math.round(med(kerbs) * 100) },
+      loweredKerbs: { count: lowSites.length, medianCm: Math.round(med(lowSites.map((q) => q.step)) * 100),
+        sunk: n(lowSites, (q) => q.step < -0.02), over5cm: n(lowSites, (q) => q.step >= 0.05) },
     },
   };
 }
