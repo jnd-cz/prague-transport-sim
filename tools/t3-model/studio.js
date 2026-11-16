@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
@@ -33,7 +34,8 @@ document.querySelector('#stats').textContent = `${stats.triangles.toLocaleString
 const $ = id => document.getElementById(id), value = id => +$(id).value;
 const state = () => ({ doors: [value('door1'), value('door2'), value('door3')], pantograph: value('pantograph'),
   bogies: [value('bogies'), -value('bogies')], wipers: value('wipers'), wheelAngle });
-let wheelAngle = 0;
+let wheelAngle = 0, viewName = 'hero';
+const mobileDistance = name => name === 'interior' ? 1 : ['entry', 'bogie', 'collector', 'coupler'].includes(name) ? 1.6 : 2.8;
 function pose() { posePhotoT3(model, state()); }
 for (const id of ['door1', 'door2', 'door3', 'pantograph', 'bogies', 'wipers']) $(id).addEventListener('input', pose);
 $('wireframe').addEventListener('change', () => model.traverse(o => { if (o.isMesh) o.material.wireframe = $('wireframe').checked; }));
@@ -43,9 +45,19 @@ function reset() {
 }
 $('reset').addEventListener('click', reset);
 function view(name) {
+  viewName = name;
   const views = { hero: [-15, 7.0, 19], front: [0, 3.2, 18], side: [-23, 3.4, 0], rear: [9, 5.5, -19], left: [20, 5, 13] };
-  camera.position.set(...(views[name] || views.hero)); controls.target.set(0, 1.55, 0);
-  if (innerWidth <= 700) camera.position.sub(controls.target).multiplyScalar(2.8).add(controls.target);
+  const closeups = {
+    entry: { eye: [-4.4, 1.65, 6.7], target: [-.8, 1.10, 5.3] },
+    bogie: { eye: [-3.7, 1.15, 4.75], target: [-.1, .38, 3.2] },
+    interior: { eye: [0, 2.25, -5.85], target: [0, 1.65, 4.25] },
+    collector: { eye: [-3.2, 5.2, 7.5], target: [0, 4.25, 3.1] },
+    coupler: { eye: [-1.5, 1.15, 8.6], target: [0, .48, 7.12] },
+  };
+  const close = closeups[name];
+  if (name === 'entry') { $('door1').value = 1; pose(); }
+  camera.position.set(...(close?.eye || views[name] || views.hero)); controls.target.set(...(close?.target || [0, 1.55, 0]));
+  if (innerWidth <= 700) camera.position.sub(controls.target).multiplyScalar(mobileDistance(name)).add(controls.target);
   controls.update(); renderer.render(scene, camera);
 }
 document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => view(b.dataset.view)));
@@ -67,8 +79,8 @@ function resize() {
   // Leave room beside the tram for controls without changing its geometry.
   if (innerWidth > 700) camera.setViewOffset(innerWidth, innerHeight, innerWidth * .08, 0, innerWidth, innerHeight);
   else camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * .16, innerWidth, innerHeight);
-  if (oldAspect > .8 && camera.aspect < .8) camera.position.sub(controls.target).multiplyScalar(2.8).add(controls.target);
-  if (oldAspect < .8 && camera.aspect > .8) camera.position.sub(controls.target).multiplyScalar(1 / 2.8).add(controls.target);
+  if (oldAspect > .8 && camera.aspect < .8) camera.position.sub(controls.target).multiplyScalar(mobileDistance(viewName)).add(controls.target);
+  if (oldAspect < .8 && camera.aspect > .8) camera.position.sub(controls.target).multiplyScalar(1 / mobileDistance(viewName)).add(controls.target);
 }
 addEventListener('resize', resize); resize(); view('hero');
 let last = performance.now();

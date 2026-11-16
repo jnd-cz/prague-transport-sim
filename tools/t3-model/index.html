@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -21,6 +22,9 @@
   #error{position:absolute;left:30px;bottom:100px;max-width:500px;color:#a43337}
   @media(max-width:700px){header{left:18px;top:16px}h1{font-size:28px}aside{top:auto;bottom:0;right:0;width:100%;padding:12px 18px;border-radius:12px 12px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:0 20px}h2,.small{display:none}.views{margin:8px 0;grid-column:1/-1;display:flex}.views button{flex:1}label{margin-top:9px}.export{margin-top:10px!important}footer{left:18px;right:18px;bottom:285px}.spec strong{font-size:15px}.status{display:none}}
 </style>
+<style>
+  @media(max-width:700px){.views{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.views button{padding:7px 3px;font-size:10px}.views button:last-child{grid-column:1/-1}footer{bottom:355px}}
+</style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
@@ -28,7 +32,7 @@
 <header><div class="eyebrow">Prague · Vehicle collection / 01</div><h1>Tatra T3</h1><p>6892 · Drawing dimensions, photographed details</p></header>
 <aside aria-label="Model controls">
   <h2>Explore the model</h2>
-  <div class="views"><button data-view="hero">Perspective</button><button data-view="front">Front</button><button data-view="side">Door side</button><button data-view="rear">Rear</button></div>
+  <div class="views"><button data-view="hero">Perspective</button><button data-view="front">Front</button><button data-view="side">Door side</button><button data-view="rear">Rear</button><button data-view="entry">Entry steps</button><button data-view="bogie">Wheels &amp; brake</button><button data-view="interior">Interior</button><button data-view="collector">Collector</button><button data-view="coupler">Coupler</button></div>
   <label>Front doors<input id="door1" aria-label="Front doors" type="range" min="0" max="1" step=".01" value="0"></label>
   <label>Middle doors<input id="door2" aria-label="Middle doors" type="range" min="0" max="1" step=".01" value="0"></label>
   <label>Rear doors<input id="door3" aria-label="Rear doors" type="range" min="0" max="1" step=".01" value="0"></label>
@@ -37,7 +41,7 @@
   <label>Wiper sweep<input id="wipers" aria-label="Wiper sweep" type="range" min="0" max="1" step=".01" value="0"></label>
   <label>Turn wheels<input id="wheels" type="checkbox"></label><label>Show wireframe<input id="wireframe" type="checkbox"></label>
   <button id="export" class="export">Download GLB</button><button id="reset" style="margin-top:8px">Reset pose</button>
-  <p class="small">Drag to orbit · scroll to zoom · right-drag to pan.<br>GLB includes named pivots and current pose.<br>Original geometry · metres · GPL-3.0<br><a href="../../assets/t3photo/README.md">Sources &amp; rig documentation</a></p>
+  <p class="small">Drag to orbit · scroll to zoom · right-drag to pan.<br>GLB includes named pivots and current pose.<br>Original geometry · metres · AGPL-3.0-or-later<br><a href="../../assets/t3photo/README.md">Sources &amp; rig documentation</a></p>
 </aside>
 <footer><div class="spec"><strong>14,000 mm</strong>Body length</div><div class="spec"><strong>2,500 mm</strong>Body width</div><div class="spec"><strong>6,400 mm</strong>Bogie centres</div><div class="spec"><strong>12 leaves</strong>Three folding doors</div></footer>
 <div class="status" id="stats">Building model…</div><div id="error" role="alert"></div>
