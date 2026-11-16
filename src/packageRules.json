@@ -1,8 +1,8 @@
 {
   "about": "What a vehicle package may hold (#530; docs/vehicles.md, Packages). Read by the game's check at install and at startup (src/packages.js) and by tools/test_vehicles.py for the repository's vehicles: one description for both.",
   "schema": 1,
-  "interface": "1.0",
-  "interface_about": "The vehicle interface's version (docs/vehicles.md): what a package's `game` is compared with. The major number grows when a field, slot, event or rig name a package uses changes its meaning or goes; the minor when one is added.",
+  "interface": "1.1",
+  "interface_about": "The vehicle interface's version (docs/vehicles.md): what a package's `game` is compared with. The major number grows when a field, slot, event or rig name a package uses changes its meaning or goes; the minor when one is added. 1.1 (#525): the rig names its headlights, tail lamps and saloon by node (`headlights`, `tailLamps`, `saloon`); 1.0's points and boxes are still read.",
   "kinds": ["vehicle", "livery", "sounds", "fleet"],
   "id": "^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9.-]*$",
   "id_about": "author.package, in lower case: two authors never collide",

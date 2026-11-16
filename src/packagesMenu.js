@@ -2,8 +2,11 @@
 // The menu's Vehicles… page (#530): the installed packages with their version, author, licence and their check's
 // problems and warnings; install from a .zip, a folder or an address; switch off, remove, update; the curated list.
 // onChange: after any change, the menu's model, fleet and livery lists are made again from the registry.
+// Submitting to the project (#580): a .zip or its address, checked here as an install checks it (dryCheck), then sent
+// to the host's submit.php (tools/submit.php; tools/serve.py locally) with the check's report; tools/submissions.py
+// reviews them.
 import { t, getLang, onLangChange } from './i18n.js';
-import { state, install, installUrl, readZip, setEnabled, remove, newerAt, canInstall, catalogue } from './packages.js';
+import { state, install, installUrl, readZip, setEnabled, remove, newerAt, canInstall, catalogue, dryCheck, fetchEntries } from './packages.js';
 import { localUrl } from './localFiles.js';
 
 const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); Object.assign(e.dataset, dataset); e.append(...kids.filter((k) => k != null)); return e; };
@@ -12,6 +15,7 @@ const name = (m) => m?.names?.[getLang()] || m?.names?.en || m?.id || '?';
 export function initPackages({ onChange }) {
   const panel = document.getElementById('pkgPanel'), body = document.getElementById('pkgBody');
   let last = [], busy = false;
+  const sub = { report: [], msg: null, busy: false, contact: '', note: '', host: false, licence: false, url: '' };
   const changed = () => { onChange(); render(); };
   const run = async (f) => {
     if (busy) return;
@@ -68,7 +72,8 @@ export function initPackages({ onChange }) {
       el('h3', { textContent: t('pkg.installedList') }),
       rows.length ? el('div', { id: 'pkgList' }, ...rows) : el('p', { className: 'dim', textContent: t('pkg.none') }),
       el('h3', { textContent: t('pkg.catalogue') }),
-      el('div', { id: 'pkgCatalogue' }, el('p', { className: 'dim', textContent: '…' }))].filter(Boolean));
+      el('div', { id: 'pkgCatalogue' }, el('p', { className: 'dim', textContent: '…' })),
+      submitForm()].filter(Boolean));
     catalogue().then((c) => {
       const box = document.getElementById('pkgCatalogue');
       if (!box) return;
@@ -79,6 +84,63 @@ export function initPackages({ onChange }) {
           x.home ? el('a', { href: x.home, target: '_blank', rel: 'noopener', textContent: new URL(x.home).host }) : null), b);
       }) : [el('p', { className: 'dim', textContent: t('pkg.catalogueEmpty') })]));
     });
+  }
+
+  // the submission form; its fields keep what was typed across the page's redraws
+  function submitForm() {
+    const zip = el('input', { type: 'file', accept: '.zip,application/zip', id: 'subZip' });
+    const url = el('input', { type: 'url', id: 'subUrl', placeholder: 'https://…/package.json', value: sub.url });
+    url.oninput = () => { sub.url = url.value; };
+    const contact = el('input', { type: 'text', id: 'subContact', maxLength: 200, value: sub.contact, placeholder: t('sub.contact') });
+    contact.oninput = () => { sub.contact = contact.value; };
+    const note = el('textarea', { id: 'subNote', maxLength: 2000, rows: 2, value: sub.note, placeholder: t('sub.note') });
+    note.oninput = () => { sub.note = note.value; };
+    const host = el('input', { type: 'checkbox', id: 'subHost', checked: sub.host });
+    host.onchange = () => { sub.host = host.checked; };
+    const lic = el('input', { type: 'checkbox', id: 'subLicence', checked: sub.licence });
+    lic.onchange = () => { sub.licence = lic.checked; };
+    const send = el('button', { textContent: t(sub.busy ? 'sub.checking' : 'sub.send'), className: 'pkgBtn', id: 'subSend', disabled: sub.busy });
+    send.onclick = async () => {
+      const file = zip.files[0], address = url.value.trim();
+      if (!file && !address) { sub.msg = { ok: false, text: t('sub.needSource') }; render(); return; }
+      if (!lic.checked) { sub.msg = { ok: false, text: t('sub.needLicence') }; render(); return; }
+      sub.busy = true; sub.msg = null; sub.report = []; render();
+      try {
+        const bytes = file ? new Uint8Array(await file.arrayBuffer()) : null;
+        let entries;
+        try { entries = bytes ? await readZip(bytes.buffer) : await fetchEntries(address); }
+        catch (e) { throw new Error(bytes ? String(e.message || e) : t('sub.unreadable', { why: String(e.message || e) })); }
+        sub.report = await dryCheck(entries);
+        if (sub.report.some((r) => !r.ok)) { sub.msg = { ok: false, text: t('sub.refused') }; return; }
+        const meta = {
+          schema: 1, url: file ? null : address, contact: sub.contact.trim() || null, note: sub.note.trim() || null,
+          host: host.checked, licence: true, lang: getLang(), game: window.deployVersion?.commit || null,
+          packages: sub.report.map((r) => ({ id: r.id, version: r.manifest.version, kind: r.manifest.kind, names: r.manifest.names,
+            authors: r.manifest.licence?.authors || [], licence: r.manifest.licence?.spdx || null, warnings: r.warnings || [], fit: r.fit || null })),
+        };
+        const form = new FormData();
+        form.append('meta', JSON.stringify(meta));
+        if (bytes) form.append('pack', new Blob([bytes], { type: 'application/zip' }), 'pack.zip');
+        const res = await fetch('submit.php', { method: 'POST', body: form, headers: { 'X-Submit': '1' } });
+        const ans = await res.json().catch(() => null);
+        sub.msg = res.ok && ans?.id ? { ok: true, text: t('sub.sent', { id: ans.id }), id: ans.id } : { ok: false, text: t('sub.failed', { why: ans?.error || res.status }) };
+      } catch (e) {
+        sub.msg = { ok: false, text: t('sub.failed', { why: String(e.message || e) }) };
+      } finally { sub.busy = false; render(); }
+    };
+    const report = sub.report.map((r) => el('div', { className: r.ok ? 'pkgOk' : 'pkgProblem' }, `${r.ok ? '✓' : '✕'} ${name({ names: r.names, id: r.id })}`,
+      ...[...(r.problems || []), ...(r.warnings || [])].map((p) => el('div', { className: 'dim', textContent: p }))));
+    return el('div', { id: 'subForm' },
+      el('h3', { textContent: t('sub.title') }),
+      el('p', { className: 'dim', textContent: t('sub.about') }),
+      el('div', { className: 'pkgInstall' }, el('label', {}, t('sub.zip'), ' ', zip), el('label', {}, t('sub.url')), url),
+      el('div', { className: 'pkgInstall' }, contact),
+      el('div', { className: 'pkgInstall' }, note),
+      el('label', { className: 'subCheck' }, host, ' ', t('sub.host')),
+      el('label', { className: 'subCheck' }, lic, ' ', t('sub.licence')),
+      el('div', { className: 'pkgInstall' }, send),
+      el('div', { id: 'subReport' }, ...report,
+        sub.msg ? el('div', { className: sub.msg.ok ? 'pkgOk' : 'pkgProblem', textContent: sub.msg.text, dataset: sub.msg.id ? { id: sub.msg.id } : {} }) : null));
   }
 
   const close = () => panel.classList.add('hidden');

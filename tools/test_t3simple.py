@@ -266,7 +266,8 @@ SHOTS = r"""async ({ kinds }) => {
   const models = await import('/src/models.js');
   const vehicles = await import('/src/vehicles.js');
   await vehicles.loadRegistry();
-  // (each model by its manifest: assets/vehicles.json)
+  // (each model by its manifest: assets/vehicles.json; any other kind is a vehicle's id, loaded already: an installed
+  // package's, tools/submission_check.py)
   const ids = { hybrid: 't3h', classic: 't3' };
   for (const k of kinds) if (ids[k]) await models.loadVehicle(vehicles.byId.get(ids[k]), async (u) => {
     const r = await fetch('/' + u), buf = r.ok ? await r.arrayBuffer() : null;
@@ -323,7 +324,7 @@ SHOTS = r"""async ({ kinds }) => {
   for (const kind of kinds) {
     for (const [view, cam] of Object.entries(views)) {
       const variant = { simple: 'T3SUCS', t3m: 'T3M', t3: 'T3' }[kind], bend = view === 'curve' || view === 'gear';
-      const m = models.makeT3({ line: '17', cars: view === 'set' || bend ? 2 : 1, vehicle: variant ? 't3simple' : ids[kind], dest: 'Sídliště Ďáblice', run: '801', variant });
+      const m = models.makeT3({ line: '17', cars: view === 'set' || bend ? 2 : 1, vehicle: variant ? 't3simple' : ids[kind] ?? kind, dest: 'Sídliště Ďáblice', run: '801', variant });
       straight.visible = !bend; bent.visible = bend;
       models.placeConsist(m, bend ? 15.04 : 7.6, bend ? arc : (s) => [0, -s, 0, 0]); // (the coupling at z 0 on the curve)
       renderer.clippingPlanes = view === 'gear' ? cut : [];

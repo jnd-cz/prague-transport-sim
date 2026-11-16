@@ -213,7 +213,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   address, a complete set in one archive too. The game checks each before it offers it (its files, its licence,
   the model's size and how heavy it is to draw) and shows a refused one with its reasons. Installed packages stay
   in this browser only and can be switched off or removed; a new tram appears in the Tram model menu. Below them
-  is the list of submitted packages.
+  are the list of submitted packages and a form where an author sends their package (a .zip or its address) to the
+  project for review; the game checks it first and sends only one that passes.
 
 ### On a phone or tablet
 
