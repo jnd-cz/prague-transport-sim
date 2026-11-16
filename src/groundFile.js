@@ -70,6 +70,23 @@ export class GroundLookup {
     const t = this._find(x, y);
     return t < 0 || !this.ta[t] ? null : { z: this.hitZ, c: this.areas[this.ta[t]] };
   }
+  // each survey triangle with a corner within r of (x, y), once: fn(class, [x, y, z] × 3) (review's class layer)
+  surveyNear(x, y, r, fn) {
+    const { vx, vy, vz, tv, ta, tris, start } = this, px = x - this.x0, py = y - this.y0, r2 = r * r, seen = new Set();
+    const i0 = Math.max(0, Math.floor((px - r) / this.cell)), i1 = Math.min(this.nx - 1, Math.floor((px + r) / this.cell));
+    const j0 = Math.max(0, Math.floor((py - r) / this.cell)), j1 = Math.min(this.ny - 1, Math.floor((py + r) / this.cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const k = j * this.nx + i;
+      for (let s = start[k], e = start[k + 1]; s < e; s++) {
+        const t = tris[s];
+        if (!ta[t] || seen.has(t)) continue;
+        seen.add(t);
+        const c = [tv[3 * t], tv[3 * t + 1], tv[3 * t + 2]];
+        if (!c.some((v) => (vx[v] - px) ** 2 + (vy[v] - py) ** 2 <= r2)) continue;
+        fn(this.areas[ta[t]], c.map((v) => [vx[v] + this.x0, vy[v] + this.y0, vz[v]]));
+      }
+    }
+  }
   // whether the survey describes the street in (x, y)'s 10 m cell at all (src/terrain.js TriIndex.covered)
   covered(x, y) { return this.coverSet.has(Math.floor(x / 10) * 100003 + Math.floor(y / 10)); }
 }
