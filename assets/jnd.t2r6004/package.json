@@ -2,7 +2,7 @@
   "schema": 1,
   "kind": "sounds",
   "id": "jnd.t2r6004",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "game": ">=1.2 <2",
   "requires": {
     "t3h": ">=1"
@@ -43,18 +43,18 @@
     },
     {
       "path": "LICENSE.txt",
-      "bytes": 313,
-      "sha256": "90ffb14bb4713356525b4f5e7c4dfe673f16ea94fde68c7328951e80002a6f14"
+      "bytes": 35037,
+      "sha256": "be6a053c06ef519e8506f27243f5dd39265f89d1527828867383c98b8669ee68"
     },
     {
       "path": "provenance.json",
-      "bytes": 4402,
-      "sha256": "8543267631b254544682132155b5092cdc665d92560f560b7b930d59dfe222fc"
+      "bytes": 4754,
+      "sha256": "768c2d311b344b491afc9d7cd0a7716b8b460c1f3493893c8f3a6c734e3e05db"
     },
     {
       "path": "README.txt",
-      "bytes": 950,
-      "sha256": "5ee4c45912b89d9b19ec23379fed4e16fd85de10da298ec1d4113ea0574c70ff"
+      "bytes": 1027,
+      "sha256": "37358f1aa9df1e02bd08a565e030ae7f873566023f593a302fe23aac1485aeb1"
     },
     {
       "path": "release-01.wav",
@@ -83,7 +83,7 @@
   },
   "loops": {},
   "licence": {
-    "spdx": "CC0-1.0",
+    "spdx": "AGPL-3.0-or-later",
     "commercial": true,
     "authors": [
       "Jenda / jnd-cz"
@@ -92,7 +92,7 @@
       "https://github.com/jnd-cz/prague-transport-sim/issues/590",
       "User recordings and synthesis attachments; provenance.json"
     ],
-    "credit": "T2R 6004 recording and synthesized bell/door warning: Jenda / jnd-cz (CC0)"
+    "credit": "T2R 6004 recording and synthesized bell/door warning: Jenda / jnd-cz (AGPL-3.0-or-later)"
   },
   "lineContactorRelease": {
     "minGain": 0.25,

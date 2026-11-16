@@ -1,4 +1,4 @@
-T2R 6004 / TR37 partial sound pack, 0.1.0
+T2R 6004 / TR37 partial sound pack, 0.1.1
 
 Requires game vehicle interface 1.2 (#590) and the hybrid T3 (t3h).
 Install its ZIP or package.json address from Vehicles... in the game menu.
@@ -9,4 +9,5 @@ These are listening settings, not measured physical constants. One release take 
 Bell: medium; short/long are retained alternatives (edit the bell event before installing).
 Door warning: full 3.2 s one-shot at the existing closing event. The loop is retained, not mapped.
 Other sounds use the built-in synthesis. No ambient recording is assigned as an isolated motor/MG loop.
-All WAV files preserve the approved bytes. Source hashes and credits: provenance.json; CC0: LICENSE.txt.
+All WAV files preserve the approved bytes. See provenance.json for hashes and credits.
+The package uses AGPL-3.0-or-later. See LICENSE.txt for the terms and the earlier CC0 release.

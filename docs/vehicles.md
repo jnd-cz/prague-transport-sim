@@ -97,7 +97,7 @@ current from immediately before the equipment opens (the maximum relay uses the 
 captured at simulation-step resolution. The gain floor is below the pack and master gains; mute and pause still
 silence it. Reapplying power before LS opens cancels the pending release without another start sound.
 
-The optional CC0 pack in `assets/jnd.t2r6004/package.json` installs through *Vehicles…* by address or ZIP.
+The optional AGPL-3.0-or-later pack in `assets/jnd.t2r6004/package.json` installs through *Vehicles…* by address or ZIP.
 It supplies both trimmed startup variants, the first release, the medium bell and full door alert. The other
 bell lengths and door-alert loop are retained as alternatives; the loop awaits a warning start/stop lifecycle.
 See its `README.txt` for source provenance and installation. Other events and loops retain built-in synthesis.

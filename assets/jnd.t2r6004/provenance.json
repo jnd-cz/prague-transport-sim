@@ -1,11 +1,5 @@
 {
   "issue": 590,
-  "licence_decision": {
-    "date": "2026-11-16",
-    "source": "Codex session",
-    "quote": "I would choose free license suitable for assets like sound. Implement the separate triggers too",
-    "choice": "CC0-1.0, selected under this authorization; credit Jenda / jnd-cz"
-  },
   "recording": "T2R 6004, TR37, 2026-11-11; microphone near middle of saloon",
   "release_cut": "Original recording 745.250–745.730 s; earlier -3 dB gain and 2 ms fades retained unchanged.",
   "start_selection": "User-trimmed attachments, exact original boundaries unknown; no further trimming or normalization.",
@@ -123,5 +117,17 @@
       "samples_at_full_scale": 0,
       "processing": "none; byte-identical copy"
     }
-  ]
+  ],
+  "initial_licence_decision": {
+    "date": "2026-11-16",
+    "source": "Codex session",
+    "quote": "I would choose free license suitable for assets like sound. Implement the separate triggers too",
+    "choice": "CC0-1.0, selected under this authorization; credit Jenda / jnd-cz"
+  },
+  "licence_decision": {
+    "source": "Codex session, follow-up to #590",
+    "quote": "Can the sound pack have the same license as the built in assets?",
+    "choice": "AGPL-3.0-or-later, matching the built-in assets",
+    "previous_release": "The identical WAVs were made available with the CC0-1.0 notice in package 0.1.0 on PR #625."
+  }
 }
