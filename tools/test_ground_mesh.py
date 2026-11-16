@@ -152,6 +152,12 @@ class Rails(unittest.TestCase):
         self.assertTrue(band.contains(shapely.Point(0.72, 45)))
         self.assertFalse(band.contains(shapely.Point(0.80, 45)))
 
+    def test_land_cover_as_the_page_colours_its_terrain(self):
+        L = {"green": [{"p": [[0, 0], [10, 0], [10, 10], [0, 10]]}, {"p": [[20, 0], [30, 0], [30, 10], [20, 10]], "t": "wood"}],
+             "water": [[[5, 5], [25, 5], [25, 8], [5, 8]]]}
+        got = gm.land_cover(L, np.array([2, 22, 15, 40, 8]), np.array([2, 2, 6, 40, 6]))
+        self.assertEqual(got.tolist(), ["grass", "wood", "water", "", "water"])
+
     def test_no_crossing_on_a_bridge(self):
         import bed_surface
         beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {"b": 1})]))

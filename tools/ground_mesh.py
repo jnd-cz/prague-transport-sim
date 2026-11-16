@@ -306,6 +306,9 @@ def build(ln, mesh=None, threads=8, log=print):
         owners.append(("terrain", t, g))
     if not outline.is_empty:
         lines.append(outline.boundary)
+    # (the line's border too: where it passes within cm of a terrain triangle's corner, the partition drops that cut
+    # triangle's remains as a sliver, and only the border closes the face there; lines 23, 9, 22, 17 had 6-52 open edges)
+    lines.append(box.boundary)
     lines += rails
     # (a raised area beside a track or a plot that reaches a rail: within RAIL_CLEAR of it at the bed's height, its kerb
     # or wall RAIL_CLEAR past the rail; its edge in the lines. The user, 2026-11-16: "any structure crossing the track
@@ -489,6 +492,10 @@ def build(ln, mesh=None, threads=8, log=print):
     if len(bd):
         cen = fc[bd].mean(1)
         draw[bd] = beds.style_at(cen[:, 0], cen[:, 1])
+    tr = np.flatnonzero(tcls == "terrain")
+    if len(tr):
+        cen = fc[tr].mean(1)
+        draw[tr] = land_cover(L, cen[:, 0], cen[:, 1])
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
     log(f"  weld: {len(uk):,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items()]}, "
         f"{time.time() - t1:.0f} s")
@@ -505,7 +512,7 @@ def build(ln, mesh=None, threads=8, log=print):
     KF = remap[KT]
     F = np.vstack([F, KF])
     fcls_id = np.concatenate([fcls_id, np.zeros(len(KF), int)])
-    draw = np.concatenate([draw, np.full(len(KF), "", dtype=object)])
+    draw = np.concatenate([draw, land_cover(L, x[KT].mean(1), y[KT].mean(1)) if len(KT) else np.zeros(0, dtype=object)])
     V = V2
 
     # the steps' walls: an edge whose two sides hold different vertices at an end; each drawn as the face above it
@@ -684,6 +691,26 @@ def rail_band(beds, outline, pieces):
             parts += [p for p in shapely.get_parts(shapely.intersection(g, shapely.union_all(buf[hit])))
                       if p.geom_type == "Polygon" and p.area > SLIVER_BAND]
     return shapely.union_all(parts) if parts else shapely.Polygon()
+
+
+def land_cover(L, x, y):
+    """Per point: the terrain's draw class as the page colours its terrain (src/world.js buildTerrain: OSM's green, wood
+    and water in the line data): "grass", "wood", "water" or "" (bare ground). (The page marks its 10 m cells in the
+    data's order, water last; here grass, then wood, then water.)"""
+    out = np.full(len(x), "", dtype=object)
+
+    def union(rings):
+        polys = [shapely.Polygon([p[:2] for p in r]) for r in rings if len(r) >= 3]
+        polys = [p if p.is_valid else shapely.make_valid(p) for p in polys]
+        return shapely.union_all(polys) if polys else None
+    green = L.get("green") or []
+    for name, rings in (("grass", [g["p"] for g in green if g.get("t") != "wood"]),
+                        ("wood", [g["p"] for g in green if g.get("t") == "wood"]), ("water", L.get("water") or [])):
+        u = union(rings)
+        if u is not None and not u.is_empty:
+            shapely.prepare(u)
+            out[shapely.contains_xy(u, x, y)] = name
+    return out
 
 
 def crossing_pieces(survey, beds):
