@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Upload the game to the web host over FTPS (#131): python -P -E tools/deploy.py [--target NAME] [--dry-run] [--reports]
-    python -P -E tools/deploy.py --pull [--target NAME]   # only fetch review verdicts and feedback notes
+    python -P -E tools/deploy.py --pull [--target NAME]   # only fetch review verdicts, feedback notes, submissions
 
 Config (git-ignored, in the checkout's root): deploy.local.json
     {"host": "<FTP host>", "user": "<FTP user>", "dir": "/httpdocs", "url": "https://testing.pipethebytes.com/",
@@ -17,6 +17,10 @@ reports/review/), search engines are asked not to index it, it is deployed only 
 version testers name), and after a deploy the URL is checked to serve the page and none of the review tools.
 Player feedback (src/report.js): tools/feedback.php goes up as feedback.php on every target and stores notes in
 feedback/ (no direct access); --pull moves them into <feedback>/<target>/ (tools/feedback.py DEST, beside the data cache; it lists them).
+Vehicle packages submitted from the Vehicles... page (#580): tools/submit.php goes up as submit.php on every target and
+stores them in submissions/ (no direct access); --pull moves them into <submissions>/<target>/ (tools/submissions.py
+DEST, which reviews them). Accepted packs the project hosts (assets/catalogue.json's urls hosted/<name>) go up from
+<submissions>/hosted/; a deploy refuses when one is missing there.
 
 What goes up: tools/make_dist.py's files, plus version.json (commit, data snapshot, date) and an
 .htaccess (brotli, revalidation). The data heavy packs go up only compressed, as <name>.brotli (#275): the
@@ -50,6 +54,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import feedback  # noqa: E402
 import reviews  # noqa: E402
 import review_sets  # noqa: E402
+import submissions  # noqa: E402
 from make_dist import ROOT, files  # noqa: E402
 
 CONFIG = os.path.join(ROOT, "deploy.local.json")
@@ -159,6 +164,9 @@ def site(commit, reports=False, github=True, public=False):
     out["version.json"] = json.dumps(version, ensure_ascii=False, indent=1).encode()
     out["feedback.php"] = os.path.join(ROOT, "tools", "feedback.php")
     out["feedback/.htaccess"] = b"Require all denied\n"
+    out["submit.php"] = os.path.join(ROOT, "tools", "submit.php")
+    out["submissions/.htaccess"] = b"Require all denied\n"
+    out.update(hosted())
     if public:
         out["robots.txt"] = ROBOTS
         out[".htaccess"] = (HTACCESS + NOINDEX).encode()
@@ -168,6 +176,21 @@ def site(commit, reports=False, github=True, public=False):
     # the review directory's index (reviews.html, #288), built at each deploy: a new set shows up by itself
     out["reports/review/index.json"] = json.dumps(review_sets.build(github=github), ensure_ascii=False, indent=1).encode()
     out[".htaccess"] = HTACCESS.encode()
+    return out
+
+
+def hosted(catalogue=os.path.join(ROOT, "assets", "catalogue.json"), folder=submissions.HOSTED):
+    """{hosted/<name>: its file} for the catalogue's packs the project hosts (their authors allowed it, #580)."""
+    with open(catalogue, encoding="utf-8") as fh:
+        urls = [p.get("url", "") for p in json.load(fh).get("packages", [])]
+    out = {}
+    for u in urls:
+        if not u.startswith("hosted/"):
+            continue
+        path = os.path.join(folder, u.removeprefix("hosted/"))
+        if os.path.basename(path) != u.removeprefix("hosted/") or not os.path.isfile(path):
+            raise SystemExit(f"deploy: the catalogue names {u}, which is not in {folder} (tools/submissions.py --accept puts it there)")
+        out[u] = path
     return out
 
 
@@ -319,13 +342,48 @@ def pull_feedback(ftp, dest):
     return got
 
 
+def pull_submissions(ftp, dest):
+    """submissions/<id>/ moved from the host into dest/<id>/ (saved before they are deleted there, so submit.php's caps
+    count only what is not pulled yet); prints each."""
+    try:
+        names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("submissions")]
+    except ftplib.error_perm:
+        return 0  # (none yet)
+    got = 0
+    for sid in sorted(names):
+        if not submissions.ID.fullmatch(sid):
+            continue
+        files = {}
+        for f in ("meta.json", "pack.zip"):
+            buf = io.BytesIO()
+            try:
+                ftp.retrbinary(f"RETR submissions/{sid}/{f}", buf.write)
+                files[f] = buf.getvalue()
+            except ftplib.error_perm:
+                pass  # (an address: no pack)
+        try:
+            meta = json.loads(files.get("meta.json") or b"null")
+        except ValueError:
+            meta = None
+        if not isinstance(meta, dict) or meta.get("id") != sid or not submissions.save(dest, meta, files.get("pack.zip")):
+            print(f"submissions/{sid}: not a submission, left on the host")
+            continue
+        for f in files:
+            ftp.delete(f"submissions/{sid}/{f}")
+        ftp.rmd(f"submissions/{sid}")
+        got += 1
+        print(f"{os.path.relpath(os.path.join(dest, sid), ROOT)}: {submissions.describe(meta)}")
+    return got
+
+
 def pull(cfg, connect):
-    """One target's review verdicts (not on a public one) and feedback notes."""
+    """One target's review verdicts (not on a public one), feedback notes and package submissions."""
     ftp = connect(cfg, password(cfg))
     try:
         if not cfg.get("public"):
             pull_reviews(ftp)
         pull_feedback(ftp, os.path.join(feedback.DEST, cfg["name"]))
+        pull_submissions(ftp, os.path.join(submissions.DEST, cfg["name"]))
     finally:
         ftp.quit()
 
@@ -343,7 +401,7 @@ def status(url, path=""):
 def public_ok(url, get=status):
     """A public target's answers without a login: the page and version.json served, every review tool and
     the stored notes not ([] when all is as it should be, else what is wrong)."""
-    want = {"": 200, "version.json": 200, "feedback/": 403, **{p: 404 for p in ("review.php", "reviews.html", "reports/review/index.json")}}
+    want = {"": 200, "version.json": 200, "feedback/": 403, "submissions/": 403, **{p: 404 for p in ("review.php", "reviews.html", "reports/review/index.json")}}
     bad = []
     for p, w in want.items():
         got = get(url, p)

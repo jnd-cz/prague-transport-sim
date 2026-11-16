@@ -195,7 +195,7 @@ def main():
             dt = 2 * math.asin(1.27 / rp)
             pitch, angle = 20 * (2 * a + dt), math.degrees(a + dt / 2)
             want = {
-                "the model loads, 43,668 triangles (the asset's 43,792 less a hidden helper)": s["fullTris"] == 43668,
+                "the model loads, 43,692 triangles (the asset's 43,840 less a hidden helper and the tail lamps' glows, drawn apart, #525)": s["fullTris"] == 43692,
                 "the saloon is its own part (>= 25,000 triangles)": s["insideTris"] >= 25000,
                 "the lighter level: no saloon": s["lightInside"] == 0 and s["lightTris"] < s["fullTris"] - s["insideTris"] + 200,
                 "a hybrid set": s["hybrid"],

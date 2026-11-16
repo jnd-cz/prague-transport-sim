@@ -68,7 +68,8 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
     orig.call(this, scene, cam);
     scene.matrixWorldAutoUpdate = auto;
     cpu.push(performance.now() - t); umw.push(t1 - t);
-    if (!info && cpu.length > warm) info = { calls: r.info.render.calls, triangles: r.info.render.triangles };
+    // (the game's scene only: the landmarks' pass renders its own scene first, 1 call, src/landmarks.js)
+    if (!info && cpu.length > warm && scene === window.scene) info = { calls: r.info.render.calls, triangles: r.info.render.triangles };
   };
   const gaps = [];
   try {

@@ -11,3 +11,5 @@ Modifications: simplified repeated interior tubing; added rigid-node folding doo
 The combined hybrid includes CC BY-NC assets and is supplied for noncommercial use under CC BY-NC 4.0. Retain both source credits, licence links, and the modification notice. The separate original base and earlier rig remain available under their original CC BY 4.0 terms. No endorsement by either original author is implied.
 
 Maintained since 2026-11-12 in the game's repository (jnd-cz/prague-transport-sim); the asset lab is retired. Further modifications are made there by its tools and listed here.
+
+2026-11-15 (#525, tools/edit_t3h_glb.py): named the track-brake shoes and coupler bars; added nodes at the headlights' centres; added red tail lamps on the rear panel, a lens and a glow each, with the brake lamps' materials; grouped the saloon's parts under one Saloon node. Nothing else moved.

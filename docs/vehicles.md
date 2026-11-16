@@ -195,14 +195,23 @@ ones join the registry after the repository's (`src/packages.js` `loadInstalled`
 package installed from a `package.json` address offers *Update* when a newer version is there.
 
 **The curated list** (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
-`assets/catalogue.json`, shown under the installed ones with an *Install* button. Submitting through the game's
-website, the pack or its address, is #580. Until then, to submit a package, open an issue
-with its address (an https `package.json` or `.zip` on your own host, which must allow the game's page to fetch it:
-CORS), its licence, and the check's report from installing it. Once it is reviewed, an entry goes into the list:
-`id`, `names` (cs, en), `author`, `licence`, `kind`, `url`, `home` (its page). The project hosts no package it did not
-make. `tools/test_vehicles.py` checks the entries.
+`assets/catalogue.json`, shown under the installed ones with an *Install* button. An entry: `id`, `names` (cs, en),
+`author`, `licence`, `url`, `home` (its page), `packages` (a bundle's), `submission`. `tools/test_vehicles.py` checks
+the entries.
 
-`tools/test_packages.py` installs a sample bundle and six broken packages in headless Chromium (docs at its top).
+**Submitting a package** (#580; the user, 2026-11-13: "submit the pack or link to the asset through our website where
+we can pick it up and review"): the Vehicles… page's *Submit a package to the project* takes a .zip or its address
+(an https `package.json` or `.zip` on the author's host, which must let the game's page fetch it: CORS), an optional
+contact for the verdict (an email or a Discord name) and a note. A box says whether the project may host the files on
+its server and offer them to everyone from the menu; unticked, they stay on the author's host and the list links
+them (the user, 2026-11-15). The page checks the package as an install does, keeping nothing (`src/packages.js`
+`dryCheck`), and sends only one that passes, with the check's report, to the host's `submit.php`
+(`tools/submit.php`: 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull; only the file types of
+`src/packageRules.json`; no IP address stored). The review (DEVELOPING.md, Deploy) adds an accepted one to the list.
+A GitHub issue with the same facts stays a way in.
+
+`tools/test_packages.py` installs a sample bundle and broken packages in headless Chromium (docs at its top);
+`tools/test_submission_check.py` submits one, checks it, accepts it and installs it from the list.
 
 ## The rig
 
@@ -216,22 +225,25 @@ name; a part its manifest's `moves` claims and the model lacks makes the game re
 | `wheels` | `wheels`: each `name` (a node under its bogie) and `radius` | rolls them by the distance; half a bogie's wheelbase comes from where they stand |
 | `couplers` | `couplers`: `front` and `rear`, the bar's meshes | turns each about the type's pin (6.25 m), its bar refitted from the pin to the coupling plane, along the link to the next car |
 | `collector` | `pantograph`: `root`, `head`, `linkages`, `clip` (lowering it, 0 raised .. 1 down), `minContactHeight`, `maxContactHeight` | scrubs the clip to the wire's height, lowers it below its range |
-| `lamps` | `signals`: `left`, `right` (glow nodes); `brakes`; `beams` (the headlights' centres, for the high beams' glow); `tailLamps` (`size`, `at`: lamps the model lacks) | lights them by state (`src/lamps.js`) |
+| `lamps` | `signals`: `left`, `right` (glow nodes); `brakes`; `headlights` (a node at each headlight's centre, for the high beams' glow); `tailLamps` (the tail lamps' glow meshes, lit on every car) | lights them by state (`src/lamps.js`) |
 | `doors` | `doors`: each `name`, `clip` (opening it) and `leaves` (`outer`, `inner` nodes) | scrubs the clips by the doors' openness |
 | `trackBrakes` | `shoes`: a bogie's name and the shoes' meshes under it | hangs them at the type's gap over the rail (12 mm), drops them when the magnets are on |
 
-Also by name: `root` (the car's node), `saloon` (`materials`, and `within`: a box whose parts belong to the saloon;
-left out far away), `numberPlates` (drawn with the fleet number, its digits `fleetDigits` m tall), `routeStyles`
+Also by name: `root` (the car's node), `saloon` (the node the saloon's parts are under; left out far away), `numberPlates` (drawn with the fleet number, its digits `fleetDigits` m tall), `routeStyles`
 (each route plate and its style: `normal`, `inverted`, `mirror`), `infoPlates` (`frontDestination`, `runNumber`,
 `sideBoards`). Transparent materials are the glass. The lighter level for AI trams far away is built at load: the
 doors shut, the collector at the wire, everything but the saloon merged by material. `tools/test_rigged.py` makes a
-sample vehicle with every part and checks each of them moves.
+sample vehicle with every part and checks each of them moves. A rig of interface 1.0 may still give the headlights'
+centres as `beams` (points), the tail lamps as boxes (`tailLamps`: `size`, `at`) and the saloon as `materials` and a box
+`within`: the loader reads both forms (#525).
 
 The hybrid is maintained in the repo: the asset lab it came from is retired (the user, 2026-11-12: the lab "is
 just website for viewing the model and it's animations, it doesn't export anything on its own and most likely won't
 be used anymore"). Its rig is generated by [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) from
 [`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) and the base rig, with its bindings checked
-against the GLB (#471). When the model changes, update the part assignments in the roles file and the
+against the GLB (#471). The model names its own parts: the shoes, couplers, headlights, tail lamps and the
+saloon were named in it by [`tools/edit_t3h_glb.py`](../tools/edit_t3h_glb.py) (#525), so the roles file holds names
+only. When the model changes, update the part assignments in the roles file and the
 base rig as needed, then regenerate `assets/t3h/rig.json` and update its byte count in `vehicle.json`.
 `revision` records the asset revision and `rigRevision` versions the generated rig.
 
