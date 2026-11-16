@@ -70,6 +70,11 @@ export class GroundLookup {
     const t = this._find(x, y);
     return t < 0 || !this.ta[t] ? null : { z: this.hitZ, c: this.areas[this.ta[t]] };
   }
+  // the file's class at (x, y) ('terrain', 'survey', 'bed', 'plot'), its height in this.hitZ; null off the ground
+  kind(x, y) {
+    const t = this._find(x, y);
+    return t < 0 ? null : this.kinds[this.tk[t]];
+  }
   // the height of a track's bed at (x, y) where the ground there is a bed off the survey, else null
   bedOffSurvey(x, y) {
     const t = this._find(x, y);

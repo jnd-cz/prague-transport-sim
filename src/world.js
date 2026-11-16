@@ -291,11 +291,13 @@ function bedRows(t, step, zBed, tilt, otherRail) {
 // A track's bed (#547): out to its width each side (`t.bed`, tools/track_beds.py: the survey's area of its style, the
 // middle of the strip to a paired track), the rails' plane between them and beyond, except where it meets the paired
 // track: there the edge lies at the mean of the two near rails, as the street between them (terrain.js heightAt).
-function addBed(cg, rows, col) {
+// (skip(i): leave the piece between rows i and i + 1 out)
+function addBed(cg, rows, col, skip = null) {
   if (rows.length < 2) return;
   const V = rows.map(([x, y, nx, ny, off, z]) => off.map((o, j) => W(x + nx * o, y + ny * o, z[j])));
   const c = cg._chunk(rows[0][0], rows[0][1]);
   for (let i = 0; i < V.length - 1; i++) {
+    if (skip?.(i)) continue;
     const A = V[i], B = V[i + 1], cc = typeof col === 'function' ? col(i) : col;
     for (let j = 0; j < 3; j++) cg.quad(c, A[j], B[j], B[j + 1], A[j + 1], cc);
   }
@@ -664,7 +666,14 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
   if (!pre) fitFineToMouths(ground.terrain, mouths);
   await mark('fine to tunnel mouths');
-  if (pre) buildGroundFile(group, pre);
+  // (the file's ground is the hill over our rock tunnels and the road tunnels' mouths too: cut where main cut its terrain,
+  // the vault, the rock top and the portals drawn below; only the squares near them are tested)
+  if (pre) {
+    const pad = TUN_W + 3 + cellPad, near = [];
+    for (const [a, b] of rock) for (let s = a - 1; s <= b + 1; s += 4) { const p = route.at(Math.max(0, Math.min(route.length, s))); near.push([p.x - pad, p.y - pad, p.x + pad, p.y + pad]); }
+    for (const m of mouths) { const r = m.D + m.w + 10; near.push([m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]); }
+    buildGroundFile(group, pre, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), near);
+  }
   else buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
@@ -736,6 +745,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (src/heights.js: t.z is the top of rail; the bed lies the track style's offset under it, the
   // rail heads stand just over it, and where the bed is well below, the rails get their sides)
   const keepTrackRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  const fileBed = (row) => ground.lookup?.kind(row[0], row[1]) === 'bed' && Math.abs(ground.lookup.hitZ - (bedZ(row, 0) ?? row[5][1])) < 0.1;
   for (const [trackId, t] of data.tracks.entries()) {
     const bc = keepTrackRanges && t.smooth.length > 1 ? bedCg._chunk(...t.smooth[0]) : null;
     const rc = keepTrackRanges && t.smooth.length > 1 ? railCg._chunk(...t.smooth[0]) : null;
@@ -745,7 +755,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // The bed is the same canted plane as the rails, including its transition ramps.
     const own = ownStyles(t);
     const cols = t.smooth.map(([x, y], i) => STYLE_BED[styleAt(x, y) ?? own[i]] || bed);
-    if (!pre || t.b) addBed(bedCg, beds[trackId].rows, (i) => cols[i]); // (the ground file holds the beds on the ground)
+    // (the ground file holds the beds on the ground: where it has this bed at both rows' centres, at the row's height; a
+    // bed on a structure is not in it, the partition leaves it out (line 37's Krejcarek viaduct, its tracks without `b`))
+    const rows = beds[trackId].rows;
+    if (!pre || t.b) addBed(bedCg, rows, (i) => cols[i]);
+    else addBed(bedCg, rows, (i) => cols[i], (i) => fileBed(rows[i]) && fileBed(rows[i + 1]));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
@@ -1443,7 +1457,8 @@ export function groundStyles(layout) {
   return out;
 }
 // The prebuilt ground's meshes (src/groundFile.js decodeGround), with the materials of the layers they replace
-function buildGroundFile(group, pre) {
+// hole(x, y): a terrain triangle whose centre it holds is not drawn (tested in the meshes that reach a box of `near`)
+function buildGroundFile(group, pre, hole = null, near = []) {
   const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
   const mats = {
     terrain: mat({ wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW, veg: true }),
@@ -1453,12 +1468,30 @@ function buildGroundFile(group, pre) {
     water: mat({}),
     bed: mat({ wet: wetFactor(BED_HEX, '#5f5c56'), snow: STREET_SNOW, slush: true }),
   };
+  let cut = 0;
   for (const m of pre.meshes) {
+    let idx = m.idx;
+    if (hole && near.length && GROUND_GROUPS[m.group] === 'terrain') { // (main cut its terrain only)
+      const P = m.pos;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let v = 0; v < P.length; v += 3) { const x = P[v], y = -P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (near.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) {
+        const keep = new Uint32Array(idx.length);
+        let n = 0;
+        for (let t = 0; t < idx.length; t += 3) {
+          const a = 3 * idx[t], b = 3 * idx[t + 1], c = 3 * idx[t + 2];
+          if (hole((P[a] + P[b] + P[c]) / 3, -(P[a + 2] + P[b + 2] + P[c + 2]) / 3)) { cut++; continue; }
+          keep[n++] = idx[t]; keep[n++] = idx[t + 1]; keep[n++] = idx[t + 2];
+        }
+        idx = keep.slice(0, n);
+      }
+    }
+    if (!idx.length) continue;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(m.nor, 3));
     g.setAttribute('color', new THREE.BufferAttribute(m.col, 3));
-    g.setIndex(new THREE.BufferAttribute(m.idx, 1));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeBoundingSphere();
     const kind = GROUND_GROUPS[m.group], mesh = new THREE.Mesh(g, mats[kind]);
     mesh.matrixAutoUpdate = false;
@@ -1466,6 +1499,7 @@ function buildGroundFile(group, pre) {
     mesh.userData.surfaceKind = kind;
     group.add(mesh);
   }
+  if (cut) console.log(`ground file: ${cut} triangles left out over the tunnels and their mouths`);
 }
 // levelsOnly: the decks and roofs only (the prebuilt ground holds level 0 and its kerbs, #509)
 function buildDtm(group, ground, levelsOnly = false) {

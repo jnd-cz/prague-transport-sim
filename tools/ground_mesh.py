@@ -60,6 +60,7 @@ BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge t
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
+WATER_LEVEL = 0.1  # a water area's level: this quantile of its outline's heights (src/terrain.js DtmSurface's water)
 BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/world.js flushDtm's 12 m)
 LAYERS = ("draw", "area")  # the file's names per triangle, in this order after the triangles (encode)
 SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
@@ -454,6 +455,13 @@ def build(ln, mesh=None, threads=8, log=print):
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)
         zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
+    # (a river or a pond is level, as the page laid it (src/terrain.js DtmSurface): its outline's heights are its banks'
+    # tops, the water at their WATER_LEVEL quantile; triangulated between them it ran in steps along line 17's Vltava)
+    wet = sc == "water"
+    for a in np.unique(sa[wet]).tolist():
+        zr = [q[2] for q in D["areas"][a]["r"] if q[2] is not None]
+        if zr:
+            zs[wet & (sa == a)] = sorted(zr)[int(len(zr) * WATER_LEVEL)]
     zc[m] = zs
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc])
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", "survey")
