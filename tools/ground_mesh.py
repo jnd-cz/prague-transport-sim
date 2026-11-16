@@ -307,7 +307,8 @@ def build(ln, mesh=None, threads=8, log=print):
         lines.append(outline.boundary)
     lines += rails
     # (a raised area beside a track or a plot that reaches a rail: within RAIL_CLEAR of it at the bed's height, its kerb
-    # or wall RAIL_CLEAR past the rail; its edge in the lines)
+    # or wall RAIL_CLEAR past the rail; its edge in the lines. The user, 2026-11-16: "any structure crossing the track
+    # should be at most level with the rail head", data/truth.json groundRules)
     across = crossing_pieces(pieces["survey"], beds)
     band = rail_band(beds, outline, [q["g"] for k, q in enumerate(pieces["survey"]) if q["c"] in RAISED and not across[k]] +
                      [q["g"] for q in pieces["plot"]])
@@ -421,11 +422,11 @@ def build(ln, mesh=None, threads=8, log=print):
     # ground whatever face holds it, at the rail's height, or the bed's under it where another bed lies lower (where two
     # tracks join, the beds' outline, sampled along `p`, and the drawn rows part by mm: 29-95 rail points a line were
     # 2-54 mm off)
-    zr = on_rails(cx, cy, beds, outline)
+    zr, zl = on_rails(cx, cy, beds, outline)
     on_rail = np.isfinite(zr)
     m = np.flatnonzero(((np.repeat(t_in_bed, 3) | on_rail) & ((kind != "raised") | c_across) & (corner_cls != "plot")) | c_band)
     zb = beds.surface_at(cx[m], cy[m], BED_REACH)
-    zb = np.where(on_rail[m], np.fmin(zr[m], np.where(zb < zr[m] - RAIL_TOL, zb, np.inf)), zb)
+    zb = np.where(on_rail[m], np.where(zl[m] < zr[m] - RAIL_TOL, zl[m], zr[m]), zb)
     ok = np.isfinite(zb)
     zc[m[ok]], prio[m[ok]], kind[m[ok]] = zb[ok], 1.0, "bed"
     nan = np.isnan(zc)
@@ -591,28 +592,34 @@ def axes(beds):
 
 
 def on_rails(cx, cy, beds, outline):
-    """Per point on a rail of a track on the ground (within RAIL_NEAR, inside the beds' outline, off bridges): the
-    rail's height there, between its rows as the page draws the bed's edge (the lowest where rails meet); NaN off them.
+    """Per point on a rail of a track on the ground (within RAIL_NEAR, off bridges): (the rail's height there, between
+    its rows as the page draws the bed's edge, the lowest where rails meet; the lowest bed's surface at that rail point),
+    NaN off them. Both are taken at the point's foot on the rail, and the beds' outline there decides "on the ground".
     (The faces' points lie on a 1 mm grid: at a joint of two tracks one 0.5 mm off the rail fell between their quads,
-    and the bed surface carried out from the nearest gave 6 mm over the rail, line 37 s ~4000)"""
+    and the bed surface carried out from the nearest gave 6 mm over the rail, line 37 s ~4000; one 0.1 mm off line 17's
+    rail lay across another bed's edge, 6.4 mm lower; one 0.17 mm off line 37's lay outside the outline)"""
     lines = np.array([shapely.LineString([(x + nx * off[j], y + ny * off[j], z[j]) for x, y, nx, ny, off, z in rows])
                       for k, rows in enumerate(beds.rows) if len(rows) > 1 and not beds.tracks[k].get("b")
                       for j in (1, 2)], dtype=object)
-    out = np.full(len(cx), np.nan)
+    zr, zl = np.full(len(cx), np.nan), np.full(len(cx), np.nan)
     if not len(lines) or outline.is_empty:
-        return out
+        return zr, zl
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     uk, first, inv = np.unique(key, return_index=True, return_inverse=True)
     pts = shapely.points(cx[first], cy[first])
     pi, li = shapely.STRtree(lines).query(pts, predicate="dwithin", distance=RAIL_NEAR)
+    if not len(pi):
+        return zr, zl
+    foot = shapely.line_interpolate_point(lines[li], shapely.line_locate_point(lines[li], pts[pi]))
+    fc = shapely.get_coordinates(foot, include_z=True)
     shapely.prepare(outline)
-    keep = shapely.intersects_xy(outline, cx[first][pi], cy[first][pi])
-    pi, li = pi[keep], li[keep]
-    z = np.full(len(uk), np.nan)
+    keep = shapely.dwithin(outline, shapely.points(fc[:, 0], fc[:, 1]), 1e-6)
+    pi, fc = pi[keep], fc[keep]
+    z, low = np.full(len(uk), np.nan), np.full(len(uk), np.nan)
     if len(pi):
-        on = shapely.line_interpolate_point(lines[li], shapely.line_locate_point(lines[li], pts[pi]))
-        np.fmin.at(z, pi, shapely.get_coordinates(on, include_z=True)[:, 2])
-    return z[inv]
+        np.fmin.at(z, pi, fc[:, 2])
+        np.fmin.at(low, pi, beds.surface_at(fc[:, 0], fc[:, 1]))
+    return z[inv], low[inv]
 
 
 def rail_band(beds, outline, pieces):

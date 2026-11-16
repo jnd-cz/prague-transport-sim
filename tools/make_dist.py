@@ -10,8 +10,9 @@ DST = os.path.join(ROOT, "dist", "tatra-t3-prague.zip")
 # (reports/review: the findings lists for review mode, ?review=reports/review/track-sources-17.json; reviews.html:
 # the directory of them, #288)
 INCLUDE = ["index.html", "app.webmanifest", "reviews.html", "README.md", "README.en.md", "src", "assets", "data", "reports/review"]
-# (built files only later build steps read, not the page: the street surfaces for the ground's partition and weld, #512)
-BUILD_ONLY = ["data/line*.streets.*"]
+# (built files only later build steps read, not the page: the street surfaces for the ground's partition and weld, #512;
+# the ground, 7.6-30 MB brotli a line, until the page reads it, #509)
+BUILD_ONLY = ["data/line*.streets.*", "data/line*.ground.*"]
 
 
 def files(root=ROOT):

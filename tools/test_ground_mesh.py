@@ -100,10 +100,19 @@ class Rails(unittest.TestCase):
         beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {}), ([[10, 0], [10, 100]], {"b": 1})]))
         x = np.array([-0.72, 0.72, 0.7205, 0.0, -0.72, 9.28])
         y = np.array([50.0, 50.0, 30.0, 50.0, 95.0, 50.0])
-        got = gm.on_rails(x, y, beds, shapely.box(-3, 0, 3, 90))
+        got, low = gm.on_rails(x, y, beds, shapely.box(-3, 0, 3, 90))
         # (on the left and right rails; 0.5 mm off; between the rails; past the outline; on a bridge's rail)
         self.assertEqual(np.isfinite(got).tolist(), [True, True, True, False, False, False])
         self.assertTrue(np.allclose(got[:3], 200.0 - bed_surface.BED_BELOW))
+        self.assertTrue(np.allclose(low[:3], 200.0 - bed_surface.BED_BELOW))
+
+    def test_a_point_off_the_rail_is_judged_at_the_rail(self):
+        # (the outline's edge on the right rail: a point 0.5 mm past it lies outside, its foot on the rail on the edge;
+        # it counts, at the rail's height)
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {})]))
+        got, _ = gm.on_rails(np.array([0.7205]), np.array([50.0]), beds, shapely.box(-3, 0, 0.72, 90))
+        self.assertTrue(np.allclose(got, 200.0 - bed_surface.BED_BELOW))
 
     def test_the_band_takes_what_reaches_a_rail(self):
         import bed_surface
