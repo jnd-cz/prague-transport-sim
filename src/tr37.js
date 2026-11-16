@@ -238,6 +238,13 @@ export class TR37 {
     const low = loopCurrent(v, C.pMin, 1), high = loopCurrent(v, 99, loopField(99, false));
     return braking(Math.max(high, Math.min(low, C.brakeCurrent[step - 1]))) * this.cars;
   }
+  // the lowest brake step that holds the accelerator at 30 or under at this speed, where the switch button works (ZR9): the relay turns
+  // it down for more current, so a step asking at least the current the loops make at 30 holds it there or under. 6 where none does
+  buttonStep(v) {
+    const I = loopCurrent(v, 30, loopField(30, false));
+    for (let k = 1; k <= 5; k++) if (this._setting(C.brakeCurrent, k) >= I) return k;
+    return 6;
+  }
   // a setting on coil RC's 24 V (T3SU-26 p. 4)
   _setting(table, step) { return table[step - 1] + (26 - this.aux.U) * C.rcShift[step - 1]; }
   // the pilot motor's turn in dt for current I against setting: dir +1 where a low current wants a higher position (drive),
