@@ -26,7 +26,7 @@ import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.
 import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
-import { trackStyles, loadHeightFacts } from './heights.js';
+import { trackStyles, loadHeightFacts, BED_BELOW, ROAD_BELOW } from './heights.js';
 import { speedFacts } from './speedRules.js';
 import { loadFigureFont, signFacts } from './speedSigns.js';
 // the signs' fallback face (D-DIN) loads while the world does; the game waits for it before it draws them (#364)
@@ -247,19 +247,22 @@ function uploadWorld() {
   for (const o of culled) o.frustumCulled = true;
 }
 
-// The prebuilt ground's lookup answers every height read of the ground (#509): ground.at (but a bridge's deck on our
-// route), ground.surface (where cars and walkers stand: no lift, the file's survey is not drawn over anything) and
-// terrain.height; the layers' answers where the file has no ground. (The survey's ground level asks it too:
-// DtmSurface's lookup.)
+// The prebuilt ground's lookup answers the ground's height reads (#509): the survey's (DtmSurface's lookup) and the
+// terrain's, so ground.at is the drawn ground, but at a track: next to our tracks it keeps the track's surface level that
+// the OSM road ribbons meet the rail heads at (src/heights.js ROAD_BELOW), and at another track's bed off the survey it
+// is the same, from the file's bed (BED_BELOW under that level): main lowered the terrain under every track for this,
+// and the file's bed under a ribbon put it 0.11 m over the rail heads (line 37: 31 -> 55 places). Cars and walkers
+// (ground.surface) stand on the survey as drawn (the file's is not lifted: no DTM_LIFT), else on an OSM ribbon's top as
+// before. The layers' answers where the file has no ground.
 function useGroundLookup(ground, lk) {
-  const at = ground.at.bind(ground), surface = ground.surface.bind(ground), th = ground.terrain.height.bind(ground.terrain);
+  const at = ground.at.bind(ground), th = ground.terrain.height.bind(ground.terrain);
   ground.lookup = lk;
-  ground.at = (x, y, deck = false) => {
-    if (deck) { const n = ground.route.nearest(x, y); if (n && n.d < 22 && ground.profile.onBridge(n.s)) return at(x, y, deck); }
-    return lk.height(x, y) ?? at(x, y, deck);
-  };
-  ground.surface = (x, y) => lk.height(x, y) ?? surface(x, y);
   ground.terrain.height = (x, y) => lk.height(x, y) ?? th(x, y);
+  ground.at = (x, y, deck = false) => {
+    const zb = deck ? null : lk.bedOffSurvey(x, y);
+    return zb !== null ? zb + BED_BELOW - ROAD_BELOW : at(x, y, deck);
+  };
+  ground.surface = (x, y) => { const t = ground.dtm?.surfaceAt(x, y); return t ? t.z : ground.at(x, y) + 0.12; };
 }
 
 // The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the

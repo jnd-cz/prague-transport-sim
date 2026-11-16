@@ -3,9 +3,10 @@
 // the loading screen (the tile container's decision: docs/decisions/2026-11-06-tile-container.md).
 //
 // In: { buffer, layout, styles, chunk, cell } — `styles[class][draw name]` = [group, r, g, b] (src/groundFile.js).
-// Out, two messages: first { lookup: { x0, y0, cell, nx, ny, start, tris, vx, vy, vz, tv, ta, areas, cover } }, the
-// height lookup: the flat triangles (the steps' walls left out) in a grid of `cell` m, each with the survey's class under
-// it (ta: an index into `areas`, 0 for none) and the survey's 10 m cells (cover, as src/terrain.js TriIndex keys them);
+// Out, two messages: first { lookup: { x0, y0, cell, nx, ny, start, tris, vx, vy, vz, tv, tk, kinds, ta, areas, cover } },
+// the height lookup: the flat triangles (the steps' walls left out) in a grid of `cell` m, each with its class (tk: an
+// index into `kinds`, the file's classes) and the survey's class under it (ta: an index into `areas`, 0 for none), and
+// the survey's 10 m cells (cover, as src/terrain.js TriIndex keys them);
 // then { meshes: [{ group, pos, nor, col, idx }], times }: per CHUNK m square and material group an indexed geometry
 // (positions as three.js takes them: x, z, -y), each draw class with its own vertices so colours do not blend across a
 // class's edge, the normals averaged over its triangles.
@@ -144,9 +145,10 @@ function lookup(g, cell) {
   const nx = Math.ceil((x1 - x0) / cell) + 1, ny = Math.ceil((y1 - y0) / cell) + 1;
   let m = 0;
   for (const [name, { tris }] of Object.entries(classes)) if (name !== 'wall') m += tris.length;
-  const tv = new Uint32Array(m), ta = new Uint8Array(m / 3), cover = new Set();
+  const tv = new Uint32Array(m), ta = new Uint8Array(m / 3), tk = new Uint8Array(m / 3), kinds = Object.keys(classes), cover = new Set();
   m = 0;
   for (const [name, { tris, area }] of Object.entries(classes)) {
+    const kind = kinds.indexOf(name);
     if (name === 'wall') continue;
     for (let i = 0; i < tris.length; i += 3) {
       const a = tris[i], b = tris[i + 1], c = tris[i + 2];
@@ -157,7 +159,7 @@ function lookup(g, cell) {
         const j0 = Math.floor(Math.min(vy[a], vy[b], vy[c]) / COVER_CELL), j1 = Math.floor(Math.max(vy[a], vy[b], vy[c]) / COVER_CELL);
         for (let ix = i0; ix <= i1; ix++) for (let iy = j0; iy <= j1; iy++) cover.add(ix * 100003 + iy);
       }
-      ta[m / 3] = id;
+      ta[m / 3] = id; tk[m / 3] = kind;
       tv[m++] = a; tv[m++] = b; tv[m++] = c;
     }
   }
@@ -178,7 +180,7 @@ function lookup(g, cell) {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) tris[fill[j * nx + i]++] = t / 3;
   }
   // (heights kept relative to the lowest vertex: a 32-bit float holds them to well under a mm)
-  return { x0, y0, cell, nx, ny, start, tris, tv: tv.slice(0, m), ta: ta.slice(0, m / 3), areas: g.areas, cover: Float64Array.from(cover),
+  return { x0, y0, cell, nx, ny, start, tris, tv: tv.slice(0, m), ta: ta.slice(0, m / 3), areas: g.areas, tk: tk.slice(0, m / 3), kinds, cover: Float64Array.from(cover),
     vx: Float32Array.from(vx, (v) => v - x0), vy: Float32Array.from(vy, (v) => v - y0), vz: Float32Array.from(vz) };
 }
 
@@ -189,7 +191,7 @@ onmessage = ({ data }) => {
   const t1 = performance.now();
   const lk = lookup(g, data.cell);
   const t2 = performance.now();
-  postMessage({ lookup: lk }, [lk.start.buffer, lk.tris.buffer, lk.tv.buffer, lk.ta.buffer, lk.cover.buffer, lk.vx.buffer, lk.vy.buffer, lk.vz.buffer]);
+  postMessage({ lookup: lk }, [lk.start.buffer, lk.tris.buffer, lk.tv.buffer, lk.ta.buffer, lk.tk.buffer, lk.cover.buffer, lk.vx.buffer, lk.vy.buffer, lk.vz.buffer]);
   const ms = meshes(g, data.layout, data.styles, data.chunk);
   const t3 = performance.now();
   const transfer = [];

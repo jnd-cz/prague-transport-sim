@@ -70,6 +70,11 @@ export class GroundLookup {
     const t = this._find(x, y);
     return t < 0 || !this.ta[t] ? null : { z: this.hitZ, c: this.areas[this.ta[t]] };
   }
+  // the height of a track's bed at (x, y) where the ground there is a bed off the survey, else null
+  bedOffSurvey(x, y) {
+    const t = this._find(x, y);
+    return t >= 0 && !this.ta[t] && this.kinds[this.tk[t]] === 'bed' ? this.hitZ : null;
+  }
   // each survey triangle with a corner within r of (x, y), once: fn(class, [x, y, z] × 3) (review's class layer)
   surveyNear(x, y, r, fn) {
     const { vx, vy, vz, tv, ta, tris, start } = this, px = x - this.x0, py = y - this.y0, r2 = r * r, seen = new Set();

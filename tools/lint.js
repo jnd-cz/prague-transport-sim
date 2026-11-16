@@ -406,7 +406,8 @@ function groundHidden(g) {
 function railSupport(g, world) {
   const r = g.route, pr = r.ground.profile;
   const targets = [];
-  world.traverse((m) => { if (m.isMesh && (m.userData.building || ['terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
+  // ('ground': the prebuilt ground, its beds on the ground included, #509)
+  world.traverse((m) => { if (m.isMesh && (m.userData.building || ['ground', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
   const rays = new DownRays(targets);
   let n = 0;
   const bad = new Map();
@@ -487,7 +488,7 @@ export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
     if (!m.isMesh) return;
     const s = m.userData.surface;
     if (s === 'rail') rails.push(m);
-    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(s)) surfaces.push(m);
+    else if (['bed', 'ground', 'terrain', 'dtm', 'road', 'support'].includes(s)) surfaces.push(m);
   });
   const t0 = performance.now();
   // (one index of the surfaces, the beds left out by the hit where the ground is asked: two copies of line 17's survey
@@ -522,7 +523,9 @@ export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
         const k = Math.min((t.bed?.l.length ?? 1) - 1, Math.round(acc / step)), w = t.bed ? t.bed[side > 0 ? 'l' : 'r'][k] / 100 : 1.35;
         if (t.bed && t.bed.meet[k] & (side > 0 ? 1 : 2)) continue;
         const at = (o) => [L[i][0] + nx * side * o, L[i][1] + ny * side * o];
-        const e = top(surfaceRays, ...at(w - 0.1), z0, (h) => h.object.userData.surface !== 'bed' || trackOf(h) !== id);
+        // (with the ground file the bed is the ground's: its edge is the ground there, #509)
+        const e = top(surfaceRays, ...at(w - 0.1), z0, (h) => h.object.userData.surface !== 'bed' || trackOf(h) !== id) ??
+          (g.route.ground.lookup ? top(surfaceRays, ...at(w - 0.1), z0, notBed) : null);
         const near = top(surfaceRays, ...at(w + 1), z0, notBed), far = top(surfaceRays, ...at(w + 4), z0, notBed);
         if (!e || !near || !far) continue;
         sides++;
@@ -552,7 +555,7 @@ export function cantedRailVisibility(g, world) {
   world.traverse((m) => {
     if (!m.isMesh) return;
     if (m.userData.surface === 'rail') rails.push(m);
-    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
+    else if (['bed', 'ground', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
   });
   const railRays = new DownRays(rails), surfaceRays = new DownRays(surfaces);
   // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
@@ -580,11 +583,13 @@ export function cantedRailVisibility(g, world) {
       if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
       samples++;
       const hits = surfaceRays.cast(...o, 4).filter((h) => h.point.y <= head.point.y + 0.4);
-      const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId);
+      // (with the ground file a bed on the ground is the ground's: the first ground under the head, #509)
+      const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId) ??
+        (r.ground.lookup ? hits.find((h) => h.object.userData.surface === 'ground') : undefined);
       if (!ownBed) missingBed++;
       else covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
       for (const [map, hit] of [[bad, ownBed],
-                                [other, hits.find((h) => h.object.userData.surface !== 'bed' || owner(h) !== trackId)]]) {
+                                [other, hits.find((h) => h !== ownBed && (h.object.userData.surface !== 'bed' || owner(h) !== trackId))]]) {
         const delta = hit ? hit.point.y - head.point.y : -Infinity;
         if (delta > 0.001 && !(map.get(curve)?.mag >= delta))
           map.set(curve, { s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: delta,
@@ -1089,7 +1094,7 @@ export function groundUnderDecks(g, world) {
   const r = g.route, pr = r.ground?.profile;
   if (!pr) return check('deck-surfaces', 0, []);
   const meshes = [];
-  world.traverse((m) => { if (m.isMesh && ['terrain', 'dtm', 'road'].includes(m.userData.surface)) meshes.push(m); });
+  world.traverse((m) => { if (m.isMesh && ['ground', 'terrain', 'dtm', 'road'].includes(m.userData.surface)) meshes.push(m); });
   const rays = new DownRays(meshes), levelOf = (h) => (h.object.userData.surface === 'dtm' ? surveyOf(h)?.[1] ?? 0 : 0);
   const bad = new Map(), spans = [], tris = { ground: new Set(), deck: new Set() };
   let n = 0;

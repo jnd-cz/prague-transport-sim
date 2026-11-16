@@ -70,6 +70,19 @@ class File(unittest.TestCase):
         self.assertEqual(sorted(names2), ["bed", "survey"])
 
 
+class Lidar(unittest.TestCase):
+    def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
+        # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")
+        x, y, z = np.array([0., 10, 10, 0]), np.array([0., 0, 10, 10]), np.array([100., 110, 120, 110])  # z = 100 + x + y
+        T = np.array([[0, 1, 2], [0, 2, 3]])
+        got = gm.city_at({"x": x, "y": y, "z": z, "T": T, "under": np.array([0, 1])}, np.array([5., 2, 20]), np.array([2., 5, 20]))
+        self.assertAlmostEqual(got[0], 107)
+        self.assertAlmostEqual(got[1], 107)
+        self.assertTrue(np.isnan(got[2]))  # (off the mesh)
+        got = gm.city_at({"x": x, "y": y, "z": z, "T": T, "under": np.array([0])}, np.array([2.]), np.array([5.]))
+        self.assertTrue(np.isnan(got[0]))  # (a triangle no class lies over is not asked)
+
+
 class Steps(unittest.TestCase):
     def square_with_a_step(self):
         # two triangles meeting along x = 1000, the right one 0.1 m higher: its own vertices on the edge

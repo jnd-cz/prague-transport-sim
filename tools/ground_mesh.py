@@ -41,6 +41,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import shapely
+import shapely.ops
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -59,6 +60,7 @@ BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge t
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
+BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/world.js flushDtm's 12 m)
 LAYERS = ("draw", "area")  # the file's names per triangle, in this order after the triangles (encode)
 SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
 RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
@@ -108,6 +110,21 @@ class SurveySurface:
                 d = (mine[None, :, 0] - x[miss, None]) ** 2 + (mine[None, :, 1] - y[miss, None]) ** 2
                 out[miss] = mine[d.argmin(1), 2]
         return out
+
+
+def city_at(G, px, py):
+    """The city mesh's height at points under the classes above the terrain (ground_partition's "under" triangles):
+    its triangle's plane, NaN where none holds a point."""
+    out = np.full(len(px), np.nan)
+    U = np.asarray(G["under"], int)
+    if not len(px) or not len(U):
+        return out
+    x, y, z, T = G["x"], G["y"], G["z"], G["T"][U]
+    tri = np.stack([np.column_stack([x[T[:, k]], y[T[:, k]], z[T[:, k]]]) for k in range(3)], 1)
+    tree = shapely.STRtree(shapely.polygons(tri[:, [0, 1, 2, 0], :2]))
+    pi, ti = tree.query(shapely.points(px, py), predicate="intersects")
+    out[pi] = plane(tri[ti], px[pi], py[pi])
+    return out
 
 
 def plane(tri, x, y):
@@ -409,10 +426,30 @@ def build(ln, mesh=None, threads=8, log=print):
     sc = np.array([q["c"] for q in sv])
     sa = np.array([q["area"] for q in sv])
     zs = np.full(len(m), np.nan)
+    # (on a bridge, within BRIDGE_NEAR of the route's span or of a bridge's track, the street below keeps the survey's own
+    # level, as the page's flushDtm left it (profile.onBridge: the route's spans, src/terrain.js Profile.bridges): the
+    # street surface follows the tracks onto the deck, and a level-0 tram area running up a ramp onto a viaduct stood at
+    # its deck, line 37 s 3464-3484, area 2091; that viaduct's tracks carry no `b`)
+    route = shapely.LineString([p[:2] for p in L["path"]])
+    spans = [shapely.ops.substring(route, a, b) for a, b in L.get("spans") or L.get("bridges") or []]
+    spans += [shapely.LineString([p[:2] for p in t["p"]]) for t in L.get("tracks") or [] if t.get("b") and len(t.get("p") or []) > 1]
+    on_span = np.zeros(len(m), bool)
+    if spans:
+        deck = shapely.union_all(shapely.buffer(np.asarray(spans, dtype=object), BRIDGE_NEAR, cap_style="flat"))
+        shapely.prepare(deck)
+        on_span = shapely.contains_xy(deck, cx[m], cy[m])
     for kd, cls in (("road", STREETS_ROAD), ("sidewalk", STREETS_WALK)):
-        mm = np.isin(sc, list(cls))
+        mm = np.isin(sc, list(cls)) & ~on_span
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
+    # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
+    # only, and the page laid it on the lidar inside (src/terrain.js DtmSurface, #444): here the city mesh's, its outline
+    # too, so it meets the terrain beside it. Its outline on a slope stood up to 5.5 m under the terrain, a wall, and a
+    # hillside of them terraced: line 37 s 3472, area 2705)
+    need = np.isnan(zs)
+    on_lidar = need & np.array([bool(D["areas"][a].get("g")) for a in sa.tolist()], bool)
+    if on_lidar.any():
+        zs[on_lidar] = city_at(G, cx[m][on_lidar], cy[m][on_lidar])
     need = np.isnan(zs)
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)

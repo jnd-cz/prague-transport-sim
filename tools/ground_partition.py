@@ -278,8 +278,9 @@ def mesh_in_box(mesh_dir, box):
 def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
     """The terrain triangles against the cover (the classes above) and the box, tile by tile side by side (shapely's
     vectorised calls release the GIL): counts and areas, and the triangles inside `window` (a box) for the pictures.
-    geometry: also "kept" (the indexes of the triangles kept whole) and "remains" ([(the cut triangle's index, a
-    polygon of what is left of it)]), for the mesh (tools/ground_mesh.py)."""
+    geometry: also "kept" (the indexes of the triangles kept whole), "remains" ([(the cut triangle's index, a polygon of
+    what is left of it)]) and "under" (the indexes of those the cover reaches: dropped or cut), for the mesh
+    (tools/ground_mesh.py)."""
     tris = shapely.polygons(np.stack([np.column_stack([x[T[:, k]], y[T[:, k]]]) for k in (0, 1, 2, 0)], 1))
     cx, cy = x[T].mean(1), y[T].mean(1)
     tile = np.floor(cx / TILE).astype(np.int64) * 1000003 + np.floor(cy / TILE).astype(np.int64)
@@ -308,7 +309,7 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
         cut = (hit & ~within) | (~hit & ~inbox)
         r = {"triangles": len(P), "dropped": int(within.sum()), "cut": int(cut.sum()), "kept": int(kept.sum()),
              "kept_area": float(shapely.area(P[kept]).sum()), "new": 0, "new_area": 0.0, "lost_area": 0.0, "win": [],
-             "kept_ids": ids[kept] if geometry else None, "remains": []}
+             "kept_ids": ids[kept] if geometry else None, "under_ids": ids[hit] if geometry else None, "remains": []}
         if cut.any():
             rest = shapely.intersection(shapely.difference(P[cut], C) if not C.is_empty else P[cut], Bx)
             parts, pi = shapely.get_parts(rest, return_index=True)
@@ -333,6 +334,7 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
     tot["win"] = [t for r in res for t in r["win"]]
     if geometry:
         tot["kept_ids"] = np.concatenate([r["kept_ids"] for r in res]) if res else np.zeros(0, int)
+        tot["under_ids"] = np.concatenate([r["under_ids"] for r in res]) if res else np.zeros(0, int)
         tot["remains"] = [q for r in res for q in r["remains"]]
     return tot
 
@@ -416,9 +418,9 @@ def partition(ln, mesh=None, threads=8, windows=(), geometry=False):
     pieces = {"survey": survey, "street": [], "bed": beds, "plot": plots, "terrain": terrain}
     rep["rail places"] = rail_places(ln, L, pieces)
     if geometry:  # (for the mesh, tools/ground_mesh.py: the box, the beds' outline on the ground, the city mesh's
-        # triangles in the box, those kept whole and the remains of those cut)
+        # triangles in the box, those kept whole, the remains of those cut and those under the classes above)
         pieces["_"] = {"L": L, "D": D, "box": box, "beds outline": B0, "x": x, "y": y, "z": z, "T": T,
-                       "kept": cut["kept_ids"], "remains": cut["remains"]}
+                       "kept": cut["kept_ids"], "remains": cut["remains"], "under": cut["under_ids"]}
     return pieces, rep, cut["win"]
 
 

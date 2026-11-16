@@ -539,7 +539,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (the prebuilt ground, src/groundFile.js, #509: its survey, terrain and beds already meet the tracks; the layers
   // below are built only without it, ?oldground)
   const pre = ground.mesh || null;
-  if (ground.dtm && !pre) flushDtm(ground);
+  if (ground.dtm) flushDtm(ground, !!pre);
   // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
   // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
   for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights.step) : t.smooth.map(() => 0);
@@ -1149,11 +1149,9 @@ const DTM_COLORS = {
 };
 // Carriageway and tram areas next to the tracks are laid flush with the track bed (ground.flush):
 // applied once to the vertices themselves, so the height lookup and the drawing agree.
-function flushDtm(ground) {
+// (flushDtm's ground level; `done`: the vertices moved, which the decks leave alone)
+function flushStreets(ground, done) {
   const dtm = ground.dtm;
-  if (dtm.flushed) return; // kept across weather rebuilds
-  dtm.flushed = true;
-  const done = new Set();
   // The ground-level street areas are laid to the track profile: the carriageway's offset
   // from the track's surface level (top of rail less its style's offset), measured on the unshifted survey along the route
   // (every 2 m) and across it (every 1 m, gaps filled from the nearest carriageway), is applied
@@ -1285,6 +1283,15 @@ function flushDtm(ground) {
       p[2] = ground.flush(p[0], p[1], p[2]);
     }
   }
+}
+// with the ground file (#509) the streets are its own: the decks of our bridges alone
+function flushDtm(ground, decksOnly = false) {
+  const dtm = ground.dtm;
+  if (dtm.flushed) return; // kept across weather rebuilds
+  dtm.flushed = true;
+  const done = new Set();
+  const { route, profile } = ground;
+  if (!decksOnly) flushStreets(ground, done);
   // The surveyed decks of our own bridges carry the tracks: laid to the track profile the same way
   // (each area's offset at the route, full within 8 m, fading out by 15 m; crossfall kept), so the
   // cars beside the tram drive on the deck at the rails' level. Measured first, then moved. (One offset
