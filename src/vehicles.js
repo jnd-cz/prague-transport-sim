@@ -69,6 +69,12 @@ export function soundProblems(p, v) {
   const out = [];
   if (!v) return [`its vehicle ${liveryVehicle(p)} is not loaded`];
   const files = new Set((p.files || []).map((f) => f.path)), sound = /\.(wav|mp3)$/i;
+  if (p.lineContactorRelease != null) {
+    const { minGain = 0.25, maxGain = 1, refCurrent = 480 } = p.lineContactorRelease;
+    if (typeof p.lineContactorRelease !== 'object' || Array.isArray(p.lineContactorRelease) ||
+        ![minGain, maxGain, refCurrent].every(Number.isFinite) || !(minGain > 0 && minGain <= maxGain && maxGain <= 1 && refCurrent > 0))
+      out.push('lineContactorRelease: wants 0 < minGain <= maxGain <= 1 and refCurrent > 0 A');
+  }
   const file = (what, f) => { if (!files.has(f)) out.push(`${what}: ${f} is not among its files`); else if (!sound.test(f)) out.push(`${what}: ${f} is not WAV or MP3`); };
   for (const [e, f] of Object.entries(p.events || {})) {
     if (!(e in EVENTS)) out.push(`event ${e}: the game raises no such event`);
