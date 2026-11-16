@@ -508,6 +508,14 @@ Sections:
 - **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
   (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
   measure is circular). It does not tell ballast from grass.
+- **The ground partition on the five lines** (`tools/ground_partition.py`, #507, 2026-11-16): the survey covers 6-14 %
+  of a line's box and holds almost every bed: the bed class (outside the survey) is 0.013-0.023 km² a line, 20-46
+  pieces. A bed sample is on a structure where its ground lies over 2.5 m from IPR's: of the samples along the route,
+  the test agrees with the route's spans and tunnels on 1,255 of 1,582 there and calls 22 elsewhere structures; the
+  ones it keeps on spans are span ends and low decks. OSM's footprints lie up to a metre off the survey's outlines of
+  the same walls: 3,400-11,400 strips under 1 m wide a line (6,300-16,100 m²) lay between them, joined to the plots.
+  The city mesh's triangles in a box dropped under the classes above: 11-29 % (line 22 11 %, 17 13 %, 23 18 %, 9 24 %,
+  37 29 %); the cut ones' remains roughly double their count.
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
@@ -602,6 +610,11 @@ Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply
 footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
   are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
   river bridge and its viaduct (14.4624–14.4660 E).
+- **A building's ground height** (#507, `ground_partition.py --calibrate`): the survey's 3D building outlines (ZPS KR
+  `Hranice_budovy`) against IPR's ground 0.5 m outside the OSM footprint, 17,240 buildings on the five lines: IPR's
+  median along the footprint is off by 0.29 m (median |error|, p90 1.42 m, mean +0.08 m); its 10th percentile 0.49 /
+  2.13 m, its lowest 0.67 / 2.48 m (both biased low: a cellar ramp, a yard). The p90 is the buildings on slopes,
+  where one flat height cannot match the whole outline.
 
 ## The T3 and the network it runs on
 

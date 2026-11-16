@@ -22,10 +22,10 @@ it, so nothing lies under anything else, and the five cover the box once:
   them dropped, one across their edges cut and its remains triangulated by shapely's constrained Delaunay
   (tools/bench/ground_cut.py's method, the decision's section 2), the rest kept.
 
-Writes data/lineN.partition.json (read by the next step, #508; not by the game, not deployed: make_dist BUILD_ONLY):
-the box, each class's pieces with their source IDs (the survey's area index and class, the bed's track indexes, the
-plot's building index and height), the terrain's counts and the mesh's key. reports/ground-partition/: lineN.json
-(the report), pictures at the places of PLACES.
+Writes reports/ground-partition/: lineN.partition.json, the pieces for review (the box, each class's pieces with their
+source IDs: the survey's area index and class, the bed's track indexes, the plot's building index and height; the
+terrain's counts and the mesh's key), lineN.json (the report) and pictures at the places of PLACES. The next step
+(#508) calls partition() itself: it needs the geometry and the city mesh, which only a building machine holds.
 """
 import json
 import os
@@ -47,6 +47,8 @@ PLOT_RULE = "median"  # the plot height (--calibrate on the five lines, 17,240 b
 # the 10th percentile 0.49 / 2.13, the lowest 0.67 / 2.48)
 RULES = {"min": lambda z: float(np.min(z)), "p10": lambda z: float(np.percentile(z, 10)),
          "p25": lambda z: float(np.percentile(z, 25)), "median": lambda z: float(np.median(z))}
+STRIP = 1.0  # m: terrain narrower than this between a plot and the classes above joins the plot (thin_strips)
+GAP = 0.01  # m: gaps between beds narrower than twice this are closed (bed_pieces)
 SLIVER = 1e-4  # m²: pieces smaller than this are left out (float noise of the cuts)
 TILE = 512.0  # m: the terrain is cut tile by tile, side by side
 GAUGE = 0.72  # m: a rail from the axis (track_beds.GAUGE)
@@ -166,6 +168,9 @@ def bed_pieces(L, box, ipr, F, log=None):
         log.update({"samples on the ground": n_ground, "samples on structures, left out": n_struct,
                     "along the route (within 3 m): the test against the route's spans and tunnels": confusion})
     union = shapely.union_all([o for _, o in outs]) if outs else shapely.Polygon()
+    # (two tracks' beds that meet, paired or at a switch, leave gaps of a few mm between them: line 17 had 2,248, median
+    # 3.5 mm wide; closed here, a gap under 2 * GAP wide)
+    union = polygonal(union.buffer(GAP, join_style="mitre").buffer(-GAP, join_style="mitre").intersection(box))
     return union, outs
 
 
@@ -185,7 +190,9 @@ def plot_height(g, ipr, F, rule=PLOT_RULE):
 
 
 def plot_pieces(L, box, above, ipr, F):
-    """OSM's footprints inside the box without the classes above and without an earlier footprint: [{building, z, g}].
+    """OSM's footprints inside the box without the classes above (`above`: their pieces, each small: the union of the
+    survey is one polygon of a million vertices, and cutting by it took 10 min on line 9) and without an earlier
+    footprint: [{building, z, g}].
     The height is measured on the whole footprint."""
     out = []
     for i, b in enumerate(L.get("buildings") or []):
@@ -197,8 +204,8 @@ def plot_pieces(L, box, above, ipr, F):
         g = polygonal(g0.intersection(box))
         out.append({"building": i, "g": g, "g0": g0})
     tree = shapely.STRtree([q["g"] for q in out])
-    tree_above = shapely.STRtree(shapely.get_parts(above)) if not above.is_empty else None
-    above_parts = shapely.get_parts(above) if not above.is_empty else []
+    above_parts = [q for g in above for q in shapely.get_parts(g)]
+    tree_above = shapely.STRtree(above_parts) if above_parts else None
     res = []
     for k, q in enumerate(out):
         g = q["g"]
@@ -211,6 +218,28 @@ def plot_pieces(L, box, above, ipr, F):
         if g.area > SLIVER:
             res.append({"building": q["building"], "z": plot_height(q["g0"], ipr, F), "g": g})
     return res
+
+
+def thin_strips(terrain, plots, width=STRIP):
+    """Terrain narrower than `width` that touches a plot joins that plot (in place): OSM's footprints lie up to a metre
+    off the survey's outlines of the same walls, and the strip between them is under the wall. {pieces, area}."""
+    thin = polygonal(terrain.difference(terrain.buffer(-width / 2).buffer(width / 2, join_style="mitre")))
+    parts = [g for g in shapely.get_parts(thin) if g.geom_type == "Polygon" and g.area > SLIVER]
+    if not parts or not plots:
+        return {"pieces": 0, "area": 0.0}
+    tree = shapely.STRtree([q["g"] for q in plots])
+    joined = {}
+    n, a = 0, 0.0
+    for g in parts:
+        near = tree.query(g, predicate="dwithin", distance=1e-3).tolist()
+        if not near:
+            continue
+        k = max(near, key=lambda j: g.buffer(1e-3).intersection(plots[j]["g"].boundary).length)
+        joined.setdefault(k, []).append(g)
+        n, a = n + 1, a + g.area
+    for k, gs in joined.items():
+        plots[k]["g"] = polygonal(shapely.union_all([plots[k]["g"]] + gs))
+    return {"pieces": n, "area": a}
 
 
 # ---------------------------------------------------------------- the terrain
@@ -288,20 +317,37 @@ def partition(ln, mesh=None, threads=8, windows=()):
     F, ipr = Frame(), IprDtm()
     box = line_box(L)
     rep = {"line": ln, "box": [round(v, 2) for v in box.bounds], "box_km2": round(box.area / 1e6, 4)}
+    tm, last = {}, [time.time()]
+
+    def lap(k):
+        tm[k] = round(time.time() - last[0], 1)
+        last[0] = time.time()
     survey = survey_pieces(D, box)
     S = shapely.union_all([q["g"] for q in survey]) if survey else shapely.Polygon()
+    lap("survey")
     blog = {}
     B0, outs = bed_pieces(L, box, ipr, F, blog)
     B = polygonal(B0.difference(S))
+    lap("beds")
     beds = []
     for g in shapely.get_parts(B):
         if g.area > SLIVER:
             beds.append({"tracks": [i for i, o in outs if o.intersects(g)], "g": g})
-    above = shapely.union_all([S, B])
-    plots = plot_pieces(L, box, above, ipr, F)
+    plots = plot_pieces(L, box, [q["g"] for q in survey] + [q["g"] for q in beds], ipr, F)
     P = shapely.union_all([q["g"] for q in plots]) if plots else shapely.Polygon()
+    lap("plots")
+    terrain = polygonal(box.difference(shapely.union_all([S, B, P])))
+    lap("terrain area")
+    strips = thin_strips(terrain, plots)
+    lap("strips")
+    if strips["area"]:
+        P = shapely.union_all([q["g"] for q in plots])
     cover = shapely.union_all([S, B, P])
     terrain = polygonal(box.difference(cover))
+    rep["strips joined to plots"] = {"pieces": strips["pieces"], "m2": round(strips["area"], 1)}
+    tp = [g for g in shapely.get_parts(terrain) if g.geom_type == "Polygon"]
+    thin = [g for g in tp if 2 * g.area / max(g.length, 1e-9) < 2 * GAP]
+    rep["terrain pieces under 2 cm wide"] = {"pieces": len(thin), "m2": round(sum(g.area for g in thin), 2)}
     t_classes = time.time() - t0
     if mesh is None:
         import city_terrain
@@ -309,6 +355,11 @@ def partition(ln, mesh=None, threads=8, windows=()):
     else:
         key = os.path.basename(os.path.normpath(mesh))
     x, y, _, T = mesh_in_box(mesh, box)
+    windows = list(windows)
+    if beds:  # (a picture of the largest bed piece: the survey holds most of the beds, PLACES show none)
+        c = max(beds, key=lambda q: q["g"].area)["g"].representative_point()
+        rep["bed window"] = [c.x - WINDOW / 2, c.y - WINDOW / 2, c.x + WINDOW / 2, c.y + WINDOW / 2]
+        windows.append(rep["bed window"])
     win = shapely.union_all([shapely.box(*w) for w in windows]) if windows else None
     t1 = time.time()
     cut = cut_terrain(x, y, T, cover, box, threads, win)
@@ -329,7 +380,7 @@ def partition(ln, mesh=None, threads=8, windows=()):
                     "after": cut["kept"] + cut["new"],
                     "mesh area over the terrain's, %": round(100 * mesh_area / max(terrain.area, 1), 4),
                     "slivers left out, m²": round(cut["lost_area"], 3)},
-        "seconds": {"classes": round(t_classes, 1), "terrain cut": round(time.time() - t1, 1), "all": round(time.time() - t0, 1)},
+        "seconds": {"classes": round(t_classes, 1), "of them": tm, "terrain cut": round(time.time() - t1, 1), "all": round(time.time() - t0, 1)},
     })
     pieces = {"survey": survey, "street": [], "bed": beds, "plot": plots, "terrain": terrain}
     rep["rail places"] = rail_places(ln, L, pieces)
@@ -371,7 +422,7 @@ def geo_json(g, nd=3):
 
 
 def write(ln, pieces, rep):
-    """data/lineN.partition.json, whole."""
+    """reports/ground-partition/lineN.partition.json, whole."""
     import sources
     from atomic import replacing
     out = {"box": rep["box"], "mesh": rep["terrain"]["mesh"],
@@ -386,7 +437,7 @@ def write(ln, pieces, rep):
         "terrain": sources.single("terrain", "ipr-dtm", rep["terrain"]["after"], "triangles of the city mesh (IPR, its "
                                   "fallbacks inside the city, tools/city_terrain.py)")})
     out["attribution"] = sources.attribution(out["provenance"])
-    p = os.path.join(ROOT, "data", f"line{ln}.partition.json")
+    p = os.path.join(ROOT, "reports", "ground-partition", f"line{ln}.partition.json")
     with replacing(p, "w") as fh:
         json.dump(out, fh, separators=(",", ":"), ensure_ascii=False)
     return os.path.getsize(p)
@@ -442,22 +493,31 @@ def draw(path, pieces, win_tris, w, px=4):
         return [(ox + (a - x0) * px, (y1 - b) * px + 24) for a, b in xy]
 
     def fill(ox, g, col):
-        for p in shapely.get_parts(polygonal(g.intersection(wb))):
+        # (through a mask: a hole shows what lies under the polygon, not white)
+        for p in shapely.get_parts(polygonal(g.intersection(wb))):  # (clipped: big triangles reach past the window)
             if p.geom_type != "Polygon" or p.is_empty:
                 continue
-            d.polygon(to(ox, p.exterior.coords), fill=col, outline=tuple(max(0, v - 50) for v in col))
+            m = Image.new("L", im.size, 0)
+            dm = ImageDraw.Draw(m)
+            dm.polygon(to(ox, p.exterior.coords), fill=255)
             for h in p.interiors:
-                d.polygon(to(ox, h.coords), fill=(255, 255, 255))
+                dm.polygon(to(ox, h.coords), fill=0)
+            im.paste(col, mask=m)
+            dark = tuple(max(0, v - 50) for v in col)
+            for r in [p.exterior, *p.interiors]:
+                d.line(to(ox, r.coords), fill=dark, width=1)
     for k, name in enumerate(panels):
         ox = k * n
         d.text((ox + 4, 4), name, fill=(0, 0, 0))
-        for c in CLASSES:
+        for c in ("terrain",) + CLASSES[:-1]:  # (the terrain first: its holes are painted white)
             if name not in ("all", c):
                 continue
             if c == "terrain":
                 fill(ox, pieces["terrain"], COLORS[c])
                 for t in win_tris:
-                    d.line(to(ox, t.exterior.coords), fill=(60, 110, 50), width=1)
+                    for e in shapely.get_parts(shapely.intersection(t.exterior, wb)):
+                        if e.geom_type == "LineString":
+                            d.line(to(ox, e.coords), fill=(60, 110, 50), width=1)
             else:
                 for q in pieces[c]:
                     if q["g"].intersects(wb):
@@ -532,7 +592,7 @@ def main(argv=None):
     ap.add_argument("--calibrate")
     ap.add_argument("--mesh", help="a city mesh folder (default: the current inputs', city_terrain.cached())")
     ap.add_argument("--threads", type=int, default=8)
-    ap.add_argument("--no-write", action="store_true", help="the report only, no data/lineN.partition.json")
+    ap.add_argument("--no-write", action="store_true", help="the report only, no lineN.partition.json")
     a = ap.parse_args(argv)
     rep_dir = os.path.join(ROOT, "reports", "ground-partition")
     os.makedirs(rep_dir, exist_ok=True)
@@ -552,6 +612,8 @@ def main(argv=None):
             pieces, rep, tris = partition(ln, a.mesh, a.threads, list(mine.values()))
             if not a.no_write:
                 rep["file bytes"] = write(ln, pieces, rep)
+            if "bed window" in rep:
+                mine["bed"] = rep["bed window"]
             for name, w in mine.items():
                 p = os.path.join(rep_dir, f"{name}-line{ln}.png")
                 wb = shapely.box(*w)

@@ -67,6 +67,13 @@ class Beds(unittest.TestCase):
         self.assertEqual(len(shapely.get_parts(B)), 1)
         self.assertGreater(B.area, 4 * 30 - 1)
 
+    def test_a_gap_of_mm_between_two_beds_is_closed_a_wide_one_stays(self):
+        L = self.line([track([[0, 0], [20, 0]], 11), track([[0, 4.005], [20, 4.005]], 11),
+                       track([[0, 8.5], [20, 8.5]], 11)])
+        B, _ = gp.bed_pieces(L, shapely.box(-100, -100, 100, 100), Ipr(lambda x, y: x * 0), Frame())
+        self.assertEqual(len(shapely.get_parts(B)), 2)  # (the 5 mm gap closed, the 0.5 m one kept)
+        self.assertAlmostEqual(B.area, 3 * 80 + 0.1, places=2)
+
     def test_samples_on_a_structure_left_out(self):
         # (a bridge: the rails 6 m over IPR's ground in the middle of the track)
         z = [0.0] * 4 + [6.0] * 3 + [0.0] * 4
@@ -96,9 +103,21 @@ class Plots(unittest.TestCase):
         L = {"buildings": [{"p": [[0, 0], [10, 0], [10, 10], [0, 10]], "h": 9, "k": "yes"},
                            {"p": [[5, 0], [15, 0], [15, 10], [5, 10]], "h": 9, "k": "yes"}]}
         above = shapely.box(0, 0, 2, 10)
-        p = gp.plot_pieces(L, shapely.box(-100, -100, 100, 100), above, Ipr(lambda x, y: x * 0 + 200), Frame())
+        p = gp.plot_pieces(L, shapely.box(-100, -100, 100, 100), [above], Ipr(lambda x, y: x * 0 + 200), Frame())
         self.assertEqual([round(q["g"].area) for q in p], [80, 50])
         self.assertEqual([q["z"] for q in p], [200.0, 200.0])
+
+
+class Strips(unittest.TestCase):
+    def test_a_thin_strip_by_a_plot_joins_it_a_wide_one_stays(self):
+        box = shapely.box(0, 0, 30, 10)
+        plots = [{"building": 0, "z": 0, "g": shapely.box(10, 0, 20, 10)}]
+        survey = shapely.box(0, 0, 9.6, 10)  # (0.4 m short of the footprint: a strip)
+        terrain = box.difference(survey.union(plots[0]["g"]))  # (and 10 m of open ground east of it)
+        r = gp.thin_strips(terrain, plots)
+        self.assertEqual(r["pieces"], 1)
+        self.assertAlmostEqual(r["area"], 4.0, places=3)
+        self.assertAlmostEqual(plots[0]["g"].area, 104.0, places=3)
 
 
 class Terrain(unittest.TestCase):
