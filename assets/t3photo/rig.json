@@ -1,0 +1,637 @@
+{
+  "schema": "t3photo-rig-v1",
+  "units": "metres",
+  "up": "+Y",
+  "forward": "+Z",
+  "doorSide": "-X",
+  "railPlane": 0,
+  "dimensions": {
+    "length": 14,
+    "width": 2.5,
+    "roof": 3.06,
+    "bogieCentres": 6.4,
+    "axleSpacing": 1.9,
+    "wheelDiameter": 0.7,
+    "gauge": 1.435,
+    "overCouplers": 15.104,
+    "floor": 0.874,
+    "doors": [
+      5.3,
+      -0.75,
+      -5.3
+    ]
+  },
+  "poseSource": "../../src/t3photo.js#posePhotoT3",
+  "nodes": [
+    {
+      "name": "Body",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Interior",
+      "parent": "Body",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Exterior_details",
+      "parent": "Body",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Door_1",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        -1.2192899999999998,
+        0.31,
+        5.3
+      ],
+      "rotation": [
+        0,
+        0.037421184585362956,
+        0,
+        0.9992995821795525
+      ]
+    },
+    {
+      "name": "Door_1_rear_outer",
+      "parent": "Door_1",
+      "translation": [
+        0,
+        0,
+        -0.69
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        1.5707963267948966
+      ]
+    },
+    {
+      "name": "Door_1_rear_inner",
+      "parent": "Door_1_rear_outer",
+      "translation": [
+        0,
+        0,
+        0.345
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        -3.141592653589793
+      ]
+    },
+    {
+      "name": "Door_1_front_outer",
+      "parent": "Door_1",
+      "translation": [
+        0,
+        0,
+        0.69
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        -1.5707963267948966
+      ]
+    },
+    {
+      "name": "Door_1_front_inner",
+      "parent": "Door_1_front_outer",
+      "translation": [
+        0,
+        0,
+        -0.345
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        3.141592653589793
+      ]
+    },
+    {
+      "name": "Door_2",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        -1.257,
+        0.31,
+        -0.75
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Door_2_rear_outer",
+      "parent": "Door_2",
+      "translation": [
+        0,
+        0,
+        -0.69
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        1.5707963267948966
+      ]
+    },
+    {
+      "name": "Door_2_rear_inner",
+      "parent": "Door_2_rear_outer",
+      "translation": [
+        0,
+        0,
+        0.345
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        -3.141592653589793
+      ]
+    },
+    {
+      "name": "Door_2_front_outer",
+      "parent": "Door_2",
+      "translation": [
+        0,
+        0,
+        0.69
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        -1.5707963267948966
+      ]
+    },
+    {
+      "name": "Door_2_front_inner",
+      "parent": "Door_2_front_outer",
+      "translation": [
+        0,
+        0,
+        -0.345
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        3.141592653589793
+      ]
+    },
+    {
+      "name": "Door_3",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        -1.2192899999999998,
+        0.31,
+        -5.3
+      ],
+      "rotation": [
+        0,
+        -0.037421184585362956,
+        0,
+        0.9992995821795525
+      ]
+    },
+    {
+      "name": "Door_3_rear_outer",
+      "parent": "Door_3",
+      "translation": [
+        0,
+        0,
+        -0.69
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        1.5707963267948966
+      ]
+    },
+    {
+      "name": "Door_3_rear_inner",
+      "parent": "Door_3_rear_outer",
+      "translation": [
+        0,
+        0,
+        0.345
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        -3.141592653589793
+      ]
+    },
+    {
+      "name": "Door_3_front_outer",
+      "parent": "Door_3",
+      "translation": [
+        0,
+        0,
+        0.69
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        -1.5707963267948966
+      ]
+    },
+    {
+      "name": "Door_3_front_inner",
+      "parent": "Door_3_front_outer",
+      "translation": [
+        0,
+        0,
+        -0.345
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y",
+      "range": [
+        0,
+        3.141592653589793
+      ]
+    },
+    {
+      "name": "Bogie_1",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0,
+        0.35,
+        3.2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y"
+    },
+    {
+      "name": "Wheelset_1_1",
+      "parent": "Bogie_1",
+      "translation": [
+        0,
+        0,
+        0.95
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "X"
+    },
+    {
+      "name": "Wheelset_1_2",
+      "parent": "Bogie_1",
+      "translation": [
+        0,
+        0,
+        -0.95
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "X"
+    },
+    {
+      "name": "Bogie_2",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0,
+        0.35,
+        -3.2
+      ],
+      "rotation": [
+        0,
+        -0.0,
+        0,
+        1
+      ],
+      "axis": "Y"
+    },
+    {
+      "name": "Wheelset_2_1",
+      "parent": "Bogie_2",
+      "translation": [
+        0,
+        0,
+        0.95
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "X"
+    },
+    {
+      "name": "Wheelset_2_2",
+      "parent": "Bogie_2",
+      "translation": [
+        0,
+        0,
+        -0.95
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "X"
+    },
+    {
+      "name": "Coupler_rear",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0,
+        0.46,
+        -6.25
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y"
+    },
+    {
+      "name": "Coupler_front",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0,
+        0.46,
+        6.25
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Y"
+    },
+    {
+      "name": "Pantograph",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0,
+        3.15,
+        3.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Pantograph_lower_rear",
+      "parent": "Pantograph",
+      "translation": [
+        0,
+        0.16,
+        0
+      ],
+      "rotation": [
+        -0.32139284304639965,
+        0,
+        0,
+        0.9469459543387639
+      ]
+    },
+    {
+      "name": "Pantograph_upper_rear",
+      "parent": "Pantograph_lower_rear",
+      "translation": [
+        0,
+        1.55,
+        0
+      ],
+      "rotation": [
+        0.6086833049524429,
+        0,
+        0,
+        0.7934132808771046
+      ]
+    },
+    {
+      "name": "Pantograph_lower_front",
+      "parent": "Pantograph",
+      "translation": [
+        0,
+        0.16,
+        0
+      ],
+      "rotation": [
+        0.32139284304639965,
+        0,
+        0,
+        0.9469459543387639
+      ]
+    },
+    {
+      "name": "Pantograph_upper_front",
+      "parent": "Pantograph_lower_front",
+      "translation": [
+        0,
+        1.55,
+        0
+      ],
+      "rotation": [
+        -0.6086833049524429,
+        0,
+        0,
+        0.7934132808771046
+      ]
+    },
+    {
+      "name": "Pantograph_contact_head",
+      "parent": "Pantograph",
+      "translation": [
+        0,
+        2.6195811707190244,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Wiper_right",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        -0.53,
+        1.79,
+        6.96
+      ],
+      "rotation": [
+        -0.19866933079506122,
+        0,
+        0,
+        0.9800665778412416
+      ]
+    },
+    {
+      "name": "Wiper_right_pivot",
+      "parent": "Wiper_right",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -0.16425233099048098,
+        0.9864183553463477
+      ],
+      "axis": "Z"
+    },
+    {
+      "name": "Wiper_left",
+      "parent": "Tatra_T3_6892",
+      "translation": [
+        0.53,
+        1.79,
+        6.96
+      ],
+      "rotation": [
+        -0.19866933079506122,
+        0,
+        0,
+        0.9800665778412416
+      ]
+    },
+    {
+      "name": "Wiper_left_pivot",
+      "parent": "Wiper_left",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -0.16425233099048098,
+        0.9864183553463477
+      ],
+      "axis": "Z"
+    }
+  ]
+}
