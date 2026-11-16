@@ -568,9 +568,12 @@ export function nearTracks(tracks) {
   };
 }
 
+// With `lookup` (the prebuilt ground's, src/groundFile.js, #509) the ground level is not triangulated here: its
+// heights, classes and cover are the drawn ground's; the areas keep their outlines (kerbs, crossings, review).
 export class DtmSurface {
-  constructor(dtm, terrain, THREE, nearTrack = () => false) {
+  constructor(dtm, terrain, THREE, nearTrack = () => false, lookup = null) {
     this.terrain = terrain;
+    this.lookup = lookup;
     this.grid = new TriIndex();
     this.deckGrid = new TriIndex(); // level 1: bridge decks and the streets on them
     this.areas = [];
@@ -615,6 +618,10 @@ export class DtmSurface {
       if (a.c === 'water') {
         const zs = outer.map((p) => p[2]).sort((u, v) => u - v), zw = zs[Math.floor(zs.length * 0.1)];
         for (const p of [...outer, ...holes.flat()]) p[2] = zw;
+      }
+      if (lookup && a.l === 0) {
+        this.areas.push({ c: a.c, l: a.l, ring: outer, holes, mesh: [], kerbs, sourceId, t: a.t, g: a.g, s: a.s });
+        continue;
       }
       const v2 = (r) => r.map((p) => new THREE.Vector2(p[0], p[1]));
       let tri;
@@ -689,6 +696,7 @@ export class DtmSurface {
     return t ? t.c : null;
   }
   _hitTri(x, y, ref = null) {
+    if (this.lookup) return this.lookup.survey(x, y); // (one level 0 there: the file's partition, no overlaps to choose from)
     const ix = this.grid, k = ix.at(x, y);
     if (k < 0) return null;
     // overlapping ground-level areas: the one closest to the lidar ground (or to `ref`), then by rank
@@ -803,7 +811,7 @@ export class DtmSurface {
     }
     return null;
   }
-  covered(x, y) { return this.grid.covered(x, y); }
+  covered(x, y) { return this.lookup ? this.lookup.covered(x, y) : this.grid.covered(x, y); }
 }
 
 // Triangles of the surveyed areas by 3 m cell, for the height and deck lookups. The triangles are

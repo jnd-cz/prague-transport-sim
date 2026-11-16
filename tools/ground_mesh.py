@@ -59,6 +59,7 @@ BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge t
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
+LAYERS = ("draw", "area")  # the file's names per triangle, in this order after the triangles (encode)
 SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
 RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
 # where two tracks' rails lie within a mm or two, at a join or a switch, the nearer track's corner is another rail)
@@ -496,6 +497,12 @@ def build(ln, mesh=None, threads=8, log=print):
     if len(tr):
         cen = fc[tr].mean(1)
         draw[tr] = land_cover(L, cen[:, 0], cen[:, 1])
+    # (the survey's class under each triangle, a bed's on the survey too: what the page's lookup answers to traffic, kerbs,
+    # stops and walkers, as the survey's own triangles did, #509; "" off the survey)
+    area = np.full(len(tcls), "", dtype=object)
+    sf = np.flatnonzero(fcls[tf] == "survey")
+    if len(sf):
+        area[sf] = [pieces["survey"][owners[o][1]]["c"] for o in owner[tf[sf]].tolist()]
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
     log(f"  weld: {len(uk):,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items()]}, "
         f"{time.time() - t1:.0f} s")
@@ -513,6 +520,7 @@ def build(ln, mesh=None, threads=8, log=print):
     F = np.vstack([F, KF])
     fcls_id = np.concatenate([fcls_id, np.zeros(len(KF), int)])
     draw = np.concatenate([draw, land_cover(L, x[KT].mean(1), y[KT].mean(1)) if len(KT) else np.zeros(0, dtype=object)])
+    area = np.concatenate([area, np.full(len(KF), "", dtype=object)])
     V = V2
 
     # the steps' walls: an edge whose two sides hold different vertices at an end; each drawn as the face above it
@@ -524,9 +532,10 @@ def build(ln, mesh=None, threads=8, log=print):
     F = np.vstack([F, walls]) if len(walls) else F
     fcls_id = np.concatenate([fcls_id, np.full(len(walls), CLASS_IDS["wall"])])
     draw = np.concatenate([draw, wall_draw]) if len(walls) else draw
+    area = np.concatenate([area, np.full(len(walls), "", dtype=object)]) if len(walls) else area
     # (no degenerate triangles)
     good = (F[:, 0] != F[:, 1]) & (F[:, 1] != F[:, 2]) & (F[:, 0] != F[:, 2])
-    F, fcls_id, draw = F[good], fcls_id[good], draw[good]
+    F, fcls_id, draw, area = F[good], fcls_id[good], draw[good], area[good]
     log(f"  {len(walls):,} wall triangles, {time.time() - t1:.0f} s")
 
     rep = {"line": ln, "partition": {k: prep[k] for k in ("box", "box_km2", "classes", "cover", "terrain", "bed window") if k in prep},
@@ -546,7 +555,9 @@ def build(ln, mesh=None, threads=8, log=print):
     rep["draw classes"] = {c: dict(zip(*np.unique(draw[fcls_id == i].astype(str), return_counts=True)))
                            for c, i in CLASS_IDS.items() if (fcls_id == i).any()}
     rep["draw classes"] = {c: {k or "-": int(v) for k, v in d.items()} for c, d in rep["draw classes"].items()}
-    return {"V": V, "F": F, "cls": fcls_id, "draw": draw, "box": box, "L": L, "rep": rep}
+    rep["survey classes"] = {c: {k or "-": int(v) for k, v in zip(*np.unique(area[fcls_id == i].astype(str), return_counts=True))}
+                             for c, i in CLASS_IDS.items() if (area[fcls_id == i] != "").any()}
+    return {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep}
 
 
 def xy_ids(V):
@@ -935,13 +946,14 @@ def hilbert(x, y, order=20):
     return d
 
 
-def encode(V, F, cls, box, draw=None):
+def encode(V, F, cls, box, draw=None, area=None):
     """(bytes, layout): the vertices along a Hilbert curve over the box's 1 m cells, as differences of x, y, z in mm from
     the box's north-west corner and its base; per class its triangles, each turned to start at its lowest index (its
     winding kept), sorted by it: that index's difference to the previous one's and the other two as differences to it.
     (Line 37, 2.45 M triangles: by rows 12.0 MB gzip, along the curve 8.7 MB, brotli 7.3 MB.)
-    `draw` (per triangle a name, "" for none): per class with names, after all the triangles, its triangles' draw classes
-    in the same order as runs (index into layout["draw"][class], run length), #509."""
+    Per triangle names, "" for none, after all the triangles: `draw` (what the page draws it as) and then `area` (the
+    survey's class under it, what the page's lookup answers), each per class with names in the same order as runs (index
+    into layout[layer][class], run length; their counts in layout[layer + "Runs"]), #509."""
     x0, y1 = round(box.bounds[0] * Q), round(box.bounds[3] * Q)
     base = int(V[:, 2].min())
     rel = np.stack([V[:, 0] - x0, y1 - V[:, 1], V[:, 2] - base], 1)
@@ -952,7 +964,7 @@ def encode(V, F, cls, box, draw=None):
     d = np.diff(np.vstack([[0, 0, 0], R]), axis=0)
     parts = [varints(zigzag(d.ravel()))]
     layout = {"unit": 1 / Q, "x0": x0 / Q, "y1": y1 / Q, "base": base / Q, "vertices": int(len(V)), "classes": {}}
-    runs = {}
+    runs = {name: {} for name in LAYERS}
     for c, i in CLASS_IDS.items():
         m = cls == i
         t = rank[F[m]]
@@ -965,26 +977,31 @@ def encode(V, F, cls, box, draw=None):
         dd = np.column_stack([np.diff(np.concatenate([[0], first])), t[:, 1] - first, t[:, 2] - first])
         parts.append(varints(zigzag(dd.ravel())))
         layout["classes"][c] = int(len(t))
-        if draw is not None and len(t):
-            d = np.asarray(draw, dtype=object)[m][o].astype(str)
+        for name, per in (("draw", draw), ("area", area)):
+            if per is None or not len(t):
+                continue
+            d = np.asarray(per, dtype=object)[m][o].astype(str)
             if (d != "").any():
                 names, ids = np.unique(d, return_inverse=True)
                 cut = np.flatnonzero(np.diff(ids)) + 1
                 starts = np.concatenate([[0], cut])
                 lens = np.diff(np.concatenate([starts, [len(ids)]]))
-                runs[c] = (names.tolist(), np.column_stack([ids[starts], lens]).ravel())
-    if runs:
-        layout["draw"], layout["drawRuns"] = {}, {}
-        for c, (names, rl) in runs.items():
+                runs[name][c] = (names.tolist(), np.column_stack([ids[starts], lens]).ravel())
+    for name in LAYERS:
+        if not runs[name]:
+            continue
+        layout[name], layout[name + "Runs"] = {}, {}
+        for c, (names, rl) in runs[name].items():
             parts.append(varints(rl.astype(np.int64)))
-            layout["draw"][c], layout["drawRuns"][c] = names, int(len(rl) // 2)
+            layout[name][c], layout[name + "Runs"][c] = names, int(len(rl) // 2)
     blob = b"".join(parts)
     layout["sections"] = [len(p) for p in parts]
     return blob, layout
 
 
-def decode(blob, layout, draw=False):
-    """(V (n, 3) float m, {class: (m, 3) indexes}); with `draw` also {class: per triangle its draw class's name}."""
+def decode(blob, layout, draw=False, area=False):
+    """(V (n, 3) float m, {class: (m, 3) indexes}); with `draw` also {class: per triangle its draw class's name}, with
+    `area` also {class: per triangle the survey's class under it}."""
     n = layout["vertices"]
     u, off = read_varints(blob, 3 * n)
     R = np.cumsum(unzigzag(u).reshape(n, 3), axis=0)
@@ -996,20 +1013,22 @@ def decode(blob, layout, draw=False):
         d = unzigzag(u).reshape(m, 3)
         first = np.cumsum(d[:, 0])
         out[c] = np.column_stack([first, first + d[:, 1], first + d[:, 2]])
-    if not draw:
+    if not (draw or area):
         return V, out
     names = {}
-    for c, n in (layout.get("drawRuns") or {}).items():
-        u, off = read_varints(blob, 2 * n, off)
-        rl = np.asarray(u, np.int64).reshape(n, 2)
-        names[c] = np.repeat(np.asarray(layout["draw"][c], dtype=object)[rl[:, 0]], rl[:, 1])
-    return V, out, names
+    for name in LAYERS:
+        names[name] = {}
+        for c, n in (layout.get(name + "Runs") or {}).items():
+            u, off = read_varints(blob, 2 * n, off)
+            rl = np.asarray(u, np.int64).reshape(n, 2)
+            names[name][c] = np.repeat(np.asarray(layout[name][c], dtype=object)[rl[:, 0]], rl[:, 1])
+    return (V, out) + ((names["draw"],) if draw else ()) + ((names["area"],) if area else ())
 
 
 def write(ln, built, rep):
     import sources
     from atomic import replacing
-    blob, layout = encode(built["V"], built["F"], built["cls"], built["box"], built.get("draw"))
+    blob, layout = encode(built["V"], built["F"], built["cls"], built["box"], built.get("draw"), built.get("area"))
     layout["provenance"] = sources.stamp("ground_mesh.py", {
         "ground": sources.single("terrain", "ipr-dtm", int(len(built["F"])), "triangles: the city mesh (IPR), the survey, "
                                  "the beds, the building plots, welded")})

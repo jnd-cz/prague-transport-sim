@@ -139,12 +139,15 @@ if (!params.has('nofine')) try {
 } catch { /* not made for this line */ }
 data.attribution = credits(built);
 logProvenance(built);
-// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548)
-const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, nearTracks(data.tracks)) : null;
+// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548; with
+// the ground file its ground level is the file's, through the file's lookup: the decks alone are triangulated here)
+const groundLookup = groundDecoded ? await groundDecoded.lookup : null;
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, groundLookup ? undefined : nearTracks(data.tracks), groundLookup) : null;
 await load.begin('profile');
 const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
 const profile = new Profile(route, data, styles.lift, dtm, terrain, styles.liftBack); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
+if (groundLookup) useGroundLookup(ground, groundLookup);
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
 ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls
@@ -246,10 +249,10 @@ function uploadWorld() {
 
 // The prebuilt ground's lookup answers every height read of the ground (#509): ground.at (but a bridge's deck on our
 // route), ground.surface (where cars and walkers stand: no lift, the file's survey is not drawn over anything) and
-// terrain.height; the layers' answers where the file has no ground.
-function useGroundFile(ground, pre) {
-  const lk = pre.lookup, at = ground.at.bind(ground), surface = ground.surface.bind(ground), th = ground.terrain.height.bind(ground.terrain);
-  ground.mesh = pre;
+// terrain.height; the layers' answers where the file has no ground. (The survey's ground level asks it too:
+// DtmSurface's lookup.)
+function useGroundLookup(ground, lk) {
+  const at = ground.at.bind(ground), surface = ground.surface.bind(ground), th = ground.terrain.height.bind(ground.terrain);
   ground.lookup = lk;
   ground.at = (x, y, deck = false) => {
     if (deck) { const n = ground.route.nearest(x, y); if (n && n.d < 22 && ground.profile.onBridge(n.s)) return at(x, y, deck); }
@@ -257,14 +260,16 @@ function useGroundFile(ground, pre) {
   };
   ground.surface = (x, y) => lk.height(x, y) ?? surface(x, y);
   ground.terrain.height = (x, y) => lk.height(x, y) ?? th(x, y);
-  window.groundTimes = pre.times; // (the worker's decode, meshes and lookup, ms)
 }
 
 // The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the
 // precipitation and the materials' state (src/weather.js): instant, so it could change during a shift.
 async function buildCity() {
   await load.parts(WORLD_PARTS);
-  if (groundDecoded) useGroundFile(ground, await groundDecoded);
+  if (groundDecoded) {
+    ground.mesh = await groundDecoded.meshes;
+    window.groundTimes = ground.mesh.times; // (the worker's decode, lookup and meshes, ms)
+  }
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)

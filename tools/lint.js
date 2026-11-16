@@ -331,6 +331,74 @@ function terrainOverSurvey(g) {
   return check('terrain-under-survey', n, [...bad.values()]);
 }
 
+// The prebuilt ground (#509). groundDrawn: cars and walkers stand on the triangle that is drawn: every DRAWN_EVERY-th
+// flat triangle of the ground meshes, the drawn height at its centroid against the lookup's there (ground.lookup), more
+// than DRAWN_TOL times (1 + its slope) apart (or no ground in the lookup) counted: the 32-bit positions hold about a mm in
+// plan 10 km from the city's origin, that much along a steep slope is more in height. Triangles under DRAWN_THIN across (twice the area over the
+// longest edge, in plan) are left out: the walls stand upright, and the slivers along a step, a fraction of a mm wide,
+// are within the 32-bit positions' mm of the triangle beside them (line 37: 515 of 316 k, up to 2.3 m apart at a plot's
+// step, before they were left out). groundHidden: on a HIDDEN_STEP m lattice over the lookup,
+// the flat triangles holding each point strictly inside (not on an edge): more than one is ground drawn under another.
+// Both count 0 checks without the file (?oldground).
+const DRAWN_EVERY = 7, DRAWN_TOL = 0.001, DRAWN_THIN = 0.005, HIDDEN_STEP = 7;
+function groundDrawn(g, world) {
+  const lk = g.route.ground.lookup;
+  if (!lk) return check('ground-drawn', 0, []);
+  let n = 0;
+  const bad = new Map();
+  world.traverse((o) => {
+    if (o.userData.surface !== 'ground' || !o.geometry?.index) return;
+    o.updateMatrixWorld();
+    const P = o.geometry.attributes.position.array, I = o.geometry.index.array, e = o.matrixWorld.elements;
+    for (let t = 0; t < I.length; t += 3 * DRAWN_EVERY) {
+      const a = 3 * I[t], b = 3 * I[t + 1], c = 3 * I[t + 2];
+      // (three.js frame: x, z up, -y)
+      const cross = Math.abs((P[b] - P[a]) * (P[c + 2] - P[a + 2]) - (P[c] - P[a]) * (P[b + 2] - P[a + 2]));
+      const longest = Math.max(Math.hypot(P[b] - P[a], P[b + 2] - P[a + 2]), Math.hypot(P[c] - P[b], P[c + 2] - P[b + 2]), Math.hypot(P[a] - P[c], P[a + 2] - P[c + 2]));
+      if (!(cross > DRAWN_THIN * longest)) continue;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], wx = P[c] - P[a], wy = P[c + 1] - P[a + 1], wz = P[c + 2] - P[a + 2];
+      const slope = Math.hypot(uy * wz - uz * wy, ux * wy - uy * wx) / Math.abs(uz * wx - ux * wz);
+      const X = (P[a] + P[b] + P[c]) / 3, Y = (P[a + 1] + P[b + 1] + P[c + 1]) / 3, Z = (P[a + 2] + P[b + 2] + P[c + 2]) / 3;
+      const x = e[0] * X + e[4] * Y + e[8] * Z + e[12], z = e[1] * X + e[5] * Y + e[9] * Z + e[13], y = -(e[2] * X + e[6] * Y + e[10] * Z + e[14]);
+      n++;
+      const h = lk.height(x, y), dz = h === null ? Infinity : z - h;
+      if (Math.abs(dz) <= DRAWN_TOL * (1 + slope)) continue;
+      const k = `${Math.round(x / 20)},${Math.round(y / 20)}`;
+      if (!(bad.get(k)?.mag >= Math.abs(dz))) bad.set(k, { x, y, mag: Math.abs(dz), info: h === null ? 'drawn where the lookup has no ground' : `drawn ${(dz * 1000).toFixed(1)} mm from the lookup's height, slope ${slope.toFixed(2)} (${o.userData.surfaceKind})` });
+    }
+  });
+  return check('ground-drawn', n, [...bad.values()]);
+}
+function groundHidden(g) {
+  const lk = g.route.ground.lookup;
+  if (!lk) return check('ground-hidden', 0, []);
+  const { vx, vy, vz, tv, tris, start } = lk;
+  let n = 0;
+  const bad = new Map();
+  for (let j = 0; j < lk.ny; j++) for (let i = 0; i < lk.nx; i++) {
+    const k = j * lk.nx + i;
+    if (start[k] === start[k + 1]) continue;
+    for (let py = j * lk.cell + HIDDEN_STEP / 2; py < (j + 1) * lk.cell; py += HIDDEN_STEP) for (let px = i * lk.cell + HIDDEN_STEP / 2; px < (i + 1) * lk.cell; px += HIDDEN_STEP) {
+      let held = 0, lo = Infinity, hi = -Infinity;
+      for (let s = start[k], e = start[k + 1]; s < e; s++) {
+        const t = 3 * tris[s], a = tv[t], b = tv[t + 1], c = tv[t + 2];
+        const d = (vy[b] - vy[c]) * (vx[a] - vx[c]) + (vx[c] - vx[b]) * (vy[a] - vy[c]);
+        if (!d) continue;
+        const w0 = ((vy[b] - vy[c]) * (px - vx[c]) + (vx[c] - vx[b]) * (py - vy[c])) / d, w1 = ((vy[c] - vy[a]) * (px - vx[c]) + (vx[a] - vx[c]) * (py - vy[c])) / d;
+        if (w0 <= 1e-6 || w1 <= 1e-6 || 1 - w0 - w1 <= 1e-6) continue;
+        const z = w0 * vz[a] + w1 * vz[b] + (1 - w0 - w1) * vz[c];
+        held++; lo = Math.min(lo, z); hi = Math.max(hi, z);
+      }
+      if (!held) continue;
+      n++;
+      if (held < 2) continue;
+      const x = px + lk.x0, y = py + lk.y0, key = `${Math.round(x / 20)},${Math.round(y / 20)}`;
+      if (!(bad.get(key)?.mag >= held)) bad.set(key, { x, y, mag: held, info: `${held} ground triangles over one point, ${((hi - lo) * 100).toFixed(1)} cm apart` });
+    }
+  }
+  return check('ground-hidden', n, [...bad.values()]);
+}
+
 // What carries the rails: every 2 m, a ray down from 2.5 m above the track bed onto the drawn
 // ground, street, bridge deck or bridge model (not the bed itself). Something above the bed top
 // covers the rails; nothing within 0.6 m under the bed is a gap (on a bridge: the deck lies below
@@ -1156,6 +1224,8 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     deckClip: deckClip(g, world),
     groundUnderDecks: groundUnderDecks(g, world),
     underpassClearance: underpassClearance(g),
+    groundDrawn: groundDrawn(g, world),
+    groundHidden: groundHidden(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });

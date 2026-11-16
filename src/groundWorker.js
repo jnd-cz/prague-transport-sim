@@ -3,10 +3,12 @@
 // the loading screen (the tile container's decision: docs/decisions/2026-11-06-tile-container.md).
 //
 // In: { buffer, layout, styles, chunk, cell } — `styles[class][draw name]` = [group, r, g, b] (src/groundFile.js).
-// Out: { meshes: [{ group, pos, nor, col, idx }], lookup: { x0, y0, cell, nx, ny, start, tris, vx, vy, vz, tv } }:
-// per CHUNK m square and material group an indexed geometry (positions as three.js takes them: x, z, -y), each
-// draw class with its own vertices so colours do not blend across a class's edge, the normals averaged over its
-// triangles; and the height lookup: the flat triangles (the steps' walls left out) in a grid of `cell` m.
+// Out, two messages: first { lookup: { x0, y0, cell, nx, ny, start, tris, vx, vy, vz, tv, ta, areas, cover } }, the
+// height lookup: the flat triangles (the steps' walls left out) in a grid of `cell` m, each with the survey's class under
+// it (ta: an index into `areas`, 0 for none) and the survey's 10 m cells (cover, as src/terrain.js TriIndex keys them);
+// then { meshes: [{ group, pos, nor, col, idx }], times }: per CHUNK m square and material group an indexed geometry
+// (positions as three.js takes them: x, z, -y), each draw class with its own vertices so colours do not blend across a
+// class's edge, the normals averaged over its triangles.
 
 function varints(bytes, n, off, out) {
   for (let i = 0; i < n; i++) {
@@ -47,7 +49,17 @@ function decode(buffer, layout) {
     let k = 0;
     for (let i = 0; i < runs; i++) draw.fill(r[2 * i], k, (k += r[2 * i + 1]));
   }
-  return { vx, vy, vz, classes };
+  // the survey's class under each triangle (tools/ground_mesh.py LAYERS: after the draw classes), as one list of names
+  const areas = [''], areaId = new Map([['', 0]]);
+  for (const [name, runs] of Object.entries(layout.areaRuns || {})) {
+    const r = new Float64Array(2 * runs);
+    off = varints(bytes, 2 * runs, off, r);
+    const ids = layout.area[name].map((a) => { if (!areaId.has(a)) { areaId.set(a, areas.length); areas.push(a); } return areaId.get(a); });
+    const area = (classes[name].area = new Uint8Array(classes[name].tris.length / 3));
+    let k = 0;
+    for (let i = 0; i < runs; i++) area.fill(ids[r[2 * i]], k, (k += r[2 * i + 1]));
+  }
+  return { vx, vy, vz, classes, areas };
 }
 
 // (a wall stands upright: two of its corners share x and y)
@@ -124,6 +136,7 @@ function meshes(g, layout, styles, chunk) {
   return out;
 }
 
+const COVER_CELL = 10; // m: src/terrain.js TriIndex's cover
 function lookup(g, cell) {
   const { vx, vy, vz, classes } = g;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -131,13 +144,21 @@ function lookup(g, cell) {
   const nx = Math.ceil((x1 - x0) / cell) + 1, ny = Math.ceil((y1 - y0) / cell) + 1;
   let m = 0;
   for (const [name, { tris }] of Object.entries(classes)) if (name !== 'wall') m += tris.length;
-  const tv = new Uint32Array(m);
+  const tv = new Uint32Array(m), ta = new Uint8Array(m / 3), cover = new Set();
   m = 0;
-  for (const [name, { tris }] of Object.entries(classes)) {
+  for (const [name, { tris, area }] of Object.entries(classes)) {
     if (name === 'wall') continue;
     for (let i = 0; i < tris.length; i += 3) {
-      if (upright(vx, vy, tris[i], tris[i + 1], tris[i + 2])) continue;
-      tv[m++] = tris[i]; tv[m++] = tris[i + 1]; tv[m++] = tris[i + 2];
+      const a = tris[i], b = tris[i + 1], c = tris[i + 2];
+      if (upright(vx, vy, a, b, c)) continue;
+      const id = area ? area[i / 3] : 0;
+      if (id) {
+        const i0 = Math.floor(Math.min(vx[a], vx[b], vx[c]) / COVER_CELL), i1 = Math.floor(Math.max(vx[a], vx[b], vx[c]) / COVER_CELL);
+        const j0 = Math.floor(Math.min(vy[a], vy[b], vy[c]) / COVER_CELL), j1 = Math.floor(Math.max(vy[a], vy[b], vy[c]) / COVER_CELL);
+        for (let ix = i0; ix <= i1; ix++) for (let iy = j0; iy <= j1; iy++) cover.add(ix * 100003 + iy);
+      }
+      ta[m / 3] = id;
+      tv[m++] = a; tv[m++] = b; tv[m++] = c;
     }
   }
   const rect = (t) => {
@@ -157,19 +178,21 @@ function lookup(g, cell) {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) tris[fill[j * nx + i]++] = t / 3;
   }
   // (heights kept relative to the lowest vertex: a 32-bit float holds them to well under a mm)
-  return { x0, y0, cell, nx, ny, start, tris, tv: tv.slice(0, m), vx: Float32Array.from(vx, (v) => v - x0), vy: Float32Array.from(vy, (v) => v - y0), vz: Float32Array.from(vz) };
+  return { x0, y0, cell, nx, ny, start, tris, tv: tv.slice(0, m), ta: ta.slice(0, m / 3), areas: g.areas, cover: Float64Array.from(cover),
+    vx: Float32Array.from(vx, (v) => v - x0), vy: Float32Array.from(vy, (v) => v - y0), vz: Float32Array.from(vz) };
 }
 
+// (the lookup first: the page's survey, profile and track bench read it before the world is built)
 onmessage = ({ data }) => {
   const t0 = performance.now();
   const g = decode(data.buffer, data.layout);
   const t1 = performance.now();
-  const ms = meshes(g, data.layout, data.styles, data.chunk);
-  const t2 = performance.now();
   const lk = lookup(g, data.cell);
+  const t2 = performance.now();
+  postMessage({ lookup: lk }, [lk.start.buffer, lk.tris.buffer, lk.tv.buffer, lk.ta.buffer, lk.cover.buffer, lk.vx.buffer, lk.vy.buffer, lk.vz.buffer]);
+  const ms = meshes(g, data.layout, data.styles, data.chunk);
   const t3 = performance.now();
   const transfer = [];
   for (const m of ms) transfer.push(m.pos.buffer, m.nor.buffer, m.col.buffer, m.idx.buffer);
-  transfer.push(lk.start.buffer, lk.tris.buffer, lk.tv.buffer, lk.vx.buffer, lk.vy.buffer, lk.vz.buffer);
-  postMessage({ meshes: ms, lookup: lk, times: { decode: t1 - t0, meshes: t2 - t1, lookup: t3 - t2 } }, transfer);
+  postMessage({ meshes: ms, times: { decode: t1 - t0, lookup: t2 - t1, meshes: t3 - t2 } }, transfer);
 };

@@ -51,6 +51,24 @@ class File(unittest.TestCase):
         V2, by2 = gm.decode(blob, layout)  # (without asking, as before)
         self.assertEqual(len(by2["survey"]), 3)
 
+    def test_survey_classes_round_trip_beside_the_draw_classes(self):
+        # (a bed on the survey: drawn as the bed, its survey class the area's under it)
+        V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900], [0, -1000, 200000], [500, -500, 201234])
+        F = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
+        cls = np.array([1, 2, 1, 0])
+        draw = np.array(["green", "embedded", "road", ""], dtype=object)
+        area = np.array(["median", "tram", "road", ""], dtype=object)
+        blob, layout = gm.encode(V, F, cls, shapely.box(0, -1, 1, 0), draw, area)
+        W, by, names, areas = gm.decode(blob, layout, draw=True, area=True)
+        self.assertEqual(sorted(layout["area"]), ["bed", "survey"])
+        for c in ("survey", "bed"):
+            got = {tuple(sorted(map(tuple, (W[t] * Q).round().astype(int).tolist()))): (n, a)
+                   for t, n, a in zip(by[c], names[c], areas[c])}
+            want = {tuple(sorted(map(tuple, V[F[i]].tolist()))): (draw[i], area[i]) for i in range(3) if cls[i] == gm.CLASS_IDS[c]}
+            self.assertEqual(got, want)
+        W2, by2, names2 = gm.decode(blob, layout, draw=True)  # (the draw classes alone, as before)
+        self.assertEqual(sorted(names2), ["bed", "survey"])
+
 
 class Steps(unittest.TestCase):
     def square_with_a_step(self):

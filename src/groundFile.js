@@ -18,25 +18,38 @@ export async function fetchGround(load, lineId, params) {
   }
 }
 
-// The decoded ground: { meshes, lookup: GroundLookup, times }. `styles[class][draw name]` = [group, r, g, b].
+// The decoded ground: { lookup: a promise of the GroundLookup, meshes: a promise of { meshes, times } }; the lookup
+// comes first (src/groundWorker.js). `styles[class][draw name]` = [group, r, g, b].
 export function decodeGround(file, styles) {
-  return new Promise((resolve, reject) => {
-    const w = new Worker(new URL('./groundWorker.js', import.meta.url), { type: 'module' });
-    w.onmessage = ({ data }) => { w.terminate(); resolve({ meshes: data.meshes, lookup: new GroundLookup(data.lookup), times: data.times }); };
-    w.onerror = (e) => { w.terminate(); reject(e); };
-    w.postMessage({ buffer: file.buffer, layout: file.layout, styles, chunk: GROUND_CHUNK, cell: LOOKUP_CELL }, [file.buffer]);
-  });
+  const w = new Worker(new URL('./groundWorker.js', import.meta.url), { type: 'module' });
+  let got, fail, done, failMeshes;
+  const lookup = new Promise((res, rej) => { got = res; fail = rej; });
+  const meshes = new Promise((res, rej) => { done = res; failMeshes = rej; });
+  w.onmessage = ({ data }) => {
+    if (data.lookup) { got(new GroundLookup(data.lookup)); return; }
+    w.terminate();
+    done({ meshes: data.meshes, times: data.times });
+  };
+  w.onerror = (e) => { w.terminate(); fail(e); failMeshes(e); };
+  w.postMessage({ buffer: file.buffer, layout: file.layout, styles, chunk: GROUND_CHUNK, cell: LOOKUP_CELL }, [file.buffer]);
+  meshes.catch(() => {}); // (one failure, reported through the lookup's promise)
+  return { lookup, meshes };
 }
 
-// The drawn ground's height at (x, y): the triangle holding the point (the highest where several do: a kerb's top at
-// its edge), its plane there; null off the ground.
+// The drawn ground at (x, y): the triangle holding the point (the highest where several do: a kerb's top at its edge),
+// its plane's height there and the survey's class under it (src/terrain.js DtmSurface asks it for its ground level).
 export class GroundLookup {
-  constructor(lk) { Object.assign(this, lk); }
-  height(x, y) {
+  constructor(lk) {
+    Object.assign(this, lk);
+    this.coverSet = new Set(lk.cover);
+    this.hitZ = 0;
+  }
+  // (the triangle, its height in this.hitZ; -1 off the ground)
+  _find(x, y) {
     const px = x - this.x0, py = y - this.y0, i = Math.floor(px / this.cell), j = Math.floor(py / this.cell);
-    if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return null;
+    if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return -1;
     const { vx, vy, vz, tv, tris } = this, k = j * this.nx + i;
-    let best = null;
+    let best = -1, bz = 0;
     for (let s = this.start[k], e = this.start[k + 1]; s < e; s++) {
       const t = 3 * tris[s], a = tv[t], b = tv[t + 1], c = tv[t + 2];
       const ax = vx[a], ay = vy[a], bx = vx[b], by = vy[b], cx = vx[c], cy = vy[c];
@@ -46,8 +59,17 @@ export class GroundLookup {
       const w2 = 1 - w0 - w1, eps = -1e-7;
       if (w0 < eps || w1 < eps || w2 < eps) continue;
       const z = w0 * vz[a] + w1 * vz[b] + w2 * vz[c];
-      if (best === null || z > best) best = z;
+      if (best < 0 || z > bz) { best = tris[s]; bz = z; }
     }
+    this.hitZ = bz;
     return best;
   }
+  height(x, y) { return this._find(x, y) < 0 ? null : this.hitZ; }
+  // the survey at (x, y): { z, c } (its class: 'road', 'sidewalk', …), null where the ground is not the survey's
+  survey(x, y) {
+    const t = this._find(x, y);
+    return t < 0 || !this.ta[t] ? null : { z: this.hitZ, c: this.areas[this.ta[t]] };
+  }
+  // whether the survey describes the street in (x, y)'s 10 m cell at all (src/terrain.js TriIndex.covered)
+  covered(x, y) { return this.coverSet.has(Math.floor(x / 10) * 100003 + Math.floor(y / 10)); }
 }

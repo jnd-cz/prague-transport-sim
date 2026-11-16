@@ -1515,7 +1515,7 @@ function buildDtm(group, ground, levelsOnly = false) {
       }
     });
   }
-  buildDtmSteps(cgs.other, ground, color.wall);
+  if (!levelsOnly) buildDtmSteps(cgs.other, ground, color.wall); // (the ground file holds its steps' walls)
   buildParapets(cgs.other, dtm.parapets || [], color.wall);
   for (const [kind, cg] of Object.entries(cgs)) cg.build(group, 'dtm', kind);
 }
