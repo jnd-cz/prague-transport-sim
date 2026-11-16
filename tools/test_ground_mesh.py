@@ -95,6 +95,16 @@ class Rails(unittest.TestCase):
                   {"c": "road", "g": shapely.box(-5, 80, 5, 85)}]  # (not raised)
         self.assertEqual(gm.crossing_pieces(survey, beds).tolist(), [True, False, False])
 
+    def test_corners_on_the_rails_inside_the_outline(self):
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {}), ([[10, 0], [10, 100]], {"b": 1})]))
+        x = np.array([-0.72, 0.72, 0.7205, 0.0, -0.72, 9.28])
+        y = np.array([50.0, 50.0, 30.0, 50.0, 95.0, 50.0])
+        got = gm.on_rails(x, y, beds, shapely.box(-3, 0, 3, 90))
+        # (on the left and right rails; 0.5 mm off; between the rails; past the outline; on a bridge's rail)
+        self.assertEqual(np.isfinite(got).tolist(), [True, True, True, False, False, False])
+        self.assertTrue(np.allclose(got[:3], 200.0 - bed_surface.BED_BELOW))
+
     def test_no_crossing_on_a_bridge(self):
         import bed_surface
         beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {"b": 1})]))
@@ -110,8 +120,11 @@ class Rails(unittest.TestCase):
                [-5000, 45000, int((top + 0.1) * Q)])
         F = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
         cls = np.array([0, 0, 1, 1])
-        r = gm.heads_check(V, F, cls, beds, shapely.box(-3, 0, 3, 100))
+        r = gm.heads_check(V, F, cls, beds, shapely.box(-3, 0, 3, 100), [("on it", 0, 42), ("away", 0, 80)])
         self.assertGreater(r["under the ground"], 0)
+        self.assertGreater(r["on it"]["under the ground"], 0)
+        self.assertAlmostEqual(r["on it"]["highest over the top of rail, mm"], 100, delta=1)
+        self.assertEqual(r["away"]["under the ground"], 0)
         self.assertEqual(set(r["by the class over them"]), {"survey"})
         self.assertTrue(all(39 <= p[1] <= 46 and abs(p[2] - 10) < 0.2 for p in r["worst places: x, y, cm over, class"]))
 

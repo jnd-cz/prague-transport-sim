@@ -56,6 +56,7 @@ STEP = {"kerb": 0.03, "plot": 0.01, "wall": 0.5}
 BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it in both squares (tile_faces)
 CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
+PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
 # where two tracks' rails lie within a mm or two, at a join or a switch, the nearer track's corner is another rail)
 RAIL_TOL = 0.001  # m: the mesh under a rail against the bed's row (#508's done-when)
@@ -404,9 +405,15 @@ def build(ln, mesh=None, threads=8, log=print):
     across = crossing_pieces(pieces["survey"], beds)
     c_across = np.zeros(len(cx), bool)
     c_across[m] = across[[owners[o][1] for o in owner[corner_face[m]]]] if len(m) else False
-    # the beds' outline: the bed surface (not a raised area, unless it crosses the track)
-    m = np.flatnonzero(np.repeat(t_in_bed, 3) & ((kind != "raised") | c_across) & (corner_cls != "plot"))
+    # the beds' outline: the bed surface (not a raised area, unless it crosses the track); and a corner on a rail on the
+    # ground whatever face holds it, at the rail's height, or the bed's under it where another bed lies lower (where two
+    # tracks join, the beds' outline, sampled along `p`, and the drawn rows part by mm: 29-95 rail points a line were
+    # 2-54 mm off)
+    zr = on_rails(cx, cy, beds, outline)
+    on_rail = np.isfinite(zr)
+    m = np.flatnonzero((np.repeat(t_in_bed, 3) | on_rail) & ((kind != "raised") | c_across) & (corner_cls != "plot"))
     zb = beds.surface_at(cx[m], cy[m], BED_REACH)
+    zb = np.where(on_rail[m], np.fmin(zr[m], np.where(zb < zr[m] - RAIL_TOL, zb, np.inf)), zb)
     ok = np.isfinite(zb)
     zc[m[ok]], prio[m[ok]], kind[m[ok]] = zb[ok], 1.0, "bed"
     nan = np.isnan(zc)
@@ -484,7 +491,7 @@ def build(ln, mesh=None, threads=8, log=print):
     log(f"  edges checked, {time.time() - t1:.0f} s")
     t1 = time.time()
     rep["rails"] = rail_check(cx, cy, zf, kind, beds, outline)
-    rep["rails"]["ground over the top of rail"] = heads_check(V, F, fcls_id, beds, outline)
+    rep["rails"]["ground over the top of rail"] = heads_check(V, F, fcls_id, beds, outline, rail_places(ln, L))
     rep["rails"]["raised areas across a track (laid flush within the beds' outline)"] = int(across.sum())
     log(f"  rails checked, {time.time() - t1:.0f} s")
     rep["page today"] = page_counts(L, D)
@@ -571,6 +578,31 @@ def axes(beds):
             if len(rows) > 1 and not beds.tracks[k].get("b")]
 
 
+def on_rails(cx, cy, beds, outline):
+    """Per point on a rail of a track on the ground (within RAIL_NEAR, inside the beds' outline, off bridges): the
+    rail's height there, between its rows as the page draws the bed's edge (the lowest where rails meet); NaN off them.
+    (The faces' points lie on a 1 mm grid: at a joint of two tracks one 0.5 mm off the rail fell between their quads,
+    and the bed surface carried out from the nearest gave 6 mm over the rail, line 37 s ~4000)"""
+    lines = np.array([shapely.LineString([(x + nx * off[j], y + ny * off[j], z[j]) for x, y, nx, ny, off, z in rows])
+                      for k, rows in enumerate(beds.rows) if len(rows) > 1 and not beds.tracks[k].get("b")
+                      for j in (1, 2)], dtype=object)
+    out = np.full(len(cx), np.nan)
+    if not len(lines) or outline.is_empty:
+        return out
+    key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
+    uk, first, inv = np.unique(key, return_index=True, return_inverse=True)
+    pts = shapely.points(cx[first], cy[first])
+    pi, li = shapely.STRtree(lines).query(pts, predicate="dwithin", distance=RAIL_NEAR)
+    shapely.prepare(outline)
+    keep = shapely.intersects_xy(outline, cx[first][pi], cy[first][pi])
+    pi, li = pi[keep], li[keep]
+    z = np.full(len(uk), np.nan)
+    if len(pi):
+        on = shapely.line_interpolate_point(lines[li], shapely.line_locate_point(lines[li], pts[pi]))
+        np.fmin.at(z, pi, shapely.get_coordinates(on, include_z=True)[:, 2])
+    return z[inv]
+
+
 def crossing_pieces(survey, beds):
     """Per survey piece: a raised one with a track's axis in it (a crossing over the track)."""
     out = np.zeros(len(survey), bool)
@@ -582,10 +614,11 @@ def crossing_pieces(survey, beds):
     return out
 
 
-def heads_check(V, F, cls, beds, outline):
+def heads_check(V, F, cls, beds, outline, named=()):
     """The written ground against the top of rail (a rail's row z + lift + BED_BELOW) at every rail point on the ground
     off bridges: the highest triangle there over it by more than RAIL_TOL buries the rail head (#508's done-when; the
-    page's lint, tools/lint.js buriedRails). The places: per track and 20 m along it, the worst."""
+    page's lint, tools/lint.js buriedRails). The places: per track and 20 m along it, the worst. `named`: (name, x, y)
+    each, the rail points within PLACE_NEAR m of it on their own (#165's and #166's, ground_partition.RAIL_PLACES)."""
     import bed_surface
     pts, top, where = [], [], []
     for k, rows in enumerate(beds.rows):
@@ -635,9 +668,23 @@ def heads_check(V, F, cls, beds, outline):
     by = {}
     for n in range(len(bad)):
         by[kinds.get(n, "")] = by.get(kinds.get(n, ""), 0) + 1
-    return {"rail points": int(len(pts)), "under the ground": int(len(bad)), "by the class over them": by,
-            "places (track, 20 m)": len(places),
-            "worst places: x, y, cm over, class": [[x, y, round(o * 100, 1), c] for x, y, o, c in worst[:12]]}
+    out = {"rail points": int(len(pts)), "under the ground": int(len(bad)), "by the class over them": by,
+           "places (track, 20 m)": len(places),
+           "worst places: x, y, cm over, class": [[x, y, round(o * 100, 1), c] for x, y, o, c in worst[:12]]}
+    for name, px, py in named:
+        m = np.hypot(pts[:, 0] - px, pts[:, 1] - py) <= PLACE_NEAR
+        o = over[m]
+        out[name] = {"rail points": int(m.sum()), "under the ground": int((o > RAIL_TOL + 0.5 / Q).sum()),
+                     "highest over the top of rail, mm": round(float(np.nanmax(o)) * 1000, 1) if np.isfinite(o).any() else None}
+    return out
+
+
+def rail_places(ln, L):
+    """#165's and #166's places on this line (ground_partition.RAIL_PLACES): (name, x, y) on the route."""
+    import ground_partition as gp
+    from route import Route
+    rt = Route(L["path"])
+    return [(f"line {ln} s {s}", *rt.at(s)[:2]) for line, s, _ in gp.RAIL_PLACES if line == ln]
 
 
 def rail_check(cx, cy, zf, kind, beds, outline):
