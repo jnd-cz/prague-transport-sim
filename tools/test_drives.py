@@ -143,9 +143,9 @@ RUN = """async (only) => {
     // (down 23 per mille under a 20 km/h street's limit it coasts through on the button at 18.5 km/h: a brake step for it 3 m before the
     // contact lifted the accelerator from 29 to 32, the button died and the drive pedal turned at 19 km/h, 8 m short on the shoes; line 9
     // seeds 1 and 2 at Anděl, #620)
-    // (not yet: 23 m before the stop down the 20 km/h street, and 30 m with time in hand: coasting it gathers to 20.3 km/h, the button dead, on
-    // main as here, #627)
-    ...[[23, 20, 0, 0], [23, 20, 0, 1], [23, 20, -0.023, 1], [23, 15, -0.023, 0], [23, 15, -0.023, 1], [30, 20, -0.023, 0], [40, 20, -0.023, 0], [40, 20, -0.023, 1]].map(([d, v, g, mild]) => ({ name: `turn under a contact ${d} m before the stop, a ${v} km/h street${g ? ', down 23 per mille' : ''}${mild ? ', time in hand' : ''}`, stops: [20, 600], limits: [[0, 50], [400, v]], pax: 60, grade: g ? (s) => (s > 380 ? g : 0) : undefined, contact: 600 - d, mild })),
+    // (23 m before the stop down the 20 km/h street, and 30 m with time in hand: coasting it gathered to 19.9 km/h, the braking for the stop
+    // began at the contact, step 1 lifted the accelerator to 33 and the drive pedal made the turn, #627)
+    ...[[23, 20, 0, 0], [23, 20, 0, 1], [23, 20, -0.023, 0], [23, 20, -0.023, 1], [23, 15, -0.023, 0], [23, 15, -0.023, 1], [30, 20, -0.023, 0], [30, 20, -0.023, 1], [40, 20, -0.023, 0], [40, 20, -0.023, 1]].map(([d, v, g, mild]) => ({ name: `turn under a contact ${d} m before the stop, a ${v} km/h street${g ? ', down 23 per mille' : ''}${mild ? ', time in hand' : ''}`, stops: [20, 600], limits: [[0, 50], [400, v]], pax: 60, grade: g ? (s) => (s > 380 ? g : 0) : undefined, contact: 600 - d, mild })),
     // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box held 90 s of a whole shift then, and the autopilot ran it dry
     // on every slip; with it empty a patch on 50 per mille can never be left (three runs stuck for good on lines 9 and 17)
     { name: 'leaves, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.15, leaves: true },
