@@ -429,8 +429,9 @@ function railSupport(g, world) {
 // every 0.25 m), the highest ground-level surveyed surface over the rail top. railSupport's rays start 2.5 m over the
 // bed: they missed the ridge of an 800 m tram area on Krejcárek's ramp (line 37 s 2566-2746), up to 6 m over the
 // rails where earcut joined its outline's points far apart.
+// (with the ground file, #509, the file's ground at the point: the survey's ground level is the file's)
 function surveyOverTrack(g) {
-  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm;
+  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm, lk = r.ground.lookup;
   if (!dtm) return check('survey-over-track', 0, []);
   const ix = dtm.grid;
   let n = 0;
@@ -439,11 +440,11 @@ function surveyOverTrack(g) {
     if (pr.onBridge(s)) continue;
     const zr = pr.height(s);
     for (let lat = -1.25; lat <= 1.25; lat += 0.25) {
-      const o = r.offset(s, lat), k = ix.at(o.x, o.y);
+      const o = r.offset(s, lat), k = lk ? -1 : ix.at(o.x, o.y);
       n++;
-      if (k < 0) continue;
-      let top = -Infinity;
-      for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
+      let top = lk ? lk.height(o.x, o.y) ?? -Infinity : -Infinity;
+      if (k < 0 && !lk) continue;
+      if (k >= 0) for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
         const [p, q, u] = ix.tris[ix.ids[m]];
         const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
         if (Math.abs(d) < 1e-9) continue;
@@ -453,7 +454,7 @@ function surveyOverTrack(g) {
         top = Math.max(top, w1 * p[2] + w2 * q[2] + w3 * u[2]);
       }
       const mag = top - zr, key = Math.round(s / 20);
-      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `survey ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
+      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `${lk ? 'ground' : 'survey'} ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
     }
   }
   return check('survey-over-track', n, [...bad.values()]);
