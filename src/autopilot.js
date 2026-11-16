@@ -254,9 +254,12 @@ export class Autopilot {
       // brake is all there (src/tr37.js coastSettle; ČKD, 2–3 s). Where the point leaves no room for that over the button's coasting
       // speed, it slows for the button instead: with time in hand, its target down at 20 km/h, the line's own target no longer marked
       // the contact as one to brake for; it coasted down 36 ‰ to the contact 29 m before Malostranská at 23 km/h, the button dead,
-      // turned on the drive pedal, braked at once, LO dropped and the shoes stood it 9 m short, line 22 seed 2, #620)
+      // turned on the drive pedal, braked at once, LO dropped and the shoes stood it 9 m short, line 22 seed 2, #620. Not where a limit
+      // holds it slow enough to coast through on the button: braking for it at Anděl, under the 20 km/h street's limit, a brake step 3 m
+      // before the contact lifted the accelerator from 29 to 32 and the drive pedal turned at 19 km/h, 8 m short, line 9 seeds 1 and 2)
+      const vPass = nl && nl.d - 12 <= dc ? nl.v / 3.6 - 0.4 : vLine;
       const dP = toPoint < Infinity ? Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5) : null;
-      const noRoom = dP !== null && -TURN_ROOM * stopDecel + Math.sqrt((TURN_ROOM * stopDecel) ** 2 + 2 * stopDecel * dP) < V_BUTTON_COAST;
+      const noRoom = dP !== null && vPass > V_BUTTON_COAST && -TURN_ROOM * stopDecel + Math.sqrt((TURN_ROOM * stopDecel) ** 2 + 2 * stopDecel * dP) < V_BUTTON_COAST;
       if (dc > 0 && there > V_BUTTON && (there < 0.75 * vLine || noRoom)) {
         // (the next limit only where it binds more than the next one: taken for it whatever, the contact 660 m ahead at Malostranská hid
         // Chotkova's hairpins from the drive's target, and it pressed to step 3 down 48 ‰ between them, from 22 to 39 km/h, #396)
@@ -264,7 +267,7 @@ export class Autopilot {
         if (!nl || curveTo(cl) < curveTo(nl)) nl = cl;
         vLimit = Math.min(vLimit, curveTo(cl));
         vt = Math.min(vt, vLimit);
-      } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity && Math.min(there, nl && nl.d - 12 <= dc ? nl.v / 3.6 - 0.4 : vLine) > V_BUTTON_COAST) {
+      } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity && Math.min(there, vPass) > V_BUTTON_COAST) {
         // (at speed the drive pedal makes the turn, ≈1.5 s without the brake: slow enough there for the point to stay on its curve after
         // that. Braking at 0.85 of step 5 it was on the curve at the contact 70 m before the stop, then needed 1.16 m/s² and the track
         // brakes; test drive "turn under a contact 70 m before the stop, at speed". Not where the limit has it pass slow enough to coast
