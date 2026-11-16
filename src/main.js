@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
-import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
+import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail, groundStyles } from './world.js';
+import { fetchGround, decodeGround } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -109,7 +110,12 @@ try {
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
-const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
+// the prebuilt ground (tools/ground_mesh.py, #509), where the line has it (?oldground: the layers below instead): decoded
+// in a worker while the page goes on; the fine terrain is not needed with it
+const groundFile = await fetchGround(load, lineId, params);
+if (groundFile) built[`line${lineId}.ground.json`] = groundFile.layout;
+const groundDecoded = groundFile ? decodeGround(groundFile, groundStyles(groundFile.layout)) : null;
+const fineRes = params.has('nofine') || groundFile ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
 // (dev switch for comparing lint runs: ?notunnels)
@@ -238,10 +244,27 @@ function uploadWorld() {
   for (const o of culled) o.frustumCulled = true;
 }
 
+// The prebuilt ground's lookup answers every height read of the ground (#509): ground.at (but a bridge's deck on our
+// route), ground.surface (where cars and walkers stand: no lift, the file's survey is not drawn over anything) and
+// terrain.height; the layers' answers where the file has no ground.
+function useGroundFile(ground, pre) {
+  const lk = pre.lookup, at = ground.at.bind(ground), surface = ground.surface.bind(ground), th = ground.terrain.height.bind(ground.terrain);
+  ground.mesh = pre;
+  ground.lookup = lk;
+  ground.at = (x, y, deck = false) => {
+    if (deck) { const n = ground.route.nearest(x, y); if (n && n.d < 22 && ground.profile.onBridge(n.s)) return at(x, y, deck); }
+    return lk.height(x, y) ?? at(x, y, deck);
+  };
+  ground.surface = (x, y) => lk.height(x, y) ?? surface(x, y);
+  ground.terrain.height = (x, y) => lk.height(x, y) ?? th(x, y);
+  window.groundTimes = pre.times; // (the worker's decode, meshes and lookup, ms)
+}
+
 // The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the
 // precipitation and the materials' state (src/weather.js): instant, so it could change during a shift.
 async function buildCity() {
   await load.parts(WORLD_PARTS);
+  if (groundDecoded) useGroundFile(ground, await groundDecoded);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)

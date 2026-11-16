@@ -536,7 +536,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const near = new SegmentIndex(4);
   for (const t of data.tracks) near.addLine(t.smooth);
   ground.trackWithin = (x, y, r) => near.within(x, y, r);
-  if (ground.dtm) flushDtm(ground);
+  // (the prebuilt ground, src/groundFile.js, #509: its survey, terrain and beds already meet the tracks; the layers
+  // below are built only without it, ?oldground)
+  const pre = ground.mesh || null;
+  if (ground.dtm && !pre) flushDtm(ground);
   // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
   // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
   for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights.step) : t.smooth.map(() => 0);
@@ -627,7 +630,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   })));
   data.tracks.forEach((t, k) => beds[k].rows.forEach((row, i) => { row[5][0] = edges[k][i][0]; row[5][3] = edges[k][i][1]; }));
   group.userData.bedRows = beds.map((b) => b.rows); // (read by tools/test_bed_surface_page.py: the build's copy of this rule, #508)
-  if (ground.dtm) layUnderBeds(ground.dtm, bedsNear);
+  if (ground.dtm && !pre) layUnderBeds(ground.dtm, bedsNear);
   const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
     (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);
   // our tunnels through rock (terrain.js carveCorridor): the hill stays whole above the track; its
@@ -654,18 +657,19 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   }
   const mouths = roadPortalMouths(tunnelPortals);
   await mark('tracks + tunnel roads');
-  lowerTerrainUnderTracks(data, ground.terrain, inTunnel, beds);
+  if (!pre) lowerTerrainUnderTracks(data, ground.terrain, inTunnel, beds);
   await mark('terrain under tracks');
-  if (ground.dtm) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); await mark('terrain under DTM'); lowerFineUnderDtm(ground.dtm, ground.terrain); await mark('fine under DTM'); }
+  if (ground.dtm && !pre) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); await mark('terrain under DTM'); lowerFineUnderDtm(ground.dtm, ground.terrain); await mark('fine under DTM'); }
   const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
-  fitFineToMouths(ground.terrain, mouths);
+  if (!pre) fitFineToMouths(ground.terrain, mouths);
   await mark('fine to tunnel mouths');
-  buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
+  if (pre) buildGroundFile(group, pre);
+  else buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
   ground.dtm?.seal(); // (the survey's heights are final from here: its lookups from typed arrays, #244, #245)
-  if (ground.dtm) buildDtm(group, ground);
+  if (ground.dtm) buildDtm(group, ground, !!pre);
   await mark('DTM streets');
 
   // (the weather is the materials' state, src/weather.js: everything is built in its dry colours, each
@@ -711,7 +715,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // the style at the nearest route point, elsewhere the track's own sections (`styles`, tools/track_styles.py
   // track_sections, #546: embedded at its junctions and road crossings), else panels
   // (setts, #574: a grey-brown stone until #308's texture)
-  const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' })
+  const STYLE_BED = Object.fromEntries(Object.entries(STYLE_BED_HEX)
     .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
   const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? styleOn(route, ground, n, x, y) : null; };
   // (a track's own style at each drawn point: its sections run along t.p, the drawn points along t.smooth, scaled as
@@ -741,7 +745,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // The bed is the same canted plane as the rails, including its transition ramps.
     const own = ownStyles(t);
     const cols = t.smooth.map(([x, y], i) => STYLE_BED[styleAt(x, y) ?? own[i]] || bed);
-    addBed(bedCg, beds[trackId].rows, (i) => cols[i]);
+    if (!pre || t.b) addBed(bedCg, beds[trackId].rows, (i) => cols[i]); // (the ground file holds the beds on the ground)
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
@@ -1409,7 +1413,55 @@ function buildParapets(cg, parapets, col) {
 // (by weather: carriageways get slush, footways and the rest trodden snow, lawns all of it; all but
 // lawns and water 0.8 darker when wet)
 const DTM_KIND = { road: 'street', parking: 'street', tram: 'street', cycle: 'street', green: 'green', water: 'water' };
-function buildDtm(group, ground) {
+// The ground file's draw classes as the page colours them (#509): the colours of the layers they replace (the terrain's
+// land cover in buildTerrain, the survey's DTM_COLORS, the beds' styles, the kerbs' sides), and the material groups
+const TERRAIN_HEX = { '': '#8d8c80', grass: '#6f8a4e', wood: '#566f3c', water: '#5d7f95' };
+const STYLE_BED_HEX = { grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' };
+const KERB_SIDE = '#8e8a82', BED_HEX = '#77736a';
+export const GROUND_GROUPS = ['terrain', 'street', 'other', 'green', 'water', 'bed'];
+const RAISED_DRAW = new Set(['sidewalk', 'island', 'median', 'platform']);
+// styles[class][draw name] = [group, r, g, b] (src/groundWorker.js); a wall is drawn as the face above it, a kerb's side grey
+export function groundStyles(layout) {
+  const G = (name) => GROUND_GROUPS.indexOf(name), rgb = (hex) => new THREE.Color(hex).toArray();
+  const out = { terrain: {}, survey: {}, bed: { '': [G('bed'), ...rgb(BED_HEX)] }, plot: { '': [G('other'), ...rgb(DTM_COLORS.paved)] }, wall: {} };
+  for (const [k, hex] of Object.entries(TERRAIN_HEX)) out.terrain[k] = [G('terrain'), ...rgb(hex)];
+  for (const [c, hex] of Object.entries(DTM_COLORS)) out.survey[c] = [G(DTM_KIND[c] || 'other'), ...rgb(hex)];
+  for (const [k, hex] of Object.entries(STYLE_BED_HEX)) out.bed[k] = [G('bed'), ...rgb(hex)];
+  const kerb = () => [G('other'), ...rgb(KERB_SIDE)];
+  for (const name of [...(layout.draw?.wall || []), '']) {
+    const [cls, d = ''] = name.split(':');
+    const above = out[cls]?.[d] ?? out[cls]?.[''];
+    out.wall[name] = cls === 'survey' && RAISED_DRAW.has(d) ? kerb() : above ? [...above] : kerb();
+  }
+  return out;
+}
+// The prebuilt ground's meshes (src/groundFile.js decodeGround), with the materials of the layers they replace
+function buildGroundFile(group, pre) {
+  const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
+  const mats = {
+    terrain: mat({ wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW, veg: true }),
+    street: mat({ wet: 0.8, snow: STREET_SNOW, slush: true }),
+    other: mat({ wet: 0.8, snow: FOOT_SNOW }),
+    green: mat({ snow: GROUND_SNOW }),
+    water: mat({}),
+    bed: mat({ wet: wetFactor(BED_HEX, '#5f5c56'), snow: STREET_SNOW, slush: true }),
+  };
+  for (const m of pre.meshes) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(m.nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(m.col, 3));
+    g.setIndex(new THREE.BufferAttribute(m.idx, 1));
+    g.computeBoundingSphere();
+    const kind = GROUND_GROUPS[m.group], mesh = new THREE.Mesh(g, mats[kind]);
+    mesh.matrixAutoUpdate = false;
+    mesh.userData.surface = 'ground';
+    mesh.userData.surfaceKind = kind;
+    group.add(mesh);
+  }
+}
+// levelsOnly: the decks and roofs only (the prebuilt ground holds level 0 and its kerbs, #509)
+function buildDtm(group, ground, levelsOnly = false) {
   const dtm = ground.dtm;
   const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
   const cgs = {
@@ -1422,6 +1474,7 @@ function buildDtm(group, ground) {
   for (const [k, v] of Object.entries(DTM_COLORS)) color[k] = new THREE.Color(v).toArray();
   const keepSurfaceRanges = /[?&](keepgeo|bot)\b/.test(location.search);
   for (const [areaId, a] of dtm.areas.entries()) {
+    if (levelsOnly && !(a.l > 0)) continue;
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
     // (a median under OSM's grass is grass behind its kerbs: `s`, tools/zps_medians.py, #555)
@@ -1796,7 +1849,7 @@ function buildTerrain(group, data, route, T, hole = () => false, fineHole = hole
   for (const g of data.green) mark(g.p, g.t === 'wood' ? 2 : 1);
   for (const w of data.water) mark(w, 3);
 
-  const palette = [new THREE.Color('#8d8c80'), new THREE.Color('#6f8a4e'), new THREE.Color('#566f3c'), new THREE.Color('#5d7f95')];
+  const palette = ['', 'grass', 'wood', 'water'].map((k) => new THREE.Color(TERRAIN_HEX[k]));
   // which chunks are close enough to the route to matter
   const samples = [];
   for (let s = 0; s <= route.length; s += 60) { const p = route.at(s); samples.push([p.x, p.y]); }
