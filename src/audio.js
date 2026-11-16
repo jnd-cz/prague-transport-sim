@@ -51,7 +51,8 @@ export const PARAMS = {
 // a loop's built-in loudness at its loudest (the synthesis below): a pack's recording plays at its share of it
 const LOOP_MAX = { motor: 0.145, rolling: 0.4, flange: 0.07, mg: 0.05 };
 // Listening settings, not measured physical constants (#590). The master still controls mute and pause.
-export function lineContactorReleaseLevel(current, { minGain = 0.25, maxGain = 1, refCurrent = 480 } = {}) {
+export function lineContactorReleaseLevel(current, config) {
+  const { minGain = 0.25, maxGain = 1, refCurrent = 480 } = config ?? {};
   return minGain + (maxGain - minGain) * Math.min(1, Math.max(0, current || 0) / refCurrent);
 }
 // a T3 set's axles behind its front, m (src/tram.js T3: the pivots 6.4 m apart, a bogie's wheelbase 1.9 m)

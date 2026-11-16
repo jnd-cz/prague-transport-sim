@@ -60,6 +60,7 @@ export async function contactors() {
   const levels = [-200,0,100,240,480,900].map(i => lineContactorReleaseLevel(i));
   need(levels[0] === .25 && levels[1] === .25 && levels[4] === 1 && levels[5] === 1 && levels[2] < levels[3], 'gain bounds/order');
   need(lineContactorReleaseLevel(100,{minGain:.1,maxGain:.7,refCurrent:200}) === .4, 'configured gain curve');
+  need(lineContactorReleaseLevel(0,null) === .25, 'null optional curve should use defaults');
   for (const curve of [{minGain:0},{maxGain:2},{minGain:.8,maxGain:.2},{refCurrent:0},{refCurrent:Infinity},false,[]])
     need(soundProblems({files:[],lineContactorRelease:curve},{}).some(x=>x.startsWith('lineContactorRelease:')), 'invalid release curve accepted');
 
