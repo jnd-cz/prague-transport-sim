@@ -257,9 +257,11 @@ def mesh_in_box(mesh_dir, box):
     return x[used], y[used], V[used, 2] / 100.0, T.reshape(-1, 3)
 
 
-def cut_terrain(x, y, T, cover, box, threads=8, window=None):
+def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
     """The terrain triangles against the cover (the classes above) and the box, tile by tile side by side (shapely's
-    vectorised calls release the GIL): counts and areas, and the triangles inside `window` (a box) for the pictures."""
+    vectorised calls release the GIL): counts and areas, and the triangles inside `window` (a box) for the pictures.
+    geometry: also "kept" (the indexes of the triangles kept whole) and "remains" ([(the cut triangle's index, a
+    polygon of what is left of it)]), for the mesh (tools/ground_mesh.py)."""
     tris = shapely.polygons(np.stack([np.column_stack([x[T[:, k]], y[T[:, k]]]) for k in (0, 1, 2, 0)], 1))
     cx, cy = x[T].mean(1), y[T].mean(1)
     tile = np.floor(cx / TILE).astype(np.int64) * 1000003 + np.floor(cy / TILE).astype(np.int64)
@@ -284,14 +286,18 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None):
         kept = ~hit & inbox
         cut = (hit & ~within) | (~hit & ~inbox)
         r = {"triangles": len(P), "dropped": int(within.sum()), "cut": int(cut.sum()), "kept": int(kept.sum()),
-             "kept_area": float(shapely.area(P[kept]).sum()), "new": 0, "new_area": 0.0, "lost_area": 0.0, "win": []}
+             "kept_area": float(shapely.area(P[kept]).sum()), "new": 0, "new_area": 0.0, "lost_area": 0.0, "win": [],
+             "kept_ids": ids[kept] if geometry else None, "remains": []}
         if cut.any():
             rest = shapely.intersection(shapely.difference(P[cut], C) if not C.is_empty else P[cut], box)
-            parts = shapely.get_parts(rest[~shapely.is_empty(rest)])
-            parts = parts[np.isin(shapely.get_type_id(parts), (3,))]
+            parts, pi = shapely.get_parts(rest, return_index=True)
+            poly = np.isin(shapely.get_type_id(parts), (3,))
+            parts, pi = parts[poly], pi[poly]
             a = shapely.area(parts)
             r["lost_area"] = float(a[a <= SLIVER].sum())
-            parts = parts[a > SLIVER]
+            parts, pi = parts[a > SLIVER], pi[a > SLIVER]
+            if geometry:
+                r["remains"] = list(zip(ids[cut][pi].tolist(), parts))
             new = shapely.get_parts(shapely.constrained_delaunay_triangles(parts)) if len(parts) else []
             r["new"], r["new_area"] = len(new), float(shapely.area(new).sum()) if len(new) else 0.0
             if window is not None and len(new):
@@ -304,11 +310,14 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None):
         res = list(ex.map(one, groups))
     tot = {k: sum(r[k] for r in res) for k in ("triangles", "dropped", "cut", "kept", "new", "kept_area", "new_area", "lost_area")}
     tot["win"] = [t for r in res for t in r["win"]]
+    if geometry:
+        tot["kept_ids"] = np.concatenate([r["kept_ids"] for r in res]) if res else np.zeros(0, int)
+        tot["remains"] = [q for r in res for q in r["remains"]]
     return tot
 
 
 # ---------------------------------------------------------------- the run
-def partition(ln, mesh=None, threads=8, windows=()):
+def partition(ln, mesh=None, threads=8, windows=(), geometry=False):
     """The partition of line ln: (the pieces per class, the report, the terrain triangles in each window)."""
     from geo import Frame
     from ipr_dtm import IprDtm
@@ -354,7 +363,7 @@ def partition(ln, mesh=None, threads=8, windows=()):
         mesh, key = city_terrain.cached()
     else:
         key = os.path.basename(os.path.normpath(mesh))
-    x, y, _, T = mesh_in_box(mesh, box)
+    x, y, z, T = mesh_in_box(mesh, box)
     windows = list(windows)
     if beds:  # (a picture of the largest bed piece: the survey holds most of the beds, PLACES show none)
         c = max(beds, key=lambda q: q["g"].area)["g"].representative_point()
@@ -362,7 +371,7 @@ def partition(ln, mesh=None, threads=8, windows=()):
         windows.append(rep["bed window"])
     win = shapely.union_all([shapely.box(*w) for w in windows]) if windows else None
     t1 = time.time()
-    cut = cut_terrain(x, y, T, cover, box, threads, win)
+    cut = cut_terrain(x, y, T, cover, box, threads, win, geometry)
     mesh_area = cut["kept_area"] + cut["new_area"]
     A = box.area
     areas = {"survey": S.area, "street": 0.0, "bed": B.area, "plot": P.area, "terrain": terrain.area}
@@ -384,6 +393,10 @@ def partition(ln, mesh=None, threads=8, windows=()):
     })
     pieces = {"survey": survey, "street": [], "bed": beds, "plot": plots, "terrain": terrain}
     rep["rail places"] = rail_places(ln, L, pieces)
+    if geometry:  # (for the mesh, tools/ground_mesh.py: the box, the beds' outline on the ground, the city mesh's
+        # triangles in the box, those kept whole and the remains of those cut)
+        pieces["_"] = {"L": L, "D": D, "box": box, "beds outline": B0, "x": x, "y": y, "z": z, "T": T,
+                       "kept": cut["kept_ids"], "remains": cut["remains"]}
     return pieces, rep, cut["win"]
 
 
@@ -438,7 +451,7 @@ def write(ln, pieces, rep):
                                   "fallbacks inside the city, tools/city_terrain.py)")})
     out["attribution"] = sources.attribution(out["provenance"])
     p = os.path.join(ROOT, "reports", "ground-partition", f"line{ln}.partition.json")
-    with replacing(p, "w") as fh:
+    with replacing(p, "w", encoding="utf-8") as fh:
         json.dump(out, fh, separators=(",", ":"), ensure_ascii=False)
     return os.path.getsize(p)
 
