@@ -23,8 +23,8 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
    then the terrain. A face keeps its own height (a step: two vertices at one point) where it differs from the weld's
    by more than STEP for its pair: a kerb (a raised area beside a street or a bed), a building plot, a wall between the
    survey and the terrain. Every step's edge gets its vertical faces, so every edge is used by two triangles.
-5. **The file.** data/lineN.ground.bin: vertices in mm (x, y from the box's corner, z over its base) sorted by row and
-   column, as zigzag varint differences; per class, its triangles' indexes as differences. lineN.ground.json: the
+5. **The file.** data/lineN.ground.bin: vertices in mm (x, y from the box's corner, z over its base) along a Hilbert
+   curve, as zigzag varint differences; per class, its triangles' indexes as differences (encode()). lineN.ground.json: the
    layout, the counts, the provenance. Decoded by decode() (and by the page, #509).
 
 The report (reports/ground-mesh/lineN.json): triangles per class against what the page draws today, the error against
@@ -53,7 +53,11 @@ STREETS_ROAD, STREETS_WALK = {"road", "tram"}, {"sidewalk"}  # (the classes the 
 # m: a face's height differing from the weld's by more than this at a shared vertex stays a step (to measure: the
 # report counts every pair's differences)
 STEP = {"kerb": 0.03, "plot": 0.01, "wall": 0.5}
+BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it in both squares (tile_faces)
+CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
+RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
+# where two tracks' rails lie within a mm or two, at a join or a switch, the nearer track's corner is another rail)
 RAIL_TOL = 0.001  # m: the mesh under a rail against the bed's row (#508's done-when)
 BANDS = ((0, 10), (10, 120), (120, 500), (500, math.inf))
 LATTICE = 4  # m: the error's samples, every LATTICE-th cell of IPR's 1 m raster
@@ -168,18 +172,40 @@ class Streets:
 
 # ---------------------------------------------------------------- faces
 def rail_lines(beds, outline):
-    """The rails of every drawn track, at the bed's rows, inside the beds' outline on the ground."""
+    """The rails of every drawn track and its rows' lines across the bed (edge to edge, CROSS_EXT m past each edge), inside
+    the beds' outline on the ground: the rails and the rows close cells as the page's bed quads do. (A rail alone would
+    end inside the outline at a track's join or end, and polygonize drops what closes no face: on line 37, 6,307 rail
+    points had no vertex within 1.25 m.)"""
     out = []
     for rows in beds.rows:
         if len(rows) < 2:
             continue
         for j in (1, 2):
-            pts = [(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows]
-            out.append(shapely.LineString(pts))
+            out.append(shapely.LineString([(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows]))
+        for x, y, nx, ny, off, _ in rows:
+            a, b = off[0] - CROSS_EXT, off[3] + CROSS_EXT
+            out.append(shapely.LineString([(x + nx * a, y + ny * a), (x + nx * off[1], y + ny * off[1]),
+                                           (x + nx * off[2], y + ny * off[2]), (x + nx * b, y + ny * b)]))
     if not out:
         return []
     clipped = shapely.intersection(np.array(out, dtype=object), outline)
     return [g for g in shapely.get_parts(clipped) if g.geom_type == "LineString" and g.length > 1e-3]
+
+
+def chunks(lines, most=64):
+    """The lines as LineStrings of at most `most` vertices: a ring around a big piece (the beds' outline, a survey area)
+    has a box as big as the piece, and every square's query found it."""
+    out = []
+    for g in shapely.get_parts(np.asarray(lines, dtype=object)):
+        if g.geom_type == "Polygon":
+            g = g.boundary
+        for q in shapely.get_parts(g):
+            c = shapely.get_coordinates(q)
+            if len(c) < 2:
+                continue
+            for i in range(0, len(c) - 1, most - 1):
+                out.append(shapely.LineString(c[i:i + most]))
+    return np.asarray(out, dtype=object)
 
 
 def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
@@ -189,10 +215,19 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
     idx = lines_tree.query(R, predicate="intersects")
     parts = [shapely.clip_by_rect(lines[i], *rect) for i in idx.tolist()]
     parts = [g for g in parts if not g.is_empty]
-    # (the border with every point a line meets it at, the lines of the square beside included: a vertex lying on the
-    # border with its piece on the other side only is in both squares' border, or the two borders differ: a T-junction)
+    # (the border with every point a line meets it at, and every vertex within BORDER_NEAR of it put onto it, from the
+    # lines of both squares beside it: snap-rounding nodes a line ending a hair from the border onto it, in the square
+    # it lies in only; both borders must hold the same points, or they differ: a T-junction)
     border = R.boundary
-    hits = shapely.get_coordinates(shapely.intersection(border, lines[idx])) if len(idx) else np.zeros((0, 2))
+    near = lines_tree.query(R.buffer(BORDER_NEAR, join_style="mitre"), predicate="intersects")
+    near = near[shapely.dwithin(lines[near], border, BORDER_NEAR)] if len(near) else near
+    hits = np.zeros((0, 2))
+    if len(near):
+        cut = shapely.get_coordinates(shapely.intersection(border, lines[near]))
+        v = shapely.get_coordinates(lines[near])
+        close = v[shapely.dwithin(shapely.points(v), border, BORDER_NEAR)]
+        onto = shapely.get_coordinates(shapely.line_interpolate_point(border, shapely.line_locate_point(border, shapely.points(close)))) if len(close) else np.zeros((0, 2))
+        hits = np.vstack([cut.reshape(-1, 2), onto.reshape(-1, 2)])
     if len(hits):
         ring = shapely.get_coordinates(border)[:-1]
         t = np.concatenate([shapely.line_locate_point(border, shapely.points(ring)), shapely.line_locate_point(border, shapely.points(hits))])
@@ -202,7 +237,9 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
         pts = pts[o]
         keep = np.concatenate([[True], np.hypot(*np.diff(pts, axis=0).T) > 1e-9])
         border = shapely.LineString(np.vstack([pts[keep], pts[:1]]))
-    noded = shapely.node(shapely.union_all([border] + parts)) if parts else border
+    # (noded on the mm grid, snap-rounded: every face's vertex on the grid the file keeps, so no two vertices a hair
+    # apart make slivers that collapse to zero-area triangles when rounded, line 37 had three edges used four times)
+    noded = shapely.union_all([border] + parts, grid_size=1 / Q) if parts else shapely.set_precision(border, 1 / Q)
     faces = np.asarray(shapely.get_parts(shapely.polygonize(shapely.get_parts(noded))))
     if not len(faces):
         return faces
@@ -230,7 +267,7 @@ def build(ln, mesh=None, threads=8, log=print):
     beds = bed_surface.Beds(L)
     outline = G["beds outline"]
     rails = rail_lines(beds, outline)
-    log(f"  beds: {sum(len(r) for r in beds.rows)} rows, {len(rails)} rail pieces on the ground, {time.time() - t1:.0f} s")
+    log(f"  beds: {sum(len(r) for r in beds.rows)} rows, {len(rails)} rail and row pieces on the ground, {time.time() - t1:.0f} s")
     bx0, by0, bx1, by1 = box.bounds
 
     # the lines that make the faces, and what each face can be
@@ -240,7 +277,6 @@ def build(ln, mesh=None, threads=8, log=print):
     ti = np.floor((tb[:, [0, 2]] - bx0) / TILE).astype(int)
     tj = np.floor((tb[:, [1, 3]] - by0) / TILE).astype(int)
     whole = (ti[:, 0] == ti[:, 1]) & (tj[:, 0] == tj[:, 1])  # (inside one square: no square's border crosses it)
-    kept_whole, kept_border = kept[whole], kept[~whole]
     lines, owners = [], []  # (owners: what the face inside a line's polygon is: (class, id))
     for k, q in enumerate(pieces["survey"]):
         lines.append(q["g"].boundary)
@@ -254,14 +290,27 @@ def build(ln, mesh=None, threads=8, log=print):
     for parent, g in G["remains"]:
         lines.append(g.boundary)
         owners.append(("terrain", int(parent), g))
-    for t in kept_border.tolist():
+    for t in kept[~whole].tolist():
         g = shapely.Polygon(tri_xy[t])
         lines.append(g.boundary)
         owners.append(("terrain", t, g))
     if not outline.is_empty:
         lines.append(outline.boundary)
     lines += rails
-    lines = np.asarray(lines, dtype=object)
+    lines = chunks(lines)
+    lines_tree = shapely.STRtree(lines)
+    # (a whole triangle that a line touches, within float noise, is noded with the lines: a piece's vertex on its edge
+    # would be a T-junction, line 37 had one)
+    cand = kept[whole]
+    polys = shapely.polygons(np.concatenate([tri_xy[cand], tri_xy[cand][:, :1]], 1))
+    touch = np.zeros(len(cand), bool)
+    ti_, _ = lines_tree.query(polys, predicate="dwithin", distance=1e-6)
+    touch[ti_] = True
+    kept_whole = cand[~touch]
+    for t in cand[touch].tolist():
+        g = shapely.Polygon(tri_xy[t])
+        lines = np.append(lines, np.array([g.boundary], dtype=object))
+        owners.append(("terrain", t, g))
     lines_tree = shapely.STRtree(lines)
     own_geoms = np.asarray([o[2] for o in owners], dtype=object)
     own_tree = shapely.STRtree(own_geoms)
@@ -342,7 +391,7 @@ def build(ln, mesh=None, threads=8, log=print):
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", "survey")
     # the beds' outline: the bed surface (not a raised area)
     m = np.flatnonzero(np.repeat(t_in_bed, 3) & (kind != "raised") & (corner_cls != "plot"))
-    zb = np.array([np.nan if (v := beds.surface(a, b, BED_REACH)) is None else v for a, b in zip(cx[m], cy[m])], float)
+    zb = beds.surface_at(cx[m], cy[m], BED_REACH)
     ok = np.isfinite(zb)
     zc[m[ok]], prio[m[ok]], kind[m[ok]] = zb[ok], 1.0, "bed"
     nan = np.isnan(zc)
@@ -415,8 +464,12 @@ def build(ln, mesh=None, threads=8, log=print):
            "faces": len(faces), "vertices": int(len(V)), "triangles": int(len(F)),
            "triangles per class": {c: int((fcls_id == i).sum()) for c, i in CLASS_IDS.items()},
            "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)}}
+    t1 = time.time()
     rep["edges"] = edge_check(V, F, box)
+    log(f"  edges checked, {time.time() - t1:.0f} s")
+    t1 = time.time()
     rep["rails"] = rail_check(cx, cy, zf, kind, beds, outline)
+    log(f"  rails checked, {time.time() - t1:.0f} s")
     rep["page today"] = page_counts(L, D)
     rep["seconds"]["mesh"] = round(time.time() - t0 - t_part, 1)
     return {"V": V, "F": F, "cls": fcls_id, "box": box, "L": L, "rep": rep}
@@ -470,9 +523,9 @@ def edge_check(V, F, box):
     once = (cnt == 1) & ~on_border
     more = cnt > 2
     out = {"edges": int(len(u)), "used once inside the box": int(once.sum()), "used more than twice": int(more.sum())}
-    if once.any():
-        w = np.flatnonzero(once)[:5]
-        out["first used once"] = [[[int(ax[i]) / Q, int(ay[i]) / Q], [int(bxx[i]) / Q, int(byy[i]) / Q]] for i in w]
+    for name, m in (("first used once", once), ("first used more than twice", more)):
+        if m.any():
+            out[name] = [[[int(ax[i]) / Q, int(ay[i]) / Q], [int(bxx[i]) / Q, int(byy[i]) / Q], int(cnt[i])] for i in np.flatnonzero(m)[:5]]
     return out
 
 
@@ -510,12 +563,15 @@ def rail_check(cx, cy, zf, kind, beds, outline):
     pts, want = np.asarray(pts), np.asarray(want)
     on = shapely.contains_xy(outline, pts[:, 0], pts[:, 1]) if not outline.is_empty else np.zeros(len(pts), bool)
     pts, want = pts[on], want[on]
+    from scipy.spatial import cKDTree
     on_bed = kind == "bed"
-    kq = np.round(cx[on_bed] * Q).astype(np.int64) * 10_000_000_000 + np.round(cy[on_bed] * Q).astype(np.int64)
-    zq = dict(zip(kq.tolist(), zf[on_bed].tolist()))
     pk = np.round(pts[:, 0] * Q).astype(np.int64) * 10_000_000_000 + np.round(pts[:, 1] * Q).astype(np.int64)
-    got = np.array([zq.get(k, np.nan) for k in pk.tolist()])
-    lowest = np.array([np.nan if (v := beds.surface(a, b)) is None else v for a, b in pts], float)
+    got = np.full(len(pts), np.nan)
+    if on_bed.any():  # (the bed's corner at the rail point; where tracks join, their rails lie a mm or two apart)
+        dd, ii = cKDTree(np.column_stack([cx[on_bed], cy[on_bed]])).query(pts, distance_upper_bound=RAIL_NEAR)
+        ok = np.isfinite(dd)
+        got[ok] = zf[on_bed][ii[ok]]
+    lowest = beds.surface_at(pts[:, 0], pts[:, 1])
     d = got - want
     under = np.isfinite(lowest) & (lowest < want - RAIL_TOL)  # (another bed lower there)
     own = ~under & np.isfinite(d)
@@ -523,8 +579,19 @@ def rail_check(cx, cy, zf, kind, beds, outline):
             "within the tolerance": int((np.abs(d[own]) <= RAIL_TOL + 0.5 / Q).sum()),
             "off by more": int((np.abs(d[own]) > RAIL_TOL + 0.5 / Q).sum()),
             "worst, mm": round(float(np.abs(d[own]).max()) * 1000, 2) if own.any() else None,
+            "first off": [[round(float(pts[i, 0]), 3), round(float(pts[i, 1]), 3), round(float(d[i]) * 1000, 1)]
+                          for i in np.flatnonzero(own & (np.abs(np.nan_to_num(d)) > RAIL_TOL + 0.5 / Q))[:6]],
             "where another bed lies lower (the ground takes it)": int(under.sum()),
-            "not a corner of the bed (left out)": missing_kinds(cx, cy, kind, pk[np.isnan(d)])}
+            "no bed corner within RAIL_NEAR (left out)": missing_kinds(cx, cy, kind, pk[np.isnan(d)]),
+            "the nearest corner to those, mm p50 / p90 / max": nearest_mm(cx, cy, pts[np.isnan(d)])}
+
+
+def nearest_mm(cx, cy, pts):
+    from scipy.spatial import cKDTree
+    if not len(pts):
+        return None
+    dd, _ = cKDTree(np.column_stack([cx, cy])).query(pts)
+    return [round(float(np.percentile(dd, q)) * 1000, 1) for q in (50, 90, 100)]
 
 
 def missing_kinds(cx, cy, kind, keys):
@@ -539,7 +606,8 @@ def missing_kinds(cx, cy, kind, keys):
         e = out.setdefault(name, {"points": 0, "first": []})
         e["points"] += 1
         if len(e["first"]) < 4:
-            e["first"].append([k // 10_000_000_000 / Q, (k - k // 10_000_000_000 * 10_000_000_000) / Q])
+            xk = (k + 5_000_000_000) // 10_000_000_000
+            e["first"].append([xk / Q, (k - xk * 10_000_000_000) / Q])
     return out
 
 
@@ -598,14 +666,32 @@ def unzigzag(u):
     return ((u >> np.uint64(1)).astype(np.int64)) ^ -((u & np.uint64(1)).astype(np.int64))
 
 
+def hilbert(x, y, order=20):
+    """The index of cells (x, y) along a Hilbert curve over 2^order cells a side."""
+    x, y = np.asarray(x, np.int64).copy(), np.asarray(y, np.int64).copy()
+    d = np.zeros(len(x), np.int64)
+    s = 1 << (order - 1)
+    while s > 0:
+        rx = ((x & s) > 0).astype(np.int64)
+        ry = ((y & s) > 0).astype(np.int64)
+        d += s * s * ((3 * rx) ^ ry)
+        m = ry == 0
+        flip = m & (rx == 1)
+        x[flip], y[flip] = s - 1 - x[flip], s - 1 - y[flip]
+        x[m], y[m] = y[m].copy(), x[m].copy()
+        s >>= 1
+    return d
+
+
 def encode(V, F, cls, box):
-    """(bytes, layout): vertices sorted by row (y down, in metres) then x, as differences of x, y, z in mm from the box's
-    north-west corner and its base; per class its triangles, each the first index's difference to the previous one's
-    and the other two as differences to it."""
+    """(bytes, layout): the vertices along a Hilbert curve over the box's 1 m cells, as differences of x, y, z in mm from
+    the box's north-west corner and its base; per class its triangles, each turned to start at its lowest index (its
+    winding kept), sorted by it: that index's difference to the previous one's and the other two as differences to it.
+    (Line 37, 2.45 M triangles: by rows 12.0 MB gzip, along the curve 8.7 MB, brotli 7.3 MB.)"""
     x0, y1 = round(box.bounds[0] * Q), round(box.bounds[3] * Q)
     base = int(V[:, 2].min())
     rel = np.stack([V[:, 0] - x0, y1 - V[:, 1], V[:, 2] - base], 1)
-    order = np.lexsort((rel[:, 0], rel[:, 1] // Q))
+    order = np.argsort(hilbert(rel[:, 0] // Q, rel[:, 1] // Q), kind="stable")
     rank = np.empty(len(order), np.int64)
     rank[order] = np.arange(len(order))
     R = rel[order]
@@ -614,6 +700,9 @@ def encode(V, F, cls, box):
     layout = {"unit": 1 / Q, "x0": x0 / Q, "y1": y1 / Q, "base": base / Q, "vertices": int(len(V)), "classes": {}}
     for c, i in CLASS_IDS.items():
         t = rank[F[cls == i]]
+        r = t.argmin(1) if len(t) else np.zeros(0, int)
+        k = np.arange(len(t))
+        t = np.stack([t[k, r], t[k, (r + 1) % 3], t[k, (r + 2) % 3]], 1) if len(t) else t.reshape(0, 3)
         t = t[np.argsort(t[:, 0], kind="stable")]
         first = t[:, 0]
         dd = np.column_stack([np.diff(np.concatenate([[0], first])), t[:, 1] - first, t[:, 2] - first])

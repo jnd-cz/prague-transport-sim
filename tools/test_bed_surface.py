@@ -68,6 +68,19 @@ class Rows(unittest.TestCase):
         _, _, _, _, off, z = b.rows[0][30]
         self.assertAlmostEqual(z[0], (200.0 + 200.2) / 2 - bs.BED_BELOW, places=6)
 
+    def test_every_rail_point_of_a_bend_has_the_surface_of_its_row(self):
+        # (on the outside of a bend a rail point lies past both segments' reach of bedsNear: line 37 track 4)
+        p = [[0, 0], [0, 20], [3, 35], [10, 48], [22, 60]]
+        b = bs.Beds(line([track(p, 200.0)]))
+        pts, want = [], []
+        for x, y, nx, ny, off, z in b.rows[0]:
+            for j in (1, 2):
+                pts.append((x + nx * off[j], y + ny * off[j]))
+                want.append(z[j])
+        got = b.surface_at(*np.asarray(pts).T)
+        self.assertTrue(np.isfinite(got).all())
+        self.assertLess(np.abs(got - want).max(), 1e-9)
+
     def test_bed_z(self):
         row = [0, 0, 1, 0, [-2, -0.72, 0.72, 2], [1, 2, 3, 4]]
         self.assertEqual(bs.bed_z(row, -0.72), 2)

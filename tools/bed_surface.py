@@ -15,7 +15,8 @@ Each drawn track (lineN.json `tracks`), along its points densified to SMOOTH m:
 - **the bed's rows**: [x, y, nx, ny, offsets, heights] across each point: its right edge, right rail, left rail, left
   edge; the rails at zBed -+ tilt, zBed = top of rail - lift - BED_BELOW, the edges on the rails' plane out to the bed's
   width (`bed`, tools/track_beds.py), where the bed meets a paired track the mean of the two near rails; then each edge
-  no higher than another bed under it within 0.3 m (#165, #548).
+  no higher than another bed under it within 0.3 m (#165, #548);
+- **the surface**: the triangles the page draws between the rows (addBed), the lowest where two beds overlap.
 """
 import math
 
@@ -316,20 +317,60 @@ class Beds:
             for row, (a, b) in zip(rows, edges[k]):
                 row[5][0], row[5][3] = a, b
 
+    def triangles(self):
+        """The beds' triangles as the page draws them (world.js addBed: between two rows, the right edge-rail, the rails'
+        and the rail-left edge strips, each quad (a, b, d), (a, d, e) as ChunkedGeometry.quad): ((n, 3, 3), track)."""
+        if getattr(self, "_tris", None) is None:
+            out, own = [], []
+            for k, rows in enumerate(self.rows):
+                if self.tracks[k].get("b") or len(rows) < 2:
+                    continue
+                P = np.array([[(x + nx * o, y + ny * o, z) for o, z in zip(off, zz)] for x, y, nx, ny, off, zz in rows])
+                for j in range(3):
+                    a, b, d, e = P[:-1, j], P[1:, j], P[1:, j + 1], P[:-1, j + 1]
+                    out += [np.stack([a, b, d], 1), np.stack([a, d, e], 1)]
+                    own += [np.full(len(a), k)] * 2
+            self._tris = (np.concatenate(out), np.concatenate(own)) if out else (np.zeros((0, 3, 3)), np.zeros(0, int))
+            import shapely
+            T = self._tris[0]
+            self._tree = shapely.STRtree(shapely.polygons(np.concatenate([T[:, :, :2], T[:, :1, :2]], 1)))
+        return self._tris
+
+    def surface_at(self, x, y, reach=0.0):
+        """The bed surface as drawn at points: the lowest of the beds' triangles holding each (two beds overlap at a
+        junction); where none does, the nearest within `reach` m, its plane carried out (the ground's bed outline,
+        tools/track_beds.py outline, samples the track along `p`, the rows along its drawn points: their edges differ by a
+        few cm); NaN farther."""
+        import shapely
+        T, _ = self.triangles()
+        x, y = np.asarray(x, float), np.asarray(y, float)
+        out = np.full(len(x), np.nan)
+        if not len(T) or not len(x):
+            return out
+        pts = shapely.points(x, y)
+        pi, ti = self._tree.query(pts, predicate="intersects")
+        if len(pi):
+            np.fmin.at(out, pi, plane(T[ti], x[pi], y[pi]))
+        miss = np.flatnonzero(np.isnan(out))
+        if reach and len(miss):
+            mi, mt = self._tree.query_nearest(pts[miss], max_distance=reach, all_matches=False)
+            out[miss[mi]] = plane(T[mt], x[miss[mi]], y[miss[mi]])
+        return out
+
     def surface(self, x, y, reach=0.0):
-        """The bed surface at (x, y): the lowest of the beds covering it (two beds overlap at a junction), or None. reach:
-        a point up to this far past a bed's edge takes the edge's height (the ground's bed outline, tools/track_beds.py
-        outline, samples the track along `p`, the rows along its drawn points: their edges differ by a few cm)."""
-        near = self.beds_near(x, y)
-        zs = [z for row, o, _ in near if (z := bed_z(row, o)) is not None]
-        if not zs and reach:  # (only where no bed covers the point)
-            for row, o, _ in near:
-                off = row[4]
-                if off[0] - reach <= o < off[0]:
-                    zs.append(row[5][0])
-                elif off[3] < o <= off[3] + reach:
-                    zs.append(row[5][3])
-        return min(zs) if zs else None
+        """surface_at for one point, or None."""
+        v = self.surface_at([x], [y], reach)[0]
+        return None if np.isnan(v) else float(v)
+
+
+def plane(tri, x, y):
+    """Heights on the planes of triangles (n, 3, 3) at (x, y)."""
+    a, b, c = tri[:, 0], tri[:, 1], tri[:, 2]
+    d = (b[:, 1] - c[:, 1]) * (a[:, 0] - c[:, 0]) + (c[:, 0] - b[:, 0]) * (a[:, 1] - c[:, 1])
+    d = np.where(np.abs(d) < 1e-12, 1e-12, d)
+    w0 = ((b[:, 1] - c[:, 1]) * (x - c[:, 0]) + (c[:, 0] - b[:, 0]) * (y - c[:, 1])) / d
+    w1 = ((c[:, 1] - a[:, 1]) * (x - c[:, 0]) + (a[:, 0] - c[:, 0]) * (y - c[:, 1])) / d
+    return w0 * a[:, 2] + w1 * b[:, 2] + (1 - w0 - w1) * c[:, 2]
 
 
 def bed_z(row, o):
