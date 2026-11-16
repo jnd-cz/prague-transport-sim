@@ -626,6 +626,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     return m;
   })));
   data.tracks.forEach((t, k) => beds[k].rows.forEach((row, i) => { row[5][0] = edges[k][i][0]; row[5][3] = edges[k][i][1]; }));
+  group.userData.bedRows = beds.map((b) => b.rows); // (read by tools/test_bed_surface_page.py: the build's copy of this rule, #508)
   if (ground.dtm) layUnderBeds(ground.dtm, bedsNear);
   const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
     (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);

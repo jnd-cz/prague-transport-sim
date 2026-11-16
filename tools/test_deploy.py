@@ -366,7 +366,7 @@ class SiteFiles(unittest.TestCase):
         import make_dist
         with tempfile.TemporaryDirectory() as root:
             os.makedirs(os.path.join(root, "data"))
-            for f in ("line17.json", "line17.streets.bin", "line17.streets.json"):
+            for f in ("line17.json", "line17.streets.bin", "line17.streets.json", "line17.ground.bin", "line17.ground.json"):
                 open(os.path.join(root, "data", f), "w").close()
             self.assertEqual(list(make_dist.files(root)), ["data/line17.json"])
 

@@ -516,6 +516,18 @@ Sections:
   the same walls: 3,400-11,400 strips under 1 m wide a line (6,300-16,100 m²) lay between them, joined to the plots.
   The city mesh's triangles in a box dropped under the classes above: 11-29 % (line 22 11 %, 17 13 %, 23 18 %, 9 24 %,
   37 29 %); the cut ones' remains roughly double their count.
+- **Raised survey areas over the rails** (#508, 2026-11-16): a raised area (sidewalk, island, median, platform) over a
+  rail almost always crosses the track, its axis in it: line 37 11 of 11, line 17 32 of 35 (699 of 712 m of rail under
+  them). They are pedestrian crossings over a reservation at its stops, classed sidewalk (line 37 U Elektry – Sídliště
+  Hloubětín), and the survey's platforms or sidewalks lying over a track. #512's sidewalk profile raises them 8-32 cm
+  over the rails, where the page keeps the survey's own heights under the rail heads; the ground mesh lays one across a
+  track flush with the rails within the beds' outline. Bridge tracks (`b`) have no ground bed (the page's `bedsNear`
+  skips them): their ends on the ground had made bed pieces without a bed surface, 961 corners on line 17. Where one
+  DI track ends and the next begins, their rail points lie 1-3 mm apart and their beds' quads leave a sliver between
+  them; a mesh point on the 1 mm grid there took the nearest quad's plane, up to 15 mm off the rail on line 37: the
+  ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
+  the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
+  sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
