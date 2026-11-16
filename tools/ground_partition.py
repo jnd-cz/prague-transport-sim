@@ -438,7 +438,7 @@ def write(ln, pieces, rep):
                                   "fallbacks inside the city, tools/city_terrain.py)")})
     out["attribution"] = sources.attribution(out["provenance"])
     p = os.path.join(ROOT, "reports", "ground-partition", f"line{ln}.partition.json")
-    with replacing(p, "w") as fh:
+    with replacing(p, "w", encoding="utf-8") as fh:
         json.dump(out, fh, separators=(",", ":"), ensure_ascii=False)
     return os.path.getsize(p)
 
