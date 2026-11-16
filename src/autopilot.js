@@ -60,6 +60,7 @@ const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may s
 const V_BUTTON = 4.2; // m/s: slow enough for the switch button: the accelerator stands at 30 or less coasting (ZR9, T3SU-24 § 8.2; tools/test_electric.py: 31 at 20 km/h), with the 1–2 km/h it comes in over the plan
 const V_BUTTON_COAST = 5.3; // m/s: the fastest the button still works coasting through (28 at 19 km/h coasting into Anděl, line 9 seed 1)
 const TURN_ROOM = 4; // s from a turn on the drive pedal to the brake fully there: ≈1.5 s on the pedal, 2.5 s for the brake loops (src/tr37.js coastSettle)
+const BUTTON_LEAD = 2; // s at V_BUTTON before a turn's contact that braking for the button is to have reached it: the brake there settled
 
 export class Autopilot {
   constructor() {
@@ -242,10 +243,13 @@ export class Autopilot {
       if (stood || dLeft <= 0) vFixed = 0;
       vt = Math.min(vt, vFixed);
     }
+    // how hard it slows by itself, rolling on the gradient with the preparation current (m/s²)
+    const resistAt = (v) => 650 * tr.cars + 28 * tr.cars * v + 4.2 * (0.7 + 0.3 * tr.cars) * v * v; // (as src/tram.js, without the curves)
+    const coastAt = (v, grade) => (resistAt(v) + 700 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia;
     // a turn under a contact where it will be braking anyway, for a stop just past it or for the switch's own limit: slow enough
     // there for the switch button, as a limit of its own, or it would take the drive pedal between the brake. (Where it
     // is still at speed there, the drive pedal is the way: nothing else draws the current.)
-    if (cd && tr.v > V_BUTTON) {
+    if (cd && (tr.v > V_BUTTON || cd.contact - tr.panto < BUTTON_LEAD * V_BUTTON)) {
       const dc = cd.contact - tr.panto;
       const toLimit = nl && nl.d - 12 > dc ? curveTo({ v: nl.v, d: nl.d - dc }) : Infinity;
       const toPoint = fixedAt !== null && cd.contact + 4.5 < fixedAt ? Math.sqrt(2 * stopDecel * Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5)) : Infinity;
@@ -255,19 +259,33 @@ export class Autopilot {
       // speed, it slows for the button instead: with time in hand, its target down at 20 km/h, the line's own target no longer marked
       // the contact as one to brake for; it coasted down 36 ‰ to the contact 29 m before Malostranská at 23 km/h, the button dead,
       // turned on the drive pedal, braked at once, LO dropped and the shoes stood it 9 m short, line 22 seed 2, #620. Not where a limit
-      // holds it slow enough to coast through on the button: braking for it at Anděl, under the 20 km/h street's limit, a brake step 3 m
-      // before the contact lifted the accelerator from 29 to 32 and the drive pedal turned at 19 km/h, 8 m short, line 9 seeds 1 and 2)
+      // holds it slow enough to coast through on the button: there it brakes for the button only where the braking past the contact
+      // would begin before it, brakeIn below)
       const vPass = nl && nl.d - 12 <= dc ? nl.v / 3.6 - 0.4 : vLine;
       const dP = toPoint < Infinity ? Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5) : null;
       const noRoom = dP !== null && vPass > V_BUTTON_COAST && -TURN_ROOM * stopDecel + Math.sqrt((TURN_ROOM * stopDecel) ** 2 + 2 * stopDecel * dP) < V_BUTTON_COAST;
-      if (dc > 0 && there > V_BUTTON && (there < 0.75 * vLine || noRoom)) {
+      // (and where it would coast through on the button, but the braking for what is past the contact begins before the pantograph is
+      // through, at a speed where the first brake step lifts the accelerator over 30: down 23 ‰ under the 20 km/h street it came to the
+      // contact at 19.9 km/h, braked for the stop 23 m on, step 1 took the accelerator to 33 and the drive pedal made the turn, #627. Its
+      // speed there: the target, and down a descent what coasting gains over the last 2.5 s, where it coasts for the button)
+      const lW = vPass * 2.5 + 2, gW = Math.min(g.profile.grade(cd.contact + 4.5 - 7), g.profile.grade(cd.contact + 4.5 - 7 - lW));
+      const vArr = Math.sqrt(vPass * vPass + 2 * Math.max(0, -coastAt(vPass, gW)) * lW);
+      const early = Math.min(dP === null ? Infinity : Math.sqrt(2 * stopDecel * Math.max(0, dP - 0.5 * vArr)), toLimit < Infinity ? curveTo({ v: nl.v, d: nl.d - dc - 0.5 * vArr }) : Infinity);
+      const brakeIn = vPass <= V_BUTTON_COAST && early < vArr && tr.eq.buttonStep(vArr) > 1;
+      // (from the button's coasting speed, where the first brake steps are light, the button's speed is reached BUTTON_LEAD before the
+      // contact: planned at it, the braking from 18.5 km/h began 3 m before it at Anděl, step 1 lifted the accelerator from 29 to 32, and
+      // the drive pedal made the turn, #620's first try. From higher up the brake is on a step that holds it under 30 by then. And slowed
+      // to it there, the limit holds until the contact: let go at 15 km/h 8 m before it, the target went back to the line's and it drove
+      // through the contact on the pedal, down 30 ‰ between two brakings)
+      const lead = vPass <= V_BUTTON_COAST ? BUTTON_LEAD * V_BUTTON : 0;
+      if (dc > 0 && there > V_BUTTON && (tr.v > V_BUTTON || dc < lead) && (there < 0.75 * vLine || noRoom || brakeIn)) {
         // (the next limit only where it binds more than the next one: taken for it whatever, the contact 660 m ahead at Malostranská hid
         // Chotkova's hairpins from the drive's target, and it pressed to step 3 down 48 ‰ between them, from 22 to 39 km/h, #396)
-        const cl = { v: V_BUTTON * 3.6, d: dc + 12 };
+        const cl = { v: V_BUTTON * 3.6, d: dc + 12 - lead };
         if (!nl || curveTo(cl) < curveTo(nl)) nl = cl;
         vLimit = Math.min(vLimit, curveTo(cl));
         vt = Math.min(vt, vLimit);
-      } else if (dc > 0 && there > V_BUTTON && toPoint < Infinity && Math.min(there, vPass) > V_BUTTON_COAST) {
+      } else if (dc > 0 && there > V_BUTTON && tr.v > V_BUTTON && toPoint < Infinity && Math.min(there, vPass) > V_BUTTON_COAST) {
         // (at speed the drive pedal makes the turn, ≈1.5 s without the brake: slow enough there for the point to stay on its curve after
         // that. Braking at 0.85 of step 5 it was on the curve at the contact 70 m before the stop, then needed 1.16 m/s² and the track
         // brakes; test drive "turn under a contact 70 m before the stop, at speed". Not where the limit has it pass slow enough to coast
@@ -292,9 +310,7 @@ export class Autopilot {
       if (d < 1) vMoving = 0;
       vt = Math.min(vt, vMoving);
     }
-    // how hard it slows by itself, rolling on the gradient with the preparation current (m/s²)
-    const resist = 650 * tr.cars + 28 * tr.cars * tr.v + 4.2 * (0.7 + 0.3 * tr.cars) * tr.v * tr.v; // (as src/tram.js, without the curves)
-    const aCoast = (resist + 700 * tr.cars) / tr.inertia + (tr.mass * 9.81 * gradeHere) / tr.inertia;
+    const resist = resistAt(tr.v), aCoast = coastAt(tr.v, gradeHere);
     // the approach: from the first brake pedal for this point until the tram stands, the point goes away, or something nearer
     // has taken it well under the curve (that may move off again, and the tram with it)
     if (fixedAt !== null && tr.notch < 0 && tr.v > 0.3 && tr.v >= vFixed - 0.5) this.approach = this.approach ?? fixedAt;
