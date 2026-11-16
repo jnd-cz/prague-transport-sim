@@ -60,6 +60,8 @@ BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge t
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
+SURVEY_LATTICE = 5.0  # m: a street's or a lidar ground's faces cut to this inside (main's DtmSurface split to 5 m)
+WATER_REACH, WATER_NEAREST = 150.0, 30  # m, points: an OSM water's level from its outlines this near
 WATER_LEVEL = 0.1  # a water area's level: this quantile of its outline's heights (src/terrain.js DtmSurface's water)
 BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/world.js flushDtm's 12 m)
 LAYERS = ("draw", "area")  # the file's names per triangle, in this order after the triangles (encode)
@@ -111,6 +113,62 @@ class SurveySurface:
                 d = (mine[None, :, 0] - x[miss, None]) ** 2 + (mine[None, :, 1] - y[miss, None]) ** 2
                 out[miss] = mine[d.argmin(1), 2]
         return out
+
+
+def water_at(L, px, py, reach=None):
+    """OSM's water areas (L["water"], terrain in the file): at points inside one, the water's level, the WATER_LEVEL
+    quantile of IPR's ground along the outlines within `reach` m (WATER_REACH: a river falls at its weirs), else along the
+    nearest WATER_NEAREST outline points; NaN outside. The city mesh over water is IPR's fills, in steps (line 17's
+    Vltava by the Vysehrad tunnel, #632)."""
+    from scipy.spatial import cKDTree
+    from geo import Frame
+    from ipr_dtm import IprDtm
+    reach = reach or WATER_REACH
+    out = np.full(len(px), np.nan)
+    rings = [r for r in L.get("water") or [] if len(r) >= 3]
+    if not rings or not len(px):
+        return out
+    polys = [shapely.Polygon([q[:2] for q in r]) for r in rings]
+    polys = [g if g.is_valid else shapely.make_valid(g) for g in polys]
+    u = shapely.union_all(polys)
+    shapely.prepare(u)
+    inside = shapely.contains_xy(u, px, py)
+    if not inside.any():
+        return out
+    pts = []
+    for r in rings:
+        ring = shapely.LineString([q[:2] for q in r] + [r[0][:2]])
+        n = max(2, int(ring.length / 5.0))
+        pts.append(shapely.get_coordinates(shapely.line_interpolate_point(ring, np.linspace(0, ring.length, n))))
+    P = np.concatenate(pts)
+    F_ = Frame()
+    zz = np.asarray(IprDtm().sample(P[:, 0] + F_.E0, P[:, 1] + F_.N0), float)
+    ok = np.isfinite(zz)
+    if not ok.any():
+        return out
+    P, zz = P[ok], zz[ok]
+    tree = cKDTree(P)
+    q = np.column_stack([px[inside], py[inside]])
+    near = tree.query_ball_point(q, reach)
+    lev = np.empty(len(q))
+    for k, idx in enumerate(near):
+        if len(idx) < 3:
+            idx = tree.query(q[k], k=min(WATER_NEAREST, len(P)))[1]
+        lev[k] = np.quantile(zz[np.atleast_1d(idx)], WATER_LEVEL)
+    out[inside] = lev
+    return out
+
+
+def lattice(g, step=None):
+    """Lines every `step` m (SURVEY_LATTICE) in x and in y on the city's grid, inside g (None when none crosses it)."""
+    step = step or SURVEY_LATTICE
+    x0, y0, x1, y1 = g.bounds
+    xs = np.arange(math.ceil(x0 / step) * step, x1, step)
+    ys = np.arange(math.ceil(y0 / step) * step, y1, step)
+    segs = [((x, y0 - 1), (x, y1 + 1)) for x in xs.tolist()] + [((x0 - 1, y), (x1 + 1, y)) for y in ys.tolist()]
+    if not segs:
+        return None
+    return shapely.intersection(shapely.MultiLineString(segs), g)
 
 
 def city_at(G, px, py):
@@ -310,6 +368,12 @@ def build(ln, mesh=None, threads=8, log=print):
     for k, q in enumerate(pieces["survey"]):
         lines.append(q["g"].boundary)
         owners.append(("survey", k, q["g"]))
+        # (a street or a ground on the lidar has a surface between its outline's points: lattice lines inside it, so its
+        # faces are cut to SURVEY_LATTICE m and their corners lie on that surface, #632)
+        if q["c"] in STREETS_ROAD | STREETS_WALK or (D.get("areas") or [{}] * (q["area"] + 1))[q["area"]].get("g"):
+            g = lattice(q["g"])
+            if g is not None and not g.is_empty:
+                lines.append(g)
     for k, q in enumerate(pieces["bed"]):
         lines.append(q["g"].boundary)
         owners.append(("bed", k, q["g"]))
@@ -417,9 +481,17 @@ def build(ln, mesh=None, threads=8, log=print):
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]
     tri3 = np.stack([np.column_stack([x[T[par, k]], y[T[par, k]], z[T[par, k]]]) for k in range(3)], 1)
     zc[m], prio[m], kind[m] = plane(tri3, cx[m], cy[m]), 3.0, "terrain"
-    # plots
+    tm = np.flatnonzero(m)
+    zw = water_at(L, cx[tm], cy[tm])
+    wet = np.isfinite(zw)
+    zc[tm[wet]] = zw[wet]
+    # plots: the ground under a building's footprint, the city mesh's (a flat pad at the median ground round it stood on walls
+    # up to 2 m on a slope, a grey slab where no building of the 3D city model stands on the footprint: a shed, a garden hut;
+    # the model's buildings carry their own walls down to their own base, #632); the pad's height where the mesh has none
     m = corner_cls == "plot"
-    zc[m] = [pieces["plot"][owners[o][1]]["z"] for o in owner[corner_face[m]]]
+    zp = np.array([pieces["plot"][owners[o][1]]["z"] for o in owner[corner_face[m]]], float)
+    zg = city_at(G, cx[m], cy[m])
+    zc[m] = np.where(np.isfinite(zg), zg, zp)
     prio[m], kind[m] = 4.0, "plot"
     # survey
     m = np.flatnonzero(corner_cls == "survey")
@@ -538,7 +610,7 @@ def build(ln, mesh=None, threads=8, log=print):
     if len(bd):
         cen = fc[bd].mean(1)
         draw[bd] = beds.style_at(cen[:, 0], cen[:, 1])
-    tr = np.flatnonzero(tcls == "terrain")
+    tr = np.flatnonzero((tcls == "terrain") | (tcls == "plot"))  # (a plot is ground: drawn by its land cover, #632)
     if len(tr):
         cen = fc[tr].mean(1)
         draw[tr] = land_cover(L, cen[:, 0], cen[:, 1])
@@ -553,8 +625,14 @@ def build(ln, mesh=None, threads=8, log=print):
         f"{time.time() - t1:.0f} s")
 
     # the kept terrain triangles, as they are
-    kv = np.stack([np.round(x * Q), np.round(y * Q), np.round(z * Q)], 1).astype(np.int64)
     KT = T[kept_whole]
+    zk = z.copy()  # (the kept triangles' corners in OSM's water at its level, as the faces' above)
+    if len(KT):
+        uk_ = np.unique(KT)
+        zw = water_at(L, x[uk_], y[uk_])
+        wet = np.isfinite(zw)
+        zk[uk_[wet]] = zw[wet]
+    kv = np.stack([np.round(x * Q), np.round(y * Q), np.round(zk * Q)], 1).astype(np.int64)
     used = np.unique(KT)
     allv = np.vstack([V, kv[used]])
     V2, inv2 = np.unique(allv, axis=0, return_inverse=True)

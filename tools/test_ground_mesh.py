@@ -70,6 +70,19 @@ class File(unittest.TestCase):
         self.assertEqual(sorted(names2), ["bed", "survey"])
 
 
+class Lattice(unittest.TestCase):
+    def test_lines_on_the_city_grid_clipped_to_the_area(self):
+        # (two pieces side by side get lines at the same x: their faces' corners meet on the shared edge)
+        g = shapely.box(1, 2, 13, 9)
+        L = gm.lattice(g, 5.0)
+        xs = sorted({round(c[0], 6) for part in shapely.get_parts(L) for c in shapely.get_coordinates(part) if
+                     abs(c[1] - 2) < 1e-9 or abs(c[1] - 9) < 1e-9})
+        self.assertEqual(xs, [5.0, 10.0])
+        self.assertAlmostEqual(shapely.length(L), 2 * 7 + 1 * 12)  # (x = 5, 10 across 7 m; y = 5 across 12 m)
+        self.assertTrue(shapely.box(1, 2, 13, 9).buffer(1e-9).contains(L))
+        self.assertIsNone(gm.lattice(shapely.box(1, 1, 4, 4), 5.0))
+
+
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")

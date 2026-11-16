@@ -1445,8 +1445,9 @@ const RAISED_DRAW = new Set(['sidewalk', 'island', 'median', 'platform']);
 // styles[class][draw name] = [group, r, g, b] (src/groundWorker.js); a wall is drawn as the face above it, a kerb's side grey
 export function groundStyles(layout) {
   const G = (name) => GROUND_GROUPS.indexOf(name), rgb = (hex) => new THREE.Color(hex).toArray();
-  const out = { terrain: {}, survey: {}, bed: { '': [G('bed'), ...rgb(BED_HEX)] }, plot: { '': [G('other'), ...rgb(DTM_COLORS.paved)] }, wall: {} };
+  const out = { terrain: {}, survey: {}, bed: { '': [G('bed'), ...rgb(BED_HEX)] }, plot: {}, wall: {} };
   for (const [k, hex] of Object.entries(TERRAIN_HEX)) out.terrain[k] = [G('terrain'), ...rgb(hex)];
+  out.plot = out.terrain; // (a building's footprint is ground, drawn by its land cover: the 3D city model's buildings stand on it, #632)
   for (const [c, hex] of Object.entries(DTM_COLORS)) out.survey[c] = [G(DTM_KIND[c] || 'other'), ...rgb(hex)];
   for (const [k, hex] of Object.entries(STYLE_BED_HEX)) out.bed[k] = [G('bed'), ...rgb(hex)];
   const kerb = () => [G('other'), ...rgb(KERB_SIDE)];
