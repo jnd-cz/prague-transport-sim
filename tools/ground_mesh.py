@@ -57,6 +57,8 @@ BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it i
 CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
+RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
+SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
 RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
 # where two tracks' rails lie within a mm or two, at a join or a switch, the nearer track's corner is another rail)
 RAIL_TOL = 0.001  # m: the mesh under a rail against the bed's row (#508's done-when)
@@ -304,6 +306,13 @@ def build(ln, mesh=None, threads=8, log=print):
     if not outline.is_empty:
         lines.append(outline.boundary)
     lines += rails
+    # (a raised area beside a track or a plot that reaches a rail: within RAIL_CLEAR of it at the bed's height, its kerb
+    # or wall RAIL_CLEAR past the rail; its edge in the lines)
+    across = crossing_pieces(pieces["survey"], beds)
+    band = rail_band(beds, outline, [q["g"] for k, q in enumerate(pieces["survey"]) if q["c"] in RAISED and not across[k]] +
+                     [q["g"] for q in pieces["plot"]])
+    if not band.is_empty:
+        lines.append(band.boundary)
     lines = chunks(lines)
     lines_tree = shapely.STRtree(lines)
     # (a whole triangle that a line touches, within float noise, is noded with the lines: a piece's vertex on its edge
@@ -351,8 +360,10 @@ def build(ln, mesh=None, threads=8, log=print):
     lost = owner < 0
     shapely.prepare(outline)
     in_bed = shapely.contains_xy(outline, *shapely.get_coordinates(inner).T) if not outline.is_empty else np.zeros(len(faces), bool)
+    shapely.prepare(band)
+    in_band = shapely.contains_xy(band, *shapely.get_coordinates(inner).T) if not band.is_empty else np.zeros(len(faces), bool)
     log(f"  owners: {n_lost} faces in no piece ({a_lost:.3f} m²) took the nearest's, {time.time() - t1:.0f} s")
-    faces, owner, in_bed = faces[~lost], owner[~lost], in_bed[~lost]
+    faces, owner, in_bed, in_band = faces[~lost], owner[~lost], in_bed[~lost], in_band[~lost]
 
     # triangles of the faces
     t1 = time.time()
@@ -401,17 +412,18 @@ def build(ln, mesh=None, threads=8, log=print):
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", "survey")
     # (a raised area across a track, its axis in it, is a crossing: within the beds' outline it lies flush with the rails,
     # its kerb at the outline's edge. #512's sidewalk stood 8-21 cm over the rails at line 37's stops; the 11 raised
-    # areas over line 37's rails all cross a track. One beside a track keeps its height, as on the page: world.js RAISED)
-    across = crossing_pieces(pieces["survey"], beds)
+    # areas over line 37's rails all cross a track. One beside a track keeps its height, as on the page: world.js RAISED,
+    # but not over a rail: within RAIL_CLEAR of one (the band) it lies at the bed's height, as a plot does there)
     c_across = np.zeros(len(cx), bool)
     c_across[m] = across[[owners[o][1] for o in owner[corner_face[m]]]] if len(m) else False
+    c_band = np.repeat(in_band[tf], 3)
     # the beds' outline: the bed surface (not a raised area, unless it crosses the track); and a corner on a rail on the
     # ground whatever face holds it, at the rail's height, or the bed's under it where another bed lies lower (where two
     # tracks join, the beds' outline, sampled along `p`, and the drawn rows part by mm: 29-95 rail points a line were
     # 2-54 mm off)
     zr = on_rails(cx, cy, beds, outline)
     on_rail = np.isfinite(zr)
-    m = np.flatnonzero((np.repeat(t_in_bed, 3) | on_rail) & ((kind != "raised") | c_across) & (corner_cls != "plot"))
+    m = np.flatnonzero(((np.repeat(t_in_bed, 3) | on_rail) & ((kind != "raised") | c_across) & (corner_cls != "plot")) | c_band)
     zb = beds.surface_at(cx[m], cy[m], BED_REACH)
     zb = np.where(on_rail[m], np.fmin(zr[m], np.where(zb < zr[m] - RAIL_TOL, zb, np.inf)), zb)
     ok = np.isfinite(zb)
@@ -601,6 +613,29 @@ def on_rails(cx, cy, beds, outline):
         on = shapely.line_interpolate_point(lines[li], shapely.line_locate_point(lines[li], pts[pi]))
         np.fmin.at(z, pi, shapely.get_coordinates(on, include_z=True)[:, 2])
     return z[inv]
+
+
+def rail_band(beds, outline, pieces):
+    """Where the given pieces (raised areas beside a track, plots) come within RAIL_CLEAR of a rail on the ground: one
+    polygon. (Line 17 s 17128, #507: a stop's island classed sidewalk lies along the outer rail, 9.5 cm over it; line 9's
+    depot hall, a plot, 13.6 cm over its tracks' ends at the door)"""
+    lines = [shapely.LineString([(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows])
+             for k, rows in enumerate(beds.rows) if len(rows) > 1 and not beds.tracks[k].get("b") for j in (1, 2)]
+    if not lines or outline.is_empty or not pieces:
+        return shapely.Polygon()
+    on = [g for g in shapely.get_parts(shapely.intersection(np.array(lines, dtype=object), outline))
+          if g.geom_type == "LineString" and not g.is_empty]
+    if not on:
+        return shapely.Polygon()
+    buf = shapely.buffer(np.array(on, dtype=object), RAIL_CLEAR)
+    tree = shapely.STRtree(buf)
+    parts = []
+    for g in pieces:
+        hit = tree.query(g, predicate="intersects")
+        if len(hit):
+            parts += [p for p in shapely.get_parts(shapely.intersection(g, shapely.union_all(buf[hit])))
+                      if p.geom_type == "Polygon" and p.area > SLIVER_BAND]
+    return shapely.union_all(parts) if parts else shapely.Polygon()
 
 
 def crossing_pieces(survey, beds):

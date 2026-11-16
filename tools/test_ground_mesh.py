@@ -105,6 +105,20 @@ class Rails(unittest.TestCase):
         self.assertEqual(np.isfinite(got).tolist(), [True, True, True, False, False, False])
         self.assertTrue(np.allclose(got[:3], 200.0 - bed_surface.BED_BELOW))
 
+    def test_the_band_takes_what_reaches_a_rail(self):
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {})]))
+        outline = shapely.box(-3, 0, 3, 90)
+        island = shapely.box(0.5, 40, 4, 50)  # (beside the track, over its right rail)
+        hall = shapely.box(-3, 90, 3, 95)  # (a plot where the tracks end: the outline's end)
+        far = shapely.box(2, 60, 4, 70)
+        band = gm.rail_band(beds, outline, [island, hall, far])
+        self.assertAlmostEqual(band.intersection(island).area, 10 * 2 * gm.RAIL_CLEAR, places=4)
+        self.assertGreater(band.intersection(hall).area, 0)  # (the rails' ends, rounded)
+        self.assertEqual(band.intersection(far).area, 0)
+        self.assertTrue(band.contains(shapely.Point(0.72, 45)))
+        self.assertFalse(band.contains(shapely.Point(0.80, 45)))
+
     def test_no_crossing_on_a_bridge(self):
         import bed_surface
         beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {"b": 1})]))
