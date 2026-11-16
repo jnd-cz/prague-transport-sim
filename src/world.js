@@ -669,6 +669,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (the file's ground is the hill over our rock tunnels and the road tunnels' mouths too: cut where main cut its terrain,
   // the vault, the rock top and the portals drawn below; only the squares near them are tested)
   if (pre) {
+    fitFileToMouths(pre, ground.lookup, mouths);
     const pad = TUN_W + 3 + cellPad, near = [];
     for (const [a, b] of rock) for (let s = a - 1; s <= b + 1; s += 4) { const p = route.at(Math.max(0, Math.min(route.length, s))); near.push([p.x - pad, p.y - pad, p.x + pad, p.y + pad]); }
     for (const m of mouths) { const r = m.D + m.w + 10; near.push([m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]); }
@@ -1676,6 +1677,54 @@ function roadPortalMouths(list) {
 // footprint, street vertices above the tunnel road come down onto it (in place: the height lookup
 // holds the same points). Lawns and the hill over the throat are left alone.
 const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'median', 'tram']);
+// The same for the ground file (#509): its street vertices inside a mouth's footprint over the tunnel road come down onto
+// it, in the drawn meshes (their street and walkway groups) and in the lookup (its survey street triangles), so walkers
+// stand on what is drawn. Only the squares and cells near a mouth are read.
+function fitFileToMouths(pre, lk, mouths) {
+  if (!mouths.length) return;
+  const into = (x, y, z) => {
+    for (const m of mouths) {
+      const [d, lat] = m.loc(x, y);
+      if (d < -3 || d > m.D || Math.abs(lat) > m.w + 1.5) continue;
+      const zt = m.zAt(d) + 0.05;
+      if (z > zt + 0.3) return zt;
+    }
+    return null;
+  };
+  const boxes = mouths.map((m) => { const r = m.D + m.w + 5; return [m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]; });
+  let n = 0;
+  for (const mesh of pre.meshes) {
+    const kind = GROUND_GROUPS[mesh.group];
+    if (kind !== 'street' && kind !== 'other') continue;
+    const P = mesh.pos;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let v = 0; v < P.length; v += 3) { const x = P[v], y = -P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (!boxes.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) continue;
+    for (let v = 0; v < P.length; v += 3) { const z = into(P[v], -P[v + 2], P[v + 1]); if (z !== null) { P[v + 1] = z; n++; } }
+  }
+  if (lk) {
+    const done = new Set();
+    for (const [bx0, by0, bx1, by1] of boxes) {
+      const i0 = Math.max(0, Math.floor((bx0 - lk.x0) / lk.cell)), i1 = Math.min(lk.nx - 1, Math.floor((bx1 - lk.x0) / lk.cell));
+      const j0 = Math.max(0, Math.floor((by0 - lk.y0) / lk.cell)), j1 = Math.min(lk.ny - 1, Math.floor((by1 - lk.y0) / lk.cell));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const k = j * lk.nx + i;
+        for (let s = lk.start[k], e = lk.start[k + 1]; s < e; s++) {
+          const t = lk.tris[s];
+          if (!MOUTH_FIT.has(lk.areas[lk.ta[t]])) continue;
+          for (let c = 0; c < 3; c++) {
+            const v = lk.tv[3 * t + c];
+            if (done.has(v)) continue;
+            done.add(v);
+            const z = into(lk.vx[v] + lk.x0, lk.vy[v] + lk.y0, lk.vz[v]);
+            if (z !== null) lk.vz[v] = z;
+          }
+        }
+      }
+    }
+  }
+  if (n) console.log(`ground file: ${n} street vertices brought down into tunnel mouths`);
+}
 function fitDtmToMouths(dtm, mouths) {
   if (!mouths.length || dtm.mouthsFitted) return;
   dtm.mouthsFitted = true;
