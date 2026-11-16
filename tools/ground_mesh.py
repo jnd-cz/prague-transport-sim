@@ -57,6 +57,7 @@ BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it i
 CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
+BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
 SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
 RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
@@ -349,6 +350,10 @@ def build(ln, mesh=None, threads=8, log=print):
     # each face's owner: the piece holding its inner point (the smallest, where a remains polygon lies on its triangle)
     t1 = time.time()
     inner = shapely.point_on_surface(faces)
+    # (a square reaching past the line's ground, ground_partition.line_area: its faces there are no one's)
+    shapely.prepare(box)
+    keep = shapely.contains_xy(box, *shapely.get_coordinates(inner).T)
+    faces, inner = faces[keep], inner[keep]
     fi, oi = own_tree.query(inner, predicate="intersects")
     owner = np.full(len(faces), -1)
     order = np.argsort(shapely.area(own_geoms[oi]))[::-1]  # (smallest last: it wins)
@@ -467,6 +472,23 @@ def build(ln, mesh=None, threads=8, log=print):
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)
     V, vid = np.unique(vkey, axis=0, return_inverse=True)
     F = vid.reshape(-1, 3)
+    # (what the page draws each triangle as, #509: inside the beds' outline at the bed's height the bed, by its track
+    # style, as the page draws its bed over the survey there; the survey by its area's class (src/world.js DTM_COLORS,
+    # a median under grass green, #555); else the class)
+    tcls = np.where((kind.reshape(-1, 3) == "bed").all(1) & (tcls != "plot"), "bed", tcls)
+    draw = np.full(len(tcls), "", dtype=object)
+    sv = np.flatnonzero(tcls == "survey")
+    if len(sv):
+        areas = D.get("areas") or []
+
+        def colour(q):
+            a = areas[q["area"]] if q["area"] < len(areas) else {}
+            return "green" if q["c"] == "median" and a.get("s") == "green" else q["c"]
+        draw[sv] = [colour(pieces["survey"][owners[o][1]]) for o in owner[tf[sv]].tolist()]
+    bd = np.flatnonzero(tcls == "bed")
+    if len(bd):
+        cen = fc[bd].mean(1)
+        draw[bd] = beds.style_at(cen[:, 0], cen[:, 1])
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
     log(f"  weld: {len(uk):,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items()]}, "
         f"{time.time() - t1:.0f} s")
@@ -483,16 +505,21 @@ def build(ln, mesh=None, threads=8, log=print):
     KF = remap[KT]
     F = np.vstack([F, KF])
     fcls_id = np.concatenate([fcls_id, np.zeros(len(KF), int)])
+    draw = np.concatenate([draw, np.full(len(KF), "", dtype=object)])
     V = V2
 
-    # the steps' walls: an edge whose two sides hold different vertices at an end
+    # the steps' walls: an edge whose two sides hold different vertices at an end; each drawn as the face above it
     t1 = time.time()
-    walls = step_walls(V, F)
+    walls, up = step_walls(V, F, above=True)
+    names = {i: c for c, i in CLASS_IDS.items()}
+    wall_draw = np.array([f"{names[int(fcls_id[u])]}:{draw[u]}" if draw[u] else names[int(fcls_id[u])] for u in up.tolist()],
+                         dtype=object)
     F = np.vstack([F, walls]) if len(walls) else F
     fcls_id = np.concatenate([fcls_id, np.full(len(walls), CLASS_IDS["wall"])])
+    draw = np.concatenate([draw, wall_draw]) if len(walls) else draw
     # (no degenerate triangles)
     good = (F[:, 0] != F[:, 1]) & (F[:, 1] != F[:, 2]) & (F[:, 0] != F[:, 2])
-    F, fcls_id = F[good], fcls_id[good]
+    F, fcls_id, draw = F[good], fcls_id[good], draw[good]
     log(f"  {len(walls):,} wall triangles, {time.time() - t1:.0f} s")
 
     rep = {"line": ln, "partition": {k: prep[k] for k in ("box", "box_km2", "classes", "cover", "terrain", "bed window") if k in prep},
@@ -509,7 +536,10 @@ def build(ln, mesh=None, threads=8, log=print):
     log(f"  rails checked, {time.time() - t1:.0f} s")
     rep["page today"] = page_counts(L, D)
     rep["seconds"]["mesh"] = round(time.time() - t0 - t_part, 1)
-    return {"V": V, "F": F, "cls": fcls_id, "box": box, "L": L, "rep": rep}
+    rep["draw classes"] = {c: dict(zip(*np.unique(draw[fcls_id == i].astype(str), return_counts=True)))
+                           for c, i in CLASS_IDS.items() if (fcls_id == i).any()}
+    rep["draw classes"] = {c: {k or "-": int(v) for k, v in d.items()} for c, d in rep["draw classes"].items()}
+    return {"V": V, "F": F, "cls": fcls_id, "draw": draw, "box": box, "L": L, "rep": rep}
 
 
 def xy_ids(V):
@@ -517,34 +547,41 @@ def xy_ids(V):
     return np.unique(V[:, :2], axis=0, return_inverse=True)[1].ravel()
 
 
-def step_walls(V, F):
-    """Vertical faces along every edge where the two triangles beside it hold different vertices at the same point."""
+def step_walls(V, F, above=False):
+    """Vertical faces along every edge where the two triangles beside it hold different vertices at the same point.
+    With `above`: also each wall's triangle on the higher side (its draw class is the wall's)."""
     k = xy_ids(V)
     e = np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    tri = np.tile(np.arange(len(F)), 3)
     ka, kb = k[e[:, 0]], k[e[:, 1]]
     lo, hi = np.minimum(ka, kb), np.maximum(ka, kb)
     flip = ka > kb
     a = np.where(flip, e[:, 1], e[:, 0])
     b = np.where(flip, e[:, 0], e[:, 1])
     order = np.lexsort((hi, lo))
-    lo, hi, a, b = lo[order], hi[order], a[order], b[order]
+    lo, hi, a, b, tri = lo[order], hi[order], a[order], b[order], tri[order]
     same = (lo[1:] == lo[:-1]) & (hi[1:] == hi[:-1])
     i = np.flatnonzero(same)
     a1, b1, a2, b2 = a[i], b[i], a[i + 1], b[i + 1]
-    out = []
-    for p, q, r, s in zip(a1.tolist(), b1.tolist(), a2.tolist(), b2.tolist()):
+    up = np.where(V[a1, 2] + V[b1, 2] >= V[a2, 2] + V[b2, 2], tri[i], tri[i + 1])
+    out, side = [], []
+    for p, q, r, s, u in zip(a1.tolist(), b1.tolist(), a2.tolist(), b2.tolist(), up.tolist()):
         if p == r and q == s:
             continue
         if p != r:
             out.append((p, q, r) if q == s else (p, q, s))
+            side.append(u)
         if q != s:
             out.append((p, s, r) if p != r else (p, s, q))
-    return np.asarray(out, int).reshape(-1, 3)
+            side.append(u)
+    walls = np.asarray(out, int).reshape(-1, 3)
+    return (walls, np.asarray(side, int)) if above else walls
 
 
 def edge_check(V, F, box):
-    """Every edge in the plane used by two triangles, or on the box's border (the walls left out: they stand on the steps'
-    edges): the edges used once, inside the box."""
+    """Every edge in the plane used by two triangles, or on the border of the line's ground (`box`: a box or the
+    corridor's polygon, ground_partition.line_area; the walls left out: they stand on the steps' edges): the edges used
+    once, inside it."""
     flat = F[~is_wall(V, F)]
     k = xy_ids(V)
     first = np.zeros(k.max() + 1, int)
@@ -555,9 +592,13 @@ def edge_check(V, F, box):
     u, cnt = np.unique(pairs, axis=0, return_counts=True)
     ax, ay = V[first[u[:, 0]], 0], V[first[u[:, 0]], 1]
     bxx, byy = V[first[u[:, 1]], 0], V[first[u[:, 1]], 1]
-    x0, y0, x1, y1 = (round(v * Q) for v in box.bounds)
-    on_border = ((ax == bxx) & ((ax == x0) | (ax == x1))) | ((ay == byy) & ((ay == y0) | (ay == y1)))
-    once = (cnt == 1) & ~on_border
+    once = cnt == 1
+    if once.any():  # (an edge on the border: both ends and its middle within BORDER_TOL of it, the points on the 1 mm grid)
+        i = np.flatnonzero(once)
+        line = box.boundary
+        d = np.maximum.reduce([shapely.distance(line, shapely.points(px / Q, py / Q)) for px, py in
+                               ((ax[i], ay[i]), (bxx[i], byy[i]), ((ax[i] + bxx[i]) / 2, (ay[i] + byy[i]) / 2))])
+        once[i[d <= BORDER_TOL]] = False
     more = cnt > 2
     out = {"edges": int(len(u)), "used once inside the box": int(once.sum()), "used more than twice": int(more.sum())}
     for name, m in (("first used once", once), ("first used more than twice", more)):
@@ -867,11 +908,13 @@ def hilbert(x, y, order=20):
     return d
 
 
-def encode(V, F, cls, box):
+def encode(V, F, cls, box, draw=None):
     """(bytes, layout): the vertices along a Hilbert curve over the box's 1 m cells, as differences of x, y, z in mm from
     the box's north-west corner and its base; per class its triangles, each turned to start at its lowest index (its
     winding kept), sorted by it: that index's difference to the previous one's and the other two as differences to it.
-    (Line 37, 2.45 M triangles: by rows 12.0 MB gzip, along the curve 8.7 MB, brotli 7.3 MB.)"""
+    (Line 37, 2.45 M triangles: by rows 12.0 MB gzip, along the curve 8.7 MB, brotli 7.3 MB.)
+    `draw` (per triangle a name, "" for none): per class with names, after all the triangles, its triangles' draw classes
+    in the same order as runs (index into layout["draw"][class], run length), #509."""
     x0, y1 = round(box.bounds[0] * Q), round(box.bounds[3] * Q)
     base = int(V[:, 2].min())
     rel = np.stack([V[:, 0] - x0, y1 - V[:, 1], V[:, 2] - base], 1)
@@ -882,23 +925,39 @@ def encode(V, F, cls, box):
     d = np.diff(np.vstack([[0, 0, 0], R]), axis=0)
     parts = [varints(zigzag(d.ravel()))]
     layout = {"unit": 1 / Q, "x0": x0 / Q, "y1": y1 / Q, "base": base / Q, "vertices": int(len(V)), "classes": {}}
+    runs = {}
     for c, i in CLASS_IDS.items():
-        t = rank[F[cls == i]]
+        m = cls == i
+        t = rank[F[m]]
         r = t.argmin(1) if len(t) else np.zeros(0, int)
         k = np.arange(len(t))
         t = np.stack([t[k, r], t[k, (r + 1) % 3], t[k, (r + 2) % 3]], 1) if len(t) else t.reshape(0, 3)
-        t = t[np.argsort(t[:, 0], kind="stable")]
+        o = np.argsort(t[:, 0], kind="stable")
+        t = t[o]
         first = t[:, 0]
         dd = np.column_stack([np.diff(np.concatenate([[0], first])), t[:, 1] - first, t[:, 2] - first])
         parts.append(varints(zigzag(dd.ravel())))
         layout["classes"][c] = int(len(t))
+        if draw is not None and len(t):
+            d = np.asarray(draw, dtype=object)[m][o].astype(str)
+            if (d != "").any():
+                names, ids = np.unique(d, return_inverse=True)
+                cut = np.flatnonzero(np.diff(ids)) + 1
+                starts = np.concatenate([[0], cut])
+                lens = np.diff(np.concatenate([starts, [len(ids)]]))
+                runs[c] = (names.tolist(), np.column_stack([ids[starts], lens]).ravel())
+    if runs:
+        layout["draw"], layout["drawRuns"] = {}, {}
+        for c, (names, rl) in runs.items():
+            parts.append(varints(rl.astype(np.int64)))
+            layout["draw"][c], layout["drawRuns"][c] = names, int(len(rl) // 2)
     blob = b"".join(parts)
     layout["sections"] = [len(p) for p in parts]
     return blob, layout
 
 
-def decode(blob, layout):
-    """(V (n, 3) float m, {class: (m, 3) indexes})."""
+def decode(blob, layout, draw=False):
+    """(V (n, 3) float m, {class: (m, 3) indexes}); with `draw` also {class: per triangle its draw class's name}."""
     n = layout["vertices"]
     u, off = read_varints(blob, 3 * n)
     R = np.cumsum(unzigzag(u).reshape(n, 3), axis=0)
@@ -910,13 +969,20 @@ def decode(blob, layout):
         d = unzigzag(u).reshape(m, 3)
         first = np.cumsum(d[:, 0])
         out[c] = np.column_stack([first, first + d[:, 1], first + d[:, 2]])
-    return V, out
+    if not draw:
+        return V, out
+    names = {}
+    for c, n in (layout.get("drawRuns") or {}).items():
+        u, off = read_varints(blob, 2 * n, off)
+        rl = np.asarray(u, np.int64).reshape(n, 2)
+        names[c] = np.repeat(np.asarray(layout["draw"][c], dtype=object)[rl[:, 0]], rl[:, 1])
+    return V, out, names
 
 
 def write(ln, built, rep):
     import sources
     from atomic import replacing
-    blob, layout = encode(built["V"], built["F"], built["cls"], built["box"])
+    blob, layout = encode(built["V"], built["F"], built["cls"], built["box"], built.get("draw"))
     layout["provenance"] = sources.stamp("ground_mesh.py", {
         "ground": sources.single("terrain", "ipr-dtm", int(len(built["F"])), "triangles: the city mesh (IPR), the survey, "
                                  "the beds, the building plots, welded")})

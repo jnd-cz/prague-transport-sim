@@ -37,6 +37,20 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_draw_classes_round_trip_with_their_triangles(self):
+        V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900], [0, -1000, 200000], [500, -500, 201234])
+        F = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
+        cls = np.array([1, 1, 1, 0])
+        draw = np.array(["road", "sidewalk", "road", ""], dtype=object)
+        blob, layout = gm.encode(V, F, cls, shapely.box(0, -1, 1, 0), draw)
+        W, by, names = gm.decode(blob, layout, draw=True)
+        self.assertEqual(sorted(layout["draw"]), ["survey"])
+        got = {tuple(sorted(map(tuple, (W[t] * Q).round().astype(int).tolist()))): n for t, n in zip(by["survey"], names["survey"])}
+        want = {tuple(sorted(map(tuple, V[F[i]].tolist()))): draw[i] for i in range(3)}
+        self.assertEqual(got, want)
+        V2, by2 = gm.decode(blob, layout)  # (without asking, as before)
+        self.assertEqual(len(by2["survey"]), 3)
+
 
 class Steps(unittest.TestCase):
     def square_with_a_step(self):
@@ -60,6 +74,16 @@ class Steps(unittest.TestCase):
         F2 = np.array([[0, 1, 2], [0, 4, 5], [5, 4, 3], [5, 3, 1]])
         r = gm.edge_check(V2, F2, shapely.box(-10, -10, 10, 10))
         self.assertGreaterEqual(r["used once inside the box"], 3)
+
+
+class Border(unittest.TestCase):
+    def test_edges_on_a_polygon_border_are_not_cracks(self):
+        # (a diamond of two triangles: its four sides on the border of a diamond-shaped ground, none a crack)
+        V = mm([0, -1000, 0], [1000, 0, 0], [0, 1000, 0], [-1000, 0, 0])
+        F = np.array([[0, 1, 2], [0, 2, 3]])
+        area = shapely.Polygon([(0, -1), (1, 0), (0, 1), (-1, 0)])
+        self.assertEqual(gm.edge_check(V, F, area)["used once inside the box"], 0)
+        self.assertEqual(gm.edge_check(V, F[:1], area)["used once inside the box"], 1)  # (the diagonal, inside)
 
 
 class Faces(unittest.TestCase):
@@ -166,7 +190,7 @@ class Built(unittest.TestCase):
                 F = np.vstack([t for t in by.values() if len(t)])
                 L = json.load(open(os.path.join(ROOT, "data", f"line{ln}.json"), encoding="utf-8"))
                 import ground_partition
-                r = gm.edge_check(Vq, F, ground_partition.line_box(L))
+                r = gm.edge_check(Vq, F, ground_partition.line_area(L))
                 self.assertEqual(r["used once inside the box"], 0, f"line {ln}: {r}")
                 self.assertEqual(r["used more than twice"], 0, f"line {ln}: {r}")
 
