@@ -77,6 +77,45 @@ class Faces(unittest.TestCase):
         self.assertAlmostEqual(float(gm.plane(tri, np.array([0.5]), np.array([0.5]))[0]), 2.5)
 
 
+def level_line(tracks):
+    """A line of straight level tracks at 200 m (top of rail), no lift: bed_surface.Beds' input."""
+    n = 60
+    return {"path": [[0, -10], [0, 110]], "pathExt": {"before": [], "after": []}, "heights": {"step": 2.0},
+            "lift": {"step": 2, "unit": 0.001, "v": [0] * n},
+            "tracks": [{"p": p, "zs": [200.0] * 62, "bed": {"l": [200] * 62, "r": [200] * 62, "meet": [0] * 62}, **extra}
+                       for p, extra in tracks]}
+
+
+class Rails(unittest.TestCase):
+    def test_a_raised_area_across_the_track_is_a_crossing_one_beside_it_is_not(self):
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {})]))
+        survey = [{"c": "sidewalk", "g": shapely.box(-5, 40, 5, 45)},  # (across: the axis in it)
+                  {"c": "sidewalk", "g": shapely.box(0.5, 60, 4, 70)},  # (beside, over the right rail only)
+                  {"c": "road", "g": shapely.box(-5, 80, 5, 85)}]  # (not raised)
+        self.assertEqual(gm.crossing_pieces(survey, beds).tolist(), [True, False, False])
+
+    def test_no_crossing_on_a_bridge(self):
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {"b": 1})]))
+        self.assertFalse(gm.crossing_pieces([{"c": "sidewalk", "g": shapely.box(-5, 40, 5, 45)}], beds).any())
+
+    def test_ground_over_a_rail_head_is_found(self):
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {})]))
+        top = 200.0
+        # (a plane 1 cm under the top of rail, and over y 40..45 a square 0.1 m over it)
+        V = mm([-5000, 0, 199990], [5000, 0, 199990], [5000, 100000, 199990], [-5000, 100000, 199990],
+               [-5000, 40000, int((top + 0.1) * Q)], [5000, 40000, int((top + 0.1) * Q)], [5000, 45000, int((top + 0.1) * Q)],
+               [-5000, 45000, int((top + 0.1) * Q)])
+        F = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
+        cls = np.array([0, 0, 1, 1])
+        r = gm.heads_check(V, F, cls, beds, shapely.box(-3, 0, 3, 100))
+        self.assertGreater(r["under the ground"], 0)
+        self.assertEqual(set(r["by the class over them"]), {"survey"})
+        self.assertTrue(all(39 <= p[1] <= 46 and abs(p[2] - 10) < 0.2 for p in r["worst places: x, y, cm over, class"]))
+
+
 class Built(unittest.TestCase):
     def test_every_built_line_has_no_t_junction_and_no_crack(self):
         names = [f[4:-len(".ground.bin")] for f in sorted(os.listdir(os.path.join(ROOT, "data"))) if f.endswith(".ground.bin")]

@@ -155,10 +155,11 @@ class Beds:
         tracks = L.get("tracks") or []
         self.tracks = tracks
         self.smooth = [densify(t["p"]) for t in tracks]
-        self.zBed, self.tilt = [], []
+        self.zBed, self.tilt, self.lift = [], [], []  # (top of rail = a rail's row z + lift + BED_BELOW)
         for t, sm in zip(tracks, self.smooth):
             z = self._own_heights(t, sm, step)
             lift = np.array([self._lift_at(x, y) for x, y in sm])
+            self.lift.append(lift)
             self.zBed.append(z - lift - BED_BELOW)
             self.tilt.append(self._tilt(sm))
         self.owner = np.concatenate([np.full(len(sm), k) for k, sm in enumerate(self.smooth)]) if tracks else np.zeros(0, int)

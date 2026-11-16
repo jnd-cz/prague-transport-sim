@@ -143,7 +143,9 @@ def bed_pieces(L, box, ipr, F, log=None):
     confusion = {"structure, on a span or in a tunnel": 0, "structure, elsewhere": 0, "ground, on a span or in a tunnel": 0,
                  "ground, elsewhere": 0}
     for i, tr in enumerate(L.get("tracks") or []):
-        if not tr.get("bed") or len(tr.get("p") or []) < 2 or not tr.get("zs"):
+        # (a bridge's track, `b`: the bridge carries it, and the page lays no ground bed under it (world.js bedsNear,
+        # lowerTerrainUnderTracks); its ends on the ground made bed pieces without a bed surface, 961 corners on line 17)
+        if not tr.get("bed") or len(tr.get("p") or []) < 2 or not tr.get("zs") or tr.get("b"):
             continue
         xy = bed_samples(tr)
         zs = np.asarray(tr["zs"], float)[:len(xy)]

@@ -398,8 +398,14 @@ def build(ln, mesh=None, threads=8, log=print):
     zc[m] = zs
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc])
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", "survey")
-    # the beds' outline: the bed surface (not a raised area)
-    m = np.flatnonzero(np.repeat(t_in_bed, 3) & (kind != "raised") & (corner_cls != "plot"))
+    # (a raised area across a track, its axis in it, is a crossing: within the beds' outline it lies flush with the rails,
+    # its kerb at the outline's edge. #512's sidewalk stood 8-21 cm over the rails at line 37's stops; the 11 raised
+    # areas over line 37's rails all cross a track. One beside a track keeps its height, as on the page: world.js RAISED)
+    across = crossing_pieces(pieces["survey"], beds)
+    c_across = np.zeros(len(cx), bool)
+    c_across[m] = across[[owners[o][1] for o in owner[corner_face[m]]]] if len(m) else False
+    # the beds' outline: the bed surface (not a raised area, unless it crosses the track)
+    m = np.flatnonzero(np.repeat(t_in_bed, 3) & ((kind != "raised") | c_across) & (corner_cls != "plot"))
     zb = beds.surface_at(cx[m], cy[m], BED_REACH)
     ok = np.isfinite(zb)
     zc[m[ok]], prio[m[ok]], kind[m[ok]] = zb[ok], 1.0, "bed"
@@ -478,6 +484,8 @@ def build(ln, mesh=None, threads=8, log=print):
     log(f"  edges checked, {time.time() - t1:.0f} s")
     t1 = time.time()
     rep["rails"] = rail_check(cx, cy, zf, kind, beds, outline)
+    rep["rails"]["ground over the top of rail"] = heads_check(V, F, fcls_id, beds, outline)
+    rep["rails"]["raised areas across a track (laid flush within the beds' outline)"] = int(across.sum())
     log(f"  rails checked, {time.time() - t1:.0f} s")
     rep["page today"] = page_counts(L, D)
     rep["seconds"]["mesh"] = round(time.time() - t0 - t_part, 1)
@@ -557,12 +565,90 @@ def mesh_at(V, F, px, py):
     return out
 
 
+def axes(beds):
+    """The axes of the tracks on the ground (not a bridge's: the bridge carries it, the page lays nothing under it)."""
+    return [shapely.LineString([r[:2] for r in rows]) for k, rows in enumerate(beds.rows)
+            if len(rows) > 1 and not beds.tracks[k].get("b")]
+
+
+def crossing_pieces(survey, beds):
+    """Per survey piece: a raised one with a track's axis in it (a crossing over the track)."""
+    out = np.zeros(len(survey), bool)
+    ax = axes(beds)
+    ri = [k for k, q in enumerate(survey) if q["c"] in RAISED]
+    if ax and ri:
+        hit, _ = shapely.STRtree(ax).query(np.asarray([survey[k]["g"] for k in ri], dtype=object), predicate="intersects")
+        out[np.asarray(ri)[np.unique(hit)]] = True
+    return out
+
+
+def heads_check(V, F, cls, beds, outline):
+    """The written ground against the top of rail (a rail's row z + lift + BED_BELOW) at every rail point on the ground
+    off bridges: the highest triangle there over it by more than RAIL_TOL buries the rail head (#508's done-when; the
+    page's lint, tools/lint.js buriedRails). The places: per track and 20 m along it, the worst."""
+    import bed_surface
+    pts, top, where = [], [], []
+    for k, rows in enumerate(beds.rows):
+        if beds.tracks[k].get("b"):
+            continue
+        for i, (x, y, nx, ny, off, z) in enumerate(rows):
+            for j in (1, 2):
+                pts.append((x + nx * off[j], y + ny * off[j]))
+                top.append(z[j] + beds.lift[k][i] + bed_surface.BED_BELOW)
+                where.append((k, i))
+    if not pts:
+        return {}
+    pts, top, where = np.asarray(pts), np.asarray(top), np.asarray(where)
+    on = shapely.contains_xy(outline, pts[:, 0], pts[:, 1]) if not outline.is_empty else np.zeros(len(pts), bool)
+    pts, top, where = pts[on], top[on], where[on]
+    from scipy.spatial import cKDTree
+    # (only the triangles near a rail: line 17 holds 10.8 M)
+    P = V[F].astype(float) / Q
+    cen = P[:, :, :2].mean(1)
+    rad = np.linalg.norm(P[:, :, :2] - cen[:, None], axis=2).max(1)
+    d, _ = cKDTree(pts).query(cen, distance_upper_bound=float(rad.max()) + 0.01)
+    near = d <= rad + 0.01
+    z = mesh_at(V, F[near], pts[:, 0], pts[:, 1])
+    over = z - top
+    bad = np.flatnonzero(over > RAIL_TOL + 0.5 / Q)
+    names = {i: c for c, i in CLASS_IDS.items()}
+    # (the class of the highest triangle at each point over the rail)
+    sub = F[near]
+    kinds = {}
+    if len(bad):
+        Pn = V[sub].astype(float) / Q
+        tree = shapely.STRtree(shapely.polygons(np.concatenate([Pn[:, :, :2], Pn[:, :1, :2]], 1)))
+        pi, ti = tree.query(shapely.points(pts[bad, 0], pts[bad, 1]), predicate="intersects")
+        zz = plane(Pn[ti], pts[bad[pi], 0], pts[bad[pi], 1])
+        best = {}
+        for a, t, h in zip(pi.tolist(), ti.tolist(), zz.tolist()):
+            if a not in best or h > best[a][0]:
+                best[a] = (h, names[int(cls[near][t])])
+        kinds = {a: c for a, (h, c) in best.items()}
+    places = {}
+    for n, i in enumerate(bad.tolist()):
+        k, r = where[i]
+        key = (int(k), int(r * 1.5 // 20))  # (rows every ~1.5 m)
+        if key not in places or over[i] > places[key][2]:
+            places[key] = (round(float(pts[i, 0]), 2), round(float(pts[i, 1]), 2), float(over[i]), kinds.get(n, ""))
+    worst = sorted(places.values(), key=lambda v: -v[2])
+    by = {}
+    for n in range(len(bad)):
+        by[kinds.get(n, "")] = by.get(kinds.get(n, ""), 0) + 1
+    return {"rail points": int(len(pts)), "under the ground": int(len(bad)), "by the class over them": by,
+            "places (track, 20 m)": len(places),
+            "worst places: x, y, cm over, class": [[x, y, round(o * 100, 1), c] for x, y, o, c in worst[:12]]}
+
+
 def rail_check(cx, cy, zf, kind, beds, outline):
     """The ground under every rail point of every bed row on the ground (the welded height of the bed's corner there)
     against the row's height (#508: within RAIL_TOL). Where two beds overlap (a switch, a crossing) the ground takes the
-    lower one: those points are counted apart."""
-    pts, want = [], []
-    for rows in beds.rows:
+    lower one: those points are counted apart. A bridge's track is left out: the bridge carries it."""
+    pts, want, n_bridge = [], [], 0
+    for k, rows in enumerate(beds.rows):
+        if beds.tracks[k].get("b"):
+            n_bridge += 2 * len(rows)
+            continue
         for x, y, nx, ny, off, z in rows:
             for j in (1, 2):
                 pts.append((x + nx * off[j], y + ny * off[j]))
@@ -584,7 +670,7 @@ def rail_check(cx, cy, zf, kind, beds, outline):
     d = got - want
     under = np.isfinite(lowest) & (lowest < want - RAIL_TOL)  # (another bed lower there)
     own = ~under & np.isfinite(d)
-    return {"rail points on the ground": int(len(pts)),
+    return {"rail points on the ground": int(len(pts)), "on bridges, left out": n_bridge,
             "within the tolerance": int((np.abs(d[own]) <= RAIL_TOL + 0.5 / Q).sum()),
             "off by more": int((np.abs(d[own]) > RAIL_TOL + 0.5 / Q).sum()),
             "worst, mm": round(float(np.abs(d[own]).max()) * 1000, 2) if own.any() else None,
