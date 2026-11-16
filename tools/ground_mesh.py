@@ -256,6 +256,11 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
 def build(ln, mesh=None, threads=8, log=print):
     import bed_surface
     import ground_partition as gp
+    from city_terrain import peak_gb
+    log0 = log
+
+    def log(msg):  # (each step with the peak memory so far: lines 22 and 17 hold 9 M terrain triangles, 21 GB)
+        log0(f"{msg} (peak {peak_gb():.1f} GB)")
     t0 = time.time()
     pieces, prep, _ = gp.partition(ln, mesh, threads, geometry=True)
     G = pieces["_"]
@@ -268,6 +273,7 @@ def build(ln, mesh=None, threads=8, log=print):
     outline = G["beds outline"]
     rails = rail_lines(beds, outline)
     log(f"  beds: {sum(len(r) for r in beds.rows)} rows, {len(rails)} rail and row pieces on the ground, {time.time() - t1:.0f} s")
+    t1 = time.time()
     bx0, by0, bx1, by1 = box.bounds
 
     # the lines that make the faces, and what each face can be
@@ -307,16 +313,19 @@ def build(ln, mesh=None, threads=8, log=print):
     ti_, _ = lines_tree.query(polys, predicate="dwithin", distance=1e-6)
     touch[ti_] = True
     kept_whole = cand[~touch]
+    more = []  # (one concatenation: an append per triangle copies the whole array each time)
     for t in cand[touch].tolist():
         g = shapely.Polygon(tri_xy[t])
-        lines = np.append(lines, np.array([g.boundary], dtype=object))
+        more.append(g.boundary)
         owners.append(("terrain", t, g))
+    lines = np.concatenate([lines, np.array(more, dtype=object)]) if more else lines
     lines_tree = shapely.STRtree(lines)
     own_geoms = np.asarray([o[2] for o in owners], dtype=object)
     own_tree = shapely.STRtree(own_geoms)
     kept_polys = shapely.polygons(np.concatenate([tri_xy[kept_whole], tri_xy[kept_whole][:, :1]], 1)) if len(kept_whole) else None
     kept_tree = shapely.STRtree(kept_polys) if kept_polys is not None else None
 
+    log(f"  {len(lines):,} lines, {int(touch.sum()):,} whole triangles noded with them, {time.time() - t1:.0f} s")
     nx_, ny_ = int(math.ceil((bx1 - bx0) / TILE)), int(math.ceil((by1 - by0) / TILE))
     rects = [(bx0 + i * TILE, by0 + j * TILE, min(bx1, bx0 + (i + 1) * TILE), min(by1, by0 + (j + 1) * TILE))
              for i in range(nx_) for j in range(ny_)]
@@ -460,7 +469,7 @@ def build(ln, mesh=None, threads=8, log=print):
     F, fcls_id = F[good], fcls_id[good]
     log(f"  {len(walls):,} wall triangles, {time.time() - t1:.0f} s")
 
-    rep = {"line": ln, "partition": {k: prep[k] for k in ("box", "box_km2", "classes", "cover", "terrain")},
+    rep = {"line": ln, "partition": {k: prep[k] for k in ("box", "box_km2", "classes", "cover", "terrain", "bed window") if k in prep},
            "faces": len(faces), "vertices": int(len(V)), "triangles": int(len(F)),
            "triangles per class": {c: int((fcls_id == i).sum()) for c, i in CLASS_IDS.items()},
            "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)}}
@@ -792,6 +801,41 @@ def raster_error(built, ln):
     return out
 
 
+COLORS = {"terrain": (130, 175, 110), "survey": (150, 150, 158), "bed": (150, 90, 60), "plot": (210, 120, 120)}
+
+
+def picture(ln, window, path, px=5):
+    """The written ground seen from above at a window (x0, y0, x1, y1): each triangle its class's colour, shaded by its
+    slope (light from the north-west), the steps' walls as red lines."""
+    from PIL import Image, ImageDraw
+    layout = json.load(open(os.path.join(ROOT, "data", f"line{ln}.ground.json"), encoding="utf-8"))
+    with open(os.path.join(ROOT, "data", f"line{ln}.ground.bin"), "rb") as f:
+        V, by = decode(f.read(), layout)
+    x0, y0, x1, y1 = window
+    n = int((x1 - x0) * px)
+    im = Image.new("RGB", (n, n), (255, 255, 255))
+    d = ImageDraw.Draw(im)
+    light = np.array([-1.0, 1.0, 1.5])
+    light /= np.linalg.norm(light)
+    for c in ("terrain", "plot", "survey", "bed"):
+        t = by[c]
+        P = V[t]
+        inside = ((P[:, :, 0] >= x0 - 5).any(1) & (P[:, :, 0] <= x1 + 5).any(1) & (P[:, :, 1] >= y0 - 5).any(1) &
+                  (P[:, :, 1] <= y1 + 5).any(1))
+        P = P[inside]
+        nrm = np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0])
+        nrm *= np.sign(nrm[:, 2:3] + 1e-12)
+        shade = 0.55 + 0.45 * np.clip((nrm / (np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-12)) @ light, 0, 1)
+        for tri, sh in zip(P, shade):
+            d.polygon([((a - x0) * px, (y1 - b) * px) for a, b, _ in tri], fill=tuple(int(v * sh) for v in COLORS[c]))
+    W = V[by["wall"]]
+    for tri in W:
+        xy = np.unique(np.round(tri[:, :2], 3), axis=0)
+        if len(xy) == 2 and (x0 <= xy[:, 0]).all() and (xy[:, 0] <= x1).all() and (y0 <= xy[:, 1]).all() and (xy[:, 1] <= y1).all():
+            d.line([((a - x0) * px, (y1 - b) * px) for a, b in xy], fill=(220, 30, 30), width=1)
+    im.save(path)
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -800,9 +844,20 @@ def main(argv=None):
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=8)
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--min-free", type=float, default=4.0, help="GB: the run stops itself when free memory falls under it")
     a = ap.parse_args(argv)
     lines = a.lines.split(",") if a.lines else [a.line]
     rep_dir = os.path.join(ROOT, "reports", "ground-mesh")
+    import threading
+    import sysinfo
+
+    def guard():  # (the machine is shared: this run ends itself rather than push it into swapping, as city_terrain.py)
+        while True:
+            if (sysinfo.available_gb() or 99) < a.min_free:
+                print(f"free memory under {a.min_free} GB: stopped", flush=True)
+                os._exit(3)
+            time.sleep(2)
+    threading.Thread(target=guard, daemon=True).start()
     os.makedirs(rep_dir, exist_ok=True)
     from baseline_store import HeavyJob
     with HeavyJob("ground_mesh"):
@@ -814,6 +869,16 @@ def main(argv=None):
             rep["seconds"]["error"] = round(time.time() - t1, 1)
             if not a.no_write:
                 write(ln, built, rep)
+            if not a.no_write:
+                import ground_partition as gp
+                wins = {k: w for k, (l2, w) in gp.place_windows({ln: built["L"]}).items() if l2 == ln}
+                bw = rep["partition"].get("bed window")
+                if bw:
+                    wins["bed"] = bw
+                for name, w in wins.items():
+                    pth = os.path.join(rep_dir, f"{name}-line{ln}.png")
+                    picture(ln, w, pth)
+                    rep.setdefault("pictures", []).append(os.path.relpath(pth, ROOT).replace(os.sep, "/"))
             with open(os.path.join(rep_dir, f"line{ln}.json"), "w", encoding="utf-8") as f:
                 json.dump(rep, f, indent=1, ensure_ascii=False)
             print(json.dumps({k: v for k, v in rep.items() if k != "partition"}, indent=1, ensure_ascii=False), flush=True)
