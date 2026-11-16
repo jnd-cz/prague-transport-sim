@@ -43,18 +43,18 @@
     },
     {
       "path": "LICENSE.txt",
-      "bytes": 319,
-      "sha256": "7a40fd0e5a324e2cfd52c8ef3baa7d9d8a0b3decf7996f76deb845e411b9366d"
+      "bytes": 313,
+      "sha256": "90ffb14bb4713356525b4f5e7c4dfe673f16ea94fde68c7328951e80002a6f14"
     },
     {
       "path": "provenance.json",
-      "bytes": 4528,
-      "sha256": "5abddfd382390cbc0b7e6d3559f4c63ed9f708e5178b6754341881e77c75a52d"
+      "bytes": 4402,
+      "sha256": "8543267631b254544682132155b5092cdc665d92560f560b7b930d59dfe222fc"
     },
     {
       "path": "README.txt",
-      "bytes": 962,
-      "sha256": "fba6356567a0ab5bbcd048b6cbccfaf52cd4f14b400657a183d53c190d15bb32"
+      "bytes": 950,
+      "sha256": "5ee4c45912b89d9b19ec23379fed4e16fd85de10da298ec1d4113ea0574c70ff"
     },
     {
       "path": "release-01.wav",
