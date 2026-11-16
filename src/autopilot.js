@@ -59,6 +59,7 @@ const STOP_MARGIN = 0.8; // m: at a stop or a signal, the tram stands this far s
 const STAND_SHORT = 2.4; // m: standing this close is arrived (a stop zone may start only 2.5 m before the point)
 const V_BUTTON = 4.2; // m/s: slow enough for the switch button: the accelerator stands at 30 or less coasting (ZR9, T3SU-24 § 8.2; tools/test_electric.py: 31 at 20 km/h), with the 1–2 km/h it comes in over the plan
 const V_BUTTON_COAST = 5.3; // m/s: the fastest the button still works coasting through (28 at 19 km/h coasting into Anděl, line 9 seed 1)
+const TURN_ROOM = 4; // s from a turn on the drive pedal to the brake fully there: ≈1.5 s on the pedal, 2.5 s for the brake loops (src/tr37.js coastSettle)
 
 export class Autopilot {
   constructor() {
@@ -249,7 +250,14 @@ export class Autopilot {
       const toLimit = nl && nl.d - 12 > dc ? curveTo({ v: nl.v, d: nl.d - dc }) : Infinity;
       const toPoint = fixedAt !== null && cd.contact + 4.5 < fixedAt ? Math.sqrt(2 * stopDecel * Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5)) : Infinity;
       const there = Math.min(toLimit, toPoint);
-      if (dc > 0 && there > V_BUTTON && there < 0.75 * vLine) {
+      // (the drive pedal's turn at speed needs room after it: ≈1.5 s on the pedal, then the brake loops' 2.5 s to settle before the
+      // brake is all there (src/tr37.js coastSettle; ČKD, 2–3 s). Where the point leaves no room for that over the button's coasting
+      // speed, it slows for the button instead: with time in hand, its target down at 20 km/h, the line's own target no longer marked
+      // the contact as one to brake for; it coasted down 36 ‰ to the contact 29 m before Malostranská at 23 km/h, the button dead,
+      // turned on the drive pedal, braked at once, LO dropped and the shoes stood it 9 m short, line 22 seed 2, #620)
+      const dP = toPoint < Infinity ? Math.max(0, fixedAt - STOP_MARGIN - cd.contact - 4.5) : null;
+      const noRoom = dP !== null && -TURN_ROOM * stopDecel + Math.sqrt((TURN_ROOM * stopDecel) ** 2 + 2 * stopDecel * dP) < V_BUTTON_COAST;
+      if (dc > 0 && there > V_BUTTON && (there < 0.75 * vLine || noRoom)) {
         // (the next limit only where it binds more than the next one: taken for it whatever, the contact 660 m ahead at Malostranská hid
         // Chotkova's hairpins from the drive's target, and it pressed to step 3 down 48 ‰ between them, from 22 to 39 km/h, #396)
         const cl = { v: V_BUTTON * 3.6, d: dc + 12 };

@@ -25,7 +25,7 @@ RUN = """async (only) => {
   const { Tram } = await import('/src/tram.js');
   const { Autopilot } = await import('/src/autopilot.js');
   const h = 1 / 30;
-  // a line: stops [s], limit (km/h) or limits [[s, km/h]], grade(s), signals [{ s, states: [[t, state]] }], ahead { s, length, moves: [[t, v]] }, crossing { s, from, to } (a car crossing the track there, from t to t), contact (s of an overhead contact for a turn), mu (the rail's adhesion, 0.15 on autumn's wet leaves), patches [[s, s]] (leaf patches, 0.06), sand (what is left in the box, 0-1)
+  // a line: stops [s], limit (km/h) or limits [[s, km/h]], grade(s), signals [{ s, states: [[t, state]] }], ahead { s, length, moves: [[t, v]] }, crossing { s, from, to } (a car crossing the track there, from t to t), contact (s of an overhead contact for a turn), mild (the time in hand, 0-1), mu (the rail's adhesion, 0.15 on autumn's wet leaves), patches [[s, s]] (leaf patches, 0.06), sand (what is left in the box, 0-1)
   const drive = (o) => {
     const tr = new Tram(o.cars ?? 2);
     tr.eq.mode = 'advanced';
@@ -56,6 +56,8 @@ RUN = """async (only) => {
       nextContact() { return o.contact && !R.contact ? { contact: o.contact, required: 'diverging' } : null; },
     };
     const pilot = new Autopilot();
+    // (o.mild: the time in hand as src/autopilot.js _mild has it, 0 to 1; the stand-in has no timetable)
+    if (o.mild != null) pilot._mild = () => ((pilot.inHand = 10 + 30 * o.mild), o.mild);
     let last = tr.notch, braked = false, lastA = 0, jf = 0, T = 0, step = 0;
     const end = o.secs ?? 240, lastS = o.until ?? Infinity;
     while (T < end) {
@@ -135,6 +137,9 @@ RUN = """async (only) => {
     // (still at speed there, already braking: nothing but the drive pedal can draw the current)
     ...[[600, 70], [600, 100]].map(([s, d]) => ({ name: `turn under a contact ${d} m before the stop, at speed`, stops: [20, s], limit: 50, pax: 60, contact: s - d })),
     { name: 'turn under a contact 70 m before the stop, downhill', stops: [20, 600], limit: 50, pax: 60, grade: uphill(-0.03), contact: 530 },
+    // (down 36 per mille into a stop with a turn's contact 29 m before it: coasting it came to the contact at 23 km/h, the button dead,
+    // turned on the drive pedal and braked at once, LO dropped and the shoes stood it 9 m short; line 22 seed 2 at Malostranská, #620)
+    ...[[30, 20], [30, 29], [30, 40], [50, 29], [50, 40]].flatMap(([v, d]) => [0, 1].map((mild) => ({ name: `turn under a contact ${d} m before the stop, down 36 per mille, ${v} km/h${mild ? ', time in hand' : ''}`, stops: [20, 600], limit: v, pax: 60, grade: (s) => (s < 570 ? -0.036 : -0.02), contact: 600 - d, mild }))),
     // autumn: wet leaves on the rail (0.15) and patches of them crushed (0.06). The sand box held 90 s of a whole shift then, and the autopilot ran it dry
     // on every slip; with it empty a patch on 50 per mille can never be left (three runs stuck for good on lines 9 and 17)
     { name: 'leaves, level', stops: [20, 700], limit: 50, pax: 60, mu: 0.15, leaves: true },
