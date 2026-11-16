@@ -302,18 +302,41 @@ async function restore(id) {
   if (!c.problems.length) registerPackage(manifest);
 }
 
-// a .zip, or a package.json's address and the files it lists beside it (only on the player's click; the hashes checked)
-export async function installUrl(url) {
+// the files at an address: a .zip, or a package.json and the files it lists beside it (path -> bytes)
+export async function fetchEntries(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
-  if (/\.zip($|\?)/i.test(url)) return install(await readZip(await res.arrayBuffer()), url);
+  if (/\.zip($|\?)/i.test(url)) return readZip(await res.arrayBuffer());
   const text = await res.text(), p = JSON.parse(text), entries = new Map([['package.json', new TextEncoder().encode(text)]]);
   for (const f of p.files || []) {
     if (!safe(f.path)) continue;
     const r = await fetch(new URL(f.path, new URL(url, location.href)));
     if (r.ok) entries.set(f.path, new Uint8Array(await r.arrayBuffer()));
   }
-  return install(entries, url);
+  return entries;
+}
+// installed from an address (only on the player's click; the hashes checked)
+export const installUrl = async (url) => install(await fetchEntries(url), url);
+
+// the packages in a set of files checked as an install checks them, and nothing kept: the game as it was after (a
+// package of the same id installed here is taken out for the check and put back). For a submission (#580): one report
+// per package, as install's, with the manifest
+export async function dryCheck(entries) {
+  const found = unpack(entries);
+  if (!found.length) return [{ id: null, ok: false, problems: ['no package.json in it'], warnings: [] }];
+  found.sort((a, b) => (KIND_ORDER[a.manifest?.kind] ?? 9) - (KIND_ORDER[b.manifest?.kind] ?? 9));
+  const reports = [], passed = [], away = [];
+  for (const pkg of found) {
+    const id = pkg.manifest?.id, old = id && state.get(id);
+    if (old?.enabled && old.ok) { unregisterPackage(id); forget(old.manifest); away.push(id); }
+    const c = await checkPackage(pkg);
+    if (!c.problems.length) { registerPackage(pkg.manifest); passed.push(pkg.manifest); }
+    reports.push({ id, names: pkg.manifest?.names, manifest: pkg.manifest, ok: !c.problems.length, ...c });
+  }
+  // (in reverse: a fleet or livery before its vehicle)
+  for (const m of passed.reverse()) { unregisterPackage(m.id); forget(m); }
+  for (const id of away) await restore(id);
+  return reports;
 }
 // a newer version at its address: the version there, or null
 export async function newerAt(id) {

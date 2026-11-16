@@ -207,7 +207,9 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 - Vozidla…: balíčky od jiných autorů (tramvaj, nátěr, zvuky nebo vozový park), instalované ze souboru .zip, ze
   složky nebo z adresy, i celý komplet v jednom archivu. Hra každý před nabídnutím zkontroluje (soubory, licenci,
   rozměry modelu a jeho náročnost); odmítnutý ukáže s důvody. Instalované zůstávají jen v tomto prohlížeči a jdou
-  vypnout nebo odebrat; nová tramvaj se objeví v menu Model tramvaje. Dole je seznam přihlášených balíčků.
+  vypnout nebo odebrat; nová tramvaj se objeví v menu Model tramvaje. Dole je seznam přihlášených balíčků a
+  formulář, kterým autor svůj balíček (soubor .zip nebo jeho adresu) pošle projektu k posouzení; hra ho napřed
+  zkontroluje a pošle jen takový, který projde.
 
 ### Na telefonu nebo tabletu
 

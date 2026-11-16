@@ -94,6 +94,11 @@ Balíček, který neprojde, odmítne s důvody. Instalované leží v úložišt
 kontroluje znovu. Pole, kontrola a jak balíček přihlásit do seznamu `assets/catalogue.json`: anglická verze,
 [Packages](vehicles.md#packages).
 
+Autor balíček přihlásí v *Vozidla…*, oddíl *Přihlásit balíček do projektu* (#580): soubor .zip nebo jeho adresu,
+nepovinný kontakt pro výsledek (e-mail nebo jméno na Discordu) a poznámku. Zaškrtnutím dovolí projektu soubory umístit
+na jeho server a nabídnout je všem z menu; jinak zůstanou na autorově serveru a seznam na ně odkazuje (uživatel,
+2026-11-15). Stránka balíček zkontroluje jako při instalaci, nic si neponechá, a pošle jen takový, který projde.
+
 ## Soubor pohyblivých dílů (rig)
 
 Vozidlo, které se hýbe bez vlastního kódu (loader `gltf-rigged`, `src/rigged.js`), jmenuje své díly v souboru
