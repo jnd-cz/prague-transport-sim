@@ -525,7 +525,9 @@ Sections:
   skips them): their ends on the ground had made bed pieces without a bed surface, 961 corners on line 17. Where one
   DI track ends and the next begins, their rail points lie 1-3 mm apart and their beds' quads leave a sliver between
   them; a mesh point on the 1 mm grid there took the nearest quad's plane, up to 15 mm off the rail on line 37: the
-  ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`).
+  ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
+  the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
+  sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
