@@ -83,6 +83,42 @@ class Lattice(unittest.TestCase):
         self.assertIsNone(gm.lattice(shapely.box(1, 1, 4, 4), 5.0))
 
 
+class Weirs(unittest.TestCase):
+    def test_a_corner_on_a_cut_is_seen_square_off_it_on_its_triangles_side(self):
+        cut = shapely.MultiLineString([[(0, 0), (10, 0)], [(20, -5), (20, 5)]])
+        x, y = gm.off_cuts(np.array([5.0, 5.0, 20.0]), np.array([0.0, 0.0, 1.0]), np.array([4.0, 9.0, 25.0]),
+                           np.array([3.0, -0.5, 0.0]), cut, 3.0)
+        self.assertEqual(np.round(x, 6).tolist(), [5.0, 5.0, 23.0])
+        self.assertEqual(np.round(y, 6).tolist(), [3.0, -3.0, 1.0])
+
+
+class LoweredKerbs(unittest.TestCase):
+    """#630: a kerb corner at a crossing's lowered stretch (tools/kerbs.py, #303) stands its height over the road."""
+
+    def test_the_stretch_its_ramps_and_the_plain_kerb_beyond(self):
+        low = np.array([[0.0, 0.0, 0.02]])
+        x = np.array([0.0, 1.9, 2.4, 3.0, 10.0])
+        y = np.zeros(5)
+        z = gm.lowered_heights(x, y, np.full(5, 100.12), np.full(5, 100.0), low, 4.0, 0.125)
+        # (within 2 m the stretch's 2 cm; then 1:8 along the kerb: 0.4 m past it 7 cm, 1 m past it the plain 12 cm)
+        self.assertEqual(np.round(z - 100.0, 3).tolist(), [0.02, 0.02, 0.07, 0.12, 0.12])
+
+    def test_a_flush_kerb_and_the_lowest_of_two(self):
+        low = np.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.02]])
+        z = gm.lowered_heights(np.array([2.2]), np.array([0.0]), np.array([100.12]), np.array([100.0]), low, 4.0, 0.125)
+        self.assertAlmostEqual(float(z[0]) - 100.0, 0.02, places=6)
+
+    def test_the_rule_read_from_the_survey(self):
+        D = {"provenance": {"lists": {"areas": {"checks": {"kerbs": {"lowered": {
+            "rule": {"kerb": 0.02, "width": 4.0, "ramp": 0.125},
+            "stretches": [{"x": 1, "y": 2, "c": "sidewalk", "h": 0.02}, {"x": 3, "y": 4, "c": "sidewalk", "h": None},
+                          {"x": 5, "y": 6, "c": "platform", "h": 0.02}]}}}}}}}
+        low, w, r = gm.lowered_kerbs(D)
+        self.assertEqual(low.tolist(), [[1.0, 2.0, 0.02]])
+        self.assertEqual((w, r), (4.0, 0.125))
+        self.assertEqual(len(gm.lowered_kerbs({})[0]), 0)
+
+
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")

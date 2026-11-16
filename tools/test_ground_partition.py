@@ -156,5 +156,31 @@ class Terrain(unittest.TestCase):
         self.assertAlmostEqual(r["kept_area"] + r["new_area"], 50, places=6)
 
 
+class Water(unittest.TestCase):
+    """WaterLevels (#632): a point's level from the banks of its own water it sees over the water, past no cut."""
+
+    def test_the_level_steps_at_a_weir(self):
+        W = shapely.box(0, 0, 600, 40)
+        weir = shapely.LineString([(300, -5), (300, 45)])
+        lv = gp.WaterLevels(W, [weir], Ipr(lambda x, y: np.where(x < 300, 12.0, 10.0)), Frame())
+        z = lv.at(np.array([150.0, 290.0, 310.0, 450.0]), np.array([20.0, 20.0, 20.0, 20.0]))
+        self.assertEqual(z.tolist(), [12.0, 12.0, 10.0, 10.0])
+        # (a corner on the weir: its own side's level, seen from inside its triangle)
+        z = lv.at(np.array([300.0, 300.0]), np.array([20.0, 20.0]), np.array([298.0, 302.0]), np.array([20.0, 20.0]))
+        self.assertEqual(z.tolist(), [12.0, 10.0])
+
+    def test_no_bank_across_an_island(self):
+        W = shapely.box(0, 0, 600, 100).difference(shapely.box(100, 30, 500, 70))
+        lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.where(y > 50, 20.0, 10.0)), Frame())
+        z = lv.at(np.array([300.0, 300.0]), np.array([85.0, 15.0]))
+        self.assertEqual(z.tolist(), [20.0, 10.0])
+
+    def test_a_pond_by_the_river_its_own_level(self):
+        W = shapely.union_all([shapely.box(0, 0, 600, 40), shapely.box(200, 60, 230, 80)])
+        lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.where(y > 50, 30.0, 10.0)), Frame())
+        z = lv.at(np.array([215.0, 215.0]), np.array([70.0, 20.0]))
+        self.assertEqual(z.tolist(), [30.0, 10.0])
+
+
 if __name__ == "__main__":
     unittest.main()

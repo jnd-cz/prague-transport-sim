@@ -82,6 +82,12 @@ Sections:
   also a (replacement) bus stop, so the asphalt runs from the road across the near track to the platform, and the
   far track stays grass. Nothing in the data tells them apart (the survey maps both as `tram` there, OSM's tram ways carry
   no surface), so a track differs only where a mark says so (`trackStyles` with `track`, data `stylesBack`/`liftBack`).
+- **OSM's Vltava is one multipolygon of untagged ways, its islands inner rings** (2026-11 extract, #632). The extract's
+  index keeps tagged ways only, so `tools/ground_partition.py` `osm_water` reads the members with a pass over the
+  extract (~10 s). The line data's `water` (`tools/build_line.py`) keeps outer rings only: Štvanice, Střelecký and
+  Slovanský ostrov lie in the river there (line 17: 0.40 km² of land in its water). Weirs, dams and lock gates are
+  `waterway=*` ways, most from bank to island, a few in pieces between piers (Štvanice's south channel); Čertovka and
+  the side channels pass the weirs with no weir mapped across them, so the weirs close no pool (`WaterLevels`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 

@@ -17,12 +17,15 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
      there (bed_surface.Beds.surface: the rails at top of rail - lift -+ the cant's tilt, as the page lays the bed);
    - survey: the generated street surface (data/lineN.streets.*, #512) on roads, tram areas and sidewalks; elsewhere
      the survey area's own surface (its outline's heights, triangulated);
-   - plot: its height (the partition's);
+   - plot: the city mesh's (#632);
+   - water (OSM's, and the survey's in it; the file's terrain class drawn as water): the level its banks give past its
+     weirs (ground_partition.WaterLevels, #632), its faces cut to WATER_LATTICE;
    - terrain: the city mesh triangle's plane.
 4. **The weld.** At a vertex the faces share, one height by priority, not averaged: the bed, then the survey (by rank),
-   then the terrain. A face keeps its own height (a step: two vertices at one point) where it differs from the weld's
-   by more than STEP for its pair: a kerb (a raised area beside a street or a bed), a building plot, a wall between the
-   survey and the terrain. Every step's edge gets its vertical faces, so every edge is used by two triangles.
+   then the water, then the terrain. A face keeps its own height (a step: two vertices at one point) where it differs
+   from the weld's by more than STEP for its pair: a kerb (a raised area beside a street or a bed), a building plot, a
+   wall between the survey and the terrain, the water below a quay or a bed and at a weir; the terrain comes down to the
+   water. Every step's edge gets its vertical faces, so every edge is used by two triangles.
 5. **The file.** data/lineN.ground.bin: vertices in mm (x, y from the box's corner, z over its base) along a Hilbert
    curve, as zigzag varint differences; per class, its triangles' indexes as differences (encode()). lineN.ground.json: the
    layout, the counts, the provenance. Decoded by decode() (and by the page, #509).
@@ -50,10 +53,14 @@ TILE = 512.0  # m: the squares the faces are built in (one future tile edge each
 Q = 1000  # vertices per m: positions and heights in mm
 CLASS_IDS = {"terrain": 0, "survey": 1, "bed": 2, "plot": 3, "wall": 4}
 RAISED = {"sidewalk", "island", "median", "platform"}  # (src/world.js RAISED: they keep their height over a bed)
+from kerbs import LOWERS as LOWERED  # noqa: E402 (the raised classes a lowered kerb is in: platforms keep their step)
+CARRIAGEWAY = {"road", "tram", "parking"}  # (the classes a lowered kerb stands over: tools/bench/surfaces.js ROAD)
 STREETS_ROAD, STREETS_WALK = {"road", "tram"}, {"sidewalk"}  # (the classes the generated street surface covers, #512)
 # m: a face's height differing from the weld's by more than this at a shared vertex stays a step (to measure: the
 # report counts every pair's differences)
-STEP = {"kerb": 0.03, "plot": 0.01, "wall": 0.5}
+# (a step's pairs: the water stands level, a wall up to what stands over it (a quay's survey, a bed: "water") and down
+# at a weir ("weir"); the terrain or a plot round it comes down to it ("bank"), #632)
+STEP = {"kerb": 0.03, "plot": 0.01, "wall": 0.5, "weir": 0.01, "water": 0.01, "bank": math.inf}
 BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it in both squares (tile_faces)
 CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
@@ -61,8 +68,11 @@ PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
 SURVEY_LATTICE = 5.0  # m: a street's or a lidar ground's faces cut to this inside (main's DtmSurface split to 5 m)
-WATER_REACH, WATER_NEAREST = 150.0, 30  # m, points: an OSM water's level from its outlines this near
-WATER_LEVEL = 0.1  # a water area's level: this quantile of its outline's heights (src/terrain.js DtmSurface's water)
+WATER_LEVEL = 0.1  # a survey water area's level outside OSM's water: this quantile of its outline's heights
+WATER_LATTICE = 32.0  # m: the water's faces cut to this (the page's lookup bins triangles in 16 m cells by their box)
+WATER_PRIO = 2.95  # the water's weld priority: under the survey's (2.x) and the beds' (1), over the terrain's (3)
+WATER_NUDGE = 3.0  # m: a water corner on a cut is seen from this far off it, on its triangle's side (off_cuts: past the
+# cut's cells on WaterLevels' raster; seen from inside a triangle 2 m along it, it lay in them and read both sides)
 BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/world.js flushDtm's 12 m)
 LAYERS = ("draw", "area")  # the file's names per triangle, in this order after the triangles (encode)
 SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
@@ -115,47 +125,53 @@ class SurveySurface:
         return out
 
 
-def water_at(L, px, py, reach=None):
-    """OSM's water areas (L["water"], terrain in the file): at points inside one, the water's level, the WATER_LEVEL
-    quantile of IPR's ground along the outlines within `reach` m (WATER_REACH: a river falls at its weirs), else along the
-    nearest WATER_NEAREST outline points; NaN outside. The city mesh over water is IPR's fills, in steps (line 17's
-    Vltava by the Vysehrad tunnel, #632)."""
+def off_cuts(px, py, tx, ty, cuts, step=None):
+    """Where points on the cuts (weirs, dams, lock gates) are seen from: `step` m (WATER_NUDGE) off the cut's segment
+    nearest each, square to it, on the side of (tx, ty) (the point's triangle's centre)."""
+    step = WATER_NUDGE if step is None else step
+    S = []
+    for part in shapely.get_parts(cuts):
+        if part.geom_type == "LineString":
+            c = shapely.get_coordinates(part)
+            S += list(zip(c[:-1], c[1:]))
+    if not S:
+        return px, py
+    S = np.asarray(S, float)
+    qi, j = shapely.STRtree(shapely.linestrings(S)).query_nearest(shapely.points(px, py), all_matches=False)
+    seg = np.empty(len(px), int)
+    seg[qi] = j
+    t = S[seg, 1] - S[seg, 0]
+    t /= np.maximum(np.hypot(t[:, 0], t[:, 1]), 1e-12)[:, None]
+    nrm = np.column_stack([-t[:, 1], t[:, 0]])
+    s = np.sign((np.column_stack([tx - px, ty - py]) * nrm).sum(1))
+    s[s == 0] = 1.0
+    return px + s * nrm[:, 0] * step, py + s * nrm[:, 1] * step
+
+
+def lowered_kerbs(D):
+    """tools/kerbs.py's lowered stretches (#303) in the survey's provenance: ((n, 3) x, y, height over the road; the
+    stretch's width; its ramps' grade). A stretch at a kerb=raised node (no height) is none."""
+    k = ((((D.get("provenance") or {}).get("lists") or {}).get("areas") or {}).get("checks") or {}).get("kerbs") or {}
+    lo = k.get("lowered") or {}
+    rule = lo.get("rule") or {}
+    st = [(s["x"], s["y"], s["h"]) for s in lo.get("stretches") or [] if s.get("h") is not None and s.get("c") in LOWERED]
+    return np.array(st, float).reshape(-1, 3), float(rule.get("width", 4.0)), float(rule.get("ramp", 0.125))
+
+
+def lowered_heights(px, py, z, zroad, low, width, ramp):
+    """Kerb corners' heights at the lowered stretches `low` ((n, 3): x, y, height over the road): within width / 2 of a
+    stretch the road's plus its height, rising at `ramp` along the kerb back to the plain kerb (z, as it was), the
+    lowest a stretch gives (tools/kerbs.py lowered_stretches' rule)."""
     from scipy.spatial import cKDTree
-    from geo import Frame
-    from ipr_dtm import IprDtm
-    reach = reach or WATER_REACH
-    out = np.full(len(px), np.nan)
-    rings = [r for r in L.get("water") or [] if len(r) >= 3]
-    if not rings or not len(px):
+    out = np.asarray(z, float).copy()
+    if not len(low) or not len(px):
         return out
-    polys = [shapely.Polygon([q[:2] for q in r]) for r in rings]
-    polys = [g if g.is_valid else shapely.make_valid(g) for g in polys]
-    u = shapely.union_all(polys)
-    shapely.prepare(u)
-    inside = shapely.contains_xy(u, px, py)
-    if not inside.any():
-        return out
-    pts = []
-    for r in rings:
-        ring = shapely.LineString([q[:2] for q in r] + [r[0][:2]])
-        n = max(2, int(ring.length / 5.0))
-        pts.append(shapely.get_coordinates(shapely.line_interpolate_point(ring, np.linspace(0, ring.length, n))))
-    P = np.concatenate(pts)
-    F_ = Frame()
-    zz = np.asarray(IprDtm().sample(P[:, 0] + F_.E0, P[:, 1] + F_.N0), float)
-    ok = np.isfinite(zz)
-    if not ok.any():
-        return out
-    P, zz = P[ok], zz[ok]
-    tree = cKDTree(P)
-    q = np.column_stack([px[inside], py[inside]])
-    near = tree.query_ball_point(q, reach)
-    lev = np.empty(len(q))
-    for k, idx in enumerate(near):
-        if len(idx) < 3:
-            idx = tree.query(q[k], k=min(WATER_NEAREST, len(P)))[1]
-        lev[k] = np.quantile(zz[np.atleast_1d(idx)], WATER_LEVEL)
-    out[inside] = lev
+    reach = width / 2 + 0.5 / ramp  # (no kerb rises 0.5 m)
+    tree = cKDTree(low[:, :2])
+    for i, near in enumerate(tree.query_ball_point(np.column_stack([px, py]), reach)):
+        for k in near:
+            d = math.hypot(px[i] - low[k, 0], py[i] - low[k, 1])
+            out[i] = min(out[i], zroad[i] + low[k, 2] + max(0.0, d - width / 2) * ramp)
     return out
 
 
@@ -374,12 +390,28 @@ def build(ln, mesh=None, threads=8, log=print):
             g = lattice(q["g"])
             if g is not None and not g.is_empty:
                 lines.append(g)
+        elif q["c"] == "water":
+            g = lattice(q["g"], WATER_LATTICE)
+            if g is not None and not g.is_empty:
+                lines.append(g)
     for k, q in enumerate(pieces["bed"]):
         lines.append(q["g"].boundary)
         owners.append(("bed", k, q["g"]))
     for k, q in enumerate(pieces["plot"]):
         lines.append(q["g"].boundary)
         owners.append(("plot", k, q["g"]))
+    # (OSM's water, level between lattice lines: its faces' corners on the level its banks give, WaterLevels; and its
+    # weirs, dams and lock gates across it and the survey's water: the level steps there, #632)
+    for k, q in enumerate(pieces["water"]):
+        lines.append(q["g"].boundary)
+        owners.append(("water", k, q["g"]))
+        g = lattice(q["g"], WATER_LATTICE)
+        if g is not None and not g.is_empty:
+            lines.append(g)
+    wet = G["water"].intersection(box) if not G["water"].is_empty else shapely.Polygon()
+    cuts = shapely.intersection(shapely.union_all(G["cuts"]), wet) if G["cuts"] and not wet.is_empty else None
+    if cuts is not None and not cuts.is_empty:
+        lines.append(cuts)
     for parent, g in G["remains"]:
         lines.append(g.boundary)
         owners.append(("terrain", int(parent), g))
@@ -481,10 +513,26 @@ def build(ln, mesh=None, threads=8, log=print):
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]
     tri3 = np.stack([np.column_stack([x[T[par, k]], y[T[par, k]], z[T[par, k]]]) for k in range(3)], 1)
     zc[m], prio[m], kind[m] = plane(tri3, cx[m], cy[m]), 3.0, "terrain"
-    tm = np.flatnonzero(m)
-    zw = water_at(L, cx[tm], cy[tm])
-    wet = np.isfinite(zw)
-    zc[tm[wet]] = zw[wet]
+    # the water: its level at each corner, a corner on a cut seen from inside its own triangle (the level steps there)
+    from geo import Frame
+    from ipr_dtm import IprDtm
+    levels = gp.WaterLevels(G["water"], G["cuts"], IprDtm(), Frame(), extent=box.buffer(gp.WATER_REACH)) if not wet.is_empty else None
+
+    def water_level(ci):
+        out = np.full(len(ci), np.nan)
+        if levels is None or not len(ci):
+            return out
+        vx, vy = cx[ci].copy(), cy[ci].copy()
+        if cuts is not None and not cuts.is_empty:
+            on = shapely.dwithin(shapely.points(vx, vy), cuts, 1e-3)
+            if on.any():
+                cen = fc[ci[on] // 3].mean(1)
+                vx[on], vy[on] = off_cuts(vx[on], vy[on], cen[:, 0], cen[:, 1], cuts)
+        key = np.round(vx * Q).astype(np.int64) * 10_000_000_000 + np.round(vy * Q).astype(np.int64)
+        uk_, first_, back = np.unique(key, return_index=True, return_inverse=True)
+        return levels.at(vx[first_], vy[first_])[back]
+    m = np.flatnonzero(corner_cls == "water")
+    zc[m], prio[m], kind[m] = water_level(m), WATER_PRIO, "pool"
     # plots: the ground under a building's footprint, the city mesh's (a flat pad at the median ground round it stood on walls
     # up to 2 m on a slope, a grey slab where no building of the 3D city model stands on the footprint: a shed, a garden hut;
     # the model's buildings carry their own walls down to their own base, #632); the pad's height where the mesh has none
@@ -527,16 +575,40 @@ def build(ln, mesh=None, threads=8, log=print):
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)
         zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
-    # (a river or a pond is level, as the page laid it (src/terrain.js DtmSurface): its outline's heights are its banks'
-    # tops, the water at their WATER_LEVEL quantile; triangulated between them it ran in steps along line 17's Vltava)
+    # (a river or a pond is level: in OSM's water, at the level its banks give (WaterLevels, as OSM's water above: two of
+    # line 17's survey water areas span a weir, Helmovský and Troja's, their own level 3.4-3.9 m under the water above it,
+    # #632); elsewhere, as the page laid it (src/terrain.js DtmSurface), at its outline's WATER_LEVEL quantile: its
+    # outline's heights are its banks' tops; triangulated between them it ran in steps along line 17's Vltava)
     wet = sc == "water"
-    for a in np.unique(sa[wet]).tolist():
+    in_osm = np.zeros(len(m), bool)
+    if wet.any() and levels is not None:
+        shapely.prepare(G["water"])
+        cen = fc[m[wet] // 3].mean(1)
+        in_osm[np.flatnonzero(wet)] = shapely.contains_xy(G["water"], cen[:, 0], cen[:, 1])
+        zs[in_osm] = water_level(m[in_osm])
+    for a in np.unique(sa[wet & ~in_osm]).tolist():
         zr = [q[2] for q in D["areas"][a]["r"] if q[2] is not None]
         if zr:
-            zs[wet & (sa == a)] = sorted(zr)[int(len(zr) * WATER_LEVEL)]
+            zs[wet & ~in_osm & (sa == a)] = sorted(zr)[int(len(zr) * WATER_LEVEL)]
+    # (a lowered kerb at a crossing (tools/kerbs.py's stretches, #303): a raised area's corner on the kerb, shared with the
+    # carriageway, stands the stretch's height over the road beside it, ramped back to the plain kerb along it. The
+    # street surface is a smooth fit 1 m in from the kerbs and carries none: line 37's 352 sites stood 9 cm over the road
+    # (median), 3 cm on main's layers, #630)
+    low, low_w, low_ramp = lowered_kerbs(D)
+    if len(low):
+        road = np.isin(sc, list(CARRIAGEWAY)) & np.isfinite(zs)
+        kr = np.round(cx[m][road] * Q).astype(np.int64) * 10_000_000_000 + np.round(cy[m][road] * Q).astype(np.int64)
+        ko, zo = np.unique(kr, return_index=True)
+        rz = zs[road][zo]
+        up = np.flatnonzero(np.isin(sc, list(LOWERED)) & np.isfinite(zs))
+        ku = np.round(cx[m][up] * Q).astype(np.int64) * 10_000_000_000 + np.round(cy[m][up] * Q).astype(np.int64)
+        j = np.clip(np.searchsorted(ko, ku), 0, max(len(ko) - 1, 0))
+        on = (ko[j] == ku) if len(ko) else np.zeros(len(up), bool)
+        up, j = up[on], j[on]
+        zs[up] = lowered_heights(cx[m][up], cy[m][up], zs[up], rz[j], low, low_w, low_ramp)
     zc[m] = zs
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc])
-    kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", "survey")
+    kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (a raised area across a track, its axis in it, is a crossing: within the beds' outline it lies flush with the rails,
     # its kerb at the outline's edge. #512's sidewalk stood 8-21 cm over the rails at line 37's stops; the 11 raised
     # areas over line 37's rails all cross a track. One beside a track keeps its height, as on the page: world.js RAISED,
@@ -578,11 +650,14 @@ def build(ln, mesh=None, threads=8, log=print):
     top_z = zc[first]
     top_kind = kind[first]
     dz = zc - top_z[inv]
-    pair = np.where(kind == "plot", "plot",
+    pk, pt = kind == "pool", top_kind[inv] == "pool"
+    pair = np.where(pk & pt, "weir", np.where(pk, "water", np.where(pt, "bank", np.where(kind == "plot", "plot",
                     np.where((kind == "raised") != (top_kind[inv] == "raised"), "kerb",
-                             np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", "")))
+                             np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
     lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
-    step = ~is_top & (np.abs(dz) > lim)
+    # (a weir's two sides share the water's priority: both are top, and the second took the first's level, its triangles
+    # sloping 1.5 m up to the weir at Šítkovský)
+    step = (~is_top | (pair == "weir")) & (np.abs(dz) > lim)
     zf = np.where(step, zc, top_z[inv])
     steps = {p: {"corners": int((step & (pair == p)).sum()),
                  "|dz| at shared corners, p50 / p90 / p99 / max m": [round(float(np.percentile(np.abs(dz[(pair == p) & ~is_top]), q)), 3)
@@ -613,7 +688,10 @@ def build(ln, mesh=None, threads=8, log=print):
     tr = np.flatnonzero((tcls == "terrain") | (tcls == "plot"))  # (a plot is ground: drawn by its land cover, #632)
     if len(tr):
         cen = fc[tr].mean(1)
-        draw[tr] = land_cover(L, cen[:, 0], cen[:, 1])
+        draw[tr] = land_cover(L, cen[:, 0], cen[:, 1], G["water"])
+    n_water = int((tcls == "water").sum())
+    draw[tcls == "water"] = "water"
+    tcls = np.where(tcls == "water", "terrain", tcls)  # (the file's terrain class, drawn as water)
     # (the survey's class under each triangle, a bed's on the survey too: what the page's lookup answers to traffic, kerbs,
     # stops and walkers, as the survey's own triangles did, #509; "" off the survey)
     area = np.full(len(tcls), "", dtype=object)
@@ -626,13 +704,7 @@ def build(ln, mesh=None, threads=8, log=print):
 
     # the kept terrain triangles, as they are
     KT = T[kept_whole]
-    zk = z.copy()  # (the kept triangles' corners in OSM's water at its level, as the faces' above)
-    if len(KT):
-        uk_ = np.unique(KT)
-        zw = water_at(L, x[uk_], y[uk_])
-        wet = np.isfinite(zw)
-        zk[uk_[wet]] = zw[wet]
-    kv = np.stack([np.round(x * Q), np.round(y * Q), np.round(zk * Q)], 1).astype(np.int64)
+    kv = np.stack([np.round(x * Q), np.round(y * Q), np.round(z * Q)], 1).astype(np.int64)
     used = np.unique(KT)
     allv = np.vstack([V, kv[used]])
     V2, inv2 = np.unique(allv, axis=0, return_inverse=True)
@@ -642,7 +714,7 @@ def build(ln, mesh=None, threads=8, log=print):
     KF = remap[KT]
     F = np.vstack([F, KF])
     fcls_id = np.concatenate([fcls_id, np.zeros(len(KF), int)])
-    draw = np.concatenate([draw, land_cover(L, x[KT].mean(1), y[KT].mean(1)) if len(KT) else np.zeros(0, dtype=object)])
+    draw = np.concatenate([draw, land_cover(L, x[KT].mean(1), y[KT].mean(1), G["water"]) if len(KT) else np.zeros(0, dtype=object)])
     area = np.concatenate([area, np.full(len(KF), "", dtype=object)])
     V = V2
 
@@ -664,6 +736,7 @@ def build(ln, mesh=None, threads=8, log=print):
     rep = {"line": ln, "partition": {k: prep[k] for k in ("box", "box_km2", "classes", "cover", "terrain", "bed window") if k in prep},
            "faces": len(faces), "vertices": int(len(V)), "triangles": int(len(F)),
            "triangles per class": {c: int((fcls_id == i).sum()) for c, i in CLASS_IDS.items()},
+           "water triangles (the terrain's, OSM's water)": n_water, "water": prep.get("water"),
            "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)}}
     t1 = time.time()
     rep["edges"] = edge_check(V, F, box)
@@ -827,10 +900,11 @@ def rail_band(beds, outline, pieces):
     return shapely.union_all(parts) if parts else shapely.Polygon()
 
 
-def land_cover(L, x, y):
+def land_cover(L, x, y, water=None):
     """Per point: the terrain's draw class as the page colours its terrain (src/world.js buildTerrain: OSM's green, wood
     and water in the line data): "grass", "wood", "water" or "" (bare ground). (The page marks its 10 m cells in the
-    data's order, water last; here grass, then wood, then water.)"""
+    data's order, water last; here grass, then wood, then water.) `water`: OSM's water with its islands
+    (ground_partition.osm_water) in place of the line data's, which keeps outer rings only: its islands lay in it, #632."""
     out = np.full(len(x), "", dtype=object)
 
     def union(rings):
@@ -840,7 +914,7 @@ def land_cover(L, x, y):
     green = L.get("green") or []
     for name, rings in (("grass", [g["p"] for g in green if g.get("t") != "wood"]),
                         ("wood", [g["p"] for g in green if g.get("t") == "wood"]), ("water", L.get("water") or [])):
-        u = union(rings)
+        u = water if name == "water" and water is not None else union(rings)
         if u is not None and not u.is_empty:
             shapely.prepare(u)
             out[shapely.contains_xy(u, x, y)] = name
