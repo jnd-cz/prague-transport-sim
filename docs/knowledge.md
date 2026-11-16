@@ -508,6 +508,26 @@ Sections:
 - **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
   (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
   measure is circular). It does not tell ballast from grass.
+- **The ground partition on the five lines** (`tools/ground_partition.py`, #507, 2026-11-16): the survey covers 6-14 %
+  of a line's box and holds almost every bed: the bed class (outside the survey) is 0.013-0.023 km² a line, 20-46
+  pieces. A bed sample is on a structure where its ground lies over 2.5 m from IPR's: of the samples along the route,
+  the test agrees with the route's spans and tunnels on 1,255 of 1,582 there and calls 22 elsewhere structures; the
+  ones it keeps on spans are span ends and low decks. OSM's footprints lie up to a metre off the survey's outlines of
+  the same walls: 3,400-11,400 strips under 1 m wide a line (6,300-16,100 m²) lay between them, joined to the plots.
+  The city mesh's triangles in a box dropped under the classes above: 11-29 % (line 22 11 %, 17 13 %, 23 18 %, 9 24 %,
+  37 29 %); the cut ones' remains roughly double their count.
+- **Raised survey areas over the rails** (#508, 2026-11-16): a raised area (sidewalk, island, median, platform) over a
+  rail almost always crosses the track, its axis in it: line 37 11 of 11, line 17 32 of 35 (699 of 712 m of rail under
+  them). They are pedestrian crossings over a reservation at its stops, classed sidewalk (line 37 U Elektry – Sídliště
+  Hloubětín), and the survey's platforms or sidewalks lying over a track. #512's sidewalk profile raises them 8-32 cm
+  over the rails, where the page keeps the survey's own heights under the rail heads; the ground mesh lays one across a
+  track flush with the rails within the beds' outline. Bridge tracks (`b`) have no ground bed (the page's `bedsNear`
+  skips them): their ends on the ground had made bed pieces without a bed surface, 961 corners on line 17. Where one
+  DI track ends and the next begins, their rail points lie 1-3 mm apart and their beds' quads leave a sliver between
+  them; a mesh point on the 1 mm grid there took the nearest quad's plane, up to 15 mm off the rail on line 37: the
+  ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
+  the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
+  sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
@@ -602,6 +622,11 @@ Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply
 footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
   are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
   river bridge and its viaduct (14.4624–14.4660 E).
+- **A building's ground height** (#507, `ground_partition.py --calibrate`): the survey's 3D building outlines (ZPS KR
+  `Hranice_budovy`) against IPR's ground 0.5 m outside the OSM footprint, 17,240 buildings on the five lines: IPR's
+  median along the footprint is off by 0.29 m (median |error|, p90 1.42 m, mean +0.08 m); its 10th percentile 0.49 /
+  2.13 m, its lowest 0.67 / 2.48 m (both biased low: a cellar ramp, a yard). The p90 is the buildings on slopes,
+  where one flat height cannot match the whole outline.
 
 ## The T3 and the network it runs on
 
@@ -762,6 +787,27 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     Energy from the wire is 0-2 % lower on every line.
   - **In other weathers** (`--checks autumn,rain,winter`): wheel spin, slides and sand stay within a few per cent of main's,
     and the delay falls in all three.
+- **Where line 17 loses its time** (#460; the `stops` check, seeds 1-5, main at f4d03d2; per stretch `arr`, `dep` and the run's
+  `depOnTime`): it departs 93 s after the timetable on average, within ±30 s of it at 8 % of the stops. The delay is the timetable's:
+  - **The GTFS has whole minutes only** (all 40,116 departures of 2026-10-21 at :00). Levského and Sídliště Modřany, 258 m apart, share
+    a minute in all 77 trips, so the run is 43 s late at its second stop and leaves it 50 s late. That is on purpose (the user,
+    2026-11-16, #621: "same minute are on purpose to leave as soon as possible and catch up on later stops"): left as it is.
+  - **Sídliště Modřany to Přístaviště is 60 s a stretch**: twelve stretches of 286-733 m at 50-65 km/h (65 where OSM has 70), eleven of
+    60 s and Nádraží Modřany's 120, 780 s in all, where the quickest run at our limits takes 665 s before any dwell. A 700 m stretch
+    from stand to stand takes a T3 ≈57 s at 1.2 m/s² up and 1.1 down. The departure delay grows from 44 s at Modřanská rokle to 158 s
+    at Dvorce, and Hercovka's 60 s for 888 m adds 64 s more.
+  - **The centre gives it back**: 120 s for 420-470 m from Jiráskovo náměstí to Právnická fakulta and 240 s to Strossmayerovo náměstí.
+  - **Our run against the quickest at the limits** (seed 1, 3312 against 2351 s): 407 s standing at stops, 88 s standing for trams,
+    signals, obstacles and cars, 170 s braking more gently than the quickest's 0.9 m/s², 257 s over 2 m/s under the limit (most of it
+    the last 20-90 m into stops, rolling in at 13-15 km/h after a switch's limit), less 80 s pulling away harder than its 0.8. Rolling in
+    only within `coastT` instead of 15 s moved nothing: 93 → 97 s, inside the seeds' spread.
+  - **By D 1/2's window** (§ 16, PPS Q51: 0-59 s late from the first stop, 0-179 s from the others, `depOnTime`) the departures are on
+    time at 97 % of the stops on line 9, 94 % on 17, 91 % on 22 and 100 % on 23 and 37. Within ±30 s of the timetable (`arrOnTime`,
+    #242's measure): 44, 8, 21, 21 and 48 %.
+  - **The autopilot keeps catching up to the timetable's minute; D 1/2's window is for the score only** (the user, 2026-11-16, #621:
+    "autopilot should be catching up to the timetable. The on time according to d1/2 should matter only for scoring. Real timetables
+    are tight, some of our in game timing can be improved by signals, proper placement and tuning the controller, that's for later
+    milestones").
 - **Running resistance** (`src/tram.js`): 650 N a car, 28 N a car per m/s and 4.2 (0.7 + 0.3 × cars) v² N of air, plus a curve's; gravity
   m g sin θ on the mass alone, the turning parts (2.4 t a car) only in the inertia. Coasting with the preparation current, one car with 40
   passengers slows at 0.067 / 0.077 / 0.090 / 0.110 m/s² at 15 / 25 / 35 / 47 km/h on the level; the phone on 7290 read 0.090 / 0.100 /

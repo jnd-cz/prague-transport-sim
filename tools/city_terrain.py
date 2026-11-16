@@ -960,25 +960,13 @@ def show(rep):
         print(f"  zero area {a['n']}: {a['km2']} km², {a['district']} {a['cadastral']}, holds {a['holds']}, filled {a['filled']}")
 
 
-# ---------------------------------------------------------------- the run
-def main(argv):
-    arg = lambda k, d: type(d)(argv[argv.index(k) + 1]) if k in argv else d  # noqa: E731
-    box = tuple(float(v) for v in arg("--box", "").split(",")) if "--box" in argv else None
-    threads, min_free = arg("--threads", 8), arg("--min-free", 6.0)
+def inputs(box=None):
+    """What the cache key hashes, as main reads it: (key()'s arguments, DI's network, the 10 m grids' paths, a function
+    hashing the DMR 5G tiles: --fetch adds tiles and keys again)."""
     import dmr5g
     import di_network
     import osm_local
-    from geo import Frame
-    from ipr_dtm import IprDtm, TIF
-    F = Frame()
-    ipr = IprDtm()
-    win = window(ipr, box, F)
-    i0, j0, i1, j1 = win
-    shape = (j1 - j0, i1 - i0)
-    origin = (ipr.e0 - F.E0 + i0, ipr.n0 - F.N0 - j0)
-    t_all = time.perf_counter()
-    origin = (float(origin[0]), float(origin[1]))
-    print(f"window {shape[1]} x {shape[0]} cells, cell (0, 0) at ({origin[0]:.4f}, {origin[1]:.4f})", flush=True)
+    from ipr_dtm import TIF
     net = di_network.load_network()
     segs = segments(net)
     print(f"DI's network: {len(net.edges)} edges, {sum(e['line'].length for e in net.edges.values()) / 1000:.0f} km of track", flush=True)
@@ -988,12 +976,44 @@ def main(argv):
 
     def tile_hashes():
         return {f: sha256(os.path.join(dmr5g.DIR, f)) for f in sorted(os.listdir(dmr5g.DIR)) if f.endswith(".tif")}
-    t0 = time.perf_counter()
-    raster = sha256(TIF)
     grids_h = {os.path.relpath(p, ROOT).replace(os.sep, "/"): sha256(p) for p in grid_paths}
-    parts = dict(raster=raster, tiles=tile_hashes(), grids=grids_h, tracks=segs, osm=osm_local.base_id(), code=code, box=box)
+    parts = dict(raster=sha256(TIF), tiles=tile_hashes(), grids=grids_h, tracks=segs, osm=osm_local.base_id(), code=code,
+                 box=box)
+    return parts, net, grid_paths, tile_hashes
+
+
+def cached(box=None):
+    """The city mesh of the current inputs from the machine cache: (its folder, the key), or SystemExit naming the run
+    that builds it (#507 reads it; the whole city takes 13 min and 15 GB)."""
+    k = key(**inputs(box)[0])
+    out = os.path.join(cache_root(), k)
+    if not os.path.exists(os.path.join(out, "mesh.npz")):
+        raise SystemExit(f"no city terrain mesh for the current inputs ({k}): python -P -E tools/city_terrain.py")
+    return out, k
+
+
+# ---------------------------------------------------------------- the run
+def main(argv):
+    arg = lambda k, d: type(d)(argv[argv.index(k) + 1]) if k in argv else d  # noqa: E731
+    box = tuple(float(v) for v in arg("--box", "").split(",")) if "--box" in argv else None
+    threads, min_free = arg("--threads", 8), arg("--min-free", 6.0)
+    import dmr5g
+    from geo import Frame
+    from ipr_dtm import IprDtm
+    F = Frame()
+    ipr = IprDtm()
+    win = window(ipr, box, F)
+    i0, j0, i1, j1 = win
+    shape = (j1 - j0, i1 - i0)
+    origin = (ipr.e0 - F.E0 + i0, ipr.n0 - F.N0 - j0)
+    t_all = time.perf_counter()
+    origin = (float(origin[0]), float(origin[1]))
+    print(f"window {shape[1]} x {shape[0]} cells, cell (0, 0) at ({origin[0]:.4f}, {origin[1]:.4f})", flush=True)
+    t0 = time.perf_counter()
+    parts, net, grid_paths, tile_hashes = inputs(box)
+    segs, grids_h, code = parts["tracks"], parts["grids"], parts["code"]
     k = key(**parts)
-    print(f"key {k} ({time.perf_counter() - t0:.0f} s hashing the inputs)", flush=True)
+    print(f"key {k} ({time.perf_counter() - t0:.0f} s reading and hashing the inputs)", flush=True)
     out = os.path.join(cache_root(), k)
     rep_dir = os.path.join(ROOT, "reports", "city-terrain")
     os.makedirs(rep_dir, exist_ok=True)
@@ -1084,7 +1104,7 @@ def main(argv):
                     pass
         km2 = lambda v: round(int(v) / 1e6, 3)  # noqa: E731
         rep = {"key": k, "window": list(win), "origin": list(origin), "tolerance": {"tol": TOL, "d0": D0, "tol_max": TOL_MAX,
-               "lattice": LAT, "floor": TERRAIN_FLOOR}, "inputs": {"raster": raster, "tiles": len(parts["tiles"]),
+               "lattice": LAT, "floor": TERRAIN_FLOOR}, "inputs": {"raster": parts["raster"], "tiles": len(parts["tiles"]),
                "grids": grids_h, "osm": parts["osm"], "track_km": round(sum(e["line"].length for e in net.edges.values()) / 1000, 1),
                "code": code},
                "mesh": mesh, "cells": {

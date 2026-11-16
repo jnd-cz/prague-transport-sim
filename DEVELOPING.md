@@ -186,6 +186,18 @@ takes them locally into `local/` there. `python -I tools/feedback.py` lists them
 `--kind`), `--perf` gives frames per second and slow frames per machine. A note becomes an issue only when
 someone decides so.
 
+**Package submissions** (#580): the Vehicles… page sends a checked package, or its address, to `submit.php`
+(`tools/submit.php`, on every target; its caps beside `tools/submissions.py`'s, which `tools/serve.py` applies
+locally). The host's PHP must take a 64 MB upload (`upload_max_filesize`, `post_max_size`). `deploy.py --pull` moves
+them into the machine's submissions folder (`$TRAM_SUBMISSIONS`, else beside the data cache:
+`tramdata/submissions/<target>/<id>/`, never in git: the contact is the author's). The review:
+`python -I tools/submissions.py` lists them; `python -P -E tools/submissions.py --check ID` installs it in a fresh
+headless browser, writes the check's report and pictures it beside the hybrid (`reports/submissions/<id>/`);
+`--accept ID` adds it to `assets/catalogue.json` (a PR), hosted when its author allowed it (the pack copied to
+`tramdata/submissions/hosted/`, which `deploy.py` uploads as `hosted/<name>`: a deploy refuses while the catalogue
+names one that is not there) or linked at the author's address (`--url` for an uploaded one; the upload deleted);
+`--reject ID "why"`; `--delete ID` once the author has the verdict.
+
 **Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame
 intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
 browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)

@@ -67,6 +67,9 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
         if self.path.split("?", 1)[0] == "/feedback.php":
             self.feedback()
             return
+        if self.path.split("?", 1)[0] == "/submit.php":
+            self.submit()
+            return
         if self.path.startswith("/review/"):
             n = int(self.headers.get("Content-Length", 0))
             if not self.headers.get("X-Review") or not reviews.NAME.fullmatch(name.removesuffix(".json")) or n > reviews.MAX:
@@ -97,6 +100,32 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
             fh.write(body)
         self.send_response(204)
         self.end_headers()
+
+    def submit(self):
+        """A vehicle package submitted from the Vehicles... page (#580) as the host's submit.php takes it, into
+        <submissions>/local/ (tools/submissions.py DEST, which lists it)."""
+        import email
+        import email.policy
+        import submissions  # (here: a server never posted to needs only feedback.py and reviews.py beside it)
+        n = int(self.headers.get("Content-Length", 0))
+        cap = submissions.rules()["caps"]["package"] + submissions.MAX_META + 65536
+        if not self.headers.get("X-Submit") or n > cap:
+            while n > 0:  # (read and dropped, as feedback's)
+                n -= len(self.rfile.read(min(n, 1 << 16)) or b"x" * n)
+            self.send_error(405 if not self.headers.get("X-Submit") else 413)
+            return
+        body = self.rfile.read(n)
+        head = b"Content-Type: " + self.headers.get("Content-Type", "").encode() + b"\r\n\r\n"
+        msg = email.message_from_bytes(head + body, policy=email.policy.HTTP)
+        fields = {p.get_param("name", header="content-disposition"): p.get_payload(decode=True)
+                  for p in (msg.iter_parts() if msg.is_multipart() else [])}
+        code, ans = submissions.take(os.path.join(submissions.DEST, "local"), fields.get("meta"), fields.get("pack"))
+        out = json.dumps(ans).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
 
     def feedback(self):
         """A player's note (src/report.js, #350) as the host's feedback.php takes it, into

@@ -13,8 +13,8 @@ manifest" and "Liveries". Each sound pack (#528), a package or a vehicle's `soun
 game's (src/audio.js, read by tools/sound_lists.py), its files listed, present, WAV or MP3, a loop's reference. The
 licences, movements and file types come from src/packageRules.json, the rules the game checks an installed package by
 (#530, src/packages.js); every vehicle's files are of those types. The curated list of submitted packages
-(assets/catalogue.json): each entry's id, names, author, licence and its package's https address. Exit code 1 on a
-failure.
+(assets/catalogue.json): each entry's id, names, author, licence and its package's address: an https one on its author's
+host, or hosted/<id>-<version>.zip, a pack the project hosts (#580). Exit code 1 on a failure.
 """
 import json
 import math
@@ -373,8 +373,9 @@ def main():
             fails.append(f"catalogue {what}: names in cs and en")
         if c.get("licence") not in LICENCES:
             fails.append(f"catalogue {what}: licence {c.get('licence')!r} is none of the redistributable ones")
-        if not str(c.get("url", "")).startswith("https://") or not re.search(r"(package\.json|\.zip)$", c.get("url", "")):
-            fails.append(f"catalogue {what}: url is not an https address of a package.json or a .zip")
+        url = str(c.get("url", ""))
+        if not (url.startswith("https://") and re.search(r"(package\.json|\.zip)$", url)) and not re.fullmatch(r"hosted/[a-z0-9][a-z0-9.-]*\.zip", url):
+            fails.append(f"catalogue {what}: url is neither an https address of a package.json or a .zip nor hosted/<name>.zip")
         if not c.get("author"):
             fails.append(f"catalogue {what}: no author")
     # the sound packs (#528)
