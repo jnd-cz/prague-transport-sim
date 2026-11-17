@@ -215,7 +215,9 @@ class Build(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as root:
             os.makedirs(os.path.join(root, "data"))
-            json.dump({"path": [[10.0, 650.0], [320.0, 645.0], [620.0, 640.0]]}, open(os.path.join(root, "data", "line99.json"), "w"))
+            # (the squares reaching the line's ground, its 10 m grid's box within 1.2 km of the route: here that box)
+            T = {"x0": 0.0, "y0": 899.0, "dx": 10.0, "dy": -10.0, "nx": 90, "ny": 30}
+            json.dump({"path": [[10.0, 650.0], [320.0, 645.0], [620.0, 640.0]], "terrain": T}, open(os.path.join(root, "data", "line99.json"), "w"))
             keep = sp.build_square, sp._wide_init
             sp.build_square, sp._wide_init = square, lambda ln: None
             try:

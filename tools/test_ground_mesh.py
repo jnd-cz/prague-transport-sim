@@ -70,6 +70,55 @@ class File(unittest.TestCase):
         self.assertEqual(sorted(names2), ["bed", "survey"])
 
 
+class Lattice(unittest.TestCase):
+    def test_lines_on_the_city_grid_clipped_to_the_area(self):
+        # (two pieces side by side get lines at the same x: their faces' corners meet on the shared edge)
+        g = shapely.box(1, 2, 13, 9)
+        L = gm.lattice(g, 5.0)
+        xs = sorted({round(c[0], 6) for part in shapely.get_parts(L) for c in shapely.get_coordinates(part) if
+                     abs(c[1] - 2) < 1e-9 or abs(c[1] - 9) < 1e-9})
+        self.assertEqual(xs, [5.0, 10.0])
+        self.assertAlmostEqual(shapely.length(L), 2 * 7 + 1 * 12)  # (x = 5, 10 across 7 m; y = 5 across 12 m)
+        self.assertTrue(shapely.box(1, 2, 13, 9).buffer(1e-9).contains(L))
+        self.assertIsNone(gm.lattice(shapely.box(1, 1, 4, 4), 5.0))
+
+
+class Weirs(unittest.TestCase):
+    def test_a_corner_on_a_cut_is_seen_square_off_it_on_its_triangles_side(self):
+        cut = shapely.MultiLineString([[(0, 0), (10, 0)], [(20, -5), (20, 5)]])
+        x, y = gm.off_cuts(np.array([5.0, 5.0, 20.0]), np.array([0.0, 0.0, 1.0]), np.array([4.0, 9.0, 25.0]),
+                           np.array([3.0, -0.5, 0.0]), cut, 3.0)
+        self.assertEqual(np.round(x, 6).tolist(), [5.0, 5.0, 23.0])
+        self.assertEqual(np.round(y, 6).tolist(), [3.0, -3.0, 1.0])
+
+
+class LoweredKerbs(unittest.TestCase):
+    """#630: a kerb corner at a crossing's lowered stretch (tools/kerbs.py, #303) stands its height over the road."""
+
+    def test_the_stretch_its_ramps_and_the_plain_kerb_beyond(self):
+        low = np.array([[0.0, 0.0, 0.02]])
+        x = np.array([0.0, 1.9, 2.4, 3.0, 10.0])
+        y = np.zeros(5)
+        z = gm.lowered_heights(x, y, np.full(5, 100.12), np.full(5, 100.0), low, 4.0, 0.125)
+        # (within 2 m the stretch's 2 cm; then 1:8 along the kerb: 0.4 m past it 7 cm, 1 m past it the plain 12 cm)
+        self.assertEqual(np.round(z - 100.0, 3).tolist(), [0.02, 0.02, 0.07, 0.12, 0.12])
+
+    def test_a_flush_kerb_and_the_lowest_of_two(self):
+        low = np.array([[0.0, 0.0, 0.0], [3.0, 0.0, 0.02]])
+        z = gm.lowered_heights(np.array([2.2]), np.array([0.0]), np.array([100.12]), np.array([100.0]), low, 4.0, 0.125)
+        self.assertAlmostEqual(float(z[0]) - 100.0, 0.02, places=6)
+
+    def test_the_rule_read_from_the_survey(self):
+        D = {"provenance": {"lists": {"areas": {"checks": {"kerbs": {"lowered": {
+            "rule": {"kerb": 0.02, "width": 4.0, "ramp": 0.125},
+            "stretches": [{"x": 1, "y": 2, "c": "sidewalk", "h": 0.02}, {"x": 3, "y": 4, "c": "sidewalk", "h": None},
+                          {"x": 5, "y": 6, "c": "platform", "h": 0.02}]}}}}}}}
+        low, w, r = gm.lowered_kerbs(D)
+        self.assertEqual(low.tolist(), [[1.0, 2.0, 0.02]])
+        self.assertEqual((w, r), (4.0, 0.125))
+        self.assertEqual(len(gm.lowered_kerbs({})[0]), 0)
+
+
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")
@@ -95,6 +144,21 @@ class Steps(unittest.TestCase):
         w = gm.step_walls(V, F)
         self.assertEqual(len(w), 2)
         self.assertTrue(gm.is_wall(V, w).all())
+
+    def test_the_wall_faces_down_the_step(self):
+        V, F = self.square_with_a_step()
+        for w in gm.step_walls(V, F):
+            P = V[w].astype(float)
+            n = np.cross(P[1] - P[0], P[2] - P[0])
+            self.assertLess(n[0], 0)  # (the lower triangle is at x < 1000)
+
+    def test_every_triangle_faces_up(self):
+        V, F = self.square_with_a_step()
+        F = np.vstack([F, F[:, ::-1]])
+        P = V[gm.face_up(V, F)].astype(float)
+        self.assertTrue((np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0])[:, 2] > 0).all())
+        w = gm.step_walls(V, F[:2])
+        self.assertTrue((gm.face_up(V, w) == w).all())  # (an upright one as it is)
 
     def test_edges_used_once_found_and_closed_by_the_walls(self):
         V, F = self.square_with_a_step()
@@ -230,6 +294,11 @@ class Built(unittest.TestCase):
                 r = gm.edge_check(Vq, F, ground_partition.line_area(L))
                 self.assertEqual(r["used once inside the box"], 0, f"line {ln}: {r}")
                 self.assertEqual(r["used more than twice"], 0, f"line {ln}: {r}")
+                # (every triangle faces up: the page's normals average over its neighbours, gm.face_up)
+                flat = F[~gm.is_wall(Vq, F)]
+                P = Vq[flat].astype(float)
+                down = int((np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0])[:, 2] < 0).sum())
+                self.assertEqual(down, 0, f"line {ln}: {down:,} triangles face down")
 
 
 if __name__ == "__main__":

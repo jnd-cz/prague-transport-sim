@@ -196,6 +196,25 @@ class SecondPass(unittest.TestCase):
         self.assertGreater(added, 0)
 
 
+class Smooth(unittest.TestCase):
+    def test_a_step_far_from_the_track_is_rounded_near_it_kept_and_no_ground_left_alone(self):
+        # (a 3 m step across the raster at column 60; the track along row 0: rows near it stay as they are)
+        h, w = 120, 120
+        Z = np.where(np.arange(w)[None, :] < 60, 200.0, 203.0).repeat(h, 0).astype(np.float32)
+        lev = np.zeros((h, w), np.uint8)
+        lev[:, 100:] = ct.NO  # (no ground: its cells keep their 0 and pull nothing down)
+        Z[:, 100:] = 0.0
+        dl = np.repeat(np.arange(0, h + 2 * ct.LAT, ct.LAT, dtype=np.float32)[:, None], w // ct.LAT + 2, 1)
+        n = ct.smooth(Z, lev, dl, sigma=1.5, near=(15.0, 30.0))
+        self.assertGreater(n, 0)
+        self.assertTrue(np.all(Z[:15, 59] == 200.0) and np.all(Z[:15, 60] == 203.0))  # (within 15 m: the raster)
+        far = Z[60]
+        self.assertTrue(200.0 < far[59] < 201.6 < far[60] < 203.0)  # (the step a slope)
+        self.assertAlmostEqual(float(far[30]), 200.0, places=4)  # (away from it the ground as it was)
+        self.assertAlmostEqual(float(far[95]), 203.0, places=4)  # (by no ground: not pulled down)
+        self.assertTrue(np.all(Z[:, 100:] == 0.0))
+
+
 class Key(unittest.TestCase):
     def test_the_key_follows_the_raster_tracks_floor_and_tolerance(self):
         segs = tracks()
