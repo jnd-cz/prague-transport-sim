@@ -1286,22 +1286,58 @@ def wall_edges(dtm):
     return np.asarray(segs, float).reshape(-1, 2, 3)
 
 
+WALL_LOCAL = 1.0  # m: a wall's or stairs' outline heights within this of a place are its top and its foot there
+
+
+class WallLevels:
+    """The level-0 survey walls' and stairs' outline heights: at a place, its top and its foot (the highest and lowest
+    within WALL_LOCAL), and of a few heights there the level nearest a reference (#653). The sidewalks' own outlines
+    along a wall zigzag between its top and its foot: Krejcárek's ramp, line 37 (3927, 322), 228.56 and 230.65 m a metre
+    apart along one wall."""
+
+    def __init__(self, dtm):
+        from scipy.spatial import cKDTree
+        p = [q[:3] for a in dtm["areas"] if a["c"] in WALL_CLASSES and a.get("l", 0) == 0
+             for r in [a["r"]] + a.get("h", []) for q in r if q[2] is not None]
+        self.p = np.asarray(p, float).reshape(-1, 3)
+        self.tree = cKDTree(self.p[:, :2]) if len(self.p) else None
+
+    def around(self, x, y):
+        lo, hi = np.full(len(x), np.nan), np.full(len(x), np.nan)
+        if self.tree is None:
+            return lo, hi
+        for i, js in enumerate(self.tree.query_ball_point(np.column_stack([x, y]), WALL_LOCAL)):
+            if js:
+                z = self.p[js, 2]
+                lo[i], hi[i] = z.min(), z.max()
+        return lo, hi
+
+    def pick(self, x, y, own, ref):
+        """Of `own` and the wall's top and foot at (x, y), the nearest `ref` (own where ref is NaN)."""
+        lo, hi = self.around(np.asarray(x, float), np.asarray(y, float))
+        c = np.stack([np.asarray(own, float), lo, hi])
+        k = np.nanargmin(np.where(np.isfinite(c), np.abs(c - np.asarray(ref, float)[None]), np.inf), axis=0)
+        return np.where(np.isfinite(ref), c[k, np.arange(c.shape[1])], own)
+
+
 def wall_heights(segs, X, Y, on, reach):
     """Per grid cell (`on` ones only): the nearest wall edge on whose left the cell lies (its sidewalk's side, WALL_ON's
-    leeway), its height at its nearest point and the distance to it, within `reach` (NaN and inf past it)."""
+    leeway), within `reach`: its own height at its nearest point, the distance, that point and the edge's inward normal
+    (NaN, inf and NaN past it)."""
     z, d = np.full(X.shape, np.nan), np.full(X.shape, np.inf)
+    q, n = np.full(X.shape + (2,), np.nan), np.full(X.shape + (2,), np.nan)
     if segs is None or not len(segs) or not on.any():
-        return z, d
+        return z, d, q, n
     x0, x1, y0, y1 = X.min() - reach, X.max() + reach, Y.min() - reach, Y.max() + reach
     lo, hi = segs[:, :, :2].min(1), segs[:, :, :2].max(1)
     s = segs[(hi[:, 0] >= x0) & (lo[:, 0] <= x1) & (hi[:, 1] >= y0) & (lo[:, 1] <= y1)]
     if not len(s):
-        return z, d
+        return z, d, q, n
     px, py = X[on], Y[on]
     a, b = s[:, 0], s[:, 1]
     ex, ey = b[:, 0] - a[:, 0], b[:, 1] - a[:, 1]
     l2 = np.maximum(ex * ex + ey * ey, 1e-12)
-    bz, bd = np.full(len(px), np.nan), np.full(len(px), np.inf)
+    bz, bd, bq, bn = np.full(len(px), np.nan), np.full(len(px), np.inf), np.full((len(px), 2), np.nan), np.full((len(px), 2), np.nan)
     for k in range(0, len(px), 20000):  # (cells × edges at once, in parts)
         sl = slice(k, k + 20000)
         t = np.clip(((px[sl, None] - a[None, :, 0]) * ex + (py[sl, None] - a[None, :, 1]) * ey) / l2, 0, 1)
@@ -1311,12 +1347,16 @@ def wall_heights(segs, X, Y, on, reach):
         j = dd.argmin(1)
         r = np.arange(len(j))
         bd[sl] = dd[r, j]
-        bz[sl] = a[j, 2] + (b[j, 2] - a[j, 2]) * t[r, j]
+        tj = t[r, j]
+        bz[sl] = a[j, 2] + (b[j, 2] - a[j, 2]) * tj
+        bq[sl] = np.column_stack([a[j, 0] + ex[j] * tj, a[j, 1] + ey[j] * tj])
+        bn[sl] = np.column_stack([-ey[j], ex[j]]) / np.sqrt(l2[j])[:, None]
     near = bd <= reach
     zz, dz = np.full(len(px), np.nan), np.full(len(px), np.inf)
-    zz[near], dz[near] = bz[near], bd[near]
-    z[on], d[on] = zz, dz
-    return z, d
+    qq, nn = np.full((len(px), 2), np.nan), np.full((len(px), 2), np.nan)
+    zz[near], dz[near], qq[near], nn[near] = bz[near], bd[near], bq[near], bn[near]
+    z[on], d[on], q[on], n[on] = zz, dz, qq, nn
+    return z, d, q, n
 
 
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
@@ -1381,11 +1421,17 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     with np.errstate(invalid="ignore", divide="ignore"):
         known = np.where(wsum > 0, acc / wsum, np.nan)
     data = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
-    # (a sidewalk's edge on a survey wall or stairs is a breakline (#653): the cells along it held at the sidewalk's own
-    # heights there, and no pull from IPR within its smear, SW_KERB_SMEAR: IPR's 1 m raster spreads a wall's face over
-    # 1-2 m, and the fill sank the walkway 0.5 m into the top of Krejcárek's ramp wall, line 37 (3929, 331))
-    wz, wd = wall_heights(ctx.get("wall_edges"), X, Y, on, SW_KERB_SMEAR)
+    # (a sidewalk's edge on a survey wall or stairs is a breakline (#653): the cells along it held at the wall's level the
+    # sidewalk meets, its top or its foot, whichever is nearer IPR SW_KERB_SMEAR in on the sidewalk's side; and no pull
+    # from IPR within that smear: IPR's 1 m raster spreads a wall's face over 1-2 m, and the fill sank the walkway 0.5 m
+    # into the top of Krejcárek's ramp wall, line 37 (3929, 331))
+    wz, wd, wq, wn = wall_heights(ctx.get("wall_edges"), X, Y, on, SW_KERB_SMEAR)
     hold = on & (wd <= cell * 0.75)
+    if hold.any() and ctx.get("wall_levels") is not None:
+        q, n = wq[hold], wn[hold]
+        r = q + n * SW_KERB_SMEAR
+        ref = np.asarray(ipr.sample(r[:, 0] + F.E0, r[:, 1] + F.N0), float)
+        wz[hold] = ctx["wall_levels"].pick(q[:, 0], q[:, 1], wz[hold], ref)
     known = np.where(hold, wz, known)
     data = np.where(on & (wd <= SW_KERB_SMEAR), np.nan, data)
     free = on & np.isnan(known)
@@ -1467,7 +1513,7 @@ def context(ln):
     edges, walk = kerb_edges(dtm)
     return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
             "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
-            "rings": outlines(dtm), "wall_edges": wall_edges(dtm)}
+            "rings": outlines(dtm), "wall_edges": wall_edges(dtm), "wall_levels": WallLevels(dtm)}
 
 
 def class_area(dtm, classes):

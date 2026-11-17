@@ -196,11 +196,24 @@ class Sidewalks(unittest.TestCase):
     def test_wall_heights_take_the_nearest_edge(self):
         # (the sidewalk on the edge's left; a cell on its right, the wall's other level, does not take it)
         X, Y = np.meshgrid(np.arange(0, 4.1, 0.5), np.array([0.0, 1.0, 3.0, -0.5]))
-        z, d = sp.wall_heights(np.array([[[0, 0, 10.0], [4, 0, 12.0]]]), X, Y, np.ones(X.shape, bool), 1.5)
+        z, d, q, n = sp.wall_heights(np.array([[[0, 0, 10.0], [4, 0, 12.0]]]), X, Y, np.ones(X.shape, bool), 1.5)
         self.assertAlmostEqual(z[0, 4], 11.0)
         self.assertAlmostEqual(d[1, 4], 1.0)
+        self.assertEqual(q[1, 4].tolist(), [2.0, 0.0])
+        self.assertEqual(n[1, 4].tolist(), [0.0, 1.0])  # (into the sidewalk)
         self.assertTrue(np.isnan(z[2]).all() and np.isinf(d[2]).all())
         self.assertTrue(np.isnan(z[3]).all())
+
+    def test_the_walls_level_nearest_the_reference(self):
+        # (a wall 2 m tall: its top and its foot within a metre; the sidewalk's own outline said the foot, IPR beside the
+        # wall the top: the top. Without a reference, its own)
+        wall = {"c": "wall", "l": 0, "r": [[0, 0, 230.6], [10, 0, 230.6], [10, 0.3, 228.56], [0, 0.3, 228.56]]}
+        lv = sp.WallLevels({"areas": [wall]})
+        got = lv.pick(np.array([5.0, 0.2, 5.0]), np.array([0.0, 0.0, 0.0]), np.array([228.56, 228.56, 228.56]),
+                      np.array([230.4, 228.7, np.nan]))
+        self.assertEqual(got.tolist(), [228.56, 228.56, 228.56])  # (no wall vertex within 1 m of (5, 0): its own)
+        got = lv.pick(np.array([0.2, 0.2]), np.array([0.1, 0.1]), np.array([228.56, 228.56]), np.array([230.4, 228.7]))
+        self.assertEqual(got.tolist(), [230.6, 228.56])
 
     def test_a_wall_edge_runs_with_its_sidewalk_on_its_left(self):
         # (the same edge drawn the other way round its ring: turned)
