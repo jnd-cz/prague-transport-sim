@@ -1,162 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Cab instruments and overlays (DOM/SVG), plus the minimap.
+// The overlays over the cab view (the top bar, the assist chips, the messages, the info screen's text) and the minimap;
+// the driver's panel under them (src/panel.js).
 import { fmtTime, fmtDev, demandAt } from './game.js';
-import { t, onLangChange } from './i18n.js';
-import { TR37_SPEC } from './tr37.js';
+import { t } from './i18n.js';
+import { Panel } from './panel.js';
 
-const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
-
-// Round analogue gauge with needle. Angles sweep 240 degrees.
-function makeGauge(el, { size, min, max, major, minor, label, unit, redFrom = null, fmt = (v) => v }) {
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('width', size);
-  svg.setAttribute('height', size);
-  svg.setAttribute('viewBox', '-100 -100 200 200');
-  const add = (tag, attrs, parent = svg) => {
-    const e = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-    parent.appendChild(e);
-    return e;
-  };
-  add('circle', { r: 97, fill: '#0d110e', stroke: '#6b7a6f', 'stroke-width': 4 });
-  add('circle', { r: 90, fill: '#f1ead6' });
-  const ang = (v) => (-210 + ((v - min) / (max - min)) * 240) * (Math.PI / 180);
-  const pt = (v, r) => [Math.cos(ang(v)) * r, Math.sin(ang(v)) * r];
-  if (redFrom !== null) {
-    const [x0, y0] = pt(redFrom, 80), [x1, y1] = pt(max, 80);
-    add('path', { d: `M${x0},${y0} A80,80 0 0,1 ${x1},${y1}`, stroke: '#c0392b', 'stroke-width': 8, fill: 'none' });
-  }
-  for (let v = min; v <= max + 1e-6; v += minor) {
-    const isMajor = Math.abs((v - min) / major - Math.round((v - min) / major)) < 1e-6;
-    const [x0, y0] = pt(v, isMajor ? 70 : 77), [x1, y1] = pt(v, 85);
-    add('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: '#1a1a1a', 'stroke-width': isMajor ? 3 : 1.5 });
-    if (isMajor) {
-      const [tx, ty] = pt(v, 54);
-      const t = add('text', { x: tx, y: ty + 6, 'text-anchor': 'middle', 'font-size': size > 150 ? 17 : 22, 'font-weight': 700, fill: '#1a1a1a', 'font-family': 'system-ui' });
-      t.textContent = fmt(v);
-    }
-  }
-  const lab = add('text', { x: 0, y: 40, 'text-anchor': 'middle', 'font-size': 15, fill: '#333', 'font-family': 'system-ui', 'font-weight': 600 });
-  lab.textContent = label;
-  const un = add('text', { x: 0, y: 58, 'text-anchor': 'middle', 'font-size': 12, fill: '#555', 'font-family': 'system-ui' });
-  un.textContent = unit;
-  // limit marker (speedometer)
-  const marker = add('path', { d: 'M0,-92 L-6,-80 L6,-80 Z', fill: '#d4232a', visibility: 'hidden' });
-  const needle = add('path', { d: 'M-4,10 L0,-82 L4,10 Z', fill: '#c0221b' });
-  add('circle', { r: 9, fill: '#222' });
-  el.appendChild(svg);
-  let shown = min;
-  return {
-    set(v) {
-      shown += (Math.max(min - (max - min) * 0.02, Math.min(max * 1.02, v)) - shown) * 0.35;
-      needle.setAttribute('transform', `rotate(${(ang(shown) * 180) / Math.PI + 90})`);
-    },
-    marker(v) {
-      if (v === null) { marker.setAttribute('visibility', 'hidden'); return; }
-      marker.setAttribute('visibility', 'visible');
-      marker.setAttribute('transform', `rotate(${(ang(v) * 180) / Math.PI + 90})`);
-    },
-  };
-}
-
-// The pedal bar (#221): one axis from the brake pedal's stop (bottom) to the drive pedal's (top), each
-// pedal's steps as coloured zones, a marker where the pedal is, P when parked; beside it the
-// accelerator's position (1–99: resistors to 75, field stages from 80)
-function drawPedals(cv, eq, S) {
-  const c = cv.getContext('2d'), W = cv.width, H = cv.height, mid = H / 2, k = (mid - 4) / S.pedalMax;
-  const y = (a) => mid - a * k; // drive +, brake −
-  c.clearRect(0, 0, W, H);
-  c.fillStyle = '#1e2420'; c.fillRect(0, 0, W - 16, H);
-  const band = (a0, a1, col) => { c.fillStyle = col; c.fillRect(2, Math.min(y(a0), y(a1)), W - 20, Math.abs(y(a1) - y(a0)) - 1); };
-  const d = S.driveAngles, b = S.brakeAngles;
-  for (let i = 0; i < 5; i++) band(d[i], d[i + 1] ?? S.pedalMax, ['#24502c', '#2c6b37', '#358343', '#3f9b4f', '#4ab35b'][i]);
-  for (let i = 0; i < 5; i++) band(-b[i], -(b[i + 1] ?? S.parkAngle), ['#5a4a22', '#6f5420', '#8a5a1c', '#a35a1a', '#bb5418'][i]);
-  band(-S.parkAngle, -S.trackAngles[0], '#7a1d18');
-  band(-S.trackAngles[0], -S.pedalMax, '#6a2a8a');
-  c.font = '600 9px ui-monospace, monospace'; c.textAlign = 'center'; c.fillStyle = '#d9e6da';
-  for (let i = 0; i < 5; i++) { c.fillText(String(i + 1), (W - 16) / 2, y((d[i] + (d[i + 1] ?? S.pedalMax)) / 2) + 3); c.fillText(String(i + 1), (W - 16) / 2, y(-(b[i] + (b[i + 1] ?? S.parkAngle)) / 2) + 3); }
-  c.fillText(eq.parked ? 'P' : 'p', (W - 16) / 2, y(-(S.parkAngle + S.trackAngles[0]) / 2) + 3);
-  c.fillStyle = '#59645b'; c.fillRect(2, mid - 0.5, W - 20, 1);
-  // the pedal: drive above, brake below (the parked ratchet holds the brake at its station)
-  const a = eq.pedal.drive > 0 ? eq.pedal.drive : -eq.brakeAngle;
-  c.fillStyle = eq.parked ? '#ffb0a0' : '#ffffff';
-  c.fillRect(0, y(a) - 2, W - 16, 4);
-  // the accelerator
-  const ax = W - 12, top = 4, h = H - 8;
-  c.fillStyle = '#151a17'; c.fillRect(ax, top, 10, h);
-  c.fillStyle = eq.p < 75 ? '#d0a030' : '#e0d070';
-  const hp = (h * (eq.p - 1)) / 98;
-  c.fillRect(ax, top + h - hp, 10, hp);
-  c.fillStyle = '#0b0e0c';
-  for (const q of [75, 80, 85, 90, 95]) c.fillRect(ax, top + h - (h * (q - 1)) / 98, 10, 1);
-}
-
-const LAMPS = [
-  ['doors', 'red'], ['request', 'amber'], ['speed', 'red'],
-  ['track', 'amber'], ['sand', 'blue'], ['deadman', 'red'],
-  ['current', 'green'], ['ready', 'green'], ['slip', 'red'],
-  ['acc', 'amber'], ['shoe', 'amber'],
-];
 
 export class Hud {
   constructor() {
-    this.speed = makeGauge($('g-speed'), { size: 160, min: 0, max: 80, major: 10, minor: 5, label: 'km/h', unit: 'TATRA', redFrom: 65 });
-    // the T3's ammeter reads 0–600 A for drive and brake alike (the user saw only a positive scale in the cab, #221)
-    this.amp = makeGauge($('g-amp'), { size: 76, min: 0, max: 600, major: 200, minor: 100, label: 'A', unit: '', fmt: (v) => (v === 0 ? '0' : v / 100) });
-    this.volt = makeGauge($('g-volt'), { size: 76, min: 0, max: 800, major: 200, minor: 100, label: 'V', unit: '', fmt: (v) => v / 100 });
-    const notch = $('notch');
-    this.pedals = document.createElement('canvas');
-    this.pedals.width = 56; this.pedals.height = 148; // (the .notch box's inside)
-    this.pedals.id = 'pedals';
-    notch.appendChild(this.pedals);
-    const lamps = $('lamps');
-    this.lampEls = {};
-    for (const [k, col] of LAMPS) {
-      const d = document.createElement('div');
-      d.className = `lamp ${col}`;
-      lamps.appendChild(d);
-      this.lampEls[k] = d;
-    }
+    this.panel = new Panel();
     this.mini = $('minimap').getContext('2d');
     this.lastMsgKey = '';
-    this.relabel();
-    onLangChange(() => this.relabel());
-  }
-
-  relabel() {
-    for (const [k, el] of Object.entries(this.lampEls)) el.innerText = t(`lamp.${k}`);
   }
 
   show(on) {
     for (const id of ['dash', 'top', 'minimap', 'help']) $(id).classList.toggle('hidden', !on);
+    if (!on) this.panel.openSheet(false);
   }
-
-  lamp(k, on) { this.lampEls[k].classList.toggle('on', !!on); }
 
   update(game, opts) {
     const tram = game.tram;
-    this.speed.set(tram.kmh);
-    this.speed.marker(game.currentLimit);
-    this.amp.set(Math.abs(tram.current));
-    this.volt.set(tram.voltage);
-    if (tram.eq.kind === 'pedals') drawPedals(this.pedals, tram.eq, TR37_SPEC);
-    const lamps = tram.eq.lamps;
-
+    this.panel.update(game, opts);
     const st = game.stops[game.nextStop];
     const sw = game.nextSwitch();
-    this.lamp('doors', game.doorState !== 'closed');
-    this.lamp('request', st && st.request && (st.alightFrac > 0) && st.target - tram.s < 400);
-    this.lamp('speed', game.overspeed);
-    this.lamp('track', tram.trackBrake);
-    this.lamp('sand', tram.sanding);
-    this.lamp('deadman', game.deadmanWarn && Math.floor(performance.now() / 250) % 2);
-    this.lamp('current', tram.drawing);
-    this.lamp('acc', lamps.acc);
-    this.lamp('shoe', lamps.shoe);
     const ready = st && st.served && st.waiting === 0 && st.alight === 0 && game.clock >= st.sched - 5;
-    this.lamp('ready', ready);
-    this.lamp('slip', (tram.slip || tram.slide) && Math.floor(performance.now() / 150) % 2);
 
     // top bar
     const ns = $('nextstop');
