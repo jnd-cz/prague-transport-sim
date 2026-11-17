@@ -183,7 +183,7 @@ class Sidewalks(unittest.TestCase):
         ipr = SimpleNamespace(sample=lambda x, y: 200.2 - 2.0 * np.clip((np.asarray(y, float) - 4.0) / 3.0, 0, 1))
         ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 6),
                "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))],
-               "wall_edges": np.array([[[0, 6, 200.2], [20, 6, 200.2]]])}
+               "wall_edges": np.array([[[20, 6, 200.2], [0, 6, 200.2]]])}  # (the sidewalk on its left)
         f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.1), [(0, 0), (20, 6)])
         z = sp.bilinear(f, np.array([10.0, 10.0]), np.array([5.0, 5.9]))
         self.assertAlmostEqual(z[1], 200.2, delta=0.03)  # (between the held row and a free one, 0.5 m in)
@@ -194,11 +194,19 @@ class Sidewalks(unittest.TestCase):
         self.assertLess(z0[0], 199.8)  # (without it: IPR's smear)
 
     def test_wall_heights_take_the_nearest_edge(self):
-        X, Y = np.meshgrid(np.arange(0, 4.1, 0.5), np.array([0.0, 1.0, 3.0]))
+        # (the sidewalk on the edge's left; a cell on its right, the wall's other level, does not take it)
+        X, Y = np.meshgrid(np.arange(0, 4.1, 0.5), np.array([0.0, 1.0, 3.0, -0.5]))
         z, d = sp.wall_heights(np.array([[[0, 0, 10.0], [4, 0, 12.0]]]), X, Y, np.ones(X.shape, bool), 1.5)
         self.assertAlmostEqual(z[0, 4], 11.0)
         self.assertAlmostEqual(d[1, 4], 1.0)
         self.assertTrue(np.isnan(z[2]).all() and np.isinf(d[2]).all())
+        self.assertTrue(np.isnan(z[3]).all())
+
+    def test_a_wall_edge_runs_with_its_sidewalk_on_its_left(self):
+        # (the same edge drawn the other way round its ring: turned)
+        sw = {"c": "sidewalk", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 0, 200.1], [0, 0, 200.1]]}
+        wall = {"c": "wall", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 6.3, 198.0], [0, 6.3, 198.0]]}
+        self.assertEqual(sp.wall_edges({"areas": [sw, wall]}).tolist(), [[[20, 6, 200.3], [0, 6, 200.2]]])
 
 
 class Measures(unittest.TestCase):

@@ -1252,9 +1252,11 @@ WALL_ON = 0.05  # m: a sidewalk's outline edge on a wall's or stairs' outline (t
 
 def wall_edges(dtm):
     """The level-0 sidewalks' outline edges along a survey wall or stairs (#653), with the sidewalk's own heights at
-    their ends: (n, 2, 3). A wall's outline holds its top and its foot at one place; the sidewalk's own edge says which
-    it meets."""
+    their ends: (n, 2, 3), each running with its sidewalk on its left. A wall's outline holds its top and its foot at
+    one place; the sidewalk's own edge says which it meets, and its side which cells it holds (a sidewalk wrapping round
+    a wall has its foot and its top within a cell of each other: Krejcárek's ramp, line 37 (3926, 327))."""
     import shapely
+    from shapely.geometry import Polygon
     walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in dtm["areas"]
              if a["c"] in WALL_CLASSES and a["l"] == 0 for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
     if not walls:
@@ -1264,6 +1266,7 @@ def wall_edges(dtm):
     for a in dtm["areas"]:
         if a["c"] != "sidewalk" or a["l"] != 0 or len(a["r"]) < 3:
             continue
+        g = None
         for ring in [a["r"]] + a.get("h", []):
             for i in range(len(ring)):
                 p, q = ring[i], ring[(i + 1) % len(ring)]
@@ -1271,14 +1274,21 @@ def wall_edges(dtm):
                     continue
                 pts = shapely.points([p[0], q[0], (p[0] + q[0]) / 2], [p[1], q[1], (p[1] + q[1]) / 2])
                 hit, _ = tree.query(pts, predicate="dwithin", distance=WALL_ON)
-                if len(set(hit.tolist())) == 3:
-                    segs.append([p[:3], q[:3]])
+                if len(set(hit.tolist())) < 3:
+                    continue
+                if g is None:
+                    g = Polygon([r[:2] for r in a["r"]], [[r[:2] for r in h] for h in a.get("h", []) if len(h) >= 3])
+                    g = g if g.is_valid else g.buffer(0)
+                dx, dy = q[0] - p[0], q[1] - p[1]
+                L = math.hypot(dx, dy)
+                left = ((p[0] + q[0]) / 2 - dy / L * 0.1, (p[1] + q[1]) / 2 + dx / L * 0.1)
+                segs.append([p[:3], q[:3]] if g.contains(shapely.Point(left)) else [q[:3], p[:3]])
     return np.asarray(segs, float).reshape(-1, 2, 3)
 
 
 def wall_heights(segs, X, Y, on, reach):
-    """Per grid cell (`on` ones only): the nearest wall edge's height at its nearest point and the distance to it, within
-    `reach` (NaN and inf past it)."""
+    """Per grid cell (`on` ones only): the nearest wall edge on whose left the cell lies (its sidewalk's side, WALL_ON's
+    leeway), its height at its nearest point and the distance to it, within `reach` (NaN and inf past it)."""
     z, d = np.full(X.shape, np.nan), np.full(X.shape, np.inf)
     if segs is None or not len(segs) or not on.any():
         return z, d
@@ -1296,6 +1306,8 @@ def wall_heights(segs, X, Y, on, reach):
         sl = slice(k, k + 20000)
         t = np.clip(((px[sl, None] - a[None, :, 0]) * ex + (py[sl, None] - a[None, :, 1]) * ey) / l2, 0, 1)
         dd = np.hypot(a[None, :, 0] + ex * t - px[sl, None], a[None, :, 1] + ey * t - py[sl, None])
+        side = (ex * (py[sl, None] - a[None, :, 1]) - ey * (px[sl, None] - a[None, :, 0])) / np.sqrt(l2)
+        dd = np.where(side >= -WALL_ON, dd, np.inf)
         j = dd.argmin(1)
         r = np.arange(len(j))
         bd[sl] = dd[r, j]
