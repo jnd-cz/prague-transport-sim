@@ -44,8 +44,8 @@
 5. **Grid north ≠ true north (7.8°):** one constant (`TRUE_NORTH = 7.8°`, from PROJ at the origin) for
    what needs real directions: sun and shadows, a compass, wind.
 6. **Tiles: 500 m squares on the S-JTSK grid**, edges at whole multiples of 500 m in absolute S-JTSK,
-   named by absolute index (e.g. `e-1486_n-2086` for the tile whose SW corner is (−743 000, −1 043 000),
-   the one with the origin in it).
+   named by absolute index (e.g. `e-1486_n-2086` for the tile whose SW corner is (−743 000, −1 043 000); the origin
+   lies 24 m south of it, in `e-1486_n-2087`: corrected 2026-11-17, #30, where the ground's tiles were built on this grid).
    Names do not depend on the origin.
    - The source rasters (DMR 5G 2 m, IPR 1 m, 10 m) divide 500 m exactly, so tiles cut between cells
      and never resample. (Measured 2026-10-30: IPR's published 1 m raster has its cell centres 0.72 m /
