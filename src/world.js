@@ -1299,6 +1299,24 @@ function attachGround(group, tiles, hole = null, near = []) {
     return out;
   };
   tiles.drop = (ms) => { for (const m of ms) { sub.remove(m); m.geometry.dispose(); } };
+  // the far ground (#30): a tile's coarse grid in its land cover's and streets' colours, not a surface anything stands on
+  tiles.makeCoarse = (c, [bx, by]) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(c.pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(c.nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(c.col, 3));
+    g.setIndex(new THREE.BufferAttribute(c.idx, 1));
+    g.computeBoundingSphere();
+    if (!tiles.keep) { g.userData.release = true; for (const at of Object.values(g.attributes)) at.onUpload(free); g.index.onUpload(free); }
+    const mesh = new THREE.Mesh(g, mats.terrain);
+    mesh.position.set(bx, 0, -by);
+    mesh.updateMatrix();
+    mesh.matrixAutoUpdate = false;
+    mesh.userData.coarseGround = true;
+    sub.add(mesh);
+    return mesh;
+  };
+  tiles.flushCoarse();
 }
 // The decks and roofs (level 1+): the prebuilt ground holds level 0, its kerbs and its steps' walls (#509)
 function buildDtm(group, ground) {

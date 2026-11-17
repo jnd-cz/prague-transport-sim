@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The ground's tiles streamed round the camera (src/groundFile.js GroundTiles, #30): line 37 loaded as a player loads it
 (no ?keepgeo) and the window moved along its route every STEP m (tools/bench/ground_tiles.py's drive): at every step
-each tile within the fog's end of the camera is drawn, fewer tiles are held than the file has, and the height lookup
-answers on the route where a tile is held.
+each tile within the detail's reach of the camera is drawn in detail and each within the fog's end at least far, fewer
+tiles are held than the file has, and the height lookup answers on the route where a tile is held.
 
     python -P -E tools/test_ground_tiles.py
 A browser test (it loads the game, about a minute). Skipped without line 37's data (python -I tools/snapshot.py
@@ -47,6 +47,8 @@ class Window(unittest.TestCase):
         self.assertEqual(errors, [])
         steps = r["steps"]
         self.assertEqual([x["s"] for x in steps if x["missing"]], [])
+        self.assertEqual([x["s"] for x in steps if x["bare"]], [])
+        self.assertTrue(all(x["coarse"] > 0 for x in steps))
         self.assertTrue(all(x["drawn"] < x["tiles"] for x in steps), [(x["s"], x["drawn"], x["tiles"]) for x in steps])
         self.assertTrue(all(x["lookups"] < x["tiles"] for x in steps[1:]))
         self.assertEqual(r["all"]["drawn"], r["all"]["tiles"])  # (every tile at the end: the drive's last step)

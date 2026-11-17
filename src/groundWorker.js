@@ -5,15 +5,19 @@
 //
 // In: first { init: { styles, names, cell, unit, tile } } — `styles[class][draw name]` = [group, r, g, b] (src/world.js
 // groundStyles), `names[class]` the file's draw names ('' first, src/groundFile.js); then per tile { id, bytes, layout,
-// box: [x0, y0], ring: [{ bytes, layout }], lookup, meshes } (bytes: the tile's blob, layout: its own).
-// Out: { id, lookup, meshes, times }:
+// box: [x0, y0], ring: [{ bytes, layout }], lookup, meshes, coarse } (bytes: the tile's blob, layout: its own; coarse:
+// the far ground's step in m, with `lookup`).
+// Out: { id, lookup, meshes, coarse, times }:
 // - lookup: { x0, y0, cell, nx, ny, start, tris, vx, vy, vz, tv, tk, kinds, ta, areas, cover }, the tile's height lookup:
 //   its flat triangles (the steps' walls left out) in a grid of `cell` m from its corner, each with its class (tk: an
 //   index into `kinds`, the file's classes) and the survey's class under it (ta: an index into `areas`, 0 for none),
 //   and the survey's 10 m cells (cover, as src/terrain.js TriIndex keys them);
 // - meshes: [{ group, pos, nor, col, idx }], one indexed geometry per material group, positions from the tile's corner
 //   as three.js takes them (x, z, -y), each draw class with its own vertices so colours do not blend across a class's
-//   edge, the normals averaged over its triangles, the neighbours' too on the tile's border.
+//   edge, the normals averaged over its triangles, the neighbours' too on the tile's border;
+// - coarse: { pos, nor, col, idx }, the far ground (#30): the lookup's heights and colours on a `coarse` m grid from the
+//   tile's corner, a cell drawn where all four corners lie on the ground, and a skirt COARSE_SKIRT m down its border
+//   (a detailed tile beside it meets it at its own vertices, not at the grid's: the skirt covers what is between).
 
 function varints(bytes, n, off, out) {
   for (let i = 0; i < n; i++) {
@@ -186,14 +190,14 @@ function meshes(g, cfg, box, ring) {
 const COVER_CELL = 10; // m: src/terrain.js TriIndex's cover
 // (the grid from the tile's corner, `side` m across: a vertex on its far border in the last cell)
 function lookup(g, cell, box, side) {
-  const { vx, vy, vz, classes } = g, [x0, y0] = box;
+  const { vx, vy, vz, classes } = g, [x0, y0] = box, col = [];
   const nx = Math.floor(side / cell) + 1, ny = nx;
   let m = 0;
   for (const [name, { tris }] of Object.entries(classes)) if (name !== 'wall') m += tris.length;
   const tv = new Uint32Array(m), ta = new Uint8Array(m / 3), tk = new Uint8Array(m / 3), kinds = Object.keys(classes), cover = new Set();
   m = 0;
-  for (const [name, { tris, area }] of Object.entries(classes)) {
-    const kind = kinds.indexOf(name);
+  for (const [name, { tris, area, draw }] of Object.entries(classes)) {
+    const kind = kinds.indexOf(name), names = cfg.names[name];
     if (name === 'wall') continue;
     for (let i = 0; i < tris.length; i += 3) {
       const a = tris[i], b = tris[i + 1], c = tris[i + 2];
@@ -205,6 +209,8 @@ function lookup(g, cell, box, side) {
         for (let ix = i0; ix <= i1; ix++) for (let iy = j0; iy <= j1; iy++) cover.add(ix * 100003 + iy);
       }
       ta[m / 3] = id; tk[m / 3] = kind;
+      const st = cfg.styles[name]?.[names[draw[i / 3]]] ?? cfg.styles[name]?.[''];
+      col.push(st ? st[1] : 0.5, st ? st[2] : 0.5, st ? st[3] : 0.5);
       tv[m++] = a; tv[m++] = b; tv[m++] = c;
     }
   }
@@ -225,8 +231,65 @@ function lookup(g, cell, box, side) {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) tris[fill[j * nx + i]++] = t / 3;
   }
   // (heights kept relative to the lowest vertex: a 32-bit float holds them to well under a mm)
-  return { x0, y0, cell, nx, ny, start, tris, tv: tv.slice(0, m), ta: ta.slice(0, m / 3), areas: g.areas, tk: tk.slice(0, m / 3), kinds, cover: Float64Array.from(cover),
+  return { x0, y0, cell, nx, ny, start, tris, tv: tv.slice(0, m), ta: ta.slice(0, m / 3), areas: g.areas, tk: tk.slice(0, m / 3), kinds, cover: Float64Array.from(cover), col,
     vx: Float32Array.from(vx, (v) => v - x0), vy: Float32Array.from(vy, (v) => v - y0), vz: Float32Array.from(vz) };
+}
+
+// The lookup's triangle at (px, py) from its corner: [index, height], [-1] off the ground (src/groundFile.js GroundLookup)
+function find(lk, px, py) {
+  const i = Math.floor(px / lk.cell), j = Math.floor(py / lk.cell);
+  if (i < 0 || j < 0 || i >= lk.nx || j >= lk.ny) return [-1, 0];
+  const { vx, vy, vz, tv, tris } = lk, k = j * lk.nx + i;
+  let best = -1, bz = 0;
+  for (let s = lk.start[k], e = lk.start[k + 1]; s < e; s++) {
+    const t = 3 * tris[s], a = tv[t], b = tv[t + 1], c = tv[t + 2];
+    const d = (vy[b] - vy[c]) * (vx[a] - vx[c]) + (vx[c] - vx[b]) * (vy[a] - vy[c]);
+    if (!d) continue;
+    const w0 = ((vy[b] - vy[c]) * (px - vx[c]) + (vx[c] - vx[b]) * (py - vy[c])) / d, w1 = ((vy[c] - vy[a]) * (px - vx[c]) + (vx[a] - vx[c]) * (py - vy[c])) / d;
+    const w2 = 1 - w0 - w1;
+    if (w0 < -1e-7 || w1 < -1e-7 || w2 < -1e-7) continue;
+    const z = w0 * vz[a] + w1 * vz[b] + w2 * vz[c];
+    if (best < 0 || z > bz) { best = tris[s]; bz = z; }
+  }
+  return [best, bz];
+}
+
+const COARSE_SKIRT = 5; // m: the far ground's skirt down its border
+function coarse(lk, col, side, step) {
+  const n = Math.round(side / step) + 1, z = new Float64Array(n * n).fill(NaN), C = new Float32Array(3 * n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const [t, h] = find(lk, i * step, j * step);
+    if (t < 0) continue;
+    z[j * n + i] = h;
+    C[3 * (j * n + i)] = col[3 * t]; C[3 * (j * n + i) + 1] = col[3 * t + 1]; C[3 * (j * n + i) + 2] = col[3 * t + 2];
+  }
+  const ok = (i, j) => i >= 0 && j >= 0 && i < n && j < n && !Number.isNaN(z[j * n + i]);
+  const pos = [], nor = [], cols = [], idx = [], at = new Int32Array(n * n).fill(-1);
+  const add = (i, j, dz) => {
+    const k = j * n + i;
+    // (the normal from the grid's differences, as three.js takes it: x, up, -y)
+    const l = ok(i - 1, j) ? i - 1 : i, r = ok(i + 1, j) ? i + 1 : i, b = ok(i, j - 1) ? j - 1 : j, f = ok(i, j + 1) ? j + 1 : j;
+    const dx = r > l ? (z[j * n + r] - z[j * n + l]) / ((r - l) * step) : 0, dy = f > b ? (z[f * n + i] - z[b * n + i]) / ((f - b) * step) : 0;
+    const len = Math.hypot(dx, 1, dy);
+    pos.push(i * step, z[k] - dz, -j * step);
+    nor.push(-dx / len, 1 / len, dy / len);
+    cols.push(C[3 * k], C[3 * k + 1], C[3 * k + 2]);
+    return pos.length / 3 - 1;
+  };
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (ok(i, j)) at[j * n + i] = add(i, j, 0);
+  for (let j = 0; j + 1 < n; j++) for (let i = 0; i + 1 < n; i++) {
+    const a = at[j * n + i], b = at[j * n + i + 1], c = at[(j + 1) * n + i + 1], d = at[(j + 1) * n + i];
+    if (a < 0 || b < 0 || c < 0 || d < 0) continue;
+    idx.push(a, b, c, a, c, d); // (counter-clockwise from above, as the ground file's)
+  }
+  // the skirt: each border edge with both ends on the ground, down COARSE_SKIRT m
+  const edge = (i0, j0, i1, j1) => {
+    if (!ok(i0, j0) || !ok(i1, j1)) return;
+    const a = at[j0 * n + i0], b = at[j1 * n + i1], a2 = add(i0, j0, COARSE_SKIRT), b2 = add(i1, j1, COARSE_SKIRT);
+    idx.push(a, a2, b2, a, b2, b);
+  };
+  for (let k = 0; k + 1 < n; k++) { edge(k, 0, k + 1, 0); edge(k + 1, n - 1, k, n - 1); edge(0, k + 1, 0, k); edge(n - 1, k, n - 1, k + 1); }
+  return { pos: new Float32Array(pos), nor: new Float32Array(nor), col: new Float32Array(cols), idx: new Uint32Array(idx) };
 }
 
 let cfg = null;
@@ -244,6 +307,11 @@ onmessage = ({ data }) => {
   const out = { id: data.id }, transfer = [];
   if (data.lookup) {
     const lk = (out.lookup = lookup(g, cfg.cell, data.box, cfg.tile));
+    if (data.coarse) {
+      const c = (out.coarse = coarse(lk, lk.col, cfg.tile, data.coarse));
+      transfer.push(c.pos.buffer, c.nor.buffer, c.col.buffer, c.idx.buffer);
+    }
+    delete lk.col;
     transfer.push(lk.start.buffer, lk.tris.buffer, lk.tv.buffer, lk.ta.buffer, lk.tk.buffer, lk.cover.buffer, lk.vx.buffer, lk.vy.buffer, lk.vz.buffer);
   }
   const t2 = performance.now();
