@@ -79,9 +79,21 @@ Zvuky hry jsou události a smyčky (#528; rozhodnutí, oddíl 5): hra vyvolá ud
 když náprava přejede srdcovku) a nastaví veličiny, kterými se řídí smyčky; `src/audio.js` přehraje každou nahrávkou
 zvukového balíčku, kde ji má, jinak vestavěným zvukem, který syntetizuje (zvuky, které hra měla před balíčky). Balíček
 je `sounds` v popisu vozidla (jeho soubory mezi soubory vozidla), nebo složka `assets/<id>/` se souborem `sounds.json`
-(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`.
-Hra zatím žádný nemá; `tools/test_sounds.py` podává vlastní ukázkový. Pole, seznam událostí, smyček a veličin a pravidla
-srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
+(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`,
+nebo balíček. Volba *Zvuky* v menu (#636) nabízí balíčky pro zvolené vozidlo, dodané s hrou i nainstalované, vedle
+jeho vlastních zvuků (vestavěných, kde vlastní nemá), které jsou výchozí; volba se pamatuje pro každé vozidlo a hraje
+od začátku další směny. Hra dodává jeden, pro hybrid: `assets/jnd.t2r6004/` (#590), *T2R 6004 – částečné zvuky*;
+`tools/test_sounds.py` podává vlastní ukázkový.
+
+Balíček je složka: popis (`sounds.json` v repozitáři, `package.json` jako balíček), soubory, které hraje, jejich
+předlohy a poznámky. Předlohy jsou WAV, mono nebo stereo, 16 nebo 24 bitů nebo 32bitové float, 44,1 nebo 48 kHz;
+událost hraje od prvního vzorku souboru v nahrané hlasitosti (ticho před zvukem ořízněte), smyčka hraje celý soubor
+dokola. Hra hraje Ogg Opus (`.ogg`); každý `.ogg` v `files` jmenuje svoje MP3 jako `fallback`, které přehraje
+prohlížeč, jenž Opus nedekóduje (Safari před 18.4), a svou předlohu jako `master`. Oba soubory píše z předloh
+`python -P -E tools/sound_encode.py <složka>`: Opus 64 kbit/s mono a 96 stereo s proměnným tokem, MP3 kodérem LAME
+-V2 (modul `lameenc`); oba dekódují na délku předlohy přesně na vzorek. Pět zvuků dodaného balíčku má jako WAV 823 kB,
+jako Ogg Opus 60 kB a jako MP3 102 kB. Pole, příklad popisu, seznam událostí, smyček a veličin a pravidla srdcovek:
+anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
 
 ## Balíčky
 

@@ -2,8 +2,8 @@
   "schema": 1,
   "kind": "sounds",
   "id": "jnd.t2r6004",
-  "version": "0.1.1",
-  "game": ">=1.2 <2",
+  "version": "0.2.0",
+  "game": ">=1.3 <2",
   "requires": {
     "t3h": ">=1"
   },
@@ -27,6 +27,19 @@
       "sha256": "2547a2ed7082ac9c421afee4413cb1962e128d46a8a28cf2392adaa2ba3a7609"
     },
     {
+      "path": "bell_medium.ogg",
+      "bytes": 9779,
+      "sha256": "38747804715cdb808dd8035743007fdbd133e5f085929613973fc054aea33e95",
+      "fallback": "bell_medium.mp3",
+      "master": "bell_medium.wav"
+    },
+    {
+      "path": "bell_medium.mp3",
+      "bytes": 17052,
+      "sha256": "59f8bebb6b78c1d1c41a29e1bc7b0e55f73bcffe65c07b528cd86fd087b22700",
+      "master": "bell_medium.wav"
+    },
+    {
       "path": "bell_short.wav",
       "bytes": 83834,
       "sha256": "699ce5a31791e70891db7583e8d4acc46139c4adec47ce2b6f10b39a26c8c4bb"
@@ -35,6 +48,19 @@
       "path": "door_alert.wav",
       "bytes": 282284,
       "sha256": "de9c765c6dbf4d843b938bbf5c07571f550252eeb146da6ff19bab38ef117cc5"
+    },
+    {
+      "path": "door_alert.ogg",
+      "bytes": 26414,
+      "sha256": "f50e2aa2c02187de2e7aa49aac34a08e485c0b5ead0212d8ad0fabcbeda76fdd",
+      "fallback": "door_alert.mp3",
+      "master": "door_alert.wav"
+    },
+    {
+      "path": "door_alert.mp3",
+      "bytes": 38917,
+      "sha256": "f4bedd386d0940198ab3910c78edccd06a74668250cb376d19cbe4cdb0601002",
+      "master": "door_alert.wav"
     },
     {
       "path": "door_alert_loop.wav",
@@ -48,13 +74,13 @@
     },
     {
       "path": "provenance.json",
-      "bytes": 4754,
-      "sha256": "768c2d311b344b491afc9d7cd0a7716b8b460c1f3493893c8f3a6c734e3e05db"
+      "bytes": 5583,
+      "sha256": "5bb747961d9b495f76b20f4f45d30a6b771ebf69e2665a0bde3f179fdcceb99b"
     },
     {
       "path": "README.txt",
-      "bytes": 1027,
-      "sha256": "37358f1aa9df1e02bd08a565e030ae7f873566023f593a302fe23aac1485aeb1"
+      "bytes": 1405,
+      "sha256": "5c70982df3de5ac74266ace926780247209126fa92b757dd33f39de148d1fa88"
     },
     {
       "path": "release-01.wav",
@@ -62,24 +88,63 @@
       "sha256": "0f0afc4139788c587becaf7d2b6cf6c565881543ba8d7f6285d926690beac647"
     },
     {
+      "path": "release-01.ogg",
+      "bytes": 6365,
+      "sha256": "1a1503f7551293d395ca5a1692b0e716f7fd9de1bb4bf0c82ae953b361c43aac",
+      "fallback": "release-01.mp3",
+      "master": "release-01.wav"
+    },
+    {
+      "path": "release-01.mp3",
+      "bytes": 12394,
+      "sha256": "e8381d033d2a39ec2e701795ff34414934354fe247aa0ffd0359d0bc2ab9a953",
+      "master": "release-01.wav"
+    },
+    {
       "path": "start-01.wav",
       "bytes": 183710,
       "sha256": "feb1fb60e9e4a0c88107a5bee9f56d97b259777bf4bcc6ee3259b9caac4bcefc"
     },
     {
+      "path": "start-01.ogg",
+      "bytes": 9003,
+      "sha256": "a8ece33fc0aae67732008b931603a530aebca9e69804947788bfd391519e8153",
+      "fallback": "start-01.mp3",
+      "master": "start-01.wav"
+    },
+    {
+      "path": "start-01.mp3",
+      "bytes": 17324,
+      "sha256": "dcb9159b5cf172262437d8426bac7cf14e51847570f964df1c8efbdd4246a6c6",
+      "master": "start-01.wav"
+    },
+    {
       "path": "start-02.wav",
       "bytes": 171542,
       "sha256": "73c2c9418931fc2008eaf428877e38eaba31ff002e8455658f152dab171b0773"
+    },
+    {
+      "path": "start-02.ogg",
+      "bytes": 8329,
+      "sha256": "e18be8b7dba86cc661b34ae680dd6a5d019ae9cf5e7c4bb1f1c7d497b1366f34",
+      "fallback": "start-02.mp3",
+      "master": "start-02.wav"
+    },
+    {
+      "path": "start-02.mp3",
+      "bytes": 16803,
+      "sha256": "858efa2953e1c52949e4bb82a7ccc4a95fc3b10cd7ce446a6fc5e76c17a8f01a",
+      "master": "start-02.wav"
     }
   ],
   "events": {
-    "bell": "bell_medium.wav",
-    "door.buzzer": "door_alert.wav",
+    "bell": "bell_medium.ogg",
+    "door.buzzer": "door_alert.ogg",
     "lineContactor.close": [
-      "start-01.wav",
-      "start-02.wav"
+      "start-01.ogg",
+      "start-02.ogg"
     ],
-    "lineContactor.open": "release-01.wav"
+    "lineContactor.open": "release-01.ogg"
   },
   "loops": {},
   "licence": {

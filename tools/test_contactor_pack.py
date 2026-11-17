@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Install/decode the approved #590 pack; optionally compare TR37 step outputs to a git revision.
+"""The shipped T2R 6004 pack (#590, #636): decode and play; optionally compare TR37 step outputs to a git revision.
 
 Usage: python -P -E tools/test_contactor_pack.py [--against origin/main]
-Own free-port server, no world data needed. Checks the actual ZIP through the game's installer, hashes and
-browser storage, all eight WAVs, and event playback. --against compares 20,000 deterministic equipment steps.
+Own free-port server, no world data needed. The pack is listed in assets/vehicles.json and the game loads it; the
+hybrid sounds with it only when it is picked (the default: the built-in sounds). All its Ogg Opus files, their MP3
+fallbacks and the WAV masters decode; its events play by the pack; where the browser cannot decode the Ogg files
+(served broken here), each event plays its MP3 fallback, as long as the Ogg. Its zip offered as a package is refused (the id is the game's own). --against compares
+20,000 deterministic equipment steps.
 """
 import argparse
 import faulthandler
@@ -27,22 +30,32 @@ import gpu  # noqa: E402
 CHECK = """async () => {
   const V = await import('/src/vehicles.js'), P = await import('/src/packages.js');
   await V.loadRegistry();
-  const reports = await P.installUrl('/test-pack.zip');
-  if (!reports[0]?.ok) throw Error(JSON.stringify(reports));
-  const manifest = P.state.get('jnd.t2r6004').manifest;
-  const {TramAudio} = await import('/src/audio.js'), a = new TramAudio();
-  a.start(); a.setMuted(true); a.setActive(true);
-  const pack = V.soundsFor(V.byId.get('t3h')); await a.usePack(pack);
-  const decoded = [];
-  for (const f of manifest.files.filter(f=>f.path.endsWith('.wav'))) {
-    const buffer = await a.ctx.decodeAudioData(await (await fetch(pack.url(f.path))).arrayBuffer());
-    decoded.push({file:f.path,channels:buffer.numberOfChannels,duration:buffer.duration});
-  }
-  a.trace = [];
-  for (const e of ['bell','door.buzzer','lineContactor.close','lineContactor.open','door.open']) a.emit(e,{current:240});
-  const trace = a.trace;
-  await a.ctx.close();
-  return {reports,decoded,trace};
+  const t3h = V.byId.get('t3h'), manifest = V.soundPacks.get('jnd.t2r6004');
+  if (!manifest) throw Error('the shipped pack is not loaded: ' + [...V.soundPacks.keys()]);
+  const out = { offered: V.soundPacksFor(t3h).map((p) => p.id), byDefault: V.soundsFor(t3h)?.id ?? null };
+  const {TramAudio} = await import('/src/audio.js');
+  const play = async (url) => {
+    const a = new TramAudio();
+    a.start(); a.setMuted(true); a.setActive(true);
+    const pack = V.soundsFor(t3h, 'jnd.t2r6004');
+    await a.usePack(pack, url ? (f) => url(f, pack) : undefined);
+    a.trace = [];
+    for (const e of ['bell','door.buzzer','lineContactor.close','lineContactor.open','door.open']) a.emit(e,{current:240});
+    const r = { trace: a.trace.map((x) => x.by), fellBack: a.fellBack, events: Object.fromEntries([...a.pack.events].map(([e, b]) => [e, b.map((x) => +x.duration.toFixed(3))])) };
+    const decoded = [];
+    for (const f of manifest.files.filter((f) => ['wav', 'ogg', 'mp3'].includes(f.path.split('.').pop()))) {
+      const b = await a.ctx.decodeAudioData(await (await fetch(pack.url(f.path))).arrayBuffer());
+      decoded.push({ file: f.path, channels: b.numberOfChannels, duration: +b.duration.toFixed(3) });
+    }
+    await a.ctx.close();
+    return { ...r, decoded };
+  };
+  out.ogg = await play();
+  // a browser without Opus: the Ogg files answer bytes it cannot decode
+  out.asked = [];
+  out.fallback = await play((f, pack) => { out.asked.push(f); return f.endsWith('.ogg') ? '/__undecodable.ogg' : pack.url(f); });
+  out.refused = (await P.installUrl('/test-pack.zip'))[0];
+  return out;
 }"""
 
 COMPARE = """async () => {
@@ -76,7 +89,7 @@ def main():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in sorted(folder.iterdir()):
-            z.write(f, f.name)
+            z.write(f, 'package.json' if f.name == 'sounds.json' else f.name)
     before = None
     if args.against:
         before = subprocess.check_output(['git','show',f'{args.against}:src/tr37.js'],cwd=ROOT).decode('utf-8')
@@ -93,18 +106,21 @@ def main():
             if before:
                 page.route('**/before-tr37.js',lambda r:r.fulfill(body=before,content_type='text/javascript'))
             page.goto(f'http://127.0.0.1:{server.server_port}/check.html')
+            page.route('**/__undecodable.ogg',lambda r:r.fulfill(body=b'OggS' + bytes(200),content_type='audio/ogg'))
             result = page.evaluate(CHECK)
-            assert len(result['decoded']) == 8, result
-            assert [x['by'] for x in result['trace']] == ['pack']*4+['built-in'],result
+            assert result['offered'] == ['jnd.t2r6004'] and result['byDefault'] is None, result
+            oggs = sum(f.endswith('.ogg') for f in json.load(open(folder/'sounds.json',encoding='utf-8'))['events'].values() for f in ([f] if isinstance(f,str) else f))
+            for how in ('ogg', 'fallback'):
+                r = result[how]
+                assert r['trace'] == ['pack']*4+['built-in'], (how, r['trace'])
+                assert len(r['decoded']) == 18, (how, r['decoded'])
+            assert result['ogg']['fellBack'] == [] and len(result['fallback']['fellBack']) == 5 == oggs, result
+            fetched = sorted(f for f in result['asked'] if not f.endswith('.ogg'))
+            assert fetched == sorted(f[:-4] + '.mp3' for f in result['fallback']['fellBack']), result['asked']
+            assert result['ogg']['events'] == result['fallback']['events'], (result['ogg']['events'], result['fallback']['events'])
+            assert not result['refused']['ok'] and any('taken by the game' in x for x in result['refused']['problems']), result['refused']
             if before:
                 result['physics'] = page.evaluate(COMPARE)
-            page.reload()
-            restored = page.evaluate("""async () => {
-              const V=await import('/src/vehicles.js'),P=await import('/src/packages.js');
-              await V.loadRegistry(); await P.loadInstalled(); return V.soundsFor(V.byId.get('t3h'))?.id;
-            }""")
-            assert restored == 'jnd.t2r6004',restored
-            result['restored'] = restored
             print(json.dumps(result,indent=2))
             browser.close()
     finally:

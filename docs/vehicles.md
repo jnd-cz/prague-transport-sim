@@ -81,15 +81,51 @@ The game's sounds are events and loops (#528; the decision record, section 5): t
 with a sound pack's recording where the pack has one, else with the built-in sound it synthesises (the sounds the game
 had before the packs). A pack is a vehicle manifest's `sounds` (its files among the vehicle's) or a folder
 `assets/<id>/` with a `sounds.json` (`kind` `sounds`, `requires` its vehicle, `names`, `licence`, `files`), listed under
-`sounds` in `assets/vehicles.json`; a vehicle sounds with the first package for it, else its own. The game ships none
-yet: every vehicle has the built-in sounds; `tools/test_sounds.py` serves a sample pack of its own.
+`sounds` in `assets/vehicles.json`, or a package. The menu's *Sounds* (#636) offers the packs for the chosen vehicle,
+shipped and installed, beside its own sounds (the built-in ones where it has none), which are the default; the pick
+is remembered per vehicle and plays from the next shift's start. The game ships one, for the hybrid (below);
+`tools/test_sounds.py` serves a sample pack of its own.
+
+**The format.** A pack is a folder: its manifest (`sounds.json` in the repository, `package.json` as a package), the
+files it plays, their masters, and its notes. The manifest holds the fields every package has (*Packages*, below:
+`schema`, `kind` `sounds`, `id`, `version`, `game`, `requires` its vehicle, `names`, `licence`, `files`) and these:
 
 | field | what |
 |---|---|
-| `events` | event → a file, or a list of files (one picked at random each time); WAV or MP3 |
+| `events` | event → a file, or a list of files (one picked at random each time); WAV, MP3, or Ogg Opus with an MP3 fallback (below) |
 | `loops` | loop → `{ "file", "refSpeed" (m/s, motor and rolling) or "refRpm" (mg), "gain" }`: the recording plays pitched by its parameter over the reference, as loud as the built-in loop's share of its loudest, times `gain` (default 1) |
 | `gain` | the pack's events' loudness (default 1); an event over a joint or a frog plays louder with speed |
 | `lineContactorRelease` | optional `{ "minGain": 0.25, "maxGain": 1, "refCurrent": 480 }`; opening gain rises linearly from the minimum at 0 A to the maximum at the reference current, clamped there. Requires `0 < minGain <= maxGain <= 1`, `refCurrent > 0` A. Listening settings, not physical constants. |
+
+A file's entry in `files`:
+
+| key | what |
+|---|---|
+| `path` | the file's path in the folder |
+| `bytes`, `sha256` | its size and SHA-256, checked at an install (a package) and by `tools/test_vehicles.py` (a shipped pack) |
+| `fallback` | an `.ogg`'s: its MP3, which a browser that cannot decode Opus plays instead |
+| `master` | an encoded file's: the recording it was encoded from (`tools/sound_encode.py` reads it; the game does not) |
+
+An author lists the masters and names them in `events` and `loops`; `tools/sound_encode.py` (below) writes the rest.
+A pack for the hybrid with a bell, two takes of the line contactor closing and a motor loop, after the encoder (the
+entries of `start-1`, `start-2` and `motor-30kmh` left out here):
+
+```json
+{
+  "schema": 1, "kind": "sounds", "id": "author.t3-sounds", "version": "1.0.0", "game": ">=1.3 <2",
+  "requires": { "t3h": ">=1" },
+  "names": { "cs": "T3 – nahrávky", "en": "T3 recordings" },
+  "licence": { "spdx": "CC-BY-4.0", "authors": ["Author"], "sources": ["own recordings, 2026-11"],
+               "credit": "T3 recordings: Author (CC BY 4.0)", "commercial": true },
+  "events": { "bell": "bell.ogg", "lineContactor.close": ["start-1.ogg", "start-2.ogg"] },
+  "loops": { "motor": { "file": "motor-30kmh.ogg", "refSpeed": 8.3 } },
+  "files": [
+    { "path": "bell.wav", "bytes": 101472, "sha256": "2547a2ed…" },
+    { "path": "bell.ogg", "bytes": 9779, "sha256": "38747804…", "fallback": "bell.mp3", "master": "bell.wav" },
+    { "path": "bell.mp3", "bytes": 17052, "sha256": "59f8bebb…", "master": "bell.wav" }
+  ]
+}
+```
 
 `lineContactor.close` and `lineContactor.open` replace the generic `lineContactor` for their respective edge.
 Each edge plays once: directional recording, else generic recording, else synthesis. Opening carries traction
@@ -97,10 +133,41 @@ current from immediately before the equipment opens (the maximum relay uses the 
 captured at simulation-step resolution. The gain floor is below the pack and master gains; mute and pause still
 silence it. Reapplying power before LS opens cancels the pending release without another start sound.
 
-The optional AGPL-3.0-or-later pack in `assets/jnd.t2r6004/package.json` installs through *Vehicles…* by address or ZIP.
-It supplies both trimmed startup variants, the first release, the medium bell and full door alert. The other
-bell lengths and door-alert loop are retained as alternatives; the loop awaits a warning start/stop lifecycle.
-See its `README.txt` for source provenance and installation. Other events and loops retain built-in synthesis.
+**The recordings** (the masters): WAV, mono or stereo, 16 or 24 bits, or 32-bit float as field recorders write
+them, at 44.1 or 48 kHz. An event plays from the file's first sample at its recorded level, times the event's level
+and the pack's `gain`: trim the silence before the sound, and keep the takes at their real loudness to each other (the
+shipped pack's peaks: −1.9 dBFS the bell, −11.6 a start). A loop plays its whole file end to start, pitched by its
+parameter over its reference: record it at its `refSpeed` or `refRpm` and cut it where its end joins its start.
+
+**The playback files.** The game plays Ogg Opus (`.ogg`; Chromium, Firefox, Safari from 18.4); a browser that cannot
+decode it plays the `.ogg`'s MP3 `fallback` instead (the decision record, section 5: "Ogg/Opus only with an MP3
+fallback"), and `soundProblems` (`src/vehicles.js`) refuses an `.ogg` without one. Both decode to their master's
+length to the sample, so an event starts on its first sample and a loop cut in its master loops the same: Opus's
+pre-skip and end granule, and the MP3's LAME info frame (the encoder's delay and padding), trim what the encoders add.
+`python -P -E tools/sound_encode.py <folder>` writes both from the masters the manifest names (in `events` and
+`loops`, or as the `.ogg` files' `master` on a later run):
+- Opus by Chromium's WebCodecs encoder (headless), at a variable bitrate of 64 kbit/s mono and 96 stereo (`--kbps`
+  sets the mono one), 20 ms frames, complexity 10;
+- MP3 by LAME 3.100 at -V2, its variable-bitrate setting for transparent quality (the shipped pack's: 97 to
+  119 kbit/s mono, 200 to 207 stereo), through the `lameenc` module (`python -m pip install --user lameenc`). A
+  master that is an MP3 is its `.ogg`'s fallback itself.
+
+It decodes each file back in the browser and compares it with its master (the length, a shift over 1 ms, the loudness
+envelope, the peak), writes nothing while one fails, then names the `.ogg` files in `events` and `loops` and refreshes
+every file's size and hash; `--check` checks a folder without writing. The shipped pack's five sounds are 823 kB as
+WAV, 60 kB as Ogg Opus and 102 kB as MP3.
+
+**Shipping it.** In the repository: a folder `assets/<id>/` with `sounds.json`, listed under `sounds` in
+`assets/vehicles.json`, its masters kept beside the files it plays (the game fetches only those), with a `README.txt`,
+a `LICENSE.txt` and a `provenance.json` (where each recording came from, its hashes). As a package: the same folder
+with the manifest named `package.json`, in a .zip (*Packages*, below). A package installs every file it lists, so it
+may leave its masters out (their entries too; the `master` keys may stay).
+
+The shipped AGPL-3.0-or-later pack `assets/jnd.t2r6004/` (#590, #636), *T2R 6004 – partial sounds* in the menu's
+*Sounds* while the hybrid is the model, supplies both trimmed startup variants, the first release, the medium bell
+and full door alert, in Ogg Opus with MP3 fallbacks. The other bell lengths and door-alert loop are retained as
+alternatives (WAV masters only); the loop awaits a warning start/stop lifecycle. See its `README.txt` for source
+provenance. Other events and loops retain built-in synthesis.
 
 A pack naming an event or a loop the game does not have, a file it does not list, or a loop without its reference is
 left out with the name (`sound pack x left out: event gong: the game raises no such event`). The frogs: a facing
