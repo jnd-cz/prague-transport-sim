@@ -55,10 +55,10 @@ function drawNames(layout) {
   return out;
 }
 
-// The ground's tiles: which are held, their lookups and meshes. `make(meshes, box)` (src/world.js attachGround) turns a
+// The ground's tiles: which are held, their lookups and meshes. `make(meshes, box)` (src/groundDraw.js attachGround) turns a
 // tile's mesh arrays into the scene's meshes and returns them, `drop(meshes)` takes them out; `makeCoarse(coarse, box)`
 // makes a tile's far ground (#30), kept for every tile and hidden while its detail is drawn; `fix` brings a tile's
-// lookup and mesh arrays down into the road tunnels' mouths (world.js mouthFix). A tile's meshes wait in `ready` and
+// lookup and mesh arrays down into the road tunnels' mouths (src/structures.js mouthFix). A tile's meshes wait in `ready` and
 // join the scene one a frame (flush), nearest first, so their uploads to the GPU fall in different frames.
 export class GroundTiles {
   constructor(file, styles, keep = false) {
@@ -115,7 +115,7 @@ export class GroundTiles {
     m.visible = !this.drawn.has(key);
     this.coarse.set(key, m);
   }
-  // the far ground's arrays that came before the world was built (src/world.js attachGround)
+  // the far ground's arrays that came before the world was built (src/groundDraw.js attachGround)
   flushCoarse() { for (const [k, c] of this.coarse) if (c.idx) this._coarse(k, c); }
   _make(key, ms) {
     if (this.drawn.has(key) || !this.make) return;

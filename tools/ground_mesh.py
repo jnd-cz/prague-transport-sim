@@ -75,7 +75,7 @@ WATER_LATTICE = 25.0  # m: the water's faces cut to this (the page's lookup bins
 WATER_PRIO = 2.95  # the water's weld priority: under the survey's (2.x) and the beds' (1), over the terrain's (3)
 WATER_NUDGE = 3.0  # m: a water corner on a cut is seen from this far off it, on its triangle's side (off_cuts: past the
 # cut's cells on WaterLevels' raster; seen from inside a triangle 2 m along it, it lay in them and read both sides)
-BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/world.js flushDtm's 12 m)
+BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/groundDraw.js flushDtm's 12 m)
 LAYERS = ("draw", "area")  # the file's names per triangle, in this order after the triangles (encode)
 SLIVER_BAND = 1e-6  # m²: a band piece smaller is float noise along a piece's edge
 RAIL_NEAR = 0.0008  # m: the bed corner a rail point reads (snap-rounding to the mm grid moves a vertex by up to 0.71 mm;
@@ -671,7 +671,7 @@ def build(ln, mesh=None, threads=8, log=print):
     V, vid = np.unique(vkey, axis=0, return_inverse=True)
     F = vid.reshape(-1, 3)
     # (what the page draws each triangle as, #509: inside the beds' outline at the bed's height the bed, by its track
-    # style, as the page draws its bed over the survey there; the survey by its area's class (src/world.js DTM_COLORS,
+    # style, as the page draws its bed over the survey there; the survey by its area's class (src/groundDraw.js DTM_COLORS,
     # a median under grass green, #555); else the class)
     tcls = np.where((kind.reshape(-1, 3) == "bed").all(1) & (tcls != "plot"), "bed", tcls)
     draw = np.full(len(tcls), "", dtype=object)
@@ -1221,7 +1221,7 @@ def encode_tiles(V, F, cls, draw=None, area=None):
     encoded on its own (encode(): its own vertices, those on its border repeated in its neighbour), so the page decodes
     the tiles it needs. A triangle goes to the tile holding its centre: the faces are built square by square on the same
     grid, so it lies in it. The layout: per tile its name, index, byte range and own layout; the totals; and per class
-    every draw and area name a tile uses (the page's styles, src/world.js groundStyles)."""
+    every draw and area name a tile uses (the page's styles, src/groundDraw.js groundStyles)."""
     cen = V[F].mean(1) / Q
     e, n = tile_index(cen[:, 0], cen[:, 1])
     keys, inv = np.unique(np.column_stack([e, n]), axis=0, return_inverse=True)

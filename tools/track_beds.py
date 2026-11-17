@@ -39,7 +39,7 @@ from route import Route  # noqa: E402
 GAUGE = 0.72           # m: a rail from the axis (src/world.js)
 RAIL = 1.35            # m: the bed's half width before #547 (the report's before)
 MIN, MAX = 1.0, 3.0    # m: the bed's half width from the survey's area (MAX: the track corridor the street is laid to,
-                       # src/world.js flushDtm)
+                       # src/groundDraw.js flushDtm)
 PAIR = (2.0, 6.0)      # m: a parallel track this far is the paired one (the opposite track, heights.backOff)
 PARALLEL = 0.95        # |cos| of the angle between two tracks counted parallel
 STEP_OUT = 0.1         # m: the survey read across the track

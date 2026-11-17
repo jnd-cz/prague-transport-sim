@@ -156,7 +156,7 @@ function chainWays(roads, flag) {
 }
 
 // m past each track's centre that the track zone reaches (#538): where the rails tilt with the street, the street
-// within it is their plane; beyond it the street keeps the survey's own shape, shifted to meet it (src/world.js
+// within it is their plane; beyond it the street keeps the survey's own shape, shifted to meet it (src/groundDraw.js
 // flushDtm). Half the track bed (2.7 m): carried 3 m out, the plane dropped the street 10 cm where the lidar drops 5
 // (Klárov, line 23 s 2856).
 export const TRACK_ZONE = 1.4;
@@ -279,7 +279,7 @@ export class Profile {
 }
 
 // The track corridor's tunnels through rock and its retaining walls, judged on the terrain grid (10 x 15 m). Where the
-// hillside rises more than WALL_MIN m above the track at BENCH m from it, a retaining wall stands there (world.js
+// hillside rises more than WALL_MIN m above the track at BENCH m from it, a retaining wall stands there (src/structures.js
 // buildWalls). Returns the wall runs and the rock tunnels. (The grid was carved here too, a bench at the track level
 // with blended slopes; near the track the ground file answers since #509, and the carving went, #510.)
 const BENCH = 7, WALL_MIN = 1.5, WALL_REACH = 22;
@@ -291,7 +291,7 @@ export function corridorWalls(T, route, profile, dtm = null) {
   const origAt = (x, y) => grid.height(x, y);
   // Tunnels of our route through rock (OSM tunnel, the lidar ground more than 8 m over the track on
   // average: the Vyšehrad tunnel; not a covered stretch under a station or a bridge): nothing is
-  // carved there, the hill stays whole over the track and world.js draws the vault and the portals
+  // carved there, the hill stays whole over the track and src/structures.js draws the vault and the portals
   const rock = (profile.tunnels || []).filter(([a, b]) => {
     let acc = 0, n = 0;
     for (let s = a; s <= b; s += 4) { const q = route.at(s); acc += origAt(q.x, q.y) - profile.height(s); n++; }
@@ -435,7 +435,7 @@ export class DtmSurface {
         const n0 = area.mesh.length;
         if (a.c !== 'roof') this._split(p, q, r, ringZ, area.mesh);
         else area.mesh.push([p, q, r]);
-        // (decks by reference: world.js lays the decks of our bridges to the track profile afterwards)
+        // (decks by reference: src/groundDraw.js flushDtm lays the decks of our bridges to the track profile afterwards)
         if (a.l >= 1 && DECK.has(a.c)) for (let m = n0; m < area.mesh.length; m++) this.deckGrid.add(area.mesh[m], a.l, a.c);
       }
       this.areas.push(area);
@@ -591,7 +591,7 @@ export class DtmSurface {
 }
 
 // Triangles of the surveyed areas by 3 m cell, for the height and deck lookups. The triangles are
-// the areas' own mesh triangles by reference (world.js moves their heights afterwards: flush with
+// the areas' own mesh triangles by reference (src/groundDraw.js flushDtm moves their heights afterwards: flush with
 // the tracks, bridge decks, tunnel mouths; the lookups see that), numbered in one list, each with a
 // value (rank or level) and a class. The cells' triangle numbers lie in one Int32Array (`ids`), cell
 // k's from start[k] to start[k + 1]. (It was 10 m cells, each entry a new [p, q, r, value, class]
@@ -724,7 +724,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
     surface(x, y) {
       if (dtm) {
         const t = dtm.surfaceAt(x, y);
-        if (t) return t.z + (DTM_LIFT[t.c] ?? 0.03); // flush with the tracks already (world.js flushDtm)
+        if (t) return t.z + (DTM_LIFT[t.c] ?? 0.03); // flush with the tracks already (src/groundDraw.js flushDtm)
       }
       return this.at(x, y) + 0.12;
     },

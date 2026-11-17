@@ -3,7 +3,7 @@
 // keeps drawing (the tile container's decision: docs/decisions/2026-11-06-tile-container.md). A tile is decoded on its
 // own; its neighbours' blobs come with it when its meshes are asked, for the normals of the vertices on its border.
 //
-// In: first { init: { styles, names, cell, unit, tile } } — `styles[class][draw name]` = [group, r, g, b] (src/world.js
+// In: first { init: { styles, names, cell, unit, tile } } — `styles[class][draw name]` = [group, r, g, b] (src/groundDraw.js
 // groundStyles), `names[class]` the file's draw names ('' first, src/groundFile.js); then per tile { id, bytes, layout,
 // box: [x0, y0], ring: [{ bytes, layout }], lookup, meshes, coarse } (bytes: the tile's blob, layout: its own; coarse:
 // the far ground's step in m, with `lookup`).
