@@ -205,6 +205,18 @@ def city_at(G, px, py):
     return out
 
 
+def on_walls(D, x, y):
+    """Which points lie on a level-0 survey wall's or stairs' outline (within street_profile.WALL_ON), #653."""
+    from street_profile import WALL_CLASSES, WALL_ON
+    walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in D["areas"]
+             if a["c"] in WALL_CLASSES and a.get("l", 0) == 0 for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
+    if not walls or not len(x):
+        return np.zeros(len(x), bool)
+    wl = shapely.union_all(walls)
+    shapely.prepare(wl)
+    return shapely.dwithin(wl, shapely.points(x, y), WALL_ON)
+
+
 def plane(tri, x, y):
     """Heights on the planes of triangles (n, 3, 3) at (x, y), barycentric."""
     a, b, c = tri[:, 0], tri[:, 1], tri[:, 2]
@@ -565,6 +577,16 @@ def build(ln, mesh=None, threads=8, log=print):
         mm = np.isin(sc, list(cls)) & ~on_span
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
+    # (a street corner on a survey wall's or stairs' outline lies at its own area's outline height there, #653: the
+    # street surface reads IPR, whose 1 m raster spreads a wall's face over 1-2 m. At Krejcárek's ramp, line 37 (3929, 331),
+    # the sidewalk's corners stood 0.87 m off the wall's top, and the weld drew the wall as a band of steps)
+    st = np.flatnonzero(np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
+    if len(st):
+        st = st[on_walls(D, cx[m][st], cy[m][st])]
+        for a in np.unique(sa[st]).tolist():
+            k = st[sa[st] == a]
+            z = surface.at(a, cx[m][k], cy[m][k])
+            zs[k[np.isfinite(z)]] = z[np.isfinite(z)]  # (an outline without heights keeps the street surface's)
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
     # only, and the page laid it on the lidar inside (src/terrain.js DtmSurface, #444): here the city mesh's, its outline
     # too, so it meets the terrain beside it. Its outline on a slope stood up to 5.5 m under the terrain, a wall, and a

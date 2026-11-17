@@ -1246,6 +1246,67 @@ def kerb_edges(dtm):
     return out, walk
 
 
+WALL_CLASSES = ("wall", "stairs")
+WALL_ON = 0.05  # m: a sidewalk's outline edge on a wall's or stairs' outline (the survey shares their vertices)
+
+
+def wall_edges(dtm):
+    """The level-0 sidewalks' outline edges along a survey wall or stairs (#653), with the sidewalk's own heights at
+    their ends: (n, 2, 3). A wall's outline holds its top and its foot at one place; the sidewalk's own edge says which
+    it meets."""
+    import shapely
+    walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in dtm["areas"]
+             if a["c"] in WALL_CLASSES and a["l"] == 0 for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
+    if not walls:
+        return np.zeros((0, 2, 3))
+    tree = shapely.STRtree(walls)
+    segs = []
+    for a in dtm["areas"]:
+        if a["c"] != "sidewalk" or a["l"] != 0 or len(a["r"]) < 3:
+            continue
+        for ring in [a["r"]] + a.get("h", []):
+            for i in range(len(ring)):
+                p, q = ring[i], ring[(i + 1) % len(ring)]
+                if p[2] is None or q[2] is None or (p[0], p[1]) == (q[0], q[1]):
+                    continue
+                pts = shapely.points([p[0], q[0], (p[0] + q[0]) / 2], [p[1], q[1], (p[1] + q[1]) / 2])
+                hit, _ = tree.query(pts, predicate="dwithin", distance=WALL_ON)
+                if len(set(hit.tolist())) == 3:
+                    segs.append([p[:3], q[:3]])
+    return np.asarray(segs, float).reshape(-1, 2, 3)
+
+
+def wall_heights(segs, X, Y, on, reach):
+    """Per grid cell (`on` ones only): the nearest wall edge's height at its nearest point and the distance to it, within
+    `reach` (NaN and inf past it)."""
+    z, d = np.full(X.shape, np.nan), np.full(X.shape, np.inf)
+    if segs is None or not len(segs) or not on.any():
+        return z, d
+    x0, x1, y0, y1 = X.min() - reach, X.max() + reach, Y.min() - reach, Y.max() + reach
+    lo, hi = segs[:, :, :2].min(1), segs[:, :, :2].max(1)
+    s = segs[(hi[:, 0] >= x0) & (lo[:, 0] <= x1) & (hi[:, 1] >= y0) & (lo[:, 1] <= y1)]
+    if not len(s):
+        return z, d
+    px, py = X[on], Y[on]
+    a, b = s[:, 0], s[:, 1]
+    ex, ey = b[:, 0] - a[:, 0], b[:, 1] - a[:, 1]
+    l2 = np.maximum(ex * ex + ey * ey, 1e-12)
+    bz, bd = np.full(len(px), np.nan), np.full(len(px), np.inf)
+    for k in range(0, len(px), 20000):  # (cells × edges at once, in parts)
+        sl = slice(k, k + 20000)
+        t = np.clip(((px[sl, None] - a[None, :, 0]) * ex + (py[sl, None] - a[None, :, 1]) * ey) / l2, 0, 1)
+        dd = np.hypot(a[None, :, 0] + ex * t - px[sl, None], a[None, :, 1] + ey * t - py[sl, None])
+        j = dd.argmin(1)
+        r = np.arange(len(j))
+        bd[sl] = dd[r, j]
+        bz[sl] = a[j, 2] + (b[j, 2] - a[j, 2]) * t[r, j]
+    near = bd <= reach
+    zz, dz = np.full(len(px), np.nan), np.full(len(px), np.inf)
+    zz[near], dz[near] = bz[near], bd[near]
+    z[on], d[on] = zz, dz
+    return z, d
+
+
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
     """The sidewalks around the generated road. The walkway, up to SW_WALK from the kerb, is a plane: at the kerb the
     road's surface 0.5 m beyond it plus KERB (tools/kerbs.py, the measured step), rising across at IPR's crossfall held
@@ -1307,8 +1368,15 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             np.add.at(wsum, (i[good], j[good]), 1.0 / dk)
     with np.errstate(invalid="ignore", divide="ignore"):
         known = np.where(wsum > 0, acc / wsum, np.nan)
-    free = on & np.isnan(known)
     data = np.asarray(ipr.sample(X.ravel() + F.E0, Y.ravel() + F.N0), float).reshape(X.shape)
+    # (a sidewalk's edge on a survey wall or stairs is a breakline (#653): the cells along it held at the sidewalk's own
+    # heights there, and no pull from IPR within its smear, SW_KERB_SMEAR: IPR's 1 m raster spreads a wall's face over
+    # 1-2 m, and the fill sank the walkway 0.5 m into the top of Krejcárek's ramp wall, line 37 (3929, 331))
+    wz, wd = wall_heights(ctx.get("wall_edges"), X, Y, on, SW_KERB_SMEAR)
+    hold = on & (wd <= cell * 0.75)
+    known = np.where(hold, wz, known)
+    data = np.where(on & (wd <= SW_KERB_SMEAR), np.nan, data)
+    free = on & np.isnan(known)
     lam = (SW_WAVE / (2 * math.pi)) ** 4 / cell ** 4
     grid = fill_2d(known, free, data, lam)
     return xs[0], ys[0], cell, np.where(on, grid, np.nan)
@@ -1387,7 +1455,7 @@ def context(ln):
     edges, walk = kerb_edges(dtm)
     return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
             "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
-            "rings": outlines(dtm)}
+            "rings": outlines(dtm), "wall_edges": wall_edges(dtm)}
 
 
 def class_area(dtm, classes):
