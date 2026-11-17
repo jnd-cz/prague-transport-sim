@@ -81,6 +81,24 @@ class Rows(unittest.TestCase):
         self.assertTrue(np.isfinite(got).all())
         self.assertLess(np.abs(got - want).max(), 1e-9)
 
+    def test_a_cell_takes_its_first_rows_style(self):
+        # (the route's styles change at s 50, y 40; a cell between two rows, across the bed, is one style: its first row's,
+        # as the page coloured a quad between two rows. The nearest point split such a cell: a saw-tooth, #652)
+        L = line([track([[0, 0], [0, 100]], 200.0)])
+        L["styles"] = [{"s0": 0, "s1": 50, "style": "panels"}, {"s0": 50, "s1": 200, "style": "embedded"}]
+        b = bs.Beds(L)
+        rows, want = b.rows[0], b.row_styles()[0]
+        i = next(i for i in range(1, len(want)) if want[i] != want[i - 1])  # (the first row of the new style)
+        pts, exp = [], []
+        for r in (i - 2, i - 1, i):
+            (x0, y0), (x1, y1) = rows[r][:2], rows[r + 1][:2]
+            for u in (0.1, 0.3, 0.7, 0.9):
+                for side in (-1.2, -0.3, 0.4, 1.3):
+                    pts.append((x0 + (x1 - x0) * u + side, y0 + (y1 - y0) * u))
+                    exp.append(want[r])
+        self.assertEqual(b.style_at(*np.asarray(pts).T), exp)
+        self.assertEqual(set(exp), {"panels", "embedded"})
+
     def test_bed_z(self):
         row = [0, 0, 1, 0, [-2, -0.72, 0.72, 2], [1, 2, 3, 4]]
         self.assertEqual(bs.bed_z(row, -0.72), 2)
