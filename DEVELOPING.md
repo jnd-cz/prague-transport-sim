@@ -481,8 +481,8 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   beds, the building plots, the water and the terrain welded into one mesh that meets the tracks; the page draws the
   beds the file does not hold (on structures) and the decks, and builds no ground of its own (#510). The file is 500 m
   tiles on the S-JTSK grid, each decoded on its own in a pool of workers (`src/groundFile.js`, #30): every tile's height
-  lookup at load, then only the tiles within the fog's end of the camera and of 1 km of route ahead are drawn and keep
-  their lookup. `?keepgeo` and `?bot` keep every tile. `tools/bench/ground_tiles.py` drives the window along a line:
+  lookup at load, kept (Start reads the survey along the whole line, #654), and only the tiles within the fog's end of
+  the camera and of 1 km of route ahead drawn in detail. `?keepgeo` and `?bot` keep every tile's meshes too. `tools/bench/ground_tiles.py` drives the window along a line:
   what is held, each tile's time, any tile missing in view.
 - **Buildings:** the type is read from the OSM tag under each LOD2 building, its roof shape and size;
   Mosty 3D sets the deck height on tagged bridges.

@@ -9,7 +9,7 @@
 // The report is saved to reports/lineN.json by tools/serve.py; regressions:
 //   python -P -E tools/headless.py --checks lint --compare
 import { makeT3, placeConsist, CONTACT_WIRE } from '../src/models.js';
-import { roofIndex } from '../src/world.js';
+import { roofIndex } from '../src/buildings.js';
 import { tramClearance, CAR_PITCH } from '../src/tram.js';
 import * as THREE from 'three';
 import { runStreetBot } from '../src/streetbot.js';
@@ -280,6 +280,23 @@ function trackLevels(g) {
     }
   }
   return check('tracks-on-profile', n, [...bad.values()]);
+}
+
+// The oncoming trams' height (ground.trackAt along the opposite track, as src/traffic.js places them) every 0.25 m: a
+// step over 4 cm (a 16 % grade, past any tram line's) is the tram jumping. trackAt switched from the route's profile to
+// the street's surface 6 m from our route: 0.27 m at Ohrada, line 37 (#655). Counted per 20 m.
+function oncomingSteps(g) {
+  const b = g.backRoute, G = g.route.ground, bad = new Map();
+  if (!b) return check('oncoming-tram-steps', 0, []);
+  let n = 0, prev = null;
+  for (let s = 0; s <= b.length; s += 0.25) {
+    const p = b.at(s), z = G.trackAt(p.x, p.y);
+    n++;
+    const dz = prev === null ? 0 : z - prev, k = Math.round(s / 20);
+    prev = z;
+    if (Math.abs(dz) > 0.04 && !(bad.get(k)?.mag >= Math.abs(dz))) bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag: Math.abs(dz), info: `the opposite track's tram steps ${dz.toFixed(2)} m in 0.25 m` });
+  }
+  return check('oncoming-tram-steps', n, [...bad.values()]);
 }
 
 // Streets that wave: the drawn survey surface along lines parallel to the route (6-20 m either side,
@@ -862,7 +879,7 @@ function trackSpacing(g) {
 
 // Our track (both directions, as the game drives them) against the building footprints (OSM, data.buildings):
 // a centre nearer than half a T3's width puts the car into the wall. The game lifts a building the route passes
-// under (src/world.js), so the meshes hide it; main's OSM track came within 0.71 m of a wall at Karlovy lázně (#20).
+// under (src/buildings.js buildLod2), so the meshes hide it; main's OSM track came within 0.71 m of a wall at Karlovy lázně (#20).
 // Footprints with a passage (building:min_level) are not in the data. Places per 20 m.
 function trackInBuildings(g) {
   const HALF = 1.25, CELL = 20, cells = new Map();
@@ -1091,7 +1108,7 @@ export function groundUnderDecks(g, world) {
         const hits = rays.cast(p.x, zt + 3, -p.y, 60);
         n++; span.samples++;
         const kind = (h) => (h.object.userData.surface === 'dtm' ? `survey ${surveyOf(h)?.[0] ?? '?'}` : h.object.userData.surface);
-        // (faces of the survey's meshes that are no surveyed area, the parapets world.js draws on a flat deck, are neither)
+        // (faces of the survey's meshes that are no surveyed area, the parapets src/groundDraw.js draws on a flat deck, are neither)
         const ours = (h) => h.object.userData.surface === 'dtm' && !surveyOf(h);
         const deck = hits.find((h) => !ours(h) && levelOf(h) > 0), ground = hits.find((h) => !ours(h) && levelOf(h) === 0);
         if (deck && deck.point.y - zt > OVER_RAILS) count('deck', deck, deck.point.y - zt, s, l, p, kind(deck));
@@ -1185,6 +1202,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     gradeSeparated: crossingsOnBridges(g),
     bridgeLevels: levelsAtBridges(g),
     trackLevels: trackLevels(g),
+    oncomingSteps: oncomingSteps(g),
     streetWaviness: streetWaviness(g),
     railSupport: railSupport(g, world),
     surveyOverTrack: surveyOverTrack(g),

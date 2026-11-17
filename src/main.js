@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, corridorWalls, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
-import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail, groundStyles } from './world.js';
+import { buildWorld, WORLD_PARTS } from './world.js';
+import { widenTramStreets, buildStreetDetail } from './streets.js';
+import { groundStyles } from './groundDraw.js';
 import { fetchGround, GroundTiles, WINDOW_AHEAD, WINDOW_STEP } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';

@@ -324,6 +324,31 @@ class DeployTest(unittest.TestCase):
         # (taken off the host once saved; what is not a submission stays there)
         self.assertEqual(sorted(os.listdir(d)), [".htaccess", "sub-20261116-120002-0000abcf"])
 
+    def test_pull_reads_a_missing_folder_as_empty_on_550_and_450(self):
+        # (the alpha answers 450 for submissions/, which came after its last deploy: the hourly pull failed on it, #650)
+        class Ftp450(FakeFtp):
+            def nlst(self, d):
+                if not os.path.isdir(self._p(d)):
+                    raise ftplib.error_temp(f"450 {d}: No such file or directory")
+                return super().nlst(d)
+
+        dest = os.path.join(self.tmp, "pulled")
+        for cls in (FakeFtp, Ftp450):
+            with self.subTest(cls.__name__):
+                ftp = cls(self.server)
+                self.assertIsNone(deploy.pull_reviews(ftp, dest))
+                self.assertEqual(deploy.pull_feedback(ftp, dest), 0)
+                self.assertEqual(deploy.pull_submissions(ftp, dest), 0)
+        self.assertFalse(os.path.exists(dest))
+
+        # another temporary refusal (the connection, the server's load) still fails the pull, to be retried
+        class Busy(FakeFtp):
+            def nlst(self, d):
+                raise ftplib.error_temp("421 too many connections")
+
+        with self.assertRaises(ftplib.error_temp):
+            deploy.pull_feedback(Busy(self.server), dest)
+
     def test_hosted_packs_go_up_and_a_missing_one_stops_the_deploy(self):
         cat, folder = os.path.join(self.tmp, "catalogue.json"), os.path.join(self.tmp, "hosted")
         os.makedirs(folder)

@@ -29,7 +29,7 @@ Every STEP m along our route (`path`, s from 0 as tools/route.py and the page co
   more a track's height is off: listed in `disagree` (#539).
 - **One plane:** the rails tilt by the compromise; the street between the two tracks is linear between their tops
   (the page's `heightAt`), past the outer track it continues the rails' tilt to TRACK_ZONE m, and beyond that it keeps
-  the survey's own shape (its fall to the gutter, its kerbs) shifted to meet it (src/world.js flushDtm). The user,
+  the survey's own shape (its fall to the gutter, its kerbs) shifted to meet it (src/groundDraw.js flushDtm). The user,
   2026-11-13: "the tracks should lie on single plane with the road/street".
 - **Level** where the fall is less than LEVEL. A stretch that reaches LEVEL keeps its flanks down to FLANK.
 - **Only at junctions and in curves** (`where`): within JUNCTION m of a DI crossing, a switch or a road crossing, and
@@ -531,7 +531,7 @@ STREET_BELOW = 0.052     # m: a surveyed street vertex next to the track under i
 
 
 def street_line(u, z0, off, zb, zs, lift, tilt=None):
-    """The street as the game lays it across the route (src/terrain.js heightAt, src/world.js flushDtm), approximately:
+    """The street as the game lays it across the route (src/terrain.js heightAt, src/groundDraw.js flushDtm), approximately:
     the tracks' surface level less STREET_BELOW (linear between the two tracks), applied to the survey fully within
     5 m of our track and faded out by 15 m. Past the outer track main's is level; where the rails tilt (`tilt`, the
     fall to the left) it continues their tilt to TRACK_ZONE m, and beyond that the survey keeps its own shape, shifted

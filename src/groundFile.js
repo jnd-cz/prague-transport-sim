@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The prebuilt ground (data/lineN.ground.bin + .json, tools/ground_mesh.py, #508): fetched with the line's files, in
 // tiles of the S-JTSK grid (`layout.tile` m, tools/geo.py TILE, #30), each decoded on its own in a pool of workers
-// (src/groundWorker.js). At load every tile's height lookup is decoded: the world is placed on it. Then only the tiles
-// in the window keep their lookup, and only they are drawn in detail: within WINDOW_NEAR of the camera, and of the
-// route ahead of the tram (WINDOW_AHEAD). Past them to the fog's end the far ground: each tile's own on a coarse grid.
+// (src/groundWorker.js). At load every tile's height lookup is decoded and kept: the world is placed on it, and Start
+// reads it along the whole line (#654). Only the tiles in the window are drawn in detail: within WINDOW_NEAR of the
+// camera, and of the route ahead of the tram (WINDOW_AHEAD). Past them to the fog's end the far ground: each tile's own
+// on a coarse grid.
 // `?keepgeo` and `?bot` keep every tile, lookup and meshes: the checks read the whole line.
 // The lookup (GroundTiles.lookup) is one index of the drawn triangles that cars, walkers, stops, kerbs, the camera and
 // the lints read (#509); where no tile is held it answers null, and the 10 m grid answers (src/main.js useGroundLookup).
@@ -55,10 +56,10 @@ function drawNames(layout) {
   return out;
 }
 
-// The ground's tiles: which are held, their lookups and meshes. `make(meshes, box)` (src/world.js attachGround) turns a
+// The ground's tiles: which are held, their lookups and meshes. `make(meshes, box)` (src/groundDraw.js attachGround) turns a
 // tile's mesh arrays into the scene's meshes and returns them, `drop(meshes)` takes them out; `makeCoarse(coarse, box)`
 // makes a tile's far ground (#30), kept for every tile and hidden while its detail is drawn; `fix` brings a tile's
-// lookup and mesh arrays down into the road tunnels' mouths (world.js mouthFix). A tile's meshes wait in `ready` and
+// lookup and mesh arrays down into the road tunnels' mouths (src/structures.js mouthFix). A tile's meshes wait in `ready` and
 // join the scene one a frame (flush), nearest first, so their uploads to the GPU fall in different frames.
 export class GroundTiles {
   constructor(file, styles, keep = false) {
@@ -115,7 +116,7 @@ export class GroundTiles {
     m.visible = !this.drawn.has(key);
     this.coarse.set(key, m);
   }
-  // the far ground's arrays that came before the world was built (src/world.js attachGround)
+  // the far ground's arrays that came before the world was built (src/groundDraw.js attachGround)
   flushCoarse() { for (const [k, c] of this.coarse) if (c.idx) this._coarse(k, c); }
   _make(key, ms) {
     if (this.drawn.has(key) || !this.make) return;
@@ -155,8 +156,11 @@ export class GroundTiles {
     }
     return new Set([...out].sort((a, b) => a[1] - b[1]).map((e) => e[0]));
   }
-  // The window: the tiles within `r` of the points held with their lookup and meshes; with `trim`, those past
-  // r + WINDOW_KEEP dropped (their far ground shown again). Resolves when the window's tiles are ready (made by flush).
+  // The window: the tiles within `r` of the points held with their lookup and meshes; with `trim`, the meshes of those
+  // past r + WINDOW_KEEP dropped (their far ground shown again). Resolves when the window's tiles are ready (made by
+  // flush). Every tile's lookup stays (48 MB on line 37, 120 on line 17: tools/bench/ground_tiles.py; all held at the load
+  // anyway): Start reads the survey along the whole line (the platforms the survey draws, traffic's footways), and with
+  // the lookups gone past the window 30 of line 37's 40 platforms were judged unsurveyed and drawn twice (#654)
   update(points, r) {
     const want = this.keep ? new Set(this.tiles.keys()) : this.near(points, r), jobs = [], queued = new Set(this.ready.map((e) => e[0]));
     for (const k of want) if (!this.drawn.has(k) && !queued.has(k)) jobs.push(this._want(k, true));
@@ -170,7 +174,6 @@ export class GroundTiles {
         const c = this.coarse.get(k);
         if (c && c.isObject3D) c.visible = true;
       }
-      for (const k of this.lookups.keys()) if (!hold.has(k) && !this.busy.has(k)) this.lookups.delete(k);
     }
     return Promise.all(jobs);
   }
