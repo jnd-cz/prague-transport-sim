@@ -14,7 +14,8 @@ encoded in Ogg Opus and MP3 that decode to their master's length to the sample, 
 the manifest naming the .ogg files, each with its MP3 as fallback and its WAV as master; the .ogg files at most a
 fifth of the WAVs' size, the MP3s a third; a second run writes the same bytes; --check passes, then fails on a
 changed .ogg or .mp3 and on an .ogg whose fallback is its WAV; a file compared with another file's master fails. The
-shipped pack (assets/jnd.t2r6004) passes --check.
+shipped pack (assets/jnd.t2r6004) passes --check, and in Playwright's Firefox its Ogg Opus files and MP3 fallbacks
+decode as their masters, to the sample (skipped where Firefox is not installed: docs/knowledge.md, Environment).
 """
 import faulthandler
 import importlib.util
@@ -234,6 +235,30 @@ class Shipped(unittest.TestCase):
         size = {k: sum(os.path.getsize(os.path.join(folder, f)) for f in os.listdir(folder) if f.endswith(k)) for k in (".ogg", ".mp3")}
         self.assertLess(size[".ogg"], 80_000)
         self.assertLess(size[".mp3"], 150_000)
+
+    def test_shipped_pack_in_firefox(self):
+        folder = os.path.join(ROOT, "assets", "jnd.t2r6004")
+        if not os.path.isdir(folder):
+            self.skipTest("no assets/jnd.t2r6004")
+        m = json.loads(read(os.path.join(folder, "sounds.json")))
+        oggs = [f for f in m["files"] if f["path"].endswith(".ogg")]
+        try:
+            b = se.Browser("firefox").__enter__()
+        except Exception as e:
+            if "Executable doesn't exist" in str(e):
+                self.skipTest("no Playwright Firefox: python -m playwright install firefox")
+            raise
+        try:
+            for f in oggs:
+                master = read(os.path.join(folder, f["master"]))
+                for name in (f["path"], f["fallback"]):
+                    c = b.compare(read(os.path.join(folder, name)), master)
+                    # (at 48 kHz: a 44.1 kHz master resampled may round to one sample more than the Opus)
+                    self.assertEqual((se.judge(c), c["lag"]), ([], 0), (name, c))
+                    self.assertLessEqual(abs(c["file"] - c["master"]), 1, (name, c))
+        finally:
+            b.__exit__(None, None, None)
+        self.assertEqual(len(oggs), 5)
 
 
 if __name__ == "__main__":

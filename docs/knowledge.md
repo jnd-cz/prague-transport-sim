@@ -1205,7 +1205,19 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   1,105 samples late (LAME's encoder delay of 576 and the decoder's 529) and padded at the end to a whole frame. With
   an info frame before them holding the delay (576) and the padding (frames × 1152 − 576 − the master's samples),
   Chromium's `decodeAudioData` trims both: the shipped pack's five MP3s decode to their WAVs' length to the sample,
-  with no shift (#636; `tools/sound_encode.py` `lame_info`).
+  with no shift (#636; `tools/sound_encode.py` `lame_info`). Playwright's Firefox 157 decodes them, and the Ogg Opus
+  files, to the WAVs' length to the sample as well.
+- Playwright's WebKit on Windows (27.2) has no Web Audio (`AudioContext` and `OfflineAudioContext` undefined) and no
+  Ogg Opus (`canPlayType` empty; WAV and MP3 "probably"): it cannot play the game's sounds, and it says nothing of
+  Safari's own decoders, which are Apple's (#636).
+- The Claude desktop app is a packaged (MSIX) Windows app. Playwright's Firefox and WebKit installed from one of its
+  sessions landed in the package's private copy of `%LOCALAPPDATA%`
+  (`AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\ms-playwright\`), which only the app's processes
+  see. Firefox then fails to start ("spawn UNKNOWN"; Windows: "side-by-side configuration is incorrect", the
+  dependent assembly `mozglue` not found): Windows looks for `mozglue` in the real folder. Chromium, in the real folder,
+  runs. Playwright's browsers are installed from a terminal outside the app
+  (`python -m playwright install firefox webkit`); pip's user site packages, written from a session, are in the real
+  `AppData\Roaming` (2026-11-17, #636).
 
 ## The test host
 

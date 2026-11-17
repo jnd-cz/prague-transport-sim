@@ -302,13 +302,22 @@ window.compare = async ({ file, master }) => {
 
 
 class Browser:
-    """Headless Chromium on a page of its own origin (WebCodecs wants a secure context: localhost is one)."""
+    """Headless Chromium on a page of its own origin (WebCodecs wants a secure context: localhost is one); engine
+    "firefox": Playwright's Firefox, to decode and compare the files (the tests)."""
+
+    def __init__(self, engine="chromium"):
+        self.engine = engine
 
     def __enter__(self):
         from playwright.sync_api import sync_playwright
         import gpu
         self.pw = sync_playwright().start()
-        self.browser = gpu.launch(self.pw, gpu=False, quiet=True)[0]
+        try:
+            self.browser = (gpu.launch(self.pw, gpu=False, quiet=True)[0] if self.engine == "chromium"
+                            else getattr(self.pw, self.engine).launch())
+        except Exception:
+            self.pw.stop()
+            raise
         self.page = self.browser.new_page()
         self.page.route("http://localhost/__sound_encode.html",
                         lambda r: r.fulfill(content_type="text/html", body=f"<!doctype html><script>{JS}</script>"))
