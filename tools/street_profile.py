@@ -1315,8 +1315,8 @@ class WallLevels:
     def pick(self, x, y, own, ref):
         """Of `own` and the wall's top and foot at (x, y), the nearest `ref` (own where ref is NaN)."""
         lo, hi = self.around(np.asarray(x, float), np.asarray(y, float))
-        c = np.stack([np.asarray(own, float), lo, hi])
-        k = np.nanargmin(np.where(np.isfinite(c), np.abs(c - np.asarray(ref, float)[None]), np.inf), axis=0)
+        c, ref = np.stack([np.asarray(own, float), lo, hi]), np.asarray(ref, float)
+        k = np.argmin(np.where(np.isfinite(c), np.abs(c - np.where(np.isfinite(ref), ref, 0.0)[None]), np.inf), axis=0)
         return np.where(np.isfinite(ref), c[k, np.arange(c.shape[1])], own)
 
 
