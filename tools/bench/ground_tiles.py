@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The ground's tiles along a drive (#30): a line loaded as a player loads it (no ?keepgeo), then the window moved along
 its route every --step m (the camera over the route, the route ahead held: src/groundFile.js), each step waited for.
-Per step: the tiles drawn and the lookups held, their triangles and MB, the tiles loaded, the workers' and the page
-thread's ms for them, a draw's ms after them (the new tiles' upload to the GPU happens there), and the tiles within the
-fog's end of the camera not drawn (must be 0). At the end every tile at once: what the page held before #30.
+Per step: the tiles drawn in detail and the lookups held, their triangles and MB, the far ground's, the tiles loaded,
+the workers' and the page thread's ms for them, a draw's ms after them (the new tiles' upload to the GPU happens there),
+the tiles within the detail's reach of the camera not drawn in detail (`missing`) and those within the fog's end drawn
+neither in detail nor far (`bare`): both must be 0. At the end every tile at once: what the page held before #30.
 
 Usage: python -P -E tools/bench/ground_tiles.py [--lines 17,9] [--step 200] [--out reports/30/tiles.json]
 
@@ -21,7 +22,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 DRIVE = """async ({ step }) => {
   const { startShift } = await import('/tools/bench/shift.js');
   await startShift({ timeout: 120 }); // (the game, its camera and scene: a shift as the player starts it)
-  const g = window.groundTiles, route = window.game.route, cam = window.camera, R = window.scene.fog.far, out = [];
+  const g = window.groundTiles, route = window.game.route, cam = window.camera, fog = window.scene.fog.far, R = g.reach(fog), out = [];
   g.last = Infinity; // (the frame loop's window off: the drive moves it)
   for (let s = 0; s <= route.length; s += step) {
     const p = route.at(s), pts = [[p.x, p.y]];
@@ -30,15 +31,18 @@ DRIVE = """async ({ step }) => {
     for (let d = 0; d <= 1000; d += 100) { const q = route.at(Math.min(route.length, s + d)); pts.push([q.x, q.y]); }
     const was = { ...g.times }, t0 = performance.now();
     await g.update(pts, R);
+    g.drain();
     const wait = performance.now() - t0, t1 = performance.now();
     window.renderer.render(window.scene, cam);
     const draw = performance.now() - t1, jobs = g.times.jobs - was.jobs;
     const missing = [...g.near([[p.x, p.y]], R)].filter((k) => !g.drawn.has(k)).length;
-    out.push({ s, ...g.held(), jobs, worker: (g.times.decode + g.times.lookup + g.times.meshes) - (was.decode + was.lookup + was.meshes),
+    const bare = [...g.near([[p.x, p.y]], fog)].filter((k) => !g.drawn.has(k) && !g.coarse.get(k)?.visible).length;
+    out.push({ s, ...g.held(), jobs, bare, worker: (g.times.decode + g.times.lookup + g.times.meshes) - (was.decode + was.lookup + was.meshes),
       make: g.times.make - was.make, makeMax: g.times.makeMax, wait, draw: jobs ? draw : null, missing });
   }
   g.keep = true;
   await g.update([], 0);
+  g.drain();
   return { steps: out, all: g.held(), times: g.times, km: route.length / 1000 };
 }"""
 
@@ -56,13 +60,15 @@ def summary(r):
         "triangles M": (round(statistics.mean(q("triangles")) / 1e6, 2), round(max(q("triangles")) / 1e6, 2)),
         "mesh MB": (round(statistics.mean(q("meshMB"))), round(max(q("meshMB")))),
         "lookup MB": (round(statistics.mean(q("lookupMB"))), round(max(q("lookupMB")))),
+        "far ground": {"tiles shown": (round(statistics.mean(q("coarseShown")), 1), max(q("coarseShown"))),
+                       "triangles M": round(st[-1]["coarseTriangles"] / 1e6, 2), "MB": round(st[-1]["coarseMB"], 1)},
         "all tiles": {"triangles M": round(r["all"]["triangles"] / 1e6, 2), "mesh MB": round(r["all"]["meshMB"]),
                       "lookup MB": round(r["all"]["lookupMB"])},
         "loads per km": round(loads / r["km"], 1),
         "worker ms per tile": (round(statistics.median(per), 1), round(max(per), 1)) if per else None,
         "page ms per tile": (round(statistics.median(make), 1), round(r["times"]["makeMax"], 1)) if make else None,
         "draw ms after new tiles": (round(statistics.median(q("draw")), 1), round(max(q("draw")), 1)) if q("draw") else None,
-        "missing": sum(x["missing"] for x in st),
+        "missing": sum(x["missing"] for x in st), "bare": sum(x["bare"] for x in st),
     }
 
 

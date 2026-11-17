@@ -264,7 +264,8 @@ async function buildCity() {
   // (the ground's window round the start before the first frame: the route ahead of the tram and the camera, #30)
   const t0 = performance.now(), ahead = [];
   for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, d)); ahead.push([p.x, p.y]); }
-  await groundTiles.update([[camera.position.x, -camera.position.z], ...ahead], scene.fog.far);
+  await groundTiles.update([[camera.position.x, -camera.position.z], ...ahead], groundTiles.reach(scene.fog.far));
+  groundTiles.drain(); // (the start's tiles in the scene at once: the 'gpu' step uploads them with the world)
   window.groundTimes = { ...groundTiles.times, window: Math.round(performance.now() - t0) }; // (the workers' ms, summed; the window's wait)
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)

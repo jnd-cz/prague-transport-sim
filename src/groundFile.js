@@ -2,12 +2,15 @@
 // The prebuilt ground (data/lineN.ground.bin + .json, tools/ground_mesh.py, #508): fetched with the line's files, in
 // tiles of the S-JTSK grid (`layout.tile` m, tools/geo.py TILE, #30), each decoded on its own in a pool of workers
 // (src/groundWorker.js). At load every tile's height lookup is decoded: the world is placed on it. Then only the tiles
-// in the window keep their lookup, and only they are drawn: within the fog's end of the camera, and of the route ahead
-// of the tram (WINDOW_AHEAD). `?keepgeo` and `?bot` keep every tile, lookup and meshes: the checks read the whole line.
+// in the window keep their lookup, and only they are drawn in detail: within WINDOW_NEAR of the camera, and of the
+// route ahead of the tram (WINDOW_AHEAD). Past them to the fog's end the far ground: each tile's own on a coarse grid.
+// `?keepgeo` and `?bot` keep every tile, lookup and meshes: the checks read the whole line.
 // The lookup (GroundTiles.lookup) is one index of the drawn triangles that cars, walkers, stops, kerbs, the camera and
 // the lints read (#509); where no tile is held it answers null, and the 10 m grid answers (src/main.js useGroundLookup).
 
 export const LOOKUP_CELL = 16; // m: a tile's lookup grid
+export const WINDOW_NEAR = 400; // m: the detail round the camera and the route ahead; past it the far ground (#30)
+export const COARSE_STEP = 20; // m: the far ground's grid (it divides the tile: its border points are the neighbour's)
 export const WINDOW_AHEAD = 1000; // m of route ahead of the tram held, as round the camera (the user, 2026-11-17: "The
 // window in front of the planned route can be loaded larger than around but I wouldn't be too greedy")
 export const WINDOW_STEP = 100; // m: the route ahead read this often
@@ -53,8 +56,10 @@ function drawNames(layout) {
 }
 
 // The ground's tiles: which are held, their lookups and meshes. `make(meshes, box)` (src/world.js attachGround) turns a
-// tile's mesh arrays into the scene's meshes and returns them, `drop(meshes)` takes them out; `fix` brings a tile's
-// lookup and mesh arrays down into the road tunnels' mouths (world.js mouthFix).
+// tile's mesh arrays into the scene's meshes and returns them, `drop(meshes)` takes them out; `makeCoarse(coarse, box)`
+// makes a tile's far ground (#30), kept for every tile and hidden while its detail is drawn; `fix` brings a tile's
+// lookup and mesh arrays down into the road tunnels' mouths (world.js mouthFix). A tile's meshes wait in `ready` and
+// join the scene one a frame (flush), nearest first, so their uploads to the GPU fall in different frames.
 export class GroundTiles {
   constructor(file, styles, keep = false) {
     const L = (this.layout = file.layout);
@@ -65,19 +70,24 @@ export class GroundTiles {
     this.tiles = new Map(L.tiles.map((t) => [`${t.e},${t.n}`, t]));
     this.lookups = new Map(); // key -> GroundLookup
     this.drawn = new Map(); // key -> the scene's meshes
+    this.coarse = new Map(); // key -> the far ground's mesh (or, before the world is built, its arrays)
+    this.ready = []; // [key, mesh arrays]: made one a frame
     this.busy = new Map(); // key -> the job's promise
     this.pool = new Pool(Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)),
       { styles, names: drawNames(L), cell: LOOKUP_CELL, unit: L.unit, tile: L.tile });
     this.lookup = new TiledLookup(this);
     this.times = { decode: 0, lookup: 0, meshes: 0, jobs: 0, make: 0, makeMax: 0 }; // (ms: the workers', the page thread's)
-    this.make = this.drop = this.fix = null;
+    this.make = this.drop = this.makeCoarse = this.fix = null;
     this.trim = false; // (set once the world is built and placed: from then on the window drops tiles)
     this.last = -Infinity;
   }
   keyAt(x, y) { return `${Math.floor((x + this.E0) / this.T)},${Math.floor((y + this.N0) / this.T)}`; }
   box(t) { return [t.e * this.T - this.E0, t.n * this.T - this.N0]; }
   blob(t) { return this.bytes.slice(t.offset, t.offset + t.bytes).buffer; }
-  // a tile's lookup and (`meshes`) its meshes, with its neighbours' blobs for the normals on its border
+  // the detail's reach: WINDOW_NEAR, or the fog's end when nearer (past it nothing is seen)
+  reach(fog) { return Math.min(WINDOW_NEAR, fog); }
+  // a tile's lookup (the first time with its far ground) and (`meshes`) its meshes, with its neighbours' blobs for the
+  // normals on its border
   _job(key, meshes) {
     const t = this.tiles.get(key), lookup = !this.lookups.has(key), bytes = this.blob(t), ring = [], transfer = [bytes];
     if (meshes) {
@@ -86,7 +96,8 @@ export class GroundTiles {
         if (r) { const b = this.blob(r); ring.push({ bytes: b, layout: r.layout }); transfer.push(b); }
       }
     }
-    return this.pool.run({ bytes, layout: t.layout, box: this.box(t), ring, lookup, meshes }, transfer).then((r) => {
+    const coarse = lookup && !this.keep && !this.coarse.has(key) ? COARSE_STEP : 0;
+    return this.pool.run({ bytes, layout: t.layout, box: this.box(t), ring, lookup, meshes, coarse }, transfer).then((r) => {
       for (const k of ['decode', 'lookup', 'meshes']) this.times[k] += r.times[k];
       this.times.jobs++;
       if (r.lookup) {
@@ -94,27 +105,43 @@ export class GroundTiles {
         this.fix?.lookup(lk);
         this.lookups.set(key, lk);
       }
-      if (r.meshes && this.make) {
-        const t0 = performance.now();
-        this.fix?.meshes(r.meshes, this.box(t));
-        this.drawn.set(key, this.make(r.meshes, this.box(t)));
-        const ms = performance.now() - t0;
-        this.times.make += ms;
-        this.times.makeMax = Math.max(this.times.makeMax, ms);
-      }
+      if (r.coarse) this._coarse(key, r.coarse);
+      if (r.meshes) this.ready.push([key, r.meshes]);
     });
   }
+  _coarse(key, c) {
+    if (!this.makeCoarse || !c.idx.length) { this.coarse.set(key, c); return; }
+    const m = this.makeCoarse(c, this.box(this.tiles.get(key)));
+    m.visible = !this.drawn.has(key);
+    this.coarse.set(key, m);
+  }
+  // the far ground's arrays that came before the world was built (src/world.js attachGround)
+  flushCoarse() { for (const [k, c] of this.coarse) if (c.idx) this._coarse(k, c); }
+  _make(key, ms) {
+    if (this.drawn.has(key) || !this.make) return;
+    const t0 = performance.now(), box = this.box(this.tiles.get(key));
+    this.fix?.meshes(ms, box);
+    this.drawn.set(key, this.make(ms, box));
+    const c = this.coarse.get(key);
+    if (c && c.isObject3D) c.visible = false;
+    const dt = performance.now() - t0;
+    this.times.make += dt;
+    this.times.makeMax = Math.max(this.times.makeMax, dt);
+  }
+  // one tile's meshes into the scene (each frame); drain(): all that are ready (the load, the benches)
+  flush() { if (this.ready.length) this._make(...this.ready.shift()); }
+  drain() { while (this.ready.length) this._make(...this.ready.shift()); }
   _want(key, meshes) {
     if (this.busy.has(key)) return this.busy.get(key);
     const p = this._job(key, meshes).finally(() => this.busy.delete(key));
     this.busy.set(key, p);
     return p;
   }
-  // every tile's lookup (the world is placed on it)
+  // every tile's lookup (the world is placed on it) and its far ground
   loadLookups() { return Promise.all([...this.tiles.keys()].map((k) => this._want(k, false))); }
-  // the tiles whose square comes within `r` of a point
+  // the tiles whose square comes within `r` of a point, nearest the first point first
   near(points, r) {
-    const out = new Set();
+    const out = new Map(), [x0, y0] = points[0] || [0, 0];
     for (const [x, y] of points) {
       const e0 = Math.floor((x - r + this.E0) / this.T), e1 = Math.floor((x + r + this.E0) / this.T);
       const n0 = Math.floor((y - r + this.N0) / this.T), n1 = Math.floor((y + r + this.N0) / this.T);
@@ -123,43 +150,60 @@ export class GroundTiles {
         if (out.has(k) || !this.tiles.has(k)) continue;
         const bx = e * this.T - this.E0, by = n * this.T - this.N0;
         const dx = Math.max(bx - x, 0, x - bx - this.T), dy = Math.max(by - y, 0, y - by - this.T);
-        if (dx * dx + dy * dy <= r * r) out.add(k);
+        if (dx * dx + dy * dy <= r * r) out.set(k, Math.hypot(bx + this.T / 2 - x0, by + this.T / 2 - y0));
       }
     }
-    return out;
+    return new Set([...out].sort((a, b) => a[1] - b[1]).map((e) => e[0]));
   }
   // The window: the tiles within `r` of the points held with their lookup and meshes; with `trim`, those past
-  // r + WINDOW_KEEP dropped. Resolves when the window's tiles are in.
+  // r + WINDOW_KEEP dropped (their far ground shown again). Resolves when the window's tiles are ready (made by flush).
   update(points, r) {
-    const want = this.keep ? new Set(this.tiles.keys()) : this.near(points, r), jobs = [];
-    for (const k of want) if (!this.drawn.has(k)) jobs.push(this._want(k, true));
+    const want = this.keep ? new Set(this.tiles.keys()) : this.near(points, r), jobs = [], queued = new Set(this.ready.map((e) => e[0]));
+    for (const k of want) if (!this.drawn.has(k) && !queued.has(k)) jobs.push(this._want(k, true));
     if (this.trim && !this.keep) {
       const hold = this.near(points, r + WINDOW_KEEP);
-      for (const [k, ms] of this.drawn) if (!hold.has(k) && !this.busy.has(k)) { this.drop(ms); this.drawn.delete(k); }
+      this.ready = this.ready.filter((e) => hold.has(e[0]));
+      for (const [k, ms] of this.drawn) {
+        if (hold.has(k) || this.busy.has(k)) continue;
+        this.drop(ms);
+        this.drawn.delete(k);
+        const c = this.coarse.get(k);
+        if (c && c.isObject3D) c.visible = true;
+      }
       for (const k of this.lookups.keys()) if (!hold.has(k) && !this.busy.has(k)) this.lookups.delete(k);
     }
     return Promise.all(jobs);
   }
-  // each frame (src/main.js): the window round the camera and the route ahead of the tram, every WINDOW_EVERY ms
-  tick(now, camera, route, s, r) {
+  // each frame (src/main.js): a tile's meshes into the scene; every WINDOW_EVERY ms the window round the camera and the
+  // route ahead of the tram, within the detail's reach
+  tick(now, camera, route, s, fog) {
+    this.flush();
     if (now - this.last < WINDOW_EVERY) return;
     this.last = now;
     const pts = [[camera.position.x, -camera.position.z]];
     if (route) for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, s + d)); pts.push([p.x, p.y]); }
-    this.update(pts, r).catch((e) => console.error('ground tiles', e));
+    this.update(pts, this.reach(fog)).catch((e) => console.error('ground tiles', e));
   }
-  // what is held now (the window's measure, tools/bench/tiles.js)
+  // what is held now (the window's measure, tools/bench/ground_tiles.py)
   held() {
-    let tris = 0, bytes = 0;
-    for (const ms of this.drawn.values()) for (const m of ms) {
-      const g = m.geometry;
-      tris += g.index.count / 3;
-      for (const a of Object.values(g.attributes)) bytes += a.count * a.itemSize * 4;
-      bytes += g.index.count * 4;
-    }
+    const size = (ms) => {
+      let tris = 0, bytes = 0;
+      for (const m of ms) {
+        const g = m.geometry;
+        tris += g.index.count / 3;
+        for (const a of Object.values(g.attributes)) bytes += a.count * a.itemSize * 4;
+        bytes += g.index.count * 4;
+      }
+      return [tris, bytes];
+    };
+    let tris = 0, bytes = 0, ctris = 0, cbytes = 0;
+    for (const ms of this.drawn.values()) { const [t, b] = size(ms); tris += t; bytes += b; }
+    const coarse = [...this.coarse.values()].filter((c) => c.isObject3D);
+    [ctris, cbytes] = size(coarse);
     let lk = 0;
     for (const l of this.lookups.values()) for (const k of ['start', 'tris', 'tv', 'ta', 'tk', 'vx', 'vy', 'vz']) lk += l[k].byteLength;
-    return { tiles: this.tiles.size, drawn: this.drawn.size, lookups: this.lookups.size, triangles: tris, meshMB: bytes / 1e6, lookupMB: lk / 1e6 };
+    return { tiles: this.tiles.size, drawn: this.drawn.size, lookups: this.lookups.size, triangles: tris, meshMB: bytes / 1e6, lookupMB: lk / 1e6,
+      coarse: coarse.length, coarseShown: coarse.filter((c) => c.visible).length, coarseTriangles: ctris, coarseMB: cbytes / 1e6 };
   }
 }
 
