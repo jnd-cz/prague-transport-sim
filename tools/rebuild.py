@@ -11,7 +11,6 @@ build_line first, then platforms (dtm names the shelters' stops from them, #617)
 reads only what those two wrote, and only the first group writes data/lineN.json, each writer whole and renamed):
   osm_speeds → cant → clearances → survey points (→ for line 17: OSM signals) → the OSM validation
   geoportal
-  fine_terrain
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
     the source lines for review mode)
 then track_styles (the user's marks, the grassed-track list and the survey's grass track with their holes, and the
@@ -82,8 +81,7 @@ def steps(line):
     beside them it read whichever lineN.json was there first (#617: #512's rebuild wrote no shelter's stop)."""
     w = writers(line)
     first = [["build_line.py", *BUILD.get(line, ["--line", line])], *[st for st in w if st[0] in BEFORE]]
-    groups = [[st for st in w if st[0] not in BEFORE], [["geoportal.py", "--line", line]],
-              [["fine_terrain.py", "--line", line]]]
+    groups = [[st for st in w if st[0] not in BEFORE], [["geoportal.py", "--line", line]]]
     if line in HOLD:
         print(f"line {line}: survey held, not built ({HOLD[line]}; tools/dtm_packages.py HOLD)", flush=True)
     elif line in DTM:
@@ -94,7 +92,7 @@ def steps(line):
 
 def names():
     """Every step's name (for --from)."""
-    out = {"build_line", "geoportal", "fine_terrain", "dtm", "zps_source", "track_styles", "line_heights", "line_structures", "cross_level",
+    out = {"build_line", "geoportal", "dtm", "zps_source", "track_styles", "line_heights", "line_structures", "cross_level",
            "street_profile"}
     return out | {st[0][:-3] for st in writers("17")}
 

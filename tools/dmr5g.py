@@ -1,21 +1,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ČÚZK DMR 5G in 500 m tiles at 1 m pixels, and the passages rule: level 1 of the terrain chain (tools/sources.py).
+"""ČÚZK DMR 5G in 500 m tiles at 1 m pixels: level 1 of the terrain chain (tools/sources.py), and IPR's datum check.
 
 Source: the dmr5g ImageServer at ags.cuzk.gov.cz (bare earth from the 2009-2013 lidar, a 2 m TIN raster, Bpv;
 CC BY 4.0 ČÚZK), exported in S-JTSK tiles of TILE m at PX m pixels: raw/dem/{ix}_{iy}.tif covers E ix*TILE ..
 +TILE, N iy*TILE .. +TILE. The tiles come from the snapshot (the `dem` group); a tile that is not in raw/ is an
 error unless the reader was made with fetch=True, which downloads it (then publish a snapshot with it, #223).
-Read by tools/fine_terrain.py (a line's band) and tools/city_terrain.py (IPR's gaps inside the city).
+Read by tools/city_terrain.py (IPR's gaps inside the city, and datum_check: IPR states no vertical datum).
 
     python -P -E tools/dmr5g.py --under-ipr [--pause 1]   # every tile holding a cell of IPR's raster with ground
 Downloads the tiles raw/dem/ lacks, one request at a time with `--pause` s between them; a tile refused through all the
 retries is tried again after 5 min (6 times), then the run stops (a rerun goes on from there). For tools/bench/
 terrain_compare.py (#428); such tiles go into a snapshot only by a decision.
 
-The passages rule: IPR is bare earth without structures, so over a passage (an underpass, a culvert) it shows the
-passage, not the surface over it, which DMR 5G kept. Near an OSM passage (PASSAGE_R), a point where IPR lies more
-than PASSAGE_DROP below DMR 5G takes DMR 5G: measured 2026-10-30, the track would otherwise dip 5-6 m into
-Divadelní's underpass at Národní divadlo (lines 9, 22, 23) and the Rokytka culvert (line 37).
+(The passages rule, DMR 5G over IPR near an OSM passage, went with tools/fine_terrain.py, #510: the track's heights
+are the build's, and the ground file lays the ground to them; tools/bench/terrain_compare.py keeps it to measure.)
 """
 import io
 import os
@@ -35,18 +33,10 @@ SERVICE = "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer/expor
 TILE, PX = 500.0, 1.0  # export tiles: 500 m at 1 m pixels (S-JTSK)
 DIR = os.path.join(ROOT, "raw", "dem")
 USER_AGENT = "tram-game-prototype/0.1"
-PASSAGE_R, PASSAGE_DROP = 8.0, 0.5  # m: half a passage's width with its walls; IPR under DMR 5G by more
-
-
-def passage(t):
-    """OSM tags of a way under the surface: tunnels, culverts, covered ways, ways below ground level; not the deep metro."""
-    if t.get("location") == "underground" or t.get("railway") == "subway":
-        return False
-    try:
-        below = float(t.get("layer", 0)) < 0
-    except ValueError:
-        below = False
-    return t.get("tunnel", "no") != "no" or t.get("covered") == "yes" or t.get("culvert") == "yes" or below
+# m, |median of IPR minus DMR 5G| (datum_check). Measured 2026-10-30 on lines 9, 17, 22, 23, 37's bands: -0.032..+0.031
+# (lidar of different years); Bpv vs EVRF2007 is 0.13 m in Prague (ČÚZK, in PROJ).
+DATUM_TOLERANCE = 0.07
+DATUM_STEP = 10.0  # m: the check's lattice on each tile
 
 
 def name(ix, iy):
@@ -72,6 +62,37 @@ def download(ix, iy, path, tries=6, out=print):
             out(f"  tile {ix},{iy}: {str(e)[:60]}; retry", flush=True)
             time.sleep(5 * (k + 1))
     raise SystemExit(f"tile {ix},{iy} failed")
+
+
+def datum_check(ipr, directory=DIR, step=None, floor=None):
+    """IPR's heights (tools/ipr_dtm.py, no datum stated) against DMR 5G (Bpv) every `step` m (DATUM_STEP) on the tiles in
+    `directory` (the snapshot's raw/dem/) where both have ground: both are bare earth from lidar of different years, so
+    single cells differ (new buildings, earthworks), and a datum shift moves the median (#62). Stops the build when the
+    median is over DATUM_TOLERANCE; returns {cells, median, p10, p90, within0.25}. (fine_terrain.py checked it on every
+    line's build until #510; the city mesh, tools/city_terrain.py, checks it now: it is built again with a new IPR.)"""
+    import sources
+    step = DATUM_STEP if step is None else step
+    floor = sources.TERRAIN_FLOOR if floor is None else floor
+    tiles = Tiles(directory=directory)
+    keys = sorted(tuple(int(v) for v in f[:-4].split("_")) for f in os.listdir(directory) if f.endswith(".tif"))
+    d = []
+    for ix, iy in keys:
+        E, N = np.meshgrid(ix * TILE + np.arange(step / 2, TILE, step), iy * TILE + np.arange(step / 2, TILE, step))
+        E, N = E.ravel(), N.ravel()
+        z0 = np.asarray(ipr.sample(E, N), float)
+        z1 = tiles.sample(E, N).astype(float)
+        tiles.tiles.pop((ix, iy), None)  # (one at a time: the city's tiles are a GB each 1,000)
+        z1[~(z1 >= floor)] = np.nan  # (no data: outside the republic's model, or under the floor)
+        both = np.isfinite(z0) & np.isfinite(z1)
+        d.append((z0 - z1)[both])
+    d = np.concatenate(d) if d else np.zeros(0)
+    out = {"tiles": len(keys), "cells": int(d.size)}
+    if d.size:
+        out.update({"median": round(float(np.median(d)), 3), "p10": round(float(np.percentile(d, 10)), 3),
+                    "p90": round(float(np.percentile(d, 90)), 3), "within0.25": round(float((np.abs(d) <= 0.25).mean()), 3)})
+        if abs(np.median(d)) > DATUM_TOLERANCE:
+            raise SystemExit(f"IPR's heights differ from DMR 5G (Bpv) by a median {np.median(d):+.3f} m: a datum change? (#62)")
+    return out
 
 
 class Tiles:

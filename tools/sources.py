@@ -6,7 +6,7 @@ datum) and LAYERS (per layer the sources in the order they are used; a feature's
 index there, 0 = the preferred source). Decision: docs/decisions/2026-10-30-source-per-layer.md.
 
 A build tool stamps each output file, per list (JSON key) the layer and the count per level:
-    out["provenance"] = stamp("fine_terrain.py", {"blocks": entry("terrain", [n_ipr, n_dmr5g, n_coarse], "blocks")})
+    out["provenance"] = stamp("city_terrain.py", {"cells": entry("terrain", [n_ipr, n_dmr5g, n_coarse], "cells")})
     out["attribution"] = attribution(out["provenance"])
 A list whose features come from several levels gives each feature its level (`fb`, or a parallel `fb`
 array for lists of bare coordinates); a list from one level has no per-feature field: its counts say
@@ -25,7 +25,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # m: a terrain height under this is no ground, in every terrain source the tools read: IPR's raster (ipr_dtm.py), the
-# DMR 5G tiles (fine_terrain.py, city_terrain.py) and the coarse grid (build_line.py). The user, 2026-11-09 (#428): "I
+# DMR 5G tiles (city_terrain.py) and the coarse grid (build_line.py). The user, 2026-11-09 (#428): "I
 # would put lower limit to 170 metres height which is well below lowest point of Prague". IPR's lowest cell is 170.73 m
 # (the file's minVal); line 17's 10 m grid holds 57 cells of 163.1-169.8 m at Troja (docs/knowledge.md, #325).
 TERRAIN_FLOOR = 170.0
@@ -47,7 +47,7 @@ SOURCES = {
     # terrain
     "ipr-dtm": Source("IPR Praha digital terrain model, 1 m raster", "ipr-dtm", f"Terrain: {IPR}",
                       "lidar 2023, corrected and resampled 2025-07-10", "capture",
-                      "Bpv assumed: the file states none; measured against DMR 5G on every build (fine_terrain.py), IPR asked (#62)"),
+                      "Bpv assumed: the file states none; measured against DMR 5G on every city mesh build (dmr5g.datum_check), IPR asked (#62)"),
     "dmr5g": Source("ČÚZK DMR 5G, 2 m", "dem", "Terrain: ČÚZK DMR 5G (CC BY 4.0)",
                     "lidar 2009-2013, updated since; exported 2026-10-21..23", "capture", "Bpv"),
     "coarse": Source("the line's 10 m grid of DMR 5G (build_line.py)", "dem", "Terrain: ČÚZK DMR 5G (CC BY 4.0)",
