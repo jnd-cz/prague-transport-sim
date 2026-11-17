@@ -16,6 +16,8 @@ import { buildBridges, buildRoadPortals, buildRockTunnels, buildTrackSupport, bu
 import { buildTrees } from './trees.js';
 import { ChunkedGeometry, GROUND_SNOW, SegmentIndex, W, addRibbon, addSide, densify, flatMat, polyLength } from './worldMesh.js';
 
+const TRACK_REACH = 6; // m from a drawn track within which ground.trackAt is its own height (terrain.js trackAt's reach)
+
 // A track's bed (#547): out to its width each side (`t.bed`, tools/track_beds.py: the survey's area of its style, the
 // middle of the strip to a paired track), the rails' plane between them and beyond, except where it meets the paired
 // track: there the edge lies at the mean of the two near rails, as the street between them (terrain.js heightAt).
@@ -159,6 +161,17 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
   // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
   for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights.step) : t.smooth.map(() => 0);
+  // a track's height where something stands on it (the oncoming trams, platforms, the gauntlet): the nearest drawn track's
+  // own, as its rails are drawn. (terrain.js trackAt took the route's profile across the street within 6 m of our route
+  // and the street's surface past it: an oncoming tram stepped 0.27 m where the opposite track leaves ours at Ohrada, 0.1 m
+  // at Palmovka, the user, 2026-11-17, #655.) Past TRACK_REACH of every track, that answer still.
+  if (!ground.trackOwn) {
+    const own = new SegmentIndex(10);
+    for (const t of data.tracks) for (let i = 1; i < t.smooth.length; i++) own.add(t.smooth[i - 1], t.smooth[i], 0, t.z[i - 1], t.z[i]);
+    const trackAt = ground.trackAt.bind(ground);
+    ground.trackOwn = own;
+    ground.trackAt = (x, y) => own.heightAt(x, y, TRACK_REACH) ?? trackAt(x, y);
+  }
   // Share the exact rail cant with pedestrian crossings; a crossing must meet each rail's height.
   const tiltCache = new WeakMap();
   const tiltOf = (t) => {

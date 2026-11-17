@@ -45,8 +45,9 @@ export const polyLength = (line) => line.reduce((s, p, i) => (i ? s + Math.hypot
 // Grid of line segments for fast "distance to the nearest X" queries (tracks, roads).
 export class SegmentIndex {
   constructor(cell = 10) { this.cell = cell; this.map = new Map(); }
-  add(a, b, w = 0) {
-    const c = this.cell, seg = [a[0], a[1], b[0], b[1], w / 2];
+  // (za, zb: the ends' heights, for heightAt)
+  add(a, b, w = 0, za = 0, zb = 0) {
+    const c = this.cell, seg = [a[0], a[1], b[0], b[1], w / 2, za, zb];
     const i0 = Math.floor((Math.min(a[0], b[0]) - seg[4]) / c), i1 = Math.floor((Math.max(a[0], b[0]) + seg[4]) / c);
     const j0 = Math.floor((Math.min(a[1], b[1]) - seg[4]) / c), j1 = Math.floor((Math.max(a[1], b[1]) + seg[4]) / c);
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
@@ -85,6 +86,23 @@ export class SegmentIndex {
       }
     }
     return false;
+  }
+  // the nearest segment's height at its point nearest (x, y), between its ends' (add's za, zb), if within r (<= cell) of
+  // its centre line; else null
+  heightAt(x, y, r) {
+    const c = this.cell, ci = Math.floor(x / c), cj = Math.floor(y / c);
+    let best = r * r, z = null;
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const arr = this.map.get(i * 65536 + j);
+      if (!arr) continue;
+      for (const [ax, ay, bx, by, , za, zb] of arr) {
+        const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+        const d = (ax + dx * t - x) ** 2 + (ay + dy * t - y) ** 2;
+        if (d < best) { best = d; z = za + (zb - za) * t; }
+      }
+    }
+    return z;
   }
 }
 

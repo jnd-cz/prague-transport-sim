@@ -801,7 +801,9 @@ export function makeGround(route, terrain, profile, dtm = null) {
     // one (4.5 m apart on the Modřany corridor), the track profile across the street (heightAt, #197: the
     // opposite track's own heights where the build gives them); elsewhere the ground or deck. The
     // drawn tracks and the trams on them both use it (the oncoming trams read the raw survey 4.2-4.8 m
-    // off our track and jumped up to 3.4 m between Nádraží Braník and Čechova čtvrť)
+    // off our track and jumped up to 3.4 m between Nádraží Braník and Čechova čtvrť). Once the world is built, near a
+    // drawn track the track's own height answers instead (src/world.js, #655: this one stepped where the opposite track
+    // leaves our route by 6 m)
     trackAt(x, y) {
       const n = near(x, y);
       return n && n.d < 6 ? profile.heightAt(n.s, n.l) : this.at(x, y, true);

@@ -282,6 +282,23 @@ function trackLevels(g) {
   return check('tracks-on-profile', n, [...bad.values()]);
 }
 
+// The oncoming trams' height (ground.trackAt along the opposite track, as src/traffic.js places them) every 0.25 m: a
+// step over 4 cm (a 16 % grade, past any tram line's) is the tram jumping. trackAt switched from the route's profile to
+// the street's surface 6 m from our route: 0.27 m at Ohrada, line 37 (#655). Counted per 20 m.
+function oncomingSteps(g) {
+  const b = g.backRoute, G = g.route.ground, bad = new Map();
+  if (!b) return check('oncoming-tram-steps', 0, []);
+  let n = 0, prev = null;
+  for (let s = 0; s <= b.length; s += 0.25) {
+    const p = b.at(s), z = G.trackAt(p.x, p.y);
+    n++;
+    const dz = prev === null ? 0 : z - prev, k = Math.round(s / 20);
+    prev = z;
+    if (Math.abs(dz) > 0.04 && !(bad.get(k)?.mag >= Math.abs(dz))) bad.set(k, { s: Math.round(s), x: p.x, y: p.y, mag: Math.abs(dz), info: `the opposite track's tram steps ${dz.toFixed(2)} m in 0.25 m` });
+  }
+  return check('oncoming-tram-steps', n, [...bad.values()]);
+}
+
 // Streets that wave: the drawn survey surface along lines parallel to the route (6-20 m either side,
 // every 1 m), each sample against its 21 m running mean within the same surface class; a sample more
 // than 8 cm off is a bump. Places: where samples deviate more than 15 cm, per 50 m.
@@ -1185,6 +1202,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     gradeSeparated: crossingsOnBridges(g),
     bridgeLevels: levelsAtBridges(g),
     trackLevels: trackLevels(g),
+    oncomingSteps: oncomingSteps(g),
     streetWaviness: streetWaviness(g),
     railSupport: railSupport(g, world),
     surveyOverTrack: surveyOverTrack(g),
