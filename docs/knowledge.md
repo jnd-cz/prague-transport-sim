@@ -82,6 +82,12 @@ Sections:
   also a (replacement) bus stop, so the asphalt runs from the road across the near track to the platform, and the
   far track stays grass. Nothing in the data tells them apart (the survey maps both as `tram` there, OSM's tram ways carry
   no surface), so a track differs only where a mark says so (`trackStyles` with `track`, data `stylesBack`/`liftBack`).
+- **OSM's Vltava is one multipolygon of untagged ways, its islands inner rings** (2026-11 extract, #632). The extract's
+  index keeps tagged ways only, so `tools/ground_partition.py` `osm_water` reads the members with a pass over the
+  extract (~10 s). The line data's `water` (`tools/build_line.py`) keeps outer rings only: Štvanice, Střelecký and
+  Slovanský ostrov lie in the river there (line 17: 0.40 km² of land in its water). Weirs, dams and lock gates are
+  `waterway=*` ways, most from bank to island, a few in pieces between piers (Štvanice's south channel); Čertovka and
+  the side channels pass the weirs with no weir mapped across them, so the weirs close no pool (`WaterLevels`).
 - **OSM `maxheight`** under the route gives underpass clearances (`tools/clearances.py`; default 4.2 m
   car roads, 2.5 m footways), applied only where the track is already ≥ 2 m over the road.
 
@@ -273,8 +279,9 @@ Sections:
   ground: its 12 % ground step had been dropped as steeper than any track. The tracks follow the lidar in the
   user's areas, no tighter than 250 m: unlimited, Malovanka read 131 m, a 2.4 cm lidar bump over 5 m
   (`data/truth.json` radiusAnswers with `area`).
-- **The heights read IPR's 1 m raster, the game draws a 2 m grid of it** (`tools/fine_terrain.py` STEP; the 1 m mesh
-  is #276): at Královka and Malovanka the 2 m grid lies within mean 0.6-0.9 cm, max 6.4 cm of the raster at the tracks.
+- **The heights read IPR's 1 m raster, and the ground file draws it** (the city mesh, `tools/city_terrain.py`, #276;
+  the 2 m fine blocks it replaced lay within mean 0.6-0.9 cm, max 6.4 cm of the raster at the tracks at Královka and
+  Malovanka).
 - **ZPS track areas on bridges are not rail height by themselves** (#184): on the queue's bridges level-0
   tram areas lie p10 −1.53 / median −0.26 / p90 +0.11 m from the smooth archive. At Černý kůň they and the
   level-1 deck meet the archive within 0.2 m on both sides and carry on across the dip (198.9 → 198.2 m).
@@ -312,11 +319,11 @@ Sections:
 - **IPR 1 m terrain** (`tools/ipr_dtm.py`): bare earth from the 2023 lidar, one 2 GB BigTIFF (tiled,
   LZW). Its cell centres sit 0.72 m / 0.61 m off the S-JTSK metre grid (sampled bilinear, never copied);
   it states no datum, and measures Bpv (+0.016 m over the ZPS street lines on line 17, ±0.03 m against
-  DMR 5G per line; a Bpv / EVRF2007 mix-up is 0.13 m). The fine 2 m blocks within 120 m of the tracks
-  come from it (`tools/fine_terrain.py`, `?nofine`). It has no covers over passages (underpasses,
-  culverts: bare earth shows the passage). Near OSM passages, the lines' fine blocks take DMR 5G, which kept the covers.
-  The city mesh keeps IPR (#428): a street or track over a passage is a deck in #276's partition. The rule also took
-  roofs, garages, building interiors and proposed tunnels (decision record 2026-11-05, "No passages rule").
+  DMR 5G per line, checked on every city mesh build: `dmr5g.datum_check`; a Bpv / EVRF2007 mix-up is 0.13 m). It has
+  no covers over passages (underpasses, culverts: bare earth shows the passage). The lines' 2 m fine blocks took DMR
+  5G near OSM passages, which kept the covers (the passages rule, gone with them, #510); the city mesh keeps IPR
+  (#428): a street or track over a passage is a deck in #276's partition. The rule also took roofs, garages, building
+  interiors and proposed tunnels (decision record 2026-11-05, "No passages rule").
 - **Terrain under 170 m is no ground** (`sources.TERRAIN_FLOOR`, read by every terrain source; the user,
   2026-11-09: "I would put lower limit to 170 metres height which is well below lowest point of Prague"). IPR's
   image (35,001 x 26,001 cells) holds 660,025,394 cells of 170.73-421.15 m and 250,035,607 of its declared
@@ -331,7 +338,7 @@ Sections:
   and the Blanka tunnel were built there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills
   them from their neighbours at line 17's next `build_line.py`.
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
-  10 m grid of a line, and the fine blocks' fallback where IPR has no data.
+  10 m grid of a line, and the city mesh's fallback inside the city where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
   (`tools/dtm_packages.py` `DTM`, `--check` recomputes it from the OSM district boundaries). The hand-made
   lists before #125 covered under half of line 22 (no Praha 1 or 6) and missed line 17's Troja and Libuš,
@@ -1161,7 +1168,7 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   --url` server needs the same.
 - Browser script calls time out at 45 s; a hidden pane throttles `requestAnimationFrame`, so step the
   simulation in JS (`window.headless`) rather than waiting in real time.
-- Memory: the whole line is built at load (no streaming); fine terrain adds ~0.15–0.2 GB.
+- Memory: the whole line is built at load (no streaming).
 - The `gh` CLI lives in `C:\Program Files\GitHub CLI` (not always on the Bash PATH).
 - numpy's OpenBLAS starts a thread per core in every process. Several processes side by side (a rebuild's
   steps, two jobs at once) then fight over the cores: an ADMM-sized inverse and 300 products (n 1200) took

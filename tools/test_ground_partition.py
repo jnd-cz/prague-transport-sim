@@ -32,6 +32,18 @@ def sq(x0, y0, x1, y1, z=0.0):
     return [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]]
 
 
+class Area(unittest.TestCase):
+    def test_the_box_within_reach_of_the_route_and_the_tracks(self):
+        L = {"terrain": {"x0": -5000, "y0": -5000, "dx": 10, "dy": 10, "nx": 1001, "ny": 1001},
+             "path": [[0, 0], [1000, 0]], "tracks": [{"p": [[0, 3000], [0, 3100]]}]}
+        a = gp.line_area(L, reach=1200)
+        self.assertTrue(a.contains(shapely.Point(500, 1100)))
+        self.assertFalse(a.contains(shapely.Point(500, 1300)))
+        self.assertTrue(a.contains(shapely.Point(0, 4250)))  # (around the track)
+        self.assertFalse(a.contains(shapely.Point(3000, 0)))
+        self.assertTrue(gp.line_box(L).covers(a))
+
+
 class Survey(unittest.TestCase):
     def test_higher_rank_holds_the_overlap(self):
         D = {"areas": [{"c": "green", "l": 0, "r": sq(0, 0, 10, 10)}, {"c": "road", "l": 0, "r": sq(5, 0, 15, 10)}]}
@@ -142,6 +154,32 @@ class Terrain(unittest.TestCase):
         r = gp.cut_terrain(self.x, self.y, self.T, shapely.Polygon(), shapely.box(0, 0, 5, 10), threads=1)
         self.assertEqual(r["cut"], 2)
         self.assertAlmostEqual(r["kept_area"] + r["new_area"], 50, places=6)
+
+
+class Water(unittest.TestCase):
+    """WaterLevels (#632): a point's level from the banks of its own water it sees over the water, past no cut."""
+
+    def test_the_level_steps_at_a_weir(self):
+        W = shapely.box(0, 0, 600, 40)
+        weir = shapely.LineString([(300, -5), (300, 45)])
+        lv = gp.WaterLevels(W, [weir], Ipr(lambda x, y: np.where(x < 300, 12.0, 10.0)), Frame())
+        z = lv.at(np.array([150.0, 290.0, 310.0, 450.0]), np.array([20.0, 20.0, 20.0, 20.0]))
+        self.assertEqual(z.tolist(), [12.0, 12.0, 10.0, 10.0])
+        # (a corner on the weir: its own side's level, seen from inside its triangle)
+        z = lv.at(np.array([300.0, 300.0]), np.array([20.0, 20.0]), np.array([298.0, 302.0]), np.array([20.0, 20.0]))
+        self.assertEqual(z.tolist(), [12.0, 10.0])
+
+    def test_no_bank_across_an_island(self):
+        W = shapely.box(0, 0, 600, 100).difference(shapely.box(100, 30, 500, 70))
+        lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.where(y > 50, 20.0, 10.0)), Frame())
+        z = lv.at(np.array([300.0, 300.0]), np.array([85.0, 15.0]))
+        self.assertEqual(z.tolist(), [20.0, 10.0])
+
+    def test_a_pond_by_the_river_its_own_level(self):
+        W = shapely.union_all([shapely.box(0, 0, 600, 40), shapely.box(200, 60, 230, 80)])
+        lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.where(y > 50, 30.0, 10.0)), Frame())
+        z = lv.at(np.array([215.0, 215.0]), np.array([70.0, 20.0]))
+        self.assertEqual(z.tolist(), [30.0, 10.0])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The DMR 5G tiles and the passages rule: python -P -E tools/test_dmr5g.py (no download, no raw/ needed)."""
+"""The DMR 5G tiles and IPR's datum check: python -P -E tools/test_dmr5g.py (no download, no raw/ needed)."""
 import os
 from pathlib import Path
 import sys
@@ -13,14 +13,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import dmr5g  # noqa: E402
 
 
-class Passage(unittest.TestCase):
-    def test_what_counts_as_a_passage(self):
-        yes = [{"tunnel": "yes"}, {"tunnel": "building_passage"}, {"tunnel": "culvert"}, {"covered": "yes"},
-               {"culvert": "yes"}, {"layer": "-1"}]
-        no = [{}, {"tunnel": "no"}, {"layer": "1"}, {"layer": "x"}, {"tunnel": "yes", "location": "underground"},
-              {"railway": "subway", "tunnel": "yes"}]
-        self.assertTrue(all(dmr5g.passage(t) for t in yes))
-        self.assertFalse(any(dmr5g.passage(t) for t in no))
+class Datum(unittest.TestCase):
+    """IPR states no vertical datum: its median against DMR 5G (Bpv) stops the build past DATUM_TOLERANCE (#62)."""
+
+    class Ipr:
+        def __init__(self, dz):
+            self.dz = dz
+
+        def sample(self, E, N):
+            z = np.full(len(E), 200.0 + self.dz)
+            z[:5] = np.nan  # (no ground there)
+            return z
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        Image.fromarray(np.full((500, 500), 200.0, np.float32), "F").save(os.path.join(self.tmp.name, dmr5g.name(-1, -2)))
+
+    def test_the_median_within_the_tolerance_and_a_shift_stops(self):
+        r = dmr5g.datum_check(self.Ipr(0.0), self.tmp.name, step=50.0, floor=0.0)
+        self.assertEqual((r["tiles"], r["cells"]), (1, 95))
+        self.assertAlmostEqual(r["median"], 0.0, places=2)
+        with self.assertRaises(SystemExit):
+            dmr5g.datum_check(self.Ipr(0.2), self.tmp.name, step=50.0, floor=0.0)
 
 
 class Tiles(unittest.TestCase):

@@ -12,7 +12,7 @@ The ground of each cell of IPR's raster (35,001 x 26,001 cells of 1 m, rows nort
     cell's centre (tools/dmr5g.py: the 500 m tiles in raw/dem/; --fetch downloads the missing ones);
   2 inside it still: the lines' 10 m grids (raw/line*/terrain5514.tif, build_line.py);
   else no ground, and no triangles. Outside the boundary, IPR's own cells only.
-No passages rule (fine_terrain.py's): IPR's ground stays where it has ground, the floors of underpasses and culverts and
+No passages rule (fine_terrain.py's, gone with it, #510): IPR's ground stays where it has ground, the floors of underpasses and culverts and
 the streets through building passages included; a street or track over a passage becomes a deck in #276's partition (the
 user, 2026-11-10: "keeping IPR lidar everywhere to keep the actual lowest points. Then bridge the gaps on streets and
 track/rail passes with other data"; tools/bench/terrain_compare.py --passages measured what the rule took and why).
@@ -62,6 +62,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOL, D0, TOL_MAX = 0.10, 120.0, 3.0  # m: the user's 10 cm at the track (2026-11-06), growing beyond D0, at most 3 m
 LAT = 8  # cells: the distance to the tracks is exact on this lattice, bilinear between (the bench's)
 CAP = 3700.0  # m: tol is TOL_MAX from D0 * TOL_MAX / TOL = 3,600 m on: farther distances are held at this
+SMOOTH_SIGMA, SMOOTH_NEAR = 1.5, (15.0, 30.0)  # m: the raster's Gaussian, blended in between these distances from a track
 BASE_BLOCK, BASE_SIGMA = 64, 8  # the base: the ground's 64 m block means, a Gaussian of 8 blocks (512 m)
 BLOCK = 16  # cells: no-ground cells take s from the ground's 16 m block means
 RAMP, RAMP_R = 0.25, 16  # s a cell, cells: no-ground cells rise this much a cell away from the ground, up to RAMP_R
@@ -200,6 +201,41 @@ def at_lattice(dl, rows, cols, lat=LAT):
     j, i = fj.astype(np.int64), fi.astype(np.int64)
     tj, ti = fj - j, fi - i
     return (dl[j, i] * (1 - ti) + dl[j, i + 1] * ti) * (1 - tj) + (dl[j + 1, i] * (1 - ti) + dl[j + 1, i + 1] * ti) * tj
+
+
+def smooth(Z, lev, dl, sigma=None, near=None, band=256):
+    """The ground's cells (IPR's and the fills') smoothed by a Gaussian of `sigma` m, the ground's own cells weighted
+    (no ground does not pull it down), blended in from near[0] to near[1] m from a track: the mesh drew IPR's 1 m detail
+    to 10 cm, a terrace's edge, a crest and the ground under trees as zigzags of steep facets (line 37 by the Krejcarek
+    viaduct, line 17 at Modrany s 2352; #632, the user, 2026-11-16: "I'd like to solve the issues first"). In place,
+    band by band; the count of cells changed."""
+    from scipy.ndimage import gaussian_filter
+    sigma = sigma or SMOOTH_SIGMA
+    near = near or SMOOTH_NEAR
+    h, w = Z.shape
+    r = int(3 * sigma) + 1
+    cols = np.arange(w)
+    n = 0
+    for r0 in range(0, h, band):
+        r1 = min(h, r0 + band)
+        a0, a1 = max(0, r0 - r), min(h, r1 + r)
+        z = np.asarray(Z[a0:a1], np.float64)
+        g = (np.asarray(lev[a0:a1]) & LEVEL) != NO
+        if not g.any():
+            continue
+        num = gaussian_filter(np.where(g, z, 0.0), sigma, mode="nearest")
+        den = gaussian_filter(g.astype(np.float64), sigma, mode="nearest")
+        k = slice(r0 - a0, r1 - a0)
+        R, C = np.meshgrid(np.arange(r0, r1), cols, indexing="ij")
+        wgt = np.clip((at_lattice(dl, R, C) - near[0]) / (near[1] - near[0]), 0.0, 1.0)
+        on = g[k] & (wgt > 0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            zs = num[k] / den[k]
+        out = z[k].copy()
+        out[on] = z[k][on] * (1 - wgt[on]) + zs[on] * wgt[on]
+        Z[r0:r1] = out.astype(np.float32)
+        n += int(on.sum())
+    return n
 
 
 def ground_steps(g, steps):
@@ -1072,6 +1108,12 @@ def main(argv):
                 dem.tiles.pop(t, None)
                 if (n_ + 1) % 20 == 0:
                     print(f"  {n_ + 1}/{len(missing)} tiles downloaded", flush=True)
+            # (IPR states no vertical datum: its median against DMR 5G (Bpv) on the snapshot's tiles stops the build past
+            # dmr5g.DATUM_TOLERANCE, #62; fine_terrain.py checked it on every line's build until #510)
+            t0 = time.perf_counter()
+            datum = dmr5g.datum_check(ipr)
+            print(f"IPR - DMR 5G on {datum['cells']:,} cells of {datum['tiles']} tiles: median {datum.get('median', 0):+.3f} m, "
+                  f"p10 {datum.get('p10', 0):+.3f}, p90 {datum.get('p90', 0):+.3f}, {time.perf_counter() - t0:.0f} s", flush=True)
             t0 = time.perf_counter()
             grids = Grids(grid_paths)
             fb = fallbacks(Z, lev, origin, F, dem, grids)
@@ -1082,6 +1124,11 @@ def main(argv):
                 k = key(**parts)
                 out = os.path.join(cache_root(), k)
                 print(f"{len(dem.fetched)} tiles downloaded: key {k}", flush=True)
+            t0 = time.perf_counter()
+            n_smooth = smooth(Z, lev, dl)
+            secs["smooth"] = time.perf_counter() - t0
+            print(f"smoothed {n_smooth:,} cells (sigma {SMOOTH_SIGMA} m past {SMOOTH_NEAR[0]:.0f}-{SMOOTH_NEAR[1]:.0f} m from a track)"
+                  f" in {secs['smooth']:.0f} s; peak {peak_gb():.1f} GB", flush=True)
             areas, rest = zero_areas(lev, origin, parts_)
             # the cells by level, inside and outside the city
             cnt = np.zeros((2, 4, 4), np.int64)  # inside, level, kind
@@ -1114,7 +1161,7 @@ def main(argv):
                    "ipr outside": {KINDS[v]: km2(cnt[0, :, v].sum()) for v in range(4)},
                    "rim (no ground under kept triangles)": km2(mesh["rim_cells"])},
                "fallbacks": fb, "dmr5g": {"needed": len(need), "downloaded": len(dem.fetched),
-                                          "fetched": [os.path.basename(f) for f in dem.fetched]},
+                                          "fetched": [os.path.basename(f) for f in dem.fetched], "iprMinusDmr5g": datum},
                "zero_areas": areas, "zero_areas_small": rest, "s": {a: round(b, 1) for a, b in secs.items()},
                "peak_gb": round(peak_gb(), 1), "ipr_kinds": {KINDS[v]: int(kinds[v]) for v in range(4)}}
         save(out, V, T, origin, rep)

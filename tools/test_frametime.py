@@ -25,8 +25,10 @@ def main():
         print(f"(skipped: no data/line{args.line}.json; python -I tools/snapshot.py data-fetch)")
         return
     faulthandler.dump_traceback_later(900, exit=True)  # the whole test: page.evaluate has no time limit
-    rows = measure(args.line, ["detailed", "simple"], frames=10, headless=True, warm=5)
-    zoomed = measure(args.line, ["simple"], frames=10, headless=True, warm=5, fovs=[22.75])[0]
+    # (the models by their registry names: "detailed" and "simple" are their names before #455, which the menu no longer
+    # offers, and the bench waited for a model never picked)
+    rows = measure(args.line, ["t3h", "t3simple"], frames=10, headless=True, warm=5)
+    zoomed = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, fovs=[22.75])[0]
     faulthandler.cancel_dump_traceback_later()
     fails = []
     hy, simple = rows
@@ -34,7 +36,7 @@ def main():
         fails.append(f"the fields measured: {simple['fov']}, {zoomed['fov']}")
     if not zoomed.get("calls") or zoomed["calls"] > simple["calls"]:
         fails.append(f"a narrower field draws no more: {zoomed.get('calls')} calls zoomed, {simple['calls']} not")
-    if hy["kind"] != "hybrid" or simple["kind"] != "simple":
+    if hy["kind"] != "rigged" or simple["kind"] != "simple":  # (the hybrid is a rigged glTF since #467)
         fails.append(f"the models drawn: {hy['kind']}, {simple['kind']}")
     if [s["level"] for s in hy["sets"]] != ["full", "light", "light"]:
         fails.append(f"the hybrid sets' levels by distance: {hy['sets']}")

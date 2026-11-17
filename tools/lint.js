@@ -313,22 +313,71 @@ function streetWaviness(g) {
   return c;
 }
 
-// The coarse lidar terrain (10 x 15 m) showing through a surveyed surface: within 25 m of the route,
-// every 2 m along and 1.5 m across, terrain more than 5 cm above the drawn survey.
-function terrainOverSurvey(g) {
-  const r = g.route, ground = r.ground, dtm = ground.dtm, T = ground.terrain;
-  if (!dtm) return check('terrain-under-survey', 0, []);
+// The prebuilt ground (#509). groundDrawn: cars and walkers stand on the triangle that is drawn: every DRAWN_EVERY-th
+// flat triangle of the ground meshes, the drawn height at its centroid against the lookup's there (ground.lookup), more
+// than DRAWN_TOL times (1 + its slope) apart (or no ground in the lookup) counted: the 32-bit positions hold about a mm in
+// plan 10 km from the city's origin, that much along a steep slope is more in height. Triangles under DRAWN_THIN across (twice the area over the
+// longest edge, in plan) are left out: the walls stand upright, and the slivers along a step, a fraction of a mm wide,
+// are within the 32-bit positions' mm of the triangle beside them (line 37: 515 of 316 k, up to 2.3 m apart at a plot's
+// step, before they were left out). groundHidden: on a HIDDEN_STEP m lattice over the lookup,
+// the flat triangles holding each point strictly inside (not on an edge): more than one is ground drawn under another.
+const DRAWN_EVERY = 7, DRAWN_TOL = 0.001, DRAWN_THIN = 0.005, HIDDEN_STEP = 7;
+function groundDrawn(g, world) {
+  const lk = g.route.ground.lookup;
+  if (!lk) return check('ground-drawn', 0, []);
   let n = 0;
   const bad = new Map();
-  for (let s = 0; s < r.length; s += 2) for (let lat = -25; lat <= 25; lat += 1.5) {
-    const o = r.offset(s, lat), t = dtm.surfaceAt(o.x, o.y);
-    if (!t) continue;
-    n++;
-    const dz = T.height(o.x, o.y) - t.z;
-    const k = Math.round(s / 20);
-    if (dz > 0.05 && !(bad.get(k)?.mag >= dz)) bad.set(k, { s: Math.round(s), x: o.x, y: o.y, mag: dz, info: `terrain ${dz.toFixed(2)} m above the ${t.c}, ${lat} m from the route` });
+  world.traverse((o) => {
+    if (o.userData.surface !== 'ground' || !o.geometry?.index) return;
+    o.updateMatrixWorld();
+    const P = o.geometry.attributes.position.array, I = o.geometry.index.array, e = o.matrixWorld.elements;
+    for (let t = 0; t < I.length; t += 3 * DRAWN_EVERY) {
+      const a = 3 * I[t], b = 3 * I[t + 1], c = 3 * I[t + 2];
+      // (three.js frame: x, z up, -y)
+      const cross = Math.abs((P[b] - P[a]) * (P[c + 2] - P[a + 2]) - (P[c] - P[a]) * (P[b + 2] - P[a + 2]));
+      const longest = Math.max(Math.hypot(P[b] - P[a], P[b + 2] - P[a + 2]), Math.hypot(P[c] - P[b], P[c + 2] - P[b + 2]), Math.hypot(P[a] - P[c], P[a + 2] - P[c + 2]));
+      if (!(cross > DRAWN_THIN * longest)) continue;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], wx = P[c] - P[a], wy = P[c + 1] - P[a + 1], wz = P[c + 2] - P[a + 2];
+      const slope = Math.hypot(uy * wz - uz * wy, ux * wy - uy * wx) / Math.abs(uz * wx - ux * wz);
+      const X = (P[a] + P[b] + P[c]) / 3, Y = (P[a + 1] + P[b + 1] + P[c + 1]) / 3, Z = (P[a + 2] + P[b + 2] + P[c + 2]) / 3;
+      const x = e[0] * X + e[4] * Y + e[8] * Z + e[12], z = e[1] * X + e[5] * Y + e[9] * Z + e[13], y = -(e[2] * X + e[6] * Y + e[10] * Z + e[14]);
+      n++;
+      const h = lk.height(x, y), dz = h === null ? Infinity : z - h;
+      if (Math.abs(dz) <= DRAWN_TOL * (1 + slope)) continue;
+      const k = `${Math.round(x / 20)},${Math.round(y / 20)}`;
+      if (!(bad.get(k)?.mag >= Math.abs(dz))) bad.set(k, { x, y, mag: Math.abs(dz), info: h === null ? 'drawn where the lookup has no ground' : `drawn ${(dz * 1000).toFixed(1)} mm from the lookup's height, slope ${slope.toFixed(2)} (${o.userData.surfaceKind})` });
+    }
+  });
+  return check('ground-drawn', n, [...bad.values()]);
+}
+function groundHidden(g) {
+  const lk = g.route.ground.lookup;
+  if (!lk) return check('ground-hidden', 0, []);
+  const { vx, vy, vz, tv, tris, start } = lk;
+  let n = 0;
+  const bad = new Map();
+  for (let j = 0; j < lk.ny; j++) for (let i = 0; i < lk.nx; i++) {
+    const k = j * lk.nx + i;
+    if (start[k] === start[k + 1]) continue;
+    for (let py = j * lk.cell + HIDDEN_STEP / 2; py < (j + 1) * lk.cell; py += HIDDEN_STEP) for (let px = i * lk.cell + HIDDEN_STEP / 2; px < (i + 1) * lk.cell; px += HIDDEN_STEP) {
+      let held = 0, lo = Infinity, hi = -Infinity;
+      for (let s = start[k], e = start[k + 1]; s < e; s++) {
+        const t = 3 * tris[s], a = tv[t], b = tv[t + 1], c = tv[t + 2];
+        const d = (vy[b] - vy[c]) * (vx[a] - vx[c]) + (vx[c] - vx[b]) * (vy[a] - vy[c]);
+        if (!d) continue;
+        const w0 = ((vy[b] - vy[c]) * (px - vx[c]) + (vx[c] - vx[b]) * (py - vy[c])) / d, w1 = ((vy[c] - vy[a]) * (px - vx[c]) + (vx[a] - vx[c]) * (py - vy[c])) / d;
+        if (w0 <= 1e-6 || w1 <= 1e-6 || 1 - w0 - w1 <= 1e-6) continue;
+        const z = w0 * vz[a] + w1 * vz[b] + (1 - w0 - w1) * vz[c];
+        held++; lo = Math.min(lo, z); hi = Math.max(hi, z);
+      }
+      if (!held) continue;
+      n++;
+      if (held < 2) continue;
+      const x = px + lk.x0, y = py + lk.y0, key = `${Math.round(x / 20)},${Math.round(y / 20)}`;
+      if (!(bad.get(key)?.mag >= held)) bad.set(key, { x, y, mag: held, info: `${held} ground triangles over one point, ${((hi - lo) * 100).toFixed(1)} cm apart` });
+    }
   }
-  return check('terrain-under-survey', n, [...bad.values()]);
+  return check('ground-hidden', n, [...bad.values()]);
 }
 
 // What carries the rails: every 2 m, a ray down from 2.5 m above the track bed onto the drawn
@@ -338,7 +387,8 @@ function terrainOverSurvey(g) {
 function railSupport(g, world) {
   const r = g.route, pr = r.ground.profile;
   const targets = [];
-  world.traverse((m) => { if (m.isMesh && (m.userData.building || ['terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
+  // ('ground': the prebuilt ground, its beds on the ground included, #509)
+  world.traverse((m) => { if (m.isMesh && (m.userData.building || ['ground', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface))) targets.push(m); });
   const rays = new DownRays(targets);
   let n = 0;
   const bad = new Map();
@@ -360,31 +410,20 @@ function railSupport(g, world) {
 // every 0.25 m), the highest ground-level surveyed surface over the rail top. railSupport's rays start 2.5 m over the
 // bed: they missed the ridge of an 800 m tram area on Krejcárek's ramp (line 37 s 2566-2746), up to 6 m over the
 // rails where earcut joined its outline's points far apart.
+// (with the ground file, #509, the file's ground at the point: the survey's ground level is the file's)
 function surveyOverTrack(g) {
-  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm;
+  const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm, lk = r.ground.lookup;
   if (!dtm) return check('survey-over-track', 0, []);
-  const ix = dtm.grid;
   let n = 0;
   const bad = new Map();
   for (let s = 0; s < r.length; s += 2) {
     if (pr.onBridge(s)) continue;
     const zr = pr.height(s);
     for (let lat = -1.25; lat <= 1.25; lat += 0.25) {
-      const o = r.offset(s, lat), k = ix.at(o.x, o.y);
+      const o = r.offset(s, lat);
       n++;
-      if (k < 0) continue;
-      let top = -Infinity;
-      for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
-        const [p, q, u] = ix.tris[ix.ids[m]];
-        const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
-        if (Math.abs(d) < 1e-9) continue;
-        const w1 = ((q[1] - u[1]) * (o.x - u[0]) + (u[0] - q[0]) * (o.y - u[1])) / d;
-        const w2 = ((u[1] - p[1]) * (o.x - u[0]) + (p[0] - u[0]) * (o.y - u[1])) / d, w3 = 1 - w1 - w2;
-        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
-        top = Math.max(top, w1 * p[2] + w2 * q[2] + w3 * u[2]);
-      }
-      const mag = top - zr, key = Math.round(s / 20);
-      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `survey ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
+      const mag = (lk.height(o.x, o.y) ?? -Infinity) - zr, key = Math.round(s / 20);
+      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `ground ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
     }
   }
   return check('survey-over-track', n, [...bad.values()]);
@@ -419,7 +458,7 @@ export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
     if (!m.isMesh) return;
     const s = m.userData.surface;
     if (s === 'rail') rails.push(m);
-    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(s)) surfaces.push(m);
+    else if (['bed', 'ground', 'terrain', 'dtm', 'road', 'support'].includes(s)) surfaces.push(m);
   });
   const t0 = performance.now();
   // (one index of the surfaces, the beds left out by the hit where the ground is asked: two copies of line 17's survey
@@ -454,7 +493,9 @@ export function buriedRails(g, world, SUNK = 0.1, DEEP = 1) {
         const k = Math.min((t.bed?.l.length ?? 1) - 1, Math.round(acc / step)), w = t.bed ? t.bed[side > 0 ? 'l' : 'r'][k] / 100 : 1.35;
         if (t.bed && t.bed.meet[k] & (side > 0 ? 1 : 2)) continue;
         const at = (o) => [L[i][0] + nx * side * o, L[i][1] + ny * side * o];
-        const e = top(surfaceRays, ...at(w - 0.1), z0, (h) => h.object.userData.surface !== 'bed' || trackOf(h) !== id);
+        // (with the ground file the bed is the ground's: its edge is the ground there, #509)
+        const e = top(surfaceRays, ...at(w - 0.1), z0, (h) => h.object.userData.surface !== 'bed' || trackOf(h) !== id) ??
+          (g.route.ground.lookup ? top(surfaceRays, ...at(w - 0.1), z0, notBed) : null);
         const near = top(surfaceRays, ...at(w + 1), z0, notBed), far = top(surfaceRays, ...at(w + 4), z0, notBed);
         if (!e || !near || !far) continue;
         sides++;
@@ -484,7 +525,7 @@ export function cantedRailVisibility(g, world) {
   world.traverse((m) => {
     if (!m.isMesh) return;
     if (m.userData.surface === 'rail') rails.push(m);
-    else if (['bed', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
+    else if (['bed', 'ground', 'terrain', 'dtm', 'road', 'support'].includes(m.userData.surface)) surfaces.push(m);
   });
   const railRays = new DownRays(rails), surfaceRays = new DownRays(surfaces);
   // The meshes combine many tracks. Compare each rail with its own bed; an overlapping track's
@@ -512,11 +553,13 @@ export function cantedRailVisibility(g, world) {
       if (trackId === null) throw new Error('canted rail check needs per-track geometry ranges');
       samples++;
       const hits = surfaceRays.cast(...o, 4).filter((h) => h.point.y <= head.point.y + 0.4);
-      const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId);
+      // (with the ground file a bed on the ground is the ground's: the first ground under the head, #509)
+      const ownBed = hits.find((h) => h.object.userData.surface === 'bed' && owner(h) === trackId) ??
+        (r.ground.lookup ? hits.find((h) => h.object.userData.surface === 'ground') : undefined);
       if (!ownBed) missingBed++;
       else covered.set(curve, (covered.get(curve) || 0) | (side < 0 ? 1 : 2));
       for (const [map, hit] of [[bad, ownBed],
-                                [other, hits.find((h) => h.object.userData.surface !== 'bed' || owner(h) !== trackId)]]) {
+                                [other, hits.find((h) => h !== ownBed && (h.object.userData.surface !== 'bed' || owner(h) !== trackId))]]) {
         const delta = hit ? hit.point.y - head.point.y : -Infinity;
         if (delta > 0.001 && !(map.get(curve)?.mag >= delta))
           map.set(curve, { s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: delta,
@@ -1021,7 +1064,7 @@ export function groundUnderDecks(g, world) {
   const r = g.route, pr = r.ground?.profile;
   if (!pr) return check('deck-surfaces', 0, []);
   const meshes = [];
-  world.traverse((m) => { if (m.isMesh && ['terrain', 'dtm', 'road'].includes(m.userData.surface)) meshes.push(m); });
+  world.traverse((m) => { if (m.isMesh && ['ground', 'terrain', 'dtm', 'road'].includes(m.userData.surface)) meshes.push(m); });
   const rays = new DownRays(meshes), levelOf = (h) => (h.object.userData.surface === 'dtm' ? surveyOf(h)?.[1] ?? 0 : 0);
   const bad = new Map(), spans = [], tris = { ground: new Set(), deck: new Set() };
   let n = 0;
@@ -1140,7 +1183,6 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     bridgeLevels: levelsAtBridges(g),
     trackLevels: trackLevels(g),
     streetWaviness: streetWaviness(g),
-    terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
     surveyOverTrack: surveyOverTrack(g),
     cantedRailVisibility: cantedRailVisibility(g, world),
@@ -1156,6 +1198,8 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     deckClip: deckClip(g, world),
     groundUnderDecks: groundUnderDecks(g, world),
     underpassClearance: underpassClearance(g),
+    groundDrawn: groundDrawn(g, world),
+    groundHidden: groundHidden(g),
   };
   if (bot && g.route.ground?.dtm) {
     const r = await runStreetBot({ world, traffic: window.traffic, ground: g.route.ground, route: g.route });

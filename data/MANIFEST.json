@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "5ab1e75",
- "published": "2026-11-16 15:25",
- "note": "the ground mesh of lines 9, 17, 22, 23, 37 (#508): data/lineN.ground.bin/.json, the partition triangulated, welded and encoded; not read by the game until #509",
+ "built_at_commit": "ae63d99",
+ "published": "2026-11-17 11:30",
+ "note": "#510: the old ground layers' fine blocks (lineN.fine.*) leave the data; the rest as #632 published",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -20,25 +20,17 @@
    "size": 841324,
    "sha256": "f3bf0bdf57f371bf29952d3721b2e3f3986ee6a5a5e95fbed2b83b1d34f43e63"
   },
-  "line17.fine.bin": {
-   "size": 4436250,
-   "sha256": "60a34cb1fe277690b447c7cda479da51eae70d2b532007f13d5bbbabfceaad12"
-  },
-  "line17.fine.json": {
-   "size": 6359,
-   "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
-  },
   "line17.geo.json": {
    "size": 231588,
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 64621270,
-   "sha256": "cbeba58856499b0cfc63c4d857b2f7346a9c322715899133bf5128a7e515bcfc"
+   "size": 29509639,
+   "sha256": "974ee255c1aa6a65c7cb3a5efa77a82305460383119052dd78b3593318c1afee"
   },
   "line17.ground.json": {
-   "size": 834,
-   "sha256": "d3ade4e806c4e4581395ff4a7c6f021502224c80730ea72ff35813232aa93624"
+   "size": 1807,
+   "sha256": "27fa285472a6f56dfc1fb7e073c837831589e74de9f76e33c8c4b6355b5f33c3"
   },
   "line17.json": {
    "size": 7042820,
@@ -49,12 +41,12 @@
    "sha256": "8698ef0e19017bcdd84848c74c82e24cd7635419e107f36365ec6858bf64dc59"
   },
   "line17.streets.bin": {
-   "size": 4152867,
-   "sha256": "9af16098af9ccbef4a2f9a86fb05f8bd97d795284339882b3a93faaad57efda4"
+   "size": 5443735,
+   "sha256": "48ddd2b356711b80c81bc8ac65d1a0c49cc6c33c9ac06e6f3d2e2ac54158e912"
   },
   "line17.streets.json": {
-   "size": 10973,
-   "sha256": "aea0c5650374c6bd979aa1277f039b8983e21f567fee5e27401b99a04bd65221"
+   "size": 18673,
+   "sha256": "9b24b100cd9b9929f3c2c74ce192e044cd2b97b2427fb8fa43b7051c312a7547"
   },
   "line17.validate.json": {
    "size": 4663,
@@ -80,37 +72,29 @@
    "size": 917174,
    "sha256": "f1e302990e1705c56d0960a42b2edd8f6ed004c620dc14ac1ae4285c87709a29"
   },
-  "line22.fine.bin": {
-   "size": 3734900,
-   "sha256": "c8d76ff740d13e3860f6e91d05d0ff2fbdd1299068b4e239b66997f1f9d4b038"
-  },
-  "line22.fine.json": {
-   "size": 5438,
-   "sha256": "a124987e2741c8f9808bd98a6042ccb7010ad9352aa793e5367573209ed155b1"
-  },
   "line22.geo.json": {
    "size": 210619,
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.ground.bin": {
-   "size": 65777868,
-   "sha256": "bb996abf59750cc4ea4a78ee51b7cdaba798e0a412a5d890c65225cc9c9ac3c7"
+   "size": 29371195,
+   "sha256": "b539ab7b788d719aa9202d86c1ff676d4e2d2ad9ef91373f95718d9e28aa05d7"
   },
   "line22.ground.json": {
-   "size": 834,
-   "sha256": "886090098e875563f72e935482cb10f4c7fe1b9c437a49b889059ec3fe88ad02"
+   "size": 1817,
+   "sha256": "796ef2926d7bfd284603de19c36d1525f1622cfa8dac93c86277f4d094e93d5e"
   },
   "line22.json": {
    "size": 7032010,
    "sha256": "5d698fbdb2c869ec6307d2a7dcaf919c19e4c354759a331299634b5dfe806847"
   },
   "line22.streets.bin": {
-   "size": 4163721,
-   "sha256": "7eeacc28b2008dedff8b52922d3cabf16957ef99dc34b1d71b5ae4b5f89d038e"
+   "size": 5442626,
+   "sha256": "f908144e5dc5eaf2e7a7a220cb0c0b401905272ffc3f57444dbc6fb2d280804c"
   },
   "line22.streets.json": {
-   "size": 9316,
-   "sha256": "56c0e82f0d3bfe1e8931873abceef07949d2142860bf709981ae14957d6d1f98"
+   "size": 17636,
+   "sha256": "5d80e3fd8bff71332654f0313c394b54712e31948e945cc9a6837272de9da610"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -136,37 +120,29 @@
    "size": 468871,
    "sha256": "b6e4f3ff48d6a593ee7f85ad979fb50daea5fc1937dc08a9a1364e36776b6221"
   },
-  "line23.fine.bin": {
-   "size": 1732250,
-   "sha256": "2c72df07464c182717f6fa5010a69c478bbd7daf8ad4734a6ca9236f72ec7ba0"
-  },
-  "line23.fine.json": {
-   "size": 3013,
-   "sha256": "de51f0fef733519aed5ac6877172a6ce3eb3241fe0637ff674c44556795ddade"
-  },
   "line23.geo.json": {
    "size": 83347,
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.ground.bin": {
-   "size": 18683180,
-   "sha256": "3f47454195331ead4adc318a8fce1e096a5577fc5e0f42bc8a7a17ff92acfcf3"
+   "size": 13660564,
+   "sha256": "091072bbe29a802c578907d1f2d37a209f8bc0e8c6b5f6e8a81e738f2704a3aa"
   },
   "line23.ground.json": {
-   "size": 830,
-   "sha256": "27acd122f9d957b902ac3923f0dbbd2db8ab00060164ac3a818eef72c9db16dd"
+   "size": 1784,
+   "sha256": "cd5aca273680668a31516e5fe31a59672b370404c366dafdafe9831ae5c5af9d"
   },
   "line23.json": {
    "size": 2711135,
    "sha256": "d6fbfb5eb652ca27af7a52b46901ed664901e1b0e987b1372cbbf74c09be6f83"
   },
   "line23.streets.bin": {
-   "size": 1831132,
-   "sha256": "1475df6c65c25181bf69a4ab1e8090499641b0c16bca1511b9883ecd2d5cb05a"
+   "size": 2468381,
+   "sha256": "4303869459e61af2a944afda38c9c677f5d56e32c998391e54c4a99f97b3f8e2"
   },
   "line23.streets.json": {
-   "size": 5249,
-   "sha256": "bd70304cf88c4f3955438eb9b50cc915d91b77b2b8ff69838dbe3a648cf3494e"
+   "size": 8977,
+   "sha256": "2c280095821a1bcc7874e91e7927b5931186a075b4a34fded34ae715ec4e98bd"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -192,37 +168,29 @@
    "size": 487070,
    "sha256": "522f19e5828c379bc304875b6705ff6a701f78ddc7b98ec8f38fd925dd96b023"
   },
-  "line37.fine.bin": {
-   "size": 1943500,
-   "sha256": "beb936a2fe2674052f35779d1d2c3406c85e072a1e66c131feb50d99b1d565a8"
-  },
-  "line37.fine.json": {
-   "size": 3201,
-   "sha256": "741187d7f7f486c1faa015846e99737b41be57b0751b1589f0522b1dd18bbfd7"
-  },
   "line37.geo.json": {
    "size": 175593,
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 15050611,
-   "sha256": "15b3364c11e67f6186ae5b441097def7732b3569329dc85bea8d9cffb47cf22c"
+   "size": 11958178,
+   "sha256": "30f0e193aeb2f315766094b93628a71302f4edc9d7ac8a5c2b94d1bdc6e88782"
   },
   "line37.ground.json": {
-   "size": 828,
-   "sha256": "7e75a6700d39c3e5ac432bc98b3354c860944c2f192570e5185b133a64f601dd"
+   "size": 1789,
+   "sha256": "b6bd6943e5b2eaf102139c85fade249a2ba57403ba1d1cadd4da2aa9890f6975"
   },
   "line37.json": {
    "size": 2538818,
    "sha256": "542da8c8eb920d20469273c701a6486db42b44577025482eb31a01ba44f919ea"
   },
   "line37.streets.bin": {
-   "size": 1826191,
-   "sha256": "d9d38123f406fc826887486e1fa1e5b72f91a91420cc6a6c2e22a4c363f60697"
+   "size": 2576828,
+   "sha256": "5671b39bd4431ff01ace5cfd158fbdff936ae5e6cd3906fcae743d01881827c6"
   },
   "line37.streets.json": {
-   "size": 5457,
-   "sha256": "b9ff81e55efcf6f5a08654a46ac91e2fa660d7bd2bd7609ddea339a42c5fd5bc"
+   "size": 9986,
+   "sha256": "f584bb718e8649dbc84c0c8537bc48a211e2d854256aa089c413e716daa22f84"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -248,37 +216,29 @@
    "size": 1243452,
    "sha256": "085a71ba503563709fbddfe9ea59d7d55401705faad444b5e2f2179b21d63321"
   },
-  "line9.fine.bin": {
-   "size": 4140500,
-   "sha256": "856b7bb76cb8caadc30808302c1ad604ac8cae46fcabfd9b1337c7a6b918dfa1"
-  },
-  "line9.fine.json": {
-   "size": 5863,
-   "sha256": "30ce3adf71e94e40410cb99f5454f7e3f77deae95a9ab73a4194d0797bd810c4"
-  },
   "line9.geo.json": {
    "size": 276144,
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 36520192,
-   "sha256": "7681f455aa4b8b07d5e2c48871a2cebefbf8f2277e991d6a7ee449032cf16037"
+   "size": 25967579,
+   "sha256": "eb0952c3913b170563bb0eda06d5046a12d312c056273827f6e26c01d273bc6c"
   },
   "line9.ground.json": {
-   "size": 833,
-   "sha256": "d5ba9721c7cd4cde7f3ab24b7e82976b6b3d633542391574b0a9ecc6f5b6bdb9"
+   "size": 1811,
+   "sha256": "ff56c791d4a603a71bf9145c6eb760a53184639fa4dc0952787a3abcae8fc744"
   },
   "line9.json": {
    "size": 6274216,
    "sha256": "1ba4b0d41766a258f0c5198d02e2c7985540f2ca61db7decef826a8ce6da5b64"
   },
   "line9.streets.bin": {
-   "size": 4356696,
-   "sha256": "127da5c01cce73ba2193aa9f1f2fd5c88cbb0ba1409c8fb48747f3a2dad6c5ad"
+   "size": 6067894,
+   "sha256": "93d9453db5a7e12590700e9dbbf67ede6e87c6ea8b536a76b7ad3bc1c86041a2"
   },
   "line9.streets.json": {
-   "size": 9750,
-   "sha256": "8602e873e14deb16a30c96594b9aaf95dd3e459b30e2b749b4bcdd810e360cb4"
+   "size": 18516,
+   "sha256": "a4dfb3850f3a5cf1ec2f3755a8f8374df14cc0729bf5b605b888f6b138f29100"
   },
   "line9.validate.json": {
    "size": 6596,

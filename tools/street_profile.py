@@ -1704,9 +1704,23 @@ def build_square(ln, cell, ij, ctx=None):
             int(on_road.sum()), int(on_walk.sum()), scale)
 
 
+def squares(L, cell=300.0):
+    """The squares of `cell` m reaching the line's ground (ground_partition.line_area), sorted."""
+    import shapely
+    from ground_partition import line_area
+    A = line_area(L)
+    shapely.prepare(A)
+    x0, y0, x1, y1 = A.bounds
+    return sorted((i, j) for i in range(int(math.floor(x0 / cell)), int(math.floor(x1 / cell)) + 1)
+                  for j in range(int(math.floor(y0 / cell)), int(math.floor(y1 / cell)) + 1)
+                  if A.intersects(shapely.box(i * cell, j * cell, (i + 1) * cell, (j + 1) * cell)))
+
+
 def build(ln, cell=300.0, jobs=None, root=ROOT):
-    """data/lineN.streets.bin and .json: the generated street surface (#512) of every square of `cell` m holding the
-    line's track, on a SW_CELL grid. The .bin: per square in the .json's order a zlib block holding its road mask
+    """data/lineN.streets.bin and .json: the generated street surface (#512) of every square of `cell` m reaching the
+    line's ground (ground_partition.line_area: 1.2 km around its route and tracks, the ground file's area; the squares
+    holding the route only left the file's sidewalks beyond 50-200 m on the survey's outline heights, tilted to its
+    facade lines, #632), on a SW_CELL grid. The .bin: per square in the .json's order a zlib block holding its road mask
     (road and tram areas) and sidewalk mask as bits (rows north to south from the square's north-west corner,
     np.packbits), then the int16 heights of the road cells and the sidewalk cells in row order, each the difference to
     the one before, in units of the square's `scale` m over its `base`. Read by
@@ -1718,8 +1732,7 @@ def build(ln, cell=300.0, jobs=None, root=ROOT):
         os.environ.setdefault(v, "1")
     t0 = time.time()
     L = json.load(open(os.path.join(root, "data", f"line{ln}.json"), encoding="utf-8"))
-    pts = np.asarray(L["path"] + L.get("pathBack", []), float)
-    sq = sorted({(int(math.floor(x / cell)), int(math.floor(y / cell))) for x, y in pts})
+    sq = squares(L, cell)
     jobs = jobs or sysinfo.workers(1.0, most=os.cpu_count() or 4)
     if jobs > 1:
         ex = sysinfo.pool(min(jobs, len(sq)), _wide_init, ln)

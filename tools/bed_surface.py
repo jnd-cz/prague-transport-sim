@@ -144,6 +144,13 @@ class RouteNear:
         qx, qy, hx, hy = self.rt.at(s)
         return hx * (y - qy) - hy * (x - qx)
 
+    def on_back(self, s, lateral):
+        """`lateral` m across from our track lies nearer the other direction's (src/terrain.js Profile.onBack, #584)."""
+        if self.back_off is None or not lateral:
+            return False
+        o = self.back_off[max(0, min(len(self.back_off) - 1, int(round(s / 2))))]
+        return bool(abs(o) > 0.5 and lateral / o > 0.5)
+
 
 class Beds:
     """Every drawn track's bed rows as the page builds them, and the bed surface at a point."""
@@ -202,6 +209,38 @@ class Beds:
             same = 1 if (b[0] - a[0]) * hx + (b[1] - a[1]) * hy >= 0 else -1
             out[i] = -0.72 * math.tan(roll) * same
         return out
+
+    def row_styles(self):
+        """Per track, per drawn point: the bed's style as the page colours it (src/world.js styleAt, ownStyles): the
+        route's at the nearest route point within 6 m (the other direction's track beside the route takes `stylesBack`,
+        #584), else the track's own sections (`styles`, along `p`), else panels."""
+        L = self.L
+        secs = L.get("styles") or []
+        back = L.get("stylesBack") or secs
+
+        def of(lst, s):
+            return next((x["style"] for x in lst if x["s0"] <= s <= x["s1"]), "panels")
+        out = []
+        for t, sm in zip(self.tracks, self.smooth):
+            k = poly_len(t["p"]) / (poly_len(sm) or 1)
+            acc = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(sm, axis=0).T))]) if len(sm) > 1 else np.zeros(1)
+            row = []
+            for (x, y), a in zip(sm, acc):
+                n = self.R.nearest(x, y)
+                if n and n[0] < 6:
+                    row.append(of(back if self.R.on_back(n[1], self.R.lateral(n[1], x, y)) else secs, n[1]))
+                else:
+                    s = a * k
+                    row.append(next((st for a0, b0, st in t.get("styles") or [] if a0 <= s <= b0), "panels"))
+            out.append(row)
+        return out
+
+    def style_at(self, x, y):
+        """The style of the nearest drawn point of any track (each point a row of its bed): per point."""
+        if not hasattr(self, "_styles"):
+            self._styles = self.row_styles()
+        _, j = self.tree.query(np.column_stack([x, y]))
+        return [self._styles[self.owner[i]][self.index[i]] for i in np.atleast_1d(j)]
 
     def near_points(self, x, y, skip=-1):
         """world.js nearPoints: each track's nearest point within NEAR m: [(track, index, distance)]."""
