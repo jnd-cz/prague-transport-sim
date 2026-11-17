@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "411fd4c",
- "published": "2026-11-17 10:41",
- "note": "#632: the ground files with every triangle facing up and the step walls facing down the step (the dark seams)",
+ "built_at_commit": "ae63d99",
+ "published": "2026-11-17 11:30",
+ "note": "#510: the old ground layers' fine blocks (lineN.fine.*) leave the data; the rest as #632 published",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -19,14 +19,6 @@
   "line17.dtmpoints.json": {
    "size": 841324,
    "sha256": "f3bf0bdf57f371bf29952d3721b2e3f3986ee6a5a5e95fbed2b83b1d34f43e63"
-  },
-  "line17.fine.bin": {
-   "size": 4436250,
-   "sha256": "60a34cb1fe277690b447c7cda479da51eae70d2b532007f13d5bbbabfceaad12"
-  },
-  "line17.fine.json": {
-   "size": 6359,
-   "sha256": "ede1b3b55942faf49d7752d0fcdba4a5a5b641c1f8204de9a12a96a2b1120bce"
   },
   "line17.geo.json": {
    "size": 231588,
@@ -80,14 +72,6 @@
    "size": 917174,
    "sha256": "f1e302990e1705c56d0960a42b2edd8f6ed004c620dc14ac1ae4285c87709a29"
   },
-  "line22.fine.bin": {
-   "size": 3734900,
-   "sha256": "c8d76ff740d13e3860f6e91d05d0ff2fbdd1299068b4e239b66997f1f9d4b038"
-  },
-  "line22.fine.json": {
-   "size": 5438,
-   "sha256": "a124987e2741c8f9808bd98a6042ccb7010ad9352aa793e5367573209ed155b1"
-  },
   "line22.geo.json": {
    "size": 210619,
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
@@ -135,14 +119,6 @@
   "line23.dtmpoints.json": {
    "size": 468871,
    "sha256": "b6e4f3ff48d6a593ee7f85ad979fb50daea5fc1937dc08a9a1364e36776b6221"
-  },
-  "line23.fine.bin": {
-   "size": 1732250,
-   "sha256": "2c72df07464c182717f6fa5010a69c478bbd7daf8ad4734a6ca9236f72ec7ba0"
-  },
-  "line23.fine.json": {
-   "size": 3013,
-   "sha256": "de51f0fef733519aed5ac6877172a6ce3eb3241fe0637ff674c44556795ddade"
   },
   "line23.geo.json": {
    "size": 83347,
@@ -192,14 +168,6 @@
    "size": 487070,
    "sha256": "522f19e5828c379bc304875b6705ff6a701f78ddc7b98ec8f38fd925dd96b023"
   },
-  "line37.fine.bin": {
-   "size": 1943500,
-   "sha256": "beb936a2fe2674052f35779d1d2c3406c85e072a1e66c131feb50d99b1d565a8"
-  },
-  "line37.fine.json": {
-   "size": 3201,
-   "sha256": "741187d7f7f486c1faa015846e99737b41be57b0751b1589f0522b1dd18bbfd7"
-  },
   "line37.geo.json": {
    "size": 175593,
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
@@ -247,14 +215,6 @@
   "line9.dtmpoints.json": {
    "size": 1243452,
    "sha256": "085a71ba503563709fbddfe9ea59d7d55401705faad444b5e2f2179b21d63321"
-  },
-  "line9.fine.bin": {
-   "size": 4140500,
-   "sha256": "856b7bb76cb8caadc30808302c1ad604ac8cae46fcabfd9b1337c7a6b918dfa1"
-  },
-  "line9.fine.json": {
-   "size": 5863,
-   "sha256": "30ce3adf71e94e40410cb99f5454f7e3f77deae95a9ab73a4194d0797bd810c4"
   },
   "line9.geo.json": {
    "size": 276144,
