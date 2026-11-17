@@ -8,9 +8,9 @@
 
 The decided priority (#15's T1, docs/decisions/2026-11-05-ground-built-offline.md): each class is cut by the ones above
 it, so nothing lies under anything else, and the five cover the box once:
-- **survey:** the level-0 ground areas of data/lineN.dtm.json (track_styles.ground_area, src/terrain.js groundArea) as
-  they are, their kerbs on their rings. Where two overlap, the higher rank holds the overlap (track_styles.RANK, the
-  page's SURFACE_RANK), the smaller area between equal ranks (placement.py).
+- **survey:** the level-0 ground areas of data/lineN.dtm.json (track_styles.ground_area, src/terrain.js groundArea) and
+  its walls (drawn_area), as they are, their kerbs on their rings. Where two overlap, the higher rank holds the overlap
+  (track_styles.RANK, the page's SURFACE_RANK), the smaller area between equal ranks (placement.py).
 - **street:** OSM's streets outside the survey: none until #301; the terrain fills them.
 - **bed:** every drawn track's bed outline (track_beds.outline: its style's width, the middle of the strip to a paired
   track), the tracks merged where they overlap at switches and crossings (#165). A bed sample whose ground (top of rail
@@ -115,12 +115,21 @@ def area_poly(r, holes=()):
 
 
 # ---------------------------------------------------------------- the classes
+def drawn_area(a):
+    """A survey area the ground draws: a ground area (track_styles.ground_area) or a level-0 wall. Nobody stands on a wall
+    (the page's groundArea), but the page drew it from its own outline before #509 (alpha-4's buildDtm drew every area):
+    left out, a battered wall's strip was the city mesh's lidar triangles, a 1.6 m face of teeth along Krejcárek's ramp,
+    line 37 (3915, 316), #653."""
+    from track_styles import ground_area
+    return ground_area(a) or (a.get("l") == 0 and a["c"] == "wall")
+
+
 def survey_pieces(D, box):
-    """The survey's level-0 ground areas inside the box, each without what a higher one holds: [{area, c, g}]."""
-    from track_styles import RANK, ground_area
+    """The survey's level-0 drawn areas (drawn_area) inside the box, each without what a higher one holds: [{area, c, g}]."""
+    from track_styles import RANK
     items = []
     for i, a in enumerate(D.get("areas", [])):
-        if not ground_area(a) or len(a["r"]) < 3:
+        if not drawn_area(a) or len(a["r"]) < 3:
             continue
         g = polygonal(area_poly(a["r"], a.get("h", [])).intersection(box))
         if g.area > SLIVER:
