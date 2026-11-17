@@ -92,11 +92,11 @@ def line_area(L, reach=CORRIDOR):
     """The line's ground: its box within `reach` of its route and its tracks (a polygon, simplified to CORRIDOR_SIMPLIFY)."""
     lines = [shapely.LineString([p[:2] for p in L["path"]])] if len(L.get("path") or []) > 1 else []
     lines += [shapely.LineString([p[:2] for p in t["p"]]) for t in L.get("tracks") or [] if len(t.get("p") or []) > 1]
-    box = line_box(L)
+    box = line_box(L) if L.get("terrain") else None  # (a line without its 10 m grid: a test's fixture)
     if not lines:
-        return box
-    near = shapely.union_all(shapely.buffer(np.asarray(lines, dtype=object), reach, quad_segs=4))
-    return polygonal(near.simplify(CORRIDOR_SIMPLIFY).intersection(box))
+        return box if box is not None else Polygon()
+    near = polygonal(shapely.union_all(shapely.buffer(np.asarray(lines, dtype=object), reach, quad_segs=4)).simplify(CORRIDOR_SIMPLIFY))
+    return near if box is None else polygonal(near.intersection(box))
 
 
 def polygonal(g):
