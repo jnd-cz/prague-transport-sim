@@ -132,16 +132,34 @@ function ctl(id, x, y, kind, o = {}) {
   return `<div class="${cls}" data-c="${id}" style="left:${px(x)};top:${px(y)}${o.fs ? `;font-size:${o.fs}px` : ''}">` +
     `<span class="plate ${o.plate || ''}" data-lab="${id}">${lab(id)}</span>${inner}${k && c.sim === true ? `<i class="kb">${k[0]}</i>` : ''}${c.q ? '<i class="q">?</i>' : ''}</div>`;
 }
-// an edgewise meter (the ammeter 0-600 A, the battery voltmeter 0-40 V): figures at every major step
-function meter(id, x, y, w, h, max, major, unit, fig = 11) {
-  let s = '';
-  for (let v = 0; v <= max + 1e-6; v += major / 2) {
-    const top = 91 - (v / max) * 82, big = Math.abs(v / major - Math.round(v / major)) < 1e-6;
-    s += `<i class="tick" style="top:${top}%;width:${big ? 26 : 14}%"></i>`;
-    if (big) s += `<b class="num" style="top:${top}%;font-size:${fig}px">${v}</b>`;
+// 6921's edgewise meters, flat as from straight above (the user's photo, 2026-11-17: "draw them as rectangles rather
+// than curved surface from perspective ... the needle comes from the right side"): a black frame, the scale plate under
+// the strip with the calibration stamp, the figures left of the ticks, the pointer's blade coming in from the right.
+// The scales are the photo's: a tick every 20 A, a long one every 100 A, figures every 200 A; a tick every 2 V, figures
+// every 10 V. Compact strips leave out the short ticks and the strip.
+const SCALE = { amp: [600, 20, 100, 200, 'A', '- - -11- 2002'], volt: [40, 2, 10, 10, 'V', '- - -12- 2002'] };
+function meter(id, x, y, w, h, fig = 9, dense = true) {
+  const [max, minor, long, step, unit, stamp] = SCALE[id], f = (n) => +n.toFixed(2);
+  const b = Math.max(3, Math.round(w * 0.07)), wx = b + 2.5, wy = b + 2.5, ww = w - 2 * wx, wh = h - 2 * wy;
+  const sh = dense ? wh * 0.1 : 0, y0 = wy + wh - fig * 0.6 - 1.5, y1 = wy + sh + fig * 0.5 + 1.5, at = (v) => y0 - (v / max) * (y0 - y1);
+  const xr = wx + ww * (dense ? 0.66 : 0.74), xl = xr - ww * 0.27;
+  let s = `<svg viewBox="0 0 ${w} ${h}"><rect class="fr" width="${w}" height="${h}" rx="3"/>` +
+    `<rect class="rim" x="${b}" y="${b}" width="${f(w - 2 * b)}" height="${f(h - 2 * b)}" rx="1.5"/>` +
+    `<rect class="pl" x="${wx}" y="${wy}" width="${f(ww)}" height="${f(wh)}"/><rect class="gap" x="${f(wx + ww * 0.93)}" y="${wy}" width="${f(ww * 0.07)}" height="${f(wh)}"/>`;
+  if (dense) s += `<rect class="strip" x="${wx}" y="${wy}" width="${f(ww)}" height="${f(sh)}"/><rect class="edge" x="${wx}" y="${f(wy + sh)}" width="${f(ww)}" height=".7"/>` +
+    `<text class="stamp" x="${f(wx + ww * 0.45)}" y="${f(wy + sh * 0.68)}" font-size="${f(sh * 0.5)}">${stamp}</text>`;
+  for (let v = 0; v <= max + 1e-6; v += dense ? minor : long) {
+    const big = Math.abs(v / long - Math.round(v / long)) < 1e-6, ty = f(at(v));
+    s += big ? `<rect class="tk" x="${f(xr - ww * 0.24)}" y="${f(ty - 0.6)}" width="${f(ww * 0.27)}" height="1.2"/>`
+      : `<rect class="tk" x="${f(xr - ww * 0.1)}" y="${f(ty - 0.35)}" width="${f(ww * 0.1)}" height=".7"/>`;
+    // (the compact ones leave out the 0: their unit letter stands there)
+    if (Math.abs(v / step - Math.round(v / step)) < 1e-6 && (dense || v)) s += `<text class="fig" x="${f(xl)}" y="${ty}" font-size="${fig}">${v}</text>`;
   }
-  return `<div class="meter" data-c="${id}" style="left:${px(x)};top:${px(y)};width:${px(w)};height:${px(h)}"><div class="scale">${s}` +
-    `<b class="unit" style="font-size:${Math.round(fig * 1.25)}px">${unit}</b><i class="ptr" data-m="${id}" style="top:91%"></i></div></div>`;
+  s += `<text class="unit" x="${f(wx + ww * 0.06)}" y="${f(y0)}" font-size="${f(fig * 1.45)}">${unit}</text>`;
+  // the pointer at 0, moved up by update() (data-r: the scale's length)
+  s += `<g class="ptr" data-m="${id}" data-r="${f(y0 - y1)}"><rect x="${f(xr - ww * 0.13)}" y="${f(y0 - 0.45)}" width="${f(ww * 0.19)}" height=".9"/>` +
+    `<rect x="${f(xr + ww * 0.05)}" y="${f(y0 - 1)}" width="${f(wx + ww - xr - ww * 0.05)}" height="2" rx=".4"/></g></svg>`;
+  return `<div class="meter" data-c="${id}" style="left:${px(x)};top:${px(y)};width:${px(w)};height:${px(h)}">${s}</div>`;
 }
 const LED = {
   arrowL: (l) => `<svg viewBox="0 0 36 14"><path class="off" data-l="${l}" d="M1 7 L10 1 L10 4.5 L35 4.5 L35 9.5 L10 9.5 L10 13 Z"/></svg>`,
@@ -208,9 +226,9 @@ function panelSec() {
     ${[[8, 100], [970, 24], [536, 40], [760, 30], [960, 128], [700, 96]].map(([x, y]) => `<i class="screw" style="left:${x}px;top:${y}px"></i>`).join('')}
     ${ctl('myci', 10, 10, 'btn', { color: 'black', plate: 'y', fs: f })}
     ${ctl('bezp', 70, 10, 'btn', { color: 'red', plate: 'r', fs: f })}
-    ${meter('amp', 132, 6, 66, 108, 600, 100, 'A')}
-    <div class="slot" style="left:207px;top:16px;width:64px;height:64px"></div>
-    ${meter('volt', 280, 6, 66, 108, 40, 10, 'V')}
+    ${meter('amp', 128, 6, 72, 108)}
+    <div class="slot" style="left:208px;top:16px;width:58px;height:64px"></div>
+    ${meter('volt', 274, 6, 72, 108)}
     ${ctl('havar', 354, 10, 'rot', { color: 'red', fs: f })}
     ${ctl('couv', 414, 10, 'rot', { color: 'green', plate: 'r', fs: f })}
     ${ctl('napeti', 474, 10, 'glow', { plate: 'y', fs: f })}
@@ -243,7 +261,7 @@ function compactL() {
   return `<div class="surface"></div><div class="sill thin"></div>
     <div class="pedestal" style="left:4px;top:4px;width:80px;height:80px"></div>
     <div class="speedo" data-c="speedo" style="left:7px;top:7px">${speedo(74)}</div>
-    ${meter('amp', 90, 5, 36, 78, 600, 200, 'A', 8)}
+    ${meter('amp', 90, 5, 36, 78, 8, false)}
     ${lampStrip(132, 5, 270, 8, false)}
     <div class="alamps cmpl" style="left:132px;top:34px;width:270px;height:49px">${ALAMPS.map(([k, c]) => `<div class="alamp ${c}" data-a="${k}"></div>`).join('')}</div>
     <canvas class="pedalcv" width="32" height="78" style="left:408px;top:5px" data-c="pedals"></canvas>
@@ -253,7 +271,7 @@ function compactP() {
   return `<div class="surface"></div><div class="sill thin"></div>
     <div class="pedestal" style="left:2px;top:6px;width:102px;height:102px"></div>
     <div class="speedo" data-c="speedo" style="left:6px;top:10px">${speedo(94)}</div>
-    ${meter('amp', 108, 6, 32, 100, 600, 200, 'A', 8)}
+    ${meter('amp', 108, 6, 32, 100, 8, false)}
     ${lampStrip(144, 6, 196, 6.8, false)}
     <div class="alamps cmpl" style="left:144px;top:32px;width:196px;height:74px">${ALAMPS.map(([k, c]) => `<div class="alamp ${c}" data-a="${k}"></div>`).join('')}</div>
     <canvas class="pedalcv" width="34" height="100" style="left:344px;top:6px" data-c="pedals"></canvas>`;
@@ -537,8 +555,8 @@ export class Panel {
     if (this.shift !== game) { this.shift = game; this.s0 = tram.s; this.ttKey = ''; }
     set('odo', Math.floor(405143 + Math.max(0, tram.s - this.s0) / 1000), (v) => { for (const n of e.odo) n.textContent = String(v).padStart(6, '0'); });
     const amp = Math.round(Math.min(1.03, Math.abs(tram.current) / 600) * 400), volt = Math.round(Math.min(1.03, eq.aux ? eq.aux.U / 40 : 0) * 400);
-    set('amp', amp, (v) => { for (const p of e.amp) p.style.top = `${91 - (v / 400) * 82}%`; });
-    set('volt', volt, (v) => { for (const p of e.volt) p.style.top = `${91 - (v / 400) * 82}%`; });
+    set('amp', amp, (v) => { for (const p of e.amp) p.style.transform = `translateY(${-(v / 400) * p.dataset.r}px)`; });
+    set('volt', volt, (v) => { for (const p of e.volt) p.style.transform = `translateY(${-(v / 400) * p.dataset.r}px)`; });
     // the lamp strip (ckd24 § 7.2-7.7)
     const st = game.stops[game.nextStop], blink = !!lamps.lit, ind = lamps.indicate, shoe = !!eq.lamps?.shoe;
     const led = (l, on, cls) => set(`led${l}`, on ? cls : '', (v) => { for (const n of e.led[l]) n.setAttribute('class', v ? `on ${v}` : 'off'); });

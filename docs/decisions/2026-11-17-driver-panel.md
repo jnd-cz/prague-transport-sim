@@ -29,3 +29,20 @@ And beyond the questions: "make the analog meters, like the ammeter, a bit talle
 and make sure the number labels are visible, so it can be wider too, basically more readable. And fix zrychlovač
 lamp: it should be led dots arranged like dice number 5." The meters are 66 × 108 px with a figure at every 100 A
 and every 10 V; the strip grew from 180 px to 240.
+
+The user's next answers (same session), on the draft (#641):
+
+- **The ceiling band as the roof:** "keep it this way for now".
+- **The eye:** "does the camera sit as real driver would, somewhat left off center? The t3 drawing which we have archive
+  shows the driver's seat from which we could more accurately position the camera." The general arrangement's plan view
+  (drawingdatabase.com `Tatra-T3-1.gif`, 20 mm a pixel, the drawing #427 measured the model from) has the seat 0.32 m left
+  of the centre line, its backrest 1.44 m and its front edge 0.96 m behind the nose. The eye moved there (src/cabframe.js
+  `EYE`: 0.32 m left, 1.2 m behind the nose) from the centre line 0.8 m behind the nose, about over the desk. Its height
+  stays 2.39 m: the side view has no seat. From the seat the left windscreen post stands about 22° left of ahead and comes
+  into the forward view; the head turns about 105° to the left window's end and 84° to the front door's (it was 103° both
+  ways).
+- **The meters:** "draw them as rectangles rather than curved surface from perspective. Study the attached photo and make
+  it flat top down look, the needle comes from the right side". Flat from above, after the photo of 6921's: a tick every
+  20 A with a long one every 100 A and figures every 200 A; a tick every 2 V and figures every 10 V; the pointer's dark
+  blade comes in from the right (src/panel.js `meter`).
+- **The phone's buttons:** "i will try it later".

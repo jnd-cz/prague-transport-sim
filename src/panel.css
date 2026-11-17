@@ -81,13 +81,20 @@ body.pcompact #dash .full, body:not(.pcompact) #dash .cmp, body:not(.pportrait) 
 body.passist:not(.touch) .ctl .kb { display: block; }
 .ctl.tog .kb { top: -.3em; right: -.2em; }
 
-/* the edgewise meters (the ammeter 0-600 A, the battery voltmeter 0-40 V) */
-.meter { position: absolute; background: #151716; border-radius: 4px; padding: 6px; box-shadow: 0 2px 4px rgba(0,0,0,.4); cursor: help; }
-.meter .scale { position: relative; width: 100%; height: 100%; background: linear-gradient(90deg, #d6d4cc, #fbfaf4 30%); border-radius: 40% 4px 4px 40% / 50% 4px 4px 50%; overflow: hidden; }
-.meter .tick { position: absolute; right: 0; height: 1px; background: #111; }
-.meter .num { position: absolute; right: 30%; font-weight: 700; font-family: var(--f-label); line-height: 1; color: #111; transform: translateY(-50%); font-variant-numeric: tabular-nums; }
-.meter .unit { position: absolute; left: 12%; bottom: 3%; font-weight: 700; font-family: var(--f-label); line-height: 1; color: #111; }
-.meter .ptr { position: absolute; left: 8%; right: 2px; height: 2px; margin-top: -1px; background: #b3261e; transition: top .25s linear; }
+/* the edgewise meters (the ammeter 0-600 A, the battery voltmeter 0-40 V), flat: src/panel.js meter() */
+.meter { position: absolute; cursor: help; filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
+.meter svg { display: block; width: 100%; height: 100%; }
+.meter .fr { fill: #161817; }
+.meter .rim { fill: #0b0c0c; stroke: #343837; stroke-width: .8; }
+.meter .pl { fill: #f3f1ea; }
+.meter .gap { fill: rgba(0,0,0,.13); }
+.meter .strip { fill: #dddbd2; }
+.meter .edge { fill: #77746c; }
+.meter .stamp { font-family: var(--f-label); fill: #8d8a80; text-anchor: middle; }
+.meter .tk { fill: #161616; }
+.meter .fig, .meter .unit { font-family: var(--f-label); font-weight: 700; fill: #161616; dominant-baseline: central; font-variant-numeric: tabular-nums; }
+.meter .fig { text-anchor: end; }
+.meter .ptr { fill: #2c2d2c; transition: transform .25s linear; }
 
 /* the speedometer on its pedestal (6921: a black face, white figures 0-80, an odometer) */
 .pedestal { position: absolute; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #8e9491, #5f6562 70%, #3f4442); box-shadow: 0 6px 10px rgba(0,0,0,.45); }

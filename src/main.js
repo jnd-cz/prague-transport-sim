@@ -35,7 +35,7 @@ import { initHelp } from './help.js';
 import { initPackages } from './packagesMenu.js';
 import { loadInstalled } from './packages.js';
 import { Mirror } from './mirror.js';
-import { CabFrame, lookLimits, leanFor } from './cabframe.js';
+import { CabFrame, EYE, lookLimits, leanFor } from './cabframe.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
 const $ = (id) => document.getElementById(id);
@@ -892,7 +892,7 @@ window.addEventListener('blur', () => {
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = 0; // the lead car's heading (route frame: atan2 of east, north)
-const EYE = new THREE.Vector3(), FWD = new THREE.Vector3();
+const EYE_AT = new THREE.Vector3(), FWD = new THREE.Vector3();
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
 // click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
 // It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
@@ -976,13 +976,13 @@ function updateCamera(dt, t) {
     hud.panel.setLook(0);
     return;
   }
-  // the driver's eye is a point of the lead car (#597): 0.8 m behind the body's front, 2.39 m over the rail, on the centre
-  // line; it turns with the body and swings out with its front in a curve. (It stood on the track's centre line and looked
-  // along the track 4 m ahead of the tram, eased: 33 degrees ahead of the body in a 20 m curve, the user, 2026-11-14:
-  // "starts turning ahead of tram body in curves")
+  // the driver's eye is a point of the lead car (#597), over the driver's seat (src/cabframe.js EYE): 1.2 m behind the body's
+  // front, 0.32 m left of the centre line, 2.39 m over the rail; it turns with the body and swings out with its front in a
+  // curve. (It stood on the track's centre line and looked along the track 4 m ahead of the tram, eased: 33 degrees ahead
+  // of the body in a 20 m curve, the user, 2026-11-14: "starts turning ahead of tram body in curves")
   const lead = tramModel.userData.cars[0];
   lead.updateWorldMatrix(true, false);
-  const eye = EYE.set(0, 2.39, leadFront() - 0.8).applyMatrix4(lead.matrixWorld);
+  const eye = EYE_AT.set(EYE.x, EYE.h, leadFront() - EYE.back).applyMatrix4(lead.matrixWorld);
   const fwd = FWD.set(0, 0, 1).transformDirection(lead.matrixWorld);
   yaw = Math.atan2(fwd.x, -fwd.z);
   const bob = Math.sin(t * 9) * 0.012 * Math.min(1, Math.abs(tram.v) / 8);

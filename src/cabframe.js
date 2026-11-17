@@ -10,7 +10,13 @@ import { CAB } from './t3simple.js';
 
 const NEAR = 0.05;
 const LEAN = 0.25, LEAN_TO = 1.3; // the eye leans towards the window it looks out of: 0.25 m a radian, up to 1.3 rad
-const EYE_BACK = 0.8; // the eye behind the body's front (src/main.js)
+// The driver's eye, over the seat of the T3's general arrangement (drawingdatabase.com Tatra-T3-1.gif, its plan view at
+// 20 mm a pixel): the seat 0.32 m left of the centre line, its backrest 1.4 m and its front edge 1.0 m behind the nose,
+// the eye over its middle (the user, 2026-11-17: "does the camera sit as real driver would, somewhat left off center? The
+// t3 drawing ... shows the driver's seat"). It was on the centre line 0.8 m behind the nose, about over the desk. Its
+// height is the old one: the drawing's side view has no seat. x left of the centre line, h over the rail, back from the
+// body's front; src/main.js places the camera there
+export const EYE = { x: 0.32, h: 2.39, back: 1.2 };
 // z from the body's front (negative), x left of the centre line, h over the rail
 const dz = (z) => z - CAB.front;
 const SIDE = { window: CAB.window.map(dz), door: CAB.door.map(dz), wrap: dz(CAB.wrap) };
@@ -74,8 +80,9 @@ function door(open) {
 // (right), with the eye leant towards it (src/main.js); fov: the camera's vertical one (degrees), aspect: width / height
 export function lookLimits(fov, aspect) {
   const halfH = Math.atan(Math.tan((fov / 2) * Math.PI / 180) * aspect), lean = LEAN * LEAN_TO;
-  const end = (d) => Math.PI - Math.atan2(half(d) - lean, -EYE_BACK - d);
-  return { left: end(SIDE.window[0]) - halfH, right: end(SIDE.door[0]) - halfH };
+  // (sign: +1 the left, -1 the right)
+  const end = (d, sign) => Math.PI - Math.atan2(half(d) - sign * EYE.x - lean, -EYE.back - d);
+  return { left: end(SIDE.window[0], 1) - halfH, right: end(SIDE.door[0], -1) - halfH };
 }
 // the eye's lean towards a side window for a head turned by look (rad)
 export const leanFor = (look) => Math.sign(look) * Math.min(Math.abs(look), LEAN_TO) * LEAN;

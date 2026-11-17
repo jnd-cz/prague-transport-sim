@@ -174,6 +174,8 @@ tmavé sklo je hra.
 
 ### Rozhlížení
 
+- Sedíte tam, kde má T3 sedačku řidiče: 0,32 m vlevo od osy vozu a 1,2 m za čelem. Levý sloupek čelního okna
+  proto stojí v pohledu vpřed.
 - Držením Q / E (nebo ← / →) se díváte levým oknem až k jeho konci, pravým přes přední dveře. S hlavou se otáčí
   rám stanoviště (sloupky, konec okna, dveře) i pult: vlevo je bočnice se směrovým přepínačem, kaloriferem,
   topením, odpojením topení a pískováním, vpravo křídlo pultu s osvětlením a jízdním řádem pořadí.

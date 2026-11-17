@@ -180,6 +180,8 @@ tram, dark glass is the game.
 
 ### Looking around
 
+- You sit where the T3 has the driver's seat: 0.32 m left of the car's centre line, 1.2 m behind its front. So the
+  windscreen's left post stands in the view ahead.
 - Hold Q / E (or ← / →) to look out of the left window to its end, or right through the front door. The cab's
   frame (the posts, the window's end, the door) and the panel turn with the head: on the left the side wall with
   the reverser, the cab heater, the heating, the heating cut-out and the sanding lever; on the right the panel's
