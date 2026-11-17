@@ -129,5 +129,13 @@
     "quote": "Can the sound pack have the same license as the built in assets?",
     "choice": "AGPL-3.0-or-later, matching the built-in assets",
     "previous_release": "The identical WAVs were made available with the CC0-1.0 notice in package 0.1.0 on PR #625."
+  },
+  "playback": {
+    "issue": 636,
+    "date": "2026-11-17",
+    "quote": "The actual files for playback should be compressed and small file size oriented audio codec should be chosen.",
+    "source": "Claude session, the user's answer on shipping the pack",
+    "codec": "Ogg Opus, 20 ms frames, 64 kbit/s mono and 96 kbit/s stereo, encoded by Chromium's WebCodecs AudioEncoder (tools/sound_encode.py)",
+    "fallback": "each .ogg names its .wav master as its fallback: the WAVs above are unchanged"
   }
 }

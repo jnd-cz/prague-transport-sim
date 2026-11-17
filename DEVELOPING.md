@@ -198,6 +198,12 @@ headless browser, writes the check's report and pictures it beside the hybrid (`
 names one that is not there) or linked at the author's address (`--url` for an uploaded one; the upload deleted);
 `--reject ID "why"`; `--delete ID` once the author has the verdict.
 
+**Sound packs' files** (#636): a pack's WAVs (or MP3s) become the Ogg Opus files it plays with
+`python -P -E tools/sound_encode.py assets/<id>`: headless Chromium encodes them (WebCodecs) and checks each against
+its master; the manifest then names the `.ogg` files, each with its master as `fallback`, and every file's size and
+hash. `--check` checks a pack as it is (`tools/test_sound_encode.py` runs it on the shipped one). The fields:
+[docs/vehicles.md](docs/vehicles.md#sound-packs).
+
 **Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame
 intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
 browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)

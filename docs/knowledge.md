@@ -1195,6 +1195,12 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 - A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
   in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
   faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
+- Python's `wave` refuses IEEE float WAVs (format 3, what the user's recorder writes: "unknown format: 3"). Chromium
+  decodes them (`decodeAudioData`) and encodes Opus with WebCodecs' `AudioEncoder`, which exists in a secure context
+  only (a page on `http://localhost` is one; `about:blank` has no `AudioEncoder`). It gives raw 20 ms packets and an
+  `OpusHead` (pre-skip 312) as `decoderConfig.description`; the Ogg pages are ours (`tools/sound_encode.py`). Chromium's
+  `decodeAudioData` applies Ogg Opus's pre-skip and end granule: the shipped pack's five files decode to their WAVs'
+  length to the sample, with no shift (#636). The same input encodes to the same bytes on this machine.
 
 ## The test host
 

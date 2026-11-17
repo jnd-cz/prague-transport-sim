@@ -79,9 +79,17 @@ Zvuky hry jsou události a smyčky (#528; rozhodnutí, oddíl 5): hra vyvolá ud
 když náprava přejede srdcovku) a nastaví veličiny, kterými se řídí smyčky; `src/audio.js` přehraje každou nahrávkou
 zvukového balíčku, kde ji má, jinak vestavěným zvukem, který syntetizuje (zvuky, které hra měla před balíčky). Balíček
 je `sounds` v popisu vozidla (jeho soubory mezi soubory vozidla), nebo složka `assets/<id>/` se souborem `sounds.json`
-(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`.
-Hra zatím žádný nemá; `tools/test_sounds.py` podává vlastní ukázkový. Pole, seznam událostí, smyček a veličin a pravidla
-srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
+(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`,
+nebo balíček. Volba *Zvuky* v menu (#636) nabízí balíčky pro zvolené vozidlo, dodané s hrou i nainstalované, vedle
+jeho vlastních zvuků (vestavěných, kde vlastní nemá), které jsou výchozí; volba se pamatuje pro každé vozidlo a hraje
+od začátku další směny. Hra dodává jeden, pro hybrid: `assets/jnd.t2r6004/` (#590), *T2R 6004 – částečné zvuky*;
+`tools/test_sounds.py` podává vlastní ukázkový.
+
+Soubory, které balíček hraje, jsou nejlépe Ogg Opus (`.ogg`): pět souborů dodaného balíčku má dohromady 60 kB, jako WAV
+823 kB. Každý `.ogg` v `files` jmenuje svůj WAV nebo MP3 jako `fallback`, který si stáhne a přehraje prohlížeč, jenž
+Opus nedekóduje (Safari před 18.4). Z WAV (nebo MP3) balíčku je píše `python -P -E tools/sound_encode.py assets/<id>`.
+Pole, seznam událostí, smyček a veličin a pravidla srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs)
+(seznamy píše `tools/sound_lists.py` z kódu).
 
 ## Balíčky
 

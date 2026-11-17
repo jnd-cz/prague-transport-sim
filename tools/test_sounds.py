@@ -3,11 +3,11 @@
 
 Usage: python -P -E tools/test_sounds.py [--line 17] [--stop 13] [--secs 240] [--impacts-only]
 
-The game ships no sound pack yet (the built-in sounds); this test makes a sample basic pack for the built-in car,
+Beside the shipped pack (tools/test_contactor_pack.py), this test makes a sample basic pack for the built-in car,
 short generated WAVs for the seven sounds the user named first (2026-11-11, PR #462: the door alert, the main bell,
 accelerating under power, idle, switches and crossings, the curves' screech, the doors opening and closing), and
 serves it to the page as a package listed in assets/vehicles.json. Then, once with the hybrid (no pack: the built-in
-sounds) and once with the built-in car (the sample pack), on line --line: the bell rung and a door cycle raise their
+sounds) and once with the built-in car (the sample pack picked in the menu's Sounds), on line --line: the bell rung and a door cycle raise their
 events (door.open; door.buzzer and door.close together as the doors start closing), played by the built-in synthesis
 or by the pack's recordings; the pack's loops mute the built-in voices and follow the drive (the motor's level under
 power, the motor-generator's at idle). Driven by the autopilot from stop --stop (line 17's 13th: switches and
@@ -77,12 +77,13 @@ def sample_pack():
     return pack, files
 
 
-GAME = r"""async ({ model, secs, stop }) => {
+GAME = r"""async ({ model, sounds, secs, stop }) => {
   const $ = (id) => document.getElementById(id);
   const { Autopilot } = await import('/src/autopilot.js'), { startShift } = await import('/tools/bench/shift.js');
   const { axlesBehind } = await import('/src/audio.js'), V = await import('/src/vehicles.js');
   window.runSeed = 3;
   $('optModel').value = model; $('optModel').dispatchEvent(new Event('change'));
+  $('optSounds').value = sounds; $('optSounds').dispatchEvent(new Event('change'));   // (the menu's Sounds, #636)
   $('selStop').value = String(stop); $('selStop').dispatchEvent(new Event('change'));
   $('selTrip').value = '0'; $('optTemp').value = 'autumn'; $('optWeather').value = 'dry';
   $('optCars').value = 'auto'; $('optObst').value = 'off'; $('optAuto').checked = false;
@@ -228,7 +229,7 @@ def main():
                     contactors = page.evaluate("async () => (await import('/tools/bench/contactors.js')).contactors()")
                     print("contactors:", json.dumps(contactors), flush=True)
                     fails.extend(contactors["failures"])
-                runs[model] = page.evaluate(GAME, {"model": model, "secs": args.secs, "stop": args.stop})
+                runs[model] = page.evaluate(GAME, {"model": model, "sounds": PACK if model == "t3simple" else "", "secs": args.secs, "stop": args.stop})
                 runs[model]["errors"] = errors
                 ctx.close()
             browser.close()

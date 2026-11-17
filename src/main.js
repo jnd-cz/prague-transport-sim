@@ -9,7 +9,7 @@ import { Game, fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor } from './vehicles.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor, soundPacksFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
@@ -382,7 +382,24 @@ function liveryMenu() {
   sel.value = pick === '*' || list.some((l) => l.id === pick) ? pick : '';
 }
 liveryMenu();
-$('optModel').addEventListener('change', () => { fleetMenu(); liveryMenu(); useVehicle($('optModel').value); });
+// Our tram's sounds (#636; the user, 2026-11-17: "it's alternative to the default in game sounds but it's shipped
+// with the game"): the vehicle's own (the built-in sounds) or a sound pack for it, shipped or installed; remembered
+// per vehicle, played from the next shift's start.
+const SOUNDS_KEY = 'tram.sounds';
+let soundPicks = {};
+try { soundPicks = JSON.parse(localStorage.getItem(SOUNDS_KEY) || '{}'); } catch { /* storage unavailable */ }
+function soundsMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), list = soundPacksFor(v), sel = $('optSounds');
+  $('soundsRow').hidden = !list.length;
+  sel.replaceChildren(new Option(t('sounds.own'), ''), ...list.map((p) => new Option(vehicleName(p, getLang()), p.id)));
+  sel.value = list.some((p) => p.id === soundPicks[v?.id]) ? soundPicks[v.id] : '';
+}
+soundsMenu();
+$('optModel').addEventListener('change', () => { fleetMenu(); liveryMenu(); soundsMenu(); useVehicle($('optModel').value); });
+$('optSounds').addEventListener('change', () => {
+  soundPicks[$('optModel').value] = $('optSounds').value;
+  try { localStorage.setItem(SOUNDS_KEY, JSON.stringify(soundPicks)); } catch { /* storage unavailable */ }
+});
 $('optFleet').addEventListener('change', () => {
   fleetPicks[$('optModel').value] = $('optFleet').value;
   try { localStorage.setItem(FLEET_KEY, JSON.stringify(fleetPicks)); } catch { /* storage unavailable */ }
@@ -469,8 +486,8 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); } });
-onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); soundsMenu(); } });
+onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); soundsMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
 const touch = new TouchControls({ deadman: () => game?.opts.deadman });
 // a gamepad (src/gamepad.js): its buttons and triggers send the keys too
@@ -504,8 +521,8 @@ async function start(extra = {}) {
   await useVehicle($('optModel').value);
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
-  // the vehicle's sound pack (#528), the built-in sounds where it has none
-  try { await audio.usePack(soundsFor(pickVehicle($('optModel').value))); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
+  // the sound pack picked for the vehicle (#528, #636), the built-in sounds where none is
+  try { await audio.usePack(soundsFor(pickVehicle($('optModel').value), $('optSounds').value)); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
   const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
   tram = new Tram(cars);
   zoom = zoomTarget = 1;

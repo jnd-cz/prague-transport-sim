@@ -81,12 +81,14 @@ The game's sounds are events and loops (#528; the decision record, section 5): t
 with a sound pack's recording where the pack has one, else with the built-in sound it synthesises (the sounds the game
 had before the packs). A pack is a vehicle manifest's `sounds` (its files among the vehicle's) or a folder
 `assets/<id>/` with a `sounds.json` (`kind` `sounds`, `requires` its vehicle, `names`, `licence`, `files`), listed under
-`sounds` in `assets/vehicles.json`; a vehicle sounds with the first package for it, else its own. The game ships none
-yet: every vehicle has the built-in sounds; `tools/test_sounds.py` serves a sample pack of its own.
+`sounds` in `assets/vehicles.json`, or a package. The menu's *Sounds* (#636) offers the packs for the chosen vehicle,
+shipped and installed, beside its own sounds (the built-in ones where it has none), which are the default; the pick
+is remembered per vehicle and plays from the next shift's start. The game ships one, for the hybrid (below);
+`tools/test_sounds.py` serves a sample pack of its own.
 
 | field | what |
 |---|---|
-| `events` | event → a file, or a list of files (one picked at random each time); WAV or MP3 |
+| `events` | event → a file, or a list of files (one picked at random each time); WAV, MP3, or Ogg Opus with a fallback (below) |
 | `loops` | loop → `{ "file", "refSpeed" (m/s, motor and rolling) or "refRpm" (mg), "gain" }`: the recording plays pitched by its parameter over the reference, as loud as the built-in loop's share of its loudest, times `gain` (default 1) |
 | `gain` | the pack's events' loudness (default 1); an event over a joint or a frog plays louder with speed |
 | `lineContactorRelease` | optional `{ "minGain": 0.25, "maxGain": 1, "refCurrent": 480 }`; opening gain rises linearly from the minimum at 0 A to the maximum at the reference current, clamped there. Requires `0 < minGain <= maxGain <= 1`, `refCurrent > 0` A. Listening settings, not physical constants. |
@@ -97,10 +99,20 @@ current from immediately before the equipment opens (the maximum relay uses the 
 captured at simulation-step resolution. The gain floor is below the pack and master gains; mute and pause still
 silence it. Reapplying power before LS opens cancels the pending release without another start sound.
 
-The optional AGPL-3.0-or-later pack in `assets/jnd.t2r6004/package.json` installs through *Vehicles…* by address or ZIP.
-It supplies both trimmed startup variants, the first release, the medium bell and full door alert. The other
-bell lengths and door-alert loop are retained as alternatives; the loop awaits a warning start/stop lifecycle.
-See its `README.txt` for source provenance and installation. Other events and loops retain built-in synthesis.
+The shipped AGPL-3.0-or-later pack `assets/jnd.t2r6004/` (#590, #636), *T2R 6004 – partial sounds* in the menu's
+*Sounds* while the hybrid is the model, supplies both trimmed startup variants, the first release, the medium bell
+and full door alert. The other bell lengths and door-alert loop are retained as alternatives; the loop awaits a
+warning start/stop lifecycle. See its `README.txt` for source provenance. Other events and loops retain built-in
+synthesis.
+
+**Ogg Opus.** The files a pack plays are best Ogg Opus (`.ogg`): the shipped pack's five are 60 kB together, against
+823 kB as WAV. Chromium, Firefox and Safari from 18.4 decode them. Each `.ogg` among `files` names a WAV or MP3 of
+itself as its `fallback` (`{ "path": "bell.ogg", "fallback": "bell.wav" }`), which a browser that cannot decode
+it downloads and plays instead (the decision record, section 5: Ogg/Opus only with a fallback). From a pack's
+WAVs (or MP3s) `python -P -E tools/sound_encode.py assets/<id>` writes them: encoded by headless Chromium (WebCodecs,
+64 kbit/s mono, 96 stereo, 20 ms frames), each checked against its master decoded (its length, no shift over 1 ms,
+its loudness envelope), the manifest's events and loops renamed to them and every file's size and hash refreshed;
+`--check` checks a pack without writing.
 
 A pack naming an event or a loop the game does not have, a file it does not list, or a loop without its reference is
 left out with the name (`sound pack x left out: event gong: the game raises no such event`). The frogs: a facing

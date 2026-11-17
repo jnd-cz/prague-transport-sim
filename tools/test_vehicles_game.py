@@ -8,7 +8,8 @@ Needs the line's data (python -I tools/snapshot.py data-fetch); skips without it
 in the page (a 14 m box in the T3's dimensions with a red block on its nose, a GLB facing +X) and served beside the
 repository's vehicles with its vehicle.json and a line in assets/vehicles.json, as a folder in assets/ would be;
 so is tools/test_rigged.py's rigged sample (#467), and a broken manifest (no names). Checks: the menu lists the index's vehicles in order with their names
-in both languages and leaves the broken one out; picking each starts a shift with it (the right model, its cars, no
+in both languages and leaves the broken one out; the Sounds row offers the hybrid its shipped pack beside the
+built-in sounds (the default), keeps the pick over a reload and the shift plays it (#636), and is hidden for the others; picking each starts a shift with it (the right model, its cars, no
 page errors), AI trams use it, it credits itself; the sample stands facing +Z with its nose forward and its wheels'
 plane on the rails. The manifests themselves: tools/test_vehicles.py.
 """
@@ -58,7 +59,8 @@ PICK = r"""async (id) => {
     await new Promise((r) => setTimeout(r, 200));
   }
   const m = window.tramModel, u = m?.userData || {};
-  const out = { vehicle: u.vehicle, kind: u.kind, cars: u.cars?.length, attrib: $('attrib').textContent };
+  const out = { vehicle: u.vehicle, kind: u.kind, cars: u.cars?.length, attrib: $('attrib').textContent,
+    sounds: window.game?.audio?.pack?.id ?? null, fellBack: window.game?.audio?.fellBack ?? [] };
   if (u.kind === 'gltf') {
     // in the car's own axes: the nose forward (+Z), the body's floor of the box on the rail plane's side
     const car = u.cars[0], THREE = await import('three'), box = (name) => {
@@ -75,6 +77,11 @@ PICK = r"""async (id) => {
   out.ai = [...ai];
   return out;
 }"""
+
+
+# the menu's Sounds row (#636): shown, its options and its pick
+SOUNDS = "(() => { const s = document.getElementById('optSounds'); return { hidden: document.getElementById('soundsRow').hidden, options: [...s.options].map((o) => [o.value, o.text]), value: s.value }; })()"
+MENU = "!document.getElementById('menu').classList.contains('hidden')"
 
 
 def serve(body):
@@ -140,7 +147,7 @@ def main():
                 page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
                 page.on("console", lambda m, warns=warns: warns.append(m.text) if m.type in ("warning", "error") else None)
                 page.goto(f"{base}/?line={args.line}", timeout=300000)
-                page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                page.wait_for_function(MENU, timeout=300000)
                 if vid == order[0]:
                     menu = lambda page=page: page.evaluate("[...document.getElementById('optModel').options].map((o) => [o.value, o.text])")  # noqa: E731
                     r["menu"] = {"en": menu()}
@@ -148,7 +155,16 @@ def main():
                     r["menu"]["cs"] = menu()
                     page.evaluate("import('/src/i18n.js').then((m) => m.setLang('en'))")
                     r["brokenWarned"] = any("vehicle broken left out" in w for w in warns)
+                # the sounds the vehicle offers; the hybrid's shipped pack picked, kept over a reload and played
+                page.evaluate("(id) => { const s = document.getElementById('optModel'); s.value = id; s.dispatchEvent(new Event('change')); }", vid)
+                sounds = page.evaluate(SOUNDS)
+                if vid == "t3h":
+                    page.evaluate("(() => { const s = document.getElementById('optSounds'); s.value = 'jnd.t2r6004'; s.dispatchEvent(new Event('change')); })()")
+                    page.reload(timeout=300000)
+                    page.wait_for_function(MENU, timeout=300000)
+                    sounds["afterReload"] = page.evaluate(SOUNDS)["value"]
                 g = r[vid] = page.evaluate(PICK, vid)
+                g["menuSounds"] = sounds
                 g["errors"] = errors
                 ctx.close()
             browser.close()
@@ -173,6 +189,16 @@ def main():
         credit = man["licence"]["credit"]
         if credit and credit not in g["attrib"]:
             fails.append(f"{vid}: its credit is not in the credits")
+        sp = g["menuSounds"]
+        if vid == "t3h":
+            pack = json.load(open(os.path.join(ROOT, "assets", "jnd.t2r6004", "sounds.json"), encoding="utf-8"))
+            want = [["", "Built-in"], ["jnd.t2r6004", pack["names"]["en"]]]
+            if sp["hidden"] or sp["options"] != want or sp["value"] != "" or sp.get("afterReload") != "jnd.t2r6004":
+                fails.append(f"t3h: the Sounds row {sp}, wants {want} with the built-in sounds by default and the pick kept over a reload")
+            if g["sounds"] != "jnd.t2r6004" or g["fellBack"]:
+                fails.append(f"t3h: the shift sounds with {g['sounds']} (fell back: {g['fellBack']}), wants the picked jnd.t2r6004 in Ogg")
+        elif not sp["hidden"] or g["sounds"] is not None:
+            fails.append(f"{vid}: the Sounds row {sp} and the pack {g['sounds']}, wants no row and the built-in sounds")
         if g["ai"] and set(g["ai"]) != {vid}:
             fails.append(f"{vid}: AI trams built as {g['ai']}")
     s = r["sample"]
