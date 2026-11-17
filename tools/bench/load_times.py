@@ -5,7 +5,8 @@ Usage: python -P -E tools/bench/load_times.py [--lines 17,9] [--loads 5] [--out 
        python -P -E tools/bench/load_times.py --compare reports/load-times/main.json reports/load-times/509.json
 
 Its own server on a free port; each load a fresh page (`headless.load_page`, `?keepgeo`), then `window.loadTimes`
-(the loading screen's steps, src/loading.js) and `window.worldTimes` (buildWorld's parts, src/world.js) and the files
+(the loading screen's steps, src/loading.js), `window.worldTimes` (buildWorld's parts, src/world.js), `window.groundTimes`
+(the ground file's worker: decode, lookup, meshes, src/groundWorker.js; off the page's thread, beside the rest) and the files
 the page fetched with their bytes (the Resource Timing entries: the body as the server sent it, `serve.py` gzips
 nothing, so raw). The median of `--loads` loads per part. Waits its turn among the heavy jobs: a load measured beside
 another job's is not this machine's.
@@ -20,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 READ = """() => ({
-  load: window.loadTimes || null, world: window.worldTimes || null,
+  load: window.loadTimes || null, world: window.worldTimes || null, ground: window.groundTimes || null,
   files: performance.getEntriesByType('resource').filter((e) => /\\/(data|assets)\\//.test(e.name))
     .map((e) => [new URL(e.name).pathname, e.encodedBodySize || e.transferSize || 0]),
 })"""
@@ -30,7 +31,7 @@ def summarize(runs):
     """{"load": {part: median ms}, "world": {part: median ms}, "files": {path: bytes}, "loads": n} from the runs'
     readings (a part missing from a run counts as absent there, not as 0)."""
     out = {"loads": len(runs)}
-    for key in ("load", "world"):
+    for key in ("load", "world", "ground"):
         parts = {}
         for r in runs:
             for k, v in (r.get(key) or {}).items():
@@ -52,13 +53,13 @@ def table(by_line, other=None):
         o = (other or {}).get(ln)
         rows.append(f"line {ln} ({s['loads']} loads; download {s['download MB']} MB"
                     + (f", before {o['download MB']} MB" if o else "") + ")")
-        for key in ("load", "world"):
-            for k, v in s[key].items():
-                was = o[key].get(k) if o else None
+        for key in ("load", "world", "ground"):
+            for k, v in s.get(key, {}).items():
+                was = o.get(key, {}).get(k) if o else None
                 rows.append(f"  {key:5} {k:28} {(f'{was} -> ' if was is not None else '')}{v} ms")
             if o:
-                for k in o[key]:
-                    if k not in s[key]:
+                for k in o.get(key, {}):
+                    if k not in s.get(key, {}):
                         rows.append(f"  {key:5} {k:28} {o[key][k]} -> gone")
     return rows
 
