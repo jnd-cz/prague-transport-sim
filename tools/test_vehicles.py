@@ -16,6 +16,7 @@ licences, movements and file types come from src/packageRules.json, the rules th
 (assets/catalogue.json): each entry's id, names, author, licence and its package's address: an https one on its author's
 host, or hosted/<id>-<version>.zip, a pack the project hosts (#580). Exit code 1 on a failure.
 """
+import hashlib
 import json
 import math
 import os
@@ -205,9 +206,16 @@ def sound_problems(p, vehicles, files_on_disk=None, own=False):
         need(valid and 0 < values[0] <= values[1] <= 1 and values[2] > 0,
              "lineContactorRelease: wants 0 < minGain <= maxGain <= 1 and refCurrent > 0 A")
 
+    entries = {f.get("path"): f for f in p.get("files", [])}
+
     def file(what, f):
-        need(f in paths, f"{what}: {f} is not among its files")
-        need(isinstance(f, str) and f.lower().endswith((".wav", ".mp3")), f"{what}: {f} is not WAV or MP3")
+        if not need(f in paths, f"{what}: {f} is not among its files"):
+            return
+        if isinstance(f, str) and f.lower().endswith(".ogg"):  # (Ogg Opus with its MP3 fallback, #636)
+            fb = entries[f].get("fallback")
+            need(fb in paths and str(fb).lower().endswith(".mp3"), f"{what}: {f} has no MP3 fallback among its files")
+        else:
+            need(isinstance(f, str) and f.lower().endswith((".wav", ".mp3")), f"{what}: {f} is not WAV, MP3 or Ogg")
     for e, f in (p.get("events") or {}).items():
         need(e in events, f"event {e}: the game raises no such event")
         for x in f if isinstance(f, list) else [f]:
@@ -225,9 +233,13 @@ def sound_problems(p, vehicles, files_on_disk=None, own=False):
             if not os.path.isfile(q):
                 bad.append(f"file {f.get('path')} missing")
                 continue
-            head = open(q, "rb").read(12)
+            data = open(q, "rb").read()
+            head = data[:12]
             kind = "wav" if head[:4] == b"RIFF" and head[8:12] == b"WAVE" else "mp3" if head[:3] == b"ID3" or head[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2") else None
             need(kind is not None or not f["path"].lower().endswith((".wav", ".mp3")), f"file {f['path']} is no WAV or MP3")
+            need(head[:4] == b"OggS" or not f["path"].lower().endswith(".ogg"), f"file {f['path']} is no Ogg")
+            need(f.get("bytes", len(data)) == len(data), f"file {f['path']}: {len(data)} bytes, the manifest says {f.get('bytes')}")
+            need(f.get("sha256", hashlib.sha256(data).hexdigest()) == hashlib.sha256(data).hexdigest(), f"file {f['path']}: its sha256 is not the manifest's")
     return bad
 
 
@@ -391,9 +403,9 @@ def main():
         bad = sound_problems(sp, manifests, os.path.join(ASSETS, sid))
         need_id = [] if sp.get("id") == sid else [f"id {sp.get('id')!r} is not its folder's {sid!r}"]
         fails += [f"{sid}: {b}" for b in need_id + bad]
-    # (none listed yet: the built-in sounds; tools/test_sounds.py serves a sample pack) the check refuses what it should
+    # (the shipped packs above; tools/test_sounds.py serves a sample pack) the check refuses what it should
     sbase = {"schema": 1, "kind": "sounds", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},
-             "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.wav"}, {"path": "b.ogg"}]}
+             "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.wav"}, {"path": "b.ogg"}, {"path": "c.mp3"}, {"path": "d.ogg", "fallback": "c.mp3"}, {"path": "e.ogg", "fallback": "b.ogg"}, {"path": "f.ogg", "fallback": "a.wav"}]}
     ssamples = [
         ({**sbase, "events": {"lineContactor.close": ["a.wav"], "lineContactor.open": "a.wav"}, "lineContactorRelease": {"minGain": 0.3}}, None),
         *[({**sbase, "lineContactorRelease": curve}, "lineContactorRelease:") for curve in
@@ -401,7 +413,10 @@ def main():
         ({**sbase, "events": {"bell": "a.wav", "points": ["a.wav", "a.wav"]}, "loops": {"motor": {"file": "a.wav", "refSpeed": 8.3}}}, None),
         ({**sbase, "events": {"gong": "a.wav"}}, "event gong: the game raises no such event"),
         ({**sbase, "events": {"bell": "c.wav"}}, "event bell: c.wav is not among its files"),
-        ({**sbase, "events": {"bell": "b.ogg"}}, "event bell: b.ogg is not WAV or MP3"),
+        ({**sbase, "events": {"bell": "b.ogg"}}, "event bell: b.ogg has no MP3 fallback"),
+        ({**sbase, "events": {"bell": "e.ogg"}}, "event bell: e.ogg has no MP3 fallback"),
+        ({**sbase, "events": {"bell": "f.ogg"}}, "event bell: f.ogg has no MP3 fallback"),
+        ({**sbase, "events": {"bell": "d.ogg"}, "loops": {"flange": {"file": "d.ogg"}}}, None),
         ({**sbase, "loops": {"compressor": {"file": "a.wav"}}}, "loop compressor: the game has no such loop"),
         ({**sbase, "loops": {"mg": {"file": "a.wav"}}}, "loop mg: refRpm is not"),
         ({**sbase, "requires": {"t9": ">=1"}}, "requires ['t9']"),

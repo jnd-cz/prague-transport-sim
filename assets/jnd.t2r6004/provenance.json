@@ -129,5 +129,17 @@
     "quote": "Can the sound pack have the same license as the built in assets?",
     "choice": "AGPL-3.0-or-later, matching the built-in assets",
     "previous_release": "The identical WAVs were made available with the CC0-1.0 notice in package 0.1.0 on PR #625."
+  },
+  "playback": {
+    "issue": 636,
+    "date": "2026-11-17",
+    "quotes": [
+      "The actual files for playback should be compressed and small file size oriented audio codec should be chosen.",
+      "Ok please install mp3 encoder and use mp3 as fallback in some good quality setting."
+    ],
+    "source": "Claude session, the user's answers on shipping the pack",
+    "codec": "Ogg Opus at a variable bitrate, 64 kbit/s mono and 96 kbit/s stereo, 20 ms frames, complexity 10, encoded by Chromium's WebCodecs AudioEncoder (tools/sound_encode.py)",
+    "fallback": "each .ogg names an MP3 of its master as its fallback: LAME 3.100 -V2 (lameenc), with a LAME info frame holding the encoder delay and padding so that decoders trim them",
+    "masters": "the WAVs above, unchanged; each .ogg and .mp3 names its own as master"
   }
 }

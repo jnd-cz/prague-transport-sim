@@ -1209,6 +1209,29 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 - A spawned process pool (Windows has no fork) pickles its initializer's arguments for each worker, one after another
   in the parent: the heights' staging gave 12 workers 115 MB that took 2.7 s each to pickle, and its pool came out no
   faster than one process (#516). `tools/sysinfo.py` `pool` pickles them once into a file each worker loads.
+- Python's `wave` refuses IEEE float WAVs (format 3, what the user's recorder writes: "unknown format: 3"). Chromium
+  decodes them (`decodeAudioData`) and encodes Opus with WebCodecs' `AudioEncoder`, which exists in a secure context
+  only (a page on `http://localhost` is one; `about:blank` has no `AudioEncoder`). It gives raw 20 ms packets and an
+  `OpusHead` (pre-skip 312) as `decoderConfig.description`; the Ogg pages are ours (`tools/sound_encode.py`). Chromium's
+  `decodeAudioData` applies Ogg Opus's pre-skip and end granule: the shipped pack's five files decode to their WAVs'
+  length to the sample, with no shift (#636). The same input encodes to the same bytes on this machine.
+- lameenc (LAME 3.100) writes MP3 frames without LAME's info frame: Chromium decodes them whole, the sound starting
+  1,105 samples late (LAME's encoder delay of 576 and the decoder's 529) and padded at the end to a whole frame. With
+  an info frame before them holding the delay (576) and the padding (frames × 1152 − 576 − the master's samples),
+  Chromium's `decodeAudioData` trims both: the shipped pack's five MP3s decode to their WAVs' length to the sample,
+  with no shift (#636; `tools/sound_encode.py` `lame_info`). Playwright's Firefox 157 decodes them, and the Ogg Opus
+  files, to the WAVs' length to the sample as well.
+- Playwright's WebKit on Windows (27.2) has no Web Audio (`AudioContext` and `OfflineAudioContext` undefined) and no
+  Ogg Opus (`canPlayType` empty; WAV and MP3 "probably"): it cannot play the game's sounds, and it says nothing of
+  Safari's own decoders, which are Apple's (#636).
+- The Claude desktop app is a packaged (MSIX) Windows app. Playwright's Firefox and WebKit installed from one of its
+  sessions landed in the package's private copy of `%LOCALAPPDATA%`
+  (`AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\ms-playwright\`), which only the app's processes
+  see. Firefox then fails to start ("spawn UNKNOWN"; Windows: "side-by-side configuration is incorrect", the
+  dependent assembly `mozglue` not found): Windows looks for `mozglue` in the real folder. Chromium, in the real folder,
+  runs. Playwright's browsers are installed from a terminal outside the app
+  (`python -m playwright install firefox webkit`); pip's user site packages, written from a session, are in the real
+  `AppData\Roaming` (2026-11-17, #636).
 
 ## The test host
 

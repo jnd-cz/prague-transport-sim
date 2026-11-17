@@ -204,6 +204,9 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
   souprava.
 - Nátěr: jen u modelu, který má kromě původního i jiné nátěry (zatím žádný): původní, některý z nich, nebo
   „Libovolný“, přidělený jako ostatním; hra si volbu pamatuje pro každý model. Nátěry nosí i část cizích souprav.
+- Zvuky: jen u modelu, pro který jsou zvukové balíčky: vestavěné (výchozí), nebo balíček. S hrou je dodaný jeden
+  pro hybrid, T2R 6004 – částečné zvuky: zvonek, výstraha dveří a stykače zrychlovače TR37 nahrané ve voze T2R 6004;
+  ostatní zvuky zůstávají vestavěné. Hra si volbu pamatuje pro každý model a hraje ji od začátku další směny.
 - Vozidla…: balíčky od jiných autorů (tramvaj, nátěr, zvuky nebo vozový park), instalované ze souboru .zip, ze
   složky nebo z adresy, i celý komplet v jednom archivu. Hra každý před nabídnutím zkontroluje (soubory, licenci,
   rozměry modelu a jeho náročnost); odmítnutý ukáže s důvody. Instalované zůstávají jen v tomto prohlížeči a jdou
