@@ -33,7 +33,7 @@ class SoundLists(unittest.TestCase):
     def test_the_game_lists(self):
         ls = sound_lists.lists()
         names = [a for a, _ in ls["EVENTS"]]
-        for e in ("door.open", "door.close", "door.buzzer", "bell", "points", "crossing", "joint"):
+        for e in ("door.open", "door.close", "door.buzzer", "bell", "points", "crossing", "joint", "lineContactor.close", "lineContactor.open"):
             self.assertIn(e, names)
         self.assertEqual([a for a, _ in ls["LOOPS"]], ["motor", "rolling", "flange", "mg"])
 

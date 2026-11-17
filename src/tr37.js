@@ -193,6 +193,8 @@ export class TR37 {
     this.sn = true;        // SN: the motor-generator's current holds it (T3SU-24 § 2.1): no fans, no traction
     this.Iset = 0;         // A: what the relay holds now
     this.ls = false;       // line contactor in (traction)
+    this.tractionCurrent = 0; // A immediately before the next switching step, never the brake-loop current
+    this.onLineContactor = null; // optional observer; equipment without audio keeps no event history
     this.lsT = 0;          // s since it closed (the damping resistors)
     this.relT = -1;        // s into a release (the dampers back in before it opens), −1: none
     this.mr = false;       // the maximum relay tripped
@@ -235,6 +237,13 @@ export class TR37 {
   brakeForce(step, v = 10) {
     const low = loopCurrent(v, C.pMin, 1), high = loopCurrent(v, 99, loopField(99, false));
     return braking(Math.max(high, Math.min(low, C.brakeCurrent[step - 1]))) * this.cars;
+  }
+  // the lowest brake step that holds the accelerator at 30 or under at this speed, where the switch button works (ZR9): the relay turns
+  // it down for more current, so a step asking at least the current the loops make at 30 holds it there or under. 6 where none does
+  buttonStep(v) {
+    const I = loopCurrent(v, 30, loopField(30, false));
+    for (let k = 1; k <= 5; k++) if (this._setting(C.brakeCurrent, k) >= I) return k;
+    return 6;
   }
   // a setting on coil RC's 24 V (T3SU-26 p. 4)
   _setting(table, step) { return table[step - 1] + (26 - this.aux.U) * C.rcShift[step - 1]; }
@@ -494,6 +503,12 @@ export class TR37 {
   }
 
   // ------------------------------------------------------------------ one step
+  _lineContactor(closed, current = this.tractionCurrent) {
+    if (this.ls === closed) return;
+    this.ls = closed;
+    this.onLineContactor?.({ closed, current: closed ? 0 : Math.max(0, current) });
+  }
+
   // ctx: { v, voltage, doorsOpen, rescue, forcedStop } → { drive, brake (wheel: electric + shoes), track
   // (magnet pairs), current (A, the ammeter, negative braking), line (A drawn from the line, all cars),
   // dissipated (W in the resistors) }
@@ -509,13 +524,13 @@ export class TR37 {
     if (this.mr && d < C.driveHold) this.mr = false;
     this.sn = this.mg.i > 2;
     const allowed = b < C.brakeOff && !doorsOpen && !this.mr && !rescue && !forcedStop && this.sn;
-    if (!this.ls && allowed && this.driveStep >= 1) { this.ls = true; this.lsT = 0; this.relT = -1; this.Ib = 0; }
+    if (!this.ls && allowed && this.driveStep >= 1) { this._lineContactor(true); this.lsT = 0; this.relT = -1; this.Ib = 0; }
     else if (this.ls) {
-      if (!allowed) this.ls = false;
+      if (!allowed) this._lineContactor(false);
       else if (d < C.driveHold) { if (this.relT < 0) this.relT = 0; } // R1, R2 drop: the dampers back in, then LS out
       else this.relT = -1;
     }
-    if (this.relT >= 0) { this.relT += dt; if (this.relT >= 2 * C.dampStep) { this.ls = false; this.relT = -1; } }
+    if (this.relT >= 0) { this.relT += dt; if (this.relT >= 2 * C.dampStep) { this._lineContactor(false); this.relT = -1; } }
     this.coastT = this.ls ? 0 : this.coastT + dt;
 
     let fDrive = 0, fElec = 0, I = 0;
@@ -531,7 +546,7 @@ export class TR37 {
         this.p = Math.max(1, Math.min(99, this.p + this._relay(I, set, 1, dt)));
         if (this.p >= 97) this.p = 99;
       }
-      if (I > C.maxRelay) { this.mr = true; this.ls = false; }
+      if (I > C.maxRelay) { this.mr = true; this._lineContactor(false, I); }
       fDrive = tractive(Im, phi) * k;
     } else {
       // the brake loops: the relay holds the preparation current coasting (its coil CP; T3SU-24 § 4.2) and the step's
@@ -575,6 +590,8 @@ export class TR37 {
     const demand = 8 + (this.ls ? 3 : 0) + magnets + (track * 2 * U) / 0.632;
     this.aux.update(dt, this.mg.rpm, demand);
     this.mg.update(dt, voltage, this.aux.U * this.aux.dynamoA);
+
+    this.tractionCurrent = this.ls ? Math.max(0, I) : 0;
 
     return {
       drive: this.drive, brake: fElec + this.shoeF, track: track * C.trackPull * trackMu(speed * 3.6) * k, trackOn: track > 0, trackPairs: track,

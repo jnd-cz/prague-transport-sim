@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Sound events and a sample sound pack (#528) in headless Chromium.
 
-Usage: python -P -E tools/test_sounds.py [--line 17] [--stop 13] [--secs 240]
+Usage: python -P -E tools/test_sounds.py [--line 17] [--stop 13] [--secs 240] [--impacts-only]
 
 The game ships no sound pack yet (the built-in sounds); this test makes a sample basic pack for the built-in car,
 short generated WAVs for the seven sounds the user named first (2026-11-11, PR #462: the door alert, the main bell,
@@ -14,7 +14,8 @@ power, the motor-generator's at idle). Driven by the autopilot from stop --stop 
 crossings within the next 1.5 km) for --secs simulated seconds, every axle of the set
 sounds `points` or `crossing` once at each frog it passes, when its own place along the route is on the frog. A
 pack naming an event the game lacks is left out with the name. Needs the line's data (python -I tools/snapshot.py
-data-fetch); skips without it.
+data-fetch); skips without it. --impacts-only renders both frog sounds through Web Audio at 10, 15 and 30 km/h,
+checks signal level and headroom, and needs no world data.
 """
 import argparse
 import faulthandler
@@ -117,14 +118,70 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+IMPACTS = """async () => {
+  const { TramAudio } = await import('/src/audio.js');
+  const rate = 48000, size = rate / 10;
+  async function render(event, kmh, old = false, overlap = false) {
+    const audio = new TramAudio();
+    const ctx = audio.ctx = new OfflineAudioContext(1, size, rate);
+    audio.active = true;
+    audio.master = ctx.createGain(); audio.master.gain.value = 0.6; audio.master.connect(ctx.destination);
+    audio.noise = ctx.createBuffer(1, 2 * rate, rate);
+    let seed = 123;
+    const noise = audio.noise.getChannelData(0);
+    for (let i = 0; i < noise.length; i++) {
+      seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
+      noise[i] = seed / 2**31 - 1;
+    }
+    const speed = Math.min(kmh / 3.6 / 12, 1), level = 0.4 + 0.6 * speed;
+    const random = Math.random;
+    Math.random = () => 0.31;
+    try {
+      if (old) audio.click(0.05 + 0.12 * speed, event === 'points' ? 220 : 180);
+      else {
+        audio.emit(event, {level});
+        if (overlap) audio.emit(event, {level});
+      }
+    } finally { Math.random = random; }
+    const rendered = (await ctx.startRendering()).getChannelData(0);
+    let peak = 0, power = 0;
+    for (const x of rendered) { peak = Math.max(peak, Math.abs(x)); power += x * x; }
+    return {peak, rmsDb: 10 * Math.log10(power / size)};
+  }
+  const out = {};
+  for (const event of ['points', 'crossing']) {
+    out[event] = {speeds: [], overlap: await render(event, 43.2, false, true)};
+    for (const kmh of [10, 15, 30]) out[event].speeds.push({kmh, old: await render(event, kmh, true), now: await render(event, kmh)});
+  }
+  return out;
+}"""
+
+
+def check_impacts(page):
+    measured = page.evaluate(IMPACTS)
+    fails = []
+    for event, result in measured.items():
+        last_peak = 0
+        for row in result["speeds"]:
+            old, new = row["old"], row["now"]
+            print(f"{event} {row['kmh']} km/h: RMS {old['rmsDb']:.1f} → {new['rmsDb']:.1f} dBFS, peak {new['peak']:.3f}")
+            if not 0.07 <= new["peak"] <= 0.21 or new["peak"] <= last_peak or new["rmsDb"] < old["rmsDb"] + 12:
+                fails.append(f"{event} at {row['kmh']} km/h: weak, overshot or unordered impact level {row}")
+            last_peak = new["peak"]
+        if not result["overlap"]["peak"] < 0.4:
+            fails.append(f"{event}: two coincident impacts have insufficient headroom {result['overlap']}")
+    return fails
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--line", default="17")
     ap.add_argument("--stop", type=int, default=13)
     ap.add_argument("--secs", type=float, default=240)
+    ap.add_argument("--impacts-only", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
-    if not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):
+    if not args.impacts_only and not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):
         print(f"skipped: no data/line{args.line}.json (python -I tools/snapshot.py data-fetch)")
         return 0
     faulthandler.dump_traceback_later(1200, exit=True)  # the whole test: page.evaluate has no time limit
@@ -147,6 +204,16 @@ def main():
     try:
         with sync_playwright() as p:
             browser = gpu.launch(p)[0]
+            page = browser.new_page()
+            page.route(base + '/impact-test', lambda route: route.fulfill(body='<!doctype html>', content_type='text/html'))
+            page.goto(base + '/impact-test')
+            fails.extend(check_impacts(page))
+            page.close()
+            if args.impacts_only:
+                browser.close()
+                for f in fails:
+                    print("FAIL", f)
+                return 1 if fails else 0
             for model in ("t3h", "t3simple"):
                 ctx = browser.new_context(viewport={"width": 960, "height": 540})
                 for path, (kind, body) in served.items():
@@ -157,6 +224,10 @@ def main():
                 page.on("console", lambda m: m.type == "warning" and "sound pack" in m.text and warns.append(m.text))
                 page.goto(f"{base}/?line={args.line}", timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                if model == "t3h":
+                    contactors = page.evaluate("async () => (await import('/tools/bench/contactors.js')).contactors()")
+                    print("contactors:", json.dumps(contactors), flush=True)
+                    fails.extend(contactors["failures"])
                 runs[model] = page.evaluate(GAME, {"model": model, "secs": args.secs, "stop": args.stop})
                 runs[model]["errors"] = errors
                 ctx.close()
