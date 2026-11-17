@@ -274,14 +274,23 @@ def upload(ftp, rel, value, made):
     ftp.rename(f"{rel}.part", rel)
 
 
+def listing(ftp, folder):
+    """The names in a folder on the host, none when it is not there. A host says so with 550 or with 450 (the alpha's,
+    whose submissions/ came after its last deploy: ftplib raises error_temp, and the hourly pull failed on it, #650)."""
+    try:
+        return [n.rsplit("/", 1)[-1] for n in ftp.nlst(folder)]
+    except ftplib.error_perm:
+        return []
+    except ftplib.error_temp as e:
+        if str(e).startswith("450"):
+            return []
+        raise
+
+
 def pull_reviews(ftp, dest=os.path.join(ROOT, "reports", "reviews")):
     """reviews/*.json from the host merged into dest; prints the files that changed. A report (src/report.js,
     written once) is fetched once, its screenshot saved beside it as report-….jpg."""
-    try:
-        names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("reviews")]
-    except ftplib.error_perm:
-        return  # (nothing reviewed yet)
-    for n in sorted(names):
+    for n in sorted(listing(ftp, "reviews")):
         if not n.endswith(".json") or not reviews.NAME.fullmatch(n[:-5]):
             continue
         path = os.path.join(dest, n)
@@ -317,12 +326,8 @@ def pull_reviews(ftp, dest=os.path.join(ROOT, "reports", "reviews")):
 def pull_feedback(ftp, dest):
     """feedback/*.json moved from the host into dest (each saved before it is deleted there, so the caps of
     feedback.php count only what is not pulled yet); prints each note."""
-    try:
-        names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("feedback")]
-    except ftplib.error_perm:
-        return 0  # (no note yet)
     got = 0
-    for n in sorted(names):
+    for n in sorted(listing(ftp, "feedback")):
         if not (n.endswith(".json") and feedback.ID.fullmatch(n[:-5])):
             continue
         buf = io.BytesIO()
@@ -345,12 +350,8 @@ def pull_feedback(ftp, dest):
 def pull_submissions(ftp, dest):
     """submissions/<id>/ moved from the host into dest/<id>/ (saved before they are deleted there, so submit.php's caps
     count only what is not pulled yet); prints each."""
-    try:
-        names = [n.rsplit("/", 1)[-1] for n in ftp.nlst("submissions")]
-    except ftplib.error_perm:
-        return 0  # (none yet)
     got = 0
-    for sid in sorted(names):
+    for sid in sorted(listing(ftp, "submissions")):
         if not submissions.ID.fullmatch(sid):
             continue
         files = {}

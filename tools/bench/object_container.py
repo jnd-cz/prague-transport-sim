@@ -10,7 +10,7 @@ position against the source:
 
 Sizes are per tile, summed: what a game loading tiles would fetch. The densest tile then goes through a page (headless Chromium,
 its own server on a free port): decode, then the triangles with flat normals, which is what the buildings end up as in every
-format (src/world.js buildLod2: per-face normals, a colour and uv per wall). The page checks that all formats give the same data.
+format (src/buildings.js buildLod2: per-face normals, a colour and uv per wall). The page checks that all formats give the same data.
 
     python -P -E tools/bench/object_container.py [--lines 17,22,9,23,37] [--size 1024] [--runs 15] [--no-page]
 (needs brotli, bench-only, and data/; writes reports/object_container/)

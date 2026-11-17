@@ -24,14 +24,14 @@ import numpy as np
 
 GAUGE_HALF = 0.72  # m: a rail from the axis (world.js GAUGE_HALF)
 BED_BELOW = 0.006  # m: the bed under the surface level the style gives (src/heights.js BED_BELOW)
-SMOOTH = 1.5  # m: the tracks' drawn points (world.js densify(t.p, 1.5))
+SMOOTH = 1.5  # m: the tracks' drawn points (world.js buildWorld: densify(t.p, 1.5))
 NEAR = 4.0  # m: a track's points this near count (world.js nearPoints)
 EDGE_OVER = 0.3  # m: an edge over another bed by less than this is lowered to it (world.js edges)
 ROUTE_SAMPLE, ROUTE_CELL = 4.0, 40.0  # m: src/route.js _buildSamples
 
 
 def densify(line, maxlen=SMOOTH):
-    """world.js densify: every segment cut into ceil(length / maxlen) equal parts."""
+    """src/worldMesh.js densify: every segment cut into ceil(length / maxlen) equal parts."""
     out = [tuple(line[0][:2])]
     for a, b in zip(line, line[1:]):
         n = math.ceil(math.hypot(b[0] - a[0], b[1] - a[1]) / maxlen)
