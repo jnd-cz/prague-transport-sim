@@ -53,6 +53,22 @@ CHECK = """async () => {
     ray.set(new THREE.Vector3(...origin), new THREE.Vector3(...direction));
     return ray.intersectObjects(objects, true)[0];
   };
+  const redShell = m.getObjectByName('Body_Prague_red_enamel');
+  checks.sideWallsKeepFullWidthBetweenShoulders = [-1, 1].every(side =>
+    [-5.8, -4.4, -3, -1.8, 0, 1.8, 3, 4.4, 5.8].filter(z => side > 0 || T3_PHOTO.doors.every(d => Math.abs(d - z) > .71)).every(z => {
+      const h = hit([side * 2, 1.495, z], [-side, 0, 0], [redShell]);
+      return h && near(Math.abs(h.point.x), 1.25 * (1 - .10 * Math.max(0, Math.abs(z) - 4.65)));
+    }));
+  // Check the actual frame vertices against the panel surface, not just the overall body bounds.
+  const frames = m.getObjectByName('Interior_Aluminium').geometry.attributes.position;
+  let frameClearance = Infinity;
+  for (let i = 0; i < frames.count; i++) {
+    const x = frames.getX(i), y = frames.getY(i), z = frames.getZ(i);
+    if (y < 1.15 || y > 1.64 || Math.abs(x) < .4) continue;
+    const side = Math.sign(x), h = hit([side * 2, y, z], [-side, 0, 0], [redShell]);
+    if (h) frameClearance = Math.min(frameClearance, Math.abs(h.point.x) - Math.abs(x));
+  }
+  checks.seatFramesClearActualPanels = frameClearance > .04 && frameClearance < .3;
   const cushions = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Red_seat_cushion') cushions.push(o); });
   checks.seatsHaveSolidCushions = seats.every(p => {
     const h = hit([p.x, 1.5, p.z + .08], [0, -1, 0], cushions);
@@ -146,7 +162,8 @@ CHECK = """async () => {
     ...(o.userData.axis ? { axis: o.userData.axis } : {}), ...(o.userData.range ? { range: o.userData.range } : {}) }); });
   return { checks, stats: s.stats, body: size.toArray(), roof: bounds.max.y, nodes,
     glbBytes: bytes.byteLength, exportedNodes: names.length, materials: materials.size,
-    drawCalls: s.renderer.info.render.calls, failed: Object.keys(checks).filter(k => !checks[k]) };
+    drawCalls: s.renderer.info.render.calls, seatFrameClearance: frameClearance,
+    failed: Object.keys(checks).filter(k => !checks[k]) };
 }"""
 
 

@@ -58,6 +58,8 @@ The user's quotes are retained in `data/truth.json`, section `t3PhotoModel`.
 corroborates the padded leatherette seats fitted to early T3 cars 6102–6323.
 
 The revised shells have a longer plan taper and rounder end sections with matching domed caps.
+Long faces are split at both shoulders before tapering, so the central walls and floor keep their
+full width. The seat-frame check measures clearance against the actual side panels.
 Steps have closed risers and side walls; door leaves end just above the first tread and fold to 84°.
 The 84° stop is a visual interpretation of the user's “a bit less” than 90°, not a factory dimension.
 Wheels have continuous profiled faces, dusty brown material and distinct running treads.

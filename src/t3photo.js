@@ -51,6 +51,42 @@ function surface(p, name, rows, mat) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   return mesh(p, name, g, mat);
 }
+// Long faces need vertices at each shoulder before tapering; moving only their
+// end vertices would narrow the entire wall/floor, exposing the seat frames (#437).
+function splitAtShoulders(geometry) {
+  const cuts = [-4.65, 4.65], attributes = ['position', 'normal', 'uv'];
+  const output = Object.fromEntries(attributes.map(k => [k, []]));
+  const index = geometry.index, count = index ? index.count : geometry.attributes.position.count;
+  const vertex = i => attributes.flatMap(k => {
+    const a = geometry.attributes[k], offset = i * a.itemSize;
+    return Array.from(a.array.subarray(offset, offset + a.itemSize));
+  });
+  for (let i = 0; i < count; i += 3) {
+    let polygons = [[0, 1, 2].map(j => vertex(index ? index.getX(i + j) : i + j))];
+    for (const z of cuts) polygons = polygons.flatMap(poly => {
+      if (!poly.some(v => v[2] < z - 1e-6) || !poly.some(v => v[2] > z + 1e-6)) return [poly];
+      const halves = [[], []];
+      for (let j = 0; j < poly.length; j++) {
+        const a = poly[j], b = poly[(j + 1) % poly.length];
+        if (a[2] <= z) halves[0].push(a);
+        if (a[2] >= z) halves[1].push(a);
+        if ((a[2] < z && b[2] > z) || (a[2] > z && b[2] < z)) {
+          const t = (z - a[2]) / (b[2] - a[2]), point = a.map((v, k) => THREE.MathUtils.lerp(v, b[k], t));
+          halves.forEach(h => h.push(point));
+        }
+      }
+      return halves.filter(h => h.length >= 3);
+    });
+    for (const poly of polygons) for (let j = 1; j < poly.length - 1; j++) {
+      for (const v of [poly[0], poly[j], poly[j + 1]]) {
+        output.position.push(...v.slice(0, 3)); output.normal.push(...v.slice(3, 6)); output.uv.push(...v.slice(6, 8));
+      }
+    }
+  }
+  const split = new THREE.BufferGeometry();
+  for (const k of attributes) split.setAttribute(k, new THREE.Float32BufferAttribute(output[k], k === 'uv' ? 2 : 3));
+  const welded = mergeVertices(split, 1e-5); split.dispose(); return welded;
+}
 // Batch only within a rigid assembly. Named articulation groups keep their local pivots.
 function batch(root) {
   for (const c of [...root.children]) if (c.isGroup) batch(c);
@@ -553,6 +589,7 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   const taper = z => 1 - .10 * Math.max(0, Math.abs(z) - 4.65);
   body.traverse(o => {
     if (!o.isMesh) return;
+    const old = o.geometry; o.geometry = splitAtShoulders(old); old.dispose();
     const p = o.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) p.setX(i, p.getX(i) * taper(p.getZ(i)));
     p.needsUpdate = true; o.geometry.computeVertexNormals();
