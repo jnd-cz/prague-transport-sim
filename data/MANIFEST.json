@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "6bd7f91",
- "published": "2026-11-17 02:44",
- "note": "#632: the ground files with the lidar smoothed past 15-30 m from the tracks, plots on the city mesh, sidewalks on the street surface at a 5 m lattice, OSM water with its islands levelled by the banks it sees past its weirs, lowered kerbs at crossings (#630); the street surfaces over each line's ground",
+ "built_at_commit": "411fd4c",
+ "published": "2026-11-17 10:41",
+ "note": "#632: the ground files with every triangle facing up and the step walls facing down the step (the dark seams)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -33,12 +33,12 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 29509471,
-   "sha256": "6a7bfb8f56e14d31cffd02b11954f4ff0e7783fe41903d412ac07d7b1c598738"
+   "size": 29509639,
+   "sha256": "974ee255c1aa6a65c7cb3a5efa77a82305460383119052dd78b3593318c1afee"
   },
   "line17.ground.json": {
    "size": 1807,
-   "sha256": "02edbb6e9cfe12d8875d5ad71b9bc0c300cd788310a9d784117ac08802cf6d2b"
+   "sha256": "27fa285472a6f56dfc1fb7e073c837831589e74de9f76e33c8c4b6355b5f33c3"
   },
   "line17.json": {
    "size": 7042820,
@@ -93,12 +93,12 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.ground.bin": {
-   "size": 29370935,
-   "sha256": "95c419302b06a43239b59183c0c40f000a54438f9b31e692e4588de6b82e6611"
+   "size": 29371195,
+   "sha256": "b539ab7b788d719aa9202d86c1ff676d4e2d2ad9ef91373f95718d9e28aa05d7"
   },
   "line22.ground.json": {
    "size": 1817,
-   "sha256": "3ce9529da311a7107671db10f9d6cfd881564f78afbc264f11b004790b991f83"
+   "sha256": "796ef2926d7bfd284603de19c36d1525f1622cfa8dac93c86277f4d094e93d5e"
   },
   "line22.json": {
    "size": 7032010,
@@ -149,12 +149,12 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.ground.bin": {
-   "size": 13660443,
-   "sha256": "fe28e422252fb885727f502d29e7e23849ec4054fee849e53004900948942b9a"
+   "size": 13660564,
+   "sha256": "091072bbe29a802c578907d1f2d37a209f8bc0e8c6b5f6e8a81e738f2704a3aa"
   },
   "line23.ground.json": {
    "size": 1784,
-   "sha256": "78855f61ad8439ea945ea97c8a449436ee80029fb898926229b9e4d71ad66b69"
+   "sha256": "cd5aca273680668a31516e5fe31a59672b370404c366dafdafe9831ae5c5af9d"
   },
   "line23.json": {
    "size": 2711135,
@@ -205,12 +205,12 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 11958260,
-   "sha256": "d68b04ebfa6968a57621ef250177fc6425308747cc0d30884ecb8de6e4c744ff"
+   "size": 11958178,
+   "sha256": "30f0e193aeb2f315766094b93628a71302f4edc9d7ac8a5c2b94d1bdc6e88782"
   },
   "line37.ground.json": {
    "size": 1789,
-   "sha256": "7183a0d94d55ee38705701b17999716d159423b084a885b3dba3d474e1155f22"
+   "sha256": "b6bd6943e5b2eaf102139c85fade249a2ba57403ba1d1cadd4da2aa9890f6975"
   },
   "line37.json": {
    "size": 2538818,
@@ -261,12 +261,12 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 25967556,
-   "sha256": "e689081cfad3f581a4ae5285d4a1b26466f79a190de32088718ba8d863b8aaf9"
+   "size": 25967579,
+   "sha256": "eb0952c3913b170563bb0eda06d5046a12d312c056273827f6e26c01d273bc6c"
   },
   "line9.ground.json": {
    "size": 1811,
-   "sha256": "5c324a2dca6ddab879297dcdc55075a1c947c7cf82838cc587f614c61a44d51f"
+   "sha256": "ff56c791d4a603a71bf9145c6eb760a53184639fa4dc0952787a3abcae8fc744"
   },
   "line9.json": {
    "size": 6274216,
