@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, corridorWalls, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail, groundStyles } from './world.js';
-import { fetchGround, decodeGround } from './groundFile.js';
+import { fetchGround, GroundTiles, WINDOW_AHEAD, WINDOW_STEP } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -109,11 +109,13 @@ try {
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
-// the prebuilt ground (tools/ground_mesh.py, #509): decoded in a worker while the page goes on. Every line has it: the
-// layers the page built without it went, #510
+// the prebuilt ground (tools/ground_mesh.py, #509): its tiles' lookups decoded in workers while the page goes on (#30).
+// Every line has it: the layers the page built without it went, #510. ?keepgeo and ?bot keep every tile (the checks).
 const groundFile = await fetchGround(load, lineId);
 built[`line${lineId}.ground.json`] = groundFile.layout;
-const groundDecoded = decodeGround(groundFile, groundStyles(groundFile.layout));
+const groundTiles = new GroundTiles(groundFile, groundStyles(groundFile.layout), params.has('bot') || params.has('keepgeo'));
+window.groundTiles = groundTiles; // (what is held: tools/bench/tiles.js)
+const groundLookups = groundTiles.loadLookups();
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
 // (dev switch for comparing lint runs: ?notunnels)
@@ -128,13 +130,15 @@ const terrain = new Terrain(data.terrain);
 data.attribution = credits(built);
 logProvenance(built);
 // (the survey's ground level is the file's, through the file's lookup: its decks alone are triangulated here)
-const groundLookup = await groundDecoded.lookup;
+await groundLookups;
+const groundLookup = groundTiles.lookup;
 const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, groundLookup) : null;
 await load.begin('profile');
 const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
 const profile = new Profile(route, data, styles.lift, dtm, terrain, styles.liftBack); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
 useGroundLookup(ground, groundLookup);
+ground.tiles = groundTiles;
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
 ground.walls = corridorWalls(terrain, route, profile, dtm); // the rock tunnels and the retaining walls
@@ -256,11 +260,12 @@ function useGroundLookup(ground, lk) {
 // precipitation and the materials' state (src/weather.js): instant, so it could change during a shift.
 async function buildCity() {
   await load.parts(WORLD_PARTS);
-  if (groundDecoded) {
-    ground.mesh = await groundDecoded.meshes;
-    window.groundTimes = ground.mesh.times; // (the worker's decode, lookup and meshes, ms)
-  }
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
+  // (the ground's window round the start before the first frame: the route ahead of the tram and the camera, #30)
+  const t0 = performance.now(), ahead = [];
+  for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, d)); ahead.push([p.x, p.y]); }
+  await groundTiles.update([[camera.position.x, -camera.position.z], ...ahead], scene.fog.far);
+  window.groundTimes = { ...groundTiles.times, window: Math.round(performance.now() - t0) }; // (the workers' ms, summed; the window's wait)
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
   const lm = world.userData.landmarks;
@@ -1145,6 +1150,7 @@ function frame(now) {
     }
   }
   if (review) review.update(dt);
+  if (world) groundTiles.tick(now, camera, route, tram.s, scene.fog.far);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
@@ -1206,6 +1212,7 @@ function poseMirror(mirrorCam) {
 }
 
 load.finish();
+groundTiles.trim = true; // (the world is placed: from here the window drops the tiles past it)
 // review mode (?review, src/review.js): the checks' findings on the map, no shift
 let review = null;
 if (params.has('review')) {

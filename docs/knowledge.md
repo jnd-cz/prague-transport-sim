@@ -21,6 +21,13 @@ Sections:
   (`data/lineN.json` `frame`). Lat/lon goes through ČÚZK's grid as a pinned PROJ pipeline (the grid file
   is in the snapshot, `raw/proj/`); survey data (DTM, DMR 5G, IPR rasters) is a plain shift. S-JTSK is
   9.6 cm/km short of true length, and grid north is 7.8° off true north.
+- **The ground's tiles** (#30, 2026-11-17): 500 m squares on the absolute S-JTSK grid (`geo.TILE`, the decision's), named
+  by their south-west corner's index (`e-1486_n-2087` holds the origin: it lies 24 m south of N −1 043 000). The build's
+  squares and its 5 m and 25 m lattices lie on that grid, so a tile's border holds the same vertices on both sides. The
+  page draws only the tiles within the fog's end of the camera and of 1 km of route ahead. A tile's normals on its
+  border take its neighbours' triangles: from its own alone, a 500 m line would show where the two sides average
+  different triangles. Line 37, driven every 200 m (`tools/bench/ground_tiles.py`): 31 of 106 tiles drawn on average,
+  mesh arrays 32 MB of 77, lookups 21 MB of 48.
 - Until 2026-10-29 each line had its own lat/lon origin and a flat-earth scale (110 574 m per degree of
   latitude, 111 320·cos(lat0) of longitude): 0.59 % short N–S, 0.20 % E–W (line 17 was 100 m short), so
   positions quoted in older notes (route `s`, x/y) are off by up to that much.

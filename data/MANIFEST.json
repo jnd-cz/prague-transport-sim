@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "ae63d99",
- "published": "2026-11-17 11:30",
- "note": "#510: the old ground layers' fine blocks (lineN.fine.*) leave the data; the rest as #632 published",
+ "built_at_commit": "13bd729",
+ "published": "2026-11-17 14:41",
+ "note": "#30: the five lines' ground in 500 m tiles on the S-JTSK grid",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -25,12 +25,12 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 29509639,
-   "sha256": "974ee255c1aa6a65c7cb3a5efa77a82305460383119052dd78b3593318c1afee"
+   "size": 29591101,
+   "sha256": "c6476254e13f6bcf6a0196a07c828cfbbb3f2cff42baa674c5d4653545f788e6"
   },
   "line17.ground.json": {
-   "size": 1807,
-   "sha256": "27fa285472a6f56dfc1fb7e073c837831589e74de9f76e33c8c4b6355b5f33c3"
+   "size": 128059,
+   "sha256": "4fa118d47fd8c240eb7f3235ba4822355f001fdfb4257bb26c40d03eb0dfa5bf"
   },
   "line17.json": {
    "size": 7042820,
@@ -77,12 +77,12 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.ground.bin": {
-   "size": 29371195,
-   "sha256": "b539ab7b788d719aa9202d86c1ff676d4e2d2ad9ef91373f95718d9e28aa05d7"
+   "size": 29409745,
+   "sha256": "41a97092ea4b37583c87170a9ee4087d95109f8419597a5679d206e0c9640d89"
   },
   "line22.ground.json": {
-   "size": 1817,
-   "sha256": "796ef2926d7bfd284603de19c36d1525f1622cfa8dac93c86277f4d094e93d5e"
+   "size": 102774,
+   "sha256": "5f278f61afa77b2728b0ca994f19e69f67431759aad1470eddef785b5c00d7b9"
   },
   "line22.json": {
    "size": 7032010,
@@ -125,12 +125,12 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.ground.bin": {
-   "size": 13660564,
-   "sha256": "091072bbe29a802c578907d1f2d37a209f8bc0e8c6b5f6e8a81e738f2704a3aa"
+   "size": 13682333,
+   "sha256": "d54ce441421c36d632f4facf033630bec889b8c9caab3d0b1442d5c49a8b61dd"
   },
   "line23.ground.json": {
-   "size": 1784,
-   "sha256": "cd5aca273680668a31516e5fe31a59672b370404c366dafdafe9831ae5c5af9d"
+   "size": 43526,
+   "sha256": "c0853ab3957c8514b992558d7a5bbb47308c7b34c78531775ba0aeebb371a771"
   },
   "line23.json": {
    "size": 2711135,
@@ -173,12 +173,12 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 11958178,
-   "sha256": "30f0e193aeb2f315766094b93628a71302f4edc9d7ac8a5c2b94d1bdc6e88782"
+   "size": 11982544,
+   "sha256": "24a26d2ec5487041dbdde882b3f58b57e4a1df4ce5e66e7758bb16cb4155eff6"
   },
   "line37.ground.json": {
-   "size": 1789,
-   "sha256": "b6bd6943e5b2eaf102139c85fade249a2ba57403ba1d1cadd4da2aa9890f6975"
+   "size": 51033,
+   "sha256": "e6a03114ec341fecbadf07fe938462e5617444c894d5162db2dd50c43bfc1408"
   },
   "line37.json": {
    "size": 2538818,
@@ -221,12 +221,12 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 25967579,
-   "sha256": "eb0952c3913b170563bb0eda06d5046a12d312c056273827f6e26c01d273bc6c"
+   "size": 25954573,
+   "sha256": "9d5fc8b76dd79fdeee568ba465dc21f18426ab5cfcd68e3b4f3bbce24cd35867"
   },
   "line9.ground.json": {
-   "size": 1811,
-   "sha256": "ff56c791d4a603a71bf9145c6eb760a53184639fa4dc0952787a3abcae8fc744"
+   "size": 86835,
+   "sha256": "9192479d07e527f1cdf3a92ac816770d4d20d4cf2dbca69941d6fb190968923f"
   },
   "line9.json": {
    "size": 6274216,

@@ -50,7 +50,7 @@ import shapely.ops
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-TILE = 512.0  # m: the squares the faces are built in (one future tile edge each, #30)
+from geo import TILE, on_grid, tile_box, tile_index, tile_name  # noqa: E402 (the squares the faces are built in: the world's tiles, #30)
 Q = 1000  # vertices per m: positions and heights in mm
 CLASS_IDS = {"terrain": 0, "survey": 1, "bed": 2, "plot": 3, "wall": 4}
 RAISED = {"sidewalk", "island", "median", "platform"}  # (src/world.js RAISED: they keep their height over a bed)
@@ -70,7 +70,8 @@ BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies 
 RAIL_CLEAR = 0.05  # m: a rail's head either side of its line (src/world.js draws it 0.1 m wide): no kerb or plot within it
 SURVEY_LATTICE = 5.0  # m: a street's or a lidar ground's faces cut to this inside (main's DtmSurface split to 5 m)
 WATER_LEVEL = 0.1  # a survey water area's level outside OSM's water: this quantile of its outline's heights
-WATER_LATTICE = 32.0  # m: the water's faces cut to this (the page's lookup bins triangles in 16 m cells by their box)
+WATER_LATTICE = 25.0  # m: the water's faces cut to this (the page's lookup bins triangles in 16 m cells by their box; it
+# divides TILE, so its lines meet a tile's border)
 WATER_PRIO = 2.95  # the water's weld priority: under the survey's (2.x) and the beds' (1), over the terrain's (3)
 WATER_NUDGE = 3.0  # m: a water corner on a cut is seen from this far off it, on its triangle's side (off_cuts: past the
 # cut's cells on WaterLevels' raster; seen from inside a triangle 2 m along it, it lay in them and read both sides)
@@ -177,11 +178,12 @@ def lowered_heights(px, py, z, zroad, low, width, ramp):
 
 
 def lattice(g, step=None):
-    """Lines every `step` m (SURVEY_LATTICE) in x and in y on the city's grid, inside g (None when none crosses it)."""
+    """Lines every `step` m (SURVEY_LATTICE) in x and in y on the tiles' grid (S-JTSK, geo.on_grid), inside g (None when
+    none crosses it)."""
     step = step or SURVEY_LATTICE
     x0, y0, x1, y1 = g.bounds
-    xs = np.arange(math.ceil(x0 / step) * step, x1, step)
-    ys = np.arange(math.ceil(y0 / step) * step, y1, step)
+    xs = np.arange(on_grid(x0, step, 0), x1, step)
+    ys = np.arange(on_grid(y0, step, 1), y1, step)
     segs = [((x, y0 - 1), (x, y1 + 1)) for x in xs.tolist()] + [((x0 - 1, y), (x1 + 1, y)) for y in ys.tolist()]
     if not segs:
         return None
@@ -378,8 +380,7 @@ def build(ln, mesh=None, threads=8, log=print):
     tri_xy = np.stack([np.column_stack([x[T[:, k]], y[T[:, k]]]) for k in range(3)], 1)
     kept = np.asarray(G["kept"], int)
     tb = np.stack([tri_xy[kept, :, 0].min(1), tri_xy[kept, :, 1].min(1), tri_xy[kept, :, 0].max(1), tri_xy[kept, :, 1].max(1)], 1)
-    ti = np.floor((tb[:, [0, 2]] - bx0) / TILE).astype(int)
-    tj = np.floor((tb[:, [1, 3]] - by0) / TILE).astype(int)
+    ti, tj = tile_index(tb[:, [0, 2]], tb[:, [1, 3]])
     whole = (ti[:, 0] == ti[:, 1]) & (tj[:, 0] == tj[:, 1])  # (inside one square: no square's border crosses it)
     lines, owners = [], []  # (owners: what the face inside a line's polygon is: (class, id))
     for k, q in enumerate(pieces["survey"]):
@@ -457,9 +458,9 @@ def build(ln, mesh=None, threads=8, log=print):
     kept_tree = shapely.STRtree(kept_polys) if kept_polys is not None else None
 
     log(f"  {len(lines):,} lines, {int(touch.sum()):,} whole triangles noded with them, {time.time() - t1:.0f} s")
-    nx_, ny_ = int(math.ceil((bx1 - bx0) / TILE)), int(math.ceil((by1 - by0) / TILE))
-    rects = [(bx0 + i * TILE, by0 + j * TILE, min(bx1, bx0 + (i + 1) * TILE), min(by1, by0 + (j + 1) * TILE))
-             for i in range(nx_) for j in range(ny_)]
+    (e0, e1), (n0, n1) = tile_index([bx0, bx1], [by0, by1])
+    rects = [(max(bx0, b[0]), max(by0, b[1]), min(bx1, b[2]), min(by1, b[3]))
+             for b in (tile_box(e, n) for e in range(int(e0), int(e1) + 1) for n in range(int(n0), int(n1) + 1))]
     t1 = time.time()
     with ThreadPoolExecutor(threads) as ex:
         faces = list(ex.map(lambda r: tile_faces(r, lines_tree, lines, kept_tree, kept_polys), rects))
@@ -1215,9 +1216,76 @@ def encode(V, F, cls, box, draw=None, area=None):
     return blob, layout
 
 
+def encode_tiles(V, F, cls, draw=None, area=None):
+    """(bytes, layout): the mesh as the world's tiles (geo.TILE m squares on the S-JTSK grid, #30), one after another, each
+    encoded on its own (encode(): its own vertices, those on its border repeated in its neighbour), so the page decodes
+    the tiles it needs. A triangle goes to the tile holding its centre: the faces are built square by square on the same
+    grid, so it lies in it. The layout: per tile its name, index, byte range and own layout; the totals; and per class
+    every draw and area name a tile uses (the page's styles, src/world.js groundStyles)."""
+    cen = V[F].mean(1) / Q
+    e, n = tile_index(cen[:, 0], cen[:, 1])
+    keys, inv = np.unique(np.column_stack([e, n]), axis=0, return_inverse=True)
+    inv = inv.ravel()
+    order = np.argsort(inv, kind="stable")
+    cut = np.searchsorted(inv[order], np.arange(len(keys) + 1))
+    per = {name: (None if v is None else np.asarray(v, dtype=object)) for name, v in (("draw", draw), ("area", area))}
+    parts, tiles, off, names = [], [], 0, {name: {} for name in LAYERS}
+    for k, (te, tn) in enumerate(keys.tolist()):
+        m = order[cut[k]:cut[k + 1]]
+        used, fl = np.unique(F[m], return_inverse=True)
+        b, lay = encode(V[used], fl.reshape(-1, 3), cls[m], shapely.box(*tile_box(te, tn)),
+                        None if per["draw"] is None else per["draw"][m], None if per["area"] is None else per["area"][m])
+        tiles.append({"name": tile_name(te, tn), "e": te, "n": tn, "offset": off, "bytes": len(b), "layout": lay})
+        for name in LAYERS:
+            for c, v in (lay.get(name) or {}).items():
+                names[name].setdefault(c, set()).update(v)
+        parts.append(b)
+        off += len(b)
+    from geo import ORIGIN
+    layout = {"tile": TILE, "origin": list(ORIGIN), "unit": 1 / Q, "vertices": int(sum(t["layout"]["vertices"] for t in tiles)),
+              "triangles": int(len(F)), "classes": {c: int((cls == i).sum()) for c, i in CLASS_IDS.items()}, "tiles": tiles}
+    for name in LAYERS:
+        if names[name]:
+            layout[name] = {c: sorted(v) for c, v in names[name].items()}
+    return b"".join(parts), layout
+
+
 def decode(blob, layout, draw=False, area=False):
     """(V (n, 3) float m, {class: (m, 3) indexes}); with `draw` also {class: per triangle its draw class's name}, with
-    `area` also {class: per triangle the survey's class under it}."""
+    `area` also {class: per triangle the survey's class under it}. A tiled file (encode_tiles) as one mesh: its tiles
+    decoded and the vertices they share on their borders welded (the same mm position)."""
+    if "tiles" not in layout:
+        return decode_one(blob, layout, draw, area)
+    Vs, by, names, nv = [], {}, {"draw": {}, "area": {}}, 0
+    for t in layout["tiles"]:
+        got = decode_one(blob[t["offset"]:t["offset"] + t["bytes"]], t["layout"], draw, area)
+        Vs.append(got[0])
+        for c, f in got[1].items():
+            by.setdefault(c, []).append(f + nv)
+        k = 2
+        for name, want in (("draw", draw), ("area", area)):
+            if want:
+                # (a tile names a class's triangles only where one has a name: the others' are "")
+                for c, f in got[1].items():
+                    v = got[k].get(c)
+                    names[name].setdefault(c, []).append((v, len(f)))
+                k += 1
+        nv += len(got[0])
+    V = np.vstack(Vs) if Vs else np.zeros((0, 3))
+    keys, first, inv = np.unique(np.round(V * Q).astype(np.int64), axis=0, return_index=True, return_inverse=True)
+    inv = inv.ravel()
+    V = V[first]
+    out = {c: inv[np.vstack(f)] if f else np.zeros((0, 3), np.int64) for c, f in by.items()}
+    extra = ()
+    for name, want in (("draw", draw), ("area", area)):
+        if want:
+            extra += ({c: np.concatenate([np.full(m, "", dtype=object) if a is None else a for a, m in v])
+                       for c, v in names[name].items() if any(a is not None for a, _ in v)},)
+    return (V, out) + extra
+
+
+def decode_one(blob, layout, draw=False, area=False):
+    """decode() of one encode() blob (a tile, or a whole file before #30)."""
     n = layout["vertices"]
     u, off = read_varints(blob, 3 * n)
     R = np.cumsum(unzigzag(u).reshape(n, 3), axis=0)
@@ -1244,7 +1312,7 @@ def decode(blob, layout, draw=False, area=False):
 def write(ln, built, rep):
     import sources
     from atomic import replacing
-    blob, layout = encode(built["V"], built["F"], built["cls"], built["box"], built.get("draw"), built.get("area"))
+    blob, layout = encode_tiles(built["V"], built["F"], built["cls"], built.get("draw"), built.get("area"))
     layout["provenance"] = sources.stamp("ground_mesh.py", {
         "ground": sources.single("terrain", "ipr-dtm", int(len(built["F"])), "triangles: the city mesh (IPR), the survey, "
                                  "the beds, the building plots, welded")})

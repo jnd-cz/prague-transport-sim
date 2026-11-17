@@ -52,7 +52,7 @@ RULES = {"min": lambda z: float(np.min(z)), "p10": lambda z: float(np.percentile
 STRIP = 1.0  # m: terrain narrower than this between a plot and the classes above joins the plot (thin_strips)
 GAP = 0.01  # m: gaps between beds narrower than twice this are closed (bed_pieces)
 SLIVER = 1e-4  # m²: pieces smaller than this are left out (float noise of the cuts)
-TILE = 512.0  # m: the terrain is cut tile by tile, side by side
+TILE = 500.0  # m: the terrain is cut in squares this size side by side (threads; the world's tiles are geo.TILE)
 GAUGE = 0.72  # m: a rail from the axis (track_beds.GAUGE)
 # (the line's ground reaches this far from its route and tracks: the fog ends at 950 m (src/main.js), nothing farther is
 # seen. The user, 2026-11-16, #509: "I want to get to tile streaming as soon as possible so let's do just option 1": the
