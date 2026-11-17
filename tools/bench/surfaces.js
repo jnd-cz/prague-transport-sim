@@ -7,37 +7,18 @@
 // kerb step median 0.06 m (the survey's one kerb line gave both sides one height).
 // Kerbs lowered on purpose (tools/kerbs.py's stretches at crossings, #303) are counted apart: loweredKerbs, and the
 // flat and sunk kerbs are plain kerb's.
-// With the ground file (#509) the ground is one welded surface, continuous but at its steps, with no areas to tell
-// apart: across the route every 0.25 m a step is two neighbouring samples' difference, less the slope on either side
-// (each side's own class) where that explains more of it (a crest's change of slope is no step); one inside the
-// street classes is a seam, one where road meets a raised class a kerb.
-// `of` counts the street samples' pairs then, not the areas' borders.
+// The ground file (#509) is one welded surface, continuous but at its steps, with no areas to tell apart: across the
+// route every 0.25 m a step is two neighbouring samples' difference, less the slope on either side (each side's own
+// class) where that explains more of it (a crest's change of slope is no step); one inside the street classes is a
+// seam, one where road meets a raised class a kerb. `of` counts the street samples' pairs, not the areas' borders.
+// (Without the file, #510 removed, the drawn survey's areas were told apart by their triangles.)
 import { findKerbs } from '../../src/review.js';
 const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'median', 'cycle', 'paved', 'platform']);
 const ROAD = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
 
 export async function run() {
-  const g = window.game, r = g.route, dtm = r.ground.dtm, T = r.ground.terrain;
+  const g = window.game, r = g.route, dtm = r.ground.dtm;
   if (!dtm) return { checks: {} };
-  // which area a point lies on: the triangle _hitTri picks, and the area that owns it
-  const owner = new Map();
-  dtm.areas.forEach((a, i) => { for (const t of a.mesh) owner.set(t, i); });
-  const hit = (x, y) => {
-    const ix = dtm.grid, k = ix.at(x, y);
-    if (k < 0) return null;
-    const gz = T.height(x, y);
-    let best = null, bs = Infinity, bz = 0;
-    for (let n = ix.start[k], e = ix.start[k + 1]; n < e; n++) {
-      const id = ix.ids[n], t = ix.tris[id], p = t[0], q = t[1], u = t[2];
-      const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
-      if (Math.abs(d) < 1e-9) continue;
-      const w1 = ((q[1] - u[1]) * (x - u[0]) + (u[0] - q[0]) * (y - u[1])) / d, w2 = ((u[1] - p[1]) * (x - u[0]) + (p[0] - u[0]) * (y - u[1])) / d, w3 = 1 - w1 - w2;
-      if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
-      const z = w1 * p[2] + w2 * q[2] + w3 * u[2], sc = Math.abs(z - gz) - ix.val[id] * 0.05;
-      if (sc < bs) { bs = sc; best = owner.get(t); bz = z; }
-    }
-    return best === null || best === undefined ? null : { a: best, z: bz, c: dtm.areas[best].c };
-  };
   // waves: lint streetWaviness's samples (6-20 m either side, every 1 m), over 8 cm off the 21 m mean
   let wn = 0, waves = 0;
   for (const lat of [-20, -14, -9, -6, 6, 9, 14, 20]) {
@@ -69,7 +50,7 @@ export async function run() {
   // seams and kerbs: across the route every 0.25 m, a row every 4 m, where two areas meet
   const seams = [], kerbs = [], seamSites = [], kerbSites = [], lowSites = [];
   const lk = r.ground.lookup;
-  if (lk) for (let s = 0; s < r.length; s += 4) {
+  for (let s = 0; s < r.length; s += 4) {
     const zs = [], cs = [];
     for (let lat = -25; lat <= 25; lat += 0.25) { const o = r.offset(s, lat), t = lk.survey(o.x, o.y); zs.push(t ? t.z : null); cs.push(t ? t.c : null); }
     for (let i = 1; i < zs.length; i++) {
@@ -92,25 +73,6 @@ export async function run() {
         if (lowered(site.x, site.y)) lowSites.push({ ...site, step });
         else { kerbs.push(step); kerbSites.push({ ...site, step }); }
       }
-    }
-  }
-  if (!lk) for (let s = 0; s < r.length; s += 4) {
-    let prev = null;
-    for (let lat = -25; lat <= 25; lat += 0.25) {
-      const o = r.offset(s, lat), h = hit(o.x, o.y);
-      if (h && prev && h.a !== prev.a) {
-        const p = r.offset(s, lat - 0.125), site = { x:p.x, y:p.y, s, lat:lat - 0.125,
-          areas:[prev.a,h.a], classes:[prev.c,h.c], heights:[prev.z,h.z] };
-        // (street classes only: lawns and water meet at any height; over 1 m apart is another level)
-        if (STREETS.has(h.c) && (h.c === prev.c || (ROAD.has(h.c) && ROAD.has(prev.c))) && Math.abs(h.z - prev.z) <= 1) {
-          seams.push(Math.abs(h.z - prev.z)); seamSites.push({ ...site, step:Math.abs(h.z - prev.z) });
-        } else if ((ROAD.has(h.c) && RAISED.has(prev.c)) || (RAISED.has(h.c) && ROAD.has(prev.c))) {
-          const step = ROAD.has(h.c) ? prev.z - h.z : h.z - prev.z;
-          if (lowered(site.x, site.y)) lowSites.push({ ...site, step });
-          else { kerbs.push(step); kerbSites.push({ ...site, step }); }
-        }
-      }
-      prev = h;
     }
   }
   const n = (a, f) => a.filter(f).length;

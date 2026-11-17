@@ -6,16 +6,11 @@
 export const GROUND_CHUNK = 350; // m: the meshes' squares, as world.js CELL (frustum culling skips far ones)
 export const LOOKUP_CELL = 16; // m: the lookup's grid
 
-// The file, or null where the line has none (or ?oldground: the layers the page built before #509, for comparing).
-export async function fetchGround(load, lineId, params) {
-  if (params?.has('oldground')) return null;
-  try {
-    const [jr, br] = await Promise.all([load.get(`data/line${lineId}.ground.json`), load.get(`data/line${lineId}.ground.bin`)]);
-    if (!jr.ok || !br.ok) return null;
-    return { layout: await jr.json(), buffer: await br.arrayBuffer() };
-  } catch {
-    return null;
-  }
+// The file: every line has it, the page builds no ground of its own (#510). Missing, the line does not load.
+export async function fetchGround(load, lineId) {
+  const [jr, br] = await Promise.all([load.get(`data/line${lineId}.ground.json`), load.get(`data/line${lineId}.ground.bin`)]);
+  if (!jr.ok || !br.ok) throw new Error(`line ${lineId}: no ground file (data/line${lineId}.ground.*, tools/ground_mesh.py): ${jr.status} / ${br.status}`);
+  return { layout: await jr.json(), buffer: await br.arrayBuffer() };
 }
 
 // The decoded ground: { lookup: a promise of the GroundLookup, meshes: a promise of { meshes, times } }; the lookup

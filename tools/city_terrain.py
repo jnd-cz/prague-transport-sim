@@ -12,7 +12,7 @@ The ground of each cell of IPR's raster (35,001 x 26,001 cells of 1 m, rows nort
     cell's centre (tools/dmr5g.py: the 500 m tiles in raw/dem/; --fetch downloads the missing ones);
   2 inside it still: the lines' 10 m grids (raw/line*/terrain5514.tif, build_line.py);
   else no ground, and no triangles. Outside the boundary, IPR's own cells only.
-No passages rule (fine_terrain.py's): IPR's ground stays where it has ground, the floors of underpasses and culverts and
+No passages rule (fine_terrain.py's, gone with it, #510): IPR's ground stays where it has ground, the floors of underpasses and culverts and
 the streets through building passages included; a street or track over a passage becomes a deck in #276's partition (the
 user, 2026-11-10: "keeping IPR lidar everywhere to keep the actual lowest points. Then bridge the gaps on streets and
 track/rail passes with other data"; tools/bench/terrain_compare.py --passages measured what the rule took and why).
@@ -1108,6 +1108,12 @@ def main(argv):
                 dem.tiles.pop(t, None)
                 if (n_ + 1) % 20 == 0:
                     print(f"  {n_ + 1}/{len(missing)} tiles downloaded", flush=True)
+            # (IPR states no vertical datum: its median against DMR 5G (Bpv) on the snapshot's tiles stops the build past
+            # dmr5g.DATUM_TOLERANCE, #62; fine_terrain.py checked it on every line's build until #510)
+            t0 = time.perf_counter()
+            datum = dmr5g.datum_check(ipr)
+            print(f"IPR - DMR 5G on {datum['cells']:,} cells of {datum['tiles']} tiles: median {datum.get('median', 0):+.3f} m, "
+                  f"p10 {datum.get('p10', 0):+.3f}, p90 {datum.get('p90', 0):+.3f}, {time.perf_counter() - t0:.0f} s", flush=True)
             t0 = time.perf_counter()
             grids = Grids(grid_paths)
             fb = fallbacks(Z, lev, origin, F, dem, grids)
@@ -1155,7 +1161,7 @@ def main(argv):
                    "ipr outside": {KINDS[v]: km2(cnt[0, :, v].sum()) for v in range(4)},
                    "rim (no ground under kept triangles)": km2(mesh["rim_cells"])},
                "fallbacks": fb, "dmr5g": {"needed": len(need), "downloaded": len(dem.fetched),
-                                          "fetched": [os.path.basename(f) for f in dem.fetched]},
+                                          "fetched": [os.path.basename(f) for f in dem.fetched], "iprMinusDmr5g": datum},
                "zero_areas": areas, "zero_areas_small": rest, "s": {a: round(b, 1) for a, b in secs.items()},
                "peak_gb": round(peak_gb(), 1), "ipr_kinds": {KINDS[v]: int(kinds[v]) for v in range(4)}}
         save(out, V, T, origin, rep)

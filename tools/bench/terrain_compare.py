@@ -6,7 +6,7 @@
 
 The comparison takes IPR's raster every --step cells (2 m) against DMR 5G bilinear at the same cell centres, where both
 have ground (tools/sources.py TERRAIN_FLOOR). It needs the DMR 5G tiles under IPR's coverage (python -P -E tools/dmr5g.py
---under-ipr; --partial compares where tiles are at hand). Cells within dmr5g.PASSAGE_R of an OSM passage are left out,
+--under-ipr; --partial compares where tiles are at hand). Cells within PASSAGE_R of an OSM passage are left out,
 and those in OSM building footprints and on OSM water are counted apart (both models interpolate under a building;
 over water they show different surfaces). It reports the difference per district, the area over 0.5 / 1 / 2 / 5 m, and
 the largest connected areas over 1 m on land with what OSM maps there, and draws a map of the city and a panel per top
@@ -35,6 +35,23 @@ import dmr5g  # noqa: E402
 from sources import TERRAIN_FLOOR  # noqa: E402
 
 OUT = os.path.join(ROOT, "reports", "city-terrain")
+# The passages rule this measures (tools/fine_terrain.py's until #510): IPR is bare earth without structures, so over a
+# passage (an underpass, a culvert) it shows the passage, not the surface over it, which DMR 5G kept. Near an OSM passage
+# (PASSAGE_R), a point where IPR lies more than PASSAGE_DROP below DMR 5G takes DMR 5G: measured 2026-10-30, the track
+# would otherwise dip 5-6 m into Divadelní's underpass at Národní divadlo (lines 9, 22, 23) and the Rokytka culvert.
+PASSAGE_R, PASSAGE_DROP = 8.0, 0.5  # m: half a passage's width with its walls; IPR under DMR 5G by more
+
+
+def passage(t):
+    """OSM tags of a way under the surface: tunnels, culverts, covered ways, ways below ground level; not the deep metro."""
+    if t.get("location") == "underground" or t.get("railway") == "subway":
+        return False
+    try:
+        below = float(t.get("layer", 0)) < 0
+    except ValueError:
+        below = False
+    return t.get("tunnel", "no") != "no" or t.get("covered") == "yes" or t.get("culvert") == "yes" or below
+
 LOD2_REACH = 110.0  # m: the LOD2 buildings at hand lie this near a line's route (tools/geoportal.py)
 OVER = (0.5, 1.0, 2.0, 5.0)  # m: |IPR - DMR 5G| thresholds
 BLOCK = 5  # comparison cells: the connected areas are found on blocks of 5 x 5 (10 m at --step 2)
@@ -51,18 +68,17 @@ def mapy(lat, lon):
 
 
 def passage_covers(frame, shape, origin, city):
-    """bool (rows, cols): cells within dmr5g.PASSAGE_R of an OSM passage inside the city (the rule's reach; the city
+    """bool (rows, cols): cells within PASSAGE_R of an OSM passage inside the city (the rule's reach; the city
     mesh had it until the user dropped the rule there, 2026-11-10)."""
-    import dmr5g
     import osm_local
     import shapely
     from shapely.geometry import LineString
-    ways = osm_local.ways(dmr5g.passage)
+    ways = osm_local.ways(passage)
     lines = []
     for wy in ways:
         x, y = frame.xy([g["lat"] for g in wy["geometry"]], [g["lon"] for g in wy["geometry"]])
         lines.append(LineString(np.column_stack([x, y])))
-    polys = shapely.buffer(np.array(lines, dtype=object), dmr5g.PASSAGE_R)
+    polys = shapely.buffer(np.array(lines, dtype=object), PASSAGE_R)
     polys = polys[shapely.intersects(polys, city)]
     h, w = shape
     out = np.zeros(shape, bool)
@@ -126,7 +142,7 @@ def ipr_cells(ipr, cols, rows):
 
 
 def kind(t):
-    """The class of an OSM passage (dmr5g.passage's tags)."""
+    """The class of an OSM passage (passage's tags)."""
     tun = t.get("tunnel", "no")
     if tun == "building_passage":
         return "building_passage"
@@ -156,10 +172,10 @@ def unbuilt(t):
 
 
 def passages(F):
-    """OSM passage ways (dmr5g.passage) in the city frame: [(id, tags, class, xy (n, 2))]."""
+    """OSM passage ways (passage) in the city frame: [(id, tags, class, xy (n, 2))]."""
     import osm_local
     out = []
-    for w in osm_local.ways(dmr5g.passage):
+    for w in osm_local.ways(passage):
         x, y = F.xy([g["lat"] for g in w["geometry"]], [g["lon"] for g in w["geometry"]])
         out.append((w["id"], w["tags"], kind(w["tags"]), np.column_stack([x, y])))
     return out
@@ -177,7 +193,7 @@ def deck_ways(F):
     """OSM highways and railways that are no passage (at the surface or over it): [(kind, half width, xy)]."""
     import osm_local
     out = []
-    for w in osm_local.ways(lambda t: (t.get("highway") in HALF or t.get("railway") in RAIL) and not dmr5g.passage(t)):
+    for w in osm_local.ways(lambda t: (t.get("highway") in HALF or t.get("railway") in RAIL) and not passage(t)):
         t = w["tags"]
         x, y = F.xy([g["lat"] for g in w["geometry"]], [g["lon"] for g in w["geometry"]])
         if t.get("railway") in RAIL:
@@ -464,7 +480,7 @@ def audit():
     dem = dmr5g.Tiles()
     z0 = ipr_cells(ipr, cols, rows)
     z1 = sample(dem, E.astype(np.float64), N.astype(np.float64), allowed)
-    rule = np.isfinite(z0) & np.isfinite(z1) & (z0 < z1 - dmr5g.PASSAGE_DROP)
+    rule = np.isfinite(z0) & np.isfinite(z1) & (z0 < z1 - PASSAGE_DROP)
     rows, cols, z0, z1 = rows[rule], cols[rule], z0[rule], z1[rule]
     x, y = ipr.e0 - F.E0 + cols, ipr.n0 - F.N0 - rows
     print(f"the rule takes {len(rows):,} cells ({len(rows) / 1e6:.3f} km²) of {int(hand.sum()):,} near passages with a "
@@ -674,7 +690,7 @@ def compare(step=2, partial=False):
         qs = getattr(g, "geoms", [g])
         return [(True, np.asarray(q.exterior.coords)) for q in qs] + [(False, np.asarray(r.coords)) for q in qs for r in q.interiors]
     pas = []
-    for g in shapely.buffer(polylines([wy[3] for wy in ways]), dmr5g.PASSAGE_R):
+    for g in shapely.buffer(polylines([wy[3] for wy in ways]), PASSAGE_R):
         pas += rings(g)
     near_pas = paint_rings(pas, (h, w), origin, step)
     osm = osm_areas(F)

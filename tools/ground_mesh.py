@@ -1072,13 +1072,10 @@ def missing_kinds(cx, cy, kind, keys):
 
 
 def page_counts(L, D):
-    """The triangles the page draws today for the ground: the 10 m grid, the fine blocks, the survey's ground areas."""
+    """The triangles the page drew for the ground before the ground file (#509): the 10 m grid and the survey's ground
+    areas (the fine blocks, tools/fine_terrain.py, went with #510)."""
     T = L["terrain"]
     out = {"10 m grid": 2 * (T["nx"] - 1) * (T["ny"] - 1)}
-    fine = os.path.join(ROOT, "data", f"line{L['line']}.fine.json")
-    if os.path.exists(fine):
-        f = json.load(open(fine, encoding="utf-8"))
-        out["fine blocks"] = len(f.get("blocks", [])) * 2 * f["B"] * f["B"]  # (B x B cells of `step` m a block)
     from track_styles import ground_area
     n = 0
     for a in D.get("areas", []):

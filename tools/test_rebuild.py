@@ -264,7 +264,7 @@ class StepsTest(unittest.TestCase):
         self.assertNotIn("platforms.py", flat)
         self.assertIn("dtm.py", flat)
         self.assertEqual({st[0] for st in first} | set(flat),
-                         {"build_line.py", "geoportal.py", "fine_terrain.py", "dtm.py", "zps_source.py"}
+                         {"build_line.py", "geoportal.py", "dtm.py", "zps_source.py"}
                          | {w[0] for w in rebuild.writers("17")})
 
 

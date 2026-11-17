@@ -313,24 +313,6 @@ function streetWaviness(g) {
   return c;
 }
 
-// The coarse lidar terrain (10 x 15 m) showing through a surveyed surface: within 25 m of the route,
-// every 2 m along and 1.5 m across, terrain more than 5 cm above the drawn survey.
-function terrainOverSurvey(g) {
-  const r = g.route, ground = r.ground, dtm = ground.dtm, T = ground.terrain;
-  if (!dtm) return check('terrain-under-survey', 0, []);
-  let n = 0;
-  const bad = new Map();
-  for (let s = 0; s < r.length; s += 2) for (let lat = -25; lat <= 25; lat += 1.5) {
-    const o = r.offset(s, lat), t = dtm.surfaceAt(o.x, o.y);
-    if (!t) continue;
-    n++;
-    const dz = T.height(o.x, o.y) - t.z;
-    const k = Math.round(s / 20);
-    if (dz > 0.05 && !(bad.get(k)?.mag >= dz)) bad.set(k, { s: Math.round(s), x: o.x, y: o.y, mag: dz, info: `terrain ${dz.toFixed(2)} m above the ${t.c}, ${lat} m from the route` });
-  }
-  return check('terrain-under-survey', n, [...bad.values()]);
-}
-
 // The prebuilt ground (#509). groundDrawn: cars and walkers stand on the triangle that is drawn: every DRAWN_EVERY-th
 // flat triangle of the ground meshes, the drawn height at its centroid against the lookup's there (ground.lookup), more
 // than DRAWN_TOL times (1 + its slope) apart (or no ground in the lookup) counted: the 32-bit positions hold about a mm in
@@ -339,7 +321,6 @@ function terrainOverSurvey(g) {
 // are within the 32-bit positions' mm of the triangle beside them (line 37: 515 of 316 k, up to 2.3 m apart at a plot's
 // step, before they were left out). groundHidden: on a HIDDEN_STEP m lattice over the lookup,
 // the flat triangles holding each point strictly inside (not on an edge): more than one is ground drawn under another.
-// Both count 0 checks without the file (?oldground).
 const DRAWN_EVERY = 7, DRAWN_TOL = 0.001, DRAWN_THIN = 0.005, HIDDEN_STEP = 7;
 function groundDrawn(g, world) {
   const lk = g.route.ground.lookup;
@@ -433,28 +414,16 @@ function railSupport(g, world) {
 function surveyOverTrack(g) {
   const r = g.route, pr = r.ground.profile, dtm = r.ground.dtm, lk = r.ground.lookup;
   if (!dtm) return check('survey-over-track', 0, []);
-  const ix = dtm.grid;
   let n = 0;
   const bad = new Map();
   for (let s = 0; s < r.length; s += 2) {
     if (pr.onBridge(s)) continue;
     const zr = pr.height(s);
     for (let lat = -1.25; lat <= 1.25; lat += 0.25) {
-      const o = r.offset(s, lat), k = lk ? -1 : ix.at(o.x, o.y);
+      const o = r.offset(s, lat);
       n++;
-      let top = lk ? lk.height(o.x, o.y) ?? -Infinity : -Infinity;
-      if (k < 0 && !lk) continue;
-      if (k >= 0) for (let m = ix.start[k], e = ix.start[k + 1]; m < e; m++) {
-        const [p, q, u] = ix.tris[ix.ids[m]];
-        const d = (q[1] - u[1]) * (p[0] - u[0]) + (u[0] - q[0]) * (p[1] - u[1]);
-        if (Math.abs(d) < 1e-9) continue;
-        const w1 = ((q[1] - u[1]) * (o.x - u[0]) + (u[0] - q[0]) * (o.y - u[1])) / d;
-        const w2 = ((u[1] - p[1]) * (o.x - u[0]) + (p[0] - u[0]) * (o.y - u[1])) / d, w3 = 1 - w1 - w2;
-        if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
-        top = Math.max(top, w1 * p[2] + w2 * q[2] + w3 * u[2]);
-      }
-      const mag = top - zr, key = Math.round(s / 20);
-      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `${lk ? 'ground' : 'survey'} ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
+      const mag = (lk.height(o.x, o.y) ?? -Infinity) - zr, key = Math.round(s / 20);
+      if (mag > 0.3 && !(bad.get(key)?.mag >= mag)) bad.set(key, { s: Math.round(s), x: o.x, y: o.y, mag, info: `ground ${mag.toFixed(2)} m over the rail top, ${lat} m from the route` });
     }
   }
   return check('survey-over-track', n, [...bad.values()]);
@@ -1214,7 +1183,6 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     bridgeLevels: levelsAtBridges(g),
     trackLevels: trackLevels(g),
     streetWaviness: streetWaviness(g),
-    terrainOverSurvey: terrainOverSurvey(g),
     railSupport: railSupport(g, world),
     surveyOverTrack: surveyOverTrack(g),
     cantedRailVisibility: cantedRailVisibility(g, world),
