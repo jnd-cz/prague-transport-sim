@@ -34,7 +34,7 @@ export const RAIL_HEAD = 0.012; // drawn rail head over TOR
 export const BED_BELOW = 0.006; // bed surface under the surface level the style gives
 // The street next to the track, as stored: drawn 0.012 m under the surface level (below the bed). The
 // surveyed areas are drawn up to 0.04 m over their stored vertices (terrain.js DTM_LIFT), the OSM road
-// ribbons 0.12 m over the ground (world.js), so each is stored that much lower again.
+// ribbons 0.12 m over the ground (src/streets.js buildRoads), so each is stored that much lower again.
 export const STREET_BELOW = 0.012 + 0.04; // a surveyed street vertex next to the track, under the surface level
 export const ROAD_BELOW = 0.012 + 0.12; // the ground under an OSM road ribbon next to the track
 

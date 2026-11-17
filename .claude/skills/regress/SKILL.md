@@ -25,8 +25,8 @@ checkpoint's. `--against W1` names a checkpoint.
      then a smoke drive per line, `--checks u3 --seeds 1` (it reaches the last stop and is not stuck;
      its counts are not compared), and `tools/datadiff.py` / `tools/track_moves.py` per line. No traffic
      or redruns: they measure traffic reshuffled by the new data (#156).
-   - **drawn geometry in the game** (surfaces, track beds, crossings, kerbs: `src/terrain.js`, `src/world.js`,
-     `src/heights.js` …): all lines, `--checks lint,surfaces,crossing,canted`.
+   - **drawn geometry in the game** (surfaces, track beds, crossings, kerbs: `src/terrain.js`, `src/world.js` and its layers,
+     `src/groundDraw.js`, `src/streets.js` …, `src/heights.js`): all lines, `--checks lint,surfaces,crossing,canted`.
    - **drawing or load that keeps the world** (models, materials, load cuts): no headless run; screenshots
      main vs branch, `tools/frametime.py`, and for a load cut the world after load compared with main's.
    - the review page (`src/review.js`, `src/trackHeightProfile.js`) only: `python -P -E tools/test_review.py`

@@ -103,7 +103,7 @@ def _densify(line, step):
 
 
 def widened(roads, tracks):
-    """The roads as the game widens them before it looks for conflicts (src/world.js widenTramStreets): a road with 60 %
+    """The roads as the game widens them before it looks for conflicts (src/streets.js widenTramStreets): a road with 60 %
     of its points within 2.6 m of a track carries the track zone too, 3.2 m per track (two where tracks lie 1.6 m to
     both sides of 30 % of its points). Copies; the data's roads stay as they are."""
     segs = [LineString([a[:2], b[:2]]) for t in tracks for a, b in zip(t['p'], t['p'][1:]) if a[:2] != b[:2]]
