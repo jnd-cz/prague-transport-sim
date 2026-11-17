@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "kind": "sounds",
+  "id": "jnd.t2r6004",
+  "version": "0.1.1",
+  "game": ">=1.2 <2",
+  "requires": {
+    "t3h": ">=1"
+  },
+  "names": {
+    "cs": "T2R 6004 – částečné zvuky",
+    "en": "T2R 6004 – partial sounds"
+  },
+  "description": {
+    "cs": "Zvonek, výstraha dveří a stykače TR37 z vozu T2R 6004. Ostatní zvuky zůstávají vestavěné.",
+    "en": "Bell, door warning and TR37 contactors from T2R 6004. Other sounds remain built-in."
+  },
+  "files": [
+    {
+      "path": "bell_long.wav",
+      "bytes": 176444,
+      "sha256": "6873f8102d5433fc6c977a76f3147481a6ffda41037db5f54efe93a415b16fe4"
+    },
+    {
+      "path": "bell_medium.wav",
+      "bytes": 101472,
+      "sha256": "2547a2ed7082ac9c421afee4413cb1962e128d46a8a28cf2392adaa2ba3a7609"
+    },
+    {
+      "path": "bell_short.wav",
+      "bytes": 83834,
+      "sha256": "699ce5a31791e70891db7583e8d4acc46139c4adec47ce2b6f10b39a26c8c4bb"
+    },
+    {
+      "path": "door_alert.wav",
+      "bytes": 282284,
+      "sha256": "de9c765c6dbf4d843b938bbf5c07571f550252eeb146da6ff19bab38ef117cc5"
+    },
+    {
+      "path": "door_alert_loop.wav",
+      "bytes": 176482,
+      "sha256": "15889ba7cbe1735807e160216d8f49e2bbadb4cbaa47d2342ff6797527e92f53"
+    },
+    {
+      "path": "LICENSE.txt",
+      "bytes": 35037,
+      "sha256": "be6a053c06ef519e8506f27243f5dd39265f89d1527828867383c98b8669ee68"
+    },
+    {
+      "path": "provenance.json",
+      "bytes": 4754,
+      "sha256": "768c2d311b344b491afc9d7cd0a7716b8b460c1f3493893c8f3a6c734e3e05db"
+    },
+    {
+      "path": "README.txt",
+      "bytes": 1027,
+      "sha256": "37358f1aa9df1e02bd08a565e030ae7f873566023f593a302fe23aac1485aeb1"
+    },
+    {
+      "path": "release-01.wav",
+      "bytes": 84716,
+      "sha256": "0f0afc4139788c587becaf7d2b6cf6c565881543ba8d7f6285d926690beac647"
+    },
+    {
+      "path": "start-01.wav",
+      "bytes": 183710,
+      "sha256": "feb1fb60e9e4a0c88107a5bee9f56d97b259777bf4bcc6ee3259b9caac4bcefc"
+    },
+    {
+      "path": "start-02.wav",
+      "bytes": 171542,
+      "sha256": "73c2c9418931fc2008eaf428877e38eaba31ff002e8455658f152dab171b0773"
+    }
+  ],
+  "events": {
+    "bell": "bell_medium.wav",
+    "door.buzzer": "door_alert.wav",
+    "lineContactor.close": [
+      "start-01.wav",
+      "start-02.wav"
+    ],
+    "lineContactor.open": "release-01.wav"
+  },
+  "loops": {},
+  "licence": {
+    "spdx": "AGPL-3.0-or-later",
+    "commercial": true,
+    "authors": [
+      "Jenda / jnd-cz"
+    ],
+    "sources": [
+      "https://github.com/jnd-cz/prague-transport-sim/issues/590",
+      "User recordings and synthesis attachments; provenance.json"
+    ],
+    "credit": "T2R 6004 recording and synthesized bell/door warning: Jenda / jnd-cz (AGPL-3.0-or-later)"
+  },
+  "lineContactorRelease": {
+    "minGain": 0.25,
+    "maxGain": 1,
+    "refCurrent": 480
+  }
+}

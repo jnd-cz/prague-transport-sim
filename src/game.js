@@ -55,6 +55,7 @@ export class Game {
     this.route = route;
     this.tram = tram;
     this.audio = audio;
+    audio.watchEquipment(tram.eq);
     this.opts = opts;
     this.rand = rng(opts.seed ?? 12345);
     this.messages = [];

@@ -18,6 +18,8 @@ export const EVENTS = {
   'notch.up': 'the controller moved to a higher command',
   'notch.down': 'the controller moved to a lower command',
   'lineContactor': 'the line contactor closes or opens',
+  'lineContactor.close': 'the line contactor closes; falls back to lineContactor',
+  'lineContactor.open': 'the line contactor opens; level follows interrupted traction current, falls back to lineContactor',
   'contactor': 'a field-weakening stage of the accelerator',
   'trackBrake.on': 'the track brakes\' magnets drop',
   'trackBrake.off': 'the track brakes\' magnets lift',
@@ -48,12 +50,41 @@ export const PARAMS = {
 };
 // a loop's built-in loudness at its loudest (the synthesis below): a pack's recording plays at its share of it
 const LOOP_MAX = { motor: 0.145, rolling: 0.4, flange: 0.07, mg: 0.05 };
+// Listening settings, not measured physical constants (#590). The master still controls mute and pause.
+export function lineContactorReleaseLevel(current, config) {
+  const { minGain = 0.25, maxGain = 1, refCurrent = 480 } = config ?? {};
+  return minGain + (maxGain - minGain) * Math.min(1, Math.max(0, current || 0) / refCurrent);
+}
 // a T3 set's axles behind its front, m (src/tram.js T3: the pivots 6.4 m apart, a bogie's wheelbase 1.9 m)
 const WHEELBASE = 1.9;
 export const axlesBehind = (cars) => Array.from({ length: cars }, (_, k) => k * CAR_PITCH + T3.length / 2)
   .flatMap((c) => [c - T3.bogies / 2, c + T3.bogies / 2]).flatMap((p) => [p - WHEELBASE / 2, p + WHEELBASE / 2]);
 // a diamond crossing's two rails of the other track, either side of where the data puts it (the angle is not known)
 const RAILS = [-0.7175, 0.7175];
+
+// A short wheel impact with a low knock and a brighter rail ring. The previous narrow-band click
+// could be masked by the rolling noise (#634). Frequencies and decay are synthesis settings.
+const RAIL_IMPACTS = {
+  points: [160, 540, 2200],
+  crossing: [190, 720, 1650],
+};
+
+function railImpactBuffer(ctx, noise, [body, rail, ring], offset) {
+  const rate = ctx.sampleRate, n = Math.ceil(0.1 * rate);
+  const buffer = ctx.createBuffer(1, n, rate), samples = buffer.getChannelData(0);
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate, phase = 2 * Math.PI * t;
+    const knock = Math.sin(phase * body) * Math.exp(-t / 0.022);
+    const metal = (0.46 * Math.sin(phase * rail) + 0.19 * Math.sin(phase * ring)) * Math.exp(-t / 0.015);
+    const attack = (noise[offset + i + 1] - noise[offset + i]) * 0.26 * Math.exp(-t / 0.004);
+    samples[i] = (knock + metal + attack) * Math.min(1, t / 0.001, (0.1 - t) / 0.015);
+    peak = Math.max(peak, Math.abs(samples[i]));
+  }
+  // Leave headroom when the two rails of a diamond and consecutive axles sound close together.
+  for (let i = 0; i < n; i++) samples[i] *= 0.32 / peak;
+  return buffer;
+}
 
 export class TramAudio {
   constructor() {
@@ -67,6 +98,7 @@ export class TramAudio {
     this.frogs = [];       // [{ s, e: 'points' | 'crossing' }] by s: the route's frogs (setTrack)
     this.params = {};
     this.trace = null;     // an array to log each event into ({ e, by, s, x }: a test's)
+    this.contactorEvents = [];
   }
 
   start() {
@@ -184,6 +216,7 @@ export class TramAudio {
     if (this.active && !on) this.epoch++;
     this.active = on;
     this.finishing = finishing;
+    if (!on) this.contactorEvents.length = 0;
     this._fade(on && !this.muted ? 0.6 : 0, finishing && !this.muted ? 1.3 : 0.05);
   }
 
@@ -195,8 +228,21 @@ export class TramAudio {
     g.linearRampToValueAtTime(target, t + seconds);
   }
 
+  watchEquipment(eq) {
+    if (this.equipment === eq) return;
+    if (this.equipment) this.equipment.onLineContactor = null;
+    this.equipment = eq;
+    this.contactorEvents.length = 0;
+    // Observe every simulation substep, including a close and protection opening in the same step.
+    eq.onLineContactor = (edge) => { if (this.active) this.contactorEvents.push(edge); };
+    this.lastP = this.lastShoe = undefined;
+  }
+
   update(tram, curvatureLimit, dt) {
+    this.watchEquipment(tram.eq);
+    const edges = this.contactorEvents.splice(0);
     if (!this.ctx || !this.active) return;
+    for (const edge of edges) this.emit(edge.closed ? 'lineContactor.close' : 'lineContactor.open', { current: edge.current });
     const t = this.ctx.currentTime;
     const v = Math.abs(tram.v);
     const load = Math.min(1, Math.abs(tram.current) / 450);
@@ -229,7 +275,6 @@ export class TramAudio {
       const rate = dt > 0 ? Math.abs(moved) / dt : 0;
       this.pilotGain.gain.setTargetAtTime(Math.min(0.012, rate * 0.0007), t, 0.04);
       this.pilotOsc.frequency.setTargetAtTime(150 + rate * 12, t, 0.05);
-      if (eq.ls !== this.lastLs) { if (this.lastLs !== undefined) this.emit('lineContactor'); this.lastLs = eq.ls; }
       if (eq.ls) for (const q of [75, 80, 85, 90, 95]) if ((eq.p - q) * (eq.p - moved - q) < 0) this.emit('contactor');
       if (eq.shoe !== this.lastShoe) { if (this.lastShoe !== undefined) this.emit(eq.shoe ? 'trackBrake.on' : 'trackBrake.off'); this.lastShoe = eq.shoe; }
     }
@@ -254,7 +299,7 @@ export class TramAudio {
       for (const a of axlesBehind(tram.cars || 1)) {
         for (const f of this.frogs) {
           const x = f.s + a;   // the front's s when this axle is on the frog
-          if (x > lo && x <= hi) this.emit(f.e, { level: 0.4 + 0.6 * k, gain: 0.05 + k * 0.12, s: tram.s, x: f.s });
+          if (x > lo && x <= hi) this.emit(f.e, { level: 0.4 + 0.6 * k, s: tram.s, x: f.s });
         }
       }
     }
@@ -269,20 +314,24 @@ export class TramAudio {
     this.lastS = undefined;
   }
 
-  // An event: the pack's recording where it has one, else the built-in sound. o: { level 0..1 (a recording's
-  // loudness), gain, freq (a click's), s, x (the trace's) }.
+  // An event: the pack's recording where it has one, else the built-in sound. o: { level 0..1 (sample or rail
+  // impact loudness), current (contactor release), gain, freq (a click's), s, x (the trace's) }.
   emit(e, o = {}) {
     if (!this.ctx || !this.active) return;
-    const files = this.pack?.events.get(e);
-    if (files?.length) this._play(files[Math.floor(Math.random() * files.length)], o.level ?? 1);
-    else BUILT_IN[e]?.(this, o);
-    this.trace?.push({ e, by: files?.length ? 'pack' : 'built-in', s: o.s, x: o.x, t: this.ctx.currentTime });
+    const directional = e === 'lineContactor.close' || e === 'lineContactor.open';
+    const sampleEvent = directional && !this.pack?.events.get(e)?.length ? 'lineContactor' : e;
+    const files = this.pack?.events.get(sampleEvent);
+    const level = e === 'lineContactor.open' ? lineContactorReleaseLevel(o.current, this.pack?.lineContactorRelease) : o.level ?? 1;
+    if (files?.length) this._play(files[Math.floor(Math.random() * files.length)], level * (this.pack.gain ?? 1));
+    else BUILT_IN[e]?.(this, { ...o, level });
+    this.trace?.push({ e, by: files?.length ? 'pack' : 'built-in', sampleEvent: files?.length ? sampleEvent : null,
+      current: o.current, level, s: o.s, x: o.x, t: this.ctx.currentTime });
   }
 
   _play(buffer, level) {
     const ctx = this.ctx, src = ctx.createBufferSource(), g = ctx.createGain();
     src.buffer = buffer;
-    g.gain.value = level * (this.pack.gain ?? 1);
+    g.gain.value = level;
     src.connect(g).connect(this.master);
     src.start();
   }
@@ -314,7 +363,7 @@ export class TramAudio {
       loops[name] = { ...l, src, out };
       this._synth(name, false);
     }
-    this.pack = { id: pack.id, gain: pack.gain, events, loops };
+    this.pack = { id: pack.id, gain: pack.gain, lineContactorRelease: pack.lineContactorRelease, events, loops };
   }
 
   // a built-in loop's voices on or off (a pack's recording plays in its place)
@@ -349,6 +398,13 @@ export class TramAudio {
     src.connect(f).connect(g).connect(this.master);
     src.start(t, Math.random());
     src.stop(t + 0.1);
+  }
+
+  railImpact(event, level) {
+    this.railImpacts ??= {};
+    const variants = this.railImpacts[event] ??= [0, 0.5, 1].map(s => railImpactBuffer(
+      this.ctx, this.noise.getChannelData(0), RAIL_IMPACTS[event], Math.floor(s * this.ctx.sampleRate)));
+    this._play(variants[Math.floor(Math.random() * variants.length)], level);
   }
 
   // T3 mechanical bell: two quick metallic strikes
@@ -449,11 +505,13 @@ const BUILT_IN = {
   'door.buzzer': (a) => a.buzzer(),
   'bell': (a) => a.bell(),
   'joint': click(0.1, 140),
-  'points': click(0.12, 220),
-  'crossing': click(0.12, 180),
+  'points': (a, o) => a.railImpact('points', o.level ?? 1),
+  'crossing': (a, o) => a.railImpact('crossing', o.level ?? 1),
   'notch.up': click(0.12, 1600),
   'notch.down': click(0.12, 1600),
   'lineContactor': click(0.12, 420),
+  'lineContactor.close': click(0.12, 420),
+  'lineContactor.open': (a, o) => a.click(0.12 * o.level, 420),
   'contactor': click(0.05, 650),
   'trackBrake.on': click(0.1, 260),
   'trackBrake.off': click(0.1, 260),

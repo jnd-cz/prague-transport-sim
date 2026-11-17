@@ -667,6 +667,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   braking begins within ≈3 s. The brake let off and pressed again inside an approach (`stops` pulses, seeds 1–5, against main at
   609a4bc): line 9 15 → 2.6, 17 9 → 1.6, 22 10 → 1, 23 1.8 → 0.6, 37 7 → 1, the stops as precise. A separate braking for a tram, a car
   or a lower limit 75–150 m out, then a coast, stays: the drivers coast there too.
+  So does a separate braking for the switch button before a turn's contact close to a stop (#627, PR #631): from the 20 km/h street
+  the first brake step lifts the accelerator over the button's 30 (step 1 holds it at 30 only up to 17 km/h), so the tram slows to
+  15 km/h 2 s before the contact, coasts through on the button and brakes again for the stop; at Anděl one press more in four of five
+  seeds (the user, 2026-11-16: "I would allow another press for the switch contact, that's a fair use and kind of stress test, with
+  radio controlled switches it would be easier").
 - **Real rides, and how far to follow them** (#351, PR #363): GPS of four rides on line 23 from the user, read from the speed with the
   gradient and the running resistance taken out: car 6921 Lazarská to Královka and car 6312 Královka to Bílá labuť on 2026-10-31,
   T2R 6004 and T3SUCS 7290 on the diverted route on 2026-11-07, the last with a phone's accelerometer for 11 minutes. The drivers
