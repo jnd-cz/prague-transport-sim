@@ -34,6 +34,8 @@ The five user photographs supplied in the 2026-11-09 session are visual referenc
 | `16191.jpg` | 8015: three right-side doors, four leaves each, long body proportions |
 | `15611.jpg`, `15609.jpg`, `15606.jpg` (2026-11-16 follow-up) | 6312: shallow centre bow, tighter corner windows, brow overhang and aligned route plate; bumper and sill trim |
 | `17884.jpg` (2026-11-16 follow-up) | 7000: headlight pods, aluminium bumper with red inserts, cast coupler, collar, handle and chain |
+| `17398.jpg`, `17399.jpg`, `17400.jpg` (2026-11-16 interior) | Red cushions, tall silver loop frames, round and electrical-box pedestals, pink-beige wall panels and ribbed floor |
+| `17402.jpg` (2026-11-16 interior) | Silver inner folding-door faces, black seals, long handles and amber warning lamp |
 
 The 874 mm floor height is corroborated by the
 [Bratislava T3 technical table](https://imhd.sk/ba/vehicle-type-description/20/%C4%8CKD-Tatra-T3).
@@ -46,6 +48,11 @@ No source image or user photograph is embedded in the GLB or redistributed in th
 The 2026-11-16 review uses the user's requested **24-place early cushioned interior**, inspired by
 6312/6102, under the 6892 exterior. There are 13 single seats on the left, nine on the door side,
 and two at the rear. The arrangement is a simplified modelling choice, not a survey of 6892.
+The interior follow-up supplies the seats' loop frames and pedestal bases, red upholstery,
+pink-beige lower wall panels with silver kick plates, red/silver sill trim and dark rubber ribs.
+Three seats near doorways have rounded electrical-box bases; the others have round pedestals.
+Door leaves have cream outer faces and silver inner faces, with long handles on the inner leaves.
+The rubber pattern is an original generated 64-pixel tile, embedded alongside the lettering atlas.
 The user's quotes are retained in `data/truth.json`, section `t3PhotoModel`.
 [DPP's October 2022 history](https://www.dpp.cz/data/leaflets/documents/2022-10-27-16-03-56_DP-kontakt-rijen-2022.pdf)
 corroborates the padded leatherette seats fitted to early T3 cars 6102–6323.
@@ -116,9 +123,9 @@ For the full render sweep, use the shared queue:
 Uses the project's existing Python/Playwright and pinned Three.js 0.160.0, with its own server on a
 free port and a whole-test timeout. It verifies physical dimensions, independent door movement,
 wheel/bogie/coupler poses, folded and raised collector linkage closure, finite geometry, and a GLB
-export/import round-trip retaining the hierarchy, materials and embedded lettering atlas.
+export/import round-trip retaining the hierarchy, materials and embedded lettering and rubber textures.
 The review checks also ray-test solid risers and wheels, the brow's projection beyond the glass,
-and the coupler's open fork and bored eye, and check the route plate and 24 seats.
+and the coupler's open fork and bored eye, and check the route plate, 24 seat supports and opposite door finishes.
 It writes the GLB and rig manifest above and the report and inspection renders to `reports/t3photo/`.
 The studio works without world data. Its first load needs the same CDN as the game.
 

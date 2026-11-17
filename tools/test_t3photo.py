@@ -58,6 +58,17 @@ CHECK = """async () => {
     const h = hit([p.x, 1.5, p.z + .08], [0, -1, 0], cushions);
     return h && h.point.y > 1.30 && h.point.y < 1.34;
   });
+  const supports = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Handrails') supports.push(o); });
+  checks.seatsHavePedestals = seats.every(p => {
+    const x = p.x * (1 - .10 * Math.max(0, Math.abs(p.z) - 4.65));
+    const h = hit([x, 1.245, p.z], [0, -1, 0], supports);
+    return h && h.point.y > 1.22 && h.point.y < 1.245;
+  });
+  checks.silverInsideCreamOutsideDoors = T3_PHOTO.doors.every((z, i) => [-.5175, -.1725, .1725, .5175].every(dz => {
+    const inside = hit([0, 1.53, z + dz], [-1, 0, 0], [r.doors[i].node]);
+    const outside = hit([-2, 1.53, z + dz], [1, 0, 0], [r.doors[i].node]);
+    return inside?.object.material.name === 'Handrails' && outside?.object.material.name === 'Ivory_enamel';
+  }));
   const floors = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Floor') floors.push(o); });
   checks.closedStairRisers = T3_PHOTO.doors.every(z => [.48, .72].every((y, i) => {
     const h = hit([-2, y, z], [1, 0, 0], floors), expected = (-1.035 + i * .22) * (1 - .10 * Math.max(0, Math.abs(z) - 4.65));
@@ -120,9 +131,13 @@ CHECK = """async () => {
   s.pose(gltf.scene); s.roundTrip = gltf.scene;
   const originalBounds = new THREE.Box3().setFromObject(m), importedBounds = new THREE.Box3().setFromObject(gltf.scene);
   checks.glbBounds = originalBounds.min.distanceTo(importedBounds.min) < .001 && originalBounds.max.distanceTo(importedBounds.max) < .001;
-  let materials = new Set(), textures = new Set();
-  gltf.scene.traverse(o => { if (o.isMesh) { materials.add(o.material.name); if (o.material.map) textures.add(o.material.map.uuid); } });
-  checks.glbMaterials = materials.has('Prague_red_enamel') && materials.has('Ivory_enamel') && textures.size === 1;
+  let materials = new Set(), textures = new Set(), floorTexture;
+  gltf.scene.traverse(o => { if (o.isMesh) {
+    materials.add(o.material.name); if (o.material.map) textures.add(o.material.map.uuid);
+    if (o.material.name === 'Floor') floorTexture = o.material.map;
+  } });
+  checks.glbMaterials = materials.has('Prague_red_enamel') && materials.has('Ivory_enamel') && textures.size === 2;
+  checks.glbRibbedFloor = floorTexture?.image.width === 64 && floorTexture.wrapS === THREE.RepeatWrapping;
   checks.meshBudget = s.stats.meshes < 150;
   checks.triangleBudget = s.stats.triangles < 100000;
   s.renderer.render(s.scene, s.camera);

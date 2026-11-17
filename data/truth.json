@@ -55,6 +55,12 @@
    "source": "user follow-up in session 2026-11-16, #437; supplied 6312 photos 15611.jpg, 15609.jpg, 15606.jpg and 7000 detail 17884.jpg",
    "quote": "model the front and back according to these photos. Pay attention to the shape, lines, contours, window, top brow with a bit of overhang and tge line plate alignment. Try to model the coupler too.",
    "reference": "The earlier photo 17824.jpg of 6892 remains the rear lamp/window reference."
+  },
+  {
+   "id": "interior-photo-character",
+   "source": "user follow-up in session 2026-11-16, #437; supplied interior photos 17398.jpg, 17399.jpg, 17402.jpg and 17400.jpg",
+   "quote": "Interior with the chairs and doors if that helps you with the design. It doesn't need to be super detailed but to capture tge general gist of it.",
+   "reference": "Red upholstered pads, silver loop frames, round and electrical-box pedestals, pink-beige wall panels, dark ribbed rubber floor, silver inner door faces and long handles. Seat count and simplified layout remain the earlier 24-place choice."
   }
  ],
  "stops": [
