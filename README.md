@@ -63,6 +63,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
+| `Tab` | panel řidiče složit do úzkého pruhu a rozložit |
 | `,` / `.` | směrovky vlevo / vpravo (znovu: vypnout); dávají se před odbočením na křižovatce a v zastávce, kde cestující přecházejí jízdní pruh (vpravo, od brzdění do rozjezdu) |
 | `/` (na české klávesnici `-`) | výstražná světla |
 | `L` | dálková světla: držením problik, se `Shift` zapnout a vypnout |
@@ -152,10 +153,34 @@ teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje tepl
 Venkovní teplota: Praha teď nebo pevný zimní / podzimní / letní den (menu). Prochladlí cestující (< 12 °C)
 a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká; v létě si cestující otevírají okna.
 
+### Panel řidiče
+
+Pult je pult vozu 6921: jeho ovladače v jeho pořadí a s jeho štítky (v angličtině přeložené). Šedý lak je tramvaj,
+tmavé sklo je hra.
+
+- **Přístroje:** rychloměr 0–80 km/h s počítadlem, ampérmetr 0–600 A (jízda i brzda), voltmetr baterie 0–40 V
+  a doutnavka NAPĚTÍ V TROLEJI (T3 nemá voltmetr trakčního napětí). S asistencí ukazuje červená značka na
+  rychloměru nejvyšší dovolenou rychlost.
+- **Kontrolky** jako na voze: směrovky, V (znamení k zastavení), DVEŘE (zelená, když jsou **všechny zavřené**),
+  BRZDY I / II / VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ (oranžová,
+  dokud jsou zařazeny odpory), TOPENÍ ZRCÁTKA.
+- **Ovladače** jdou stisknout myší nebo prstem a pošlou klávesu hry (s asistencí je na nich napsaná). Ty, které
+  hra zatím neumí (mycí stroj, stěrače, osvětlení, havarijní pojezd a další), jsou nakreslené a nic nedělají.
+  Najetí myší na ovladač řekne, co dělá.
+- **Pomůcky hry** ve skle vpravo: sloupec šlapek se zrychlovačem; s asistencí pomocné kontrolky (rychlost,
+  otevřené dveře, proud kontaktem, odjezd, skluz, kolejnicová brzda, písek, bdělost); při pohledu z okna rychlost.
+  Informační obrazovka je vlevo, kde má 6921 palubní počítač.
+- Pult roste s oknem prohlížeče; **Tab** ho složí do úzkého pruhu a zase rozloží.
+
 ### Rozhlížení
 
-- Držením Q / E (nebo ← / →) se díváte levým / pravým oknem; pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje
-  bok soupravy a dveře. Roste s oknem prohlížeče a zorné pole se nemění.
+- Sedíte tam, kde má T3 sedačku řidiče: 0,32 m vlevo od osy vozu a 1,2 m za čelem. Levý sloupek čelního okna
+  proto stojí v pohledu vpřed.
+- Držením Q / E (nebo ← / →) se díváte levým oknem až k jeho konci, pravým přes přední dveře. S hlavou se otáčí
+  rám stanoviště (sloupky, konec okna, dveře) i pult: vlevo je bočnice se směrovým přepínačem, kaloriferem,
+  topením, odpojením topení a pískováním, vpravo křídlo pultu s osvětlením a jízdním řádem pořadí.
+- Pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje bok soupravy a dveře. Roste s oknem prohlížeče a zorné
+  pole se nemění.
 - **Pohled zvenku** (V): kamera obíhá kolem tramvaje. Tažením ji otáčíte a nakláníte, kolečkem nebo dvěma prsty
   přibližujete, dvojklik ji vrátí za tramvaj.
 
@@ -222,10 +247,12 @@ zařízení; vypnutá je 🎮 vrátí i za jízdy). Posílají klávesy klávesn
 - řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
-  zvuk, ✉ zpětná vazba.
+- Pult (kde bývalo ⋯) otevře pult v záložkách bočnice, pult, spínače, křídlo a hra. Ovladače jsou tam, kde jsou na
+  voze: směrovky, výstražná světla, světlomety a světelná houkačka, výhybka, topení a jeho odpojení, písek. V záložce
+  Hra je zajišťovací brzda (pokročilé ovládání), stavěcí klíč, klapka, zrcátko, autopilot, zvuk a ✉ zpětná vazba.
+  Otevře ho i klepnutí na panel řidiče.
 
-Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá. Telefon na šířku má ovládač jako
+Na malé obrazovce je panel řidiče úzký pruh (rychloměr, ampérmetr, kontrolky, pomůcky a šlapky), horní lišta je menší a mapka je skrytá. Telefon na šířku má ovládač jako
 sloupec u pravého palce (▲ nahoře, STOP dole), ostatní tlačítka ve dvou sloupcích vlevo a panel řidiče mezi nimi.
 
 **Celá obrazovka:** telefon se jednou zeptá v menu; s „Celá obrazovka“ se každá směna spustí na celé obrazovce,
@@ -281,7 +308,7 @@ působí řízení a provoz.
 
 - **Na co se ptáme:** jak se ovládá kontrolér, rozjezd, výběh a brzdění; zastávky a jízdní řád; návěsti,
   výhybky a pravidla; které pojmy nezní jako u řidičů tramvají; co vás při jízdě vytrhne.
-- **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v ⋯) zastaví hru a otevře poznámku. Přiloží místo na
+- **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v Pultu, záložka Hra) zastaví hru a otevře poznámku. Přiloží místo na
   lince, stav tramvaje, verzi hry a případně obrázek obrazovky, takže stačí napsat, co vidíte a jak by to mělo
   být. Když se hra nespustí nebo grafika přestane pracovat, tlačítko „Poslat chybu autorům“ pošle, co se stalo.
 - **Plynulost:** test výkonu v menu minutu jede autopilotem pevný úsek linky a ukáže, jak hra stíhá; výsledek

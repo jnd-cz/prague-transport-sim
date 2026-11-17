@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // On-screen controls for a phone or tablet (#79): the essentials as buttons over the view, sending the same
 // key events as the keyboard (src/main.js keeps one control path). Shown on a touch screen by default;
-// the 🎮 button in the menu switches them, remembered per device. ⋯ opens the rarer ones, ✉ the feedback note.
+// the 🎮 button in the menu switches them, remembered per device. "Pult" (where ⋯ was) opens the driver's panel's sheet
+// (src/panel.js, #246) with the rarer controls where they are in the cab, and the game's own (autopilot, sound, ✉ the note).
 // Full screen (#485): asked once in the menu on a touch screen; with a yes, a shift starts in full screen turned to
 // landscape (a browser goes full screen only from a tap: Start's), and ⛶ switches it any time. Leaving it (the back
 // gesture) holds until the next start. Safari on an iPhone has no full screen for a page: there the question becomes how
@@ -21,12 +22,11 @@ const standalone = () => matchMedia('(display-mode: fullscreen), (display-mode: 
 // [key, label, hold] — a held button sends keyup on release (sand, look, zoom, the emergency brake)
 const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', false, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', false, 'drive'], [' ', 'tb.stop', true, 'emerg']];
 const SIDE = [['d', 'tb.doors'], ['b', 'tb.bell'], ['a', 'tb.sand', true], ['q', '◀', true], ['e', '▶', true], ['g', '🔍', true], ['v', 'tb.view'], ['z', 'tb.mirror'], ['p', 'II']];
-// (the indicators: left, right, hazard; the high beams: held a flash, 'L' on and off as Shift+L)
-const MORE = [[',', '⇦'], ['.', '⇨'], ['/', '⚠'], ['l', 'tb.flash', true], ['L', 'tb.beam'], ['r', 'tb.park'], ['y', 'tb.switch', true], ['x', 'tb.iron'], ['c', 'tb.cutout', true], ['h', 'tb.saloon'], ['k', 'tb.cab'], ['f', 'tb.flap'], ['o', 'tb.auto'], ['m', 'tb.mute'], ['F9', '✉']];
 
 export class TouchControls {
-  constructor({ deadman }) {
+  constructor({ deadman, sheet }) {
     this.deadman = deadman; // () => the dead-man option is on: a held button for Shift
+    this.sheet = sheet; // () => the panel's sheet opened or closed
     let on;
     try { on = localStorage.getItem(KEY); } catch { /* (no storage) */ }
     this.set(on === null || on === undefined ? matchMedia('(pointer: coarse)').matches : on === '1', false);
@@ -43,8 +43,6 @@ body.touch.shift #touch { display: block }
 #touch .main .drive { background: rgba(44,107,55,.85) }
 #touch .main .brake { background: rgba(138,90,28,.85) }
 #touch .side { position: absolute; left: 6px; top: calc(var(--topH) + 6px); display: flex; flex-direction: column; gap: 6px; max-height: calc(100% - var(--topH) - var(--dashH) - 80px); flex-wrap: wrap }
-#touch .more { position: absolute; left: 62px; top: calc(var(--topH) + 6px); display: none; flex-wrap: wrap; gap: 6px; max-width: 60vw }
-#touch.open .more { display: flex }
 #touch .main .dm { display: none; background: rgba(40,70,120,.85); font-size: 13px }
 #touch.deadman .main .dm { display: block }
 body.touch #rpBtn { display: none !important }
@@ -76,18 +74,16 @@ body.shift .tbToggle { display: none }
   #touch .main .brake { order: 3 } #touch .main .emerg { order: 4; font-size: 14px }
   #touch .side { top: 6px; max-height: none; width: 120px; flex-direction: row; align-content: flex-start }
   #touch .side button { width: 57px; min-width: 0; padding: 2px; font-size: 13px }
-  /* (in pairs: doors bell, sand zoom, look left right, view mirror, pause more) */
+  /* (in pairs: doors bell, sand zoom, look left right, view mirror, pause panel) */
   #touch .side [data-k="g"] { order: 1 } #touch .side [data-k="q"], #touch .side [data-k="e"] { order: 2 }
   #touch .side [data-k="v"], #touch .side [data-k="z"] { order: 3 } #touch .side [data-k="p"], #touch .side [data-more] { order: 4 }
-  #touch .more { left: var(--padL); top: 6px; max-width: calc(100vw - var(--padL) - var(--padR) - 8px) }
 }`;
     document.head.appendChild(css);
     const box = (this.box = document.createElement('div'));
     box.id = 'touch';
     const btn = ([k, label, hold, cls]) => `<button data-k="${k === ' ' ? 'space' : k}"${hold ? ' data-hold="1"' : ''}${cls ? ` class="${cls}"` : ''} data-l="${label}"></button>`;
     box.innerHTML = `<div class="main">${MAIN.map(btn).join('')}</div>
-<div class="side">${SIDE.map(btn).join('')}<button data-more="1">⋯</button></div>
-<div class="more">${MORE.map(btn).join('')}</div>`;
+<div class="side">${SIDE.map(btn).join('')}<button data-more="1" data-l="tb.panel"></button></div>`;
     document.body.appendChild(box);
     this.labels();
     // a pressed button: keydown, and keyup when the finger lifts (or slides off a held one)
@@ -97,7 +93,7 @@ body.shift .tbToggle { display: none }
       const b = e.target.closest('button');
       if (!b) return;
       e.preventDefault();
-      if (b.dataset.more) { box.classList.toggle('open'); return; }
+      if (b.dataset.more) { this.sheet?.(); return; }
       b.classList.add('down');
       down.set(e.pointerId, b);
       try { b.setPointerCapture(e.pointerId); } catch { /* (gone) */ }
@@ -110,7 +106,6 @@ body.shift .tbToggle { display: none }
       down.delete(e.pointerId);
       b.classList.remove('down');
       if (b.dataset.hold) send('keyup', b.dataset.k);
-      if (MORE.some(([k]) => (k === ' ' ? 'space' : k) === b.dataset.k) && !b.dataset.hold) box.classList.remove('open');
     };
     box.addEventListener('pointerup', up);
     box.addEventListener('pointercancel', up);

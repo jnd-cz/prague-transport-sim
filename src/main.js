@@ -38,6 +38,7 @@ import { initHelp } from './help.js';
 import { initPackages } from './packagesMenu.js';
 import { loadInstalled } from './packages.js';
 import { Mirror } from './mirror.js';
+import { CabFrame, EYE, lookLimits, leanFor } from './cabframe.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
 const $ = (id) => document.getElementById(id);
@@ -515,11 +516,11 @@ initHelp();
 initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); soundsMenu(); } });
 onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); soundsMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
-const touch = new TouchControls({ deadman: () => game?.opts.deadman });
+const touch = new TouchControls({ deadman: () => game?.opts.deadman, sheet: () => hud.panel.toggleSheet() });
 // a gamepad (src/gamepad.js): its buttons and triggers send the keys too
 const pad = new Gamepad({
   onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4),
-  onLook: (x) => { lookTarget = -LOOK * x; }, // (the right stick: as far as Q / E at its end)
+  onLook: (x) => { const m = lookMax(); lookTarget = -x * (x > 0 ? m.right : m.left); }, // (the right stick: as far as Q / E at its end)
 });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
@@ -808,7 +809,10 @@ $('btnToMenu').addEventListener('click', () => {
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
-const LOOK = 1.3; // the head turned out of a side window (rad)
+// the head turned out of a side window, until the screen's edge reaches the cab window's end on the left and the front
+// door's on the right (src/cabframe.js, #246; it was 1.3 rad both ways)
+const lookMax = () => lookLimits(CAB_FOV, camera.aspect);
+const cabFrame = new CabFrame($('cabFrame'));
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
@@ -859,8 +863,8 @@ window.addEventListener('keydown', (e) => {
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
-    case 'q': case 'arrowleft': lookTarget = LOOK; break;   // look out of the left window
-    case 'e': case 'arrowright': lookTarget = -LOOK; break; // look right, at the doors
+    case 'q': case 'arrowleft': lookTarget = lookMax().left; break;    // look out of the left window
+    case 'e': case 'arrowright': lookTarget = -lookMax().right; break; // look right, at the front door
     case 'z': mirrorOn = !mirrorOn; document.body.classList.toggle('nomirror', !mirrorOn); break;
     case 'h': game.setHeating('saloon'); break;
     case 'k': game.setHeating('cab'); break;
@@ -931,7 +935,7 @@ window.addEventListener('blur', () => {
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = 0; // the lead car's heading (route frame: atan2 of east, north)
-const EYE = new THREE.Vector3(), FWD = new THREE.Vector3();
+const EYE_AT = new THREE.Vector3(), FWD = new THREE.Vector3();
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
 // click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
 // It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
@@ -1012,15 +1016,16 @@ function updateCamera(dt, t) {
     orbit.drag -= dt;
     camera.position.lerp(camPos, orbit.drag > 0 ? 1 : Math.min(1, dt * 4));
     camera.lookAt(camLook);
+    hud.panel.setLook(0);
     return;
   }
-  // the driver's eye is a point of the lead car (#597): 0.8 m behind the body's front, 2.39 m over the rail, on the centre
-  // line; it turns with the body and swings out with its front in a curve. (It stood on the track's centre line and looked
-  // along the track 4 m ahead of the tram, eased: 33 degrees ahead of the body in a 20 m curve, the user, 2026-11-14:
-  // "starts turning ahead of tram body in curves")
+  // the driver's eye is a point of the lead car (#597), over the driver's seat (src/cabframe.js EYE): 1.2 m behind the body's
+  // front, 0.32 m left of the centre line, 2.39 m over the rail; it turns with the body and swings out with its front in a
+  // curve. (It stood on the track's centre line and looked along the track 4 m ahead of the tram, eased: 33 degrees ahead
+  // of the body in a 20 m curve, the user, 2026-11-14: "starts turning ahead of tram body in curves")
   const lead = tramModel.userData.cars[0];
   lead.updateWorldMatrix(true, false);
-  const eye = EYE.set(0, 2.39, leadFront() - 0.8).applyMatrix4(lead.matrixWorld);
+  const eye = EYE_AT.set(EYE.x, EYE.h, leadFront() - EYE.back).applyMatrix4(lead.matrixWorld);
   const fwd = FWD.set(0, 0, 1).transformDirection(lead.matrixWorld);
   yaw = Math.atan2(fwd.x, -fwd.z);
   const bob = Math.sin(t * 9) * 0.012 * Math.min(1, Math.abs(tram.v) / 8);
@@ -1032,7 +1037,7 @@ function updateCamera(dt, t) {
   camAcc += (tram.a - camAcc) * Math.min(1, dt * 3);
   const pitch = -0.035 - camAcc * 0.006 + slope;
   // turning the head also leans towards that side window
-  const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
+  const lean = leanFor(look), lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
   camera.position.set(eye.x + lx, eye.y + bob, eye.z - ly);
   camera.rotation.set(0, 0, 0);
   camera.rotation.order = 'YXZ';
@@ -1040,6 +1045,9 @@ function updateCamera(dt, t) {
   camera.rotation.x = pitch;
   // sway, and the lean into a canted curve
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
+  // the cab's frame where the eye sees it, the panel's band turned with the head
+  cabFrame.draw(camera, lead, leadFront(), game ? game.doorOpenness : 0);
+  hud.panel.setLook(look, lookMax());
 }
 
 // ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php

@@ -73,6 +73,16 @@ const DOORS = [[-6.04, -4.71], [-1.41, -0.10], [4.71, 6.03]];
 // (3.02 m), which agree to 3 %; the colour elevation has it 6 cm lower.
 const LIV = { bumper: [0.76, 0.86], red: [0.84, 1.62], redCab: 1.48, glass: [1.71, 2.52], transom: [2.10, 2.135], eave: 2.56, gutter: 2.85, capSide: 3.05, capTop: 6.08 };
 const CAB_STEP = { r: 6.03, l: 6.11, radius: 0.09 };
+// the windscreen: from its sill at WS_SILL it wraps round the front corners onto both sides to WRAP; its two posts stand
+// at ±WS_POST on the face
+const WRAP = 6.22, WS_SILL = 1.66, WS_POST = 0.71;
+// The cab's openings as the driver sees them from inside, for the frame drawn in the cab view (src/cabframe.js, #246):
+// the windscreen's posts on the face, where its wrap ends on each side, the cab window on the left and the front door on
+// the right; z from the car's centre, the body's front at BODY_FRONT
+export const CAB = {
+  front: BODY_FRONT, glass: LIV.glass, post: WS_POST, wrap: WRAP, window: WIN_L[0], door: DOORS[2],
+  face: (x, h) => onFace(1, x, h).z, half: (z) => taperHW('f', z),
+};
 // the skirt cut out over each bogie in arches round the wheels, 2 cm clear of their treads, level over their tops
 // between them (the user's photo of a T3's bogie from the side, 2026-11-10; the colour elevation and conflig's
 // model have a lower, square cutout to 0.62 m)
@@ -302,8 +312,8 @@ function livery(paint = {}) {
     g.fillStyle = glass(h0, h1); g.fill();
     g.strokeStyle = COL.rubber; g.lineWidth = 2; g.stroke();
   };
-  wrapped(1, 6.22, 6.22, 1.66, LIV.glass[1], 0.07);
-  for (const x of [-0.71, 0.71]) { const u = uAt(x, onFace(1, x, REF_H).z); span(u - du(0.014), u + du(0.014), 1.66, LIV.glass[1], '#c9c3b2'); }
+  wrapped(1, WRAP, WRAP, WS_SILL, LIV.glass[1], 0.07);
+  for (const x of [-WS_POST, WS_POST]) { const u = uAt(x, onFace(1, x, REF_H).z); span(u - du(0.014), u + du(0.014), WS_SILL, LIV.glass[1], '#c9c3b2'); }
   g.strokeStyle = '#151515'; g.lineWidth = 3;
   for (const [x0, x1] of [[-0.40, -0.55], [0.06, -0.09]]) { // the wipers
     g.beginPath(); g.moveTo(X(uAt(x0, 7)), Y(1.70)); g.lineTo(X(uAt(x1, 7)), Y(2.24)); g.stroke();
