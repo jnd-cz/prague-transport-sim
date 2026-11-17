@@ -585,8 +585,8 @@ def build(ln, mesh=None, threads=8, log=print):
         st = st[on_walls(D, cx[m][st], cy[m][st])]
         for a in np.unique(sa[st]).tolist():
             k = st[sa[st] == a]
-            z = surface.at(a, cx[m][k], cy[m][k])
-            zs[k[np.isfinite(z)]] = z[np.isfinite(z)]  # (an outline without heights keeps the street surface's)
+            zo = surface.at(a, cx[m][k], cy[m][k])
+            zs[k[np.isfinite(zo)]] = zo[np.isfinite(zo)]  # (an outline without heights keeps the street surface's)
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
     # only, and the page laid it on the lidar inside (src/terrain.js DtmSurface, #444): here the city mesh's, its outline
     # too, so it meets the terrain beside it. Its outline on a slope stood up to 5.5 m under the terrain, a wall, and a
