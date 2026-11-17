@@ -52,6 +52,11 @@ GAP = 0.01  # m: gaps between beds narrower than twice this are closed (bed_piec
 SLIVER = 1e-4  # m²: pieces smaller than this are left out (float noise of the cuts)
 TILE = 512.0  # m: the terrain is cut tile by tile, side by side
 GAUGE = 0.72  # m: a rail from the axis (track_beds.GAUGE)
+# (the line's ground reaches this far from its route and tracks: the fog ends at 950 m (src/main.js), nothing farther is
+# seen. The user, 2026-11-16, #509: "I want to get to tile streaming as soon as possible so let's do just option 1": the
+# crop, lines 17 and 22 keeping 63 % of their triangles)
+CORRIDOR = 1200.0  # m
+CORRIDOR_SIMPLIFY = 1.0  # m: the corridor's outline, simplified (its arcs need no more)
 # #166's and #165's places: (line, route s, the city-frame sample where the issue gives one)
 RAIL_PLACES = (("17", 2352, (-742.275, -8964.692)), ("17", 17128, None), ("9", 1194, None), ("37", 3768, (3920.091, 1082.375)))
 # the pictures (#507's done-when): (name, line, a stop's name or a point)
@@ -73,6 +78,17 @@ def line_box(L):
     xs = (T["x0"], T["x0"] + T["dx"] * (T["nx"] - 1))
     ys = (T["y0"], T["y0"] + T["dy"] * (T["ny"] - 1))
     return shapely.box(min(xs), min(ys), max(xs), max(ys))
+
+
+def line_area(L, reach=CORRIDOR):
+    """The line's ground: its box within `reach` of its route and its tracks (a polygon, simplified to CORRIDOR_SIMPLIFY)."""
+    lines = [shapely.LineString([p[:2] for p in L["path"]])] if len(L.get("path") or []) > 1 else []
+    lines += [shapely.LineString([p[:2] for p in t["p"]]) for t in L.get("tracks") or [] if len(t.get("p") or []) > 1]
+    box = line_box(L)
+    if not lines:
+        return box
+    near = shapely.union_all(shapely.buffer(np.asarray(lines, dtype=object), reach, quad_segs=4))
+    return polygonal(near.simplify(CORRIDOR_SIMPLIFY).intersection(box))
 
 
 def polygonal(g):
@@ -262,22 +278,26 @@ def mesh_in_box(mesh_dir, box):
 def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
     """The terrain triangles against the cover (the classes above) and the box, tile by tile side by side (shapely's
     vectorised calls release the GIL): counts and areas, and the triangles inside `window` (a box) for the pictures.
-    geometry: also "kept" (the indexes of the triangles kept whole) and "remains" ([(the cut triangle's index, a
-    polygon of what is left of it)]), for the mesh (tools/ground_mesh.py)."""
+    geometry: also "kept" (the indexes of the triangles kept whole), "remains" ([(the cut triangle's index, a polygon of
+    what is left of it)]) and "under" (the indexes of those the cover reaches: dropped or cut), for the mesh
+    (tools/ground_mesh.py)."""
     tris = shapely.polygons(np.stack([np.column_stack([x[T[:, k]], y[T[:, k]]]) for k in (0, 1, 2, 0)], 1))
     cx, cy = x[T].mean(1), y[T].mean(1)
     tile = np.floor(cx / TILE).astype(np.int64) * 1000003 + np.floor(cy / TILE).astype(np.int64)
     order = np.argsort(tile, kind="stable")
     bounds = np.flatnonzero(np.diff(tile[order])) + 1
     groups = np.split(order, bounds)
-    shapely.prepare(box)
 
     def one(ids):
         P = tris[ids]
         b = shapely.bounds(P)
         bb = (b[:, 0].min(), b[:, 1].min(), b[:, 2].max(), b[:, 3].max())
         C = shapely.clip_by_rect(cover, *bb)
-        inbox = shapely.contains(box, P)
+        # (each tile its own piece of the box: a prepared geometry builds its index at its first use, and the corridor's
+        # polygon shared by the threads crashed GEOS with an access violation)
+        Bx = shapely.clip_by_rect(box, *bb)
+        shapely.prepare(Bx)
+        inbox = shapely.contains(Bx, P)
         if C.is_empty:
             hit = within = np.zeros(len(P), bool)
         else:
@@ -289,9 +309,9 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
         cut = (hit & ~within) | (~hit & ~inbox)
         r = {"triangles": len(P), "dropped": int(within.sum()), "cut": int(cut.sum()), "kept": int(kept.sum()),
              "kept_area": float(shapely.area(P[kept]).sum()), "new": 0, "new_area": 0.0, "lost_area": 0.0, "win": [],
-             "kept_ids": ids[kept] if geometry else None, "remains": []}
+             "kept_ids": ids[kept] if geometry else None, "under_ids": ids[hit] if geometry else None, "remains": []}
         if cut.any():
-            rest = shapely.intersection(shapely.difference(P[cut], C) if not C.is_empty else P[cut], box)
+            rest = shapely.intersection(shapely.difference(P[cut], C) if not C.is_empty else P[cut], Bx)
             parts, pi = shapely.get_parts(rest, return_index=True)
             poly = np.isin(shapely.get_type_id(parts), (3,))
             parts, pi = parts[poly], pi[poly]
@@ -314,6 +334,7 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
     tot["win"] = [t for r in res for t in r["win"]]
     if geometry:
         tot["kept_ids"] = np.concatenate([r["kept_ids"] for r in res]) if res else np.zeros(0, int)
+        tot["under_ids"] = np.concatenate([r["under_ids"] for r in res]) if res else np.zeros(0, int)
         tot["remains"] = [q for r in res for q in r["remains"]]
     return tot
 
@@ -326,8 +347,9 @@ def partition(ln, mesh=None, threads=8, windows=(), geometry=False):
     t0 = time.time()
     L, D = load(ln)
     F, ipr = Frame(), IprDtm()
-    box = line_box(L)
-    rep = {"line": ln, "box": [round(v, 2) for v in box.bounds], "box_km2": round(box.area / 1e6, 4)}
+    box = line_area(L)  # (the box within CORRIDOR of the route and tracks: `box` below is that polygon)
+    rep = {"line": ln, "box": [round(v, 2) for v in box.bounds], "box_km2": round(box.area / 1e6, 4),
+           "corridor m": CORRIDOR, "of the box, %": round(100 * box.area / line_box(L).area, 1)}
     tm, last = {}, [time.time()]
 
     def lap(k):
@@ -396,9 +418,9 @@ def partition(ln, mesh=None, threads=8, windows=(), geometry=False):
     pieces = {"survey": survey, "street": [], "bed": beds, "plot": plots, "terrain": terrain}
     rep["rail places"] = rail_places(ln, L, pieces)
     if geometry:  # (for the mesh, tools/ground_mesh.py: the box, the beds' outline on the ground, the city mesh's
-        # triangles in the box, those kept whole and the remains of those cut)
+        # triangles in the box, those kept whole, the remains of those cut and those under the classes above)
         pieces["_"] = {"L": L, "D": D, "box": box, "beds outline": B0, "x": x, "y": y, "z": z, "T": T,
-                       "kept": cut["kept_ids"], "remains": cut["remains"]}
+                       "kept": cut["kept_ids"], "remains": cut["remains"], "under": cut["under_ids"]}
     return pieces, rep, cut["win"]
 
 

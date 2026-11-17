@@ -368,7 +368,7 @@ class SiteFiles(unittest.TestCase):
             os.makedirs(os.path.join(root, "data"))
             for f in ("line17.json", "line17.streets.bin", "line17.streets.json", "line17.ground.bin", "line17.ground.json"):
                 open(os.path.join(root, "data", f), "w").close()
-            self.assertEqual(list(make_dist.files(root)), ["data/line17.json"])
+            self.assertEqual(sorted(make_dist.files(root)), ["data/line17.ground.bin", "data/line17.ground.json", "data/line17.json"])
 
 
 if __name__ == "__main__":

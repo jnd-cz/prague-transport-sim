@@ -37,6 +37,51 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_draw_classes_round_trip_with_their_triangles(self):
+        V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900], [0, -1000, 200000], [500, -500, 201234])
+        F = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
+        cls = np.array([1, 1, 1, 0])
+        draw = np.array(["road", "sidewalk", "road", ""], dtype=object)
+        blob, layout = gm.encode(V, F, cls, shapely.box(0, -1, 1, 0), draw)
+        W, by, names = gm.decode(blob, layout, draw=True)
+        self.assertEqual(sorted(layout["draw"]), ["survey"])
+        got = {tuple(sorted(map(tuple, (W[t] * Q).round().astype(int).tolist()))): n for t, n in zip(by["survey"], names["survey"])}
+        want = {tuple(sorted(map(tuple, V[F[i]].tolist()))): draw[i] for i in range(3)}
+        self.assertEqual(got, want)
+        V2, by2 = gm.decode(blob, layout)  # (without asking, as before)
+        self.assertEqual(len(by2["survey"]), 3)
+
+    def test_survey_classes_round_trip_beside_the_draw_classes(self):
+        # (a bed on the survey: drawn as the bed, its survey class the area's under it)
+        V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900], [0, -1000, 200000], [500, -500, 201234])
+        F = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
+        cls = np.array([1, 2, 1, 0])
+        draw = np.array(["green", "embedded", "road", ""], dtype=object)
+        area = np.array(["median", "tram", "road", ""], dtype=object)
+        blob, layout = gm.encode(V, F, cls, shapely.box(0, -1, 1, 0), draw, area)
+        W, by, names, areas = gm.decode(blob, layout, draw=True, area=True)
+        self.assertEqual(sorted(layout["area"]), ["bed", "survey"])
+        for c in ("survey", "bed"):
+            got = {tuple(sorted(map(tuple, (W[t] * Q).round().astype(int).tolist()))): (n, a)
+                   for t, n, a in zip(by[c], names[c], areas[c])}
+            want = {tuple(sorted(map(tuple, V[F[i]].tolist()))): (draw[i], area[i]) for i in range(3) if cls[i] == gm.CLASS_IDS[c]}
+            self.assertEqual(got, want)
+        W2, by2, names2 = gm.decode(blob, layout, draw=True)  # (the draw classes alone, as before)
+        self.assertEqual(sorted(names2), ["bed", "survey"])
+
+
+class Lidar(unittest.TestCase):
+    def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
+        # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")
+        x, y, z = np.array([0., 10, 10, 0]), np.array([0., 0, 10, 10]), np.array([100., 110, 120, 110])  # z = 100 + x + y
+        T = np.array([[0, 1, 2], [0, 2, 3]])
+        got = gm.city_at({"x": x, "y": y, "z": z, "T": T, "under": np.array([0, 1])}, np.array([5., 2, 20]), np.array([2., 5, 20]))
+        self.assertAlmostEqual(got[0], 107)
+        self.assertAlmostEqual(got[1], 107)
+        self.assertTrue(np.isnan(got[2]))  # (off the mesh)
+        got = gm.city_at({"x": x, "y": y, "z": z, "T": T, "under": np.array([0])}, np.array([2.]), np.array([5.]))
+        self.assertTrue(np.isnan(got[0]))  # (a triangle no class lies over is not asked)
+
 
 class Steps(unittest.TestCase):
     def square_with_a_step(self):
@@ -60,6 +105,16 @@ class Steps(unittest.TestCase):
         F2 = np.array([[0, 1, 2], [0, 4, 5], [5, 4, 3], [5, 3, 1]])
         r = gm.edge_check(V2, F2, shapely.box(-10, -10, 10, 10))
         self.assertGreaterEqual(r["used once inside the box"], 3)
+
+
+class Border(unittest.TestCase):
+    def test_edges_on_a_polygon_border_are_not_cracks(self):
+        # (a diamond of two triangles: its four sides on the border of a diamond-shaped ground, none a crack)
+        V = mm([0, -1000, 0], [1000, 0, 0], [0, 1000, 0], [-1000, 0, 0])
+        F = np.array([[0, 1, 2], [0, 2, 3]])
+        area = shapely.Polygon([(0, -1), (1, 0), (0, 1), (-1, 0)])
+        self.assertEqual(gm.edge_check(V, F, area)["used once inside the box"], 0)
+        self.assertEqual(gm.edge_check(V, F[:1], area)["used once inside the box"], 1)  # (the diagonal, inside)
 
 
 class Faces(unittest.TestCase):
@@ -128,6 +183,12 @@ class Rails(unittest.TestCase):
         self.assertTrue(band.contains(shapely.Point(0.72, 45)))
         self.assertFalse(band.contains(shapely.Point(0.80, 45)))
 
+    def test_land_cover_as_the_page_colours_its_terrain(self):
+        L = {"green": [{"p": [[0, 0], [10, 0], [10, 10], [0, 10]]}, {"p": [[20, 0], [30, 0], [30, 10], [20, 10]], "t": "wood"}],
+             "water": [[[5, 5], [25, 5], [25, 8], [5, 8]]]}
+        got = gm.land_cover(L, np.array([2, 22, 15, 40, 8]), np.array([2, 2, 6, 40, 6]))
+        self.assertEqual(got.tolist(), ["grass", "wood", "water", "", "water"])
+
     def test_no_crossing_on_a_bridge(self):
         import bed_surface
         beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {"b": 1})]))
@@ -166,7 +227,7 @@ class Built(unittest.TestCase):
                 F = np.vstack([t for t in by.values() if len(t)])
                 L = json.load(open(os.path.join(ROOT, "data", f"line{ln}.json"), encoding="utf-8"))
                 import ground_partition
-                r = gm.edge_check(Vq, F, ground_partition.line_box(L))
+                r = gm.edge_check(Vq, F, ground_partition.line_area(L))
                 self.assertEqual(r["used once inside the box"], 0, f"line {ln}: {r}")
                 self.assertEqual(r["used more than twice"], 0, f"line {ln}: {r}")
 

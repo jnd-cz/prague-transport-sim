@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "5ab1e75",
- "published": "2026-11-16 15:25",
- "note": "the ground mesh of lines 9, 17, 22, 23, 37 (#508): data/lineN.ground.bin/.json, the partition triangulated, welded and encoded; not read by the game until #509",
+ "built_at_commit": "01b418f",
+ "published": "2026-11-16 21:53",
+ "note": "#509: survey water levelled",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -33,12 +33,12 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 64621270,
-   "sha256": "cbeba58856499b0cfc63c4d857b2f7346a9c322715899133bf5128a7e515bcfc"
+   "size": 40360263,
+   "sha256": "9166f7f65475e6c2c1a2f9b892f5ed17d06b5cf936f2cc0e33bdc30308564d93"
   },
   "line17.ground.json": {
-   "size": 834,
-   "sha256": "d3ade4e806c4e4581395ff4a7c6f021502224c80730ea72ff35813232aa93624"
+   "size": 1728,
+   "sha256": "3e92721660be60a2a05e5e016b81c6790b63e017e5bf5e2ce981597139742f3c"
   },
   "line17.json": {
    "size": 7042820,
@@ -93,12 +93,12 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.ground.bin": {
-   "size": 65777868,
-   "sha256": "bb996abf59750cc4ea4a78ee51b7cdaba798e0a412a5d890c65225cc9c9ac3c7"
+   "size": 41118365,
+   "sha256": "4a4585b3c6bf085f03eda1330464f0d04a5f89cfe5e45fe88c47efd747a49888"
   },
   "line22.ground.json": {
-   "size": 834,
-   "sha256": "886090098e875563f72e935482cb10f4c7fe1b9c437a49b889059ec3fe88ad02"
+   "size": 1724,
+   "sha256": "92d9d9abc79ad4041e9af85bef0fa90de59f49395b6b59d4780968a412344249"
   },
   "line22.json": {
    "size": 7032010,
@@ -149,12 +149,12 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.ground.bin": {
-   "size": 18683180,
-   "sha256": "3f47454195331ead4adc318a8fce1e096a5577fc5e0f42bc8a7a17ff92acfcf3"
+   "size": 17497762,
+   "sha256": "1d807c4989e5e1a5018767f864c2a01619342f4a6d120b60905520de646120aa"
   },
   "line23.ground.json": {
-   "size": 830,
-   "sha256": "27acd122f9d957b902ac3923f0dbbd2db8ab00060164ac3a818eef72c9db16dd"
+   "size": 1695,
+   "sha256": "04dfeaac656bbb5e721e7f061b24d278ec897fb08423a592eb8092971cea215f"
   },
   "line23.json": {
    "size": 2711135,
@@ -205,12 +205,12 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 15050611,
-   "sha256": "15b3364c11e67f6186ae5b441097def7732b3569329dc85bea8d9cffb47cf22c"
+   "size": 15034127,
+   "sha256": "e61be0e86909e241f857c18fb8127af0b69a9ab81f93e8967a3cba5b76f43ebf"
   },
   "line37.ground.json": {
-   "size": 828,
-   "sha256": "7e75a6700d39c3e5ac432bc98b3354c860944c2f192570e5185b133a64f601dd"
+   "size": 1718,
+   "sha256": "80fb4fe4437ad57af683b517bd35f6f2f7f9416b6be0a0bc96a4004a4742030e"
   },
   "line37.json": {
    "size": 2538818,
@@ -261,12 +261,12 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 36520192,
-   "sha256": "7681f455aa4b8b07d5e2c48871a2cebefbf8f2277e991d6a7ee449032cf16037"
+   "size": 34148649,
+   "sha256": "e32d3551fa6e0cba5ed1ae56dfbe1fcce9e2fcd00b68247283d87dabe4771d9e"
   },
   "line9.ground.json": {
-   "size": 833,
-   "sha256": "d5ba9721c7cd4cde7f3ab24b7e82976b6b3d633542391574b0a9ecc6f5b6bdb9"
+   "size": 1718,
+   "sha256": "43567f3a88ead590552c9327f762cb81ef0ea7d5b467446a65f28e0277647195"
   },
   "line9.json": {
    "size": 6274216,

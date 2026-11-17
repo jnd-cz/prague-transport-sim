@@ -291,11 +291,13 @@ function bedRows(t, step, zBed, tilt, otherRail) {
 // A track's bed (#547): out to its width each side (`t.bed`, tools/track_beds.py: the survey's area of its style, the
 // middle of the strip to a paired track), the rails' plane between them and beyond, except where it meets the paired
 // track: there the edge lies at the mean of the two near rails, as the street between them (terrain.js heightAt).
-function addBed(cg, rows, col) {
+// (skip(i): leave the piece between rows i and i + 1 out)
+function addBed(cg, rows, col, skip = null) {
   if (rows.length < 2) return;
   const V = rows.map(([x, y, nx, ny, off, z]) => off.map((o, j) => W(x + nx * o, y + ny * o, z[j])));
   const c = cg._chunk(rows[0][0], rows[0][1]);
   for (let i = 0; i < V.length - 1; i++) {
+    if (skip?.(i)) continue;
     const A = V[i], B = V[i + 1], cc = typeof col === 'function' ? col(i) : col;
     for (let j = 0; j < 3; j++) cg.quad(c, A[j], B[j], B[j + 1], A[j + 1], cc);
   }
@@ -536,7 +538,10 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const near = new SegmentIndex(4);
   for (const t of data.tracks) near.addLine(t.smooth);
   ground.trackWithin = (x, y, r) => near.within(x, y, r);
-  if (ground.dtm) flushDtm(ground);
+  // (the prebuilt ground, src/groundFile.js, #509: its survey, terrain and beds already meet the tracks; the layers
+  // below are built only without it, ?oldground)
+  const pre = ground.mesh || null;
+  if (ground.dtm) flushDtm(ground, !!pre);
   // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
   // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
   for (const t of data.tracks) if (!t.z) t.z = t.zs ? ownHeights(t, data.heights.step) : t.smooth.map(() => 0);
@@ -627,7 +632,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   })));
   data.tracks.forEach((t, k) => beds[k].rows.forEach((row, i) => { row[5][0] = edges[k][i][0]; row[5][3] = edges[k][i][1]; }));
   group.userData.bedRows = beds.map((b) => b.rows); // (read by tools/test_bed_surface_page.py: the build's copy of this rule, #508)
-  if (ground.dtm) layUnderBeds(ground.dtm, bedsNear);
+  if (ground.dtm && !pre) layUnderBeds(ground.dtm, bedsNear);
   const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
     (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);
   // our tunnels through rock (terrain.js carveCorridor): the hill stays whole above the track; its
@@ -654,18 +659,27 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   }
   const mouths = roadPortalMouths(tunnelPortals);
   await mark('tracks + tunnel roads');
-  lowerTerrainUnderTracks(data, ground.terrain, inTunnel, beds);
+  if (!pre) lowerTerrainUnderTracks(data, ground.terrain, inTunnel, beds);
   await mark('terrain under tracks');
-  if (ground.dtm) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); await mark('terrain under DTM'); lowerFineUnderDtm(ground.dtm, ground.terrain); await mark('fine under DTM'); }
+  if (ground.dtm && !pre) { lowerTerrainUnderDtm(ground.dtm, ground.terrain); await mark('terrain under DTM'); lowerFineUnderDtm(ground.dtm, ground.terrain); await mark('fine under DTM'); }
   const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
-  fitFineToMouths(ground.terrain, mouths);
+  if (!pre) fitFineToMouths(ground.terrain, mouths);
   await mark('fine to tunnel mouths');
-  buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
+  // (the file's ground is the hill over our rock tunnels and the road tunnels' mouths too: cut where main cut its terrain,
+  // the vault, the rock top and the portals drawn below; only the squares near them are tested)
+  if (pre) {
+    fitFileToMouths(pre, ground.lookup, mouths);
+    const pad = TUN_W + 3 + cellPad, near = [];
+    for (const [a, b] of rock) for (let s = a - 1; s <= b + 1; s += 4) { const p = route.at(Math.max(0, Math.min(route.length, s))); near.push([p.x - pad, p.y - pad, p.x + pad, p.y + pad]); }
+    for (const m of mouths) { const r = m.D + m.w + 10; near.push([m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]); }
+    buildGroundFile(group, pre, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), near);
+  }
+  else buildTerrain(group, data, route, ground.terrain, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), (x, y) => inTunnel(x, y, 3));
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
   ground.dtm?.seal(); // (the survey's heights are final from here: its lookups from typed arrays, #244, #245)
-  if (ground.dtm) buildDtm(group, ground);
+  if (ground.dtm) buildDtm(group, ground, !!pre);
   await mark('DTM streets');
 
   // (the weather is the materials' state, src/weather.js: everything is built in its dry colours, each
@@ -711,7 +725,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // the style at the nearest route point, elsewhere the track's own sections (`styles`, tools/track_styles.py
   // track_sections, #546: embedded at its junctions and road crossings), else panels
   // (setts, #574: a grey-brown stone until #308's texture)
-  const STYLE_BED = Object.fromEntries(Object.entries({ grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' })
+  const STYLE_BED = Object.fromEntries(Object.entries(STYLE_BED_HEX)
     .map(([k, v]) => [k, new THREE.Color(v).toArray()]));
   const styleAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 && ground.styles ? styleOn(route, ground, n, x, y) : null; };
   // (a track's own style at each drawn point: its sections run along t.p, the drawn points along t.smooth, scaled as
@@ -732,6 +746,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // (src/heights.js: t.z is the top of rail; the bed lies the track style's offset under it, the
   // rail heads stand just over it, and where the bed is well below, the rails get their sides)
   const keepTrackRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  const fileBed = (row) => ground.lookup?.kind(row[0], row[1]) === 'bed' && Math.abs(ground.lookup.hitZ - (bedZ(row, 0) ?? row[5][1])) < 0.1;
   for (const [trackId, t] of data.tracks.entries()) {
     const bc = keepTrackRanges && t.smooth.length > 1 ? bedCg._chunk(...t.smooth[0]) : null;
     const rc = keepTrackRanges && t.smooth.length > 1 ? railCg._chunk(...t.smooth[0]) : null;
@@ -741,7 +756,11 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
     // The bed is the same canted plane as the rails, including its transition ramps.
     const own = ownStyles(t);
     const cols = t.smooth.map(([x, y], i) => STYLE_BED[styleAt(x, y) ?? own[i]] || bed);
-    addBed(bedCg, beds[trackId].rows, (i) => cols[i]);
+    // (the ground file holds the beds on the ground: where it has this bed at both rows' centres, at the row's height; a
+    // bed on a structure is not in it, the partition leaves it out (line 37's Krejcarek viaduct, its tracks without `b`))
+    const rows = beds[trackId].rows;
+    if (!pre || t.b) addBed(bedCg, rows, (i) => cols[i]);
+    else addBed(bedCg, rows, (i) => cols[i], (i) => fileBed(rows[i]) && fileBed(rows[i + 1]));
     for (const side of [1, -1]) {
       const zr = t.z.map((z, i) => z + side * tilt[i]);
       addRibbon(railCg, t.smooth, 0.1, zr, RAIL_HEAD, null, side * 0.72);
@@ -1145,11 +1164,9 @@ const DTM_COLORS = {
 };
 // Carriageway and tram areas next to the tracks are laid flush with the track bed (ground.flush):
 // applied once to the vertices themselves, so the height lookup and the drawing agree.
-function flushDtm(ground) {
+// (flushDtm's ground level; `done`: the vertices moved, which the decks leave alone)
+function flushStreets(ground, done) {
   const dtm = ground.dtm;
-  if (dtm.flushed) return; // kept across weather rebuilds
-  dtm.flushed = true;
-  const done = new Set();
   // The ground-level street areas are laid to the track profile: the carriageway's offset
   // from the track's surface level (top of rail less its style's offset), measured on the unshifted survey along the route
   // (every 2 m) and across it (every 1 m, gaps filled from the nearest carriageway), is applied
@@ -1281,6 +1298,15 @@ function flushDtm(ground) {
       p[2] = ground.flush(p[0], p[1], p[2]);
     }
   }
+}
+// with the ground file (#509) the streets are its own: the decks of our bridges alone
+function flushDtm(ground, decksOnly = false) {
+  const dtm = ground.dtm;
+  if (dtm.flushed) return; // kept across weather rebuilds
+  dtm.flushed = true;
+  const done = new Set();
+  const { route, profile } = ground;
+  if (!decksOnly) flushStreets(ground, done);
   // The surveyed decks of our own bridges carry the tracks: laid to the track profile the same way
   // (each area's offset at the route, full within 8 m, fading out by 15 m; crossfall kept), so the
   // cars beside the tram drive on the deck at the rails' level. Measured first, then moved. (One offset
@@ -1409,7 +1435,75 @@ function buildParapets(cg, parapets, col) {
 // (by weather: carriageways get slush, footways and the rest trodden snow, lawns all of it; all but
 // lawns and water 0.8 darker when wet)
 const DTM_KIND = { road: 'street', parking: 'street', tram: 'street', cycle: 'street', green: 'green', water: 'water' };
-function buildDtm(group, ground) {
+// The ground file's draw classes as the page colours them (#509): the colours of the layers they replace (the terrain's
+// land cover in buildTerrain, the survey's DTM_COLORS, the beds' styles, the kerbs' sides), and the material groups
+const TERRAIN_HEX = { '': '#8d8c80', grass: '#6f8a4e', wood: '#566f3c', water: '#5d7f95' };
+const STYLE_BED_HEX = { grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' };
+const KERB_SIDE = '#8e8a82', BED_HEX = '#77736a';
+export const GROUND_GROUPS = ['terrain', 'street', 'other', 'green', 'water', 'bed'];
+const RAISED_DRAW = new Set(['sidewalk', 'island', 'median', 'platform']);
+// styles[class][draw name] = [group, r, g, b] (src/groundWorker.js); a wall is drawn as the face above it, a kerb's side grey
+export function groundStyles(layout) {
+  const G = (name) => GROUND_GROUPS.indexOf(name), rgb = (hex) => new THREE.Color(hex).toArray();
+  const out = { terrain: {}, survey: {}, bed: { '': [G('bed'), ...rgb(BED_HEX)] }, plot: { '': [G('other'), ...rgb(DTM_COLORS.paved)] }, wall: {} };
+  for (const [k, hex] of Object.entries(TERRAIN_HEX)) out.terrain[k] = [G('terrain'), ...rgb(hex)];
+  for (const [c, hex] of Object.entries(DTM_COLORS)) out.survey[c] = [G(DTM_KIND[c] || 'other'), ...rgb(hex)];
+  for (const [k, hex] of Object.entries(STYLE_BED_HEX)) out.bed[k] = [G('bed'), ...rgb(hex)];
+  const kerb = () => [G('other'), ...rgb(KERB_SIDE)];
+  for (const name of [...(layout.draw?.wall || []), '']) {
+    const [cls, d = ''] = name.split(':');
+    const above = out[cls]?.[d] ?? out[cls]?.[''];
+    out.wall[name] = cls === 'survey' && RAISED_DRAW.has(d) ? kerb() : above ? [...above] : kerb();
+  }
+  return out;
+}
+// The prebuilt ground's meshes (src/groundFile.js decodeGround), with the materials of the layers they replace
+// hole(x, y): a terrain triangle whose centre it holds is not drawn (tested in the meshes that reach a box of `near`)
+function buildGroundFile(group, pre, hole = null, near = []) {
+  const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
+  const mats = {
+    terrain: mat({ wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW, veg: true }),
+    street: mat({ wet: 0.8, snow: STREET_SNOW, slush: true }),
+    other: mat({ wet: 0.8, snow: FOOT_SNOW }),
+    green: mat({ snow: GROUND_SNOW }),
+    water: mat({}),
+    bed: mat({ wet: wetFactor(BED_HEX, '#5f5c56'), snow: STREET_SNOW, slush: true }),
+  };
+  let cut = 0;
+  for (const m of pre.meshes) {
+    let idx = m.idx;
+    if (hole && near.length && GROUND_GROUPS[m.group] === 'terrain') { // (main cut its terrain only)
+      const P = m.pos;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let v = 0; v < P.length; v += 3) { const x = P[v], y = -P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (near.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) {
+        const keep = new Uint32Array(idx.length);
+        let n = 0;
+        for (let t = 0; t < idx.length; t += 3) {
+          const a = 3 * idx[t], b = 3 * idx[t + 1], c = 3 * idx[t + 2];
+          if (hole((P[a] + P[b] + P[c]) / 3, -(P[a + 2] + P[b + 2] + P[c + 2]) / 3)) { cut++; continue; }
+          keep[n++] = idx[t]; keep[n++] = idx[t + 1]; keep[n++] = idx[t + 2];
+        }
+        idx = keep.slice(0, n);
+      }
+    }
+    if (!idx.length) continue;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(m.nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(m.col, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeBoundingSphere();
+    const kind = GROUND_GROUPS[m.group], mesh = new THREE.Mesh(g, mats[kind]);
+    mesh.matrixAutoUpdate = false;
+    mesh.userData.surface = 'ground';
+    mesh.userData.surfaceKind = kind;
+    group.add(mesh);
+  }
+  if (cut) console.log(`ground file: ${cut} triangles left out over the tunnels and their mouths`);
+}
+// levelsOnly: the decks and roofs only (the prebuilt ground holds level 0 and its kerbs, #509)
+function buildDtm(group, ground, levelsOnly = false) {
   const dtm = ground.dtm;
   const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
   const cgs = {
@@ -1422,6 +1516,7 @@ function buildDtm(group, ground) {
   for (const [k, v] of Object.entries(DTM_COLORS)) color[k] = new THREE.Color(v).toArray();
   const keepSurfaceRanges = /[?&](keepgeo|bot)\b/.test(location.search);
   for (const [areaId, a] of dtm.areas.entries()) {
+    if (levelsOnly && !(a.l > 0)) continue;
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
     // (a median under OSM's grass is grass behind its kerbs: `s`, tools/zps_medians.py, #555)
@@ -1462,7 +1557,7 @@ function buildDtm(group, ground) {
       }
     });
   }
-  buildDtmSteps(cgs.other, ground, color.wall);
+  if (!levelsOnly) buildDtmSteps(cgs.other, ground, color.wall); // (the ground file holds its steps' walls)
   buildParapets(cgs.other, dtm.parapets || [], color.wall);
   for (const [kind, cg] of Object.entries(cgs)) cg.build(group, 'dtm', kind);
 }
@@ -1582,6 +1677,54 @@ function roadPortalMouths(list) {
 // footprint, street vertices above the tunnel road come down onto it (in place: the height lookup
 // holds the same points). Lawns and the hill over the throat are left alone.
 const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'median', 'tram']);
+// The same for the ground file (#509): its street vertices inside a mouth's footprint over the tunnel road come down onto
+// it, in the drawn meshes (their street and walkway groups) and in the lookup (its survey street triangles), so walkers
+// stand on what is drawn. Only the squares and cells near a mouth are read.
+function fitFileToMouths(pre, lk, mouths) {
+  if (!mouths.length) return;
+  const into = (x, y, z) => {
+    for (const m of mouths) {
+      const [d, lat] = m.loc(x, y);
+      if (d < -3 || d > m.D || Math.abs(lat) > m.w + 1.5) continue;
+      const zt = m.zAt(d) + 0.05;
+      if (z > zt + 0.3) return zt;
+    }
+    return null;
+  };
+  const boxes = mouths.map((m) => { const r = m.D + m.w + 5; return [m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]; });
+  let n = 0;
+  for (const mesh of pre.meshes) {
+    const kind = GROUND_GROUPS[mesh.group];
+    if (kind !== 'street' && kind !== 'other') continue;
+    const P = mesh.pos;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let v = 0; v < P.length; v += 3) { const x = P[v], y = -P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (!boxes.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) continue;
+    for (let v = 0; v < P.length; v += 3) { const z = into(P[v], -P[v + 2], P[v + 1]); if (z !== null) { P[v + 1] = z; n++; } }
+  }
+  if (lk) {
+    const done = new Set();
+    for (const [bx0, by0, bx1, by1] of boxes) {
+      const i0 = Math.max(0, Math.floor((bx0 - lk.x0) / lk.cell)), i1 = Math.min(lk.nx - 1, Math.floor((bx1 - lk.x0) / lk.cell));
+      const j0 = Math.max(0, Math.floor((by0 - lk.y0) / lk.cell)), j1 = Math.min(lk.ny - 1, Math.floor((by1 - lk.y0) / lk.cell));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const k = j * lk.nx + i;
+        for (let s = lk.start[k], e = lk.start[k + 1]; s < e; s++) {
+          const t = lk.tris[s];
+          if (!MOUTH_FIT.has(lk.areas[lk.ta[t]])) continue;
+          for (let c = 0; c < 3; c++) {
+            const v = lk.tv[3 * t + c];
+            if (done.has(v)) continue;
+            done.add(v);
+            const z = into(lk.vx[v] + lk.x0, lk.vy[v] + lk.y0, lk.vz[v]);
+            if (z !== null) lk.vz[v] = z;
+          }
+        }
+      }
+    }
+  }
+  if (n) console.log(`ground file: ${n} street vertices brought down into tunnel mouths`);
+}
 function fitDtmToMouths(dtm, mouths) {
   if (!mouths.length || dtm.mouthsFitted) return;
   dtm.mouthsFitted = true;
@@ -1796,7 +1939,7 @@ function buildTerrain(group, data, route, T, hole = () => false, fineHole = hole
   for (const g of data.green) mark(g.p, g.t === 'wood' ? 2 : 1);
   for (const w of data.water) mark(w, 3);
 
-  const palette = [new THREE.Color('#8d8c80'), new THREE.Color('#6f8a4e'), new THREE.Color('#566f3c'), new THREE.Color('#5d7f95')];
+  const palette = ['', 'grass', 'wood', 'water'].map((k) => new THREE.Color(TERRAIN_HEX[k]));
   // which chunks are close enough to the route to matter
   const samples = [];
   for (let s = 0; s <= route.length; s += 60) { const p = route.at(s); samples.push([p.x, p.y]); }

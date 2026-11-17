@@ -32,6 +32,18 @@ def sq(x0, y0, x1, y1, z=0.0):
     return [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]]
 
 
+class Area(unittest.TestCase):
+    def test_the_box_within_reach_of_the_route_and_the_tracks(self):
+        L = {"terrain": {"x0": -5000, "y0": -5000, "dx": 10, "dy": 10, "nx": 1001, "ny": 1001},
+             "path": [[0, 0], [1000, 0]], "tracks": [{"p": [[0, 3000], [0, 3100]]}]}
+        a = gp.line_area(L, reach=1200)
+        self.assertTrue(a.contains(shapely.Point(500, 1100)))
+        self.assertFalse(a.contains(shapely.Point(500, 1300)))
+        self.assertTrue(a.contains(shapely.Point(0, 4250)))  # (around the track)
+        self.assertFalse(a.contains(shapely.Point(3000, 0)))
+        self.assertTrue(gp.line_box(L).covers(a))
+
+
 class Survey(unittest.TestCase):
     def test_higher_rank_holds_the_overlap(self):
         D = {"areas": [{"c": "green", "l": 0, "r": sq(0, 0, 10, 10)}, {"c": "road", "l": 0, "r": sq(5, 0, 15, 10)}]}

@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
-import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
+import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail, groundStyles } from './world.js';
+import { fetchGround, decodeGround } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { Game, fmtTime, fmtDev } from './game.js';
@@ -25,7 +26,7 @@ import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.
 import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
-import { trackStyles, loadHeightFacts } from './heights.js';
+import { trackStyles, loadHeightFacts, BED_BELOW, ROAD_BELOW } from './heights.js';
 import { speedFacts } from './speedRules.js';
 import { loadFigureFont, signFacts } from './speedSigns.js';
 // the signs' fallback face (D-DIN) loads while the world does; the game waits for it before it draws them (#364)
@@ -109,7 +110,12 @@ try {
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
-const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
+// the prebuilt ground (tools/ground_mesh.py, #509), where the line has it (?oldground: the layers below instead): decoded
+// in a worker while the page goes on; the fine terrain is not needed with it
+const groundFile = await fetchGround(load, lineId, params);
+if (groundFile) built[`line${lineId}.ground.json`] = groundFile.layout;
+const groundDecoded = groundFile ? decodeGround(groundFile, groundStyles(groundFile.layout)) : null;
+const fineRes = params.has('nofine') || groundFile ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
 // (dev switch for comparing lint runs: ?notunnels)
@@ -133,12 +139,15 @@ if (!params.has('nofine')) try {
 } catch { /* not made for this line */ }
 data.attribution = credits(built);
 logProvenance(built);
-// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548)
-const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, nearTracks(data.tracks)) : null;
+// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548; with
+// the ground file its ground level is the file's, through the file's lookup: the decks alone are triangulated here)
+const groundLookup = groundDecoded ? await groundDecoded.lookup : null;
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, groundLookup ? undefined : nearTracks(data.tracks), groundLookup) : null;
 await load.begin('profile');
 const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
 const profile = new Profile(route, data, styles.lift, dtm, terrain, styles.liftBack); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
+if (groundLookup) useGroundLookup(ground, groundLookup);
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
 ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls
@@ -238,10 +247,32 @@ function uploadWorld() {
   for (const o of culled) o.frustumCulled = true;
 }
 
+// The prebuilt ground's lookup answers the ground's height reads (#509): the survey's (DtmSurface's lookup) and the
+// terrain's, so ground.at is the drawn ground, but at a track: next to our tracks it keeps the track's surface level that
+// the OSM road ribbons meet the rail heads at (src/heights.js ROAD_BELOW), and at another track's bed off the survey it
+// is the same, from the file's bed (BED_BELOW under that level): main lowered the terrain under every track for this,
+// and the file's bed under a ribbon put it 0.11 m over the rail heads (line 37: 31 -> 55 places). Cars and walkers
+// (ground.surface) stand on the survey as drawn (the file's is not lifted: no DTM_LIFT), else on an OSM ribbon's top as
+// before. The layers' answers where the file has no ground.
+function useGroundLookup(ground, lk) {
+  const at = ground.at.bind(ground), th = ground.terrain.height.bind(ground.terrain);
+  ground.lookup = lk;
+  ground.terrain.height = (x, y) => lk.height(x, y) ?? th(x, y);
+  ground.at = (x, y, deck = false) => {
+    const zb = deck ? null : lk.bedOffSurvey(x, y);
+    return zb !== null ? zb + BED_BELOW - ROAD_BELOW : at(x, y, deck);
+  };
+  ground.surface = (x, y) => { const t = ground.dtm?.surfaceAt(x, y); return t ? t.z : ground.at(x, y) + 0.12; };
+}
+
 // The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the
 // precipitation and the materials' state (src/weather.js): instant, so it could change during a shift.
 async function buildCity() {
   await load.parts(WORLD_PARTS);
+  if (groundDecoded) {
+    ground.mesh = await groundDecoded.meshes;
+    window.groundTimes = ground.mesh.times; // (the worker's decode, lookup and meshes, ms)
+  }
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)

@@ -7,6 +7,11 @@
 // kerb step median 0.06 m (the survey's one kerb line gave both sides one height).
 // Kerbs lowered on purpose (tools/kerbs.py's stretches at crossings, #303) are counted apart: loweredKerbs, and the
 // flat and sunk kerbs are plain kerb's.
+// With the ground file (#509) the ground is one welded surface, continuous but at its steps, with no areas to tell
+// apart: across the route every 0.25 m a step is two neighbouring samples' difference, less the slope on either side
+// (each side's own class) where that explains more of it (a crest's change of slope is no step); one inside the
+// street classes is a seam, one where road meets a raised class a kerb.
+// `of` counts the street samples' pairs then, not the areas' borders.
 import { findKerbs } from '../../src/review.js';
 const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'median', 'cycle', 'paved', 'platform']);
 const ROAD = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
@@ -63,7 +68,33 @@ export async function run() {
   };
   // seams and kerbs: across the route every 0.25 m, a row every 4 m, where two areas meet
   const seams = [], kerbs = [], seamSites = [], kerbSites = [], lowSites = [];
-  for (let s = 0; s < r.length; s += 4) {
+  const lk = r.ground.lookup;
+  if (lk) for (let s = 0; s < r.length; s += 4) {
+    const zs = [], cs = [];
+    for (let lat = -25; lat <= 25; lat += 0.25) { const o = r.offset(s, lat), t = lk.survey(o.x, o.y); zs.push(t ? t.z : null); cs.push(t ? t.c : null); }
+    for (let i = 1; i < zs.length; i++) {
+      if (zs[i] === null || zs[i - 1] === null) continue;
+      const a = cs[i - 1], b = cs[i];
+      const kerb = (ROAD.has(a) && RAISED.has(b)) || (RAISED.has(a) && ROAD.has(b));
+      const same = STREETS.has(b) && (a === b || (ROAD.has(a) && ROAD.has(b)));
+      if (!kerb && !same) continue;
+      const left = i > 1 && zs[i - 2] !== null && cs[i - 2] === a ? zs[i - 1] - zs[i - 2] : null;
+      const right = i + 1 < zs.length && zs[i + 1] !== null && cs[i + 1] === b ? zs[i + 1] - zs[i] : null;
+      let jump = zs[i] - zs[i - 1];
+      for (const sl of [left, right]) if (sl !== null && Math.abs(zs[i] - zs[i - 1] - sl) < Math.abs(jump)) jump = zs[i] - zs[i - 1] - sl;
+      const lat = -25 + (i - 0.5) * 0.25, p = r.offset(s, lat), site = { x: p.x, y: p.y, s, lat, classes: [a, b], heights: [zs[i - 1], zs[i]] };
+      if (same) {
+        if (Math.abs(jump) > 1) continue; // (another level)
+        seams.push(Math.abs(jump));
+        if (Math.abs(jump) > 0.03) seamSites.push({ ...site, step: Math.abs(jump) });
+      } else {
+        const step = ROAD.has(b) ? -jump : jump;
+        if (lowered(site.x, site.y)) lowSites.push({ ...site, step });
+        else { kerbs.push(step); kerbSites.push({ ...site, step }); }
+      }
+    }
+  }
+  if (!lk) for (let s = 0; s < r.length; s += 4) {
     let prev = null;
     for (let lat = -25; lat <= 25; lat += 0.25) {
       const o = r.offset(s, lat), h = hit(o.x, o.y);
