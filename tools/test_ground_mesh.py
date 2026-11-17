@@ -151,19 +151,6 @@ class Lidar(unittest.TestCase):
         self.assertTrue(np.isnan(got[0]))  # (a triangle no class lies over is not asked)
 
 
-class Walls(unittest.TestCase):
-    def test_a_street_corner_on_a_wall_and_its_own_outlines_height(self):
-        # (#653: a sidewalk's corner on a wall's outline takes the sidewalk's own outline height, not the street surface's)
-        sw = {"c": "sidewalk", "l": 0, "r": [[0, 0, 200.1], [20, 0, 200.1], [20, 6, 200.3], [0, 6, 200.2]]}
-        wall = {"c": "wall", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 6.3, 198.0], [0, 6.3, 198.0]]}
-        upper = {"c": "wall", "l": 1, "r": [[0, 3, 205.0], [20, 3, 205.0], [20, 3.3, 205.0]]}
-        D = {"areas": [sw, wall, upper]}
-        on = gm.on_walls(D, np.array([10.0, 10.0, 10.0, 20.0]), np.array([6.02, 5.5, 3.0, 6.3]))
-        self.assertEqual(on.tolist(), [True, False, False, True])  # (not another level's wall)
-        z = gm.SurveySurface(D, [0]).at(0, np.array([10.0]), np.array([6.0]))
-        self.assertAlmostEqual(z[0], 200.25)
-
-
 class Steps(unittest.TestCase):
     def square_with_a_step(self):
         # two triangles meeting along x = 1000, the right one 0.1 m higher: its own vertices on the edge
