@@ -161,9 +161,10 @@ tmavé sklo je hra.
 - **Přístroje:** rychloměr 0–80 km/h s počítadlem, ampérmetr 0–600 A (jízda i brzda), voltmetr baterie 0–40 V
   a doutnavka NAPĚTÍ V TROLEJI (T3 nemá voltmetr trakčního napětí). S asistencí ukazuje červená značka na
   rychloměru nejvyšší dovolenou rychlost.
-- **Kontrolky** jako na voze: směrovky, V (znamení k zastavení), DVEŘE (zelená, když jsou **všechny zavřené**),
-  BRZDY I / II / VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ (oranžová,
-  dokud jsou zařazeny odpory), TOPENÍ ZRCÁTKA.
+- **Kontrolky** jako na voze: směrovky (zelené), V (VÝSTUP: cestující zmáčkl znamení řidiči, aby vystoupil v příští
+  zastávce na znamení; svítí do otevření dveří), DVEŘE (zelená, když jsou **všechny zavřené**), BRZDA I, BRZDY II
+  a VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ (oranžová, dokud jsou
+  zařazeny odpory), TOPENÍ ZRCÁTKA.
 - **Ovladače** jdou stisknout myší nebo prstem a pošlou klávesu hry (s asistencí je na nich napsaná). Ty, které
   hra zatím neumí (mycí stroj, stěrače, osvětlení, havarijní pojezd a další), jsou nakreslené a nic nedělají.
   Najetí myší na ovladač řekne, co dělá.
@@ -176,11 +177,12 @@ tmavé sklo je hra.
 
 - Sedíte tam, kde má T3 sedačku řidiče: 0,32 m vlevo od osy vozu a 1,2 m za čelem. Levý sloupek čelního okna
   proto stojí v pohledu vpřed.
-- Držením Q / E (nebo ← / →) se díváte levým oknem až k jeho konci, pravým přes přední dveře. S hlavou se otáčí
-  rám stanoviště (sloupky, konec okna, dveře) i pult: vlevo je bočnice se směrovým přepínačem, kaloriferem,
-  topením, odpojením topení a pískováním, vpravo křídlo pultu s osvětlením a jízdním řádem pořadí.
-- Pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje bok soupravy a dveře. Roste s oknem prohlížeče a zorné
-  pole se nemění.
+- Držením Q / E (nebo ← / →) se díváte levým oknem až k zadní stěně kabiny, která okno přetíná, pravým přes
+  přední dveře. S hlavou se otáčí rám stanoviště (sloupky se zaoblenými rohy oken, zadní stěna, dveře) i pult:
+  vlevo je bočnice se směrovým přepínačem, kaloriferem, topením, odpojením topení a pískováním, vpravo křídlo
+  pultu s osvětlením a jízdním řádem pořadí.
+- Pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje bok soupravy a dveře a nic kromě nabídek ho nezakryje. Roste
+  s oknem prohlížeče a zorné pole se nemění.
 - **Pohled zvenku** (V): kamera obíhá kolem tramvaje. Tažením ji otáčíte a nakláníte, kolečkem nebo dvěma prsty
   přibližujete, dvojklik ji vrátí za tramvaj.
 

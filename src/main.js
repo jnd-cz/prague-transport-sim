@@ -809,11 +809,12 @@ $('btnToMenu').addEventListener('click', () => {
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
-// the head turned out of a side window, until the screen's edge reaches the cab window's end on the left and the front
-// door's on the right (src/cabframe.js, #246; it was 1.3 rad both ways)
+// the head turned out of a side window, until the screen's edge shows the cab's rear wall past the cab window on the left
+// and reaches the front door's end on the right (src/cabframe.js, #246; it was 1.3 rad both ways)
 const lookMax = () => lookLimits(CAB_FOV, camera.aspect);
 const cabFrame = new CabFrame($('cabFrame'));
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
+const mirrorShown = () => game && !chase && mirrorOn && !window.freeCam && !window.headless;
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished || !$('menu').classList.contains('hidden') || reporter.isOpen) return;
@@ -1046,7 +1047,7 @@ function updateCamera(dt, t) {
   // sway, and the lean into a canted curve
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
   // the cab's frame where the eye sees it, the panel's band turned with the head
-  cabFrame.draw(camera, lead, leadFront(), game ? game.doorOpenness : 0);
+  cabFrame.draw(camera, lead, leadFront(), game ? game.doorOpenness : 0, mirrorShown() ? $('mirror') : null);
   hud.panel.setLook(look, lookMax());
 }
 
@@ -1187,7 +1188,7 @@ function frame(now) {
   if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
-  if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
+  if (draw && mirrorShown()) {
     mirror.draw(now, !lazy, poseMirror, tramModel);
   }
 }
