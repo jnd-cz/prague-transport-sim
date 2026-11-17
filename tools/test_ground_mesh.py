@@ -145,6 +145,21 @@ class Steps(unittest.TestCase):
         self.assertEqual(len(w), 2)
         self.assertTrue(gm.is_wall(V, w).all())
 
+    def test_the_wall_faces_down_the_step(self):
+        V, F = self.square_with_a_step()
+        for w in gm.step_walls(V, F):
+            P = V[w].astype(float)
+            n = np.cross(P[1] - P[0], P[2] - P[0])
+            self.assertLess(n[0], 0)  # (the lower triangle is at x < 1000)
+
+    def test_every_triangle_faces_up(self):
+        V, F = self.square_with_a_step()
+        F = np.vstack([F, F[:, ::-1]])
+        P = V[gm.face_up(V, F)].astype(float)
+        self.assertTrue((np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0])[:, 2] > 0).all())
+        w = gm.step_walls(V, F[:2])
+        self.assertTrue((gm.face_up(V, w) == w).all())  # (an upright one as it is)
+
     def test_edges_used_once_found_and_closed_by_the_walls(self):
         V, F = self.square_with_a_step()
         box = shapely.box(0, 0, 2, 1)
@@ -279,6 +294,11 @@ class Built(unittest.TestCase):
                 r = gm.edge_check(Vq, F, ground_partition.line_area(L))
                 self.assertEqual(r["used once inside the box"], 0, f"line {ln}: {r}")
                 self.assertEqual(r["used more than twice"], 0, f"line {ln}: {r}")
+                # (every triangle faces up: the page's normals average over its neighbours, gm.face_up)
+                flat = F[~gm.is_wall(Vq, F)]
+                P = Vq[flat].astype(float)
+                down = int((np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0])[:, 2] < 0).sum())
+                self.assertEqual(down, 0, f"line {ln}: {down:,} triangles face down")
 
 
 if __name__ == "__main__":

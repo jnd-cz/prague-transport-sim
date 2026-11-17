@@ -11,7 +11,8 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
    on the ground, the rails (each drawn track's, at the bed's rows: tools/bed_surface.py) and the square's own border are
    noded and polygonized into faces, so two faces meeting along an edge share every vertex on it (no T-junction). The
    terrain's triangles that nothing crosses stay as they are. Each face takes the class at its inner point.
-2. **Triangles.** Each face by shapely's constrained Delaunay (its edges kept: kerbs, bed edges, footprints, rails).
+2. **Triangles.** Each face by shapely's constrained Delaunay (its edges kept: kerbs, bed edges, footprints, rails),
+   every triangle wound counter-clockwise seen from above and every step's wall facing down the step (face_up()).
 3. **Heights.** Each face's vertices by its class:
    - inside the beds' outline (but a raised area: a platform, a sidewalk, an island): the bed surface, the lowest bed
      there (bed_surface.Beds.surface: the rails at top of rail - lift -+ the cant's tilt, as the page lays the bed);
@@ -717,6 +718,7 @@ def build(ln, mesh=None, threads=8, log=print):
     draw = np.concatenate([draw, land_cover(L, x[KT].mean(1), y[KT].mean(1), G["water"]) if len(KT) else np.zeros(0, dtype=object)])
     area = np.concatenate([area, np.full(len(KF), "", dtype=object)])
     V = V2
+    F = face_up(V, F)
 
     # the steps' walls: an edge whose two sides hold different vertices at an end; each drawn as the face above it
     t1 = time.time()
@@ -761,9 +763,22 @@ def xy_ids(V):
     return np.unique(V[:, :2], axis=0, return_inverse=True)[1].ravel()
 
 
+def face_up(V, F):
+    """The triangles wound counter-clockwise seen from above (an upright one as it is). The page averages a corner's
+    normal over the triangles of its draw class beside it (src/groundWorker.js): the constrained Delaunay's faces
+    (clockwise) beside the city mesh's triangles kept whole (counter-clockwise) cancelled there, and drew a dark seam a
+    triangle wide round every piece of the terrain (#632)."""
+    P = V[F][:, :, :2].astype(np.float64)
+    s = (P[:, 1, 0] - P[:, 0, 0]) * (P[:, 2, 1] - P[:, 0, 1]) - (P[:, 1, 1] - P[:, 0, 1]) * (P[:, 2, 0] - P[:, 0, 0])
+    F = F.copy()
+    F[s < 0] = F[s < 0][:, [0, 2, 1]]
+    return F
+
+
 def step_walls(V, F, above=False):
-    """Vertical faces along every edge where the two triangles beside it hold different vertices at the same point.
-    With `above`: also each wall's triangle on the higher side (its draw class is the wall's)."""
+    """Vertical faces along every edge where the two triangles beside it hold different vertices at the same point, each
+    facing away from the higher triangle (seen from below the step; face_up's reason). With `above`: also each wall's
+    triangle on the higher side (its draw class is the wall's)."""
     k = xy_ids(V)
     e = np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
     tri = np.tile(np.arange(len(F)), 3)
@@ -789,7 +804,14 @@ def step_walls(V, F, above=False):
             out.append((p, s, r) if p != r else (p, s, q))
             side.append(u)
     walls = np.asarray(out, int).reshape(-1, 3)
-    return (walls, np.asarray(side, int)) if above else walls
+    side = np.asarray(side, int)
+    if len(walls):
+        W = V[walls].astype(np.float64)
+        n = np.cross(W[:, 1] - W[:, 0], W[:, 2] - W[:, 0])
+        away = W[:, :, :2].mean(1) - V[F[side]][:, :, :2].astype(np.float64).mean(1)
+        back = (n[:, :2] * away).sum(1) < 0
+        walls[back] = walls[back][:, [0, 2, 1]]
+    return (walls, side) if above else walls
 
 
 def edge_check(V, F, box):
