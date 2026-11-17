@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """A line's load by part and its download, in headless Chromium on the GPU (#509: the load before -> after).
 
-Usage: python -P -E tools/bench/load_times.py [--lines 17,9] [--loads 5] [--out reports/load-times/main.json]
+Usage: python -P -E tools/bench/load_times.py [--lines 17,9] [--loads 5] [--plain] [--out reports/load-times/main.json]
        python -P -E tools/bench/load_times.py --compare reports/load-times/main.json reports/load-times/509.json
 
-Its own server on a free port; each load a fresh page (`headless.load_page`, `?keepgeo`), then `window.loadTimes`
+Its own server on a free port; each load a fresh page (`headless.load_page`, `?keepgeo`; `--plain` without it, as a player
+loads the line: the ground's tiles round the start only, #30), then `window.loadTimes`
 (the loading screen's steps, src/loading.js), `window.worldTimes` (buildWorld's parts, src/world.js), `window.groundTimes`
 (the ground file's worker: decode, lookup, meshes, src/groundWorker.js; off the page's thread, beside the rest) and the files
 the page fetched with their bytes (the Resource Timing entries: the body as the server sent it, `serve.py` gzips
@@ -64,7 +65,7 @@ def table(by_line, other=None):
     return rows
 
 
-def measure(lines, loads, timeout=600):
+def measure(lines, loads, timeout=600, plain=False):
     from playwright.sync_api import sync_playwright
 
     import gpu
@@ -77,7 +78,7 @@ def measure(lines, loads, timeout=600):
             for ln in lines:
                 runs = []
                 for k in range(loads):
-                    page, errors, load = load_page(browser, url, ln, timeout)
+                    page, errors, load = load_page(browser, url, ln, timeout, {"keepgeo": not plain})
                     if isinstance(load, dict):
                         page.close()
                         raise SystemExit(f"line {ln}: the load failed: {load} {errors[:3]}")
@@ -96,6 +97,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--lines", default="17")
     ap.add_argument("--loads", type=int, default=5)
+    ap.add_argument("--plain", action="store_true", help="load without ?keepgeo, as a player does (#30)")
     ap.add_argument("--out", help="write the medians here (JSON)")
     ap.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"), help="print two saved runs side by side")
     a = ap.parse_args()
@@ -105,7 +107,7 @@ def main():
         return
     from baseline_store import HeavyJob
     with HeavyJob("load times"):
-        res = measure([s.strip() for s in a.lines.split(",") if s.strip()], a.loads)
+        res = measure([s.strip() for s in a.lines.split(",") if s.strip()], a.loads, plain=a.plain)
     print("\n".join(table(res)))
     if a.out:
         os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)

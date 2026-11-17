@@ -351,11 +351,13 @@ function groundDrawn(g, world) {
   return check('ground-drawn', n, [...bad.values()]);
 }
 function groundHidden(g) {
-  const lk = g.route.ground.lookup;
-  if (!lk) return check('ground-hidden', 0, []);
-  const { vx, vy, vz, tv, tris, start } = lk;
+  const all = g.route.ground.lookup;
+  if (!all) return check('ground-hidden', 0, []);
   let n = 0;
   const bad = new Map();
+  // (each tile's lookup, #30: a tile holds its own triangles only, so two can't overlap across a tile's edge)
+  for (const lk of all.parts ? all.parts() : [all]) {
+  const { vx, vy, vz, tv, tris, start } = lk;
   for (let j = 0; j < lk.ny; j++) for (let i = 0; i < lk.nx; i++) {
     const k = j * lk.nx + i;
     if (start[k] === start[k + 1]) continue;
@@ -376,6 +378,7 @@ function groundHidden(g) {
       const x = px + lk.x0, y = py + lk.y0, key = `${Math.round(x / 20)},${Math.round(y / 20)}`;
       if (!(bad.get(key)?.mag >= held)) bad.set(key, { x, y, mag: held, info: `${held} ground triangles over one point, ${((hi - lo) * 100).toFixed(1)} cm apart` });
     }
+  }
   }
   return check('ground-hidden', n, [...bad.values()]);
 }

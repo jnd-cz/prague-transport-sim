@@ -521,7 +521,8 @@ ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-
         "--disable-backgrounding-occluded-windows"]
 GPU_ARGS = [*gpu.HARDWARE, *ARGS[3:]]  # (WebGL on the machine's GPU, tools/gpu.py)
 PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free memory)
-PAGE = {"draw": False, "viewport": (960, 540), "gpu": False}  # (how the pages draw: --draw, --viewport, --gpu, #411)
+PAGE = {"draw": False, "viewport": (960, 540), "gpu": False, "keepgeo": True}  # (how the pages draw: --draw, --viewport, --gpu,
+# #411; keepgeo: every ground tile held and the geometry kept, as the checks read it; False: as a player loads it, #30)
 
 
 # This machine's run times, for planning the batches (#413): {"runs": {"line|check|seed": s}, "loads": {line: s}}, a
@@ -663,7 +664,7 @@ def load_page(browser, url, line, timeout, opts=None):
     page.on("pageerror", lambda e: errors.append(str(e)))
     t0 = time.monotonic()
     try:
-        page.goto(f"{url}/index.html?line={line}&keepgeo", timeout=min(120_000, timeout * 1000))
+        page.goto(f"{url}/index.html?line={line}{'&keepgeo' if opts['keepgeo'] else ''}", timeout=min(120_000, timeout * 1000))
         # loaded: the loading screen is hidden and the title names the line (as batch.html waits)
         page.wait_for_function(
             f"() => document.getElementById('loading')?.classList.contains('hidden') && document.title.includes('{line}')",

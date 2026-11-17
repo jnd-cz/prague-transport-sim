@@ -37,6 +37,24 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_tiles_round_trip_and_weld_on_their_border(self):
+        # (x 306 m is the border between tiles e-1486 and e-1485, #30: two triangles either side share its two vertices)
+        V = mm([300000, 0, 200000], [306000, 0, 200100], [306000, -1000, 199900], [300000, -1000, 200000],
+               [312000, 0, 200300], [312000, -1000, 200200])
+        F = np.array([[0, 1, 2], [0, 2, 3], [1, 4, 5], [1, 5, 2]])
+        cls = np.array([0, 1, 1, 0])
+        draw = np.array(["grass", "road", "sidewalk", ""], dtype=object)
+        blob, layout = gm.encode_tiles(V, F, cls, draw)
+        self.assertEqual([t["name"] for t in layout["tiles"]], ["e-1486_n-2087", "e-1485_n-2087"])
+        self.assertEqual(layout["vertices"], 8)  # (the border's two in both tiles)
+        self.assertEqual(layout["draw"], {"survey": ["road", "sidewalk"], "terrain": ["grass"]})  # ("": unnamed)
+        W, by, names = gm.decode(blob, layout, draw=True)
+        self.assertEqual(len(W), 6)  # (welded)
+        got = {tuple(sorted(map(tuple, (W[t] * Q).round().astype(int).tolist()))): n
+               for c in by for t, n in zip(by[c], names.get(c, [""] * len(by[c])))}
+        want = {tuple(sorted(map(tuple, V[F[i]].tolist()))): draw[i] for i in range(4)}
+        self.assertEqual(got, want)
+
     def test_draw_classes_round_trip_with_their_triangles(self):
         V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900], [0, -1000, 200000], [500, -500, 201234])
         F = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
@@ -71,16 +89,17 @@ class File(unittest.TestCase):
 
 
 class Lattice(unittest.TestCase):
-    def test_lines_on_the_city_grid_clipped_to_the_area(self):
-        # (two pieces side by side get lines at the same x: their faces' corners meet on the shared edge)
-        g = shapely.box(1, 2, 13, 9)
+    def test_lines_on_the_tiles_grid_clipped_to_the_area(self):
+        # (two pieces side by side get lines at the same x: their faces' corners meet on the shared edge; the grid is
+        # S-JTSK's, as the tiles' (#30): x = 1 is E -742,805, y = 4 is N -1,043,020)
+        g = shapely.box(2, 0, 14, 8)
         L = gm.lattice(g, 5.0)
         xs = sorted({round(c[0], 6) for part in shapely.get_parts(L) for c in shapely.get_coordinates(part) if
-                     abs(c[1] - 2) < 1e-9 or abs(c[1] - 9) < 1e-9})
-        self.assertEqual(xs, [5.0, 10.0])
-        self.assertAlmostEqual(shapely.length(L), 2 * 7 + 1 * 12)  # (x = 5, 10 across 7 m; y = 5 across 12 m)
-        self.assertTrue(shapely.box(1, 2, 13, 9).buffer(1e-9).contains(L))
-        self.assertIsNone(gm.lattice(shapely.box(1, 1, 4, 4), 5.0))
+                     abs(c[1] - 0) < 1e-9 or abs(c[1] - 8) < 1e-9})
+        self.assertEqual(xs, [6.0, 11.0])
+        self.assertAlmostEqual(shapely.length(L), 2 * 8 + 1 * 12)  # (x = 6, 11 across 8 m; y = 4 across 12 m)
+        self.assertTrue(g.buffer(1e-9).contains(L))
+        self.assertIsNone(gm.lattice(shapely.box(7, 5, 10, 8), 5.0))
 
 
 class Weirs(unittest.TestCase):

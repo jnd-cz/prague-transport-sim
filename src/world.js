@@ -503,7 +503,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   for (const t of data.tracks) near.addLine(t.smooth);
   ground.trackWithin = (x, y, r) => near.within(x, y, r);
   // (the prebuilt ground, src/groundFile.js, #509: its survey, terrain and beds already meet the tracks)
-  const pre = ground.mesh;
+  const pre = ground.tiles; // (the ground file's tiles, src/groundFile.js: lookups now, meshes as the window wants them)
   if (ground.dtm) flushDtm(ground);
   // every track's top of rail is the build's (#197: `zs` every 2 m along t.p, tools/line_heights.py), unsmoothed; since
   // #480 the build leaves no sample without one (the surface plus the style's lift where no source has a height)
@@ -625,11 +625,12 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
   // (the file's ground is the hill over our rock tunnels and the road tunnels' mouths too: cut there, the vault, the
   // rock top and the portals drawn below; only the squares near them are tested)
-  fitFileToMouths(pre, ground.lookup, mouths);
+  const fix = mouthFix(mouths);
+  if (fix) { for (const lk of ground.lookup.parts()) fix.lookup(lk); pre.fix = fix; }
   const pad = TUN_W + 3 + cellPad, nearCut = [];
   for (const [a, b] of rock) for (let s = a - 1; s <= b + 1; s += 4) { const p = route.at(Math.max(0, Math.min(route.length, s))); nearCut.push([p.x - pad, p.y - pad, p.x + pad, p.y + pad]); }
   for (const m of mouths) { const r = m.D + m.w + 10; nearCut.push([m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]); }
-  buildGroundFile(group, pre, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), nearCut);
+  attachGround(group, pre, (x, y) => inTunnel(x, y, 3) || inMouth(x, y), nearCut);
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
   ground.dtm?.seal(); // (the survey's heights are final from here: its lookups from typed arrays, #244, #245)
@@ -1239,9 +1240,10 @@ export function groundStyles(layout) {
   }
   return out;
 }
-// The prebuilt ground's meshes (src/groundFile.js decodeGround), with the materials of the layers they replace
+// The prebuilt ground's meshes, tile by tile as src/groundFile.js GroundTiles brings them (#30), with the materials of
+// the layers they replace; a tile's positions are from its corner (the mesh stands there: 32-bit positions within 500 m)
 // hole(x, y): a terrain triangle whose centre it holds is not drawn (tested in the meshes that reach a box of `near`)
-function buildGroundFile(group, pre, hole = null, near = []) {
+function attachGround(group, tiles, hole = null, near = []) {
   const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
   const mats = {
     terrain: mat({ wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW, veg: true }),
@@ -1251,38 +1253,52 @@ function buildGroundFile(group, pre, hole = null, near = []) {
     water: mat({}),
     bed: mat({ wet: wetFactor(BED_HEX, '#5f5c56'), snow: STREET_SNOW, slush: true }),
   };
-  let cut = 0;
-  for (const m of pre.meshes) {
-    let idx = m.idx;
-    if (hole && near.length && GROUND_GROUPS[m.group] === 'terrain') { // (main cut its terrain only)
-      const P = m.pos;
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      for (let v = 0; v < P.length; v += 3) { const x = P[v], y = -P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-      if (near.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) {
-        const keep = new Uint32Array(idx.length);
-        let n = 0;
-        for (let t = 0; t < idx.length; t += 3) {
-          const a = 3 * idx[t], b = 3 * idx[t + 1], c = 3 * idx[t + 2];
-          if (hole((P[a] + P[b] + P[c]) / 3, -(P[a + 2] + P[b + 2] + P[c + 2]) / 3)) { cut++; continue; }
-          keep[n++] = idx[t]; keep[n++] = idx[t + 1]; keep[n++] = idx[t + 2];
+  const sub = new THREE.Group();
+  sub.matrixAutoUpdate = false;
+  group.add(sub);
+  // (a tile's arrays freed once on the GPU, as uploadWorld frees the world's: kept with ?keepgeo and ?bot)
+  const free = function () { this.array = null; };
+  tiles.make = (ms, [bx, by]) => {
+    const out = [];
+    let cut = 0;
+    for (const m of ms) {
+      let idx = m.idx;
+      if (hole && near.length && GROUND_GROUPS[m.group] === 'terrain') { // (main cut its terrain only)
+        const P = m.pos;
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let v = 0; v < P.length; v += 3) { const x = P[v] + bx, y = by - P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (near.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) {
+          const keep = new Uint32Array(idx.length);
+          let n = 0;
+          for (let t = 0; t < idx.length; t += 3) {
+            const a = 3 * idx[t], b = 3 * idx[t + 1], c = 3 * idx[t + 2];
+            if (hole(bx + (P[a] + P[b] + P[c]) / 3, by - (P[a + 2] + P[b + 2] + P[c + 2]) / 3)) { cut++; continue; }
+            keep[n++] = idx[t]; keep[n++] = idx[t + 1]; keep[n++] = idx[t + 2];
+          }
+          idx = keep.slice(0, n);
         }
-        idx = keep.slice(0, n);
       }
+      if (!idx.length) continue;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(m.nor, 3));
+      g.setAttribute('color', new THREE.BufferAttribute(m.col, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.computeBoundingSphere();
+      if (!tiles.keep) { g.userData.release = true; for (const at of Object.values(g.attributes)) at.onUpload(free); g.index.onUpload(free); }
+      const kind = GROUND_GROUPS[m.group], mesh = new THREE.Mesh(g, mats[kind]);
+      mesh.position.set(bx, 0, -by);
+      mesh.updateMatrix();
+      mesh.matrixAutoUpdate = false;
+      mesh.userData.surface = 'ground';
+      mesh.userData.surfaceKind = kind;
+      sub.add(mesh);
+      out.push(mesh);
     }
-    if (!idx.length) continue;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(m.nor, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(m.col, 3));
-    g.setIndex(new THREE.BufferAttribute(idx, 1));
-    g.computeBoundingSphere();
-    const kind = GROUND_GROUPS[m.group], mesh = new THREE.Mesh(g, mats[kind]);
-    mesh.matrixAutoUpdate = false;
-    mesh.userData.surface = 'ground';
-    mesh.userData.surfaceKind = kind;
-    group.add(mesh);
-  }
-  if (cut) console.log(`ground file: ${cut} triangles left out over the tunnels and their mouths`);
+    if (cut) tiles.cut = (tiles.cut || 0) + cut;
+    return out;
+  };
+  tiles.drop = (ms) => { for (const m of ms) { sub.remove(m); m.geometry.dispose(); } };
 }
 // The decks and roofs (level 1+): the prebuilt ground holds level 0, its kerbs and its steps' walls (#509)
 function buildDtm(group, ground) {
@@ -1460,12 +1476,12 @@ function roadPortalMouths(list) {
 const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'median', 'tram']);
 // The same for the ground file (#509): its street vertices inside a mouth's footprint over the tunnel road come down onto
 // it, in the lookup (its survey street triangles' vertices) and then every drawn vertex at one of those points, whatever
-// its group: the file is one welded surface, a lawn, a bed or a step's wall shares a street's vertex there, and drawn on
+// its group, tile by tile as they come (#30): the file is one welded surface, a lawn, a bed or a step's wall shares a street's vertex there, and drawn on
 // its own it kept that corner up, a crack, cars and walkers standing 2.5-17.7 m off what was drawn (#632: groundDrawn
 // at the Strahov tunnel's mouths, lines 9, 17, 22, 23). Only the squares and cells near a mouth are read.
 const MOUTH_NEAR = 0.005; // m: a drawn vertex (32-bit) this near a moved one in plan and height is it
-function fitFileToMouths(pre, lk, mouths) {
-  if (!mouths.length) return;
+function mouthFix(mouths) {
+  if (!mouths.length) return null;
   const into = (x, y, z) => {
     for (const m of mouths) {
       const [d, lat] = m.loc(x, y);
@@ -1478,48 +1494,57 @@ function fitFileToMouths(pre, lk, mouths) {
   const boxes = mouths.map((m) => { const r = m.D + m.w + 5; return [m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]; });
   // the points moved: 2 cm cells -> [x, y, z before, z after]
   const moved = new Map(), C = 0.02, key = (i, j) => i * 1048576 + j;
-  const done = new Set();
-  for (const [bx0, by0, bx1, by1] of boxes) {
-    const i0 = Math.max(0, Math.floor((bx0 - lk.x0) / lk.cell)), i1 = Math.min(lk.nx - 1, Math.floor((bx1 - lk.x0) / lk.cell));
-    const j0 = Math.max(0, Math.floor((by0 - lk.y0) / lk.cell)), j1 = Math.min(lk.ny - 1, Math.floor((by1 - lk.y0) / lk.cell));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const k = j * lk.nx + i;
-      for (let s = lk.start[k], e = lk.start[k + 1]; s < e; s++) {
-        const t = lk.tris[s];
-        if (!MOUTH_FIT.has(lk.areas[lk.ta[t]])) continue;
-        for (let c = 0; c < 3; c++) {
-          const v = lk.tv[3 * t + c];
-          if (done.has(v)) continue;
-          done.add(v);
-          const x = lk.vx[v] + lk.x0, y = lk.vy[v] + lk.y0, z = into(x, y, lk.vz[v]);
-          if (z === null) continue;
-          const kk = key(Math.round(x / C), Math.round(y / C));
-          if (!moved.has(kk)) moved.set(kk, []);
-          moved.get(kk).push([x, y, lk.vz[v], z]);
-          lk.vz[v] = z;
+  const fix = { points: 0, drawn: 0 };
+  // a tile's lookup: its street points in a mouth come down (each point once, whichever tile held it first)
+  fix.lookup = (lk) => {
+    const done = new Set();
+    for (const [bx0, by0, bx1, by1] of boxes) {
+      const i0 = Math.max(0, Math.floor((bx0 - lk.x0) / lk.cell)), i1 = Math.min(lk.nx - 1, Math.floor((bx1 - lk.x0) / lk.cell));
+      const j0 = Math.max(0, Math.floor((by0 - lk.y0) / lk.cell)), j1 = Math.min(lk.ny - 1, Math.floor((by1 - lk.y0) / lk.cell));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const k = j * lk.nx + i;
+        for (let s = lk.start[k], e = lk.start[k + 1]; s < e; s++) {
+          const t = lk.tris[s];
+          if (!MOUTH_FIT.has(lk.areas[lk.ta[t]])) continue;
+          for (let c = 0; c < 3; c++) {
+            const v = lk.tv[3 * t + c];
+            if (done.has(v)) continue;
+            done.add(v);
+            const x = lk.vx[v] + lk.x0, y = lk.vy[v] + lk.y0, z = into(x, y, lk.vz[v]);
+            if (z === null) continue;
+            const kk = key(Math.round(x / C), Math.round(y / C)), at = moved.get(kk) || [];
+            if (!at.some((q) => Math.abs(q[0] - x) <= MOUTH_NEAR && Math.abs(q[1] - y) <= MOUTH_NEAR && Math.abs(q[2] - lk.vz[v]) <= MOUTH_NEAR)) {
+              at.push([x, y, lk.vz[v], z]);
+              moved.set(kk, at);
+              fix.points++;
+            }
+            lk.vz[v] = z;
+          }
         }
       }
     }
-  }
-  if (!moved.size) return;
-  let n = 0;
-  for (const mesh of pre.meshes) {
-    const P = mesh.pos;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (let v = 0; v < P.length; v += 3) { const x = P[v], y = -P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    if (!boxes.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) continue;
-    for (let v = 0; v < P.length; v += 3) {
-      const x = P[v], y = -P[v + 2], z = P[v + 1], ci = Math.round(x / C), cj = Math.round(y / C);
-      let to = null;
-      for (let a = -1; a <= 1 && to === null; a++) for (let b = -1; b <= 1 && to === null; b++) {
-        for (const q of moved.get(key(ci + a, cj + b)) || []) {
-          if (Math.abs(q[0] - x) <= MOUTH_NEAR && Math.abs(q[1] - y) <= MOUTH_NEAR && Math.abs(q[2] - z) <= MOUTH_NEAR) { to = q[3]; break; }
+  };
+  // a tile's mesh arrays (positions from its corner [bx, by]): every drawn vertex at a moved point follows it
+  fix.meshes = (ms, [bx, by]) => {
+    if (!moved.size) return;
+    for (const mesh of ms) {
+      const P = mesh.pos;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let v = 0; v < P.length; v += 3) { const x = P[v] + bx, y = by - P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (!boxes.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) continue;
+      for (let v = 0; v < P.length; v += 3) {
+        const x = P[v] + bx, y = by - P[v + 2], z = P[v + 1], ci = Math.round(x / C), cj = Math.round(y / C);
+        let to = null;
+        for (let a = -1; a <= 1 && to === null; a++) for (let b = -1; b <= 1 && to === null; b++) {
+          for (const q of moved.get(key(ci + a, cj + b)) || []) {
+            if (Math.abs(q[0] - x) <= MOUTH_NEAR && Math.abs(q[1] - y) <= MOUTH_NEAR && Math.abs(q[2] - z) <= MOUTH_NEAR) { to = q[3]; break; }
+          }
         }
+        if (to !== null) { P[v + 1] = to; fix.drawn++; }
       }
-      if (to !== null) { P[v + 1] = to; n++; }
     }
-  }
-  console.log(`ground file: ${done.size ? moved.size : 0} points brought down into tunnel mouths, ${n} drawn vertices`);
+  };
+  return fix;
 }
 function fitDtmToMouths(dtm, mouths) {
   if (!mouths.length || dtm.mouthsFitted) return;

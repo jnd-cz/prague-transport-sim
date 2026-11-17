@@ -105,6 +105,34 @@ class Frame:
         return self.ll(0.0, 0.0)
 
 
+# The world's tiles: TILE m squares on the absolute S-JTSK grid, named by their south-west corner's index on it
+# (e-1486_n-2087: E -743,000, N -1,043,500, the tile holding the origin), so a name does not depend on the origin
+# (docs/decisions/2026-10-29-city-frame-and-tiles.md; the user's choice for #30, 2026-11-17). The build's lattices
+# (5 and 25 m) divide it and lie on the same grid, so their lines meet a tile's border.
+TILE = 500.0
+
+
+def on_grid(v, step, axis):
+    """The local coordinate of the first S-JTSK multiple of `step` at or past v (axis 0: x, eastings; 1: y, northings)."""
+    o = ORIGIN[axis]
+    return math.ceil((v + o) / step) * step - o
+
+
+def tile_index(x, y):
+    """The tile holding local (x, y) (scalars or arrays): its (e, n) on the S-JTSK grid."""
+    return (np.floor((np.asarray(x, dtype=float) + ORIGIN[0]) / TILE).astype(np.int64),
+            np.floor((np.asarray(y, dtype=float) + ORIGIN[1]) / TILE).astype(np.int64))
+
+
+def tile_box(e, n):
+    """A tile's local box (x0, y0, x1, y1)."""
+    return (e * TILE - ORIGIN[0], n * TILE - ORIGIN[1], (e + 1) * TILE - ORIGIN[0], (n + 1) * TILE - ORIGIN[1])
+
+
+def tile_name(e, n):
+    return f"e{int(e)}_n{int(n)}"
+
+
 def _arr(v):
     return np.asarray(v, dtype=float) if isinstance(v, (list, tuple)) else v
 
