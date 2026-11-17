@@ -139,5 +139,59 @@ class Tools(unittest.TestCase):
             self.assertIn(f"`{name}`", rule, f"{name} takes its turn: AGENTS.md's heavy jobs rule names it")
 
 
+class Shell(unittest.TestCase):
+    """#645: on Windows a plain `bash` or `sh` is Git Bash's, not WSL's (System32 comes before PATH)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def git(self, where, wrappers=True):
+        """A Git for Windows layout of empty files: git.exe in `where` (under <Git>), bash.exe and sh.exe in usr/bin and
+        (with `wrappers`) in bin."""
+        g = Path(self.tmp.name, "Git")
+        for f in [where + "/git.exe", "usr/bin/bash.exe", "usr/bin/sh.exe"] + (["bin/bash.exe", "bin/sh.exe"] if wrappers else []):
+            (g / f).parent.mkdir(parents=True, exist_ok=True)
+            (g / f).touch()
+        return str(g / where / "git.exe"), str(g / ("bin" if wrappers else "usr/bin"))
+
+    def test_a_plain_bash_or_sh_is_git_bash_wherever_git_lies(self):
+        for where in ("cmd", "bin", "mingw64/bin", "ucrt64/bin"):
+            git, shells = self.git(where)
+            for name, exe in (("bash", "bash.exe"), ("BASH.EXE", "bash.exe"), ("sh", "sh.exe")):
+                self.assertEqual(heavy.program([name, "job.sh", "a"], windows=True, git=git),
+                                 [os.path.join(shells, exe), "job.sh", "a"], (where, name))
+
+    def test_usr_bin_when_git_has_no_wrapper(self):
+        git, shells = self.git("cmd", wrappers=False)
+        self.assertEqual(heavy.program(["bash", "x.sh"], windows=True, git=git), [os.path.join(shells, "bash.exe"), "x.sh"])
+
+    def test_other_commands_run_as_given(self):
+        git, _ = self.git("cmd")
+        for cmd in (["python", "-I", "x.py"], [r"C:\Windows\System32\bash.exe", "x.sh"], ["/usr/bin/bash", "x.sh"],
+                    ["bashful"], []):
+            self.assertEqual(heavy.program(cmd, windows=True, git=git), cmd)
+        self.assertEqual(heavy.program(["bash", "x.sh"], windows=False, git=git), ["bash", "x.sh"])
+        # (no Git for Windows next to git: as given)
+        self.assertEqual(heavy.program(["bash", "x.sh"], windows=True, git=os.path.join(self.tmp.name, "git.exe")),
+                         ["bash", "x.sh"])
+
+    @unittest.skipUnless(os.name == "nt" and heavy.git_shell("bash"), "Windows with Git for Windows")
+    def test_heavy_runs_a_bash_script_with_plain_bash(self):
+        """As from PowerShell: only <Git>/cmd of Git's directories on PATH. The script finds Git's tools (uname)."""
+        root = os.path.dirname(os.path.dirname(heavy.git_shell("bash")))
+        path = [p for p in os.environ["PATH"].split(os.pathsep) if not os.path.normcase(p).startswith(os.path.normcase(root))]
+        env = {**os.environ, "TMP": self.tmp.name, "TEMP": self.tmp.name, "TMPDIR": self.tmp.name,
+               "PATH": os.pathsep.join([*path, os.path.join(root, "cmd")])}
+        env.pop(heavy.HELD, None)
+        env.pop("TRAM_HEAVY_NOWAIT", None)
+        r = subprocess.run([sys.executable, "-I", str(TOOLS / "heavy.py"), "a script", "--", "bash", "-c",
+                            'echo "$BASH_VERSION $(uname -s)"; exit 4'], env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertRegex(r.stdout.strip(), r"^\d+\.\d+\S* (MINGW|MSYS)")
+
+
 if __name__ == "__main__":
     unittest.main()
